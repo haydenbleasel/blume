@@ -43,6 +43,18 @@ export const astroConfigTemplate = (options: {
     ? `\n  base: ${JSON.stringify(deployment.base)},`
     : "";
 
+  const redirectsOption =
+    config.redirects.length > 0
+      ? `\n  redirects: ${JSON.stringify(
+          Object.fromEntries(
+            config.redirects.map((redirect) => [
+              redirect.from,
+              { destination: redirect.to, status: redirect.status },
+            ])
+          )
+        )},`
+      : "";
+
   // React is only wired in when the project actually uses React islands. The
   // core theme is Astro-first and ships no client JS.
   const reactImport = needsReact ? `import react from "@astrojs/react";\n` : "";
@@ -73,7 +85,7 @@ export default defineConfig({
   srcDir: ${JSON.stringify(`${context.outDir}/src`)},
   outDir: ${JSON.stringify(`${context.root}/dist`)},
   publicDir: ${JSON.stringify(`${context.root}/public`)},
-  output: ${JSON.stringify(deployment.output)},${adapterOption}${siteOption}${baseOption}
+  output: ${JSON.stringify(deployment.output)},${adapterOption}${siteOption}${baseOption}${redirectsOption}
   integrations: [${integrations.join(", ")}],
   devToolbar: { enabled: false },
   vite: {

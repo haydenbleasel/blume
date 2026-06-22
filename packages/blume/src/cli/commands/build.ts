@@ -5,6 +5,8 @@ import { defineCommand } from "citty";
 import { join } from "pathe";
 
 import { buildLlmsFiles } from "../../ai/llms.ts";
+import { serverFeatures } from "../../core/server-features.ts";
+import { buildSitemap } from "../../deploy/sitemap.ts";
 import { buildSearchIndex } from "../../search/build.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
@@ -50,6 +52,26 @@ export const buildCommand = defineCommand({
       ]);
       logger.success("Generated llms.txt and llms-full.txt");
     }
+
+    const sitemap = buildSitemap(project);
+    if (sitemap) {
+      await writeFile(join(distDir, "sitemap.xml"), sitemap, "utf-8");
+      logger.success("Generated sitemap.xml");
+    }
+
+    const { config } = project;
+    const features = serverFeatures(config);
+    logger.box(
+      [
+        `Output     ${config.deployment.output}`,
+        `Adapter    ${config.deployment.adapter ?? "none"}`,
+        `Search     ${config.search.provider}`,
+        `Redirects  ${config.redirects.length}`,
+        `Sitemap    ${sitemap ? "yes" : "no (set deployment.site)"}`,
+        `LLM files  ${config.ai.llmsTxt ? "yes" : "no"}`,
+        `Server features  ${features.length > 0 ? features.join(", ") : "none"}`,
+      ].join("\n")
+    );
 
     logger.success(`Built to ${distDir}`);
   },
