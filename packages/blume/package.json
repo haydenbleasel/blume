@@ -30,6 +30,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
