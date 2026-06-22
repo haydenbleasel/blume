@@ -1,0 +1,50 @@
+{
+  "name": "blume",
+  "version": "0.0.0",
+  "description": "Open-source, markdown-first documentation framework powered by Astro and Vite.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["documentation", "docs", "astro", "vite", "mdx", "markdown"],
+  "bin": {
+    "blume": "./bin/blume.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/core/schema.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./astro": "./src/astro/index.ts",
+    "./components": "./src/components/index.ts",
+    "./components/*": "./src/components/*",
+    "./theme/*": "./src/theme/*",
+    "./package.json": "./package.json"
+  },
+  "files": ["src", "bin"],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^4.3.0",
+    "@astrojs/react": "^4.2.0",
+    "astro": "^5.13.0",
+    "citty": "^0.1.6",
+    "consola": "^3.4.0",
+    "deepmerge": "^4.3.1",
+    "gray-matter": "^4.0.3",
+    "jiti": "^2.4.0",
+    "pathe": "^2.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tinyglobby": "^0.2.10",
+    "yaml": "^2.6.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

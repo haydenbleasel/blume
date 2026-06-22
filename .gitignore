@@ -1,1 +1,11 @@
 node_modules
+dist
+.turbo
+.blume
+.astro
+*.tsbuildinfo
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
