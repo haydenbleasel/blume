@@ -36,7 +36,7 @@ The short pitch:
 - Static by default: docs should be fast, cacheable, and cheap to host.
 - Dynamic when needed: AI chat, authenticated docs, feedback, OG images, preview routes, and integrations can use Astro server features.
 - Customization without forking: component overrides, layouts, pages, CSS tokens, and registry installs should cover most real-world needs.
-- Eject without punishment: an ejected project should become a normal Astro project that can keep receiving Blume packages.
+- Eject without punishment: an ejected project should become a normal Astro project that can keep using the `blume` package.
 - Vercel-friendly: support analytics, speed insights, Blob, Edge Config, OG image generation, and serverless deploy paths cleanly.
 
 ## Non-goals
@@ -79,7 +79,7 @@ The hidden runtime can be ejected into an ordinary Astro project later.
 - AI should require a clear model/auth/runtime choice.
 - Authenticated docs should be a server-mode feature.
 - Deep theme replacement should be source-level and visible.
-- Ejecting should be a one-way ownership step, even if Blume packages remain usable.
+- Ejecting should be a one-way ownership step, even if the `blume` package remains usable.
 
 ## Success criteria
 

@@ -16,7 +16,7 @@ Components should be:
 
 ## Implementation stance
 
-Default components should live in `@blume/components`.
+Default components should live behind the `blume/components` subpath export from the single `blume` package.
 
 Static components should be `.astro` where possible:
 

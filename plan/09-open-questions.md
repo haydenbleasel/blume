@@ -179,7 +179,7 @@ Question: is eject one-way?
 Preferred answer:
 
 - yes, source ownership transfers to the user
-- Blume packages remain dependencies
+- the `blume` package remains the dependency
 - CLI should not overwrite ejected files
 
 ### API reference engine
@@ -189,7 +189,7 @@ Question: should OpenAPI rendering be built in or a separate integration package
 Preferred direction:
 
 - core schemas and components in Blume
-- heavy parsers/importers in `@blume/openapi` or similar
+- heavy parsers/importers in an internal module or optional integration loaded by `blume`
 
 ### Internationalization
 

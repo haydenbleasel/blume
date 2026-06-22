@@ -2,20 +2,21 @@
 
 ## Repository shape
 
-Suggested monorepo:
+Suggested repo shape:
 
 ```txt
 packages/
   blume/
-  create-blume/
-  core/
-  astro/
-  mdx/
-  components/
-  theme/
-  search/
-  registry/
-  migrate/
+    src/
+      cli/
+      core/
+      astro/
+      mdx/
+      components/
+      theme/
+      search/
+      registry/
+      migrate/
 examples/
   basic/
   api-reference/
@@ -23,6 +24,8 @@ examples/
   ask-ai/
 docs/
 ```
+
+Only `blume` is published. The folders under `src/` are internal modules with package subpath exports where needed.
 
 ## Package manager
 
@@ -37,7 +40,7 @@ The public CLI should work regardless of the user's package manager.
 
 ## Build system
 
-Use Turborepo or a similarly well-supported workspace task runner for package builds, tests, and release tasks.
+Use Turborepo or a similarly well-supported task runner for builds, tests, examples, and release tasks.
 
 Astro and Vite are runtime/build dependencies for generated docs projects.
 
@@ -46,9 +49,9 @@ Astro and Vite are runtime/build dependencies for generated docs projects.
 Requirements:
 
 - strict mode
-- project references where useful
+- project references only if internal build boundaries justify them
 - no barrel-only `index.ts` files inside feature folders
-- public exports explicit through package `exports`
+- public subpath exports explicit through the `blume` package `exports`
 - generated types for config and components
 
 ## Linting and formatting
@@ -98,9 +101,9 @@ Fixtures should include:
 
 Release flow:
 
-- changesets
+- changesets or an equivalent release tool
 - package provenance
-- canary releases
+- canary releases for `blume`
 - fixture build matrix before stable release
 - generated runtime compatibility tests
 

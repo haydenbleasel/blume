@@ -33,9 +33,9 @@ The user owns:
 
 No `src/`, `astro.config.mjs`, or app scaffold is required for the default path.
 
-### 2. Blume core
+### 2. Internal core module
 
-`@blume/core` owns framework-independent docs logic:
+The `blume` package owns framework-independent docs logic through an internal core module:
 
 - config loading and validation
 - content discovery
@@ -48,12 +48,12 @@ No `src/`, `astro.config.mjs`, or app scaffold is required for the default path.
 
 This layer should avoid importing Astro runtime APIs directly.
 
-### 3. Blume Astro integration
+### 3. Internal Astro integration
 
-`@blume/astro` owns the generated Astro project contract:
+The `blume` package owns the generated Astro project contract through an internal Astro integration module:
 
 - generated `astro.config.mjs`
-- Vite aliases to user files and Blume packages
+- Vite aliases to user files and Blume internals
 - content and route virtual modules
 - layouts and pages
 - endpoint/action registration
@@ -62,9 +62,9 @@ This layer should avoid importing Astro runtime APIs directly.
 
 This is the bridge between Blume's docs graph and Astro's rendering model.
 
-### 4. Blume theme and components
+### 4. Internal theme and components
 
-`@blume/theme` and `@blume/components` own:
+The `blume` package owns theme and component modules for:
 
 - default docs layout
 - sidebar, tabs, search, TOC, breadcrumbs, pagination
@@ -161,22 +161,36 @@ Next-specific features have workable Astro equivalents:
 | Image optimization | Astro assets/image service plus adapter support |
 | Analytics | Vercel Analytics or user-selected script integration |
 
-## Package boundaries
+## Package model
 
-Suggested packages:
+Blume should publish one package:
 
 | Package | Responsibility |
 | --- | --- |
-| `blume` | CLI and public command entrypoint |
-| `create-blume` | Project scaffolding |
-| `@blume/core` | Config, content graph, manifests, diagnostics |
-| `@blume/astro` | Astro integration, generated runtime, endpoints |
-| `@blume/mdx` | MDX/Markdoc compilation helpers and component mapping |
-| `@blume/components` | Default component implementations |
-| `@blume/theme` | CSS tokens, layout styles, theme build artifacts |
-| `@blume/search` | Local search indexing and runtime adapters |
-| `@blume/registry` | Add/eject/source registry helpers |
-| `@blume/migrate` | Mintlify, Starlight, Fumadocs migration tools |
+| `blume` | CLI, config API, generated Astro runtime, content graph, components, theme, search, registry, migration tools |
+
+Separate concerns should be internal modules inside the `blume` package, not separate public packages.
+
+Suggested internal module layout:
+
+| Internal module | Responsibility |
+| --- | --- |
+| `cli` | `blume` command entrypoint |
+| `core` | Config, content graph, manifests, diagnostics |
+| `astro` | Astro integration, generated runtime, endpoints |
+| `mdx` | MDX/Markdoc compilation helpers and component mapping |
+| `components` | Default component implementations and public component types |
+| `theme` | CSS tokens, layout styles, theme build artifacts |
+| `search` | Local search indexing and runtime adapters |
+| `registry` | Add/eject/source registry helpers |
+| `migrate` | Mintlify, Starlight, Fumadocs migration tools |
+
+Public imports can use subpath exports from the same package:
+
+- `blume`
+- `blume/components`
+- `blume/runtime`
+- `blume/schema`
 
 ## Public API surface
 

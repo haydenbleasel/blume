@@ -57,7 +57,7 @@ Generated modules can expose:
 - `blume:nav`
 - `blume:search`
 
-Astro/Vite can resolve these through aliases or a Vite plugin inside `@blume/astro`.
+Astro/Vite can resolve these through aliases or a Vite plugin inside the `blume` package's Astro integration module.
 
 ## Route rendering
 

@@ -124,7 +124,7 @@ After eject:
 - user has `astro.config.mjs`
 - user has `src/pages`, `src/layouts`, and generated runtime files promoted to source
 - `blume dev` is no longer required
-- Blume packages can still be imported directly
+- the `blume` package can still be imported directly
 - future Blume updates may require manual merge work
 
 `eject` should print a clear diff and ask for confirmation.

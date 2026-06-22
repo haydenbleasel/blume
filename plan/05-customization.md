@@ -204,4 +204,4 @@ Use eject for:
 - custom Vite plugins
 - app-like docs portals
 
-Eject should preserve content and keep Blume packages importable.
+Eject should preserve content and keep the `blume` package importable.
