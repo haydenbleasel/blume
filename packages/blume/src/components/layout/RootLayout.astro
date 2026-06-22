@@ -13,6 +13,7 @@ interface Props {
   headings: Heading[];
   themeMode: "system" | "light" | "dark";
   searchEnabled: boolean;
+  searchProvider: "orama" | "pagefind";
   indexable: boolean;
   ogImage?: string | null;
 }
@@ -24,6 +25,7 @@ const {
   headings,
   themeMode,
   searchEnabled,
+  searchProvider,
   indexable,
   ogImage,
 } = Astro.props;
@@ -104,7 +106,7 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
       }
       <div class="flex-1"></div>
       <slot name="ask" />
-      {searchEnabled && <Search />}
+      {searchEnabled && <Search provider={searchProvider} />}
       <button aria-label="Toggle color theme" class={iconButton} data-blume-theme-toggle type="button">
         <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
         <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>

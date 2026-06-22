@@ -5,6 +5,7 @@ import { dirname, join } from "pathe";
 import { glob } from "tinyglobby";
 
 import type { BlumeProject } from "../core/project-graph.ts";
+import { buildSearchDocuments } from "../search/documents.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 import { discoverPages } from "./pages.ts";
@@ -17,6 +18,7 @@ import {
   ogEndpointTemplate,
   runtimePackageTemplate,
   runtimeTsconfigTemplate,
+  searchEndpointTemplate,
   userComponentsTemplate,
 } from "./templates.ts";
 
@@ -71,7 +73,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       description: config.description,
       logo: config.logo ?? null,
       og: { enabled: config.og.enabled },
-      search: { enabled: config.search.provider !== "none" },
+      search: {
+        enabled: config.search.provider !== "none",
+        provider: config.search.provider,
+      },
       site: config.deployment.site ?? null,
       theme: config.theme,
       title: config.title,
@@ -166,6 +171,18 @@ export const generateRuntime = async (
     await writeIfChanged(
       join(srcDir, "pages", "og", "[...slug].png.ts"),
       ogEndpointTemplate()
+    );
+  }
+
+  if (config.search.provider === "orama") {
+    const documents = await buildSearchDocuments(project);
+    await writeIfChanged(
+      join(srcDir, "generated", "search.json"),
+      `${JSON.stringify(documents)}\n`
+    );
+    await writeIfChanged(
+      join(srcDir, "pages", "blume-search.json.ts"),
+      searchEndpointTemplate()
     );
   }
 

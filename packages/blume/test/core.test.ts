@@ -31,7 +31,7 @@ describe("config schema", () => {
     expect(config.title).toBe("Documentation");
     expect(config.content.root).toBe("docs");
     expect(config.deployment.output).toBe("static");
-    expect(config.search.provider).toBe("pagefind");
+    expect(config.search.provider).toBe("orama");
   });
 
   it("rejects unknown top-level keys", () => {

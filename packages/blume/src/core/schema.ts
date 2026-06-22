@@ -199,7 +199,7 @@ const searchConfigSchema = z
       })
       .strict()
       .default({}),
-    provider: z.enum(["pagefind", "none"]).default("pagefind"),
+    provider: z.enum(["orama", "pagefind", "none"]).default("orama"),
   })
   .strict();
 

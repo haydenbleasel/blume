@@ -12,10 +12,12 @@ import {
   envTemplate,
   ogEndpointTemplate,
   runtimeTsconfigTemplate,
+  searchEndpointTemplate,
   userComponentsTemplate,
 } from "../astro/templates.ts";
 import { scanProject } from "../core/project-graph.ts";
 import type { ProjectContext } from "../core/types.ts";
+import { buildSearchDocuments } from "../search/documents.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 
@@ -119,6 +121,20 @@ export const eject = async (root: string): Promise<string[]> => {
       content: ogEndpointTemplate(),
       path: join(srcDir, "pages", "og", "[...slug].png.ts"),
     });
+  }
+
+  if (config.search.provider === "orama") {
+    const documents = await buildSearchDocuments(project);
+    files.push(
+      {
+        content: `${JSON.stringify(documents)}\n`,
+        path: join(genDir, "search.json"),
+      },
+      {
+        content: searchEndpointTemplate(),
+        path: join(srcDir, "pages", "blume-search.json.ts"),
+      }
+    );
   }
 
   await Promise.all(

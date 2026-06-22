@@ -1,29 +1,48 @@
 ---
 title: Search
-description: Local, static-friendly search with Pagefind.
+description: Local search that works in dev and production.
 ---
 
 # Search
 
-Blume builds a local [Pagefind](https://pagefind.app) index over your built
-site — no hosted infrastructure required.
+Blume ships local search with no hosted infrastructure. The default engine is
+[Orama](https://orama.com), which indexes your content graph — so search works
+in `blume dev` (with live updates) and `blume build` alike.
 
 ```ts
 search: {
-  provider: "pagefind",
+  provider: "orama", // default
   indexing: { includeHiddenPages: false },
 }
 ```
 
+Press <Badge variant="accent">⌘K</Badge> (or `/`) to open search.
+
 ## How it works
 
 <Steps>
-  <Step title="Build">Astro renders your docs to HTML.</Step>
-  <Step title="Index">Blume runs Pagefind over the output.</Step>
-  <Step title="Search">The header search modal loads the local index.</Step>
+  <Step title="Index">
+    Blume builds a search index from your pages (titles, descriptions, and body
+    text) and serves it at `/blume-search.json`.
+  </Step>
+  <Step title="Search">
+    The header search modal loads the index and queries it in the browser with
+    Orama — instant, client-side, and available in dev.
+  </Step>
 </Steps>
 
-Press <Badge variant="accent">⌘K</Badge> (or `/`) to open search.
+## Large sites: Pagefind
+
+For very large docs, opt into [Pagefind](https://pagefind.app), which indexes
+the built HTML and loads the index in shards on demand:
+
+```ts
+search: {
+  provider: "pagefind";
+}
+```
+
+Pagefind indexes after `blume build`, so it is not available in `blume dev`.
 
 ## Excluding pages
 
