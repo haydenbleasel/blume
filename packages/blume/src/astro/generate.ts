@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "pathe";
 
 import type { BlumeProject } from "../core/project-graph.ts";
+import { buildThemeCss } from "../theme/palette.ts";
 import {
   astroConfigTemplate,
   catchAllPageTemplate,
@@ -10,6 +11,7 @@ import {
   envTemplate,
   runtimePackageTemplate,
   runtimeTsconfigTemplate,
+  userComponentsTemplate,
 } from "./templates.ts";
 
 const writeIfChanged = async (
@@ -84,9 +86,18 @@ export const generateRuntime = async (
     ),
     writeIfChanged(
       join(srcDir, "pages", "[...slug].astro"),
-      catchAllPageTemplate()
+      catchAllPageTemplate({ themeFile: context.themeFile })
+    ),
+    writeIfChanged(
+      join(srcDir, "generated", "components.ts"),
+      userComponentsTemplate(context.componentsFile)
     ),
   ]);
+
+  await writeIfChanged(
+    join(srcDir, "generated", "theme.css"),
+    buildThemeCss(config.theme)
+  );
 
   // Data and manifest are not "structural" for Astro; they hot-reload.
   await writeIfChanged(

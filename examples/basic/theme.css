@@ -1,0 +1,5 @@
+/* User theme overrides, layered after Blume defaults and config tokens. */
+:root {
+  --blume-accent: oklch(0.68 0.14 180);
+  --blume-radius: 0.75rem;
+}
