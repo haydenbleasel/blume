@@ -1,0 +1,34 @@
+---
+import { icons } from "../theme/icons.ts";
+
+interface Props {
+  name: string;
+  size?: number;
+  class?: string;
+  label?: string;
+}
+
+const { name, size = 16, class: className, label } = Astro.props;
+const markup = icons[name];
+---
+
+{
+  markup && (
+    <svg
+      aria-hidden={label ? undefined : "true"}
+      aria-label={label}
+      class={className}
+      fill="none"
+      height={size}
+      role={label ? "img" : undefined}
+      set:html={markup}
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+    />
+  )
+}

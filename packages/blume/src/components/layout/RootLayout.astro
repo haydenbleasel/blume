@@ -1,6 +1,12 @@
 ---
 import type { Heading, Navigation } from "../../core/types.ts";
 import "../../theme/base.css";
+import Icon from "../Icon.astro";
+import {
+  findBreadcrumbs,
+  flattenPages,
+  getPagination,
+} from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
 
 interface Props {
@@ -17,39 +23,124 @@ const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
 const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
 const description = page.description ?? site.description;
 
-const initialTheme = themeMode === "dark" ? "dark" : "light";
+const crumbs = findBreadcrumbs(navigation.sidebar, page.route);
+const { prev, next } = getPagination(
+  flattenPages(navigation.sidebar),
+  page.route
+);
+
+const initialThemeScript = `(()=>{const m=${JSON.stringify(themeMode)};const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);})();`;
+const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=next;localStorage.setItem("blume-theme",next);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}});`;
 ---
 
 <!doctype html>
-<html lang="en" data-theme={initialTheme}>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
     {description && <meta name="description" content={description} />}
-    {
-      themeMode === "system" && (
-        <script is:inline>
-          {`document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";`}
-        </script>
-      )
-    }
+    <script is:inline set:html={initialThemeScript} />
   </head>
   <body>
     <a class="blume-skip-link" href="#blume-content">Skip to content</a>
     <header class="blume-header">
+      <button
+        aria-label="Toggle navigation"
+        class="blume-icon-button blume-menu-toggle"
+        data-blume-nav-toggle
+        type="button"
+      >
+        <Icon name="menu" size={20} />
+      </button>
       <a class="blume-header__title" href="/">{site.title}</a>
+      {
+        navigation.tabs.length > 0 && (
+          <nav class="blume-tabs" aria-label="Sections">
+            {navigation.tabs.map((tab) => (
+              <a
+                aria-current={
+                  page.route === tab.path ||
+                  (tab.path !== "/" && page.route.startsWith(tab.path))
+                    ? "page"
+                    : undefined
+                }
+                class="blume-tab"
+                href={tab.path}
+              >
+                {tab.label}
+              </a>
+            ))}
+          </nav>
+        )
+      }
+      <div class="blume-header__spacer"></div>
+      <button
+        aria-label="Toggle color theme"
+        class="blume-icon-button"
+        data-blume-theme-toggle
+        type="button"
+      >
+        <span class="blume-theme-icon blume-theme-icon--light">
+          <Icon name="sun" size={18} />
+        </span>
+        <span class="blume-theme-icon blume-theme-icon--dark">
+          <Icon name="moon" size={18} />
+        </span>
+      </button>
     </header>
     <div class="blume-shell">
       <aside class="blume-sidebar" aria-label="Primary">
         <nav>
-          <NavTree items={navigation.sidebar} currentRoute={page.route} />
+          <NavTree currentRoute={page.route} items={navigation.sidebar} />
         </nav>
       </aside>
       <main class="blume-main" id="blume-content">
+        {
+          crumbs.length > 1 && (
+            <nav aria-label="Breadcrumb" class="blume-breadcrumbs">
+              {crumbs.map((crumb, i) => (
+                <>
+                  {i > 0 && <Icon class="blume-breadcrumbs__sep" name="chevron-right" size={14} />}
+                  {crumb.route ? (
+                    <a href={crumb.route}>{crumb.label}</a>
+                  ) : (
+                    <span>{crumb.label}</span>
+                  )}
+                </>
+              ))}
+            </nav>
+          )
+        }
         <article class="blume-content">
           <slot />
         </article>
+        {
+          (prev || next) && (
+            <nav class="blume-pagination" aria-label="Pagination">
+              {prev ? (
+                <a class="blume-pagination__link blume-pagination__prev" href={prev.route}>
+                  <Icon name="arrow-left" size={16} />
+                  <span>
+                    <span class="blume-pagination__label">Previous</span>
+                    <span class="blume-pagination__title">{prev.label}</span>
+                  </span>
+                </a>
+              ) : (
+                <span />
+              )}
+              {next && (
+                <a class="blume-pagination__link blume-pagination__next" href={next.route}>
+                  <span>
+                    <span class="blume-pagination__label">Next</span>
+                    <span class="blume-pagination__title">{next.label}</span>
+                  </span>
+                  <Icon name="arrow-right" size={16} />
+                </a>
+              )}
+            </nav>
+          )
+        }
       </main>
       {
         tocHeadings.length > 0 && (
@@ -66,5 +157,12 @@ const initialTheme = themeMode === "dark" ? "dark" : "light";
         )
       }
     </div>
+    <button
+      aria-label="Close navigation"
+      class="blume-nav-backdrop"
+      data-blume-nav-toggle
+      type="button"
+    ></button>
+    <script is:inline set:html={toggleScript} />
   </body>
 </html>
