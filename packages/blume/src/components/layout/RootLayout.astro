@@ -1,13 +1,8 @@
 ---
 import type { Heading, Navigation } from "../../core/types.ts";
-import "../../theme/base.css";
-import "../../theme/components.css";
+import "blume:theme";
 import Icon from "../Icon.astro";
-import {
-  findBreadcrumbs,
-  flattenPages,
-  getPagination,
-} from "./nav-utils.ts";
+import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
 import Search from "./Search.astro";
 
@@ -43,6 +38,9 @@ const { prev, next } = getPagination(
   page.route
 );
 
+const iconButton =
+  "inline-flex size-9 cursor-pointer items-center justify-center rounded-blume text-muted-foreground hover:bg-muted hover:text-foreground";
+
 const initialThemeScript = `(()=>{const m=${JSON.stringify(themeMode)};const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);})();`;
 const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=next;localStorage.setItem("blume-theme",next);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}});`;
 ---
@@ -67,21 +65,26 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
     }
     <script is:inline set:html={initialThemeScript} />
   </head>
-  <body>
-    <a class="blume-skip-link" href="#blume-content">Skip to content</a>
-    <header class="blume-header">
+  <body class="bg-background font-sans text-foreground antialiased">
+    <a
+      class="absolute left-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:left-0"
+      href="#blume-content">Skip to content</a
+    >
+    <header
+      class="sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-border bg-background/85 px-6 backdrop-blur"
+    >
       <button
         aria-label="Toggle navigation"
-        class="blume-icon-button blume-menu-toggle"
+        class={`${iconButton} md:hidden`}
         data-blume-nav-toggle
         type="button"
       >
         <Icon name="menu" size={20} />
       </button>
-      <a class="blume-header__title" href="/">{site.title}</a>
+      <a class="font-semibold text-foreground" href="/">{site.title}</a>
       {
         navigation.tabs.length > 0 && (
-          <nav class="blume-tabs" aria-label="Sections">
+          <nav aria-label="Sections" class="hidden gap-1 md:flex">
             {navigation.tabs.map((tab) => (
               <a
                 aria-current={
@@ -90,7 +93,7 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
                     ? "page"
                     : undefined
                 }
-                class="blume-tab"
+                class="rounded-blume px-3 py-1.5 font-medium text-muted-foreground text-sm hover:bg-muted hover:text-foreground aria-[current=page]:text-accent"
                 href={tab.path}
               >
                 {tab.label}
@@ -99,38 +102,41 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
           </nav>
         )
       }
-      <div class="blume-header__spacer"></div>
+      <div class="flex-1"></div>
       <slot name="ask" />
       {searchEnabled && <Search />}
-      <button
-        aria-label="Toggle color theme"
-        class="blume-icon-button"
-        data-blume-theme-toggle
-        type="button"
-      >
-        <span class="blume-theme-icon blume-theme-icon--light">
-          <Icon name="sun" size={18} />
-        </span>
-        <span class="blume-theme-icon blume-theme-icon--dark">
-          <Icon name="moon" size={18} />
-        </span>
+      <button aria-label="Toggle color theme" class={iconButton} data-blume-theme-toggle type="button">
+        <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
+        <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
       </button>
     </header>
-    <div class="blume-shell">
-      <aside class="blume-sidebar" aria-label="Primary">
+    <div
+      class="mx-auto grid max-w-[90rem] grid-cols-1 items-start md:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_15rem]"
+    >
+      <aside
+        aria-label="Primary"
+        class="fixed top-14 left-0 z-[35] h-[calc(100dvh-3.5rem)] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-r bg-background px-4 py-6 transition-transform [:where([data-blume-nav-open])_&]:translate-x-0 md:sticky md:z-auto md:w-auto md:max-w-none md:translate-x-0 md:bg-transparent"
+      >
         <nav>
           <NavTree currentRoute={page.route} items={navigation.sidebar} />
         </nav>
       </aside>
-      <main class="blume-main" id="blume-content">
+      <main class="min-w-0 px-6 py-8 md:px-10" id="blume-content">
         {
           crumbs.length > 1 && (
-            <nav aria-label="Breadcrumb" class="blume-breadcrumbs">
+            <nav
+              aria-label="Breadcrumb"
+              class="mb-5 flex flex-wrap items-center gap-1.5 text-muted-foreground text-sm"
+            >
               {crumbs.map((crumb, i) => (
                 <>
-                  {i > 0 && <Icon class="blume-breadcrumbs__sep" name="chevron-right" size={14} />}
+                  {i > 0 && (
+                    <Icon class="opacity-60" name="chevron-right" size={14} />
+                  )}
                   {crumb.route ? (
-                    <a href={crumb.route}>{crumb.label}</a>
+                    <a class="hover:text-foreground" href={crumb.route}>
+                      {crumb.label}
+                    </a>
                   ) : (
                     <span>{crumb.label}</span>
                   )}
@@ -139,28 +145,39 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
             </nav>
           )
         }
-        <article class="blume-content" data-pagefind-body={indexable ? "" : undefined}>
+        <article class="prose max-w-3xl">
           <slot />
         </article>
         {
           (prev || next) && (
-            <nav class="blume-pagination" aria-label="Pagination">
+            <nav
+              aria-label="Pagination"
+              class="mt-12 flex justify-between gap-4 border-border border-t pt-6 max-md:flex-col"
+            >
               {prev ? (
-                <a class="blume-pagination__link blume-pagination__prev" href={prev.route}>
+                <a
+                  class="flex max-w-[48%] flex-1 items-center gap-2 rounded-blume border border-border px-4 py-3 text-foreground hover:border-accent max-md:max-w-full"
+                  href={prev.route}
+                >
                   <Icon name="arrow-left" size={16} />
                   <span>
-                    <span class="blume-pagination__label">Previous</span>
-                    <span class="blume-pagination__title">{prev.label}</span>
+                    <span class="block text-muted-foreground text-xs">
+                      Previous
+                    </span>
+                    <span class="block font-medium">{prev.label}</span>
                   </span>
                 </a>
               ) : (
                 <span />
               )}
               {next && (
-                <a class="blume-pagination__link blume-pagination__next" href={next.route}>
+                <a
+                  class="ml-auto flex max-w-[48%] flex-1 items-center justify-end gap-2 rounded-blume border border-border px-4 py-3 text-right text-foreground hover:border-accent max-md:max-w-full"
+                  href={next.route}
+                >
                   <span>
-                    <span class="blume-pagination__label">Next</span>
-                    <span class="blume-pagination__title">{next.label}</span>
+                    <span class="block text-muted-foreground text-xs">Next</span>
+                    <span class="block font-medium">{next.label}</span>
                   </span>
                   <Icon name="arrow-right" size={16} />
                 </a>
@@ -171,12 +188,22 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
       </main>
       {
         tocHeadings.length > 0 && (
-          <aside class="blume-toc" aria-label="Table of contents">
-            <p class="blume-toc__title">On this page</p>
-            <ul>
+          <aside
+            aria-label="Table of contents"
+            class="sticky top-14 hidden h-[calc(100dvh-3.5rem)] overflow-y-auto px-4 py-6 text-sm xl:block"
+          >
+            <p class="mb-3 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+              On this page
+            </p>
+            <ul class="m-0 list-none p-0">
               {tocHeadings.map((heading) => (
                 <li style={`padding-left:${(heading.depth - 2) * 0.75}rem`}>
-                  <a href={`#${heading.slug}`}>{heading.text}</a>
+                  <a
+                    class="block py-1 text-muted-foreground hover:text-foreground"
+                    href={`#${heading.slug}`}
+                  >
+                    {heading.text}
+                  </a>
                 </li>
               ))}
             </ul>
@@ -186,7 +213,7 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
     </div>
     <button
       aria-label="Close navigation"
-      class="blume-nav-backdrop"
+      class="fixed inset-0 z-[30] hidden cursor-pointer border-0 bg-black/40 [:where([data-blume-nav-open])_&]:block md:hidden"
       data-blume-nav-toggle
       type="button"
     ></button>
@@ -197,13 +224,17 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
       const svg = (name: string) =>
         `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
 
-      for (const pre of document.querySelectorAll(".blume-content pre")) {
+      const buttonClass =
+        "blume-copy-button absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100";
+
+      for (const pre of document.querySelectorAll(".prose pre")) {
         if (pre.querySelector(".blume-copy-button")) {
           continue;
         }
+        pre.classList.add("group", "relative");
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "blume-copy-button";
+        button.className = buttonClass;
         button.setAttribute("aria-label", "Copy code");
         button.innerHTML = svg("copy");
         button.addEventListener("click", async () => {
@@ -213,10 +244,8 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
           } catch {
             return;
           }
-          button.dataset.copied = "true";
           button.innerHTML = svg("check");
           setTimeout(() => {
-            button.dataset.copied = "false";
             button.innerHTML = svg("copy");
           }, 1500);
         });

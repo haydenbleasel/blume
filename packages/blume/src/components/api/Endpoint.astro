@@ -6,11 +6,24 @@ interface Props {
 
 const { method, path } = Astro.props;
 const normalized = method.toLowerCase();
+
+const methodColor: Record<string, string> = {
+  delete: "bg-red-500",
+  get: "bg-sky-500",
+  patch: "bg-amber-500",
+  post: "bg-green-500",
+  put: "bg-amber-500",
+};
+const color = methodColor[normalized] ?? "bg-muted-foreground";
 ---
 
-<div class="blume-endpoint">
-  <span class={`blume-endpoint__method blume-endpoint__method--${normalized}`}>
+<div
+  class="not-prose my-6 flex items-center gap-2.5 rounded-blume border border-border bg-muted p-2.5"
+>
+  <span
+    class={`rounded px-2 py-1 font-mono font-bold text-white text-xs ${color}`}
+  >
     {method.toUpperCase()}
   </span>
-  <code class="blume-endpoint__path">{path}</code>
+  <code class="font-mono text-[0.95rem]">{path}</code>
 </div>

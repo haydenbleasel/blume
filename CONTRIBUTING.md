@@ -59,6 +59,10 @@ files with project-relative paths into your project and removes `.blume/`.
 
 ## Conventions
 
+- Components are styled with Tailwind v4 utilities (via `@tailwindcss/vite` in
+  the generated runtime) — no hand-written CSS files. Design tokens live as
+  `--blume-*` variables mapped into Tailwind's theme; the typography plugin
+  styles MDX content (`prose`). Users never configure Tailwind themselves.
 - Code style is enforced by [Ultracite](https://github.com/haydenbleasel/ultracite)
   (oxlint + oxfmt). Use arrow function expressions, sorted object keys, and
   `u`-flag regular expressions with named groups.

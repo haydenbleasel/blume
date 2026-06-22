@@ -6,8 +6,18 @@ interface Props {
 }
 
 const { variant = "default" } = Astro.props;
+
+const styleByVariant: Record<BadgeVariant, string> = {
+  accent: "bg-accent/15 text-accent",
+  danger: "bg-red-500/15 text-red-600",
+  default: "bg-muted text-muted-foreground",
+  success: "bg-green-500/15 text-green-600",
+  warning: "bg-amber-500/20 text-amber-600",
+};
 ---
 
-<span class={`blume-badge blume-badge--${variant}`}>
+<span
+  class={`not-prose inline-flex items-center rounded-full px-2 py-0.5 font-medium text-xs ${styleByVariant[variant]}`}
+>
   <slot />
 </span>

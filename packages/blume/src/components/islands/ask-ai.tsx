@@ -13,6 +13,9 @@ const nextId = (): number => {
   return idCounter;
 };
 
+const BUTTON_CLASS =
+  "inline-flex h-9 cursor-pointer items-center gap-2 rounded-blume border border-border bg-muted px-2.5 text-muted-foreground text-sm hover:border-accent disabled:opacity-50";
+
 const AskAI = () => {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -75,42 +78,47 @@ const AskAI = () => {
   };
 
   return (
-    <div className="blume-ask">
+    <div className="relative">
       <button
-        className="blume-search-button"
+        className={BUTTON_CLASS}
         onClick={() => setOpen(!open)}
         type="button"
       >
         Ask AI
       </button>
       {open && (
-        <div className="blume-ask__panel">
-          <div className="blume-ask__messages">
+        <div className="absolute top-[calc(100%+0.5rem)] right-0 z-50 flex max-h-[70vh] w-[min(24rem,90vw)] flex-col overflow-hidden rounded-blume border border-border bg-background shadow-xl">
+          <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3.5">
             {messages.length === 0 && (
-              <p className="blume-ask__hint">Ask a question about the docs.</p>
+              <p className="m-0 text-muted-foreground text-sm">
+                Ask a question about the docs.
+              </p>
             )}
             {messages.map((message) => (
               <div
-                className={`blume-ask__message blume-ask__message--${message.role}`}
+                className={`whitespace-pre-wrap rounded-blume px-2.5 py-2 text-sm ${
+                  message.role === "user"
+                    ? "self-end bg-accent/15"
+                    : "self-start bg-muted"
+                }`}
                 key={message.id}
               >
                 {message.content}
               </div>
             ))}
           </div>
-          <form className="blume-ask__form" onSubmit={send}>
+          <form
+            className="flex gap-2 border-border border-t p-2.5"
+            onSubmit={send}
+          >
             <input
               aria-label="Ask a question"
-              className="blume-search-input"
+              className="flex-1 rounded-blume border border-border bg-transparent px-2.5 py-1.5 text-sm"
               onChange={(event) => setInput(event.target.value)}
               placeholder="Ask a question..."
               value={input}
             />
-            <button
-              className="blume-search-button"
-              disabled={busy}
-              type="submit"
-            >
+            <button className={BUTTON_CLASS} disabled={busy} type="submit">
               Send
             </button>
           </form>

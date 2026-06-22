@@ -6,6 +6,11 @@ interface Props {
 const { title } = Astro.props;
 ---
 
-<div class="blume-tab-panel" data-blume-tab-panel data-title={title} role="tabpanel">
+<div
+  class="[&>:first-child]:mt-0 [&>:last-child]:mb-0"
+  data-blume-tab-panel
+  data-title={title}
+  role="tabpanel"
+>
   <slot />
 </div>

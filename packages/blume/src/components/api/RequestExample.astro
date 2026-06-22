@@ -6,9 +6,13 @@ interface Props {
 const { title = "Request" } = Astro.props;
 ---
 
-<div class="blume-example blume-example--request">
-  <div class="blume-example__title">{title}</div>
-  <div class="blume-example__body">
+<div class="not-prose my-6 overflow-hidden rounded-blume border border-border">
+  <div
+    class="border-border border-b bg-muted px-3.5 py-2 font-semibold text-muted-foreground text-xs"
+  >
+    {title}
+  </div>
+  <div class="px-3.5 [&>pre]:my-3 [&>pre]:overflow-x-auto">
     <slot />
   </div>
 </div>

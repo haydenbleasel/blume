@@ -18,16 +18,27 @@ const iconByType: Record<CalloutType, string> = {
   tip: "lightbulb",
   warning: "triangle-alert",
 };
+
+const styleByType: Record<CalloutType, { border: string; icon: string }> = {
+  danger: { border: "border-l-red-500", icon: "text-red-500" },
+  info: { border: "border-l-sky-500", icon: "text-sky-500" },
+  note: { border: "border-l-sky-500", icon: "text-sky-500" },
+  success: { border: "border-l-green-500", icon: "text-green-500" },
+  tip: { border: "border-l-emerald-500", icon: "text-emerald-500" },
+  warning: { border: "border-l-amber-500", icon: "text-amber-500" },
+};
+
+const variant = styleByType[type];
 ---
 
-<aside class={`blume-callout blume-callout--${type}`}>
-  <div class="blume-callout__icon">
+<aside
+  class={`not-prose my-6 flex gap-3 rounded-blume border border-border border-l-[3px] bg-muted p-4 ${variant.border}`}
+>
+  <div class={`mt-0.5 shrink-0 ${variant.icon}`}>
     <Icon name={iconByType[type]} size={18} />
   </div>
-  <div class="blume-callout__body">
-    {title && <p class="blume-callout__title">{title}</p>}
-    <div class="blume-callout__content">
-      <slot />
-    </div>
+  <div class="min-w-0 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+    {title && <p class="mb-1 font-semibold">{title}</p>}
+    <slot />
   </div>
 </aside>

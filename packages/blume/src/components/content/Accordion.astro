@@ -9,12 +9,21 @@ interface Props {
 const { title, defaultOpen = false } = Astro.props;
 ---
 
-<details class="blume-accordion" open={defaultOpen}>
-  <summary class="blume-accordion__summary">
+<details
+  class="not-prose group my-4 rounded-blume border border-border"
+  open={defaultOpen}
+>
+  <summary
+    class="flex cursor-pointer list-none items-center justify-between p-4 font-medium [&::-webkit-details-marker]:hidden"
+  >
     <span>{title}</span>
-    <Icon class="blume-accordion__chevron" name="chevron-down" size={16} />
+    <Icon
+      class="text-muted-foreground transition-transform group-open:rotate-180"
+      name="chevron-down"
+      size={16}
+    />
   </summary>
-  <div class="blume-accordion__body">
+  <div class="px-4 pb-4 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
     <slot />
   </div>
 </details>

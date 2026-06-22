@@ -6,9 +6,11 @@ interface Props {
 const { title } = Astro.props;
 ---
 
-<div class="blume-step">
-  {title && <p class="blume-step__title">{title}</p>}
-  <div class="blume-step__body">
+<div
+  class="relative [counter-increment:blume-step] before:absolute before:top-0 before:-left-[2.75rem] before:flex before:size-6 before:items-center before:justify-center before:rounded-full before:bg-accent before:text-center before:font-semibold before:text-accent-foreground before:text-xs before:[content:counter(blume-step)]"
+>
+  {title && <p class="mb-1.5 font-semibold">{title}</p>}
+  <div class="[&>:first-child]:mt-0 [&>:last-child]:mb-0">
     <slot />
   </div>
 </div>

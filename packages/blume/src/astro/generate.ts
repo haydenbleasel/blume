@@ -1,9 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { dirname, join } from "pathe";
 import { glob } from "tinyglobby";
 
 import type { BlumeProject } from "../core/project-graph.ts";
+import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 import { discoverPages } from "./pages.ts";
 import {
@@ -17,6 +19,21 @@ import {
   runtimeTsconfigTemplate,
   userComponentsTemplate,
 } from "./templates.ts";
+
+/** Absolute path to the Blume package `src` directory. */
+const BLUME_SRC = fileURLToPath(new URL("..", import.meta.url));
+
+/** Read a file's contents, or return an empty string if it is absent. */
+const readOptional = async (path: string | null): Promise<string> => {
+  if (!path) {
+    return "";
+  }
+  try {
+    return await readFile(path, "utf-8");
+  } catch {
+    return "";
+  }
+};
 
 /** Heuristically detect whether the project uses React islands. */
 export const detectNeedsReact = async (root: string): Promise<boolean> => {
@@ -88,18 +105,27 @@ export const generateRuntime = async (
   const out = context.outDir;
   const srcDir = join(out, "src");
   const dataPath = join(srcDir, "generated", "data.json");
+  const themePath = join(srcDir, "generated", "app.css");
 
   const askEnabled = config.ai.ask?.enabled ?? false;
-  const [pages, detectedReact] = await Promise.all([
+  const [pages, detectedReact, userTheme] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(context.root),
+    readOptional(context.themeFile),
   ]);
   const needsReact = detectedReact || askEnabled;
 
   const structural = await Promise.all([
     writeIfChanged(
       join(out, "astro.config.mjs"),
-      astroConfigTemplate({ config, context, dataPath, needsReact, pages })
+      astroConfigTemplate({
+        config,
+        context,
+        dataPath,
+        needsReact,
+        pages,
+        themePath,
+      })
     ),
     writeIfChanged(join(out, "package.json"), runtimePackageTemplate()),
     writeIfChanged(join(out, "tsconfig.json"), runtimeTsconfigTemplate()),
@@ -110,11 +136,22 @@ export const generateRuntime = async (
     ),
     writeIfChanged(
       join(srcDir, "pages", "[...slug].astro"),
-      catchAllPageTemplate({ askEnabled, themeFile: context.themeFile })
+      catchAllPageTemplate({ askEnabled })
     ),
     writeIfChanged(
       join(srcDir, "generated", "components.ts"),
       userComponentsTemplate(context.componentsFile)
+    ),
+    writeIfChanged(
+      themePath,
+      tailwindEntryTemplate({
+        configTokens: buildThemeCss(config.theme),
+        sources: [
+          `${BLUME_SRC}/**/*.{astro,ts,tsx}`,
+          `${context.root}/**/*.{astro,mdx,ts,tsx}`,
+        ],
+        userTheme,
+      })
     ),
   ]);
 
@@ -131,11 +168,6 @@ export const generateRuntime = async (
       ogEndpointTemplate()
     );
   }
-
-  await writeIfChanged(
-    join(srcDir, "generated", "theme.css"),
-    buildThemeCss(config.theme)
-  );
 
   // Data and manifest are not "structural" for Astro; they hot-reload.
   await writeIfChanged(

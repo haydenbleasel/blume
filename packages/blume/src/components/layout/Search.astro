@@ -7,44 +7,63 @@ const pagefindUrl = `${import.meta.env.BASE_URL}pagefind/pagefind.js`.replace(
 );
 ---
 
-<blume-search class="blume-search" data-pagefind-url={pagefindUrl}>
+<blume-search class="contents" data-pagefind-url={pagefindUrl}>
   <button
     aria-label="Search"
-    class="blume-search-button"
+    class="inline-flex h-9 cursor-pointer items-center gap-2 rounded-blume border border-border bg-muted px-2.5 text-muted-foreground text-sm hover:border-accent"
     data-blume-search-open
     type="button"
   >
     <Icon name="search" size={16} />
-    <span class="blume-search-button__label">Search</span>
-    <kbd class="blume-search-button__kbd">⌘K</kbd>
+    <span class="max-sm:hidden">Search</span>
+    <kbd
+      class="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[0.7rem] max-sm:hidden"
+    >
+      ⌘K
+    </kbd>
   </button>
 
-  <dialog aria-label="Search docs" class="blume-search-dialog" data-blume-search-dialog>
-    <div class="blume-search-box">
-      <div class="blume-search-input-row">
-        <Icon name="search" size={18} />
-        <input
-          aria-label="Search docs"
-          class="blume-search-input"
-          data-blume-search-input
-          placeholder="Search documentation..."
-          type="search"
-        />
-        <kbd>Esc</kbd>
-      </div>
-      <ul class="blume-search-results" data-blume-search-results></ul>
-      <p class="blume-search-message" data-blume-search-message hidden></p>
+  <dialog
+    aria-label="Search docs"
+    class="mx-auto mt-[12vh] w-[min(36rem,92vw)] rounded-blume border border-border bg-background p-0 text-foreground backdrop:bg-black/40"
+    data-blume-search-dialog
+  >
+    <div class="flex items-center gap-2.5 border-border border-b px-4 py-3.5 text-muted-foreground">
+      <Icon name="search" size={18} />
+      <input
+        aria-label="Search docs"
+        class="flex-1 border-0 bg-transparent text-base text-foreground focus:outline-none"
+        data-blume-search-input
+        placeholder="Search documentation..."
+        type="search"
+      />
+      <kbd class="rounded border border-border px-1.5 py-0.5 font-mono text-[0.7rem]">Esc</kbd>
     </div>
+    <ul class="m-0 max-h-[60vh] list-none overflow-y-auto p-2" data-blume-search-results></ul>
+    <p class="m-0 px-4 py-5 text-center text-muted-foreground text-sm" data-blume-search-message hidden></p>
   </dialog>
 
   <script>
+    interface PagefindDoc {
+      url: string;
+      excerpt: string;
+      meta?: { title?: string };
+    }
+
+    const RESULT_CLASS = "block rounded-blume px-2.5 py-2.5 text-inherit hover:bg-muted hover:no-underline";
+    const EXCERPT_CLASS =
+      "block text-muted-foreground text-sm [&_mark]:bg-accent/25 [&_mark]:text-inherit";
+
     class BlumeSearch extends HTMLElement {
       dialog!: HTMLDialogElement;
       input!: HTMLInputElement;
       results!: HTMLElement;
       message!: HTMLElement;
-      pagefind: { search: (q: string) => Promise<{ results: { data: () => Promise<PagefindDoc> }[] }> } | null =
-        null;
+      pagefind: {
+        search: (
+          q: string
+        ) => Promise<{ results: { data: () => Promise<PagefindDoc> }[] }>;
+      } | null = null;
       loaded = false;
 
       connectedCallback() {
@@ -130,24 +149,18 @@ const pagefindUrl = `${import.meta.env.BASE_URL}pagefind/pagefind.js`.replace(
           const item = document.createElement("li");
           const link = document.createElement("a");
           link.href = doc.url;
-          link.className = "blume-search-result";
+          link.className = RESULT_CLASS;
           const title = document.createElement("span");
-          title.className = "blume-search-result__title";
+          title.className = "block font-medium";
           title.textContent = doc.meta?.title ?? doc.url;
           const excerpt = document.createElement("span");
-          excerpt.className = "blume-search-result__excerpt";
+          excerpt.className = EXCERPT_CLASS;
           excerpt.innerHTML = doc.excerpt;
           link.append(title, excerpt);
           item.appendChild(link);
           this.results.appendChild(item);
         }
       }
-    }
-
-    interface PagefindDoc {
-      url: string;
-      excerpt: string;
-      meta?: { title?: string };
     }
 
     if (!customElements.get("blume-search")) {

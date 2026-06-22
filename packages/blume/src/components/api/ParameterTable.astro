@@ -14,29 +14,43 @@ interface Props {
 const { title, parameters = [] } = Astro.props;
 ---
 
-<div class="blume-param-table">
-  {title && <p class="blume-param-table__title">{title}</p>}
+<div class="not-prose my-6">
+  {title && <p class="mb-2 font-semibold">{title}</p>}
   {
     parameters.length > 0 && (
-      <table>
+      <table class="w-full border-collapse text-sm">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
+            <th class="border border-border px-3 py-2 text-left font-semibold">
+              Name
+            </th>
+            <th class="border border-border px-3 py-2 text-left font-semibold">
+              Type
+            </th>
+            <th class="border border-border px-3 py-2 text-left font-semibold">
+              Description
+            </th>
           </tr>
         </thead>
         <tbody>
           {parameters.map((parameter) => (
             <tr>
-              <td>
-                <code>{parameter.name}</code>
+              <td class="border border-border px-3 py-2 align-top">
+                <code class="font-mono">{parameter.name}</code>
                 {parameter.required && (
-                  <span class="blume-param-table__required">required</span>
+                  <span class="ml-1.5 text-red-600 text-xs">required</span>
                 )}
               </td>
-              <td>{parameter.type && <code>{parameter.type}</code>}</td>
-              <td>{parameter.description}</td>
+              <td class="border border-border px-3 py-2 align-top">
+                {parameter.type && (
+                  <code class="font-mono text-muted-foreground">
+                    {parameter.type}
+                  </code>
+                )}
+              </td>
+              <td class="border border-border px-3 py-2 align-top text-muted-foreground">
+                {parameter.description}
+              </td>
             </tr>
           ))}
         </tbody>

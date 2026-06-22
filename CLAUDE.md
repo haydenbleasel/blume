@@ -24,12 +24,16 @@ written (HMR-friendly).
 
 `cli` commands · `core` config/content/graph/navigation/manifest/diagnostics ·
 `astro` runtime generation + integration · `components` Astro/React UI ·
-`theme` tokens/CSS/icons/palette · `search` Pagefind · `registry` add + eject ·
+`theme` Tailwind v4 entry/tokens/icons/palette · `search` Pagefind · `registry` add + eject ·
 `migrate` migrators · `openapi` import · `ai` llms.txt + Ask AI endpoint ·
 `og` Takumi-rendered Open Graph images.
 
 ## Conventions
 
+- Components are styled with Tailwind v4 utility classes (no CSS files). The
+  generated runtime imports a single Tailwind entry (`blume:theme` alias →
+  `.blume/src/generated/app.css`) that `@source`s the package, maps Tailwind
+  tokens to `--blume-*` vars, and appends config + user `theme.css` overrides.
 - Arrow function expressions, sorted object keys, `u`-flag regex with named
   groups (Ultracite rules). `.ts` import extensions are used everywhere.
 - `.astro` files use PascalCase and are excluded from oxlint; the core theme is

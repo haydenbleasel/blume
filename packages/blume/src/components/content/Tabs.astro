@@ -1,20 +1,28 @@
 ---
 ---
 
-<blume-tabs class="blume-tabs-root">
-  <div class="blume-tablist" role="tablist"></div>
-  <div class="blume-tab-panels">
+<blume-tabs class="not-prose my-6 block">
+  <div
+    class="mb-4 flex gap-1 border-border border-b"
+    data-blume-tablist
+    role="tablist"
+  >
+  </div>
+  <div>
     <slot />
   </div>
 </blume-tabs>
 
 <script>
+  const TRIGGER_CLASS =
+    "-mb-px cursor-pointer border-transparent border-b-2 bg-transparent px-3.5 py-2 text-muted-foreground text-sm hover:text-foreground aria-[selected=true]:border-accent aria-[selected=true]:text-accent";
+
   class BlumeTabs extends HTMLElement {
     connectedCallback() {
       const panels = Array.from(
         this.querySelectorAll<HTMLElement>("[data-blume-tab-panel]")
       );
-      const list = this.querySelector<HTMLElement>(".blume-tablist");
+      const list = this.querySelector<HTMLElement>("[data-blume-tablist]");
       if (!list || panels.length === 0) {
         return;
       }
@@ -23,19 +31,19 @@
         const trigger = document.createElement("button");
         trigger.type = "button";
         trigger.role = "tab";
-        trigger.className = "blume-tab-trigger";
+        trigger.className = TRIGGER_CLASS;
         trigger.textContent = panel.dataset.title ?? `Tab ${index + 1}`;
         trigger.setAttribute("aria-selected", index === 0 ? "true" : "false");
         trigger.addEventListener("click", () => {
           panels.forEach((p, i) => {
-            p.hidden = i !== index;
+            p.classList.toggle("hidden", i !== index);
           });
           for (const [i, t] of Array.from(list.children).entries()) {
             t.setAttribute("aria-selected", i === index ? "true" : "false");
           }
         });
         list.appendChild(trigger);
-        panel.hidden = index !== 0;
+        panel.classList.toggle("hidden", index !== 0);
       });
     }
   }

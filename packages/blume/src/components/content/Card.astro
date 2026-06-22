@@ -13,23 +13,23 @@ const external = href?.startsWith("http");
 ---
 
 <Tag
-  class="blume-card"
+  class="not-prose block rounded-blume border border-border bg-background p-5 text-inherit transition-colors hover:[&[href]]:border-accent"
   href={href}
   rel={external ? "noreferrer" : undefined}
   target={external ? "_blank" : undefined}
 >
   {
     icon && (
-      <div class="blume-card__icon">
+      <div class="mb-2.5 text-accent">
         <Icon name={icon} size={20} />
       </div>
     )
   }
-  <p class="blume-card__title">
+  <p class="mb-1.5 flex items-center gap-1.5 font-semibold">
     {title}
-    {href && <Icon class="blume-card__arrow" name="arrow-right" size={14} />}
+    {href && <Icon class="text-muted-foreground" name="arrow-right" size={14} />}
   </p>
-  <div class="blume-card__body">
+  <div class="text-muted-foreground text-sm [&>:first-child]:mt-0 [&>:last-child]:mb-0">
     <slot />
   </div>
 </Tag>
