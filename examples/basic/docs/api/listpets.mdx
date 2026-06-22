@@ -1,0 +1,39 @@
+---
+title: "List pets"
+description: "Returns a paginated list of pets."
+type: api
+api:
+  method: GET
+  path: "/pets"
+---
+
+# List pets
+
+<Endpoint method="GET" path={"/pets"} />
+
+Returns a paginated list of pets.
+
+<ParameterTable
+  title="Query parameters"
+  parameters={[
+    {
+      description: "Maximum number of pets to return.",
+      name: "limit",
+      required: false,
+      type: "integer",
+    },
+  ]}
+/>
+
+<ResponseExample title="200 — A list of pets.">
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Rex"
+  }
+]
+```
+
+</ResponseExample>

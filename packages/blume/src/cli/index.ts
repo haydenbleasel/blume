@@ -4,6 +4,7 @@ import { BLUME_VERSION } from "../core/version.ts";
 import { addCommand } from "./commands/add.ts";
 import { buildCommand } from "./commands/build.ts";
 import { devCommand } from "./commands/dev.ts";
+import { importCommand } from "./commands/import.ts";
 import { initCommand } from "./commands/init.ts";
 import { previewCommand } from "./commands/preview.ts";
 
@@ -17,6 +18,7 @@ const main = defineCommand({
     add: addCommand,
     build: buildCommand,
     dev: devCommand,
+    import: importCommand,
     init: initCommand,
     preview: previewCommand,
   },

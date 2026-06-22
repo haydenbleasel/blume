@@ -1,0 +1,15 @@
+---
+interface Props {
+  type: string;
+  name?: string;
+  description?: string;
+}
+
+const { type, name, description } = Astro.props;
+---
+
+<div class="blume-auth-method">
+  <span class="blume-badge blume-badge--accent">{type}</span>
+  {name && <code>{name}</code>}
+  {description && <p class="blume-auth-method__description">{description}</p>}
+</div>

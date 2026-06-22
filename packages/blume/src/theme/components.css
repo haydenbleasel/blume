@@ -430,6 +430,101 @@ a.blume-card:hover {
   }
 }
 
+/* API reference -------------------------------------------------------- */
+
+.blume-endpoint {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1.5rem 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--blume-border);
+  border-radius: var(--blume-radius);
+  background: var(--blume-muted);
+}
+
+.blume-endpoint__method {
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.3rem;
+  font-family: var(--blume-font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: oklch(1 0 0);
+  background: var(--blume-muted-foreground);
+}
+
+.blume-endpoint__method--get {
+  background: oklch(0.6 0.13 250);
+}
+.blume-endpoint__method--post {
+  background: oklch(0.6 0.16 150);
+}
+.blume-endpoint__method--put,
+.blume-endpoint__method--patch {
+  background: oklch(0.7 0.16 75);
+}
+.blume-endpoint__method--delete {
+  background: oklch(0.58 0.2 25);
+}
+
+.blume-endpoint__path {
+  font-size: 0.95rem;
+  background: transparent;
+  padding: 0;
+}
+
+.blume-param-table__title {
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.blume-param-table__required {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  color: oklch(0.58 0.2 25);
+}
+
+.blume-example {
+  margin: 1.5rem 0;
+  border: 1px solid var(--blume-border);
+  border-radius: var(--blume-radius);
+  overflow: hidden;
+}
+
+.blume-example__title {
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--blume-border);
+  background: var(--blume-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--blume-muted-foreground);
+}
+
+.blume-example__body {
+  padding: 0.25rem 0.9rem;
+}
+
+.blume-example__body pre {
+  border: 0;
+  background: transparent;
+  padding: 0.75rem 0;
+}
+
+.blume-auth-method {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.blume-auth-method__description {
+  width: 100%;
+  margin: 0;
+  color: var(--blume-muted-foreground);
+  font-size: 0.9rem;
+}
+
 /* File tree ------------------------------------------------------------ */
 
 .blume-file-tree {

@@ -1,0 +1,14 @@
+---
+interface Props {
+  title?: string;
+}
+
+const { title = "Request" } = Astro.props;
+---
+
+<div class="blume-example blume-example--request">
+  <div class="blume-example__title">{title}</div>
+  <div class="blume-example__body">
+    <slot />
+  </div>
+</div>

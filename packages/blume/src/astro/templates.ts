@@ -128,6 +128,11 @@ import Step from "blume/components/content/Step.astro";
 import Steps from "blume/components/content/Steps.astro";
 import Tab from "blume/components/content/Tab.astro";
 import Tabs from "blume/components/content/Tabs.astro";
+import AuthMethod from "blume/components/api/AuthMethod.astro";
+import Endpoint from "blume/components/api/Endpoint.astro";
+import ParameterTable from "blume/components/api/ParameterTable.astro";
+import RequestExample from "blume/components/api/RequestExample.astro";
+import ResponseExample from "blume/components/api/ResponseExample.astro";
 import Icon from "blume/components/Icon.astro";
 import { mdxComponents as userMdx } from "../generated/components.ts";
 import data from "../generated/data.json";
@@ -135,12 +140,17 @@ import "../generated/theme.css";
 ${userTheme}
 const components = {
   Accordion,
+  AuthMethod,
   Badge,
   Callout,
   Card,
   CardGroup,
+  Endpoint,
   FileTree,
   Icon,
+  ParameterTable,
+  RequestExample,
+  ResponseExample,
   Step,
   Steps,
   Tab,

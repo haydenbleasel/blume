@@ -1,0 +1,16 @@
+---
+interface Props {
+  method: string;
+  path: string;
+}
+
+const { method, path } = Astro.props;
+const normalized = method.toLowerCase();
+---
+
+<div class="blume-endpoint">
+  <span class={`blume-endpoint__method blume-endpoint__method--${normalized}`}>
+    {method.toUpperCase()}
+  </span>
+  <code class="blume-endpoint__path">{path}</code>
+</div>

@@ -1,0 +1,47 @@
+---
+interface Parameter {
+  name: string;
+  type?: string;
+  required?: boolean;
+  description?: string;
+}
+
+interface Props {
+  title?: string;
+  parameters?: Parameter[];
+}
+
+const { title, parameters = [] } = Astro.props;
+---
+
+<div class="blume-param-table">
+  {title && <p class="blume-param-table__title">{title}</p>}
+  {
+    parameters.length > 0 && (
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {parameters.map((parameter) => (
+            <tr>
+              <td>
+                <code>{parameter.name}</code>
+                {parameter.required && (
+                  <span class="blume-param-table__required">required</span>
+                )}
+              </td>
+              <td>{parameter.type && <code>{parameter.type}</code>}</td>
+              <td>{parameter.description}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+  <slot />
+</div>
