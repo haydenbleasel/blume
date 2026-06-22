@@ -1,0 +1,70 @@
+---
+import type { Heading, Navigation } from "../../core/types.ts";
+import "../../theme/base.css";
+import NavTree from "./NavTree.astro";
+
+interface Props {
+  site: { title: string; description?: string };
+  navigation: Navigation;
+  page: { title: string; description?: string; route: string };
+  headings: Heading[];
+  themeMode: "system" | "light" | "dark";
+}
+
+const { site, navigation, page, headings, themeMode } = Astro.props;
+
+const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
+const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
+const description = page.description ?? site.description;
+
+const initialTheme = themeMode === "dark" ? "dark" : "light";
+---
+
+<!doctype html>
+<html lang="en" data-theme={initialTheme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    {description && <meta name="description" content={description} />}
+    {
+      themeMode === "system" && (
+        <script is:inline>
+          {`document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";`}
+        </script>
+      )
+    }
+  </head>
+  <body>
+    <a class="blume-skip-link" href="#blume-content">Skip to content</a>
+    <header class="blume-header">
+      <a class="blume-header__title" href="/">{site.title}</a>
+    </header>
+    <div class="blume-shell">
+      <aside class="blume-sidebar" aria-label="Primary">
+        <nav>
+          <NavTree items={navigation.sidebar} currentRoute={page.route} />
+        </nav>
+      </aside>
+      <main class="blume-main" id="blume-content">
+        <article class="blume-content">
+          <slot />
+        </article>
+      </main>
+      {
+        tocHeadings.length > 0 && (
+          <aside class="blume-toc" aria-label="Table of contents">
+            <p class="blume-toc__title">On this page</p>
+            <ul>
+              {tocHeadings.map((heading) => (
+                <li style={`padding-left:${(heading.depth - 2) * 0.75}rem`}>
+                  <a href={`#${heading.slug}`}>{heading.text}</a>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )
+      }
+    </div>
+  </body>
+</html>

@@ -1,0 +1,304 @@
+/* Blume base theme. Token-driven; user theme.css and presets layer on top. */
+
+:root {
+  --blume-background: oklch(1 0 0);
+  --blume-foreground: oklch(0.2 0 0);
+  --blume-muted: oklch(0.97 0 0);
+  --blume-muted-foreground: oklch(0.5 0 0);
+  --blume-border: oklch(0.92 0 0);
+  --blume-accent: oklch(0.62 0.16 250);
+  --blume-accent-foreground: oklch(1 0 0);
+  --blume-radius: 0.5rem;
+  --blume-code-background: oklch(0.97 0 0);
+
+  --blume-sidebar-width: 16rem;
+  --blume-toc-width: 15rem;
+  --blume-content-max: 48rem;
+  --blume-header-height: 3.5rem;
+
+  --blume-font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --blume-font-mono:
+    ui-monospace, "SF Mono", "Cascadia Code", "Source Code Pro", Menlo,
+    Consolas, monospace;
+}
+
+:root[data-theme="dark"] {
+  --blume-background: oklch(0.17 0 0);
+  --blume-foreground: oklch(0.96 0 0);
+  --blume-muted: oklch(0.23 0 0);
+  --blume-muted-foreground: oklch(0.66 0 0);
+  --blume-border: oklch(0.28 0 0);
+  --blume-code-background: oklch(0.21 0 0);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--blume-header-height) + 1rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: var(--blume-font-sans);
+  background: var(--blume-background);
+  color: var(--blume-foreground);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--blume-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--blume-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.blume-skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  background: var(--blume-accent);
+  color: var(--blume-accent-foreground);
+  padding: 0.5rem 1rem;
+  z-index: 100;
+}
+
+.blume-skip-link:focus {
+  left: 0;
+}
+
+/* Layout shell --------------------------------------------------------- */
+
+.blume-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--blume-header-height);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--blume-border);
+  background: color-mix(in oklch, var(--blume-background) 85%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.blume-header__title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--blume-foreground);
+}
+
+.blume-shell {
+  display: grid;
+  grid-template-columns: var(--blume-sidebar-width) minmax(0, 1fr) var(
+      --blume-toc-width
+    );
+  align-items: start;
+  max-width: 90rem;
+  margin: 0 auto;
+}
+
+.blume-sidebar {
+  position: sticky;
+  top: var(--blume-header-height);
+  height: calc(100vh - var(--blume-header-height));
+  overflow-y: auto;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid var(--blume-border);
+}
+
+.blume-main {
+  min-width: 0;
+  padding: 2rem 2.5rem;
+}
+
+.blume-content {
+  max-width: var(--blume-content-max);
+}
+
+.blume-toc {
+  position: sticky;
+  top: var(--blume-header-height);
+  height: calc(100vh - var(--blume-header-height));
+  overflow-y: auto;
+  padding: 1.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.blume-toc__title {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--blume-muted-foreground);
+  margin-bottom: 0.75rem;
+}
+
+.blume-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.blume-toc a {
+  display: block;
+  padding: 0.2rem 0;
+  color: var(--blume-muted-foreground);
+}
+
+.blume-toc a:hover {
+  color: var(--blume-foreground);
+}
+
+/* Sidebar nav ---------------------------------------------------------- */
+
+.blume-nav,
+.blume-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.blume-nav__group-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--blume-muted-foreground);
+  margin: 1rem 0 0.4rem;
+}
+
+.blume-nav__link {
+  display: block;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--blume-radius);
+  color: var(--blume-muted-foreground);
+  font-size: 0.9rem;
+}
+
+.blume-nav__link:hover {
+  background: var(--blume-muted);
+  color: var(--blume-foreground);
+  text-decoration: none;
+}
+
+.blume-nav__link[aria-current="page"] {
+  background: color-mix(in oklch, var(--blume-accent) 14%, transparent);
+  color: var(--blume-accent);
+  font-weight: 500;
+}
+
+.blume-nav__children {
+  margin-left: 0.5rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--blume-border);
+}
+
+/* Content typography --------------------------------------------------- */
+
+.blume-content h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  margin: 0 0 1rem;
+}
+
+.blume-content h2 {
+  font-size: 1.4rem;
+  margin: 2.5rem 0 1rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--blume-border);
+}
+
+.blume-content h3 {
+  font-size: 1.15rem;
+  margin: 2rem 0 0.75rem;
+}
+
+.blume-content p,
+.blume-content ul,
+.blume-content ol {
+  margin: 0 0 1rem;
+}
+
+.blume-content code {
+  font-family: var(--blume-font-mono);
+  font-size: 0.875em;
+  background: var(--blume-code-background);
+  padding: 0.15em 0.35em;
+  border-radius: 0.3rem;
+}
+
+.blume-content pre {
+  background: var(--blume-code-background);
+  padding: 1rem;
+  border-radius: var(--blume-radius);
+  overflow-x: auto;
+  border: 1px solid var(--blume-border);
+}
+
+.blume-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.blume-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+}
+
+.blume-content th,
+.blume-content td {
+  border: 1px solid var(--blume-border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.blume-lead {
+  font-size: 1.1rem;
+  color: var(--blume-muted-foreground);
+  margin-bottom: 2rem;
+}
+
+/* Responsive ----------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .blume-shell {
+    grid-template-columns: var(--blume-sidebar-width) minmax(0, 1fr);
+  }
+  .blume-toc {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .blume-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .blume-sidebar {
+    display: none;
+  }
+  .blume-main {
+    padding: 1.5rem;
+  }
+}

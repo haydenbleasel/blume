@@ -1,0 +1,13 @@
+{
+  "name": "@blume-examples/basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "blume dev",
+    "build": "blume build",
+    "preview": "blume preview"
+  },
+  "dependencies": {
+    "blume": "workspace:*"
+  }
+}

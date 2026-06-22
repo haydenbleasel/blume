@@ -1,0 +1,36 @@
+---
+import type { NavNode } from "../../core/types.ts";
+import Self from "./NavTree.astro";
+
+interface Props {
+  items: NavNode[];
+  currentRoute: string;
+}
+
+const { items, currentRoute } = Astro.props;
+---
+
+<ul class="blume-nav">
+  {
+    items.map((item) =>
+      item.kind === "page" ? (
+        <li>
+          <a
+            class="blume-nav__link"
+            href={item.route}
+            aria-current={item.route === currentRoute ? "page" : undefined}
+          >
+            {item.label}
+          </a>
+        </li>
+      ) : (
+        <li>
+          <p class="blume-nav__group-label">{item.label}</p>
+          <div class="blume-nav__children">
+            <Self items={item.children} currentRoute={currentRoute} />
+          </div>
+        </li>
+      )
+    )
+  }
+</ul>

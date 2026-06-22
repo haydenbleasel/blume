@@ -1,8 +1,11 @@
 {
   "name": "blume-monorepo",
   "private": true,
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "type": "module",
-  "workspaces": ["packages/*", "examples/*"],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -19,8 +22,8 @@
     "typescript": "^5.7.0",
     "ultracite": "^7.8.3"
   },
-  "packageManager": "bun@1.3.14",
   "engines": {
     "node": ">=20"
-  }
+  },
+  "packageManager": "bun@1.3.14"
 }

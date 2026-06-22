@@ -1,0 +1,32 @@
+---
+title: Getting Started
+description: Install Blume and create your first docs site.
+---
+
+# Getting Started
+
+Install Blume and scaffold a project.
+
+## Install
+
+```bash
+bun add blume
+```
+
+## Create content
+
+Add a `docs/` folder with an `index.mdx` file, then run:
+
+```bash
+blume dev
+```
+
+Blume generates a hidden Astro runtime under `.blume/` and serves your docs.
+
+## Build
+
+```bash
+blume build
+```
+
+The static site is written to `dist/`.
