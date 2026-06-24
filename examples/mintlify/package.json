@@ -1,0 +1,13 @@
+{
+  "name": "@blume-examples/mintlify",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mint dev --port 4323",
+    "build": "mint build",
+    "preview": "mint preview"
+  },
+  "dependencies": {
+    "blume": "workspace:*"
+  }
+}

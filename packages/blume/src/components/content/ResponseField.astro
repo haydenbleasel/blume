@@ -1,0 +1,48 @@
+---
+import ParamField from "./ParamField.astro";
+
+const {
+  default: defaultValue,
+  deprecated = false,
+  name,
+  post = [],
+  pre = [],
+  required = false,
+  type,
+} = Astro.props;
+const prefix = Array.isArray(pre) ? pre : [pre];
+const suffix = Array.isArray(post) ? post : [post];
+---
+
+<ParamField name={name} required={required} type={type}>
+  {
+    (prefix.length > 0 ||
+      suffix.length > 0 ||
+      deprecated ||
+      defaultValue !== undefined) && (
+      <p class="m-0 mb-2 flex flex-wrap gap-1">
+        {prefix.map((label) => (
+          <span class="rounded bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+            {label}
+          </span>
+        ))}
+        {deprecated && (
+          <span class="rounded bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+            deprecated
+          </span>
+        )}
+        {defaultValue !== undefined && (
+          <span class="rounded bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+            default: {String(defaultValue)}
+          </span>
+        )}
+        {suffix.map((label) => (
+          <span class="rounded bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+            {label}
+          </span>
+        ))}
+      </p>
+    )
+  }
+  <slot />
+</ParamField>

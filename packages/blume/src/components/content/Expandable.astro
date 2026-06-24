@@ -1,0 +1,9 @@
+---
+import Accordion from "./Accordion.astro";
+
+const { defaultOpen = false, title = "Show more" } = Astro.props;
+---
+
+<Accordion defaultOpen={defaultOpen} title={title}>
+  <slot />
+</Accordion>

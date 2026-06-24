@@ -1,0 +1,42 @@
+---
+import Icon from "../Icon.astro";
+
+const { description, href, title } = Astro.props;
+const Tag = href ? "a" : "div";
+const external = href?.startsWith("http");
+const previewPattern =
+  "background-image:radial-gradient(circle at 1px 1px,color-mix(in oklab,currentColor 18%,transparent) 1px,transparent 0);background-size:18px 18px;";
+---
+
+<Tag
+  class="not-prose block overflow-hidden rounded-blume border border-border bg-background text-inherit transition-colors hover:[&[href]]:border-accent"
+  data-blume-tile
+  href={href}
+  rel={external ? "noreferrer" : undefined}
+  target={external ? "_blank" : undefined}
+>
+  <div
+    class="flex aspect-[16/9] min-h-32 items-center justify-center bg-muted/40 p-4 text-muted-foreground [&_img]:max-h-full [&_img]:max-w-full [&_svg]:max-h-full [&_svg]:max-w-full"
+    data-blume-tile-preview
+    style={previewPattern}
+  >
+    <slot />
+  </div>
+  <div class="p-4">
+    {
+      title && (
+        <p class="m-0 flex items-center gap-1.5 font-semibold">
+          {title}
+          {href && (
+            <Icon class="text-muted-foreground" name="arrow-right" size={14} />
+          )}
+        </p>
+      )
+    }
+    {
+      description && (
+        <p class="m-0 mt-1 text-muted-foreground text-sm">{description}</p>
+      )
+    }
+  </div>
+</Tag>

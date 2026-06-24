@@ -1,0 +1,68 @@
+---
+import { randomUUID } from "node:crypto";
+
+interface Props {
+  cta?: string;
+  headline?: string;
+  href?: string;
+  tip: string;
+}
+
+const { cta, headline, href, tip } = Astro.props;
+const tooltipId = `blume-tooltip-${randomUUID()}`;
+const external = href?.startsWith("http");
+
+const unwrapParagraph = (html: string): string => {
+  const trimmed = html.trim();
+  const match = trimmed.match(/^<p>(?<content>[\s\S]*)<\/p>$/u);
+  return match?.groups?.content ?? trimmed;
+};
+
+const labelHtml = Astro.slots.has("default")
+  ? unwrapParagraph(await Astro.slots.render("default"))
+  : "";
+---
+
+<span class="not-prose group relative inline-flex cursor-help items-baseline">
+  <span
+    aria-describedby={tooltipId}
+    class="underline decoration-dotted underline-offset-4"
+    data-blume-tooltip-trigger
+    tabindex="0"
+    set:html={labelHtml}
+  />
+  <span
+    class="absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-xs -translate-x-1/2 rounded-blume border border-border bg-background p-3 text-left font-sans text-foreground text-sm shadow-lg"
+    data-blume-tooltip-panel
+    id={tooltipId}
+    role="tooltip"
+  >
+    {headline && <span class="mb-1 block font-semibold">{headline}</span>}
+    <span class="block text-muted-foreground leading-5">{tip}</span>
+    {
+      cta && href && (
+        <a
+          class="mt-2 inline-flex font-medium text-accent text-xs hover:underline"
+          href={href}
+          rel={external ? "noreferrer" : undefined}
+          target={external ? "_blank" : undefined}
+        >
+          {cta}
+        </a>
+      )
+    }
+  </span>
+</span>
+
+<style>
+  [data-blume-tooltip-panel] {
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  [data-blume-tooltip-trigger]:focus + [data-blume-tooltip-panel],
+  .group:hover [data-blume-tooltip-panel] {
+    pointer-events: auto;
+    visibility: visible;
+  }
+</style>

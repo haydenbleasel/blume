@@ -35,6 +35,8 @@ blume build
 - **Customization** — component overrides, React islands, custom pages, theme
   tokens and `theme.css`, and a source-component registry (`blume add`).
 - **API docs** — `blume import openapi` generates editable reference pages.
+- **Mintlify bridge** — run common `docs.json` projects locally through
+  `mint dev`, `mint build`, and `mint preview` after swapping the dependency.
 - **OG images** — per-page Open Graph images rendered at build with Takumi.
 - **AI** — `llms.txt`/`llms-full.txt` and an optional Ask AI assistant.
 - **Migration** — `blume migrate mintlify | starlight | fumadocs`.
@@ -57,10 +59,11 @@ blume build
 ## Repository layout
 
 ```txt
-packages/blume   The published package: CLI, core, Astro runtime, components,
-                 theme, search, registry, migrate, openapi
-examples/basic   A demo docs site exercising every feature
-docs             Blume's own documentation, built with Blume
+packages/blume      The published package: CLI, core, Astro runtime,
+                    components, theme, search, registry, migrate, openapi
+examples/basic      A demo docs site exercising every feature
+examples/mintlify   A Mintlify starter compatibility fixture
+docs                Blume's own documentation, built with Blume
 ```
 
 ## Compatibility

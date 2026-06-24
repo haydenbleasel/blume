@@ -1,0 +1,20 @@
+---
+const { title } = Astro.props;
+---
+
+<aside
+  class="not-prose my-6 overflow-hidden rounded-blume border border-border/80 bg-background shadow-sm shadow-border/30"
+  data-blume-panel
+  data-blume-right-rail-item
+>
+  {
+    title && (
+      <p class="m-0 border-border/70 border-b bg-muted/35 px-3.5 py-2 font-medium text-muted-foreground text-xs">
+        {title}
+      </p>
+    )
+  }
+  <div class="px-3.5 py-3 text-sm leading-6 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+    <slot />
+  </div>
+</aside>

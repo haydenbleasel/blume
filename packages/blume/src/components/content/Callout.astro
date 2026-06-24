@@ -1,16 +1,27 @@
 ---
 import Icon from "../Icon.astro";
 
-type CalloutType = "info" | "note" | "tip" | "success" | "warning" | "danger";
+type CalloutType =
+  | "info"
+  | "note"
+  | "tip"
+  | "success"
+  | "check"
+  | "warning"
+  | "danger";
 
 interface Props {
   type?: CalloutType;
   title?: string;
+  icon?: unknown;
+  iconType?: string;
+  color?: string;
 }
 
-const { type = "info", title } = Astro.props;
+const { color, icon, iconType, type = "info", title } = Astro.props;
 
 const iconByType: Record<CalloutType, string> = {
+  check: "circle-check",
   danger: "circle-x",
   info: "info",
   note: "info",
@@ -18,13 +29,42 @@ const iconByType: Record<CalloutType, string> = {
   tip: "lightbulb",
   warning: "triangle-alert",
 };
+
+const variantClass: Record<CalloutType, string> = {
+  check: "border-green-500/25 bg-green-500/10",
+  danger: "border-red-500/25 bg-red-500/10",
+  info: "border-blue-500/25 bg-blue-500/10",
+  note: "border-border bg-muted",
+  success: "border-green-500/25 bg-green-500/10",
+  tip: "border-accent/25 bg-accent/10",
+  warning: "border-amber-500/25 bg-amber-500/10",
+};
+
+const iconClass: Record<CalloutType, string> = {
+  check: "text-green-600 dark:text-green-400",
+  danger: "text-red-600 dark:text-red-400",
+  info: "text-blue-600 dark:text-blue-400",
+  note: "text-muted-foreground/70",
+  success: "text-green-600 dark:text-green-400",
+  tip: "text-accent",
+  warning: "text-amber-600 dark:text-amber-400",
+};
 ---
 
 <aside
-  class="not-prose my-5 flex flex-row items-start gap-2 rounded-2xl bg-muted px-4 py-3 font-sans text-muted-foreground text-sm leading-6 [&_a]:underline [&_a]:decoration-current/50 [&_code]:font-mono"
+  class:list={[
+    "not-prose my-5 flex flex-row items-start gap-2 rounded-blume border px-4 py-3 font-sans text-muted-foreground text-sm leading-6 [&_a]:underline [&_a]:decoration-current/50 [&_code]:font-mono",
+    color ? "bg-background" : variantClass[type],
+  ]}
+  style={color ? `border:1px solid ${color};color:${color}` : undefined}
 >
-  <span class="mt-0.5 shrink-0 text-muted-foreground/70">
-    <Icon name={iconByType[type]} size={16} />
+  <span class:list={["mt-0.5 shrink-0", color ? "" : iconClass[type]]}>
+    <Icon
+      color={color}
+      icon={icon ?? iconByType[type]}
+      iconType={iconType}
+      size={16}
+    />
   </span>
   <div class="min-w-0 flex-1 [&>:first-child]:mt-0! [&>:last-child]:mb-0!">
     {title && <p class="mb-1 font-semibold text-foreground">{title}</p>}

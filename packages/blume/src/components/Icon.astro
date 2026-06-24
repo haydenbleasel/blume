@@ -1,23 +1,86 @@
 ---
-import { icons } from "../theme/icons.ts";
+import { resolveIcon } from "../theme/icons.ts";
 
 interface Props {
-  name: string;
+  name?: unknown;
+  icon?: unknown;
+  iconType?: string;
   size?: number;
   class?: string;
+  className?: string;
+  color?: string;
   label?: string;
 }
 
-const { name, size = 16, class: className, label } = Astro.props;
-const markup = icons[name];
+const {
+  color,
+  icon,
+  iconType,
+  name,
+  size = 16,
+  class: astroClass,
+  className,
+  label,
+} = Astro.props;
+const rawIcon = name ?? icon;
+const customIcon =
+  rawIcon !== undefined && rawIcon !== null && typeof rawIcon !== "string"
+    ? rawIcon
+    : null;
+const iconName = typeof rawIcon === "string" ? rawIcon : null;
+const rawSvg =
+  iconName && /^\s*<svg[\s\S]*<\/svg>\s*$/u.test(iconName)
+    ? iconName.trim()
+    : null;
+const isImageIcon = (value: string): boolean =>
+  /^(?:https?:\/\/|data:image\/|\/|\.{1,2}\/)/u.test(value) ||
+  /\.(?:avif|gif|jpe?g|png|svg|webp)$/iu.test(value);
+const imageSrc = iconName && !rawSvg && isImageIcon(iconName) ? iconName : null;
+const resolvedIcon =
+  iconName && !(imageSrc || rawSvg) ? resolveIcon(iconName, iconType) : null;
+const markup = resolvedIcon?.markup;
+const resolvedClass = astroClass ?? className;
+const customStyle = `display:inline-flex;width:${size}px;height:${size}px;${
+  color ? `color:${color}` : ""
+}`;
+const style = color ? `color:${color}` : undefined;
 ---
 
 {
-  markup && (
+  customIcon ? (
+    <span
+      aria-hidden={label ? undefined : "true"}
+      aria-label={label}
+      class={resolvedClass}
+      role={label ? "img" : undefined}
+      style={customStyle}
+    >
+      {customIcon}
+    </span>
+  ) : rawSvg ? (
+    <span
+      aria-hidden={label ? undefined : "true"}
+      aria-label={label}
+      class={resolvedClass}
+      role={label ? "img" : undefined}
+      set:html={rawSvg}
+      style={customStyle}
+    />
+  ) : imageSrc ? (
+    <img
+      alt={label ?? ""}
+      aria-hidden={label ? undefined : "true"}
+      class={resolvedClass}
+      height={size}
+      src={imageSrc}
+      width={size}
+    />
+  ) : (
+    markup && (
     <svg
       aria-hidden={label ? undefined : "true"}
       aria-label={label}
-      class={className}
+      class={resolvedClass}
       fill="none"
       height={size}
       role={label ? "img" : undefined}
@@ -26,9 +89,11 @@ const markup = icons[name];
       stroke-linecap="round"
       stroke-linejoin="round"
       stroke-width="2"
+      style={style}
       viewBox="0 0 24 24"
       width={size}
       xmlns="http://www.w3.org/2000/svg"
     />
+    )
   )
 }

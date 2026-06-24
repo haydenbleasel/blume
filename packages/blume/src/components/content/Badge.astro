@@ -1,23 +1,124 @@
 ---
+import Icon from "../Icon.astro";
+
 type BadgeVariant = "default" | "accent" | "success" | "warning" | "danger";
+type BadgeSize = "xs" | "sm" | "md" | "lg";
+type BadgeShape = "rounded" | "pill";
 
 interface Props {
   variant?: BadgeVariant;
+  color?: string;
+  disabled?: boolean | string;
+  icon?: unknown;
+  iconType?: string;
+  shape?: BadgeShape;
+  size?: BadgeSize;
+  stroke?: boolean | string;
+  tooltip?: string;
+  class?: string;
+  className?: string;
 }
 
-const { variant = "default" } = Astro.props;
+const {
+  color,
+  disabled = false,
+  icon,
+  iconType,
+  shape = "rounded",
+  size = "md",
+  stroke = false,
+  tooltip,
+  variant = "default",
+  class: astroClass,
+  className,
+} = Astro.props;
 
-const styleByVariant: Record<BadgeVariant, string> = {
-  accent: "bg-accent/15 text-accent",
-  danger: "bg-red-500/15 text-red-600",
-  default: "bg-muted text-muted-foreground",
-  success: "bg-green-500/15 text-green-600",
-  warning: "bg-amber-500/20 text-amber-600",
+const activeStroke = stroke === true || stroke === "true";
+const isDisabled = disabled === true || disabled === "true";
+const colorName =
+  color ??
+  {
+    accent: "blue",
+    danger: "red",
+    default: "gray",
+    success: "green",
+    warning: "orange",
+  }[variant];
+const customColor = colorName.startsWith("#") ? colorName : null;
+
+const filledColorClass: Record<string, string> = {
+  blue: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  gray: "bg-muted text-muted-foreground",
+  green: "bg-green-500/15 text-green-700 dark:text-green-300",
+  orange: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+  red: "bg-red-500/15 text-red-700 dark:text-red-300",
+  surface: "bg-background text-muted-foreground ring-1 ring-border",
+  "surface-destructive":
+    "bg-background text-red-700 ring-1 ring-red-500/30 dark:text-red-300",
+  white: "bg-white text-muted-foreground ring-1 ring-border dark:bg-white/10",
+  "white-destructive":
+    "bg-white text-red-700 ring-1 ring-red-500/30 dark:bg-white/10 dark:text-red-300",
+  yellow: "bg-yellow-500/20 text-yellow-800 dark:text-yellow-300",
 };
+
+const strokeColorClass: Record<string, string> = {
+  blue: "border-blue-500/40 text-blue-700 dark:text-blue-300",
+  gray: "border-border text-muted-foreground",
+  green: "border-green-500/40 text-green-700 dark:text-green-300",
+  orange: "border-orange-500/40 text-orange-700 dark:text-orange-300",
+  purple: "border-purple-500/40 text-purple-700 dark:text-purple-300",
+  red: "border-red-500/40 text-red-700 dark:text-red-300",
+  surface: "border-border text-muted-foreground",
+  "surface-destructive": "border-red-500/40 text-red-700 dark:text-red-300",
+  white: "border-border text-muted-foreground",
+  "white-destructive": "border-red-500/40 text-red-700 dark:text-red-300",
+  yellow: "border-yellow-500/40 text-yellow-800 dark:text-yellow-300",
+};
+
+const sizeClass: Record<BadgeSize, string> = {
+  lg: "gap-1.5 px-2.5 py-1 text-sm",
+  md: "gap-1 px-2 py-0.5 text-xs",
+  sm: "gap-1 px-1.5 py-0.5 text-[0.6875rem]",
+  xs: "gap-0.5 px-1.5 py-px text-[0.625rem]",
+};
+
+const iconSize: Record<BadgeSize, number> = {
+  lg: 14,
+  md: 12,
+  sm: 11,
+  xs: 10,
+};
+
+const shapeClass: Record<BadgeShape, string> = {
+  pill: "rounded-full",
+  rounded: "rounded-md",
+};
+
+const resolvedClass = astroClass ?? className;
+const colorClass = activeStroke
+  ? strokeColorClass[colorName] ?? strokeColorClass.gray
+  : filledColorClass[colorName] ?? filledColorClass.gray;
+const customStyle = customColor
+  ? activeStroke
+    ? `border-color:${customColor};color:${customColor}`
+    : `background:${customColor}20;color:${customColor}`
+  : undefined;
 ---
 
 <span
-  class={`not-prose inline-flex items-center rounded-full px-2 py-0.5 font-medium text-xs ${styleByVariant[variant]}`}
+  class:list={[
+    "not-prose inline-flex w-fit items-center border font-medium leading-5",
+    activeStroke ? "bg-transparent" : "border-transparent",
+    colorClass,
+    sizeClass[size],
+    shapeClass[shape],
+    isDisabled ? "opacity-50" : "",
+    resolvedClass,
+  ]}
+  style={customStyle}
+  title={tooltip}
 >
+  {icon && <Icon icon={icon} iconType={iconType} size={iconSize[size]} />}
   <slot />
 </span>

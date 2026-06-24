@@ -1,7 +1,8 @@
 import { createJiti } from "jiti";
 
 import { BlumeError, diagnosticsFromZod } from "./diagnostics.ts";
-import { findConfigFile } from "./project.ts";
+import { loadMintlifyConfig } from "./mintlify.ts";
+import { findBlumeConfigFile, findMintlifyConfigFile } from "./project.ts";
 import { blumeConfigSchema } from "./schema.ts";
 import type { BlumeConfig, ResolvedConfig } from "./schema.ts";
 import type { Diagnostic } from "./types.ts";
@@ -31,20 +32,26 @@ const importConfigModule = async (file: string): Promise<unknown> => {
  * defaults produce a fully resolved config so the zero-boilerplate path works.
  */
 export const loadConfig = async (root: string): Promise<ConfigLoadResult> => {
-  const configFile = findConfigFile(root);
+  const blumeConfigFile = findBlumeConfigFile(root);
+  const mintlifyConfigFile = blumeConfigFile
+    ? null
+    : findMintlifyConfigFile(root);
+  const configFile = blumeConfigFile ?? mintlifyConfigFile;
 
   let raw: unknown = {};
-  if (configFile) {
+  if (blumeConfigFile) {
     try {
-      raw = await importConfigModule(configFile);
+      raw = await importConfigModule(blumeConfigFile);
     } catch (error) {
       throw new BlumeError({
         code: "BLUME_CONFIG_LOAD_FAILED",
-        file: configFile,
+        file: blumeConfigFile,
         message: `Failed to load config: ${(error as Error).message}`,
         severity: "error",
       });
     }
+  } else if (mintlifyConfigFile) {
+    raw = await loadMintlifyConfig(root, mintlifyConfigFile);
   }
 
   const parsed = blumeConfigSchema.safeParse(raw ?? {});

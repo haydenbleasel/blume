@@ -1,0 +1,300 @@
+---
+---
+
+<blume-tree
+  class="not-prose my-6 block rounded-blume border border-border bg-background p-3 text-sm"
+  data-blume-tree
+  role="tree"
+>
+  <slot />
+</blume-tree>
+
+<script>
+  const ITEM_SELECTOR = "[data-blume-tree-item]";
+  const FOLDER_SELECTOR = "[data-blume-tree-folder]";
+  const OPENABLE_SELECTOR =
+    '[data-blume-tree-folder][data-blume-tree-openable="true"]';
+  const CHILDREN_SELECTOR = "[data-blume-tree-children]";
+  const TYPEAHEAD_RESET_MS = 700;
+
+  const directItem = (folder: Element) =>
+    folder.querySelector<HTMLElement>(`:scope > ${ITEM_SELECTOR}`);
+
+  const folderForItem = (item: HTMLElement) => {
+    const folder = item.closest<HTMLElement>(FOLDER_SELECTOR);
+    return directItem(folder ?? document.documentElement) === item
+      ? folder
+      : null;
+  };
+
+  const isOpenableDetails = (
+    folder: HTMLElement | null
+  ): folder is HTMLDetailsElement =>
+    folder instanceof HTMLDetailsElement &&
+    folder.matches(OPENABLE_SELECTOR);
+
+  class BlumeTree extends HTMLElement {
+    #activeItem: HTMLElement | null = null;
+    #typeahead = "";
+    #typeaheadTimer = 0;
+
+    connectedCallback() {
+      if (this.dataset.blumeTreeReady === "true") {
+        return;
+      }
+      this.dataset.blumeTreeReady = "true";
+
+      this.addEventListener("click", this.#onClick);
+      this.addEventListener("focusin", this.#onFocusIn);
+      this.addEventListener("keydown", this.#onKeydown);
+      this.#folders().forEach((folder) => {
+        if (folder instanceof HTMLDetailsElement) {
+          folder.addEventListener("toggle", this.#syncFolderState);
+        }
+      });
+      this.#syncTree();
+      this.#setActive(this.#visibleItems()[0] ?? null, false);
+    }
+
+    disconnectedCallback() {
+      this.removeEventListener("click", this.#onClick);
+      this.removeEventListener("focusin", this.#onFocusIn);
+      this.removeEventListener("keydown", this.#onKeydown);
+      this.#folders().forEach((folder) => {
+        if (folder instanceof HTMLDetailsElement) {
+          folder.removeEventListener("toggle", this.#syncFolderState);
+        }
+      });
+      window.clearTimeout(this.#typeaheadTimer);
+    }
+
+    #items() {
+      return Array.from(
+        this.querySelectorAll<HTMLElement>(ITEM_SELECTOR)
+      );
+    }
+
+    #folders() {
+      return Array.from(
+        this.querySelectorAll<HTMLElement>(FOLDER_SELECTOR)
+      );
+    }
+
+    #visibleItems() {
+      return this.#items().filter((item) => this.#isVisible(item));
+    }
+
+    #isVisible(item: HTMLElement) {
+      for (const folder of this.#folders()) {
+        if (
+          folder instanceof HTMLDetailsElement &&
+          folder.contains(item) &&
+          !folder.open &&
+          directItem(folder) !== item
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    #syncTree() {
+      this.#folders().forEach((folder) => {
+        const item = directItem(folder);
+        if (!item) {
+          return;
+        }
+        const openable = folder.dataset.blumeTreeOpenable === "true";
+        if (openable || folder.querySelector(CHILDREN_SELECTOR)) {
+          const expanded =
+            folder instanceof HTMLDetailsElement ? folder.open : true;
+          item.setAttribute("aria-expanded", expanded ? "true" : "false");
+        }
+      });
+
+      this.#items().forEach((item) => {
+        item.setAttribute("aria-level", String(this.#level(item)));
+        item.tabIndex = item === this.#activeItem ? 0 : -1;
+      });
+    }
+
+    #level(item: HTMLElement) {
+      let level = 1;
+      let group = item.parentElement?.closest<HTMLElement>(CHILDREN_SELECTOR);
+      while (group && this.contains(group)) {
+        level += 1;
+        const parentFolder =
+          group.parentElement?.closest<HTMLElement>(FOLDER_SELECTOR);
+        group =
+          parentFolder?.parentElement?.closest<HTMLElement>(
+            CHILDREN_SELECTOR
+          ) ?? null;
+      }
+      return level;
+    }
+
+    #setActive(item: HTMLElement | null, focus: boolean) {
+      if (!item) {
+        return;
+      }
+      this.#activeItem = item;
+      this.#syncTree();
+      item.tabIndex = 0;
+      if (focus) {
+        item.focus();
+      }
+    }
+
+    #move(delta: number) {
+      const items = this.#visibleItems();
+      const active = this.#activeItem ?? (document.activeElement as HTMLElement);
+      const index = items.indexOf(active);
+      const nextIndex = Math.min(Math.max(index + delta, 0), items.length - 1);
+      this.#setActive(items[nextIndex] ?? items[0] ?? null, true);
+    }
+
+    #moveToEdge(edge: "first" | "last") {
+      const items = this.#visibleItems();
+      this.#setActive(
+        edge === "first" ? items[0] : items[items.length - 1],
+        true
+      );
+    }
+
+    #firstChild(folder: HTMLElement) {
+      return folder.querySelector<HTMLElement>(
+        `:scope > ${CHILDREN_SELECTOR} > ${ITEM_SELECTOR}, :scope > ${CHILDREN_SELECTOR} > ${FOLDER_SELECTOR} > ${ITEM_SELECTOR}`
+      );
+    }
+
+    #parentItem(item: HTMLElement) {
+      const group = item.parentElement?.closest(CHILDREN_SELECTOR);
+      const parentFolder = group?.parentElement?.closest(FOLDER_SELECTOR);
+      return parentFolder ? directItem(parentFolder) : null;
+    }
+
+    #expandSiblings(item: HTMLElement) {
+      const group = item.parentElement?.closest(CHILDREN_SELECTOR);
+      const scope = group ?? this;
+      scope
+        .querySelectorAll<HTMLDetailsElement>(
+          `:scope > ${OPENABLE_SELECTOR}`
+        )
+        .forEach((folder) => {
+          folder.open = true;
+        });
+      this.#syncTree();
+    }
+
+    #toggle(folder: HTMLDetailsElement) {
+      folder.open = !folder.open;
+      this.#syncTree();
+    }
+
+    #search(character: string) {
+      window.clearTimeout(this.#typeaheadTimer);
+      this.#typeahead += character.toLowerCase();
+      this.#typeaheadTimer = window.setTimeout(() => {
+        this.#typeahead = "";
+      }, TYPEAHEAD_RESET_MS);
+
+      const items = this.#visibleItems();
+      const active = this.#activeItem ?? (document.activeElement as HTMLElement);
+      const activeIndex = items.indexOf(active);
+      const ordered = items
+        .slice(Math.max(activeIndex + 1, 0))
+        .concat(items.slice(0, Math.max(activeIndex + 1, 0)));
+      const match = ordered.find((item) =>
+        (item.dataset.blumeTreeName ?? "")
+          .toLowerCase()
+          .startsWith(this.#typeahead)
+      );
+      this.#setActive(match ?? null, true);
+    }
+
+    #onClick = (event: MouseEvent) => {
+      const item = (event.target as Element | null)?.closest<HTMLElement>(
+        ITEM_SELECTOR
+      );
+      if (item && this.contains(item)) {
+        this.#setActive(item, false);
+      }
+    };
+
+    #onFocusIn = (event: FocusEvent) => {
+      const item = (event.target as Element | null)?.closest<HTMLElement>(
+        ITEM_SELECTOR
+      );
+      if (item && this.contains(item)) {
+        this.#setActive(item, false);
+      }
+    };
+
+    #onKeydown = (event: KeyboardEvent) => {
+      const item = (event.target as Element | null)?.closest<HTMLElement>(
+        ITEM_SELECTOR
+      );
+      if (!item || !this.contains(item)) {
+        return;
+      }
+
+      const folder = folderForItem(item);
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        this.#move(1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        this.#move(-1);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        this.#moveToEdge("first");
+      } else if (event.key === "End") {
+        event.preventDefault();
+        this.#moveToEdge("last");
+      } else if (event.key === "ArrowRight" && folder) {
+        event.preventDefault();
+        if (isOpenableDetails(folder) && !folder.open) {
+          folder.open = true;
+          this.#syncTree();
+        } else {
+          this.#setActive(this.#firstChild(folder), true);
+        }
+      } else if (event.key === "ArrowLeft") {
+        const parent = this.#parentItem(item);
+        if (isOpenableDetails(folder) && folder.open) {
+          event.preventDefault();
+          folder.open = false;
+          this.#syncTree();
+        } else if (parent) {
+          event.preventDefault();
+          this.#setActive(parent, true);
+        }
+      } else if (
+        (event.key === "Enter" || event.key === " ") &&
+        isOpenableDetails(folder)
+      ) {
+        event.preventDefault();
+        this.#toggle(folder);
+      } else if (event.key === "*") {
+        event.preventDefault();
+        this.#expandSiblings(item);
+      } else if (
+        event.key.length === 1 &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey
+      ) {
+        event.preventDefault();
+        this.#search(event.key);
+      }
+    };
+
+    #syncFolderState = () => {
+      this.#syncTree();
+    };
+  }
+
+  if (!customElements.get("blume-tree")) {
+    customElements.define("blume-tree", BlumeTree);
+  }
+</script>

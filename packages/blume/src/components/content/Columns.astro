@@ -1,0 +1,9 @@
+---
+import CardGroup from "./CardGroup.astro";
+
+const { cols = 2 } = Astro.props;
+---
+
+<CardGroup cols={cols}>
+  <slot />
+</CardGroup>

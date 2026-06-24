@@ -1,0 +1,26 @@
+---
+title: "Create manual user"
+description: "Manual API page generated from Mintlify api frontmatter."
+api: "POST /v1/users/{userId}"
+deprecated: true
+hideApiMarker: true
+---
+
+Use this page to verify that Mintlify-style manual API pages render the
+endpoint bar and playground from `api` frontmatter.
+
+<ParamField path="userId" type="string" required>
+  Unique identifier for the user.
+</ParamField>
+
+<ParamField query="notify" type="boolean" default={true}>
+  Send an onboarding notification.
+</ParamField>
+
+<ParamField body="email" type="string" required placeholder="alex@example.com">
+  Email address for the user.
+</ParamField>
+
+<ResponseField name="id" type="string" required>
+  Unique identifier for the created user.
+</ResponseField>

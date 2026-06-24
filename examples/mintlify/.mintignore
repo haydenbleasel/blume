@@ -1,0 +1,13 @@
+# Blume should treat this file as part of the Mintlify starter compatibility fixture.
+# Mintlify automatically ignores these files and directories:
+# .git, .github, .claude, .agents, .idea, node_modules,
+# README.md, LICENSE.md, CHANGELOG.md, CONTRIBUTING.md
+
+# Draft content
+drafts/
+*.draft.mdx
+
+# Local build output
+.blume/
+dist/
+.turbo/

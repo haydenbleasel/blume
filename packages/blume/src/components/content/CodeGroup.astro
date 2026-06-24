@@ -1,0 +1,13 @@
+---
+import Tabs from "./Tabs.astro";
+
+interface Props {
+  dropdown?: boolean;
+}
+
+const { dropdown = false } = Astro.props;
+---
+
+<Tabs dropdown={dropdown} hash={false}>
+  <slot />
+</Tabs>

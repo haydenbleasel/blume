@@ -1,0 +1,15 @@
+---
+import Icon from "../Icon.astro";
+
+const { name } = Astro.props;
+---
+
+<div
+  class="flex items-center gap-2 rounded px-2 py-1 text-muted-foreground outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent/40"
+  data-blume-tree-item
+  data-blume-tree-name={name}
+  role="treeitem"
+>
+  <Icon class="shrink-0" name="file" size={15} />
+  <span class="font-mono text-xs">{name}</span>
+</div>

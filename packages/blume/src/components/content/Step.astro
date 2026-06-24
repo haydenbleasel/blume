@@ -1,15 +1,39 @@
 ---
+import Icon from "../Icon.astro";
+import { hasIcon } from "../../theme/icons.ts";
+
 interface Props {
+  icon?: string;
+  iconType?: string;
   title?: string;
 }
 
-const { title } = Astro.props;
+const { icon, iconType, title } = Astro.props;
+const markerClass =
+  "absolute top-0 -left-[2.75rem] flex size-6 items-center justify-center rounded-full bg-accent text-center font-semibold text-accent-foreground text-xs";
+const isImageIcon = (value: string): boolean =>
+  /^(?:https?:\/\/|data:image\/|\/|\.{1,2}\/)/u.test(value) ||
+  /\.(?:avif|gif|jpe?g|png|svg|webp)$/iu.test(value);
+const canRenderIcon =
+  icon !== undefined &&
+  (/^\s*<svg[\s\S]*<\/svg>\s*$/u.test(icon) ||
+    isImageIcon(icon) ||
+    hasIcon(icon, iconType));
 ---
 
 <div
-  class="relative [counter-increment:blume-step] before:absolute before:top-0 before:-left-[2.75rem] before:flex before:size-6 before:items-center before:justify-center before:rounded-full before:bg-accent before:text-center before:font-semibold before:text-accent-foreground before:text-xs before:[content:counter(blume-step)]"
+  class="relative [counter-increment:blume-step]"
 >
-  {title && <p class="mb-1.5 font-semibold">{title}</p>}
+  <span class:list={[markerClass, !canRenderIcon && "before:[content:counter(blume-step)]"]}>
+    {canRenderIcon && <Icon iconType={iconType} name={icon} size={14} />}
+  </span>
+  {
+    title && (
+      <p class="mb-1.5 font-semibold text-[length:var(--blume-step-title-size,1rem)] leading-[var(--blume-step-title-line-height,1.75rem)]">
+        {title}
+      </p>
+    )
+  }
   <div class="[&>:first-child]:mt-0 [&>:last-child]:mb-0">
     <slot />
   </div>

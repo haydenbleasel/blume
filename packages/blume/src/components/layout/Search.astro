@@ -2,10 +2,12 @@
 import Icon from "../Icon.astro";
 
 interface Props {
+  prompt?: string;
   provider: "orama" | "pagefind";
 }
 
-const { provider } = Astro.props;
+const { prompt = "Search documentation...", provider } = Astro.props;
+const buttonLabel = prompt.replaceAll(/\.\.\.$/gu, "");
 const base = import.meta.env.BASE_URL;
 const pagefindUrl = `${base}pagefind/pagefind.js`.replace("//", "/");
 const indexUrl = `${base}blume-search.json`.replace("//", "/");
@@ -24,7 +26,9 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
     type="button"
   >
     <Icon name="search" size={16} />
-    <span class="min-w-0 flex-1 text-left max-sm:hidden">Search</span>
+    <span class="min-w-0 flex-1 truncate text-left max-sm:hidden">
+      {buttonLabel}
+    </span>
     <kbd
       class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.7rem] max-sm:hidden"
     >
@@ -43,7 +47,7 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
         aria-label="Search docs"
         class="flex-1 border-0 bg-transparent text-base text-foreground focus:outline-none"
         data-blume-search-input
-        placeholder="Search documentation..."
+        placeholder={prompt}
         type="search"
       />
       <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.7rem]">Esc</kbd>

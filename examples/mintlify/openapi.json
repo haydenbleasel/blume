@@ -1,0 +1,128 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Blume API",
+    "description": "A small OpenAPI spec used to verify Mintlify-style API navigation.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com"
+    }
+  ],
+  "paths": {
+    "/flowers": {
+      "get": {
+        "operationId": "listFlowers",
+        "summary": "List flowers",
+        "description": "Returns the flowers available in the catalog.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of flowers to return.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of flowers.",
+            "content": {
+              "application/json": {
+                "example": [
+                  {
+                    "id": "rose",
+                    "name": "Rose"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createFlower",
+        "summary": "Create a flower",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The flower name."
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "The display color."
+                  }
+                }
+              },
+              "example": {
+                "name": "Rose",
+                "color": "red"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created flower.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "id": "rose",
+                  "name": "Rose"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hidden-flowers": {
+      "get": {
+        "operationId": "hiddenFlowers",
+        "summary": "Hidden flowers",
+        "description": "Returns flowers that are documented but hidden from navigation.",
+        "x-hidden": true,
+        "responses": {
+          "200": {
+            "description": "A hidden list of flowers."
+          }
+        }
+      }
+    },
+    "/internal-flowers": {
+      "get": {
+        "operationId": "internalFlowers",
+        "summary": "Internal flowers",
+        "description": "This endpoint should not be published.",
+        "x-excluded": true,
+        "responses": {
+          "200": {
+            "description": "Internal flowers."
+          }
+        }
+      }
+    },
+    "/legacy-flowers": {
+      "get": {
+        "operationId": "legacyFlowers",
+        "summary": "Legacy flowers",
+        "description": "Returns the legacy flower catalog.",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "Legacy flowers."
+          }
+        }
+      }
+    }
+  }
+}

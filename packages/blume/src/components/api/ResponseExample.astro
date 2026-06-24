@@ -1,19 +1,15 @@
 ---
+import ApiExamplePanel from "./ApiExamplePanel.astro";
+
 interface Props {
+  dropdown?: boolean;
+  id?: string;
   title?: string;
 }
 
-const { title = "Response" } = Astro.props;
+const { dropdown = false, id, title = "Response" } = Astro.props;
 ---
 
-<div
-  class="not-prose my-6 overflow-hidden rounded-blume border border-border bg-background"
-  data-blume-code-panel
->
-  <div
-    class="border-border border-b bg-muted/35 px-3.5 py-2 font-medium text-muted-foreground text-xs"
-  >
-    {title}
-  </div>
+<ApiExamplePanel dropdown={dropdown} id={id} kind="response" title={title}>
   <slot />
-</div>
+</ApiExamplePanel>

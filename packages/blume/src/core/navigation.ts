@@ -1,7 +1,15 @@
 import { extname } from "pathe";
 
 import type { FolderMeta, SidebarItemConfig } from "./schema.ts";
-import type { NavNode, Navigation, NavTab, PageRecord } from "./types.ts";
+import type {
+  NavChromeVariant,
+  NavNode,
+  NavSidebarVariant,
+  Navigation,
+  NavSelector,
+  NavTab,
+  PageRecord,
+} from "./types.ts";
 
 const NUMERIC_PREFIX = /^(?<order>\d+)[-_.]/u;
 const GROUP_FOLDER = /^\((?<label>.+)\)$/u;
@@ -31,8 +39,11 @@ interface MutablePage {
   key: string;
   label: string;
   route: string;
+  description?: string;
   icon?: string;
   badge?: string;
+  deprecated?: boolean;
+  apiMethod?: string;
   pageId: string;
   order: number;
 }
@@ -96,6 +107,19 @@ const pageOrder = (page: PageRecord, filename: string): number => {
   return numericOrder(filename);
 };
 
+const pageApiMethod = (page: PageRecord): string | undefined => {
+  if (page.meta.hideApiMarker) {
+    return undefined;
+  }
+  const { api } = page.meta;
+  if (typeof api === "string") {
+    return api
+      .match(/^(?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/iu)
+      ?.groups?.method?.toUpperCase();
+  }
+  return api?.method;
+};
+
 /** Apply folder meta (title/order/icon/collapsed and explicit page order). */
 const applyFolderMeta = (
   group: MutableGroup,
@@ -143,7 +167,10 @@ const sortNodes = (nodes: MutableNode[]): void => {
 const toNavNode = (node: MutableNode): NavNode => {
   if (node.kind === "page") {
     return {
+      apiMethod: node.apiMethod,
       badge: node.badge,
+      deprecated: node.deprecated || undefined,
+      description: node.description,
       icon: node.icon,
       kind: "page",
       label: node.label,
@@ -181,7 +208,10 @@ const buildFileSystemSidebar = (
     }
 
     parent.children.push({
+      apiMethod: pageApiMethod(page),
       badge: page.meta.sidebar.badge,
+      deprecated: page.meta.deprecated || undefined,
+      description: page.description,
       icon: page.meta.sidebar.icon,
       key: segmentKey(filename.replace(extname(filename), "")),
       kind: "page",
@@ -205,6 +235,17 @@ const normalizeRef = (ref: string): string => {
   return withSlash.endsWith("/index") ? withSlash.slice(0, -6) : withSlash;
 };
 
+const routeForRef = (
+  ref: string | undefined,
+  byRoute: Map<string, PageRecord>
+): string | undefined => {
+  if (!ref) {
+    return undefined;
+  }
+  const normalized = normalizeRef(ref);
+  return byRoute.get(normalized)?.route ?? normalized;
+};
+
 /** Build the sidebar tree from an explicit config spec. */
 const buildConfigSidebar = (
   items: SidebarItemConfig[],
@@ -217,6 +258,10 @@ const buildConfigSidebar = (
       const page = byRoute.get(normalizeRef(item));
       if (page) {
         nodes.push({
+          apiMethod: pageApiMethod(page),
+          badge: page.meta.sidebar.badge,
+          deprecated: page.meta.deprecated || undefined,
+          description: page.description,
           icon: page.meta.sidebar.icon,
           kind: "page",
           label: page.meta.sidebar.label ?? page.title,
@@ -229,17 +274,36 @@ const buildConfigSidebar = (
 
     if (item.items) {
       nodes.push({
+        badge: item.badge,
         children: buildConfigSidebar(item.items, byRoute),
         collapsed: item.collapsed,
+        directory: item.directory,
         icon: item.icon,
         kind: "group",
         label: item.label,
+        route: routeForRef(item.root, byRoute),
+      });
+      continue;
+    }
+
+    if (item.root) {
+      const page = byRoute.get(normalizeRef(item.root));
+      nodes.push({
+        apiMethod: page ? pageApiMethod(page) : undefined,
+        badge: item.badge,
+        deprecated: page?.meta.deprecated || undefined,
+        icon: item.icon,
+        kind: "page",
+        label: item.label,
+        pageId: page?.id ?? "",
+        route: page?.route ?? normalizeRef(item.root),
       });
       continue;
     }
 
     if (item.href) {
       nodes.push({
+        badge: item.badge,
         icon: item.icon,
         kind: "page",
         label: item.label,
@@ -256,17 +320,40 @@ const buildConfigSidebar = (
 export const buildNavigation = (
   pages: PageRecord[],
   options: {
+    chromeVariants?: NavChromeVariant[];
     folderMeta: Map<string, FolderMeta>;
+    selectors?: NavSelector[];
     tabs?: NavTab[];
     sidebar?: SidebarItemConfig[];
+    sidebarVariants?: { path: string; items: SidebarItemConfig[] }[];
   }
 ): Navigation => {
+  const chromeVariants = options.chromeVariants ?? [];
+  const selectors = options.selectors ?? [];
   const tabs = options.tabs ?? [];
+  const byRoute = new Map(pages.map((page) => [page.route, page]));
+  const sidebarVariants: NavSidebarVariant[] = (
+    options.sidebarVariants ?? []
+  ).map((variant) => ({
+    path: variant.path,
+    sidebar: buildConfigSidebar(variant.items, byRoute),
+  }));
 
   if (options.sidebar) {
-    const byRoute = new Map(pages.map((page) => [page.route, page]));
-    return { sidebar: buildConfigSidebar(options.sidebar, byRoute), tabs };
+    return {
+      chromeVariants,
+      selectors,
+      sidebar: buildConfigSidebar(options.sidebar, byRoute),
+      sidebarVariants,
+      tabs,
+    };
   }
 
-  return { sidebar: buildFileSystemSidebar(pages, options.folderMeta), tabs };
+  return {
+    chromeVariants,
+    selectors,
+    sidebar: buildFileSystemSidebar(pages, options.folderMeta),
+    sidebarVariants,
+    tabs,
+  };
 };

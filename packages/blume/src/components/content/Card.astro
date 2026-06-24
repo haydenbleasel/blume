@@ -2,34 +2,103 @@
 import Icon from "../Icon.astro";
 
 interface Props {
-  title: string;
+  title?: string;
   href?: string;
   icon?: string;
+  iconType?: string;
+  img?: string;
+  horizontal?: boolean | string;
+  cta?: string;
+  arrow?: boolean | string;
+  type?: "info" | "warning" | "note" | "tip" | "check" | "danger";
+  color?: string;
 }
 
-const { title, href, icon } = Astro.props;
+const { arrow, color, cta, horizontal, href, icon, iconType, img, title, type } =
+  Astro.props;
 const Tag = href ? "a" : "div";
 const external = href?.startsWith("http");
+const isHorizontal = horizontal === true || horizontal === "true";
+const showArrow =
+  href && arrow === undefined ? external : arrow === true || arrow === "true";
+const iconByType = {
+  check: "circle-check",
+  danger: "circle-x",
+  info: "info",
+  note: "info",
+  tip: "lightbulb",
+  warning: "triangle-alert",
+};
+const iconClass = {
+  check: "text-green-600 dark:text-green-400",
+  danger: "text-red-600 dark:text-red-400",
+  info: "text-blue-600 dark:text-blue-400",
+  note: "text-muted-foreground/70",
+  tip: "text-accent",
+  warning: "text-amber-600 dark:text-amber-400",
+};
+const iconName = icon ?? (type ? iconByType[type] : undefined);
+const variantClass = {
+  check: "border-green-500/30 bg-green-500/10",
+  danger: "border-red-500/30 bg-red-500/10",
+  info: "border-blue-500/30 bg-blue-500/10",
+  note: "border-border bg-muted/40",
+  tip: "border-accent/30 bg-accent/10",
+  warning: "border-amber-500/30 bg-amber-500/10",
+}[type ?? "note"];
 ---
 
 <Tag
-  class="not-prose block rounded-blume border border-border bg-background p-5 text-inherit no-underline! transition-colors hover:[&[href]]:border-accent"
+  class:list={[
+    "not-prose block overflow-hidden rounded-blume border text-inherit no-underline transition-colors hover:no-underline hover:[&[href]]:border-accent",
+    type ? variantClass : "border-border bg-background",
+    isHorizontal ? "sm:flex" : "",
+  ]}
+  data-blume-card
   href={href}
   rel={external ? "noreferrer" : undefined}
   target={external ? "_blank" : undefined}
 >
   {
-    icon && (
-      <div class="mb-2.5 text-accent">
-        <Icon name={icon} size={20} />
+    img && (
+      <img
+        alt=""
+        class:list={[
+          "w-full object-cover",
+          isHorizontal ? "sm:w-40 sm:shrink-0" : "max-h-48",
+        ]}
+        src={img}
+      />
+    )
+  }
+  <div class="p-5">
+  {
+    iconName && (
+      <div class:list={["mb-2.5", color ? "" : type ? iconClass[type] : "text-accent"]}>
+        <Icon color={color} iconType={iconType} name={iconName} size={20} />
       </div>
     )
   }
-  <p class="mt-0! mb-1.5! flex items-center gap-1.5 font-semibold">
-    {title}
-    {href && <Icon class="text-muted-foreground" name="arrow-right" size={14} />}
-  </p>
-  <div class="text-muted-foreground text-sm [&>:first-child]:mt-0! [&>:last-child]:mb-0!">
+  {
+    title && (
+      <p class="mb-1.5 flex items-center gap-1.5 font-semibold">
+        {title}
+        {showArrow && (
+          <Icon class="text-muted-foreground" name="arrow-right" size={14} />
+        )}
+      </p>
+    )
+  }
+  <div class="text-muted-foreground text-sm [&>:first-child]:mt-0 [&>:last-child]:mb-0">
     <slot />
+  </div>
+  {
+    cta && (
+      <p class="mt-4 mb-0 flex items-center gap-1.5 font-medium text-accent text-sm">
+        {cta}
+        {showArrow && <Icon name="arrow-right" size={14} />}
+      </p>
+    )
+  }
   </div>
 </Tag>

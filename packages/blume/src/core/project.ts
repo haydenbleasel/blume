@@ -10,8 +10,9 @@ const CONFIG_FILENAMES = [
   "blume.config.mjs",
   "blume.config.js",
 ];
+const MINTLIFY_CONFIG_FILENAMES = ["docs.json"];
 
-const THEME_FILENAMES = ["theme.css"];
+const THEME_FILENAMES = ["theme.css", "custom.css", "style.css"];
 const COMPONENTS_FILENAMES = ["components.tsx", "components.ts"];
 
 const firstExisting = (root: string, names: string[]): string | null => {
@@ -24,9 +25,22 @@ const firstExisting = (root: string, names: string[]): string | null => {
   return null;
 };
 
-/** Locate the Blume config file for a project root, if any. */
-export const findConfigFile = (root: string): string | null =>
+const allExisting = (root: string, names: string[]): string[] =>
+  names
+    .map((name) => join(root, name))
+    .filter((candidate) => existsSync(candidate));
+
+/** Locate a native Blume config file for a project root, if any. */
+export const findBlumeConfigFile = (root: string): string | null =>
   firstExisting(root, CONFIG_FILENAMES);
+
+/** Locate a Mintlify config file for a project root, if any. */
+export const findMintlifyConfigFile = (root: string): string | null =>
+  firstExisting(root, MINTLIFY_CONFIG_FILENAMES);
+
+/** Locate any config file Blume can load for a project root, if any. */
+export const findConfigFile = (root: string): string | null =>
+  findBlumeConfigFile(root) ?? findMintlifyConfigFile(root);
 
 /**
  * Resolve every path Blume needs from a project root and its resolved config.
@@ -37,20 +51,32 @@ export const resolveProjectContext = (
   config: ResolvedConfig
 ): ProjectContext => {
   const absoluteRoot = resolve(root);
+  const configFile = findConfigFile(absoluteRoot);
+  const isMintlifyProject = configFile?.endsWith("docs.json") === true;
+  const outDir = join(absoluteRoot, ".blume");
   const contentRoot = isAbsolute(config.content.root)
     ? config.content.root
     : join(absoluteRoot, config.content.root);
 
   const pagesPath = join(absoluteRoot, config.content.pages);
   const pagesRoot = existsSync(pagesPath) ? pagesPath : null;
+  const themeFiles = allExisting(absoluteRoot, THEME_FILENAMES);
 
   return {
     componentsFile: firstExisting(absoluteRoot, COMPONENTS_FILENAMES),
-    configFile: findConfigFile(absoluteRoot),
+    configFile,
     contentRoot,
-    outDir: join(absoluteRoot, ".blume"),
+    generatedContentRoot:
+      config.api.openapi.length > 0 || config.api.asyncapi.length > 0
+        ? join(outDir, "api-content")
+        : null,
+    outDir,
     pagesRoot,
+    publicRoot: isMintlifyProject
+      ? join(outDir, "public")
+      : join(absoluteRoot, "public"),
     root: absoluteRoot,
-    themeFile: firstExisting(absoluteRoot, THEME_FILENAMES),
+    themeFile: themeFiles[0] ?? null,
+    themeFiles,
   };
 };

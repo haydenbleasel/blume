@@ -1,4 +1,4 @@
-import type { PageMeta, ResolvedConfig } from "./schema.ts";
+import type { DirectoryMode, PageMeta, ResolvedConfig } from "./schema.ts";
 
 /** Severity levels for Blume diagnostics. */
 export type DiagnosticSeverity = "error" | "warning" | "info";
@@ -39,8 +39,14 @@ export interface ProjectContext {
   pagesRoot: string | null;
   /** Absolute path to the generated runtime (`<root>/.blume`). */
   outDir: string;
-  /** Absolute path to the user `theme.css`, if present. */
+  /** Absolute path to generated content, if any generator is enabled. */
+  generatedContentRoot: string | null;
+  /** Absolute path to the directory Astro serves as static public assets. */
+  publicRoot: string;
+  /** Absolute path to the first user theme stylesheet, if present. */
   themeFile: string | null;
+  /** Absolute paths to user theme stylesheets, in cascade order. */
+  themeFiles: string[];
   /** Absolute path to the user `components.ts`/`.tsx`, if present. */
   componentsFile: string | null;
   /** Absolute path to the resolved config file, if any was found. */
@@ -79,14 +85,20 @@ export type NavNode =
       kind: "page";
       label: string;
       route: string;
+      description?: string;
       icon?: string;
       badge?: string;
+      deprecated?: boolean;
+      apiMethod?: string;
       pageId: string;
     }
   | {
       kind: "group";
       label: string;
+      badge?: string;
+      directory?: DirectoryMode;
       icon?: string;
+      route?: string;
       collapsed?: boolean;
       children: NavNode[];
     };
@@ -96,12 +108,46 @@ export interface NavTab {
   label: string;
   path: string;
   icon?: string;
+  items?: NavSelectorItem[];
+}
+
+/** A selectable navigation option inside a tab menu or top selector. */
+export interface NavSelectorItem {
+  label: string;
+  path: string;
+  description?: string;
+  icon?: string;
+  tag?: string;
+}
+
+/** Top-level Mintlify-style partition selectors. */
+export interface NavSelector {
+  label: string;
+  kind: "dropdown" | "language" | "product" | "version";
+  items: NavSelectorItem[];
+}
+
+/** Sidebar tree used when the current route belongs to a nav partition. */
+export interface NavSidebarVariant {
+  path: string;
+  sidebar: NavNode[];
+}
+
+/** Chrome overrides used when the current route belongs to a nav partition. */
+export interface NavChromeVariant {
+  path: string;
+  banner?: ResolvedConfig["banner"];
+  footer?: ResolvedConfig["footer"];
+  navbar?: ResolvedConfig["navbar"];
 }
 
 /** The complete navigation model derived from the content graph. */
 export interface Navigation {
   tabs: NavTab[];
+  selectors: NavSelector[];
+  chromeVariants: NavChromeVariant[];
   sidebar: NavNode[];
+  sidebarVariants: NavSidebarVariant[];
 }
 
 /** The full content graph: the source of truth for generated modules. */

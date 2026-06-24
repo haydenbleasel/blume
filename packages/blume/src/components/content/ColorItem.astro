@@ -1,0 +1,87 @@
+---
+interface ColorValue {
+  dark?: string;
+  light?: string;
+}
+
+interface Props {
+  name: string;
+  value: string | ColorValue;
+}
+
+const { name, value } = Astro.props;
+
+const lightValue = typeof value === "string" ? value : value.light ?? value.dark;
+const darkValue = typeof value === "string" ? value : value.dark ?? value.light;
+const displayValue =
+  lightValue && darkValue && lightValue !== darkValue
+    ? `${lightValue} / ${darkValue}`
+    : lightValue;
+---
+
+<button
+  aria-label={`Copy ${name} color ${displayValue}`}
+  class="min-w-0 cursor-pointer rounded-blume border border-border bg-background p-3 text-left transition hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+  data-blume-color-copy={displayValue}
+  style={`--blume-color-light:${lightValue};--blume-color-dark:${darkValue};`}
+  type="button"
+>
+  <div
+    class="mb-2 h-10 rounded border border-border"
+    data-blume-color-swatch
+    style="background:var(--blume-color-light)"
+  >
+  </div>
+  <div class="flex min-w-0 items-center justify-between gap-2">
+    <p class="m-0 truncate font-medium text-foreground text-xs">{name}</p>
+    <span
+      class="shrink-0 font-medium text-[0.65rem] text-muted-foreground"
+      data-blume-color-status
+    >
+      Copy
+    </span>
+  </div>
+  <p class="m-0 truncate font-mono text-muted-foreground text-xs">
+    {displayValue}
+  </p>
+</button>
+
+<style>
+  :global(.dark) [data-blume-color-swatch] {
+    background: var(--blume-color-dark, var(--blume-color-light));
+  }
+</style>
+
+<script>
+  const state = window as Window & { __blumeColorCopy?: boolean };
+  if (!state.__blumeColorCopy) {
+    state.__blumeColorCopy = true;
+    document.addEventListener("click", async (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const button = target.closest<HTMLButtonElement>("[data-blume-color-copy]");
+      if (!button) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(button.dataset.blumeColorCopy ?? "");
+      } catch {
+        return;
+      }
+
+      const status = button.querySelector("[data-blume-color-status]");
+      if (!status) {
+        return;
+      }
+
+      status.textContent = "Copied";
+      window.setTimeout(() => {
+        status.textContent = "Copy";
+      }, 1500);
+    });
+  }
+</script>

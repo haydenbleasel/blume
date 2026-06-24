@@ -1,0 +1,65 @@
+---
+interface RssMetadata {
+  description?: string;
+  title?: string;
+}
+
+interface Props {
+  description?: string;
+  label?: string;
+  rss?: RssMetadata;
+  tags?: string[] | string;
+  title?: string;
+}
+
+const { description, label, rss, tags, title } = Astro.props;
+const slugify = (text: string): string =>
+  text
+    .toLowerCase()
+    .trim()
+    .replaceAll(/[^\w\s-]/gu, "")
+    .replaceAll(/[\s_]+/gu, "-")
+    .replaceAll(/-+/gu, "-")
+    .replaceAll(/^-|-$/gu, "");
+const updateLabel = label ?? title ?? "Update";
+const id = slugify(updateLabel) || "update";
+const tagList = Array.isArray(tags) ? tags : tags ? [tags] : [];
+---
+
+<article
+  class="not-prose group/update my-8 grid gap-4 border-border border-l pl-4 md:grid-cols-[10rem_minmax(0,1fr)] md:border-l-0 md:pl-0"
+  data-blume-update
+  data-blume-update-rss-description={rss?.description}
+  data-blume-update-rss-title={rss?.title}
+  id={id}
+>
+  <header class="md:border-border md:border-r md:pr-4">
+    <a
+      class="font-semibold text-foreground text-sm no-underline hover:text-accent"
+      href={`#${id}`}
+    >
+      {updateLabel}
+    </a>
+    {
+      description && (
+        <p class="mt-1 mb-0 text-muted-foreground text-xs leading-5">
+          {description}
+        </p>
+      )
+    }
+    {
+      tagList.length > 0 && (
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          {tagList.map((tag) => (
+            <span class="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-[0.65rem]">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )
+    }
+  </header>
+  <div class="min-w-0 text-muted-foreground text-sm leading-6 [&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h2]:mt-0 [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:font-semibold [&_h3]:text-foreground [&_img]:rounded-blume [&_li]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0">
+    <slot />
+  </div>
+</article>

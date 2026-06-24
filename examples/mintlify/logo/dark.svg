@@ -1,0 +1,7 @@
+<svg width="180" height="23" viewBox="0 0 180 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="23" height="23" rx="5" fill="#0C8C5E" />
+  <path d="M7 5H13.5C16.2 5 18 6.6 18 8.9C18 10.3 17.2 11.5 15.9 12.1C17.5 12.7 18.4 14 18.4 15.7C18.4 18.2 16.4 20 13.5 20H7V5Z" fill="#18E299" />
+  <path d="M10.3 8V11H13C14.1 11 14.8 10.4 14.8 9.5C14.8 8.6 14.1 8 13 8H10.3ZM10.3 14V17H13.2C14.4 17 15.2 16.4 15.2 15.5C15.2 14.6 14.4 14 13.2 14H10.3Z" fill="white" />
+  <text x="32" y="17" font-family="Inter, ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="16" font-weight="650" fill="white">Blume</text>
+  <text x="92" y="17" font-family="Inter, ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="15" font-weight="500" fill="#A1A1AA">Starter Kit</text>
+</svg>

@@ -1,40 +1,179 @@
 ---
 import type { NavNode } from "../../core/types.ts";
+import Icon from "../Icon.astro";
 import Self from "./NavTree.astro";
 
 interface Props {
   items: NavNode[];
   currentRoute: string;
+  depth?: number;
 }
 
-const { items, currentRoute } = Astro.props;
+const { items, currentRoute, depth = 0 } = Astro.props;
+
+const apiMethodClass = (method: string): string => {
+  const key = method.toLowerCase();
+  const colors: Record<string, string> = {
+    delete: "bg-red-500/10 text-red-600 dark:text-red-400",
+    get: "bg-green-500/10 text-green-600 dark:text-green-400",
+    head: "bg-muted text-muted-foreground",
+    options: "bg-muted text-muted-foreground",
+    patch: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    post: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    put: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  };
+  return colors[key] ?? "bg-muted text-muted-foreground";
+};
+
+const badgeClass =
+  "shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-medium text-[0.65rem] text-muted-foreground leading-none";
+const deprecatedClass =
+  "shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-medium text-[0.65rem] text-amber-700 leading-none dark:text-amber-300";
+
+const hasActivePage = (item: NavNode): boolean =>
+  item.kind === "page"
+    ? item.route === currentRoute
+    : item.route === currentRoute || item.children.some(hasActivePage);
 ---
 
-<ul class="m-0 list-none space-y-px p-0">
+<ul class="m-0 list-none p-0">
   {
-    items.map((item, index) =>
-      item.kind === "page" ? (
-        <li>
-          <a
-            aria-current={item.route === currentRoute ? "page" : undefined}
-            class="block rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground"
-            href={item.route}
-          >
-            {item.label}
-          </a>
+    items.map((item, index) => {
+      if (item.kind === "page") {
+        return (
+          <li>
+            <a
+              aria-current={item.route === currentRoute ? "page" : undefined}
+              class="block rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground"
+              href={item.route}
+            >
+              <span class="flex min-w-0 items-center gap-2">
+                {item.icon && (
+                  <Icon
+                    class="shrink-0 text-muted-foreground"
+                    name={item.icon}
+                    size={14}
+                  />
+                )}
+                {item.apiMethod && (
+                  <span
+                    class={`shrink-0 rounded px-1.5 py-0.5 font-mono font-semibold text-[0.65rem] leading-none ${apiMethodClass(item.apiMethod)}`}
+                  >
+                    {item.apiMethod}
+                  </span>
+                )}
+                <span class="min-w-0 flex-1 truncate">{item.label}</span>
+                {item.badge && <span class={badgeClass}>{item.badge}</span>}
+                {item.deprecated && (
+                  <span class={deprecatedClass}>deprecated</span>
+                )}
+              </span>
+            </a>
+          </li>
+        );
+      }
+
+      const active = hasActivePage(item);
+      const open = depth === 0 || active || item.collapsed === false;
+      const spacing = index === 0 ? "mt-0" : "mt-6";
+      if (depth === 0) {
+        return (
+          <li>
+            <p
+              class={`mb-2 flex min-w-0 items-center gap-1.5 font-medium text-foreground text-sm ${spacing}`}
+            >
+              {item.route ? (
+                <a
+                  aria-current={item.route === currentRoute ? "page" : undefined}
+                  class="-ml-1 flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-foreground transition-colors hover:bg-muted aria-[current=page]:bg-muted"
+                  href={item.route}
+                >
+                  {item.icon && (
+                    <Icon
+                      class="shrink-0 text-muted-foreground"
+                      name={item.icon}
+                      size={14}
+                    />
+                  )}
+                  <span class="min-w-0 truncate">{item.label}</span>
+                  {item.badge && (
+                    <span class={`ml-auto ${badgeClass}`}>{item.badge}</span>
+                  )}
+                </a>
+              ) : (
+                <>
+                  {item.icon && (
+                    <Icon
+                      class="shrink-0 text-muted-foreground"
+                      name={item.icon}
+                      size={14}
+                    />
+                  )}
+                  <span class="min-w-0 truncate">{item.label}</span>
+                  {item.badge && (
+                    <span class={`ml-auto ${badgeClass}`}>{item.badge}</span>
+                  )}
+                </>
+              )}
+            </p>
+            <div class="space-y-0.5">
+              <Self
+                currentRoute={currentRoute}
+                depth={depth + 1}
+                items={item.children}
+              />
+            </div>
+          </li>
+        );
+      }
+
+      return (
+        <li class={spacing}>
+          <details class="group" open={open}>
+            <summary class="mb-1 flex cursor-pointer list-none items-center gap-1.5 rounded-[0.65rem] px-2.5 py-1.5 font-medium text-foreground text-sm transition-colors hover:bg-muted [&::-webkit-details-marker]:hidden">
+              {item.route ? (
+                <a
+                  aria-current={item.route === currentRoute ? "page" : undefined}
+                  class="-my-1 flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 text-foreground transition-colors aria-[current=page]:font-semibold"
+                  href={item.route}
+                >
+                  {item.icon && (
+                    <Icon
+                      class="shrink-0 text-muted-foreground"
+                      name={item.icon}
+                      size={14}
+                    />
+                  )}
+                  <span class="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.badge && <span class={badgeClass}>{item.badge}</span>}
+                </a>
+              ) : (
+                <>
+                  {item.icon && (
+                    <Icon
+                      class="shrink-0 text-muted-foreground"
+                      name={item.icon}
+                      size={14}
+                    />
+                  )}
+                  <span class="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.badge && <span class={badgeClass}>{item.badge}</span>}
+                </>
+              )}
+              <span class="shrink-0 text-muted-foreground transition-transform group-open:rotate-90">
+                <Icon name="chevron-right" size={13} />
+              </span>
+            </summary>
+            <div class="space-y-0.5 border-border border-l pl-3">
+              <Self
+                currentRoute={currentRoute}
+                depth={depth + 1}
+                items={item.children}
+              />
+            </div>
+          </details>
         </li>
-      ) : (
-        <li>
-          <p
-            class={`mx-2 mb-2 font-medium text-foreground text-sm ${index === 0 ? "mt-0" : "mt-6"}`}
-          >
-            {item.label}
-          </p>
-          <div class="space-y-0.5">
-            <Self currentRoute={currentRoute} items={item.children} />
-          </div>
-        </li>
-      )
-    )
+      );
+    })
   }
 </ul>

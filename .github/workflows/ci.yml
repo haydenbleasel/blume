@@ -21,6 +21,6 @@ jobs:
       - name: Test
         run: bun run test
       - name: Build example
-        run: cd examples/basic && bun run build
+        run: cd examples/mintlify && bun run build
       - name: Build docs
         run: cd docs && bun run build

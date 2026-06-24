@@ -8,6 +8,26 @@ import { scanProject } from "../../core/project-graph.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
+const ignoredWatchSegments = new Set([
+  ".blume",
+  ".git",
+  "build",
+  "dist",
+  "node_modules",
+]);
+
+const shouldIgnoreWatchEvent = (
+  filename: Buffer<ArrayBufferLike> | string | null
+): boolean => {
+  if (!filename) {
+    return false;
+  }
+  const value = filename.toString();
+  return value
+    .split(/[\\/]/u)
+    .some((segment) => ignoredWatchSegments.has(segment));
+};
+
 export const devCommand = defineCommand({
   args: {
     host: { description: "Network host to bind.", type: "string" },
@@ -43,7 +63,7 @@ export const devCommand = defineCommand({
       project.context.contentRoot,
       project.context.pagesRoot,
       project.context.configFile,
-      project.context.themeFile,
+      ...project.context.themeFiles,
       project.context.componentsFile,
     ].filter((target) => target !== null);
 
@@ -63,7 +83,11 @@ export const devCommand = defineCommand({
     };
 
     const watchers = watchTargets.map((target) =>
-      watch(target, { recursive: true }, regenerate)
+      watch(target, { recursive: true }, (_event, filename) => {
+        if (!shouldIgnoreWatchEvent(filename)) {
+          regenerate();
+        }
+      })
     );
 
     const shutdown = async () => {

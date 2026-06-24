@@ -3,7 +3,10 @@ interface Parameter {
   name: string;
   type?: string;
   required?: boolean;
+  deprecated?: boolean;
   description?: string;
+  post?: string[] | string;
+  pre?: string[] | string;
 }
 
 interface Props {
@@ -12,6 +15,13 @@ interface Props {
 }
 
 const { title, parameters = [] } = Astro.props;
+
+const pills = (value: string[] | string | undefined): string[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return value ? [value] : [];
+};
 ---
 
 <div class="not-prose my-6">
@@ -37,12 +47,37 @@ const { title, parameters = [] } = Astro.props;
             {parameters.map((parameter) => (
               <tr>
                 <td class="border-border border-b px-3 py-2 align-top">
-                  <code class="font-mono">{parameter.name}</code>
-                  {parameter.required && (
-                    <span class="ml-1.5 text-muted-foreground text-xs">
-                      required
-                    </span>
-                  )}
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    {
+                      pills(parameter.pre).map((label) => (
+                        <span class="rounded bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+                          {label}
+                        </span>
+                      ))
+                    }
+                    <code class="font-mono">{parameter.name}</code>
+                    {
+                      parameter.required && (
+                        <span class="rounded bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+                          required
+                        </span>
+                      )
+                    }
+                    {
+                      parameter.deprecated && (
+                        <span class="rounded bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+                          deprecated
+                        </span>
+                      )
+                    }
+                    {
+                      pills(parameter.post).map((label) => (
+                        <span class="rounded bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+                          {label}
+                        </span>
+                      ))
+                    }
+                  </div>
                 </td>
                 <td class="border-border border-b px-3 py-2 align-top">
                   {parameter.type && (

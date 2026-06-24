@@ -1,0 +1,15 @@
+---
+const { variant = "compact" } = Astro.props;
+---
+
+<div
+  class:list={[
+    "not-prose my-6",
+    variant === "table"
+      ? "space-y-4"
+      : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4",
+  ]}
+  data-blume-color={variant}
+>
+  <slot />
+</div>

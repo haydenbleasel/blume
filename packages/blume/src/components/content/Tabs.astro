@@ -1,13 +1,36 @@
 ---
+interface Props {
+  borderBottom?: boolean;
+  defaultTabIndex?: number;
+  dropdown?: boolean;
+  hash?: boolean;
+  sync?: boolean;
+}
+
+const {
+  borderBottom = false,
+  defaultTabIndex = 0,
+  dropdown = false,
+  hash = true,
+  sync = true,
+} = Astro.props;
 ---
 
 <blume-tabs
   class="not-prose my-6 block overflow-hidden rounded-blume border border-border bg-background"
+  data-border-bottom={borderBottom ? "true" : "false"}
+  data-default-tab-index={defaultTabIndex}
+  data-dropdown={dropdown ? "true" : "false"}
+  data-hash={hash ? "true" : "false"}
+  data-sync={sync ? "true" : "false"}
 >
   <div
-    class="flex gap-4 overflow-x-auto border-border border-b px-3"
+    class:list={[
+      dropdown || borderBottom ? "border-border border-b" : "",
+      dropdown ? "p-3" : "flex gap-4 overflow-x-auto px-3",
+    ]}
     data-blume-tablist
-    role="tablist"
+    role={dropdown ? undefined : "tablist"}
   >
   </div>
   <div>
@@ -17,9 +40,37 @@
 
 <script>
   const TRIGGER_CLASS =
-    "-mb-px inline-flex shrink-0 cursor-pointer items-center border-transparent border-b-2 bg-transparent px-1 py-2.5 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground aria-[selected=true]:border-accent aria-[selected=true]:text-foreground";
+    "-mb-px inline-flex shrink-0 cursor-pointer items-center gap-1.5 border-transparent border-b-2 bg-transparent px-1 py-2.5 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground aria-[selected=true]:border-accent aria-[selected=true]:text-foreground";
+  const SELECT_CLASS =
+    "w-full rounded-blume border border-border bg-background px-3 py-2 font-medium text-foreground text-sm";
+  const SYNC_EVENT = "blume-tabs-change";
+
+  const panelTitle = (panel: HTMLElement, index: number) =>
+    panel.dataset.title ?? `Tab ${index + 1}`;
+  const panelId = (panel: HTMLElement) => panel.dataset.tabId ?? panel.id;
+  const boundedIndex = (value: number, length: number) =>
+    Math.min(Math.max(value, 0), Math.max(length - 1, 0));
+  const appendTriggerContent = (
+    trigger: HTMLButtonElement,
+    panel: HTMLElement,
+    index: number
+  ) => {
+    const icon = panel.querySelector<HTMLTemplateElement>(
+      ":scope > template[data-blume-tab-icon]"
+    );
+    if (icon) {
+      trigger.appendChild(icon.content.cloneNode(true));
+    }
+    const label = document.createElement("span");
+    label.textContent = panelTitle(panel, index);
+    trigger.appendChild(label);
+  };
 
   class BlumeTabs extends HTMLElement {
+    #panels: HTMLElement[] = [];
+    #triggers: HTMLButtonElement[] = [];
+    #select: HTMLSelectElement | null = null;
+
     connectedCallback() {
       const panels = Array.from(
         this.querySelectorAll<HTMLElement>("[data-blume-tab-panel]")
@@ -28,26 +79,172 @@
       if (!list || panels.length === 0) {
         return;
       }
+      if (this.dataset.blumeTabsReady === "true") {
+        return;
+      }
+      this.dataset.blumeTabsReady = "true";
+      this.#panels = panels;
 
-      panels.forEach((panel, index) => {
-        const trigger = document.createElement("button");
-        trigger.type = "button";
-        trigger.role = "tab";
-        trigger.className = TRIGGER_CLASS;
-        trigger.textContent = panel.dataset.title ?? `Tab ${index + 1}`;
-        trigger.setAttribute("aria-selected", index === 0 ? "true" : "false");
-        trigger.addEventListener("click", () => {
-          panels.forEach((p, i) => {
-            p.classList.toggle("hidden", i !== index);
-          });
-          for (const [i, t] of Array.from(list.children).entries()) {
-            t.setAttribute("aria-selected", i === index ? "true" : "false");
-          }
+      if (this.dataset.dropdown === "true") {
+        this.#select = document.createElement("select");
+        this.#select.className = SELECT_CLASS;
+        this.#select.setAttribute("aria-label", "Select code example");
+        panels.forEach((panel, index) => {
+          const option = document.createElement("option");
+          option.value = String(index);
+          option.textContent = panelTitle(panel, index);
+          this.#select?.appendChild(option);
         });
-        list.appendChild(trigger);
-        panel.classList.toggle("hidden", index !== 0);
-      });
+        this.#select.addEventListener("change", () => {
+          this.activate(Number(this.#select?.value ?? "0"), true, true);
+        });
+        list.appendChild(this.#select);
+      } else {
+        panels.forEach((panel, index) => {
+          const trigger = document.createElement("button");
+          trigger.type = "button";
+          trigger.role = "tab";
+          trigger.className = TRIGGER_CLASS;
+          appendTriggerContent(trigger, panel, index);
+          trigger.tabIndex = index === 0 ? 0 : -1;
+          if (panel.id) {
+            trigger.setAttribute("aria-controls", panel.id);
+          }
+          trigger.setAttribute(
+            "aria-selected",
+            index === 0 ? "true" : "false"
+          );
+          trigger.addEventListener("click", () => {
+            this.activate(index, true, true);
+          });
+          trigger.addEventListener("keydown", (event) => {
+            this.#onTriggerKeydown(event, index);
+          });
+          list.appendChild(trigger);
+          this.#triggers.push(trigger);
+          panel.classList.toggle("hidden", index !== 0);
+        });
+      }
+
+      this.activate(this.#initialIndex(), false, false);
+      if (this.#syncEnabled()) {
+        document.addEventListener(SYNC_EVENT, this.#sync);
+      }
+      window.addEventListener("hashchange", this.#hashChange);
     }
+
+    disconnectedCallback() {
+      document.removeEventListener(SYNC_EVENT, this.#sync);
+      window.removeEventListener("hashchange", this.#hashChange);
+    }
+
+    activate(index: number, sync: boolean, updateHash: boolean) {
+      const activePanel = this.#panels[index];
+      if (!activePanel) {
+        return;
+      }
+
+      this.#panels.forEach((panel, panelIndex) => {
+        panel.classList.toggle("hidden", panelIndex !== index);
+      });
+      this.#triggers.forEach((trigger, triggerIndex) => {
+        trigger.setAttribute(
+          "aria-selected",
+          triggerIndex === index ? "true" : "false"
+        );
+        trigger.tabIndex = triggerIndex === index ? 0 : -1;
+      });
+      if (this.#select) {
+        this.#select.value = String(index);
+      }
+      const id = panelId(activePanel);
+      if (updateHash && id && this.#hashEnabled()) {
+        history.replaceState(null, "", `#${encodeURIComponent(id)}`);
+      }
+      if (sync && this.#syncEnabled()) {
+        document.dispatchEvent(
+          new CustomEvent(SYNC_EVENT, {
+            detail: { title: panelTitle(activePanel, index) },
+          })
+        );
+      }
+    }
+
+    activateByTitle(title: string, sync: boolean) {
+      const index = this.#panels.findIndex((panel, panelIndex) => {
+        return panelTitle(panel, panelIndex) === title;
+      });
+      if (index !== -1) {
+        this.activate(index, sync, false);
+      }
+    }
+
+    #activateByHash() {
+      if (!this.#hashEnabled()) {
+        return false;
+      }
+      const id = decodeURIComponent(window.location.hash.slice(1));
+      if (!id) {
+        return false;
+      }
+      const index = this.#panels.findIndex((panel) => panelId(panel) === id);
+      if (index === -1) {
+        return false;
+      }
+
+      this.activate(index, false, false);
+      return true;
+    }
+
+    #initialIndex() {
+      if (this.#activateByHash()) {
+        return this.#panels.findIndex((panel) => !panel.classList.contains("hidden"));
+      }
+      return boundedIndex(
+        Number(this.dataset.defaultTabIndex ?? "0"),
+        this.#panels.length
+      );
+    }
+
+    #onTriggerKeydown(event: KeyboardEvent, index: number) {
+      const lastIndex = this.#triggers.length - 1;
+      let nextIndex: number | undefined;
+      if (event.key === "ArrowRight") {
+        nextIndex = index === lastIndex ? 0 : index + 1;
+      } else if (event.key === "ArrowLeft") {
+        nextIndex = index === 0 ? lastIndex : index - 1;
+      } else if (event.key === "Home") {
+        nextIndex = 0;
+      } else if (event.key === "End") {
+        nextIndex = lastIndex;
+      }
+      if (nextIndex === undefined) {
+        return;
+      }
+
+      event.preventDefault();
+      this.activate(nextIndex, true, true);
+      this.#triggers[nextIndex]?.focus();
+    }
+
+    #syncEnabled() {
+      return this.dataset.sync !== "false";
+    }
+
+    #hashEnabled() {
+      return this.dataset.hash !== "false";
+    }
+
+    #sync = (event: Event) => {
+      const title = (event as CustomEvent<{ title?: string }>).detail?.title;
+      if (title) {
+        this.activateByTitle(title, false);
+      }
+    };
+
+    #hashChange = () => {
+      this.#activateByHash();
+    };
   }
 
   if (!customElements.get("blume-tabs")) {

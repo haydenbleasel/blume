@@ -29,8 +29,11 @@ export const buildContentGraph = (
   }
 
   const navigation = buildNavigation(pages, {
+    chromeVariants: options.navigation.chromeVariants,
     folderMeta: options.folderMeta,
+    selectors: options.navigation.selectors,
     sidebar: options.navigation.sidebar,
+    sidebarVariants: options.navigation.sidebarVariants,
     tabs: options.navigation.tabs,
   });
 

@@ -1,19 +1,100 @@
 ---
+import { createSatteriMarkdownProcessor } from "@astrojs/markdown-satteri";
+
 import type { Heading, Navigation } from "../../core/types.ts";
 import "blume:theme";
 import Icon from "../Icon.astro";
-import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
+import DirectoryListing from "./DirectoryListing.astro";
+import {
+  findBreadcrumbs,
+  findDirectoryListing,
+  flattenPages,
+  getPagination,
+} from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
 import PageActions from "./PageActions.astro";
 import Search from "./Search.astro";
 
+type ContextualOption =
+  | string
+  | {
+      description?: string;
+      href?: string;
+      icon?: string;
+      title: string;
+    };
+
+interface BannerConfig {
+  color?: { dark?: string; light?: string };
+  content: string;
+  dismissible: boolean;
+  type: "info" | "warning" | "critical";
+}
+
 interface Props {
-  site: { title: string; description?: string };
+  banner?: BannerConfig | null;
+  site: {
+    title: string;
+    description?: string;
+    favicon?: string | { dark?: string; light?: string } | null;
+    logo?:
+      | string
+      | { alt?: string; dark?: string; href?: string; light?: string }
+      | null;
+  };
   navigation: Navigation;
-  page: { title: string; description?: string; route: string };
+  page: {
+    canonical?: string;
+    contentType?: string;
+    title: string;
+    deprecated?: boolean;
+    description?: string;
+    route: string;
+    hideFooterPagination?: boolean;
+    keywords?: string[];
+    metaTags?: Record<string, string>;
+    mode?: string;
+    noindex?: boolean;
+    robots?: string;
+    rss?: boolean;
+    seoTitle?: string;
+    toc?:
+      | boolean
+      | { maxHeadingLevel?: number; minHeadingLevel?: number };
+  };
   headings: Heading[];
+  contextual?: { display?: "header" | "toc"; options?: ContextualOption[] };
+  footer?: {
+    links?: {
+      header?: string;
+      items?: { href: string; label: string }[];
+    }[];
+    socials?: Record<string, string>;
+  };
+  navbar?: {
+    links?: {
+      href: string;
+      icon?: string;
+      label: string;
+      type?: "github" | "discord";
+    }[];
+    primary?: {
+      href: string;
+      label: string;
+      type?: "button" | "github" | "discord";
+    };
+  };
+  seo?: {
+    metatags?: Record<string, string>;
+  };
+  styling?: {
+    eyebrows?: "breadcrumbs" | "section";
+  };
+  showPageHeader?: boolean;
   themeMode: "system" | "light" | "dark";
+  themeStrict: boolean;
   searchEnabled: boolean;
+  searchPrompt?: string;
   searchProvider: "orama" | "pagefind";
   indexable: boolean;
   ogImage?: string | null;
@@ -23,12 +104,21 @@ interface Props {
 }
 
 const {
+  banner: baseBanner,
   site,
   navigation,
   page,
   headings,
+  contextual,
+  footer: baseFooter,
+  navbar: baseNavbar,
+  seo,
+  styling,
+  showPageHeader = false,
   themeMode,
+  themeStrict,
   searchEnabled,
+  searchPrompt,
   searchProvider,
   indexable,
   ogImage,
@@ -37,22 +127,388 @@ const {
   askEnabled,
 } = Astro.props;
 
-const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
-const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
+const pageModes = new Set(["center", "custom", "default", "frame", "wide"]);
+const pageMode = page.mode && pageModes.has(page.mode) ? page.mode : "default";
+const layoutHasSidebar = pageMode !== "custom" && pageMode !== "center";
+const layoutHasSidePanel = pageMode === "default";
+const layoutHasFooter = pageMode !== "custom";
+const layoutHasPageActions = pageMode !== "custom" && pageMode !== "frame";
+const tocConfig = page.toc ?? true;
+const tocMinHeadingLevel =
+  tocConfig && typeof tocConfig === "object"
+    ? (tocConfig.minHeadingLevel ?? 2)
+    : 2;
+const tocMaxHeadingLevel =
+  tocConfig && typeof tocConfig === "object"
+    ? (tocConfig.maxHeadingLevel ?? 3)
+    : 3;
+const tocHeadings =
+  tocConfig === false || !layoutHasSidePanel
+    ? []
+    : headings.filter(
+        (h) => h.depth >= tocMinHeadingLevel && h.depth <= tocMaxHeadingLevel
+      );
+const isApiPage = page.contentType === "api";
+const pageTitle =
+  page.seoTitle ?? (page.title ? `${page.title} - ${site.title}` : site.title);
 const description = page.description ?? site.description;
+const logo = site.logo;
+const logoHref = typeof logo === "object" && logo?.href ? logo.href : "/";
+const logoAlt =
+  typeof logo === "object" && logo?.alt ? logo.alt : `${site.title} home page`;
+const favicon = site.favicon;
+const faviconLight =
+  typeof favicon === "string" ? favicon : (favicon?.light ?? favicon?.dark);
+const faviconDark = typeof favicon === "string" ? null : favicon?.dark;
+const propertyMetaPrefixes = ["article:", "book:", "og:", "profile:"];
+type MetaTag = {
+  content: string;
+  key: string;
+  property: boolean;
+};
+const toMetaTag = ([key, content]: [string, string]): MetaTag => ({
+    content,
+    key,
+    property: propertyMetaPrefixes.some((prefix) => key.startsWith(prefix)),
+});
+const globalMetaTags = Object.entries(seo?.metatags ?? {}).map(toMetaTag);
+const pageMetaTags = Object.entries(page.metaTags ?? {}).map(toMetaTag);
+const globalCanonical = seo?.metatags?.canonical;
+const pageCanonical = page.canonical ?? page.metaTags?.canonical;
+const canonicalHref =
+  pageCanonical ??
+  (globalCanonical
+    ? `${globalCanonical.replace(/\/$/, "")}${page.route === "/" ? "" : page.route}`
+    : null);
+const keywordContent = page.keywords?.length ? page.keywords.join(", ") : null;
+const robots =
+  page.robots ?? (page.noindex === true || !indexable ? "noindex" : null);
+const mergedMetaTags = [
+  ...new Map(
+    [...globalMetaTags, ...pageMetaTags]
+      .filter((tag) => tag.key !== "canonical")
+      .filter((tag) => tag.key !== "keywords" || !keywordContent)
+      .filter((tag) => tag.key !== "robots" || !robots)
+      .map((tag) => [tag.key, tag])
+  ).values(),
+];
+const hasMetaTag = (key: string): boolean =>
+  mergedMetaTags.some((tag) => tag.key === key);
+const renderDefaultMeta = (key: string): boolean => !hasMetaTag(key);
 
-const crumbs = findBreadcrumbs(navigation.sidebar, page.route);
-const { prev, next } = getPagination(
-  flattenPages(navigation.sidebar),
-  page.route
-);
-const eyebrowCrumb = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
+const isActivePath = (path: string): boolean =>
+  page.route === path || (path !== "/" && page.route.startsWith(`${path}/`));
+const activeChromeVariant = [...(navigation.chromeVariants ?? [])]
+  .filter((variant) => isActivePath(variant.path))
+  .sort((a, b) => b.path.length - a.path.length)[0];
+const banner = activeChromeVariant?.banner ?? baseBanner;
+const footer = activeChromeVariant?.footer ?? baseFooter;
+const navbar = activeChromeVariant?.navbar ?? baseNavbar;
+const activeSidebarVariant = [...(navigation.sidebarVariants ?? [])]
+  .filter((variant) => variant.sidebar.length > 0 && isActivePath(variant.path))
+  .sort((a, b) => b.path.length - a.path.length)[0];
+const activeSidebar = activeSidebarVariant?.sidebar ?? navigation.sidebar;
+const crumbs = findBreadcrumbs(activeSidebar, page.route);
+const directoryListing = findDirectoryListing(activeSidebar, page.route);
+const { prev, next } = getPagination(flattenPages(activeSidebar), page.route);
+const eyebrowStyle = styling?.eyebrows ?? "section";
+const eyebrowCrumbs =
+  layoutHasSidebar && eyebrowStyle === "breadcrumbs" && crumbs.length > 1
+    ? crumbs
+    : layoutHasSidebar && crumbs.length > 1
+      ? [crumbs[crumbs.length - 2]]
+      : [];
+const contextualOptions = contextual?.options ?? [];
+type ContextualAction = {
+  action: string;
+  description?: string;
+  href?: string;
+  icon: string;
+  id: string;
+  title: string;
+};
+const builtinContextualActions: Record<string, ContextualAction> = {
+  "add-mcp": {
+    action: "copy-mcp-command",
+    description: "Copy the MCP install command.",
+    icon: "puzzle-piece",
+    id: "add-mcp",
+    title: "Copy MCP install command",
+  },
+  aistudio: {
+    action: "ai",
+    description: "Open this page as context in Google AI Studio.",
+    icon: "external-link",
+    id: "aistudio",
+    title: "Open in Google AI Studio",
+  },
+  assistant: {
+    action: "assistant",
+    description: "Open the assistant with this page as context.",
+    icon: "search",
+    id: "assistant",
+    title: "Ask assistant",
+  },
+  chatgpt: {
+    action: "ai",
+    description: "Open this page as context in ChatGPT.",
+    icon: "external-link",
+    id: "chatgpt",
+    title: "Open in ChatGPT",
+  },
+  claude: {
+    action: "ai",
+    description: "Open this page as context in Claude.",
+    icon: "external-link",
+    id: "claude",
+    title: "Open in Claude",
+  },
+  copy: {
+    action: "copy-page",
+    description: "Copy this page text for use as context.",
+    icon: "copy",
+    id: "copy",
+    title: "Copy page",
+  },
+  cursor: {
+    action: "editor-mcp",
+    description: "Install the hosted MCP server in Cursor.",
+    icon: "external-link",
+    id: "cursor",
+    title: "Connect to Cursor",
+  },
+  devin: {
+    action: "ai",
+    description: "Open this page as context in Devin.",
+    icon: "external-link",
+    id: "devin",
+    title: "Open in Devin",
+  },
+  "devin-mcp": {
+    action: "editor-mcp",
+    description: "Install the hosted MCP server in Devin.",
+    icon: "external-link",
+    id: "devin-mcp",
+    title: "Connect to Devin",
+  },
+  "devin-desktop": {
+    action: "ai",
+    description: "Open this page as context in Devin Desktop.",
+    icon: "external-link",
+    id: "devin-desktop",
+    title: "Open in Devin Desktop",
+  },
+  "download-pdf": {
+    action: "download-pdf",
+    description: "Print or save this page as a PDF.",
+    icon: "file",
+    id: "download-pdf",
+    title: "Download PDF",
+  },
+  "download-spec": {
+    action: "download-spec",
+    description: "Open the API spec for download.",
+    icon: "file",
+    id: "download-spec",
+    title: "Download API spec",
+  },
+  downloadApiSpec: {
+    action: "download-spec",
+    description: "Open the API spec for download.",
+    icon: "file",
+    id: "downloadApiSpec",
+    title: "Download API spec",
+  },
+  grok: {
+    action: "ai",
+    description: "Open this page as context in Grok.",
+    icon: "external-link",
+    id: "grok",
+    title: "Open in Grok",
+  },
+  mcp: {
+    action: "copy-mcp-url",
+    description: "Copy the hosted MCP server URL.",
+    icon: "puzzle-piece",
+    id: "mcp",
+    title: "Copy MCP server URL",
+  },
+  perplexity: {
+    action: "ai",
+    description: "Open this page as context in Perplexity.",
+    icon: "external-link",
+    id: "perplexity",
+    title: "Open in Perplexity",
+  },
+  view: {
+    action: "view-markdown",
+    description: "Open this page as Markdown.",
+    icon: "file",
+    id: "view",
+    title: "View as Markdown",
+  },
+  vscode: {
+    action: "editor-mcp",
+    description: "Install the hosted MCP server in VS Code.",
+    icon: "external-link",
+    id: "vscode",
+    title: "Connect to VS Code",
+  },
+  windsurf: {
+    action: "ai",
+    description: "Open this page as context in Windsurf.",
+    icon: "external-link",
+    id: "windsurf",
+    title: "Open in Windsurf",
+  },
+};
+const contextualActionFor = (
+  option: ContextualOption
+): ContextualAction | null => {
+  if (typeof option === "string") {
+    return builtinContextualActions[option] ?? null;
+  }
+  return {
+    action: option.href ? "custom-link" : "copy-page",
+    description: option.description,
+    href: option.href,
+    icon: option.icon ?? "external-link",
+    id: `custom-${option.title.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}`,
+    title: option.title,
+  };
+};
+const contextualActions = contextualOptions.flatMap((option) => {
+  const action = contextualActionFor(option);
+  return action ? [action] : [];
+});
+const headerContextualActions =
+  layoutHasPageActions && contextual?.display !== "toc"
+    ? contextualActions
+    : [];
+const tocContextualActions =
+  layoutHasSidePanel && contextual?.display === "toc"
+    ? contextualActions
+    : [];
+const hasHeaderContextualActions = headerContextualActions.length > 0;
+const hasTocContextualActions = tocContextualActions.length > 0;
+const rssHref = page.route === "/" ? "/rss.xml" : `${page.route}/rss.xml`;
+const hasRssAction = layoutHasPageActions && page.rss === true;
+const socialIcon = (name: string): string => {
+  const key = name.toLowerCase();
+  if (key === "twitter" || key === "x") {
+    return "brand-x";
+  }
+  if (key === "github" || key === "linkedin") {
+    return key;
+  }
+  return "external-link";
+};
+const socialEntries = Object.entries(footer?.socials ?? {});
+const footerLinkGroups = footer?.links ?? [];
+const hasFooterContent =
+  footerLinkGroups.length > 0 || socialEntries.length > 0;
+const navbarLinks = navbar?.links ?? [];
+const navbarPrimary = navbar?.primary;
+const tabStates = (navigation.tabs ?? []).map((tab) => ({
+  ...tab,
+  active:
+    isActivePath(tab.path) ||
+    (tab.items ?? []).some((item) => isActivePath(item.path)),
+}));
+const selectorStates = (navigation.selectors ?? []).map((selector) => ({
+  ...selector,
+  active: selector.items.find((item) => isActivePath(item.path)) ?? null,
+}));
+const hasMobileChromeLinks =
+  tabStates.length > 0 || navbarLinks.length > 0 || Boolean(navbarPrimary);
+const navbarIcon = (item: { icon?: string; type?: string }): string | null =>
+  item.icon ?? (item.type === "github" ? "github" : null);
+const linkTarget = (href: string): "_blank" | undefined =>
+  href.startsWith("http") ? "_blank" : undefined;
+const linkRel = (href: string): "noreferrer" | undefined =>
+  href.startsWith("http") ? "noreferrer" : undefined;
+const scriptStringLiteral = (value: string): string =>
+  JSON.stringify(value)
+    .replaceAll("<", "\\u003C")
+    .replaceAll(">", "\\u003E")
+    .replaceAll("&", "\\u0026")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
+const escapeRawHtml = (value: string): string =>
+  value.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+const unwrapParagraph = (html: string): string => {
+  const trimmed = html.trim();
+  const match = trimmed.match(/^<p>(?<content>[\s\S]*)<\/p>$/u);
+  return match?.groups?.content ?? trimmed;
+};
+
+let bannerHtml = "";
+if (banner) {
+  const markdownProcessor = await createSatteriMarkdownProcessor();
+  const renderedBanner = await markdownProcessor.render(
+    escapeRawHtml(banner.content)
+  );
+  bannerHtml = unwrapParagraph(renderedBanner.code);
+}
+const bannerColor = banner?.color;
+const bannerHasCustomColor = Boolean(bannerColor?.light || bannerColor?.dark);
+const bannerStyle = bannerHasCustomColor
+  ? `--blume-banner-bg-light:${bannerColor?.light ?? bannerColor?.dark};--blume-banner-bg-dark:${bannerColor?.dark ?? bannerColor?.light};`
+  : undefined;
+let bannerToneClass = "bg-accent text-accent-foreground";
+if (bannerHasCustomColor) {
+  bannerToneClass =
+    "bg-[var(--blume-banner-bg-light)] text-white dark:bg-[var(--blume-banner-bg-dark)]";
+} else if (banner?.type === "warning") {
+  bannerToneClass = "bg-amber-500 text-white";
+} else if (banner?.type === "critical") {
+  bannerToneClass = "bg-red-600 text-white";
+}
+const bannerKey = banner ? `blume-banner:${banner.content}` : "";
 
 const iconButton =
   "inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+const contextualActionClass =
+  "flex w-full cursor-pointer items-start gap-3 rounded-blume border-0 bg-transparent px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-accent/25";
+const contentGridClass =
+  layoutHasSidebar && layoutHasSidePanel
+    ? isApiPage
+      ? "mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_minmax(20rem,28rem)]"
+      : "mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_16rem]"
+    : layoutHasSidebar
+      ? "mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)]"
+      : "mx-auto grid w-full grid-cols-1 items-start";
+const mainClass =
+  pageMode === "custom"
+    ? "min-w-0 px-0 py-0"
+    : "min-w-0 px-6 py-10 lg:px-8 xl:px-10";
+const contentWidthClass =
+  pageMode === "custom" || pageMode === "frame"
+    ? "max-w-none"
+    : pageMode === "wide"
+      ? "max-w-5xl"
+      : "max-w-[42rem]";
+const articleClass = [
+  "prose mx-auto",
+  contentWidthClass,
+  layoutHasSidePanel ? "" : "[&_[data-blume-right-rail-item]]:hidden",
+]
+  .filter(Boolean)
+  .join(" ");
+const showPagination =
+  layoutHasFooter && !page.hideFooterPagination && Boolean(prev || next);
 
 const initialThemeScript = `(()=>{const m=${JSON.stringify(themeMode)};const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);})();`;
+const initialBannerScript =
+  banner?.dismissible === true
+    ? `(()=>{try{if(localStorage.getItem("blume-banner-dismissed")===${scriptStringLiteral(bannerKey)})document.documentElement.setAttribute("data-blume-banner-hidden","");}catch{}})();`
+    : "";
 const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=next;localStorage.setItem("blume-theme",next);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}});`;
+const bannerDismissScript =
+  banner?.dismissible === true
+    ? `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-banner-dismiss]");if(!t)return;const b=t.closest("[data-blume-banner]");if(!b)return;document.documentElement.setAttribute("data-blume-banner-hidden","");try{localStorage.setItem("blume-banner-dismissed",b.dataset.blumeBannerKey??"");}catch{}});`
+    : "";
 ---
 
 <!doctype html>
@@ -61,104 +517,606 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
-    {description && <meta name="description" content={description} />}
-    <meta property="og:title" content={pageTitle} />
-    {description && <meta property="og:description" content={description} />}
+    {
+      description &&
+        renderDefaultMeta("description") && (
+          <meta name="description" content={description} />
+        )
+    }
+    {keywordContent && <meta name="keywords" content={keywordContent} />}
+    {robots && <meta name="robots" content={robots} />}
+    {
+      mergedMetaTags.map((tag) =>
+        tag.property ? (
+          <meta property={tag.key} content={tag.content} />
+        ) : (
+          <meta name={tag.key} content={tag.content} />
+        )
+      )
+    }
+    {canonicalHref && <link rel="canonical" href={canonicalHref} />}
+    {page.rss && <link rel="alternate" type="application/rss+xml" href={rssHref} />}
+    {faviconLight && <link rel="icon" href={faviconLight} />}
+    {
+      faviconDark && (
+        <link rel="icon" href={faviconDark} media="(prefers-color-scheme: dark)" />
+      )
+    }
+    {
+      renderDefaultMeta("og:title") && (
+        <meta property="og:title" content={pageTitle} />
+      )
+    }
+    {
+      description &&
+        renderDefaultMeta("og:description") && (
+          <meta property="og:description" content={description} />
+        )
+    }
     {
       ogImage && (
         <>
-          <meta property="og:image" content={ogImage} />
-          <meta name="twitter:image" content={ogImage} />
-          <meta name="twitter:card" content="summary_large_image" />
+          {
+            renderDefaultMeta("og:image") && (
+              <meta property="og:image" content={ogImage} />
+            )
+          }
+          {
+            renderDefaultMeta("twitter:image") && (
+              <meta name="twitter:image" content={ogImage} />
+            )
+          }
+          {
+            renderDefaultMeta("twitter:card") && (
+              <meta name="twitter:card" content="summary_large_image" />
+            )
+          }
         </>
       )
     }
     <script is:inline set:html={initialThemeScript} />
+    {initialBannerScript && <script is:inline set:html={initialBannerScript} />}
   </head>
   <body class="bg-background font-sans text-foreground antialiased">
     <a
       class="absolute left-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:left-0"
       href="#blume-content">Skip to content</a
     >
+    {
+      banner && (
+        <div
+          class={`relative z-50 flex min-h-10 items-center justify-center gap-3 px-4 py-2 text-center text-sm ${bannerToneClass} ${banner.dismissible ? "[:where([data-blume-banner-hidden])_&]:hidden" : ""}`}
+          data-blume-banner
+          data-blume-banner-key={bannerKey}
+          role={banner.type === "critical" ? "alert" : "status"}
+          style={bannerStyle}
+        >
+          <div
+            class="max-w-5xl [&_a]:font-medium [&_a]:underline [&_a]:decoration-current/50 [&_a]:underline-offset-4 [&_code]:rounded [&_code]:bg-white/15 [&_code]:px-1 [&_code]:py-0.5"
+            set:html={bannerHtml}
+          />
+          {banner.dismissible && (
+            <button
+              aria-label="Dismiss banner"
+              class="absolute right-2 inline-flex size-7 cursor-pointer items-center justify-center rounded-full text-current/80 transition hover:bg-white/15 hover:text-current"
+              data-blume-banner-dismiss
+              type="button"
+            >
+              <Icon name="x" size={16} />
+            </button>
+          )}
+        </div>
+      )
+    }
     <header
       class="sticky top-0 z-40 flex h-16 items-center gap-3 bg-background/90 px-4 backdrop-blur md:px-6"
     >
-      <button
-        aria-label="Toggle navigation"
-        class={`${iconButton} lg:hidden`}
-        data-blume-nav-toggle
-        type="button"
-      >
-        <Icon name="menu" size={20} />
-      </button>
+      {
+        layoutHasSidebar && (
+          <button
+            aria-label="Toggle navigation"
+            class={`${iconButton} lg:hidden`}
+            data-blume-nav-toggle
+            type="button"
+          >
+            <Icon name="menu" size={20} />
+          </button>
+        )
+      }
       <a
         class="inline-flex items-center gap-2 font-semibold text-foreground text-sm"
-        href="/"
+        href={logoHref}
       >
-        {site.title}
+        {
+          logo ? (
+            typeof logo === "string" ? (
+              <img alt={logoAlt} class="h-6 w-auto" src={logo} />
+            ) : (
+              <>
+                {logo.light && (
+                  <img
+                    alt={logoAlt}
+                    class={`h-6 w-auto ${logo.dark ? "dark:hidden" : ""}`}
+                    src={logo.light}
+                  />
+                )}
+                {logo.dark && (
+                  <img
+                    alt={logoAlt}
+                    class="hidden h-6 w-auto dark:inline-block"
+                    src={logo.dark}
+                  />
+                )}
+                {!logo.light && !logo.dark && site.title}
+              </>
+            )
+          ) : (
+            site.title
+          )
+        }
       </a>
       {
-        navigation.tabs.length > 0 && (
+        tabStates.length > 0 && (
           <nav aria-label="Sections" class="hidden gap-1 md:flex">
-            {navigation.tabs.map((tab) => (
+            {tabStates.map((tab) =>
+              tab.items && tab.items.length > 0 ? (
+                <details class="group relative">
+                  <summary
+                    aria-current={tab.active ? "page" : undefined}
+                    class="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground [&::-webkit-details-marker]:hidden"
+                  >
+                    {tab.icon && <Icon name={tab.icon} size={15} />}
+                    {tab.label}
+                    <Icon
+                      class="text-muted-foreground transition-transform group-open:rotate-180"
+                      name="chevron-down"
+                      size={13}
+                    />
+                  </summary>
+                  <div class="absolute top-full left-0 z-50 mt-2 w-72 rounded-blume border border-border bg-background p-1.5 shadow-xl">
+                    {tab.items.map((item) => (
+                      <a
+                        aria-current={isActivePath(item.path) ? "page" : undefined}
+                        class="block rounded-blume px-3 py-2 text-foreground text-sm transition-colors hover:bg-muted aria-[current=page]:bg-muted"
+                        href={item.path}
+                        rel={linkRel(item.path)}
+                        target={linkTarget(item.path)}
+                      >
+                        <span class="flex min-w-0 items-center gap-2">
+                          {item.icon && (
+                            <Icon class="shrink-0 text-muted-foreground" name={item.icon} size={15} />
+                          )}
+                          <span class="min-w-0">
+                            <span class="block truncate font-medium">{item.label}</span>
+                            {item.description && (
+                              <span class="mt-0.5 block line-clamp-2 text-muted-foreground text-xs leading-5">
+                                {item.description}
+                              </span>
+                            )}
+                          </span>
+                          {item.tag && (
+                            <span class="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 font-medium text-[0.65rem] text-muted-foreground uppercase">
+                              {item.tag}
+                            </span>
+                          )}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </details>
+              ) : (
+                <a
+                  aria-current={tab.active ? "page" : undefined}
+                  class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground"
+                  href={tab.path}
+                  rel={linkRel(tab.path)}
+                  target={linkTarget(tab.path)}
+                >
+                  {tab.icon && <Icon name={tab.icon} size={15} />}
+                  {tab.label}
+                </a>
+              )
+            )}
+          </nav>
+        )
+      }
+      <div class="flex-1"></div>
+      {
+        navbarLinks.length > 0 && (
+          <nav aria-label="Navbar links" class="hidden items-center gap-1 lg:flex">
+            {navbarLinks.map((item) => (
               <a
-                aria-current={
-                  page.route === tab.path ||
-                  (tab.path !== "/" && page.route.startsWith(tab.path))
-                    ? "page"
-                    : undefined
-                }
-                class="rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground"
-                href={tab.path}
+                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
+                href={item.href}
+                rel={linkRel(item.href)}
+                target={linkTarget(item.href)}
               >
-                {tab.label}
+                {navbarIcon(item) && <Icon name={navbarIcon(item) ?? ""} size={15} />}
+                {item.label}
               </a>
             ))}
           </nav>
         )
       }
-      <div class="flex-1"></div>
       <slot name="ask" />
-      {searchEnabled && <Search provider={searchProvider} />}
-      <button aria-label="Toggle color theme" class={iconButton} data-blume-theme-toggle type="button">
-        <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
-        <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
-      </button>
+      {searchEnabled && <Search prompt={searchPrompt} provider={searchProvider} />}
+      {
+        navbarPrimary && (
+          <a
+            class="hidden items-center gap-1.5 rounded-full bg-action px-3.5 py-2 font-medium text-action-foreground text-sm transition hover:opacity-90 md:inline-flex"
+            href={navbarPrimary.href}
+            rel={linkRel(navbarPrimary.href)}
+            target={linkTarget(navbarPrimary.href)}
+          >
+            {navbarIcon(navbarPrimary) && <Icon name={navbarIcon(navbarPrimary) ?? ""} size={15} />}
+            {navbarPrimary.label}
+          </a>
+        )
+      }
+      {
+        !themeStrict && (
+          <button aria-label="Toggle color theme" class={iconButton} data-blume-theme-toggle type="button">
+            <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
+            <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
+          </button>
+        )
+      }
     </header>
-    <div class="mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_16rem]">
-      <aside
-        aria-label="Primary"
-        class="fixed top-16 left-0 z-[35] h-[calc(100dvh-4rem)] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-r bg-background px-5 py-6 transition-transform [:where([data-blume-nav-open])_&]:translate-x-0 lg:sticky lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-r-0 lg:bg-transparent lg:px-4"
-      >
-        <nav>
-          <NavTree currentRoute={page.route} items={navigation.sidebar} />
-        </nav>
-      </aside>
-      <main class="min-w-0 px-6 py-10 lg:px-8 xl:px-10" id="blume-content">
+    <div class={contentGridClass}>
+      {
+        layoutHasSidebar && (
+          <aside
+            aria-label="Primary"
+            class="fixed top-16 left-0 z-[35] hidden h-[calc(100dvh-4rem)] w-72 max-w-[85vw] -translate-x-[105%] overflow-y-auto border-border border-r bg-background px-5 py-6 transition-transform lg:sticky lg:block lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-r-0 lg:bg-transparent lg:px-4"
+            data-blume-mobile-nav
+          >
+            <nav>
+              {
+                hasMobileChromeLinks && (
+                  <div
+                    class="mb-6 space-y-5 border-border border-b pb-5 lg:hidden"
+                    data-blume-mobile-chrome
+                  >
+                    {tabStates.length > 0 && (
+                      <div>
+                        <p class="mb-2 font-medium text-muted-foreground text-xs uppercase">
+                          Sections
+                        </p>
+                        <div class="space-y-1">
+                          {tabStates.map((tab) =>
+                            tab.items && tab.items.length > 0 ? (
+                              <details
+                                class="group rounded-blume border border-border bg-background/60"
+                                open={tab.active}
+                              >
+                                <summary
+                                  aria-current={tab.active ? "page" : undefined}
+                                  class="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 font-medium text-foreground text-sm [&::-webkit-details-marker]:hidden"
+                                >
+                                  {tab.icon && (
+                                    <Icon
+                                      class="shrink-0 text-muted-foreground"
+                                      name={tab.icon}
+                                      size={15}
+                                    />
+                                  )}
+                                  <span class="min-w-0 flex-1 truncate">
+                                    {tab.label}
+                                  </span>
+                                  <Icon
+                                    class="shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                                    name="chevron-down"
+                                    size={15}
+                                  />
+                                </summary>
+                                <div class="border-border border-t p-1.5">
+                                  {tab.items.map((item) => (
+                                    <a
+                                      aria-current={isActivePath(item.path) ? "page" : undefined}
+                                      class="block rounded-blume px-2.5 py-2 text-sm transition-colors hover:bg-muted aria-[current=page]:bg-muted"
+                                      href={item.path}
+                                      rel={linkRel(item.path)}
+                                      target={linkTarget(item.path)}
+                                    >
+                                      <span class="flex min-w-0 items-start gap-2">
+                                        {item.icon && (
+                                          <Icon class="mt-0.5 shrink-0 text-muted-foreground" name={item.icon} size={15} />
+                                        )}
+                                        <span class="min-w-0 flex-1">
+                                          <span class="block truncate font-medium text-foreground">
+                                            {item.label}
+                                          </span>
+                                          {item.description && (
+                                            <span class="mt-0.5 block line-clamp-2 text-muted-foreground text-xs leading-5">
+                                              {item.description}
+                                            </span>
+                                          )}
+                                        </span>
+                                        {item.tag && (
+                                          <span class="shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-medium text-[0.65rem] text-muted-foreground uppercase">
+                                            {item.tag}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </a>
+                                  ))}
+                                </div>
+                              </details>
+                            ) : (
+                              <a
+                                aria-current={tab.active ? "page" : undefined}
+                                class="flex min-w-0 items-center gap-2 rounded-blume px-3 py-2 font-medium text-foreground text-sm transition-colors hover:bg-muted aria-[current=page]:bg-muted"
+                                href={tab.path}
+                                rel={linkRel(tab.path)}
+                                target={linkTarget(tab.path)}
+                              >
+                                {tab.icon && (
+                                  <Icon
+                                    class="shrink-0 text-muted-foreground"
+                                    name={tab.icon}
+                                    size={15}
+                                  />
+                                )}
+                                <span class="min-w-0 truncate">{tab.label}</span>
+                              </a>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {(navbarLinks.length > 0 || navbarPrimary) && (
+                      <div>
+                        <p class="mb-2 font-medium text-muted-foreground text-xs uppercase">
+                          Links
+                        </p>
+                        <div class="space-y-1">
+                          {navbarLinks.map((item) => (
+                            <a
+                              class="flex min-w-0 items-center gap-2 rounded-blume px-3 py-2 font-medium text-foreground text-sm transition-colors hover:bg-muted"
+                              href={item.href}
+                              rel={linkRel(item.href)}
+                              target={linkTarget(item.href)}
+                            >
+                              {navbarIcon(item) && (
+                                <Icon
+                                  class="shrink-0 text-muted-foreground"
+                                  name={navbarIcon(item) ?? ""}
+                                  size={15}
+                                />
+                              )}
+                              <span class="min-w-0 truncate">{item.label}</span>
+                            </a>
+                          ))}
+                          {navbarPrimary && (
+                            <a
+                              class="mt-2 flex min-w-0 items-center justify-center gap-2 rounded-full bg-action px-3.5 py-2 font-medium text-action-foreground text-sm transition hover:opacity-90"
+                              href={navbarPrimary.href}
+                              rel={linkRel(navbarPrimary.href)}
+                              target={linkTarget(navbarPrimary.href)}
+                            >
+                              {navbarIcon(navbarPrimary) && (
+                                <Icon name={navbarIcon(navbarPrimary) ?? ""} size={15} />
+                              )}
+                              <span class="min-w-0 truncate">
+                                {navbarPrimary.label}
+                              </span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              {
+                selectorStates.length > 0 && (
+                  <div
+                    class="mb-6 space-y-2"
+                    data-blume-navigation-selectors
+                  >
+                    {selectorStates.map((selector) => (
+                      <details
+                        class="group rounded-blume border border-border bg-background/60"
+                        open={Boolean(selector.active)}
+                      >
+                        <summary class="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-left [&::-webkit-details-marker]:hidden">
+                          <span class="min-w-0 flex-1">
+                            <span class="block text-muted-foreground text-[0.7rem] uppercase">
+                              {selector.label}
+                            </span>
+                            <span class="mt-0.5 block truncate font-medium text-foreground text-sm">
+                              {selector.active?.label ?? selector.items[0]?.label ?? selector.label}
+                            </span>
+                          </span>
+                          <Icon
+                            class="shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                            name="chevron-down"
+                            size={15}
+                          />
+                        </summary>
+                        <div class="border-border border-t p-1.5">
+                          {selector.items.map((item) => (
+                            <a
+                              aria-current={isActivePath(item.path) ? "page" : undefined}
+                              class="block rounded-blume px-2.5 py-2 text-sm transition-colors hover:bg-muted aria-[current=page]:bg-muted"
+                              href={item.path}
+                              rel={linkRel(item.path)}
+                              target={linkTarget(item.path)}
+                            >
+                              <span class="flex min-w-0 items-start gap-2">
+                                {item.icon && (
+                                  <Icon class="mt-0.5 shrink-0 text-muted-foreground" name={item.icon} size={15} />
+                                )}
+                                <span class="min-w-0 flex-1">
+                                  <span class="block truncate font-medium text-foreground">
+                                    {item.label}
+                                  </span>
+                                  {item.description && (
+                                    <span class="mt-0.5 block line-clamp-2 text-muted-foreground text-xs leading-5">
+                                      {item.description}
+                                    </span>
+                                  )}
+                                </span>
+                                {item.tag && (
+                                  <span class="shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-medium text-[0.65rem] text-muted-foreground uppercase">
+                                    {item.tag}
+                                  </span>
+                                )}
+                              </span>
+                            </a>
+                          ))}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                )
+              }
+              <NavTree currentRoute={page.route} items={activeSidebar} />
+            </nav>
+          </aside>
+        )
+      }
+      <main class={mainClass} id="blume-content">
         {
-          eyebrowCrumb && (
+          eyebrowCrumbs.length > 0 && (
             <nav
               aria-label="Breadcrumb"
-              class="mx-auto mb-2 max-w-[42rem] text-muted-foreground text-sm"
+              class={`mx-auto mb-2 flex min-w-0 items-center gap-1.5 ${contentWidthClass} text-muted-foreground text-sm`}
             >
-              {eyebrowCrumb.route ? (
-                <a class="hover:text-foreground" href={eyebrowCrumb.route}>
-                  {eyebrowCrumb.label}
-                </a>
-              ) : (
-                <span>{eyebrowCrumb.label}</span>
-              )}
+              {eyebrowCrumbs.map((crumb, index) => (
+                <>
+                  {index > 0 && (
+                    <Icon
+                      aria-hidden="true"
+                      class="shrink-0 text-muted-foreground/60"
+                      name="chevron-right"
+                      size={13}
+                    />
+                  )}
+                  {crumb.route && index < eyebrowCrumbs.length - 1 ? (
+                    <a class="truncate hover:text-foreground" href={crumb.route}>
+                      {crumb.label}
+                    </a>
+                  ) : (
+                    <span class="truncate">{crumb.label}</span>
+                  )}
+                </>
+              ))}
             </nav>
           )
         }
-        <article class="prose mx-auto max-w-[42rem]">
+        <article class={articleClass}>
+          {
+            (showPageHeader || hasHeaderContextualActions || hasRssAction) && (
+              <header class="not-prose mb-8 flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  {showPageHeader && (
+                    <>
+                      <h1 class="m-0 font-semibold text-3xl text-foreground tracking-normal" data-blume-page-title>
+                        <span class="inline-flex min-w-0 items-center gap-3">
+                          <span>{page.title}</span>
+                          {page.deprecated && (
+                            <span class="rounded-full bg-amber-500/10 px-2 py-1 font-medium text-amber-700 text-xs leading-none dark:text-amber-300">
+                              deprecated
+                            </span>
+                          )}
+                        </span>
+                      </h1>
+                      {page.description && (
+                        <p class="mt-3 text-muted-foreground text-xl leading-8">
+                          {page.description}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+                {(hasRssAction || hasHeaderContextualActions) && (
+                  <div class="flex shrink-0 items-center gap-2">
+                    {hasRssAction && (
+                      <a
+                        aria-label="RSS feed"
+                        class="inline-flex size-9 items-center justify-center rounded-blume border border-border bg-background text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+                        data-blume-rss-link
+                        href={rssHref}
+                      >
+                        <Icon name="rss" size={16} />
+                      </a>
+                    )}
+                    {hasHeaderContextualActions && (
+                      <details class="group relative" data-blume-contextual-menu>
+                        <summary
+                          aria-label="Open contextual menu"
+                          class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-blume border border-border bg-background px-3 font-medium text-foreground text-sm transition-colors hover:border-accent hover:text-accent [&::-webkit-details-marker]:hidden"
+                        >
+                          <Icon name="puzzle-piece" size={16} />
+                          <span>Context</span>
+                          <Icon
+                            class="text-muted-foreground transition-transform group-open:rotate-180"
+                            name="chevron-down"
+                            size={14}
+                          />
+                        </summary>
+                        <div
+                          class="absolute right-0 z-30 mt-2 w-72 rounded-blume border border-border bg-background p-1.5 shadow-xl"
+                          role="menu"
+                        >
+                          {headerContextualActions.map((action) =>
+                            action.href ? (
+                              <a
+                                class={contextualActionClass}
+                                data-blume-contextual-action={action.action}
+                                data-blume-contextual-tool={action.id}
+                                href={action.href}
+                                rel={action.href.startsWith("http") ? "noreferrer" : undefined}
+                                role="menuitem"
+                                target={action.href.startsWith("http") ? "_blank" : undefined}
+                              >
+                                <Icon class="mt-0.5 shrink-0 text-muted-foreground" name={action.icon} size={16} />
+                                <span>
+                                  <span class="block font-medium" data-blume-contextual-label>{action.title}</span>
+                                  {action.description && (
+                                    <span class="mt-0.5 block text-muted-foreground text-xs leading-5">
+                                      {action.description}
+                                    </span>
+                                  )}
+                                </span>
+                              </a>
+                            ) : (
+                              <button
+                                class={contextualActionClass}
+                                data-blume-contextual-action={action.action}
+                                data-blume-contextual-tool={action.id}
+                                data-blume-copy-page={action.action === "copy-page" ? "" : undefined}
+                                type="button"
+                              >
+                                <Icon class="mt-0.5 shrink-0 text-muted-foreground" name={action.icon} size={16} />
+                                <span>
+                                  <span class="block font-medium" data-blume-contextual-label data-blume-copy-page-label={action.action === "copy-page" ? "" : undefined}>{action.title}</span>
+                                  {action.description && (
+                                    <span class="mt-0.5 block text-muted-foreground text-xs leading-5">
+                                      {action.description}
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </header>
+            )
+          }
           <slot />
+          {directoryListing && <DirectoryListing listing={directoryListing} />}
         </article>
         {
-          (prev || next) && (
+          showPagination && (
             <nav
               aria-label="Pagination"
-              class="mx-auto mt-12 flex max-w-[42rem] justify-between gap-4 border-border border-t pt-6 max-md:flex-col"
+              class={`mx-auto mt-12 flex ${contentWidthClass} justify-between gap-4 border-border border-t pt-6 max-md:flex-col`}
             >
               {prev ? (
                 <a
@@ -191,52 +1149,197 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
             </nav>
           )
         }
-      </main>
-      <aside
-        aria-label="On this page"
-        class="sticky top-16 hidden h-[calc(100dvh-4rem)] overflow-y-auto px-4 py-10 text-sm xl:block"
-      >
         {
-          tocHeadings.length > 0 && (
-            <>
-              <p class="mb-3 font-semibold text-foreground text-sm">
-                On this page
-              </p>
-              <ul class="m-0 list-none p-0">
-                {tocHeadings.map((heading) => (
-                  <li style={`padding-left:${(heading.depth - 2) * 0.75}rem`}>
-                    <a
-                      class="block py-1.5 text-muted-foreground transition-colors hover:text-foreground"
-                      href={`#${heading.slug}`}
-                    >
-                      {heading.text}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </>
+          layoutHasFooter && hasFooterContent && (
+            <footer class={`mx-auto mt-10 ${contentWidthClass} border-border border-t pt-6 text-muted-foreground text-sm`}>
+              {
+                footerLinkGroups.length > 0 && (
+                  <nav
+                    aria-label="Footer"
+                    class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4"
+                  >
+                    {footerLinkGroups.map((group) => (
+                      <div>
+                        {group.header && (
+                          <p class="m-0 mb-3 font-semibold text-foreground text-sm">
+                            {group.header}
+                          </p>
+                        )}
+                        <ul class="m-0 list-none space-y-2 p-0">
+                          {(group.items ?? []).map((item) => (
+                            <li>
+                              <a
+                                class="transition-colors hover:text-foreground"
+                                href={item.href}
+                                rel={item.href.startsWith("http") ? "noreferrer" : undefined}
+                                target={item.href.startsWith("http") ? "_blank" : undefined}
+                              >
+                                {item.label}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </nav>
+                )
+              }
+              {
+                socialEntries.length > 0 && (
+                  <nav
+                    aria-label="Social links"
+                    class={`flex items-center gap-4 ${footerLinkGroups.length > 0 ? "mt-8" : ""}`}
+                  >
+                    {socialEntries.map(([label, href]) => (
+                      <a
+                        aria-label={label}
+                        class="inline-flex size-8 items-center justify-center rounded-full transition-colors hover:bg-muted hover:text-foreground"
+                        href={href}
+                        rel={href.startsWith("http") ? "noreferrer" : undefined}
+                        target={href.startsWith("http") ? "_blank" : undefined}
+                      >
+                        <Icon name={socialIcon(label)} size={18} />
+                      </a>
+                    ))}
+                  </nav>
+                )
+              }
+            </footer>
           )
         }
-        <PageActions
-          askEnabled={askEnabled}
-          editUrl={editUrl}
-          repoUrl={repoUrl}
-          route={page.route}
-        />
-      </aside>
+      </main>
+      {
+        layoutHasSidePanel && (
+          <aside
+            aria-label="Page sidebar"
+            class="sticky top-16 hidden h-[calc(100dvh-4rem)] overflow-y-auto px-3 py-8 text-sm xl:block"
+            data-blume-right-rail
+          >
+            {
+              tocHeadings.length > 0 && (
+                <div data-blume-toc>
+                  <p class="mb-3 font-semibold text-foreground text-sm">
+                    On this page
+                  </p>
+                  <ul class="m-0 list-none p-0">
+                    {tocHeadings.map((heading) => (
+                      <li
+                        data-blume-toc-item
+                        style={`padding-left:${(heading.depth - 2) * 0.75}rem`}
+                      >
+                        <a
+                          class="block py-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                          href={`#${heading.slug}`}
+                        >
+                          {heading.text}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            }
+            <div class="space-y-3" data-blume-right-rail-content></div>
+            {
+              hasTocContextualActions && (
+                <div class="mt-8 border-border border-t pt-6">
+                  <p class="mb-3 font-semibold text-foreground text-sm">
+                    Page actions
+                  </p>
+                  <div class="space-y-1" data-blume-contextual-menu>
+                    {tocContextualActions.map((action) =>
+                      action.href ? (
+                        <a
+                          class={contextualActionClass}
+                          data-blume-contextual-action={action.action}
+                          data-blume-contextual-tool={action.id}
+                          href={action.href}
+                          rel={action.href.startsWith("http") ? "noreferrer" : undefined}
+                          target={action.href.startsWith("http") ? "_blank" : undefined}
+                        >
+                          <Icon class="mt-0.5 shrink-0 text-muted-foreground" name={action.icon} size={16} />
+                          <span>
+                            <span class="block font-medium" data-blume-contextual-label>{action.title}</span>
+                            {action.description && (
+                              <span class="mt-0.5 block text-muted-foreground text-xs leading-5">
+                                {action.description}
+                              </span>
+                            )}
+                          </span>
+                        </a>
+                      ) : (
+                        <button
+                          class={contextualActionClass}
+                          data-blume-contextual-action={action.action}
+                          data-blume-contextual-tool={action.id}
+                          data-blume-copy-page={action.action === "copy-page" ? "" : undefined}
+                          type="button"
+                        >
+                          <Icon class="mt-0.5 shrink-0 text-muted-foreground" name={action.icon} size={16} />
+                          <span>
+                            <span class="block font-medium" data-blume-contextual-label data-blume-copy-page-label={action.action === "copy-page" ? "" : undefined}>{action.title}</span>
+                            {action.description && (
+                              <span class="mt-0.5 block text-muted-foreground text-xs leading-5">
+                                {action.description}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              )
+            }
+            {
+              layoutHasPageActions && (
+                <PageActions
+                  askEnabled={askEnabled}
+                  editUrl={editUrl}
+                  repoUrl={repoUrl}
+                  route={page.route}
+                />
+              )
+            }
+          </aside>
+        )
+      }
     </div>
-    <button
-      aria-label="Close navigation"
-      class="fixed inset-0 z-[30] hidden cursor-pointer border-0 bg-black/40 [:where([data-blume-nav-open])_&]:block lg:hidden"
-      data-blume-nav-toggle
-      type="button"
-    ></button>
+    {
+      layoutHasSidebar && (
+        <button
+          aria-label="Close navigation"
+          class="fixed inset-0 z-[30] hidden cursor-pointer border-0 bg-black/40 lg:hidden"
+          data-blume-mobile-nav-backdrop
+          data-blume-nav-toggle
+          type="button"
+        ></button>
+      )
+    }
     <script is:inline set:html={toggleScript} />
-    <script>
-      import { icons } from "../../theme/icons.ts";
+    {bannerDismissScript && <script is:inline set:html={bannerDismissScript} />}
+    <style is:global>
+      @media (max-width: 1023.98px) {
+        :root[data-blume-nav-open] [data-blume-mobile-nav] {
+          display: block;
+          translate: 0;
+          transform: translateX(0);
+        }
 
-      const svg = (name: string) =>
-        `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
+        :root[data-blume-nav-open] [data-blume-mobile-nav-backdrop] {
+          display: block;
+        }
+      }
+    </style>
+    <script>
+      import { resolveIcon } from "../../theme/icons.ts";
+
+      const svg = (name: string) => {
+        const icon = resolveIcon(name);
+        return icon
+          ? `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon.markup}</svg>`
+          : "";
+      };
 
       const buttonClass =
         "absolute right-3 inline-flex size-7 items-center justify-center rounded-full bg-transparent text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:opacity-100";
@@ -262,6 +1365,32 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
         zsh: "Zsh",
       };
 
+      const rightRailContent = document.querySelector<HTMLElement>(
+        "[data-blume-right-rail-content]"
+      );
+      const rightRailItems = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          "article [data-blume-right-rail-item]"
+        )
+      ).filter(
+        (item) => !item.parentElement?.closest("[data-blume-right-rail-item]")
+      );
+      if (rightRailContent && rightRailItems.length > 0) {
+        rightRailContent.replaceChildren();
+        if (rightRailItems.some((item) => item.hasAttribute("data-blume-panel"))) {
+          document.querySelector("[data-blume-toc]")?.setAttribute("hidden", "");
+        }
+
+        for (const item of rightRailItems) {
+          const clone = item.cloneNode(true) as HTMLElement;
+          item.classList.add("xl:hidden");
+          clone.classList.remove("my-6");
+          clone.classList.remove("xl:hidden");
+          clone.classList.add("my-0");
+          rightRailContent.append(clone);
+        }
+      }
+
       for (const pre of document.querySelectorAll(".prose pre")) {
         if (pre.querySelector("[data-blume-copy]")) {
           continue;
@@ -280,7 +1409,7 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
         // offset; pick the Tailwind class by context instead of a CSS override.
         const topClass = pre.closest("blume-tabs, .not-prose")
           ? "top-2.5"
-          : "top-2";
+          : "top-1";
         button.className = `${buttonClass} ${topClass}`;
         button.setAttribute("data-blume-copy", "");
         button.setAttribute("aria-label", "Copy code");
@@ -298,6 +1427,303 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
           }, 1500);
         });
         pre.appendChild(button);
+      }
+
+      const articleText = () => {
+        const article = document.querySelector("article");
+        const clone = article?.cloneNode(true) as HTMLElement | undefined;
+        clone
+          ?.querySelectorAll(
+            "[data-blume-contextual-menu], [data-blume-copy-page], [data-blume-right-rail-item]"
+          )
+          .forEach((element) => element.remove());
+        return clone?.innerText.trim() ?? document.title;
+      };
+
+      const pageMarkdown = () => {
+        const title =
+          document.querySelector("article h1")?.textContent?.trim() ??
+          document.title;
+        const body = articleText();
+        return body.startsWith(title) ? body : `# ${title}\n\n${body}`;
+      };
+
+      const pagePrompt = () =>
+        [
+          "Use this documentation page as context.",
+          `URL: ${window.location.href}`,
+          "",
+          pageMarkdown(),
+        ].join("\n");
+
+      const mcpServerUrl = () =>
+        new URL("/mcp", window.location.origin).toString();
+
+      const updateActionLabel = (
+        button: Element,
+        label: string,
+        timeout = 1500
+      ) => {
+        const target = button.querySelector("[data-blume-contextual-label]");
+        if (!target) {
+          return;
+        }
+        const previous = target.textContent ?? "";
+        target.textContent = label;
+        setTimeout(() => {
+          target.textContent = previous;
+        }, timeout);
+      };
+
+      const copyToClipboard = async (button: Element, text: string) => {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          return false;
+        }
+        updateActionLabel(button, "Copied");
+        return true;
+      };
+
+      const aiUrl = (tool: string, prompt: string): string => {
+        const query = encodeURIComponent(prompt);
+        if (tool === "chatgpt") {
+          return `https://chatgpt.com/?q=${query}`;
+        }
+        if (tool === "claude") {
+          return `https://claude.ai/new?q=${query}`;
+        }
+        if (tool === "perplexity") {
+          return `https://www.perplexity.ai/search/new?q=${query}`;
+        }
+        if (tool === "grok") {
+          return `https://grok.com/?q=${query}`;
+        }
+        if (tool === "aistudio") {
+          return `https://aistudio.google.com/prompts/new_chat?prompt=${query}`;
+        }
+        if (tool === "devin") {
+          return `https://app.devin.ai/?q=${query}`;
+        }
+        if (tool === "windsurf" || tool === "devin-desktop") {
+          return `https://windsurf.com/editor?prompt=${query}`;
+        }
+        return `https://www.google.com/search?q=${query}`;
+      };
+
+      const mcpInstallUrl = (tool: string): string | null => {
+        const name = encodeURIComponent(document.title.split(" - ")[0] || "Docs");
+        const config = encodeURIComponent(
+          JSON.stringify({ mcpServers: { [name]: { url: mcpServerUrl() } } })
+        );
+        if (tool === "cursor") {
+          return `cursor://anysphere.cursor-deeplink/mcp/install?name=${name}&config=${config}`;
+        }
+        if (tool === "vscode") {
+          return `vscode:mcp/install?name=${name}&config=${config}`;
+        }
+        if (tool === "devin-mcp") {
+          return `https://app.devin.ai/settings/mcp?config=${config}`;
+        }
+        return null;
+      };
+
+      const closeContextualMenu = (button: Element) => {
+        const menu = button.closest(
+          "details[data-blume-contextual-menu]"
+        ) as HTMLDetailsElement | null;
+        if (menu) {
+          menu.open = false;
+        }
+      };
+
+      for (const button of document.querySelectorAll(
+        "[data-blume-contextual-action]"
+      )) {
+        button.addEventListener("click", async (event) => {
+          const action = button.getAttribute("data-blume-contextual-action");
+          const tool = button.getAttribute("data-blume-contextual-tool") ?? "";
+          if (action === "custom-link") {
+            return;
+          }
+          event.preventDefault();
+          closeContextualMenu(button);
+
+          if (action === "copy-page") {
+            await copyToClipboard(button, pageMarkdown());
+            return;
+          }
+          if (action === "view-markdown") {
+            const blob = new Blob([pageMarkdown()], {
+              type: "text/markdown;charset=utf-8",
+            });
+            const url = URL.createObjectURL(blob);
+            window.open(url, "_blank", "noopener,noreferrer");
+            setTimeout(() => URL.revokeObjectURL(url), 30_000);
+            return;
+          }
+          if (action === "ai") {
+            window.open(aiUrl(tool, pagePrompt()), "_blank", "noopener,noreferrer");
+            return;
+          }
+          if (action === "copy-mcp-url") {
+            await copyToClipboard(button, mcpServerUrl());
+            return;
+          }
+          if (action === "copy-mcp-command") {
+            await copyToClipboard(button, `npx add-mcp ${mcpServerUrl()}`);
+            return;
+          }
+          if (action === "editor-mcp") {
+            const url = mcpInstallUrl(tool);
+            if (url) {
+              window.location.href = url;
+            }
+            return;
+          }
+          if (action === "assistant") {
+            const askButton = Array.from(document.querySelectorAll("button")).find(
+              (item) => item.textContent?.trim() === "Ask AI"
+            );
+            if (askButton instanceof HTMLButtonElement) {
+              askButton.click();
+            } else {
+              await copyToClipboard(button, pagePrompt());
+            }
+            return;
+          }
+          if (action === "download-pdf") {
+            window.print();
+            return;
+          }
+          if (action === "download-spec") {
+            window.open("/openapi.json", "_blank", "noopener,noreferrer");
+          }
+        });
+      }
+
+      for (const button of document.querySelectorAll("[data-blume-copy-page]")) {
+        if (button.hasAttribute("data-blume-contextual-action")) {
+          continue;
+        }
+        button.addEventListener("click", async () => {
+          const article = document.querySelector("article");
+          const clone = article?.cloneNode(true) as HTMLElement | undefined;
+          clone
+            ?.querySelectorAll("[data-blume-copy-page]")
+            .forEach((element) => element.remove());
+          const text = clone?.innerText.trim() ?? document.title;
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch {
+            return;
+          }
+
+          const label = button.querySelector("[data-blume-copy-page-label]");
+          if (!label) {
+            return;
+          }
+          const previous = label.textContent ?? "Copy page";
+          label.textContent = "Copied";
+          setTimeout(() => {
+            label.textContent = previous;
+          }, 1500);
+        });
+      }
+
+      const viewPanels = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-blume-view-panel]")
+      );
+      if (
+        viewPanels.length > 1 &&
+        !document.querySelector("[data-blume-view-selector]")
+      ) {
+        const titles = Array.from(
+          new Set(
+            viewPanels
+              .map((panel) => panel.dataset.blumeViewTitle)
+              .filter(Boolean)
+          )
+        ) as string[];
+        const saved = localStorage.getItem("blume-view");
+        const initial = saved && titles.includes(saved) ? saved : titles[0];
+
+        const buildSelector = (id: string, className: string) => {
+          const wrapper = document.createElement("div");
+          wrapper.className = className;
+          wrapper.setAttribute("data-blume-view-selector", "");
+
+          const label = document.createElement("label");
+          label.className = "sr-only";
+          label.htmlFor = id;
+          label.textContent = "View";
+
+          const select = document.createElement("select");
+          select.id = id;
+          select.className =
+            "rounded-blume border border-border bg-background px-3 py-2 font-medium text-foreground text-sm";
+          for (const title of titles) {
+            const option = document.createElement("option");
+            option.value = title;
+            option.textContent = title;
+            select.appendChild(option);
+          }
+          wrapper.append(label, select);
+          return { select, wrapper };
+        };
+
+        const inlineSelector = buildSelector(
+          "blume-view-select",
+          "not-prose my-6 flex items-center justify-end gap-2 xl:hidden"
+        );
+        const railSelector = buildSelector(
+          "blume-view-select-rail",
+          "mb-6 hidden items-center justify-stretch gap-2 xl:flex"
+        );
+        const selects = [inlineSelector.select, railSelector.select];
+        const viewForHeading = (anchor: HTMLAnchorElement) => {
+          const id = decodeURIComponent(anchor.hash.slice(1));
+          if (!id) {
+            return null;
+          }
+          return document
+            .getElementById(id)
+            ?.closest<HTMLElement>("[data-blume-view-panel]");
+        };
+        const tocItems = Array.from(
+          document.querySelectorAll<HTMLElement>("[data-blume-toc-item]")
+        ).map((item) => {
+          const anchor = item.querySelector<HTMLAnchorElement>("a[href^='#']");
+          return {
+            item,
+            panel: anchor ? viewForHeading(anchor) : null,
+          };
+        });
+
+        const updateView = (active: string) => {
+          for (const select of selects) {
+            select.value = active;
+          }
+          localStorage.setItem("blume-view", active);
+          for (const panel of viewPanels) {
+            const selected = panel.dataset.blumeViewTitle === active;
+            panel.hidden = !selected;
+            panel.setAttribute("aria-hidden", selected ? "false" : "true");
+          }
+          for (const { item, panel } of tocItems) {
+            const visible = !panel || panel.dataset.blumeViewTitle === active;
+            item.hidden = !visible;
+          }
+        };
+
+        for (const select of selects) {
+          select.addEventListener("change", () => updateView(select.value));
+        }
+        viewPanels[0].before(inlineSelector.wrapper);
+        document
+          .querySelector("[data-blume-toc]")
+          ?.before(railSelector.wrapper);
+        updateView(initial);
       }
     </script>
   </body>

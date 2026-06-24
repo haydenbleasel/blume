@@ -132,6 +132,7 @@ export const discoverContent = async (options: {
   include: string[];
   exclude: string[];
   defaultType: string;
+  transformSource?: (source: string, file: string) => Promise<string> | string;
 }): Promise<{ pages: PageRecord[]; diagnostics: Diagnostic[] }> => {
   const files = await glob(options.include, {
     absolute: true,
@@ -142,7 +143,15 @@ export const discoverContent = async (options: {
   files.sort();
 
   const sources = await Promise.all(
-    files.map(async (file) => ({ file, source: await readFile(file, "utf-8") }))
+    files.map(async (file) => {
+      const source = await readFile(file, "utf-8");
+      return {
+        file,
+        source: options.transformSource
+          ? await options.transformSource(source, file)
+          : source,
+      };
+    })
   );
 
   const pages: PageRecord[] = [];

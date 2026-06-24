@@ -2,6 +2,9 @@ import { satteri } from "@astrojs/markdown-satteri";
 
 import { directiveToCalloutPlugin } from "./directives.ts";
 import { mathPlugin } from "./math.ts";
+import { mermaidPlugin } from "./mermaid.ts";
+import { mintlifyCodeGroupPlugin } from "./mintlify-code-group.ts";
+import { mintlifySvgIconPlugin } from "./mintlify-svg-icons.ts";
 import { packageInstallPlugin } from "./package-install.ts";
 
 export {
@@ -14,6 +17,21 @@ export {
   codeTitleTransformer,
 } from "./code-title.ts";
 export { calloutTypeFor } from "./directives.ts";
+export { mermaidPlugin } from "./mermaid.ts";
+export { mintlifyCodeGroupPlugin } from "./mintlify-code-group.ts";
+export { rewriteMintlifyAsyncApiPage } from "./mintlify-asyncapi.ts";
+export { rewriteMintlifyManualApiPage } from "./mintlify-manual-api.ts";
+export { rewriteMintlifyOpenApiSchemaPage } from "./mintlify-openapi.ts";
+export {
+  mintlifySvgIconPlugin,
+  rewriteMintlifySvgIconProps,
+} from "./mintlify-svg-icons.ts";
+export {
+  rewriteMintlifyGlobalVariables,
+  rewriteMintlifyMarkdownSnippets,
+  rewriteMintlifySnippetVariables,
+  rewriteMintlifyUserVariable,
+} from "./mintlify-snippets.ts";
 export { packageInstallPlugin } from "./package-install.ts";
 
 /** Element type of Satteri's `mdastPlugins`, sourced from the (alpha) core. */
@@ -51,6 +69,9 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) => {
   const plugins: unknown[] = [
     packageInstallPlugin(),
     directiveToCalloutPlugin(),
+    mintlifySvgIconPlugin(),
+    mintlifyCodeGroupPlugin(),
+    mermaidPlugin(),
   ];
   if (options.math) {
     plugins.push(mathPlugin());

@@ -1,0 +1,59 @@
+---
+const {
+  body,
+  default: defaultValue,
+  deprecated = false,
+  header,
+  name,
+  path,
+  placeholder,
+  query,
+  required = false,
+  type,
+} = Astro.props;
+
+const fieldName = name ?? path ?? query ?? body ?? header;
+const location = path
+  ? "path"
+  : query
+    ? "query"
+    : body
+      ? "body"
+      : header
+        ? "header"
+        : null;
+---
+
+<div class="not-prose my-4 rounded-blume border border-border p-4">
+  <p class="m-0 flex flex-wrap items-center gap-2 font-mono text-sm">
+    {location && <span class="text-muted-foreground">{location}</span>}
+    <span class="font-semibold text-foreground">{fieldName}</span>
+    {type && <span class="text-muted-foreground">{type}</span>}
+    {
+      required && (
+        <span class="rounded bg-muted px-1.5 py-0.5 font-sans text-[0.7rem] text-muted-foreground">
+          required
+        </span>
+      )
+    }
+    {
+      deprecated && (
+        <span class="rounded bg-muted px-1.5 py-0.5 font-sans text-[0.7rem] text-muted-foreground">
+          deprecated
+        </span>
+      )
+    }
+  </p>
+  {
+    (defaultValue !== undefined || placeholder) && (
+      <p class="m-0 mt-2 text-muted-foreground text-xs">
+        {defaultValue !== undefined && <>default: {String(defaultValue)}</>}
+        {defaultValue !== undefined && placeholder && <> / </>}
+        {placeholder && <>placeholder: {placeholder}</>}
+      </p>
+    )
+  }
+  <div class="mt-2 text-muted-foreground text-sm [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+    <slot />
+  </div>
+</div>

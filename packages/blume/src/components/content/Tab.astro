@@ -1,16 +1,40 @@
 ---
+import Icon from "../Icon.astro";
+
 interface Props {
+  icon?: string;
+  iconType?: string;
+  id?: string;
   title: string;
 }
 
-const { title } = Astro.props;
+const { icon, iconType, id, title } = Astro.props;
+const slugify = (value: string): string =>
+  value
+    .toLowerCase()
+    .trim()
+    .replaceAll(/[^\w\s-]/gu, "")
+    .replaceAll(/[\s_]+/gu, "-")
+    .replaceAll(/-+/gu, "-")
+    .replaceAll(/^-|-$/gu, "");
+const tabId = id ?? slugify(title);
 ---
 
 <div
   class="[&>:first-child]:mt-0 [&>:last-child]:mb-0"
   data-blume-tab-panel
+  data-icon={icon}
+  data-tab-id={tabId}
   data-title={title}
+  id={id}
   role="tabpanel"
 >
   <slot />
+  {
+    icon && (
+      <template data-blume-tab-icon>
+        <Icon class="shrink-0" iconType={iconType} name={icon} size={14} />
+      </template>
+    )
+  }
 </div>

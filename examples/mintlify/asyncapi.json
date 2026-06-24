@@ -1,0 +1,123 @@
+{
+  "asyncapi": "3.0.0",
+  "info": {
+    "title": "Blume Events",
+    "version": "1.0.0",
+    "description": "Event streams for real-time garden activity."
+  },
+  "channels": {
+    "gardenUpdates": {
+      "address": "gardens/{gardenId}/updates",
+      "title": "Garden updates",
+      "description": "Subscribe to lifecycle events for a garden.",
+      "messages": {
+        "FlowerBloomed": {
+          "$ref": "#/components/messages/FlowerBloomed"
+        }
+      }
+    }
+  },
+  "operations": {
+    "receiveGardenUpdates": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/gardenUpdates"
+      },
+      "messages": [
+        {
+          "$ref": "#/components/messages/FlowerBloomed"
+        }
+      ],
+      "summary": "Receive garden updates"
+    }
+  },
+  "components": {
+    "messages": {
+      "FlowerBloomed": {
+        "title": "Flower bloomed",
+        "summary": "A flower changed from bud to bloom.",
+        "payload": {
+          "$ref": "#/components/schemas/FlowerBloomedPayload"
+        }
+      }
+    },
+    "schemas": {
+      "FlowerBloomedPayload": {
+        "type": "object",
+        "required": ["flowerId", "color"],
+        "properties": {
+          "flowerId": {
+            "type": "string",
+            "description": "The stable flower identifier."
+          },
+          "color": {
+            "type": "string",
+            "description": "The flower color at bloom time."
+          },
+          "bloomedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the flower bloomed."
+          },
+          "care": {
+            "type": "object",
+            "description": "Care guidance generated after bloom.",
+            "required": ["watering"],
+            "properties": {
+              "watering": {
+                "type": "string",
+                "description": "Recommended watering cadence."
+              },
+              "fertilizers": {
+                "type": "array",
+                "description": "Suggested fertilizer names.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "observations": {
+            "type": "array",
+            "description": "Sensor observations captured during bloom.",
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "description": "Observation kind."
+                },
+                "reading": {
+                  "description": "Observation reading.",
+                  "oneOf": [
+                    {
+                      "title": "TextReading",
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string",
+                          "description": "Text reading value."
+                        }
+                      }
+                    },
+                    {
+                      "title": "NumericReading",
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "number",
+                          "description": "Numeric reading value."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+---
+const { title } = Astro.props;
+---
+
+<div class="rounded-blume border border-border bg-background p-4">
+  {title && <p class="m-0 mb-3 font-medium text-foreground text-sm">{title}</p>}
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <slot />
+  </div>
+</div>

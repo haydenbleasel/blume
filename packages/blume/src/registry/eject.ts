@@ -3,7 +3,12 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "pathe";
 
 import { buildRawMarkdown } from "../ai/markdown.ts";
-import { buildRuntimeData, detectNeedsReact } from "../astro/generate.ts";
+import {
+  buildRuntimeData,
+  buildRuntimeMarkdown,
+  detectNeedsMermaid,
+  detectNeedsReact,
+} from "../astro/generate.ts";
 import { discoverPages } from "../astro/pages.ts";
 import {
   askEndpointTemplate,
@@ -25,6 +30,13 @@ import { buildThemeCss } from "../theme/palette.ts";
 
 const POSIX = (path: string): string => path.split("\\").join("/");
 
+const readThemeFiles = async (paths: string[]): Promise<string> => {
+  const contents = await Promise.all(
+    paths.map((path) => readFile(path, "utf-8"))
+  );
+  return contents.join("\n");
+};
+
 /**
  * Promote the generated runtime into the project as an owned Astro app. After
  * eject the project has a normal `astro.config.mjs` and `src/`, the `blume` CLI
@@ -40,14 +52,16 @@ export const eject = async (root: string): Promise<string[]> => {
   const genDir = join(srcDir, "generated");
   const askEnabled = config.ai.ask?.enabled ?? false;
 
-  const [pages, needsReactRaw, userTheme, rawMarkdown] = await Promise.all([
-    context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
-    detectNeedsReact(root),
-    context.themeFile
-      ? readFile(context.themeFile, "utf-8")
-      : Promise.resolve(""),
-    buildRawMarkdown(project),
-  ]);
+  const [pages, needsReactRaw, needsMermaid, userTheme, rawMarkdown] =
+    await Promise.all([
+      context.pagesRoot
+        ? discoverPages(context.pagesRoot)
+        : Promise.resolve([]),
+      detectNeedsReact(root),
+      detectNeedsMermaid(project.graph.pages),
+      readThemeFiles(context.themeFiles),
+      buildRawMarkdown(project),
+    ]);
   const needsReact = needsReactRaw || askEnabled;
 
   // A project-relative context so generated files use portable paths.
@@ -72,6 +86,7 @@ export const eject = async (root: string): Promise<string[]> => {
         config,
         context: relContext,
         dataPath: "./src/generated/data.json",
+        markdownDataPath: "./src/generated/markdown.json",
         needsReact,
         pages: relPages,
         themePath: "./src/generated/app.css",
@@ -91,6 +106,7 @@ export const eject = async (root: string): Promise<string[]> => {
       content: catchAllPageTemplate({
         askEnabled,
         mathEnabled: config.markdown.math,
+        mermaidEnabled: needsMermaid,
       }),
       path: join(srcDir, "pages", "[...slug].astro"),
     },
@@ -111,6 +127,10 @@ export const eject = async (root: string): Promise<string[]> => {
       path: join(genDir, "app.css"),
     },
     { content: buildRuntimeData(project), path: join(genDir, "data.json") },
+    {
+      content: await buildRuntimeMarkdown(project),
+      path: join(genDir, "markdown.json"),
+    },
     {
       content: `${JSON.stringify(rawMarkdown)}\n`,
       path: join(genDir, "raw-markdown.json"),
