@@ -173,7 +173,7 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 }
 
 .prose :where(pre) {
-  background: var(--blume-code-background);
+  background: transparent;
   border: 1px solid var(--blume-border);
   border-radius: var(--blume-radius);
   color: var(--blume-foreground);
@@ -186,7 +186,7 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 }
 
 .prose :where(pre.astro-code) {
-  background: var(--blume-code-background) !important;
+  background: transparent !important;
   color: var(--shiki-light, var(--blume-foreground)) !important;
 }
 
@@ -215,7 +215,6 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 
 .prose :where(pre[data-language])::before {
   align-items: center;
-  background: color-mix(in oklab, var(--blume-muted) 35%, transparent);
   border-bottom: 1px solid var(--blume-border);
   color: var(--blume-muted-foreground);
   content: attr(data-language);
