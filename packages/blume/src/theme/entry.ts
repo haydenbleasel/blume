@@ -210,7 +210,7 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 }
 
 .prose :where(pre[data-language]) {
-  padding-top: 3.25rem;
+  padding-top: 3.75rem;
 }
 
 .prose :where(pre[data-language])::before {
@@ -222,12 +222,16 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   font-family: var(--font-sans);
   font-size: 0.75rem;
   font-weight: 500;
-  height: 2.25rem;
+  height: 2.75rem;
   left: 0;
   padding: 0 3.25rem 0 1rem;
   position: absolute;
   right: 0;
   top: 0;
+}
+
+.prose :where(pre[data-title])::before {
+  content: attr(data-title);
 }
 
 .prose :where(pre code) {
@@ -268,6 +272,16 @@ blume-tabs pre[data-language],
 blume-tabs pre[data-language]::before,
 .not-prose pre[data-language]::before {
   content: none;
+}
+
+/* Code blocks inside request/response example panels sit flush; the panel owns
+   the frame. Unlayered (like the tab rules) so they beat the base \`pre\` styles
+   that a class on the panel cannot. */
+[data-blume-code-panel] pre {
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
 }
 
 @media (max-width: 640px) {

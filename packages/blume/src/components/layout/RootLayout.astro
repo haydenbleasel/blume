@@ -265,7 +265,7 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
         // offset; pick the Tailwind class by context instead of a CSS override.
         const topClass = pre.closest("blume-tabs, .not-prose")
           ? "top-2.5"
-          : "top-1";
+          : "top-2";
         button.className = `${buttonClass} ${topClass}`;
         button.setAttribute("data-blume-copy", "");
         button.setAttribute("aria-label", "Copy code");

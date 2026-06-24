@@ -8,13 +8,12 @@ const { title = "Response" } = Astro.props;
 
 <div
   class="not-prose my-6 overflow-hidden rounded-blume border border-border bg-background"
+  data-blume-code-panel
 >
   <div
     class="border-border border-b bg-muted/35 px-3.5 py-2 font-medium text-muted-foreground text-xs"
   >
     {title}
   </div>
-  <div class="[&>pre]:m-0 [&>pre]:overflow-x-auto [&>pre]:rounded-none [&>pre]:border-0">
-    <slot />
-  </div>
+  <slot />
 </div>

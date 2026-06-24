@@ -105,7 +105,7 @@ export const astroConfigTemplate = (options: {
 import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 import tailwindcss from "@tailwindcss/vite";
-import { blumeMarkdownProcessor, blumeMdxProcessor } from "blume/markdown";
+import { blumeMarkdownProcessor, blumeMdxProcessor, codeTitleTransformer } from "blume/markdown";
 ${reactImport}${blumeImport}${adapterImport}
 export default defineConfig({
   root: ${JSON.stringify(context.outDir)},
@@ -122,6 +122,7 @@ export default defineConfig({
         dark: "github-dark",
       },
       defaultColor: false,
+      transformers: [codeTitleTransformer()],
     },
   },
   devToolbar: { enabled: false },

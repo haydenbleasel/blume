@@ -9,6 +9,10 @@ export {
   type PackageManager,
   toPackageCommands,
 } from "./package-commands.ts";
+export {
+  type CodeTitleTransformer,
+  codeTitleTransformer,
+} from "./code-title.ts";
 export { calloutTypeFor } from "./directives.ts";
 export { packageInstallPlugin } from "./package-install.ts";
 
