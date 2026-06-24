@@ -21,12 +21,12 @@ const iconByType: Record<CalloutType, string> = {
 ---
 
 <aside
-  class="blume-callout not-prose my-5 flex flex-row items-start gap-2 rounded-2xl bg-muted px-4 py-3 font-sans text-muted-foreground text-sm leading-6 [&_a]:underline [&_a]:decoration-current/50 [&_code]:font-mono"
+  class="not-prose my-5 flex flex-row items-start gap-2 rounded-2xl bg-muted px-4 py-3 font-sans text-muted-foreground text-sm leading-6 [&_a]:underline [&_a]:decoration-current/50 [&_code]:font-mono"
 >
   <span class="mt-0.5 shrink-0 text-muted-foreground/70">
     <Icon name={iconByType[type]} size={16} />
   </span>
-  <div class="min-w-0 flex-1">
+  <div class="min-w-0 flex-1 [&>:first-child]:mt-0! [&>:last-child]:mb-0!">
     {title && <p class="mb-1 font-semibold text-foreground">{title}</p>}
     <slot />
   </div>

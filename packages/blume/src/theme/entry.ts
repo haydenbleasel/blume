@@ -258,16 +258,6 @@ blume-tabs [data-blume-tab-panel] > pre {
   margin: 0;
 }
 
-/* Callout body hugs the card padding: strip the outer paragraph margins while
-   keeping spacing between paragraphs. Unlayered so it beats the prose margins. */
-.blume-callout > div > :first-child {
-  margin-top: 0;
-}
-
-.blume-callout > div > :last-child {
-  margin-bottom: 0;
-}
-
 blume-tabs pre[data-language],
 .not-prose pre[data-language] {
   padding-top: 1rem;
