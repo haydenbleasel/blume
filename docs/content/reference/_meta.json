@@ -1,5 +1,5 @@
 {
   "title": "Reference",
-  "order": 4,
-  "pages": ["syntax", "components", "frontmatter", "cli"]
+  "order": 5,
+  "pages": ["frontmatter", "cli"]
 }

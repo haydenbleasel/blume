@@ -1,0 +1,5 @@
+{
+  "title": "Content",
+  "order": 3,
+  "pages": ["navigation", "syntax", "components"]
+}
