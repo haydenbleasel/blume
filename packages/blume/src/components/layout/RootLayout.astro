@@ -224,7 +224,7 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
         `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
 
       const buttonClass =
-        "blume-copy-button absolute right-3 top-1 inline-flex size-7 items-center justify-center rounded-full bg-transparent text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:opacity-100";
+        "absolute right-3 inline-flex size-7 items-center justify-center rounded-full bg-transparent text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:opacity-100";
 
       const languageLabels: Record<string, string> = {
         astro: "Astro",
@@ -248,7 +248,7 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
       };
 
       for (const pre of document.querySelectorAll(".prose pre")) {
-        if (pre.querySelector(".blume-copy-button")) {
+        if (pre.querySelector("[data-blume-copy]")) {
           continue;
         }
         const language = pre.getAttribute("data-language");
@@ -261,7 +261,13 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
         pre.classList.add("group", "relative");
         const button = document.createElement("button");
         button.type = "button";
-        button.className = buttonClass;
+        // The language-label bar (prose) vs flush code (tabs) need a different
+        // offset; pick the Tailwind class by context instead of a CSS override.
+        const topClass = pre.closest("blume-tabs, .not-prose")
+          ? "top-2.5"
+          : "top-1";
+        button.className = `${buttonClass} ${topClass}`;
+        button.setAttribute("data-blume-copy", "");
         button.setAttribute("aria-label", "Copy code");
         button.innerHTML = svg("copy");
         button.addEventListener("click", async () => {

@@ -268,11 +268,6 @@ blume-tabs pre[data-language]::before,
   content: none;
 }
 
-blume-tabs .blume-copy-button,
-.not-prose .blume-copy-button {
-  top: 0.625rem;
-}
-
 @media (max-width: 640px) {
   .prose :where(h1) {
     font-size: 2.25rem;
