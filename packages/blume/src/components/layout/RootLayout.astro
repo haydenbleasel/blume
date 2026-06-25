@@ -52,7 +52,11 @@ const iconButton =
   "inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
 const initialThemeScript = `(()=>{const m=${JSON.stringify(themeMode)};const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);})();`;
-const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=next;localStorage.setItem("blume-theme",next);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}});`;
+// Toggling the theme flips colors; without suppressing transitions the
+// animated styles fade while the non-animated ones snap, so we disable all
+// transitions for the swap (next-themes' disableTransitionOnChange trick),
+// force a synchronous style flush, then restore them on the next tick.
+const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";const s=document.createElement("style");s.appendChild(document.createTextNode("*,*::before,*::after{transition:none!important}"));document.head.appendChild(s);d.dataset.theme=next;localStorage.setItem("blume-theme",next);window.getComputedStyle(d).opacity;setTimeout(()=>document.head.removeChild(s),1);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}});`;
 ---
 
 <!doctype html>
