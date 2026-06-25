@@ -3,7 +3,6 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "examples/*",
     "docs"
   ],
   "type": "module",
@@ -13,7 +12,8 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "check": "ultracite check",
-    "fix": "ultracite fix"
+    "fix": "ultracite fix",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@astrojs/markdown-satteri": "^0.3.2",
@@ -29,6 +29,7 @@
     "@takumi-rs/helpers": "^1.8.7",
     "ai": "^5.0.0",
     "astro": "^7.0.2",
+    "husky": "^9.1.7",
     "katex": "^0.17.0",
     "oxfmt": "^0.55.0",
     "oxlint": "^1.70.0",

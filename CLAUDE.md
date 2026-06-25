@@ -9,7 +9,7 @@ reformat it).
 - `bun run check` / `bun run fix` — Ultracite lint + format (oxlint + oxfmt)
 - `bun run typecheck` — tsc across packages
 - `bun run test` — Vitest (`packages/blume/test`)
-- Run the CLI locally: `cd examples/basic && bun ../../packages/blume/bin/blume.mjs <cmd>`
+- Run the CLI locally: `cd docs && bun ../packages/blume/bin/blume.mjs <cmd>`
 
 ## How it works
 
@@ -44,5 +44,4 @@ MDAST plugins — `package-install` → package-manager tabs, `:::note` directiv
   React-free (vanilla custom elements). React auto-enables only when the project
   has `.tsx`/`.jsx` or Ask AI is on.
 - Generated `.blume/` and `plan/` are excluded from lint/format.
-- Commit per milestone; keep the example (`examples/basic`) and docs (`docs/`)
-  building.
+- Commit per milestone; keep the docs (`docs/`) building.

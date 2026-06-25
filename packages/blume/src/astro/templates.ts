@@ -1,6 +1,60 @@
+import { existsSync, readFileSync } from "node:fs";
+
+import { dirname, join } from "pathe";
+
 import type { ResolvedConfig } from "../core/schema.ts";
 import type { ProjectContext } from "../core/types.ts";
 import type { BlumePageRoute } from "./integration.ts";
+
+const WORKSPACE_MARKERS = [
+  ".git",
+  "bun.lock",
+  "bun.lockb",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "yarn.lock",
+];
+
+/** True when the package.json at this path declares a `workspaces` field. */
+const hasWorkspacesField = (pkgPath: string): boolean => {
+  if (!existsSync(pkgPath)) {
+    return false;
+  }
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
+      workspaces?: unknown;
+    };
+    return pkg.workspaces !== undefined;
+  } catch {
+    return false;
+  }
+};
+
+/** True when a directory looks like a workspace/monorepo root. */
+const hasWorkspaceMarker = (dir: string): boolean =>
+  hasWorkspacesField(join(dir, "package.json")) ||
+  WORKSPACE_MARKERS.some((marker) => existsSync(join(dir, marker)));
+
+/**
+ * Walk up from the project root to the workspace/monorepo root so Vite's
+ * `fs.allow` can reach hoisted dependencies — e.g. KaTeX fonts that resolve to
+ * a monorepo root `node_modules` outside the project directory. Falls back to
+ * the project root when no workspace markers are found.
+ */
+const findWorkspaceRoot = (start: string): string => {
+  let dir = start;
+  for (;;) {
+    if (hasWorkspaceMarker(dir)) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      return start;
+    }
+    dir = parent;
+  }
+};
 
 const ADAPTER_IMPORTS: Record<string, string> = {
   cloudflare: "@astrojs/cloudflare",
@@ -51,6 +105,10 @@ export const astroConfigTemplate = (options: {
   const { context, config, needsReact, pages, dataPath, themePath } = options;
   const { deployment } = config;
   const server = deployment.output === "server";
+
+  // The project root plus the workspace root, so hoisted dependencies (e.g.
+  // KaTeX fonts under a monorepo's root node_modules) stay servable in dev.
+  const fsAllow = [...new Set([findWorkspaceRoot(context.root), context.root])];
 
   const adapterImport =
     server && deployment.adapter
@@ -105,7 +163,6 @@ export const astroConfigTemplate = (options: {
 import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 import tailwindcss from "@tailwindcss/vite";
-import { searchForWorkspaceRoot } from "vite";
 import { blumeMarkdownProcessor, blumeMdxProcessor, codeTitleTransformer } from "blume/markdown";
 ${reactImport}${blumeImport}${adapterImport}
 export default defineConfig({
@@ -137,9 +194,7 @@ export default defineConfig({
     },
     server: {
       fs: {
-        // The project root plus the workspace root, so hoisted dependencies
-        // (e.g. KaTeX fonts under a monorepo's root node_modules) stay servable.
-        allow: [searchForWorkspaceRoot(${JSON.stringify(context.root)}), ${JSON.stringify(context.root)}],
+        allow: ${JSON.stringify(fsAllow)},
       },
     },
   },
