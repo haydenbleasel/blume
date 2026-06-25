@@ -81,7 +81,7 @@ const variantClass = {
   }
   {
     title && (
-      <p class="mb-1.5 flex items-center gap-1.5 font-semibold">
+      <p class="mb-1.5 flex items-center gap-1.5 font-medium">
         {title}
         {showArrow && (
           <Icon class="text-muted-foreground" name="arrow-right" size={14} />
@@ -89,7 +89,7 @@ const variantClass = {
       </p>
     )
   }
-  <div class="text-muted-foreground text-sm [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+  <div class="font-normal text-muted-foreground text-sm [&>:first-child]:mt-0 [&>:last-child]:mb-0">
     <slot />
   </div>
   {

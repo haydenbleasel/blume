@@ -21,11 +21,11 @@ bun run typecheck   # tsc --noEmit across packages
 bun run test        # Vitest
 ```
 
-Run the example or docs site against your local build:
+Run the docs site against your local build:
 
 ```bash
-cd examples/basic
-bun ../../packages/blume/bin/blume.mjs dev
+cd docs
+bun ../packages/blume/bin/blume.mjs dev
 ```
 
 ## Architecture

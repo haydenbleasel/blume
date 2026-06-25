@@ -504,7 +504,11 @@ const initialBannerScript =
   banner?.dismissible === true
     ? `(()=>{try{if(localStorage.getItem("blume-banner-dismissed")===${scriptStringLiteral(bannerKey)})document.documentElement.setAttribute("data-blume-banner-hidden","");}catch{}})();`
     : "";
-const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=next;localStorage.setItem("blume-theme",next);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}});`;
+// Toggling the theme flips colors; without suppressing transitions the
+// animated styles fade while the non-animated ones snap, so we disable all
+// transitions for the swap (next-themes' disableTransitionOnChange trick),
+// force a synchronous style flush, then restore them on the next tick.
+const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";const s=document.createElement("style");s.appendChild(document.createTextNode("*,*::before,*::after{transition:none!important}"));document.head.appendChild(s);d.dataset.theme=next;localStorage.setItem("blume-theme",next);window.getComputedStyle(d).opacity;setTimeout(()=>document.head.removeChild(s),1);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}});`;
 const bannerDismissScript =
   banner?.dismissible === true
     ? `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-banner-dismiss]");if(!t)return;const b=t.closest("[data-blume-banner]");if(!b)return;document.documentElement.setAttribute("data-blume-banner-hidden","");try{localStorage.setItem("blume-banner-dismissed",b.dataset.blumeBannerKey??"");}catch{}});`

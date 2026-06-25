@@ -61,7 +61,6 @@ blume build
 ```txt
 packages/blume      The published package: CLI, core, Astro runtime,
                     components, theme, search, registry, migrate, openapi
-examples/basic      A demo docs site exercising every feature
 examples/mintlify   A Mintlify starter compatibility fixture
 docs                Blume's own documentation, built with Blume
 ```
