@@ -10,6 +10,7 @@ import { importCommand } from "./commands/import.ts";
 import { initCommand } from "./commands/init.ts";
 import { migrateCommand } from "./commands/migrate.ts";
 import { previewCommand } from "./commands/preview.ts";
+import { validateCommand } from "./commands/validate.ts";
 
 const main = defineCommand({
   meta: {
@@ -27,6 +28,7 @@ const main = defineCommand({
     init: initCommand,
     migrate: migrateCommand,
     preview: previewCommand,
+    validate: validateCommand,
   },
 });
 
