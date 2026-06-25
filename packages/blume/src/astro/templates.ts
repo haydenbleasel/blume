@@ -438,6 +438,7 @@ const canonical =
   site={{ title: data.config.title, description: data.config.description }}
   logo={data.config.logo}
   banner={data.config.banner}
+  imageZoom={data.config.imageZoom}
   navigation={data.navigation}
   page={{ title: seo.title ?? title, description: seo.description ?? frontmatter.description, route }}
   headings={headings}

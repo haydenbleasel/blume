@@ -26,6 +26,7 @@ interface Props {
   navigation: Navigation;
   page: { title: string; description?: string; route: string };
   headings: Heading[];
+  imageZoom?: boolean;
   themeMode: "system" | "light" | "dark";
   searchEnabled: boolean;
   searchProvider: "orama" | "pagefind";
@@ -50,6 +51,7 @@ const {
   navigation,
   page,
   headings,
+  imageZoom = true,
   themeMode,
   searchEnabled,
   searchProvider,
@@ -164,7 +166,10 @@ const bannerScript = banner?.dismissible
     {bannerScript && <script is:inline set:html={bannerScript} />}
     <script is:inline set:html={initialThemeScript} />
   </head>
-  <body class="bg-background font-sans text-foreground antialiased">
+  <body
+    class="bg-background font-sans text-foreground antialiased"
+    data-blume-image-zoom={imageZoom ? "" : undefined}
+  >
     <a
       class="absolute left-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:left-0"
       href="#blume-content">Skip to content</a
@@ -293,6 +298,32 @@ const bannerScript = banner?.dismissible
                 <span>{eyebrowCrumb.label}</span>
               )}
             </nav>
+          )
+        }
+        {
+          tocHeadings.length > 0 && (
+            <details class="group mx-auto mb-6 max-w-[42rem] rounded-blume border border-border xl:hidden">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-medium text-foreground text-sm [&::-webkit-details-marker]:hidden">
+                <span>On this page</span>
+                <Icon
+                  class="text-muted-foreground transition-transform group-open:rotate-180"
+                  name="chevron-down"
+                  size={16}
+                />
+              </summary>
+              <ul class="m-0 list-none border-border border-t p-2">
+                {tocHeadings.map((heading) => (
+                  <li style={`padding-left:${(heading.depth - 2) * 0.75}rem`}>
+                    <a
+                      class="block rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:text-foreground"
+                      href={`#${heading.slug}`}
+                    >
+                      {heading.text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )
         }
         <article class="prose mx-auto max-w-[42rem]">
@@ -442,6 +473,116 @@ const bannerScript = banner?.dismissible
           }, 1500);
         });
         pre.appendChild(button);
+      }
+
+      // Click-to-zoom for content images (gated by `markdown.imageZoom`).
+      // Enhances every `.prose img` so plain Markdown images open in a lightbox.
+      // Opt out per-image with `data-no-zoom`.
+      const zoomImages: Iterable<HTMLImageElement> =
+        document.body.hasAttribute("data-blume-image-zoom")
+          ? document.querySelectorAll<HTMLImageElement>(
+              ".prose img:not([data-no-zoom])"
+            )
+          : [];
+      const zoomTargets = Array.from(zoomImages);
+      if (zoomTargets.length > 0) {
+        const reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)"
+        ).matches;
+        let active: {
+          clone: HTMLImageElement;
+          original: HTMLImageElement;
+          overlay: HTMLElement;
+        } | null = null;
+
+        const closeZoom = () => {
+          if (!active) {
+            return;
+          }
+          const { clone, original, overlay } = active;
+          active = null;
+          overlay.style.opacity = "0";
+          clone.style.transform = "translate(0px, 0px) scale(1)";
+          const cleanup = () => {
+            overlay.remove();
+            original.style.visibility = "";
+            document.removeEventListener("keydown", onKey);
+            window.removeEventListener("scroll", closeZoom);
+          };
+          if (reduceMotion) {
+            cleanup();
+          } else {
+            clone.addEventListener("transitionend", cleanup, { once: true });
+          }
+        };
+
+        const onKey = (event: KeyboardEvent) => {
+          if (event.key === "Escape") {
+            closeZoom();
+          }
+        };
+
+        const openZoom = (image: HTMLImageElement) => {
+          if (active) {
+            return;
+          }
+          const start = image.getBoundingClientRect();
+          if (start.width === 0 || start.height === 0) {
+            return;
+          }
+
+          const overlay = document.createElement("div");
+          overlay.className =
+            "fixed inset-0 z-[100] flex cursor-zoom-out items-center justify-center bg-background/80 opacity-0 backdrop-blur-sm transition-opacity duration-300";
+
+          const clone = image.cloneNode(true) as HTMLImageElement;
+          clone.className = "absolute m-0 max-w-none rounded-blume shadow-2xl";
+          clone.style.top = `${start.top}px`;
+          clone.style.left = `${start.left}px`;
+          clone.style.width = `${start.width}px`;
+          clone.style.height = `${start.height}px`;
+          clone.style.transformOrigin = "top left";
+          if (!reduceMotion) {
+            clone.style.transition =
+              "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)";
+          }
+
+          overlay.appendChild(clone);
+          document.body.appendChild(overlay);
+          image.style.visibility = "hidden";
+          active = { clone, original: image, overlay };
+
+          const margin = 0.92;
+          const ratio = start.width / start.height;
+          let targetWidth = window.innerWidth * margin;
+          let targetHeight = targetWidth / ratio;
+          if (targetHeight > window.innerHeight * margin) {
+            targetHeight = window.innerHeight * margin;
+            targetWidth = targetHeight * ratio;
+          }
+          const naturalWidth = image.naturalWidth || targetWidth;
+          if (targetWidth > naturalWidth) {
+            targetWidth = naturalWidth;
+            targetHeight = targetWidth / ratio;
+          }
+          const scale = targetWidth / start.width;
+          const dx = (window.innerWidth - targetWidth) / 2 - start.left;
+          const dy = (window.innerHeight - targetHeight) / 2 - start.top;
+
+          requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+            clone.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+          });
+
+          overlay.addEventListener("click", closeZoom);
+          document.addEventListener("keydown", onKey);
+          window.addEventListener("scroll", closeZoom, { passive: true });
+        };
+
+        for (const image of zoomTargets) {
+          image.classList.add("cursor-zoom-in");
+          image.addEventListener("click", () => openZoom(image));
+        }
       }
     </script>
   </body>

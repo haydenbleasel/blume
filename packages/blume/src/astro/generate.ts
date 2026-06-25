@@ -209,6 +209,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     config: {
       banner: resolveBanner(config),
       description: config.description,
+      imageZoom: config.markdown.imageZoom,
       logo: resolveLogo(project),
       og: { enabled: config.seo.og.enabled },
       repoUrl,

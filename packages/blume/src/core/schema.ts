@@ -322,6 +322,11 @@ const githubConfigSchema = z
 const markdownConfigSchema = z
   .object({
     /**
+     * Make content images click-to-zoom (open in a lightbox). On by default;
+     * opt a single image out with `data-no-zoom`.
+     */
+    imageZoom: z.boolean().default(true),
+    /**
      * Enable LaTeX math (`$…$` inline, `$$…$$` block) rendered with KaTeX.
      * Off by default since `$` is common in prose, shell, and code. MDX only.
      */
