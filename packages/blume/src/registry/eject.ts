@@ -13,12 +13,14 @@ import {
   envTemplate,
   ogEndpointTemplate,
   rawMarkdownEndpointTemplate,
+  rssEndpointTemplate,
   runtimeTsconfigTemplate,
   searchEndpointTemplate,
   userComponentsTemplate,
 } from "../astro/templates.ts";
 import { scanProject } from "../core/project-graph.ts";
 import type { ProjectContext } from "../core/types.ts";
+import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
@@ -149,6 +151,23 @@ export const eject = async (root: string): Promise<string[]> => {
       {
         content: searchEndpointTemplate(),
         path: join(srcDir, "pages", "blume-search.json.ts"),
+      }
+    );
+  }
+
+  const feeds = buildRssFeeds(project);
+  if (feeds.length > 0) {
+    const feedXml = Object.fromEntries(
+      feeds.map((feed) => [feed.type, renderRssFeed(feed)])
+    );
+    files.push(
+      {
+        content: `${JSON.stringify(feedXml)}\n`,
+        path: join(genDir, "rss.json"),
+      },
+      {
+        content: rssEndpointTemplate(),
+        path: join(srcDir, "pages", "[section]", "rss.xml.ts"),
       }
     );
   }

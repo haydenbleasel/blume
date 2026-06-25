@@ -20,6 +20,7 @@ interface Props {
   editUrl?: string | null;
   repoUrl?: string | null;
   askEnabled?: boolean;
+  feeds?: { title: string; href: string }[];
 }
 
 const {
@@ -35,6 +36,7 @@ const {
   editUrl,
   repoUrl,
   askEnabled,
+  feeds,
 } = Astro.props;
 
 const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
@@ -76,6 +78,16 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
           <meta name="twitter:card" content="summary_large_image" />
         </>
       )
+    }
+    {
+      feeds?.map((feed) => (
+        <link
+          href={feed.href}
+          rel="alternate"
+          title={feed.title}
+          type="application/rss+xml"
+        />
+      ))
     }
     <script is:inline set:html={initialThemeScript} />
   </head>

@@ -9,8 +9,10 @@ import {
 import { extractHeadings, slugify } from "../src/core/content.ts";
 import { buildContentGraph } from "../src/core/graph.ts";
 import { buildManifest } from "../src/core/manifest.ts";
+import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { PageRecord, ProjectContext } from "../src/core/types.ts";
+import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
 
 const makePage = (
   over: Pick<PageRecord, "id" | "route" | "title"> & Partial<PageRecord>
@@ -25,6 +27,34 @@ const makePage = (
   sourcePath: `/abs/${over.id}`,
   ...over,
 });
+
+const postPage = (
+  id: string,
+  route: string,
+  type: string,
+  meta: Record<string, unknown>
+): PageRecord =>
+  makePage({
+    contentType: type,
+    description: `About ${id}`,
+    id,
+    meta: pageMetaSchema.parse({ type, ...meta }),
+    route,
+    title: id,
+  });
+
+const rssProject = (
+  pages: PageRecord[],
+  config: Record<string, unknown> = {}
+): BlumeProject =>
+  ({
+    config: blumeConfigSchema.parse({
+      deployment: { site: "https://example.com" },
+      title: "Docs",
+      ...config,
+    }),
+    graph: { pages },
+  }) as unknown as BlumeProject;
 
 describe("config schema", () => {
   it("applies defaults for an empty config", () => {
@@ -167,5 +197,78 @@ describe("nav utilities", () => {
     const flat = flattenPages(sidebar);
     expect(getPagination(flat, "/").next?.route).toBe("/g/deploy");
     expect(getPagination(flat, "/g/deploy").prev?.route).toBe("/");
+  });
+});
+
+describe("rss feeds", () => {
+  it("returns no feeds without a configured site", () => {
+    const pages = [postPage("a", "/blog/a", "blog", { date: "2026-01-01" })];
+    expect(buildRssFeeds(rssProject(pages, { deployment: {} }))).toStrictEqual(
+      []
+    );
+  });
+
+  it("returns no feeds when disabled", () => {
+    const pages = [postPage("a", "/blog/a", "blog", { date: "2026-01-01" })];
+    expect(
+      buildRssFeeds(rssProject(pages, { rss: { enabled: false } }))
+    ).toStrictEqual([]);
+  });
+
+  it("builds a feed per content type with matching pages", () => {
+    const pages = [
+      postPage("doc", "/guide", "doc", {}),
+      postPage("post", "/blog/post", "blog", { date: "2026-01-01" }),
+      postPage("v1", "/changelog/v1", "changelog", {
+        changelog: { date: "2026-02-01" },
+      }),
+    ];
+    const feeds = buildRssFeeds(rssProject(pages));
+    expect(feeds.map((f) => f.path)).toStrictEqual([
+      "/blog/rss.xml",
+      "/changelog/rss.xml",
+    ]);
+    expect(feeds[0]?.title).toBe("Docs — Blog");
+  });
+
+  it("sorts items newest-first and honors the limit", () => {
+    const pages = [
+      postPage("old", "/blog/old", "blog", { date: "2026-01-01" }),
+      postPage("new", "/blog/new", "blog", { date: "2026-03-01" }),
+      postPage("mid", "/blog/mid", "blog", { date: "2026-02-01" }),
+    ];
+    const [feed] = buildRssFeeds(rssProject(pages, { rss: { limit: 2 } }));
+    expect(feed?.items.map((i) => i.title)).toStrictEqual(["new", "mid"]);
+  });
+
+  it("excludes drafts and hidden pages", () => {
+    const pages = [
+      postPage("draft", "/blog/draft", "blog", {
+        date: "2026-01-01",
+        draft: true,
+      }),
+      postPage("hidden", "/blog/hidden", "blog", {
+        date: "2026-01-02",
+        sidebar: { hidden: true },
+      }),
+      postPage("live", "/blog/live", "blog", { date: "2026-01-03" }),
+    ];
+    const [feed] = buildRssFeeds(rssProject(pages));
+    expect(feed?.items.map((i) => i.title)).toStrictEqual(["live"]);
+  });
+
+  it("renders escaped RSS 2.0 XML with absolute links and pubDate", () => {
+    const pages = [
+      postPage("Tom & Jerry", "/blog/post", "blog", { date: "2026-01-01" }),
+    ];
+    const [feed] = buildRssFeeds(rssProject(pages));
+    const xml = renderRssFeed(feed as NonNullable<typeof feed>);
+    expect(xml).toContain('<rss version="2.0"');
+    expect(xml).toContain("<title>Tom &amp; Jerry</title>");
+    expect(xml).toContain("<link>https://example.com/blog/post</link>");
+    expect(xml).toContain("<pubDate>Thu, 01 Jan 2026 00:00:00 GMT</pubDate>");
+    expect(xml).toContain(
+      '<atom:link href="https://example.com/blog/rss.xml" rel="self"'
+    );
   });
 });

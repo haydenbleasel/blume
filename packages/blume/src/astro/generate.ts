@@ -15,6 +15,7 @@ import { glob } from "tinyglobby";
 
 import { buildRawMarkdown } from "../ai/markdown.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
+import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
@@ -27,6 +28,7 @@ import {
   envTemplate,
   ogEndpointTemplate,
   rawMarkdownEndpointTemplate,
+  rssEndpointTemplate,
   runtimeDependencies,
   runtimePackageTemplate,
   runtimeTsconfigTemplate,
@@ -152,6 +154,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       theme: config.theme,
       title: config.title,
     },
+    feeds: buildRssFeeds(project).map((feed) => ({
+      href: feed.path,
+      title: feed.title,
+    })),
     navigation: graph.navigation,
     routes: manifest.routes.map((route) => ({
       draft: route.draft,
@@ -278,6 +284,25 @@ export const generateRuntime = async (
       rawMarkdownEndpointTemplate()
     ),
   ]);
+
+  // Automatic RSS feeds for blog/changelog content types (a no-op when no such
+  // pages exist or no deployment.site is configured).
+  const feeds = buildRssFeeds(project);
+  if (feeds.length > 0) {
+    const feedXml = Object.fromEntries(
+      feeds.map((feed) => [feed.type, renderRssFeed(feed)])
+    );
+    await Promise.all([
+      writeIfChanged(
+        join(srcDir, "generated", "rss.json"),
+        `${JSON.stringify(feedXml)}\n`
+      ),
+      writeIfChanged(
+        join(srcDir, "pages", "[section]", "rss.xml.ts"),
+        rssEndpointTemplate()
+      ),
+    ]);
+  }
 
   // Data and manifest are not "structural" for Astro; they hot-reload.
   await writeIfChanged(

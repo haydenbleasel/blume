@@ -17,6 +17,14 @@ const iconName = z.string().min(1);
 const hydrationMode = z.enum(["load", "idle", "visible", "media", "only"]);
 export type HydrationMode = z.infer<typeof hydrationMode>;
 
+/**
+ * A publish date in frontmatter. YAML auto-parses an unquoted `2026-01-01` into
+ * a `Date`, so accept either form and normalize to an ISO string.
+ */
+const dateSchema = z
+  .union([z.string(), z.date()])
+  .transform((value) => (value instanceof Date ? value.toISOString() : value));
+
 // ---------------------------------------------------------------------------
 // Page frontmatter
 // ---------------------------------------------------------------------------
@@ -72,7 +80,7 @@ const apiMetaSchema = z
 const changelogMetaSchema = z
   .object({
     category: z.string().optional(),
-    date: z.string().optional(),
+    date: dateSchema.optional(),
     version: z.string().optional(),
   })
   .strict();
@@ -82,6 +90,8 @@ export const pageMetaSchema = z
   .object({
     api: apiMetaSchema.optional(),
     changelog: changelogMetaSchema.optional(),
+    /** Publish date for feed-backed content like blog/changelog. */
+    date: dateSchema.optional(),
     description: z.string().optional(),
     draft: z.boolean().default(false),
     search: searchMetaSchema.default({}),
@@ -257,6 +267,16 @@ const ogConfigSchema = z
   })
   .strict();
 
+const rssConfigSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    /** Max items per feed, newest first. */
+    limit: z.number().int().positive().default(50),
+    /** Content types that each get a feed at `/<type>/rss.xml`. */
+    types: z.array(z.string()).default(["blog", "changelog"]),
+  })
+  .strict();
+
 const githubConfigSchema = z
   .object({
     branch: z.string().default("main"),
@@ -291,6 +311,7 @@ export const blumeConfigSchema = z
     navigation: navigationConfigSchema.default({}),
     og: ogConfigSchema.default({}),
     redirects: z.array(redirectSchema).default([]),
+    rss: rssConfigSchema.default({}),
     search: searchConfigSchema.default({}),
     theme: themeConfigSchema.default({}),
     title: z.string().default("Documentation"),
