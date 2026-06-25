@@ -27,7 +27,7 @@ That's enough for many sites — everything below is opt-in.
 Tune how a single page appears in the sidebar from its frontmatter, under
 `sidebar`:
 
-```yaml
+```yaml lineNumbers
 sidebar:
   label: Quickstart # override the title in the sidebar
   icon: rocket # an icon from Blume's built-in set
@@ -42,7 +42,7 @@ See [Frontmatter](/reference/frontmatter) for the full page schema.
 Add a `_meta.json` to a folder to control how its group appears and how its pages
 are ordered:
 
-```json _meta.json
+```json _meta.json lineNumbers
 {
   "title": "Guides",
   "icon": "book-open",
@@ -94,7 +94,7 @@ Render top-level sections as tabs in the header, useful for separating, say, doc
 from an API reference. A tab is highlighted when the current route falls under
 its `path`:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 navigation: {
   tabs: [
     { label: "Docs", path: "/", icon: "book-open" },
@@ -108,7 +108,7 @@ navigation: {
 For full control, define `navigation.sidebar` in config. When it's set, Blume
 uses it verbatim and skips file-system generation:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 navigation: {
   sidebar: [
     "/", // a page, referenced by route

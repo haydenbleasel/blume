@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   cp,
   mkdir,
@@ -22,7 +22,9 @@ import {
 } from "../ai/markdown.ts";
 import { writeChangelogRssFeeds } from "../changelog/rss.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
+import type { ResolvedConfig } from "../core/schema.ts";
 import type { PageRecord } from "../core/types.ts";
+import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
@@ -35,6 +37,7 @@ import {
   envTemplate,
   ogEndpointTemplate,
   rawMarkdownEndpointTemplate,
+  rssEndpointTemplate,
   runtimeDependencies,
   runtimePackageTemplate,
   runtimeTsconfigTemplate,
@@ -194,6 +197,70 @@ const writeIfChanged = async (
   return true;
 };
 
+/** The logo shape the runtime consumes: an inline SVG or image URL(s). */
+interface ResolvedLogo {
+  svg?: string;
+  light?: string;
+  dark?: string;
+  alt: string;
+  href: string;
+}
+
+/**
+ * Resolve the configured logo. A single SVG is read and inlined so a
+ * `currentColor` logo follows the theme; other images keep their URL for an
+ * `<img>`. The file is looked up under `public/` and the project root.
+ */
+const resolveLogo = (project: BlumeProject): ResolvedLogo | null => {
+  const { logo } = project.config;
+  if (!logo) {
+    return null;
+  }
+  const config = typeof logo === "string" ? { light: logo } : logo;
+  const light = config.light ?? config.dark;
+  const dark = config.dark ?? config.light;
+  const alt = config.alt ?? "";
+  const href = config.href ?? "/";
+
+  if (light && light === dark && light.toLowerCase().endsWith(".svg")) {
+    const rel = light.replace(/^\//u, "");
+    const file = [
+      join(project.context.root, "public", rel),
+      join(project.context.root, rel),
+    ].find((path) => existsSync(path));
+    if (file) {
+      return { alt, href, svg: readFileSync(file, "utf-8") };
+    }
+  }
+  return { alt, dark, href, light };
+};
+
+/** The announcement banner shape the runtime consumes. */
+interface ResolvedBanner {
+  content: string;
+  link?: { href: string; text: string };
+  dismissible: boolean;
+  /** Dismissal key: the configured id, else the content itself. */
+  key: string;
+}
+
+/** Normalize the banner config (string shorthand or object) for the runtime. */
+const resolveBanner = (config: ResolvedConfig): ResolvedBanner | null => {
+  const { banner } = config;
+  if (!banner) {
+    return null;
+  }
+  if (typeof banner === "string") {
+    return { content: banner, dismissible: false, key: banner };
+  }
+  return {
+    content: banner.content,
+    dismissible: banner.dismissible,
+    key: banner.id ?? banner.content,
+    link: banner.link,
+  };
+};
+
 /** Serialize the content graph into the data module the runtime consumes. */
 export const buildRuntimeData = (project: BlumeProject): string => {
   const { config, context, graph, manifest } = project;
@@ -212,26 +279,24 @@ export const buildRuntimeData = (project: BlumeProject): string => {
 
   const data = {
     config: {
-      banner: config.banner ?? null,
-      contextual: config.contextual,
+      banner: resolveBanner(config),
       description: config.description,
-      favicon: config.favicon ?? null,
-      footer: config.footer,
-      logo: config.logo ?? null,
-      navbar: config.navbar,
-      og: { enabled: config.og.enabled },
+      logo: resolveLogo(project),
+      og: { enabled: config.seo.og.enabled },
       repoUrl,
       search: {
         enabled: config.search.provider !== "none",
-        prompt: config.search.prompt,
         provider: config.search.provider,
       },
-      seo: config.seo,
       site: config.deployment.site ?? null,
-      styling: config.styling,
+      structuredData: config.seo.structuredData,
       theme: config.theme,
       title: config.title,
     },
+    feeds: buildRssFeeds(project).map((feed) => ({
+      href: feed.path,
+      title: feed.title,
+    })),
     navigation: graph.navigation,
     routes: manifest.routes.map((route) => ({
       draft: route.draft,
@@ -371,7 +436,7 @@ export const generateRuntime = async (
     force: true,
   });
 
-  if (config.og.enabled) {
+  if (config.seo.og.enabled) {
     await writeIfChanged(
       join(srcDir, "pages", "og", "[...slug].png.ts"),
       ogEndpointTemplate()
@@ -405,6 +470,25 @@ export const generateRuntime = async (
       rawMarkdownEndpointTemplate()
     ),
   ]);
+
+  // Automatic RSS feeds for blog/changelog content types (a no-op when no such
+  // pages exist or no deployment.site is configured).
+  const feeds = buildRssFeeds(project);
+  if (feeds.length > 0) {
+    const feedXml = Object.fromEntries(
+      feeds.map((feed) => [feed.type, renderRssFeed(feed)])
+    );
+    await Promise.all([
+      writeIfChanged(
+        join(srcDir, "generated", "rss.json"),
+        `${JSON.stringify(feedXml)}\n`
+      ),
+      writeIfChanged(
+        join(srcDir, "pages", "[section]", "rss.xml.ts"),
+        rssEndpointTemplate()
+      ),
+    ]);
+  }
 
   // Data and manifest are not "structural" for Astro; they hot-reload.
   await writeIfChanged(

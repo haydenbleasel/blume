@@ -32,7 +32,7 @@ Blume's default engine. It builds a JSON index served at `/blume-search.json` an
 queries it in the browser — instant, client-side, and live in `blume dev` as you
 edit.
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 search: {
   provider: "orama", // default
 }
@@ -44,7 +44,7 @@ For very large docs, opt into [Pagefind](https://pagefind.app). It indexes your
 built HTML and loads the index in shards on demand, keeping the initial payload
 tiny no matter how big the site grows.
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 search: {
   provider: "pagefind",
 }
@@ -55,7 +55,7 @@ with this provider.
 
 ### Disabling search
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 search: {
   provider: "none",
 }
@@ -74,7 +74,7 @@ search:
 [Hidden pages](/content/navigation#hidden-pages) are also excluded by default.
 To index them anyway, opt in:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 search: {
   indexing: { includeHiddenPages: true },
 }

@@ -9,7 +9,6 @@ import { describe, expect, it, vi } from "vitest";
 import { buildLlmsFiles, writeLlmsArtifacts } from "../src/ai/llms.ts";
 import { buildPageMarkdown } from "../src/ai/markdown.ts";
 import {
-  buildRuntimeData,
   buildRuntimeMarkdown,
   generateRuntime,
 } from "../src/astro/generate.ts";
@@ -41,8 +40,12 @@ import { scanProject } from "../src/core/project-graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { PageRecord, ProjectContext } from "../src/core/types.ts";
+import { buildRobots } from "../src/deploy/robots.ts";
+import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
+import { buildSitemap } from "../src/deploy/sitemap.ts";
 import { generateApiDocs, parseOpenApi } from "../src/openapi/import.ts";
 import { buildSearchDocuments } from "../src/search/documents.ts";
+import { buildStructuredData } from "../src/seo/jsonld.ts";
 import { buildThemeCss } from "../src/theme/palette.ts";
 
 const makePage = (
@@ -590,6 +593,38 @@ const renderContentConfig = (): string => {
 
   return contentConfigTemplate({ config, context });
 };
+const postPage = (
+  id: string,
+  route: string,
+  type: string,
+  meta: Record<string, unknown>
+): PageRecord =>
+  makePage({
+    contentType: type,
+    description: `About ${id}`,
+    id,
+    meta: pageMetaSchema.parse({ type, ...meta }),
+    route,
+    title: id,
+  });
+
+const makeProject = (
+  pages: PageRecord[],
+  config: Record<string, unknown> = {}
+): BlumeProject =>
+  ({
+    config: blumeConfigSchema.parse({
+      deployment: { site: "https://example.com" },
+      title: "Docs",
+      ...config,
+    }),
+    graph: { pages },
+  }) as unknown as BlumeProject;
+
+const graphOf = (
+  data: Record<string, unknown> | null
+): Record<string, unknown>[] =>
+  (data?.["@graph"] ?? []) as Record<string, unknown>[];
 
 describe("config schema", () => {
   it("applies defaults for an empty config", () => {
@@ -623,6 +658,27 @@ describe("config schema", () => {
 
   it("rejects unknown top-level keys", () => {
     expect(blumeConfigSchema.safeParse({ nope: true }).success).toBeFalsy();
+  });
+
+  it("nests og, rss, and structured data under seo", () => {
+    const { seo } = blumeConfigSchema.parse({});
+    expect(seo.og.enabled).toBeFalsy();
+    expect(seo.rss.enabled).toBeTruthy();
+    expect(seo.rss.types).toStrictEqual(["blog", "changelog"]);
+    expect(seo.structuredData).toBeTruthy();
+    expect(
+      blumeConfigSchema.safeParse({ og: { enabled: true } }).success
+    ).toBeFalsy();
+  });
+
+  it("accepts a banner string or object, defaulting dismissible to false", () => {
+    expect(blumeConfigSchema.parse({ banner: "Beta" }).banner).toBe("Beta");
+    expect(
+      blumeConfigSchema.parse({ banner: { content: "Hi" } }).banner
+    ).toStrictEqual({ content: "Hi", dismissible: false });
+    expect(
+      blumeConfigSchema.safeParse({ banner: { dismissible: true } }).success
+    ).toBeFalsy();
   });
 });
 
@@ -1358,39 +1414,6 @@ describe("MDX component template", () => {
     expect(output).toContain("  Mermaid,");
   });
 
-  it("renders frontmatter page headers when content has no h1", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain(
-      "const showPageHeader =\n  !headings.some((heading) => heading.depth === 1)"
-    );
-    expect(output).toContain(
-      'const chromeFreeModes = new Set(["custom", "frame"]);'
-    );
-    expect(output).toContain("!chromeFreeModes.has(frontmatter.mode)");
-    expect(output).toContain("showPageHeader={showPageHeader}");
-  });
-
-  it("passes Mintlify page layout frontmatter to the root layout", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain(
-      "hideFooterPagination: frontmatter.hideFooterPagination"
-    );
-    expect(output).toContain("mode: frontmatter.mode");
-    expect(output).toContain("toc: frontmatter.toc");
-    expect(output).toContain("contextual={data.config.contextual}");
-    expect(output).toContain("footer={data.config.footer}");
-  });
-
   it("passes global banner config to the root layout", () => {
     const output = catchAllPageTemplate({
       askEnabled: false,
@@ -1399,98 +1422,6 @@ describe("MDX component template", () => {
     });
 
     expect(output).toContain("banner={data.config.banner}");
-  });
-
-  it("passes global navbar config to the root layout", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain("navbar={data.config.navbar}");
-  });
-
-  it("passes global SEO config to the root layout", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain("seo={data.config.seo}");
-  });
-
-  it("collects Mintlify page SEO frontmatter", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain("const pageMetaTags = Object.fromEntries");
-    expect(output).toContain('key.includes(":")');
-    expect(output).toContain('pageMetaTags["og:image"]');
-    expect(output).toContain("robots: frontmatter.robots");
-  });
-
-  it("passes Mintlify page SEO frontmatter to the root layout", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain(
-      "canonical: frontmatter.canonical ?? frontmatter.seo?.canonical"
-    );
-    expect(output).toContain("keywords: frontmatter.keywords");
-    expect(output).toContain("metaTags: pageMetaTags");
-    expect(output).toContain(
-      "noindex: frontmatter.noindex ?? frontmatter.seo?.noindex"
-    );
-    expect(output).toContain("seoTitle: frontmatter.seo?.title");
-  });
-
-  it("passes search prompt config to the root layout", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain("searchPrompt={data.config.search.prompt}");
-  });
-
-  it("passes styling config to the root layout", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain("styling={data.config.styling}");
-  });
-
-  it("passes strict theme mode to the root layout", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain("themeStrict={data.config.theme.strict}");
-  });
-
-  it("passes logged-out Mintlify user data to MDX content", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: false,
-    });
-
-    expect(output).toContain("const user = {};");
-    expect(output).toContain("<Content components={components} user={user} />");
   });
 });
 
@@ -2154,33 +2085,6 @@ describe("Mintlify compatibility config", () => {
       expect(markdownByRoute["/api-reference/list-pets"]).toContain(
         "## OpenAPI schema"
       );
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("serializes Mintlify navbar, SEO, and styling config into runtime data", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const project = await scanProject(root);
-      const data = JSON.parse(buildRuntimeData(project));
-      expect(data.config.navbar).toStrictEqual({
-        links: [{ href: "mailto:hi@blume.dev", label: "Support" }],
-        primary: {
-          href: "https://github.com",
-          label: "GitHub",
-          type: "button",
-        },
-      });
-      expect(data.config.styling).toStrictEqual({
-        eyebrows: "breadcrumbs",
-      });
-      expect(data.config.seo.metatags).toStrictEqual({
-        "og:site_name": "Blume Starter Kit",
-        "theme-color": "#16A34A",
-        "twitter:site": "@blume",
-      });
-      expect(data.config.search.prompt).toBe("Search the garden...");
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -3730,5 +3634,194 @@ describe("nav utilities", () => {
     const flat = flattenPages(sidebar);
     expect(getPagination(flat, "/").next?.route).toBe("/g");
     expect(getPagination(flat, "/g/deploy").prev?.route).toBe("/g");
+  });
+});
+
+describe("rss feeds", () => {
+  it("returns no feeds without a configured site", () => {
+    const pages = [postPage("a", "/blog/a", "blog", { date: "2026-01-01" })];
+    expect(buildRssFeeds(makeProject(pages, { deployment: {} }))).toStrictEqual(
+      []
+    );
+  });
+
+  it("returns no feeds when disabled", () => {
+    const pages = [postPage("a", "/blog/a", "blog", { date: "2026-01-01" })];
+    expect(
+      buildRssFeeds(makeProject(pages, { seo: { rss: { enabled: false } } }))
+    ).toStrictEqual([]);
+  });
+
+  it("builds a feed per content type with matching pages", () => {
+    const pages = [
+      postPage("doc", "/guide", "doc", {}),
+      postPage("post", "/blog/post", "blog", { date: "2026-01-01" }),
+      postPage("v1", "/changelog/v1", "changelog", {
+        changelog: { date: "2026-02-01" },
+      }),
+    ];
+    const feeds = buildRssFeeds(makeProject(pages));
+    expect(feeds.map((f) => f.path)).toStrictEqual([
+      "/blog/rss.xml",
+      "/changelog/rss.xml",
+    ]);
+    expect(feeds[0]?.title).toBe("Docs — Blog");
+  });
+
+  it("sorts items newest-first and honors the limit", () => {
+    const pages = [
+      postPage("old", "/blog/old", "blog", { date: "2026-01-01" }),
+      postPage("new", "/blog/new", "blog", { date: "2026-03-01" }),
+      postPage("mid", "/blog/mid", "blog", { date: "2026-02-01" }),
+    ];
+    const [feed] = buildRssFeeds(
+      makeProject(pages, { seo: { rss: { limit: 2 } } })
+    );
+    expect(feed?.items.map((i) => i.title)).toStrictEqual(["new", "mid"]);
+  });
+
+  it("excludes drafts and hidden pages", () => {
+    const pages = [
+      postPage("draft", "/blog/draft", "blog", {
+        date: "2026-01-01",
+        draft: true,
+      }),
+      postPage("hidden", "/blog/hidden", "blog", {
+        date: "2026-01-02",
+        sidebar: { hidden: true },
+      }),
+      postPage("live", "/blog/live", "blog", { date: "2026-01-03" }),
+    ];
+    const [feed] = buildRssFeeds(makeProject(pages));
+    expect(feed?.items.map((i) => i.title)).toStrictEqual(["live"]);
+  });
+
+  it("renders escaped RSS 2.0 XML with absolute links and pubDate", () => {
+    const pages = [
+      postPage("Tom & Jerry", "/blog/post", "blog", { date: "2026-01-01" }),
+    ];
+    const [feed] = buildRssFeeds(makeProject(pages));
+    const xml = renderRssFeed(feed as NonNullable<typeof feed>);
+    expect(xml).toContain('<rss version="2.0"');
+    expect(xml).toContain("<title>Tom &amp; Jerry</title>");
+    expect(xml).toContain("<link>https://example.com/blog/post</link>");
+    expect(xml).toContain("<pubDate>Thu, 01 Jan 2026 00:00:00 GMT</pubDate>");
+    expect(xml).toContain(
+      '<atom:link href="https://example.com/blog/rss.xml" rel="self"'
+    );
+  });
+});
+
+describe("structured data", () => {
+  it("emits only a WebSite node for the homepage", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [],
+      route: "/",
+      siteName: "Docs",
+      siteUrl: "https://x.com",
+      title: "Home",
+    });
+    expect(graphOf(data).map((n) => n["@type"])).toStrictEqual(["WebSite"]);
+  });
+
+  it("emits a BlogPosting with absolute url, datePublished, and breadcrumbs", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [{ label: "Blog", route: "/blog" }, { label: "Post" }],
+      description: "Hi",
+      pageType: "blog",
+      published: "2026-01-01",
+      route: "/blog/post",
+      siteName: "Docs",
+      siteUrl: "https://x.com/",
+      title: "Post",
+    });
+    const graph = graphOf(data);
+    const article = graph.find((n) => n["@type"] === "BlogPosting");
+    expect(article?.url).toBe("https://x.com/blog/post");
+    expect(article?.datePublished).toBe("2026-01-01T00:00:00.000Z");
+    expect(article?.isPartOf).toStrictEqual({ "@id": "https://x.com#website" });
+    expect(graph.some((n) => n["@type"] === "BreadcrumbList")).toBeTruthy();
+  });
+
+  it("falls back to relative urls and TechArticle without a site", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [],
+      route: "/guide",
+      siteName: "Docs",
+      siteUrl: null,
+      title: "Guide",
+    });
+    const graph = graphOf(data);
+    expect(graph.map((n) => n["@type"])).toStrictEqual(["TechArticle"]);
+    expect(graph[0]?.url).toBe("/guide");
+  });
+
+  it("returns null for the homepage without a site", () => {
+    expect(
+      buildStructuredData({
+        breadcrumbs: [],
+        route: "/",
+        siteName: "Docs",
+        siteUrl: null,
+        title: "Home",
+      })
+    ).toBeNull();
+  });
+});
+
+describe("sitemap", () => {
+  it("excludes drafts, hidden, and noindex pages", () => {
+    const pages = [
+      makePage({ id: "a", route: "/a", title: "A" }),
+      makePage({
+        id: "b",
+        meta: pageMetaSchema.parse({ draft: true }),
+        route: "/b",
+        title: "B",
+      }),
+      makePage({
+        id: "c",
+        meta: pageMetaSchema.parse({ sidebar: { hidden: true } }),
+        route: "/c",
+        title: "C",
+      }),
+      makePage({
+        id: "d",
+        meta: pageMetaSchema.parse({ seo: { noindex: true } }),
+        route: "/d",
+        title: "D",
+      }),
+    ];
+    const xml = buildSitemap(makeProject(pages)) ?? "";
+    expect(xml).toContain("https://example.com/a");
+    expect(xml).not.toContain("/b<");
+    expect(xml).not.toContain("/c<");
+    expect(xml).not.toContain("/d<");
+  });
+
+  it("returns null without a site or when disabled", () => {
+    const pages = [makePage({ id: "a", route: "/a", title: "A" })];
+    expect(buildSitemap(makeProject(pages, { deployment: {} }))).toBeNull();
+    expect(
+      buildSitemap(makeProject(pages, { seo: { sitemap: false } }))
+    ).toBeNull();
+  });
+});
+
+describe("robots.txt", () => {
+  it("allows all crawlers and links the sitemap when a site is set", () => {
+    const robots = buildRobots(makeProject([])) ?? "";
+    expect(robots).toContain("User-agent: *");
+    expect(robots).toContain("Sitemap: https://example.com/sitemap.xml");
+  });
+
+  it("omits the sitemap line without a site", () => {
+    const robots = buildRobots(makeProject([], { deployment: {} })) ?? "";
+    expect(robots).toContain("User-agent: *");
+    expect(robots).not.toContain("Sitemap:");
+  });
+
+  it("returns null when disabled", () => {
+    expect(buildRobots(makeProject([], { seo: { robots: false } }))).toBeNull();
   });
 });

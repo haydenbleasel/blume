@@ -25,7 +25,7 @@ indexes, and “next steps” — anywhere you’re guiding the reader onward.
   </Card>
 </CardGroup>
 
-```mdx
+```mdx lineNumbers
 <CardGroup cols={2}>
   <Card title="Quickstart" href="/quickstart" icon="rocket">
     Install Blume and ship your first page.
@@ -52,7 +52,7 @@ and tutorials where the order matters. Each `Step` takes a `title`.
   <Step title="Ship it">Run `blume build` and deploy `dist/`.</Step>
 </Steps>
 
-```mdx
+```mdx lineNumbers
 <Steps>
   <Step title="Install Blume">Add the package to your project.</Step>
   <Step title="Write a page">
@@ -73,7 +73,7 @@ Each `Tab` takes a `title`.
   <Tab title="Windows">Use winget to install the toolchain.</Tab>
 </Tabs>
 
-```mdx
+```mdx lineNumbers
 <Tabs>
   <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
   <Tab title="Windows">Use winget to install the toolchain.</Tab>
@@ -90,7 +90,7 @@ available without crowding the page. Set `defaultOpen` to start expanded.
   is only enabled when you add an island.
 </Accordion>
 
-```mdx
+```mdx lineNumbers
 <Accordion title="Is the core theme really React-free?">
   Yes. Interactive bits like tabs and search are vanilla custom elements. React
   is only enabled when you add an island.
@@ -167,7 +167,7 @@ styles it as a tree — handy for explaining structure in setup and config guide
 
 </FileTree>
 
-```mdx
+```mdx lineNumbers
 <FileTree>
 
 - docs/
@@ -211,7 +211,7 @@ description. Pass a `parameters` array.
   ]}
 />
 
-```mdx
+```mdx lineNumbers
 <ParameterTable
   parameters={[
     {
@@ -232,7 +232,7 @@ title to “Request”.
 
 <RequestExample title="Request">
 
-```json
+```json lineNumbers
 {
   "name": "Rex",
   "tag": "dog"
@@ -261,7 +261,7 @@ label the status, like “201 — Created”.
 
 <ResponseExample title="201 — Created">
 
-```json
+```json lineNumbers
 {
   "id": 1,
   "name": "Rex"
@@ -294,7 +294,7 @@ description.
   description="Pass your API key as a bearer token."
 />
 
-```mdx
+```mdx lineNumbers
 <AuthMethod
   type="Bearer"
   name="Authorization"

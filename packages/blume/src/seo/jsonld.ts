@@ -1,0 +1,105 @@
+import type { Crumb } from "../components/layout/nav-utils.ts";
+
+/** Inputs for a page's JSON-LD, all known at render time in RootLayout. */
+export interface StructuredDataInput {
+  siteName: string;
+  /** Absolute site origin, or null when `deployment.site` is unset. */
+  siteUrl: string | null;
+  title: string;
+  description?: string;
+  /** Page route, e.g. `/blog/post`. */
+  route: string;
+  /** Content type — `blog` and `changelog` map to richer article types. */
+  pageType?: string;
+  /** Publish date (string or YAML Date); emitted as ISO `datePublished`. */
+  published?: string | Date | null;
+  breadcrumbs: Crumb[];
+}
+
+/** schema.org `@type` for each content type; defaults to TechArticle. */
+const ARTICLE_TYPES: Record<string, string> = {
+  blog: "BlogPosting",
+  changelog: "TechArticle",
+};
+
+const trimSlash = (value: string): string => value.replace(/\/$/u, "");
+
+const absolute = (base: string | null, path: string): string =>
+  base ? `${base}${path}` : path;
+
+const toIso = (value: string | Date | null | undefined): string | undefined => {
+  if (!value) {
+    return;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
+/**
+ * Build a schema.org JSON-LD `@graph` for a page: site identity, the page as an
+ * article, and its breadcrumb trail. Returns null when there is nothing useful
+ * to emit (e.g. the homepage without a configured site). URLs are absolute when
+ * `siteUrl` is set, otherwise route-relative.
+ */
+export const buildStructuredData = (
+  input: StructuredDataInput
+): Record<string, unknown> | null => {
+  const base = input.siteUrl ? trimSlash(input.siteUrl) : null;
+  const pageUrl = absolute(base, input.route);
+  const graph: Record<string, unknown>[] = [];
+
+  if (base) {
+    graph.push({
+      "@id": `${base}#website`,
+      "@type": "WebSite",
+      name: input.siteName,
+      url: base,
+    });
+  }
+
+  // The homepage is fully described by the WebSite node; deeper pages get an
+  // article node plus a breadcrumb trail.
+  if (input.route !== "/") {
+    const node: Record<string, unknown> = {
+      "@id": `${pageUrl}#page`,
+      "@type": ARTICLE_TYPES[input.pageType ?? ""] ?? "TechArticle",
+      headline: input.title,
+      inLanguage: "en",
+      name: input.title,
+      url: pageUrl,
+    };
+    if (input.description) {
+      node.description = input.description;
+    }
+    const published = toIso(input.published);
+    if (published) {
+      node.datePublished = published;
+    }
+    if (base) {
+      node.isPartOf = { "@id": `${base}#website` };
+    }
+    graph.push(node);
+
+    if (input.breadcrumbs.length > 1) {
+      graph.push({
+        "@type": "BreadcrumbList",
+        itemListElement: input.breadcrumbs.map((crumb, index) => {
+          const item: Record<string, unknown> = {
+            "@type": "ListItem",
+            name: crumb.label,
+            position: index + 1,
+          };
+          if (crumb.route) {
+            item.item = absolute(base, crumb.route);
+          }
+          return item;
+        }),
+      });
+    }
+  }
+
+  if (graph.length === 0) {
+    return null;
+  }
+  return { "@context": "https://schema.org", "@graph": graph };
+};

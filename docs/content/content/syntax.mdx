@@ -152,6 +152,25 @@ export default defineConfig({
 ```
 ````
 
+### Line numbers
+
+Append `lineNumbers` to render a line-number gutter — on its own or alongside a
+title:
+
+```ts server.ts lineNumbers
+import { serve } from "blume";
+
+serve({ port: 3000 });
+```
+
+````md
+```ts server.ts lineNumbers
+import { serve } from "blume";
+
+serve({ port: 3000 });
+```
+````
+
 ## Package install
 
 A `package-install` block turns a single install command into a tabbed snippet

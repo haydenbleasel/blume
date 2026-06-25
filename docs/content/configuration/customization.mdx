@@ -15,7 +15,7 @@ Add a `components.ts` (or `components.tsx`) to your project root and export
 `defineComponents`. The `mdx` map either **replaces** a built-in component or
 **adds** a new one — available in every `.mdx` page with no import.
 
-```ts components.ts
+```ts components.ts lineNumbers
 import { defineComponents } from "blume";
 import Callout from "./components/Callout.astro";
 import Pricing from "./components/Pricing.astro";
@@ -37,7 +37,7 @@ The core theme is React-free, but React switches on automatically the moment you
 project contains a `.tsx` or `.jsx` file. To use an interactive component in MDX,
 wrap it in an `.astro` file with a [hydration directive](https://docs.astro.build/en/guides/framework-components/#hydrating-interactive-components):
 
-```astro Counter.astro
+```astro Counter.astro lineNumbers
 ---
 import Counter from "./Counter.tsx";
 ---
@@ -47,7 +47,7 @@ import Counter from "./Counter.tsx";
 
 Register the wrapper as an MDX override and use `<Counter />` in any page:
 
-```ts components.ts
+```ts components.ts lineNumbers
 import { defineComponents } from "blume";
 import Counter from "./Counter.astro";
 
@@ -66,7 +66,7 @@ alongside your docs. They keep their location, so relative imports and
 `getStaticPaths` work as usual. Read your config, navigation, and page list from
 the `blume:data` module:
 
-```astro pages/changelog.astro
+```astro pages/changelog.astro lineNumbers
 ---
 import data from "blume:data";
 ---

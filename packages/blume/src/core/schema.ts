@@ -17,6 +17,14 @@ const iconName = z.string().min(1);
 const hydrationMode = z.enum(["load", "idle", "visible", "media", "only"]);
 export type HydrationMode = z.infer<typeof hydrationMode>;
 
+/**
+ * A publish date in frontmatter. YAML auto-parses an unquoted `2026-01-01` into
+ * a `Date`, so accept either form and normalize to an ISO string.
+ */
+const dateSchema = z
+  .union([z.string(), z.date()])
+  .transform((value) => (value instanceof Date ? value.toISOString() : value));
+
 // ---------------------------------------------------------------------------
 // Page frontmatter
 // ---------------------------------------------------------------------------
@@ -75,7 +83,7 @@ const apiMetaSchema = z.union([
 const changelogMetaSchema = z
   .object({
     category: z.string().optional(),
-    date: z.string().optional(),
+    date: dateSchema.optional(),
     version: z.string().optional(),
   })
   .strict();
@@ -173,6 +181,8 @@ const pageMetaBaseSchema = z
     api: apiMetaSchema.optional(),
     boost: z.number().optional(),
     changelog: changelogMetaSchema.optional(),
+    /** Publish date for feed-backed content like blog/changelog. */
+    date: dateSchema.optional(),
     deprecated: z.boolean().default(false),
     description: z.string().optional(),
     draft: z.boolean().default(false),
@@ -246,6 +256,38 @@ const faviconConfigSchema = z.union([
     .object({
       dark: z.string().optional(),
       light: z.string().optional(),
+    })
+    .strict(),
+]);
+
+const bannerColorSchema = z
+  .object({
+    dark: z.string().optional(),
+    light: z.string().optional(),
+  })
+  .strict()
+  .refine((value) => value.dark !== undefined || value.light !== undefined, {
+    message: "Banner color requires at least one of light or dark.",
+  });
+
+/** Site-wide announcement banner: a string, or text with an optional link. */
+const bannerConfigSchema = z.union([
+  z.string(),
+  z
+    .object({
+      /** Background color override (Mintlify compatibility). */
+      color: bannerColorSchema.optional(),
+      content: z.string(),
+      /** Show a dismiss button; the choice is remembered per visitor. */
+      dismissible: z.boolean().default(false),
+      /** Stable key for remembering dismissal; defaults to the content. */
+      id: z.string().optional(),
+      link: z
+        .object({ href: z.string(), text: z.string() })
+        .strict()
+        .optional(),
+      /** Tone (Mintlify compatibility). */
+      type: z.enum(["info", "warning", "critical"]).optional(),
     })
     .strict(),
 ]);
@@ -434,25 +476,6 @@ const searchConfigSchema = z
   })
   .strict();
 
-const bannerColorSchema = z
-  .object({
-    dark: z.string().optional(),
-    light: z.string().optional(),
-  })
-  .strict()
-  .refine((value) => value.dark !== undefined || value.light !== undefined, {
-    message: "Banner color requires at least one of light or dark.",
-  });
-
-const bannerConfigSchema = z
-  .object({
-    color: bannerColorSchema.optional(),
-    content: z.string().min(1),
-    dismissible: z.boolean().default(false),
-    type: z.enum(["info", "warning", "critical"]).default("info"),
-  })
-  .strict();
-
 const aiConfigSchema = z
   .object({
     ask: z
@@ -637,6 +660,31 @@ const ogConfigSchema = z
   })
   .strict();
 
+const rssConfigSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    /** Max items per feed, newest first. */
+    limit: z.number().int().positive().default(50),
+    /** Content types that each get a feed at `/<type>/rss.xml`. */
+    types: z.array(z.string()).default(["blog", "changelog"]),
+  })
+  .strict();
+
+/** Discoverability features: OG images, feeds, sitemap, structured data. */
+const seoConfigSchema = z
+  .object({
+    metatags: z.record(z.string(), z.string()).default({}),
+    og: ogConfigSchema.default({}),
+    /** Generate robots.txt (with a Sitemap reference when available). */
+    robots: z.boolean().default(true),
+    rss: rssConfigSchema.default({}),
+    /** Generate sitemap.xml (requires deployment.site). */
+    sitemap: z.boolean().default(true),
+    /** Emit schema.org JSON-LD in each page's <head>. */
+    structuredData: z.boolean().default(true),
+  })
+  .strict();
+
 const githubConfigSchema = z
   .object({
     branch: z.string().default("main"),
@@ -644,12 +692,6 @@ const githubConfigSchema = z
     dir: z.string().optional(),
     owner: z.string(),
     repo: z.string(),
-  })
-  .strict();
-
-const seoConfigSchema = z
-  .object({
-    metatags: z.record(z.string(), z.string()).default({}),
   })
   .strict();
 
@@ -704,7 +746,6 @@ export const blumeConfigSchema = z
     markdown: markdownConfigSchema.default({}),
     navbar: navbarConfigSchema.default({}),
     navigation: navigationConfigSchema.default({}),
-    og: ogConfigSchema.default({}),
     redirects: z.array(redirectSchema).default([]),
     search: searchConfigSchema.default({}),
     seo: seoConfigSchema.default({}),

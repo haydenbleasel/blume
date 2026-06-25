@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 
 import { build } from "astro";
@@ -7,6 +8,7 @@ import { join } from "pathe";
 import { writeLlmsArtifacts } from "../../ai/llms.ts";
 import { writeChangelogRssFeeds } from "../../changelog/rss.ts";
 import { serverFeatures } from "../../core/server-features.ts";
+import { buildRobots } from "../../deploy/robots.ts";
 import { buildSitemap } from "../../deploy/sitemap.ts";
 import { buildSearchIndex } from "../../search/build.ts";
 import { logger } from "../log.ts";
@@ -49,10 +51,17 @@ export const runBuild = async (options: { strict?: boolean } = {}) => {
     logger.success(`Generated ${rssFeeds} changelog RSS feed(s)`);
   }
 
+  // A user's own public/ file (copied into dist by Astro) always wins.
   const sitemap = buildSitemap(project);
-  if (sitemap) {
+  if (sitemap && !existsSync(join(distDir, "sitemap.xml"))) {
     await writeFile(join(distDir, "sitemap.xml"), sitemap, "utf-8");
     logger.success("Generated sitemap.xml");
+  }
+
+  const robots = buildRobots(project);
+  if (robots && !existsSync(join(distDir, "robots.txt"))) {
+    await writeFile(join(distDir, "robots.txt"), robots, "utf-8");
+    logger.success("Generated robots.txt");
   }
 
   const { config } = project;
@@ -64,6 +73,7 @@ export const runBuild = async (options: { strict?: boolean } = {}) => {
       `Search     ${config.search.provider}`,
       `Redirects  ${config.redirects.length}`,
       `Sitemap    ${sitemap ? "yes" : "no (set deployment.site)"}`,
+      `Robots     ${robots ? "yes" : "no"}`,
       `LLM files  ${config.ai.llmsTxt ? "yes" : "no"}`,
       `Server features  ${features.length > 0 ? features.join(", ") : "none"}`,
     ].join("\n")

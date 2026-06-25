@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { codeTitleTransformer } from "../src/markdown/code-title.ts";
 import { calloutTypeFor } from "../src/markdown/directives.ts";
 import { mermaidPlugin } from "../src/markdown/mermaid.ts";
 import { mintlifyCodeGroupPlugin } from "../src/markdown/mintlify-code-group.ts";
@@ -14,6 +15,17 @@ import {
   rewriteMintlifySvgIconProps,
 } from "../src/markdown/mintlify-svg-icons.ts";
 import { toPackageCommands } from "../src/markdown/package-commands.ts";
+
+/** Run the code-meta transformer over a fence's meta and return the <pre> attrs. */
+const metaAttrs = (
+  raw: string | undefined
+): Record<string, boolean | number | string | undefined> => {
+  const node = {
+    properties: {} as Record<string, boolean | number | string | undefined>,
+  };
+  codeTitleTransformer().pre.call({ options: { meta: { __raw: raw } } }, node);
+  return node.properties;
+};
 
 describe(calloutTypeFor, () => {
   it("passes through canonical callout types", () => {
@@ -537,5 +549,32 @@ describe(mermaidPlugin, () => {
       name: "Mermaid",
       type: "mdxJsxFlowElement",
     });
+  });
+});
+
+describe(codeTitleTransformer, () => {
+  it("promotes the first bare token to a title", () => {
+    expect(metaAttrs("blume.config.ts").dataTitle).toBe("blume.config.ts");
+  });
+
+  it("reads an explicit title attribute", () => {
+    expect(metaAttrs('title="My File"').dataTitle).toBe("My File");
+  });
+
+  it("sets data-line-numbers and keeps the title", () => {
+    const attrs = metaAttrs("file.ts lineNumbers");
+    expect(attrs.dataTitle).toBe("file.ts");
+    expect(attrs.dataLineNumbers).toBeTruthy();
+  });
+
+  it("does not treat the lineNumbers keyword as a title", () => {
+    const attrs = metaAttrs("lineNumbers");
+    expect(attrs.dataTitle).toBeUndefined();
+    expect(attrs.dataLineNumbers).toBeTruthy();
+  });
+
+  it("ignores line ranges and leaves plain blocks bare", () => {
+    expect(metaAttrs("{1,3-5}").dataTitle).toBeUndefined();
+    expect(metaAttrs().dataLineNumbers).toBeUndefined();
   });
 });

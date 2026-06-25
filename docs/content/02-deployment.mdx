@@ -30,17 +30,17 @@ A static build includes:
 
 - every docs and custom page as static HTML
 - a local search index (Orama by default, Pagefind opt-in)
-- `sitemap.xml` when `deployment.site` is set
+- a [`sitemap.xml`](/configuration/seo#sitemap) and [`robots.txt`](/configuration/seo#robots) when `deployment.site` is set
 - `llms.txt` and `llms-full.txt` for AI tools
 - redirect pages
-- prerendered [Open Graph images](/configuration/open-graph) when `og.enabled` is on
+- prerendered [Open Graph images](/configuration/seo#open-graph-images) when `seo.og.enabled` is on
 
 ### Set your site URL
 
 Add `deployment.site` to `blume.config.ts` so sitemaps, canonical tags, and Open
 Graph images resolve to absolute URLs:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 deployment: {
   site: "https://docs.example.com",
 }
@@ -62,7 +62,7 @@ Serving docs under a path like `example.com/docs`? Set `deployment.base` — com
 for GitHub Pages project sites. Internal links and assets are rewritten to
 include the base path.
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 deployment: {
   base: "/docs",
 }
@@ -73,7 +73,7 @@ deployment: {
 Static output covers most docs. Switch to server output when you need
 request-time features — most notably the [Ask AI](/configuration/ai) endpoint:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 deployment: {
   output: "server",
   adapter: "vercel",

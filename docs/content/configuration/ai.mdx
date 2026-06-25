@@ -14,7 +14,7 @@ and static docs stay fully static until you turn a feature on.
 Emit machine-readable versions of your docs that coding agents and chat
 assistants can consume:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 ai: {
   llmsTxt: true,
 }
@@ -50,7 +50,7 @@ served at `/index.md`.
 Add an assistant that answers reader questions in an in-page chat panel, backed
 by a streaming server endpoint and the [AI SDK](https://ai-sdk.dev):
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 ai: {
   ask: {
     enabled: true,
@@ -64,7 +64,7 @@ ai: {
 Ask AI is a server route (`POST /api/ask`), so it can't run on a static build.
 Switch to server output and pick an adapter:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 deployment: {
   output: "server",
   adapter: "vercel",

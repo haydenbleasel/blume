@@ -14,7 +14,12 @@ Every page accepts the following frontmatter. All fields are optional.
     {
       name: "type",
       type: "string",
-      description: "Content type (default: doc).",
+      description: "Content type (default: doc). blog/changelog drive feeds.",
+    },
+    {
+      name: "date",
+      type: "string",
+      description: "Publish date for blog/changelog feeds (ISO or YAML date).",
     },
     {
       name: "slug",
@@ -31,7 +36,7 @@ Every page accepts the following frontmatter. All fields are optional.
 
 ## Sidebar
 
-```yaml
+```yaml lineNumbers
 sidebar:
   label: Install
   order: 2
@@ -41,7 +46,7 @@ sidebar:
 
 ## SEO
 
-```yaml
+```yaml lineNumbers
 seo:
   title: Install Blume
   image: /og/install.png
@@ -50,10 +55,26 @@ seo:
 
 ## Search
 
-```yaml
+```yaml lineNumbers
 search:
   exclude: false
   tags: [api]
 ```
+
+## Changelog
+
+Changelog entries (`type: changelog`) accept an optional `changelog` object for
+richer feed and display metadata:
+
+```yaml lineNumbers
+type: changelog
+changelog:
+  version: 1.2.0
+  date: 2026-06-20
+  category: Features
+```
+
+`date` may live here or at the top level — both feed the
+[changelog RSS feed](/content#feeds).
 
 Schemas are exported from `blume/schema` for editor and migration tooling.

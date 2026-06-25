@@ -1,9 +1,12 @@
 /**
- * Code-fence titles. Authors write a title as the first bare token after the
- * language (```ts blume.config.ts) or as `title="..."`. A Shiki transformer
- * promotes it to a `data-title` attribute on the rendered `<pre>`; the theme's
- * code-block header shows `data-title` when present, falling back to the
- * language label.
+ * Code-fence meta. A Shiki transformer reads the tokens after the language and
+ * promotes them to attributes on the rendered `<pre>`:
+ *
+ * - a title — the first bare token (```ts blume.config.ts) or `title="..."` —
+ *   becomes `data-title`; the theme's code header shows it, falling back to the
+ *   language label.
+ * - the `lineNumbers` keyword (```ts file.ts lineNumbers) becomes
+ *   `data-line-numbers`; the theme renders a counter-driven line-number gutter.
  */
 
 /** The slice of Shiki's transformer `this` context Blume reads. */
@@ -23,6 +26,7 @@ export interface CodeTitleTransformer {
 }
 
 const TITLE_ATTR = /title=(?<quote>["'])(?<title>[^"']*)\k<quote>/u;
+const LINE_NUMBERS = /(?:^|\s)lineNumbers(?=\s|$)/u;
 
 const parseTitle = (raw: string | undefined): string | undefined => {
   if (!raw) {
@@ -32,19 +36,34 @@ const parseTitle = (raw: string | undefined): string | undefined => {
   if (explicit?.groups?.title) {
     return explicit.groups.title;
   }
-  // Treat the first bare token as the title (```ts blume.config.ts), but skip
-  // Shiki line-range meta such as `{1,3-5}`.
-  const [first] = raw.trim().split(/\s+/u);
-  return first && !first.startsWith("{") ? first : undefined;
+  // The first bare token is the title (```ts blume.config.ts), skipping Shiki
+  // line ranges (`{1,3-5}`), `key=value` attrs, and the `lineNumbers` keyword.
+  return raw
+    .trim()
+    .split(/\s+/u)
+    .find(
+      (token) =>
+        token.length > 0 &&
+        token !== "lineNumbers" &&
+        !token.startsWith("{") &&
+        !token.includes("=")
+    );
 };
+
+const hasLineNumbers = (raw: string | undefined): boolean =>
+  Boolean(raw && LINE_NUMBERS.test(raw));
 
 /** Build the transformer. Runs after Shiki's built-in `data-language` hook. */
 export const codeTitleTransformer = (): CodeTitleTransformer => ({
-  name: "blume:code-title",
+  name: "blume:code-meta",
   pre(node) {
-    const title = parseTitle(this.options.meta?.__raw);
+    const raw = this.options.meta?.__raw;
+    const title = parseTitle(raw);
     if (title) {
       node.properties.dataTitle = title;
+    }
+    if (hasLineNumbers(raw)) {
+      node.properties.dataLineNumbers = true;
     }
   },
 });

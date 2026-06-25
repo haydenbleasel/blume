@@ -14,7 +14,7 @@ custom components.
 
 The everyday knobs live under `theme` in your config:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 theme: {
   accent: "teal",   // a named preset or any CSS color
   radius: "md",     // none | sm | md | lg
@@ -27,7 +27,7 @@ theme: {
 The accent color tints interactive and highlighted elements — step markers,
 active tabs, badges, card hovers, and more. Use a named preset or any CSS color:
 
-```ts blume.config.ts
+```ts blume.config.ts lineNumbers
 theme: {
   accent: "#ff0066", // hex, oklch(), rgb()… anything CSS understands
 }
@@ -57,7 +57,7 @@ across visits. Dark mode is applied with a `data-theme="dark"` attribute on the
 Drop a `theme.css` in your project root to override any design token. It's the
 last layer in the cascade, so it wins over the defaults and config tokens:
 
-```css theme.css
+```css theme.css lineNumbers
 :root {
   --blume-accent: oklch(0.68 0.14 180);
   --blume-radius: 0.5rem;

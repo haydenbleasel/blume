@@ -4,6 +4,11 @@ export default defineConfig({
   ai: {
     llmsTxt: true,
   },
+  banner: {
+    content: "Blume is in beta — expect breaking changes.",
+    dismissible: true,
+    id: "beta",
+  },
   content: {
     root: "content",
   },
@@ -17,6 +22,7 @@ export default defineConfig({
     owner: "haydenbleasel",
     repo: "blume",
   },
+  logo: "/logo.svg",
   markdown: {
     math: true,
   },

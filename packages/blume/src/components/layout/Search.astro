@@ -2,12 +2,10 @@
 import Icon from "../Icon.astro";
 
 interface Props {
-  prompt?: string;
   provider: "orama" | "pagefind";
 }
 
-const { prompt = "Search documentation...", provider } = Astro.props;
-const buttonLabel = prompt.replaceAll(/\.\.\.$/gu, "");
+const { provider } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const pagefindUrl = `${base}pagefind/pagefind.js`.replace("//", "/");
 const indexUrl = `${base}blume-search.json`.replace("//", "/");
@@ -26,14 +24,10 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
     type="button"
   >
     <Icon name="search" size={16} />
-    <span class="min-w-0 flex-1 truncate text-left max-sm:hidden">
-      {buttonLabel}
-    </span>
-    <kbd
-      class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.7rem] max-sm:hidden"
+    <span class="min-w-0 flex-1 text-left max-sm:hidden">Search</span>
+    <kbd class="font-mono text-[0.7rem] max-sm:hidden" data-blume-search-kbd
+      >⌘K</kbd
     >
-      ⌘K
-    </kbd>
   </button>
 
   <dialog
@@ -47,7 +41,7 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
         aria-label="Search docs"
         class="flex-1 border-0 bg-transparent text-base text-foreground focus:outline-none"
         data-blume-search-input
-        placeholder={prompt}
+        placeholder="Search documentation..."
         type="search"
       />
       <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.7rem]">Esc</kbd>
@@ -82,6 +76,14 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
         this.input = this.querySelector("[data-blume-search-input]")!;
         this.results = this.querySelector("[data-blume-search-results]")!;
         this.message = this.querySelector("[data-blume-search-message]")!;
+
+        // The handler accepts ⌘K and Ctrl+K; show the right one per platform.
+        const kbd = this.querySelector("[data-blume-search-kbd]");
+        if (kbd) {
+          kbd.textContent = /mac|iphone|ipad|ipod/iu.test(navigator.platform)
+            ? "⌘K"
+            : "Ctrl K";
+        }
 
         this.querySelector("[data-blume-search-open]")?.addEventListener(
           "click",

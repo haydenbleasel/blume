@@ -328,6 +328,23 @@ blume-tabs pre[data-language]::before,
   margin: 0;
 }
 
+/* Opt-in line numbers (\`\`\`ts file.ts lineNumbers): a counter-driven gutter that
+   works in prose and flush (tab / API panel) code blocks alike. */
+pre[data-line-numbers] code {
+  counter-reset: line;
+}
+
+pre[data-line-numbers] .line::before {
+  color: var(--blume-muted-foreground);
+  content: counter(line);
+  counter-increment: line;
+  display: inline-block;
+  margin-right: 1.25rem;
+  text-align: right;
+  user-select: none;
+  width: 1.25rem;
+}
+
 @media (max-width: 640px) {
   .prose :where(h1) {
     font-size: 2.25rem;
