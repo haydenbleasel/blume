@@ -64,6 +64,12 @@ export default defineConfig({
     enabled: true,
   },
 
+  // RSS feeds for blog & changelog — see RSS feeds below
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+  },
+
   // Deployment — see the Deployment guide
   deployment: {
     output: "static",
@@ -98,6 +104,30 @@ content: {
 | `pages`       | `"pages"`            | Folder for custom `.astro` pages.            |
 | `defaultType` | `"doc"`              | Page `type` used when frontmatter omits it.  |
 
+## RSS feeds
+
+Blume builds an RSS feed automatically for each content type in `rss.types`
+that has pages — `blog` and `changelog` by default — served at
+`/<type>/rss.xml`. See [Feeds](/content#feeds) for authoring blog and changelog
+entries.
+
+```ts blume.config.ts
+rss: {
+  enabled: true,
+  types: ["blog", "changelog"],
+}
+```
+
+| Option    | Default                 | Description                                      |
+| --------- | ----------------------- | ------------------------------------------------ |
+| `enabled` | `true`                  | Generate feeds. Set `false` to disable entirely. |
+| `types`   | `["blog", "changelog"]` | Content types that each get a feed.              |
+| `limit`   | `50`                    | Maximum items per feed, newest first.            |
+
+Feeds need an absolute [`deployment.site`](/deployment) for valid URLs (the same
+requirement as the sitemap). Blume also injects `<link rel="alternate">` tags so
+browsers and readers discover the feeds.
+
 ## Feature options
 
 Each of these has its own guide. The config field is the entry point:
@@ -110,6 +140,7 @@ Each of these has its own guide. The config field is the entry point:
 | `markdown`   | Opt-in Markdown features like math           | [Syntax](/content/syntax)               |
 | `ai`         | `llms.txt` and the Ask AI assistant          | [AI](/configuration/ai)                 |
 | `og`         | Open Graph image generation                  | [Open Graph](/configuration/open-graph) |
+| `rss`        | Feeds for blog and changelog content         | [RSS feeds](#rss-feeds)                 |
 | `deployment` | Output mode, adapter, and site URL           | [Deployment](/deployment)               |
 | `redirects`  | Permanent and temporary redirects            | [Deployment](/deployment#redirects)     |
 

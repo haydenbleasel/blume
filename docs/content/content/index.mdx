@@ -76,6 +76,50 @@ draft: true
 
 `blume build` skips drafts; `blume dev` renders them so you can work in the open.
 
+## Content types
+
+Every page has a **type**, set with the `type` frontmatter field (default
+`doc`). Types let Blume treat groups of pages differently — most importantly,
+`blog` and `changelog` pages are collected into [feeds](#feeds).
+
+```yaml
+---
+title: v1.2.0
+type: changelog
+date: 2026-06-20
+---
+```
+
+The type is independent of where the file lives, but by convention blog posts
+go under `blog/` and changelog entries under `changelog/`.
+
+## Feeds
+
+Blume generates an RSS feed automatically for each content type listed in
+[`rss.types`](/configuration#rss-feeds) — `blog` and `changelog` by default — as
+long as it has at least one page. Feeds are served at `/<type>/rss.xml`:
+
+| Type        | Feed                 |
+| ----------- | -------------------- |
+| `blog`      | `/blog/rss.xml`      |
+| `changelog` | `/changelog/rss.xml` |
+
+Give each entry a `date` so items sort newest-first and carry a `pubDate`. An
+unquoted YAML date is fine — Blume normalizes it:
+
+```yaml
+---
+title: Introducing Blume
+type: blog
+date: 2026-06-22
+description: Why we built a markdown-first docs framework.
+---
+```
+
+Feeds need an absolute site URL, so set [`deployment.site`](/deployment). Blume
+adds `<link rel="alternate">` tags to every page so browsers and feed readers
+discover them automatically.
+
 ## Where to next
 
 <CardGroup cols={2}>
