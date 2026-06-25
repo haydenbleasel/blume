@@ -277,11 +277,15 @@ const rssConfigSchema = z
   })
   .strict();
 
-/** Discoverability features: OG images, feeds, and structured data. */
+/** Discoverability features: OG images, feeds, sitemap, structured data. */
 const seoConfigSchema = z
   .object({
     og: ogConfigSchema.default({}),
+    /** Generate robots.txt (with a Sitemap reference when available). */
+    robots: z.boolean().default(true),
     rss: rssConfigSchema.default({}),
+    /** Generate sitemap.xml (requires deployment.site). */
+    sitemap: z.boolean().default(true),
     /** Emit schema.org JSON-LD in each page's <head>. */
     structuredData: z.boolean().default(true),
   })

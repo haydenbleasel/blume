@@ -12,7 +12,9 @@ import { buildManifest } from "../src/core/manifest.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { PageRecord, ProjectContext } from "../src/core/types.ts";
+import { buildRobots } from "../src/deploy/robots.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
+import { buildSitemap } from "../src/deploy/sitemap.ts";
 import { buildStructuredData } from "../src/seo/jsonld.ts";
 
 const makePage = (
@@ -44,7 +46,7 @@ const postPage = (
     title: id,
   });
 
-const rssProject = (
+const makeProject = (
   pages: PageRecord[],
   config: Record<string, unknown> = {}
 ): BlumeProject =>
@@ -220,7 +222,7 @@ describe("nav utilities", () => {
 describe("rss feeds", () => {
   it("returns no feeds without a configured site", () => {
     const pages = [postPage("a", "/blog/a", "blog", { date: "2026-01-01" })];
-    expect(buildRssFeeds(rssProject(pages, { deployment: {} }))).toStrictEqual(
+    expect(buildRssFeeds(makeProject(pages, { deployment: {} }))).toStrictEqual(
       []
     );
   });
@@ -228,7 +230,7 @@ describe("rss feeds", () => {
   it("returns no feeds when disabled", () => {
     const pages = [postPage("a", "/blog/a", "blog", { date: "2026-01-01" })];
     expect(
-      buildRssFeeds(rssProject(pages, { seo: { rss: { enabled: false } } }))
+      buildRssFeeds(makeProject(pages, { seo: { rss: { enabled: false } } }))
     ).toStrictEqual([]);
   });
 
@@ -240,7 +242,7 @@ describe("rss feeds", () => {
         changelog: { date: "2026-02-01" },
       }),
     ];
-    const feeds = buildRssFeeds(rssProject(pages));
+    const feeds = buildRssFeeds(makeProject(pages));
     expect(feeds.map((f) => f.path)).toStrictEqual([
       "/blog/rss.xml",
       "/changelog/rss.xml",
@@ -255,7 +257,7 @@ describe("rss feeds", () => {
       postPage("mid", "/blog/mid", "blog", { date: "2026-02-01" }),
     ];
     const [feed] = buildRssFeeds(
-      rssProject(pages, { seo: { rss: { limit: 2 } } })
+      makeProject(pages, { seo: { rss: { limit: 2 } } })
     );
     expect(feed?.items.map((i) => i.title)).toStrictEqual(["new", "mid"]);
   });
@@ -272,7 +274,7 @@ describe("rss feeds", () => {
       }),
       postPage("live", "/blog/live", "blog", { date: "2026-01-03" }),
     ];
-    const [feed] = buildRssFeeds(rssProject(pages));
+    const [feed] = buildRssFeeds(makeProject(pages));
     expect(feed?.items.map((i) => i.title)).toStrictEqual(["live"]);
   });
 
@@ -280,7 +282,7 @@ describe("rss feeds", () => {
     const pages = [
       postPage("Tom & Jerry", "/blog/post", "blog", { date: "2026-01-01" }),
     ];
-    const [feed] = buildRssFeeds(rssProject(pages));
+    const [feed] = buildRssFeeds(makeProject(pages));
     const xml = renderRssFeed(feed as NonNullable<typeof feed>);
     expect(xml).toContain('<rss version="2.0"');
     expect(xml).toContain("<title>Tom &amp; Jerry</title>");
@@ -346,5 +348,62 @@ describe("structured data", () => {
         title: "Home",
       })
     ).toBeNull();
+  });
+});
+
+describe("sitemap", () => {
+  it("excludes drafts, hidden, and noindex pages", () => {
+    const pages = [
+      makePage({ id: "a", route: "/a", title: "A" }),
+      makePage({
+        id: "b",
+        meta: pageMetaSchema.parse({ draft: true }),
+        route: "/b",
+        title: "B",
+      }),
+      makePage({
+        id: "c",
+        meta: pageMetaSchema.parse({ sidebar: { hidden: true } }),
+        route: "/c",
+        title: "C",
+      }),
+      makePage({
+        id: "d",
+        meta: pageMetaSchema.parse({ seo: { noindex: true } }),
+        route: "/d",
+        title: "D",
+      }),
+    ];
+    const xml = buildSitemap(makeProject(pages)) ?? "";
+    expect(xml).toContain("https://example.com/a");
+    expect(xml).not.toContain("/b<");
+    expect(xml).not.toContain("/c<");
+    expect(xml).not.toContain("/d<");
+  });
+
+  it("returns null without a site or when disabled", () => {
+    const pages = [makePage({ id: "a", route: "/a", title: "A" })];
+    expect(buildSitemap(makeProject(pages, { deployment: {} }))).toBeNull();
+    expect(
+      buildSitemap(makeProject(pages, { seo: { sitemap: false } }))
+    ).toBeNull();
+  });
+});
+
+describe("robots.txt", () => {
+  it("allows all crawlers and links the sitemap when a site is set", () => {
+    const robots = buildRobots(makeProject([])) ?? "";
+    expect(robots).toContain("User-agent: *");
+    expect(robots).toContain("Sitemap: https://example.com/sitemap.xml");
+  });
+
+  it("omits the sitemap line without a site", () => {
+    const robots = buildRobots(makeProject([], { deployment: {} })) ?? "";
+    expect(robots).toContain("User-agent: *");
+    expect(robots).not.toContain("Sitemap:");
+  });
+
+  it("returns null when disabled", () => {
+    expect(buildRobots(makeProject([], { seo: { robots: false } }))).toBeNull();
   });
 });

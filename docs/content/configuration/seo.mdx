@@ -15,13 +15,15 @@ the `seo` key in `blume.config.ts`; metadata is driven by your content.
 seo: {
   og: { enabled: true },
   rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
   structuredData: true,
 }
 ```
 
 Most of this is sharper with an absolute site URL — set
-[`deployment.site`](/deployment) so feeds, OG images, canonicals, and JSON-LD can
-emit full URLs.
+[`deployment.site`](/deployment) so feeds, OG images, canonicals, the sitemap,
+and JSON-LD can emit full URLs.
 
 ## Metadata
 
@@ -162,3 +164,29 @@ Each page includes:
 
 URLs are absolute when `deployment.site` is set. Pages marked `seo.noindex` are
 skipped.
+
+## Sitemap and robots
+
+At build time Blume writes a `sitemap.xml` of every indexable page and a
+`robots.txt` that points crawlers to it. Both are on by default:
+
+```ts blume.config.ts
+seo: {
+  sitemap: true,
+  robots: true,
+}
+```
+
+The sitemap needs an absolute [`deployment.site`](/deployment) and lists every
+page except drafts, hidden, and `noindex` pages. The `robots.txt` allows all
+crawlers and adds a `Sitemap:` line when the sitemap is available:
+
+```txt robots.txt
+User-agent: *
+Allow: /
+
+Sitemap: https://docs.example.com/sitemap.xml
+```
+
+Ship your own `public/robots.txt` or `public/sitemap.xml` to take over — Blume
+never overwrites a file you place in `public/`.

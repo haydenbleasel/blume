@@ -59,10 +59,12 @@ export default defineConfig({
     llmsTxt: true,
   },
 
-  // SEO — Open Graph, feeds, structured data; see the SEO guide
+  // SEO — OG images, feeds, sitemap, structured data; see the SEO guide
   seo: {
     og: { enabled: true },
     rss: { enabled: true, types: ["blog", "changelog"] },
+    sitemap: true,
+    robots: true,
     structuredData: true,
   },
 
@@ -110,17 +112,21 @@ the full reference.
 seo: {
   og: { enabled: false },
   rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
   structuredData: true,
 }
 ```
 
-| Option           | Default                 | Description                                  |
-| ---------------- | ----------------------- | -------------------------------------------- |
-| `og.enabled`     | `false`                 | Generate per-page Open Graph images.         |
-| `rss.enabled`    | `true`                  | Build feeds for blog and changelog content.  |
-| `rss.types`      | `["blog", "changelog"]` | Content types that each get a feed.          |
-| `rss.limit`      | `50`                    | Maximum items per feed.                      |
-| `structuredData` | `true`                  | Emit schema.org JSON-LD in each page's head. |
+| Option           | Default                 | Description                                   |
+| ---------------- | ----------------------- | --------------------------------------------- |
+| `og.enabled`     | `false`                 | Generate per-page Open Graph images.          |
+| `rss.enabled`    | `true`                  | Build feeds for blog and changelog content.   |
+| `rss.types`      | `["blog", "changelog"]` | Content types that each get a feed.           |
+| `rss.limit`      | `50`                    | Maximum items per feed.                       |
+| `sitemap`        | `true`                  | Generate sitemap.xml (needs deployment.site). |
+| `robots`         | `true`                  | Generate robots.txt with a Sitemap link.      |
+| `structuredData` | `true`                  | Emit schema.org JSON-LD in each page's head.  |
 
 These work best with an absolute [`deployment.site`](/deployment) for full URLs.
 
