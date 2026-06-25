@@ -421,26 +421,30 @@ if (!entry) {
 const { Content, headings } = await render(entry);
 const frontmatter = entry.data ?? {};
 
+const seo = frontmatter.seo ?? {};
+const base = data.config.site ? data.config.site.replace(/\\/$/, "") : null;
+
 const ogPath = data.config.og.enabled
   ? \`/og/\${route === "/" ? "index" : route.slice(1)}.png\`
   : null;
-const ogRel = frontmatter.seo?.image ?? ogPath;
-const ogImage =
-  ogRel && data.config.site
-    ? \`\${data.config.site.replace(/\\/$/, "")}\${ogRel}\`
-    : ogRel;
+const ogRel = seo.image ?? ogPath;
+const ogImage = ogRel && base ? \`\${base}\${ogRel}\` : ogRel;
+
+const canonical =
+  seo.canonical ?? (base ? \`\${base}\${route === "/" ? "" : route}\` : null);
 ---
 
 <RootLayout
   site={{ title: data.config.title, description: data.config.description }}
   navigation={data.navigation}
-  page={{ title, description: frontmatter.description, route }}
+  page={{ title: seo.title ?? title, description: seo.description ?? frontmatter.description, route }}
   headings={headings}
   themeMode={data.config.theme.mode}
   searchEnabled={data.config.search.enabled}
   searchProvider={data.config.search.provider}
   indexable={indexable}
   ogImage={ogImage}
+  canonical={canonical}
   editUrl={editUrl}
   repoUrl={data.config.repoUrl}
   askEnabled={${options.askEnabled}}
@@ -448,7 +452,8 @@ const ogImage =
   siteUrl={data.config.site}
   pageType={frontmatter.type}
   published={frontmatter.date ?? frontmatter.changelog?.date ?? null}
-  noindex={frontmatter.seo?.noindex}
+  noindex={seo.noindex}
+  structuredDataEnabled={data.config.structuredData}
 >${askSlot}
   <Content components={components} />
 </RootLayout>

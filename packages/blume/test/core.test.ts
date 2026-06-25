@@ -74,6 +74,17 @@ describe("config schema", () => {
   it("rejects unknown top-level keys", () => {
     expect(blumeConfigSchema.safeParse({ nope: true }).success).toBeFalsy();
   });
+
+  it("nests og, rss, and structured data under seo", () => {
+    const { seo } = blumeConfigSchema.parse({});
+    expect(seo.og.enabled).toBeFalsy();
+    expect(seo.rss.enabled).toBeTruthy();
+    expect(seo.rss.types).toStrictEqual(["blog", "changelog"]);
+    expect(seo.structuredData).toBeTruthy();
+    expect(
+      blumeConfigSchema.safeParse({ og: { enabled: true } }).success
+    ).toBeFalsy();
+  });
 });
 
 describe("astro config template", () => {
@@ -217,7 +228,7 @@ describe("rss feeds", () => {
   it("returns no feeds when disabled", () => {
     const pages = [postPage("a", "/blog/a", "blog", { date: "2026-01-01" })];
     expect(
-      buildRssFeeds(rssProject(pages, { rss: { enabled: false } }))
+      buildRssFeeds(rssProject(pages, { seo: { rss: { enabled: false } } }))
     ).toStrictEqual([]);
   });
 
@@ -243,7 +254,9 @@ describe("rss feeds", () => {
       postPage("new", "/blog/new", "blog", { date: "2026-03-01" }),
       postPage("mid", "/blog/mid", "blog", { date: "2026-02-01" }),
     ];
-    const [feed] = buildRssFeeds(rssProject(pages, { rss: { limit: 2 } }));
+    const [feed] = buildRssFeeds(
+      rssProject(pages, { seo: { rss: { limit: 2 } } })
+    );
     expect(feed?.items.map((i) => i.title)).toStrictEqual(["new", "mid"]);
   });
 

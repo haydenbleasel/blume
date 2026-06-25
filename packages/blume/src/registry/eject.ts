@@ -134,7 +134,7 @@ export const eject = async (root: string): Promise<string[]> => {
     });
   }
 
-  if (config.og.enabled) {
+  if (config.seo.og.enabled) {
     files.push({
       content: ogEndpointTemplate(),
       path: join(srcDir, "pages", "og", "[...slug].png.ts"),

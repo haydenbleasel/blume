@@ -144,13 +144,14 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     config: {
       description: config.description,
       logo: config.logo ?? null,
-      og: { enabled: config.og.enabled },
+      og: { enabled: config.seo.og.enabled },
       repoUrl,
       search: {
         enabled: config.search.provider !== "none",
         provider: config.search.provider,
       },
       site: config.deployment.site ?? null,
+      structuredData: config.seo.structuredData,
       theme: config.theme,
       title: config.title,
     },
@@ -250,7 +251,7 @@ export const generateRuntime = async (
     );
   }
 
-  if (config.og.enabled) {
+  if (config.seo.og.enabled) {
     await writeIfChanged(
       join(srcDir, "pages", "og", "[...slug].png.ts"),
       ogEndpointTemplate()

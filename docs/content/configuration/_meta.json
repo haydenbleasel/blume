@@ -1,5 +1,5 @@
 {
   "title": "Configuration",
   "order": 4,
-  "pages": ["theming", "customization", "search", "ai", "open-graph"]
+  "pages": ["theming", "customization", "search", "ai", "seo"]
 }

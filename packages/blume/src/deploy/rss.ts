@@ -45,7 +45,7 @@ const pageDate = (page: PageRecord): Date | undefined => {
  */
 export const buildRssFeeds = (project: BlumeProject): RssFeed[] => {
   const { config } = project;
-  const { rss } = config;
+  const { rss } = config.seo;
   const { site } = config.deployment;
   if (!(rss.enabled && site)) {
     return [];

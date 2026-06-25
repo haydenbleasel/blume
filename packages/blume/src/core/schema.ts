@@ -277,6 +277,16 @@ const rssConfigSchema = z
   })
   .strict();
 
+/** Discoverability features: OG images, feeds, and structured data. */
+const seoConfigSchema = z
+  .object({
+    og: ogConfigSchema.default({}),
+    rss: rssConfigSchema.default({}),
+    /** Emit schema.org JSON-LD in each page's <head>. */
+    structuredData: z.boolean().default(true),
+  })
+  .strict();
+
 const githubConfigSchema = z
   .object({
     branch: z.string().default("main"),
@@ -309,10 +319,9 @@ export const blumeConfigSchema = z
     logo: logoConfigSchema.optional(),
     markdown: markdownConfigSchema.default({}),
     navigation: navigationConfigSchema.default({}),
-    og: ogConfigSchema.default({}),
     redirects: z.array(redirectSchema).default([]),
-    rss: rssConfigSchema.default({}),
     search: searchConfigSchema.default({}),
+    seo: seoConfigSchema.default({}),
     theme: themeConfigSchema.default({}),
     title: z.string().default("Documentation"),
   })

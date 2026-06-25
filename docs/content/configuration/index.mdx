@@ -59,15 +59,11 @@ export default defineConfig({
     llmsTxt: true,
   },
 
-  // Open Graph images — see the Open Graph guide
-  og: {
-    enabled: true,
-  },
-
-  // RSS feeds for blog & changelog — see RSS feeds below
-  rss: {
-    enabled: true,
-    types: ["blog", "changelog"],
+  // SEO — Open Graph, feeds, structured data; see the SEO guide
+  seo: {
+    og: { enabled: true },
+    rss: { enabled: true, types: ["blog", "changelog"] },
+    structuredData: true,
   },
 
   // Deployment — see the Deployment guide
@@ -104,45 +100,44 @@ content: {
 | `pages`       | `"pages"`            | Folder for custom `.astro` pages.            |
 | `defaultType` | `"doc"`              | Page `type` used when frontmatter omits it.  |
 
-## RSS feeds
+## SEO
 
-Blume builds an RSS feed automatically for each content type in `rss.types`
-that has pages — `blog` and `changelog` by default — served at
-`/<type>/rss.xml`. See [Feeds](/content#feeds) for authoring blog and changelog
-entries.
+Open Graph images, RSS feeds, and JSON-LD structured data, grouped under `seo`.
+See the [SEO guide](/configuration/seo) for metadata, frontmatter overrides, and
+the full reference.
 
 ```ts blume.config.ts
-rss: {
-  enabled: true,
-  types: ["blog", "changelog"],
+seo: {
+  og: { enabled: false },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  structuredData: true,
 }
 ```
 
-| Option    | Default                 | Description                                      |
-| --------- | ----------------------- | ------------------------------------------------ |
-| `enabled` | `true`                  | Generate feeds. Set `false` to disable entirely. |
-| `types`   | `["blog", "changelog"]` | Content types that each get a feed.              |
-| `limit`   | `50`                    | Maximum items per feed, newest first.            |
+| Option           | Default                 | Description                                  |
+| ---------------- | ----------------------- | -------------------------------------------- |
+| `og.enabled`     | `false`                 | Generate per-page Open Graph images.         |
+| `rss.enabled`    | `true`                  | Build feeds for blog and changelog content.  |
+| `rss.types`      | `["blog", "changelog"]` | Content types that each get a feed.          |
+| `rss.limit`      | `50`                    | Maximum items per feed.                      |
+| `structuredData` | `true`                  | Emit schema.org JSON-LD in each page's head. |
 
-Feeds need an absolute [`deployment.site`](/deployment) for valid URLs (the same
-requirement as the sitemap). Blume also injects `<link rel="alternate">` tags so
-browsers and readers discover the feeds.
+These work best with an absolute [`deployment.site`](/deployment) for full URLs.
 
 ## Feature options
 
 Each of these has its own guide. The config field is the entry point:
 
-| Field        | What it configures                           | Guide                                   |
-| ------------ | -------------------------------------------- | --------------------------------------- |
-| `theme`      | Accent color, corner radius, light/dark mode | [Theming](/configuration/theming)       |
-| `navigation` | Explicit sidebar and header tabs             | [Navigation](/content/navigation)       |
-| `search`     | Provider (Orama or Pagefind) and indexing    | [Search](/configuration/search)         |
-| `markdown`   | Opt-in Markdown features like math           | [Syntax](/content/syntax)               |
-| `ai`         | `llms.txt` and the Ask AI assistant          | [AI](/configuration/ai)                 |
-| `og`         | Open Graph image generation                  | [Open Graph](/configuration/open-graph) |
-| `rss`        | Feeds for blog and changelog content         | [RSS feeds](#rss-feeds)                 |
-| `deployment` | Output mode, adapter, and site URL           | [Deployment](/deployment)               |
-| `redirects`  | Permanent and temporary redirects            | [Deployment](/deployment#redirects)     |
+| Field        | What it configures                           | Guide                               |
+| ------------ | -------------------------------------------- | ----------------------------------- |
+| `theme`      | Accent color, corner radius, light/dark mode | [Theming](/configuration/theming)   |
+| `navigation` | Explicit sidebar and header tabs             | [Navigation](/content/navigation)   |
+| `search`     | Provider (Orama or Pagefind) and indexing    | [Search](/configuration/search)     |
+| `markdown`   | Opt-in Markdown features like math           | [Syntax](/content/syntax)           |
+| `ai`         | `llms.txt` and the Ask AI assistant          | [AI](/configuration/ai)             |
+| `seo`        | Metadata, OG images, feeds, structured data  | [SEO](/configuration/seo)           |
+| `deployment` | Output mode, adapter, and site URL           | [Deployment](/deployment)           |
+| `redirects`  | Permanent and temporary redirects            | [Deployment](/deployment#redirects) |
 
 ## Precedence
 
