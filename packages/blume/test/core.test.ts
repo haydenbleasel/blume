@@ -13,6 +13,7 @@ import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { PageRecord, ProjectContext } from "../src/core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
+import { buildStructuredData } from "../src/seo/jsonld.ts";
 
 const makePage = (
   over: Pick<PageRecord, "id" | "route" | "title"> & Partial<PageRecord>
@@ -55,6 +56,11 @@ const rssProject = (
     }),
     graph: { pages },
   }) as unknown as BlumeProject;
+
+const graphOf = (
+  data: Record<string, unknown> | null
+): Record<string, unknown>[] =>
+  (data?.["@graph"] ?? []) as Record<string, unknown>[];
 
 describe("config schema", () => {
   it("applies defaults for an empty config", () => {
@@ -270,5 +276,62 @@ describe("rss feeds", () => {
     expect(xml).toContain(
       '<atom:link href="https://example.com/blog/rss.xml" rel="self"'
     );
+  });
+});
+
+describe("structured data", () => {
+  it("emits only a WebSite node for the homepage", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [],
+      route: "/",
+      siteName: "Docs",
+      siteUrl: "https://x.com",
+      title: "Home",
+    });
+    expect(graphOf(data).map((n) => n["@type"])).toStrictEqual(["WebSite"]);
+  });
+
+  it("emits a BlogPosting with absolute url, datePublished, and breadcrumbs", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [{ label: "Blog", route: "/blog" }, { label: "Post" }],
+      description: "Hi",
+      pageType: "blog",
+      published: "2026-01-01",
+      route: "/blog/post",
+      siteName: "Docs",
+      siteUrl: "https://x.com/",
+      title: "Post",
+    });
+    const graph = graphOf(data);
+    const article = graph.find((n) => n["@type"] === "BlogPosting");
+    expect(article?.url).toBe("https://x.com/blog/post");
+    expect(article?.datePublished).toBe("2026-01-01T00:00:00.000Z");
+    expect(article?.isPartOf).toStrictEqual({ "@id": "https://x.com#website" });
+    expect(graph.some((n) => n["@type"] === "BreadcrumbList")).toBeTruthy();
+  });
+
+  it("falls back to relative urls and TechArticle without a site", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [],
+      route: "/guide",
+      siteName: "Docs",
+      siteUrl: null,
+      title: "Guide",
+    });
+    const graph = graphOf(data);
+    expect(graph.map((n) => n["@type"])).toStrictEqual(["TechArticle"]);
+    expect(graph[0]?.url).toBe("/guide");
+  });
+
+  it("returns null for the homepage without a site", () => {
+    expect(
+      buildStructuredData({
+        breadcrumbs: [],
+        route: "/",
+        siteName: "Docs",
+        siteUrl: null,
+        title: "Home",
+      })
+    ).toBeNull();
   });
 });

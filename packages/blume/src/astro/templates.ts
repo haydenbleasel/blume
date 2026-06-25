@@ -445,6 +445,10 @@ const ogImage =
   repoUrl={data.config.repoUrl}
   askEnabled={${options.askEnabled}}
   feeds={data.feeds}
+  siteUrl={data.config.site}
+  pageType={frontmatter.type}
+  published={frontmatter.date ?? frontmatter.changelog?.date ?? null}
+  noindex={frontmatter.seo?.noindex}
 >${askSlot}
   <Content components={components} />
 </RootLayout>

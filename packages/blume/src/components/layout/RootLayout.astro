@@ -2,6 +2,7 @@
 import type { Heading, Navigation } from "../../core/types.ts";
 import "blume:theme";
 import Icon from "../Icon.astro";
+import { buildStructuredData } from "../../seo/jsonld.ts";
 import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
 import PageActions from "./PageActions.astro";
@@ -21,6 +22,10 @@ interface Props {
   repoUrl?: string | null;
   askEnabled?: boolean;
   feeds?: { title: string; href: string }[];
+  siteUrl?: string | null;
+  pageType?: string;
+  published?: string | Date | null;
+  noindex?: boolean;
 }
 
 const {
@@ -37,6 +42,10 @@ const {
   repoUrl,
   askEnabled,
   feeds,
+  siteUrl,
+  pageType,
+  published,
+  noindex,
 } = Astro.props;
 
 const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
@@ -49,6 +58,25 @@ const { prev, next } = getPagination(
   page.route
 );
 const eyebrowCrumb = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
+
+// Structured data is skipped for pages we ask crawlers not to index. Escape
+// `<` so a title/description containing `</script>` can't break out of the
+// inline JSON-LD tag.
+const structuredData = noindex
+  ? null
+  : buildStructuredData({
+      breadcrumbs: crumbs,
+      description,
+      pageType,
+      published,
+      route: page.route,
+      siteName: site.title,
+      siteUrl: siteUrl ?? null,
+      title: page.title,
+    });
+const structuredDataJson = structuredData
+  ? JSON.stringify(structuredData).replaceAll("<", "\\u003c")
+  : null;
 
 const iconButton =
   "inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
@@ -88,6 +116,15 @@ const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.c
           type="application/rss+xml"
         />
       ))
+    }
+    {
+      structuredDataJson && (
+        <script
+          is:inline
+          set:html={structuredDataJson}
+          type="application/ld+json"
+        />
+      )
     }
     <script is:inline set:html={initialThemeScript} />
   </head>
