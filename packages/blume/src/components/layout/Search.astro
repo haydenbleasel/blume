@@ -25,7 +25,9 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
   >
     <Icon name="search" size={16} />
     <span class="min-w-0 flex-1 text-left max-sm:hidden">Search</span>
-    <kbd class="font-mono text-[0.7rem] max-sm:hidden">⌘K</kbd>
+    <kbd class="font-mono text-[0.7rem] max-sm:hidden" data-blume-search-kbd
+      >⌘K</kbd
+    >
   </button>
 
   <dialog
@@ -74,6 +76,14 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
         this.input = this.querySelector("[data-blume-search-input]")!;
         this.results = this.querySelector("[data-blume-search-results]")!;
         this.message = this.querySelector("[data-blume-search-message]")!;
+
+        // The handler accepts ⌘K and Ctrl+K; show the right one per platform.
+        const kbd = this.querySelector("[data-blume-search-kbd]");
+        if (kbd) {
+          kbd.textContent = /mac|iphone|ipad|ipod/iu.test(navigator.platform)
+            ? "⌘K"
+            : "Ctrl K";
+        }
 
         this.querySelector("[data-blume-search-open]")?.addEventListener(
           "click",
