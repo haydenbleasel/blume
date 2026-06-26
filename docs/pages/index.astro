@@ -1,0 +1,316 @@
+---
+import "blume:theme";
+import Header from "blume/components/layout/Header.astro";
+import data from "blume:data";
+
+// Everything the landing page needs comes from the resolved Blume config, so it
+// stays in sync with the docs site (title, logo, banner, repo, theme mode).
+const { config } = data;
+const title = config.title;
+const description = config.description;
+const logoSvg = config.logo?.svg;
+const banner = config.banner;
+const repoUrl = config.repoUrl;
+const siteUrl = config.site;
+const docsHref = "/introduction";
+const startHref = "/quickstart";
+const year = new Date().getFullYear();
+
+const pageTitle = `${title} — fast, AI-ready, markdown-first docs`;
+
+// The header (logo, search, theme toggle) and its theme/banner click handlers
+// come from the shared <Header>, so the navbar is identical to the docs pages.
+// The pre-paint scripts must run in <head> before first paint, so they stay
+// inline here (same `blume-theme` / `blume-banner:*` keys as the docs).
+const themeMode = config.theme.mode;
+const initialThemeScript = `(()=>{const m=${JSON.stringify(themeMode)};const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);})();`;
+const bannerScript = banner?.dismissible
+  ? `(()=>{if(localStorage.getItem("blume-banner:"+${JSON.stringify(banner.key)}))document.documentElement.setAttribute("data-blume-banner-hidden","");})();`
+  : null;
+
+const primaryButton =
+  "inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 font-medium text-background text-sm transition-opacity hover:opacity-90";
+const secondaryButton =
+  "inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 font-medium text-foreground text-sm transition-colors hover:border-foreground";
+
+const arrowRight =
+  '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>';
+
+// Inline Lucide-style marks (the shipped icon set is intentionally small, and a
+// landing page wants a few that aren't in it). Stored as inner SVG markup.
+const features = [
+  {
+    body: "A React-free core ships zero client JavaScript and renders static HTML by default, so pages score well on Core Web Vitals out of the box.",
+    icon: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+    title: "Fast by default",
+  },
+  {
+    body: "Emit llms.txt and llms-full.txt, and add an optional Ask AI assistant. Your Markdown is the source of truth for humans and models alike.",
+    icon: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/>',
+    title: "AI-ready out of the box",
+  },
+  {
+    body: "A folder of Markdown is a complete project. No starter to clone, no Astro or Tailwind to wire up — configuration is something you reach for later.",
+    icon: '<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>',
+    title: "Zero configuration",
+  },
+  {
+    body: "Callouts, cards, steps, tabs, accordions, file trees, and API-reference blocks — usable directly in MDX with no imports to manage.",
+    icon: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    title: "Components included",
+  },
+  {
+    body: "Orama search works in dev and production with no hosted index. Pagefind is one flag away when your site outgrows the default.",
+    icon: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    title: "Local search",
+  },
+  {
+    body: "When you outgrow the defaults, blume eject produces a standalone Astro project that still uses the blume package. No lock-in.",
+    icon: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+    title: "Eject anytime",
+  },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    {siteUrl && <link rel="canonical" href={siteUrl} />}
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    {bannerScript && <script is:inline set:html={bannerScript} />}
+    <script is:inline set:html={initialThemeScript} />
+  </head>
+  <body class="bg-background font-sans text-foreground antialiased">
+    {
+      banner && (
+        <div
+          class="relative flex items-center justify-center gap-x-2 gap-y-0.5 bg-foreground px-10 py-3 text-center text-background text-sm max-sm:flex-wrap dark:border-border dark:border-b dark:bg-background dark:text-foreground [:where([data-blume-banner-hidden])_&]:hidden"
+          data-banner-key={banner.key}
+          data-blume-banner
+        >
+          <span>{banner.content}</span>
+          {banner.dismissible && (
+            <button
+              aria-label="Dismiss announcement"
+              class="absolute right-1.5 inline-flex size-7 items-center justify-center rounded-full text-background/80 transition-colors hover:bg-white/10 hover:text-background dark:text-foreground/70 dark:hover:bg-foreground/10 dark:hover:text-foreground"
+              data-blume-banner-dismiss
+              type="button"
+            >
+              <svg
+                fill="none"
+                height="16"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="16"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )
+    }
+
+    <Header
+      hasSidebar={false}
+      logo={config.logo}
+      navigation={data.navigation}
+      route="/"
+      searchEnabled={config.search.enabled}
+      searchProvider={config.search.provider}
+      site={{ title }}
+    />
+
+    <main>
+      <!-- Hero -->
+      <section class="mx-auto max-w-5xl px-6 pt-20 pb-16 text-center sm:pt-28">
+        <span
+          class="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-muted-foreground text-xs"
+        >
+          <span class="size-1.5 rounded-full bg-accent"></span>
+          Open source · Astro + Vite
+        </span>
+        <h1
+          class="mx-auto mt-6 max-w-3xl text-balance font-medium text-4xl tracking-tight sm:text-5xl lg:text-6xl"
+        >
+          Documentation that's fast, AI-ready, and zero-config.
+        </h1>
+        <p
+          class="mx-auto mt-6 max-w-2xl text-balance text-lg text-muted-foreground"
+        >
+          {description} Drop Markdown into a folder, run <code
+            class="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground"
+            >blume dev</code
+          >, and ship a production-grade docs site — no app boilerplate to write
+          or maintain.
+        </p>
+        <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+          <a class={primaryButton} href={startHref}>
+            Get started
+            <svg
+              fill="none"
+              height="16"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="16"
+              xmlns="http://www.w3.org/2000/svg"
+              set:html={arrowRight}
+            ></svg>
+          </a>
+          <a class={secondaryButton} href={docsHref}>Read the docs</a>
+        </div>
+
+        <!-- Terminal preview -->
+        <div
+          class="mx-auto mt-14 max-w-xl overflow-hidden rounded-blume border border-border text-left"
+        >
+          <div
+            class="flex items-center gap-1.5 border-border border-b bg-muted/50 px-4 py-3"
+          >
+            <span class="size-2.5 rounded-full bg-border"></span>
+            <span class="size-2.5 rounded-full bg-border"></span>
+            <span class="size-2.5 rounded-full bg-border"></span>
+          </div>
+          <pre
+            class="overflow-x-auto bg-code px-5 py-4 font-mono text-muted-foreground text-sm leading-7"><code><span class="text-accent">$</span> <span class="text-foreground">npm i blume</span>
+<span class="text-accent">$</span> <span class="text-foreground">blume init</span>
+<span class="text-accent">$</span> <span class="text-foreground">blume dev</span>
+  <span class="text-accent">➜</span> Local:   http://localhost:4321</code></pre>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section class="mx-auto max-w-5xl px-6 pb-20">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {
+            features.map((feature) => (
+              <div class="rounded-blume border border-border p-6">
+                <span class="inline-flex size-10 items-center justify-center rounded-blume bg-muted text-accent">
+                  <svg
+                    class="size-5"
+                    fill="none"
+                    height="20"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="20"
+                    xmlns="http://www.w3.org/2000/svg"
+                    set:html={feature.icon}
+                  />
+                </span>
+                <h3 class="mt-4 font-medium text-base text-foreground">
+                  {feature.title}
+                </h3>
+                <p class="mt-2 text-muted-foreground text-sm leading-relaxed">
+                  {feature.body}
+                </p>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <!-- Closing CTA -->
+      <section class="mx-auto max-w-5xl px-6 pb-24">
+        <div
+          class="rounded-blume border border-border bg-muted/30 px-6 py-16 text-center"
+        >
+          <h2
+            class="mx-auto max-w-xl text-balance font-medium text-3xl tracking-tight sm:text-4xl"
+          >
+            Write Markdown. Get a docs site.
+          </h2>
+          <p class="mx-auto mt-4 max-w-lg text-balance text-muted-foreground">
+            The framework is the template, so the only thing you ever touch is
+            your content.
+          </p>
+          <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <a class={primaryButton} href={startHref}>
+              Get started
+              <svg
+                fill="none"
+                height="16"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="16"
+                xmlns="http://www.w3.org/2000/svg"
+                set:html={arrowRight}
+              ></svg>
+            </a>
+            {
+              repoUrl && (
+                <a
+                  class={secondaryButton}
+                  href={repoUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Star on GitHub
+                </a>
+              )
+            }
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-border border-t">
+      <div
+        class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-muted-foreground text-sm"
+      >
+        <div class="flex items-center gap-2">
+          {
+            logoSvg && (
+              <span
+                aria-hidden="true"
+                class="inline-flex h-4 items-center [&>svg]:h-4 [&>svg]:w-auto"
+                set:html={logoSvg}
+              />
+            )
+          }
+          <span>© {year} {title}. MIT licensed.</span>
+        </div>
+        <nav class="flex items-center gap-5">
+          <a class="transition-colors hover:text-foreground" href={docsHref}
+            >Docs</a
+          >
+          <a
+            class="transition-colors hover:text-foreground"
+            href="/configuration">Configuration</a
+          >
+          {
+            repoUrl && (
+              <a
+                class="transition-colors hover:text-foreground"
+                href={repoUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                GitHub
+              </a>
+            )
+          }
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
