@@ -277,6 +277,29 @@ blume-tabs pre[data-language]::before,
   content: none;
 }
 
+/* Pre-hydration layout-shift guard. The horizontal trigger row and
+   single-panel visibility are built by the <blume-tabs> custom element's JS:
+   until it upgrades, the trigger row is empty and every panel is in normal flow,
+   so the browser paints all panels stacked vertically (e.g. all four
+   package-manager commands at once) before JS hides them. While the element is
+   :not(:defined), show only the first panel and reserve the trigger row's height
+   so nothing jumps when JS takes over. The child selector covers both <Tab>
+   panels and <CodeGroup> raw code blocks (which only gain
+   [data-blume-tab-panel] from JS). */
+blume-tabs:not(:defined) [data-blume-tab-content] > *:nth-child(n + 2) {
+  display: none;
+}
+
+blume-tabs:not(:defined) [data-blume-tablist] {
+  /* Matches a trigger's height: py-2.5 + text-xs line-height + border-b-2. */
+  min-height: 2.375rem;
+}
+
+blume-tabs:not(:defined)[data-dropdown="true"] [data-blume-tablist] {
+  /* Dropdown variant: p-3 padding around a select (py-2 + text-sm + border). */
+  min-height: 3.875rem;
+}
+
 /* Code blocks inside request/response example panels sit flush; the panel owns
    the frame. Unlayered (like the tab rules) so they beat the base \`pre\` styles
    that a class on the panel cannot. */
