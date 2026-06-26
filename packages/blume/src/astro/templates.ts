@@ -534,6 +534,8 @@ const canonical =
   noindex={seo.noindex}
   structuredDataEnabled={data.config.structuredData}
 >${askSlot}
+  <h1>{title}</h1>
+  {frontmatter.description && <p class="mt-3 text-lg text-muted-foreground">{frontmatter.description}</p>}
   <Content components={components} />
 </RootLayout>
 `;

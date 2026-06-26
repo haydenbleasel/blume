@@ -3,8 +3,6 @@ title: Syntax
 description: Every Markdown and MDX feature Blume renders — formatting, lists, tables, callouts, code blocks, package installs, and math.
 ---
 
-# Syntax
-
 Blume renders standard Markdown and MDX with a curated, GitHub-flavored feature
 set — no imports, no configuration. Write content the way you already do; this
 page shows everything that's supported, with a live preview and the source for
@@ -12,12 +10,11 @@ each.
 
 ## Headings
 
-Structure a page with headings. Use a single `#` for the page title; `##`
-through `####` become entries in the table of contents and get linkable anchors.
+Structure a page with headings. Blume renders your frontmatter `title` as the
+page heading, so start your content at `##` — `##` through `####` become entries
+in the table of contents and get linkable anchors.
 
 ```md
-# Page title
-
 ## Section
 
 ### Subsection
