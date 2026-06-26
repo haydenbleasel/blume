@@ -1,5 +1,5 @@
 {
   "title": "Advanced",
   "order": 5,
-  "pages": ["custom-pages", "changelog", "blog"]
+  "pages": ["custom-pages", "changelog", "blog", "api-reference"]
 }

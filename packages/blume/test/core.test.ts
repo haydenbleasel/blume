@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { astroConfigTemplate } from "../src/astro/templates.ts";
+import {
+  astroConfigTemplate,
+  runtimeDependencies,
+} from "../src/astro/templates.ts";
 import {
   findBreadcrumbs,
   flattenPages,
@@ -15,6 +18,11 @@ import type { PageRecord, ProjectContext } from "../src/core/types.ts";
 import { buildRobots } from "../src/deploy/robots.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
 import { buildSitemap } from "../src/deploy/sitemap.ts";
+import {
+  buildReferenceFiles,
+  referenceTabs,
+  resolveReferences,
+} from "../src/openapi/scalar.ts";
 import { buildStructuredData } from "../src/seo/jsonld.ts";
 
 const makePage = (
@@ -415,5 +423,114 @@ describe("robots.txt", () => {
 
   it("returns null when disabled", () => {
     expect(buildRobots(makeProject([], { seo: { robots: false } }))).toBeNull();
+  });
+});
+
+describe("api reference (scalar)", () => {
+  it("defaults openapi and asyncapi to disabled with sensible routes", () => {
+    const config = blumeConfigSchema.parse({});
+    expect(config.openapi.enabled).toBeFalsy();
+    expect(config.openapi.route).toBe("/reference");
+    expect(config.asyncapi.enabled).toBeFalsy();
+    expect(config.asyncapi.route).toBe("/events");
+    expect(resolveReferences(config)).toStrictEqual([]);
+  });
+
+  it("treats the spec shorthand as a single source at the base route", () => {
+    const config = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://example.com/openapi.json" },
+    });
+    expect(resolveReferences(config)).toStrictEqual([
+      {
+        kind: "openapi",
+        label: "API Reference",
+        route: "/reference",
+        spec: "https://example.com/openapi.json",
+        theme: undefined,
+      },
+    ]);
+  });
+
+  it("derives one route per source and honors explicit routes", () => {
+    const config = blumeConfigSchema.parse({
+      openapi: {
+        enabled: true,
+        sources: [
+          { label: "Public API", spec: "https://x.dev/public.json" },
+          { route: "/admin", spec: "https://x.dev/admin.json" },
+        ],
+      },
+    });
+    const routes = resolveReferences(config).map((ref) => ref.route);
+    expect(routes).toStrictEqual(["/reference/public-api", "/admin"]);
+  });
+
+  it("emits both openapi and asyncapi references as nav tabs", () => {
+    const config = blumeConfigSchema.parse({
+      asyncapi: { enabled: true, spec: "https://x.dev/async.yaml" },
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+    });
+    expect(referenceTabs(config)).toStrictEqual([
+      { label: "API Reference", path: "/reference" },
+      { label: "Events", path: "/events" },
+    ]);
+  });
+
+  it("declares @scalar/astro only when a reference is enabled", () => {
+    const off = blumeConfigSchema.parse({});
+    const on = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+    });
+    expect(
+      runtimeDependencies({ config: off, needsReact: false })
+    ).not.toContain("@scalar/astro");
+    expect(runtimeDependencies({ config: on, needsReact: false })).toContain(
+      "@scalar/astro"
+    );
+  });
+
+  it("builds a prerendered page passing a remote spec straight through", async () => {
+    const config = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      theme: { accent: "teal" },
+    });
+    const { files, warnings } = await buildReferenceFiles({
+      config,
+      contentRoutes: new Set(),
+      root: "/r",
+    });
+    const [page] = files;
+    expect(warnings).toStrictEqual([]);
+    expect(files).toHaveLength(1);
+    expect(page.pagePath).toBe("reference.astro");
+  });
+
+  it("emits a prerendered Scalar page with the spec url and theme accent", async () => {
+    const config = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      theme: { accent: "teal" },
+    });
+    const { files } = await buildReferenceFiles({
+      config,
+      contentRoutes: new Set(),
+      root: "/r",
+    });
+    const [{ content }] = files;
+    expect(content).toContain("export const prerender = true");
+    expect(content).toContain('"url": "https://x.dev/openapi.json"');
+    expect(content).toContain("--scalar-color-accent");
+  });
+
+  it("skips a reference whose route collides with a content page", async () => {
+    const config = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+    });
+    const { files, warnings } = await buildReferenceFiles({
+      config,
+      contentRoutes: new Set(["/reference"]),
+      root: "/r",
+    });
+    expect(files).toStrictEqual([]);
+    expect(warnings[0]).toContain("collides with a content page");
   });
 });

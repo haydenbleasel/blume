@@ -21,6 +21,7 @@ import {
 import { scanProject } from "../core/project-graph.ts";
 import type { ProjectContext } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
+import { buildReferenceFiles, hasReferences } from "../openapi/scalar.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
@@ -170,6 +171,22 @@ export const eject = async (root: string): Promise<string[]> => {
         path: join(srcDir, "pages", "[section]", "rss.xml.ts"),
       }
     );
+  }
+
+  // Scalar API/AsyncAPI reference pages, mirrored from the generated runtime so
+  // the ejected app keeps its reference routes.
+  if (hasReferences(config)) {
+    const references = await buildReferenceFiles({
+      config,
+      contentRoutes: new Set(project.graph.pages.map((page) => page.route)),
+      root,
+    });
+    for (const file of references.files) {
+      files.push({
+        content: file.content,
+        path: join(srcDir, "pages", file.pagePath),
+      });
+    }
   }
 
   await Promise.all(

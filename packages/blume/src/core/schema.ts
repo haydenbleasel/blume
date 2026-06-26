@@ -323,11 +323,62 @@ const markdownConfigSchema = z
   })
   .strict();
 
+/**
+ * A single spec rendered by the API reference (Scalar). `spec` is a local path
+ * or an `http(s)` URL; Scalar auto-detects OpenAPI vs AsyncAPI documents.
+ */
+const openapiSourceSchema = z
+  .object({
+    /** Nav/section label for this source. */
+    label: z.string().optional(),
+    /** Per-source route; defaults to the block's `route` (or a derived path). */
+    route: z.string().optional(),
+    /** Local path or `http(s)` URL to the spec. */
+    spec: z.string(),
+  })
+  .strict();
+
+export type OpenApiSource = z.infer<typeof openapiSourceSchema>;
+
+/**
+ * OpenAPI reference, delegated wholesale to Scalar (`@scalar/astro`). The
+ * reference is a self-contained embed on its own route — it does not weave into
+ * Blume's sidebar, search, or llms. Set `enabled: true` to opt in.
+ */
+const openapiConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    /** Where the reference mounts. */
+    route: z.string().default("/reference"),
+    /** One or more specs; each renders on its own route by default. */
+    sources: z.array(openapiSourceSchema).default([]),
+    /** Shorthand for a single source: `sources: [{ spec }]`. */
+    spec: z.string().optional(),
+    /** Scalar theme name; defaults to a Blume-derived accent override. */
+    theme: z.string().optional(),
+  })
+  .strict();
+
+/**
+ * AsyncAPI reference. Same shape and Scalar pipeline as {@link openapiConfigSchema}
+ * (Scalar auto-detects the document type); only the default `route` differs.
+ */
+const asyncapiConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    route: z.string().default("/events"),
+    sources: z.array(openapiSourceSchema).default([]),
+    spec: z.string().optional(),
+    theme: z.string().optional(),
+  })
+  .strict();
+
 /** Full user-facing config schema. All fields optional with defaults. */
 export const blumeConfigSchema = z
   .object({
     ai: aiConfigSchema.default({}),
     analytics: analyticsConfigSchema.optional(),
+    asyncapi: asyncapiConfigSchema.default({}),
     banner: bannerConfigSchema.optional(),
     content: contentConfigSchema.default({}),
     deployment: deploymentConfigSchema.default({}),
@@ -336,6 +387,7 @@ export const blumeConfigSchema = z
     logo: logoConfigSchema.optional(),
     markdown: markdownConfigSchema.default({}),
     navigation: navigationConfigSchema.default({}),
+    openapi: openapiConfigSchema.default({}),
     redirects: z.array(redirectSchema).default([]),
     search: searchConfigSchema.default({}),
     seo: seoConfigSchema.default({}),

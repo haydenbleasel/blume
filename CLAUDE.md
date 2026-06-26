@@ -25,7 +25,7 @@ written (HMR-friendly).
 `cli` commands · `core` config/content/graph/navigation/manifest/diagnostics ·
 `astro` runtime generation + integration · `components` Astro/React UI ·
 `theme` Tailwind v4 entry/tokens/icons/palette · `search` Orama (default, dev + build) + Pagefind opt-in · `registry` add + eject ·
-`migrate` migrators · `openapi` import · `ai` llms.txt + Ask AI endpoint ·
+`migrate` migrators · `openapi` Scalar OpenAPI/AsyncAPI reference · `ai` llms.txt + Ask AI endpoint ·
 `og` Takumi-rendered Open Graph images · `markdown` Satteri processors
 (`blumeMarkdownProcessor` for `.md`, `blumeMdxProcessor` for `.mdx`): curated
 feature set (GFM/frontmatter/smart punctuation/super+subscript) and MDX-only

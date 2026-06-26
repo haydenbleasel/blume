@@ -17,6 +17,11 @@ import { buildRawMarkdown } from "../ai/markdown.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
+import {
+  buildReferenceFiles,
+  hasReferences,
+  referenceTabs,
+} from "../openapi/scalar.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
@@ -227,7 +232,12 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       href: feed.path,
       title: feed.title,
     })),
-    navigation: graph.navigation,
+    // API reference routes (Scalar) surface as header tabs alongside the
+    // content-derived ones, so the reference stays discoverable.
+    navigation: {
+      ...graph.navigation,
+      tabs: [...graph.navigation.tabs, ...referenceTabs(config)],
+    },
     routes: manifest.routes.map((route) => ({
       draft: route.draft,
       editUrl: editUrlFor(route.sourcePath),
@@ -244,6 +254,8 @@ export const buildRuntimeData = (project: BlumeProject): string => {
 export interface GenerateResult {
   /** Whether any structural file changed (config/page/content config). */
   structuralChange: boolean;
+  /** Non-fatal warnings raised while generating (e.g. a missing API spec). */
+  warnings: string[];
 }
 
 /**
@@ -391,6 +403,23 @@ export const generateRuntime = async (
     ]);
   }
 
+  // API/AsyncAPI reference pages (Scalar). One self-contained page per source,
+  // mounted on its configured route and regenerated each run.
+  const warnings: string[] = [];
+  if (hasReferences(config)) {
+    const references = await buildReferenceFiles({
+      config,
+      contentRoutes: new Set(project.graph.pages.map((page) => page.route)),
+      root: context.root,
+    });
+    warnings.push(...references.warnings);
+    await Promise.all(
+      references.files.map((file) =>
+        writeIfChanged(join(srcDir, "pages", file.pagePath), file.content)
+      )
+    );
+  }
+
   // Data and manifest are not "structural" for Astro; they hot-reload.
   await writeIfChanged(
     join(srcDir, "generated", "data.json"),
@@ -401,5 +430,5 @@ export const generateRuntime = async (
     `${JSON.stringify(project.manifest, null, 2)}\n`
   );
 
-  return { structuralChange: structural.some(Boolean) };
+  return { structuralChange: structural.some(Boolean), warnings };
 };

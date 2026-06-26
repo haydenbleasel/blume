@@ -1,0 +1,115 @@
+---
+title: OpenAPI / AsyncAPI
+description: Drop in an OpenAPI or AsyncAPI spec and get an interactive reference, rendered by Scalar.
+---
+
+# OpenAPI / AsyncAPI
+
+Point Blume at an OpenAPI or AsyncAPI spec and it generates an interactive API
+reference — schemas, authentication, examples, and a request playground — on its
+own route. The reference is rendered by [Scalar](https://scalar.com), not by
+Blume: API reference isn't core to Blume, so the whole surface is delegated to a
+tool that has already solved its large edge-case space.
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "https://petstore3.swagger.io/api/v3/openapi.json",
+}
+```
+
+That mounts the reference at `/reference` and adds a header link to it. The
+`spec` is either an `http(s)` URL or a path to a local file in your project.
+
+:::note
+The reference is a **self-contained embed** with its own sidebar, search, and
+theme. By design it doesn't weave into Blume's content sidebar, site search, or
+`llms.txt` — it's a bolt-on route, not part of the docs shell.
+:::
+
+## A local spec
+
+A relative path is resolved from your project root and inlined at build time, so
+nothing is copied into your source tree and the page works offline:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+}
+```
+
+Both JSON and YAML specs work; Scalar auto-detects the format.
+
+## Route
+
+`route` controls where the reference mounts (and the header link's target):
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  route: "/api",
+  spec: "./openapi.yaml",
+}
+```
+
+## Multiple specs
+
+Use `sources` to publish more than one spec. Each source gets its own route and
+header link. Give each a `label` (used for the link and to derive its route), or
+set an explicit `route`:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", spec: "./public.json" },   // → /reference/public-api
+    { label: "Admin API", route: "/admin", spec: "./admin.json" },
+  ],
+}
+```
+
+`spec` is shorthand for a single-entry `sources`, so you only reach for `sources`
+when you have more than one.
+
+## AsyncAPI
+
+Event-driven APIs use a sibling `asyncapi` block with the **same shape** — Scalar
+renders AsyncAPI through the same component. Only the default route differs
+(`/events`):
+
+```ts blume.config.ts lineNumbers
+asyncapi: {
+  enabled: true,
+  spec: "./asyncapi.yaml",
+}
+```
+
+:::warning
+Scalar's AsyncAPI support is still a work in progress — it renders channels,
+operations, messages, and a Models section, but there's **no interactive
+playground** for events yet. It improves upstream over time.
+:::
+
+## Theming
+
+By default Blume layers your [accent and radius](/configuration/theming) onto
+Scalar's theme so the reference doesn't feel jarring. It's best-effort, not
+pixel-identical — Scalar carries its own design system. To pick a specific
+[Scalar theme](https://github.com/scalar/scalar) instead, set `theme`:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+  theme: "purple",
+}
+```
+
+## The playground and CORS
+
+Scalar's "Try it" playground calls your **target API directly from the
+browser** — Blume doesn't proxy the request. For it to succeed, the API must
+allow cross-origin requests from the docs site (send the appropriate
+`Access-Control-Allow-Origin` headers). This is a property of the API being
+documented, not of Blume.
