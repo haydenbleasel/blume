@@ -1,9 +1,11 @@
 ---
-import Accordion from "./Accordion.astro";
+import AccordionItem from "./AccordionItem.astro";
 
 const { defaultOpen = false, title = "Show more" } = Astro.props;
 ---
 
-<Accordion defaultOpen={defaultOpen} title={title}>
-  <slot />
-</Accordion>
+<div class="not-prose my-4 overflow-hidden rounded-blume border border-border">
+  <AccordionItem defaultOpen={defaultOpen} title={title}>
+    <slot />
+  </AccordionItem>
+</div>

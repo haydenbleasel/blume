@@ -21,7 +21,7 @@ const tabId = id ?? slugify(title);
 ---
 
 <div
-  class="[&>:first-child]:mt-0 [&>:last-child]:mb-0"
+  class="px-4 py-3 [&:has(>pre)]:p-0 [&>:first-child]:mt-0! [&>:last-child]:mb-0!"
   data-blume-tab-panel
   data-icon={icon}
   data-tab-id={tabId}

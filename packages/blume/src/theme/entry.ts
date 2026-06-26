@@ -298,8 +298,11 @@ blume-tabs pre,
 
 /* Code blocks inside tabs sit flush; the tab container owns the frame. These
    rules are unlayered like the base \`pre\` styles, so they win over Tailwind's
-   layered utilities (which a class on the panel cannot). */
-blume-tabs [data-blume-tab-panel] > pre {
+   layered utilities (which a class on the panel cannot). The second selector
+   covers <CodeGroup>, where each code block IS the panel (a direct child of the
+   tab content wrapper) rather than a <pre> nested inside a <Tab>. */
+blume-tabs [data-blume-tab-panel] > pre,
+blume-tabs [data-blume-tab-content] > pre {
   /* Important to beat the astro-code background rule above; the tab container
      owns the surface, so the code sits directly on it. */
   background: transparent !important;

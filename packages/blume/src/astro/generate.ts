@@ -23,7 +23,6 @@ import {
 import { writeChangelogRssFeeds } from "../changelog/rss.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
-import type { PageRecord } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
@@ -33,6 +32,7 @@ import {
   askEndpointTemplate,
   astroConfigTemplate,
   catchAllPageTemplate,
+  changelogIndexTemplate,
   contentConfigTemplate,
   envTemplate,
   ogEndpointTemplate,
@@ -157,19 +157,6 @@ export const detectNeedsReact = async (root: string): Promise<boolean> => {
   return matches.length > 0;
 };
 
-const MERMAID_FENCE = /^```mermaid(?:\s|$)/mu;
-
-export const detectNeedsMermaid = async (
-  pages: PageRecord[]
-): Promise<boolean> => {
-  const sources = await Promise.all(
-    pages
-      .filter((page) => page.format === "mdx")
-      .map((page) => readFile(page.sourcePath, "utf-8"))
-  );
-  return sources.some((source) => MERMAID_FENCE.test(source));
-};
-
 const writeIfChanged = async (
   path: string,
   content: string
@@ -281,6 +268,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     config: {
       banner: resolveBanner(config),
       description: config.description,
+      imageZoom: config.markdown.imageZoom,
       logo: resolveLogo(project),
       og: { enabled: config.seo.og.enabled },
       repoUrl,
@@ -367,10 +355,9 @@ export const generateRuntime = async (
   }
 
   const askEnabled = config.ai.ask?.enabled ?? false;
-  const [pages, detectedReact, detectedMermaid, userTheme] = await Promise.all([
+  const [pages, detectedReact, userTheme] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(context.root),
-    detectNeedsMermaid(project.graph.pages),
     readThemeFiles(context.themeFiles),
   ]);
   const needsReact = detectedReact || askEnabled;
@@ -405,7 +392,6 @@ export const generateRuntime = async (
       catchAllPageTemplate({
         askEnabled,
         mathEnabled: config.markdown.math,
-        mermaidEnabled: detectedMermaid,
       })
     ),
     writeIfChanged(
@@ -440,6 +426,24 @@ export const generateRuntime = async (
     await writeIfChanged(
       join(srcDir, "pages", "og", "[...slug].png.ts"),
       ogEndpointTemplate()
+    );
+  }
+
+  // Changelog index (`/changelog`): a timeline of every `type: changelog` entry,
+  // rendered through the Update layout. Skipped when there are no entries, or
+  // when a user content page already occupies the `/changelog` route.
+  const hasChangelog = project.graph.pages.some(
+    (page) =>
+      page.contentType === "changelog" &&
+      !(page.meta.draft || page.meta.sidebar.hidden)
+  );
+  const changelogRouteTaken = project.graph.pages.some(
+    (page) => page.route === "/changelog"
+  );
+  if (hasChangelog && !changelogRouteTaken) {
+    await writeIfChanged(
+      join(srcDir, "pages", "changelog.astro"),
+      changelogIndexTemplate({ askEnabled })
     );
   }
 

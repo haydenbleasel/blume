@@ -10,6 +10,7 @@ import { importCommand } from "./commands/import.ts";
 import { initCommand } from "./commands/init.ts";
 import { migrateCommand } from "./commands/migrate.ts";
 import { previewCommand } from "./commands/preview.ts";
+import { validateCommand } from "./commands/validate.ts";
 import { logger } from "./log.ts";
 
 const cliName = process.env.BLUME_CLI_NAME === "mint" ? "mint" : "blume";
@@ -41,6 +42,7 @@ const blumeSubCommands = {
   init: initCommand,
   migrate: migrateCommand,
   preview: previewCommand,
+  validate: validateCommand,
 };
 
 const mintSubCommands = {

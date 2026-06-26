@@ -30,7 +30,8 @@ written (HMR-friendly).
 (`blumeMarkdownProcessor` for `.md`, `blumeMdxProcessor` for `.mdx`): curated
 feature set (GFM/frontmatter/smart punctuation/super+subscript) and MDX-only
 MDAST plugins — `package-install` → package-manager tabs, `:::note` directives →
-`<Callout>`, and opt-in KaTeX math (`markdown.math`) → `<Math>`.
+`<Callout>`, opt-in KaTeX math (`markdown.math`) → `<Math>`, and ` ```mermaid `
+→ a client-rendered `<blume-mermaid>` element (lazy-loads Mermaid).
 
 ## Conventions
 

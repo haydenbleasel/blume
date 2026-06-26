@@ -26,6 +26,16 @@ export interface Heading {
   slug: string;
 }
 
+/** A link target discovered in page content, anchored to its source line. */
+export interface PageLink {
+  /** Raw link target as written, e.g. `./foo`, `/api#auth`, `https://x.dev`. */
+  target: string;
+  /** 1-based line number in the source file. */
+  line: number;
+  /** 1-based column of the target within the line. */
+  column: number;
+}
+
 /**
  * Resolved project paths. Computed once per CLI invocation and threaded
  * through the core pipeline.
@@ -76,7 +86,7 @@ export interface PageRecord {
   /** Whether the file is `.md`/`.mdx`. */
   format: "md" | "mdx";
   /** Internal/asset links discovered in the page (for validation). */
-  links: string[];
+  links: PageLink[];
 }
 
 /** A node in the generated navigation tree. */

@@ -6,7 +6,6 @@ import { buildRawMarkdown } from "../ai/markdown.ts";
 import {
   buildRuntimeData,
   buildRuntimeMarkdown,
-  detectNeedsMermaid,
   detectNeedsReact,
 } from "../astro/generate.ts";
 import { discoverPages } from "../astro/pages.ts";
@@ -54,16 +53,12 @@ export const eject = async (root: string): Promise<string[]> => {
   const genDir = join(srcDir, "generated");
   const askEnabled = config.ai.ask?.enabled ?? false;
 
-  const [pages, needsReactRaw, needsMermaid, userTheme, rawMarkdown] =
-    await Promise.all([
-      context.pagesRoot
-        ? discoverPages(context.pagesRoot)
-        : Promise.resolve([]),
-      detectNeedsReact(root),
-      detectNeedsMermaid(project.graph.pages),
-      readThemeFiles(context.themeFiles),
-      buildRawMarkdown(project),
-    ]);
+  const [pages, needsReactRaw, userTheme, rawMarkdown] = await Promise.all([
+    context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
+    detectNeedsReact(root),
+    readThemeFiles(context.themeFiles),
+    buildRawMarkdown(project),
+  ]);
   const needsReact = needsReactRaw || askEnabled;
 
   // A project-relative context so generated files use portable paths.
@@ -108,7 +103,6 @@ export const eject = async (root: string): Promise<string[]> => {
       content: catchAllPageTemplate({
         askEnabled,
         mathEnabled: config.markdown.math,
-        mermaidEnabled: needsMermaid,
       }),
       path: join(srcDir, "pages", "[...slug].astro"),
     },

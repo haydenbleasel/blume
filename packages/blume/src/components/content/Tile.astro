@@ -9,7 +9,7 @@ const previewPattern =
 ---
 
 <Tag
-  class="not-prose block overflow-hidden rounded-blume border border-border bg-background text-inherit transition-colors hover:[&[href]]:border-accent"
+  class="not-prose block overflow-hidden rounded-blume border border-border bg-background text-inherit no-underline! transition-colors hover:no-underline! hover:[&[href]]:border-accent"
   data-blume-tile
   href={href}
   rel={external ? "noreferrer" : undefined}
@@ -25,7 +25,7 @@ const previewPattern =
   <div class="p-4">
     {
       title && (
-        <p class="m-0 flex items-center gap-1.5 font-semibold">
+        <p class="m-0! flex items-center gap-1.5 font-semibold">
           {title}
           {href && (
             <Icon class="text-muted-foreground" name="arrow-right" size={14} />
@@ -35,7 +35,7 @@ const previewPattern =
     }
     {
       description && (
-        <p class="m-0 mt-1 text-muted-foreground text-sm">{description}</p>
+        <p class="mt-1! mb-0! text-muted-foreground text-sm">{description}</p>
       )
     }
   </div>

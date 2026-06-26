@@ -3,53 +3,32 @@ import type { MdastNode, MdastVisitorContext } from "./mdast.ts";
 
 interface CodeNode extends MdastNode {
   lang?: string | null;
-  meta?: string | null;
   value: string;
 }
 
-const ATTRIBUTE_PATTERN =
-  /(?<name>[A-Za-z_$][\w$-]*)=(?:"(?<double>[^"]*)"|'(?<single>[^']*)'|\{(?<expression>[^}]*)\}|(?<bare>[^\s]+))/gu;
-
-const metaAttributes = (meta: string | null | undefined): unknown[] => {
-  if (!meta) {
-    return [];
-  }
-
-  const attributes: unknown[] = [];
-  for (const match of meta.matchAll(ATTRIBUTE_PATTERN)) {
-    const name = match.groups?.name;
-    if (name !== "actions" && name !== "placement") {
-      continue;
-    }
-
-    const value =
-      match.groups?.double ??
-      match.groups?.single ??
-      match.groups?.expression ??
-      match.groups?.bare;
-    if (name && value !== undefined) {
-      attributes.push(jsxAttribute(name, value));
-    }
-  }
-  return attributes;
-};
-
 /**
- * Mintlify renders fenced `mermaid` code blocks as diagrams with optional
- * `actions` and `placement` fence props. Rewrite them to Blume's Mermaid
- * component before syntax highlighting can treat them as ordinary code.
+ * Satteri MDAST plugin that turns a ` ```mermaid ` code block into a
+ * `<blume-mermaid>` custom element carrying the raw diagram source. There is no
+ * importable component — the fence is the whole interface. The element is
+ * rendered on the client (Mermaid needs a DOM), so the source rides on a string
+ * attribute rather than as child text (which MDX would try to parse).
  */
 export const mermaidPlugin = () => ({
   code(node: CodeNode, ctx: MdastVisitorContext) {
     if (node.lang !== "mermaid") {
       return;
     }
-
     ctx.replaceNode(
       node,
       jsxFlowElement(
-        "Mermaid",
-        [jsxAttribute("code", node.value), ...metaAttributes(node.meta)],
+        "blume-mermaid",
+        [
+          jsxAttribute(
+            "class",
+            "not-prose my-6 flex justify-center overflow-x-auto"
+          ),
+          jsxAttribute("data-source", node.value),
+        ],
         []
       )
     );

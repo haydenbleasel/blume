@@ -1,0 +1,121 @@
+---
+import Icon from "../Icon.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+  defaultOpen?: boolean;
+  id?: string;
+  icon?: string;
+  iconType?: string;
+}
+
+const { defaultOpen = false, description, icon, iconType, id, title } =
+  Astro.props;
+const slugify = (value: string): string =>
+  value
+    .toLowerCase()
+    .trim()
+    .replaceAll(/[^\w\s-]/gu, "")
+    .replaceAll(/[\s_]+/gu, "-")
+    .replaceAll(/-+/gu, "-")
+    .replaceAll(/^-|-$/gu, "");
+const accordionId = id ?? slugify(title);
+---
+
+<details
+  class="not-prose group"
+  data-blume-accordion
+  id={accordionId}
+  open={defaultOpen}
+>
+  <summary
+    class="flex cursor-pointer list-none items-center justify-between p-4 font-medium [&::-webkit-details-marker]:hidden"
+  >
+    <span class="flex min-w-0 items-start gap-2">
+      {
+        icon && (
+          <Icon
+            class="mt-0.5 shrink-0 text-muted-foreground"
+            iconType={iconType}
+            name={icon}
+            size={16}
+          />
+        )
+      }
+      <span class="min-w-0">
+        <span class="block">{title}</span>
+        {
+          description && (
+            <span class="block font-normal text-muted-foreground text-sm">
+              {description}
+            </span>
+          )
+        }
+      </span>
+    </span>
+    <Icon
+      class="text-muted-foreground transition-transform group-open:rotate-180"
+      name="chevron-down"
+      size={16}
+    />
+  </summary>
+  <div class="px-4 pb-4 [&>:first-child]:mt-0! [&>:last-child]:mb-0!">
+    <slot />
+  </div>
+</details>
+
+<script>
+  const state = window as Window & { __blumeAccordionHash?: boolean };
+  if (!state.__blumeAccordionHash) {
+    state.__blumeAccordionHash = true;
+
+    const accordionFromHash = () => {
+      const id = decodeURIComponent(window.location.hash.slice(1));
+      if (!id) {
+        return null;
+      }
+      return document.getElementById(id)?.matches("[data-blume-accordion]")
+        ? (document.getElementById(id) as HTMLDetailsElement)
+        : null;
+    };
+
+    const openHashAccordion = () => {
+      const accordion = accordionFromHash();
+      if (!accordion) {
+        return;
+      }
+      accordion.open = true;
+      requestAnimationFrame(() => {
+        accordion.scrollIntoView({ block: "start" });
+      });
+    };
+
+    document.addEventListener(
+      "toggle",
+      (event) => {
+        const accordion = event.target;
+        if (
+          !(accordion instanceof HTMLDetailsElement) ||
+          !accordion.matches("[data-blume-accordion]") ||
+          !accordion.open ||
+          !accordion.id
+        ) {
+          return;
+        }
+
+        history.replaceState(null, "", `#${encodeURIComponent(accordion.id)}`);
+      },
+      true
+    );
+
+    window.addEventListener("hashchange", openHashAccordion);
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", openHashAccordion, {
+        once: true,
+      });
+    } else {
+      openHashAccordion();
+    }
+  }
+</script>

@@ -7,7 +7,7 @@ import { glob } from "tinyglobby";
 import { diagnosticsFromZod } from "./diagnostics.ts";
 import { pageMetaSchema } from "./schema.ts";
 import type { PageMeta } from "./schema.ts";
-import type { Diagnostic, Heading, PageRecord } from "./types.ts";
+import type { Diagnostic, Heading, PageLink, PageRecord } from "./types.ts";
 
 const NUMERIC_PREFIX = /^\d+[-_.]/u;
 const GROUP_FOLDER = /^\((?<label>.+)\)$/u;
@@ -98,15 +98,37 @@ export const extractHeadings = (body: string): Heading[] => {
 
 const MD_LINK = /\[[^\]]*\]\((?<target>[^)\s]+)(?:\s+"[^"]*")?\)/gu;
 
-/** Extract link targets from markdown body for later validation. */
-const extractLinks = (body: string): string[] => {
-  const links: string[] = [];
-  for (const match of body.matchAll(MD_LINK)) {
-    const target = match.groups?.target;
-    if (target) {
-      links.push(target);
+/**
+ * Extract link targets from a markdown body for later validation, recording the
+ * 1-based line/column of each target. Skips fenced code blocks.
+ */
+export const extractLinks = (body: string): PageLink[] => {
+  const links: PageLink[] = [];
+  let inFence = false;
+  let lineNumber = 0;
+
+  for (const line of body.split("\n")) {
+    lineNumber += 1;
+    if (CODE_FENCE.test(line.trimStart())) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      continue;
+    }
+    for (const match of line.matchAll(MD_LINK)) {
+      const target = match.groups?.target;
+      if (target === undefined || match.index === undefined) {
+        continue;
+      }
+      links.push({
+        column: line.indexOf(target, match.index) + 1,
+        line: lineNumber,
+        target,
+      });
     }
   }
+
   return links;
 };
 

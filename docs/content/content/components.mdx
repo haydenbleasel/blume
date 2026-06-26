@@ -1,6 +1,6 @@
 ---
 title: Components
-description: The built-in JSX components — cards, steps, tabs, accordions, badges, file trees, and API-reference blocks — usable in any MDX page.
+description: The built-in JSX components — cards, columns, steps, tabs, accordions, badges, code groups, frames, trees, tooltips, fields, and API-reference blocks — usable in any MDX page.
 ---
 
 # Components
@@ -25,7 +25,7 @@ indexes, and “next steps” — anywhere you’re guiding the reader onward.
   </Card>
 </CardGroup>
 
-```mdx lineNumbers
+```astro lineNumbers
 <CardGroup cols={2}>
   <Card title="Quickstart" href="/quickstart" icon="rocket">
     Install Blume and ship your first page.
@@ -52,7 +52,7 @@ and tutorials where the order matters. Each `Step` takes a `title`.
   <Step title="Ship it">Run `blume build` and deploy `dist/`.</Step>
 </Steps>
 
-```mdx lineNumbers
+```astro lineNumbers
 <Steps>
   <Step title="Install Blume">Add the package to your project.</Step>
   <Step title="Write a page">
@@ -73,28 +73,11 @@ Each `Tab` takes a `title`.
   <Tab title="Windows">Use winget to install the toolchain.</Tab>
 </Tabs>
 
-```mdx lineNumbers
+```astro lineNumbers
 <Tabs>
   <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
   <Tab title="Windows">Use winget to install the toolchain.</Tab>
 </Tabs>
-```
-
-## Accordion
-
-Collapse supplementary detail — FAQs, optional steps, or long examples — so it's
-available without crowding the page. Set `defaultOpen` to start expanded.
-
-<Accordion title="Is the core theme really React-free?">
-  Yes. Interactive bits like tabs and search are vanilla custom elements. React
-  is only enabled when you add an island.
-</Accordion>
-
-```mdx lineNumbers
-<Accordion title="Is the core theme really React-free?">
-  Yes. Interactive bits like tabs and search are vanilla custom elements. React
-  is only enabled when you add an island.
-</Accordion>
 ```
 
 ## Badge
@@ -108,7 +91,7 @@ Neutral metadata with no particular emphasis.
 
 <Badge>Stable</Badge>
 
-```mdx
+```astro
 <Badge>Stable</Badge>
 ```
 
@@ -118,7 +101,7 @@ Draws the eye using your theme accent — good for “new” or featured markers
 
 <Badge variant="accent">New</Badge>
 
-```mdx
+```astro
 <Badge variant="accent">New</Badge>
 ```
 
@@ -128,7 +111,7 @@ A positive or passing state.
 
 <Badge variant="success">Passing</Badge>
 
-```mdx
+```astro
 <Badge variant="success">Passing</Badge>
 ```
 
@@ -138,7 +121,7 @@ Something to use with caution, such as an experimental feature.
 
 <Badge variant="warning">Beta</Badge>
 
-```mdx
+```astro
 <Badge variant="warning">Beta</Badge>
 ```
 
@@ -148,7 +131,7 @@ A negative or breaking state, such as a deprecation.
 
 <Badge variant="danger">Deprecated</Badge>
 
-```mdx
+```astro
 <Badge variant="danger">Deprecated</Badge>
 ```
 
@@ -167,7 +150,7 @@ styles it as a tree — handy for explaining structure in setup and config guide
 
 </FileTree>
 
-```mdx lineNumbers
+```astro lineNumbers
 <FileTree>
 
 - docs/
@@ -177,6 +160,294 @@ styles it as a tree — handy for explaining structure in setup and config guide
 - blume.config.ts
 
 </FileTree>
+```
+
+## Accordion
+
+Stack related collapsibles in a single bordered container with dividers between
+them — FAQs, optional steps, or long examples. Each child is an `AccordionItem`
+(`title`, optional `icon`, `description`, `defaultOpen`). For a single standalone
+disclosure, use [Expandable](#expandable).
+
+<Accordion>
+  <AccordionItem title="Does it support MDX?">
+    Yes — every page can be `.md` or `.mdx`.
+  </AccordionItem>
+  <AccordionItem title="Is the theme customizable?">
+    Yes, via Tailwind v4 tokens and your own `theme.css`.
+  </AccordionItem>
+</Accordion>
+
+```astro lineNumbers
+<Accordion>
+  <AccordionItem title="Does it support MDX?">
+    Yes — every page can be `.md` or `.mdx`.
+  </AccordionItem>
+  <AccordionItem title="Is the theme customizable?">
+    Yes, via Tailwind v4 tokens and your own `theme.css`.
+  </AccordionItem>
+</Accordion>
+```
+
+## Expandable
+
+A lightweight inline disclosure for nested detail — expanding a field's
+sub-properties or an optional aside. `title` labels the toggle (defaults to
+“Show more”); set `defaultOpen` to start expanded.
+
+<Expandable title="Show advanced options">
+  These settings are optional and rarely need changing.
+</Expandable>
+
+```astro
+<Expandable title="Show advanced options">
+  These settings are optional and rarely need changing.
+</Expandable>
+```
+
+## Columns
+
+Lay cards or blocks out in a responsive grid of equal columns that reflows on
+mobile. `Columns` takes `cols`; wrap each cell in a `Column`.
+
+<Columns cols={2}>
+  <Column>
+    <Card title="Fast" icon="rocket">
+      Built on Astro and Vite.
+    </Card>
+  </Column>
+  <Column>
+    <Card title="Themeable" icon="sun">
+      Tailwind v4 design tokens.
+    </Card>
+  </Column>
+</Columns>
+
+```astro lineNumbers
+<Columns cols={2}>
+  <Column>
+    <Card title="Fast" icon="rocket">
+      Built on Astro and Vite.
+    </Card>
+  </Column>
+  <Column>
+    <Card title="Themeable" icon="sun">
+      Tailwind v4 design tokens.
+    </Card>
+  </Column>
+</Columns>
+```
+
+## CodeGroup
+
+Group several code blocks into one tabbed switcher — a tab per language or file.
+The tab label is each block's title (the text after the language). Add `dropdown`
+to switch with a menu instead of a tab bar.
+
+<CodeGroup>
+
+```ts TypeScript
+export const greet = (name: string) => `Hello, ${name}`;
+```
+
+```python Python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+```rust Rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}")
+}
+```
+
+</CodeGroup>
+
+````astro
+<CodeGroup>
+
+```ts TypeScript
+export const greet = (name: string) => `Hello, ${name}`;
+```
+
+```python Python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+```rust Rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}")
+}
+```
+
+</CodeGroup>
+````
+
+## Frame
+
+Wrap an image or any visual in a centered, bordered frame with an optional
+`caption` (rendered as Markdown) and `hint`.
+
+<Frame
+  caption="A **framed** illustration."
+  hint="Frames center and caption visuals."
+>
+  <svg
+    width="160"
+    height="72"
+    viewBox="0 0 160 72"
+    role="img"
+    aria-label="Sample frame"
+  >
+    <rect width="160" height="72" rx="8" fill="#3b82f6" />
+  </svg>
+</Frame>
+
+```astro lineNumbers
+<Frame
+  caption="A **framed** illustration."
+  hint="Frames center and caption visuals."
+>
+  <img src="/screenshot.png" alt="Product screenshot" />
+</Frame>
+```
+
+## Color
+
+Show color swatches with copyable hex values — useful for documenting a palette
+or brand colors. Use `variant="compact"` for a swatch list, or `variant="table"`
+with `Color.Row` to group them. Each `Color.Item` takes a `name` and a `value`
+(a hex string, or `{ light, dark }` for theme-aware colors).
+
+<Color variant="compact">
+  <Color.Item name="blue-500" value="#3B82F6" />
+  <Color.Item name="green-500" value="#16A34A" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+
+```astro lineNumbers
+<Color variant="compact">
+  <Color.Item name="blue-500" value="#3B82F6" />
+  <Color.Item name="green-500" value="#16A34A" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+```
+
+## Tree
+
+Render a hierarchical file/folder structure with expandable folders. (For a
+quick, list-driven version see [File tree](#file-tree); `Tree` gives per-folder
+control.) Use `Tree.Folder` (`name`, optional `defaultOpen`, `openable`) and
+`Tree.File` (`name`).
+
+<Tree>
+  <Tree.Folder name="src" defaultOpen>
+    <Tree.File name="index.ts" />
+    <Tree.Folder name="components">
+      <Tree.File name="Button.tsx" />
+    </Tree.Folder>
+  </Tree.Folder>
+  <Tree.File name="blume.config.ts" />
+</Tree>
+
+```astro lineNumbers
+<Tree>
+  <Tree.Folder name="src" defaultOpen>
+    <Tree.File name="index.ts" />
+    <Tree.Folder name="components">
+      <Tree.File name="Button.tsx" />
+    </Tree.Folder>
+  </Tree.Folder>
+  <Tree.File name="blume.config.ts" />
+</Tree>
+```
+
+## Panel
+
+A titled container for supplementary, set-aside content. `title` is optional.
+
+<Panel title="Good to know">
+  Panels hold supporting detail without interrupting the main flow.
+</Panel>
+
+```astro
+<Panel title="Good to know">
+  Panels hold supporting detail without interrupting the main flow.
+</Panel>
+```
+
+## Tooltip
+
+Reveal a definition or hint on hover for an inline term. `tip` is the hover text;
+add an optional `headline` and a `cta` + `href` for a follow-up link.
+
+Hover the <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/quickstart">API</Tooltip> term to learn more.
+
+```astro
+Hover the <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/quickstart">API</Tooltip> term.
+```
+
+## Tile
+
+A clickable preview that leads with a visual — an icon or image — above a title
+and description. Good for galleries and showcases. Takes `title`, `description`,
+and `href`; the child is the visual.
+
+<Tile
+  title="Quickstart"
+  description="Ship your first page in minutes."
+  href="/quickstart"
+>
+  <Icon icon="rocket" size={28} />
+</Tile>
+
+```astro
+<Tile
+  title="Quickstart"
+  description="Ship your first page in minutes."
+  href="/quickstart"
+>
+  <Icon icon="rocket" size={28} />
+</Tile>
+```
+
+## Prompt
+
+A single row with a label and a copy button. The `description` (Markdown) is the
+visible label; the body is the prompt itself — hidden, and copied to the
+clipboard when the **Copy prompt** button is pressed. `actions` controls the
+buttons (e.g. `["copy", "cursor"]`).
+
+<Prompt
+  description="Ask the model to **document** an endpoint."
+  actions={["copy"]}
+>
+  Write reference docs for the POST /v1/pets endpoint.
+</Prompt>
+
+```astro
+<Prompt
+  description="Ask the model to **document** an endpoint."
+  actions={["copy"]}
+>
+  Write reference docs for the POST /v1/pets endpoint.
+</Prompt>
+```
+
+## Visibility
+
+Show or hide content by audience. `for="web"` renders only on the site;
+`for="agents"` targets the generated Markdown (`llms.txt`) that AI agents read.
+
+<Visibility for="web">
+  This note appears on the website but is omitted from the agent-facing
+  Markdown.
+</Visibility>
+
+```astro
+<Visibility for="web">Shown on the site only.</Visibility>
+<Visibility for="agents">Shown only in the generated Markdown.</Visibility>
 ```
 
 ## API reference
@@ -190,7 +461,7 @@ A method-and-path header for an API operation. The method is color-coded by verb
 
 <Endpoint method="POST" path="/v1/pets" />
 
-```mdx
+```astro
 <Endpoint method="POST" path="/v1/pets" />
 ```
 
@@ -211,7 +482,7 @@ description. Pass a `parameters` array.
   ]}
 />
 
-```mdx lineNumbers
+```astro lineNumbers
 <ParameterTable
   parameters={[
     {
@@ -241,7 +512,7 @@ title to “Request”.
 
 </RequestExample>
 
-````mdx
+````astro
 <RequestExample title="Request">
 
 ```json
@@ -270,7 +541,7 @@ label the status, like “201 — Created”.
 
 </ResponseExample>
 
-````mdx
+````astro
 <ResponseExample title="201 — Created">
 
 ```json
@@ -294,10 +565,58 @@ description.
   description="Pass your API key as a bearer token."
 />
 
-```mdx lineNumbers
+```astro lineNumbers
 <AuthMethod
   type="Bearer"
   name="Authorization"
   description="Pass your API key as a bearer token."
 />
+```
+
+### Param field
+
+Document a single request parameter — its name, type, and whether it's required —
+with a description in the body. Identify the parameter with one of `path`,
+`query`, `header`, or `body`, and add `required`, `default`, `placeholder`, or
+`deprecated` as needed.
+
+<ParamField body="name" type="string" required>
+  The pet's name.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum number of results to return.
+</ParamField>
+
+```astro lineNumbers
+<ParamField body="name" type="string" required>
+  The pet's name.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum number of results to return.
+</ParamField>
+```
+
+### Response field
+
+Document a field in an API response — its name, type, and a description —
+optionally marking it `required` or `deprecated`.
+
+<ResponseField name="id" type="string" required>
+  Unique identifier for the created pet.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp of creation.
+</ResponseField>
+
+```astro lineNumbers
+<ResponseField name="id" type="string" required>
+  Unique identifier for the created pet.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp of creation.
+</ResponseField>
 ```

@@ -1,0 +1,135 @@
+---
+import type { Navigation } from "../../core/types.ts";
+import Icon from "../Icon.astro";
+import Search from "./Search.astro";
+
+interface Props {
+  site: { title: string };
+  logo?: {
+    svg?: string;
+    light?: string;
+    dark?: string;
+    alt: string;
+    href: string;
+  } | null;
+  navigation: Navigation;
+  route: string;
+  searchEnabled: boolean;
+  searchProvider: "orama" | "pagefind";
+  // The mobile menu button toggles the docs sidebar drawer; custom pages
+  // without a sidebar (e.g. a landing page) pass `false` to hide it.
+  hasSidebar?: boolean;
+}
+
+const {
+  site,
+  logo,
+  navigation,
+  route,
+  searchEnabled,
+  searchProvider,
+  hasSidebar = true,
+} = Astro.props;
+
+// The logo is resolved upstream: an inline `svg` (so a currentColor mark
+// follows the theme) or image URL(s) for an <img>.
+const logoSvg = logo?.svg;
+const logoLight = logo?.light;
+const logoDark = logo?.dark ?? logo?.light;
+const logoAlt = logo?.alt ?? "";
+const brandHref = logo?.href ?? "/";
+
+const iconButton =
+  "inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+
+// Delegated handlers for the theme toggle, mobile nav drawer, and banner
+// dismiss. Living with the header means every page that renders it — docs pages
+// and custom pages alike — gets identical behavior from one source.
+//
+// Toggling the theme flips colors; without suppressing transitions the animated
+// styles fade while the non-animated ones snap, so we disable all transitions
+// for the swap (next-themes' disableTransitionOnChange trick), force a
+// synchronous style flush, then restore them on the next tick.
+const clickScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";const s=document.createElement("style");s.appendChild(document.createTextNode("*,*::before,*::after{transition:none!important}"));document.head.appendChild(s);d.dataset.theme=next;localStorage.setItem("blume-theme",next);window.getComputedStyle(d).opacity;setTimeout(()=>document.head.removeChild(s),1);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}const b=e.target.closest("[data-blume-banner-dismiss]");if(b){const bar=b.closest("[data-blume-banner]");const k=bar&&bar.getAttribute("data-banner-key");if(k){localStorage.setItem("blume-banner:"+k,"1");}document.documentElement.setAttribute("data-blume-banner-hidden","");}});`;
+---
+
+<header
+  class="sticky top-0 z-40 flex h-16 items-center gap-3 bg-background/90 px-4 backdrop-blur md:px-6"
+>
+  {
+    hasSidebar && (
+      <button
+        aria-label="Toggle navigation"
+        class={`${iconButton} lg:hidden`}
+        data-blume-nav-toggle
+        type="button"
+      >
+        <Icon name="menu" size={20} />
+      </button>
+    )
+  }
+  <a
+    class="inline-flex items-center gap-2 font-semibold text-base text-foreground"
+    href={brandHref}
+  >
+    {
+      logoSvg && (
+        <span
+          aria-hidden="true"
+          class="inline-flex h-5 items-center [&>svg]:h-5 [&>svg]:w-auto"
+          set:html={logoSvg}
+        />
+      )
+    }
+    {
+      !logoSvg &&
+        logoLight &&
+        (logoLight === logoDark ? (
+          <img alt={logoAlt} class="h-5 w-auto" src={logoLight} />
+        ) : (
+          <>
+            <img alt={logoAlt} class="h-5 w-auto dark:hidden" src={logoLight} />
+            <img
+              alt={logoAlt}
+              class="hidden h-5 w-auto dark:block"
+              src={logoDark}
+            />
+          </>
+        ))
+    }
+    {site.title}
+  </a>
+  {
+    navigation.tabs.length > 0 && (
+      <nav aria-label="Sections" class="hidden gap-1 md:flex">
+        {navigation.tabs.map((tab) => (
+          <a
+            aria-current={
+              route === tab.path ||
+              (tab.path !== "/" && route.startsWith(tab.path))
+                ? "page"
+                : undefined
+            }
+            class="rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground"
+            href={tab.path}
+          >
+            {tab.label}
+          </a>
+        ))}
+      </nav>
+    )
+  }
+  <div class="flex-1"></div>
+  <slot name="ask" />
+  {searchEnabled && <Search provider={searchProvider} />}
+  <button
+    aria-label="Toggle color theme"
+    class={iconButton}
+    data-blume-theme-toggle
+    type="button"
+  >
+    <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
+    <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
+  </button>
+</header>
+<script is:inline set:html={clickScript} />

@@ -8,7 +8,7 @@ interface Props {
 }
 
 const {
-  borderBottom = false,
+  borderBottom = true,
   defaultTabIndex = 0,
   dropdown = false,
   hash = true,
@@ -24,16 +24,18 @@ const {
   data-hash={hash ? "true" : "false"}
   data-sync={sync ? "true" : "false"}
 >
-  <div
-    class:list={[
-      dropdown || borderBottom ? "border-border border-b" : "",
-      dropdown ? "p-3" : "flex gap-4 overflow-x-auto px-3",
-    ]}
-    data-blume-tablist
-    role={dropdown ? undefined : "tablist"}
-  >
+  <div class:list={[dropdown ? "" : "overflow-x-auto"]}>
+    <div
+      class:list={[
+        dropdown || borderBottom ? "border-border border-b" : "",
+        dropdown ? "p-3" : "flex gap-4 px-3",
+      ]}
+      data-blume-tablist
+      role={dropdown ? undefined : "tablist"}
+    >
+    </div>
   </div>
-  <div>
+  <div data-blume-tab-content>
     <slot />
   </div>
 </blume-tabs>
@@ -72,10 +74,28 @@ const {
     #select: HTMLSelectElement | null = null;
 
     connectedCallback() {
-      const panels = Array.from(
+      const list = this.querySelector<HTMLElement>("[data-blume-tablist]");
+      let panels = Array.from(
         this.querySelectorAll<HTMLElement>("[data-blume-tab-panel]")
       );
-      const list = this.querySelector<HTMLElement>("[data-blume-tablist]");
+      // CodeGroup passes raw code fences instead of <Tab> elements, so adopt
+      // the content wrapper's direct code blocks as panels. The tab label comes
+      // from each block's title (the text after the language in the fence).
+      if (panels.length === 0) {
+        const wrapper = this.querySelector<HTMLElement>(
+          ":scope > [data-blume-tab-content]"
+        );
+        const blocks = wrapper
+          ? Array.from(wrapper.children).filter(
+              (child): child is HTMLElement =>
+                child instanceof HTMLElement && child.matches("pre, figure")
+            )
+          : [];
+        for (const block of blocks) {
+          block.setAttribute("data-blume-tab-panel", "");
+        }
+        panels = blocks;
+      }
       if (!list || panels.length === 0) {
         return;
       }

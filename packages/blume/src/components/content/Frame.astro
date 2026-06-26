@@ -32,7 +32,9 @@ const captionHtml = caption
         </p>
       )
     }
-    <div class="overflow-hidden rounded-blume border border-border bg-background">
+    <div
+      class="flex justify-center overflow-hidden rounded-blume border border-border bg-muted/30 p-6 [&>:first-child]:m-0! [&_img]:h-auto [&_img]:max-w-full [&_video]:h-auto [&_video]:max-w-full"
+    >
       <slot />
     </div>
     {

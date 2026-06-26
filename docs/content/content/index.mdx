@@ -87,11 +87,19 @@ Every page has a **type**, set with the `type` frontmatter field (default
 title: v1.2.0
 type: changelog
 date: 2026-06-20
+changelog:
+  version: 1.2.0
+  category: Features
 ---
 ```
 
 The type is independent of where the file lives, but by convention blog posts
 go under `blog/` and changelog entries under `changelog/`.
+
+Changelog entries are also collected into a generated **`/changelog`** timeline —
+each one rendered newest-first with its date, version, and `category` in a left
+rail beside its content. The page appears automatically once you have at least
+one `type: changelog` entry (and nothing already occupies the `/changelog` route).
 
 ## Feeds
 

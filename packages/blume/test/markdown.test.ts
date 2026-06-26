@@ -509,14 +509,13 @@ describe(rewriteMintlifyUserVariable, () => {
 });
 
 describe(mermaidPlugin, () => {
-  it("turns Mermaid code fences into the Mermaid component", () => {
+  it("turns mermaid code fences into a blume-mermaid element", () => {
     const plugin = mermaidPlugin();
     let replacement: unknown;
 
     plugin.code(
       {
         lang: "mermaid",
-        meta: 'placement="top-left" actions={false}',
         type: "code",
         value: "flowchart LR\n  A --> B",
       },
@@ -530,23 +529,18 @@ describe(mermaidPlugin, () => {
     expect(replacement).toStrictEqual({
       attributes: [
         {
-          name: "code",
+          name: "class",
+          type: "mdxJsxAttribute",
+          value: "not-prose my-6 flex justify-center overflow-x-auto",
+        },
+        {
+          name: "data-source",
           type: "mdxJsxAttribute",
           value: "flowchart LR\n  A --> B",
         },
-        {
-          name: "placement",
-          type: "mdxJsxAttribute",
-          value: "top-left",
-        },
-        {
-          name: "actions",
-          type: "mdxJsxAttribute",
-          value: "false",
-        },
       ],
       children: [],
-      name: "Mermaid",
+      name: "blume-mermaid",
       type: "mdxJsxFlowElement",
     });
   });

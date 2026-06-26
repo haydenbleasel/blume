@@ -6,13 +6,14 @@ interface RssMetadata {
 
 interface Props {
   description?: string;
+  id?: string;
   label?: string;
   rss?: RssMetadata;
   tags?: string[] | string;
   title?: string;
 }
 
-const { description, label, rss, tags, title } = Astro.props;
+const { description, id: providedId, label, rss, tags, title } = Astro.props;
 const slugify = (text: string): string =>
   text
     .toLowerCase()
@@ -22,7 +23,7 @@ const slugify = (text: string): string =>
     .replaceAll(/-+/gu, "-")
     .replaceAll(/^-|-$/gu, "");
 const updateLabel = label ?? title ?? "Update";
-const id = slugify(updateLabel) || "update";
+const id = providedId ?? (slugify(updateLabel) || "update");
 const tagList = Array.isArray(tags) ? tags : tags ? [tags] : [];
 ---
 
@@ -42,7 +43,7 @@ const tagList = Array.isArray(tags) ? tags : tags ? [tags] : [];
     </a>
     {
       description && (
-        <p class="mt-1 mb-0 text-muted-foreground text-xs leading-5">
+        <p class="mt-1! mb-0! text-muted-foreground text-xs leading-5">
           {description}
         </p>
       )
@@ -59,7 +60,7 @@ const tagList = Array.isArray(tags) ? tags : tags ? [tags] : [];
       )
     }
   </header>
-  <div class="min-w-0 text-muted-foreground text-sm leading-6 [&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h2]:mt-0 [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:font-semibold [&_h3]:text-foreground [&_img]:rounded-blume [&_li]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0">
+  <div class="min-w-0 text-muted-foreground text-sm leading-6 [&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h2]:mt-0! [&_h2]:border-t-0! [&_h2]:pt-0! [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:font-semibold [&_h3]:text-foreground [&_img]:rounded-blume [&_li]:my-1 [&_p:first-child]:mt-0! [&_p:last-child]:mb-0!">
     <slot />
   </div>
 </article>

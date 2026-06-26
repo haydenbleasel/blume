@@ -57,8 +57,9 @@ export interface BlumeMdxOptions {
 
 /**
  * Sätteri MDX processor: Blume's feature set plus the MDAST plugins that target
- * components — `package-install` → package-manager tabs and `:::note` →
- * `<Callout>`. Used as the `processor` for `@astrojs/mdx` so these apply to
+ * components — `package-install` → package-manager tabs, `:::note` →
+ * `<Callout>`, and ` ```mermaid ` → a `<blume-mermaid>` element. Used as the
+ * `processor` for `@astrojs/mdx` so these apply to
  * `.mdx` only (plain `.md` uses {@link blumeMarkdownProcessor}). Math is opt-in
  * via config since `$` is common in prose and code.
  *

@@ -1,17 +1,12 @@
 ---
 import { createSatteriMarkdownProcessor } from "@astrojs/markdown-satteri";
 
-import Icon from "../Icon.astro";
-
 interface Props {
   actions?: boolean | string | string[];
   description: string;
-  icon?: string;
-  iconType?: string;
 }
 
-const { actions = ["copy"], description, icon = "copy" } = Astro.props;
-const { iconType } = Astro.props;
+const { actions = ["copy"], description } = Astro.props;
 
 const escapeRawHtml = (value: string): string =>
   value.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -39,46 +34,41 @@ const renderedDescription = await markdownProcessor.render(
 );
 const descriptionHtml = unwrapParagraph(renderedDescription.code);
 
-const actionButton =
-  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-background px-3 font-medium text-muted-foreground text-xs transition hover:border-accent hover:text-accent";
+const primaryButton =
+  "inline-flex h-8 cursor-pointer items-center rounded-lg bg-accent px-3.5 font-medium text-accent-foreground text-xs transition hover:bg-accent/90";
+const secondaryButton =
+  "inline-flex h-8 cursor-pointer items-center rounded-lg border border-border bg-background px-3.5 font-medium text-muted-foreground text-xs transition hover:border-accent hover:text-accent";
 ---
 
 <blume-prompt
-  class="not-prose my-6 block overflow-hidden rounded-blume border border-border bg-background"
+  class="not-prose my-6 block rounded-blume border border-border bg-muted/30"
 >
-  <div
-    class="flex flex-col gap-3 border-border border-b bg-muted/30 p-4 sm:flex-row sm:items-start sm:justify-between"
-  >
-    <div class="flex min-w-0 items-start gap-2 text-muted-foreground text-sm">
-      <Icon class="mt-0.5 shrink-0" iconType={iconType} name={icon} size={16} />
-      <p
-        class="m-0 min-w-0 [&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_strong]:font-semibold [&_strong]:text-foreground"
-        data-blume-prompt-description
-        set:html={descriptionHtml}
-      />
-    </div>
+  <div class="flex items-center justify-between gap-3 px-4 py-3">
+    <p
+      class="m-0! min-w-0 text-foreground text-sm [&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_strong]:font-semibold [&_strong]:text-foreground"
+      data-blume-prompt-description
+      set:html={descriptionHtml}
+    />
     {
       enabledActions.size > 0 && (
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
+        <div class="flex shrink-0 items-center gap-2">
           {enabledActions.has("copy") && (
             <button
               aria-label="Copy prompt"
-              class={actionButton}
+              class={primaryButton}
               data-blume-prompt-copy
               type="button"
             >
-              <Icon name="copy" size={14} />
               <span data-blume-prompt-copy-label>Copy prompt</span>
             </button>
           )}
           {enabledActions.has("cursor") && (
             <a
               aria-label="Open prompt in Cursor"
-              class={actionButton}
+              class={secondaryButton}
               data-blume-prompt-cursor
               href="cursor://anysphere.cursor-deeplink/prompt"
             >
-              <Icon name="external-link" size={14} />
               Open in Cursor
             </a>
           )}
@@ -86,15 +76,8 @@ const actionButton =
       )
     }
   </div>
-  <div
-    class="p-4"
-    data-blume-prompt-content
-  >
-    <div
-      class="rounded-blume bg-muted p-3 font-mono text-foreground text-sm leading-6 [&>:first-child]:mt-0 [&>:last-child]:mb-0"
-    >
-      <slot />
-    </div>
+  <div data-blume-prompt-content hidden>
+    <slot />
   </div>
 </blume-prompt>
 
@@ -104,7 +87,7 @@ const actionButton =
       const content = this.querySelector<HTMLElement>(
         "[data-blume-prompt-content]"
       );
-      const promptText = () => content?.innerText.trim() ?? "";
+      const promptText = () => content?.textContent?.trim() ?? "";
 
       const cursor = this.querySelector<HTMLAnchorElement>(
         "[data-blume-prompt-cursor]"

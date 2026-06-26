@@ -27,14 +27,8 @@ const canRenderIcon =
   <span class:list={[markerClass, !canRenderIcon && "before:[content:counter(blume-step)]"]}>
     {canRenderIcon && <Icon iconType={iconType} name={icon} size={14} />}
   </span>
-  {
-    title && (
-      <p class="mb-1.5 font-semibold text-[length:var(--blume-step-title-size,1rem)] leading-[var(--blume-step-title-line-height,1.75rem)]">
-        {title}
-      </p>
-    )
-  }
-  <div class="[&>:first-child]:mt-0 [&>:last-child]:mb-0">
+  {title && <p class="mb-1.5 font-semibold">{title}</p>}
+  <div class="[&>:first-child]:mt-0! [&>:last-child]:mb-0!">
     <slot />
   </div>
 </div>

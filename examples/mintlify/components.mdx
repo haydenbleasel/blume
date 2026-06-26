@@ -29,17 +29,29 @@ Imported variables from an MDX snippet: **{packageName}** installs with <code>{i
 
 Inline math renders when `styling.latex` is enabled: $E = mc^2$.
 
-<Note title="Note">Supplemental information.</Note>
+:::note[Note]
+Supplemental information.
+:::
 
-<Info title="Info">Helpful context.</Info>
+:::info[Info]
+Helpful context.
+:::
 
-<Tip title="Tip">Recommended path.</Tip>
+:::tip[Tip]
+Recommended path.
+:::
 
-<Warning title="Warning">Potentially risky action.</Warning>
+:::warning[Warning]
+Potentially risky action.
+:::
 
-<Check title="Check">Successful outcome.</Check>
+:::success[Check]
+Successful outcome.
+:::
 
-<Danger title="Danger">Destructive action.</Danger>
+:::danger[Danger]
+Destructive action.
+:::
 
 <Callout type="info" title="Custom callout" icon="key" iconType="regular">
   A callout with explicit type, icon, and iconType props.
@@ -57,19 +69,6 @@ Inline math renders when `styling.latex` is enabled: $E = mc^2$.
 >
   A callout with a custom SVG icon prop.
 </Callout>
-
-<Banner title="Banner" type="warning">
-  Banner component usage inside MDX.
-</Banner>
-
-<Banner
-  title="Dismissible banner"
-  type="info"
-  dismissible
-  color={{ light: "#2563EB", dark: "#1D4ED8" }}
->
-  This banner uses custom colors and can be dismissed.
-</Banner>
 
 Status <Badge icon="circle-check" color="green" tooltip="Current release">stable</Badge>
 
@@ -92,8 +91,8 @@ Status <Badge icon="circle-check" color="green" tooltip="Current release">stable
   custom svg
 </Badge>
 
-<AccordionGroup>
-  <Accordion
+<Accordion>
+  <AccordionItem
     id="first-accordion"
     title="First accordion"
     description="Uses Mintlify props"
@@ -101,9 +100,11 @@ Status <Badge icon="circle-check" color="green" tooltip="Current release">stable
     defaultOpen
   >
     Accordion content renders inside a native disclosure.
-  </Accordion>
-  <Accordion title="Second accordion">More accordion content.</Accordion>
-</AccordionGroup>
+  </AccordionItem>
+  <AccordionItem title="Second accordion">
+    More accordion content.
+  </AccordionItem>
+</Accordion>
 
 <Tabs defaultTabIndex={1} borderBottom sync={false}>
   <Tab id="npm-install" title="JavaScript" icon="leaf">
@@ -272,22 +273,7 @@ flowchart LR
 </Tooltip>
 documentation helps developers understand how to integrate with your service.
 
-<Update
-  label="June 2026"
-  description="v0.2.0"
-  tags={["Blume", "Docs"]}
-  rss={{
-    title: "June 2026 - Blume docs compatibility",
-    description: "Mintlify-style update metadata renders in Blume."
-  }}
->
-  ## Compatibility update
-
-Product update content.
-
-</Update>
-
-<View title="JavaScript" icon="js">
+<Panel title="JavaScript">
   ## JavaScript setup
 
 JavaScript-only view content.
@@ -296,9 +282,9 @@ JavaScript-only view content.
 console.log("Hello from JavaScript");
 ```
 
-</View>
+</Panel>
 
-<View title="Python" icon="python">
+<Panel title="Python">
   ## Python setup
 
 Python-only view content.
@@ -307,7 +293,7 @@ Python-only view content.
 print("Hello from Python")
 ```
 
-</View>
+</Panel>
 
 <Visibility for="web">Content visible on the web output.</Visibility>
 

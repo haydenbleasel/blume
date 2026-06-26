@@ -45,6 +45,27 @@ for every page, in dev and production, with no configuration.
 Nested routes work the same way (`/content/syntax.md`), and the home page is
 served at `/index.md`.
 
+## Copy as Markdown
+
+Every page carries a **Copy as Markdown** action — in the [page
+actions](/content/navigation#page-actions) beneath the table of contents — that copies the
+page's raw Markdown to the clipboard. It's the same source served at the [`.md`
+URL](#raw-markdown) above, ready to paste into an LLM, an issue, or your notes.
+It's available on every page, in dev and production, with no configuration.
+
+## Open in chat
+
+The **Open in chat** action opens the current page in an AI assistant — v0,
+ChatGPT, Claude, T3 Chat, Scira, or Cursor — pre-filled with a prompt that points
+it at the page's raw Markdown so it can answer questions about what you're
+reading:
+
+> Read `https://your-site/this-page.md` so I can ask you questions about this
+> page.
+
+Like Copy as Markdown, it needs no setup. The assistant fetches the page over its
+public URL, so it works as soon as the page is deployed.
+
 ## Ask AI
 
 Add an assistant that answers reader questions in an in-page chat panel, backed

@@ -1362,7 +1362,6 @@ describe("MDX component template", () => {
     const output = catchAllPageTemplate({
       askEnabled: false,
       mathEnabled: false,
-      mermaidEnabled: false,
     });
 
     expect(output).toContain(
@@ -1372,53 +1371,33 @@ describe("MDX component template", () => {
       "const Tree = Object.assign(TreeRoot, { File: TreeFile, Folder: TreeFolder });"
     );
     for (const name of [
-      "AccordionGroup",
-      "Banner",
+      "AccordionItem",
       "CodeGroup",
       "Panel",
       "ParamField",
       "Prompt",
       "ResponseField",
       "Tile",
-      "View",
       "Visibility",
     ]) {
       expect(output).toContain(`  ${name},`);
     }
-    expect(output).not.toContain(
-      'import Mermaid from "blume/components/content/Mermaid.astro"'
-    );
   });
 
   it("keeps the docs catch-all prerendered", () => {
     const output = catchAllPageTemplate({
       askEnabled: false,
       mathEnabled: false,
-      mermaidEnabled: false,
     });
 
     expect(output).toContain("export const prerender = true");
     expect(output).not.toContain("Astro.request.headers");
   });
 
-  it("registers Mermaid only when enabled", () => {
-    const output = catchAllPageTemplate({
-      askEnabled: false,
-      mathEnabled: false,
-      mermaidEnabled: true,
-    });
-
-    expect(output).toContain(
-      'import Mermaid from "blume/components/content/Mermaid.astro"'
-    );
-    expect(output).toContain("  Mermaid,");
-  });
-
   it("passes global banner config to the root layout", () => {
     const output = catchAllPageTemplate({
       askEnabled: false,
       mathEnabled: false,
-      mermaidEnabled: false,
     });
 
     expect(output).toContain("banner={data.config.banner}");

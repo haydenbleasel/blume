@@ -3,10 +3,10 @@ import type { Heading, Navigation } from "../../core/types.ts";
 import "blume:theme";
 import Icon from "../Icon.astro";
 import { buildStructuredData } from "../../seo/jsonld.ts";
+import Header from "./Header.astro";
 import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
 import PageActions from "./PageActions.astro";
-import Search from "./Search.astro";
 
 interface Props {
   site: { title: string; description?: string };
@@ -26,6 +26,7 @@ interface Props {
   navigation: Navigation;
   page: { title: string; description?: string; route: string };
   headings: Heading[];
+  imageZoom?: boolean;
   themeMode: "system" | "light" | "dark";
   searchEnabled: boolean;
   searchProvider: "orama" | "pagefind";
@@ -50,6 +51,7 @@ const {
   navigation,
   page,
   headings,
+  imageZoom = true,
   themeMode,
   searchEnabled,
   searchProvider,
@@ -70,14 +72,6 @@ const {
 const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
 const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
 const description = page.description ?? site.description;
-
-// The logo is resolved upstream: an inline `svg` (so a currentColor mark
-// follows the theme) or image URL(s) for an <img>.
-const logoSvg = logo?.svg;
-const logoLight = logo?.light;
-const logoDark = logo?.dark ?? logo?.light;
-const logoAlt = logo?.alt ?? "";
-const brandHref = logo?.href ?? "/";
 
 const crumbs = findBreadcrumbs(navigation.sidebar, page.route);
 const { prev, next } = getPagination(
@@ -106,15 +100,7 @@ const structuredDataJson = structuredData
   ? JSON.stringify(structuredData).replaceAll("<", "\\u003c")
   : null;
 
-const iconButton =
-  "inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
-
 const initialThemeScript = `(()=>{const m=${JSON.stringify(themeMode)};const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);})();`;
-// Toggling the theme flips colors; without suppressing transitions the
-// animated styles fade while the non-animated ones snap, so we disable all
-// transitions for the swap (next-themes' disableTransitionOnChange trick),
-// force a synchronous style flush, then restore them on the next tick.
-const toggleScript = `document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";const s=document.createElement("style");s.appendChild(document.createTextNode("*,*::before,*::after{transition:none!important}"));document.head.appendChild(s);d.dataset.theme=next;localStorage.setItem("blume-theme",next);window.getComputedStyle(d).opacity;setTimeout(()=>document.head.removeChild(s),1);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){document.documentElement.toggleAttribute("data-blume-nav-open");}const b=e.target.closest("[data-blume-banner-dismiss]");if(b){const bar=b.closest("[data-blume-banner]");const k=bar&&bar.getAttribute("data-banner-key");if(k){localStorage.setItem("blume-banner:"+k,"1");}document.documentElement.setAttribute("data-blume-banner-hidden","");}});`;
 
 // Pre-paint: hide a previously-dismissed banner before it flashes in.
 const bannerScript = banner?.dismissible
@@ -164,7 +150,10 @@ const bannerScript = banner?.dismissible
     {bannerScript && <script is:inline set:html={bannerScript} />}
     <script is:inline set:html={initialThemeScript} />
   </head>
-  <body class="bg-background font-sans text-foreground antialiased">
+  <body
+    class="bg-background font-sans text-foreground antialiased"
+    data-blume-image-zoom={imageZoom ? "" : undefined}
+  >
     <a
       class="absolute left-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:left-0"
       href="#blume-content">Skip to content</a
@@ -172,7 +161,7 @@ const bannerScript = banner?.dismissible
     {
       banner && (
         <div
-          class="relative flex items-center justify-center gap-x-2 gap-y-0.5 bg-foreground px-10 py-3 text-center text-background text-sm max-sm:flex-wrap [:where([data-blume-banner-hidden])_&]:hidden"
+          class="relative flex items-center justify-center gap-x-2 gap-y-0.5 bg-foreground px-10 py-3 text-center text-background text-sm max-sm:flex-wrap dark:border-border dark:border-b dark:bg-background dark:text-foreground [:where([data-blume-banner-hidden])_&]:hidden"
           data-banner-key={banner.key}
           data-blume-banner
         >
@@ -189,7 +178,7 @@ const bannerScript = banner?.dismissible
           {banner.dismissible && (
             <button
               aria-label="Dismiss announcement"
-              class="absolute right-1.5 inline-flex size-7 items-center justify-center rounded-full text-background/80 transition-colors hover:bg-white/10 hover:text-background"
+              class="absolute right-1.5 inline-flex size-7 items-center justify-center rounded-full text-background/80 transition-colors hover:bg-white/10 hover:text-background dark:text-foreground/70 dark:hover:bg-foreground/10 dark:hover:text-foreground"
               data-blume-banner-dismiss
               type="button"
             >
@@ -199,76 +188,16 @@ const bannerScript = banner?.dismissible
         </div>
       )
     }
-    <header
-      class="sticky top-0 z-40 flex h-16 items-center gap-3 bg-background/90 px-4 backdrop-blur md:px-6"
+    <Header
+      logo={logo}
+      navigation={navigation}
+      route={page.route}
+      searchEnabled={searchEnabled}
+      searchProvider={searchProvider}
+      site={site}
     >
-      <button
-        aria-label="Toggle navigation"
-        class={`${iconButton} lg:hidden`}
-        data-blume-nav-toggle
-        type="button"
-      >
-        <Icon name="menu" size={20} />
-      </button>
-      <a
-        class="inline-flex items-center gap-2 font-semibold text-base text-foreground"
-        href={brandHref}
-      >
-        {
-          logoSvg && (
-            <span
-              aria-hidden="true"
-              class="inline-flex h-5 items-center [&>svg]:h-5 [&>svg]:w-auto"
-              set:html={logoSvg}
-            />
-          )
-        }
-        {
-          !logoSvg &&
-            logoLight &&
-            (logoLight === logoDark ? (
-              <img alt={logoAlt} class="h-5 w-auto" src={logoLight} />
-            ) : (
-              <>
-                <img alt={logoAlt} class="h-5 w-auto dark:hidden" src={logoLight} />
-                <img
-                  alt={logoAlt}
-                  class="hidden h-5 w-auto dark:block"
-                  src={logoDark}
-                />
-              </>
-            ))
-        }
-        {site.title}
-      </a>
-      {
-        navigation.tabs.length > 0 && (
-          <nav aria-label="Sections" class="hidden gap-1 md:flex">
-            {navigation.tabs.map((tab) => (
-              <a
-                aria-current={
-                  page.route === tab.path ||
-                  (tab.path !== "/" && page.route.startsWith(tab.path))
-                    ? "page"
-                    : undefined
-                }
-                class="rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground"
-                href={tab.path}
-              >
-                {tab.label}
-              </a>
-            ))}
-          </nav>
-        )
-      }
-      <div class="flex-1"></div>
-      <slot name="ask" />
-      {searchEnabled && <Search provider={searchProvider} />}
-      <button aria-label="Toggle color theme" class={iconButton} data-blume-theme-toggle type="button">
-        <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
-        <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
-      </button>
-    </header>
+      <slot name="ask" slot="ask" />
+    </Header>
     <div class="mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_16rem]">
       <aside
         aria-label="Primary"
@@ -293,6 +222,32 @@ const bannerScript = banner?.dismissible
                 <span>{eyebrowCrumb.label}</span>
               )}
             </nav>
+          )
+        }
+        {
+          tocHeadings.length > 0 && (
+            <details class="group mx-auto mb-6 max-w-[42rem] rounded-blume border border-border xl:hidden">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-medium text-foreground text-sm [&::-webkit-details-marker]:hidden">
+                <span>On this page</span>
+                <Icon
+                  class="text-muted-foreground transition-transform group-open:rotate-180"
+                  name="chevron-down"
+                  size={16}
+                />
+              </summary>
+              <ul class="m-0 list-none border-border border-t p-2">
+                {tocHeadings.map((heading) => (
+                  <li style={`padding-left:${(heading.depth - 2) * 0.75}rem`}>
+                    <a
+                      class="block rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:text-foreground"
+                      href={`#${heading.slug}`}
+                    >
+                      {heading.text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )
         }
         <article class="prose mx-auto max-w-[42rem]">
@@ -375,9 +330,11 @@ const bannerScript = banner?.dismissible
       data-blume-nav-toggle
       type="button"
     ></button>
-    <script is:inline set:html={toggleScript} />
     <script>
       import { icons } from "../../theme/icons.ts";
+      // Registers the <blume-mermaid> custom element (emitted by ```mermaid
+      // fences). Mermaid itself is lazy-loaded only on pages that use a diagram.
+      import "../content/mermaid-element.ts";
 
       const svg = (name: string) =>
         `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
@@ -442,6 +399,116 @@ const bannerScript = banner?.dismissible
           }, 1500);
         });
         pre.appendChild(button);
+      }
+
+      // Click-to-zoom for content images (gated by `markdown.imageZoom`).
+      // Enhances every `.prose img` so plain Markdown images open in a lightbox.
+      // Opt out per-image with `data-no-zoom`.
+      const zoomImages: Iterable<HTMLImageElement> =
+        document.body.hasAttribute("data-blume-image-zoom")
+          ? document.querySelectorAll<HTMLImageElement>(
+              ".prose img:not([data-no-zoom])"
+            )
+          : [];
+      const zoomTargets = Array.from(zoomImages);
+      if (zoomTargets.length > 0) {
+        const reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)"
+        ).matches;
+        let active: {
+          clone: HTMLImageElement;
+          original: HTMLImageElement;
+          overlay: HTMLElement;
+        } | null = null;
+
+        const closeZoom = () => {
+          if (!active) {
+            return;
+          }
+          const { clone, original, overlay } = active;
+          active = null;
+          overlay.style.opacity = "0";
+          clone.style.transform = "translate(0px, 0px) scale(1)";
+          const cleanup = () => {
+            overlay.remove();
+            original.style.visibility = "";
+            document.removeEventListener("keydown", onKey);
+            window.removeEventListener("scroll", closeZoom);
+          };
+          if (reduceMotion) {
+            cleanup();
+          } else {
+            clone.addEventListener("transitionend", cleanup, { once: true });
+          }
+        };
+
+        const onKey = (event: KeyboardEvent) => {
+          if (event.key === "Escape") {
+            closeZoom();
+          }
+        };
+
+        const openZoom = (image: HTMLImageElement) => {
+          if (active) {
+            return;
+          }
+          const start = image.getBoundingClientRect();
+          if (start.width === 0 || start.height === 0) {
+            return;
+          }
+
+          const overlay = document.createElement("div");
+          overlay.className =
+            "fixed inset-0 z-[100] flex cursor-zoom-out items-center justify-center bg-background/80 opacity-0 backdrop-blur-sm transition-opacity duration-300";
+
+          const clone = image.cloneNode(true) as HTMLImageElement;
+          clone.className = "absolute m-0 max-w-none rounded-blume shadow-2xl";
+          clone.style.top = `${start.top}px`;
+          clone.style.left = `${start.left}px`;
+          clone.style.width = `${start.width}px`;
+          clone.style.height = `${start.height}px`;
+          clone.style.transformOrigin = "top left";
+          if (!reduceMotion) {
+            clone.style.transition =
+              "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)";
+          }
+
+          overlay.appendChild(clone);
+          document.body.appendChild(overlay);
+          image.style.visibility = "hidden";
+          active = { clone, original: image, overlay };
+
+          const margin = 0.92;
+          const ratio = start.width / start.height;
+          let targetWidth = window.innerWidth * margin;
+          let targetHeight = targetWidth / ratio;
+          if (targetHeight > window.innerHeight * margin) {
+            targetHeight = window.innerHeight * margin;
+            targetWidth = targetHeight * ratio;
+          }
+          const naturalWidth = image.naturalWidth || targetWidth;
+          if (targetWidth > naturalWidth) {
+            targetWidth = naturalWidth;
+            targetHeight = targetWidth / ratio;
+          }
+          const scale = targetWidth / start.width;
+          const dx = (window.innerWidth - targetWidth) / 2 - start.left;
+          const dy = (window.innerHeight - targetHeight) / 2 - start.top;
+
+          requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+            clone.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+          });
+
+          overlay.addEventListener("click", closeZoom);
+          document.addEventListener("keydown", onKey);
+          window.addEventListener("scroll", closeZoom, { passive: true });
+        };
+
+        for (const image of zoomTargets) {
+          image.classList.add("cursor-zoom-in");
+          image.addEventListener("click", () => openZoom(image));
+        }
       }
     </script>
   </body>

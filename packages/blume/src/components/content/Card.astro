@@ -50,7 +50,7 @@ const variantClass = {
 
 <Tag
   class:list={[
-    "not-prose block overflow-hidden rounded-blume border text-inherit no-underline transition-colors hover:no-underline hover:[&[href]]:border-accent",
+    "not-prose block overflow-hidden rounded-blume border text-inherit no-underline! transition-colors hover:no-underline! hover:[&[href]]:border-accent",
     type ? variantClass : "border-border bg-background",
     isHorizontal ? "sm:flex" : "",
   ]}
@@ -81,7 +81,7 @@ const variantClass = {
   }
   {
     title && (
-      <p class="mb-1.5 flex items-center gap-1.5 font-medium">
+      <p class="mt-0! mb-1.5! flex items-center gap-1.5 font-medium">
         {title}
         {showArrow && (
           <Icon class="text-muted-foreground" name="arrow-right" size={14} />
@@ -89,12 +89,12 @@ const variantClass = {
       </p>
     )
   }
-  <div class="font-normal text-muted-foreground text-sm [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+  <div class="font-normal text-muted-foreground text-sm [&>:first-child]:mt-0! [&>:last-child]:mb-0!">
     <slot />
   </div>
   {
     cta && (
-      <p class="mt-4 mb-0 flex items-center gap-1.5 font-medium text-accent text-sm">
+      <p class="mt-4! mb-0! flex items-center gap-1.5 font-medium text-accent text-sm">
         {cta}
         {showArrow && <Icon name="arrow-right" size={14} />}
       </p>
