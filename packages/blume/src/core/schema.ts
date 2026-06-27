@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { FONT_SLUGS, isFontSlug } from "../theme/fonts.ts";
+
 /**
  * Public Blume schemas.
  *
@@ -178,6 +180,8 @@ const pageMetaBaseSchema = z
     icon: iconName.optional(),
     iconType: z.string().optional(),
     keywords: z.array(z.string()).optional(),
+    /** Overrides the git-derived last-modified date when `lastModified` is on. */
+    lastModified: dateSchema.optional(),
     mode: z.string().optional(),
     noindex: z.boolean().default(false),
     public: z.boolean().optional(),
@@ -404,25 +408,10 @@ const variablesConfigSchema = z
   .record(z.string().regex(/^[A-Za-z0-9-]+$/u), z.string())
   .default({});
 
-const fontConfigSchema = z
-  .object({
-    family: z.string().optional(),
-    format: z.enum(["woff", "woff2"]).optional(),
-    source: z.string().optional(),
-    weight: z.number().optional(),
-  })
-  .strict();
-
-const themeFontsConfigSchema = z
-  .object({
-    body: fontConfigSchema.optional(),
-    family: z.string().optional(),
-    format: z.enum(["woff", "woff2"]).optional(),
-    heading: fontConfigSchema.optional(),
-    source: z.string().optional(),
-    weight: z.number().optional(),
-  })
-  .strict();
+/** A curated Google Font slug (see `theme/fonts.ts`). */
+const fontSlug = z.string().refine(isFontSlug, (value) => ({
+  message: `Unknown font "${value}". Supported fonts: ${FONT_SLUGS.join(", ")}.`,
+}));
 
 const themeConfigSchema = z
   .object({
@@ -434,7 +423,14 @@ const themeConfigSchema = z
     backgroundDecoration: z.enum(["gradient", "grid", "windows"]).optional(),
     backgroundImage: z.string().optional(),
     backgroundImageDark: z.string().optional(),
-    fonts: themeFontsConfigSchema.default({}),
+    fonts: z
+      .object({
+        body: fontSlug.default("inter"),
+        display: fontSlug.default("inter-tight"),
+        mono: fontSlug.default("ibm-plex-mono"),
+      })
+      .strict()
+      .default({}),
     layout: z.enum(["sidebar"]).default("sidebar"),
     mode: z.enum(["system", "light", "dark"]).default("system"),
     radius: z.enum(["none", "sm", "md", "lg"]).default("md"),
@@ -448,18 +444,91 @@ const iconsConfigSchema = z
   })
   .strict();
 
+/** Public credentials for the Algolia search backend (sync key is an env var). */
+const algoliaSearchSchema = z
+  .object({
+    appId: z.string(),
+    indexName: z.string(),
+    searchApiKey: z.string(),
+  })
+  .strict();
+
+/** Public credentials for the Orama Cloud search backend. */
+const oramaCloudSearchSchema = z
+  .object({
+    apiKey: z.string(),
+    endpoint: z.string(),
+    /** Index id used by the build-time sync (with `ORAMA_PRIVATE_API_KEY`). */
+    indexId: z.string().optional(),
+  })
+  .strict();
+
+/** Public credentials for a (self-hosted or cloud) Typesense backend. */
+const typesenseSearchSchema = z
+  .object({
+    collection: z.string(),
+    host: z.string(),
+    port: z.number().int().positive().optional(),
+    protocol: z.enum(["http", "https"]).optional(),
+    searchApiKey: z.string(),
+  })
+  .strict();
+
+/** Mixedbread semantic search: the store the server endpoint queries. */
+const mixedbreadSearchSchema = z
+  .object({
+    storeId: z.string(),
+  })
+  .strict();
+
+export const searchProviders = [
+  "orama",
+  "pagefind",
+  "flexsearch",
+  "algolia",
+  "orama-cloud",
+  "typesense",
+  "mixedbread",
+  "none",
+] as const;
+
+/** Providers that need a config block, mapped to its `search.*` key. */
+const PROVIDER_CONFIG_KEY = {
+  algolia: "algolia",
+  mixedbread: "mixedbread",
+  "orama-cloud": "oramaCloud",
+  typesense: "typesense",
+} as const;
+
 const searchConfigSchema = z
   .object({
+    algolia: algoliaSearchSchema.optional(),
     indexing: z
       .object({
         includeHiddenPages: z.boolean().default(false),
       })
       .strict()
       .default({}),
+    mixedbread: mixedbreadSearchSchema.optional(),
+    oramaCloud: oramaCloudSearchSchema.optional(),
     prompt: z.string().optional(),
-    provider: z.enum(["orama", "pagefind", "none"]).default("orama"),
+    provider: z.enum(searchProviders).default("orama"),
+    typesense: typesenseSearchSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    // Hosted providers can't work without their credentials; flag a missing
+    // block with a path so the diagnostic points at `search.<provider>`.
+    const field =
+      PROVIDER_CONFIG_KEY[value.provider as keyof typeof PROVIDER_CONFIG_KEY];
+    if (field && !value[field]) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `search.${field} is required when provider is "${value.provider}".`,
+        path: [field],
+      });
+    }
+  });
 
 const aiConfigSchema = z
   .object({
@@ -628,8 +697,42 @@ const codeBlocksConfigSchema = z
   })
   .strict();
 
+/**
+ * "Last updated" timestamps for content pages. `false` (default) disables the
+ * feature; `true` derives each page's date from git history; an object selects
+ * the source explicitly. A page's `lastModified` frontmatter always wins.
+ */
+const lastModifiedConfigSchema = z.union([
+  z.boolean(),
+  z.object({ type: z.enum(["git", "frontmatter"]).default("git") }).strict(),
+]);
+
+/** Code-block rendering options (`markdown.code`). */
+const codeConfigSchema = z
+  .object({
+    /**
+     * Show a brand language icon in the code-block header (TypeScript, Python,
+     * …). On by default; recognized languages only.
+     */
+    icons: z.boolean().default(true),
+    /**
+     * Syntax-highlight inline `` `code{:lang}` `` snippets. Off by default — most
+     * inline code (flags, file names) reads better plain; opt a snippet in with
+     * a trailing `{:lang}` marker.
+     */
+    inline: z.boolean().default(false),
+    /**
+     * Wrap long lines instead of scrolling horizontally. Off by default, so
+     * code keeps its original line breaks and overflows into a scroll area.
+     */
+    wrap: z.boolean().default(false),
+  })
+  .strict();
+
 const markdownConfigSchema = z
   .object({
+    /** Code-block rendering: language icons and line wrapping. */
+    code: codeConfigSchema.default({}),
     codeBlocks: codeBlocksConfigSchema.default({}),
     /**
      * Make content images click-to-zoom (open in a lightbox). On by default;
@@ -715,6 +818,7 @@ export const blumeConfigSchema = z
     footer: footerConfigSchema.default({}),
     github: githubConfigSchema.optional(),
     icons: iconsConfigSchema.default({}),
+    lastModified: lastModifiedConfigSchema.default(false),
     logo: logoConfigSchema.optional(),
     markdown: markdownConfigSchema.default({}),
     navbar: navbarConfigSchema.default({}),
@@ -734,3 +838,5 @@ export const blumeConfigSchema = z
 export type ResolvedConfig = z.infer<typeof blumeConfigSchema>;
 /** User-authored config: the shape accepted by `defineConfig`. */
 export type BlumeConfig = z.input<typeof blumeConfigSchema>;
+/** A configured search backend. */
+export type SearchProvider = (typeof searchProviders)[number];

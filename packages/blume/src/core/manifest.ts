@@ -29,6 +29,7 @@ export const buildManifest = (options: {
       searchEnabled &&
       !page.meta.search.exclude &&
       (!page.meta.sidebar.hidden || includeHiddenPages),
+    lastModified: page.lastModified,
     path: page.route,
     sourcePath: page.sourcePath,
     title: page.title,

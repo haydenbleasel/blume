@@ -603,42 +603,6 @@ describe("theme palette", () => {
       darkRoot: true,
     });
   });
-
-  it("emits configured body and heading font tokens", () => {
-    const config = blumeConfigSchema.parse({
-      theme: {
-        fonts: {
-          body: { family: "Inter", weight: 400 },
-          family: "Inter",
-          heading: {
-            family: "Fraunces",
-            format: "woff2",
-            source: "/fonts/fraunces.woff2",
-            weight: 650,
-          },
-        },
-      },
-    });
-    const output = buildThemeCss(config.theme);
-
-    expect({
-      bodyFamily: output.includes('--blume-font-body: "Inter"'),
-      bodyWeight: output.includes("--blume-font-body-weight: 400"),
-      fontFaceFamily: output.includes('font-family: "Fraunces"'),
-      fontFaceSource: output.includes(
-        'src: url("/fonts/fraunces.woff2") format("woff2")'
-      ),
-      headingFamily: output.includes('--blume-font-heading: "Fraunces"'),
-      headingWeight: output.includes("--blume-font-heading-weight: 650"),
-    }).toStrictEqual({
-      bodyFamily: true,
-      bodyWeight: true,
-      fontFaceFamily: true,
-      fontFaceSource: true,
-      headingFamily: true,
-      headingWeight: true,
-    });
-  });
 });
 
 describe("astro config template", () => {
@@ -658,6 +622,7 @@ describe("astro config template", () => {
       markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
       themePath: "/r/.blume/src/generated/app.css",
     });
 
@@ -692,6 +657,7 @@ describe("astro config template", () => {
       markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
       themePath: "/r/.blume/src/generated/app.css",
     });
 
@@ -719,6 +685,7 @@ describe("astro config template", () => {
       markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: true,
       pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
       themePath: "/r/.blume/src/generated/app.css",
     });
 
@@ -752,6 +719,7 @@ describe("astro config template", () => {
       markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
       themePath: "/r/.blume/src/generated/app.css",
     });
 
@@ -779,6 +747,7 @@ describe("astro config template", () => {
       markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
       themePath: "/r/.blume/src/generated/app.css",
     });
 
@@ -806,11 +775,60 @@ describe("astro config template", () => {
       markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
       themePath: "/r/.blume/src/generated/app.css",
     });
 
     expect(output).not.toContain("blume-api-playground-proxy");
     expect(output).not.toContain("/api/blume/proxy");
+  });
+
+  const fontContext = {
+    outDir: "/r/.blume",
+    pagesRoot: null,
+    publicRoot: "/r/public",
+    root: "/r",
+  } as ProjectContext;
+  const fontConfigTemplate = (
+    config: ReturnType<typeof blumeConfigSchema.parse>
+  ) =>
+    astroConfigTemplate({
+      config,
+      context: fontContext,
+      dataPath: "/r/.blume/src/generated/data.json",
+      markdownDataPath: "/r/.blume/src/generated/markdown.json",
+      needsReact: false,
+      pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
+      themePath: "/r/.blume/src/generated/app.css",
+    });
+
+  it("emits the self-hosted default fonts when theme.fonts is omitted", () => {
+    const output = fontConfigTemplate(blumeConfigSchema.parse({}));
+    expect(output).toContain(
+      'import { defineConfig, fontProviders } from "astro/config";'
+    );
+    expect(output).toContain("provider: fontProviders.google()");
+    expect(output).toContain('name: "Inter Tight"');
+    expect(output).toContain('name: "Inter"');
+    expect(output).toContain('cssVariable: "--blume-ff-ibm-plex-mono"');
+  });
+
+  it("emits an overridden font role alongside the defaults", () => {
+    const output = fontConfigTemplate(
+      blumeConfigSchema.parse({ theme: { fonts: { body: "geist" } } })
+    );
+    expect(output).toContain('name: "Geist"');
+    expect(output).toContain('name: "Inter Tight"');
+    expect(output).toContain('cssVariable: "--blume-ff-ibm-plex-mono"');
+  });
+
+  it("always wires Twoslash in with an explicit per-block trigger", () => {
+    const output = fontConfigTemplate(blumeConfigSchema.parse({}));
+    expect(output).toContain(
+      'import { transformerTwoslash } from "@shikijs/twoslash"'
+    );
+    expect(output).toContain("transformerTwoslash({ explicitTrigger: true })");
   });
 });
 
@@ -971,11 +989,6 @@ describe("Mintlify compatibility config", () => {
           backgroundDecoration: "grid",
           backgroundImage: "/images/background-light.svg",
           backgroundImageDark: "/images/background-dark.svg",
-          fonts: {
-            body: { family: "Inter", weight: 400 },
-            family: "Inter",
-            heading: { family: "Inter", weight: 650 },
-          },
           mode: "light",
           strict: true,
         },

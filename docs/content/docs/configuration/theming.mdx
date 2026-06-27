@@ -17,6 +17,11 @@ theme: {
   accent: "teal",   // a named preset or any CSS color
   radius: "md",     // none | sm | md | lg
   mode: "system",   // system | light | dark
+  fonts: {          // self-hosted Google Fonts
+    display: "inter-tight",
+    body: "inter",
+    mono: "ibm-plex-mono",
+  },
 }
 ```
 
@@ -50,6 +55,49 @@ A toggle in the header always lets readers switch, and their choice is remembere
 across visits. Dark mode is applied with a `data-theme="dark"` attribute on the
 `<html>` element.
 
+### Fonts
+
+`fonts` sets the typefaces for three roles:
+
+- **`display`** — headings (`h1`–`h6`)
+- **`body`** — body text, UI, and prose
+- **`mono`** — code blocks and inline code
+
+Each defaults to a curated Google Font, so Blume looks intentional out of the box:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: "inter-tight",   // default
+    body: "inter",            // default
+    mono: "ibm-plex-mono",    // default
+  },
+}
+```
+
+Set only the roles you want to change — the rest keep their defaults:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: { display: "geist" }, // body + mono stay Inter / IBM Plex Mono
+}
+```
+
+Fonts are **self-hosted**: Blume downloads them at build time and serves them from
+your own site, so there's no runtime request to Google and no layout shift (Astro
+generates fallback-metric faces automatically).
+
+Each value is a Google Fonts slug from the curated set below:
+
+| Category | Slugs                                                                                                                                                            |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sans     | `dm-sans` `figtree` `geist` `ibm-plex-sans` `inter` `inter-tight` `manrope` `open-sans` `plus-jakarta-sans` `roboto` `source-sans-3` `space-grotesk` `work-sans` |
+| Serif    | `ibm-plex-serif` `lora` `merriweather` `playfair-display` `source-serif-4`                                                                                       |
+| Mono     | `fira-code` `geist-mono` `ibm-plex-mono` `jetbrains-mono` `roboto-mono` `source-code-pro` `space-mono`                                                           |
+
+Need a font that isn't listed, or want to drop back to the system stack? Override
+the `--blume-font-*` tokens directly in [`theme.css`](#theme-css).
+
 ## theme.css
 
 Drop a `theme.css` in your project root to override any design token. It's the
@@ -82,6 +130,18 @@ dark mode.
 | `--blume-accent-foreground` | Text and icons on an accent background    |
 | `--blume-code-background`   | Code block surface                        |
 | `--blume-radius`            | Corner radius                             |
+| `--blume-font-display`      | Heading font                              |
+| `--blume-font-body`         | Body / UI font                            |
+| `--blume-font-mono`         | Code font                                 |
+
+Set a `--blume-font-*` token to any font stack to use a font outside the curated
+list, or to fall back to the system stack:
+
+```css theme.css lineNumbers
+:root {
+  --blume-font-body: ui-sans-serif, system-ui, sans-serif;
+}
+```
 
 ## Tailwind utilities
 
@@ -100,6 +160,9 @@ a utility, so your components track the theme automatically:
 | `--blume-accent`            | `bg-accent`, `text-accent` |
 | `--blume-accent-foreground` | `text-accent-foreground`   |
 | `--blume-radius`            | `rounded-blume`            |
+| `--blume-font-display`      | `font-display`             |
+| `--blume-font-body`         | `font-sans`                |
+| `--blume-font-mono`         | `font-mono`                |
 
 ## Cascade order
 
@@ -108,7 +171,8 @@ Styles resolve in three layers, each overriding the last:
 <Steps>
   <Step title="Base">Blume's reset, default tokens, and component styles.</Step>
   <Step title="Config tokens">
-    `--blume-accent` and `--blume-radius` from `theme`.
+    `--blume-accent`, `--blume-radius`, and the `--blume-font-*` tokens from
+    `theme`.
   </Step>
   <Step title="theme.css">Your token overrides — the final word.</Step>
 </Steps>

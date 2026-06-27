@@ -1,11 +1,18 @@
 ---
 title: Search
-description: Local, client-side search that works in dev and production — no hosted service.
+description: Client-side search out of the box, with optional hosted and semantic backends.
 ---
 
 Blume ships local search with no hosted infrastructure and no API keys. It runs
 in the browser, works in both `blume dev` and `blume build`, and indexes only
-your real content — navigation chrome and excluded pages are skipped.
+your real content — navigation chrome and excluded pages are skipped. When you
+outgrow it, you can switch to a hosted or semantic backend without changing how
+search looks or behaves — only the `search.provider` you configure changes.
+
+Blume reaches parity with Fumadocs' provider set: **Orama**, **FlexSearch**,
+**Algolia**, **Orama Cloud**, **Typesense**, and **Mixedbread** (plus
+**Pagefind**). Only the configured provider's SDK is installed into your project,
+so picking one backend never pulls in the others.
 
 ## Using search
 
@@ -24,15 +31,32 @@ production.
 
 ## Providers
 
+The client-side providers are keyless and need no extra config. The hosted ones
+take **public** credentials in `blume.config.ts` (safe to ship to the browser)
+and read their **secret** admin key from an environment variable at build time —
+the secret never lands in the config or the client bundle.
+
 ### Orama (default)
 
 Blume's default engine. It builds a JSON index served at `/blume-search.json` and
 queries it in the browser — instant, client-side, and live in `blume dev` as you
-edit.
+edit. No keys, no service.
 
 ```ts blume.config.ts lineNumbers
 search: {
   provider: "orama", // default
+}
+```
+
+### FlexSearch
+
+A second keyless, client-side option. It reuses the same `/blume-search.json`
+index Orama ships and builds a [FlexSearch](https://github.com/nextapps-de/flexsearch)
+document index in the browser. Works in `blume dev` and `blume build`.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "flexsearch",
 }
 ```
 
@@ -50,6 +74,75 @@ search: {
 
 Pagefind only runs during `blume build`, so search isn't available in `blume dev`
 with this provider.
+
+### Algolia
+
+The browser queries [Algolia](https://www.algolia.com) directly with your
+search-only key. Each `blume build` uploads the index using the admin key from
+`ALGOLIA_ADMIN_API_KEY` (the build warns and skips the upload if it's unset).
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "algolia",
+  algolia: {
+    appId: "YOUR_APP_ID",
+    indexName: "docs",
+    searchApiKey: "YOUR_SEARCH_ONLY_KEY", // public
+  },
+}
+```
+
+### Orama Cloud
+
+Hosted Orama. The browser queries your index endpoint with the public API key;
+`blume build` pushes records to the index using `ORAMA_PRIVATE_API_KEY`. Set
+`indexId` to enable the sync.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "orama-cloud",
+  oramaCloud: {
+    endpoint: "https://cloud.orama.run/v1/indexes/your-index",
+    apiKey: "YOUR_PUBLIC_API_KEY",
+    indexId: "your-index-id", // for the build-time sync
+  },
+}
+```
+
+### Typesense
+
+Self-hosted or cloud [Typesense](https://typesense.org). The browser queries the
+collection with the search-only key; `blume build` creates the collection (if
+needed) and imports documents using `TYPESENSE_ADMIN_API_KEY`.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "typesense",
+  typesense: {
+    host: "xyz.a1.typesense.net",
+    collection: "docs",
+    searchApiKey: "YOUR_SEARCH_ONLY_KEY", // public
+    // port + protocol default to 443 / https
+  },
+}
+```
+
+### Mixedbread
+
+Semantic search via [Mixedbread](https://www.mixedbread.com). Queries are proxied
+through a generated `/api/search` endpoint that holds your key, so this provider
+**requires server output** (`deployment.output: "server"`). The endpoint reads
+`MIXEDBREAD_API_KEY`. Sync your content to the store with the Mixedbread CLI in
+your build, e.g. `mxbai vs sync <STORE_ID> ./content --ci`.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "mixedbread",
+  mixedbread: {
+    storeId: "YOUR_STORE_ID",
+  },
+}
+```
 
 ### Disabling search
 

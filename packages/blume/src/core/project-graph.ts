@@ -6,6 +6,10 @@ import { loadConfig } from "./config.ts";
 import { discoverContent } from "./content.ts";
 import { BlumeError } from "./diagnostics.ts";
 import { buildContentGraph } from "./graph.ts";
+import {
+  gitLastModifiedTimes,
+  resolveLastModifiedConfig,
+} from "./last-modified.ts";
 import { buildManifest } from "./manifest.ts";
 import { discoverFolderMeta } from "./meta.ts";
 import { resolveProjectContext } from "./project.ts";
@@ -93,6 +97,25 @@ export const scanProject = async (
     mode === "build"
       ? content.pages.filter((page) => !page.meta.draft)
       : content.pages;
+
+  // Resolve "last updated" dates before the graph is built so the manifest
+  // (which shares these page objects) picks them up. Frontmatter always wins;
+  // git provides the rest when enabled.
+  const lastModified = resolveLastModifiedConfig(config.lastModified);
+  if (lastModified.enabled) {
+    const gitTimes =
+      lastModified.source === "git"
+        ? gitLastModifiedTimes(
+            context.root,
+            context.contentRoot,
+            pages.map((page) => page.sourcePath)
+          )
+        : new Map<string, string>();
+    for (const page of pages) {
+      page.lastModified =
+        page.meta.lastModified ?? gitTimes.get(page.sourcePath);
+    }
+  }
 
   const graph = buildContentGraph(pages, {
     folderMeta: folderMeta.meta,

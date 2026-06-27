@@ -2,6 +2,7 @@
 import "blume:theme";
 import type { Navigation } from "../../core/types.ts";
 import Banner from "./Banner.astro";
+import Fonts from "./Fonts.astro";
 import Header from "./Header.astro";
 
 // A minimal shell for the Scalar API/AsyncAPI reference: Blume's banner + navbar
@@ -25,8 +26,8 @@ interface Props {
   navigation: Navigation;
   route: string;
   themeMode: "system" | "light" | "dark";
+  fontCssVars?: string[];
   searchEnabled: boolean;
-  searchProvider: "orama" | "pagefind";
   pageTitle: string;
 }
 
@@ -37,8 +38,8 @@ const {
   navigation,
   route,
   themeMode,
+  fontCssVars,
   searchEnabled,
-  searchProvider,
   pageTitle,
 } = Astro.props;
 
@@ -58,6 +59,7 @@ const bannerScript = banner?.dismissible
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
+    <Fonts cssVars={fontCssVars ?? []} />
     {bannerScript && <script is:inline set:html={bannerScript} />}
     <script is:inline set:html={initialThemeScript} />
   </head>
@@ -69,7 +71,6 @@ const bannerScript = banner?.dismissible
       navigation={navigation}
       route={route}
       searchEnabled={searchEnabled}
-      searchProvider={searchProvider}
       site={site}
     />
     <div

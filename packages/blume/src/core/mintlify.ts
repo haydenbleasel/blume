@@ -260,47 +260,6 @@ const optionalBoolean = (value: unknown): boolean | undefined => {
   return undefined;
 };
 
-const optionalNumber = (value: unknown): number | undefined =>
-  typeof value === "number" ? value : undefined;
-
-const fontFormat = (value: unknown): "woff" | "woff2" | undefined => {
-  if (value === "woff" || value === "woff2") {
-    return value;
-  }
-  return undefined;
-};
-
-const mintlifyFont = (
-  value: unknown
-): NonNullable<NonNullable<BlumeConfig["theme"]>["fonts"]>["body"] => {
-  const object = asObject(value);
-  return withoutUndefined({
-    family: asString(object?.family),
-    format: fontFormat(object?.format),
-    source: asString(object?.source),
-    weight: optionalNumber(object?.weight),
-  });
-};
-
-const mintlifyFonts = (
-  value: unknown
-): NonNullable<BlumeConfig["theme"]>["fonts"] | undefined => {
-  const object = asObject(value);
-  if (!object) {
-    return undefined;
-  }
-  const body = mintlifyFont(object.body);
-  const heading = mintlifyFont(object.heading);
-  return withoutUndefined({
-    body: body && Object.keys(body).length > 0 ? body : undefined,
-    family: asString(object.family),
-    format: fontFormat(object.format),
-    heading: heading && Object.keys(heading).length > 0 ? heading : undefined,
-    source: asString(object.source),
-    weight: optionalNumber(object.weight),
-  });
-};
-
 const mintlifyBackgroundColor = (
   value: unknown
 ): { dark?: string; light?: string } => {
@@ -1067,7 +1026,6 @@ export const loadMintlifyConfig = async (
       backgroundDecoration: mintlifyBackgroundDecoration(spec.background),
       backgroundImage: backgroundImage.light,
       backgroundImageDark: backgroundImage.dark,
-      fonts: mintlifyFonts(spec.fonts),
       mode:
         appearance.default === "light" ||
         appearance.default === "dark" ||

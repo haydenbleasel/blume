@@ -131,9 +131,10 @@ Separate major shifts in topic within a long page.
 
 ## Code blocks
 
-Fenced code blocks are syntax-highlighted with a header showing the language and
-a copy button. Add a **title** after the language — typically a filename — and it
-replaces the language label in the header.
+Fenced code blocks are syntax-highlighted with a header showing the language —
+with a brand icon for recognized languages — and a copy button. Add a **title**
+after the language — typically a filename — and it replaces the language label in
+the header.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -152,6 +153,10 @@ export default defineConfig({
 });
 ```
 ````
+
+Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span
+and it's colored like a tiny code block — `useState(){:js}` or
+`T extends object{:ts}`. Turn it on with `markdown: { code: { inline: true } }`.
 
 ### Line numbers
 
@@ -171,6 +176,103 @@ import { serve } from "blume";
 serve({ port: 3000 });
 ```
 ````
+
+### Highlighting
+
+Annotate code with GitHub-style comments to draw attention to lines, words, and
+changes. The comments are stripped from the rendered output, so the code stays
+copy-paste clean. All four are on by default — no configuration.
+
+Mark a line with `// [!code highlight]` to give it a highlighted background:
+
+```ts
+const config = defineConfig({
+  title: "My docs", // [!code highlight]
+});
+```
+
+Show changes with `// [!code ++]` for additions and `// [!code --]` for
+removals, rendered as a green/red diff:
+
+```ts
+export default defineConfig({
+  title: "My docs", // [!code --]
+  title: "Blume docs", // [!code ++]
+});
+```
+
+Highlight every occurrence of a term on a line with `// [!code word:serve]`:
+
+```ts
+import { serve } from "blume"; // [!code word:serve]
+
+serve({ port: 3000 });
+```
+
+Dim everything except the lines you mark with `// [!code focus]` (the rest
+sharpens on hover):
+
+```ts
+export default defineConfig({
+  title: "My docs", // [!code focus]
+  description: "Built with Blume",
+});
+```
+
+Or highlight lines by **number** instead of comments — useful when you can't edit
+the code. Put a brace range after the language; single lines, comma lists, and
+`start-end` spans all work:
+
+```ts {1,4-5}
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  title: "My docs",
+  description: "Built with Blume",
+});
+```
+
+````md
+```ts {1,4-5}
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  title: "My docs",
+  description: "Built with Blume",
+});
+```
+````
+
+### Display types
+
+Mark a TypeScript block `twoslash` to display real types straight from the
+compiler — powered by [Twoslash](https://shiki.style/packages/twoslash). Hover
+any token to see its inferred type, and add an inline `^?` query to pin a type
+below the line.
+
+```ts twoslash
+const config = {
+  title: "My docs",
+  version: 1,
+};
+
+config.title;
+//     ^?
+```
+
+````md
+```ts twoslash
+const config = { title: "My docs", version: 1 };
+
+config.title;
+//     ^?
+```
+````
+
+:::note
+Hide the language icons or wrap long lines instead of scrolling with
+`markdown: { code: { icons: false, wrap: true } }` in `blume.config.ts`.
+:::
 
 ## Package install
 

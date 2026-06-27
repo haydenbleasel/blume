@@ -22,8 +22,12 @@ export default defineConfig({
     owner: "haydenbleasel",
     repo: "blume",
   },
+  lastModified: true,
   logo: "/logo.svg",
   markdown: {
+    code: {
+      inline: true,
+    },
     math: true,
   },
   navigation: {

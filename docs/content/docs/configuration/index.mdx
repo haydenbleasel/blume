@@ -52,6 +52,11 @@ export default defineConfig({
   markdown: {
     imageZoom: true,
     math: false,
+    code: {
+      icons: true, // language icon in the code-block header
+      wrap: false, // wrap long lines instead of scrolling
+      inline: false, // highlight inline `code{:lang}` snippets
+    },
   },
 
   // AI — see the AI guide
@@ -151,6 +156,38 @@ content: {
 | `pages`       | `"pages"`            | Folder for custom `.astro` pages.            |
 | `defaultType` | `"doc"`              | Page `type` used when frontmatter omits it.  |
 
+## Last modified
+
+Show a "Last updated on …" line at the bottom of each page. Off by default; set
+`lastModified` to `true` to derive each page's date from its git history:
+
+```ts blume.config.ts
+lastModified: true,
+```
+
+| Value                     | Description                                                    |
+| ------------------------- | -------------------------------------------------------------- |
+| `false`                   | Disabled (default).                                            |
+| `true`                    | Read the date from git history (commit dates).                 |
+| `{ type: "git" }`         | Same as `true`, written explicitly.                            |
+| `{ type: "frontmatter" }` | Never run git — use only the `lastModified` frontmatter field. |
+
+The git source reads the most recent commit that touched each file, so it works
+in any git repository — including monorepos — and needs the repo's history at
+build time (avoid a shallow `--depth 1` checkout in CI). A page's own
+`lastModified` frontmatter always wins, which is handy for pinning a date or for
+files that aren't committed yet:
+
+```mdx page.mdx
+---
+title: My page
+lastModified: 2026-06-20
+---
+```
+
+When enabled, the date is also emitted as schema.org `dateModified` in the
+page's structured data.
+
 ## SEO
 
 Open Graph images, RSS feeds, and JSON-LD structured data, grouped under `seo`.
@@ -183,16 +220,16 @@ These work best with an absolute [`deployment.site`](/docs/deployment) for full 
 
 Each of these has its own guide. The config field is the entry point:
 
-| Field        | What it configures                           | Guide                                    |
-| ------------ | -------------------------------------------- | ---------------------------------------- |
-| `theme`      | Accent color, corner radius, light/dark mode | [Theming](/docs/configuration/theming)   |
-| `navigation` | Explicit sidebar and header tabs             | [Navigation](/docs/content/navigation)   |
-| `search`     | Provider (Orama or Pagefind) and indexing    | [Search](/docs/configuration/search)     |
-| `markdown`   | Opt-in Markdown features like math           | [Syntax](/docs/content/syntax)           |
-| `ai`         | `llms.txt` and the Ask AI assistant          | [AI](/docs/configuration/ai)             |
-| `seo`        | Metadata, OG images, feeds, structured data  | [SEO](/docs/configuration/seo)           |
-| `deployment` | Output mode, adapter, and site URL           | [Deployment](/docs/deployment)           |
-| `redirects`  | Permanent and temporary redirects            | [Deployment](/docs/deployment#redirects) |
+| Field        | What it configures                                  | Guide                                    |
+| ------------ | --------------------------------------------------- | ---------------------------------------- |
+| `theme`      | Accent color, corner radius, fonts, light/dark mode | [Theming](/docs/configuration/theming)   |
+| `navigation` | Explicit sidebar and header tabs                    | [Navigation](/docs/content/navigation)   |
+| `search`     | Provider (Orama or Pagefind) and indexing           | [Search](/docs/configuration/search)     |
+| `markdown`   | Opt-in Markdown features like math                  | [Syntax](/docs/content/syntax)           |
+| `ai`         | `llms.txt` and the Ask AI assistant                 | [AI](/docs/configuration/ai)             |
+| `seo`        | Metadata, OG images, feeds, structured data         | [SEO](/docs/configuration/seo)           |
+| `deployment` | Output mode, adapter, and site URL                  | [Deployment](/docs/deployment)           |
+| `redirects`  | Permanent and temporary redirects                   | [Deployment](/docs/deployment#redirects) |
 
 ## Precedence
 

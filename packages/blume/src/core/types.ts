@@ -85,6 +85,8 @@ export interface PageRecord {
   format: "md" | "mdx";
   /** Internal/asset links discovered in the page (for validation). */
   links: PageLink[];
+  /** Resolved "last updated" ISO date, when the feature is enabled. */
+  lastModified?: string;
 }
 
 /** A node in the generated navigation tree. */
@@ -177,6 +179,8 @@ export interface RouteManifestEntry {
   draft: boolean;
   /** Whether the page should be included in the search index. */
   indexable: boolean;
+  /** Resolved "last updated" ISO date, when the feature is enabled. */
+  lastModified?: string;
 }
 
 /** The generated runtime contract between core and the Astro project. */

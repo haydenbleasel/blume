@@ -1,22 +1,13 @@
 ---
 import Icon from "../Icon.astro";
 
-interface Props {
-  provider: "orama" | "pagefind";
-}
-
-const { provider } = Astro.props;
-const base = import.meta.env.BASE_URL;
-const pagefindUrl = `${base}pagefind/pagefind.js`.replace("//", "/");
-const indexUrl = `${base}blume-search.json`.replace("//", "/");
+// The provider-specific loader is generated per project into `blume:search-client`
+// (an alias to `.blume/src/generated/search-client.ts`), so this component is
+// provider-agnostic: it lazy-imports that module on first open and uses the
+// `SearchFn` it returns. Only the configured provider's SDK is bundled.
 ---
 
-<blume-search
-  class="contents"
-  data-index-url={indexUrl}
-  data-pagefind-url={pagefindUrl}
-  data-provider={provider}
->
+<blume-search class="contents">
   <button
     aria-label="Search"
     class="inline-flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground sm:min-w-48"
@@ -120,61 +111,6 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
         );
       }
 
-      async loadOrama() {
-        const [orama, response] = await Promise.all([
-          import("@orama/orama"),
-          fetch(this.dataset.indexUrl as string),
-        ]);
-        const documents = await response.json();
-        const db = orama.create({
-          schema: {
-            content: "string",
-            description: "string",
-            route: "string",
-            title: "string",
-          },
-        });
-        await orama.insertMultiple(db, documents);
-        this.searchFn = async (query) => {
-          const found = await orama.search(db, {
-            boost: { description: 2, title: 3 },
-            limit: 8,
-            properties: ["title", "description", "content"],
-            term: query,
-          });
-          return found.hits.map((hit) => {
-            const doc = hit.document as Record<string, string>;
-            return {
-              excerpt: doc.description || `${doc.content.slice(0, 140)}…`,
-              title: doc.title,
-              url: doc.route,
-            };
-          });
-        };
-      }
-
-      async loadPagefind() {
-        const pagefind = await import(
-          /* @vite-ignore */ this.dataset.pagefindUrl as string
-        );
-        this.searchFn = async (query) => {
-          const response = await pagefind.search(query);
-          const docs = await Promise.all(
-            response.results
-              .slice(0, 8)
-              .map((result: { data: () => Promise<unknown> }) => result.data())
-          );
-          return docs.map((doc) => {
-            const d = doc as {
-              url: string;
-              excerpt: string;
-              meta?: { title?: string };
-            };
-            return { excerpt: d.excerpt, title: d.meta?.title ?? d.url, url: d.url };
-          });
-        };
-      }
-
       async open() {
         this.dialog.showModal();
         this.input.focus();
@@ -183,11 +119,8 @@ const indexUrl = `${base}blume-search.json`.replace("//", "/");
         }
         this.loaded = true;
         try {
-          if (this.dataset.provider === "orama") {
-            await this.loadOrama();
-          } else {
-            await this.loadPagefind();
-          }
+          const { createSearch } = await import("blume:search-client");
+          this.searchFn = await createSearch();
         } catch {
           this.searchFn = null;
           this.setMessage("Search is available in the production build.");

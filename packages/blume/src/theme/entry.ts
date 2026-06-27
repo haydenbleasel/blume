@@ -8,6 +8,8 @@ interface TailwindEntryOptions {
   configTokens: string;
   /** Raw contents of the user's theme.css, if any. */
   userTheme: string;
+  /** Twoslash rich-renderer styles (for fences with the `twoslash` meta). */
+  twoslashCss?: string;
 }
 
 /**
@@ -45,7 +47,45 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   --blume-action: var(--blume-accent);
   --blume-action-foreground: var(--blume-accent-foreground);
   --blume-code-background: oklch(0.99 0 0);
+  /* Shiki notation transformers: line/word highlight, diff add/remove. */
+  --blume-code-highlight: oklch(0.55 0.16 255 / 0.1);
+  --blume-code-highlight-border: oklch(0.55 0.16 255 / 0.55);
+  --blume-code-add: oklch(0.72 0.16 150 / 0.16);
+  --blume-code-add-border: oklch(0.52 0.15 150 / 0.7);
+  --blume-code-remove: oklch(0.66 0.21 22 / 0.16);
+  --blume-code-remove-border: oklch(0.55 0.2 22 / 0.7);
+  --blume-code-word: oklch(0.55 0.16 255 / 0.16);
+  --blume-code-word-border: oklch(0.55 0.16 255 / 0.5);
   --blume-radius: 0.75rem;
+
+  /*
+   * Font tokens resolve through optional src variables that Astro's Fonts API
+   * populates (via theme.fonts). When unset they fall back to the system
+   * stacks, so the default look is unchanged. The display font defaults to the
+   * body font.
+   */
+  --blume-font-body: var(
+    --blume-font-body-src,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
+  --blume-font-mono: var(
+    --blume-font-mono-src,
+    ui-monospace,
+    "SF Mono",
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    monospace
+  );
+  --blume-font-display: var(--blume-font-display-src, var(--blume-font-body));
 }
 
 :root[data-theme="dark"] {
@@ -65,6 +105,15 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   --blume-action: var(--blume-accent);
   --blume-action-foreground: var(--blume-accent-foreground);
   --blume-code-background: oklch(0.12 0 0);
+  /* Brighter tints read better over the dark code surface. */
+  --blume-code-highlight: oklch(0.7 0.14 255 / 0.16);
+  --blume-code-highlight-border: oklch(0.7 0.14 255 / 0.6);
+  --blume-code-add: oklch(0.78 0.17 150 / 0.2);
+  --blume-code-add-border: oklch(0.72 0.16 150 / 0.7);
+  --blume-code-remove: oklch(0.72 0.21 22 / 0.22);
+  --blume-code-remove-border: oklch(0.7 0.2 22 / 0.7);
+  --blume-code-word: oklch(0.7 0.14 255 / 0.22);
+  --blume-code-word-border: oklch(0.7 0.14 255 / 0.55);
 }
 
 @theme inline {
@@ -79,19 +128,24 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   --color-action-foreground: var(--blume-action-foreground);
   --color-code: var(--blume-code-background);
   --radius-blume: var(--blume-radius);
-  --font-sans:
-    var(--blume-font-body, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, Helvetica, Arial, sans-serif);
-  --font-heading: var(--blume-font-heading, var(--font-sans));
-  --font-mono:
-    ui-monospace, "SF Mono", "Cascadia Code", "Source Code Pro", Menlo,
-    Consolas, monospace;
+  --font-sans: var(--blume-font-body);
+  --font-mono: var(--blume-font-mono);
+  --font-display: var(--blume-font-display);
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
     scroll-padding-top: 4.5rem;
+  }
+  /* Headings use the display font (defaults to the body font when unset). */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
   }
   :focus-visible {
     outline: 2px solid var(--blume-accent);
@@ -109,7 +163,6 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
     background-size:
       var(--blume-background-image-size),
       var(--blume-background-decoration-size);
-    font-weight: var(--blume-font-body-weight, 400);
   }
   @media (prefers-reduced-motion: reduce) {
     html {
@@ -142,14 +195,8 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 }
 
 .prose :where(h1, h2, h3, h4) {
-  font-family: var(--font-heading);
-  font-weight: var(--blume-font-heading-weight, 500);
+  font-weight: 500;
   letter-spacing: 0;
-}
-
-[data-blume-page-title] {
-  font-family: var(--font-heading);
-  font-weight: var(--blume-font-heading-weight, 600);
 }
 
 .prose :where(h1) {
@@ -159,11 +206,9 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 }
 
 .prose :where(h2) {
-  border-top: 1px solid var(--blume-border);
   font-size: 1.875rem;
   line-height: 1.2;
   margin-top: 3rem;
-  padding-top: 2rem;
 }
 
 .prose :where(h3) {
@@ -221,6 +266,7 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   border: 1px solid var(--blume-border);
   border-radius: var(--blume-radius);
   color: var(--blume-foreground);
+  font-family: var(--font-mono);
   font-size: 0.8125rem;
   line-height: 1.55;
   margin: 1.5rem 0;
@@ -278,6 +324,28 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   content: attr(data-title);
 }
 
+/* Language icon (simple-icons) sits at the header's left edge; the label shifts
+   right to make room. Injected at build time by the language-icon transformer.
+   Shown only for top-level prose blocks, which have a header — flush code in
+   tabs and API panels is nested deeper, so the child combinator skips it. */
+.blume-lang-icon {
+  display: none;
+}
+
+.prose > :where(pre[data-icon]) > .blume-lang-icon {
+  color: var(--blume-muted-foreground);
+  display: block;
+  height: 1rem;
+  left: 1rem;
+  position: absolute;
+  top: 0.875rem;
+  width: 1rem;
+}
+
+.prose > :where(pre[data-icon])::before {
+  padding-left: 2.5rem;
+}
+
 .prose :where(pre code) {
   background: transparent;
   border-radius: 0;
@@ -285,6 +353,14 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   font-size: inherit;
   font-weight: 400;
   padding: 0;
+}
+
+/* Word wrap (markdown.code.wrap): long lines wrap instead of scrolling. The
+   attribute is set on <body> from config; default code keeps \`white-space: pre\`. */
+[data-blume-code-wrap] pre,
+[data-blume-code-wrap] pre code {
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .prose :where(table) {
@@ -371,6 +447,62 @@ pre[data-line-numbers] .line::before {
   width: 1.25rem;
 }
 
+/* Shiki notation transformers (on by default). The notation comments are
+   stripped from the output; these style the classes they leave behind. A styled
+   line becomes a full-width inline-block so its background fills the row; plain
+   lines are left untouched, so blocks without notations render as before. */
+.line.highlighted,
+.line.diff {
+  display: inline-block;
+  width: 100%;
+}
+
+/* The backgrounds need !important to beat the \`pre.astro-code span\` rule above,
+   which forces token spans transparent; these line/word spans are exceptions. */
+.line.highlighted {
+  background-color: var(--blume-code-highlight) !important;
+  box-shadow: inset 2px 0 0 0 var(--blume-code-highlight-border);
+}
+
+.line.diff.add {
+  background-color: var(--blume-code-add) !important;
+  box-shadow: inset 2px 0 0 0 var(--blume-code-add-border);
+}
+
+.line.diff.remove {
+  background-color: var(--blume-code-remove) !important;
+  box-shadow: inset 2px 0 0 0 var(--blume-code-remove-border);
+}
+
+/* Word highlight (\`// [!code word:x]\`) wraps matches in an inline span. The
+   element selector keeps it ahead of the transparent token-span rule. */
+span.highlighted-word {
+  background-color: var(--blume-code-word) !important;
+  border-radius: 0.25rem;
+  box-shadow: 0 0 0 1px var(--blume-code-word-border);
+  padding: 0.1em 0.2em;
+}
+
+/* Focus (\`// [!code focus]\`): dim and blur the rest; reveal on hover. */
+pre:has(.line.focused) .line:not(.focused) {
+  filter: blur(0.085rem);
+  opacity: 0.5;
+  transition:
+    filter 0.2s ease,
+    opacity 0.2s ease;
+}
+
+pre:has(.line.focused):hover .line:not(.focused) {
+  filter: none;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  pre:has(.line.focused) .line:not(.focused) {
+    transition: none;
+  }
+}
+
 @media (max-width: 640px) {
   .prose :where(h1) {
     font-size: 2.25rem;
@@ -385,6 +517,7 @@ pre[data-line-numbers] .line::before {
   background: var(--blume-code-background);
   padding: 0.15em 0.35em;
   border-radius: 0.3rem;
+  font-family: var(--font-mono);
   font-weight: 500;
 }
 
@@ -392,6 +525,20 @@ pre[data-line-numbers] .line::before {
 .prose :not(pre) > code::after {
   content: none;
 }
+
+/* Inline code highlighting (markdown.code.inline): Shiki colors the tokens of a
+   \`code\`{:lang} snippet via the same dual-theme CSS variables as fenced blocks,
+   keeping the inline pill background. */
+.prose code.blume-inline-code span {
+  color: var(--shiki-light);
+}
+
+:root[data-theme="dark"] .prose code.blume-inline-code span {
+  color: var(--shiki-dark);
+}
+
+/* Twoslash rich-renderer styles (used by fences with the \`twoslash\` meta). */
+${options.twoslashCss ?? ""}
 
 /* Token overrides: config first, then the user's theme.css (highest priority). */
 ${options.configTokens}

@@ -11,6 +11,7 @@ import { serverFeatures } from "../../core/server-features.ts";
 import { buildRobots } from "../../deploy/robots.ts";
 import { buildSitemap } from "../../deploy/sitemap.ts";
 import { buildSearchIndex } from "../../search/build.ts";
+import { syncSearchProvider } from "../../search/sync/index.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
@@ -38,6 +39,14 @@ export const runBuild = async (options: { strict?: boolean } = {}) => {
     const indexed = await buildSearchIndex(distDir);
     logger.success(`Indexed ${indexed} page(s) for search`);
   }
+
+  // Upload the index to a hosted provider (Algolia, Orama Cloud, Typesense).
+  // Skipped with a warning when its admin key isn't configured.
+  await syncSearchProvider(project, {
+    start: (message) => logger.start(message),
+    success: (message) => logger.success(message),
+    warn: (message) => logger.warn(message),
+  });
 
   if (project.config.ai.llmsTxt) {
     const { markdownPages } = await writeLlmsArtifacts(project, distDir);

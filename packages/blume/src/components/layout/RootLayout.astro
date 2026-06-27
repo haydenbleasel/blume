@@ -4,6 +4,7 @@ import "blume:theme";
 import Icon from "../Icon.astro";
 import { buildStructuredData } from "../../seo/jsonld.ts";
 import Banner from "./Banner.astro";
+import Fonts from "./Fonts.astro";
 import Header from "./Header.astro";
 import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
@@ -28,9 +29,10 @@ interface Props {
   page: { title: string; description?: string; route: string };
   headings: Heading[];
   imageZoom?: boolean;
+  codeWrap?: boolean;
   themeMode: "system" | "light" | "dark";
+  fontCssVars?: string[];
   searchEnabled: boolean;
-  searchProvider: "orama" | "pagefind";
   indexable: boolean;
   ogImage?: string | null;
   canonical?: string | null;
@@ -41,6 +43,7 @@ interface Props {
   siteUrl?: string | null;
   pageType?: string;
   published?: string | Date | null;
+  lastModified?: string | null;
   noindex?: boolean;
   structuredDataEnabled?: boolean;
 }
@@ -53,9 +56,10 @@ const {
   page,
   headings,
   imageZoom = true,
+  codeWrap = false,
   themeMode,
+  fontCssVars,
   searchEnabled,
-  searchProvider,
   indexable,
   ogImage,
   canonical,
@@ -66,6 +70,7 @@ const {
   siteUrl,
   pageType,
   published,
+  lastModified,
   noindex,
   structuredDataEnabled,
 } = Astro.props;
@@ -73,6 +78,16 @@ const {
 const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
 const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
 const description = page.description ?? site.description;
+
+// "Last updated on <date>" — formatted in UTC to match the changelog timeline.
+const lastModifiedDate = lastModified ? new Date(lastModified) : null;
+const formattedLastModified =
+  lastModifiedDate && !Number.isNaN(lastModifiedDate.getTime())
+    ? new Intl.DateTimeFormat("en", {
+        dateStyle: "long",
+        timeZone: "UTC",
+      }).format(lastModifiedDate)
+    : null;
 
 const crumbs = findBreadcrumbs(navigation.sidebar, page.route);
 const { prev, next } = getPagination(
@@ -90,6 +105,7 @@ const structuredData =
     : buildStructuredData({
       breadcrumbs: crumbs,
       description,
+      modified: lastModified,
       pageType,
       published,
       route: page.route,
@@ -115,6 +131,7 @@ const bannerScript = banner?.dismissible
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
+    <Fonts cssVars={fontCssVars ?? []} />
     {canonical && <link rel="canonical" href={canonical} />}
     {noindex && <meta name="robots" content="noindex" />}
     {description && <meta name="description" content={description} />}
@@ -153,6 +170,7 @@ const bannerScript = banner?.dismissible
   </head>
   <body
     class="bg-background font-sans text-foreground antialiased"
+    data-blume-code-wrap={codeWrap ? "" : undefined}
     data-blume-image-zoom={imageZoom ? "" : undefined}
   >
     <a
@@ -165,7 +183,6 @@ const bannerScript = banner?.dismissible
       navigation={navigation}
       route={page.route}
       searchEnabled={searchEnabled}
-      searchProvider={searchProvider}
       site={site}
     >
       <slot name="ask" slot="ask" />
@@ -225,6 +242,13 @@ const bannerScript = banner?.dismissible
         <article class="prose mx-auto max-w-[42rem]">
           <slot />
         </article>
+        {
+          formattedLastModified && (
+            <p class="mx-auto mt-10 max-w-[42rem] text-muted-foreground text-sm">
+              Last updated on {formattedLastModified}
+            </p>
+          )
+        }
         {
           (prev || next) && (
             <nav
@@ -337,6 +361,11 @@ const bannerScript = banner?.dismissible
 
       for (const pre of document.querySelectorAll(".prose pre")) {
         if (pre.querySelector("[data-blume-copy]")) {
+          continue;
+        }
+        // Skip nested <pre>: Twoslash renders each hover popup's type signature
+        // as a <pre> inside the code block, which shouldn't get its own button.
+        if (pre.parentElement?.closest("pre")) {
           continue;
         }
         const language = pre.getAttribute("data-language");

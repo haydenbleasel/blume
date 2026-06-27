@@ -37,7 +37,8 @@ const parseTitle = (raw: string | undefined): string | undefined => {
     return explicit.groups.title;
   }
   // The first bare token is the title (```ts blume.config.ts), skipping Shiki
-  // line ranges (`{1,3-5}`), `key=value` attrs, and the `lineNumbers` keyword.
+  // line ranges (`{1,3-5}`), `key=value` attrs, and the reserved `lineNumbers`
+  // and `twoslash` keywords.
   return raw
     .trim()
     .split(/\s+/u)
@@ -45,6 +46,7 @@ const parseTitle = (raw: string | undefined): string | undefined => {
       (token) =>
         token.length > 0 &&
         token !== "lineNumbers" &&
+        token !== "twoslash" &&
         !token.startsWith("{") &&
         !token.includes("=")
     );

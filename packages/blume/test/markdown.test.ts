@@ -5,6 +5,9 @@ import {
   calloutTypeFor,
   directiveToCalloutPlugin,
 } from "../src/markdown/directives.ts";
+import { blumeShikiTransformers } from "../src/markdown/index.ts";
+import { parseInlineLang } from "../src/markdown/inline-code.ts";
+import { languageIconTransformer } from "../src/markdown/language-icon.ts";
 import { mathPlugin } from "../src/markdown/math.ts";
 import {
   codeBlock,
@@ -596,9 +599,88 @@ describe(codeTitleTransformer, () => {
     expect(attrs.dataLineNumbers).toBeTruthy();
   });
 
+  it("does not treat the twoslash keyword as a title", () => {
+    expect(metaAttrs("twoslash").dataTitle).toBeUndefined();
+  });
+
   it("ignores line ranges and leaves plain blocks bare", () => {
     expect(metaAttrs("{1,3-5}").dataTitle).toBeUndefined();
     expect(metaAttrs().dataLineNumbers).toBeUndefined();
+  });
+});
+
+describe(blumeShikiTransformers, () => {
+  it("enables the notation, range, icon, and meta transformers by default", () => {
+    const names = blumeShikiTransformers().map(
+      (transformer) => transformer.name ?? ""
+    );
+    expect(names).toHaveLength(7);
+    // Upstream Shiki transformers (notation + meta-highlight range) run first.
+    expect(names).toContain("@shikijs/transformers:notation-highlight");
+    expect(names).toContain("@shikijs/transformers:notation-diff");
+    expect(names).toContain("@shikijs/transformers:notation-highlight-word");
+    expect(names).toContain("@shikijs/transformers:notation-focus");
+    expect(names).toContain("@shikijs/transformers:meta-highlight");
+    // Blume's own transformers: the icon, then the fence-meta reader last.
+    expect(names).toContain("blume:language-icon");
+    expect(names.at(-1)).toBe("blume:code-meta");
+  });
+
+  it("drops the icon transformer when icons are disabled", () => {
+    const names = blumeShikiTransformers({ icons: false }).map(
+      (transformer) => transformer.name ?? ""
+    );
+    expect(names).toHaveLength(6);
+    expect(names).not.toContain("blume:language-icon");
+    expect(names.at(-1)).toBe("blume:code-meta");
+  });
+});
+
+describe(parseInlineLang, () => {
+  it("splits a trailing marker from the code", () => {
+    expect(parseInlineLang("useState(){:js}")).toStrictEqual({
+      code: "useState()",
+      lang: "js",
+    });
+  });
+
+  it("ignores plain code and marker-only or non-language markers", () => {
+    expect(parseInlineLang("useState()")).toBeNull();
+    expect(parseInlineLang("{:js}")).toBeNull();
+    expect(parseInlineLang("x{:.keyword}")).toBeNull();
+  });
+});
+
+describe(languageIconTransformer, () => {
+  type IconPreNode = Parameters<
+    ReturnType<typeof languageIconTransformer>["pre"]
+  >[0];
+
+  /** Run the icon transformer over a language and return the <pre> node. */
+  const runIcon = (lang?: string): IconPreNode => {
+    const node = { children: [], properties: {} } as unknown as IconPreNode;
+    languageIconTransformer().pre.call({ options: { lang } }, node);
+    return node;
+  };
+
+  it("prepends an icon and marks the block for known languages", () => {
+    const node = runIcon("ts");
+    expect(node.properties.dataIcon).toBe("");
+    expect(node.children).toHaveLength(1);
+    expect(node.children[0]?.properties?.className).toStrictEqual([
+      "blume-lang-icon",
+    ]);
+  });
+
+  it("is case-insensitive and resolves aliases", () => {
+    expect(runIcon("TSX").properties.dataIcon).toBe("");
+    expect(runIcon("shell").children).toHaveLength(1);
+  });
+
+  it("leaves unknown languages untouched", () => {
+    const node = runIcon("plaintext");
+    expect(node.properties.dataIcon).toBeUndefined();
+    expect(node.children).toHaveLength(0);
   });
 });
 

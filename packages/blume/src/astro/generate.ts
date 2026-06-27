@@ -30,8 +30,11 @@ import {
   referenceTabs,
 } from "../openapi/scalar.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
+import { searchProviderMeta, servesStaticIndex } from "../search/providers.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
+import { buildFontsCss, configuredCssVars } from "../theme/fonts.ts";
 import { buildThemeCss } from "../theme/palette.ts";
+import { twoslashCss } from "../theme/twoslash.ts";
 import { discoverPages } from "./pages.ts";
 import {
   askEndpointTemplate,
@@ -40,12 +43,14 @@ import {
   changelogIndexTemplate,
   contentConfigTemplate,
   envTemplate,
+  mixedbreadSearchEndpointTemplate,
   ogEndpointTemplate,
   rawMarkdownEndpointTemplate,
   rssEndpointTemplate,
   runtimeDependencies,
   runtimePackageTemplate,
   runtimeTsconfigTemplate,
+  searchClientTemplate,
   searchEndpointTemplate,
   userComponentsTemplate,
 } from "./templates.ts";
@@ -55,17 +60,19 @@ const BLUME_SRC = fileURLToPath(new URL("..", import.meta.url));
 /** The Blume package's own `node_modules` (where Astro and friends live). */
 const BLUME_NODE_MODULES = join(BLUME_SRC, "..", "node_modules");
 
-/** Whether Astro resolves from a directory via normal node resolution. */
-const canResolveAstro = (fromDir: string): boolean => {
+/** Whether a module specifier resolves from a directory via node resolution. */
+const canResolveFrom = (fromDir: string, spec: string): boolean => {
   try {
-    createRequire(pathToFileURL(join(fromDir, "_.js")).href).resolve(
-      "astro/package.json"
-    );
+    createRequire(pathToFileURL(join(fromDir, "_.js")).href).resolve(spec);
     return true;
   } catch {
     return false;
   }
 };
+
+/** Whether Astro resolves from a directory via normal node resolution. */
+const canResolveAstro = (fromDir: string): boolean =>
+  canResolveFrom(fromDir, "astro/package.json");
 
 /**
  * Make the generated runtime resolve Astro and its integrations. When they are
@@ -272,6 +279,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
   const data = {
     config: {
       banner: resolveBanner(config),
+      codeWrap: config.markdown.code.wrap,
       description: config.description,
       imageZoom: config.markdown.imageZoom,
       logo: resolveLogo(project),
@@ -290,6 +298,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       href: feed.path,
       title: feed.title,
     })),
+    // CSS variables for Astro's <Font> component; matches the astro.config
+    // `fonts:` entries derived from the same theme.fonts config.
+    fontCssVars: configuredCssVars(config.theme.fonts),
     // API reference routes (Scalar) surface as header tabs alongside the
     // content-derived ones, so the reference stays discoverable.
     navigation: {
@@ -302,6 +313,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       hidden: route.hidden,
       id: route.id,
       indexable: route.indexable,
+      lastModified: route.lastModified ?? null,
       path: route.path,
       title: route.title,
     })),
@@ -340,6 +352,24 @@ export interface GenerateResult {
 }
 
 /**
+ * Mintlify projects use a custom public root (`.blume/public`); mirror the
+ * changelog feeds and llms artifacts there, since `preparePublicAssets` only
+ * copies a user's own `public/` directory. A no-op for standard projects.
+ */
+const writeCustomPublicRootArtifacts = async (
+  project: BlumeProject
+): Promise<void> => {
+  const { context, config } = project;
+  if (context.publicRoot === join(context.root, "public")) {
+    return;
+  }
+  await writeChangelogRssFeeds(project, context.publicRoot);
+  if (config.ai.llmsTxt) {
+    await writeLlmsArtifacts(project, context.publicRoot);
+  }
+};
+
+/**
  * Write (or update) the generated `.blume/` Astro runtime for a project.
  * Only files whose content changed are rewritten so Vite HMR stays fast.
  */
@@ -352,19 +382,12 @@ export const generateRuntime = async (
   const dataPath = join(srcDir, "generated", "data.json");
   const markdownDataPath = join(srcDir, "generated", "markdown.json");
   const themePath = join(srcDir, "generated", "app.css");
+  const searchClientPath = join(srcDir, "generated", "search-client.ts");
 
   await ensureDepsLink(out);
   await preparePublicAssets(project);
-  if (context.publicRoot !== join(context.root, "public")) {
-    await writeChangelogRssFeeds(project, context.publicRoot);
-  }
+  await writeCustomPublicRootArtifacts(project);
   await rm(join(srcDir, "middleware.ts"), { force: true });
-  if (
-    config.ai.llmsTxt &&
-    context.publicRoot !== join(context.root, "public")
-  ) {
-    await writeLlmsArtifacts(project, context.publicRoot);
-  }
 
   const askEnabled = config.ai.ask?.enabled ?? false;
   const [pages, detectedReact, userTheme] = await Promise.all([
@@ -386,6 +409,7 @@ export const generateRuntime = async (
         markdownDataPath,
         needsReact,
         pages,
+        searchClientPath,
         themePath,
       })
     ),
@@ -413,11 +437,12 @@ export const generateRuntime = async (
     writeIfChanged(
       themePath,
       tailwindEntryTemplate({
-        configTokens: buildThemeCss(config.theme),
+        configTokens: `${buildThemeCss(config.theme)}${buildFontsCss(config.theme.fonts)}`,
         sources: [
           `${BLUME_SRC}/**/*.{astro,ts,tsx}`,
           `${context.root}/**/*.{astro,mdx,ts,tsx}`,
         ],
+        twoslashCss: twoslashCss(),
         userTheme,
       })
     ),
@@ -459,7 +484,12 @@ export const generateRuntime = async (
     );
   }
 
-  if (config.search.provider === "orama") {
+  // The provider-specific client loader behind the `blume:search-client` alias
+  // is always (re)generated so the alias resolves even when search is disabled.
+  await writeIfChanged(searchClientPath, searchClientTemplate(config));
+
+  // Client-loaded providers (orama, flexsearch) ship a static index + endpoint.
+  if (servesStaticIndex(config.search.provider)) {
     const documents = await buildSearchDocuments(project);
     await writeIfChanged(
       join(srcDir, "generated", "search.json"),
@@ -468,6 +498,14 @@ export const generateRuntime = async (
     await writeIfChanged(
       join(srcDir, "pages", "blume-search.json.ts"),
       searchEndpointTemplate()
+    );
+  }
+
+  // Mixedbread proxies queries through a server endpoint that holds the key.
+  if (config.search.provider === "mixedbread") {
+    await writeIfChanged(
+      join(srcDir, "pages", "api", "search.ts"),
+      mixedbreadSearchEndpointTemplate(config.search.mixedbread?.storeId ?? "")
     );
   }
 
@@ -509,6 +547,16 @@ export const generateRuntime = async (
   // API/AsyncAPI reference pages (Scalar). One self-contained page per source,
   // mounted on its configured route and regenerated each run.
   const warnings: string[] = [];
+
+  // The new provider SDKs are optional peers; warn (rather than fail opaquely in
+  // Vite) when the configured provider's package isn't installed.
+  for (const dep of searchProviderMeta(config.search.provider).runtimeDeps) {
+    if (!canResolveFrom(context.root, dep)) {
+      warnings.push(
+        `Search provider "${config.search.provider}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`
+      );
+    }
+  }
   if (hasReferences(config)) {
     const references = await buildReferenceFiles({
       config,

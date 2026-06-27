@@ -9,12 +9,29 @@ import {
   rewriteMintlifySnippetVariables,
 } from "../markdown/mintlify-snippets.ts";
 
-/** A document indexed by the Orama search provider. */
+/** A document indexed by the client-side search providers (Orama, FlexSearch). */
 export interface SearchDocument {
   route: string;
   title: string;
   description: string;
   content: string;
+  /** Frontmatter `search.tags`, surfaced for hosted-provider faceting. */
+  tags?: string[];
+}
+
+/**
+ * A record uploaded to a hosted search backend (Algolia, Orama Cloud,
+ * Typesense, Mixedbread). `_id` is the stable per-page key; each sync adapts it
+ * to the backend's own id field (`objectID`, `id`, …).
+ */
+export interface SearchRecord {
+  _id: string;
+  url: string;
+  title: string;
+  description: string;
+  content: string;
+  /** Single faceting tag (the first frontmatter tag, when present). */
+  tag?: string;
 }
 
 const CODE_FENCE = /```[\s\S]*?```/gu;
@@ -92,12 +109,29 @@ export const buildSearchDocuments = async (
             })
           : raw;
       const body = source ? toPlainText(matter(source).content) : "";
+      const tags = page?.meta?.search?.tags;
       return {
         content: body,
         description: page?.description ?? "",
         route: route.path,
+        tags: tags && tags.length > 0 ? tags : undefined,
         title: route.title,
       };
     })
   );
 };
+
+/**
+ * Map per-page search documents to the flat record shape hosted backends
+ * ingest. One record per page, keyed by route; the first tag becomes the
+ * faceting `tag`.
+ */
+export const toSearchRecords = (documents: SearchDocument[]): SearchRecord[] =>
+  documents.map((doc) => ({
+    _id: doc.route,
+    content: doc.content,
+    description: doc.description,
+    tag: doc.tags?.[0],
+    title: doc.title,
+    url: doc.route,
+  }));

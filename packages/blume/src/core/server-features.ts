@@ -1,3 +1,4 @@
+import { searchProviderMeta } from "../search/providers.ts";
 import type { ResolvedConfig } from "./schema.ts";
 
 /**
@@ -8,6 +9,11 @@ export const serverFeatures = (config: ResolvedConfig): string[] => {
   const features: string[] = [];
   if (config.ai.ask?.enabled) {
     features.push("Ask AI");
+  }
+  // Mixedbread (and any future provider) that proxies queries through a secret
+  // server endpoint can't run on a static build.
+  if (searchProviderMeta(config.search.provider).requiresServer) {
+    features.push(`Search (${config.search.provider})`);
   }
   return features;
 };

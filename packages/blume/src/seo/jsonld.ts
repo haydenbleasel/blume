@@ -13,6 +13,8 @@ export interface StructuredDataInput {
   pageType?: string;
   /** Publish date (string or YAML Date); emitted as ISO `datePublished`. */
   published?: string | Date | null;
+  /** Last-modified date; emitted as ISO `dateModified`. */
+  modified?: string | Date | null;
   breadcrumbs: Crumb[];
 }
 
@@ -74,6 +76,10 @@ export const buildStructuredData = (
     const published = toIso(input.published);
     if (published) {
       node.datePublished = published;
+    }
+    const modified = toIso(input.modified);
+    if (modified) {
+      node.dateModified = modified;
     }
     if (base) {
       node.isPartOf = { "@id": `${base}#website` };
