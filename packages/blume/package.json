@@ -34,7 +34,7 @@
   "scripts": {
     "test": "bun test",
     "test:coverage": "bun test --coverage",
-    "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit"
+    "typecheck": "tsgo --noEmit && tsgo -p test/tsconfig.json --noEmit"
   },
   "dependencies": {
     "@astrojs/markdown-satteri": "^0.3.2",
@@ -70,6 +70,7 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260626.1",
     "bun-types": "^1.3.14",
     "typescript": "^5.7.0"
   },
