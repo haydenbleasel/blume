@@ -1,0 +1,565 @@
+---
+title: Components
+description: The built-in JSX components — cards, columns, steps, tabs, accordions, badges, code groups, frames, trees, tooltips, type tables, and a GitHub card — usable in any MDX page.
+---
+
+Blume ships an accessible, themeable component set available in any `.mdx` page
+with **no imports**. Each one is shown below with a live preview and its source.
+Components are vanilla and React-free; React only switches on if you add your own
+island.
+
+## Card and CardGroup
+
+Cards link to a destination with an icon, title, and short blurb. Group them with
+`CardGroup` for a responsive grid. Reach for them on landing pages, section
+indexes, and “next steps” — anywhere you’re guiding the reader onward.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
+    Install Blume and ship your first page.
+  </Card>
+  <Card title="Components" href="/docs/content/components" icon="folder">
+    Browse the component library.
+  </Card>
+</CardGroup>
+
+```astro lineNumbers
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
+    Install Blume and ship your first page.
+  </Card>
+  <Card title="Components" href="/docs/content/components" icon="folder">
+    Browse the component library.
+  </Card>
+</CardGroup>
+```
+
+`Card` takes `title`, an optional `href` (omit it for a non-clickable card), and
+an `icon` from Blume's built-in icon set. `CardGroup` takes `cols` (default `2`).
+
+## Steps
+
+A numbered vertical sequence for ordered instructions — installs, setup flows,
+and tutorials where the order matters. Each `Step` takes a `title`.
+
+<Steps>
+  <Step title="Install Blume">Add the package to your project.</Step>
+  <Step title="Write a page">
+    Drop an `.mdx` file into your content folder.
+  </Step>
+  <Step title="Ship it">Run `blume build` and deploy `dist/`.</Step>
+</Steps>
+
+```astro lineNumbers
+<Steps>
+  <Step title="Install Blume">Add the package to your project.</Step>
+  <Step title="Write a page">
+    Drop an `.mdx` file into your content folder.
+  </Step>
+  <Step title="Ship it">Run `blume build` and deploy `dist/`.</Step>
+</Steps>
+```
+
+## Tabs
+
+Switch between equivalent content in place — language variants, OS-specific
+commands, or alternative approaches — without stacking everything on the page.
+Each `Tab` takes a `title`.
+
+<Tabs>
+  <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
+  <Tab title="Windows">Use winget to install the toolchain.</Tab>
+</Tabs>
+
+```astro lineNumbers
+<Tabs>
+  <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
+  <Tab title="Windows">Use winget to install the toolchain.</Tab>
+</Tabs>
+```
+
+## Badge
+
+A small inline label for status or metadata — version tags, “new” or “beta”
+markers, stability levels. The `variant` tunes the color to the meaning.
+
+### Default
+
+Neutral metadata with no particular emphasis.
+
+<Badge>Stable</Badge>
+
+```astro
+<Badge>Stable</Badge>
+```
+
+### Accent
+
+Draws the eye using your theme accent — good for “new” or featured markers.
+
+<Badge variant="accent">New</Badge>
+
+```astro
+<Badge variant="accent">New</Badge>
+```
+
+### Success
+
+A positive or passing state.
+
+<Badge variant="success">Passing</Badge>
+
+```astro
+<Badge variant="success">Passing</Badge>
+```
+
+### Warning
+
+Something to use with caution, such as an experimental feature.
+
+<Badge variant="warning">Beta</Badge>
+
+```astro
+<Badge variant="warning">Beta</Badge>
+```
+
+### Danger
+
+A negative or breaking state, such as a deprecation.
+
+<Badge variant="danger">Deprecated</Badge>
+
+```astro
+<Badge variant="danger">Deprecated</Badge>
+```
+
+## File tree
+
+Illustrate a project or folder layout. Wrap a normal Markdown list and Blume
+styles it as a tree — handy for explaining structure in setup and config guides.
+
+<FileTree>
+
+- docs/
+  - index.mdx
+  - guides/
+    - configuration.mdx
+- blume.config.ts
+
+</FileTree>
+
+```astro lineNumbers
+<FileTree>
+
+- docs/
+  - index.mdx
+  - guides/
+    - configuration.mdx
+- blume.config.ts
+
+</FileTree>
+```
+
+## Accordion
+
+Stack related collapsibles in a single bordered container with dividers between
+them — FAQs, optional steps, or long examples. Each child is an `AccordionItem`
+(`title`, optional `icon`, `description`, `defaultOpen`). For a single standalone
+disclosure, use [Expandable](#expandable).
+
+<Accordion>
+  <AccordionItem title="Does it support MDX?">
+    Yes — every page can be `.md` or `.mdx`.
+  </AccordionItem>
+  <AccordionItem title="Is the theme customizable?">
+    Yes, via Tailwind v4 tokens and your own `theme.css`.
+  </AccordionItem>
+</Accordion>
+
+```astro lineNumbers
+<Accordion>
+  <AccordionItem title="Does it support MDX?">
+    Yes — every page can be `.md` or `.mdx`.
+  </AccordionItem>
+  <AccordionItem title="Is the theme customizable?">
+    Yes, via Tailwind v4 tokens and your own `theme.css`.
+  </AccordionItem>
+</Accordion>
+```
+
+## Expandable
+
+A lightweight inline disclosure for nested detail — expanding a field's
+sub-properties or an optional aside. `title` labels the toggle (defaults to
+“Show more”); set `defaultOpen` to start expanded.
+
+<Expandable title="Show advanced options">
+  These settings are optional and rarely need changing.
+</Expandable>
+
+```astro
+<Expandable title="Show advanced options">
+  These settings are optional and rarely need changing.
+</Expandable>
+```
+
+## Columns
+
+Lay cards or blocks out in a responsive grid of equal columns that reflows on
+mobile. `Columns` takes `cols`; wrap each cell in a `Column`.
+
+<Columns cols={2}>
+  <Column>
+    <Card title="Fast" icon="rocket">
+      Built on Astro and Vite.
+    </Card>
+  </Column>
+  <Column>
+    <Card title="Themeable" icon="sun">
+      Tailwind v4 design tokens.
+    </Card>
+  </Column>
+</Columns>
+
+```astro lineNumbers
+<Columns cols={2}>
+  <Column>
+    <Card title="Fast" icon="rocket">
+      Built on Astro and Vite.
+    </Card>
+  </Column>
+  <Column>
+    <Card title="Themeable" icon="sun">
+      Tailwind v4 design tokens.
+    </Card>
+  </Column>
+</Columns>
+```
+
+## CodeGroup
+
+Group several code blocks into one tabbed switcher — a tab per language or file.
+The tab label is each block's title (the text after the language). Add `dropdown`
+to switch with a menu instead of a tab bar.
+
+<CodeGroup>
+
+```ts TypeScript
+export const greet = (name: string) => `Hello, ${name}`;
+```
+
+```python Python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+```rust Rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}")
+}
+```
+
+</CodeGroup>
+
+````astro
+<CodeGroup>
+
+```ts TypeScript
+export const greet = (name: string) => `Hello, ${name}`;
+```
+
+```python Python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+```rust Rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}")
+}
+```
+
+</CodeGroup>
+````
+
+## Frame
+
+Wrap an image or any visual in a centered, bordered frame with an optional
+`caption` (rendered as Markdown) and `hint`.
+
+<Frame
+  caption="A **framed** illustration."
+  hint="Frames center and caption visuals."
+>
+  <svg
+    width="160"
+    height="72"
+    viewBox="0 0 160 72"
+    role="img"
+    aria-label="Sample frame"
+  >
+    <rect width="160" height="72" rx="8" fill="#3b82f6" />
+  </svg>
+</Frame>
+
+```astro lineNumbers
+<Frame
+  caption="A **framed** illustration."
+  hint="Frames center and caption visuals."
+>
+  <img src="/screenshot.png" alt="Product screenshot" />
+</Frame>
+```
+
+## Color
+
+Show color swatches with copyable hex values — useful for documenting a palette
+or brand colors. Use `variant="compact"` for a swatch list, or `variant="table"`
+with `Color.Row` to group them. Each `Color.Item` takes a `name` and a `value`
+(a hex string, or `{ light, dark }` for theme-aware colors).
+
+<Color variant="compact">
+  <Color.Item name="blue-500" value="#3B82F6" />
+  <Color.Item name="green-500" value="#16A34A" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+
+```astro lineNumbers
+<Color variant="compact">
+  <Color.Item name="blue-500" value="#3B82F6" />
+  <Color.Item name="green-500" value="#16A34A" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+```
+
+## Tree
+
+Render a hierarchical file/folder structure with expandable folders. (For a
+quick, list-driven version see [File tree](#file-tree); `Tree` gives per-folder
+control.) Use `Tree.Folder` (`name`, optional `defaultOpen`, `openable`) and
+`Tree.File` (`name`).
+
+<Tree>
+  <Tree.Folder name="src" defaultOpen>
+    <Tree.File name="index.ts" />
+    <Tree.Folder name="components">
+      <Tree.File name="Button.tsx" />
+    </Tree.Folder>
+  </Tree.Folder>
+  <Tree.File name="blume.config.ts" />
+</Tree>
+
+```astro lineNumbers
+<Tree>
+  <Tree.Folder name="src" defaultOpen>
+    <Tree.File name="index.ts" />
+    <Tree.Folder name="components">
+      <Tree.File name="Button.tsx" />
+    </Tree.Folder>
+  </Tree.Folder>
+  <Tree.File name="blume.config.ts" />
+</Tree>
+```
+
+## Panel
+
+A titled container for supplementary, set-aside content. `title` is optional.
+
+<Panel title="Good to know">
+  Panels hold supporting detail without interrupting the main flow.
+</Panel>
+
+```astro
+<Panel title="Good to know">
+  Panels hold supporting detail without interrupting the main flow.
+</Panel>
+```
+
+## Tooltip
+
+Reveal a definition or hint on hover for an inline term. `tip` is the hover text;
+add an optional `headline` and a `cta` + `href` for a follow-up link.
+
+Hover the <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/docs/quickstart">API</Tooltip> term to learn more.
+
+```astro
+Hover the <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/docs/quickstart">API</Tooltip> term.
+```
+
+## Tile
+
+A clickable preview that leads with a visual — an icon or image — above a title
+and description. Good for galleries and showcases. Takes `title`, `description`,
+and `href`; the child is the visual.
+
+<Tile
+  title="Quickstart"
+  description="Ship your first page in minutes."
+  href="/docs/quickstart"
+>
+  <Icon icon="rocket" size={28} />
+</Tile>
+
+```astro
+<Tile
+  title="Quickstart"
+  description="Ship your first page in minutes."
+  href="/docs/quickstart"
+>
+  <Icon icon="rocket" size={28} />
+</Tile>
+```
+
+## Prompt
+
+A single row with a label and a copy button. The `description` (Markdown) is the
+visible label; the body is the prompt itself — hidden, and copied to the
+clipboard when the **Copy prompt** button is pressed. `actions` controls the
+buttons (e.g. `["copy", "cursor"]`).
+
+<Prompt
+  description="Ask the model to **document** an endpoint."
+  actions={["copy"]}
+>
+  Write reference docs for the POST /v1/pets endpoint.
+</Prompt>
+
+```astro
+<Prompt
+  description="Ask the model to **document** an endpoint."
+  actions={["copy"]}
+>
+  Write reference docs for the POST /v1/pets endpoint.
+</Prompt>
+```
+
+## Visibility
+
+Show or hide content by audience. `for="web"` renders only on the site;
+`for="agents"` targets the generated Markdown (`llms.txt`) that AI agents read.
+
+<Visibility for="web">
+  This note appears on the website but is omitted from the agent-facing
+  Markdown.
+</Visibility>
+
+```astro
+<Visibility for="web">Shown on the site only.</Visibility>
+<Visibility for="agents">Shown only in the generated Markdown.</Visibility>
+```
+
+## Type tables
+
+Tables for documenting an object's properties — its props, types, and defaults.
+Write the rows by hand with `TypeTable`, or generate them straight from a
+TypeScript interface or type alias with `AutoTypeTable`.
+
+### Type table
+
+A **Prop / Type** grid where each row expands to reveal its description and
+details. Pass a `type` map keyed by property name; each entry takes a `type`,
+plus an optional `description`, `default`, `required` flag, `typeDescription`,
+and `typeDescriptionLink`. Optional props (`required` unset) show a `?` after the
+name.
+
+<TypeTable
+  type={{
+    label: {
+      type: "string",
+      required: true,
+      description: "The button's visible label.",
+    },
+    variant: {
+      type: '"primary" | "ghost"',
+      default: '"primary"',
+      description: "Visual style.",
+    },
+    disabled: { type: "boolean" },
+  }}
+/>
+
+```astro lineNumbers
+<TypeTable
+  type={{
+    label: {
+      type: "string",
+      required: true,
+      description: "The button's visible label.",
+    },
+    variant: {
+      type: '"primary" | "ghost"',
+      default: '"primary"',
+      description: "Visual style.",
+    },
+    disabled: { type: "boolean" },
+  }}
+/>
+```
+
+### Auto type table
+
+Generate a type table from a TypeScript type so the docs stay in sync with the
+source. Point `AutoTypeTable` at a file with `path` (resolved from your project
+root) and a type `name`. Descriptions come from JSDoc comments, defaults from
+`@default` tags, and optional properties (`?`) are marked accordingly.
+
+```astro
+<AutoTypeTable path="./src/button.ts" name="ButtonProps" />
+```
+
+You can also pass the type inline with `type` instead of a `path` — handy for
+small examples:
+
+<AutoTypeTable
+  name="ButtonProps"
+  type={`
+export interface ButtonProps {
+  /** The button's visible label. */
+  label: string;
+  /**
+   * Visual style.
+   * @default "primary"
+   */
+  variant?: "primary" | "ghost";
+  /** Disable interaction. */
+  disabled?: boolean;
+}
+`}
+/>
+
+```astro lineNumbers
+<AutoTypeTable
+  name="ButtonProps"
+  type={`
+export interface ButtonProps {
+  /** The button's visible label. */
+  label: string;
+  /**
+   * Visual style.
+   * @default "primary"
+   */
+  variant?: "primary" | "ghost";
+  /** Disable interaction. */
+  disabled?: boolean;
+}
+`}
+/>
+```
+
+## GitHub info
+
+A card linking to a GitHub repository with its live star and fork counts.
+Counts are fetched at build time — no client JavaScript — and the card still
+renders if the API is unreachable. Pass `owner` and `repo`, or omit them to use
+the repository from your `blume.config`. Set a `GITHUB_TOKEN` environment
+variable to lift the API rate limit.
+
+<GithubInfo owner="withastro" repo="astro" />
+
+```astro lineNumbers
+<!-- Uses the repo from blume.config -->
+<GithubInfo />
+
+<!-- Or point it at any repository -->
+<GithubInfo owner="withastro" repo="astro" />
+```

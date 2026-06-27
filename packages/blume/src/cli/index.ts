@@ -6,7 +6,6 @@ import { buildCommand } from "./commands/build.ts";
 import { devCommand } from "./commands/dev.ts";
 import { doctorCommand } from "./commands/doctor.ts";
 import { ejectCommand } from "./commands/eject.ts";
-import { importCommand } from "./commands/import.ts";
 import { initCommand } from "./commands/init.ts";
 import { migrateCommand } from "./commands/migrate.ts";
 import { previewCommand } from "./commands/preview.ts";
@@ -38,7 +37,6 @@ const blumeSubCommands = {
   dev: devCommand,
   doctor: doctorCommand,
   eject: ejectCommand,
-  import: importCommand,
   init: initCommand,
   migrate: migrateCommand,
   preview: previewCommand,

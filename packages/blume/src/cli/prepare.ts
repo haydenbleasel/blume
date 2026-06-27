@@ -61,6 +61,9 @@ export const prepareProject = async (
     logger.warn("Continuing despite errors. Use --strict to fail the build.");
   }
 
-  await generateRuntime(project);
+  const { warnings } = await generateRuntime(project);
+  for (const warning of warnings) {
+    logger.warn(warning);
+  }
   return project;
 };

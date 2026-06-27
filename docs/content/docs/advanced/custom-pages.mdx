@@ -1,0 +1,187 @@
+---
+title: Custom Pages
+description: Mount fully custom .astro routes alongside your docs and read your site's config, navigation, and content from the blume:data module.
+---
+
+Most of a Blume site is Markdown, but sometimes you need a route that _isn't_ a
+doc — a landing page, a pricing page, a hand-built blog or changelog index, or an
+interactive dashboard. Drop an `.astro` file under your **pages** folder and
+Blume mounts it as a real route, right alongside your content.
+
+## Add a page
+
+Create a `pages/` folder at your project root and add an `.astro` file:
+
+```astro pages/pricing.astro lineNumbers
+---
+import data from "blume:data";
+---
+
+<h1>Pricing for {data.config.title}</h1>
+```
+
+`blume dev` picks it up immediately and `blume build` prerenders it to static
+HTML. The folder name is configurable with [`content.pages`](/docs/configuration#content)
+(default `"pages"`).
+
+Custom pages keep their original location on disk, so relative imports, component
+imports, and [`getStaticPaths`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
+all work exactly as they do in a plain Astro project — Blume mounts each file
+where it sits rather than copying it.
+
+## Files and routes
+
+Each file's path under the pages folder becomes its route. `index` maps to the
+parent folder, and dynamic `[param]` segments are preserved:
+
+| File                      | Route         |
+| ------------------------- | ------------- |
+| `pages/pricing.astro`     | `/pricing`    |
+| `pages/blog/index.astro`  | `/blog`       |
+| `pages/blog/[slug].astro` | `/blog/:slug` |
+| `pages/changelog.astro`   | `/changelog`  |
+
+A custom page **wins** over a generated route at the same path. Adding
+`pages/changelog.astro`, for example, replaces Blume's
+[generated changelog timeline](/docs/advanced/changelog) with your own.
+
+## Reading site data
+
+Import `blume:data` to read the same resolved config, navigation, routes, and
+feeds the rest of the site uses:
+
+```astro pages/all-pages.astro lineNumbers
+---
+import data from "blume:data";
+---
+
+<h1>All pages</h1>
+<ul>
+  {
+    data.routes
+      .filter((route) => route.indexable)
+      .map((route) => (
+        <li>
+          <a href={route.path}>{route.title}</a>
+        </li>
+      ))
+  }
+</ul>
+```
+
+The module exposes:
+
+<TypeTable
+  type={{
+    config: {
+      type: "object",
+      required: true,
+      description:
+        "Resolved site config — title, description, logo, banner, theme, site URL, repoUrl, and search settings.",
+    },
+    navigation: {
+      type: "object",
+      required: true,
+      description: "The sidebar and tab tree inferred from your content.",
+    },
+    routes: {
+      type: "Route[]",
+      required: true,
+      description:
+        "Every content page: { id, path, title, indexable, hidden, draft, editUrl }.",
+    },
+    feeds: {
+      type: "Feed[]",
+      required: true,
+      description: "Generated RSS feeds: { href, title }.",
+    },
+  }}
+/>
+
+`routes` carries page metadata but not frontmatter like `type` or `date`. To
+build a list filtered by content type — a blog or changelog index — pair it with
+Astro's `docs` content collection, which holds the frontmatter:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import { getCollection } from "astro:content";
+import data from "blume:data";
+
+// Each route's id matches its collection entry id.
+const routeById = new Map(data.routes.map((route) => [route.id, route.path]));
+
+const posts = (await getCollection("docs"))
+  .filter((entry) => entry.data.type === "blog" && !entry.data.draft)
+  .map((entry) => ({
+    description: entry.data.description,
+    href: routeById.get(entry.id),
+    title: entry.data.title,
+  }));
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={post.href}>{post.title}</a>
+        <p>{post.description}</p>
+      </li>
+    ))
+  }
+</ul>
+```
+
+## Using the site layout
+
+To give a custom page the full Blume chrome — header, sidebar, search, and theme
+— wrap it in `RootLayout`, the same layout the generated pages use. Pull the
+required props straight from `blume:data`:
+
+```astro pages/pricing.astro lineNumbers
+---
+import RootLayout from "blume/components/layout/RootLayout.astro";
+import data from "blume:data";
+---
+
+<RootLayout
+  site={{ title: data.config.title, description: data.config.description }}
+  logo={data.config.logo}
+  banner={data.config.banner}
+  navigation={data.navigation}
+  page={{ title: "Pricing", route: "/pricing" }}
+  headings={[]}
+  themeMode={data.config.theme.mode}
+  searchEnabled={data.config.search.enabled}
+  searchProvider={data.config.search.provider}
+  indexable={true}
+>
+  <h1>Pricing</h1>
+</RootLayout>
+```
+
+:::note
+`RootLayout` is part of the generated runtime, so its props can change between
+releases. When you want a layout that's fully yours,
+[`blume eject`](/docs/configuration/customization#eject) turns `.blume/` into a
+standard Astro project you own outright.
+:::
+
+## Interactive pages
+
+Custom pages are ordinary Astro, so you can drop in React (or any framework)
+[islands](/docs/configuration/customization#react-islands) with a hydration directive.
+React switches on automatically the moment your project contains a `.tsx` or
+`.jsx` file.
+
+<CardGroup cols={2}>
+  <Card
+    title="Customization"
+    href="/docs/configuration/customization"
+    icon="file"
+  >
+    Component overrides, React islands, the registry, and eject.
+  </Card>
+  <Card title="Blog" href="/docs/advanced/blog" icon="book-open">
+    Author posts and build a custom blog index.
+  </Card>
+</CardGroup>

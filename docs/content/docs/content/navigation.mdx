@@ -1,0 +1,151 @@
+---
+title: Navigation
+description: Build the sidebar from your files, then refine it with frontmatter, folder meta, or config.
+---
+
+Blume builds your sidebar from the file system, then lets you refine it as much —
+or as little — as you want: page by page, folder by folder, or with one explicit
+config. Breadcrumbs, previous/next links, and the on-page outline all follow from
+the same model, with nothing to wire up.
+
+## The generated sidebar
+
+By default the sidebar mirrors your content tree:
+
+- folders become **groups**, files become **pages**
+- a page's label is its frontmatter `title`; a group's label is the humanized
+  folder name
+- items sort by [numeric prefix](/docs/content), then alphabetically, and a folder's
+  `index` page comes first
+
+That's enough for many sites — everything below is opt-in.
+
+## Page label, icon, and badge
+
+Tune how a single page appears in the sidebar from its frontmatter, under
+`sidebar`:
+
+```yaml lineNumbers
+sidebar:
+  label: Quickstart # override the title in the sidebar
+  icon: rocket # an icon from Blume's built-in set
+  badge: New # a small label beside the entry
+  order: 1 # sort position within its group
+```
+
+See [Frontmatter](/docs/reference/frontmatter) for the full page schema.
+
+## Folder groups
+
+Add a `_meta.json` to a folder to control how its group appears and how its pages
+are ordered:
+
+```json _meta.json lineNumbers
+{
+  "title": "Guides",
+  "icon": "book-open",
+  "order": 2,
+  "collapsed": false,
+  "pages": ["configuration", "theming", "deployment"]
+}
+```
+
+- **`title`**, **`icon`**, **`order`** — the group's label, icon, and position
+- **`collapsed`** — start the group collapsed
+- **`pages`** — explicit order for the group's children, listed by slug (numeric
+  prefix and parentheses stripped). Pages you leave out still appear, after the
+  listed ones.
+
+To group pages _without_ adding a URL segment, use a parenthesized folder name —
+see [Pages](/docs/content#group-folders).
+
+## Ordering
+
+When the sidebar is generated, order is resolved highest priority first:
+
+<Steps>
+  <Step title="Config sidebar">
+    An explicit `navigation.sidebar` replaces the generated tree entirely.
+  </Step>
+  <Step title="Folder meta">
+    The `pages` array in `_meta.json` orders a group.
+  </Step>
+  <Step title="Frontmatter">`sidebar.order` on a page.</Step>
+  <Step title="File system">
+    An `index` page first, then numeric prefixes, then alphabetical by label.
+  </Step>
+</Steps>
+
+## Hidden pages
+
+Hide a page from the sidebar — and from previous/next pagination — while keeping
+it built and reachable by its URL:
+
+```yaml
+sidebar:
+  hidden: true
+```
+
+## Tabs
+
+Render top-level sections as tabs in the header, useful for separating, say, docs
+from an API reference. A tab is highlighted when the current route falls under
+its `path`:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  tabs: [
+    { label: "Docs", path: "/", icon: "book-open" },
+    { label: "API", path: "/api", icon: "rocket" },
+  ],
+}
+```
+
+## Explicit sidebar
+
+For full control, define `navigation.sidebar` in config. When it's set, Blume
+uses it verbatim and skips file-system generation:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  sidebar: [
+    "/", // a page, referenced by route
+    {
+      label: "Guides", // a group
+      collapsed: false,
+      items: ["/configuration", "/configuration/theming"],
+    },
+    { label: "GitHub", href: "https://github.com/owner/repo" }, // an external link
+  ],
+}
+```
+
+Each item is a page route (a string), a group (`label` + `items`), or a link
+(`label` + `href`). Groups can nest and start `collapsed`.
+
+## Breadcrumbs and pagination
+
+These come for free from the sidebar tree — no configuration:
+
+- **Breadcrumbs** show the current page's parent group above the title.
+- **Previous and next** links at the foot of each page follow sidebar order,
+  skipping hidden pages.
+
+## On this page
+
+A right-rail outline is generated automatically from each page's `##` and `###`
+headings, so long pages stay scannable. On narrower screens, where the right rail
+is hidden, it collapses into an “On this page” dropdown above the content.
+
+## Page actions
+
+Below the table of contents, every page shows a set of quick actions:
+
+- **Edit this page on GitHub** — links straight to the source file. Appears once
+  you set [`github`](/docs/configuration) in your config.
+- **Scroll to top** — smoothly returns to the top of long pages.
+- **Give feedback** — opens a prefilled GitHub issue with an optional reaction and
+  note (also requires `github`).
+
+Three more hand the page to AI tools — **Copy as Markdown**, **Open in chat**, and
+**Ask AI about this page** — covered in [AI](/docs/configuration/ai#copy-as-markdown).

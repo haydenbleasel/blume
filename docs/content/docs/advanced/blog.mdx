@@ -1,0 +1,121 @@
+---
+title: Blog
+description: Publish posts as content, get an RSS feed and article structured data for free, and build a custom index page.
+---
+
+A blog in Blume is just content with a type. Mark a page `type: blog` and Blume
+gives it an RSS feed and richer article metadata automatically. Unlike the
+[changelog](/docs/advanced/changelog), there's no generated index page — you compose
+the landing page yourself, which keeps the design entirely in your hands.
+
+## Write a post
+
+A post is a regular `.md` or `.mdx` page with `type: blog` in its frontmatter. By
+convention posts live under `blog/`, but the type — not the folder — is what
+matters:
+
+```mdx blog/introducing-blume.mdx lineNumbers
+---
+title: Introducing Blume
+type: blog
+date: 2026-06-22
+description: Why we built a markdown-first docs framework.
+---
+
+Documentation should be fast, AI-ready, and zero-config — down to not needing a
+starter template at all. Here's the thinking behind Blume.
+```
+
+Give every post a `date` so feed items sort newest-first and carry a `pubDate`,
+and a `description` — it's used for both the feed summary and SEO.
+
+## The RSS feed
+
+Blume builds a blog feed at **`/blog/rss.xml`**, sorted newest-first by `date`.
+Feeds need an absolute site URL, so set [`deployment.site`](/docs/deployment); Blume
+then injects a `<link rel="alternate">` tag on every page so readers discover it
+automatically.
+
+The feed is on by default. Tune it under [`seo.rss`](/docs/configuration/seo#rss-feeds):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+Remove `"blog"` from `rss.types` to skip the feed.
+
+## Structured data
+
+When [structured data](/docs/configuration/seo#structured-data) is on, each post is
+emitted as a schema.org **`BlogPosting`** with its description and publish date —
+the richer article type search engines expect for blog content.
+
+## Building an index
+
+Blume doesn't generate a `/blog` landing page, so you build one. The simplest
+option is a content page that links to each post by hand:
+
+```mdx blog/index.mdx lineNumbers
+---
+title: Blog
+description: News and writing from the team.
+---
+
+<CardGroup cols={2}>
+  <Card title="Introducing Blume" href="/blog/introducing-blume">
+    Why we built a markdown-first docs framework.
+  </Card>
+</CardGroup>
+```
+
+To list posts automatically instead, add a [custom page](/docs/advanced/custom-pages)
+at `pages/blog/index.astro` that reads from Astro's `docs` content collection and
+pairs each entry with its route from `blume:data`:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import { getCollection } from "astro:content";
+import data from "blume:data";
+
+const routeById = new Map(data.routes.map((route) => [route.id, route.path]));
+
+const posts = (await getCollection("docs"))
+  .filter((entry) => entry.data.type === "blog" && !entry.data.draft)
+  .map((entry) => ({
+    date: entry.data.date,
+    description: entry.data.description,
+    href: routeById.get(entry.id),
+    title: entry.data.title,
+  }))
+  .toSorted((a, b) => Number(new Date(b.date)) - Number(new Date(a.date)));
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={post.href}>{post.title}</a>
+        <p>{post.description}</p>
+      </li>
+    ))
+  }
+</ul>
+```
+
+See [Custom Pages](/docs/advanced/custom-pages#using-the-site-layout) for wrapping this
+in the full site layout.
+
+<CardGroup cols={2}>
+  <Card title="Custom Pages" href="/docs/advanced/custom-pages" icon="folder">
+    Mount the blog index and read from blume:data.
+  </Card>
+  <Card title="SEO" href="/docs/configuration/seo" icon="file">
+    Feeds, Open Graph images, and structured data.
+  </Card>
+</CardGroup>

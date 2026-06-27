@@ -66,10 +66,6 @@ export const resolveProjectContext = (
     componentsFile: firstExisting(absoluteRoot, COMPONENTS_FILENAMES),
     configFile,
     contentRoot,
-    generatedContentRoot:
-      config.api.openapi.length > 0 || config.api.asyncapi.length > 0
-        ? join(outDir, "api-content")
-        : null,
     outDir,
     pagesRoot,
     publicRoot: isMintlifyProject

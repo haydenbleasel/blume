@@ -43,7 +43,6 @@ interface MutablePage {
   icon?: string;
   badge?: string;
   deprecated?: boolean;
-  apiMethod?: string;
   pageId: string;
   order: number;
 }
@@ -107,19 +106,6 @@ const pageOrder = (page: PageRecord, filename: string): number => {
   return numericOrder(filename);
 };
 
-const pageApiMethod = (page: PageRecord): string | undefined => {
-  if (page.meta.hideApiMarker) {
-    return undefined;
-  }
-  const { api } = page.meta;
-  if (typeof api === "string") {
-    return api
-      .match(/^(?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/iu)
-      ?.groups?.method?.toUpperCase();
-  }
-  return api?.method;
-};
-
 /** Apply folder meta (title/order/icon/collapsed and explicit page order). */
 const applyFolderMeta = (
   group: MutableGroup,
@@ -167,7 +153,6 @@ const sortNodes = (nodes: MutableNode[]): void => {
 const toNavNode = (node: MutableNode): NavNode => {
   if (node.kind === "page") {
     return {
-      apiMethod: node.apiMethod,
       badge: node.badge,
       deprecated: node.deprecated || undefined,
       description: node.description,
@@ -208,7 +193,6 @@ const buildFileSystemSidebar = (
     }
 
     parent.children.push({
-      apiMethod: pageApiMethod(page),
       badge: page.meta.sidebar.badge,
       deprecated: page.meta.deprecated || undefined,
       description: page.description,
@@ -258,7 +242,6 @@ const buildConfigSidebar = (
       const page = byRoute.get(normalizeRef(item));
       if (page) {
         nodes.push({
-          apiMethod: pageApiMethod(page),
           badge: page.meta.sidebar.badge,
           deprecated: page.meta.deprecated || undefined,
           description: page.description,
@@ -289,7 +272,6 @@ const buildConfigSidebar = (
     if (item.root) {
       const page = byRoute.get(normalizeRef(item.root));
       nodes.push({
-        apiMethod: page ? pageApiMethod(page) : undefined,
         badge: item.badge,
         deprecated: page?.meta.deprecated || undefined,
         icon: item.icon,

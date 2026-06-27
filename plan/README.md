@@ -53,6 +53,7 @@ Astro gives Blume the default shape it wants:
 | `18-errors.md` | Error model, diagnostics, overlay, doctor output |
 | `19-deployment.md` | Static/server builds, Vercel, adapters, search, redirects |
 | `20-mintlify-compatibility.md` | Mintlify starter and component drop-in replacement audit |
+| `21-openapi.md` | OpenAPI & AsyncAPI reference via an embedded Scalar renderer (no native UI) |
 
 ## Core architecture in one diagram
 

@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+
+import { join } from "pathe";
 
 import { extractLinks } from "../src/core/content.ts";
 import { validateLinks } from "../src/core/links.ts";
@@ -36,7 +40,13 @@ const makePage = (
 const makeGraph = (pages: PageRecord[]): ContentGraph =>
   ({
     diagnostics: [],
-    navigation: { sidebar: [], tabs: [] },
+    navigation: {
+      chromeVariants: [],
+      selectors: [],
+      sidebar: [],
+      sidebarVariants: [],
+      tabs: [],
+    },
     pages,
     routes: new Map(pages.map((page) => [page.route, page.id])),
   }) as ContentGraph;
@@ -151,5 +161,50 @@ describe(validateLinks, () => {
       }),
     ]);
     expect(diagnostics).toHaveLength(0);
+  });
+
+  it("normalizes index and trailing-slash targets, and strips query strings", async () => {
+    const diagnostics = await validate([
+      makePage({
+        id: "a.mdx",
+        links: [link("/b/"), link("/b/index"), link("/b?ref=nav")],
+        route: "/a",
+      }),
+      makePage({ id: "b.mdx", route: "/b" }),
+    ]);
+    expect(diagnostics).toHaveLength(0);
+  });
+});
+
+describe("validateLinks — assets against a public dir", () => {
+  let publicDir: string;
+
+  beforeAll(async () => {
+    publicDir = await mkdtemp(join(tmpdir(), "blume-public-"));
+    await writeFile(join(publicDir, "logo.png"), "binary");
+  });
+
+  afterAll(async () => {
+    await rm(publicDir, { force: true, recursive: true });
+  });
+
+  const validateWithPublic = (pages: PageRecord[]) =>
+    validateLinks(makeGraph(pages), { publicDir });
+
+  it("accepts an asset that exists in the public directory", async () => {
+    const diagnostics = await validateWithPublic([
+      makePage({ id: "a.mdx", links: [link("/logo.png")], route: "/a" }),
+    ]);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("warns when a referenced asset is missing", async () => {
+    const diagnostics = await validateWithPublic([
+      makePage({ id: "a.mdx", links: [link("/missing.png")], route: "/a" }),
+    ]);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_BROKEN_ASSET");
+    expect(diagnostics[0]?.severity).toBe("warning");
+    expect(diagnostics[0]?.suggestion).toContain("public/missing.png");
   });
 });

@@ -49,8 +49,6 @@ export interface ProjectContext {
   pagesRoot: string | null;
   /** Absolute path to the generated runtime (`<root>/.blume`). */
   outDir: string;
-  /** Absolute path to generated content, if any generator is enabled. */
-  generatedContentRoot: string | null;
   /** Absolute path to the directory Astro serves as static public assets. */
   publicRoot: string;
   /** Absolute path to the first user theme stylesheet, if present. */
@@ -99,7 +97,6 @@ export type NavNode =
       icon?: string;
       badge?: string;
       deprecated?: boolean;
-      apiMethod?: string;
       pageId: string;
     }
   | {

@@ -26,6 +26,23 @@ export default defineConfig({
   markdown: {
     math: true,
   },
+  navigation: {
+    tabs: [
+      { label: "Home", path: "/" },
+      { label: "Docs", path: "/docs" },
+    ],
+  },
+  // The "Example API" navbar tab is added automatically from this reference.
+  openapi: {
+    enabled: true,
+    route: "/api",
+    sources: [
+      {
+        label: "Example API",
+        spec: "https://petstore3.swagger.io/api/v3/openapi.json",
+      },
+    ],
+  },
   theme: {
     accent: "teal",
   },

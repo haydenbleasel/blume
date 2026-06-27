@@ -67,19 +67,6 @@ const searchMetaSchema = z
   })
   .strict();
 
-const apiMetaSchema = z.union([
-  z.string(),
-  z
-    .object({
-      auth: z.string().optional(),
-      method: z
-        .enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
-        .optional(),
-      path: z.string().optional(),
-    })
-    .strict(),
-]);
-
 const changelogMetaSchema = z
   .object({
     category: z.string().optional(),
@@ -178,8 +165,6 @@ const normalizeMintlifyPageMeta = (value: unknown): unknown => {
 /** Frontmatter accepted on any content page. */
 const pageMetaBaseSchema = z
   .object({
-    api: apiMetaSchema.optional(),
-    boost: z.number().optional(),
     changelog: changelogMetaSchema.optional(),
     /** Publish date for feed-backed content like blog/changelog. */
     date: dateSchema.optional(),
@@ -489,71 +474,6 @@ const aiConfigSchema = z
   })
   .strict();
 
-const openApiConfigSchema = z
-  .object({
-    directory: z.string().default("api-reference"),
-    source: z.string().min(1),
-  })
-  .strict();
-
-const asyncApiConfigSchema = z
-  .object({
-    directory: z.string().default("api-reference"),
-    source: z.string().min(1),
-  })
-  .strict();
-
-const apiPlaygroundConfigSchema = z
-  .object({
-    credentials: z.boolean().default(false),
-    display: z
-      .enum(["interactive", "simple", "none", "auth"])
-      .default("interactive"),
-    proxy: z.boolean().default(true),
-    url: z.enum(["full"]).optional(),
-  })
-  .strict();
-
-const apiExamplesConfigSchema = z
-  .object({
-    autogenerate: z.boolean().default(true),
-    defaults: z.enum(["required", "all"]).default("all"),
-    languages: z.array(z.string()).default(["curl"]),
-    prefill: z.boolean().default(false),
-  })
-  .strict();
-
-const apiParamsConfigSchema = z
-  .object({
-    post: z.array(z.string()).default([]),
-  })
-  .strict();
-
-const apiMdxAuthConfigSchema = z
-  .object({
-    method: z.enum(["basic", "bearer", "key", "none"]),
-    name: z.string().optional(),
-  })
-  .strict();
-
-const apiMdxConfigSchema = z
-  .object({
-    auth: apiMdxAuthConfigSchema.optional(),
-    server: z.string().optional(),
-  })
-  .strict();
-
-const apiConfigSchema = z
-  .object({
-    asyncapi: z.array(asyncApiConfigSchema).default([]),
-    examples: apiExamplesConfigSchema.default({}),
-    mdx: apiMdxConfigSchema.default({}),
-    openapi: z.array(openApiConfigSchema).default([]),
-    params: apiParamsConfigSchema.default({}),
-    playground: apiPlaygroundConfigSchema.default({}),
-  })
-  .strict();
-
 const contextualOptionSchema = z.union([
   z.string(),
   z
@@ -721,8 +641,6 @@ const markdownConfigSchema = z
      * Off by default since `$` is common in prose, shell, and code. MDX only.
      */
     math: z.boolean().default(false),
-    /** Include API schemas in generated Markdown exports. */
-    schema: z.boolean().default(true),
   })
   .strict();
 
@@ -732,12 +650,62 @@ const stylingConfigSchema = z
   })
   .strict();
 
+/**
+ * A single spec rendered by the API reference (Scalar). `spec` is a local path
+ * or an `http(s)` URL; Scalar auto-detects OpenAPI vs AsyncAPI documents.
+ */
+const openapiSourceSchema = z
+  .object({
+    /** Nav/section label for this source. */
+    label: z.string().optional(),
+    /** Per-source route; defaults to the block's `route` (or a derived path). */
+    route: z.string().optional(),
+    /** Local path or `http(s)` URL to the spec. */
+    spec: z.string(),
+  })
+  .strict();
+
+export type OpenApiSource = z.infer<typeof openapiSourceSchema>;
+
+/**
+ * OpenAPI reference, delegated wholesale to Scalar (`@scalar/astro`). The
+ * reference is a self-contained embed on its own route — it does not weave into
+ * Blume's sidebar, search, or llms. Set `enabled: true` to opt in.
+ */
+const openapiConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    /** Where the reference mounts. */
+    route: z.string().default("/reference"),
+    /** One or more specs; each renders on its own route by default. */
+    sources: z.array(openapiSourceSchema).default([]),
+    /** Shorthand for a single source: `sources: [{ spec }]`. */
+    spec: z.string().optional(),
+    /** Scalar theme name; defaults to a Blume-derived accent override. */
+    theme: z.string().optional(),
+  })
+  .strict();
+
+/**
+ * AsyncAPI reference. Same shape and Scalar pipeline as {@link openapiConfigSchema}
+ * (Scalar auto-detects the document type); only the default `route` differs.
+ */
+const asyncapiConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    route: z.string().default("/events"),
+    sources: z.array(openapiSourceSchema).default([]),
+    spec: z.string().optional(),
+    theme: z.string().optional(),
+  })
+  .strict();
+
 /** Full user-facing config schema. All fields optional with defaults. */
 export const blumeConfigSchema = z
   .object({
     ai: aiConfigSchema.default({}),
     analytics: analyticsConfigSchema.optional(),
-    api: apiConfigSchema.default({}),
+    asyncapi: asyncapiConfigSchema.default({}),
     banner: bannerConfigSchema.optional(),
     content: contentConfigSchema.default({}),
     contextual: contextualConfigSchema.default({}),
@@ -751,6 +719,7 @@ export const blumeConfigSchema = z
     markdown: markdownConfigSchema.default({}),
     navbar: navbarConfigSchema.default({}),
     navigation: navigationConfigSchema.default({}),
+    openapi: openapiConfigSchema.default({}),
     redirects: z.array(redirectSchema).default([]),
     search: searchConfigSchema.default({}),
     seo: seoConfigSchema.default({}),

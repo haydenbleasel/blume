@@ -1,10 +1,10 @@
+import { describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { join } from "pathe";
-import { describe, expect, it, vi } from "vitest";
 
 import { buildLlmsFiles, writeLlmsArtifacts } from "../src/ai/llms.ts";
 import { buildPageMarkdown } from "../src/ai/markdown.ts";
@@ -16,8 +16,8 @@ import {
   astroConfigTemplate,
   catchAllPageTemplate,
   contentConfigTemplate,
+  runtimeDependencies,
 } from "../src/astro/templates.ts";
-import { generateAsyncApiDocs, parseAsyncApi } from "../src/asyncapi/import.ts";
 import {
   buildChangelogRssFeeds,
   writeChangelogRssFeeds,
@@ -43,7 +43,11 @@ import type { PageRecord, ProjectContext } from "../src/core/types.ts";
 import { buildRobots } from "../src/deploy/robots.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
 import { buildSitemap } from "../src/deploy/sitemap.ts";
-import { generateApiDocs, parseOpenApi } from "../src/openapi/import.ts";
+import {
+  buildReferenceFiles,
+  referenceTabs,
+  resolveReferences,
+} from "../src/openapi/scalar.ts";
 import { buildSearchDocuments } from "../src/search/documents.ts";
 import { buildStructuredData } from "../src/seo/jsonld.ts";
 import { buildThemeCss } from "../src/theme/palette.ts";
@@ -450,135 +454,6 @@ const createMintlifyNestedNavigationFixture = async (): Promise<string> => {
   return root;
 };
 
-const writeAsyncApiFixture = async (root: string): Promise<void> => {
-  await writeFile(
-    join(root, "asyncapi.json"),
-    JSON.stringify({
-      asyncapi: "3.0.0",
-      channels: {
-        userUpdates: {
-          address: "users/{userId}/updates",
-          description: "Real-time user lifecycle updates.",
-          messages: {
-            UserUpdated: { $ref: "#/components/messages/UserUpdated" },
-          },
-          title: "User updates",
-        },
-      },
-      components: {
-        messages: {
-          UserUpdated: {
-            payload: { $ref: "#/components/schemas/UserUpdatedPayload" },
-            summary: "A user profile changed.",
-            title: "User updated",
-          },
-        },
-        schemas: {
-          UserUpdatedPayload: {
-            properties: {
-              email: {
-                description: "The user's new email address.",
-                format: "email",
-                type: "string",
-              },
-              profile: {
-                description: "Updated profile details.",
-                properties: {
-                  displayName: {
-                    description: "Public display name.",
-                    type: "string",
-                  },
-                  roles: {
-                    description: "Assigned user roles.",
-                    items: { type: "string" },
-                    type: "array",
-                  },
-                },
-                required: ["displayName"],
-                type: "object",
-              },
-              revisions: {
-                description: "Changed fields in this update.",
-                items: {
-                  properties: {
-                    field: {
-                      description: "Changed field name.",
-                      type: "string",
-                    },
-                    value: {
-                      description: "Changed field value.",
-                      oneOf: [
-                        {
-                          properties: {
-                            text: {
-                              description: "String value.",
-                              type: "string",
-                            },
-                          },
-                          title: "StringValue",
-                          type: "object",
-                        },
-                        {
-                          properties: {
-                            amount: {
-                              description: "Numeric value.",
-                              type: "number",
-                            },
-                          },
-                          title: "NumberValue",
-                          type: "object",
-                        },
-                      ],
-                    },
-                  },
-                  required: ["field"],
-                  type: "object",
-                },
-                type: "array",
-              },
-              userId: {
-                description: "The stable user identifier.",
-                type: "string",
-              },
-            },
-            required: ["userId"],
-            type: "object",
-          },
-        },
-      },
-      info: {
-        description: "A fixture event stream.",
-        title: "Fixture Events",
-        version: "1.0.0",
-      },
-      operations: {
-        receiveUserUpdates: {
-          action: "receive",
-          channel: { $ref: "#/channels/userUpdates" },
-          messages: [{ $ref: "#/components/messages/UserUpdated" }],
-          summary: "Receive user updates",
-        },
-      },
-    })
-  );
-};
-
-const createMintlifyAsyncApiFixture = async (): Promise<string> => {
-  const root = await createMintlifyFixture();
-  await writeAsyncApiFixture(root);
-  const raw = await readFile(join(root, "docs.json"), "utf-8");
-  const spec = JSON.parse(raw);
-  spec.navigation.pages.push({
-    asyncapi: {
-      directory: "events",
-      source: "/asyncapi.json",
-    },
-    group: "Event Reference",
-  });
-  await writeFile(join(root, "docs.json"), JSON.stringify(spec));
-  return root;
-};
-
 const renderContentConfig = (): string => {
   const config = blumeConfigSchema.parse({
     content: {
@@ -630,10 +505,8 @@ describe("config schema", () => {
   it("applies defaults for an empty config", () => {
     const config = blumeConfigSchema.parse({});
     expect(config).toMatchObject({
-      api: { asyncapi: [], openapi: [] },
       content: { root: "docs" },
       deployment: { output: "static" },
-      markdown: { schema: true },
       navigation: { chromeVariants: [], selectors: [], sidebarVariants: [] },
       search: { provider: "orama" },
       seo: { metatags: {} },
@@ -854,10 +727,7 @@ describe("astro config template", () => {
         'name: "blume-mintlify-mdx-snippets"',
         'import { existsSync } from "node:fs";',
         "rewriteMintlifyGlobalVariables",
-        "rewriteMintlifyAsyncApiPage",
-        "rewriteMintlifyManualApiPage",
         "rewriteMintlifyMarkdownSnippets",
-        "rewriteMintlifyOpenApiSchemaPage",
         "rewriteMintlifyUserVariable",
         '"product-name":"Blume Garden"',
         'const projectRoot = "/r";',
@@ -944,399 +814,6 @@ describe("astro config template", () => {
   });
 });
 
-describe("Mintlify OpenAPI pages", () => {
-  it("renders manual api frontmatter pages as static endpoint docs", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-manual-api-page-"));
-    try {
-      await writeFile(
-        join(root, "docs.json"),
-        JSON.stringify({
-          $schema: "https://mintlify.com/docs.json",
-          api: {
-            mdx: {
-              auth: { method: "key", name: "x-api-key" },
-              server: "https://api.example.com",
-            },
-            playground: {
-              credentials: true,
-              display: "interactive",
-              proxy: false,
-            },
-          },
-          name: "Manual API docs",
-          navigation: {
-            pages: ["create-user"],
-          },
-        })
-      );
-      await writeFile(
-        join(root, "create-user.mdx"),
-        [
-          "---",
-          "title: Create user",
-          'api: "POST /v1/users/{userId}"',
-          "deprecated: true",
-          "---",
-          "",
-          "Create a user manually.",
-          "",
-          '<ParamField path="userId" type="string" required>',
-          "  User identifier.",
-          "</ParamField>",
-          "",
-          '<ParamField query="notify" type="boolean" default={true}>',
-          "  Notify the user.",
-          "</ParamField>",
-          "",
-          '<ParamField body="email" type="string" required placeholder="alex@example.com">',
-          "  User email.",
-          "</ParamField>",
-          "",
-          '<ResponseField name="id" type="string" required>',
-          "  Created user identifier.",
-          "</ResponseField>",
-          "",
-        ].join("\n")
-      );
-
-      const project = await scanProject(root);
-      const page = project.graph.pages.find(
-        (candidate) => candidate.id === "create-user.mdx"
-      );
-      if (!page) {
-        throw new Error("Manual API page missing from fixture.");
-      }
-      const markdown = await buildPageMarkdown(project, page);
-
-      expect({
-        apiLayout: page.contentType,
-        endpoint: markdown.includes(
-          '<Endpoint method="POST" path={"/v1/users/{userId}"} deprecated={true} server={"https://api.example.com"} tryIt={false} />'
-        ),
-        noPlayground: !markdown.includes("<ApiPlayground"),
-        preservesFields:
-          markdown.includes('<ParamField path="userId"') &&
-          markdown.includes('<ParamField query="notify"') &&
-          markdown.includes('<ParamField body="email"') &&
-          markdown.includes('<ResponseField name="id"'),
-      }).toStrictEqual({
-        apiLayout: "api",
-        endpoint: true,
-        noPlayground: true,
-        preservesFields: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("renders openapi frontmatter endpoint docs after custom content", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-endpoint-page-"));
-    try {
-      await writeFile(
-        join(root, "docs.json"),
-        JSON.stringify({
-          $schema: "https://mintlify.com/docs.json",
-          name: "Endpoint docs",
-          navigation: {
-            pages: ["endpoint"],
-          },
-        })
-      );
-      await writeFile(
-        join(root, "openapi.json"),
-        JSON.stringify({
-          info: { title: "Pets API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {
-            "/pets/{petId}": {
-              get: {
-                callbacks: {
-                  petUpdated: {
-                    "{$request.body#/callbackUrl}": {
-                      post: {
-                        requestBody: {
-                          content: {
-                            "application/json": {
-                              schema: {
-                                properties: {
-                                  status: {
-                                    description: "Updated pet status.",
-                                    type: "string",
-                                  },
-                                },
-                                type: "object",
-                              },
-                            },
-                          },
-                        },
-                        responses: {
-                          "200": {
-                            description: "Callback received.",
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-                description: "Returns a pet.",
-                operationId: "getPet",
-                parameters: [
-                  {
-                    description: "Pet identifier.",
-                    in: "path",
-                    name: "petId",
-                    required: true,
-                    schema: { type: "string" },
-                  },
-                ],
-                responses: {
-                  "200": {
-                    content: {
-                      "application/json": {
-                        schema: {
-                          properties: {
-                            id: {
-                              description: "Stable pet identifier.",
-                              type: "string",
-                            },
-                          },
-                          required: ["id"],
-                          type: "object",
-                        },
-                      },
-                    },
-                    description: "Pet response.",
-                  },
-                },
-                summary: "Get pet",
-              },
-            },
-          },
-          servers: [{ url: "https://api.example.com" }],
-        })
-      );
-      await writeFile(
-        join(root, "endpoint.mdx"),
-        [
-          "---",
-          "title: Pet details",
-          'openapi: "openapi.json GET /pets/{petId}/"',
-          "---",
-          "",
-          "Custom overview.",
-          "",
-        ].join("\n")
-      );
-
-      const project = await scanProject(root);
-      const page = project.graph.pages.find(
-        (candidate) => candidate.id === "endpoint.mdx"
-      );
-      if (!page) {
-        throw new Error("Endpoint page missing from fixture.");
-      }
-      const markdown = await buildPageMarkdown(project, page);
-
-      expect({
-        apiLayout: page.contentType,
-        callback:
-          markdown.includes("## Callbacks") &&
-          markdown.includes("#### petUpdated") &&
-          markdown.includes('path={"{$request.body#/callbackUrl}"}'),
-        customBeforeEndpoint:
-          markdown.indexOf("Custom overview.") < markdown.indexOf("<Endpoint"),
-        endpoint: markdown.includes(
-          '<Endpoint method="GET" path={"/pets/{petId}"} server={"https://api.example.com"} requestExampleId="blume-request-example" />'
-        ),
-        pathParameter: markdown.includes('"name":"petId"'),
-        responseField: markdown.includes('"name":"id"'),
-      }).toStrictEqual({
-        apiLayout: "api",
-        callback: true,
-        customBeforeEndpoint: true,
-        endpoint: true,
-        pathParameter: true,
-        responseField: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("renders webhook openapi frontmatter pages", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-webhook-page-"));
-    try {
-      await writeFile(
-        join(root, "docs.json"),
-        JSON.stringify({
-          $schema: "https://mintlify.com/docs.json",
-          name: "Webhook docs",
-          navigation: {
-            pages: ["webhook"],
-          },
-        })
-      );
-      await writeFile(
-        join(root, "openapi.json"),
-        JSON.stringify({
-          info: { title: "Webhook API", version: "1.0.0" },
-          openapi: "3.1.0",
-          paths: {},
-          webhooks: {
-            orderUpdated: {
-              post: {
-                requestBody: {
-                  content: {
-                    "application/json": {
-                      schema: {
-                        properties: {
-                          orderId: {
-                            description: "Order identifier.",
-                            type: "string",
-                          },
-                        },
-                        required: ["orderId"],
-                        type: "object",
-                      },
-                    },
-                  },
-                },
-                responses: {
-                  "200": {
-                    description: "Webhook received.",
-                  },
-                },
-                summary: "Order updated webhook",
-              },
-            },
-          },
-        })
-      );
-      await writeFile(
-        join(root, "webhook.mdx"),
-        [
-          "---",
-          "title: Order updated webhook",
-          'openapi: "openapi.json webhook orderUpdated"',
-          "---",
-          "",
-          "Custom webhook notes.",
-          "",
-        ].join("\n")
-      );
-
-      const project = await scanProject(root);
-      const page = project.graph.pages.find(
-        (candidate) => candidate.id === "webhook.mdx"
-      );
-      if (!page) {
-        throw new Error("Webhook page missing from fixture.");
-      }
-      const markdown = await buildPageMarkdown(project, page);
-
-      expect({
-        apiLayout: page.contentType,
-        bodyField: markdown.includes('"name":"orderId"'),
-        customBeforeEndpoint:
-          markdown.indexOf("Custom webhook notes.") <
-          markdown.indexOf("<Endpoint"),
-        endpoint: markdown.includes(
-          '<Endpoint method="POST" path={"orderUpdated"} tryIt={false} />'
-        ),
-      }).toStrictEqual({
-        apiLayout: "api",
-        bodyField: true,
-        customBeforeEndpoint: true,
-        endpoint: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("renders openapi-schema frontmatter from components.schemas", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-schema-page-"));
-    try {
-      await writeFile(
-        join(root, "docs.json"),
-        JSON.stringify({
-          $schema: "https://mintlify.com/docs.json",
-          name: "Schema docs",
-          navigation: {
-            pages: ["model"],
-          },
-          openapi: "/openapi.json",
-        })
-      );
-      await writeFile(
-        join(root, "openapi.json"),
-        JSON.stringify({
-          components: {
-            schemas: {
-              Pet: {
-                description: "Pet object.",
-                properties: {
-                  id: {
-                    description: "Stable pet identifier.",
-                    type: "string",
-                  },
-                  profile: {
-                    properties: {
-                      age: {
-                        description: "Pet age.",
-                        type: "integer",
-                      },
-                    },
-                    type: "object",
-                  },
-                },
-                required: ["id"],
-                title: "Pet",
-                type: "object",
-              },
-            },
-          },
-          info: { title: "Pets API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {},
-        })
-      );
-      await writeFile(
-        join(root, "model.mdx"),
-        '---\nopenapi-schema: "openapi.json Pet"\n---\n'
-      );
-
-      const project = await scanProject(root);
-      const page = project.graph.pages.find(
-        (candidate) => candidate.id === "model.mdx"
-      );
-      if (!page) {
-        throw new Error("Schema page missing from fixture.");
-      }
-      const markdown = await buildPageMarkdown(project, page);
-
-      expect({
-        graphHeading: page.headings.some((heading) => heading.text === "Pet"),
-        graphTitle: page.title,
-        markdownDescription: markdown.includes("Pet object."),
-        nestedProperty: markdown.includes('"name":"profile.age"'),
-        requiredProperty:
-          markdown.includes('"name":"id"') &&
-          markdown.includes('"required":true'),
-      }).toStrictEqual({
-        graphHeading: true,
-        graphTitle: "Pet",
-        markdownDescription: true,
-        nestedProperty: true,
-        requiredProperty: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-});
-
 describe("content config template", () => {
   it("passes include and exclude patterns separately to the Blume loader", () => {
     const output = renderContentConfig();
@@ -1344,7 +821,6 @@ describe("content config template", () => {
     expect(output).toContain(
       'import { blumeContentLoader } from "blume/astro"'
     );
-    expect(output).toContain("additionalBases: []");
     expect(output).toContain('ignore: ["**/.*",".blume/**","drafts/**"]');
     expect(output).toContain('pattern: ["**/*.{md,mdx}"]');
   });
@@ -1374,9 +850,7 @@ describe("MDX component template", () => {
       "AccordionItem",
       "CodeGroup",
       "Panel",
-      "ParamField",
       "Prompt",
-      "ResponseField",
       "Tile",
       "Visibility",
     ]) {
@@ -1432,18 +906,6 @@ describe("Mintlify compatibility config", () => {
       const { config, configFile } = await loadConfig(root);
       expect(configFile).toBe(join(root, "docs.json"));
       expect(config).toMatchObject({
-        api: {
-          examples: {
-            defaults: "required",
-            languages: ["curl", "javascript"],
-            prefill: true,
-          },
-          playground: {
-            credentials: true,
-            display: "interactive",
-            proxy: false,
-          },
-        },
         banner: {
           content:
             "Version **2.0** is live. Read the [quickstart](/quickstart).",
@@ -1485,7 +947,6 @@ describe("Mintlify compatibility config", () => {
             },
           },
           math: true,
-          schema: true,
         },
         navbar: {
           links: [{ href: "mailto:hi@blume.dev", label: "Support" }],
@@ -1523,9 +984,6 @@ describe("Mintlify compatibility config", () => {
           "product-name": "Blume Garden",
         },
       });
-      expect(config.api.openapi).toStrictEqual([
-        { directory: "api-reference", source: "/openapi.json" },
-      ]);
       expect(config.navigation.tabs?.[0]).toStrictEqual({
         label: "GitHub",
         path: "https://github.com",
@@ -1565,23 +1023,6 @@ describe("Mintlify compatibility config", () => {
     }
   });
 
-  it("maps Mintlify api.params post pills", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const raw = await readFile(join(root, "docs.json"), "utf-8");
-      const spec = JSON.parse(raw);
-      spec.api.params = { post: ["nullable", "x-internal"] };
-      await writeFile(join(root, "docs.json"), JSON.stringify(spec));
-
-      const { config } = await loadConfig(root);
-      expect(config.api.params).toStrictEqual({
-        post: ["nullable", "x-internal"],
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
   it("scans root MDX pages, navigation, and .mintignore", async () => {
     const root = await createMintlifyFixture();
     try {
@@ -1589,11 +1030,6 @@ describe("Mintlify compatibility config", () => {
       expect(project.graph.pages.map((page) => page.route)).toStrictEqual([
         "/",
         "/quickstart",
-        "/api-reference/create-pet",
-        "/api-reference/hidden-pets",
-        "/api-reference",
-        "/api-reference/legacy-pets",
-        "/api-reference/list-pets",
       ]);
       expect(
         project.graph.pages.find((page) => page.route === "/")?.title
@@ -1610,28 +1046,6 @@ describe("Mintlify compatibility config", () => {
             { label: "Quickstart", route: "/quickstart" },
           ],
           label: "Getting Started",
-        },
-        {
-          children: [
-            { label: "Fixture API", route: "/api-reference" },
-            {
-              apiMethod: "GET",
-              deprecated: true,
-              label: "Legacy pets",
-              route: "/api-reference/legacy-pets",
-            },
-            {
-              apiMethod: "GET",
-              label: "List pets",
-              route: "/api-reference/list-pets",
-            },
-            {
-              apiMethod: "POST",
-              label: "Create a pet",
-              route: "/api-reference/create-pet",
-            },
-          ],
-          label: "API Reference",
         },
       ]);
       const search = await buildSearchDocuments(project);
@@ -1663,134 +1077,12 @@ describe("Mintlify compatibility config", () => {
     }
   });
 
-  it("includes OpenAPI schemas in Mintlify Markdown exports by default", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const project = await scanProject(root);
-      const page = project.graph.pages.find(
-        (candidate) => candidate.route === "/api-reference/list-pets"
-      );
-      if (!page) {
-        throw new Error("OpenAPI page missing from fixture.");
-      }
-      const markdown = await buildPageMarkdown(project, page);
-      expect(markdown).toContain("## OpenAPI schema");
-      expect(markdown).toContain("Source: /openapi.json");
-      expect(markdown).toContain('"openapi":"3.0.0"');
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("fetches remote OpenAPI schemas for Mintlify Markdown exports", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-remote-schema-"));
-    const sourcePath = join(root, "remote.mdx");
-    const config = blumeConfigSchema.parse({
-      api: {
-        openapi: [
-          {
-            directory: "api-reference",
-            source: "https://example.test/openapi.json?version=1",
-          },
-        ],
-      },
-    });
-    const page = makePage({
-      id: "remote.mdx",
-      route: "/api-reference/list-pets",
-      sourcePath,
-      title: "Remote API",
-    });
-    const fetchMock = vi.fn<typeof globalThis.fetch>(() =>
-      Promise.resolve(new Response('{"openapi":"3.1.0"}'))
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    try {
-      await writeFile(sourcePath, "---\ntitle: Remote API\n---\n\nBody.\n");
-      const project: BlumeProject = {
-        config,
-        context: {
-          componentsFile: null,
-          configFile: join(root, "docs.json"),
-          contentRoot: root,
-          generatedContentRoot: null,
-          outDir: join(root, ".blume"),
-          pagesRoot: null,
-          publicRoot: join(root, "public"),
-          root,
-          themeFile: null,
-          themeFiles: [],
-        },
-        diagnostics: [],
-        graph: {
-          diagnostics: [],
-          navigation: {
-            chromeVariants: [],
-            selectors: [],
-            sidebar: [],
-            sidebarVariants: [],
-            tabs: [],
-          },
-          pages: [page],
-          routes: new Map([[page.route, page.id]]),
-        },
-        manifest: {
-          blumeVersion: "0.0.0",
-          contentRoot: root,
-          output: config.deployment.output,
-          projectRoot: root,
-          routes: [],
-          version: 1,
-        },
-        mode: "dev",
-      };
-
-      const markdown = await buildPageMarkdown(project, page);
-      expect(markdown).toContain("## OpenAPI schema");
-      expect(markdown).toContain(
-        "Source: https://example.test/openapi.json?version=1"
-      );
-      expect(markdown).toContain('```json\n{"openapi":"3.1.0"}\n```');
-      expect(fetchMock).toHaveBeenCalledWith(
-        "https://example.test/openapi.json?version=1"
-      );
-    } finally {
-      vi.unstubAllGlobals();
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("respects Mintlify markdown.schema false", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const raw = await readFile(join(root, "docs.json"), "utf-8");
-      const spec = JSON.parse(raw);
-      spec.markdown = { schema: false };
-      await writeFile(join(root, "docs.json"), JSON.stringify(spec));
-
-      const project = await scanProject(root);
-      expect(project.config.markdown.schema).toBeFalsy();
-      const page = project.graph.pages.find(
-        (candidate) => candidate.route === "/api-reference/list-pets"
-      );
-      if (!page) {
-        throw new Error("OpenAPI page missing from fixture.");
-      }
-      const markdown = await buildPageMarkdown(project, page);
-      expect(markdown).not.toContain("## OpenAPI schema");
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
   it("writes Blume llms and Markdown artifacts", async () => {
     const root = await createMintlifyFixture();
     try {
       const project = await scanProject(root);
       const { index } = await buildLlmsFiles(project);
       expect(index).toContain("- [Quickstart](/quickstart.md): Start quickly.");
-      expect(index).toContain("## OpenAPI Specs");
 
       const outDir = join(root, "markdown-output");
       await writeLlmsArtifacts(project, outDir);
@@ -1871,7 +1163,7 @@ describe("Mintlify compatibility config", () => {
       await expect(writeChangelogRssFeeds(project, outDir)).resolves.toBe(1);
       await expect(
         readFile(join(outDir, "changelog", "rss.xml"), "utf-8")
-      ).resolves.toBe(feeds[0]?.content);
+      ).resolves.toBe(content);
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -2061,41 +1353,6 @@ describe("Mintlify compatibility config", () => {
         "Call `POST /v1/accounts`"
       );
       expect(markdownByRoute["/quickstart"]).not.toContain("Get started");
-      expect(markdownByRoute["/api-reference/list-pets"]).toContain(
-        "## OpenAPI schema"
-      );
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("maps Mintlify OpenAPI visibility metadata into routes and navigation", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const project = await scanProject(root);
-      const routes = new Set(project.graph.pages.map((page) => page.route));
-      const sidebarPages = flattenPages(project.graph.navigation.sidebar);
-      const sidebarByRoute = new Map(
-        sidebarPages.map((page) => [page.route, page])
-      );
-      const routeIndexability = new Map(
-        project.manifest.routes.map((route) => [route.path, route.indexable])
-      );
-
-      expect({
-        excludedRoute: routes.has("/api-reference/internal-pets"),
-        hiddenIndexable: routeIndexability.get("/api-reference/hidden-pets"),
-        hiddenRoute: routes.has("/api-reference/hidden-pets"),
-        hiddenSidebar: sidebarByRoute.has("/api-reference/hidden-pets"),
-        legacyDeprecated: sidebarByRoute.get("/api-reference/legacy-pets")
-          ?.deprecated,
-      }).toStrictEqual({
-        excludedRoute: false,
-        hiddenIndexable: false,
-        hiddenRoute: true,
-        hiddenSidebar: false,
-        legacyDeprecated: true,
-      });
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -2137,7 +1394,6 @@ describe("Mintlify compatibility config", () => {
           label: "Developers",
           path: "/sdk/js",
         },
-        { label: "API", path: "/api" },
         { label: "Support", path: "https://example.com/support" },
       ]);
       expect(config.navigation.selectors).toStrictEqual([
@@ -2172,14 +1428,6 @@ describe("Mintlify compatibility config", () => {
         {
           items: [{ icon: "code", items: ["sdk/js"], label: "SDKs" }],
           path: "/sdk/js",
-        },
-        {
-          items: [{ items: ["api/index", "api/list-things"], label: "API" }],
-          path: "/api",
-        },
-        {
-          items: [{ items: ["api/index", "api/list-things"], label: "API" }],
-          path: "/api/list-things",
         },
         {
           items: [{ items: ["resources/reference"], label: "Resources" }],
@@ -2230,9 +1478,6 @@ describe("Mintlify compatibility config", () => {
           path: "/en/intro",
         },
       ]);
-      expect(config.api.openapi).toStrictEqual([
-        { directory: "api", source: "/openapi.json" },
-      ]);
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -2250,7 +1495,6 @@ describe("Mintlify compatibility config", () => {
               label: "Guides",
               path: "/guides/quickstart",
             },
-            { icon: "code", label: "API Reference", path: "/api-reference" },
           ],
           label: "Documentation",
           path: "/guides/quickstart",
@@ -2271,11 +1515,6 @@ describe("Mintlify compatibility config", () => {
                   items: ["guides/quickstart", "guides/tutorial"],
                   label: "Guides",
                 },
-                {
-                  icon: "code",
-                  items: ["api-reference/index", "api-reference/list-things"],
-                  label: "API Reference",
-                },
               ],
               label: "Documentation",
             },
@@ -2291,56 +1530,11 @@ describe("Mintlify compatibility config", () => {
                   items: ["guides/quickstart", "guides/tutorial"],
                   label: "Guides",
                 },
-                {
-                  icon: "code",
-                  items: ["api-reference/index", "api-reference/list-things"],
-                  label: "API Reference",
-                },
               ],
               label: "Documentation",
             },
           ],
           path: "/guides/tutorial",
-        },
-        {
-          items: [
-            {
-              items: [
-                {
-                  icon: "book-open",
-                  items: ["guides/quickstart", "guides/tutorial"],
-                  label: "Guides",
-                },
-                {
-                  icon: "code",
-                  items: ["api-reference/index", "api-reference/list-things"],
-                  label: "API Reference",
-                },
-              ],
-              label: "Documentation",
-            },
-          ],
-          path: "/api-reference",
-        },
-        {
-          items: [
-            {
-              items: [
-                {
-                  icon: "book-open",
-                  items: ["guides/quickstart", "guides/tutorial"],
-                  label: "Guides",
-                },
-                {
-                  icon: "code",
-                  items: ["api-reference/index", "api-reference/list-things"],
-                  label: "API Reference",
-                },
-              ],
-              label: "Documentation",
-            },
-          ],
-          path: "/api-reference/list-things",
         },
         {
           items: [
@@ -2360,9 +1554,6 @@ describe("Mintlify compatibility config", () => {
           ],
           path: "/faq",
         },
-      ]);
-      expect(config.api.openapi).toStrictEqual([
-        { directory: "api-reference", source: "/openapi.json" },
       ]);
     } finally {
       await rm(root, { force: true, recursive: true });
@@ -2659,746 +1850,6 @@ describe("Mintlify compatibility config", () => {
       await rm(root, { force: true, recursive: true });
     }
   });
-
-  it("maps Mintlify AsyncAPI navigation and generates channel pages", async () => {
-    const root = await createMintlifyAsyncApiFixture();
-    try {
-      const { config } = await loadConfig(root);
-      expect(config.api.asyncapi).toStrictEqual([
-        { directory: "events", source: "/asyncapi.json" },
-      ]);
-
-      const project = await scanProject(root);
-      expect(project.graph.pages.map((page) => page.route)).toStrictEqual(
-        expect.arrayContaining(["/events", "/events/user-updates"])
-      );
-      expect(project.graph.navigation.sidebar).toMatchObject([
-        expect.any(Object),
-        expect.any(Object),
-        {
-          children: [
-            { label: "Fixture Events", route: "/events" },
-            { label: "User updates", route: "/events/user-updates" },
-          ],
-          label: "Event Reference",
-        },
-      ]);
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("includes AsyncAPI schemas in Mintlify Markdown exports", async () => {
-    const root = await createMintlifyAsyncApiFixture();
-    try {
-      const project = await scanProject(root);
-      const page = project.graph.pages.find(
-        (candidate) => candidate.route === "/events/user-updates"
-      );
-      if (!page) {
-        throw new Error("AsyncAPI page missing from fixture.");
-      }
-      const markdown = await buildPageMarkdown(project, page);
-      expect(markdown).toContain("## AsyncAPI schema");
-      expect(markdown).toContain("Source: /asyncapi.json");
-      expect(markdown).toContain('"asyncapi":"3.0.0"');
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("renders manual asyncapi frontmatter channel pages", async () => {
-    const root = await createMintlifyAsyncApiFixture();
-    try {
-      await writeFile(
-        join(root, "manual-channel.mdx"),
-        [
-          "---",
-          "title: Manual channel",
-          'asyncapi: "/asyncapi.json userUpdates"',
-          "---",
-          "",
-          "Custom channel notes.",
-          "",
-        ].join("\n")
-      );
-
-      const project = await scanProject(root);
-      const page = project.graph.pages.find(
-        (candidate) => candidate.id === "manual-channel.mdx"
-      );
-      if (!page) {
-        throw new Error("Manual AsyncAPI page missing from fixture.");
-      }
-      const markdown = await buildPageMarkdown(project, page);
-
-      expect({
-        apiLayout: page.contentType,
-        customBeforeGenerated:
-          markdown.indexOf("Custom channel notes.") <
-          markdown.indexOf("## Operations"),
-        message: markdown.includes("### User updated"),
-        operation: markdown.includes("### Receive user updates"),
-        payload: markdown.includes('name={"userId"}'),
-      }).toStrictEqual({
-        apiLayout: "api",
-        customBeforeGenerated: true,
-        message: true,
-        operation: true,
-        payload: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("generates request examples for OpenAPI operations", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const doc = await parseOpenApi(join(root, "openapi.json"));
-      const outDir = join(root, "generated-api");
-      await generateApiDocs(doc, outDir);
-      const output = await readFile(join(outDir, "list-pets.mdx"), "utf-8");
-      expect(output).toContain(
-        '<Endpoint method="GET" path={"/pets"} server={"https://api.example.com"} requestExampleId="blume-request-example" />'
-      );
-      expect(output).not.toContain("<ApiPlayground");
-      expect(output).toContain(
-        '<RequestExample title="List pets" id="blume-request-example">'
-      );
-      expect(output).toContain("curl --request GET \\");
-      expect(output).toContain("--url 'https://api.example.com/pets'");
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("applies OpenAPI x-mint content and href overrides", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-href-"));
-    try {
-      const outDir = join(root, "api-reference");
-      const paths = await generateApiDocs(
-        {
-          info: { title: "Custom API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {
-            "/legacy": {
-              get: {
-                operationId: "legacyEndpoint",
-                parameters: [
-                  {
-                    in: "query",
-                    name: "include_archived",
-                    schema: { type: "boolean" },
-                  },
-                ],
-                responses: { "200": { description: "OK." } },
-                summary: "Legacy endpoint",
-                "x-mint": {
-                  content:
-                    "## Prerequisites\n\n<Note>Use this endpoint only for legacy clients.</Note>",
-                  href: "/deprecated/endpoints/legacy",
-                },
-              },
-            },
-          },
-        },
-        outDir,
-        { rootDir: root }
-      );
-      const customPath = join(root, "deprecated", "endpoints", "legacy.mdx");
-      const defaultPath = join(outDir, "legacy-endpoint.mdx");
-      const output = await readFile(customPath, "utf-8");
-
-      expect({
-        contentBeforeParameters:
-          output.indexOf("## Prerequisites") <
-          output.indexOf("<ParameterTable"),
-        hasMintlifyComponent: output.includes(
-          "<Note>Use this endpoint only for legacy clients.</Note>"
-        ),
-        includesDefaultPath: paths.includes(defaultPath),
-        includesHrefPath: paths.includes(customPath),
-      }).toStrictEqual({
-        contentBeforeParameters: true,
-        hasMintlifyComponent: true,
-        includesDefaultPath: false,
-        includesHrefPath: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("generates OpenAPI parameter pills from x-mint and api params config", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-pills-"));
-    try {
-      const outDir = join(root, "api-reference");
-      await generateApiDocs(
-        {
-          info: { title: "Pill API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {
-            "/users": {
-              post: {
-                operationId: "createUser",
-                parameters: [
-                  {
-                    in: "query",
-                    name: "email",
-                    schema: {
-                      nullable: true,
-                      readOnly: true,
-                      type: "string",
-                      "x-internal": "admin",
-                      "x-mint": {
-                        post: ["indexed"],
-                        pre: ["PII"],
-                      },
-                    },
-                  },
-                ],
-                requestBody: {
-                  content: {
-                    "application/json": {
-                      schema: {
-                        properties: {
-                          password: {
-                            deprecated: true,
-                            description: "Temporary password.",
-                            type: "string",
-                            writeOnly: true,
-                          },
-                        },
-                        type: "object",
-                      },
-                    },
-                  },
-                },
-                responses: { "201": { description: "Created." } },
-                summary: "Create user",
-              },
-            },
-          },
-        },
-        outDir,
-        { params: { post: ["nullable", "x-internal"] } }
-      );
-      const output = await readFile(join(outDir, "create-user.mdx"), "utf-8");
-
-      expect({
-        configuredPost: output.includes(
-          '"post":["read-only","nullable","admin","indexed"]'
-        ),
-        deprecatedBody: output.includes('"deprecated":true'),
-        prePill: output.includes('"pre":["PII"]'),
-        writeOnlyBody: output.includes('"post":["write-only"]'),
-      }).toStrictEqual({
-        configuredPost: true,
-        deprecatedBody: true,
-        prePill: true,
-        writeOnlyBody: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("generates nested OpenAPI schema fields from local refs", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-schema-"));
-    try {
-      const outDir = join(root, "api-reference");
-      await generateApiDocs(
-        {
-          components: {
-            schemas: {
-              AuditFields: {
-                properties: {
-                  createdAt: {
-                    description: "When the record was created.",
-                    format: "date-time",
-                    type: "string",
-                  },
-                },
-                required: ["createdAt"],
-                type: "object",
-              },
-              Post: {
-                properties: {
-                  title: {
-                    description: "Post title.",
-                    type: "string",
-                  },
-                },
-                required: ["title"],
-                type: "object",
-              },
-              Profile: {
-                properties: {
-                  email: {
-                    description: "Primary email address.",
-                    type: "string",
-                  },
-                  tags: {
-                    description: "Profile tags.",
-                    items: { type: "string" },
-                    type: "array",
-                  },
-                },
-                required: ["email"],
-                type: "object",
-              },
-              User: {
-                allOf: [
-                  { $ref: "#/components/schemas/AuditFields" },
-                  {
-                    properties: {
-                      id: {
-                        description: "Stable user identifier.",
-                        type: "string",
-                      },
-                      posts: {
-                        description: "Published posts.",
-                        items: { $ref: "#/components/schemas/Post" },
-                        type: "array",
-                      },
-                      profile: { $ref: "#/components/schemas/Profile" },
-                    },
-                    required: ["id", "profile"],
-                    type: "object",
-                  },
-                ],
-              },
-            },
-          },
-          info: { title: "Schema API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {
-            "/users": {
-              post: {
-                operationId: "createUserWithSchema",
-                requestBody: {
-                  content: {
-                    "application/json": {
-                      schema: { $ref: "#/components/schemas/User" },
-                    },
-                  },
-                },
-                responses: {
-                  "200": {
-                    content: {
-                      "application/json": {
-                        examples: {
-                          active: {
-                            summary: "Active user",
-                            value: { id: "user_123" },
-                          },
-                          archived: {
-                            summary: "Archived user",
-                            value: { id: "user_456" },
-                          },
-                        },
-                        schema: { $ref: "#/components/schemas/User" },
-                      },
-                    },
-                    description: "Created.",
-                  },
-                },
-                summary: "Create user with schema",
-              },
-            },
-          },
-        },
-        outDir
-      );
-      const output = await readFile(
-        join(outDir, "create-user-with-schema.mdx"),
-        "utf-8"
-      );
-
-      expect({
-        arrayChild: output.includes('"name":"posts[].title"'),
-        arrayType: output.includes(
-          '"name":"posts","post":[],"pre":[],"required":false,"type":"object[]"'
-        ),
-        examples:
-          output.includes("### Active user") &&
-          output.includes("### Archived user"),
-        localRefChild: output.includes('"name":"profile.email"'),
-        primitiveArray:
-          output.includes('"name":"profile.tags"') &&
-          output.includes('"type":"string[]"'),
-        requiredFromAllOf:
-          output.includes('"name":"createdAt"') &&
-          output.includes('"required":true'),
-        responseSchema: output.includes(
-          '<ParameterTable title="Response 200 body"'
-        ),
-      }).toStrictEqual({
-        arrayChild: true,
-        arrayType: true,
-        examples: true,
-        localRefChild: true,
-        primitiveArray: true,
-        requiredFromAllOf: true,
-        responseSchema: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("generates tagged OpenAPI pages under the tag URL segment", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-tags-"));
-    try {
-      const outDir = join(root, "api-reference");
-      const paths = await generateApiDocs(
-        {
-          info: { title: "Tagged API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {
-            "/users": {
-              get: {
-                operationId: "listUsers",
-                responses: { "200": { description: "OK." } },
-                summary: "List users",
-                tags: ["user-management"],
-              },
-            },
-          },
-          tags: [{ name: "user-management", "x-group": "User Management" }],
-        },
-        outDir
-      );
-      const groupedPath = join(outDir, "user-management", "list-users.mdx");
-      const flatPath = join(outDir, "list-users.mdx");
-
-      expect({
-        groupedOutput: paths.includes(groupedPath),
-        oldFlatOutput: paths.includes(flatPath),
-      }).toStrictEqual({
-        groupedOutput: true,
-        oldFlatOutput: false,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("generates Mintlify OpenAPI hidden and deprecated endpoint metadata", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-visibility-"));
-    try {
-      const outDir = join(root, "api-reference");
-      const paths = await generateApiDocs(
-        {
-          info: { title: "Visibility API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {
-            "/hidden": {
-              get: {
-                operationId: "hiddenEndpoint",
-                responses: { "200": { description: "OK." } },
-                summary: "Hidden endpoint",
-                "x-hidden": true,
-              },
-            },
-            "/internal": {
-              get: {
-                operationId: "internalEndpoint",
-                responses: { "200": { description: "OK." } },
-                summary: "Internal endpoint",
-                "x-excluded": true,
-              },
-            },
-            "/legacy": {
-              get: {
-                deprecated: true,
-                operationId: "legacyEndpoint",
-                responses: { "200": { description: "OK." } },
-                summary: "Legacy endpoint",
-              },
-            },
-          },
-        },
-        outDir
-      );
-      const hiddenPath = join(outDir, "hidden-endpoint.mdx");
-      const internalPath = join(outDir, "internal-endpoint.mdx");
-      const legacyOutput = await readFile(
-        join(outDir, "legacy-endpoint.mdx"),
-        "utf-8"
-      );
-      const hiddenOutput = await readFile(hiddenPath, "utf-8");
-
-      expect({
-        deprecatedEndpoint: legacyOutput.includes("deprecated={true}"),
-        deprecatedFrontmatter: legacyOutput.includes("deprecated: true"),
-        excluded: paths.includes(internalPath),
-        hiddenFrontmatter: hiddenOutput.includes("hidden: true"),
-        hiddenOutput: paths.includes(hiddenPath),
-      }).toStrictEqual({
-        deprecatedEndpoint: true,
-        deprecatedFrontmatter: true,
-        excluded: false,
-        hiddenFrontmatter: true,
-        hiddenOutput: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("uses OpenAPI x-group labels in Mintlify navigation", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const raw = await readFile(join(root, "openapi.json"), "utf-8");
-      const spec = JSON.parse(raw);
-      spec.tags = [{ name: "pet-store", "x-group": "Pet Store" }];
-      spec.paths["/pets"].get.tags = ["pet-store"];
-      await writeFile(join(root, "openapi.json"), JSON.stringify(spec));
-
-      const project = await scanProject(root);
-      const routes = new Set(project.graph.pages.map((page) => page.route));
-      const sidebar = JSON.stringify(project.graph.navigation.sidebar);
-      const sidebarRoutes = flattenPages(project.graph.navigation.sidebar).map(
-        (page) => page.route
-      );
-
-      expect({
-        customRoute: routes.has("/api-reference/pet-store/list-pets"),
-        oldRoute: routes.has("/api-reference/list-pets"),
-        sidebarGroup: sidebar.includes('"label":"Pet Store"'),
-        sidebarRoute: sidebarRoutes.includes(
-          "/api-reference/pet-store/list-pets"
-        ),
-      }).toStrictEqual({
-        customRoute: true,
-        oldRoute: false,
-        sidebarGroup: true,
-        sidebarRoute: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("uses OpenAPI x-mint href in Mintlify navigation", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const raw = await readFile(join(root, "openapi.json"), "utf-8");
-      const spec = JSON.parse(raw);
-      spec.paths["/pets"].get["x-mint"] = {
-        href: "/reference/pets/list",
-      };
-      await writeFile(join(root, "openapi.json"), JSON.stringify(spec));
-
-      const project = await scanProject(root);
-      const routes = new Set(project.graph.pages.map((page) => page.route));
-      const sidebarRoutes = flattenPages(project.graph.navigation.sidebar).map(
-        (page) => page.route
-      );
-
-      expect({
-        customRoute: routes.has("/reference/pets/list"),
-        oldRoute: routes.has("/api-reference/list-pets"),
-        sidebarRoute: sidebarRoutes.includes("/reference/pets/list"),
-      }).toStrictEqual({
-        customRoute: true,
-        oldRoute: false,
-        sidebarRoute: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("generates static OpenAPI request examples without playground auth fields", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-auth-"));
-    try {
-      const outDir = join(root, "generated-api");
-      await generateApiDocs(
-        {
-          components: {
-            securitySchemes: {
-              bearerAuth: {
-                scheme: "bearer",
-                type: "http",
-                "x-default": "demo-token",
-              },
-            },
-          },
-          info: { title: "Auth API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {
-            "/users/{userId}": {
-              get: {
-                operationId: "getUser",
-                parameters: [
-                  {
-                    in: "path",
-                    name: "userId",
-                    required: true,
-                    schema: { type: "string" },
-                  },
-                ],
-                responses: { "200": { description: "OK." } },
-                security: [{ bearerAuth: [] }],
-                summary: "Get user",
-              },
-            },
-          },
-          servers: [{ url: "https://api.example.com/v1" }],
-        },
-        outDir,
-        { examples: { prefill: true } }
-      );
-      const output = await readFile(join(outDir, "get-user.mdx"), "utf-8");
-
-      expect({
-        endpoint: output.includes(
-          '<Endpoint method="GET" path={"/users/{userId}"} server={"https://api.example.com/v1"} requestExampleId="blume-request-example" />'
-        ),
-        noAuthField: !output.includes('"name":"Authorization"'),
-        noProxy: !output.includes("proxy={true}"),
-        requestExample: output.includes(
-          '<RequestExample title="Get user" id="blume-request-example">'
-        ),
-        requestUrl: output.includes(
-          "--url 'https://api.example.com/v1/users/{userId}'"
-        ),
-        userParam: output.includes('"name":"userId"'),
-      }).toStrictEqual({
-        endpoint: true,
-        noAuthField: true,
-        noProxy: true,
-        requestExample: true,
-        requestUrl: true,
-        userParam: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("carries x-mint group metadata into generated API pages", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-openapi-groups-"));
-    try {
-      const outDir = join(root, "generated-api");
-      await generateApiDocs(
-        {
-          info: { title: "Grouped API", version: "1.0.0" },
-          openapi: "3.0.0",
-          paths: {
-            "/admin/users": {
-              post: {
-                operationId: "createAdminUser",
-                responses: { "201": { description: "Created." } },
-                summary: "Create admin user",
-                "x-mint": {
-                  metadata: {
-                    description: "Create a user with admin privileges.",
-                    groups: ["admin"],
-                    playground: "auth",
-                    public: true,
-                    sidebarTitle: "Create admin",
-                    title: "Create privileged user",
-                  },
-                },
-              },
-            },
-            "/billing": {
-              get: {
-                operationId: "getBilling",
-                responses: { "200": { description: "OK." } },
-                summary: "Get billing",
-              },
-              "x-mint": {
-                groups: ["billing"],
-              },
-            },
-          },
-          servers: [{ url: "https://api.example.com" }],
-        },
-        outDir
-      );
-
-      const publicOutput = await readFile(
-        join(outDir, "create-admin-user.mdx"),
-        "utf-8"
-      );
-      const restrictedOutput = await readFile(
-        join(outDir, "get-billing.mdx"),
-        "utf-8"
-      );
-      expect({
-        publicDescription: publicOutput.includes(
-          'description: "Create a user with admin privileges."'
-        ),
-        publicGroups: publicOutput.includes('groups: ["admin"]'),
-        publicPlayground: publicOutput.includes('playground: "auth"'),
-        publicSidebarTitle: publicOutput.includes(
-          'sidebarTitle: "Create admin"'
-        ),
-        publicTitle: publicOutput.includes('title: "Create privileged user"'),
-        restrictedGroups: restrictedOutput.includes('groups: ["billing"]'),
-        restrictedPublic: restrictedOutput.includes("public: true"),
-        staticEndpointOnly: !publicOutput.includes("<ApiPlayground"),
-      }).toStrictEqual({
-        publicDescription: true,
-        publicGroups: true,
-        publicPlayground: true,
-        publicSidebarTitle: true,
-        publicTitle: true,
-        restrictedGroups: true,
-        restrictedPublic: false,
-        staticEndpointOnly: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("generates AsyncAPI message payload fields", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-asyncapi-"));
-    try {
-      await writeAsyncApiFixture(root);
-      const doc = await parseAsyncApi(join(root, "asyncapi.json"));
-      const outDir = join(root, "generated-events");
-      await generateAsyncApiDocs(doc, outDir);
-      const output = await readFile(join(outDir, "user-updates.mdx"), "utf-8");
-      expect({
-        arrayField: output.includes('name={"profile.roles"} type={"string[]"}'),
-        description: output.includes("The stable user identifier."),
-        heading: output.includes("# User updates"),
-        messages: output.includes("## Messages"),
-        nestedField: output.includes('name={"profile.displayName"}'),
-        oneOfNumber: output.includes(
-          'name={"revisions[].value.NumberValue.amount"}'
-        ),
-        oneOfString: output.includes(
-          'name={"revisions[].value.StringValue.text"}'
-        ),
-        required: output.includes("required={true}"),
-        rootArray: output.includes('name={"revisions"} type={"object[]"}'),
-        rootField: output.includes('name={"userId"}'),
-        rootFieldItem: output.includes('name={"revisions[].field"}'),
-      }).toStrictEqual({
-        arrayField: true,
-        description: true,
-        heading: true,
-        messages: true,
-        nestedField: true,
-        oneOfNumber: true,
-        oneOfString: true,
-        required: true,
-        rootArray: true,
-        rootField: true,
-        rootFieldItem: true,
-      });
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
 });
 
 describe("page meta schema", () => {
@@ -3520,16 +1971,14 @@ describe("content graph", () => {
     ).toBeTruthy();
   });
 
-  it("carries Mintlify API marker and deprecated metadata into navigation", () => {
+  it("carries deprecated metadata into navigation", () => {
     const config = blumeConfigSchema.parse({});
     const graph = buildContentGraph(
       [
         makePage({
           id: "legacy.mdx",
           meta: pageMetaSchema.parse({
-            api: "GET /legacy",
             deprecated: true,
-            hideApiMarker: true,
           }),
           route: "/legacy",
           title: "Legacy",
@@ -3543,7 +1992,6 @@ describe("content graph", () => {
     const [item] = graph.navigation.sidebar;
 
     expect(item).toMatchObject({
-      apiMethod: undefined,
       deprecated: true,
       kind: "page",
       route: "/legacy",
@@ -3802,5 +2250,114 @@ describe("robots.txt", () => {
 
   it("returns null when disabled", () => {
     expect(buildRobots(makeProject([], { seo: { robots: false } }))).toBeNull();
+  });
+});
+
+describe("api reference (scalar)", () => {
+  it("defaults openapi and asyncapi to disabled with sensible routes", () => {
+    const config = blumeConfigSchema.parse({});
+    expect(config.openapi.enabled).toBeFalsy();
+    expect(config.openapi.route).toBe("/reference");
+    expect(config.asyncapi.enabled).toBeFalsy();
+    expect(config.asyncapi.route).toBe("/events");
+    expect(resolveReferences(config)).toStrictEqual([]);
+  });
+
+  it("treats the spec shorthand as a single source at the base route", () => {
+    const config = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://example.com/openapi.json" },
+    });
+    expect(resolveReferences(config)).toStrictEqual([
+      {
+        kind: "openapi",
+        label: "API Reference",
+        route: "/reference",
+        spec: "https://example.com/openapi.json",
+        theme: undefined,
+      },
+    ]);
+  });
+
+  it("derives one route per source and honors explicit routes", () => {
+    const config = blumeConfigSchema.parse({
+      openapi: {
+        enabled: true,
+        sources: [
+          { label: "Public API", spec: "https://x.dev/public.json" },
+          { route: "/admin", spec: "https://x.dev/admin.json" },
+        ],
+      },
+    });
+    const routes = resolveReferences(config).map((ref) => ref.route);
+    expect(routes).toStrictEqual(["/reference/public-api", "/admin"]);
+  });
+
+  it("emits both openapi and asyncapi references as nav tabs", () => {
+    const config = blumeConfigSchema.parse({
+      asyncapi: { enabled: true, spec: "https://x.dev/async.yaml" },
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+    });
+    expect(referenceTabs(config)).toStrictEqual([
+      { label: "API Reference", path: "/reference" },
+      { label: "Events", path: "/events" },
+    ]);
+  });
+
+  it("declares @scalar/astro only when a reference is enabled", () => {
+    const off = blumeConfigSchema.parse({});
+    const on = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+    });
+    expect(
+      runtimeDependencies({ config: off, needsReact: false })
+    ).not.toContain("@scalar/astro");
+    expect(runtimeDependencies({ config: on, needsReact: false })).toContain(
+      "@scalar/astro"
+    );
+  });
+
+  it("builds a prerendered page passing a remote spec straight through", async () => {
+    const config = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      theme: { accent: "teal" },
+    });
+    const { files, warnings } = await buildReferenceFiles({
+      config,
+      contentRoutes: new Set(),
+      root: "/r",
+    });
+    const [page] = files;
+    expect(warnings).toStrictEqual([]);
+    expect(files).toHaveLength(1);
+    expect(page?.pagePath).toBe("reference.astro");
+  });
+
+  it("emits a prerendered Scalar page with the spec url and theme accent", async () => {
+    const config = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      theme: { accent: "teal" },
+    });
+    const { files } = await buildReferenceFiles({
+      config,
+      contentRoutes: new Set(),
+      root: "/r",
+    });
+    const [page] = files;
+    expect(page?.content).toContain("export const prerender = true");
+    expect(page?.content).toContain('"url": "https://x.dev/openapi.json"');
+    expect(page?.content).toContain("--scalar-color-accent");
+  });
+
+  it("skips a reference whose route collides with a content page", async () => {
+    const config = blumeConfigSchema.parse({
+      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+    });
+    const { files, warnings } = await buildReferenceFiles({
+      config,
+      contentRoutes: new Set(["/reference"]),
+      root: "/r",
+    });
+    expect(files).toStrictEqual([]);
+    expect(warnings[0]).toContain("collides with a content page");
   });
 });

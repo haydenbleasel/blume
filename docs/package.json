@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "blume dev --port 4322",
+    "dev": "blume dev --port 3000",
     "build": "blume build",
     "preview": "blume preview"
   },

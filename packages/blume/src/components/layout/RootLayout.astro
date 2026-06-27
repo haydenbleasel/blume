@@ -3,6 +3,7 @@ import type { Heading, Navigation } from "../../core/types.ts";
 import "blume:theme";
 import Icon from "../Icon.astro";
 import { buildStructuredData } from "../../seo/jsonld.ts";
+import Banner from "./Banner.astro";
 import Header from "./Header.astro";
 import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
@@ -158,36 +159,7 @@ const bannerScript = banner?.dismissible
       class="absolute left-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:left-0"
       href="#blume-content">Skip to content</a
     >
-    {
-      banner && (
-        <div
-          class="relative flex items-center justify-center gap-x-2 gap-y-0.5 bg-foreground px-10 py-3 text-center text-background text-sm max-sm:flex-wrap dark:border-border dark:border-b dark:bg-background dark:text-foreground [:where([data-blume-banner-hidden])_&]:hidden"
-          data-banner-key={banner.key}
-          data-blume-banner
-        >
-          <span>{banner.content}</span>
-          {banner.link && (
-            <a
-              class="inline-flex items-center gap-1 font-medium underline underline-offset-2"
-              href={banner.link.href}
-            >
-              {banner.link.text}
-              <Icon name="arrow-right" size={14} />
-            </a>
-          )}
-          {banner.dismissible && (
-            <button
-              aria-label="Dismiss announcement"
-              class="absolute right-1.5 inline-flex size-7 items-center justify-center rounded-full text-background/80 transition-colors hover:bg-white/10 hover:text-background dark:text-foreground/70 dark:hover:bg-foreground/10 dark:hover:text-foreground"
-              data-blume-banner-dismiss
-              type="button"
-            >
-              <Icon name="x" size={16} />
-            </button>
-          )}
-        </div>
-      )
-    }
+    <Banner banner={banner} />
     <Header
       logo={logo}
       navigation={navigation}

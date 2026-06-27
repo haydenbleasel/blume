@@ -21,13 +21,6 @@ interface SkillArtifact {
   slug: string;
 }
 
-const pageUrl = (route: string, site?: string): string => {
-  if (!site) {
-    return route;
-  }
-  return `${site.replace(/\/$/u, "")}${route}`;
-};
-
 const orderedPages = (project: BlumeProject): PageRecord[] =>
   [...project.graph.pages]
     .filter((page) => !page.meta.draft && isPublicAgentPage(page))
@@ -44,11 +37,6 @@ const descriptionSummary = (description: string | undefined): string => {
       : firstLine;
   return truncated ? `: ${truncated}` : "";
 };
-
-const specUrl = (source: string, site?: string): string =>
-  source.startsWith("http://") || source.startsWith("https://")
-    ? source
-    : pageUrl(source.startsWith("/") ? source : `/${source}`, site);
 
 const artifactUrl = (path: string, site?: string): string =>
   site ? `${site.replace(/\/$/u, "")}${path}` : path;
@@ -131,16 +119,6 @@ const buildGeneratedSkill = (project: BlumeProject): SkillArtifact => {
       lines.push(
         `- [${page.title}](${markdownUrlForPage(page.route, config.deployment.site)})${descriptionSummary(page.description)}`
       );
-    }
-  }
-
-  if (config.api.openapi.length > 0 || config.api.asyncapi.length > 0) {
-    lines.push("", "## API references", "");
-    for (const spec of config.api.openapi) {
-      lines.push(`- OpenAPI: ${specUrl(spec.source, config.deployment.site)}`);
-    }
-    for (const spec of config.api.asyncapi) {
-      lines.push(`- AsyncAPI: ${specUrl(spec.source, config.deployment.site)}`);
     }
   }
 
@@ -297,20 +275,6 @@ const buildIndex = (project: BlumeProject): string => {
     lines.push(
       `- [${page.title}](${url})${descriptionSummary(page.description)}`
     );
-  }
-
-  if (config.api.openapi.length > 0) {
-    lines.push("", "## OpenAPI Specs", "");
-    for (const spec of config.api.openapi) {
-      lines.push(`- [openapi](${specUrl(spec.source, site)})`);
-    }
-  }
-
-  if (config.api.asyncapi.length > 0) {
-    lines.push("", "## AsyncAPI Specs", "");
-    for (const spec of config.api.asyncapi) {
-      lines.push(`- [asyncapi](${specUrl(spec.source, site)})`);
-    }
   }
 
   return `${lines.join("\n")}\n`;

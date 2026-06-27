@@ -1,0 +1,81 @@
+---
+import "blume:theme";
+import type { Navigation } from "../../core/types.ts";
+import Banner from "./Banner.astro";
+import Header from "./Header.astro";
+
+// A minimal shell for the Scalar API/AsyncAPI reference: Blume's banner + navbar
+// on top, then a full-height region the reference mounts into. Unlike RootLayout
+// it has no docs sidebar/TOC/prose column, so the reference renders edge to edge.
+interface Props {
+  site: { title: string; description?: string };
+  logo?: {
+    svg?: string;
+    light?: string;
+    dark?: string;
+    alt: string;
+    href: string;
+  } | null;
+  banner?: {
+    content: string;
+    link?: { text: string; href: string };
+    dismissible: boolean;
+    key: string;
+  } | null;
+  navigation: Navigation;
+  route: string;
+  themeMode: "system" | "light" | "dark";
+  searchEnabled: boolean;
+  searchProvider: "orama" | "pagefind";
+  pageTitle: string;
+}
+
+const {
+  site,
+  logo,
+  banner,
+  navigation,
+  route,
+  themeMode,
+  searchEnabled,
+  searchProvider,
+  pageTitle,
+} = Astro.props;
+
+// Set the theme before paint so the navbar never flashes the wrong colors
+// (mirrors RootLayout's pre-paint script).
+const initialThemeScript = `(()=>{const m=${JSON.stringify(themeMode)};const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);})();`;
+
+// Pre-paint: hide a previously-dismissed banner before it flashes in.
+const bannerScript = banner?.dismissible
+  ? `(()=>{if(localStorage.getItem("blume-banner:"+${JSON.stringify(banner.key)}))document.documentElement.setAttribute("data-blume-banner-hidden","");})();`
+  : null;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    {bannerScript && <script is:inline set:html={bannerScript} />}
+    <script is:inline set:html={initialThemeScript} />
+  </head>
+  <body class="bg-background font-sans text-foreground antialiased">
+    <Banner banner={banner} />
+    <Header
+      hasSidebar={false}
+      logo={logo}
+      navigation={navigation}
+      route={route}
+      searchEnabled={searchEnabled}
+      searchProvider={searchProvider}
+      site={site}
+    />
+    <div
+      class="h-[calc(100dvh-4rem)] overflow-auto border-border border-t [&>[data-scalar-client]]:h-full"
+    >
+      <slot />
+    </div>
+  </body>
+</html>

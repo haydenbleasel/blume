@@ -1,0 +1,113 @@
+---
+title: Changelog
+description: Author release notes as content, and Blume builds a timeline page and an RSS feed automatically.
+---
+
+Blume ships a changelog out of the box. Write each release as a normal content
+file, mark it `type: changelog`, and Blume collects every entry into a generated
+timeline page and an RSS feed — no layout to build, no list to maintain.
+
+## Write an entry
+
+A changelog entry is a regular `.md` or `.mdx` page with `type: changelog` in its
+frontmatter. By convention they live under `changelog/`, but the type — not the
+folder — is what matters:
+
+```mdx changelog/v1-2-0.mdx lineNumbers
+---
+title: v1.2.0
+type: changelog
+date: 2026-06-20
+changelog:
+  version: 1.2.0
+  category: Features
+---
+
+A big batch of components landed this release — columns, frames, trees, and
+tooltips, plus code groups that render as proper language tabs.
+
+- New `Accordion`, `Expandable`, and `Tooltip` components
+- `CodeGroup` tabs with flush code blocks
+```
+
+Give every entry a `date` so the timeline and feed sort newest-first. An
+unquoted YAML date is fine — Blume normalizes it.
+
+### The `changelog` object
+
+The optional `changelog` object adds richer metadata for the timeline and feed:
+
+<TypeTable
+  type={{
+    "changelog.version": {
+      type: "string",
+      description:
+        "Release version. Falls back to a v-prefixed label when there's no title.",
+    },
+    "changelog.category": {
+      type: "string",
+      description:
+        "Shown as a tag beside the entry, e.g. Release, Features, Fixes.",
+    },
+    "changelog.date": {
+      type: "string",
+      description:
+        "Publish date. May live here or at the top level — both feed the timeline and RSS feed.",
+    },
+  }}
+/>
+
+## The timeline page
+
+Once you have at least one `type: changelog` entry, Blume generates a
+**`/changelog`** page automatically. Each entry renders newest-first with its
+date, label, and `category` tag in a left rail beside its content:
+
+- The entry **title** becomes its label — or `v{version}` when there's no title.
+- The `category` renders as a tag next to the date.
+- Drafts and `sidebar.hidden` entries are skipped.
+
+The page appears only when nothing already occupies the `/changelog` route. To
+replace it with your own design, add a [custom page](/docs/advanced/custom-pages) at
+`pages/changelog.astro` — it takes over and Blume stops generating the default
+timeline.
+
+## The RSS feed
+
+Blume also builds a changelog feed at **`/changelog/rss.xml`**, sorted
+newest-first by `date`. Feeds need an absolute site URL, so set
+[`deployment.site`](/docs/deployment); Blume then injects a `<link rel="alternate">`
+tag on every page so readers discover it automatically.
+
+The feed is on by default. Tune it under [`seo.rss`](/docs/configuration/seo#rss-feeds):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+Remove `"changelog"` from `rss.types` to skip the feed while keeping the timeline.
+
+## Structured data
+
+When [structured data](/docs/configuration/seo#structured-data) is on, each changelog
+entry is emitted as a schema.org **`TechArticle`** with its description and
+publish date, so search engines can index releases as dated articles.
+
+<CardGroup cols={2}>
+  <Card
+    title="Frontmatter"
+    href="/docs/reference/frontmatter#changelog"
+    icon="file"
+  >
+    The full changelog frontmatter schema.
+  </Card>
+  <Card title="Custom Pages" href="/docs/advanced/custom-pages" icon="folder">
+    Replace the generated timeline with your own layout.
+  </Card>
+</CardGroup>

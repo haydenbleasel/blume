@@ -1,0 +1,114 @@
+---
+title: Theming
+description: Tune the look with config tokens, override any CSS variable in theme.css, or use Tailwind utilities.
+---
+
+Blume's theme is token-driven and works in light and dark mode out of the box.
+Reach for as little or as much as you need: a few config tokens for the common
+cases, a `theme.css` to override any design token, or Tailwind utilities for
+custom components.
+
+## Config tokens
+
+The everyday knobs live under `theme` in your config:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: "teal",   // a named preset or any CSS color
+  radius: "md",     // none | sm | md | lg
+  mode: "system",   // system | light | dark
+}
+```
+
+### Accent
+
+The accent color tints interactive and highlighted elements — step markers,
+active tabs, badges, card hovers, and more. Use a named preset or any CSS color:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: "#ff0066", // hex, oklch(), rgb()… anything CSS understands
+}
+```
+
+Named presets: `blue` (default), `green`, `orange`, `pink`, `purple`, `red`, and
+`teal`.
+
+### Radius
+
+`radius` sets the corner rounding shared by cards, code blocks, callouts, and
+inputs — `none`, `sm`, `md` (default), or `lg`.
+
+### Color mode
+
+`mode` sets the initial color scheme:
+
+- **`system`** (default) — follow the reader's OS preference
+- **`light`** / **`dark`** — default to one scheme
+
+A toggle in the header always lets readers switch, and their choice is remembered
+across visits. Dark mode is applied with a `data-theme="dark"` attribute on the
+`<html>` element.
+
+## theme.css
+
+Drop a `theme.css` in your project root to override any design token. It's the
+last layer in the cascade, so it wins over the defaults and config tokens:
+
+```css theme.css lineNumbers
+:root {
+  --blume-accent: oklch(0.68 0.14 180);
+  --blume-radius: 0.5rem;
+}
+
+:root[data-theme="dark"] {
+  --blume-background: oklch(0.16 0 0);
+}
+```
+
+Set a token under `:root` for light mode and under `:root[data-theme="dark"]` for
+dark mode.
+
+### Design tokens
+
+| Token                       | Controls                                  |
+| --------------------------- | ----------------------------------------- |
+| `--blume-background`        | Page background                           |
+| `--blume-foreground`        | Body text                                 |
+| `--blume-muted`             | Subtle surfaces — callouts, table headers |
+| `--blume-muted-foreground`  | Secondary text                            |
+| `--blume-border`            | Borders and dividers                      |
+| `--blume-accent`            | Accent color                              |
+| `--blume-accent-foreground` | Text and icons on an accent background    |
+| `--blume-code-background`   | Code block surface                        |
+| `--blume-radius`            | Corner radius                             |
+
+## Tailwind utilities
+
+Blume's theme is built with Tailwind v4 internally, and your project's `.astro`,
+`.tsx`, and `.jsx` files are scanned too — so you can style custom components and
+pages with utility classes, no Tailwind setup required. Every token is exposed as
+a utility, so your components track the theme automatically:
+
+| Token                       | Utilities                  |
+| --------------------------- | -------------------------- |
+| `--blume-background`        | `bg-background`            |
+| `--blume-foreground`        | `text-foreground`          |
+| `--blume-muted`             | `bg-muted`                 |
+| `--blume-muted-foreground`  | `text-muted-foreground`    |
+| `--blume-border`            | `border-border`            |
+| `--blume-accent`            | `bg-accent`, `text-accent` |
+| `--blume-accent-foreground` | `text-accent-foreground`   |
+| `--blume-radius`            | `rounded-blume`            |
+
+## Cascade order
+
+Styles resolve in three layers, each overriding the last:
+
+<Steps>
+  <Step title="Base">Blume's reset, default tokens, and component styles.</Step>
+  <Step title="Config tokens">
+    `--blume-accent` and `--blume-radius` from `theme`.
+  </Step>
+  <Step title="theme.css">Your token overrides — the final word.</Step>
+</Steps>

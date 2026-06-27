@@ -1,0 +1,209 @@
+---
+title: Configuration file
+description: Every option in blume.config.ts — site metadata, content, and links to each feature guide.
+sidebar:
+  label: blume.config.ts
+---
+
+Blume reads `blume.config.ts` from your project root. Wrap your config in
+`defineConfig` for autocomplete and type-checking — every field is optional, with
+a sensible default.
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  title: "My Docs",
+  description: "Documentation for my project.",
+});
+```
+
+## A complete example
+
+Every option Blume reads, with its default:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  // Site
+  title: "My Docs",
+  description: "Documentation for my project.",
+  logo: "/logo.svg",
+
+  // Content
+  content: {
+    root: "docs",
+  },
+
+  // Theme — see the Theming guide
+  theme: {
+    accent: "teal",
+    radius: "md",
+    mode: "system",
+  },
+
+  // Search — see the Search guide
+  search: {
+    provider: "orama",
+  },
+
+  // Markdown features
+  markdown: {
+    imageZoom: true,
+    math: false,
+  },
+
+  // AI — see the AI guide
+  ai: {
+    llmsTxt: true,
+  },
+
+  // SEO — OG images, feeds, sitemap, structured data; see the SEO guide
+  seo: {
+    og: { enabled: true },
+    rss: { enabled: true, types: ["blog", "changelog"] },
+    sitemap: true,
+    robots: true,
+    structuredData: true,
+  },
+
+  // Deployment — see the Deployment guide
+  deployment: {
+    output: "static",
+    site: "https://docs.example.com",
+  },
+});
+```
+
+## Site
+
+| Option        | Default           | Description                                             |
+| ------------- | ----------------- | ------------------------------------------------------- |
+| `title`       | `"Documentation"` | Site name — shown in the header, page titles, OG cards. |
+| `description` | —                 | Default meta description, used for SEO and OG.          |
+| `logo`        | —                 | Brand logo shown beside the title in the header.        |
+| `banner`      | —                 | Site-wide announcement bar above the header.            |
+
+### Logo
+
+Point `logo` at an SVG and Blume inlines it, so a `currentColor` logo follows
+the light and dark theme automatically:
+
+```ts blume.config.ts
+logo: "/logo.svg",
+```
+
+The SVG can live at your project root or in `public/`. For raster images — or
+separate light and dark artwork — use the object form (these must live in
+`public/`):
+
+```ts blume.config.ts lineNumbers
+logo: {
+  light: "/logo-light.png",
+  dark: "/logo-dark.png",
+  alt: "Acme",
+  href: "/",
+},
+```
+
+`href` overrides the logo's link (it defaults to `/`).
+
+### Banner
+
+Show a site-wide announcement bar above the header. Pass a string, or an object
+with a link and a dismiss button:
+
+```ts blume.config.ts
+banner: "Docs are in beta — expect changes.",
+```
+
+```ts blume.config.ts lineNumbers
+banner: {
+  content: "Blume v1 is here!",
+  link: { text: "Read more", href: "/blog/v1" },
+  dismissible: true,
+  id: "v1",
+},
+```
+
+When `dismissible` is on, the bar shows a close button and stays hidden for that
+visitor afterward. The dismissal key defaults to the content text, so editing
+the message brings the banner back; set a stable `id` to keep it dismissed
+across edits.
+
+## Content
+
+Where your content lives and how Blume discovers it. See [Pages](/docs/content) for
+how files become routes.
+
+```ts blume.config.ts lineNumbers
+content: {
+  root: "docs",
+}
+```
+
+| Option        | Default              | Description                                  |
+| ------------- | -------------------- | -------------------------------------------- |
+| `root`        | `"docs"`             | Folder Blume scans for content.              |
+| `include`     | `["**/*.{md,mdx}"]`  | Globs that match content files.              |
+| `exclude`     | `["**/_*", "**/.*"]` | Globs to ignore (underscore- and dot-files). |
+| `pages`       | `"pages"`            | Folder for custom `.astro` pages.            |
+| `defaultType` | `"doc"`              | Page `type` used when frontmatter omits it.  |
+
+## SEO
+
+Open Graph images, RSS feeds, and JSON-LD structured data, grouped under `seo`.
+See the [SEO guide](/docs/configuration/seo) for metadata, frontmatter overrides, and
+the full reference.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: false },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
+  structuredData: true,
+}
+```
+
+| Option           | Default                 | Description                                   |
+| ---------------- | ----------------------- | --------------------------------------------- |
+| `og.enabled`     | `false`                 | Generate per-page Open Graph images.          |
+| `rss.enabled`    | `true`                  | Build feeds for blog and changelog content.   |
+| `rss.types`      | `["blog", "changelog"]` | Content types that each get a feed.           |
+| `rss.limit`      | `50`                    | Maximum items per feed.                       |
+| `sitemap`        | `true`                  | Generate sitemap.xml (needs deployment.site). |
+| `robots`         | `true`                  | Generate robots.txt with a Sitemap link.      |
+| `structuredData` | `true`                  | Emit schema.org JSON-LD in each page's head.  |
+
+These work best with an absolute [`deployment.site`](/docs/deployment) for full URLs.
+
+## Feature options
+
+Each of these has its own guide. The config field is the entry point:
+
+| Field        | What it configures                           | Guide                                    |
+| ------------ | -------------------------------------------- | ---------------------------------------- |
+| `theme`      | Accent color, corner radius, light/dark mode | [Theming](/docs/configuration/theming)   |
+| `navigation` | Explicit sidebar and header tabs             | [Navigation](/docs/content/navigation)   |
+| `search`     | Provider (Orama or Pagefind) and indexing    | [Search](/docs/configuration/search)     |
+| `markdown`   | Opt-in Markdown features like math           | [Syntax](/docs/content/syntax)           |
+| `ai`         | `llms.txt` and the Ask AI assistant          | [AI](/docs/configuration/ai)             |
+| `seo`        | Metadata, OG images, feeds, structured data  | [SEO](/docs/configuration/seo)           |
+| `deployment` | Output mode, adapter, and site URL           | [Deployment](/docs/deployment)           |
+| `redirects`  | Permanent and temporary redirects            | [Deployment](/docs/deployment#redirects) |
+
+## Precedence
+
+Settings resolve from lowest to highest priority, so you only override what you
+need:
+
+<Steps>
+  <Step title="Blume defaults">A sensible default for every field.</Step>
+  <Step title="blume.config.ts">Your project-wide configuration.</Step>
+  <Step title="Folder meta">
+    `_meta.json` for a section's title and ordering.
+  </Step>
+  <Step title="Page frontmatter">Per-page overrides win.</Step>
+</Steps>

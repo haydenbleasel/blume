@@ -1,0 +1,194 @@
+---
+title: SEO
+description: Metadata, Open Graph images, RSS feeds, and JSON-LD — Blume's discoverability layer, grouped under one seo config.
+sidebar:
+  label: SEO
+---
+
+Blume handles the discoverability layer for you: page metadata, social share
+images, feeds, and structured data. The three configurable features live under
+the `seo` key in `blume.config.ts`; metadata is driven by your content.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
+  structuredData: true,
+}
+```
+
+Most of this is sharper with an absolute site URL — set
+[`deployment.site`](/docs/deployment) so feeds, OG images, canonicals, the sitemap,
+and JSON-LD can emit full URLs.
+
+## Metadata
+
+Every page renders the standard `<head>` tags from your config and frontmatter:
+
+- `<title>` — the page title plus your site `title`.
+- `<meta name="description">` and `og:description` — the page `description`,
+  falling back to the site `description`.
+- `og:title` — the page title.
+- `<link rel="canonical">` — the page's absolute URL (when `deployment.site` is
+  set).
+
+Override any of these per page with `seo` frontmatter:
+
+```yaml lineNumbers
+---
+title: Pricing
+description: Plans and pricing for every team size.
+seo:
+  title: Pricing — Acme
+  canonical: https://acme.com/pricing
+  noindex: false
+---
+```
+
+<TypeTable
+  type={{
+    "seo.title": {
+      type: "string",
+      description: "Override the <title> and og:title for this page.",
+    },
+    "seo.description": {
+      type: "string",
+      description: "Override the meta + og:description.",
+    },
+    "seo.image": {
+      type: "string",
+      description: "Custom social image (see Open Graph).",
+    },
+    "seo.canonical": {
+      type: "string",
+      description: "Override the canonical URL.",
+    },
+    "seo.noindex": {
+      type: "boolean",
+      description: "Emit robots noindex and skip structured data.",
+    },
+  }}
+/>
+
+## Open Graph images
+
+Blume can render a 1200×630 social card for every page at build time — no
+headless browser, thanks to [Takumi](https://takumi.kane.tw), so builds stay
+fast. Off by default:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true },
+}
+```
+
+Each card is derived from your content and theme — the **page title** as the
+headline, your **site title** as the eyebrow, and your theme **accent** for the
+mark. Images are served at `/og/<slug>.png`, mirroring each route, and are
+prerendered as static files even in server mode:
+
+| Page route          | Image URL                  |
+| ------------------- | -------------------------- |
+| `/`                 | `/og/index.png`            |
+| `/quickstart`       | `/og/quickstart.png`       |
+| `/configuration/ai` | `/og/configuration/ai.png` |
+
+Override the generated card for any page with `seo.image` — a file in `public/`
+or an external URL. It takes precedence over the generated card and works even
+when `og` is off, so you can mix custom images with generated ones:
+
+```yaml lineNumbers
+---
+title: Pricing
+seo:
+  image: /og/pricing-custom.png
+---
+```
+
+:::note
+OG rendering uses hex internally, so an `oklch` custom accent falls back to the
+default. Use a named accent (`blue`, `teal`, …) or a hex value for custom cards.
+:::
+
+## RSS feeds
+
+Blume builds an RSS feed for each content type in `rss.types` — `blog` and
+`changelog` by default — that has pages, served at `/<type>/rss.xml`. See
+[Feeds](/docs/content#feeds) for authoring blog and changelog entries with dates.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+| Option    | Default                 | Description                           |
+| --------- | ----------------------- | ------------------------------------- |
+| `enabled` | `true`                  | Generate feeds.                       |
+| `types`   | `["blog", "changelog"]` | Content types that each get a feed.   |
+| `limit`   | `50`                    | Maximum items per feed, newest first. |
+
+Blume injects `<link rel="alternate">` tags so browsers and feed readers discover
+the feeds automatically.
+
+## Structured data
+
+Blume emits [schema.org](https://schema.org) JSON-LD in every page's `<head>` so
+search engines understand your content. On by default:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  structuredData: true,
+}
+```
+
+Each page includes:
+
+- a **WebSite** node for site identity,
+- the page as an **article** — `BlogPosting` for blog posts, `TechArticle` for
+  changelog and docs — with its description and publish date,
+- a **BreadcrumbList** built from the navigation trail.
+
+URLs are absolute when `deployment.site` is set. Pages marked `seo.noindex` are
+skipped.
+
+## Sitemap
+
+Blume writes a `sitemap.xml` of every indexable page at build time. It needs an
+absolute [`deployment.site`](/docs/deployment) and lists every page except drafts,
+hidden, and `noindex` pages. On by default:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  sitemap: true,
+}
+```
+
+Ship your own `public/sitemap.xml` to take over — Blume never overwrites a file
+you place in `public/`.
+
+## Robots
+
+Blume writes a `robots.txt` that allows all crawlers and adds a `Sitemap:` line
+pointing to the sitemap when one is available. On by default:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  robots: true,
+}
+```
+
+```txt robots.txt
+User-agent: *
+Allow: /
+
+Sitemap: https://docs.example.com/sitemap.xml
+```
+
+Ship your own `public/robots.txt` to take over.

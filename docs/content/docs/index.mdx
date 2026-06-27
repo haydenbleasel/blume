@@ -1,0 +1,99 @@
+---
+title: Introduction
+description: Blume is an open-source, markdown-first documentation framework on Astro and Vite — fast, AI-ready, and zero-config down to the template.
+sidebar:
+  label: Introduction
+  order: 0
+---
+
+Drop Markdown or MDX into a folder, run `blume dev`, and get a production-grade
+docs site — navigation, search, theming, Open Graph images, and a rich component
+library — with no app boilerplate to write or maintain.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
+    Install Blume and ship your first page in minutes.
+  </Card>
+  <Card title="Configuration" href="/docs/configuration" icon="file">
+    Tune the title, theme, search, and deployment.
+  </Card>
+</CardGroup>
+
+## Why Blume exists
+
+Blume is the answer to a problem I kept trying to solve at Vercel: documentation
+should be _fast_, _AI-ready_, and require _zero configuration_ — down to not
+needing a starter template at all.
+
+Most docs tools hand you a project to own before you've written a word: an app to
+scaffold, a framework to learn, a template to keep in sync with upstream. Blume
+flips that around. The framework _is_ the template, so the only thing you ever
+touch is your content. When you outgrow the defaults, you add configuration one
+file at a time — and you can `blume eject` to a plain Astro project the day you
+want full control.
+
+— Hayden Bleasel
+
+## What makes Blume different
+
+### Fast by default
+
+Blume builds on Astro and Vite and renders static HTML by default — fast,
+cacheable, and cheap to host. The core theme is React-free and ships **zero
+client JavaScript**, so pages score well on Core Web Vitals out of the box. Dev
+startup and hot reload feel Vite-native, and you opt into server features only
+when you need them.
+
+### AI-ready out of the box
+
+Every Blume site can emit [`llms.txt` and `llms-full.txt`](/docs/configuration/ai) so coding
+agents and chat assistants can read your docs the way users do. Add an optional
+**Ask AI** assistant to answer questions directly from your content — no hosted
+service required, and no markup to hand-author. Your Markdown is the source of
+truth for both humans and models.
+
+### Zero configuration — even the template
+
+A folder of docs is a complete project. There's no starter to clone, no Astro or
+Tailwind to set up, and no template to maintain. Navigation is inferred from your
+files, [search](/docs/configuration/search) works in dev and production without a hosted
+service, and theming is a handful of tokens. Everything has a sensible default;
+configuration is something you reach for, not something you start with.
+
+## Everything included
+
+- **Components** — callouts, cards, steps, tabs, accordions, badges, file trees,
+  and parameter tables, usable in MDX with [no imports](/docs/content/components).
+- **Local search** — Orama works in dev and production; Pagefind is one flag away
+  for large sites. No hosted index.
+- **Navigation** — inferred from files, refined with `_meta.json` or config.
+- **SEO** — metadata, Open Graph images, RSS feeds, and JSON-LD, [built in](/docs/configuration/seo).
+- **Customization** — component overrides, React islands, custom pages, theme
+  tokens, and a source-component registry via `blume add`.
+- **Migration** — `blume migrate mintlify | starlight | fumadocs`.
+- **Eject** — `blume eject` produces a standalone Astro project that still uses
+  the `blume` package.
+
+## How it works
+
+The Blume CLI discovers your content, builds a content graph, and generates a
+hidden Astro project under `.blume/` that it drives for dev and build. The
+generated runtime is an implementation detail — you write Markdown, Blume handles
+the rest — until you choose to eject and own it.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" href="/docs/configuration" icon="file">
+    Tune the title, theme, search, and deployment.
+  </Card>
+  <Card title="Components" href="/docs/content/components" icon="folder">
+    Explore the built-in component library.
+  </Card>
+  <Card title="AI" href="/docs/configuration/ai" icon="lightbulb">
+    Ship `llms.txt` and an Ask AI assistant.
+  </Card>
+  <Card title="CLI" href="/docs/reference/cli" icon="rocket">
+    Every `blume` command and flag.
+  </Card>
+</CardGroup>

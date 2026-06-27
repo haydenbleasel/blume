@@ -11,20 +11,6 @@ interface Props {
 
 const { items, currentRoute, depth = 0 } = Astro.props;
 
-const apiMethodClass = (method: string): string => {
-  const key = method.toLowerCase();
-  const colors: Record<string, string> = {
-    delete: "bg-red-500/10 text-red-600 dark:text-red-400",
-    get: "bg-green-500/10 text-green-600 dark:text-green-400",
-    head: "bg-muted text-muted-foreground",
-    options: "bg-muted text-muted-foreground",
-    patch: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-    post: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-    put: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  };
-  return colors[key] ?? "bg-muted text-muted-foreground";
-};
-
 const badgeClass =
   "shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-medium text-[0.65rem] text-muted-foreground leading-none";
 const deprecatedClass =
@@ -54,13 +40,6 @@ const hasActivePage = (item: NavNode): boolean =>
                     name={item.icon}
                     size={14}
                   />
-                )}
-                {item.apiMethod && (
-                  <span
-                    class={`shrink-0 rounded px-1.5 py-0.5 font-mono font-semibold text-[0.65rem] leading-none ${apiMethodClass(item.apiMethod)}`}
-                  >
-                    {item.apiMethod}
-                  </span>
                 )}
                 <span class="min-w-0 flex-1 truncate">{item.label}</span>
                 {item.badge && <span class={badgeClass}>{item.badge}</span>}

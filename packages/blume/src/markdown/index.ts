@@ -19,9 +19,6 @@ export {
 export { calloutTypeFor } from "./directives.ts";
 export { mermaidPlugin } from "./mermaid.ts";
 export { mintlifyCodeGroupPlugin } from "./mintlify-code-group.ts";
-export { rewriteMintlifyAsyncApiPage } from "./mintlify-asyncapi.ts";
-export { rewriteMintlifyManualApiPage } from "./mintlify-manual-api.ts";
-export { rewriteMintlifyOpenApiSchemaPage } from "./mintlify-openapi.ts";
 export {
   mintlifySvgIconPlugin,
   rewriteMintlifySvgIconProps,

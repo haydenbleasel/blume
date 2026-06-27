@@ -1,0 +1,51 @@
+---
+// Generate a <TypeTable> from a TypeScript interface or type alias. Point it at
+// a file (`path`, relative to the project root) and a type `name`, or pass inline
+// source via `type`. Extraction runs at build time through the TypeScript
+// compiler API; failures degrade to an inline notice rather than breaking the
+// build.
+import { extractTypeTable } from "./auto-type-table.ts";
+import TypeTable from "./TypeTable.astro";
+
+interface Props {
+  name: string;
+  path?: string;
+  type?: string;
+}
+
+const { name, path, type: source } = Astro.props;
+
+let typeMap: Record<
+  string,
+  { default?: string; description?: string; required: boolean; type: string }
+> = {};
+let error: string | undefined;
+
+try {
+  const rows = await extractTypeTable({ name, path, source });
+  typeMap = Object.fromEntries(
+    rows.map((row) => [
+      row.name,
+      {
+        default: row.default,
+        description: row.description,
+        required: row.required,
+        type: row.type,
+      },
+    ])
+  );
+} catch (cause) {
+  error = cause instanceof Error ? cause.message : String(cause);
+}
+---
+
+{
+  error ? (
+    <div class="not-prose my-6 rounded-blume border border-border px-3 py-2 text-muted-foreground text-sm">
+      Could not generate a type table for <code class="font-mono">{name}</code>:{" "}
+      {error}
+    </div>
+  ) : (
+    <TypeTable type={typeMap} />
+  )
+}

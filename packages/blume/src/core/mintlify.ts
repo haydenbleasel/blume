@@ -2,10 +2,6 @@ import { readFile } from "node:fs/promises";
 
 import { dirname, relative, resolve } from "pathe";
 
-import { listAsyncApiChannels, parseAsyncApi } from "../asyncapi/import.ts";
-import type { AsyncApiDocument } from "../asyncapi/types.ts";
-import { listOpenApiOperations, parseOpenApi } from "../openapi/import.ts";
-import type { OpenApiDocument } from "../openapi/types.ts";
 import { BlumeError } from "./diagnostics.ts";
 import type {
   BlumeConfig,
@@ -15,12 +11,6 @@ import type {
 } from "./schema.ts";
 
 type JsonObject = Record<string, unknown>;
-type MintlifyAsyncApiSpec = NonNullable<
-  NonNullable<BlumeConfig["api"]>["asyncapi"]
->[number] & { directory: string; source: string };
-type MintlifyOpenApiSpec = NonNullable<
-  NonNullable<BlumeConfig["api"]>["openapi"]
->[number] & { directory: string; source: string };
 type NavigationSelectors = ResolvedConfig["navigation"]["selectors"];
 type NavigationSelectorItem = NavigationSelectors[number]["items"][number];
 type NavigationChromeVariants = NonNullable<
@@ -28,14 +18,6 @@ type NavigationChromeVariants = NonNullable<
 >["chromeVariants"];
 type NavigationSidebarVariants =
   ResolvedConfig["navigation"]["sidebarVariants"];
-
-interface ApiSidebarOptions {
-  asyncDocs: Map<string, Promise<AsyncApiDocument>>;
-  activeOpenApi?: MintlifyOpenApiSpec;
-  directory?: DirectoryMode;
-  docs: Map<string, Promise<OpenApiDocument>>;
-  root: string;
-}
 
 const MINTLIFY_DEFAULT_IGNORES = [
   "**/_*",
@@ -63,11 +45,9 @@ const MINTLIFY_DEFAULT_IGNORES = [
   "CHANGELOG.md",
   "CONTRIBUTING.md",
 ];
-const DEFAULT_API_DIRECTORY = "api-reference";
 const API_ENDPOINT_REF =
   /^(?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(?<path>\/.*)$/iu;
 const VARIABLE_NAME = /^[A-Za-z0-9-]+$/u;
-const NON_SLUG = /[^a-z0-9/]+/gu;
 
 const asObject = (value: unknown): JsonObject | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -231,109 +211,8 @@ const mintlifyNavigationItems = (navigation: JsonObject): unknown[] => {
   ];
 };
 
-const slugifyDirectory = (value: string): string =>
-  value
-    .toLowerCase()
-    .trim()
-    .replaceAll(NON_SLUG, "-")
-    .replaceAll(/\/+/gu, "/")
-    .replaceAll(/^-|-$/gu, "");
-
 const normalizeDirectory = (value: string): string =>
   normalizePageRef(value).replaceAll(/^\/+|\/+$/gu, "");
-
-const apiSpecDirectory = (
-  value: string | undefined,
-  fallback: string
-): string => {
-  const directory = value
-    ? normalizeDirectory(value)
-    : slugifyDirectory(fallback);
-  return directory || DEFAULT_API_DIRECTORY;
-};
-
-const openApiSpecsFrom = (
-  value: unknown,
-  fallbackDirectory: string
-): MintlifyOpenApiSpec[] => {
-  if (typeof value === "string") {
-    return [
-      {
-        directory: apiSpecDirectory(undefined, fallbackDirectory),
-        source: value,
-      },
-    ];
-  }
-
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => openApiSpecsFrom(item, fallbackDirectory));
-  }
-
-  const object = asObject(value);
-  if (!object) {
-    return [];
-  }
-
-  const source =
-    asString(object.source) ?? asString(object.openapi) ?? asString(object.url);
-  if (!source) {
-    return [];
-  }
-
-  return [
-    {
-      directory: apiSpecDirectory(
-        asString(object.directory),
-        fallbackDirectory
-      ),
-      source,
-    },
-  ];
-};
-
-const asyncApiSpecsFrom = (
-  value: unknown,
-  fallbackDirectory: string
-): MintlifyAsyncApiSpec[] => {
-  if (typeof value === "string") {
-    return [
-      {
-        directory: apiSpecDirectory(undefined, fallbackDirectory),
-        source: value,
-      },
-    ];
-  }
-
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => asyncApiSpecsFrom(item, fallbackDirectory));
-  }
-
-  const object = asObject(value);
-  if (!object) {
-    return [];
-  }
-
-  const source =
-    asString(object.source) ??
-    asString(object.asyncapi) ??
-    asString(object.url);
-  if (!source) {
-    return [];
-  }
-
-  return [
-    {
-      directory: apiSpecDirectory(
-        asString(object.directory),
-        fallbackDirectory
-      ),
-      source,
-    },
-  ];
-};
-
-const navItemApiDirectory = (item: JsonObject): string =>
-  labelForNavItem(item) ?? DEFAULT_API_DIRECTORY;
 
 const tabPathFromRef = (ref: string): string => {
   const normalized = normalizeDirectory(ref).replaceAll(/\/index$/gu, "");
@@ -362,22 +241,6 @@ const navItemPath = (item: unknown): string | undefined => {
     return tabPathFromRef(root);
   }
 
-  const [openApiSpec] = openApiSpecsFrom(
-    object.openapi,
-    navItemApiDirectory(object)
-  );
-  if (openApiSpec) {
-    return tabPathFromRef(`${openApiSpec.directory}/index`);
-  }
-
-  const [asyncApiSpec] = asyncApiSpecsFrom(
-    object.asyncapi,
-    navItemApiDirectory(object)
-  );
-  if (asyncApiSpec) {
-    return tabPathFromRef(`${asyncApiSpec.directory}/index`);
-  }
-
   for (const child of childItemsFor(object)) {
     const path = navItemPath(child);
     if (path) {
@@ -385,78 +248,6 @@ const navItemPath = (item: unknown): string | undefined => {
     }
   }
   return undefined;
-};
-
-const collectNavigationOpenApiSpecs = (
-  items: unknown[]
-): MintlifyOpenApiSpec[] => {
-  const specs: MintlifyOpenApiSpec[] = [];
-  for (const item of items) {
-    const object = asObject(item);
-    if (!object) {
-      continue;
-    }
-    specs.push(
-      ...openApiSpecsFrom(object.openapi, navItemApiDirectory(object))
-    );
-    specs.push(...collectNavigationOpenApiSpecs(childItemsFor(object)));
-  }
-  return specs;
-};
-
-const collectNavigationAsyncApiSpecs = (
-  items: unknown[]
-): MintlifyAsyncApiSpec[] => {
-  const specs: MintlifyAsyncApiSpec[] = [];
-  for (const item of items) {
-    const object = asObject(item);
-    if (!object) {
-      continue;
-    }
-    specs.push(
-      ...asyncApiSpecsFrom(object.asyncapi, navItemApiDirectory(object))
-    );
-    specs.push(...collectNavigationAsyncApiSpecs(childItemsFor(object)));
-  }
-  return specs;
-};
-
-const uniqueApiSpecs = <T extends { directory: string; source: string }>(
-  specs: T[]
-): T[] => {
-  const seen = new Set<string>();
-  return specs.filter((item) => {
-    const key = `${item.directory}\u0000${item.source}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-};
-
-const mintlifyOpenApiSpecs = (
-  spec: JsonObject,
-  navigation: JsonObject
-): MintlifyOpenApiSpec[] => {
-  const api = asObject(spec.api) ?? {};
-  return uniqueApiSpecs([
-    ...openApiSpecsFrom(spec.openapi, DEFAULT_API_DIRECTORY),
-    ...openApiSpecsFrom(api.openapi, DEFAULT_API_DIRECTORY),
-    ...collectNavigationOpenApiSpecs(mintlifyNavigationItems(navigation)),
-  ]);
-};
-
-const mintlifyAsyncApiSpecs = (
-  spec: JsonObject,
-  navigation: JsonObject
-): MintlifyAsyncApiSpec[] => {
-  const api = asObject(spec.api) ?? {};
-  return uniqueApiSpecs([
-    ...asyncApiSpecsFrom(spec.asyncapi, DEFAULT_API_DIRECTORY),
-    ...asyncApiSpecsFrom(api.asyncapi, DEFAULT_API_DIRECTORY),
-    ...collectNavigationAsyncApiSpecs(mintlifyNavigationItems(navigation)),
-  ]);
 };
 
 const optionalBoolean = (value: unknown): boolean | undefined => {
@@ -556,258 +347,6 @@ const mintlifyBackgroundDecoration = (
   return undefined;
 };
 
-const apiPlaygroundDisplay = (
-  value: unknown
-): "interactive" | "simple" | "none" | "auth" | undefined => {
-  const display = asString(value);
-  if (
-    display === "interactive" ||
-    display === "simple" ||
-    display === "none" ||
-    display === "auth"
-  ) {
-    return display;
-  }
-  return undefined;
-};
-
-const apiExampleDefaults = (value: unknown): "required" | "all" | undefined => {
-  const defaults = asString(value);
-  if (defaults === "required" || defaults === "all") {
-    return defaults;
-  }
-  return undefined;
-};
-
-const mintlifyApiExamples = (
-  value: unknown
-): NonNullable<BlumeConfig["api"]>["examples"] => {
-  const examples = asObject(value);
-  const languages = asArray(examples?.languages).flatMap((language) => {
-    const text = asString(language);
-    return text ? [text] : [];
-  });
-  return withoutUndefined({
-    autogenerate: optionalBoolean(examples?.autogenerate),
-    defaults: apiExampleDefaults(examples?.defaults),
-    languages: languages.length > 0 ? languages : undefined,
-    prefill: optionalBoolean(examples?.prefill),
-  });
-};
-
-const mintlifyApiParams = (
-  value: unknown
-): NonNullable<BlumeConfig["api"]>["params"] => {
-  const params = asObject(value);
-  const post = asArray(params?.post).flatMap((item) => {
-    const text = asString(item);
-    return text ? [text] : [];
-  });
-  return { post };
-};
-
-const mintlifyApiPlayground = (
-  value: unknown
-): NonNullable<BlumeConfig["api"]>["playground"] => {
-  const playground = asObject(value);
-  const url: "full" | undefined =
-    playground?.url === "full" ? "full" : undefined;
-  return withoutUndefined({
-    credentials: optionalBoolean(playground?.credentials),
-    display: apiPlaygroundDisplay(playground?.display),
-    proxy: optionalBoolean(playground?.proxy),
-    url,
-  });
-};
-
-const apiMdxAuthMethod = (
-  value: unknown
-): "basic" | "bearer" | "key" | "none" | undefined => {
-  const method = asString(value);
-  if (
-    method === "basic" ||
-    method === "bearer" ||
-    method === "key" ||
-    method === "none"
-  ) {
-    return method;
-  }
-  return undefined;
-};
-
-const mintlifyApiMdx = (
-  value: unknown
-): NonNullable<BlumeConfig["api"]>["mdx"] => {
-  const mdx = asObject(value);
-  const auth = asObject(mdx?.auth);
-  const method = apiMdxAuthMethod(auth?.method);
-  return withoutUndefined({
-    auth: method
-      ? withoutUndefined({
-          method,
-          name: asString(auth?.name),
-        })
-      : undefined,
-    server: asString(mdx?.server),
-  });
-};
-
-const mintlifyApiSettings = (
-  spec: JsonObject,
-  navigation: JsonObject
-): NonNullable<BlumeConfig["api"]> => {
-  const api = asObject(spec.api) ?? {};
-  return {
-    asyncapi: mintlifyAsyncApiSpecs(spec, navigation),
-    examples: mintlifyApiExamples(api.examples),
-    mdx: mintlifyApiMdx(api.mdx),
-    openapi: mintlifyOpenApiSpecs(spec, navigation),
-    params: mintlifyApiParams(api.params),
-    playground: mintlifyApiPlayground(api.playground),
-  };
-};
-
-const resolveApiSource = (
-  root: string,
-  source: string,
-  type: "AsyncAPI" | "OpenAPI"
-): string => {
-  if (source.startsWith("http://") || source.startsWith("https://")) {
-    return source;
-  }
-
-  const candidate = source.startsWith("/")
-    ? resolve(root, source.slice(1))
-    : resolve(root, source);
-  if (!isInsideRoot(root, candidate)) {
-    throw new BlumeError({
-      code: `BLUME_MINTLIFY_${type.toUpperCase()}_OUTSIDE_ROOT`,
-      file: source,
-      message: `Mintlify ${type} source points outside the project root: ${source}`,
-      severity: "error",
-    });
-  }
-  return candidate;
-};
-
-const openApiDoc = (
-  spec: MintlifyOpenApiSpec,
-  options: ApiSidebarOptions
-): Promise<OpenApiDocument> => {
-  const source = resolveApiSource(options.root, spec.source, "OpenAPI");
-  const cached = options.docs.get(source);
-  if (cached) {
-    return cached;
-  }
-  const doc = parseOpenApi(source);
-  options.docs.set(source, doc);
-  return doc;
-};
-
-const openApiPageRef = (spec: MintlifyOpenApiSpec, slug: string): string =>
-  normalizePageRef(`${spec.directory}/${slug}`);
-
-const openApiOperationRef = (
-  spec: MintlifyOpenApiSpec,
-  operation: ReturnType<typeof listOpenApiOperations>[number]
-): string =>
-  normalizePageRef(
-    operation.href ??
-      [spec.directory, operation.group?.slug, operation.slug]
-        .filter(Boolean)
-        .join("/")
-  );
-
-const asyncApiDoc = (
-  spec: MintlifyAsyncApiSpec,
-  options: ApiSidebarOptions
-): Promise<AsyncApiDocument> => {
-  const source = resolveApiSource(options.root, spec.source, "AsyncAPI");
-  const cached = options.asyncDocs.get(source);
-  if (cached) {
-    return cached;
-  }
-  const doc = parseAsyncApi(source);
-  options.asyncDocs.set(source, doc);
-  return doc;
-};
-
-const asyncApiPageRef = (spec: MintlifyAsyncApiSpec, slug: string): string =>
-  normalizePageRef(`${spec.directory}/${slug}`);
-
-const normalizeEndpointPath = (value: string): string => {
-  const normalized = value.replace(/\/+$/u, "");
-  return normalized.length > 0 ? normalized : "/";
-};
-
-const endpointKey = (method: string, path: string): string =>
-  `${method.toUpperCase()} ${normalizeEndpointPath(path)}`;
-
-const openApiEndpointRef = async (
-  ref: string,
-  spec: MintlifyOpenApiSpec,
-  options: ApiSidebarOptions
-): Promise<string | undefined> => {
-  const match = ref.match(API_ENDPOINT_REF);
-  if (!match?.groups) {
-    return undefined;
-  }
-
-  const target = endpointKey(
-    match.groups.method ?? "",
-    match.groups.path ?? ""
-  );
-  const doc = await openApiDoc(spec, options);
-  const operation = listOpenApiOperations(doc).find(
-    (item) => endpointKey(item.method, item.path) === target
-  );
-  return operation ? openApiOperationRef(spec, operation) : undefined;
-};
-
-const openApiSectionRefs = async (
-  spec: MintlifyOpenApiSpec,
-  options: ApiSidebarOptions
-): Promise<SidebarItemConfig[]> => {
-  const doc = await openApiDoc(spec, options);
-  const operations = listOpenApiOperations(doc);
-  const grouped = new Map<string, { label: string; pages: string[] }>();
-  const ungrouped: string[] = [];
-  for (const operation of operations.filter((item) => !item.hidden)) {
-    const ref = openApiOperationRef(spec, operation);
-    if (!operation.group) {
-      ungrouped.push(ref);
-      continue;
-    }
-    const group = grouped.get(operation.group.slug) ?? {
-      label: operation.group.label,
-      pages: [],
-    };
-    group.pages.push(ref);
-    grouped.set(operation.group.slug, group);
-  }
-  return [
-    openApiPageRef(spec, "index"),
-    ...ungrouped,
-    ...[...grouped.values()].map((group) => ({
-      items: group.pages,
-      label: group.label,
-    })),
-  ];
-};
-
-const asyncApiSectionRefs = async (
-  spec: MintlifyAsyncApiSpec,
-  options: ApiSidebarOptions
-): Promise<string[]> => {
-  const doc = await asyncApiDoc(spec, options);
-  return [
-    asyncApiPageRef(spec, "index"),
-    ...listAsyncApiChannels(doc).map((item) =>
-      asyncApiPageRef(spec, item.slug)
-    ),
-  ];
-};
-
 const sidebarItemPaths = (items: SidebarItemConfig[]): string[] =>
   items.flatMap((item) => {
     if (typeof item === "string") {
@@ -830,14 +369,18 @@ const collapsedFromExpanded = (value: unknown): boolean | undefined => {
   return undefined;
 };
 
+interface SidebarOptions {
+  directory?: DirectoryMode;
+}
+
 type SidebarItemConverter = (
   items: unknown[],
-  options: ApiSidebarOptions
+  options: SidebarOptions
 ) => Promise<SidebarItemConfig[]>;
 
 const toSidebarObjectItems = async (
   object: JsonObject,
-  options: ApiSidebarOptions,
+  options: SidebarOptions,
   convertItems: SidebarItemConverter
 ): Promise<SidebarItemConfig[]> => {
   const label = labelForNavItem(object);
@@ -849,33 +392,8 @@ const toSidebarObjectItems = async (
   const rootRef = root && groupLabel ? normalizePageRef(root) : undefined;
   const directory = asDirectoryMode(object.directory) ?? options.directory;
   const rootDirectory = rootRef && directory !== "none" ? directory : undefined;
-  const openApiSpecs = openApiSpecsFrom(
-    object.openapi,
-    navItemApiDirectory(object)
-  );
-  const asyncApiSpecs = asyncApiSpecsFrom(
-    object.asyncapi,
-    navItemApiDirectory(object)
-  );
   const children = childItemsFor(object);
-  const nested = await convertItems(children, {
-    ...options,
-    activeOpenApi: openApiSpecs[0] ?? options.activeOpenApi,
-    directory,
-  });
-
-  if (openApiSpecs.length > 0 && children.length === 0) {
-    const openApiRefGroups = await Promise.all(
-      openApiSpecs.map((spec) => openApiSectionRefs(spec, options))
-    );
-    nested.push(...openApiRefGroups.flat());
-  }
-  if (asyncApiSpecs.length > 0) {
-    const asyncApiRefGroups = await Promise.all(
-      asyncApiSpecs.map((spec) => asyncApiSectionRefs(spec, options))
-    );
-    nested.push(...asyncApiRefGroups.flat());
-  }
+  const nested = await convertItems(children, { ...options, directory });
 
   if (nested.length > 0) {
     return label
@@ -914,15 +432,12 @@ const toSidebarObjectItems = async (
 
 const toSidebarItems = async (
   items: unknown[],
-  options: ApiSidebarOptions
+  options: SidebarOptions
 ): Promise<SidebarItemConfig[]> => {
   const itemLists = await Promise.all(
-    items.map(async (item): Promise<SidebarItemConfig[]> => {
+    items.map((item): SidebarItemConfig[] | Promise<SidebarItemConfig[]> => {
       if (typeof item === "string") {
-        const endpointRef = options.activeOpenApi
-          ? await openApiEndpointRef(item, options.activeOpenApi, options)
-          : undefined;
-        return [endpointRef ?? normalizePageRef(item)];
+        return [normalizePageRef(item)];
       }
 
       const object = asObject(item);
@@ -965,50 +480,26 @@ const isExternalRoute = (path: string): boolean =>
   path.startsWith("tel:");
 
 const hasOwnNavigationContent = (item: JsonObject): boolean =>
-  Boolean(asString(item.root)) ||
-  childItemsFor(item).length > 0 ||
-  openApiSpecsFrom(item.openapi, navItemApiDirectory(item)).length > 0 ||
-  asyncApiSpecsFrom(item.asyncapi, navItemApiDirectory(item)).length > 0;
-
-const activeOpenApiOptions = (
-  item: JsonObject,
-  options: ApiSidebarOptions
-): ApiSidebarOptions => {
-  const [activeOpenApi] = openApiSpecsFrom(
-    item.openapi,
-    navItemApiDirectory(item)
-  );
-  return activeOpenApi ? { ...options, activeOpenApi } : options;
-};
+  Boolean(asString(item.root)) || childItemsFor(item).length > 0;
 
 const mintlifySidebarVariants = async (
-  spec: JsonObject,
-  root: string
+  spec: JsonObject
 ): Promise<NavigationSidebarVariants> => {
   const navigation = asObject(spec.navigation) ?? {};
   const global = asObject(navigation.global) ?? {};
   interface SidebarVariantCandidate {
     item: unknown;
-    options: ApiSidebarOptions;
     path: string;
   }
-  const apiOptions: ApiSidebarOptions = {
-    asyncDocs: new Map(),
-    docs: new Map(),
-    root,
-  };
   const candidates: SidebarVariantCandidate[] = [];
 
-  const addCandidate = (
-    item: unknown,
-    options: ApiSidebarOptions = apiOptions
-  ): void => {
+  const addCandidate = (item: unknown): void => {
     const path = navItemPath(item);
     if (!path || isExternalRoute(path)) {
       return;
     }
 
-    candidates.push({ item, options, path });
+    candidates.push({ item, path });
   };
 
   for (const item of [
@@ -1022,9 +513,8 @@ const mintlifySidebarVariants = async (
       continue;
     }
 
-    const menuOptions = activeOpenApiOptions(object, apiOptions);
     for (const menuItem of asArray(object.menu)) {
-      addCandidate(menuItem, menuOptions);
+      addCandidate(menuItem);
     }
 
     if (hasOwnNavigationContent(object)) {
@@ -1043,7 +533,7 @@ const mintlifySidebarVariants = async (
 
   const resolved = await Promise.all(
     candidates.map(async (candidate) => {
-      const items = await toSidebarItems([candidate.item], candidate.options);
+      const items = await toSidebarItems([candidate.item], {});
       if (items.length === 0) {
         return [];
       }
@@ -1536,7 +1026,6 @@ export const loadMintlifyConfig = async (
   const styling = asObject(spec.styling) ?? {};
 
   return {
-    api: mintlifyApiSettings(spec, navigation),
     banner: mintlifyBanner(spec.banner),
     content: {
       exclude: [
@@ -1556,12 +1045,8 @@ export const loadMintlifyConfig = async (
     navigation: {
       chromeVariants: mintlifyChromeVariants(spec),
       selectors: mintlifySelectors(spec),
-      sidebar: await toSidebarItems(mintlifyNavigationItems(navigation), {
-        asyncDocs: new Map(),
-        docs: new Map(),
-        root: projectRoot,
-      }),
-      sidebarVariants: await mintlifySidebarVariants(spec, projectRoot),
+      sidebar: await toSidebarItems(mintlifyNavigationItems(navigation), {}),
+      sidebarVariants: await mintlifySidebarVariants(spec),
       tabs: mintlifyTabs(spec),
     },
     redirects: mintlifyRedirects(spec),

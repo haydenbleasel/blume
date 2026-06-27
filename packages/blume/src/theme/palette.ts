@@ -174,6 +174,18 @@ ${tokens.join("\n")}
 };
 
 /**
+ * Resolve the configured accent to a CSS color. A named accent resolves to its
+ * preset; any other value is treated as a raw CSS color so users can pass
+ * arbitrary colors without a config change.
+ */
+export const resolveAccent = (theme: ResolvedConfig["theme"]): string =>
+  ACCENTS[theme.accent] ?? theme.accent;
+
+/** Resolve the configured radius preset to a CSS length. */
+export const resolveRadius = (theme: ResolvedConfig["theme"]): string =>
+  RADII[theme.radius];
+
+/**
  * Compile theme config into CSS custom properties. A named accent resolves to
  * its preset; any other value is treated as a raw CSS color so users can pass
  * arbitrary colors without a config change.

@@ -33,8 +33,9 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
+    "typecheck": "tsgo --noEmit && tsgo -p test/tsconfig.json --noEmit"
   },
   "dependencies": {
     "@astrojs/markdown-satteri": "^0.3.2",
@@ -43,6 +44,7 @@
     "@astrojs/react": "^6.0.0",
     "@astrojs/vercel": "^11.0.0",
     "@orama/orama": "^3.1.18",
+    "@scalar/astro": "^0.4.5",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4",
     "@takumi-rs/core": "^1.8.7",
@@ -63,6 +65,7 @@
     "react-dom": "^19.0.0",
     "tailwindcss": "^4",
     "tinyglobby": "^0.2.10",
+    "typescript": "^5.7.0",
     "yaml": "^2.6.0",
     "zod": "^3.24.0"
   },
@@ -71,7 +74,8 @@
     "@types/picomatch": "^4.0.3",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.0"
+    "@typescript/native-preview": "^7.0.0-dev.20260626.1",
+    "bun-types": "^1.3.14"
   },
   "engines": {
     "node": ">=22.12.0"
