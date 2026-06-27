@@ -25,6 +25,7 @@ import {
 import { buildSearchDocuments } from "../search/documents.ts";
 import { searchProviderMeta, servesStaticIndex } from "../search/providers.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
+import { buildFontsCss, configuredCssVars } from "../theme/fonts.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 import { discoverPages } from "./pages.ts";
 import {
@@ -237,6 +238,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       href: feed.path,
       title: feed.title,
     })),
+    // CSS variables for Astro's <Font> component; matches the astro.config
+    // `fonts:` entries derived from the same theme.fonts config.
+    fontCssVars: configuredCssVars(config.theme.fonts),
     // API reference routes (Scalar) surface as header tabs alongside the
     // content-derived ones, so the reference stays discoverable.
     navigation: {
@@ -322,7 +326,7 @@ export const generateRuntime = async (
     writeIfChanged(
       themePath,
       tailwindEntryTemplate({
-        configTokens: buildThemeCss(config.theme),
+        configTokens: `${buildThemeCss(config.theme)}${buildFontsCss(config.theme.fonts)}`,
         sources: [
           `${BLUME_SRC}/**/*.{astro,ts,tsx}`,
           `${context.root}/**/*.{astro,mdx,ts,tsx}`,

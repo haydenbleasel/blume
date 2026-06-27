@@ -1,0 +1,14 @@
+---
+// Emits the optimized @font-face declarations + preload links for each
+// configured font (Astro's Fonts API). Renders nothing when no fonts are set;
+// the CSS variables match the astro.config `fonts:` entries.
+import { Font } from "astro:assets";
+
+interface Props {
+  cssVars: string[];
+}
+
+const { cssVars } = Astro.props;
+---
+
+{cssVars.map((cssVar) => <Font cssVariable={cssVar} preload />)}

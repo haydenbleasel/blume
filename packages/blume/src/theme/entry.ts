@@ -38,6 +38,35 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   --blume-accent-foreground: oklch(1 0 0);
   --blume-code-background: oklch(0.99 0 0);
   --blume-radius: 0.75rem;
+
+  /*
+   * Font tokens resolve through optional src variables that Astro's Fonts API
+   * populates (via theme.fonts). When unset they fall back to the system
+   * stacks, so the default look is unchanged. The display font defaults to the
+   * body font.
+   */
+  --blume-font-body: var(
+    --blume-font-body-src,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
+  --blume-font-mono: var(
+    --blume-font-mono-src,
+    ui-monospace,
+    "SF Mono",
+    "Cascadia Code",
+    "Source Code Pro",
+    Menlo,
+    Consolas,
+    monospace
+  );
+  --blume-font-display: var(--blume-font-display-src, var(--blume-font-body));
 }
 
 :root[data-theme="dark"] {
@@ -61,18 +90,24 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   --color-accent-foreground: var(--blume-accent-foreground);
   --color-code: var(--blume-code-background);
   --radius-blume: var(--blume-radius);
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
-  --font-mono:
-    ui-monospace, "SF Mono", "Cascadia Code", "Source Code Pro", Menlo,
-    Consolas, monospace;
+  --font-sans: var(--blume-font-body);
+  --font-mono: var(--blume-font-mono);
+  --font-display: var(--blume-font-display);
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
     scroll-padding-top: 4.5rem;
+  }
+  /* Headings use the display font (defaults to the body font when unset). */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
   }
   :focus-visible {
     outline: 2px solid var(--blume-accent);
@@ -177,6 +212,7 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   border: 1px solid var(--blume-border);
   border-radius: var(--blume-radius);
   color: var(--blume-foreground);
+  font-family: var(--font-mono);
   font-size: 0.8125rem;
   line-height: 1.55;
   margin: 1.5rem 0;
@@ -341,6 +377,7 @@ pre[data-line-numbers] .line::before {
   background: var(--blume-code-background);
   padding: 0.15em 0.35em;
   border-radius: 0.3rem;
+  font-family: var(--font-mono);
   font-weight: 500;
 }
 

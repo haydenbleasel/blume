@@ -130,6 +130,42 @@ describe("astro config template", () => {
     expect(output).toContain('dark: "github-dark"');
     expect(output).toContain("defaultColor: false");
   });
+
+  const context = {
+    outDir: "/r/.blume",
+    pagesRoot: null,
+    root: "/r",
+  } as ProjectContext;
+  const configTemplate = (config: ReturnType<typeof blumeConfigSchema.parse>) =>
+    astroConfigTemplate({
+      config,
+      context,
+      dataPath: "/r/.blume/src/generated/data.json",
+      needsReact: false,
+      pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
+      themePath: "/r/.blume/src/generated/app.css",
+    });
+
+  it("emits the self-hosted default fonts when theme.fonts is omitted", () => {
+    const output = configTemplate(blumeConfigSchema.parse({}));
+    expect(output).toContain(
+      'import { defineConfig, fontProviders } from "astro/config";'
+    );
+    expect(output).toContain("provider: fontProviders.google()");
+    expect(output).toContain('name: "Inter Tight"');
+    expect(output).toContain('name: "Inter"');
+    expect(output).toContain('cssVariable: "--blume-ff-ibm-plex-mono"');
+  });
+
+  it("emits an overridden font role alongside the defaults", () => {
+    const output = configTemplate(
+      blumeConfigSchema.parse({ theme: { fonts: { body: "geist" } } })
+    );
+    expect(output).toContain('name: "Geist"');
+    expect(output).toContain('name: "Inter Tight"');
+    expect(output).toContain('cssVariable: "--blume-ff-ibm-plex-mono"');
+  });
 });
 
 describe("page meta schema", () => {

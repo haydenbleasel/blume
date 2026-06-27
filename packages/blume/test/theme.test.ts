@@ -3,6 +3,11 @@ import { describe, expect, it } from "bun:test";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { tailwindEntryTemplate } from "../src/theme/entry.ts";
 import {
+  buildFontEntries,
+  buildFontsCss,
+  configuredCssVars,
+} from "../src/theme/fonts.ts";
+import {
   buildThemeCss,
   resolveAccent,
   resolveRadius,
@@ -71,5 +76,88 @@ describe("tailwindEntryTemplate", () => {
     const userAt = entry.indexOf(".prose { color: green; }");
     expect(configAt).toBeGreaterThan(-1);
     expect(userAt).toBeGreaterThan(configAt);
+  });
+
+  it("routes font tokens through overridable indirection variables", () => {
+    expect(entry).toContain("--font-sans: var(--blume-font-body);");
+    expect(entry).toContain("--font-mono: var(--blume-font-mono);");
+    expect(entry).toContain("--font-display: var(--blume-font-display);");
+    // Headings pick up the display font (defaults to body when unset).
+    expect(entry).toContain("font-family: var(--font-display);");
+  });
+});
+
+describe("buildFontEntries", () => {
+  it("resolves a slug to its Google family, weights, and fallbacks", () => {
+    const [entry] = buildFontEntries({ mono: "ibm-plex-mono" });
+    expect(entry).toStrictEqual({
+      cssVariable: "--blume-ff-ibm-plex-mono",
+      fallbacks: ["ui-monospace", "SF Mono", "Menlo", "monospace"],
+      name: "IBM Plex Mono",
+      weights: [400, 500, 600],
+    });
+  });
+
+  it("dedupes when multiple roles share a font", () => {
+    const entries = buildFontEntries({ body: "inter", display: "inter" });
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.name).toBe("Inter");
+  });
+
+  it("returns no entries when no roles are set", () => {
+    expect(buildFontEntries({})).toStrictEqual([]);
+  });
+});
+
+describe("buildFontsCss", () => {
+  it("points each role's src variable at its shared font variable", () => {
+    const css = buildFontsCss({
+      body: "inter",
+      display: "geist",
+      mono: "ibm-plex-mono",
+    });
+    expect(css).toContain("--blume-font-display-src: var(--blume-ff-geist);");
+    expect(css).toContain("--blume-font-body-src: var(--blume-ff-inter);");
+    expect(css).toContain(
+      "--blume-font-mono-src: var(--blume-ff-ibm-plex-mono);"
+    );
+  });
+
+  it("emits nothing when no roles are set", () => {
+    expect(buildFontsCss({})).toBe("");
+  });
+});
+
+describe("configuredCssVars", () => {
+  it("lists the unique Astro font variables to preload", () => {
+    expect(
+      configuredCssVars({ body: "inter", display: "inter", mono: "geist-mono" })
+    ).toStrictEqual(["--blume-ff-inter", "--blume-ff-geist-mono"]);
+  });
+});
+
+describe("theme.fonts schema", () => {
+  it("defaults to Inter Tight / Inter / IBM Plex Mono when omitted", () => {
+    expect(themeOf({}).fonts).toStrictEqual({
+      body: "inter",
+      display: "inter-tight",
+      mono: "ibm-plex-mono",
+    });
+  });
+
+  it("merges an explicit role over the defaults", () => {
+    expect(themeOf({ fonts: { body: "geist" } }).fonts).toStrictEqual({
+      body: "geist",
+      display: "inter-tight",
+      mono: "ibm-plex-mono",
+    });
+  });
+
+  it("rejects an unknown font slug with a helpful message", () => {
+    const result = blumeConfigSchema.safeParse({
+      theme: { fonts: { body: "comic-sans" } },
+    });
+    expect(result.success).toBeFalsy();
+    expect(result.error?.issues[0]?.message).toContain("Unknown font");
   });
 });

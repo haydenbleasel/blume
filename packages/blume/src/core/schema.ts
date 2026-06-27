@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { FONT_SLUGS, isFontSlug } from "../theme/fonts.ts";
+
 /**
  * Public Blume schemas.
  *
@@ -201,9 +203,22 @@ const navigationConfigSchema = z
   })
   .strict();
 
+/** A curated Google Font slug (see `theme/fonts.ts`). */
+const fontSlug = z.string().refine(isFontSlug, (value) => ({
+  message: `Unknown font "${value}". Supported fonts: ${FONT_SLUGS.join(", ")}.`,
+}));
+
 const themeConfigSchema = z
   .object({
     accent: z.string().default("blue"),
+    fonts: z
+      .object({
+        body: fontSlug.default("inter"),
+        display: fontSlug.default("inter-tight"),
+        mono: fontSlug.default("ibm-plex-mono"),
+      })
+      .strict()
+      .default({}),
     layout: z.enum(["sidebar"]).default("sidebar"),
     mode: z.enum(["system", "light", "dark"]).default("system"),
     radius: z.enum(["none", "sm", "md", "lg"]).default("md"),
