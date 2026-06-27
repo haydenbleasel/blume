@@ -187,6 +187,15 @@ describe(blumeShikiTransformers, () => {
     expect(names).toContain("blume:language-icon");
     expect(names.at(-1)).toBe("blume:code-meta");
   });
+
+  it("drops the icon transformer when icons are disabled", () => {
+    const names = blumeShikiTransformers({ icons: false }).map(
+      (transformer) => transformer.name ?? ""
+    );
+    expect(names).toHaveLength(6);
+    expect(names).not.toContain("blume:language-icon");
+    expect(names.at(-1)).toBe("blume:code-meta");
+  });
 });
 
 describe(languageIconTransformer, () => {

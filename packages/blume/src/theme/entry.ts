@@ -319,6 +319,14 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   padding: 0;
 }
 
+/* Word wrap (markdown.code.wrap): long lines wrap instead of scrolling. The
+   attribute is set on <body> from config; default code keeps \`white-space: pre\`. */
+[data-blume-code-wrap] pre,
+[data-blume-code-wrap] pre code {
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
 .prose :where(table) {
   font-size: 0.8125rem;
 }

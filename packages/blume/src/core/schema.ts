@@ -408,8 +408,26 @@ const lastModifiedConfigSchema = z.union([
   z.object({ type: z.enum(["git", "frontmatter"]).default("git") }).strict(),
 ]);
 
+/** Code-block rendering options (`markdown.code`). */
+const codeConfigSchema = z
+  .object({
+    /**
+     * Show a brand language icon in the code-block header (TypeScript, Python,
+     * …). On by default; recognized languages only.
+     */
+    icons: z.boolean().default(true),
+    /**
+     * Wrap long lines instead of scrolling horizontally. Off by default, so
+     * code keeps its original line breaks and overflows into a scroll area.
+     */
+    wrap: z.boolean().default(false),
+  })
+  .strict();
+
 const markdownConfigSchema = z
   .object({
+    /** Code-block rendering: language icons and line wrapping. */
+    code: codeConfigSchema.default({}),
     /**
      * Make content images click-to-zoom (open in a lightbox). On by default;
      * opt a single image out with `data-no-zoom`.

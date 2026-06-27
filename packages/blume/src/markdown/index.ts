@@ -49,15 +49,28 @@ type MdastPlugin = NonNullable<
  * (`highlighted`, `diff add/remove`, `highlighted-word`, `focused`,
  * `blume-lang-icon`).
  */
-export const blumeShikiTransformers = (): ShikiTransformer[] => [
-  transformerNotationHighlight({ matchAlgorithm: "v3" }),
-  transformerNotationDiff({ matchAlgorithm: "v3" }),
-  transformerNotationWordHighlight({ matchAlgorithm: "v3" }),
-  transformerNotationFocus({ matchAlgorithm: "v3" }),
-  transformerMetaHighlight(),
-  languageIconTransformer() as unknown as ShikiTransformer,
-  codeTitleTransformer() as unknown as ShikiTransformer,
-];
+export interface BlumeShikiOptions {
+  /** Prepend a brand language icon to the header (`markdown.code.icons`). */
+  icons?: boolean;
+}
+
+export const blumeShikiTransformers = (
+  options: BlumeShikiOptions = {}
+): ShikiTransformer[] => {
+  const transformers: ShikiTransformer[] = [
+    transformerNotationHighlight({ matchAlgorithm: "v3" }),
+    transformerNotationDiff({ matchAlgorithm: "v3" }),
+    transformerNotationWordHighlight({ matchAlgorithm: "v3" }),
+    transformerNotationFocus({ matchAlgorithm: "v3" }),
+    transformerMetaHighlight(),
+  ];
+  if (options.icons !== false) {
+    transformers.push(languageIconTransformer() as unknown as ShikiTransformer);
+  }
+  // The fence-meta reader (title / line numbers) always runs last.
+  transformers.push(codeTitleTransformer() as unknown as ShikiTransformer);
+  return transformers;
+};
 
 /**
  * Sätteri Markdown features Blume enables beyond Astro's defaults. GFM,
