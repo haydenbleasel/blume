@@ -5,31 +5,26 @@ description: The page metadata schema.
 
 Every page accepts the following frontmatter. All fields are optional.
 
-<ParameterTable
-  parameters={[
-    { name: "title", type: "string", description: "Page title." },
-    { name: "description", type: "string", description: "Page summary." },
-    {
-      name: "type",
+<TypeTable
+  type={{
+    title: { type: "string", description: "Page title." },
+    description: { type: "string", description: "Page summary." },
+    type: {
       type: "string",
-      description: "Content type (default: doc). blog/changelog drive feeds.",
+      default: "doc",
+      description: "Content type. blog/changelog drive feeds.",
     },
-    {
-      name: "date",
+    date: {
       type: "string",
       description: "Publish date for blog/changelog feeds (ISO or YAML date).",
     },
-    {
-      name: "slug",
-      type: "string",
-      description: "Override the generated slug.",
-    },
-    {
-      name: "draft",
+    slug: { type: "string", description: "Override the generated slug." },
+    draft: {
       type: "boolean",
+      default: "false",
       description: "Exclude from production builds.",
     },
-  ]}
+  }}
 />
 
 ## Sidebar

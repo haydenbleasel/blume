@@ -448,86 +448,100 @@ Show or hide content by audience. `for="web"` renders only on the site;
 <Visibility for="agents">Shown only in the generated Markdown.</Visibility>
 ```
 
-## Parameters and fields
+## Type tables
 
-Components for documenting parameters, fields, and structured options — used
-throughout these docs for config, frontmatter, and data tables.
+Tables for documenting an object's properties — its props, types, and defaults.
+Write the rows by hand with `TypeTable`, or generate them straight from a
+TypeScript interface or type alias with `AutoTypeTable`.
 
-### Parameter table
+### Type table
 
-Document request parameters — name, type, whether they're required, and a
-description. Pass a `parameters` array.
+A **Prop / Type** grid where each row expands to reveal its description and
+details. Pass a `type` map keyed by property name; each entry takes a `type`,
+plus an optional `description`, `default`, `required` flag, `typeDescription`,
+and `typeDescriptionLink`. Optional props (`required` unset) show a `?` after the
+name.
 
-<ParameterTable
-  parameters={[
-    {
-      name: "name",
+<TypeTable
+  type={{
+    label: {
       type: "string",
       required: true,
-      description: "The pet's name.",
+      description: "The button's visible label.",
     },
-    { name: "tag", type: "string", description: "An optional category." },
-  ]}
+    variant: {
+      type: '"primary" | "ghost"',
+      default: '"primary"',
+      description: "Visual style.",
+    },
+    disabled: { type: "boolean" },
+  }}
 />
 
 ```astro lineNumbers
-<ParameterTable
-  parameters={[
-    {
-      name: "name",
+<TypeTable
+  type={{
+    label: {
       type: "string",
       required: true,
-      description: "The pet's name.",
+      description: "The button's visible label.",
     },
-    { name: "tag", type: "string", description: "An optional category." },
-  ]}
+    variant: {
+      type: '"primary" | "ghost"',
+      default: '"primary"',
+      description: "Visual style.",
+    },
+    disabled: { type: "boolean" },
+  }}
 />
 ```
 
-### Param field
+### Auto type table
 
-Document a single request parameter — its name, type, and whether it's required —
-with a description in the body. Identify the parameter with one of `path`,
-`query`, `header`, or `body`, and add `required`, `default`, `placeholder`, or
-`deprecated` as needed.
+Generate a type table from a TypeScript type so the docs stay in sync with the
+source. Point `AutoTypeTable` at a file with `path` (resolved from your project
+root) and a type `name`. Descriptions come from JSDoc comments, defaults from
+`@default` tags, and optional properties (`?`) are marked accordingly.
 
-<ParamField body="name" type="string" required>
-  The pet's name.
-</ParamField>
-
-<ParamField query="limit" type="integer" default="20">
-  Maximum number of results to return.
-</ParamField>
-
-```astro lineNumbers
-<ParamField body="name" type="string" required>
-  The pet's name.
-</ParamField>
-
-<ParamField query="limit" type="integer" default="20">
-  Maximum number of results to return.
-</ParamField>
+```astro
+<AutoTypeTable path="./src/button.ts" name="ButtonProps" />
 ```
 
-### Response field
+You can also pass the type inline with `type` instead of a `path` — handy for
+small examples:
 
-Document a field in an API response — its name, type, and a description —
-optionally marking it `required` or `deprecated`.
-
-<ResponseField name="id" type="string" required>
-  Unique identifier for the created pet.
-</ResponseField>
-
-<ResponseField name="createdAt" type="string">
-  ISO 8601 timestamp of creation.
-</ResponseField>
+<AutoTypeTable
+  name="ButtonProps"
+  type={`
+export interface ButtonProps {
+  /** The button's visible label. */
+  label: string;
+  /**
+   * Visual style.
+   * @default "primary"
+   */
+  variant?: "primary" | "ghost";
+  /** Disable interaction. */
+  disabled?: boolean;
+}
+`}
+/>
 
 ```astro lineNumbers
-<ResponseField name="id" type="string" required>
-  Unique identifier for the created pet.
-</ResponseField>
-
-<ResponseField name="createdAt" type="string">
-  ISO 8601 timestamp of creation.
-</ResponseField>
+<AutoTypeTable
+  name="ButtonProps"
+  type={`
+export interface ButtonProps {
+  /** The button's visible label. */
+  label: string;
+  /**
+   * Visual style.
+   * @default "primary"
+   */
+  variant?: "primary" | "ghost";
+  /** Disable interaction. */
+  disabled?: boolean;
+}
+`}
+/>
 ```

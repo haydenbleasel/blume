@@ -71,31 +71,31 @@ import data from "blume:data";
 
 The module exposes:
 
-<ParameterTable
-  parameters={[
-    {
-      name: "config",
+<TypeTable
+  type={{
+    config: {
       type: "object",
+      required: true,
       description:
         "Resolved site config — title, description, logo, banner, theme, site URL, repoUrl, and search settings.",
     },
-    {
-      name: "navigation",
+    navigation: {
       type: "object",
+      required: true,
       description: "The sidebar and tab tree inferred from your content.",
     },
-    {
-      name: "routes",
+    routes: {
       type: "Route[]",
+      required: true,
       description:
         "Every content page: { id, path, title, indexable, hidden, draft, editUrl }.",
     },
-    {
-      name: "feeds",
+    feeds: {
       type: "Feed[]",
+      required: true,
       description: "Generated RSS feeds: { href, title }.",
     },
-  ]}
+  }}
 />
 
 `routes` carries page metadata but not frontmatter like `type` or `date`. To

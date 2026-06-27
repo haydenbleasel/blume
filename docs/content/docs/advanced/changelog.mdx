@@ -37,27 +37,24 @@ unquoted YAML date is fine — Blume normalizes it.
 
 The optional `changelog` object adds richer metadata for the timeline and feed:
 
-<ParameterTable
-  parameters={[
-    {
-      name: "changelog.version",
+<TypeTable
+  type={{
+    "changelog.version": {
       type: "string",
       description:
         "Release version. Falls back to a v-prefixed label when there's no title.",
     },
-    {
-      name: "changelog.category",
+    "changelog.category": {
       type: "string",
       description:
         "Shown as a tag beside the entry, e.g. Release, Features, Fixes.",
     },
-    {
-      name: "changelog.date",
+    "changelog.date": {
       type: "string",
       description:
         "Publish date. May live here or at the top level — both feed the timeline and RSS feed.",
     },
-  ]}
+  }}
 />
 
 ## The timeline page

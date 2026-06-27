@@ -403,6 +403,7 @@ import RootLayout from "blume/components/layout/RootLayout.astro";
 ${askImport}
 import Accordion from "blume/components/content/Accordion.astro";
 import AccordionItem from "blume/components/content/AccordionItem.astro";
+import AutoTypeTable from "blume/components/content/AutoTypeTable.astro";
 import Badge from "blume/components/content/Badge.astro";
 import Callout from "blume/components/content/Callout.astro";
 import Card from "blume/components/content/Card.astro";
@@ -417,9 +418,7 @@ import Expandable from "blume/components/content/Expandable.astro";
 import FileTree from "blume/components/content/FileTree.astro";
 import Frame from "blume/components/content/Frame.astro";
 import Panel from "blume/components/content/Panel.astro";
-import ParamField from "blume/components/content/ParamField.astro";
 import Prompt from "blume/components/content/Prompt.astro";
-import ResponseField from "blume/components/content/ResponseField.astro";
 import Step from "blume/components/content/Step.astro";
 import Steps from "blume/components/content/Steps.astro";
 import Tab from "blume/components/content/Tab.astro";
@@ -429,9 +428,9 @@ import Tooltip from "blume/components/content/Tooltip.astro";
 import TreeRoot from "blume/components/content/Tree.astro";
 import TreeFile from "blume/components/content/TreeFile.astro";
 import TreeFolder from "blume/components/content/TreeFolder.astro";
+import TypeTable from "blume/components/content/TypeTable.astro";
 import Visibility from "blume/components/content/Visibility.astro";
 import Warning from "blume/components/content/Warning.astro";
-import ParameterTable from "blume/components/content/ParameterTable.astro";
 import Icon from "blume/components/Icon.astro";
 ${mathImport}import { mdxComponents as userMdx } from "../generated/components.ts";
 import data from "../generated/data.json";
@@ -448,6 +447,7 @@ export const prerender = true;
 const components = {
   Accordion,
   AccordionItem,
+  AutoTypeTable,
   Badge,
   Callout,
   Card,
@@ -461,10 +461,7 @@ const components = {
   Frame,
   Icon,
   Panel,
-  ParameterTable,
-  ParamField,
   Prompt,
-  ResponseField,
   Step,
   Steps,
   Tab,
@@ -472,6 +469,7 @@ const components = {
   Tile,
   Tooltip,
   Tree,
+  TypeTable,
   Visibility,
   ${mathEntry}...userMdx,
 };

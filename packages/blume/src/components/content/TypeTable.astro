@@ -1,0 +1,106 @@
+---
+// A table of object properties laid out like Fumadocs' <TypeTable>: a Prop /
+// Type grid where every row is an expandable <details>. Collapsed, a row shows
+// the accent-colored prop name (with a `?` suffix when optional) and its type;
+// expanded, the row lifts into a card showing the description and a Type/Default
+// detail grid. Uses native <details>/<summary> so the core stays React-free.
+interface TypeEntry {
+  default?: string;
+  description?: string;
+  required?: boolean;
+  type: string;
+  typeDescription?: string;
+  typeDescriptionLink?: string;
+}
+
+interface Props {
+  type?: Record<string, TypeEntry>;
+}
+
+const { type = {} } = Astro.props;
+const entries = Object.entries(type);
+
+// Shared column track so the header, every summary, and the detail grid align.
+const columns = "grid grid-cols-[1fr_2fr_auto] items-center gap-4";
+---
+
+{
+  entries.length > 0 && (
+    <div class="not-prose my-6 rounded-blume border border-border bg-muted/30 p-1.5">
+      <div class={`${columns} px-3 py-2 font-medium text-muted-foreground text-xs`}>
+        <span>Prop</span>
+        <span>Type</span>
+        <span aria-hidden="true" class="size-3.5" />
+      </div>
+
+      <div class="mt-1 flex flex-col gap-1">
+        {entries.map(([name, info]) => (
+        <details class="group/tt border-border border-t [[open]+&]:border-t-transparent open:rounded-blume open:border-transparent open:bg-background open:shadow-sm open:ring-1 open:ring-border">
+          <summary class={`${columns} cursor-pointer list-none px-3 py-2.5 [&::-webkit-details-marker]:hidden`}>
+            <code class="min-w-0 break-words font-mono text-accent text-xs">
+              {name}
+              {info.required ? "" : "?"}
+            </code>
+            {info.typeDescriptionLink ? (
+              <a
+                class="min-w-0 break-words font-mono text-foreground text-xs underline-offset-2 hover:underline"
+                href={info.typeDescriptionLink}
+              >
+                {info.type}
+              </a>
+            ) : (
+              <code class="min-w-0 break-words font-mono text-foreground text-xs">
+                {info.type}
+              </code>
+            )}
+            <svg
+              aria-hidden="true"
+              class="size-3.5 shrink-0 text-muted-foreground transition-transform group-open/tt:rotate-180"
+              fill="none"
+              height="16"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="16"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
+
+          <div class="border-border border-t px-3 py-3 text-xs">
+            {info.description && (
+              <p class="mt-0! mb-2! text-foreground">{info.description}</p>
+            )}
+            {info.typeDescription && (
+              <p class="mt-0! mb-2! text-muted-foreground">
+                {info.typeDescription}
+              </p>
+            )}
+            <div class="space-y-1.5">
+              <div class={columns}>
+                <span class="text-muted-foreground">Type</span>
+                <code class="min-w-0 break-words font-mono text-foreground">
+                  {info.type}
+                </code>
+                <span aria-hidden="true" class="size-3.5" />
+              </div>
+              {info.default && (
+                <div class={columns}>
+                  <span class="text-muted-foreground">Default</span>
+                  <code class="min-w-0 break-words font-mono text-foreground">
+                    {info.default}
+                  </code>
+                  <span aria-hidden="true" class="size-3.5" />
+                </div>
+              )}
+            </div>
+          </div>
+        </details>
+        ))}
+      </div>
+    </div>
+  )
+}
+<slot />

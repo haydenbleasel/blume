@@ -47,34 +47,29 @@ seo:
 ---
 ```
 
-<ParameterTable
-  parameters={[
-    {
-      name: "seo.title",
+<TypeTable
+  type={{
+    "seo.title": {
       type: "string",
       description: "Override the <title> and og:title for this page.",
     },
-    {
-      name: "seo.description",
+    "seo.description": {
       type: "string",
       description: "Override the meta + og:description.",
     },
-    {
-      name: "seo.image",
+    "seo.image": {
       type: "string",
       description: "Custom social image (see Open Graph).",
     },
-    {
-      name: "seo.canonical",
+    "seo.canonical": {
       type: "string",
       description: "Override the canonical URL.",
     },
-    {
-      name: "seo.noindex",
+    "seo.noindex": {
       type: "boolean",
       description: "Emit robots noindex and skip structured data.",
     },
-  ]}
+  }}
 />
 
 ## Open Graph images
