@@ -1,8 +1,36 @@
 import { describe, expect, it } from "bun:test";
 
 import { codeTitleTransformer } from "../src/markdown/code-title.ts";
-import { calloutTypeFor } from "../src/markdown/directives.ts";
-import { toPackageCommands } from "../src/markdown/package-commands.ts";
+import {
+  calloutTypeFor,
+  directiveToCalloutPlugin,
+} from "../src/markdown/directives.ts";
+import {
+  codeBlock,
+  jsxAttribute,
+  jsxFlowElement,
+  jsxTextElement,
+} from "../src/markdown/mdast.ts";
+import {
+  PACKAGE_MANAGERS,
+  toPackageCommands,
+} from "../src/markdown/package-commands.ts";
+import { packageInstallPlugin } from "../src/markdown/package-install.ts";
+
+/** Run a plugin visitor and capture the node it replaces, if any. */
+const captureReplacement = (
+  run: (ctx: {
+    replaceNode: (node: unknown, replacement: unknown) => void;
+  }) => void
+): unknown => {
+  let replacement: unknown;
+  run({
+    replaceNode: (_node, value) => {
+      replacement = value;
+    },
+  });
+  return replacement;
+};
 
 /** Run the code-meta transformer over a fence's meta and return the <pre> attrs. */
 const metaAttrs = (
@@ -136,5 +164,146 @@ describe(codeTitleTransformer, () => {
   it("ignores line ranges and leaves plain blocks bare", () => {
     expect(metaAttrs("{1,3-5}").dataTitle).toBeUndefined();
     expect(metaAttrs().dataLineNumbers).toBeUndefined();
+  });
+});
+
+describe("mdast builders", () => {
+  it("renders a value-less attribute as a boolean attribute", () => {
+    expect(jsxAttribute("open")).toStrictEqual({
+      name: "open",
+      type: "mdxJsxAttribute",
+      value: null,
+    });
+  });
+
+  it("carries a string value when given one", () => {
+    expect(jsxAttribute("title", "Hi").value).toBe("Hi");
+  });
+
+  it("builds flow and text JSX elements, defaulting text children to []", () => {
+    const attr = jsxAttribute("type", "note");
+    expect(jsxFlowElement("Callout", [attr], ["body"])).toStrictEqual({
+      attributes: [attr],
+      children: ["body"],
+      name: "Callout",
+      type: "mdxJsxFlowElement",
+    });
+    expect(jsxTextElement("Math", [attr])).toStrictEqual({
+      attributes: [attr],
+      children: [],
+      name: "Math",
+      type: "mdxJsxTextElement",
+    });
+  });
+
+  it("builds a fenced code block with a null meta", () => {
+    expect(codeBlock("bash", "npm i")).toStrictEqual({
+      lang: "bash",
+      meta: null,
+      type: "code",
+      value: "npm i",
+    });
+  });
+});
+
+describe("directiveToCalloutPlugin", () => {
+  const body = {
+    children: [{ type: "text", value: "Body" }],
+    type: "paragraph",
+  };
+
+  it("rewrites a known directive into a typed <Callout>", () => {
+    const node = { children: [body], name: "tip", type: "containerDirective" };
+    const result = captureReplacement((ctx) =>
+      directiveToCalloutPlugin().containerDirective(node, ctx)
+    );
+    expect(result).toStrictEqual(
+      jsxFlowElement("Callout", [jsxAttribute("type", "tip")], [body])
+    );
+  });
+
+  it("uses a {title} attribute for the callout title", () => {
+    const node = {
+      attributes: { title: "Heads up" },
+      children: [body],
+      name: "warning",
+      type: "containerDirective",
+    };
+    const result = captureReplacement((ctx) =>
+      directiveToCalloutPlugin().containerDirective(node, ctx)
+    );
+    expect(result).toStrictEqual(
+      jsxFlowElement(
+        "Callout",
+        [jsxAttribute("type", "warning"), jsxAttribute("title", "Heads up")],
+        [body]
+      )
+    );
+  });
+
+  it("lifts a [label] paragraph into the title and drops it from the body", () => {
+    const label = {
+      children: [{ type: "text", value: "My Label" }],
+      data: { directiveLabel: true },
+      type: "paragraph",
+    };
+    const node = {
+      children: [label, body],
+      name: "note",
+      type: "containerDirective",
+    };
+    const result = captureReplacement((ctx) =>
+      directiveToCalloutPlugin().containerDirective(node, ctx)
+    );
+    expect(result).toStrictEqual(
+      jsxFlowElement(
+        "Callout",
+        [jsxAttribute("type", "note"), jsxAttribute("title", "My Label")],
+        [body]
+      )
+    );
+  });
+
+  it("leaves a non-callout directive untouched", () => {
+    const node = {
+      children: [body],
+      name: "figure",
+      type: "containerDirective",
+    };
+    const result = captureReplacement((ctx) =>
+      directiveToCalloutPlugin().containerDirective(node, ctx)
+    );
+    expect(result).toBeUndefined();
+  });
+});
+
+describe("packageInstallPlugin", () => {
+  it("expands a package-install block into one tab per manager", () => {
+    const node = { lang: "package-install", type: "code", value: "react" };
+    const result = captureReplacement((ctx) =>
+      packageInstallPlugin().code(node, ctx)
+    );
+    const commands = toPackageCommands("react");
+    expect(result).toStrictEqual(
+      jsxFlowElement(
+        "Tabs",
+        [],
+        PACKAGE_MANAGERS.map((manager) =>
+          jsxFlowElement(
+            "Tab",
+            [jsxAttribute("title", manager)],
+            [codeBlock("bash", commands[manager])]
+          )
+        )
+      )
+    );
+  });
+
+  it("ignores code blocks in other languages", () => {
+    const node = { lang: "ts", type: "code", value: "const x = 1;" };
+    const result = captureReplacement((ctx) =>
+      packageInstallPlugin().code(node, ctx)
+    );
+    expect(result).toBeUndefined();
   });
 });
