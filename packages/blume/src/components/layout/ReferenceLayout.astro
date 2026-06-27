@@ -2,6 +2,7 @@
 import "blume:theme";
 import type { Navigation } from "../../core/types.ts";
 import Banner from "./Banner.astro";
+import Favicon from "./Favicon.astro";
 import Fonts from "./Fonts.astro";
 import Header from "./Header.astro";
 
@@ -16,6 +17,10 @@ interface Props {
     dark?: string;
     alt: string;
     href: string;
+  } | null;
+  favicon?: {
+    href: string;
+    type?: string;
   } | null;
   banner?: {
     content: string;
@@ -34,6 +39,7 @@ interface Props {
 const {
   site,
   logo,
+  favicon,
   banner,
   navigation,
   route,
@@ -59,6 +65,7 @@ const bannerScript = banner?.dismissible
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
+    <Favicon favicon={favicon} />
     <Fonts cssVars={fontCssVars ?? []} />
     {bannerScript && <script is:inline set:html={bannerScript} />}
     <script is:inline set:html={initialThemeScript} />

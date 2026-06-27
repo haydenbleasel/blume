@@ -175,6 +175,72 @@ const resolveLogo = (project: BlumeProject): ResolvedLogo | null => {
   return { alt, dark, href, light };
 };
 
+/** The favicon shape the runtime consumes: a link href plus optional MIME type. */
+interface ResolvedFavicon {
+  href: string;
+  type?: string;
+}
+
+/**
+ * Favicon filenames Blume auto-detects, in priority order. Mirrors the Next.js
+ * convention: an `icon.*` or `favicon.*` file in `public/` or the project root
+ * becomes the site favicon, no config required.
+ */
+const FAVICON_CANDIDATES = [
+  "icon.svg",
+  "favicon.svg",
+  "icon.png",
+  "favicon.png",
+  "favicon.ico",
+  "icon.ico",
+];
+
+/** `<link type>` MIME for the favicon extensions we recognize. */
+const FAVICON_TYPES: Record<string, string> = {
+  ico: "image/x-icon",
+  png: "image/png",
+  svg: "image/svg+xml",
+};
+
+/** Infer the `<link type>` MIME from a filename, when we recognize the extension. */
+const faviconType = (name: string): string | undefined => {
+  const ext = name.split(".").pop()?.toLowerCase();
+  return ext ? FAVICON_TYPES[ext] : undefined;
+};
+
+/** Read a file and encode it as a `data:` URI of the given MIME type. */
+const inlineDataUri = (file: string, type: string): string =>
+  `data:${type};base64,${readFileSync(file).toString("base64")}`;
+
+/** The bundled Blume favicon, inlined as a data URI so it needs no public file. */
+const defaultFavicon = (): ResolvedFavicon => ({
+  href: inlineDataUri(join(BLUME_SRC, "assets", "icon.png"), "image/png"),
+  type: "image/png",
+});
+
+/**
+ * Resolve the site favicon by convention. An `icon.*`/`favicon.*` file in
+ * `public/` is served as-is and referenced by URL; one at the project root is
+ * inlined as a data URI (the root isn't a served directory). Falls back to the
+ * bundled Blume mark when the project ships no icon.
+ */
+const resolveFavicon = (project: BlumeProject): ResolvedFavicon => {
+  const { root } = project.context;
+  for (const name of FAVICON_CANDIDATES) {
+    if (existsSync(join(root, "public", name))) {
+      return { href: `/${name}`, type: faviconType(name) };
+    }
+  }
+  for (const name of FAVICON_CANDIDATES) {
+    const file = join(root, name);
+    if (existsSync(file)) {
+      const type = faviconType(name);
+      return { href: inlineDataUri(file, type ?? "image/x-icon"), type };
+    }
+  }
+  return defaultFavicon();
+};
+
 /** The announcement banner shape the runtime consumes. */
 interface ResolvedBanner {
   content: string;
@@ -223,6 +289,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       banner: resolveBanner(config),
       codeWrap: config.markdown.code.wrap,
       description: config.description,
+      favicon: resolveFavicon(project),
       imageZoom: config.markdown.imageZoom,
       logo: resolveLogo(project),
       og: { enabled: config.seo.og.enabled },

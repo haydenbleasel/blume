@@ -544,6 +544,7 @@ const configuration = ${JSON.stringify(options.configuration, null, 2)};
   banner={data.config.banner}
   fontCssVars={data.fontCssVars}
   logo={data.config.logo}
+  favicon={data.config.favicon}
   navigation={data.navigation}
   pageTitle={${JSON.stringify(options.title)}}
   route={${JSON.stringify(options.route)}}
@@ -686,6 +687,7 @@ const canonical =
 <RootLayout
   site={{ title: data.config.title, description: data.config.description }}
   logo={data.config.logo}
+  favicon={data.config.favicon}
   banner={data.config.banner}
   imageZoom={data.config.imageZoom}
   codeWrap={data.config.codeWrap}
@@ -808,6 +810,7 @@ const canonical = base ? base + "/changelog" : null;
 <RootLayout
   site={{ title: data.config.title, description: data.config.description }}
   logo={data.config.logo}
+  favicon={data.config.favicon}
   banner={data.config.banner}
   imageZoom={data.config.imageZoom}
   codeWrap={data.config.codeWrap}
