@@ -1,6 +1,6 @@
 ---
 title: Components
-description: The built-in JSX components — cards, columns, steps, tabs, accordions, badges, code groups, frames, trees, tooltips, fields, and API-reference blocks — usable in any MDX page.
+description: The built-in JSX components — cards, columns, steps, tabs, accordions, badges, code groups, frames, trees, tooltips, type tables, and a GitHub card — usable in any MDX page.
 ---
 
 Blume ships an accessible, themeable component set available in any `.mdx` page
@@ -544,4 +544,22 @@ export interface ButtonProps {
 }
 `}
 />
+```
+
+## GitHub info
+
+A card linking to a GitHub repository with its live star and fork counts.
+Counts are fetched at build time — no client JavaScript — and the card still
+renders if the API is unreachable. Pass `owner` and `repo`, or omit them to use
+the repository from your `blume.config`. Set a `GITHUB_TOKEN` environment
+variable to lift the API rate limit.
+
+<GithubInfo owner="withastro" repo="astro" />
+
+```astro lineNumbers
+<!-- Uses the repo from blume.config -->
+<GithubInfo />
+
+<!-- Or point it at any repository -->
+<GithubInfo owner="withastro" repo="astro" />
 ```

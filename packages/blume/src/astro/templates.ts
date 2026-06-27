@@ -417,6 +417,7 @@ import Columns from "blume/components/content/Columns.astro";
 import Expandable from "blume/components/content/Expandable.astro";
 import FileTree from "blume/components/content/FileTree.astro";
 import Frame from "blume/components/content/Frame.astro";
+import GithubInfo from "blume/components/content/GithubInfo.astro";
 import Panel from "blume/components/content/Panel.astro";
 import Prompt from "blume/components/content/Prompt.astro";
 import Step from "blume/components/content/Step.astro";
@@ -459,6 +460,7 @@ const components = {
   Expandable,
   FileTree,
   Frame,
+  GithubInfo,
   Icon,
   Panel,
   Prompt,
