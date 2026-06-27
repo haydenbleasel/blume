@@ -417,6 +417,12 @@ const codeConfigSchema = z
      */
     icons: z.boolean().default(true),
     /**
+     * Syntax-highlight inline `` `code`{:lang} `` snippets. Off by default — most
+     * inline code (flags, file names) reads better plain; opt a snippet in with
+     * a trailing `{:lang}` marker.
+     */
+    inline: z.boolean().default(false),
+    /**
      * Enable Twoslash: run the TypeScript compiler over fences marked
      * `twoslash` to add type-on-hover, inline queries, and error rendering.
      * Off by default — it adds the TS compiler and build cost, and only runs on

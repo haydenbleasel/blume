@@ -9,6 +9,7 @@ import {
 
 import { codeTitleTransformer } from "./code-title.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
+import { inlineCodeHighlightPlugin } from "./inline-code.ts";
 import { languageIconTransformer } from "./language-icon.ts";
 import { mathPlugin } from "./math.ts";
 import { mermaidPlugin } from "./mermaid.ts";
@@ -34,6 +35,15 @@ export { packageInstallPlugin } from "./package-install.ts";
 type MdastPlugin = NonNullable<
   NonNullable<Parameters<typeof satteri>[0]>["mdastPlugins"]
 >[number];
+
+/** Element type of Satteri's `hastPlugins`. */
+type HastPlugin = NonNullable<
+  NonNullable<Parameters<typeof satteri>[0]>["hastPlugins"]
+>[number];
+
+/** Hast plugins enabled by config: inline `` `code`{:lang} `` highlighting. */
+const blumeHastPlugins = (inline?: boolean): HastPlugin[] =>
+  inline ? [inlineCodeHighlightPlugin() as unknown as HastPlugin] : [];
 
 /**
  * Shiki transformers enabled by default for every code block. The four upstream
@@ -79,11 +89,20 @@ export const blumeShikiTransformers = (
  */
 const FEATURES = { subscript: true, superscript: true };
 
-/** Sätteri processor for plain `.md`, with Blume's curated feature set. */
-export const blumeMarkdownProcessor = () =>
-  satteri({ features: { ...FEATURES } });
+/** Options shared by both processors. */
+export interface BlumeMarkdownOptions {
+  /** Highlight inline `` `code`{:lang} `` snippets (`markdown.code.inline`). */
+  inline?: boolean;
+}
 
-export interface BlumeMdxOptions {
+/** Sätteri processor for plain `.md`, with Blume's curated feature set. */
+export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
+  satteri({
+    features: { ...FEATURES },
+    hastPlugins: blumeHastPlugins(options.inline),
+  });
+
+export interface BlumeMdxOptions extends BlumeMarkdownOptions {
   /** Enable KaTeX math parsing and rendering. */
   math?: boolean;
 }
@@ -114,6 +133,7 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) => {
       directive: true,
       ...(options.math ? { math: true } : {}),
     },
+    hastPlugins: blumeHastPlugins(options.inline),
     mdastPlugins: plugins as unknown as MdastPlugin[],
   });
 };

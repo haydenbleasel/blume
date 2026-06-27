@@ -193,6 +193,7 @@ export const astroConfigTemplate = (options: {
 
   const integrations = [
     `mdx({ processor: blumeMdxProcessor(${JSON.stringify({
+      inline: config.markdown.code.inline,
       math: config.markdown.math,
     })}) })`,
   ];
@@ -217,7 +218,9 @@ export default defineConfig({
   output: ${JSON.stringify(deployment.output)},${adapterOption}${siteOption}${baseOption}${redirectsOption}${fontsOption}
   integrations: [${integrations.join(", ")}],
   markdown: {
-    processor: blumeMarkdownProcessor(),
+    processor: blumeMarkdownProcessor(${JSON.stringify({
+      inline: config.markdown.code.inline,
+    })}),
     shikiConfig: {
       themes: {
         light: "github-light",

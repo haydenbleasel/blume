@@ -154,6 +154,10 @@ export default defineConfig({
 ```
 ````
 
+Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span
+and it's colored like a tiny code block — `useState(){:js}` or
+`T extends object{:ts}`. Turn it on with `markdown: { code: { inline: true } }`.
+
 ### Line numbers
 
 Append `lineNumbers` to render a line-number gutter — on its own or alongside a

@@ -26,6 +26,7 @@ export default defineConfig({
   logo: "/logo.svg",
   markdown: {
     code: {
+      inline: true,
       twoslash: true,
     },
     math: true,

@@ -6,6 +6,7 @@ import {
   directiveToCalloutPlugin,
 } from "../src/markdown/directives.ts";
 import { blumeShikiTransformers } from "../src/markdown/index.ts";
+import { parseInlineLang } from "../src/markdown/inline-code.ts";
 import { languageIconTransformer } from "../src/markdown/language-icon.ts";
 import { mathPlugin } from "../src/markdown/math.ts";
 import {
@@ -199,6 +200,21 @@ describe(blumeShikiTransformers, () => {
     expect(names).toHaveLength(6);
     expect(names).not.toContain("blume:language-icon");
     expect(names.at(-1)).toBe("blume:code-meta");
+  });
+});
+
+describe(parseInlineLang, () => {
+  it("splits a trailing marker from the code", () => {
+    expect(parseInlineLang("useState(){:js}")).toStrictEqual({
+      code: "useState()",
+      lang: "js",
+    });
+  });
+
+  it("ignores plain code and marker-only or non-language markers", () => {
+    expect(parseInlineLang("useState()")).toBeNull();
+    expect(parseInlineLang("{:js}")).toBeNull();
+    expect(parseInlineLang("x{:.keyword}")).toBeNull();
   });
 });
 
