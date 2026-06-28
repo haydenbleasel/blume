@@ -204,10 +204,25 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   line-height: 1.4;
 }
 
-.prose :where(h1, h2, h3, h4) a {
+.prose :where(h1, h2, h3, h4, h5, h6) a {
   color: inherit;
   font-weight: inherit;
   text-decoration: none;
+}
+
+/* Auto-generated heading permalinks (markdown.headingAnchors): the whole
+   heading links to its own id, with a muted “#” revealed on hover or keyboard
+   focus so the link is discoverable without cluttering the heading at rest. */
+.prose :where(h2, h3, h4, h5, h6) a.blume-heading-anchor::after {
+  content: "#";
+  color: var(--blume-muted-foreground);
+  margin-inline-start: 0.35em;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.prose :where(h2, h3, h4, h5, h6) a.blume-heading-anchor:hover::after,
+.prose :where(h2, h3, h4, h5, h6) a.blume-heading-anchor:focus-visible::after {
+  opacity: 1;
 }
 
 .prose :where(h2:first-child) {

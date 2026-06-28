@@ -210,6 +210,7 @@ export const astroConfigTemplate = (options: {
 
   const integrations = [
     `mdx({ processor: blumeMdxProcessor(${JSON.stringify({
+      headingAnchors: config.markdown.headingAnchors,
       inline: config.markdown.code.inline,
       math: config.markdown.math,
     })}) })`,
@@ -238,6 +239,7 @@ export default defineConfig({
   integrations: [${integrations.join(", ")}],
   markdown: {
     processor: blumeMarkdownProcessor(${JSON.stringify({
+      headingAnchors: config.markdown.headingAnchors,
       inline: config.markdown.code.inline,
     })}),
     shikiConfig: {

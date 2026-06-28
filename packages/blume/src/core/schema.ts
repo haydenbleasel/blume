@@ -536,6 +536,12 @@ const markdownConfigSchema = z
     /** Code-block rendering: language icons and line wrapping. */
     code: codeConfigSchema.default({}),
     /**
+     * Wrap each `##`–`######` heading in a link to its own anchor so readers can
+     * click to copy, bookmark, or share a permalink to that section. On by
+     * default; set to `false` to render plain headings.
+     */
+    headingAnchors: z.boolean().default(true),
+    /**
      * Make content images click-to-zoom (open in a lightbox). On by default;
      * opt a single image out with `data-no-zoom`.
      */

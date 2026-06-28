@@ -5,6 +5,7 @@ import {
   calloutTypeFor,
   directiveToCalloutPlugin,
 } from "../src/markdown/directives.ts";
+import { headingAnchorPlugin } from "../src/markdown/heading-anchors.ts";
 import { blumeShikiTransformers } from "../src/markdown/index.ts";
 import { parseInlineLang } from "../src/markdown/inline-code.ts";
 import { languageIconTransformer } from "../src/markdown/language-icon.ts";
@@ -413,6 +414,113 @@ describe("mathPlugin", () => {
     expect(result).toStrictEqual(
       jsxTextElement("Math", [jsxAttribute("code", "x_i")])
     );
+  });
+});
+
+/** Recursively read a node's text, like Satteri's `textContent`. */
+const textOf = (node: { children?: unknown[]; value?: unknown }): string =>
+  typeof node.value === "string"
+    ? node.value
+    : (node.children ?? [])
+        .map((child) => textOf(child as { value?: unknown }))
+        .join("");
+
+describe("headingAnchorPlugin", () => {
+  interface HeadingNode {
+    children: { type: string; value?: string }[];
+    properties: Record<string, unknown>;
+    tagName: string;
+    type: string;
+  }
+
+  /** A hast context whose `setProperty` mutates the node so tests can assert. */
+  const makeCtx = () => ({
+    data: { astro: { frontmatter: {} } },
+    setProperty(
+      node: { properties?: Record<string, unknown> },
+      key: string,
+      value: unknown
+    ) {
+      node.properties = { ...node.properties, [key]: value };
+    },
+    textContent: textOf,
+  });
+
+  /** A heading node with text (or element) children. */
+  const heading = (tagName: string, ...children: unknown[]): HeadingNode => ({
+    children: children.map((child) =>
+      typeof child === "string" ? { type: "text", value: child } : child
+    ) as HeadingNode["children"],
+    properties: {},
+    tagName,
+    type: "element",
+  });
+
+  it("wraps an h2's content in an anchor to its own slug", () => {
+    const node = heading("h2", "Getting Started");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result).toStrictEqual({
+      children: [
+        {
+          children: node.children,
+          properties: {
+            className: ["blume-heading-anchor"],
+            href: "#getting-started",
+          },
+          tagName: "a",
+          type: "element",
+        },
+      ],
+      properties: { id: "getting-started" },
+      tagName: "h2",
+      type: "element",
+    });
+  });
+
+  it("slugs an h1 for id parity but leaves it unwrapped", () => {
+    const node = heading("h1", "Title");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result).toBeUndefined();
+    expect(node.properties.id).toBe("title");
+  });
+
+  it("disambiguates duplicate headings within one render", () => {
+    const plugin = headingAnchorPlugin();
+    const ctx = makeCtx();
+    const first = plugin.element.visit(heading("h2", "Setup"), ctx);
+    const second = plugin.element.visit(heading("h2", "Setup"), ctx);
+    expect(first?.properties?.id).toBe("setup");
+    expect(first?.children?.[0]?.properties?.href).toBe("#setup");
+    expect(second?.properties?.id).toBe("setup-1");
+    expect(second?.children?.[0]?.properties?.href).toBe("#setup-1");
+  });
+
+  it("resets disambiguation across renders", () => {
+    const plugin = headingAnchorPlugin();
+    const a = plugin.element.visit(heading("h2", "Setup"), makeCtx());
+    const b = plugin.element.visit(heading("h2", "Setup"), makeCtx());
+    expect(a?.properties?.id).toBe("setup");
+    expect(b?.properties?.id).toBe("setup");
+  });
+
+  it("skips wrapping a heading that already contains a link", () => {
+    const link = {
+      children: [{ type: "text", value: "docs" }],
+      properties: { href: "https://example.com" },
+      tagName: "a",
+      type: "element",
+    };
+    const node = heading("h3", link);
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result).toBeUndefined();
+    expect(node.properties.id).toBe("docs");
+  });
+
+  it("reuses an author-supplied id for both the heading and the link", () => {
+    const node = { ...heading("h2", "Custom"), properties: { id: "my-id" } };
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.properties?.id).toBe("my-id");
+    expect(result?.children?.[0]?.properties?.href).toBe("#my-id");
   });
 });
 

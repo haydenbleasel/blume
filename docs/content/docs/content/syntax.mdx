@@ -12,7 +12,10 @@ each.
 
 Structure a page with headings. Blume renders your frontmatter `title` as the
 page heading, so start your content at `##` — `##` through `####` become entries
-in the table of contents and get linkable anchors.
+in the table of contents. Every `##`–`######` heading is also wrapped in a link
+to its own anchor, so readers can click a heading to copy, bookmark, or share a
+permalink straight to that section (hover to reveal the `#`). Turn this off with
+`markdown: { headingAnchors: false }` in `blume.config.ts`.
 
 ```md
 ## Section
