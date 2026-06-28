@@ -213,11 +213,28 @@ describe("notionSource", () => {
       },
     } as unknown as NotionClientLike;
     const source = notionSource(
-      { client: draftClient, database: "db1", fetchImpl, name: "handbook" },
+      {
+        client: draftClient,
+        database: "db1",
+        fetchImpl,
+        name: "handbook",
+        publishedValue: "Published",
+      },
       await ctxFor()
     );
     const { entries } = await source.load();
     expect(entries[0]?.data.draft).toBe(true);
+  });
+
+  it("imports every page as published when publishedValue is unset", async () => {
+    const source = notionSource(
+      { client: client(), database: "db1", fetchImpl, name: "handbook" },
+      await ctxFor()
+    );
+    const { entries } = await source.load();
+    // Status is "Published" in the fixture, but without publishedValue the
+    // adapter never infers draft — nothing is filtered.
+    expect(entries[0]?.data.draft).toBeUndefined();
   });
 });
 

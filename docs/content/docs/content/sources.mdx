@@ -138,8 +138,9 @@ export default defineConfig({
         type: "notion",
         prefix: "handbook",
         database: process.env.NOTION_DB_ID,
-        // Property names default to Title / Description / Slug / Status / Order
-        properties: { status: "Status", order: "Order" },
+        // Property names default to the title-typed prop / Description / Slug / Order
+        // Set publishedValue to treat Status as a publish gate (opt-in)
+        publishedValue: "Published",
       },
     ],
   },
@@ -147,10 +148,12 @@ export default defineConfig({
 ```
 
 The integration token comes from the `NOTION_TOKEN` environment variable (share
-the database with your integration). A `Status` that isn't `Published` maps to
-`draft: true`, which production builds drop. **Notion image URLs are signed and
-expire**, so the adapter downloads them at build time into the site's assets and
-rewrites the references — a CMS image never rots a static build.
+the database with your integration). By default every page is imported; set
+`publishedValue` to make the `Status` property a publish gate — any other value
+then maps to `draft: true`, which production builds drop. **Notion image URLs
+are signed and expire**, so the adapter downloads them at build time into the
+site's assets and rewrites the references — a CMS image never rots a static
+build.
 
 ## Custom sources
 

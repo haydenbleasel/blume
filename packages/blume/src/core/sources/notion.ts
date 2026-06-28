@@ -97,7 +97,12 @@ export interface NotionSourceOptions {
   /** Integration token; defaults to `NOTION_TOKEN`. */
   token?: string;
   properties?: NotionPropertyMap;
-  /** Status value treated as published; others map to `draft`. Default `Published`. */
+  /**
+   * When set, the `Status` property is treated as a publish signal: any value
+   * other than this maps to `draft: true`. Omit to import every page regardless
+   * of status (the safe default for databases that use Status for an editorial
+   * workflow rather than publishing).
+   */
   publishedValue?: string;
   /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
   pollInterval?: number;
@@ -143,6 +148,16 @@ const collectAll = async <T>(
     ? collectAll(page, res.next_cursor, all)
     : all;
 };
+
+const LIST_BLOCKS = new Set([
+  "bulleted_list_item",
+  "numbered_list_item",
+  "to_do",
+]);
+
+/** Whether a block is a list item (so consecutive ones render as a tight list). */
+const isListItem = (block: NotionBlock | undefined): boolean =>
+  block !== undefined && LIST_BLOCKS.has(block.type);
 
 /** Render a leaf (non-container) block to Markdown, or null for containers. */
 const renderLeaf = (block: NotionBlock): string | null => {
@@ -204,7 +219,6 @@ export const notionSource = (
   ctx?: SourceContext
 ): ContentSource => {
   const props = options.properties ?? {};
-  const published = options.publishedValue ?? "Published";
   const cache = snapshotCache(
     ctx?.cacheDir ?? join(".blume", "cache", options.name)
   );
@@ -284,7 +298,20 @@ export const notionSource = (
           renderLeaf(block) ?? renderContainer(client, block, renderBlocks)
       )
     );
-    return parts.filter(Boolean).join("\n\n");
+    // Join with a blank line, except between consecutive list items, which stay
+    // tight so they render as a single list rather than separate loose ones.
+    const pairs = blocks
+      .map((block, i) => ({ block, text: parts[i] ?? "" }))
+      .filter((pair) => pair.text);
+    return pairs
+      .map((pair, i) => {
+        if (i === 0) {
+          return pair.text;
+        }
+        const tight = isListItem(pairs[i - 1]?.block) && isListItem(pair.block);
+        return `${tight ? "\n" : "\n\n"}${pair.text}`;
+      })
+      .join("");
   };
 
   const titleProperty = (page: NotionPage): NotionProperty | undefined => {
@@ -295,9 +322,12 @@ export const notionSource = (
   };
 
   const isDraft = (page: NotionPage): boolean => {
+    if (!options.publishedValue) {
+      return false;
+    }
     const prop = page.properties[props.status ?? "Status"];
     const status = prop?.status?.name ?? prop?.select?.name;
-    return Boolean(status && status !== published);
+    return Boolean(status && status !== options.publishedValue);
   };
 
   const orderOf = (page: NotionPage): number | undefined => {
