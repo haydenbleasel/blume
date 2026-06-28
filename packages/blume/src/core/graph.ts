@@ -17,6 +17,7 @@ export const buildContentGraph = (
   pages: PageRecord[],
   options: {
     folderMeta: Map<string, FolderMeta>;
+    sharedFolderMeta?: Map<string, FolderMeta>;
     navigation: ResolvedConfig["navigation"];
     i18n?: ResolvedI18nConfig;
   }
@@ -61,6 +62,7 @@ export const buildContentGraph = (
           folderMeta: options.folderMeta,
           metaPrefix: code === i18n.defaultLocale ? "" : code,
           refByLogical: true,
+          sharedFolderMeta: options.sharedFolderMeta,
           sidebar: options.navigation.sidebar,
           tabs,
         }
@@ -73,6 +75,7 @@ export const buildContentGraph = (
   } else {
     navigation = buildNavigation(pages, {
       folderMeta: options.folderMeta,
+      sharedFolderMeta: options.sharedFolderMeta,
       sidebar: options.navigation.sidebar,
       tabs: options.navigation.tabs,
     });

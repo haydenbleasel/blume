@@ -51,6 +51,32 @@ docs/
 You only translate the files you want — everything else falls back automatically
 (see [Fallbacks](#fallbacks)).
 
+### Filename suffixes
+
+Prefer to keep translations next to the original? Set `parser: "dot"` and name
+files with a locale suffix instead of using folders:
+
+```txt
+docs/
+  guides/quickstart.mdx     ->  /guides/quickstart      (default)
+  guides/quickstart.fr.mdx  ->  /fr/guides/quickstart   (French)
+```
+
+Good for sparse translations — colocate the few pages you've translated without
+mirroring the whole tree.
+
+### Shared files
+
+For content that's the same in every language — a changelog, a status page — add
+a `$` marker so one file serves all locales without duplication:
+
+```txt
+docs/changelog.$.mdx   ->  /changelog and /fr/changelog (same content)
+docs/guides/_meta.$.json   (folder meta applied to every locale)
+```
+
+A locale-specific `_meta.json` still overrides the shared one for that language.
+
 ## Default-locale URLs
 
 By default the default locale has no URL prefix (`/`, `/guides/quickstart`) while
@@ -153,9 +179,8 @@ providers carry a `locale` facet on each record.
 ## Current limitations
 
 :::note
-The first release covers the locale-folder layout (the `dir` parser). The
-dotted-filename parser (`page.fr.mdx`), shared locale-agnostic files, and full
-right-to-left theming are not yet available.
+Right-to-left locales set `<html dir="rtl">`, but a full RTL pass on the default
+theme is still in progress — some layout details won't mirror yet.
 :::
 
 ## Where to next

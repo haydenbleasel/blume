@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { dirname, relative } from "pathe";
+import { basename, dirname, relative } from "pathe";
 import { glob } from "tinyglobby";
 import { parse as parseYaml } from "yaml";
 
@@ -9,15 +9,29 @@ import { folderMetaSchema } from "./schema.ts";
 import type { FolderMeta } from "./schema.ts";
 import type { Diagnostic } from "./types.ts";
 
-const META_FILES = ["**/_meta.json", "**/_meta.yaml", "**/_meta.yml"];
+const META_FILES = [
+  "**/_meta.json",
+  "**/_meta.yaml",
+  "**/_meta.yml",
+  // Shared, locale-agnostic folder meta (applies to every locale).
+  "**/_meta.$.json",
+  "**/_meta.$.yaml",
+  "**/_meta.$.yml",
+];
 
 /**
  * Discover `_meta.{json,yaml}` files under the content root. Keys are the
  * directory path relative to the content root (`""` for the root directory).
+ * `_meta.$.*` files are returned in `shared` — folder meta that applies to that
+ * directory in every locale (a locale-specific `_meta.*` overrides it).
  */
 export const discoverFolderMeta = async (
   contentRoot: string
-): Promise<{ meta: Map<string, FolderMeta>; diagnostics: Diagnostic[] }> => {
+): Promise<{
+  meta: Map<string, FolderMeta>;
+  shared: Map<string, FolderMeta>;
+  diagnostics: Diagnostic[];
+}> => {
   const files = await glob(META_FILES, {
     absolute: true,
     cwd: contentRoot,
@@ -29,6 +43,7 @@ export const discoverFolderMeta = async (
   );
 
   const meta = new Map<string, FolderMeta>();
+  const shared = new Map<string, FolderMeta>();
   const diagnostics: Diagnostic[] = [];
 
   for (const { file, raw } of sources) {
@@ -49,7 +64,8 @@ export const discoverFolderMeta = async (
 
     const result = folderMetaSchema.safeParse(data);
     if (result.success) {
-      meta.set(dir, result.data);
+      const target = basename(file).startsWith("_meta.$.") ? shared : meta;
+      target.set(dir, result.data);
     } else {
       diagnostics.push(
         ...diagnosticsFromZod(result.error, {
@@ -60,5 +76,5 @@ export const discoverFolderMeta = async (
     }
   }
 
-  return { diagnostics, meta };
+  return { diagnostics, meta, shared };
 };

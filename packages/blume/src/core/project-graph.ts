@@ -97,6 +97,7 @@ export const scanProject = async (
     folderMeta: folderMeta.meta,
     i18n: config.i18n,
     navigation: config.navigation,
+    sharedFolderMeta: folderMeta.shared,
   });
   const manifest = buildManifest({ config, context, graph });
 

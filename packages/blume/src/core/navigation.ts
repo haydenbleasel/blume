@@ -112,9 +112,14 @@ const metaKey = (path: string, metaPrefix: string): string => {
 const applyFolderMeta = (
   group: MutableGroup,
   folderMeta: Map<string, FolderMeta>,
+  sharedMeta: Map<string, FolderMeta>,
   metaPrefix: string
 ): void => {
-  const meta = folderMeta.get(metaKey(group.path, metaPrefix));
+  // Locale-specific meta wins; a shared `_meta.$.*` (keyed by the locale-stripped
+  // group path) applies to every locale otherwise.
+  const meta =
+    folderMeta.get(metaKey(group.path, metaPrefix)) ??
+    sharedMeta.get(group.path);
   if (meta) {
     group.label = meta.title ?? group.label;
     group.icon = meta.icon ?? group.icon;
@@ -134,7 +139,7 @@ const applyFolderMeta = (
 
   for (const child of group.children) {
     if (child.kind === "group") {
-      applyFolderMeta(child, folderMeta, metaPrefix);
+      applyFolderMeta(child, folderMeta, sharedMeta, metaPrefix);
     }
   }
 };
@@ -177,6 +182,7 @@ const toNavNode = (node: MutableNode): NavNode => {
 const buildFileSystemSidebar = (
   pages: PageRecord[],
   folderMeta: Map<string, FolderMeta>,
+  sharedMeta: Map<string, FolderMeta>,
   metaPrefix: string
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
@@ -207,7 +213,7 @@ const buildFileSystemSidebar = (
     });
   }
 
-  applyFolderMeta(root, folderMeta, metaPrefix);
+  applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix);
   sortNodes(root.children);
   return root.children.map(toNavNode);
 };
@@ -282,10 +288,13 @@ export const buildNavigation = (
      * single authored sidebar maps onto every locale's pages.
      */
     refByLogical?: boolean;
+    /** Shared `_meta.$.*` meta, keyed by locale-stripped dir path. */
+    sharedFolderMeta?: Map<string, FolderMeta>;
   }
 ): Navigation => {
   const tabs = options.tabs ?? [];
   const metaPrefix = options.metaPrefix ?? "";
+  const sharedFolderMeta = options.sharedFolderMeta ?? new Map();
 
   if (options.sidebar) {
     const byRoute = new Map(
@@ -298,7 +307,12 @@ export const buildNavigation = (
   }
 
   return {
-    sidebar: buildFileSystemSidebar(pages, options.folderMeta, metaPrefix),
+    sidebar: buildFileSystemSidebar(
+      pages,
+      options.folderMeta,
+      sharedFolderMeta,
+      metaPrefix
+    ),
     tabs,
   };
 };

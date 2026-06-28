@@ -85,6 +85,53 @@ export const detectLocale = (
 };
 
 /**
+ * Resolve where a content file lives across locales, by parser:
+ * - `dir`: a leading locale directory (`fr/page.mdx`)
+ * - `dot`: a filename suffix (`page.fr.mdx`)
+ *
+ * A `.$.` infix (e.g. `changelog.$.mdx`) marks a shared, locale-agnostic file
+ * that is materialized into every configured locale. Returns the locale-stripped
+ * path (used for nav grouping) and the locale codes the file maps to (one for a
+ * normal file, all locales for a shared one).
+ */
+export const localePlacement = (
+  rel: string,
+  ext: string,
+  i18n: ResolvedI18nConfig
+): { navPath: string; locales: string[] } => {
+  const base = rel.slice(0, rel.length - ext.length);
+
+  // Shared `$` file: the same content in every locale.
+  if (base.endsWith(".$")) {
+    return {
+      locales: i18n.locales.map((locale) => locale.code),
+      navPath: `${base.slice(0, -2)}${ext}`,
+    };
+  }
+
+  if (i18n.parser === "dot") {
+    const lastDot = base.lastIndexOf(".");
+    // Only a dot inside the filename (not a directory) is a locale suffix.
+    if (lastDot > base.lastIndexOf("/")) {
+      const suffix = base.slice(lastDot + 1);
+      const isNonDefault = i18n.locales.some(
+        (locale) => locale.code !== i18n.defaultLocale && locale.code === suffix
+      );
+      if (isNonDefault) {
+        return {
+          locales: [suffix],
+          navPath: `${base.slice(0, lastDot)}${ext}`,
+        };
+      }
+    }
+    return { locales: [i18n.defaultLocale], navPath: rel };
+  }
+
+  const { locale, rest } = detectLocale(rel.split("/"), i18n);
+  return { locales: [locale], navPath: rest.join("/") };
+};
+
+/**
  * Warn about top-level content folders that look like a locale (a code Blume
  * recognizes) but aren't declared in `i18n.locales`. Without this they're
  * silently treated as default-locale content under a `/<code>/…` route, which

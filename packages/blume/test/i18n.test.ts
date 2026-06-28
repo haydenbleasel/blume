@@ -16,6 +16,7 @@ import {
   resolveFallbackLocale,
 } from "../src/core/i18n.ts";
 import { buildManifest } from "../src/core/manifest.ts";
+import { discoverFolderMeta } from "../src/core/meta.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type {
   FolderMeta,
@@ -92,6 +93,30 @@ const buildProject = async (resolved: ResolvedConfig) => {
 
 const labelsOf = (nodes: NavNode[]): string[] =>
   nodes.map((node) => node.label);
+
+/** Write a content tree to a fresh temp dir and return its content root. */
+const tempContent = async (files: Record<string, string>): Promise<string> => {
+  const root = await mkdtemp(join(tmpdir(), "blume-i18n-"));
+  dirs.push(root);
+  const contentRoot = join(root, "docs");
+  await Promise.all(
+    Object.entries(files).map(async ([rel, content]) => {
+      const abs = join(contentRoot, rel);
+      await mkdir(dirname(abs), { recursive: true });
+      await writeFile(abs, content);
+    })
+  );
+  return contentRoot;
+};
+
+const discoverIn = (contentRoot: string, resolved: ResolvedConfig) =>
+  discoverContent({
+    contentRoot,
+    defaultType: resolved.content.defaultType,
+    exclude: resolved.content.exclude,
+    i18n: resolved.i18n,
+    include: resolved.content.include,
+  });
 
 describe("i18n helpers", () => {
   it("detects a leading non-default locale dir and strips it", () => {
@@ -227,6 +252,69 @@ describe("i18n diagnostics", () => {
     const { pages } = await buildProject(config());
     // FILES ships an `fr/` folder, and `fr` is a configured locale.
     expect(i18nDiagnostics(pages, i18nOf())).toEqual([]);
+  });
+});
+
+describe("dot parser and shared files", () => {
+  it("maps a dotted filename suffix to a locale (dot parser)", async () => {
+    const contentRoot = await tempContent({
+      "guides/quickstart.fr.mdx": "# Démarrage\n",
+      "guides/quickstart.mdx": "# Quickstart\n",
+    });
+    const { pages } = await discoverIn(contentRoot, config({ parser: "dot" }));
+    const byId = new Map(pages.map((page) => [page.id, page]));
+
+    const fr = byId.get("guides/quickstart.fr.mdx");
+    expect(fr?.locale).toBe("fr");
+    expect(fr?.route).toBe("/fr/guides/quickstart");
+    expect(fr?.translationKey).toBe("/guides/quickstart");
+    expect(fr?.navPath).toBe("guides/quickstart.mdx");
+
+    const en = byId.get("guides/quickstart.mdx");
+    expect(en?.locale).toBe("en");
+    expect(en?.route).toBe("/guides/quickstart");
+  });
+
+  it("materializes a shared $ file into every locale", async () => {
+    const contentRoot = await tempContent({
+      "changelog.$.mdx": "# Changelog\n",
+      "index.mdx": "# Home\n",
+    });
+    const { pages } = await discoverIn(contentRoot, config());
+    const changelog = pages.filter((p) => p.translationKey === "/changelog");
+
+    expect(changelog.map((p) => p.locale).toSorted()).toEqual(["en", "fr"]);
+    expect(changelog.map((p) => p.route).toSorted()).toEqual([
+      "/changelog",
+      "/fr/changelog",
+    ]);
+    // Both placements share one source entry id and a locale-stripped navPath.
+    expect(new Set(changelog.map((p) => p.id)).size).toBe(1);
+    expect(changelog.every((p) => p.navPath === "changelog.mdx")).toBe(true);
+  });
+
+  it("applies shared _meta.$.json to every locale's nav group", async () => {
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "fr/guides/intro.mdx": "# Intro fr\n",
+      "guides/_meta.$.json": JSON.stringify({ title: "Handbook" }),
+      "guides/intro.mdx": "# Intro\n",
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const folderMeta = await discoverFolderMeta(contentRoot);
+    const graph = buildContentGraph(pages, {
+      folderMeta: folderMeta.meta,
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+      sharedFolderMeta: folderMeta.shared,
+    });
+
+    expect(labelsOf(graph.navigationByLocale.en?.sidebar ?? [])).toContain(
+      "Handbook"
+    );
+    expect(labelsOf(graph.navigationByLocale.fr?.sidebar ?? [])).toContain(
+      "Handbook"
+    );
   });
 });
 

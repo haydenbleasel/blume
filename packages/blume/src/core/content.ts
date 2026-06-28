@@ -5,7 +5,7 @@ import { extname, relative } from "pathe";
 import { glob } from "tinyglobby";
 
 import { diagnosticsFromZod } from "./diagnostics.ts";
-import { detectLocale, localizeRoute } from "./i18n.ts";
+import { localePlacement, localizeRoute } from "./i18n.ts";
 import { pageMetaSchema } from "./schema.ts";
 import type { PageMeta, ResolvedI18nConfig } from "./schema.ts";
 import type { Diagnostic, Heading, PageLink, PageRecord } from "./types.ts";
@@ -191,24 +191,23 @@ export const discoverContent = async (options: {
 
     const meta = result.data;
 
-    // Locale comes from the file's path (a leading locale dir), not the slug —
-    // the slug is the logical, locale-agnostic path within that locale.
+    // Locale and the locale-stripped nav path come from the file's location
+    // (a leading dir, or a filename suffix under the `dot` parser), not the
+    // slug — the slug is the logical, locale-agnostic path within a locale. A
+    // shared `$` file maps to every locale.
     const { i18n } = options;
-    const detected = i18n ? detectLocale(rel.split("/"), i18n) : null;
-    const locale = detected?.locale ?? i18n?.defaultLocale ?? "";
-    const navPath = detected ? detected.rest.join("/") : rel;
+    const { navPath, locales } = i18n
+      ? localePlacement(rel, ext, i18n)
+      : { locales: [""], navPath: rel };
 
     const {
       segments,
       groups,
       route: logicalRoute,
     } = mapRoute(meta.slug ? `${meta.slug}${ext}` : navPath);
-    const route = i18n
-      ? localizeRoute(logicalRoute, locale, i18n)
-      : logicalRoute;
     const headings = extractHeadings(parsed.content);
 
-    pages.push({
+    const base = {
       contentType: meta.type ?? options.defaultType,
       description: meta.description,
       format,
@@ -216,15 +215,23 @@ export const discoverContent = async (options: {
       headings,
       id: rel,
       links: extractLinks(parsed.content),
-      locale,
       meta,
       navPath,
-      route,
       segments,
       sourcePath: file,
-      title: deriveTitle(meta, headings, rel),
+      title: deriveTitle(meta, headings, navPath),
       translationKey: logicalRoute,
-    });
+    } satisfies Omit<PageRecord, "locale" | "route">;
+
+    // One record per locale this file maps to (one normally; every locale for a
+    // shared `$` file). All share the same source entry id and translation key.
+    for (const locale of locales) {
+      pages.push({
+        ...base,
+        locale,
+        route: i18n ? localizeRoute(logicalRoute, locale, i18n) : logicalRoute,
+      });
+    }
   }
 
   return { diagnostics, pages };

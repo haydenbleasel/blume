@@ -376,8 +376,8 @@ const i18nConfigSchema = z
     /** Drop the URL prefix for the default locale (`/`, `/fr/…`). Static-safe. */
     hideDefaultLocalePrefix: z.boolean().default(true),
     locales: z.array(localeSchema).min(1),
-    /** `"dir"`: locale directories (`fr/page.mdx`). `"dot"` is not yet supported. */
-    parser: z.enum(["dir"]).default("dir"),
+    /** `"dir"`: locale directories (`fr/page.mdx`). `"dot"`: filename suffix (`page.fr.mdx`). */
+    parser: z.enum(["dir", "dot"]).default("dir"),
     /** Per-locale UI string overrides: `{ fr: { search: { button: "…" } } }`. */
     ui: uiLocaleOverridesSchema.optional(),
   })
