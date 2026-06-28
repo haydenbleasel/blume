@@ -4,6 +4,7 @@ import "blume:theme";
 import Icon from "../Icon.astro";
 import { buildStructuredData } from "../../seo/jsonld.ts";
 import Banner from "./Banner.astro";
+import Favicon from "./Favicon.astro";
 import Fonts from "./Fonts.astro";
 import Header from "./Header.astro";
 import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
@@ -18,6 +19,10 @@ interface Props {
     dark?: string;
     alt: string;
     href: string;
+  } | null;
+  favicon?: {
+    href: string;
+    type?: string;
   } | null;
   banner?: {
     content: string;
@@ -51,6 +56,7 @@ interface Props {
 const {
   site,
   logo,
+  favicon,
   banner,
   navigation,
   page,
@@ -131,6 +137,7 @@ const bannerScript = banner?.dismissible
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
+    <Favicon favicon={favicon} />
     <Fonts cssVars={fontCssVars ?? []} />
     {canonical && <link rel="canonical" href={canonical} />}
     {noindex && <meta name="robots" content="noindex" />}

@@ -1,5 +1,11 @@
 # OpenAPI & AsyncAPI
 
+> **Update (2026-06-27):** the "Scalar-only, no native renderer" decision below
+> is **revisited for OpenAPI** in `24-openapi-native.md` — a native reference
+> renderer (real per-operation pages, in Blume's search/nav/llms/SEO) with the
+> hard parsing layer delegated to libraries and Scalar kept as an optional
+> playground island. AsyncAPI stays Scalar-only as described here.
+
 ## Goal
 
 Let a project drop in an OpenAPI spec and get a solid, interactive API reference

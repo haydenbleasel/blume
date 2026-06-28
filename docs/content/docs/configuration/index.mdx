@@ -114,6 +114,23 @@ logo: {
 
 `href` overrides the logo's link (it defaults to `/`).
 
+### Favicon
+
+There's no favicon option — Blume auto-detects one by filename, the way Next.js
+does. Drop an `icon` or `favicon` file (`.svg`, `.png`, or `.ico`) in your
+project root or `public/` directory and it becomes the browser tab icon:
+
+```
+my-docs/
+├─ blume.config.ts
+├─ icon.png          ← picked up automatically
+└─ docs/
+```
+
+SVG wins over PNG over ICO when several are present, and a file in `public/` is
+preferred over one at the root. If Blume finds no icon, it falls back to its own
+mark.
+
 ### Banner
 
 Show a site-wide announcement bar above the header. Pass a string, or an object

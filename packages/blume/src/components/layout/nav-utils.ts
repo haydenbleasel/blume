@@ -7,22 +7,6 @@ export interface FlatPage {
   deprecated?: boolean;
 }
 
-export interface DirectoryListingItem {
-  kind: "group" | "page";
-  label: string;
-  route?: string;
-  description?: string;
-  icon?: string;
-  badge?: string;
-  children: DirectoryListingItem[];
-}
-
-export interface DirectoryListing {
-  label: string;
-  mode: "accordion" | "card";
-  items: DirectoryListingItem[];
-}
-
 /** A breadcrumb segment; `route` is absent for non-clickable group ancestors. */
 export interface Crumb {
   label: string;
@@ -85,66 +69,6 @@ export const findBreadcrumbs = (nodes: NavNode[], route: string): Crumb[] => {
     return null;
   };
   return search(nodes, []) ?? [];
-};
-
-const toDirectoryListingItems = (nodes: NavNode[]): DirectoryListingItem[] =>
-  nodes.flatMap((item): DirectoryListingItem[] => {
-    if (item.kind === "page") {
-      return [
-        {
-          badge: item.badge,
-          children: [],
-          description: item.description,
-          icon: item.icon,
-          kind: "page",
-          label: item.label,
-          route: item.route,
-        },
-      ];
-    }
-
-    const children = toDirectoryListingItems(item.children);
-    if (!item.route && children.length === 0) {
-      return [];
-    }
-
-    return [
-      {
-        badge: item.badge,
-        children,
-        icon: item.icon,
-        kind: "group",
-        label: item.label,
-        route: item.route,
-      },
-    ];
-  });
-
-/** Find the configured child directory listing for the current root page. */
-export const findDirectoryListing = (
-  nodes: NavNode[],
-  route: string
-): DirectoryListing | null => {
-  const search = (items: NavNode[]): DirectoryListing | null => {
-    for (const item of items) {
-      if (item.kind !== "group") {
-        continue;
-      }
-      if (item.route === route && item.directory && item.directory !== "none") {
-        return {
-          items: toDirectoryListingItems(item.children),
-          label: item.label,
-          mode: item.directory,
-        };
-      }
-      const found = search(item.children);
-      if (found) {
-        return found;
-      }
-    }
-    return null;
-  };
-  return search(nodes);
 };
 
 /** Resolve previous/next pages around the current route. */

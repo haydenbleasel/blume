@@ -1,5 +1,6 @@
 ---
 import "blume:theme";
+import Favicon from "blume/components/layout/Favicon.astro";
 import Header from "blume/components/layout/Header.astro";
 import data from "blume:data";
 
@@ -89,6 +90,7 @@ const features = [
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
+    <Favicon favicon={config.favicon} />
     <meta name="description" content={description} />
     {siteUrl && <link rel="canonical" href={siteUrl} />}
     <meta property="og:title" content={pageTitle} />

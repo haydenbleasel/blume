@@ -8,10 +8,7 @@ import { join } from "pathe";
 
 import { buildLlmsFiles, writeLlmsArtifacts } from "../src/ai/llms.ts";
 import { buildPageMarkdown } from "../src/ai/markdown.ts";
-import {
-  buildRuntimeMarkdown,
-  generateRuntime,
-} from "../src/astro/generate.ts";
+import { generateRuntime } from "../src/astro/generate.ts";
 import {
   astroConfigTemplate,
   catchAllPageTemplate,
@@ -20,7 +17,6 @@ import {
 } from "../src/astro/templates.ts";
 import {
   findBreadcrumbs,
-  findDirectoryListing,
   flattenPages,
   getPagination,
 } from "../src/components/layout/nav-utils.ts";
@@ -60,17 +56,6 @@ const makePage = (
   segments: [],
   sourcePath: `/abs/${over.id}`,
   ...over,
-});
-
-const withLlmsTxt = (project: BlumeProject): BlumeProject => ({
-  ...project,
-  config: {
-    ...project.config,
-    ai: {
-      ...project.config.ai,
-      llmsTxt: true,
-    },
-  },
 });
 
 const createMintlifyFixture = async (): Promise<string> => {
@@ -613,9 +598,9 @@ describe("astro config template", () => {
 
     const output = astroConfigTemplate({
       config,
+      contentRoutes: [],
       context,
       dataPath: "/r/.blume/src/generated/data.json",
-      markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
       searchClientPath: "/r/.blume/src/generated/search-client.ts",
@@ -648,9 +633,9 @@ describe("astro config template", () => {
 
     const output = astroConfigTemplate({
       config,
+      contentRoutes: [],
       context,
       dataPath: "/r/.blume/src/generated/data.json",
-      markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
       searchClientPath: "/r/.blume/src/generated/search-client.ts",
@@ -676,9 +661,9 @@ describe("astro config template", () => {
 
     const output = astroConfigTemplate({
       config,
+      contentRoutes: [],
       context,
       dataPath: "/r/.blume/src/generated/data.json",
-      markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: true,
       pages: [],
       searchClientPath: "/r/.blume/src/generated/search-client.ts",
@@ -699,34 +684,6 @@ describe("astro config template", () => {
     ).toStrictEqual([]);
   });
 
-  it("emits dev Markdown Accept-header middleware when llms exports are enabled", () => {
-    const config = blumeConfigSchema.parse({ ai: { llmsTxt: true } });
-    const context = {
-      outDir: "/r/.blume",
-      pagesRoot: null,
-      publicRoot: "/r/public",
-      root: "/r",
-    } as ProjectContext;
-
-    const output = astroConfigTemplate({
-      config,
-      context,
-      dataPath: "/r/.blume/src/generated/data.json",
-      markdownDataPath: "/r/.blume/src/generated/markdown.json",
-      needsReact: false,
-      pages: [],
-      searchClientPath: "/r/.blume/src/generated/search-client.ts",
-      themePath: "/r/.blume/src/generated/app.css",
-    });
-
-    expect(output).toContain('name: "blume-markdown-accept"');
-    expect(output).toContain(
-      'await readFile("/r/.blume/src/generated/markdown.json", "utf-8")'
-    );
-    expect(output).toContain("request.headers.accept");
-    expect(output).toContain("text/markdown;charset=utf-8");
-  });
-
   it("allows KaTeX package assets in dev when math rendering is enabled", () => {
     const config = blumeConfigSchema.parse({ markdown: { math: true } });
     const context = {
@@ -738,9 +695,9 @@ describe("astro config template", () => {
 
     const output = astroConfigTemplate({
       config,
+      contentRoutes: [],
       context,
       dataPath: "/r/.blume/src/generated/data.json",
-      markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
       searchClientPath: "/r/.blume/src/generated/search-client.ts",
@@ -766,9 +723,9 @@ describe("astro config template", () => {
 
     const output = astroConfigTemplate({
       config,
+      contentRoutes: [],
       context,
       dataPath: "/r/.blume/src/generated/data.json",
-      markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
       searchClientPath: "/r/.blume/src/generated/search-client.ts",
@@ -790,9 +747,9 @@ describe("astro config template", () => {
   ) =>
     astroConfigTemplate({
       config,
+      contentRoutes: [],
       context: fontContext,
       dataPath: "/r/.blume/src/generated/data.json",
-      markdownDataPath: "/r/.blume/src/generated/markdown.json",
       needsReact: false,
       pages: [],
       searchClientPath: "/r/.blume/src/generated/search-client.ts",
@@ -1182,19 +1139,6 @@ describe("Mintlify compatibility config", () => {
         privateInSkill: false,
         publicInSkill: true,
       });
-
-      const markdownByRoute = JSON.parse(
-        await buildRuntimeMarkdown(withLlmsTxt(project))
-      );
-      expect({
-        privateRoute: markdownByRoute["/admin"],
-        publicRouteHasContent:
-          typeof markdownByRoute["/public-admin"] === "string" &&
-          markdownByRoute["/public-admin"].includes("Public page content."),
-      }).toStrictEqual({
-        privateRoute: undefined,
-        publicRouteHasContent: true,
-      });
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -1282,20 +1226,6 @@ describe("Mintlify compatibility config", () => {
       expect(
         index.skills.map((item: { name: string }) => item.name)
       ).toStrictEqual(["custom-product", "payments"]);
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("serializes Markdown exports for Accept-header routing", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const project = withLlmsTxt(await scanProject(root));
-      const markdownByRoute = JSON.parse(await buildRuntimeMarkdown(project));
-      expect(markdownByRoute["/quickstart"]).toContain(
-        "Call `POST /v1/accounts`"
-      );
-      expect(markdownByRoute["/quickstart"]).not.toContain("Get started");
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -1659,136 +1589,6 @@ describe("Mintlify compatibility config", () => {
         { label: "Guides", route: "/guides" },
         { label: "Quickstart", route: "/guides/quickstart" },
       ]);
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("maps inherited Mintlify directory listings for group roots", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-mintlify-directory-nav-"));
-    try {
-      await Promise.all(
-        ["help", "help/api", "help/getting-started"].map((dir) =>
-          mkdir(join(root, dir), { recursive: true })
-        )
-      );
-      await writeFile(
-        join(root, "docs.json"),
-        JSON.stringify({
-          $schema: "https://mintlify.com/docs.json",
-          name: "Directory navigation",
-          navigation: {
-            groups: [
-              {
-                directory: "accordion",
-                group: "Help Center",
-                pages: [
-                  {
-                    group: "Getting Started",
-                    pages: ["help/getting-started/quickstart"],
-                    root: "help/getting-started/index",
-                  },
-                  {
-                    directory: "none",
-                    group: "API Reference",
-                    pages: ["help/api/reference"],
-                    root: "help/api/index",
-                  },
-                ],
-                root: "help/index",
-              },
-            ],
-          },
-        })
-      );
-      await Promise.all(
-        [
-          "help/index",
-          "help/getting-started/index",
-          "help/getting-started/quickstart",
-          "help/api/index",
-          "help/api/reference",
-        ].map((page) =>
-          writeFile(
-            join(root, `${page}.mdx`),
-            `---\ntitle: ${page}\ndescription: ${page} description\n---\n`
-          )
-        )
-      );
-
-      const { config } = await loadConfig(root);
-      expect(config.navigation.sidebar).toStrictEqual([
-        {
-          directory: "accordion",
-          items: [
-            {
-              directory: "accordion",
-              items: ["help/getting-started/quickstart"],
-              label: "Getting Started",
-              root: "help/getting-started/index",
-            },
-            {
-              items: ["help/api/reference"],
-              label: "API Reference",
-              root: "help/api/index",
-            },
-          ],
-          label: "Help Center",
-          root: "help/index",
-        },
-      ]);
-
-      const project = await scanProject(root);
-      const rootListing = findDirectoryListing(
-        project.graph.navigation.sidebar,
-        "/help"
-      );
-      const inheritedListing = findDirectoryListing(
-        project.graph.navigation.sidebar,
-        "/help/getting-started"
-      );
-      const disabledListing = findDirectoryListing(
-        project.graph.navigation.sidebar,
-        "/help/api"
-      );
-
-      expect(rootListing).toMatchObject({
-        items: [
-          {
-            children: [
-              {
-                label: "help/getting-started/quickstart",
-                route: "/help/getting-started/quickstart",
-              },
-            ],
-            label: "Getting Started",
-            route: "/help/getting-started",
-          },
-          {
-            children: [
-              {
-                label: "help/api/reference",
-                route: "/help/api/reference",
-              },
-            ],
-            label: "API Reference",
-            route: "/help/api",
-          },
-        ],
-        label: "Help Center",
-        mode: "accordion",
-      });
-      expect(inheritedListing).toMatchObject({
-        items: [
-          {
-            label: "help/getting-started/quickstart",
-            route: "/help/getting-started/quickstart",
-          },
-        ],
-        label: "Getting Started",
-        mode: "accordion",
-      });
-      expect(disabledListing).toBeNull();
     } finally {
       await rm(root, { force: true, recursive: true });
     }

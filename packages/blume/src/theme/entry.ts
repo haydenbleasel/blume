@@ -335,11 +335,11 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 .prose > :where(pre[data-icon]) > .blume-lang-icon {
   color: var(--blume-muted-foreground);
   display: block;
-  height: 1rem;
+  height: 0.875rem;
   left: 1rem;
   position: absolute;
   top: 0.875rem;
-  width: 1rem;
+  width: 0.875rem;
 }
 
 .prose > :where(pre[data-icon])::before {

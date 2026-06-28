@@ -15,11 +15,7 @@ import { dirname, join, relative } from "pathe";
 import { glob } from "tinyglobby";
 
 import { writeLlmsArtifacts } from "../ai/llms.ts";
-import {
-  buildPageMarkdown,
-  buildRawMarkdown,
-  isPublicAgentPage,
-} from "../ai/markdown.ts";
+import { buildRawMarkdown } from "../ai/markdown.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
@@ -233,6 +229,72 @@ const resolveLogo = (project: BlumeProject): ResolvedLogo | null => {
   return { alt, dark, href, light };
 };
 
+/** The favicon shape the runtime consumes: a link href plus optional MIME type. */
+interface ResolvedFavicon {
+  href: string;
+  type?: string;
+}
+
+/**
+ * Favicon filenames Blume auto-detects, in priority order. Mirrors the Next.js
+ * convention: an `icon.*` or `favicon.*` file in `public/` or the project root
+ * becomes the site favicon, no config required.
+ */
+const FAVICON_CANDIDATES = [
+  "icon.svg",
+  "favicon.svg",
+  "icon.png",
+  "favicon.png",
+  "favicon.ico",
+  "icon.ico",
+];
+
+/** `<link type>` MIME for the favicon extensions we recognize. */
+const FAVICON_TYPES: Record<string, string> = {
+  ico: "image/x-icon",
+  png: "image/png",
+  svg: "image/svg+xml",
+};
+
+/** Infer the `<link type>` MIME from a filename, when we recognize the extension. */
+const faviconType = (name: string): string | undefined => {
+  const ext = name.split(".").pop()?.toLowerCase();
+  return ext ? FAVICON_TYPES[ext] : undefined;
+};
+
+/** Read a file and encode it as a `data:` URI of the given MIME type. */
+const inlineDataUri = (file: string, type: string): string =>
+  `data:${type};base64,${readFileSync(file).toString("base64")}`;
+
+/** The bundled Blume favicon, inlined as a data URI so it needs no public file. */
+const defaultFavicon = (): ResolvedFavicon => ({
+  href: inlineDataUri(join(BLUME_SRC, "assets", "icon.png"), "image/png"),
+  type: "image/png",
+});
+
+/**
+ * Resolve the site favicon by convention. An `icon.*`/`favicon.*` file in
+ * `public/` is served as-is and referenced by URL; one at the project root is
+ * inlined as a data URI (the root isn't a served directory). Falls back to the
+ * bundled Blume mark when the project ships no icon.
+ */
+const resolveFavicon = (project: BlumeProject): ResolvedFavicon => {
+  const { root } = project.context;
+  for (const name of FAVICON_CANDIDATES) {
+    if (existsSync(join(root, "public", name))) {
+      return { href: `/${name}`, type: faviconType(name) };
+    }
+  }
+  for (const name of FAVICON_CANDIDATES) {
+    const file = join(root, name);
+    if (existsSync(file)) {
+      const type = faviconType(name);
+      return { href: inlineDataUri(file, type ?? "image/x-icon"), type };
+    }
+  }
+  return defaultFavicon();
+};
+
 /** The announcement banner shape the runtime consumes. */
 interface ResolvedBanner {
   content: string;
@@ -280,6 +342,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       banner: resolveBanner(config),
       codeWrap: config.markdown.code.wrap,
       description: config.description,
+      favicon: resolveFavicon(project),
       imageZoom: config.markdown.imageZoom,
       logo: resolveLogo(project),
       og: { enabled: config.seo.og.enabled },
@@ -320,29 +383,6 @@ export const buildRuntimeData = (project: BlumeProject): string => {
   return `${JSON.stringify(data, null, 2)}\n`;
 };
 
-/** Serialize route -> Markdown export content for Accept-header routing. */
-export const buildRuntimeMarkdown = async (
-  project: BlumeProject
-): Promise<string> => {
-  if (!project.config.ai.llmsTxt) {
-    return "{}\n";
-  }
-
-  const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
-  const entries = await Promise.all(
-    project.manifest.routes
-      .filter((route) => {
-        const page = pageById.get(route.id);
-        return route.indexable && page !== undefined && isPublicAgentPage(page);
-      })
-      .map(async (route) => {
-        const page = pageById.get(route.id);
-        return page ? [route.path, await buildPageMarkdown(project, page)] : [];
-      })
-  );
-  return `${JSON.stringify(Object.fromEntries(entries), null, 2)}\n`;
-};
-
 export interface GenerateResult {
   /** Whether any structural file changed (config/page/content config). */
   structuralChange: boolean;
@@ -378,7 +418,6 @@ export const generateRuntime = async (
   const out = context.outDir;
   const srcDir = join(out, "src");
   const dataPath = join(srcDir, "generated", "data.json");
-  const markdownDataPath = join(srcDir, "generated", "markdown.json");
   const themePath = join(srcDir, "generated", "app.css");
   const searchClientPath = join(srcDir, "generated", "search-client.ts");
 
@@ -395,16 +434,14 @@ export const generateRuntime = async (
   ]);
   const needsReact = detectedReact || askEnabled;
 
-  await writeIfChanged(markdownDataPath, await buildRuntimeMarkdown(project));
-
   const structural = await Promise.all([
     writeIfChanged(
       join(out, "astro.config.mjs"),
       astroConfigTemplate({
         config,
+        contentRoutes: project.manifest.routes.map((route) => route.path),
         context,
         dataPath,
-        markdownDataPath,
         needsReact,
         pages,
         searchClientPath,

@@ -1,0 +1,15 @@
+---
+// Emits the favicon <link> for the document <head>. The href is either a URL to
+// a file the project ships in public/, or a data URI (a root-level icon, or the
+// bundled Blume default) — both resolved by the generator's resolveFavicon.
+interface Props {
+  favicon?: {
+    href: string;
+    type?: string;
+  } | null;
+}
+
+const { favicon } = Astro.props;
+---
+
+{favicon && <link href={favicon.href} rel="icon" type={favicon.type} />}

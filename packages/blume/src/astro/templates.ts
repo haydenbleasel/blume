@@ -141,84 +141,12 @@ const mintlifyMdxSnippetPluginTemplate = (
         },
       }`;
 
-const markdownAcceptPluginTemplate = (options: {
-  base?: string;
-  markdownDataPath: string;
-}): string => `{
-        name: "blume-markdown-accept",
-        configureServer(server) {
-          const markdownMediaTypes = new Set(["text/markdown", "text/plain"]);
-          const acceptsMarkdown = (accept) =>
-            accept
-              ?.split(",")
-              .some((item) => {
-                const [type = "", ...params] = item
-                  .trim()
-                  .toLowerCase()
-                  .split(";")
-                  .map((part) => part.trim());
-                if (!markdownMediaTypes.has(type)) {
-                  return false;
-                }
-                const q = params.find((param) => param.startsWith("q="));
-                if (!q) {
-                  return true;
-                }
-                const value = Number.parseFloat(q.slice(2));
-                return Number.isNaN(value) || value > 0;
-              }) ?? false;
-          const normalizedRoute = (url) => {
-            const base = ${JSON.stringify(options.base?.replace(/\/$/u, "") ?? "")};
-            const pathname = new URL(url ?? "/", "http://blume.local").pathname;
-            const withoutBase =
-              base && pathname.startsWith(\`\${base}/\`)
-                ? pathname.slice(base.length)
-                : pathname;
-            const route = withoutBase.replace(/\\/$/u, "");
-            return route || "/";
-          };
-
-          server.middlewares.use(async (request, response, next) => {
-            if (!acceptsMarkdown(request.headers.accept)) {
-              return next();
-            }
-
-            try {
-              const { readFile } = await import("node:fs/promises");
-              const markdownByRoute = JSON.parse(
-                await readFile(${JSON.stringify(options.markdownDataPath)}, "utf-8")
-              );
-              const markdown = markdownByRoute[normalizedRoute(request.url)];
-              if (!markdown) {
-                return next();
-              }
-              response.statusCode = 200;
-              response.setHeader("Content-Type", "text/markdown;charset=utf-8");
-              response.setHeader("Vary", "Accept");
-              response.end(markdown);
-            } catch {
-              next();
-            }
-          });
-        },
-      }`;
-
 const vitePluginEntries = (options: {
-  base?: string;
   isMintlifyProject: boolean;
-  markdownDataPath?: string;
   root: string;
   variables: Record<string, string>;
 }): string[] => {
   const plugins = ["tailwindcss()"];
-  if (options.markdownDataPath) {
-    plugins.push(
-      markdownAcceptPluginTemplate({
-        base: options.base,
-        markdownDataPath: options.markdownDataPath,
-      })
-    );
-  }
   if (options.isMintlifyProject) {
     plugins.push(
       mintlifyRootImportPluginTemplate(options.root),
@@ -268,16 +196,16 @@ export const astroConfigTemplate = (options: {
   config: ResolvedConfig;
   needsReact: boolean;
   pages: BlumePageRoute[];
+  contentRoutes: string[];
   dataPath: string;
-  markdownDataPath: string;
   themePath: string;
   searchClientPath: string;
 }): string => {
   const {
     config,
     context,
+    contentRoutes,
     dataPath,
-    markdownDataPath,
     needsReact,
     pages,
     searchClientPath,
@@ -342,9 +270,7 @@ export const astroConfigTemplate = (options: {
   // core theme is Astro-first and ships no client JS.
   const reactImport = needsReact ? `import react from "@astrojs/react";\n` : "";
   const fsImport = mintlifyFsImport(isMintlifyProject);
-  const blumeImport = pages.length
-    ? `import { blumeIntegration } from "blume/astro";\n`
-    : "";
+  const blumeImport = `import { blumeIntegration } from "blume/astro";\n`;
   const fsAllow = fsAllowConfig({
     mathEnabled: config.markdown.math,
     root: context.root,
@@ -366,13 +292,13 @@ export const astroConfigTemplate = (options: {
   if (needsReact) {
     integrations.push("react()");
   }
-  if (pages.length) {
-    integrations.push(`blumeIntegration(${JSON.stringify({ pages })})`);
-  }
+  // Always mounted: injects user pages (a no-op when there are none) and wires
+  // up dev-server `Accept: text/markdown` negotiation over the content routes.
+  integrations.push(
+    `blumeIntegration(${JSON.stringify({ contentRoutes, pages })})`
+  );
   const vitePlugins = vitePluginEntries({
-    base: config.deployment.base,
     isMintlifyProject,
-    markdownDataPath: config.ai.llmsTxt ? markdownDataPath : undefined,
     root: context.root,
     variables: config.variables,
   });
@@ -722,6 +648,7 @@ const configuration = ${JSON.stringify(options.configuration, null, 2)};
   banner={data.config.banner}
   fontCssVars={data.fontCssVars}
   logo={data.config.logo}
+  favicon={data.config.favicon}
   navigation={data.navigation}
   pageTitle={${JSON.stringify(options.title)}}
   route={${JSON.stringify(options.route)}}
@@ -864,6 +791,7 @@ const canonical =
 <RootLayout
   site={{ title: data.config.title, description: data.config.description }}
   logo={data.config.logo}
+  favicon={data.config.favicon}
   banner={data.config.banner}
   imageZoom={data.config.imageZoom}
   codeWrap={data.config.codeWrap}
@@ -986,6 +914,7 @@ const canonical = base ? base + "/changelog" : null;
 <RootLayout
   site={{ title: data.config.title, description: data.config.description }}
   logo={data.config.logo}
+  favicon={data.config.favicon}
   banner={data.config.banner}
   imageZoom={data.config.imageZoom}
   codeWrap={data.config.codeWrap}

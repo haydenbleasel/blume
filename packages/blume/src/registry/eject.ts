@@ -3,11 +3,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "pathe";
 
 import { buildRawMarkdown } from "../ai/markdown.ts";
-import {
-  buildRuntimeData,
-  buildRuntimeMarkdown,
-  detectNeedsReact,
-} from "../astro/generate.ts";
+import { buildRuntimeData, detectNeedsReact } from "../astro/generate.ts";
 import { discoverPages } from "../astro/pages.ts";
 import {
   askEndpointTemplate,
@@ -86,9 +82,9 @@ export const eject = async (root: string): Promise<string[]> => {
     {
       content: astroConfigTemplate({
         config,
+        contentRoutes: project.manifest.routes.map((route) => route.path),
         context: relContext,
         dataPath: "./src/generated/data.json",
-        markdownDataPath: "./src/generated/markdown.json",
         needsReact,
         pages: relPages,
         searchClientPath: "./src/generated/search-client.ts",
@@ -130,10 +126,6 @@ export const eject = async (root: string): Promise<string[]> => {
       path: join(genDir, "app.css"),
     },
     { content: buildRuntimeData(project), path: join(genDir, "data.json") },
-    {
-      content: await buildRuntimeMarkdown(project),
-      path: join(genDir, "markdown.json"),
-    },
     {
       content: `${JSON.stringify(rawMarkdown)}\n`,
       path: join(genDir, "raw-markdown.json"),
