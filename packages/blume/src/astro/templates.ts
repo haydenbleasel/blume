@@ -601,6 +601,8 @@ const configuration = ${JSON.stringify(options.configuration, null, 2)};
 
 export const catchAllPageTemplate = (options: {
   askEnabled: boolean;
+  exportEpub: boolean;
+  exportPdf: boolean;
   mathEnabled: boolean;
 }): string => {
   const askImport = options.askEnabled
@@ -747,6 +749,8 @@ const canonical =
   editUrl={editUrl}
   repoUrl={data.config.repoUrl}
   askEnabled={${options.askEnabled}}
+  exportPdf={${options.exportPdf}}
+  exportEpub={${options.exportEpub}}
   feeds={data.feeds}
   siteUrl={data.config.site}
   pageType={frontmatter.type}
@@ -770,6 +774,8 @@ const canonical =
  */
 export const changelogIndexTemplate = (options: {
   askEnabled: boolean;
+  exportEpub: boolean;
+  exportPdf: boolean;
 }): string => {
   const askImport = options.askEnabled
     ? 'import AskAI from "blume/components/islands/AskAI.astro";\n'
@@ -874,6 +880,8 @@ const canonical = base ? base + "/changelog" : null;
   canonical={canonical}
   repoUrl={data.config.repoUrl}
   askEnabled={${options.askEnabled}}
+  exportPdf={${options.exportPdf}}
+  exportEpub={${options.exportEpub}}
   feeds={data.feeds}
   siteUrl={data.config.site}
   noindex={false}

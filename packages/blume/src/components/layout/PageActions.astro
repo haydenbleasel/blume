@@ -6,13 +6,18 @@ interface Props {
   editUrl?: string | null;
   repoUrl?: string | null;
   askEnabled?: boolean;
+  /** Show the "Export to PDF" action (native browser print). */
+  exportPdf?: boolean;
+  /** Show the "Export to EPUB" action (client-side, current page). */
+  exportEpub?: boolean;
   /** Absolute URL of the hosted MCP server, when enabled and a site is set. */
   mcpUrl?: string | null;
   /** Display name of the MCP server (defaults to the site title). */
   mcpName?: string | null;
 }
 
-const { route, editUrl, repoUrl, askEnabled, mcpUrl, mcpName } = Astro.props;
+const { route, editUrl, repoUrl, askEnabled, exportPdf, exportEpub, mcpUrl, mcpName } =
+  Astro.props;
 const mdPath = route === "/" ? "/index.md" : `${route}.md`;
 
 const GITHUB_LOGO =
@@ -127,6 +132,40 @@ const menuRowClass =
   </button>
 
   {
+    (exportPdf || exportEpub) && (
+      <details class="group relative">
+        <summary
+          class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
+        >
+          <Icon name="download" size={16} />
+          Export
+          <Icon
+            class="ml-auto transition-transform group-open:rotate-180"
+            name="chevron-down"
+            size={14}
+          />
+        </summary>
+        <div class="absolute right-0 left-0 z-50 mt-1 rounded-blume border border-border bg-background p-1 shadow-xl">
+          {exportPdf && (
+            <button class={menuRowClass} data-blume-export-pdf type="button">
+              <Icon name="file" size={16} />
+              <span class="flex-1">Export to PDF</span>
+            </button>
+          )}
+          {exportEpub && (
+            <button class={menuRowClass} data-blume-export-epub type="button">
+              <Icon name="book-open" size={16} />
+              <span class="flex-1" data-blume-epub-label>
+                Export to EPUB
+              </span>
+            </button>
+          )}
+        </div>
+      </details>
+    )
+  }
+
+  {
     askEnabled && (
       <button class={rowClass} data-blume-ask-ai type="button">
         <Icon name="message-circle" size={16} />
@@ -220,6 +259,54 @@ const menuRowClass =
     scira: (q) => `https://scira.ai/?q=${q}`,
     t3: (q) => `https://t3.chat/new?q=${q}`,
     v0: (q) => `https://v0.app?q=${q}`,
+  };
+
+  // Self-contained e-reader stylesheet for the EPUB. None of Blume's theme CSS
+  // ships inside the .epub, so the chapter HTML must stand on its own.
+  const EPUB_STYLES = `
+body { line-height: 1.6; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.4em 0 0.6em; }
+h1 { font-size: 1.8em; } h2 { font-size: 1.4em; } h3 { font-size: 1.15em; }
+p, ul, ol { margin: 0.8em 0; }
+a { color: #0b63c4; }
+img { max-width: 100%; height: auto; }
+pre {
+  background: #f4f4f5; padding: 0.85em 1em; border-radius: 6px;
+  overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;
+  font-size: 0.85em; line-height: 1.45;
+}
+pre, code { font-family: "SF Mono", Menlo, Consolas, monospace; }
+:not(pre) > code {
+  background: #f0f0f1; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em;
+}
+blockquote { margin: 1em 0; padding-left: 1em; border-left: 3px solid #ddd; color: #555; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 0.4em 0.6em; text-align: left; }
+hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
+
+  // Turn the live, JS/CSS-dependent article DOM into clean, self-contained HTML
+  // for the EPUB: drop decorative SVGs and interactive controls (which render as
+  // broken boxes in a reader), flatten Shiki's variable-colored code to plain
+  // monospace text, and reveal panels the tab scripts would otherwise hide.
+  const buildEpubChapterHtml = (article: Element): string => {
+    const clone = article.cloneNode(true) as Element;
+    for (const el of clone.querySelectorAll(
+      "svg, button, select, script, style, link, noscript, template"
+    )) {
+      el.remove();
+    }
+    for (const pre of clone.querySelectorAll("pre")) {
+      const code = document.createElement("code");
+      code.textContent = pre.textContent ?? "";
+      pre.replaceChildren(code);
+      pre.removeAttribute("style");
+      pre.removeAttribute("class");
+      pre.removeAttribute("tabindex");
+    }
+    for (const el of clone.querySelectorAll(".hidden")) {
+      el.classList.remove("hidden");
+    }
+    return clone.innerHTML;
   };
 
   const root = document.querySelector("[data-blume-page-actions]");
@@ -325,6 +412,64 @@ const menuRowClass =
           // Clipboard or fetch unavailable; nothing to do.
         }
       });
+
+    root
+      .querySelector("[data-blume-export-pdf]")
+      ?.addEventListener("click", () => window.print());
+
+    const epubButton = root.querySelector("[data-blume-export-epub]");
+    const epubLabel = root.querySelector("[data-blume-epub-label]");
+    epubButton?.addEventListener("click", async () => {
+      const article = document.querySelector("#blume-content article");
+      if (!article) {
+        return;
+      }
+      const heading = document.querySelector("#blume-content h1");
+      const title = heading?.textContent?.trim() || document.title;
+      const reset = epubLabel?.textContent ?? "Export to EPUB";
+      if (epubLabel) {
+        epubLabel.textContent = "Generating…";
+      }
+      try {
+        // Browser bundle: avoids Node built-ins and returns a Blob. Lazy-loaded
+        // so it never ships in the main bundle. The browserified UMD nests its
+        // callable under `.default`, which Vite's dev (esbuild) and build
+        // (rollup) interops expose at slightly different depths — unwrap both.
+        const epubModule = await import("epub-gen-memory/bundle");
+        const epub = epubModule.default?.default ?? epubModule.default;
+        // The article HTML already opens with the page's <h1>, so don't let the
+        // generator prepend a second chapter-title heading.
+        const result = await epub(
+          { css: EPUB_STYLES, prependChapterTitles: false, title },
+          [{ content: buildEpubChapterHtml(article), title }]
+        );
+        const blob =
+          result instanceof Blob
+            ? result
+            : new Blob([result], { type: "application/epub+zip" });
+        const slug =
+          md
+            .replace(/\.md$/u, "")
+            .replace(/^\//u, "")
+            .replace(/\//gu, "-") || "index";
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `${slug}.epub`;
+        link.href = url;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        // Revoke later: revoking synchronously after click can cancel the
+        // download before the browser has finished reading the blob.
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      } catch (error) {
+        console.error("[blume] EPUB export failed", error);
+      } finally {
+        if (epubLabel) {
+          epubLabel.textContent = reset;
+        }
+      }
+    });
 
     const feedback = root.querySelector("[data-blume-feedback]");
     if (feedback) {

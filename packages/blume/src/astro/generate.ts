@@ -453,6 +453,8 @@ export const generateRuntime = async (
   await ensureDepsLink(out);
 
   const askEnabled = config.ai.ask?.enabled ?? false;
+  const exportPdf = config.export.pdf;
+  const exportEpub = config.export.epub;
   const [pages, detectedReact, userTheme] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(context.root),
@@ -492,7 +494,12 @@ export const generateRuntime = async (
     ),
     writeIfChanged(
       join(srcDir, "pages", "[...slug].astro"),
-      catchAllPageTemplate({ askEnabled, mathEnabled: config.markdown.math })
+      catchAllPageTemplate({
+        askEnabled,
+        exportEpub,
+        exportPdf,
+        mathEnabled: config.markdown.math,
+      })
     ),
     writeIfChanged(
       join(srcDir, "generated", "components.ts"),
@@ -542,7 +549,7 @@ export const generateRuntime = async (
   if (hasChangelog && !changelogRouteTaken) {
     await writeIfChanged(
       join(srcDir, "pages", "changelog.astro"),
-      changelogIndexTemplate({ askEnabled })
+      changelogIndexTemplate({ askEnabled, exportEpub, exportPdf })
     );
   }
 

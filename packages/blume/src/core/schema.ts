@@ -323,6 +323,24 @@ const aiConfigSchema = z
   })
   .strict();
 
+// Reader-facing "Export" page action (PDF via print, EPUB via client-side
+// generation). Off by default. Accepts a shorthand boolean to toggle both
+// formats, or an object to enable them individually; both normalize to
+// `{ epub, pdf }` so consumers read plain booleans.
+const exportConfigSchema = z
+  .union([
+    z.boolean(),
+    z
+      .object({
+        epub: z.boolean().default(false),
+        pdf: z.boolean().default(false),
+      })
+      .strict(),
+  ])
+  .transform((value) =>
+    typeof value === "boolean" ? { epub: value, pdf: value } : value
+  );
+
 const mcpConfigSchema = z
   .object({
     enabled: z.boolean().default(false),
@@ -518,6 +536,7 @@ export const blumeConfigSchema = z
     content: contentConfigSchema.default({}),
     deployment: deploymentConfigSchema.default({}),
     description: z.string().optional(),
+    export: exportConfigSchema.default(false),
     github: githubConfigSchema.optional(),
     lastModified: lastModifiedConfigSchema.default(false),
     logo: logoConfigSchema.optional(),

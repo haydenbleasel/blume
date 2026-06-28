@@ -37,6 +37,7 @@
     "ai": "^5.0.0",
     "algoliasearch": "^5.55.0",
     "astro": "^7.0.2",
+    "epub-gen-memory": "^1.1.2",
     "flexsearch": "^0.8.0",
     "husky": "^9.1.7",
     "katex": "^0.17.0",

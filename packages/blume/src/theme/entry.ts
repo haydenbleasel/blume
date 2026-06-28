@@ -501,6 +501,41 @@ pre:has(.line.focused):hover .line:not(.focused) {
   color: var(--shiki-dark);
 }
 
+/* Print / "Save as PDF" (the page-actions Export → PDF runs window.print()).
+   Strip the surrounding chrome so the printout is just the article. */
+@media print {
+  [data-blume-banner],
+  header,
+  aside,
+  [data-blume-page-actions],
+  #blume-content > nav,
+  #blume-content > details {
+    display: none !important;
+  }
+
+  #blume-content {
+    padding: 0 !important;
+  }
+
+  .prose {
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Reveal collapsed tab panels so their content isn't dropped from the print. */
+  blume-tabs [data-blume-tab-panel] {
+    display: block !important;
+  }
+
+  /* Keep code/callout backgrounds (subject to the dialog's "Background graphics"
+     toggle). */
+  pre,
+  .prose :not(pre) > code {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 /* Twoslash rich-renderer styles (used by fences with the \`twoslash\` meta). */
 ${options.twoslashCss ?? ""}
 

@@ -46,6 +46,8 @@ export const eject = async (root: string): Promise<string[]> => {
   const srcDir = join(root, "src");
   const genDir = join(srcDir, "generated");
   const askEnabled = config.ai.ask?.enabled ?? false;
+  const exportPdf = config.export.pdf;
+  const exportEpub = config.export.epub;
 
   const [pages, needsReactRaw, userTheme, rawMarkdown] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
@@ -99,6 +101,8 @@ export const eject = async (root: string): Promise<string[]> => {
     {
       content: catchAllPageTemplate({
         askEnabled,
+        exportEpub,
+        exportPdf,
         mathEnabled: config.markdown.math,
       }),
       path: join(srcDir, "pages", "[...slug].astro"),
