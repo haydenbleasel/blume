@@ -13,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, normalize, relative } from "pathe";
 import { glob } from "tinyglobby";
 
+import { resolveAskBackend } from "../ai/ask.ts";
 import { buildRawMarkdown } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
@@ -619,7 +620,7 @@ export const generateRuntime = async (
   if (askEnabled) {
     await write(
       join(srcDir, "pages", "api", "ask.ts"),
-      askEndpointTemplate(config.ai.ask?.model ?? "openai/gpt-5.5")
+      askEndpointTemplate(resolveAskBackend(config.ai.ask))
     );
   }
 

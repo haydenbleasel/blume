@@ -311,18 +311,49 @@ const searchConfigSchema = z
     }
   });
 
+/** Ask AI backends. `gateway` (default) routes through the Vercel AI Gateway. */
+export const askAiProviders = [
+  "gateway",
+  "openrouter",
+  "llmgateway",
+  "inkeep",
+  "openai-compatible",
+] as const;
+
 const aiConfigSchema = z
   .object({
     ask: z
       .object({
+        // Name of the env var holding the provider's API key; each provider has
+        // a sensible default, so this only needs setting to override it.
+        apiKeyEnv: z.string().optional(),
+        // Base URL of the backend. Required for `openai-compatible`; for the
+        // named providers it overrides the built-in preset.
+        baseUrl: z.string().url().optional(),
         enabled: z.boolean().default(false),
         model: z.string().default("openai/gpt-5.5"),
+        provider: z.enum(askAiProviders).default("gateway"),
       })
       .strict()
+      .superRefine((value, ctx) => {
+        // A generic OpenAI-compatible backend has no preset URL, so the user
+        // must supply one; the named providers fall back to their preset.
+        if (value.provider === "openai-compatible" && !value.baseUrl) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              'ai.ask.baseUrl is required when provider is "openai-compatible".',
+            path: ["baseUrl"],
+          });
+        }
+      })
       .optional(),
     llmsTxt: z.boolean().default(false),
   })
   .strict();
+
+export type AskAiProvider = (typeof askAiProviders)[number];
+export type AskAiConfig = NonNullable<z.infer<typeof aiConfigSchema>["ask"]>;
 
 // Reader-facing "Export" page action (PDF via print, EPUB via client-side
 // generation). Off by default. Accepts a shorthand boolean to toggle both

@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 
 import { join, relative } from "pathe";
 
+import { resolveAskBackend } from "../ai/ask.ts";
 import { buildRawMarkdown } from "../ai/markdown.ts";
 import { buildRuntimeData, detectNeedsReact } from "../astro/generate.ts";
 import { discoverPages } from "../astro/pages.ts";
@@ -141,7 +142,7 @@ export const eject = async (root: string): Promise<string[]> => {
 
   if (askEnabled) {
     files.push({
-      content: askEndpointTemplate(config.ai.ask?.model ?? "openai/gpt-5.5"),
+      content: askEndpointTemplate(resolveAskBackend(config.ai.ask)),
       path: join(srcDir, "pages", "api", "ask.ts"),
     });
   }
