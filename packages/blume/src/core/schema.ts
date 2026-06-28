@@ -187,6 +187,8 @@ const sidebarItemSchema: z.ZodType<SidebarItemConfig> = z.lazy(() =>
 
 const navigationConfigSchema = z
   .object({
+    /** Show a GitHub repo link in the header (requires `github` configured). */
+    repo: z.boolean().default(true),
     /** Explicit sidebar override; when omitted the sidebar is generated. */
     sidebar: z.array(sidebarItemSchema).optional(),
     tabs: z.array(navTabSchema).optional(),

@@ -326,6 +326,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
   // content-derived ones, so the reference stays discoverable in every locale.
   const withReferenceTabs = (nav: Navigation): Navigation => ({
     ...nav,
+    repoUrl: config.navigation.repo && repoUrl ? repoUrl : null,
     tabs: [...nav.tabs, ...referenceTabs(config)],
   });
 

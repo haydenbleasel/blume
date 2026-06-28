@@ -127,6 +127,8 @@ export interface NavTab {
 export interface Navigation {
   tabs: NavTab[];
   sidebar: NavNode[];
+  /** Repo URL for the header link, or null when hidden (`navigation.repo`). */
+  repoUrl?: string | null;
 }
 
 /** The full content graph: the source of truth for generated modules. */
