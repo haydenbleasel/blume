@@ -26,6 +26,13 @@ i18n: {
 Each locale has a `code` (used in URLs), a `label` (shown in the language
 switcher), and an optional `dir` for right-to-left scripts (`"ltr"` by default).
 
+:::tip
+Migrating from Mintlify? `blume migrate mintlify` reads
+`navigation.languages[]` and writes the `i18n` block for you — the `default: true`
+language becomes `defaultLocale`, and translated folders already match Blume's
+layout.
+:::
+
 ## Organize translated content
 
 The default locale lives at your content root. Every other locale is a top-level
