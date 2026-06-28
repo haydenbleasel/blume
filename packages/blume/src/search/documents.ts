@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import matter from "gray-matter";
 
+import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
@@ -55,13 +56,24 @@ const toPlainText = (markdown: string): string =>
  * Build search documents from the content graph. Only indexable pages are
  * included (per the route manifest), and content comes from the source files,
  * so the index is identical in dev and build.
+ *
+ * Pass `includeWhenDisabled` to index pages on their content merits even when
+ * the search provider is `none` — used by the MCP server, which is a separate
+ * feature from on-page search.
  */
 export const buildSearchDocuments = async (
-  project: BlumeProject
+  project: BlumeProject,
+  options?: { includeWhenDisabled?: boolean }
 ): Promise<SearchDocument[]> => {
   const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
 
-  const indexable = project.manifest.routes.filter((route) => route.indexable);
+  const indexable = project.manifest.routes.filter((route) => {
+    if (!options?.includeWhenDisabled) {
+      return route.indexable;
+    }
+    const page = pageById.get(route.id);
+    return page ? contentIndexable(page, project.config) : false;
+  });
 
   return await Promise.all(
     indexable.map(async (route) => {

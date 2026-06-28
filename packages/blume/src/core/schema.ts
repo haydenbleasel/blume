@@ -323,6 +323,17 @@ const aiConfigSchema = z
   })
   .strict();
 
+const mcpConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    /** Optional system hint passed to connecting agents. */
+    instructions: z.string().optional(),
+    /** Server name shown to clients; defaults to the site title. */
+    name: z.string().optional(),
+    route: z.string().default("/mcp"),
+  })
+  .strict();
+
 const analyticsConfigSchema = z
   .object({
     posthog: z
@@ -511,6 +522,7 @@ export const blumeConfigSchema = z
     lastModified: lastModifiedConfigSchema.default(false),
     logo: logoConfigSchema.optional(),
     markdown: markdownConfigSchema.default({}),
+    mcp: mcpConfigSchema.default({}),
     navigation: navigationConfigSchema.default({}),
     openapi: openapiConfigSchema.default({}),
     redirects: z.array(redirectSchema).default([]),

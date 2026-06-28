@@ -10,6 +10,10 @@ export const serverFeatures = (config: ResolvedConfig): string[] => {
   if (config.ai.ask?.enabled) {
     features.push("Ask AI");
   }
+  // The hosted MCP server is a live JSON-RPC endpoint, so it needs a runtime.
+  if (config.mcp.enabled) {
+    features.push("MCP server");
+  }
   // Mixedbread (and any future provider) that proxies queries through a secret
   // server endpoint can't run on a static build.
   if (searchProviderMeta(config.search.provider).requiresServer) {

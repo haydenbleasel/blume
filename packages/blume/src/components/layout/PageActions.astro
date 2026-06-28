@@ -6,9 +6,13 @@ interface Props {
   editUrl?: string | null;
   repoUrl?: string | null;
   askEnabled?: boolean;
+  /** Absolute URL of the hosted MCP server, when enabled and a site is set. */
+  mcpUrl?: string | null;
+  /** Display name of the MCP server (defaults to the site title). */
+  mcpName?: string | null;
 }
 
-const { route, editUrl, repoUrl, askEnabled } = Astro.props;
+const { route, editUrl, repoUrl, askEnabled, mcpUrl, mcpName } = Astro.props;
 const mdPath = route === "/" ? "/index.md" : `${route}.md`;
 
 const GITHUB_LOGO =
@@ -53,6 +57,8 @@ const menuRowClass =
 <div
   class="mt-8 space-y-0.5 border-border border-t pt-4"
   data-blume-page-actions
+  data-mcp-name={mcpName ?? undefined}
+  data-mcp-url={mcpUrl ?? undefined}
   data-md={mdPath}
 >
   {
@@ -161,6 +167,49 @@ const menuRowClass =
       }
     </div>
   </details>
+
+  {
+    mcpUrl && (
+      <details class="group relative">
+        <summary
+          class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
+        >
+          <Icon name="plug" size={16} />
+          Connect to MCP
+          <Icon
+            class="ml-auto transition-transform group-open:rotate-180"
+            name="chevron-down"
+            size={14}
+          />
+        </summary>
+        <div class="absolute right-0 left-0 z-50 mt-1 rounded-blume border border-border bg-background p-1 shadow-xl">
+          <button class={menuRowClass} data-mcp-copy-url type="button">
+            <Icon name="link" size={16} />
+            <span class="flex-1" data-mcp-url-label>
+              Copy server URL
+            </span>
+          </button>
+          <button class={menuRowClass} data-mcp-copy-claude type="button">
+            <span set:html={LOGOS.claude} />
+            <span class="flex-1" data-mcp-claude-label>
+              Copy Claude Code command
+            </span>
+          </button>
+          <hr class="my-1 border-border border-t" />
+          <a class={menuRowClass} data-mcp-cursor rel="noreferrer">
+            <span set:html={LOGOS.cursor} />
+            <span class="flex-1">Add to Cursor</span>
+            <Icon name="external-link" size={13} />
+          </a>
+          <a class={menuRowClass} data-mcp-vscode rel="noreferrer">
+            <Icon name="code" size={16} />
+            <span class="flex-1">Add to VS Code</span>
+            <Icon name="external-link" size={13} />
+          </a>
+        </div>
+      </details>
+    )
+  }
 </div>
 
 <script>
@@ -199,6 +248,65 @@ const menuRowClass =
       ?.addEventListener("click", () =>
         window.dispatchEvent(new CustomEvent("blume:open-ask-ai"))
       );
+
+    const mcpUrl = root.getAttribute("data-mcp-url");
+    if (mcpUrl) {
+      const rawName = root.getAttribute("data-mcp-name") || "docs";
+      const id =
+        rawName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/gu, "-")
+          .replace(/^-+|-+$/gu, "") || "docs";
+
+      const cursorConfig = btoa(JSON.stringify({ url: mcpUrl }));
+      root
+        .querySelector("[data-mcp-cursor]")
+        ?.setAttribute(
+          "href",
+          `cursor://anysphere.cursor-deeplink/mcp/install?name=${encodeURIComponent(id)}&config=${cursorConfig}`
+        );
+      root
+        .querySelector("[data-mcp-vscode]")
+        ?.setAttribute(
+          "href",
+          `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: id, type: "http", url: mcpUrl }))}`
+        );
+
+      const flash = (el: Element | null, text: string, reset: string) => {
+        if (el) {
+          el.textContent = text;
+          setTimeout(() => {
+            el.textContent = reset;
+          }, 1500);
+        }
+      };
+      const copy = async (value: string, el: Element | null, label: string) => {
+        try {
+          await navigator.clipboard.writeText(value);
+          flash(el, "Copied!", label);
+        } catch {
+          // Clipboard unavailable; nothing to do.
+        }
+      };
+      root
+        .querySelector("[data-mcp-copy-url]")
+        ?.addEventListener("click", () =>
+          copy(
+            mcpUrl,
+            root.querySelector("[data-mcp-url-label]"),
+            "Copy server URL"
+          )
+        );
+      root
+        .querySelector("[data-mcp-copy-claude]")
+        ?.addEventListener("click", () =>
+          copy(
+            `claude mcp add --transport http ${id} ${mcpUrl}`,
+            root.querySelector("[data-mcp-claude-label]"),
+            "Copy Claude Code command"
+          )
+        );
+    }
 
     const label = root.querySelector("[data-blume-copy-label]");
     root

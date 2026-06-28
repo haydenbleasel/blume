@@ -1,5 +1,7 @@
-import { create, insertMultiple, search } from "@orama/orama";
-
+import {
+  buildOramaIndex,
+  queryOramaIndex,
+} from "../../../search/orama-index.ts";
 import { excerptFor, SEARCH_LIMIT } from "./types.ts";
 import type { IndexedDocument, SearchFn } from "./types.ts";
 
@@ -13,30 +15,14 @@ export const createSearch = async (opts: {
 }): Promise<SearchFn> => {
   const response = await fetch(opts.indexUrl);
   const documents = (await response.json()) as IndexedDocument[];
-  const db = create({
-    schema: {
-      content: "string",
-      description: "string",
-      route: "string",
-      title: "string",
-    },
-  });
-  await insertMultiple(db, documents);
+  const db = await buildOramaIndex(documents);
 
   return async (query) => {
-    const found = await search(db, {
-      boost: { description: 2, title: 3 },
-      limit: SEARCH_LIMIT,
-      properties: ["title", "description", "content"],
-      term: query,
-    });
-    return found.hits.map((hit) => {
-      const doc = hit.document as unknown as IndexedDocument;
-      return {
-        excerpt: excerptFor(doc.description, doc.content),
-        title: doc.title,
-        url: doc.route,
-      };
-    });
+    const docs = await queryOramaIndex(db, query, SEARCH_LIMIT);
+    return docs.map((doc) => ({
+      excerpt: excerptFor(doc.description, doc.content),
+      title: doc.title,
+      url: doc.route,
+    }));
   };
 };

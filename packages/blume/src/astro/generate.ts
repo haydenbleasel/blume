@@ -14,6 +14,8 @@ import { dirname, join, relative } from "pathe";
 import { glob } from "tinyglobby";
 
 import { buildRawMarkdown } from "../ai/markdown.ts";
+import { buildMcpData } from "../ai/mcp/data.ts";
+import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
@@ -36,10 +38,13 @@ import {
   changelogIndexTemplate,
   contentConfigTemplate,
   envTemplate,
+  mcpEndpointTemplate,
+  mcpPageFile,
   mixedbreadSearchEndpointTemplate,
   ogEndpointTemplate,
   rawMarkdownEndpointTemplate,
   rssEndpointTemplate,
+  staticJsonEndpointTemplate,
   runtimeDependencies,
   runtimePackageTemplate,
   runtimeTsconfigTemplate,
@@ -292,6 +297,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       favicon: resolveFavicon(project),
       imageZoom: config.markdown.imageZoom,
       logo: resolveLogo(project),
+      mcp: config.mcp.enabled
+        ? { name: config.mcp.name ?? config.title, route: config.mcp.route }
+        : null,
       og: { enabled: config.seo.og.enabled },
       repoUrl,
       search: {
@@ -330,6 +338,97 @@ export const buildRuntimeData = (project: BlumeProject): string => {
   return `${JSON.stringify(data, null, 2)}\n`;
 };
 
+/** The resolved plan for the hosted MCP server within a single generate pass. */
+interface McpPlan {
+  /** Directory holding the injected discovery endpoints (`.blume/src/blume-mcp`). */
+  dir: string;
+  /** `.well-known` discovery routes to inject as prerendered pages. */
+  discoveryPages: { entrypoint: string; pattern: string }[];
+  enabled: boolean;
+  route: string;
+  srcDir: string;
+  warnings: string[];
+}
+
+/**
+ * Decide whether (and how) to generate the MCP server. Skipped — with a
+ * warning — when a content page already occupies its route, so the user's page
+ * keeps working.
+ */
+const planMcp = (project: BlumeProject, srcDir: string): McpPlan => {
+  const { config } = project;
+  const { route } = config.mcp;
+  const dir = join(srcDir, "blume-mcp");
+  const base: McpPlan = {
+    dir,
+    discoveryPages: [],
+    enabled: false,
+    route,
+    srcDir,
+    warnings: [],
+  };
+  if (!config.mcp.enabled) {
+    return base;
+  }
+  if (project.graph.pages.some((page) => page.route === route)) {
+    return {
+      ...base,
+      warnings: [
+        `MCP server route "${route}" is already used by a content page; the MCP server was not generated. Set a different "mcp.route" in blume.config.ts.`,
+      ],
+    };
+  }
+  return {
+    ...base,
+    discoveryPages: [
+      {
+        entrypoint: join(dir, "discovery.ts"),
+        pattern: "/.well-known/mcp.json",
+      },
+      {
+        entrypoint: join(dir, "server-card.ts"),
+        pattern: "/.well-known/mcp/server-card.json",
+      },
+    ],
+    enabled: true,
+  };
+};
+
+/** Write the MCP data snapshot, server endpoint, and discovery documents. */
+const writeMcpFiles = async (
+  project: BlumeProject,
+  plan: McpPlan
+): Promise<void> => {
+  if (!plan.enabled) {
+    return;
+  }
+  const data = await buildMcpData(project);
+  const discoveryInput = {
+    name: data.name,
+    route: plan.route,
+    site: data.site,
+    version: data.version,
+  };
+  await Promise.all([
+    writeIfChanged(
+      join(plan.srcDir, "generated", "mcp-data.json"),
+      `${JSON.stringify(data)}\n`
+    ),
+    writeIfChanged(
+      join(plan.srcDir, "pages", mcpPageFile(plan.route)),
+      mcpEndpointTemplate(plan.route)
+    ),
+    writeIfChanged(
+      join(plan.dir, "discovery.ts"),
+      staticJsonEndpointTemplate(buildMcpDiscovery(discoveryInput))
+    ),
+    writeIfChanged(
+      join(plan.dir, "server-card.ts"),
+      staticJsonEndpointTemplate(buildMcpServerCard(discoveryInput))
+    ),
+  ]);
+};
+
 export interface GenerateResult {
   /** Whether any structural file changed (config/page/content config). */
   structuralChange: boolean;
@@ -360,6 +459,12 @@ export const generateRuntime = async (
     readOptional(context.themeFile),
   ]);
   const needsReact = detectedReact || askEnabled;
+
+  // The hosted MCP server. The `.well-known` discovery docs are injected as
+  // prerendered routes alongside user pages; the server endpoint itself is a
+  // normal (server-rendered) page written by `writeMcpFiles`.
+  const mcp = planMcp(project, srcDir);
+  pages.push(...mcp.discoveryPages);
 
   const structural = await Promise.all([
     writeIfChanged(
@@ -413,6 +518,8 @@ export const generateRuntime = async (
       askEndpointTemplate(config.ai.ask?.model ?? "openai/gpt-5.5")
     );
   }
+
+  await writeMcpFiles(project, mcp);
 
   if (config.seo.og.enabled) {
     await writeIfChanged(
@@ -501,7 +608,7 @@ export const generateRuntime = async (
 
   // API/AsyncAPI reference pages (Scalar). One self-contained page per source,
   // mounted on its configured route and regenerated each run.
-  const warnings: string[] = [];
+  const warnings: string[] = [...mcp.warnings];
 
   // The new provider SDKs are optional peers; warn (rather than fail opaquely in
   // Vite) when the configured provider's package isn't installed.

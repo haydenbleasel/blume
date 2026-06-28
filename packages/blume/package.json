@@ -21,6 +21,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./ai/*": "./src/ai/*",
     "./schema": "./src/core/schema.ts",
     "./runtime": "./src/runtime/index.ts",
     "./astro": "./src/astro/index.ts",
@@ -42,6 +43,7 @@
     "@astrojs/node": "^11.0.0",
     "@astrojs/react": "^6.0.0",
     "@astrojs/vercel": "^11.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@orama/orama": "^3.1.18",
     "@scalar/astro": "^0.4.5",
     "@shikijs/transformers": "^4.2.0",

@@ -31,6 +31,7 @@ interface Props {
     key: string;
   } | null;
   navigation: Navigation;
+  mcp?: { name: string; route: string } | null;
   page: { title: string; description?: string; route: string };
   headings: Heading[];
   imageZoom?: boolean;
@@ -59,6 +60,7 @@ const {
   favicon,
   banner,
   navigation,
+  mcp,
   page,
   headings,
   imageZoom = true,
@@ -94,6 +96,10 @@ const formattedLastModified =
         timeZone: "UTC",
       }).format(lastModifiedDate)
     : null;
+
+// The hosted MCP server's absolute URL, used by the page-actions install menu.
+// Needs a configured site to be useful, so the menu is hidden without one.
+const mcpUrl = mcp && siteUrl ? new URL(mcp.route, siteUrl).href : null;
 
 const crumbs = findBreadcrumbs(navigation.sidebar, page.route);
 const { prev, next } = getPagination(
@@ -322,6 +328,8 @@ const bannerScript = banner?.dismissible
         <PageActions
           askEnabled={askEnabled}
           editUrl={editUrl}
+          mcpName={mcp?.name}
+          mcpUrl={mcpUrl}
           repoUrl={repoUrl}
           route={page.route}
         />
