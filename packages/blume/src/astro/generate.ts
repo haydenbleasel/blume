@@ -366,6 +366,7 @@ export const generateRuntime = async (
       join(out, "astro.config.mjs"),
       astroConfigTemplate({
         config,
+        contentRoutes: project.manifest.routes.map((route) => route.path),
         context,
         dataPath,
         needsReact,

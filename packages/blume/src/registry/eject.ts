@@ -77,6 +77,7 @@ export const eject = async (root: string): Promise<string[]> => {
     {
       content: astroConfigTemplate({
         config,
+        contentRoutes: project.manifest.routes.map((route) => route.path),
         context: relContext,
         dataPath: "./src/generated/data.json",
         needsReact,

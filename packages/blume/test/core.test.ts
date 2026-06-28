@@ -118,6 +118,7 @@ describe("astro config template", () => {
 
     const output = astroConfigTemplate({
       config,
+      contentRoutes: [],
       context,
       dataPath: "/r/.blume/src/generated/data.json",
       needsReact: false,
@@ -139,6 +140,7 @@ describe("astro config template", () => {
   const configTemplate = (config: ReturnType<typeof blumeConfigSchema.parse>) =>
     astroConfigTemplate({
       config,
+      contentRoutes: [],
       context,
       dataPath: "/r/.blume/src/generated/data.json",
       needsReact: false,
