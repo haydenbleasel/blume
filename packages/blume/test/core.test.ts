@@ -19,10 +19,6 @@ import {
   runtimeDependencies,
 } from "../src/astro/templates.ts";
 import {
-  buildChangelogRssFeeds,
-  writeChangelogRssFeeds,
-} from "../src/changelog/rss.ts";
-import {
   findBreadcrumbs,
   findDirectoryListing,
   flattenPages,
@@ -1111,72 +1107,6 @@ describe("Mintlify compatibility config", () => {
       await expect(
         readFile(join(outDir, ".well-known", "llms.txt"), "utf-8")
       ).resolves.toBe(index);
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
-
-  it("writes Mintlify-style changelog RSS feeds from Update components", async () => {
-    const root = await createMintlifyFixture();
-    try {
-      const raw = await readFile(join(root, "docs.json"), "utf-8");
-      const spec = JSON.parse(raw);
-      spec.navigation.pages[0].pages.push("changelog");
-      await writeFile(join(root, "docs.json"), JSON.stringify(spec));
-      await writeFile(
-        join(root, "changelog.mdx"),
-        [
-          "---",
-          "title: Changelog",
-          "description: Product updates.",
-          "rss: true",
-          "---",
-          "",
-          '<Update label="June 2026" description="v2.0.0" rss={{ title: "June release", description: "Custom RSS description." }}>',
-          "  ## Ignored heading",
-          "",
-          "  <Frame>",
-          '    <img src="/dashboard.png" alt="Dashboard" />',
-          "  </Frame>",
-          "</Update>",
-          "",
-          '<Update label="May 2026" description="v1.0.0">',
-          "  ## Heading entry",
-          "",
-          "  Added changelog entries.",
-          "</Update>",
-          "",
-        ].join("\n")
-      );
-
-      const project = await scanProject(root);
-      const feeds = await buildChangelogRssFeeds(project);
-      const content = feeds[0]?.content ?? "";
-      expect({
-        count: feeds.length,
-        hasCustomDescription: content.includes(
-          "<description><![CDATA[Custom RSS description.]]></description>"
-        ),
-        hasHeadingLink: content.includes("/changelog#heading-entry"),
-        hasHeadingTitle: content.includes("<title><![CDATA[Heading entry]]>"),
-        hasPageTitle: content.includes("<title><![CDATA[Changelog]]>"),
-        hasRssTitle: content.includes("<title><![CDATA[June release]]>"),
-        route: feeds[0]?.route,
-      }).toStrictEqual({
-        count: 1,
-        hasCustomDescription: true,
-        hasHeadingLink: true,
-        hasHeadingTitle: true,
-        hasPageTitle: true,
-        hasRssTitle: true,
-        route: "/changelog/rss.xml",
-      });
-
-      const outDir = join(root, "rss-output");
-      await expect(writeChangelogRssFeeds(project, outDir)).resolves.toBe(1);
-      await expect(
-        readFile(join(outDir, "changelog", "rss.xml"), "utf-8")
-      ).resolves.toBe(content);
     } finally {
       await rm(root, { force: true, recursive: true });
     }

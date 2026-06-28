@@ -20,7 +20,6 @@ import {
   buildRawMarkdown,
   isPublicAgentPage,
 } from "../ai/markdown.ts";
-import { writeChangelogRssFeeds } from "../changelog/rss.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
@@ -353,8 +352,8 @@ export interface GenerateResult {
 
 /**
  * Mintlify projects use a custom public root (`.blume/public`); mirror the
- * changelog feeds and llms artifacts there, since `preparePublicAssets` only
- * copies a user's own `public/` directory. A no-op for standard projects.
+ * llms artifacts there, since `preparePublicAssets` only copies a user's own
+ * `public/` directory. A no-op for standard projects.
  */
 const writeCustomPublicRootArtifacts = async (
   project: BlumeProject
@@ -363,7 +362,6 @@ const writeCustomPublicRootArtifacts = async (
   if (context.publicRoot === join(context.root, "public")) {
     return;
   }
-  await writeChangelogRssFeeds(project, context.publicRoot);
   if (config.ai.llmsTxt) {
     await writeLlmsArtifacts(project, context.publicRoot);
   }

@@ -6,7 +6,6 @@ import { defineCommand } from "citty";
 import { join } from "pathe";
 
 import { writeLlmsArtifacts } from "../../ai/llms.ts";
-import { writeChangelogRssFeeds } from "../../changelog/rss.ts";
 import { serverFeatures } from "../../core/server-features.ts";
 import { buildRobots } from "../../deploy/robots.ts";
 import { buildSitemap } from "../../deploy/sitemap.ts";
@@ -53,11 +52,6 @@ export const runBuild = async (options: { strict?: boolean } = {}) => {
     logger.success(
       `Generated llms.txt, llms-full.txt, skill.md, and ${markdownPages} Markdown page export(s)`
     );
-  }
-
-  const rssFeeds = await writeChangelogRssFeeds(project, distDir);
-  if (rssFeeds > 0) {
-    logger.success(`Generated ${rssFeeds} changelog RSS feed(s)`);
   }
 
   // A user's own public/ file (copied into dist by Astro) always wins.
