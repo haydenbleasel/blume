@@ -141,6 +141,18 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   }
 }
 
+/* Code reads left-to-right regardless of page direction; only the surrounding
+   chrome mirrors for RTL. Inline code is isolated so LTR identifiers don't
+   disturb the bidi flow of right-to-left prose. */
+[dir="rtl"] pre,
+[dir="rtl"] .prose pre {
+  direction: ltr;
+  text-align: left;
+}
+[dir="rtl"] :not(pre) > code {
+  unicode-bidi: isolate;
+}
+
 /* Theme Tailwind Typography (prose) with Blume tokens. */
 .prose {
   --tw-prose-body: var(--blume-foreground);

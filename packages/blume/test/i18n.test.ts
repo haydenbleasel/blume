@@ -195,6 +195,25 @@ describe("per-locale navigation", () => {
     expect(labelsOf(fr)).toContain("Guides");
   });
 
+  it("fills a locale's sidebar with fallback pages for untranslated content", async () => {
+    const { graph } = await buildProject(config());
+    const guides = (graph.navigationByLocale.fr?.sidebar ?? []).find(
+      (node) => node.kind === "group" && node.label === "Guides"
+    );
+    const routes =
+      guides?.kind === "group"
+        ? guides.children
+            .filter((child) => child.kind === "page")
+            .map((child) => (child.kind === "page" ? child.route : ""))
+        : [];
+    // The translated quickstart and the untranslated (fallback) only-en page
+    // both appear, each at its /fr route.
+    expect(routes.toSorted()).toEqual([
+      "/fr/guides/only-en",
+      "/fr/guides/quickstart",
+    ]);
+  });
+
   it("localizes header tab paths per locale", async () => {
     const resolved = blumeConfigSchema.parse({
       i18n: {

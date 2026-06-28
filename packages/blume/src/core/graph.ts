@@ -1,4 +1,4 @@
-import { localizeRoute } from "./i18n.ts";
+import { localizeRoute, resolveFallbackLocale } from "./i18n.ts";
 import { buildNavigation } from "./navigation.ts";
 import type {
   FolderMeta,
@@ -45,6 +45,19 @@ export const buildContentGraph = (
   let navigation: Navigation;
 
   if (i18n) {
+    // Pages of the fallback locale, by translation key — used to fill in a
+    // locale's sidebar for pages it hasn't translated yet, so navigation mirrors
+    // the default structure instead of showing an empty (or partial) tree.
+    const fallback = resolveFallbackLocale(i18n);
+    const fallbackByKey = new Map<string, PageRecord>();
+    if (fallback) {
+      for (const page of pages) {
+        if (page.locale === fallback) {
+          fallbackByKey.set(page.translationKey, page);
+        }
+      }
+    }
+
     // Each locale gets an independent tree from its own pages and folder meta,
     // so navigation may diverge per language (Mintlify-style).
     for (const { code } of i18n.locales) {
@@ -56,17 +69,32 @@ export const buildContentGraph = (
           ? localizeRoute(tab.path, code, i18n)
           : tab.path,
       }));
-      navigationByLocale[code] = buildNavigation(
-        pages.filter((page) => page.locale === code),
-        {
-          folderMeta: options.folderMeta,
-          metaPrefix: code === i18n.defaultLocale ? "" : code,
-          refByLogical: true,
-          sharedFolderMeta: options.sharedFolderMeta,
-          sidebar: options.navigation.sidebar,
-          tabs,
+
+      const real = pages.filter((page) => page.locale === code);
+      let localePages = real;
+      if (fallback && code !== fallback) {
+        const present = new Set(real.map((page) => page.translationKey));
+        const filled: PageRecord[] = [];
+        for (const [key, source] of fallbackByKey) {
+          if (!present.has(key)) {
+            filled.push({
+              ...source,
+              locale: code,
+              route: localizeRoute(key, code, i18n),
+            });
+          }
         }
-      );
+        localePages = [...real, ...filled];
+      }
+
+      navigationByLocale[code] = buildNavigation(localePages, {
+        folderMeta: options.folderMeta,
+        metaPrefix: code === i18n.defaultLocale ? "" : code,
+        refByLogical: true,
+        sharedFolderMeta: options.sharedFolderMeta,
+        sidebar: options.navigation.sidebar,
+        tabs,
+      });
     }
     navigation = navigationByLocale[i18n.defaultLocale] ?? {
       sidebar: [],
