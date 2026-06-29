@@ -37,38 +37,22 @@ See [Frontmatter](/docs/reference/frontmatter) for the full page schema.
 
 ## Folder groups
 
-Add a `meta.ts` to a folder to control how its group appears and how its pages
-are ordered. Export a `defineMeta` object for full type-checking:
+Each folder becomes a sidebar group. Drop a [`meta.ts`](/docs/content/meta)
+beside its pages to set the group's title, icon, order, [display
+mode](/docs/content/meta#display-modes), and the order of its children:
 
-```ts meta.ts lineNumbers
+```ts meta.ts
 import { defineMeta } from "blume";
 
 export default defineMeta({
   title: "Guides",
   icon: "book-open",
-  order: 2,
-  collapsed: false,
   pages: ["configuration", "theming", "deployment"],
 });
 ```
 
-- **`title`**, **`icon`**, **`order`** — the group's label, icon, and position
-- **`collapsed`** — start the group collapsed
-- **`pages`** — explicit order for the group's children, listed by slug (numeric
-  prefix and parentheses stripped). Pages you leave out still appear, after the
-  listed ones.
-
-Because `meta.ts` is a real module, you can compute the meta — pass a function
-(sync or `async`) instead of an object to build it at scan time:
-
-```ts meta.ts
-import { defineMeta } from "blume";
-
-export default defineMeta(async () => ({
-  title: "Guides",
-  pages: await orderFromCms(),
-}));
-```
+See [Folder meta](/docs/content/meta) for every field, the three display modes,
+and computing meta at scan time.
 
 To group pages _without_ adding a URL segment, use a parenthesized folder name —
 see [Pages](/docs/content#group-folders).
@@ -135,7 +119,8 @@ navigation: {
 ```
 
 Each item is a page route (a string), a group (`label` + `items`), or a link
-(`label` + `href`). Groups can nest and start `collapsed`.
+(`label` + `href`). Groups can nest, take a [`display`
+mode](/docs/content/meta#display-modes), and start `collapsed`.
 
 ## Repository link
 

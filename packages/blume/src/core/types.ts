@@ -1,4 +1,9 @@
-import type { DirectoryMode, PageMeta, ResolvedConfig } from "./schema.ts";
+import type {
+  DirectoryMode,
+  PageMeta,
+  ResolvedConfig,
+  SidebarDisplay,
+} from "./schema.ts";
 
 /** Severity levels for Blume diagnostics. */
 export type DiagnosticSeverity = "error" | "warning" | "info";
@@ -129,6 +134,7 @@ export type NavNode =
       label: string;
       badge?: string;
       directory?: DirectoryMode;
+      display?: SidebarDisplay;
       icon?: string;
       route?: string;
       collapsed?: boolean;

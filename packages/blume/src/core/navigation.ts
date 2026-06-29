@@ -1,6 +1,10 @@
 import { extname } from "pathe";
 
-import type { FolderMeta, SidebarItemConfig } from "./schema.ts";
+import type {
+  FolderMeta,
+  SidebarDisplay,
+  SidebarItemConfig,
+} from "./schema.ts";
 import type {
   NavChromeVariant,
   NavNode,
@@ -54,6 +58,7 @@ interface MutableGroup {
   label: string;
   icon?: string;
   collapsed?: boolean;
+  display?: SidebarDisplay;
   order: number;
   children: MutableNode[];
   index: Map<string, MutableGroup>;
@@ -135,6 +140,7 @@ const applyFolderMeta = (
     group.icon = meta.icon ?? group.icon;
     group.order = meta.order ?? group.order;
     group.collapsed = meta.collapsed ?? group.collapsed;
+    group.display = meta.display ?? group.display;
 
     if (meta.pages) {
       const rank = new Map(meta.pages.map((key, i) => [key, i]));
@@ -184,6 +190,7 @@ const toNavNode = (node: MutableNode): NavNode => {
   return {
     children: node.children.map(toNavNode),
     collapsed: node.collapsed,
+    display: node.display,
     icon: node.icon,
     kind: "group",
     label: node.label,
@@ -282,6 +289,7 @@ const buildConfigSidebar = (
         children: buildConfigSidebar(item.items, byRoute),
         collapsed: item.collapsed,
         directory: item.directory,
+        display: item.display,
         icon: item.icon,
         kind: "group",
         label: item.label,

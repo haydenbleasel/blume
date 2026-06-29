@@ -111,9 +111,20 @@ export type PageMetaInput = z.input<typeof pageMetaBaseSchema>;
 // Folder meta (meta.ts)
 // ---------------------------------------------------------------------------
 
+/**
+ * How a sidebar group renders:
+ * - `flat`: a non-collapsible header with its items listed beneath (default).
+ * - `group`: a collapsible `<details>` disclosure.
+ * - `page`: a single row that drills into a sub-panel showing only this group's
+ *   items, with a back arrow at the top.
+ */
+const sidebarDisplaySchema = z.enum(["flat", "group", "page"]);
+export type SidebarDisplay = z.infer<typeof sidebarDisplaySchema>;
+
 export const folderMetaSchema = z
   .object({
     collapsed: z.boolean().optional(),
+    display: sidebarDisplaySchema.optional(),
     icon: iconName.optional(),
     order: z.number().optional(),
     /** Explicit child ordering by slug segment (without numeric prefix). */
@@ -366,6 +377,7 @@ export type SidebarItemConfig =
       label: string;
       badge?: string;
       directory?: DirectoryMode;
+      display?: SidebarDisplay;
       href?: string;
       icon?: string;
       collapsed?: boolean;
@@ -381,6 +393,7 @@ const sidebarItemSchema: z.ZodType<SidebarItemConfig> = z.lazy(() =>
         badge: z.string().optional(),
         collapsed: z.boolean().optional(),
         directory: directoryModeSchema.optional(),
+        display: sidebarDisplaySchema.optional(),
         href: z.string().optional(),
         icon: iconName.optional(),
         items: z.array(sidebarItemSchema).optional(),

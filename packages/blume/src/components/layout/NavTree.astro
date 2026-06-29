@@ -3,13 +3,33 @@ import type { NavNode } from "../../core/types.ts";
 import Icon from "../Icon.astro";
 import Self from "./NavTree.astro";
 
+interface PagePanel {
+  id: string;
+  parentId: string;
+  label: string;
+  route?: string;
+  icon?: string;
+  children: NavNode[];
+  active: boolean;
+}
+
 interface Props {
   items: NavNode[];
   currentRoute: string;
   depth?: number;
+  /** Id prefix used to address `page`-mode panels (`${prefix}.${index}`). */
+  idPrefix?: string;
+  /** True only for the top-level call; renders the `<blume-nav>` panel stack. */
+  root?: boolean;
 }
 
-const { items, currentRoute, depth = 0 } = Astro.props;
+const {
+  items,
+  currentRoute,
+  depth = 0,
+  idPrefix = "n",
+  root = depth === 0,
+} = Astro.props;
 
 const badgeClass =
   "shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-medium text-[0.65rem] text-muted-foreground leading-none";
@@ -20,20 +40,146 @@ const hasActivePage = (item: NavNode): boolean =>
   item.kind === "page"
     ? item.route === currentRoute
     : item.route === currentRoute || item.children.some(hasActivePage);
+
+// Collect every `page`-mode group in the tree as a panel that is hoisted to the
+// top of the `<blume-nav>` stack. Panel ids match the `${prefix}.${index}`
+// scheme the row renderer uses for `data-nav-to`, so a drill-in trigger and its
+// panel always agree. `flat`/`group` ancestors keep their children in the same
+// visual panel (parentId unchanged); a `page` group opens a new panel.
+const collectPanels = (
+  nodes: NavNode[],
+  prefix: string,
+  parentId: string
+): PagePanel[] => {
+  const out: PagePanel[] = [];
+  nodes.forEach((node, index) => {
+    if (node.kind !== "group") {
+      return;
+    }
+    const id = `${prefix}.${index}`;
+    if ((node.display ?? "flat") === "page") {
+      out.push({
+        active: hasActivePage(node),
+        children: node.children,
+        icon: node.icon,
+        id,
+        label: node.label,
+        parentId,
+        route: node.route,
+      });
+      out.push(...collectPanels(node.children, id, id));
+    } else {
+      out.push(...collectPanels(node.children, id, parentId));
+    }
+  });
+  return out;
+};
+
+const panels = root ? collectPanels(items, idPrefix, "root") : [];
+// Open the deepest panel that contains the current page, so a real page load
+// lands on the right sub-panel (and degrades gracefully without JS).
+const activePanels = panels.filter((panel) => panel.active);
+const initialId =
+  activePanels.length > 0
+    ? activePanels.reduce((a, b) =>
+        b.id.split(".").length > a.id.split(".").length ? b : a
+      ).id
+    : "root";
 ---
 
-<ul class="m-0 list-none p-0">
-  {
-    items.map((item, index) => {
-      if (item.kind === "page") {
-        return (
-          <li>
-            <a
-              aria-current={item.route === currentRoute ? "page" : undefined}
-              class="block rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground"
-              href={item.route}
+{
+  root && panels.length > 0 ? (
+    <blume-nav class="block" data-initial={initialId}>
+      <div data-nav-panel="root" hidden={initialId !== "root"}>
+        <Self
+          currentRoute={currentRoute}
+          depth={0}
+          idPrefix={idPrefix}
+          items={items}
+          root={false}
+        />
+      </div>
+      {panels.map((panel) => (
+        <div data-nav-panel={panel.id} hidden={panel.id !== initialId}>
+          <div class="mb-3 flex items-center gap-1.5">
+            <button
+              aria-label="Back"
+              class="-ml-1 flex shrink-0 items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              data-nav-back={panel.parentId}
+              type="button"
             >
-              <span class="flex min-w-0 items-center gap-2">
+              <Icon name="arrow-left" size={16} />
+            </button>
+            {panel.route ? (
+              <a
+                aria-current={panel.route === currentRoute ? "page" : undefined}
+                class="min-w-0 flex-1 truncate font-semibold text-foreground text-sm hover:underline"
+                href={panel.route}
+              >
+                {panel.label}
+              </a>
+            ) : (
+              <span class="min-w-0 flex-1 truncate font-semibold text-foreground text-sm">
+                {panel.label}
+              </span>
+            )}
+          </div>
+          <Self
+            currentRoute={currentRoute}
+            depth={1}
+            idPrefix={panel.id}
+            items={panel.children}
+            root={false}
+          />
+        </div>
+      ))}
+    </blume-nav>
+  ) : (
+    <ul class="m-0 list-none p-0">
+      {items.map((item, index) => {
+        if (item.kind === "page") {
+          return (
+            <li>
+              <a
+                aria-current={item.route === currentRoute ? "page" : undefined}
+                class="block rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground"
+                href={item.route}
+              >
+                <span class="flex min-w-0 items-center gap-2">
+                  {item.icon && (
+                    <Icon
+                      class="shrink-0 text-muted-foreground"
+                      name={item.icon}
+                      size={14}
+                    />
+                  )}
+                  <span class="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.badge && <span class={badgeClass}>{item.badge}</span>}
+                  {item.deprecated && (
+                    <span class={deprecatedClass}>deprecated</span>
+                  )}
+                </span>
+              </a>
+            </li>
+          );
+        }
+
+        const display = item.display ?? "flat";
+        const id = `${idPrefix}.${index}`;
+        // Flat groups are section headers and want breathing room; collapsible
+        // `group`/`page` rows are single rows and should stack tightly.
+        const spacing =
+          index === 0 ? "mt-0" : display === "flat" ? "mt-6" : "mt-0.5";
+
+        // `page`: a single row that drills into this group's panel.
+        if (display === "page") {
+          return (
+            <li class={spacing}>
+              <button
+                class="flex w-full min-w-0 items-center gap-2 rounded-[0.65rem] px-2.5 py-1.5 text-left font-medium text-foreground text-sm transition-colors hover:bg-muted"
+                data-nav-to={id}
+                type="button"
+              >
                 {item.icon && (
                   <Icon
                     class="shrink-0 text-muted-foreground"
@@ -43,24 +189,81 @@ const hasActivePage = (item: NavNode): boolean =>
                 )}
                 <span class="min-w-0 flex-1 truncate">{item.label}</span>
                 {item.badge && <span class={badgeClass}>{item.badge}</span>}
-                {item.deprecated && (
-                  <span class={deprecatedClass}>deprecated</span>
-                )}
-              </span>
-            </a>
-          </li>
-        );
-      }
+                <Icon
+                  class="shrink-0 text-muted-foreground"
+                  name="chevron-right"
+                  size={14}
+                />
+              </button>
+            </li>
+          );
+        }
 
-      const active = hasActivePage(item);
-      const open = depth === 0 || active || item.collapsed === false;
-      const spacing = index === 0 ? "mt-0" : "mt-6";
-      if (depth === 0) {
+        // `group`: a collapsible `<details>` disclosure.
+        if (display === "group") {
+          const active = hasActivePage(item);
+          const open = depth === 0 || active || item.collapsed === false;
+          return (
+            <li class={spacing}>
+              <details class="group" open={open}>
+                <summary class="mb-1 flex cursor-pointer list-none items-center gap-1.5 rounded-[0.65rem] px-2.5 py-1.5 font-medium text-foreground text-sm transition-colors hover:bg-muted [&::-webkit-details-marker]:hidden">
+                  {item.route ? (
+                    <a
+                      aria-current={
+                        item.route === currentRoute ? "page" : undefined
+                      }
+                      class="-my-1 flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 text-foreground transition-colors aria-[current=page]:font-semibold"
+                      href={item.route}
+                    >
+                      {item.icon && (
+                        <Icon
+                          class="shrink-0 text-muted-foreground"
+                          name={item.icon}
+                          size={14}
+                        />
+                      )}
+                      <span class="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.badge && (
+                        <span class={badgeClass}>{item.badge}</span>
+                      )}
+                    </a>
+                  ) : (
+                    <>
+                      {item.icon && (
+                        <Icon
+                          class="shrink-0 text-muted-foreground"
+                          name={item.icon}
+                          size={14}
+                        />
+                      )}
+                      <span class="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.badge && (
+                        <span class={badgeClass}>{item.badge}</span>
+                      )}
+                    </>
+                  )}
+                  <span class="shrink-0 text-muted-foreground transition-transform group-open:rotate-90">
+                    <Icon name="chevron-right" size={13} />
+                  </span>
+                </summary>
+                <div class="space-y-0.5 border-border border-l pl-3">
+                  <Self
+                    currentRoute={currentRoute}
+                    depth={depth + 1}
+                    idPrefix={id}
+                    items={item.children}
+                    root={false}
+                  />
+                </div>
+              </details>
+            </li>
+          );
+        }
+
+        // `flat` (default): a non-collapsible header with its items beneath.
         return (
-          <li>
-            <p
-              class={`mb-2 flex min-w-0 items-center gap-1.5 font-medium text-foreground text-sm ${spacing}`}
-            >
+          <li class={spacing}>
+            <p class="mb-2 flex min-w-0 items-center gap-1.5 px-2.5 font-medium text-foreground text-sm">
               {item.route ? (
                 <a
                   aria-current={item.route === currentRoute ? "page" : undefined}
@@ -99,60 +302,161 @@ const hasActivePage = (item: NavNode): boolean =>
               <Self
                 currentRoute={currentRoute}
                 depth={depth + 1}
+                idPrefix={id}
                 items={item.children}
+                root={false}
               />
             </div>
           </li>
         );
+      })}
+    </ul>
+  )
+}
+
+<script>
+  const DURATION = 260;
+  const EASING = "cubic-bezier(0.33, 1, 0.68, 1)";
+
+  class BlumeNav extends HTMLElement {
+    connectedCallback() {
+      if (this.dataset.ready) {
+        return;
+      }
+      this.dataset.ready = "1";
+      this.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        const drill = target.closest("[data-nav-to]");
+        if (drill && this.contains(drill)) {
+          const id = drill.getAttribute("data-nav-to");
+          if (id && this.panel(id)) {
+            event.preventDefault();
+            this.show(id, true);
+          }
+          return;
+        }
+        const back = target.closest("[data-nav-back]");
+        if (back && this.contains(back)) {
+          event.preventDefault();
+          this.show(back.getAttribute("data-nav-back") || "root", true);
+        }
+      });
+      // Initial panel is route-driven, so it snaps into place without a slide.
+      this.show(this.dataset.initial || "root", false);
+    }
+
+    panel(id) {
+      return this.querySelector(`[data-nav-panel="${id}"]`);
+    }
+
+    depth(id) {
+      return id === "root" ? 0 : id.split(".").length;
+    }
+
+    reduced() {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+
+    show(id, animate) {
+      const next = this.panel(id) || this.panel("root");
+      if (!next) {
+        return;
+      }
+      const resolved = next.getAttribute("data-nav-panel");
+      const prev = this.active;
+      if (prev === next) {
+        return;
+      }
+      // Settle any in-flight slide before starting the next one.
+      if (this.finishSlide) {
+        this.finishSlide();
+      }
+      this.active = next;
+      this.dataset.active = resolved;
+
+      if (!(animate && prev) || this.reduced()) {
+        for (const panel of this.querySelectorAll("[data-nav-panel]")) {
+          panel.hidden = panel !== next;
+        }
+        return;
       }
 
-      return (
-        <li class={spacing}>
-          <details class="group" open={open}>
-            <summary class="mb-1 flex cursor-pointer list-none items-center gap-1.5 rounded-[0.65rem] px-2.5 py-1.5 font-medium text-foreground text-sm transition-colors hover:bg-muted [&::-webkit-details-marker]:hidden">
-              {item.route ? (
-                <a
-                  aria-current={item.route === currentRoute ? "page" : undefined}
-                  class="-my-1 flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 text-foreground transition-colors aria-[current=page]:font-semibold"
-                  href={item.route}
-                >
-                  {item.icon && (
-                    <Icon
-                      class="shrink-0 text-muted-foreground"
-                      name={item.icon}
-                      size={14}
-                    />
-                  )}
-                  <span class="min-w-0 flex-1 truncate">{item.label}</span>
-                  {item.badge && <span class={badgeClass}>{item.badge}</span>}
-                </a>
-              ) : (
-                <>
-                  {item.icon && (
-                    <Icon
-                      class="shrink-0 text-muted-foreground"
-                      name={item.icon}
-                      size={14}
-                    />
-                  )}
-                  <span class="min-w-0 flex-1 truncate">{item.label}</span>
-                  {item.badge && <span class={badgeClass}>{item.badge}</span>}
-                </>
-              )}
-              <span class="shrink-0 text-muted-foreground transition-transform group-open:rotate-90">
-                <Icon name="chevron-right" size={13} />
-              </span>
-            </summary>
-            <div class="space-y-0.5 border-border border-l pl-3">
-              <Self
-                currentRoute={currentRoute}
-                depth={depth + 1}
-                items={item.children}
-              />
-            </div>
-          </details>
-        </li>
-      );
-    })
+      const forward =
+        this.depth(resolved) > this.depth(prev.getAttribute("data-nav-panel"));
+      this.slide(prev, next, forward);
+    }
+
+    slide(out, into, forward) {
+      const rtl = getComputedStyle(this).direction === "rtl" ? -1 : 1;
+      const sign = (forward ? -1 : 1) * rtl;
+
+      const fromHeight = out.offsetHeight;
+      this.style.position = "relative";
+      this.style.overflow = "hidden";
+      this.style.height = `${fromHeight}px`;
+      into.hidden = false;
+      for (const panel of [out, into]) {
+        panel.style.position = "absolute";
+        panel.style.top = "0";
+        panel.style.insetInlineStart = "0";
+        panel.style.width = "100%";
+      }
+      const toHeight = into.offsetHeight;
+      this.style.height = `${toHeight}px`;
+
+      const options = { duration: DURATION, easing: EASING };
+      const animations = [
+        out.animate(
+          [
+            { transform: "translateX(0)" },
+            { transform: `translateX(${sign * 100}%)` },
+          ],
+          options
+        ),
+        into.animate(
+          [
+            { transform: `translateX(${-sign * 100}%)` },
+            { transform: "translateX(0)" },
+          ],
+          options
+        ),
+        this.animate(
+          [{ height: `${fromHeight}px` }, { height: `${toHeight}px` }],
+          options
+        ),
+      ];
+
+      let done = false;
+      const finish = () => {
+        if (done) {
+          return;
+        }
+        done = true;
+        for (const animation of animations) {
+          animation.cancel();
+        }
+        out.hidden = true;
+        for (const panel of [out, into]) {
+          panel.style.position = "";
+          panel.style.top = "";
+          panel.style.insetInlineStart = "";
+          panel.style.width = "";
+          panel.style.transform = "";
+        }
+        this.style.position = "";
+        this.style.overflow = "";
+        this.style.height = "";
+        this.finishSlide = null;
+      };
+      this.finishSlide = finish;
+      animations[0].finished.then(finish, finish);
+    }
   }
-</ul>
+
+  if (!customElements.get("blume-nav")) {
+    customElements.define("blume-nav", BlumeNav);
+  }
+</script>
