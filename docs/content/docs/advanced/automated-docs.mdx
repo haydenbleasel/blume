@@ -4,15 +4,14 @@ description: Configure your agent runner to keep Blume docs current.
 ---
 
 Blume publishes docs in formats that coding agents can read: `llms.txt`, raw
-Markdown URLs, and the optional MCP server. Pair those surfaces with the
-`self-updating-docs` skill and your own automation runner to keep docs in sync
-with the product.
+Markdown URLs, and the optional MCP server. Pair those surfaces with an agent
+skill and your own automation runner to keep docs in sync with the product.
 
 Blume does not host the automation. You configure the schedule, trigger,
 permissions, and prompt in Codex, Cursor, Claude, or another agent runner. The
-skill supplies the docs-maintenance workflow: audit user-facing drift, ignore
-feature-flagged work that is not ready, update only stale docs, verify the docs
-build, and open a `blume/*` pull request when changes are needed.
+skill supplies the docs workflow: audit user-facing drift, ignore
+feature-flagged work that is not ready, update or create docs from code, verify
+the docs build, and open a `blume/*` pull request when changes are needed.
 
 ## How it works
 
@@ -22,26 +21,46 @@ Each automation needs four pieces:
 | ------------ | -------------------------------------------------- |
 | Trigger      | Weekly schedule, release event, PR merge, or cron. |
 | Context      | Repository, docs path, lookback window, and tools. |
-| Instructions | The prompt and the `self-updating-docs` skill.     |
+| Instructions | The prompt and a docs skill.                       |
 | Outcome      | No-op report or a verified `blume/*` PR.           |
 
 Keep the automation narrow. It should update docs only when it can connect a
 merged PR, release note, schema change, CLI change, or public behavior change to
 missing or stale docs.
 
-## Install the skill
+## Choose a skill
 
-Download the packaged skill:
+| Skill                | Use it for                                                         |
+| -------------------- | ------------------------------------------------------------------ |
+| `self-updating-docs` | Narrow scheduled maintenance for existing Blume docs.              |
+| `homelander`         | Full docs harness: maintain docs or generate first docs from code. |
+
+`self-updating-docs` is intentionally small: it packages policy for weekly docs
+drift checks. `homelander` goes further. It gives the agent deterministic
+scanners, evidence reports, references, and templates so docs can be treated as
+an extension of the codebase rather than a separate app.
+
+## Install the skills
+
+Download the lightweight maintenance skill:
 
 ```bash
 curl -L https://blume.dev/skills/self-updating-docs.skill \
   -o self-updating-docs.skill
 ```
 
-The package contains only `SKILL.md` and a reference checklist. It does not ship
-executable scripts.
+Download the fuller codebase-to-docs harness:
 
-Install it where your agent reads project skills:
+```bash
+curl -L https://blume.dev/skills/homelander.skill \
+  -o homelander.skill
+```
+
+`self-updating-docs` contains `SKILL.md` and a reference checklist. `homelander`
+also includes a deterministic scanner, evidence report format, operating
+references, and reusable MDX templates.
+
+Install them where your agent reads project skills:
 
 | Agent       | Project skill location |
 | ----------- | ---------------------- |
@@ -52,6 +71,7 @@ Install it where your agent reads project skills:
 ```bash
 mkdir -p .agents/skills
 unzip -o self-updating-docs.skill -d .agents/skills
+unzip -o homelander.skill -d .agents/skills
 ```
 
 Use `.cursor/skills` for Cursor, or `.claude/skills` for Claude Code. Use a
@@ -70,6 +90,21 @@ Use the self-updating-docs skill. Monitor the PRs merged within the last 7 days.
 
 Replace `apps/docs` with `docs` or your configured Blume docs root if your repo
 uses a different layout.
+
+### Generate docs from a codebase
+
+Run this when a repository has little or no documentation:
+
+```text
+Use the homelander skill. Run init mode. Inspect the codebase, infer the public product surface, scaffold a first useful Blume docs set from templates, validate the docs build, and open a blume/docs-init-* PR with an evidence report and remaining questions.
+```
+
+Use this when docs already exist but you want deeper code-surface coverage than
+the lightweight maintenance skill:
+
+```text
+Use the homelander skill. Run maintenance mode with a 7 day lookback window. Compare recent merged work, routes, APIs, SDK exports, CLI commands, env vars, config, schemas, and components against the docs inventory. Skip feature-flagged and unreleased behavior. Update docs only for factual drift, validate changes, and open or update one blume/* PR to main. Always produce an evidence report.
+```
 
 ### Release readiness
 
