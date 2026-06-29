@@ -7,6 +7,7 @@ import type {
   Navigation,
 } from "../../core/types.ts";
 import "blume:theme";
+import type { ComponentOverride } from "../../core/define-components.ts";
 import Icon from "../Icon.astro";
 import { buildStructuredData } from "../../seo/jsonld.ts";
 import Banner from "./Banner.astro";
@@ -15,6 +16,7 @@ import Fonts from "./Fonts.astro";
 import Header from "./Header.astro";
 import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
+import { resolveSlot } from "./overrides.ts";
 import PageActions from "./PageActions.astro";
 
 interface Props {
@@ -78,6 +80,12 @@ interface Props {
   xDefault?: string | null;
   /** Language-switcher entries for the current page. */
   localeSwitch?: LocaleSwitchOption[];
+  /**
+   * User layout-slot overrides from `components.ts` (`defineComponents`). Each
+   * key replaces the matching built-in; unknown keys are ignored. Wired slots:
+   * `Header`, `Sidebar`.
+   */
+  layout?: Record<string, ComponentOverride>;
 }
 
 const {
@@ -116,7 +124,13 @@ const {
   localeAlternates,
   xDefault,
   localeSwitch,
+  layout = {},
 } = Astro.props;
+
+// Layout-slot overrides: render the user's component when configured, else the
+// built-in. Each override receives the same props as the component it replaces.
+const HeaderSlot = resolveSlot(layout.Header, Header);
+const SidebarSlot = resolveSlot(layout.Sidebar, NavTree);
 
 const strings = ui ?? EN_UI;
 // Filter search to the active language only when the site is multi-locale.
@@ -237,7 +251,7 @@ const bannerScript = banner?.dismissible
       href="#blume-content">{strings.page.skipToContent}</a
     >
     <Banner banner={banner} />
-    <Header
+    <HeaderSlot
       askEnabled={askEnabled}
       localeSwitch={localeSwitch}
       logo={logo}
@@ -250,14 +264,14 @@ const bannerScript = banner?.dismissible
       switcherStrings={strings.languageSwitcher}
     >
       <slot name="ask" slot="ask" />
-    </Header>
+    </HeaderSlot>
     <div class="mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]">
       <aside
         aria-label="Primary"
         class="fixed top-16 start-0 z-[35] h-[calc(100dvh-4rem)] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:sticky lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0! lg:border-e-0 lg:bg-transparent lg:px-4"
       >
         <nav>
-          <NavTree currentRoute={page.route} items={navigation.sidebar} />
+          <SidebarSlot currentRoute={page.route} items={navigation.sidebar} />
         </nav>
       </aside>
       <main class="min-w-0 px-6 pt-6 pb-10 lg:px-8 xl:px-10" id="blume-content">
