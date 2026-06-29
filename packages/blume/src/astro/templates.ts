@@ -692,6 +692,7 @@ const configuration = ${JSON.stringify(options.configuration, null, 2)};
 ---
 
 <ReferenceLayout
+  analytics={data.config.analytics}
   banner={data.config.banner}
   fontCssVars={data.fontCssVars}
   logo={data.config.logo}
@@ -906,6 +907,7 @@ const localeSwitch = i18n
   mcp={data.config.mcp}
   favicon={data.config.favicon}
   banner={data.config.banner}
+  analytics={data.config.analytics}
   imageZoom={data.config.imageZoom}
   codeWrap={data.config.codeWrap}
   navigation={navigation}
@@ -1043,6 +1045,7 @@ const canonical = base ? base + "/changelog" : null;
   mcp={data.config.mcp}
   favicon={data.config.favicon}
   banner={data.config.banner}
+  analytics={data.config.analytics}
   imageZoom={data.config.imageZoom}
   codeWrap={data.config.codeWrap}
   navigation={data.navigation}

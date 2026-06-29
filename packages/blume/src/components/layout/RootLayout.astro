@@ -9,6 +9,7 @@ import type {
 import "blume:theme";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import { buildStructuredData } from "../../seo/jsonld.ts";
+import Analytics from "./Analytics.astro";
 import Banner from "./Banner.astro";
 import Breadcrumbs from "./Breadcrumbs.astro";
 import Favicon from "./Favicon.astro";
@@ -39,6 +40,16 @@ interface Props {
     link?: { text: string; href: string };
     dismissible: boolean;
     key: string;
+  } | null;
+  analytics?: {
+    posthog?: { host?: string; key: string };
+    scripts?: {
+      attributes?: Record<string, string>;
+      content?: string;
+      src?: string;
+      strategy?: "async" | "defer";
+    }[];
+    vercel?: boolean;
   } | null;
   navigation: Navigation;
   mcp?: { name: string; route: string } | null;
@@ -95,6 +106,7 @@ const {
   logo,
   favicon,
   banner,
+  analytics,
   navigation,
   mcp,
   page,
@@ -244,6 +256,7 @@ const bannerScript = banner?.dismissible
     }
     {bannerScript && <script is:inline set:html={bannerScript} />}
     <script is:inline set:html={initialThemeScript} />
+    <Analytics analytics={analytics} />
   </head>
   <body
     class="bg-background font-sans text-foreground antialiased"

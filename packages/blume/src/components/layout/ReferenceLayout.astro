@@ -1,6 +1,7 @@
 ---
 import "blume:theme";
 import type { Navigation } from "../../core/types.ts";
+import Analytics from "./Analytics.astro";
 import Banner from "./Banner.astro";
 import Favicon from "./Favicon.astro";
 import Fonts from "./Fonts.astro";
@@ -28,6 +29,16 @@ interface Props {
     dismissible: boolean;
     key: string;
   } | null;
+  analytics?: {
+    posthog?: { host?: string; key: string };
+    scripts?: {
+      attributes?: Record<string, string>;
+      content?: string;
+      src?: string;
+      strategy?: "async" | "defer";
+    }[];
+    vercel?: boolean;
+  } | null;
   navigation: Navigation;
   route: string;
   themeMode: "system" | "light" | "dark";
@@ -41,6 +52,7 @@ const {
   logo,
   favicon,
   banner,
+  analytics,
   navigation,
   route,
   themeMode,
@@ -69,6 +81,7 @@ const bannerScript = banner?.dismissible
     <Fonts cssVars={fontCssVars ?? []} />
     {bannerScript && <script is:inline set:html={bannerScript} />}
     <script is:inline set:html={initialThemeScript} />
+    <Analytics analytics={analytics} />
   </head>
   <body class="bg-background font-sans text-foreground antialiased">
     <Banner banner={banner} />

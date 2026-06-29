@@ -760,6 +760,22 @@ const i18nConfigSchema = z
     }
   });
 
+const analyticsScriptSchema = z
+  .object({
+    // Extra attributes (e.g. `data-domain`, `id`) spread onto the <script>.
+    attributes: z.record(z.string(), z.string()).optional(),
+    // Inline script body, mutually exclusive with `src`.
+    content: z.string().optional(),
+    // External script URL, mutually exclusive with `content`.
+    src: z.string().optional(),
+    // Load strategy for an external script.
+    strategy: z.enum(["async", "defer"]).optional(),
+  })
+  .strict()
+  .refine((value) => Boolean(value.src) !== Boolean(value.content), {
+    message: "An analytics script must set exactly one of `src` or `content`.",
+  });
+
 const analyticsConfigSchema = z
   .object({
     posthog: z
@@ -769,6 +785,8 @@ const analyticsConfigSchema = z
       })
       .strict()
       .optional(),
+    // Escape hatch for any other provider (Plausible, Fathom, GA, Umami, …).
+    scripts: z.array(analyticsScriptSchema).optional(),
     vercel: z.boolean().optional(),
   })
   .strict();

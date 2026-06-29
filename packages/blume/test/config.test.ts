@@ -109,3 +109,35 @@ describe("loadConfig", () => {
     expect(on.config.seo.og.enabled).toBe(true);
   });
 });
+
+describe("analytics config", () => {
+  it("accepts vercel, posthog, and custom scripts together", async () => {
+    const dir = await makeDir(
+      'export default { analytics: { vercel: true, posthog: { key: "phc_test" }, scripts: [{ src: "https://plausible.io/js/script.js", strategy: "defer", attributes: { "data-domain": "example.com" } }] } };'
+    );
+    const result = await loadConfig(dir);
+    expect(result.config.analytics?.vercel).toBe(true);
+    expect(result.config.analytics?.posthog?.key).toBe("phc_test");
+    expect(result.config.analytics?.scripts?.[0]?.src).toBe(
+      "https://plausible.io/js/script.js"
+    );
+  });
+
+  it("rejects a script with both src and content", async () => {
+    const dir = await makeDir(
+      'export default { analytics: { scripts: [{ src: "https://x.test/a.js", content: "noop()" }] } };'
+    );
+    const error = await loadError(dir);
+    expect(error).toBeInstanceOf(BlumeError);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+  });
+
+  it("rejects a script with neither src nor content", async () => {
+    const dir = await makeDir(
+      'export default { analytics: { scripts: [{ strategy: "defer" }] } };'
+    );
+    const error = await loadError(dir);
+    expect(error).toBeInstanceOf(BlumeError);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+  });
+});

@@ -4,6 +4,9 @@ export default defineConfig({
   ai: {
     llmsTxt: true,
   },
+  analytics: {
+    vercel: true,
+  },
   banner: {
     content: "Blume is in beta — expect breaking changes.",
     dismissible: true,
