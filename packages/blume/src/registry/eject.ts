@@ -1,9 +1,15 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 
 import { join, relative } from "pathe";
 
+import { resolveAskBackend } from "../ai/ask.ts";
 import { buildRawMarkdown } from "../ai/markdown.ts";
-import { buildRuntimeData, detectNeedsReact } from "../astro/generate.ts";
+import {
+  buildRuntimeData,
+  collectStaged,
+  detectNeedsReact,
+} from "../astro/generate.ts";
 import { discoverPages } from "../astro/pages.ts";
 import {
   askEndpointTemplate,
@@ -53,6 +59,8 @@ export const eject = async (root: string): Promise<string[]> => {
   const srcDir = join(root, "src");
   const genDir = join(srcDir, "generated");
   const askEnabled = config.ai.ask?.enabled ?? false;
+  const exportPdf = config.export.pdf;
+  const exportEpub = config.export.epub;
 
   const [pages, needsReactRaw, userTheme, rawMarkdown] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
@@ -78,6 +86,13 @@ export const eject = async (root: string): Promise<string[]> => {
     pattern: page.pattern,
   }));
 
+  // Non-filesystem sources eject their materialized MDX into `<root>/blume-staged`
+  // (a dedicated dir so it never clashes with a content root literally named
+  // `content`; the relative `staged` collection points there).
+  const staged = collectStaged(project);
+  const hasStaged = staged.size > 0;
+  const stagedDir = "blume-staged";
+
   const files: { path: string; content: string }[] = [
     {
       content: astroConfigTemplate({
@@ -98,12 +113,19 @@ export const eject = async (root: string): Promise<string[]> => {
     },
     { content: envTemplate(), path: join(srcDir, "env.d.ts") },
     {
-      content: contentConfigTemplate({ config, context: relContext }),
+      content: contentConfigTemplate({
+        config,
+        context: relContext,
+        staged: hasStaged,
+        stagedBase: stagedDir,
+      }),
       path: join(srcDir, "content.config.ts"),
     },
     {
       content: catchAllPageTemplate({
         askEnabled,
+        exportEpub,
+        exportPdf,
         mathEnabled: config.markdown.math,
       }),
       path: join(srcDir, "pages", "[...slug].astro"),
@@ -142,7 +164,7 @@ export const eject = async (root: string): Promise<string[]> => {
 
   if (askEnabled) {
     files.push({
-      content: askEndpointTemplate(config.ai.ask?.model ?? "openai/gpt-5.5"),
+      content: askEndpointTemplate(resolveAskBackend(config.ai.ask)),
       path: join(srcDir, "pages", "api", "ask.ts"),
     });
   }
@@ -216,12 +238,28 @@ export const eject = async (root: string): Promise<string[]> => {
     }
   }
 
+  // Materialize staged source bodies under `<root>/blume-staged/<source>/<ref>`,
+  // matching the relative `staged` collection base in the ejected config.
+  for (const [entryId, content] of staged) {
+    files.push({ content, path: join(root, stagedDir, entryId) });
+  }
+
   await Promise.all(
     files.map(async (file) => {
       await mkdir(join(file.path, ".."), { recursive: true });
       await writeFile(file.path, file.content, "utf-8");
     })
   );
+
+  // Materialized source assets (e.g. downloaded Notion images) live under the
+  // hidden runtime's public dir; copy them into the owned project's `public/`
+  // so the staged content's `/blume-assets/…` references still resolve.
+  const assetsSrc = join(context.outDir, "public", "blume-assets");
+  if (existsSync(assetsSrc)) {
+    await cp(assetsSrc, join(root, "public", "blume-assets"), {
+      recursive: true,
+    });
+  }
 
   // The hidden runtime is no longer the source of truth.
   await rm(context.outDir, { force: true, recursive: true });

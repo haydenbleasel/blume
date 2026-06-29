@@ -32,14 +32,26 @@ A static build includes:
 
 ### Set your site URL
 
-Add `deployment.site` to `blume.config.ts` so sitemaps, canonical tags, and Open
-Graph images resolve to absolute URLs:
+Sitemaps, canonical tags, RSS, and Open Graph images need an absolute origin. On
+**Vercel**, **Netlify**, and **Cloudflare Pages**, Blume detects it from the
+platform's environment at build time — no config required.
+
+Set `deployment.site` to override the detected value, or to provide one on hosts
+that don't expose it (GitHub Pages, S3, a custom CDN):
 
 ```ts blume.config.ts lineNumbers
 deployment: {
   site: "https://docs.example.com",
 }
 ```
+
+When detecting automatically, Blume prefers your stable production domain over
+per-deploy preview URLs, so the canonical origin stays put across deploys.
+
+During `blume dev`, the site URL falls back to your local dev server (e.g.
+`http://localhost:4321`) when none is set, so site-gated features — Open Graph
+images, canonicals, the sitemap — work out of the box. Builds never use this
+fallback, so production output is never pointed at localhost.
 
 ## Preview locally
 
@@ -84,6 +96,11 @@ Choosing an adapter pulls in the matching Astro adapter automatically:
 | `node`       | `@astrojs/node`       | Self-hosted Node servers, containers |
 | `cloudflare` | `@astrojs/cloudflare` | Cloudflare Workers and Pages         |
 
+On **Vercel**, **Netlify**, and **Cloudflare Pages**, Blume picks the matching
+adapter automatically for server output — set `output: "server"` and deploy. Set
+`adapter` explicitly to override the detected value, or when self-hosting with
+`node`.
+
 A server build includes everything a static build does, plus any Astro endpoints
 or middleware you add. The `node` adapter produces a standalone server you can
 run directly.
@@ -106,6 +123,7 @@ emit redirect pages; server builds handle redirects at request time.
 
 ## Build summary
 
-Every build prints a summary — output mode, adapter, search provider, redirect
-count, sitemap and `llms.txt` status, and any enabled server features — so you
-can confirm what shipped before you deploy.
+Every build prints a summary — output mode, adapter, resolved site URL, search
+provider, redirect count, sitemap and `llms.txt` status, and any enabled server
+features — so you can confirm what shipped (including anything auto-detected)
+before you deploy.

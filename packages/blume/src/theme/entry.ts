@@ -171,6 +171,18 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   }
 }
 
+/* Code reads left-to-right regardless of page direction; only the surrounding
+   chrome mirrors for RTL. Inline code is isolated so LTR identifiers don't
+   disturb the bidi flow of right-to-left prose. */
+[dir="rtl"] pre,
+[dir="rtl"] .prose pre {
+  direction: ltr;
+  text-align: left;
+}
+[dir="rtl"] :not(pre) > code {
+  unicode-bidi: isolate;
+}
+
 /* Theme Tailwind Typography (prose) with Blume tokens. */
 .prose {
   --tw-prose-body: var(--blume-foreground);
@@ -222,10 +234,25 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   line-height: 1.4;
 }
 
-.prose :where(h1, h2, h3, h4) a {
+.prose :where(h1, h2, h3, h4, h5, h6) a {
   color: inherit;
   font-weight: inherit;
   text-decoration: none;
+}
+
+/* Auto-generated heading permalinks (markdown.headingAnchors): the whole
+   heading links to its own id, with a muted “#” revealed on hover or keyboard
+   focus so the link is discoverable without cluttering the heading at rest. */
+.prose :where(h2, h3, h4, h5, h6) a.blume-heading-anchor::after {
+  content: "#";
+  color: var(--blume-muted-foreground);
+  margin-inline-start: 0.35em;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.prose :where(h2, h3, h4, h5, h6) a.blume-heading-anchor:hover::after,
+.prose :where(h2, h3, h4, h5, h6) a.blume-heading-anchor:focus-visible::after {
+  opacity: 1;
 }
 
 .prose :where(h2:first-child) {
@@ -535,6 +562,41 @@ pre:has(.line.focused):hover .line:not(.focused) {
 
 :root[data-theme="dark"] .prose code.blume-inline-code span {
   color: var(--shiki-dark);
+}
+
+/* Print / "Save as PDF" (the page-actions Export → PDF runs window.print()).
+   Strip the surrounding chrome so the printout is just the article. */
+@media print {
+  [data-blume-banner],
+  header,
+  aside,
+  [data-blume-page-actions],
+  #blume-content > nav,
+  #blume-content > details {
+    display: none !important;
+  }
+
+  #blume-content {
+    padding: 0 !important;
+  }
+
+  .prose {
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Reveal collapsed tab panels so their content isn't dropped from the print. */
+  blume-tabs [data-blume-tab-panel] {
+    display: block !important;
+  }
+
+  /* Keep code/callout backgrounds (subject to the dialog's "Background graphics"
+     toggle). */
+  pre,
+  .prose :not(pre) > code {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
 
 /* Twoslash rich-renderer styles (used by fences with the \`twoslash\` meta). */

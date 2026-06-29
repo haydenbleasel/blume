@@ -15,8 +15,8 @@ export const createSearch =
       method: "POST",
     });
     if (!response.ok) {
-      return [];
+      return { hits: [], sections: [] };
     }
     const hits = (await response.json()) as SearchHit[];
-    return hits.slice(0, SEARCH_LIMIT);
+    return { hits: hits.slice(0, SEARCH_LIMIT), sections: [] };
   };

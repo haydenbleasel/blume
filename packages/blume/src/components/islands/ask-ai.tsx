@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
+import type { UIStrings } from "../../core/i18n-ui.ts";
+
 interface ChatMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
 }
+
+// English fallback so the island renders even if no dictionary is passed.
+const DEFAULT_ASK: UIStrings["ask"] = {
+  empty: "Ask a question about the docs.",
+  error: "Sorry, something went wrong.",
+  label: "Ask a question",
+  placeholder: "Ask a question…",
+  send: "Send",
+  title: "Ask AI",
+};
 
 let idCounter = 0;
 const nextId = (): number => {
@@ -16,14 +28,23 @@ const nextId = (): number => {
 const BUTTON_CLASS =
   "inline-flex h-9 cursor-pointer items-center gap-2 rounded-blume border border-border bg-muted px-2.5 text-muted-foreground text-sm hover:border-accent disabled:opacity-50";
 
-const AskAI = () => {
+const AskAI = ({ strings }: { strings?: UIStrings["ask"] }) => {
+  const t = strings ?? DEFAULT_ASK;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const handler = () => setOpen(true);
+    const handler = (event: Event) => {
+      // The search modal forwards the typed query so "Ask AI: <query>" carries
+      // straight into the chat input.
+      const query = (event as CustomEvent<{ query?: string }>).detail?.query;
+      if (query) {
+        setInput(query);
+      }
+      setOpen(true);
+    };
     window.addEventListener("blume:open-ask-ai", handler);
     return () => window.removeEventListener("blume:open-ask-ai", handler);
   }, []);
@@ -76,7 +97,7 @@ const AskAI = () => {
         }
       }
     } catch {
-      assistant.content = "Sorry, something went wrong.";
+      assistant.content = t.error;
       setMessages((current) => [...current.slice(0, -1), { ...assistant }]);
     } finally {
       setBusy(false);
@@ -90,15 +111,13 @@ const AskAI = () => {
         onClick={() => setOpen(!open)}
         type="button"
       >
-        Ask AI
+        {t.title}
       </button>
       {open && (
-        <div className="absolute top-[calc(100%+0.5rem)] right-0 z-50 flex max-h-[70vh] w-[min(24rem,90vw)] flex-col overflow-hidden rounded-blume border border-border bg-background shadow-xl">
+        <div className="absolute top-[calc(100%+0.5rem)] end-0 z-50 flex max-h-[70vh] w-[min(24rem,90vw)] flex-col overflow-hidden rounded-blume border border-border bg-background shadow-xl">
           <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3.5">
             {messages.length === 0 && (
-              <p className="m-0 text-muted-foreground text-sm">
-                Ask a question about the docs.
-              </p>
+              <p className="m-0 text-muted-foreground text-sm">{t.empty}</p>
             )}
             {messages.map((message) => (
               <div
@@ -118,14 +137,14 @@ const AskAI = () => {
             onSubmit={send}
           >
             <input
-              aria-label="Ask a question"
+              aria-label={t.label}
               className="flex-1 rounded-blume border border-border bg-transparent px-2.5 py-1.5 text-sm"
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Ask a question..."
+              placeholder={t.placeholder}
               value={input}
             />
             <button className={BUTTON_CLASS} disabled={busy} type="submit">
-              Send
+              {t.send}
             </button>
           </form>
         </div>

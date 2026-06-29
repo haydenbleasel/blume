@@ -28,13 +28,13 @@ const tagList = Array.isArray(tags) ? tags : tags ? [tags] : [];
 ---
 
 <article
-  class="not-prose group/update my-8 grid gap-4 border-border border-l pl-4 md:grid-cols-[10rem_minmax(0,1fr)] md:border-l-0 md:pl-0"
+  class="not-prose group/update my-8 grid gap-4 border-border border-s ps-4 md:grid-cols-[10rem_minmax(0,1fr)] md:border-s-0 md:ps-0"
   data-blume-update
   data-blume-update-rss-description={rss?.description}
   data-blume-update-rss-title={rss?.title}
   id={id}
 >
-  <header class="md:border-border md:border-r md:pr-4">
+  <header class="md:border-border md:border-e md:pe-4">
     <a
       class="font-semibold text-foreground text-sm no-underline hover:text-accent"
       href={`#${id}`}

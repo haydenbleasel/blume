@@ -24,7 +24,7 @@ describe("serverFeatures", () => {
 describe("defineComponents", () => {
   it("returns the overrides unchanged (identity helper)", () => {
     const overrides: ComponentOverrides = {
-      islands: { Counter: { client: "load", component: "./Counter.tsx" } },
+      layout: { Header: "./Header.astro" },
       mdx: { Callout: "./Callout.astro" },
     };
     expect(defineComponents(overrides)).toBe(overrides);

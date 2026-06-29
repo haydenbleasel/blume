@@ -118,9 +118,10 @@ describe("client loaders", () => {
     const { createSearch } =
       await import("../src/components/layout/search/orama.ts");
     const search = await createSearch({ indexUrl: "/blume-search.json" });
-    const hits = await search("alpha");
+    const { hits } = await search("alpha");
     expect(hits[0]?.url).toBe("/a");
-    expect(hits[0]?.title).toBe("Alpha");
+    // The title carries `<mark>` highlight markup for the matched term.
+    expect(hits[0]?.title).toContain("Alpha");
   });
 
   it("flexsearch indexes the JSON and finds the matching page", async () => {
@@ -128,7 +129,7 @@ describe("client loaders", () => {
     const { createSearch } =
       await import("../src/components/layout/search/flexsearch.ts");
     const search = await createSearch({ indexUrl: "/blume-search.json" });
-    const hits = await search("beta");
+    const { hits } = await search("beta");
     expect(hits.map((hit) => hit.url)).toContain("/b");
   });
 
@@ -144,7 +145,7 @@ describe("client loaders", () => {
     });
     const { createSearch } =
       await import("../src/components/layout/search/endpoint.ts");
-    const hits = await createSearch({ api: "/api/search" })("hello");
+    const { hits } = await createSearch({ api: "/api/search" })("hello");
     expect(captured.url).toBe("/api/search");
     expect(JSON.parse(captured.body ?? "{}").query).toBe("hello");
     expect(hits[0]?.url).toBe("/x");
@@ -167,7 +168,7 @@ describe("client loaders", () => {
       indexName: "docs",
       searchApiKey: "key",
     });
-    const hits = await search("q");
+    const { hits } = await search("q");
     expect(captured.value?.requests[0]?.indexName).toBe("docs");
     expect(hits[0]?.url).toBe("/a");
     expect(hits[0]?.excerpt).toBe("d");
@@ -187,7 +188,7 @@ describe("client loaders", () => {
     };
     const { createSearch } =
       await import("../src/components/layout/search/orama-cloud.ts");
-    const hits = await createSearch({ apiKey: "k", endpoint: "https://x" })(
+    const { hits } = await createSearch({ apiKey: "k", endpoint: "https://x" })(
       "q"
     );
     expect(captured.value?.term).toBe("q");
@@ -208,14 +209,14 @@ describe("client loaders", () => {
     };
     const { createSearch } =
       await import("../src/components/layout/search/typesense.ts");
-    const hits = await createSearch({
+    const result = await createSearch({
       collection: "docs",
       host: "h",
       searchApiKey: "k",
     })("q");
     expect(captured.value?.q).toBe("q");
     expect(captured.value?.query_by).toContain("title");
-    expect(hits[0]?.url).toBe("/t");
+    expect(result.hits[0]?.url).toBe("/t");
   });
 
   it("pagefind imports the built bundle and maps its results", async () => {
@@ -228,7 +229,7 @@ describe("client loaders", () => {
     const { createSearch } =
       await import("../src/components/layout/search/pagefind.ts");
     const search = await createSearch({ url: pathToFileURL(fixture).href });
-    const hits = await search("q");
+    const { hits } = await search("q");
     expect(hits[0]?.url).toBe("/p");
     expect(hits[0]?.title).toBe("PF");
   });
@@ -240,6 +241,7 @@ describe("hosted sync uploads", () => {
       _id: "/a",
       content: "c",
       description: "d",
+      locale: "en",
       tag: "guides",
       title: "A",
       url: "/a",

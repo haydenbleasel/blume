@@ -52,9 +52,13 @@ const makePage = (
   groups: [],
   headings: [],
   links: [],
+  locale: "",
   meta: pageMetaSchema.parse({}),
+  navPath: over.id,
   segments: [],
+  source: { name: "filesystem", ref: over.id },
   sourcePath: `/abs/${over.id}`,
+  translationKey: over.route,
   ...over,
 });
 
@@ -516,7 +520,8 @@ describe("config schema", () => {
 
   it("nests og, rss, and structured data under seo", () => {
     const { seo } = blumeConfigSchema.parse({});
-    expect(seo.og.enabled).toBeFalsy();
+    // Left unset by the schema; loadConfig resolves it against deployment.site.
+    expect(seo.og.enabled).toBeUndefined();
     expect(seo.rss.enabled).toBeTruthy();
     expect(seo.rss.types).toStrictEqual(["blog", "changelog"]);
     expect(seo.structuredData).toBeTruthy();
@@ -808,6 +813,8 @@ describe("MDX component template", () => {
   it("registers Mintlify component aliases and namespaces", () => {
     const output = catchAllPageTemplate({
       askEnabled: false,
+      exportEpub: false,
+      exportPdf: false,
       mathEnabled: false,
     });
 
@@ -832,6 +839,8 @@ describe("MDX component template", () => {
   it("keeps the docs catch-all prerendered", () => {
     const output = catchAllPageTemplate({
       askEnabled: false,
+      exportEpub: false,
+      exportPdf: false,
       mathEnabled: false,
     });
 
@@ -842,6 +851,8 @@ describe("MDX component template", () => {
   it("passes global banner config to the root layout", () => {
     const output = catchAllPageTemplate({
       askEnabled: false,
+      exportEpub: false,
+      exportPdf: false,
       mathEnabled: false,
     });
 

@@ -55,6 +55,14 @@ describe("scanProject", () => {
     expect(routesOf(project.manifest.routes)).toStrictEqual(["/"]);
   });
 
+  it("keeps drafts in build mode under preview", async () => {
+    const project = await scanProject(await makeProject(CONTENT), {
+      mode: "build",
+      preview: true,
+    });
+    expect(routesOf(project.manifest.routes)).toStrictEqual(["/", "/draft"]);
+  });
+
   it("aggregates content diagnostics without throwing", async () => {
     const project = await scanProject(await makeProject(CONTENT));
     expect(project.diagnostics.map((d) => d.code)).toContain(

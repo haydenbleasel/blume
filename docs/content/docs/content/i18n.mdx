@@ -1,0 +1,206 @@
+---
+title: Internationalization
+description: Serve your docs in multiple languages with locale-aware routing, per-language navigation, translated UI, and SEO — all convention-first.
+---
+
+Blume serves one project in many languages. Drop translated files into the right
+place and Blume wires up routing, the language switcher, per-locale navigation,
+and SEO for you — there's no separate routing layer to maintain. It's opt-in:
+without an `i18n` block, your site stays single-language exactly as before.
+
+## Enable it
+
+Add an `i18n` block listing your locales and which one is the default:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  defaultLocale: "en",
+  locales: [
+    { code: "en", label: "English" },
+    { code: "fr", label: "Français" },
+    { code: "ar", label: "العربية", dir: "rtl" },
+  ],
+}
+```
+
+Each locale has a `code` (used in URLs), a `label` (shown in the language
+switcher), and an optional `dir` for right-to-left scripts (`"ltr"` by default).
+
+:::tip
+Migrating from Mintlify? `blume migrate mintlify` reads
+`navigation.languages[]` and writes the `i18n` block for you — the `default: true`
+language becomes `defaultLocale`, and translated folders already match Blume's
+layout.
+:::
+
+## Organize translated content
+
+The default locale lives at your content root. Every other locale is a top-level
+folder named by its `code`, mirroring the default structure:
+
+```txt
+docs/
+  index.mdx               ->  /
+  guides/quickstart.mdx   ->  /guides/quickstart
+  fr/
+    index.mdx             ->  /fr
+    guides/quickstart.mdx ->  /fr/guides/quickstart
+  ar/
+    index.mdx             ->  /ar
+```
+
+| File                            | Route                   |
+| ------------------------------- | ----------------------- |
+| `docs/index.mdx`                | `/`                     |
+| `docs/guides/quickstart.mdx`    | `/guides/quickstart`    |
+| `docs/fr/guides/quickstart.mdx` | `/fr/guides/quickstart` |
+
+You only translate the files you want — everything else falls back automatically
+(see [Fallbacks](#fallbacks)).
+
+### Filename suffixes
+
+Prefer to keep translations next to the original? Set `parser: "dot"` and name
+files with a locale suffix instead of using folders:
+
+```txt
+docs/
+  guides/quickstart.mdx     ->  /guides/quickstart      (default)
+  guides/quickstart.fr.mdx  ->  /fr/guides/quickstart   (French)
+```
+
+Good for sparse translations — colocate the few pages you've translated without
+mirroring the whole tree.
+
+### Shared files
+
+For content that's the same in every language — a changelog, a status page — add
+a `$` marker so one file serves all locales without duplication:
+
+```txt
+docs/changelog.$.mdx   ->  /changelog and /fr/changelog (same content)
+docs/guides/meta.$.ts   (folder meta applied to every locale)
+```
+
+A locale-specific `meta.ts` still overrides the shared one for that language.
+
+## Default-locale URLs
+
+By default the default locale has no URL prefix (`/`, `/guides/quickstart`) while
+other locales are prefixed (`/fr/…`). This keeps your primary language's URLs
+clean. To prefix every locale, including the default:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  // …
+  hideDefaultLocalePrefix: false, // /en/…, /fr/…
+}
+```
+
+## Per-locale navigation
+
+Each language gets its own sidebar, built from that locale's files — so
+translations can diverge in structure, ordering, or labels. Folder
+[`meta.ts`](/docs/content/navigation#folder-groups) files resolve per locale,
+too: put a `meta.ts` under `fr/guides/` to order the French group
+independently. Everything else about [navigation](/docs/content/navigation) works
+the same, per language.
+
+## Fallbacks
+
+When a page isn't translated yet, Blume renders the fallback locale's content at
+the localized URL — so the link works, the page is fully pre-rendered, and search
+engines aren't sent to a dead end. The fallback defaults to your `defaultLocale`:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  // …
+  fallbackLocale: "en", // default; set to null to 404 instead
+}
+```
+
+Fallback pages are excluded from the search index and aren't advertised as real
+translations in `hreflang`, so untranslated content doesn't compete for ranking.
+They still appear in that locale's sidebar, so navigation stays complete — a
+reader can reach every page in any language.
+
+:::tip
+Start by translating your most important pages — the homepage, quickstart, and
+top guides — and let the rest fall back. You can fill in translations over time
+without breaking any links.
+:::
+
+## The language switcher
+
+When i18n is on, a language switcher appears in the header automatically,
+generated from your `locales`. For each page it links the matching translation in
+every language; where a translation is missing it links the fallback page and
+marks it as not translated. There's nothing to configure.
+
+## Translated UI
+
+Blume ships built-in translations for its own interface chrome — “On this page”,
+“Search”, “Edit on GitHub”, and the rest — so a locale with a built-in pack gets
+translated UI out of the box. **You only translate your content.**
+
+Packs ship for 36 languages — Arabic, Bengali, Bulgarian, Catalan, Chinese
+(Simplified and Traditional), Croatian, Czech, Danish, Dutch, Finnish, French,
+German, Greek, Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean,
+Norwegian, Persian, Polish, Portuguese (and Brazilian Portuguese), Romanian,
+Russian, Serbian, Slovak, Spanish, Swedish, Thai, Turkish, Ukrainian, and
+Vietnamese. They're community-maintained — open a PR to add a locale or sharpen a
+translation.
+
+Missing or unshipped strings fall back to the default locale, then to English.
+To override a string or supply your own language, set `i18n.ui`, keyed by locale:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  // …
+  ui: {
+    fr: {
+      search: { button: "Rechercher", placeholder: "Rechercher…" },
+      page: { previous: "Précédent", next: "Suivant" },
+    },
+  },
+}
+```
+
+## SEO
+
+Localized SEO is handled for you — no per-page metadata to write:
+
+- `<html lang>` and `dir` are set from the active locale.
+- `hreflang` alternates link every real translation of a page, plus an
+  `x-default` pointing at the default locale.
+- Canonical URLs are locale-correct, and JSON-LD carries `inLanguage`.
+
+Set [`deployment.site`](/docs/deployment) so these can be emitted as absolute
+URLs.
+
+## Search
+
+Search is scoped to the active language: on a `/fr/…` page the dialog returns
+French results, with an **All languages** toggle to search across every locale at
+once. The default (Orama) and FlexSearch indexes filter in the browser; hosted
+providers carry a `locale` facet on each record.
+
+## Right-to-left
+
+Set `dir: "rtl"` on a locale and Blume mirrors the whole interface — the sidebar,
+header, table of contents, pagination, search, and menus — and sets `<html dir>`
+to match. Two things deliberately stay left-to-right: **code blocks** (code reads
+LTR in any language) and **fallback content** — an untranslated page keeps the
+direction of the language it's actually written in, so English shown under an RTL
+locale still reads correctly while the surrounding chrome mirrors.
+
+## Where to next
+
+<CardGroup cols={2}>
+  <Card title="Navigation" href="/docs/content/navigation" icon="menu">
+    Shape each locale's sidebar, ordering, and tabs.
+  </Card>
+  <Card title="SEO" href="/docs/configuration/seo" icon="rocket">
+    Sitemaps, Open Graph, and structured data.
+  </Card>
+</CardGroup>

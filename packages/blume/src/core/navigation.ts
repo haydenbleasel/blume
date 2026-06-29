@@ -106,12 +106,30 @@ const pageOrder = (page: PageRecord, filename: string): number => {
   return numericOrder(filename);
 };
 
+/**
+ * Folder-meta lookup key for a group path. Under i18n the meta files live in
+ * the locale directory (`fr/guides/meta.ts` -> key `fr/guides`) while the
+ * nav group path is locale-stripped (`guides`), so prepend the locale prefix.
+ */
+const metaKey = (path: string, metaPrefix: string): string => {
+  if (!metaPrefix) {
+    return path;
+  }
+  return path ? `${metaPrefix}/${path}` : metaPrefix;
+};
+
 /** Apply folder meta (title/order/icon/collapsed and explicit page order). */
 const applyFolderMeta = (
   group: MutableGroup,
-  folderMeta: Map<string, FolderMeta>
+  folderMeta: Map<string, FolderMeta>,
+  sharedMeta: Map<string, FolderMeta>,
+  metaPrefix: string
 ): void => {
-  const meta = folderMeta.get(group.path);
+  // Locale-specific meta wins; a shared `meta.$.*` (keyed by the locale-stripped
+  // group path) applies to every locale otherwise.
+  const meta =
+    folderMeta.get(metaKey(group.path, metaPrefix)) ??
+    sharedMeta.get(group.path);
   if (meta) {
     group.label = meta.title ?? group.label;
     group.icon = meta.icon ?? group.icon;
@@ -131,7 +149,7 @@ const applyFolderMeta = (
 
   for (const child of group.children) {
     if (child.kind === "group") {
-      applyFolderMeta(child, folderMeta);
+      applyFolderMeta(child, folderMeta, sharedMeta, metaPrefix);
     }
   }
 };
@@ -175,7 +193,9 @@ const toNavNode = (node: MutableNode): NavNode => {
 /** Build the sidebar tree from the file system and folder meta. */
 const buildFileSystemSidebar = (
   pages: PageRecord[],
-  folderMeta: Map<string, FolderMeta>
+  folderMeta: Map<string, FolderMeta>,
+  sharedMeta: Map<string, FolderMeta>,
+  metaPrefix: string
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
 
@@ -183,8 +203,9 @@ const buildFileSystemSidebar = (
     if (page.meta.sidebar.hidden) {
       continue;
     }
-    const parts = page.id.split("/");
-    const filename = parts.at(-1) ?? page.id;
+    // Group by the locale-stripped path so the locale dir is not a nav group.
+    const parts = page.navPath.split("/");
+    const filename = parts.at(-1) ?? page.navPath;
     const dirs = parts.slice(0, -1);
 
     let parent = root;
@@ -206,7 +227,7 @@ const buildFileSystemSidebar = (
     });
   }
 
-  applyFolderMeta(root, folderMeta);
+  applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix);
   sortNodes(root.children);
   return root.children.map(toNavNode);
 };
@@ -308,12 +329,29 @@ export const buildNavigation = (
     tabs?: NavTab[];
     sidebar?: SidebarItemConfig[];
     sidebarVariants?: { path: string; items: SidebarItemConfig[] }[];
+    /** Locale dir prefix for folder-meta lookup (`""` for the default locale). */
+    metaPrefix?: string;
+    /**
+     * Resolve explicit-sidebar references against each page's locale-agnostic
+     * `translationKey` instead of its localized `route`. Used under i18n so a
+     * single authored sidebar maps onto every locale's pages.
+     */
+    refByLogical?: boolean;
+    /** Shared `meta.$.*` meta, keyed by locale-stripped dir path. */
+    sharedFolderMeta?: Map<string, FolderMeta>;
   }
 ): Navigation => {
   const chromeVariants = options.chromeVariants ?? [];
   const selectors = options.selectors ?? [];
   const tabs = options.tabs ?? [];
-  const byRoute = new Map(pages.map((page) => [page.route, page]));
+  const metaPrefix = options.metaPrefix ?? "";
+  const sharedFolderMeta = options.sharedFolderMeta ?? new Map();
+  const byRoute = new Map(
+    pages.map((page) => [
+      options.refByLogical ? page.translationKey : page.route,
+      page,
+    ])
+  );
   const sidebarVariants: NavSidebarVariant[] = (
     options.sidebarVariants ?? []
   ).map((variant) => ({
@@ -334,7 +372,12 @@ export const buildNavigation = (
   return {
     chromeVariants,
     selectors,
-    sidebar: buildFileSystemSidebar(pages, options.folderMeta),
+    sidebar: buildFileSystemSidebar(
+      pages,
+      options.folderMeta,
+      sharedFolderMeta,
+      metaPrefix
+    ),
     sidebarVariants,
     tabs,
   };

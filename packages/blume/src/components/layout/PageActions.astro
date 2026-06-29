@@ -1,4 +1,7 @@
 ---
+import { EN_UI } from "../../core/i18n-ui.ts";
+import type { UIStrings } from "../../core/i18n-ui.ts";
+import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
 
 interface Props {
@@ -6,13 +9,33 @@ interface Props {
   editUrl?: string | null;
   repoUrl?: string | null;
   askEnabled?: boolean;
+  /** Show the "Export to PDF" action (native browser print). */
+  exportPdf?: boolean;
+  /** Show the "Export to EPUB" action (client-side, current page). */
+  exportEpub?: boolean;
+  /** Absolute URL of the hosted MCP server, when enabled and a site is set. */
+  mcpUrl?: string | null;
+  /** Display name of the MCP server (defaults to the site title). */
+  mcpName?: string | null;
+  /** Localized action labels. */
+  strings?: UIStrings["actions"];
 }
 
-const { route, editUrl, repoUrl, askEnabled } = Astro.props;
+const {
+  route,
+  editUrl,
+  repoUrl,
+  askEnabled,
+  exportPdf,
+  exportEpub,
+  mcpUrl,
+  mcpName,
+  strings,
+} = Astro.props;
+const a = strings ?? EN_UI.actions;
 const mdPath = route === "/" ? "/index.md" : `${route}.md`;
 
-const GITHUB_LOGO =
-  '<svg class="size-4 shrink-0" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>';
+const GITHUB_LOGO = `<svg class="size-4 shrink-0" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">${GITHUB_MARK}</svg>`;
 
 /** Brand logos for the "Open in chat" providers (monochrome, currentColor). */
 const LOGOS: Record<string, string> = {
@@ -42,31 +65,34 @@ const EMOJI = ["😭", "🙁", "🙂", "🤩"];
 // Top-level actions match the ToC links: flat, no background/padding, color
 // shift on hover only.
 const rowClass =
-  "flex w-full items-center gap-2.5 py-1.5 text-left text-muted-foreground text-sm transition-colors hover:text-foreground";
+  "flex w-full items-center gap-2.5 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:text-foreground";
 
 // Items inside the floating popovers keep menu affordances (padding + hover
 // background).
 const menuRowClass =
-  "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground";
+  "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground";
 ---
 
 <div
   class="mt-8 space-y-0.5 border-border border-t pt-4"
   data-blume-page-actions
+  data-i18n-copied={a.copied}
+  data-mcp-name={mcpName ?? undefined}
+  data-mcp-url={mcpUrl ?? undefined}
   data-md={mdPath}
 >
   {
     editUrl && (
       <a class={rowClass} href={editUrl} rel="noreferrer" target="_blank">
         <span set:html={GITHUB_LOGO} />
-        Edit this page on GitHub
+        {a.edit}
       </a>
     )
   }
 
   <button class={rowClass} data-blume-scroll-top type="button">
     <Icon name="arrow-up" size={16} />
-    Scroll to top
+    {a.scrollToTop}
   </button>
 
   {
@@ -76,7 +102,7 @@ const menuRowClass =
           class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
         >
           <Icon name="thumbs-up" size={16} />
-          Give feedback
+          {a.giveFeedback}
         </summary>
         <div
           class="absolute right-0 left-0 z-50 mt-2 rounded-blume border border-border bg-background p-2.5 shadow-xl"
@@ -86,10 +112,10 @@ const menuRowClass =
           <textarea
             class="block max-h-40 min-h-20 w-full resize-y rounded-md border border-border bg-transparent px-2 py-1.5 text-foreground text-sm"
             data-feedback-text
-            placeholder="Leave your feedback…"
+            placeholder={a.feedbackPlaceholder}
           />
           <p class="mt-1 mb-2 text-muted-foreground text-xs">
-            Markdown supported
+            {a.markdownSupported}
           </p>
           <div class="flex items-center gap-1">
             {EMOJI.map((emoji) => (
@@ -103,11 +129,11 @@ const menuRowClass =
               </button>
             ))}
             <button
-              class="ml-auto rounded-md bg-accent px-3 py-1 font-medium text-accent-foreground text-sm hover:opacity-90"
+              class="ms-auto rounded-md bg-accent px-3 py-1 font-medium text-accent-foreground text-sm hover:opacity-90"
               data-feedback-send
               type="button"
             >
-              Send
+              {a.send}
             </button>
           </div>
         </div>
@@ -117,14 +143,48 @@ const menuRowClass =
 
   <button class={rowClass} data-blume-copy-page type="button">
     <Icon name="copy" size={16} />
-    <span data-blume-copy-label>Copy as Markdown</span>
+    <span data-blume-copy-label>{a.copyMarkdown}</span>
   </button>
+
+  {
+    (exportPdf || exportEpub) && (
+      <details class="group relative">
+        <summary
+          class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
+        >
+          <Icon name="download" size={16} />
+          Export
+          <Icon
+            class="ms-auto transition-transform group-open:rotate-180"
+            name="chevron-down"
+            size={14}
+          />
+        </summary>
+        <div class="absolute right-0 left-0 z-50 mt-1 rounded-blume border border-border bg-background p-1 shadow-xl">
+          {exportPdf && (
+            <button class={menuRowClass} data-blume-export-pdf type="button">
+              <Icon name="file" size={16} />
+              <span class="flex-1">Export to PDF</span>
+            </button>
+          )}
+          {exportEpub && (
+            <button class={menuRowClass} data-blume-export-epub type="button">
+              <Icon name="book-open" size={16} />
+              <span class="flex-1" data-blume-epub-label>
+                Export to EPUB
+              </span>
+            </button>
+          )}
+        </div>
+      </details>
+    )
+  }
 
   {
     askEnabled && (
       <button class={rowClass} data-blume-ask-ai type="button">
         <Icon name="message-circle" size={16} />
-        Ask AI about this page
+        {a.askAI}
       </button>
     )
   }
@@ -134,9 +194,9 @@ const menuRowClass =
       class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
     >
       <Icon name="external-link" size={16} />
-      Open in chat
+      {a.openInChat}
       <Icon
-        class="ml-auto transition-transform group-open:rotate-180"
+        class="ms-auto transition-transform group-open:rotate-180"
         name="chevron-down"
         size={14}
       />
@@ -161,6 +221,49 @@ const menuRowClass =
       }
     </div>
   </details>
+
+  {
+    mcpUrl && (
+      <details class="group relative">
+        <summary
+          class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
+        >
+          <Icon name="plug" size={16} />
+          {a.connectMcp}
+          <Icon
+            class="ms-auto transition-transform group-open:rotate-180"
+            name="chevron-down"
+            size={14}
+          />
+        </summary>
+        <div class="absolute right-0 left-0 z-50 mt-1 rounded-blume border border-border bg-background p-1 shadow-xl">
+          <button class={menuRowClass} data-mcp-copy-url type="button">
+            <Icon name="link" size={16} />
+            <span class="flex-1" data-mcp-url-label>
+              {a.copyServerUrl}
+            </span>
+          </button>
+          <button class={menuRowClass} data-mcp-copy-claude type="button">
+            <span set:html={LOGOS.claude} />
+            <span class="flex-1" data-mcp-claude-label>
+              {a.copyClaudeCode}
+            </span>
+          </button>
+          <hr class="my-1 border-border border-t" />
+          <a class={menuRowClass} data-mcp-cursor rel="noreferrer">
+            <span set:html={LOGOS.cursor} />
+            <span class="flex-1">{a.addToCursor}</span>
+            <Icon name="external-link" size={13} />
+          </a>
+          <a class={menuRowClass} data-mcp-vscode rel="noreferrer">
+            <Icon name="code" size={16} />
+            <span class="flex-1">{a.addToVscode}</span>
+            <Icon name="external-link" size={13} />
+          </a>
+        </div>
+      </details>
+    )
+  }
 </div>
 
 <script>
@@ -173,9 +276,58 @@ const menuRowClass =
     v0: (q) => `https://v0.app?q=${q}`,
   };
 
+  // Self-contained e-reader stylesheet for the EPUB. None of Blume's theme CSS
+  // ships inside the .epub, so the chapter HTML must stand on its own.
+  const EPUB_STYLES = `
+body { line-height: 1.6; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.4em 0 0.6em; }
+h1 { font-size: 1.8em; } h2 { font-size: 1.4em; } h3 { font-size: 1.15em; }
+p, ul, ol { margin: 0.8em 0; }
+a { color: #0b63c4; }
+img { max-width: 100%; height: auto; }
+pre {
+  background: #f4f4f5; padding: 0.85em 1em; border-radius: 6px;
+  overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;
+  font-size: 0.85em; line-height: 1.45;
+}
+pre, code { font-family: "SF Mono", Menlo, Consolas, monospace; }
+:not(pre) > code {
+  background: #f0f0f1; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em;
+}
+blockquote { margin: 1em 0; padding-left: 1em; border-left: 3px solid #ddd; color: #555; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 0.4em 0.6em; text-align: left; }
+hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
+
+  // Turn the live, JS/CSS-dependent article DOM into clean, self-contained HTML
+  // for the EPUB: drop decorative SVGs and interactive controls (which render as
+  // broken boxes in a reader), flatten Shiki's variable-colored code to plain
+  // monospace text, and reveal panels the tab scripts would otherwise hide.
+  const buildEpubChapterHtml = (article: Element): string => {
+    const clone = article.cloneNode(true) as Element;
+    for (const el of clone.querySelectorAll(
+      "svg, button, select, script, style, link, noscript, template"
+    )) {
+      el.remove();
+    }
+    for (const pre of clone.querySelectorAll("pre")) {
+      const code = document.createElement("code");
+      code.textContent = pre.textContent ?? "";
+      pre.replaceChildren(code);
+      pre.removeAttribute("style");
+      pre.removeAttribute("class");
+      pre.removeAttribute("tabindex");
+    }
+    for (const el of clone.querySelectorAll(".hidden")) {
+      el.classList.remove("hidden");
+    }
+    return clone.innerHTML;
+  };
+
   const root = document.querySelector("[data-blume-page-actions]");
   if (root) {
     const md = root.getAttribute("data-md") ?? "";
+    const copiedLabel = root.getAttribute("data-i18n-copied") || "Copied!";
     const absolute = new URL(md, location.origin).href;
     const query = encodeURIComponent(
       `Read ${absolute} so I can ask you questions about this page.`
@@ -200,23 +352,138 @@ const menuRowClass =
         window.dispatchEvent(new CustomEvent("blume:open-ask-ai"))
       );
 
+    const mcpUrl = root.getAttribute("data-mcp-url");
+    if (mcpUrl) {
+      const rawName = root.getAttribute("data-mcp-name") || "docs";
+      const id =
+        rawName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/gu, "-")
+          .replace(/^-+|-+$/gu, "") || "docs";
+
+      const cursorConfig = btoa(JSON.stringify({ url: mcpUrl }));
+      root
+        .querySelector("[data-mcp-cursor]")
+        ?.setAttribute(
+          "href",
+          `cursor://anysphere.cursor-deeplink/mcp/install?name=${encodeURIComponent(id)}&config=${cursorConfig}`
+        );
+      root
+        .querySelector("[data-mcp-vscode]")
+        ?.setAttribute(
+          "href",
+          `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: id, type: "http", url: mcpUrl }))}`
+        );
+
+      const flash = (el: Element | null, text: string, reset: string) => {
+        if (el) {
+          el.textContent = text;
+          setTimeout(() => {
+            el.textContent = reset;
+          }, 1500);
+        }
+      };
+      const copy = async (value: string, el: Element | null) => {
+        // Restore the element's own label, so localized text round-trips.
+        const reset = el?.textContent ?? "";
+        try {
+          await navigator.clipboard.writeText(value);
+          flash(el, copiedLabel, reset);
+        } catch {
+          // Clipboard unavailable; nothing to do.
+        }
+      };
+      root
+        .querySelector("[data-mcp-copy-url]")
+        ?.addEventListener("click", () =>
+          copy(mcpUrl, root.querySelector("[data-mcp-url-label]"))
+        );
+      root
+        .querySelector("[data-mcp-copy-claude]")
+        ?.addEventListener("click", () =>
+          copy(
+            `claude mcp add --transport http ${id} ${mcpUrl}`,
+            root.querySelector("[data-mcp-claude-label]")
+          )
+        );
+    }
+
     const label = root.querySelector("[data-blume-copy-label]");
     root
       .querySelector("[data-blume-copy-page]")
       ?.addEventListener("click", async () => {
+        const original = label?.textContent ?? "";
         try {
           const response = await fetch(md);
           await navigator.clipboard.writeText(await response.text());
           if (label) {
-            label.textContent = "Copied!";
+            label.textContent = copiedLabel;
             setTimeout(() => {
-              label.textContent = "Copy as Markdown";
+              label.textContent = original;
             }, 1500);
           }
         } catch {
           // Clipboard or fetch unavailable; nothing to do.
         }
       });
+
+    root
+      .querySelector("[data-blume-export-pdf]")
+      ?.addEventListener("click", () => window.print());
+
+    const epubButton = root.querySelector("[data-blume-export-epub]");
+    const epubLabel = root.querySelector("[data-blume-epub-label]");
+    epubButton?.addEventListener("click", async () => {
+      const article = document.querySelector("#blume-content article");
+      if (!article) {
+        return;
+      }
+      const heading = document.querySelector("#blume-content h1");
+      const title = heading?.textContent?.trim() || document.title;
+      const reset = epubLabel?.textContent ?? "Export to EPUB";
+      if (epubLabel) {
+        epubLabel.textContent = "Generating…";
+      }
+      try {
+        // Browser bundle: avoids Node built-ins and returns a Blob. Lazy-loaded
+        // so it never ships in the main bundle. The browserified UMD nests its
+        // callable under `.default`, which Vite's dev (esbuild) and build
+        // (rollup) interops expose at slightly different depths — unwrap both.
+        const epubModule = await import("epub-gen-memory/bundle");
+        const epub = epubModule.default?.default ?? epubModule.default;
+        // The article HTML already opens with the page's <h1>, so don't let the
+        // generator prepend a second chapter-title heading.
+        const result = await epub(
+          { css: EPUB_STYLES, prependChapterTitles: false, title },
+          [{ content: buildEpubChapterHtml(article), title }]
+        );
+        const blob =
+          result instanceof Blob
+            ? result
+            : new Blob([result], { type: "application/epub+zip" });
+        const slug =
+          md
+            .replace(/\.md$/u, "")
+            .replace(/^\//u, "")
+            .replace(/\//gu, "-") || "index";
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `${slug}.epub`;
+        link.href = url;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        // Revoke later: revoking synchronously after click can cancel the
+        // download before the browser has finished reading the blob.
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      } catch (error) {
+        console.error("[blume] EPUB export failed", error);
+      } finally {
+        if (epubLabel) {
+          epubLabel.textContent = reset;
+        }
+      }
+    });
 
     const feedback = root.querySelector("[data-blume-feedback]");
     if (feedback) {

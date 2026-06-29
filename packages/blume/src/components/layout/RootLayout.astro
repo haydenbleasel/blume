@@ -1,15 +1,25 @@
 ---
-import type { Heading, Navigation } from "../../core/types.ts";
+import { EN_UI } from "../../core/i18n-ui.ts";
+import type { UIStrings } from "../../core/i18n-ui.ts";
+import type {
+  Heading,
+  LocaleSwitchOption,
+  Navigation,
+} from "../../core/types.ts";
 import "blume:theme";
-import Icon from "../Icon.astro";
+import type { ComponentOverride } from "../../core/define-components.ts";
 import { buildStructuredData } from "../../seo/jsonld.ts";
 import Banner from "./Banner.astro";
+import Breadcrumbs from "./Breadcrumbs.astro";
 import Favicon from "./Favicon.astro";
 import Fonts from "./Fonts.astro";
 import Header from "./Header.astro";
 import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
+import { resolveSlot } from "./overrides.ts";
 import PageActions from "./PageActions.astro";
+import Pagination from "./Pagination.astro";
+import TableOfContents from "./TableOfContents.astro";
 
 interface Props {
   site: { title: string; description?: string };
@@ -31,6 +41,7 @@ interface Props {
     key: string;
   } | null;
   navigation: Navigation;
+  mcp?: { name: string; route: string } | null;
   page: { title: string; description?: string; route: string };
   headings: Heading[];
   imageZoom?: boolean;
@@ -44,6 +55,8 @@ interface Props {
   editUrl?: string | null;
   repoUrl?: string | null;
   askEnabled?: boolean;
+  exportPdf?: boolean;
+  exportEpub?: boolean;
   feeds?: { title: string; href: string }[];
   siteUrl?: string | null;
   pageType?: string;
@@ -51,6 +64,30 @@ interface Props {
   lastModified?: string | null;
   noindex?: boolean;
   structuredDataEnabled?: boolean;
+  /** Active locale code for `<html lang>` (defaults to `en`). */
+  locale?: string;
+  /** Text direction for `<html dir>` (defaults to `ltr`). */
+  dir?: "ltr" | "rtl";
+  /**
+   * Direction of the page content's own language — differs from `dir` on a
+   * fallback page (e.g. English content under an RTL locale). Applied to the
+   * article so prose punctuation reads correctly; the chrome still mirrors.
+   */
+  contentDir?: "ltr" | "rtl";
+  /** Resolved UI dictionary; English baseline when omitted. */
+  ui?: UIStrings;
+  /** `hreflang` alternates (absolute URLs) for this page's translations. */
+  localeAlternates?: { hreflang: string; href: string }[];
+  /** Absolute URL of the default-locale translation, for `hreflang=x-default`. */
+  xDefault?: string | null;
+  /** Language-switcher entries for the current page. */
+  localeSwitch?: LocaleSwitchOption[];
+  /**
+   * User layout-slot overrides from `components.ts` (`defineComponents`). Each
+   * key replaces the matching built-in; unknown keys are ignored. Wired slots:
+   * `Header`, `Sidebar`, `Breadcrumbs`, `TableOfContents`, `Pagination`.
+   */
+  layout?: Record<string, ComponentOverride>;
 }
 
 const {
@@ -59,6 +96,7 @@ const {
   favicon,
   banner,
   navigation,
+  mcp,
   page,
   headings,
   imageZoom = true,
@@ -72,6 +110,8 @@ const {
   editUrl,
   repoUrl,
   askEnabled,
+  exportPdf,
+  exportEpub,
   feeds,
   siteUrl,
   pageType,
@@ -79,8 +119,28 @@ const {
   lastModified,
   noindex,
   structuredDataEnabled,
+  locale = "en",
+  dir = "ltr",
+  contentDir,
+  ui,
+  localeAlternates,
+  xDefault,
+  localeSwitch,
+  layout = {},
 } = Astro.props;
 
+// Layout-slot overrides: render the user's component when configured, else the
+// built-in. Each override receives the same props as the component it replaces.
+const HeaderSlot = resolveSlot(layout.Header, Header);
+const SidebarSlot = resolveSlot(layout.Sidebar, NavTree);
+const BreadcrumbsSlot = resolveSlot(layout.Breadcrumbs, Breadcrumbs);
+const TableOfContentsSlot = resolveSlot(layout.TableOfContents, TableOfContents);
+const PaginationSlot = resolveSlot(layout.Pagination, Pagination);
+
+const strings = ui ?? EN_UI;
+// Filter search to the active language only when the site is multi-locale.
+const searchLocale =
+  localeSwitch && localeSwitch.length > 1 ? locale : undefined;
 const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
 const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
 const description = page.description ?? site.description;
@@ -89,18 +149,21 @@ const description = page.description ?? site.description;
 const lastModifiedDate = lastModified ? new Date(lastModified) : null;
 const formattedLastModified =
   lastModifiedDate && !Number.isNaN(lastModifiedDate.getTime())
-    ? new Intl.DateTimeFormat("en", {
+    ? new Intl.DateTimeFormat(locale || "en", {
         dateStyle: "long",
         timeZone: "UTC",
       }).format(lastModifiedDate)
     : null;
+
+// The hosted MCP server's absolute URL, used by the page-actions install menu.
+// Needs a configured site to be useful, so the menu is hidden without one.
+const mcpUrl = mcp && siteUrl ? new URL(mcp.route, siteUrl).href : null;
 
 const crumbs = findBreadcrumbs(navigation.sidebar, page.route);
 const { prev, next } = getPagination(
   flattenPages(navigation.sidebar),
   page.route
 );
-const eyebrowCrumb = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
 
 // Structured data is skipped when disabled or for pages we ask crawlers not to
 // index. Escape `<` so a title/description containing `</script>` can't break
@@ -111,6 +174,7 @@ const structuredData =
     : buildStructuredData({
       breadcrumbs: crumbs,
       description,
+      locale,
       modified: lastModified,
       pageType,
       published,
@@ -132,7 +196,7 @@ const bannerScript = banner?.dismissible
 ---
 
 <!doctype html>
-<html lang="en">
+<html dir={dir} lang={locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -140,6 +204,12 @@ const bannerScript = banner?.dismissible
     <Favicon favicon={favicon} />
     <Fonts cssVars={fontCssVars ?? []} />
     {canonical && <link rel="canonical" href={canonical} />}
+    {
+      localeAlternates?.map((alt) => (
+        <link href={alt.href} hreflang={alt.hreflang} rel="alternate" />
+      ))
+    }
+    {xDefault && <link href={xDefault} hreflang="x-default" rel="alternate" />}
     {noindex && <meta name="robots" content="noindex" />}
     {description && <meta name="description" content={description} />}
     <meta property="og:title" content={pageTitle} />
@@ -181,149 +251,71 @@ const bannerScript = banner?.dismissible
     data-blume-image-zoom={imageZoom ? "" : undefined}
   >
     <a
-      class="absolute left-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:left-0"
-      href="#blume-content">Skip to content</a
+      class="absolute start-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:start-0"
+      href="#blume-content">{strings.page.skipToContent}</a
     >
     <Banner banner={banner} />
-    <Header
+    <HeaderSlot
+      askEnabled={askEnabled}
+      localeSwitch={localeSwitch}
       logo={logo}
       navigation={navigation}
       route={page.route}
       searchEnabled={searchEnabled}
+      searchLocale={searchLocale}
+      searchStrings={strings.search}
       site={site}
+      switcherStrings={strings.languageSwitcher}
     >
       <slot name="ask" slot="ask" />
-    </Header>
-    <div class="mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_16rem]">
+    </HeaderSlot>
+    <div class="mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]">
       <aside
         aria-label="Primary"
-        class="fixed top-16 left-0 z-[35] h-[calc(100dvh-4rem)] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-r bg-background px-5 pt-4 pb-6 transition-transform [:where([data-blume-nav-open])_&]:translate-x-0 lg:sticky lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-r-0 lg:bg-transparent lg:px-4"
+        class="fixed top-16 start-0 z-[35] h-[calc(100dvh-4rem)] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:sticky lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0! lg:border-e-0 lg:bg-transparent lg:px-4"
       >
         <nav>
-          <NavTree currentRoute={page.route} items={navigation.sidebar} />
+          <SidebarSlot currentRoute={page.route} items={navigation.sidebar} />
         </nav>
       </aside>
       <main class="min-w-0 px-6 pt-6 pb-10 lg:px-8 xl:px-10" id="blume-content">
-        {
-          eyebrowCrumb && (
-            <nav
-              aria-label="Breadcrumb"
-              class="mx-auto mb-2 max-w-[42rem] text-muted-foreground text-sm"
-            >
-              {eyebrowCrumb.route ? (
-                <a class="hover:text-foreground" href={eyebrowCrumb.route}>
-                  {eyebrowCrumb.label}
-                </a>
-              ) : (
-                <span>{eyebrowCrumb.label}</span>
-              )}
-            </nav>
-          )
-        }
-        {
-          tocHeadings.length > 0 && (
-            <details class="group mx-auto mb-6 max-w-[42rem] rounded-blume border border-border xl:hidden">
-              <summary class="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-medium text-foreground text-sm [&::-webkit-details-marker]:hidden">
-                <span>On this page</span>
-                <Icon
-                  class="text-muted-foreground transition-transform group-open:rotate-180"
-                  name="chevron-down"
-                  size={16}
-                />
-              </summary>
-              <ul class="m-0 list-none border-border border-t p-2">
-                {tocHeadings.map((heading) => (
-                  <li style={`padding-left:${(heading.depth - 2) * 0.75}rem`}>
-                    <a
-                      class="block rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:text-foreground"
-                      href={`#${heading.slug}`}
-                    >
-                      {heading.text}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )
-        }
-        <article class="prose mx-auto max-w-[42rem]">
+        <BreadcrumbsSlot crumbs={crumbs} />
+        <TableOfContentsSlot
+          headings={tocHeadings}
+          title={strings.toc.title}
+          variant="mobile"
+        />
+        <article class="prose mx-auto max-w-[42rem]" dir={contentDir}>
           <slot />
         </article>
         {
           formattedLastModified && (
             <p class="mx-auto mt-10 max-w-[42rem] text-muted-foreground text-sm">
-              Last updated on {formattedLastModified}
+              {strings.page.lastUpdated} {formattedLastModified}
             </p>
           )
         }
-        {
-          (prev || next) && (
-            <nav
-              aria-label="Pagination"
-              class="mx-auto mt-12 flex max-w-[42rem] justify-between gap-4 border-border border-t pt-6 max-md:flex-col"
-            >
-              {prev ? (
-                <a
-                  class="flex max-w-[48%] flex-1 items-center gap-2 rounded-full border border-border px-4 py-3 text-foreground transition-colors hover:border-foreground max-md:max-w-full"
-                  href={prev.route}
-                >
-                  <Icon name="arrow-left" size={16} />
-                  <span>
-                    <span class="block text-muted-foreground text-xs">
-                      Previous
-                    </span>
-                    <span class="block font-medium">{prev.label}</span>
-                  </span>
-                </a>
-              ) : (
-                <span />
-              )}
-              {next && (
-                <a
-                  class="ml-auto flex max-w-[48%] flex-1 items-center justify-end gap-2 rounded-full border border-border px-4 py-3 text-right text-foreground transition-colors hover:border-foreground max-md:max-w-full"
-                  href={next.route}
-                >
-                  <span>
-                    <span class="block text-muted-foreground text-xs">Next</span>
-                    <span class="block font-medium">{next.label}</span>
-                  </span>
-                  <Icon name="arrow-right" size={16} />
-                </a>
-              )}
-            </nav>
-          )
-        }
+        <PaginationSlot next={next} prev={prev} strings={strings.page} />
       </main>
       <aside
-        aria-label="On this page"
+        aria-label={strings.toc.title}
         class="sticky top-16 hidden h-[calc(100dvh-4rem)] overflow-y-auto px-4 pt-6 pb-10 text-sm xl:block"
       >
-        {
-          tocHeadings.length > 0 && (
-            <>
-              <p class="mb-3 font-semibold text-foreground text-sm">
-                On this page
-              </p>
-              <ul class="m-0 list-none p-0">
-                {tocHeadings.map((heading) => (
-                  <li style={`padding-left:${(heading.depth - 2) * 0.75}rem`}>
-                    <a
-                      class="block py-1.5 text-muted-foreground transition-colors hover:text-foreground"
-                      href={`#${heading.slug}`}
-                    >
-                      {heading.text}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )
-        }
+        <TableOfContentsSlot
+          headings={tocHeadings}
+          title={strings.toc.title}
+          variant="desktop"
+        />
         <PageActions
           askEnabled={askEnabled}
           editUrl={editUrl}
+          exportEpub={exportEpub}
+          exportPdf={exportPdf}
+          mcpName={mcp?.name}
+          mcpUrl={mcpUrl}
           repoUrl={repoUrl}
           route={page.route}
+          strings={strings.actions}
         />
       </aside>
     </div>
@@ -338,6 +330,9 @@ const bannerScript = banner?.dismissible
       // Registers the <blume-mermaid> custom element (emitted by ```mermaid
       // fences). Mermaid itself is lazy-loaded only on pages that use a diagram.
       import "../content/mermaid-element.ts";
+      // Registers the <blume-toc> custom element: scrollspy for the table of
+      // contents, highlighting the section currently in view as you scroll.
+      import "./toc-element.ts";
 
       const svg = (name: string) =>
         `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;

@@ -2,11 +2,14 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { dirname, join } from "pathe";
 
+import { askBackendRuntimeDep } from "../ai/ask.ts";
+import type { AskBackend } from "../ai/ask.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import type { ProjectContext } from "../core/types.ts";
 import { searchProviderMeta } from "../search/providers.ts";
 import { buildFontEntries } from "../theme/fonts.ts";
 import type { BlumePageRoute } from "./integration.ts";
+import type { IslandSpec } from "./islands.ts";
 
 const WORKSPACE_MARKERS = [
   ".git",
@@ -71,6 +74,19 @@ const ADAPTER_OPTIONS: Record<string, string> = {
 
 const mintlifyFsImport = (enabled: boolean): string =>
   enabled ? 'import { existsSync } from "node:fs";\n' : "";
+
+// Framework renderer imports are only wired in when an island (or Ask AI, for
+// React) needs them. The core theme is Astro-first and ships no client JS.
+const rendererImports = (options: {
+  needsReact: boolean;
+  needsVue?: boolean;
+  needsSvelte?: boolean;
+}): string =>
+  [
+    options.needsReact ? 'import react from "@astrojs/react";\n' : "",
+    options.needsVue ? 'import vue from "@astrojs/vue";\n' : "",
+    options.needsSvelte ? 'import svelte from "@astrojs/svelte";\n' : "",
+  ].join("");
 
 const markdownImportNames = (isMintlifyProject: boolean): string =>
   [
@@ -166,11 +182,19 @@ const vitePluginEntries = (options: {
 export const runtimeDependencies = (options: {
   config: ResolvedConfig;
   needsReact: boolean;
+  needsVue?: boolean;
+  needsSvelte?: boolean;
 }): string[] => {
-  const { config, needsReact } = options;
+  const { config, needsReact, needsSvelte, needsVue } = options;
   const deps = ["@astrojs/mdx"];
   if (needsReact) {
     deps.push("@astrojs/react");
+  }
+  if (needsVue) {
+    deps.push("@astrojs/vue");
+  }
+  if (needsSvelte) {
+    deps.push("@astrojs/svelte");
   }
   // The Scalar integration is only declared when an API reference is configured,
   // so projects that don't use it never pull it into the runtime.
@@ -180,6 +204,13 @@ export const runtimeDependencies = (options: {
   // Only the configured search provider's SDK is declared, so a project pulls in
   // (and the user installs) exactly the backend it uses — nothing more.
   deps.push(...searchProviderMeta(config.search.provider).runtimeDeps);
+  // Ask AI's provider SDK, when its backend needs one (gateway uses core `ai`).
+  if (config.ai.ask?.enabled) {
+    const askDep = askBackendRuntimeDep(config.ai.ask);
+    if (askDep) {
+      deps.push(askDep);
+    }
+  }
   const { deployment } = config;
   if (deployment.output === "server" && deployment.adapter) {
     const adapter = ADAPTER_IMPORTS[deployment.adapter];
@@ -195,6 +226,8 @@ export const astroConfigTemplate = (options: {
   context: ProjectContext;
   config: ResolvedConfig;
   needsReact: boolean;
+  needsVue?: boolean;
+  needsSvelte?: boolean;
   pages: BlumePageRoute[];
   contentRoutes: string[];
   dataPath: string;
@@ -203,10 +236,12 @@ export const astroConfigTemplate = (options: {
 }): string => {
   const {
     config,
-    context,
     contentRoutes,
+    context,
     dataPath,
     needsReact,
+    needsSvelte,
+    needsVue,
     pages,
     searchClientPath,
     themePath,
@@ -231,6 +266,19 @@ export const astroConfigTemplate = (options: {
     : "";
   const baseOption = deployment.base
     ? `\n  base: ${JSON.stringify(deployment.base)},`
+    : "";
+
+  // Astro's native i18n gives locale-aware helpers + `<html lang>` correctness.
+  // Blume owns getStaticPaths and materializes fallback routes in the manifest,
+  // so we deliberately omit Astro's `fallback` to keep one source of routing.
+  const i18nOption = config.i18n
+    ? `\n  i18n: ${JSON.stringify({
+        defaultLocale: config.i18n.defaultLocale,
+        locales: config.i18n.locales.map((locale) => locale.code),
+        routing: {
+          prefixDefaultLocale: !config.i18n.hideDefaultLocalePrefix,
+        },
+      })},`
     : "";
 
   const redirectsOption =
@@ -266,10 +314,8 @@ export const astroConfigTemplate = (options: {
     ? `import { defineConfig, fontProviders } from "astro/config";`
     : `import { defineConfig } from "astro/config";`;
 
-  // React is only wired in when the project actually uses React islands. The
-  // core theme is Astro-first and ships no client JS.
-  const reactImport = needsReact ? `import react from "@astrojs/react";\n` : "";
   const fsImport = mintlifyFsImport(isMintlifyProject);
+  const rendererImport = rendererImports({ needsReact, needsSvelte, needsVue });
   const blumeImport = `import { blumeIntegration } from "blume/astro";\n`;
   const fsAllow = fsAllowConfig({
     mathEnabled: config.markdown.math,
@@ -285,12 +331,19 @@ export const astroConfigTemplate = (options: {
 
   const integrations = [
     `mdx({ processor: blumeMdxProcessor(${JSON.stringify({
+      headingAnchors: config.markdown.headingAnchors,
       inline: config.markdown.code.inline,
       math: config.markdown.math,
     })}) })`,
   ];
   if (needsReact) {
     integrations.push("react()");
+  }
+  if (needsVue) {
+    integrations.push("vue()");
+  }
+  if (needsSvelte) {
+    integrations.push("svelte()");
   }
   // Always mounted: injects user pages (a no-op when there are none) and wires
   // up dev-server `Accept: text/markdown` negotiation over the content routes.
@@ -310,7 +363,7 @@ ${defineConfigImport}
 import mdx from "@astrojs/mdx";
 import tailwindcss from "@tailwindcss/vite";
 import { ${markdownImports} } from "blume/markdown";
-${twoslashImport}${fsAllow.imports}${fsImport}${reactImport}${blumeImport}${adapterImport}
+${twoslashImport}${fsAllow.imports}${fsImport}${rendererImport}${blumeImport}${adapterImport}
 ${fsAllow.setup}
 export default defineConfig({
   root: ${JSON.stringify(context.outDir)},
@@ -318,10 +371,11 @@ export default defineConfig({
   outDir: ${JSON.stringify(`${context.root}/dist`)},
   publicDir: ${JSON.stringify(context.publicRoot)},
   cacheDir: ${JSON.stringify(`${context.root}/node_modules/.cache/blume/astro`)},
-  output: ${JSON.stringify(deployment.output)},${adapterOption}${siteOption}${baseOption}${redirectsOption}${fontsOption}
+  output: ${JSON.stringify(deployment.output)},${adapterOption}${siteOption}${baseOption}${redirectsOption}${i18nOption}${fontsOption}
   integrations: [${integrations.join(", ")}],
   markdown: {
     processor: blumeMarkdownProcessor(${JSON.stringify({
+      headingAnchors: config.markdown.headingAnchors,
       inline: config.markdown.code.inline,
     })}),
     shikiConfig: {
@@ -335,6 +389,19 @@ export default defineConfig({
   devToolbar: { enabled: false },
   vite: {
     plugins: [${vitePlugins.join(", ")}],
+    // @takumi-rs/core (OG image rendering) is a native NAPI addon that loads a
+    // platform-specific .node binding via createRequire(import.meta.url). Astro's
+    // build bundles it into the per-environment output by default, which
+    // relocates import.meta.url and breaks the binding lookup ("Cannot find
+    // native binding") on other platforms (e.g. the Linux CI runner). Astro 7
+    // configures externalization per Vite environment, so it must be forced
+    // external on the prerender (static) and ssr (server) environments -- a
+    // top-level ssr.external only reaches the latter -- so the binding resolves
+    // from node_modules at runtime instead.
+    environments: {
+      prerender: { resolve: { external: ["@takumi-rs/core"] } },
+      ssr: { resolve: { external: ["@takumi-rs/core"] } },
+    },
     resolve: {
       alias: {
         "blume:data": ${JSON.stringify(dataPath)},
@@ -352,12 +419,36 @@ export default defineConfig({
 `;
 };
 
+/** The default staged-content base, relative to the runtime `outDir`. */
+export const stagedContentDir = (outDir: string): string =>
+  join(outDir, "content");
+
 /** Generate `.blume/src/content.config.ts`. */
 export const contentConfigTemplate = (options: {
   context: ProjectContext;
   config: ResolvedConfig;
+  /** Whether any non-filesystem source materialized MDX into the staged dir. */
+  staged?: boolean;
+  /** Base dir for the staged collection; defaults to `<outDir>/content`. */
+  stagedBase?: string;
 }): string => {
   const { context, config } = options;
+  const stagedBase = options.stagedBase ?? stagedContentDir(context.outDir);
+
+  // Non-filesystem sources render through a parallel `staged` collection backed
+  // by materialized MDX, so the filesystem `docs` collection stays untouched.
+  const stagedBlock = options.staged
+    ? `
+const staged = defineCollection({
+  loader: glob({
+    pattern: ["**/*.{md,mdx}"],
+    base: ${JSON.stringify(stagedBase)},
+    generateId: ({ entry }) => entry,
+  }),
+});
+`
+    : "";
+
   return `// Generated by Blume. Do not edit.
 import { defineCollection } from "astro:content";
 import { blumeContentLoader } from "blume/astro";
@@ -369,24 +460,48 @@ const docs = defineCollection({
     pattern: ${JSON.stringify(config.content.include)},
   }),
 });
-
-export const collections = { docs };
+${stagedBlock}
+export const collections = { docs${options.staged ? ", staged" : ""} };
 `;
 };
 
 /** Generate `.blume/src/pages/[...slug].astro`, the docs catch-all route. */
 /** Generate the Ask AI server endpoint (`.blume/src/pages/api/ask.ts`). */
-export const askEndpointTemplate = (model: string): string =>
-  `// Generated by Blume. Do not edit.
-import type { APIRoute } from "astro";
-import { streamText } from "ai";
+export const askEndpointTemplate = (backend: AskBackend): string => {
+  const imports = [
+    'import type { APIRoute } from "astro";',
+    'import { streamText } from "ai";',
+  ];
+  let setup = "";
+  let modelExpr = JSON.stringify(backend.model);
+  if (backend.kind === "openrouter") {
+    imports.push(
+      'import { createOpenRouter } from "@openrouter/ai-sdk-provider";'
+    );
+    setup = `\nconst openrouter = createOpenRouter({ apiKey: process.env[${JSON.stringify(
+      backend.apiKeyEnv
+    )}] });\n`;
+    modelExpr = `openrouter(${JSON.stringify(backend.model)})`;
+  } else if (backend.kind === "openai-compatible") {
+    imports.push(
+      'import { createOpenAICompatible } from "@ai-sdk/openai-compatible";'
+    );
+    setup = `\nconst provider = createOpenAICompatible({
+  apiKey: process.env[${JSON.stringify(backend.apiKeyEnv)}],
+  baseURL: ${JSON.stringify(backend.baseUrl)},
+  name: ${JSON.stringify(backend.name)},
+});\n`;
+    modelExpr = `provider(${JSON.stringify(backend.model)})`;
+  }
+  return `// Generated by Blume. Do not edit.
+${imports.join("\n")}
 
 export const prerender = false;
-
+${setup}
 export const POST: APIRoute = async ({ request }) => {
   const { messages } = await request.json();
   const result = streamText({
-    model: ${JSON.stringify(model)},
+    model: ${modelExpr},
     system:
       "You are a helpful documentation assistant. Answer using the project's documentation.",
     messages,
@@ -394,6 +509,7 @@ export const POST: APIRoute = async ({ request }) => {
   return result.toTextStreamResponse();
 };
 `;
+};
 
 /** Generate the static search index endpoint (`/blume-search.json`). */
 export const searchEndpointTemplate = (): string =>
@@ -494,7 +610,8 @@ export const createSearch = () => create({ url });
   }
 
   // Search disabled: a no-op client so the alias always resolves.
-  return `${SEARCH_CLIENT_HEADER}export const createSearch = () => () => Promise.resolve([]);
+  return `${SEARCH_CLIENT_HEADER}export const createSearch = () => () =>
+  Promise.resolve({ hits: [], sections: [] });
 `;
 };
 
@@ -560,6 +677,48 @@ export function getStaticPaths() {
 export function GET({ props }) {
   return new Response(raw[props.route] ?? "", {
     headers: { "Content-Type": "text/markdown; charset=utf-8" },
+  });
+}
+`;
+
+/** The `src/pages` file that serves a route, e.g. `/mcp` -> `mcp.ts`. */
+export const mcpPageFile = (route: string): string => {
+  const clean = route.replace(/^\/+/u, "").replace(/\/+$/u, "");
+  return `${clean}.ts`;
+};
+
+/**
+ * Generate the hosted MCP server endpoint (e.g. `.blume/src/pages/mcp.ts`). A
+ * thin wrapper around the shipped `createMcpFetchHandler`, served from the
+ * generated data snapshot. Runs server-side (no prerender) so agents can query
+ * the docs over Streamable HTTP.
+ */
+export const mcpEndpointTemplate = (route: string): string => {
+  const clean = route.replace(/^\/+/u, "").replace(/\/+$/u, "");
+  const up = "../".repeat(clean.split("/").length);
+  return `// Generated by Blume. Do not edit.
+import type { APIRoute } from "astro";
+import { createMcpFetchHandler } from "blume/ai/mcp/server.ts";
+import data from "${up}generated/mcp-data.json";
+
+export const prerender = false;
+
+const handler = createMcpFetchHandler(data);
+
+export const ALL: APIRoute = ({ request }) => handler(request);
+`;
+};
+
+/** Generate a prerendered endpoint that serves a fixed JSON payload. */
+export const staticJsonEndpointTemplate = (payload: unknown): string =>
+  `// Generated by Blume. Do not edit.
+export const prerender = true;
+
+const payload = ${JSON.stringify(payload, null, 2)};
+
+export function GET() {
+  return new Response(JSON.stringify(payload), {
+    headers: { "Content-Type": "application/json" },
   });
 }
 `;
@@ -662,12 +821,16 @@ const configuration = ${JSON.stringify(options.configuration, null, 2)};
 
 export const catchAllPageTemplate = (options: {
   askEnabled: boolean;
+  exportEpub: boolean;
+  exportPdf: boolean;
   mathEnabled: boolean;
 }): string => {
   const askImport = options.askEnabled
     ? 'import AskAI from "blume/components/islands/AskAI.astro";\n'
     : "";
-  const askSlot = options.askEnabled ? '\n  <AskAI slot="ask" />' : "";
+  const askSlot = options.askEnabled
+    ? '\n  <AskAI slot="ask" strings={ui.ask} />'
+    : "";
   const mathImport = options.mathEnabled
     ? 'import Math from "blume/components/content/Math.astro";\n'
     : "";
@@ -708,9 +871,9 @@ import TreeFile from "blume/components/content/TreeFile.astro";
 import TreeFolder from "blume/components/content/TreeFolder.astro";
 import TypeTable from "blume/components/content/TypeTable.astro";
 import Visibility from "blume/components/content/Visibility.astro";
-import Warning from "blume/components/content/Warning.astro";
 import Icon from "blume/components/Icon.astro";
-${mathImport}import { mdxComponents as userMdx } from "../generated/components.ts";
+${mathImport}import { mdxComponents as userMdx, layoutOverrides } from "../generated/components.ts";
+import { islandComponents } from "../generated/islands.ts";
 import data from "../generated/data.json";
 
 const Color = Object.assign(ColorRoot, { Item: ColorItem, Row: ColorRow });
@@ -750,25 +913,30 @@ const components = {
   Tree,
   TypeTable,
   Visibility,
-  ${mathEntry}...userMdx,
+  ${mathEntry}...islandComponents,
+  ...userMdx,
 };
 
 export function getStaticPaths() {
   return data.routes.map((route) => ({
     params: { slug: route.path === "/" ? undefined : route.path.slice(1) },
     props: {
+      alternates: route.alternates,
+      collection: route.collection,
       editUrl: route.editUrl,
-      entryId: route.id,
+      entryId: route.entryId,
+      fallback: route.fallback,
       indexable: route.indexable,
       lastModified: route.lastModified,
+      locale: route.locale,
       route: route.path,
       title: route.title,
     },
   }));
 }
 
-const { entryId, route, title, indexable, editUrl, lastModified } = Astro.props;
-const entry = await getEntry("docs", entryId);
+const { entryId, collection, route, title, indexable, editUrl, lastModified, locale, alternates, fallback } = Astro.props;
+const entry = await getEntry(collection, entryId);
 if (!entry) {
   return new Response(null, { status: 404 });
 }
@@ -786,16 +954,80 @@ const ogImage = ogRel && base ? \`\${base}\${ogRel}\` : ogRel;
 
 const canonical =
   seo.canonical ?? (base ? \`\${base}\${route === "/" ? "" : route}\` : null);
+
+// Locale resolution. With i18n on, pick the active locale's nav + dictionary,
+// build hreflang alternates, and derive the language-switcher targets.
+const i18n = data.config.i18n;
+const localePrefix = (codeArg) =>
+  i18n && codeArg === i18n.defaultLocale && i18n.hideDefaultLocalePrefix
+    ? ""
+    : \`/\${codeArg}\`;
+const localizeRoute = (logical, codeArg) => {
+  const prefix = localePrefix(codeArg);
+  if (!prefix) {
+    return logical;
+  }
+  return logical === "/" ? prefix : \`\${prefix}\${logical}\`;
+};
+const stripLocale = (path, codeArg) => {
+  const prefix = localePrefix(codeArg);
+  return prefix && path.startsWith(prefix) ? path.slice(prefix.length) || "/" : path;
+};
+
+const navigation = i18n ? (data.navigationByLocale[locale] ?? data.navigation) : data.navigation;
+const ui = i18n ? (data.uiByLocale[locale] ?? data.ui) : data.ui;
+const localeMeta = i18n ? i18n.locales.find((l) => l.code === locale) : null;
+const dir = localeMeta?.dir ?? "ltr";
+const htmlLang = i18n ? locale : "en";
+// A fallback page renders the fallback locale's content, so its text direction
+// follows that language — not the (mirrored) page locale.
+const contentLocale =
+  fallback && i18n?.fallbackLocale ? i18n.fallbackLocale : locale;
+const contentDir = i18n
+  ? (i18n.locales.find((l) => l.code === contentLocale)?.dir ?? "ltr")
+  : "ltr";
+const absolute = (path) => base + (path === "/" ? "" : path);
+
+const localeAlternates =
+  i18n && base
+    ? (alternates ?? []).map((alt) => ({ hreflang: alt.locale, href: absolute(alt.path) }))
+    : [];
+const defaultAlt = i18n ? (alternates ?? []).find((alt) => alt.locale === i18n.defaultLocale) : null;
+const xDefault = defaultAlt && base ? absolute(defaultAlt.path) : null;
+
+const logicalRoute = i18n ? stripLocale(route, locale) : route;
+const localeSwitch = i18n
+  ? i18n.locales.map((l) => {
+      const alt = (alternates ?? []).find((x) => x.locale === l.code);
+      return {
+        code: l.code,
+        current: l.code === locale,
+        dir: l.dir,
+        href: alt ? alt.path : localizeRoute(logicalRoute, l.code),
+        label: l.label,
+        untranslated: !alt,
+      };
+    })
+  : [];
 ---
 
 <RootLayout
   site={{ title: data.config.title, description: data.config.description }}
+  layout={layoutOverrides}
   logo={data.config.logo}
+  mcp={data.config.mcp}
   favicon={data.config.favicon}
   banner={data.config.banner}
   imageZoom={data.config.imageZoom}
   codeWrap={data.config.codeWrap}
-  navigation={data.navigation}
+  navigation={navigation}
+  locale={htmlLang}
+  dir={dir}
+  contentDir={contentDir}
+  ui={ui}
+  localeAlternates={localeAlternates}
+  xDefault={xDefault}
+  localeSwitch={localeSwitch}
   page={{ title: seo.title ?? title, description: seo.description ?? frontmatter.description, route }}
   headings={headings}
   themeMode={data.config.theme.mode}
@@ -807,6 +1039,8 @@ const canonical =
   editUrl={editUrl}
   repoUrl={data.config.repoUrl}
   askEnabled={${options.askEnabled}}
+  exportPdf={${options.exportPdf}}
+  exportEpub={${options.exportEpub}}
   feeds={data.feeds}
   siteUrl={data.config.site}
   pageType={frontmatter.type}
@@ -830,6 +1064,8 @@ const canonical =
  */
 export const changelogIndexTemplate = (options: {
   askEnabled: boolean;
+  exportEpub: boolean;
+  exportPdf: boolean;
 }): string => {
   const askImport = options.askEnabled
     ? 'import AskAI from "blume/components/islands/AskAI.astro";\n'
@@ -841,6 +1077,7 @@ export const changelogIndexTemplate = (options: {
 import { getCollection, render } from "astro:content";
 import RootLayout from "blume/components/layout/RootLayout.astro";
 import Update from "blume/components/content/Update.astro";
+import { layoutOverrides } from "../generated/components.ts";
 ${askImport}import data from "../generated/data.json";
 
 export const prerender = true;
@@ -913,7 +1150,9 @@ const canonical = base ? base + "/changelog" : null;
 
 <RootLayout
   site={{ title: data.config.title, description: data.config.description }}
+  layout={layoutOverrides}
   logo={data.config.logo}
+  mcp={data.config.mcp}
   favicon={data.config.favicon}
   banner={data.config.banner}
   imageZoom={data.config.imageZoom}
@@ -933,6 +1172,8 @@ const canonical = base ? base + "/changelog" : null;
   canonical={canonical}
   repoUrl={data.config.repoUrl}
   askEnabled={${options.askEnabled}}
+  exportPdf={${options.exportPdf}}
+  exportEpub={${options.exportEpub}}
   feeds={data.feeds}
   siteUrl={data.config.site}
   noindex={false}
@@ -974,6 +1215,53 @@ export const layoutOverrides = {};
 import overrides from ${JSON.stringify(componentsFile)};
 export const mdxComponents = overrides.mdx ?? {};
 export const layoutOverrides = overrides.layout ?? {};
+`;
+};
+
+/** The literal Astro hydration directive for an island's client mode. */
+const islandDirective = (spec: IslandSpec): string =>
+  spec.client === "only"
+    ? `client:only="${spec.framework}"`
+    : `client:${spec.client}`;
+
+/**
+ * Generate `.blume/src/generated/islands/<Name>.astro` — a wrapper that renders
+ * a convention island with its hydration directive applied. Astro client
+ * directives must be written statically, so one wrapper is emitted per island;
+ * props and the default slot (MDX children) forward through.
+ */
+export const islandWrapperTemplate = (spec: IslandSpec): string =>
+  `---
+// Generated by Blume. Do not edit.
+import Island from ${JSON.stringify(spec.file)};
+---
+<Island ${islandDirective(spec)} {...Astro.props}><slot /></Island>
+`;
+
+/**
+ * Generate `.blume/src/generated/islands.ts` — the map of island names to their
+ * wrappers, spread into the MDX component scope by the catch-all page. Always
+ * written (an empty map when there are no islands) so the import resolves.
+ */
+export const islandMapTemplate = (specs: IslandSpec[]): string => {
+  if (specs.length === 0) {
+    return `// Generated by Blume. Do not edit.
+export const islandComponents = {};
+`;
+  }
+  const imports = specs
+    .map(
+      (spec, index) => `import I${index} from "./islands/${spec.name}.astro";`
+    )
+    .join("\n");
+  const entries = specs
+    .map((spec, index) => `  ${spec.name}: I${index},`)
+    .join("\n");
+  return `// Generated by Blume. Do not edit.
+${imports}
+export const islandComponents = {
+${entries}
+};
 `;
 };
 

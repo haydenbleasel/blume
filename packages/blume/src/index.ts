@@ -5,8 +5,14 @@ export type {
   ComponentOverrides,
   IslandDescriptor,
 } from "./core/define-components.ts";
+export { defineMeta } from "./core/define-meta.ts";
+export type {
+  FolderMetaDefinition,
+  FolderMetaFactory,
+} from "./core/define-meta.ts";
 export type {
   BlumeConfig,
+  FolderMeta,
   HydrationMode,
   ResolvedConfig,
 } from "./core/schema.ts";

@@ -11,13 +11,19 @@ import {
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { dirname, join, relative } from "pathe";
+import { dirname, join, normalize, relative } from "pathe";
 import { glob } from "tinyglobby";
 
+import { resolveAskBackend } from "../ai/ask.ts";
 import { writeLlmsArtifacts } from "../ai/llms.ts";
 import { buildRawMarkdown } from "../ai/markdown.ts";
+import { buildMcpData } from "../ai/mcp/data.ts";
+import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
+import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
+import { resolveFallbackLocale } from "../core/i18n.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
+import type { Navigation } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import {
   buildReferenceFiles,
@@ -30,6 +36,7 @@ import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildFontsCss, configuredCssVars } from "../theme/fonts.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
+import { discoverIslands } from "./islands.ts";
 import { discoverPages } from "./pages.ts";
 import {
   askEndpointTemplate,
@@ -38,15 +45,21 @@ import {
   changelogIndexTemplate,
   contentConfigTemplate,
   envTemplate,
+  islandMapTemplate,
+  islandWrapperTemplate,
+  mcpEndpointTemplate,
+  mcpPageFile,
   mixedbreadSearchEndpointTemplate,
   ogEndpointTemplate,
   rawMarkdownEndpointTemplate,
   rssEndpointTemplate,
+  staticJsonEndpointTemplate,
   runtimeDependencies,
   runtimePackageTemplate,
   runtimeTsconfigTemplate,
   searchClientTemplate,
   searchEndpointTemplate,
+  stagedContentDir,
   userComponentsTemplate,
 } from "./templates.ts";
 
@@ -90,6 +103,33 @@ const ensureDepsLink = async (outDir: string): Promise<void> => {
   await symlink(BLUME_NODE_MODULES, link, "junction");
 };
 
+/** Astro integration package each non-React island framework needs installed. */
+const ISLAND_FRAMEWORK_DEPS: Record<string, string> = {
+  svelte: "@astrojs/svelte",
+  vue: "@astrojs/vue",
+};
+
+/**
+ * Warn when a Vue/Svelte island is present but its Astro integration isn't
+ * installed — Vite would otherwise fail opaquely on the generated config import.
+ * React ships with Blume, so it never needs this.
+ */
+const islandFrameworkWarnings = (
+  frameworks: Set<string>,
+  root: string
+): string[] => {
+  const warnings: string[] = [];
+  for (const framework of frameworks) {
+    const dep = ISLAND_FRAMEWORK_DEPS[framework];
+    if (dep && !canResolveFrom(root, dep)) {
+      warnings.push(
+        `Islands use ${framework}, which needs "${dep}". Install it (e.g. \`npm install ${dep} ${framework}\`).`
+      );
+    }
+  }
+  return warnings;
+};
+
 /** Read a file's contents, or return an empty string if it is absent. */
 const readOptional = async (path: string | null): Promise<string> => {
   if (!path) {
@@ -100,11 +140,6 @@ const readOptional = async (path: string | null): Promise<string> => {
   } catch {
     return "";
   }
-};
-
-const readThemeFiles = async (paths: string[]): Promise<string> => {
-  const contents = await Promise.all(paths.map((path) => readOptional(path)));
-  return contents.filter((content) => content.length > 0).join("\n");
 };
 
 const copyIfExists = async (from: string, to: string): Promise<void> => {
@@ -189,6 +224,70 @@ const writeIfChanged = async (
     throw error;
   }
   return true;
+};
+
+/**
+ * Delete generated files under `srcDir` that this pass didn't (re)write. The
+ * generator emits many files conditionally — an Ask AI endpoint, OG images, a
+ * search index, RSS feeds, reference pages, the MCP server — so toggling a
+ * feature off would otherwise leave a stale file behind, and a leftover
+ * server-rendered endpoint breaks the static build. `writeIfChanged` only ever
+ * adds or updates, so this closes the loop. Scoped to `.blume/src`, so it never
+ * touches Astro's `dist/`, `.astro/` cache, or the symlinked `node_modules`
+ * (all of which live outside `src`). `written` holds normalized absolute paths.
+ */
+export const pruneOrphans = async (
+  srcDir: string,
+  written: Set<string>
+): Promise<void> => {
+  const existing = await glob("**/*", {
+    absolute: true,
+    cwd: srcDir,
+    onlyFiles: true,
+  });
+  await Promise.all(
+    existing
+      .map((path) => normalize(path))
+      .filter((path) => !written.has(path))
+      .map((path) => rm(path, { force: true }))
+  );
+};
+
+/**
+ * Collect staged (non-filesystem) page bodies keyed by their Astro entry id, so
+ * i18n duplicates of one entry collapse to a single materialized file. Shared
+ * with `eject`, which materializes the same bodies into the owned project.
+ */
+export const collectStaged = (project: BlumeProject): Map<string, string> => {
+  const staged = new Map<string, string>();
+  for (const page of project.graph.pages) {
+    if (page.collection === "staged" && page.entryId && page.body) {
+      staged.set(page.entryId, page.body.text);
+    }
+  }
+  return staged;
+};
+
+/**
+ * Materialize staged source bodies under `.blume/content` and prune orphans in
+ * that tree (separate from `.blume/src`), so a removed remote entry is cleaned up.
+ */
+const writeStagedContent = async (
+  out: string,
+  staged: Map<string, string>
+): Promise<void> => {
+  const contentDir = stagedContentDir(out);
+  const written = new Set<string>();
+  await Promise.all(
+    [...staged].map(async ([entryId, text]) => {
+      const path = join(contentDir, entryId);
+      written.add(normalize(path));
+      await writeIfChanged(path, text);
+    })
+  );
+  if (existsSync(contentDir)) {
+    await pruneOrphans(contentDir, written);
+  }
 };
 
 /** The logo shape the runtime consumes: an inline SVG or image URL(s). */
@@ -329,13 +428,61 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     ? `https://github.com/${github.owner}/${github.repo}`
     : null;
   const editBase = github ? `${repoUrl}/edit/${github.branch}` : null;
-  const editUrlFor = (sourcePath: string): string | null => {
-    if (!editBase) {
+
+  const editUrlFor = (sourcePath?: string): string | null => {
+    if (!(editBase && sourcePath)) {
       return null;
     }
     const rel = relative(context.root, sourcePath).split("\\").join("/");
     return `${editBase}/${github?.dir ? `${github.dir}/${rel}` : rel}`;
   };
+
+  const { i18n } = config;
+
+  // API reference routes (Scalar) surface as header tabs alongside the
+  // content-derived ones, so the reference stays discoverable in every locale.
+  const withReferenceTabs = (nav: Navigation): Navigation => ({
+    ...nav,
+    repoUrl: config.navigation.repo && repoUrl ? repoUrl : null,
+    tabs: [...nav.tabs, ...referenceTabs(config)],
+  });
+
+  // Resolved UI dictionaries: one per locale under i18n, English baseline
+  // otherwise. Threaded into chrome so the catch-all can pick the active locale.
+  const uiByLocale = i18n
+    ? Object.fromEntries(
+        i18n.locales.map(({ code }) => [
+          code,
+          resolveUIStrings(code, {
+            defaultLocale: i18n.defaultLocale,
+            overrides: i18n.ui,
+          }),
+        ])
+      )
+    : {};
+  const defaultUi = i18n
+    ? resolveUIStrings(i18n.defaultLocale, {
+        defaultLocale: i18n.defaultLocale,
+        overrides: i18n.ui,
+      })
+    : EN_UI;
+
+  const navigationByLocale = i18n
+    ? Object.fromEntries(
+        i18n.locales.map(({ code }) => [
+          code,
+          withReferenceTabs(
+            graph.navigationByLocale[code] ?? {
+              chromeVariants: [],
+              selectors: [],
+              sidebar: [],
+              sidebarVariants: [],
+              tabs: [],
+            }
+          ),
+        ])
+      )
+    : {};
 
   const data = {
     config: {
@@ -343,8 +490,25 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       codeWrap: config.markdown.code.wrap,
       description: config.description,
       favicon: resolveFavicon(project),
+      i18n: i18n
+        ? {
+            defaultLocale: i18n.defaultLocale,
+            // The locale fallback content is rendered from, so the catch-all can
+            // set the content direction to the language it's actually written in.
+            fallbackLocale: resolveFallbackLocale(i18n),
+            hideDefaultLocalePrefix: i18n.hideDefaultLocalePrefix,
+            locales: i18n.locales.map(({ code, dir, label }) => ({
+              code,
+              dir,
+              label,
+            })),
+          }
+        : null,
       imageZoom: config.markdown.imageZoom,
       logo: resolveLogo(project),
+      mcp: config.mcp.enabled
+        ? { name: config.mcp.name ?? config.title, route: config.mcp.route }
+        : null,
       og: { enabled: config.seo.og.enabled },
       repoUrl,
       search: {
@@ -363,24 +527,122 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     // CSS variables for Astro's <Font> component; matches the astro.config
     // `fonts:` entries derived from the same theme.fonts config.
     fontCssVars: configuredCssVars(config.theme.fonts),
-    // API reference routes (Scalar) surface as header tabs alongside the
-    // content-derived ones, so the reference stays discoverable.
-    navigation: {
-      ...graph.navigation,
-      tabs: [...graph.navigation.tabs, ...referenceTabs(config)],
-    },
+    navigation: withReferenceTabs(graph.navigation),
+    // Per-locale navigation; the catch-all selects the active locale's tree.
+    navigationByLocale,
     routes: manifest.routes.map((route) => ({
+      alternates: route.alternates,
+      collection: route.collection,
       draft: route.draft,
-      editUrl: editUrlFor(route.sourcePath),
+      editUrl: route.editUrl ?? editUrlFor(route.sourcePath),
+      entryId: route.entryId,
+      fallback: route.fallback ?? false,
       hidden: route.hidden,
       id: route.id,
       indexable: route.indexable,
       lastModified: route.lastModified ?? null,
+      locale: route.locale,
       path: route.path,
       title: route.title,
     })),
+    // Default-locale chrome strings (English baseline when not under i18n).
+    ui: defaultUi,
+    // Per-locale chrome strings, selected by the catch-all under i18n.
+    uiByLocale,
   };
   return `${JSON.stringify(data, null, 2)}\n`;
+};
+
+/** The resolved plan for the hosted MCP server within a single generate pass. */
+interface McpPlan {
+  /** Directory holding the injected discovery endpoints (`.blume/src/blume-mcp`). */
+  dir: string;
+  /** `.well-known` discovery routes to inject as prerendered pages. */
+  discoveryPages: { entrypoint: string; pattern: string }[];
+  enabled: boolean;
+  route: string;
+  srcDir: string;
+  warnings: string[];
+}
+
+/**
+ * Decide whether (and how) to generate the MCP server. Skipped — with a
+ * warning — when a content page already occupies its route, so the user's page
+ * keeps working.
+ */
+const planMcp = (project: BlumeProject, srcDir: string): McpPlan => {
+  const { config } = project;
+  const { route } = config.mcp;
+  const dir = join(srcDir, "blume-mcp");
+  const base: McpPlan = {
+    dir,
+    discoveryPages: [],
+    enabled: false,
+    route,
+    srcDir,
+    warnings: [],
+  };
+  if (!config.mcp.enabled) {
+    return base;
+  }
+  if (project.graph.pages.some((page) => page.route === route)) {
+    return {
+      ...base,
+      warnings: [
+        `MCP server route "${route}" is already used by a content page; the MCP server was not generated. Set a different "mcp.route" in blume.config.ts.`,
+      ],
+    };
+  }
+  return {
+    ...base,
+    discoveryPages: [
+      {
+        entrypoint: join(dir, "discovery.ts"),
+        pattern: "/.well-known/mcp.json",
+      },
+      {
+        entrypoint: join(dir, "server-card.ts"),
+        pattern: "/.well-known/mcp/server-card.json",
+      },
+    ],
+    enabled: true,
+  };
+};
+
+/** Write the MCP data snapshot, server endpoint, and discovery documents. */
+const writeMcpFiles = async (
+  project: BlumeProject,
+  plan: McpPlan,
+  write: (path: string, content: string) => Promise<boolean>
+): Promise<void> => {
+  if (!plan.enabled) {
+    return;
+  }
+  const data = await buildMcpData(project);
+  const discoveryInput = {
+    name: data.name,
+    route: plan.route,
+    site: data.site,
+    version: data.version,
+  };
+  await Promise.all([
+    write(
+      join(plan.srcDir, "generated", "mcp-data.json"),
+      `${JSON.stringify(data)}\n`
+    ),
+    write(
+      join(plan.srcDir, "pages", mcpPageFile(plan.route)),
+      mcpEndpointTemplate(plan.route)
+    ),
+    write(
+      join(plan.dir, "discovery.ts"),
+      staticJsonEndpointTemplate(buildMcpDiscovery(discoveryInput))
+    ),
+    write(
+      join(plan.dir, "server-card.ts"),
+      staticJsonEndpointTemplate(buildMcpServerCard(discoveryInput))
+    ),
+  ]);
 };
 
 export interface GenerateResult {
@@ -421,21 +683,51 @@ export const generateRuntime = async (
   const themePath = join(srcDir, "generated", "app.css");
   const searchClientPath = join(srcDir, "generated", "search-client.ts");
 
+  // Record every file this pass writes so orphans (from a now-disabled feature)
+  // can be pruned afterwards. `write` wraps the atomic writer and tracks paths.
+  const written = new Set<string>();
+  const write = (path: string, content: string): Promise<boolean> => {
+    written.add(normalize(path));
+    return writeIfChanged(path, content);
+  };
+
   await ensureDepsLink(out);
   await preparePublicAssets(project);
   await writeCustomPublicRootArtifacts(project);
   await rm(join(srcDir, "middleware.ts"), { force: true });
 
   const askEnabled = config.ai.ask?.enabled ?? false;
-  const [pages, detectedReact, userTheme] = await Promise.all([
+  const exportPdf = config.export.pdf;
+  const exportEpub = config.export.epub;
+  const [pages, detectedReact, userTheme, islandDiscovery] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(context.root),
-    readThemeFiles(context.themeFiles),
+    readOptional(context.themeFile),
+    discoverIslands(context.root),
   ]);
-  const needsReact = detectedReact || askEnabled;
+  // Each island's framework enables its Astro renderer. React also switches on
+  // for any project `.tsx`/`.jsx` and for Ask AI; Vue/Svelte are island-driven.
+  const islandFrameworks = new Set(
+    islandDiscovery.islands.map((island) => island.framework)
+  );
+  const needsReact =
+    detectedReact || askEnabled || islandFrameworks.has("react");
+  const needsVue = islandFrameworks.has("vue");
+  const needsSvelte = islandFrameworks.has("svelte");
+
+  // The hosted MCP server. The `.well-known` discovery docs are injected as
+  // prerendered routes alongside user pages; the server endpoint itself is a
+  // normal (server-rendered) page written by `writeMcpFiles`.
+  const mcp = planMcp(project, srcDir);
+  pages.push(...mcp.discoveryPages);
+
+  // Staged (non-filesystem) sources materialize into `.blume/content`; keyed by
+  // entryId so i18n duplicates of one entry write a single file.
+  const staged = collectStaged(project);
+  const hasStaged = staged.size > 0;
 
   const structural = await Promise.all([
-    writeIfChanged(
+    write(
       join(out, "astro.config.mjs"),
       astroConfigTemplate({
         config,
@@ -443,33 +735,43 @@ export const generateRuntime = async (
         context,
         dataPath,
         needsReact,
+        needsSvelte,
+        needsVue,
         pages,
         searchClientPath,
         themePath,
       })
     ),
-    writeIfChanged(
+    write(
       join(out, "package.json"),
-      runtimePackageTemplate(runtimeDependencies({ config, needsReact }))
+      runtimePackageTemplate(
+        runtimeDependencies({ config, needsReact, needsSvelte, needsVue })
+      )
     ),
-    writeIfChanged(join(out, "tsconfig.json"), runtimeTsconfigTemplate()),
-    writeIfChanged(join(srcDir, "env.d.ts"), envTemplate()),
-    writeIfChanged(
+    write(join(out, "tsconfig.json"), runtimeTsconfigTemplate()),
+    write(join(srcDir, "env.d.ts"), envTemplate()),
+    write(
       join(srcDir, "content.config.ts"),
-      contentConfigTemplate({ config, context })
+      contentConfigTemplate({ config, context, staged: hasStaged })
     ),
-    writeIfChanged(
+    write(
       join(srcDir, "pages", "[...slug].astro"),
       catchAllPageTemplate({
         askEnabled,
+        exportEpub,
+        exportPdf,
         mathEnabled: config.markdown.math,
       })
     ),
-    writeIfChanged(
+    write(
       join(srcDir, "generated", "components.ts"),
       userComponentsTemplate(context.componentsFile)
     ),
-    writeIfChanged(
+    write(
+      join(srcDir, "generated", "islands.ts"),
+      islandMapTemplate(islandDiscovery.islands)
+    ),
+    write(
       themePath,
       tailwindEntryTemplate({
         configTokens: `${buildThemeCss(config.theme)}${buildFontsCss(config.theme.fonts)}`,
@@ -483,19 +785,35 @@ export const generateRuntime = async (
     ),
   ]);
 
+  // Per-island hydration wrappers for the `islands/` convention. The map module
+  // (written above, always) imports these; orphans from removed islands are
+  // pruned at the end of the pass.
+  await Promise.all(
+    islandDiscovery.islands.map((island) =>
+      write(
+        join(srcDir, "generated", "islands", `${island.name}.astro`),
+        islandWrapperTemplate(island)
+      )
+    )
+  );
+
   if (askEnabled) {
-    await writeIfChanged(
+    await write(
       join(srcDir, "pages", "api", "ask.ts"),
-      askEndpointTemplate(config.ai.ask?.model ?? "openai/gpt-5.5")
+      askEndpointTemplate(resolveAskBackend(config.ai.ask))
     );
   }
 
+  await writeMcpFiles(project, mcp, write);
+
+  // Mintlify imports can leave a generated API proxy playground behind; Blume's
+  // local compatibility doesn't serve one, so drop it if present.
   await rm(join(srcDir, "pages", "api", "blume", "proxy.ts"), {
     force: true,
   });
 
   if (config.seo.og.enabled) {
-    await writeIfChanged(
+    await write(
       join(srcDir, "pages", "og", "[...slug].png.ts"),
       ogEndpointTemplate()
     );
@@ -513,24 +831,24 @@ export const generateRuntime = async (
     (page) => page.route === "/changelog"
   );
   if (hasChangelog && !changelogRouteTaken) {
-    await writeIfChanged(
+    await write(
       join(srcDir, "pages", "changelog.astro"),
-      changelogIndexTemplate({ askEnabled })
+      changelogIndexTemplate({ askEnabled, exportEpub, exportPdf })
     );
   }
 
   // The provider-specific client loader behind the `blume:search-client` alias
   // is always (re)generated so the alias resolves even when search is disabled.
-  await writeIfChanged(searchClientPath, searchClientTemplate(config));
+  await write(searchClientPath, searchClientTemplate(config));
 
   // Client-loaded providers (orama, flexsearch) ship a static index + endpoint.
   if (servesStaticIndex(config.search.provider)) {
     const documents = await buildSearchDocuments(project);
-    await writeIfChanged(
+    await write(
       join(srcDir, "generated", "search.json"),
       `${JSON.stringify(documents)}\n`
     );
-    await writeIfChanged(
+    await write(
       join(srcDir, "pages", "blume-search.json.ts"),
       searchEndpointTemplate()
     );
@@ -538,7 +856,7 @@ export const generateRuntime = async (
 
   // Mixedbread proxies queries through a server endpoint that holds the key.
   if (config.search.provider === "mixedbread") {
-    await writeIfChanged(
+    await write(
       join(srcDir, "pages", "api", "search.ts"),
       mixedbreadSearchEndpointTemplate(config.search.mixedbread?.storeId ?? "")
     );
@@ -546,15 +864,15 @@ export const generateRuntime = async (
 
   const rawMarkdown = await buildRawMarkdown(project);
   await Promise.all([
-    writeIfChanged(
+    write(
       join(srcDir, "generated", "raw-markdown.json"),
       `${JSON.stringify(rawMarkdown)}\n`
     ),
-    writeIfChanged(
+    write(
       join(srcDir, "pages", "[...slug].md.ts"),
       rawMarkdownEndpointTemplate()
     ),
-    writeIfChanged(
+    write(
       join(srcDir, "pages", "[...slug].mdx.ts"),
       rawMarkdownEndpointTemplate()
     ),
@@ -568,11 +886,11 @@ export const generateRuntime = async (
       feeds.map((feed) => [feed.type, renderRssFeed(feed)])
     );
     await Promise.all([
-      writeIfChanged(
+      write(
         join(srcDir, "generated", "rss.json"),
         `${JSON.stringify(feedXml)}\n`
       ),
-      writeIfChanged(
+      write(
         join(srcDir, "pages", "[section]", "rss.xml.ts"),
         rssEndpointTemplate()
       ),
@@ -581,7 +899,7 @@ export const generateRuntime = async (
 
   // API/AsyncAPI reference pages (Scalar). One self-contained page per source,
   // mounted on its configured route and regenerated each run.
-  const warnings: string[] = [];
+  const warnings: string[] = [...mcp.warnings, ...islandDiscovery.warnings];
 
   // The new provider SDKs are optional peers; warn (rather than fail opaquely in
   // Vite) when the configured provider's package isn't installed.
@@ -592,6 +910,10 @@ export const generateRuntime = async (
       );
     }
   }
+
+  // React ships with Blume; Vue/Svelte islands need their Astro integration
+  // installed by the project. Warn early rather than let Vite fail to resolve it.
+  warnings.push(...islandFrameworkWarnings(islandFrameworks, context.root));
   if (hasReferences(config)) {
     const references = await buildReferenceFiles({
       config,
@@ -601,20 +923,28 @@ export const generateRuntime = async (
     warnings.push(...references.warnings);
     await Promise.all(
       references.files.map((file) =>
-        writeIfChanged(join(srcDir, "pages", file.pagePath), file.content)
+        write(join(srcDir, "pages", file.pagePath), file.content)
       )
     );
   }
 
   // Data and manifest are not "structural" for Astro; they hot-reload.
-  await writeIfChanged(
+  await write(
     join(srcDir, "generated", "data.json"),
     buildRuntimeData(project)
   );
-  await writeIfChanged(
+  await write(
     join(out, "blume.manifest.json"),
     `${JSON.stringify(project.manifest, null, 2)}\n`
   );
+
+  // Write staged source bodies and prune orphans under `.blume/content` (its own
+  // tree, outside `.blume/src`), so a removed remote entry doesn't linger.
+  await writeStagedContent(out, staged);
+
+  // Remove anything under `.blume/src` this pass didn't write — e.g. an Ask AI
+  // endpoint left behind after the feature was switched off.
+  await pruneOrphans(srcDir, written);
 
   return { structuralChange: structural.some(Boolean), warnings };
 };

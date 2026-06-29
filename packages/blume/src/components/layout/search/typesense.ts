@@ -1,6 +1,6 @@
 import { Client } from "typesense";
 
-import { excerptFor, SEARCH_LIMIT } from "./types.ts";
+import { excerptFor, highlight, SEARCH_LIMIT } from "./types.ts";
 import type { SearchFn } from "./types.ts";
 
 interface TypesenseRecord extends Record<string, unknown> {
@@ -43,13 +43,18 @@ export const createSearch = (opts: {
         },
         {}
       );
-    return (response.hits ?? []).map((hit) => {
+    const hits = (response.hits ?? []).map((hit) => {
       const doc = hit.document;
       return {
-        excerpt: excerptFor(doc.description ?? "", doc.content ?? ""),
-        title: doc.title,
+        content: doc.content ?? "",
+        excerpt: highlight(
+          excerptFor(doc.description ?? "", doc.content ?? "", query),
+          query
+        ),
+        title: highlight(doc.title, query),
         url: doc.url,
       };
     });
+    return { hits, sections: [] };
   };
 };

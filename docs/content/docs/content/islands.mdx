@@ -1,0 +1,94 @@
+---
+title: Islands
+description: Drop an interactive component into islands/ and use it in any MDX page — hydrated automatically, no per-page import.
+---
+
+Blume renders your docs as static HTML with **zero JavaScript** by default. When
+you need something interactive — a live demo, a chart, a playground — you add an
+**island**: a framework component that ships JS only for itself, only on the
+pages that use it.
+
+## The `islands/` convention
+
+Drop a component into an `islands/` folder at your project root. Its filename
+becomes a component you can use in **any** `.mdx` page, with no import:
+
+```tsx islands/Counter.tsx lineNumbers
+import { useState } from "react";
+
+export default function Counter() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>Clicked {count}</button>;
+}
+```
+
+```mdx page.mdx
+Here's a live counter: <Counter />
+```
+
+The filename is the component name, so it **must be PascalCase**
+(`Counter.tsx` → `<Counter />`). Lowercase filenames and two islands that
+resolve to the same name are skipped with a build warning.
+
+:::note
+Islands are for **interactive** UI. For a static component you reuse across
+pages (a styled callout, a pricing table), use an [MDX
+override](/docs/configuration/customization) instead — it ships no JavaScript.
+:::
+
+## Hydration
+
+By default an island uses `client:visible`: it hydrates when the reader scrolls
+it into view, so a page full of islands still loads instantly. Opt into a
+different strategy with an `export const client` in the island file:
+
+```tsx islands/Chart.tsx lineNumbers
+// Skip server rendering entirely — for components that touch the DOM/window.
+export const client = "only";
+
+export default function Chart() {
+  /* ... */
+}
+```
+
+| `client` value          | Hydrates                           | Use it for                                                |
+| ----------------------- | ---------------------------------- | --------------------------------------------------------- |
+| `"visible"` _(default)_ | When scrolled into view            | Most islands                                              |
+| `"load"`                | Immediately on page load           | Above-the-fold, must-be-instant UI                        |
+| `"idle"`                | When the main thread is idle       | Non-urgent interactivity                                  |
+| `"only"`                | Client only, never server-rendered | Libraries that need `window`/`document` (charts, editors) |
+
+## Frameworks
+
+**React works out of the box** — Blume turns it on automatically the moment your
+project contains a `.tsx`/`.jsx` island.
+
+**Vue and Svelte** are supported too; install the matching Astro integration and
+Blume wires up the renderer when it sees a `.vue` or `.svelte` island:
+
+```bash
+# Vue
+npm install @astrojs/vue vue
+
+# Svelte
+npm install @astrojs/svelte svelte
+```
+
+```vue islands/Toggle.vue lineNumbers
+<script setup>
+import { ref } from "vue";
+const on = ref(false);
+</script>
+
+<template>
+  <button @click="on = !on">{{ on ? "On" : "Off" }}</button>
+</template>
+```
+
+Props you pass in MDX (`<Counter start={5} />`) are forwarded to the component,
+and children (`<Counter>label</Counter>`) arrive as the default slot.
+
+:::tip
+Islands hydrate on the client, so anything you pass as a prop must be
+serializable — strings, numbers, plain objects, not functions.
+:::

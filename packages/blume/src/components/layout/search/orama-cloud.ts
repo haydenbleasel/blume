@@ -1,6 +1,6 @@
 import { OramaClient } from "@oramacloud/client";
 
-import { excerptFor, SEARCH_LIMIT } from "./types.ts";
+import { excerptFor, highlight, SEARCH_LIMIT } from "./types.ts";
 import type { SearchFn } from "./types.ts";
 
 interface OramaCloudRecord {
@@ -24,14 +24,18 @@ export const createSearch = (opts: {
   });
   return async (query) => {
     const results = await client.search({ limit: SEARCH_LIMIT, term: query });
-    const hits = results?.hits ?? [];
-    return hits.map((hit) => {
+    const hits = (results?.hits ?? []).map((hit) => {
       const doc = hit.document as unknown as OramaCloudRecord;
       return {
-        excerpt: excerptFor(doc.description ?? "", doc.content ?? ""),
-        title: doc.title,
+        content: doc.content ?? "",
+        excerpt: highlight(
+          excerptFor(doc.description ?? "", doc.content ?? "", query),
+          query
+        ),
+        title: highlight(doc.title, query),
         url: doc.url,
       };
     });
+    return { hits, sections: [] };
   };
 };

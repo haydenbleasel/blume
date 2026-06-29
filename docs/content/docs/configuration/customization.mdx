@@ -1,6 +1,6 @@
 ---
 title: Customization
-description: Override components, add React islands, mount custom pages, install registry components, or eject.
+description: Override components, add interactive islands, mount custom pages, install registry components, or eject.
 ---
 
 ## Component overrides
@@ -25,33 +25,27 @@ export default defineComponents({
 Keys are the names you write in MDX (`<Callout>`, `<Pricing>`). Use the `.tsx`
 filename when you import React components.
 
-## React islands
+## Interactive islands
 
-The core theme is React-free, but React switches on automatically the moment your
-project contains a `.tsx` or `.jsx` file. To use an interactive component in MDX,
-wrap it in an `.astro` file with a [hydration directive](https://docs.astro.build/en/guides/framework-components/#hydrating-interactive-components):
+For interactive UI (React, Vue, or Svelte), drop a component into an `islands/`
+folder and use it in any MDX page — Blume hydrates it for you, no wrapper or
+registration needed:
 
-```astro Counter.astro lineNumbers
----
-import Counter from "./Counter.tsx";
----
+```tsx islands/Counter.tsx lineNumbers
+import { useState } from "react";
 
-<Counter client:load />
+export default function Counter() {
+  const [n, setN] = useState(0);
+  return <button onClick={() => setN(n + 1)}>Clicked {n}</button>;
+}
 ```
 
-Register the wrapper as an MDX override and use `<Counter />` in any page:
-
-```ts components.ts lineNumbers
-import { defineComponents } from "blume";
-import Counter from "./Counter.astro";
-
-export default defineComponents({
-  mdx: { Counter },
-});
+```mdx page.mdx
+Use it anywhere: <Counter />
 ```
 
-Choose how eagerly the island hydrates with the directive: `client:load`,
-`client:idle`, `client:visible`, `client:media`, or `client:only`.
+See [Islands](/docs/content/islands) for hydration strategies and framework
+setup.
 
 ## Custom pages
 
@@ -64,15 +58,24 @@ See [Custom Pages](/docs/advanced/custom-pages) for the full guide.
 
 ## Registry
 
-Install Blume-maintained components as **source** in your project — you own the
-code and can edit it freely:
+`blume add` copies a Blume-maintained component into your project as **source** —
+you own it and can edit it freely. Run it with no arguments to list what's
+available:
 
 ```bash
-blume add feedback
+blume add
 ```
 
-The component is copied into your project rather than imported from the package,
-so it's yours to change.
+Install a widget, or any built-in layout slot you want to customize — the
+header, sidebar, breadcrumbs, table of contents, or pagination:
+
+```bash
+blume add pagination
+```
+
+The copy imports the rest of the framework from `blume/*`, so it renders
+exactly like the built-in until you change it. `blume add` prints the
+`defineComponents` snippet to register it under the matching layout slot.
 
 ## Eject
 

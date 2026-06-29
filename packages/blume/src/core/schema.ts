@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { FONT_SLUGS, isFontSlug } from "../theme/fonts.ts";
+import { uiLocaleOverridesSchema } from "./i18n-ui.ts";
+import type { ContentSource } from "./sources/types.ts";
 
 /**
  * Public Blume schemas.
@@ -50,16 +52,6 @@ const seoMetaSchema = z
     title: z.string().optional(),
   })
   .strict();
-
-const tocMetaSchema = z.union([
-  z.boolean(),
-  z
-    .object({
-      maxHeadingLevel: z.number().int().min(1).max(6).default(3),
-      minHeadingLevel: z.number().int().min(1).max(6).default(2),
-    })
-    .strict(),
-]);
 
 const searchMetaSchema = z
   .object({
@@ -193,7 +185,6 @@ const pageMetaBaseSchema = z
     slug: z.string().optional(),
     tag: z.string().optional(),
     title: z.string().optional(),
-    toc: tocMetaSchema.default(true),
     type: z.string().default("doc"),
   })
   .passthrough();
@@ -207,7 +198,7 @@ export type PageMeta = z.infer<typeof pageMetaBaseSchema>;
 export type PageMetaInput = z.input<typeof pageMetaBaseSchema>;
 
 // ---------------------------------------------------------------------------
-// Folder meta (_meta.json / _meta.yaml)
+// Folder meta (meta.ts)
 // ---------------------------------------------------------------------------
 
 export const folderMetaSchema = z
@@ -281,6 +272,125 @@ const bannerConfigSchema = z.union([
     .strict(),
 ]);
 
+/** A local filesystem content source. */
+const filesystemSourceSchema = z
+  .object({
+    exclude: z.array(z.string()).default(["**/_*", "**/.*"]),
+    include: z.array(z.string()).default(["**/*.{md,mdx}"]),
+    /** Namespaces the source's routes under `/<prefix>/`. */
+    prefix: z.string().optional(),
+    root: z.string().default("docs"),
+    type: z.literal("filesystem"),
+  })
+  .strict();
+
+/**
+ * Remote Markdown/MDX fetched over HTTP. Enumerate files either explicitly
+ * (`files` against a raw `url` base) or from a GitHub repo subtree (`github`).
+ * The token, when needed, comes from `GITHUB_TOKEN` — never inlined here.
+ */
+const mdxRemoteSourceSchema = z
+  .object({
+    /** Explicit list of source-relative file paths to fetch from `url`. */
+    files: z.array(z.string()).optional(),
+    /** Enumerate a GitHub repo subtree via the git-trees API. */
+    github: z
+      .object({
+        owner: z.string(),
+        path: z.string().default(""),
+        ref: z.string().default("main"),
+        repo: z.string(),
+      })
+      .strict()
+      .optional(),
+    /** Glob patterns applied to enumerated refs. */
+    include: z.array(z.string()).default(["**/*.{md,mdx}"]),
+    /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
+    pollInterval: z.number().positive().optional(),
+    /** Namespaces the source's routes under `/<prefix>/`. */
+    prefix: z.string().optional(),
+    type: z.literal("mdx-remote"),
+    /** Raw base URL, e.g. `https://raw.githubusercontent.com/acme/sdk/main/docs`. */
+    url: z.string().optional(),
+  })
+  .strict();
+
+/** A Sanity dataset queried with GROQ; Portable Text bodies become Markdown. */
+const sanitySourceSchema = z.object({
+  /** Sanity API version (a date); default `2024-01-01`. */
+  apiVersion: z.string().optional(),
+  dataset: z.string(),
+  /** Field paths mapping a document onto Blume meta + body. */
+  fields: z
+    .object({
+      body: z.string().optional(),
+      description: z.string().optional(),
+      lastModified: z.string().optional(),
+      slug: z.string().optional(),
+      title: z.string().optional(),
+    })
+    .strict()
+    .optional(),
+  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
+  pollInterval: z.number().positive().optional(),
+  prefix: z.string().optional(),
+  projectId: z.string(),
+  /** GROQ query selecting the documents to import. */
+  query: z.string(),
+  type: z.literal("sanity"),
+});
+
+/** A Notion database; pages become entries, blocks become MDX. */
+const notionSourceSchema = z.object({
+  database: z.string(),
+  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
+  pollInterval: z.number().positive().optional(),
+  prefix: z.string().optional(),
+  /** Notion property names mapped onto Blume meta. */
+  properties: z
+    .object({
+      description: z.string().optional(),
+      order: z.string().optional(),
+      slug: z.string().optional(),
+      status: z.string().optional(),
+      title: z.string().optional(),
+    })
+    .strict()
+    .optional(),
+  /** Status value treated as published; others map to `draft`. Default `Published`. */
+  publishedValue: z.string().optional(),
+  type: z.literal("notion"),
+});
+
+/**
+ * A user-provided `ContentSource` instance, passed straight through from
+ * `blume.config.ts`. This is the extension point that lets adapters with custom
+ * serializers (or any backend) ship without their SDKs touching core.
+ */
+const customSourceSchema = z.object({
+  source: z.custom<ContentSource>(
+    (val) =>
+      typeof val === "object" &&
+      val !== null &&
+      typeof (val as { load?: unknown }).load === "function" &&
+      typeof (val as { name?: unknown }).name === "string",
+    { message: "custom source must be a ContentSource (with name + load)" }
+  ),
+  type: z.literal("custom"),
+});
+
+/** A single configured content source. */
+const contentSourceSchema = z.discriminatedUnion("type", [
+  filesystemSourceSchema,
+  mdxRemoteSourceSchema,
+  sanitySourceSchema,
+  notionSourceSchema,
+  customSourceSchema,
+]);
+
+/** A resolved content-source config entry (post-defaults). */
+export type ContentSourceConfig = z.infer<typeof contentSourceSchema>;
+
 const contentConfigSchema = z
   .object({
     defaultType: z.string().default("doc"),
@@ -288,6 +398,12 @@ const contentConfigSchema = z
     include: z.array(z.string()).default(["**/*.{md,mdx}"]),
     pages: z.string().default("pages"),
     root: z.string().default("docs"),
+    /**
+     * Pluggable content sources. When omitted, the top-level
+     * `root`/`include`/`exclude` desugar to one implicit filesystem source, so
+     * existing projects are unchanged.
+     */
+    sources: z.array(contentSourceSchema).optional(),
   })
   .strict();
 
@@ -530,14 +646,42 @@ const searchConfigSchema = z
     }
   });
 
+/** Ask AI backends. `gateway` (default) routes through the Vercel AI Gateway. */
+export const askAiProviders = [
+  "gateway",
+  "openrouter",
+  "llmgateway",
+  "inkeep",
+  "openai-compatible",
+] as const;
+
 const aiConfigSchema = z
   .object({
     ask: z
       .object({
+        // Name of the env var holding the provider's API key; each provider has
+        // a sensible default, so this only needs setting to override it.
+        apiKeyEnv: z.string().optional(),
+        // Base URL of the backend. Required for `openai-compatible`; for the
+        // named providers it overrides the built-in preset.
+        baseUrl: z.string().url().optional(),
         enabled: z.boolean().default(false),
         model: z.string().default("openai/gpt-5.5"),
+        provider: z.enum(askAiProviders).default("gateway"),
       })
       .strict()
+      .superRefine((value, ctx) => {
+        // A generic OpenAI-compatible backend has no preset URL, so the user
+        // must supply one; the named providers fall back to their preset.
+        if (value.provider === "openai-compatible" && !value.baseUrl) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              'ai.ask.baseUrl is required when provider is "openai-compatible".',
+            path: ["baseUrl"],
+          });
+        }
+      })
       .optional(),
     llmsTxt: z.boolean().default(false),
   })
@@ -600,6 +744,8 @@ const chromeVariantSchema = z
 const navigationConfigSchema = z
   .object({
     chromeVariants: z.array(chromeVariantSchema).default([]),
+    /** Show a GitHub repo link in the header (requires `github` configured). */
+    repo: z.boolean().default(true),
     selectors: z.array(navSelectorSchema).default([]),
     /** Explicit sidebar override; when omitted the sidebar is generated. */
     sidebar: z.array(sidebarItemSchema).optional(),
@@ -607,6 +753,89 @@ const navigationConfigSchema = z
     tabs: z.array(navTabSchema).optional(),
   })
   .strict();
+
+export type AskAiProvider = (typeof askAiProviders)[number];
+export type AskAiConfig = NonNullable<z.infer<typeof aiConfigSchema>["ask"]>;
+
+// Reader-facing "Export" page action (PDF via print, EPUB via client-side
+// generation). Off by default. Accepts a shorthand boolean to toggle both
+// formats, or an object to enable them individually; both normalize to
+// `{ epub, pdf }` so consumers read plain booleans.
+const exportConfigSchema = z
+  .union([
+    z.boolean(),
+    z
+      .object({
+        epub: z.boolean().default(false),
+        pdf: z.boolean().default(false),
+      })
+      .strict(),
+  ])
+  .transform((value) =>
+    typeof value === "boolean" ? { epub: value, pdf: value } : value
+  );
+
+const mcpConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    /** Optional system hint passed to connecting agents. */
+    instructions: z.string().optional(),
+    /** Server name shown to clients; defaults to the site title. */
+    name: z.string().optional(),
+    route: z.string().default("/mcp"),
+  })
+  .strict();
+
+/** A configured locale: ISO-ish code plus display metadata for the switcher. */
+const localeSchema = z
+  .object({
+    code: z.string().min(1),
+    /** Text direction; drives `<html dir>` and a future RTL pass. */
+    dir: z.enum(["ltr", "rtl"]).default("ltr"),
+    label: z.string(),
+  })
+  .strict();
+
+/**
+ * Internationalization. Opt-in: when absent, Blume is single-locale and behaves
+ * exactly as before. The default locale lives at the content root; other locales
+ * are top-level directories named by `code` (the `dir` parser).
+ */
+const i18nConfigSchema = z
+  .object({
+    defaultLocale: z.string().default("en"),
+    /** Locale rendered for a missing translation; `null` disables fallback. */
+    fallbackLocale: z.string().nullable().optional(),
+    /** Drop the URL prefix for the default locale (`/`, `/fr/…`). Static-safe. */
+    hideDefaultLocalePrefix: z.boolean().default(true),
+    locales: z.array(localeSchema).min(1),
+    /** `"dir"`: locale directories (`fr/page.mdx`). `"dot"`: filename suffix (`page.fr.mdx`). */
+    parser: z.enum(["dir", "dot"]).default("dir"),
+    /** Per-locale UI string overrides: `{ fr: { search: { button: "…" } } }`. */
+    ui: uiLocaleOverridesSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const codes = new Set(value.locales.map((locale) => locale.code));
+    if (!codes.has(value.defaultLocale)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `i18n.defaultLocale "${value.defaultLocale}" must match one of i18n.locales.`,
+        path: ["defaultLocale"],
+      });
+    }
+    if (
+      value.fallbackLocale !== null &&
+      value.fallbackLocale !== undefined &&
+      !codes.has(value.fallbackLocale)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `i18n.fallbackLocale "${value.fallbackLocale}" must match one of i18n.locales.`,
+        path: ["fallbackLocale"],
+      });
+    }
+  });
 
 const analyticsConfigSchema = z
   .object({
@@ -645,7 +874,13 @@ const redirectSchema = z
 
 const ogConfigSchema = z
   .object({
-    enabled: z.boolean().default(false),
+    /**
+     * Generate a per-page Open Graph image. Defaults to on once a deployment
+     * site URL is known (set or auto-detected) and off otherwise, since
+     * `og:image` must be absolute to be useful to crawlers — resolved in
+     * `loadConfig`. An explicit value here always wins.
+     */
+    enabled: z.boolean().optional(),
   })
   .strict();
 
@@ -735,6 +970,12 @@ const markdownConfigSchema = z
     code: codeConfigSchema.default({}),
     codeBlocks: codeBlocksConfigSchema.default({}),
     /**
+     * Wrap each `##`–`######` heading in a link to its own anchor so readers can
+     * click to copy, bookmark, or share a permalink to that section. On by
+     * default; set to `false` to render plain headings.
+     */
+    headingAnchors: z.boolean().default(true),
+    /**
      * Make content images click-to-zoom (open in a lightbox). On by default;
      * opt a single image out with `data-no-zoom`.
      */
@@ -814,13 +1055,16 @@ export const blumeConfigSchema = z
     contextual: contextualConfigSchema.default({}),
     deployment: deploymentConfigSchema.default({}),
     description: z.string().optional(),
+    export: exportConfigSchema.default(false),
     favicon: faviconConfigSchema.optional(),
     footer: footerConfigSchema.default({}),
     github: githubConfigSchema.optional(),
+    i18n: i18nConfigSchema.optional(),
     icons: iconsConfigSchema.default({}),
     lastModified: lastModifiedConfigSchema.default(false),
     logo: logoConfigSchema.optional(),
     markdown: markdownConfigSchema.default({}),
+    mcp: mcpConfigSchema.default({}),
     navbar: navbarConfigSchema.default({}),
     navigation: navigationConfigSchema.default({}),
     openapi: openapiConfigSchema.default({}),
@@ -836,6 +1080,10 @@ export const blumeConfigSchema = z
 
 /** Resolved config: every field present after defaults are applied. */
 export type ResolvedConfig = z.infer<typeof blumeConfigSchema>;
+/** Resolved i18n block (present only when the project opts into i18n). */
+export type ResolvedI18nConfig = z.infer<typeof i18nConfigSchema>;
+/** A configured locale with display metadata. */
+export type LocaleConfig = z.infer<typeof localeSchema>;
 /** User-authored config: the shape accepted by `defineConfig`. */
 export type BlumeConfig = z.input<typeof blumeConfigSchema>;
 /** A configured search backend. */

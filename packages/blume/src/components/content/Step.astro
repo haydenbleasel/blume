@@ -10,7 +10,7 @@ interface Props {
 
 const { icon, iconType, title } = Astro.props;
 const markerClass =
-  "absolute top-0 -left-[2.75rem] flex size-6 items-center justify-center rounded-full bg-accent text-center font-semibold text-accent-foreground text-xs";
+  "absolute top-0 -start-[2.75rem] flex size-6 items-center justify-center rounded-full bg-accent text-center font-semibold text-accent-foreground text-xs";
 const isImageIcon = (value: string): boolean =>
   /^(?:https?:\/\/|data:image\/|\/|\.{1,2}\/)/u.test(value) ||
   /\.(?:avif|gif|jpe?g|png|svg|webp)$/iu.test(value);

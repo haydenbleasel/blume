@@ -1,13 +1,13 @@
 import { Document } from "flexsearch";
 
-import { excerptFor, SEARCH_LIMIT } from "./types.ts";
-import type { IndexedDocument, SearchFn, SearchHit } from "./types.ts";
+import { buildResult, RESULT_POOL } from "./types.ts";
+import type { IndexedDocument, SearchFn } from "./types.ts";
 
 /**
  * FlexSearch: reuse the same static `blume-search.json` Orama ships, but build
  * a FlexSearch document index in the browser. Keyless; works in dev and build.
- * Results are looked up from a route→document map so we never depend on the
- * `enrich` result typing.
+ * Matched routes are resolved back to their full documents (so we never depend
+ * on `enrich` typing) and shaped by the shared `buildResult` helper.
  */
 export const createSearch = async (opts: {
   indexUrl: string;
@@ -28,9 +28,9 @@ export const createSearch = async (opts: {
 
   // FlexSearch's in-memory search is synchronous, so the SearchFn resolves
   // immediately rather than awaiting anything.
-  return (query) => {
-    const groups = index.search(query, { limit: SEARCH_LIMIT });
-    const hits: SearchHit[] = [];
+  return (query, options) => {
+    const groups = index.search(query, { limit: RESULT_POOL });
+    const matched: IndexedDocument[] = [];
     const seen = new Set<string>();
     for (const group of groups) {
       for (const id of group.result) {
@@ -40,18 +40,13 @@ export const createSearch = async (opts: {
         }
         seen.add(route);
         const doc = byRoute.get(route);
-        if (doc) {
-          hits.push({
-            excerpt: excerptFor(doc.description, doc.content),
-            title: doc.title,
-            url: doc.route,
-          });
-        }
-        if (hits.length >= SEARCH_LIMIT) {
-          return Promise.resolve(hits);
+        // Filter to the active locale (when one is requested) before shaping,
+        // so section counts and results stay within the language.
+        if (doc && (!options?.locale || doc.locale === options.locale)) {
+          matched.push(doc);
         }
       }
     }
-    return Promise.resolve(hits);
+    return Promise.resolve(buildResult(matched, query, options?.section));
   };
 };

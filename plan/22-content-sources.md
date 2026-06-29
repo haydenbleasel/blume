@@ -328,10 +328,10 @@ imports must also be mirrored in root devDependencies so they hoist.
 | Adapter | Package | Native shape → MDX |
 | --- | --- | --- |
 | filesystem | built-in | the current pipeline |
-| mdx-remote | `@blume/source-mdx-remote` | fetch raw `.md(x)` over HTTP/git; pass through |
-| sanity | `@blume/source-sanity` | GROQ query → docs; Portable Text → MDX |
-| notion | `@blume/source-notion` | database → collection; blocks → MDX |
-| git | `@blume/source-git` | sparse-checkout a repo subdir → filesystem adapter |
+| mdx-remote | built-in | fetch raw `.md(x)` over HTTP/git; pass through |
+| sanity | built-in | GROQ query → docs; Portable Text → MDX |
+| notion | built-in | database → collection; blocks → MDX |
+| git | built-in | sparse-checkout a repo subdir → filesystem adapter |
 
 ### Notion adapter (deep dive)
 

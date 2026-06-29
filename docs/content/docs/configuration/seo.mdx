@@ -76,11 +76,13 @@ seo:
 
 Blume can render a 1200×630 social card for every page at build time — no
 headless browser, thanks to [Takumi](https://takumi.kane.tw), so builds stay
-fast. Off by default:
+fast. On by default once [`deployment.site`](/docs/deployment) is set or
+auto-detected (the `og:image` URL has to be absolute to be useful to crawlers),
+and off otherwise. Set `enabled` to override that either way:
 
 ```ts blume.config.ts lineNumbers
 seo: {
-  og: { enabled: true },
+  og: { enabled: true }, // or false to opt out even with a site set
 }
 ```
 

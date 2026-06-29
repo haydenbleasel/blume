@@ -4,7 +4,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { defineCommand } from "citty";
 import { dirname, join } from "pathe";
 
-import { findItem, itemsRoot, registry } from "../../registry/registry.ts";
+import { findItem, packageSrc, registry } from "../../registry/registry.ts";
+import { rewriteImports } from "../../registry/rewrite-imports.ts";
 import { logger } from "../log.ts";
 
 export const addCommand = defineCommand({
@@ -48,10 +49,13 @@ export const addCommand = defineCommand({
       plan
         .filter((entry) => !entry.skip)
         .map(async (entry) => {
-          const content = await readFile(
-            join(itemsRoot, entry.file.source),
-            "utf-8"
-          );
+          const source = join(packageSrc, entry.file.source);
+          const raw = await readFile(source, "utf-8");
+          // Built-in components carry relative imports into the package; rewrite
+          // them to `blume/*` so the installed copy resolves them.
+          const content = entry.file.rewrite
+            ? rewriteImports(raw, source, packageSrc)
+            : raw;
           await mkdir(dirname(entry.target), { recursive: true });
           await writeFile(entry.target, content, "utf-8");
         })

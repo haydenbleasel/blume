@@ -125,6 +125,21 @@ adds `<link rel="alternate">` tags to every page so browsers and feed readers
 discover them automatically. See [Blog](/docs/advanced/blog) and
 [Changelog](/docs/advanced/changelog) for authoring each content type.
 
+## On this page
+
+Every page gets an automatic table of contents, built from its headings. On wide
+screens it sits in a sticky sidebar beside your content; on narrower screens it
+collapses into an **On this page** panel above the page. As you scroll, the entry
+for the section you're reading is highlighted, so you always know where you are in
+a long page.
+
+Blume slugifies each heading into an anchor, so every entry links straight to its
+section — and you can deep-link to any heading by appending its slug to the URL
+(`.../my-page#getting-started`).
+
+The contents list your `##` and `###` headings (H2 and H3). A page with no
+headings at that level simply has no table of contents.
+
 ## Where to next
 
 <CardGroup cols={2}>

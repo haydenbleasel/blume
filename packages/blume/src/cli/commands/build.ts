@@ -14,10 +14,13 @@ import { syncSearchProvider } from "../../search/sync/index.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
-export const runBuild = async (options: { strict?: boolean } = {}) => {
+export const runBuild = async (
+  options: { preview?: boolean; strict?: boolean } = {}
+) => {
   const root = process.cwd();
   const project = await prepareProject({
     mode: "build",
+    preview: options.preview,
     root,
     strict: options.strict,
   });
@@ -73,6 +76,7 @@ export const runBuild = async (options: { strict?: boolean } = {}) => {
     [
       `Output     ${config.deployment.output}`,
       `Adapter    ${config.deployment.adapter ?? "none"}`,
+      `Site       ${config.deployment.site ?? "not set"}`,
       `Search     ${config.search.provider}`,
       `Redirects  ${config.redirects.length}`,
       `Sitemap    ${sitemap ? "yes" : "no (set deployment.site)"}`,
@@ -87,6 +91,10 @@ export const runBuild = async (options: { strict?: boolean } = {}) => {
 
 export const buildCommand = defineCommand({
   args: {
+    preview: {
+      description: "Include drafts and unpublished CMS content.",
+      type: "boolean",
+    },
     strict: { description: "Fail on diagnostics.", type: "boolean" },
   },
   meta: {
@@ -94,7 +102,7 @@ export const buildCommand = defineCommand({
     name: "build",
   },
   async run({ args }) {
-    await runBuild({ strict: args.strict });
+    await runBuild({ preview: args.preview, strict: args.strict });
     process.exit(0);
   },
 });

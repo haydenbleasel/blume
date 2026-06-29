@@ -4,7 +4,7 @@
 // repo from blume.config. A `GITHUB_TOKEN` env var lifts the API rate limit.
 // If the API is unreachable the card still renders, just without counts.
 import data from "blume:data";
-import Icon from "blume/components/Icon.astro";
+import { GITHUB_MARK } from "../github-mark.ts";
 import { fetchRepositoryInfo } from "./github-info.ts";
 
 interface Props {
@@ -44,7 +44,16 @@ const statIcon =
       target="_blank"
     >
       <span class="flex items-center gap-2 font-medium text-foreground text-sm">
-        <Icon class="shrink-0 text-muted-foreground" name="github" size={16} />
+        <svg
+          aria-hidden="true"
+          class="shrink-0 text-muted-foreground"
+          fill="currentColor"
+          height="16"
+          set:html={GITHUB_MARK}
+          viewBox="0 0 16 16"
+          width="16"
+          xmlns="http://www.w3.org/2000/svg"
+        />
         <span class="truncate">
           {owner}/{repo}
         </span>

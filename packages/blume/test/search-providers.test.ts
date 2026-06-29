@@ -113,9 +113,12 @@ describe("toSearchRecords", () => {
   it("maps documents to the hosted record shape with the first tag", () => {
     const docs: SearchDocument[] = [
       {
+        breadcrumb: ["Guides"],
         content: "body",
         description: "desc",
+        locale: "en",
         route: "/a",
+        section: "Guides",
         tags: ["guides", "intro"],
         title: "A",
       },
@@ -125,6 +128,7 @@ describe("toSearchRecords", () => {
         _id: "/a",
         content: "body",
         description: "desc",
+        locale: "en",
         tag: "guides",
         title: "A",
         url: "/a",
@@ -134,7 +138,15 @@ describe("toSearchRecords", () => {
 
   it("omits the tag when there are none", () => {
     const [record] = toSearchRecords([
-      { content: "", description: "", route: "/x", title: "X" },
+      {
+        breadcrumb: [],
+        content: "",
+        description: "",
+        locale: "",
+        route: "/x",
+        section: "Docs",
+        title: "X",
+      },
     ]);
     expect(record?.tag).toBeUndefined();
   });
@@ -200,7 +212,7 @@ describe("searchClientTemplate", () => {
 
   it("falls back to a no-op client when search is disabled", () => {
     const client = searchClientTemplate(parse({ provider: "none" }));
-    expect(client).toContain("Promise.resolve([])");
+    expect(client).toContain("Promise.resolve({ hits: [], sections: [] })");
   });
 });
 

@@ -1,6 +1,6 @@
 import { liteClient } from "algoliasearch/lite";
 
-import { excerptFor, SEARCH_LIMIT } from "./types.ts";
+import { excerptFor, highlight, SEARCH_LIMIT } from "./types.ts";
 import type { SearchFn } from "./types.ts";
 
 interface AlgoliaRecord {
@@ -27,12 +27,17 @@ export const createSearch = (opts: {
       ],
     });
     const [first] = results;
-    const hits =
+    const records =
       first && "hits" in first ? (first.hits as AlgoliaRecord[]) : [];
-    return hits.map((hit) => ({
-      excerpt: excerptFor(hit.description ?? "", hit.content ?? ""),
-      title: hit.title,
-      url: hit.url,
+    const hits = records.map((record) => ({
+      content: record.content ?? "",
+      excerpt: highlight(
+        excerptFor(record.description ?? "", record.content ?? "", query),
+        query
+      ),
+      title: highlight(record.title, query),
+      url: record.url,
     }));
+    return { hits, sections: [] };
   };
 };

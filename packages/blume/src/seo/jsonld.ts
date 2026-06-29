@@ -15,6 +15,8 @@ export interface StructuredDataInput {
   published?: string | Date | null;
   /** Last-modified date; emitted as ISO `dateModified`. */
   modified?: string | Date | null;
+  /** BCP-47 language tag for `inLanguage`; defaults to `en`. */
+  locale?: string;
   breadcrumbs: Crumb[];
 }
 
@@ -66,7 +68,7 @@ export const buildStructuredData = (
       "@id": `${pageUrl}#page`,
       "@type": ARTICLE_TYPES[input.pageType ?? ""] ?? "TechArticle",
       headline: input.title,
-      inLanguage: "en",
+      inLanguage: input.locale || "en",
       name: input.title,
       url: pageUrl,
     };

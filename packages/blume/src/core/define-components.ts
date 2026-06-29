@@ -23,8 +23,6 @@ export interface ComponentOverrides {
   mdx?: Record<string, ComponentOverride>;
   /** Layout slot overrides (`Header`, `Sidebar`, `Search`, ...). */
   layout?: Record<string, ComponentOverride>;
-  /** Named interactive islands available to pages. */
-  islands?: Record<string, IslandDescriptor>;
 }
 
 /**

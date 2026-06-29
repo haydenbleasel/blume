@@ -66,12 +66,39 @@ export interface ProjectContext {
  * and search index are derived from.
  */
 export interface PageRecord {
-  /** Stable id: content-root-relative path, e.g. `api/auth.mdx`. */
+  /** Stable, globally-unique id: `"<source>:<ref>"`, e.g. `filesystem:api/auth.mdx`. */
   id: string;
-  /** Absolute source path. */
-  sourcePath: string;
-  /** URL route, e.g. `/api/auth`. Always starts with `/`. */
+  /** Provenance: the owning source's name and its source-local ref. */
+  source: { name: string; ref: string };
+  /** Absolute source path. Populated by the filesystem adapter only (back-compat). */
+  sourcePath?: string;
+  /**
+   * Renderable body captured at scan time. Set for staged (non-filesystem)
+   * sources so they can be materialized to `.blume/content` and so soft
+   * consumers need no re-read; omitted for filesystem entries (read from disk).
+   */
+  body?: { format: "md" | "mdx"; text: string };
+  /** Adapter-supplied "edit this page" URL (non-filesystem sources). */
+  editUrl?: string;
+  /** Astro collection this entry renders through; defaults to `"docs"`. */
+  collection?: string;
+  /** Astro collection-relative entry id for `getEntry`; defaults to the ref. */
+  entryId?: string;
+  /** URL route, e.g. `/api/auth`. Always starts with `/`. Locale-prefixed under i18n. */
   route: string;
+  /** Resolved locale code; the default locale when not under i18n. */
+  locale: string;
+  /**
+   * Locale-agnostic logical route shared by every translation (e.g.
+   * `/guides/x`). Pages with the same key are translations of each other.
+   */
+  translationKey: string;
+  /**
+   * Content-relative path with the leading locale directory stripped, used for
+   * sidebar grouping so the locale dir is not surfaced as a nav group. Equals
+   * `id` for single-locale projects.
+   */
+  navPath: string;
   /** Path segments without numeric prefixes, e.g. `["api", "auth"]`. */
   segments: string[];
   /** Group-folder labels this page lives under, e.g. `["guides"]`. */
@@ -157,28 +184,66 @@ export interface Navigation {
   chromeVariants: NavChromeVariant[];
   sidebar: NavNode[];
   sidebarVariants: NavSidebarVariant[];
+  /** Repo URL for the header link, or null when hidden (`navigation.repo`). */
+  repoUrl?: string | null;
 }
 
 /** The full content graph: the source of truth for generated modules. */
 export interface ContentGraph {
   pages: PageRecord[];
+  /** Default-locale navigation (the whole site when not under i18n). */
   navigation: Navigation;
+  /** Navigation per locale; one entry per configured locale under i18n. */
+  navigationByLocale: Record<string, Navigation>;
   /** Map of route -> pageId for fast lookup and duplicate detection. */
   routes: Map<string, string>;
   diagnostics: Diagnostic[];
 }
 
+/** A locale a logical page exists in, for the switcher and `hreflang`. */
+export interface RouteAlternate {
+  locale: string;
+  path: string;
+}
+
+/** A resolved language-switcher entry for the current page. */
+export interface LocaleSwitchOption {
+  code: string;
+  label: string;
+  dir: "ltr" | "rtl";
+  /** Target URL: the real translation, or the localized fallback URL. */
+  href: string;
+  current: boolean;
+  /** True when this locale has no real translation (renders fallback content). */
+  untranslated: boolean;
+}
+
 /** A route entry written to `blume.manifest.json`. */
 export interface RouteManifestEntry {
   id: string;
+  /** Provenance: the owning source's name and its source-local ref. */
+  source: { name: string; ref: string };
+  /** Astro collection this entry renders through (`"docs"` | `"staged"`). */
+  collection: string;
+  /** Astro collection-relative entry id, passed to `getEntry`. */
+  entryId: string;
   path: string;
-  sourcePath: string;
+  /** Absolute source path; populated for filesystem entries only (back-compat). */
+  sourcePath?: string;
+  /** Adapter-supplied "edit this page" URL (non-filesystem sources). */
+  editUrl?: string;
   title: string;
   contentType: string;
   hidden: boolean;
   draft: boolean;
   /** Whether the page should be included in the search index. */
   indexable: boolean;
+  /** Resolved locale code; the default locale when not under i18n. */
+  locale: string;
+  /** Locales this logical page is genuinely translated into (excludes fallbacks). */
+  alternates: RouteAlternate[];
+  /** True when this route renders fallback content for a missing translation. */
+  fallback?: boolean;
   /** Resolved "last updated" ISO date, when the feature is enabled. */
   lastModified?: string;
 }

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "pathe";
 
 import type { BlumeProject } from "../src/core/project-graph.ts";
+import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { PageRecord, RouteManifestEntry } from "../src/core/types.ts";
 import { buildSearchDocuments } from "../src/search/documents.ts";
 
@@ -96,5 +97,47 @@ describe("buildSearchDocuments", () => {
     );
     expect(doc?.content).toBe("");
     expect(doc?.description).toBe("");
+  });
+});
+
+// When the search provider is "none" every route is non-indexable, but the MCP
+// server is a separate feature and should still index docs.
+describe("buildSearchDocuments with includeWhenDisabled", () => {
+  const projectNoSearch = (over: Record<string, unknown> = {}): BlumeProject =>
+    ({
+      config: blumeConfigSchema.parse({ search: { provider: "none" } }),
+      context: { configFile: null, root },
+      graph: {
+        pages: [
+          page({
+            description: "Desc A",
+            id: "a.md",
+            meta: pageMetaSchema.parse(over),
+          }),
+        ],
+      },
+      manifest: {
+        routes: [route({ id: "a.md", indexable: false, path: "/a" })],
+      },
+    }) as unknown as BlumeProject;
+
+  it("indexes nothing by default when search is disabled", async () => {
+    const docs = await buildSearchDocuments(projectNoSearch());
+    expect(docs).toHaveLength(0);
+  });
+
+  it("indexes content-indexable pages when the flag is set", async () => {
+    const docs = await buildSearchDocuments(projectNoSearch(), {
+      includeWhenDisabled: true,
+    });
+    expect(docs.map((doc) => doc.route)).toStrictEqual(["/a"]);
+  });
+
+  it("still honours per-page search.exclude when the flag is set", async () => {
+    const docs = await buildSearchDocuments(
+      projectNoSearch({ search: { exclude: true } }),
+      { includeWhenDisabled: true }
+    );
+    expect(docs).toHaveLength(0);
   });
 });

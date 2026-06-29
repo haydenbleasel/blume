@@ -3,9 +3,10 @@ title: AI
 description: Machine-readable docs with llms.txt and an optional in-page Ask AI assistant.
 ---
 
-Blume has two AI features, both opt-in: machine-readable docs for external tools
-(`llms.txt`), and an in-page **Ask AI** assistant. Everything is off by default,
-and static docs stay fully static until you turn a feature on.
+Blume has several opt-in AI features: machine-readable docs for external tools
+(`llms.txt`), an in-page **Ask AI** assistant, and a hosted **MCP server** for
+coding agents. Everything is off by default, and static docs stay fully static
+until you turn a feature on.
 
 ## llms.txt
 
@@ -64,6 +65,10 @@ reading:
 Like Copy as Markdown, it needs no setup. The assistant fetches the page over its
 public URL, so it works as soon as the page is deployed.
 
+To embed a ready-to-copy prompt inline in your content — rather than a whole-page
+action — use the [Prompt component](/docs/content/components#prompt), which renders
+a labelled row with a **Copy prompt** button and an optional open-in-Cursor link.
+
 ## Ask AI
 
 Add an assistant that answers reader questions in an in-page chat panel, backed
@@ -73,7 +78,8 @@ by a streaming server endpoint and the [AI SDK](https://ai-sdk.dev):
 ai: {
   ask: {
     enabled: true,
-    model: "openai/gpt-5.5", // default
+    provider: "gateway", // default
+    model: "openai/gpt-5.5",
   },
 }
 ```
@@ -93,12 +99,116 @@ deployment: {
 A static build with Ask AI enabled fails fast with a message telling you to set
 `deployment.output` to `server`. See [Deployment](/docs/deployment) for the adapters.
 
-### Models and credentials
+### Backends
 
-The `model` is a `provider/model` string resolved through the Vercel AI Gateway,
-so you don't install a provider SDK — switch models by changing the string
-(`openai/gpt-5.5`, `anthropic/claude-sonnet-4-5`, and so on).
+By default Ask AI routes through the **Vercel AI Gateway**: `model` is a
+`provider/model` string, so you switch models by changing it (`openai/gpt-5.5`,
+`anthropic/claude-sonnet-4-5`, and so on) with no provider SDK to install. The
+gateway reads `AI_GATEWAY_API_KEY` from your environment and is wired up
+automatically when you deploy on Vercel.
 
-The gateway reads an API key from your environment (`AI_GATEWAY_API_KEY`), and is
-wired up automatically when you deploy on Vercel. Enabling Ask AI also turns on
-React for the in-page island — see [Customization](/docs/configuration/customization#react-islands).
+Set `provider` to point Ask AI somewhere else. Each backend reads its API key
+from an environment variable, and the matching provider SDK is added to your
+project's runtime automatically when you build — only the one you use:
+
+| `provider`          | `model`                                       | API key env var      |
+| ------------------- | --------------------------------------------- | -------------------- |
+| `gateway` (default) | a `provider/model` string via the AI Gateway  | `AI_GATEWAY_API_KEY` |
+| `openrouter`        | any [OpenRouter](https://openrouter.ai) model | `OPENROUTER_API_KEY` |
+| `llmgateway`        | any [LLMGateway](https://llmgateway.io) model | `LLMGATEWAY_API_KEY` |
+| `inkeep`            | an [Inkeep](https://inkeep.com) QA model      | `INKEEP_API_KEY`     |
+| `openai-compatible` | whatever your endpoint serves                 | set with `apiKeyEnv` |
+
+For example, to use OpenRouter:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    provider: "openrouter",
+    model: "anthropic/claude-sonnet-4-5",
+  },
+}
+```
+
+Any OpenAI-compatible endpoint works through `openai-compatible` — supply the
+`baseUrl` and the env var holding its key:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    provider: "openai-compatible",
+    baseUrl: "https://my-gateway.example.com/v1",
+    apiKeyEnv: "MY_GATEWAY_API_KEY",
+    model: "gpt-4o",
+  },
+}
+```
+
+Set `apiKeyEnv` (and, for the named providers, `baseUrl`) on any backend to point
+at a different env var or proxy.
+
+:::note
+**Inkeep** answers from the content you've indexed in the Inkeep dashboard — it
+runs its own retrieval — rather than from this site's pages. The other backends
+are plain model passthroughs: the endpoint streams the reader's messages straight
+to the model.
+:::
+
+Keys are read with `process.env`, which covers the Node, Vercel, and Netlify
+adapters. On Cloudflare, expose the key through the platform's [runtime
+binding](https://docs.astro.build/en/guides/integrations-guide/cloudflare/#environment-variables-and-secrets).
+Enabling Ask AI also turns on React for the in-page island — see
+[Customization](/docs/configuration/customization#react-islands).
+
+## MCP server
+
+Host a [Model Context Protocol](https://modelcontextprotocol.io) server so coding
+agents (Claude Code, Cursor, VS Code, claude.ai connectors) can search and read
+your docs directly — no scraping:
+
+```ts blume.config.ts lineNumbers
+mcp: {
+  enabled: true,
+  route: "/mcp", // where the server is mounted
+}
+```
+
+| Option         | Default | Description                                       |
+| -------------- | ------- | ------------------------------------------------- |
+| `enabled`      | `false` | Generate and host the MCP server.                 |
+| `route`        | `/mcp`  | Path the Streamable-HTTP endpoint is mounted on.  |
+| `name`         | title   | Server name shown to clients (defaults to title). |
+| `instructions` | —       | Optional system hint passed to connecting agents. |
+
+The server exposes four read-only tools — `search_docs`, `get_page`,
+`list_pages`, and `get_navigation` — and publishes discovery documents at
+`/.well-known/mcp.json` and `/.well-known/mcp/server-card.json`. Each page's
+**Connect to MCP** menu offers copy-and-go install for Claude Code, Cursor, and
+VS Code (shown once [`deployment.site`](/docs/deployment) is set).
+
+`search_docs` runs its own full-text index, so it works regardless of your
+[search](/docs/configuration/search) provider — and even when search is set to
+`none`. The MCP server is a separate feature from on-page search.
+
+### Server output required
+
+The MCP server is a live endpoint (`/mcp`), so it can't run on a static build.
+Switch to server output and pick an adapter:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  output: "server",
+  adapter: "node", // or "vercel" | "netlify" | "cloudflare"
+  site: "https://docs.example.com",
+}
+```
+
+A static build with `mcp.enabled` fails fast with a message telling you to set
+`deployment.output` to `server`. See [Deployment](/docs/deployment) for the
+adapters. Once deployed, connect from Claude Code with:
+
+```bash
+claude mcp add --transport http my-docs https://docs.example.com/mcp
+```

@@ -1,77 +1,254 @@
 ---
+import { EN_UI } from "../../core/i18n-ui.ts";
+import type { UIStrings } from "../../core/i18n-ui.ts";
+import type { Navigation } from "../../core/types.ts";
 import Icon from "../Icon.astro";
+import { flattenPages } from "./nav-utils.ts";
 
 // The provider-specific loader is generated per project into `blume:search-client`
 // (an alias to `.blume/src/generated/search-client.ts`), so this component is
 // provider-agnostic: it lazy-imports that module on first open and uses the
 // `SearchFn` it returns. Only the configured provider's SDK is bundled.
+
+interface Props {
+  askEnabled?: boolean;
+  navigation?: Navigation;
+  strings?: UIStrings["search"];
+  /** Active locale to filter results to; omitted disables locale filtering. */
+  locale?: string;
+}
+
+const { askEnabled = false, navigation, strings, locale } = Astro.props;
+const s = strings ?? EN_UI.search;
+
+// Pages shown in the empty state, before the user has typed anything.
+const popular = navigation ? flattenPages(navigation.sidebar).slice(0, 6) : [];
+
+const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 ---
 
-<blume-search class="contents">
+<blume-search
+  class="contents"
+  data-ask={askEnabled ? "" : undefined}
+  data-i18n-dev={s.devOnly}
+  data-i18n-empty={s.noResults}
+  data-locale={locale || undefined}
+>
   <button
-    aria-label="Search"
+    aria-label={s.button}
     class="inline-flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground sm:min-w-48"
     data-blume-search-open
     type="button"
   >
     <Icon name="search" size={16} />
-    <span class="min-w-0 flex-1 text-left max-sm:hidden">Search</span>
+    <span class="min-w-0 flex-1 text-start max-sm:hidden">{s.button}</span>
     <kbd class="font-mono text-[0.7rem] max-sm:hidden" data-blume-search-kbd
       >⌘K</kbd
     >
   </button>
 
   <dialog
-    aria-label="Search docs"
-    class="mx-auto mt-[12vh] w-[min(36rem,92vw)] rounded-blume border border-border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
+    aria-label={s.label}
+    class="m-auto h-[min(480px,90vh)] w-[min(62.5rem,94vw)] flex-col overflow-hidden rounded-blume border border-border bg-background/80 p-0 text-foreground shadow-2xl outline-none backdrop-blur-xl backdrop:bg-black/30 open:flex"
     data-blume-search-dialog
   >
-    <div class="flex items-center gap-2.5 border-border border-b px-4 py-3.5 text-muted-foreground">
+    <div
+      class="flex items-center gap-2.5 border-border border-b px-4 py-3 text-muted-foreground"
+    >
       <Icon name="search" size={18} />
       <input
-        aria-label="Search docs"
-        class="flex-1 border-0 bg-transparent text-base text-foreground focus:outline-none"
+        aria-label={s.label}
+        autocomplete="off"
+        class="flex-1 border-0 bg-transparent text-foreground text-sm focus:outline-none [&::-webkit-search-cancel-button]:appearance-none"
         data-blume-search-input
-        placeholder="Search documentation..."
+        placeholder={s.placeholder}
         type="search"
       />
-      <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.7rem]">Esc</kbd>
+      <kbd class={`${kbd} text-[0.7rem]`}>Esc</kbd>
     </div>
-    <ul class="m-0 max-h-[60vh] list-none overflow-y-auto p-2" data-blume-search-results></ul>
-    <p class="m-0 px-4 py-5 text-center text-muted-foreground text-sm" data-blume-search-message hidden></p>
+    <div
+      class="grid min-h-0 flex-1 md:grid-cols-[22rem_minmax(0,1fr)]"
+      data-blume-search-grid
+    >
+      <div class="flex min-h-0 flex-col md:border-border md:border-e">
+        <div
+          class="flex flex-wrap gap-1.5 border-border border-b px-3 py-2"
+          data-blume-search-filters
+          hidden
+        >
+        </div>
+        <div
+          class="min-h-0 flex-1 overflow-y-auto p-2"
+          data-blume-search-results
+        >
+        </div>
+        <p
+          class="m-0 px-4 py-6 text-center text-muted-foreground text-sm"
+          data-blume-search-message
+          hidden
+        >
+        </p>
+      </div>
+      <div
+        class="hidden min-h-0 overflow-y-auto p-5 md:block"
+        data-blume-search-preview
+      >
+      </div>
+    </div>
+    <div
+      class="flex items-center justify-between gap-3 border-border border-t px-3 py-2 text-muted-foreground text-xs"
+    >
+      {
+        locale ? (
+          <label class="flex cursor-pointer select-none items-center gap-1.5">
+            <input
+              class="size-3.5 accent-accent"
+              data-blume-search-all-locales
+              type="checkbox"
+            />
+            {s.allLanguages}
+          </label>
+        ) : (
+          <span />
+        )
+      }
+      <div class="flex items-center gap-3">
+        <span class="flex items-center gap-1">
+          <kbd class={`${kbd} text-[0.65rem]`}>↑</kbd>
+          <kbd class={`${kbd} text-[0.65rem]`}>↓</kbd>
+          navigate
+        </span>
+        <span class="flex items-center gap-1">
+          <kbd class={`${kbd} text-[0.65rem]`}>↵</kbd>
+          open
+        </span>
+        <span class="flex items-center gap-1 max-md:hidden">
+          <kbd class={`${kbd} text-[0.65rem]`}>⌘J</kbd>
+          preview
+        </span>
+      </div>
+    </div>
   </dialog>
 
-  <script>
-    interface SearchHit {
-      url: string;
-      title: string;
-      excerpt: string;
-    }
-    type SearchFn = (query: string) => Promise<SearchHit[]>;
+  <script
+    data-blume-search-popular
+    is:inline
+    set:html={JSON.stringify(popular)}
+    type="application/json"
+  />
 
-    const RESULT_CLASS =
-      "block rounded-blume px-2.5 py-2.5 text-inherit transition-colors hover:bg-muted hover:no-underline";
-    const EXCERPT_CLASS =
-      "block text-muted-foreground text-sm [&_mark]:bg-accent/25 [&_mark]:text-inherit";
+  <script>
+    import { icons } from "../../theme/icons.ts";
+    import {
+      escapeHtml,
+      highlight,
+      matchSnippet,
+    } from "./search/types.ts";
+    import type { SearchFn, SearchHit } from "./search/types.ts";
+
+    interface Selectable {
+      el: HTMLElement;
+      hit?: SearchHit;
+      kind: "ask" | "link";
+      url?: string;
+    }
+
+    interface PopularPage {
+      label: string;
+      route: string;
+    }
+
+    const GRID_COLS = "md:grid-cols-[22rem_minmax(0,1fr)]";
+    const ROW_CLASS =
+      "flex w-full cursor-pointer items-start gap-2.5 rounded-blume border border-transparent px-2.5 py-2 text-start text-inherit transition-colors hover:no-underline";
+    // A transparent border sits on every row so selecting one only recolors it
+    // (to the theme border) — no 1px layout shift as the cursor moves.
+    const ROW_ON = ["bg-muted", "border-border"];
+    const ROW_OFF = ["border-transparent"];
+    const MARK =
+      "[&_mark]:rounded-sm [&_mark]:bg-accent/25 [&_mark]:text-inherit";
+    const PILL_BASE =
+      "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium text-xs transition-colors";
+    const PILL_ON = "border-transparent bg-foreground text-background";
+    const PILL_OFF = "border-border text-muted-foreground hover:text-foreground";
+
+    const svg = (name: string, size = 16): string =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] ?? ""}</svg>`;
 
     class BlumeSearch extends HTMLElement {
       dialog!: HTMLDialogElement;
       input!: HTMLInputElement;
+      grid!: HTMLElement;
+      filters!: HTMLElement;
       results!: HTMLElement;
       message!: HTMLElement;
+      preview!: HTMLElement;
       searchFn: SearchFn | null = null;
       loaded = false;
+      askEnabled = false;
+      popular: PopularPage[] = [];
+      selectables: Selectable[] = [];
+      selectedIndex = -1;
+      activeSection: string | null = null;
+      previewOn = true;
+      devOnlyMsg = "Search is available in the production build.";
+      noResultsMsg = "No results found.";
+      // The active locale to filter to (null when i18n is off), and whether the
+      // reader has opted to search across every language instead.
+      locale: string | null = null;
+      allLocales = false;
 
       connectedCallback() {
+        this.devOnlyMsg =
+          this.getAttribute("data-i18n-dev") || this.devOnlyMsg;
+        this.noResultsMsg =
+          this.getAttribute("data-i18n-empty") || this.noResultsMsg;
+        this.locale = this.getAttribute("data-locale");
         this.dialog = this.querySelector("[data-blume-search-dialog]")!;
         this.input = this.querySelector("[data-blume-search-input]")!;
+        this.grid = this.querySelector("[data-blume-search-grid]")!;
+        this.filters = this.querySelector("[data-blume-search-filters]")!;
         this.results = this.querySelector("[data-blume-search-results]")!;
         this.message = this.querySelector("[data-blume-search-message]")!;
+        this.preview = this.querySelector("[data-blume-search-preview]")!;
+        this.askEnabled = this.hasAttribute("data-ask");
+
+        const popularScript = this.querySelector(
+          "[data-blume-search-popular]"
+        );
+        try {
+          this.popular = JSON.parse(popularScript?.textContent || "[]");
+        } catch {
+          this.popular = [];
+        }
+
+        this.previewOn =
+          localStorage.getItem("blume-search-preview") !== "0";
+        this.applyPreviewState();
+
+        // Per-language filtering: default to the active locale, with an opt-in
+        // toggle to search every language. The choice is remembered.
+        const allToggle = this.querySelector<HTMLInputElement>(
+          "[data-blume-search-all-locales]"
+        );
+        if (allToggle) {
+          this.allLocales =
+            localStorage.getItem("blume-search-all-locales") === "1";
+          allToggle.checked = this.allLocales;
+          allToggle.addEventListener("change", () => {
+            this.allLocales = allToggle.checked;
+            localStorage.setItem(
+              "blume-search-all-locales",
+              this.allLocales ? "1" : "0"
+            );
+            this.render();
+          });
+        }
 
         // The handler accepts ⌘K and Ctrl+K; show the right one per platform.
-        const kbd = this.querySelector("[data-blume-search-kbd]");
-        if (kbd) {
-          kbd.textContent = /mac|iphone|ipad|ipod/iu.test(navigator.platform)
+        const hint = this.querySelector("[data-blume-search-kbd]");
+        if (hint) {
+          hint.textContent = /mac|iphone|ipad|ipod/iu.test(navigator.platform)
             ? "⌘K"
             : "Ctrl K";
         }
@@ -93,7 +270,10 @@ import Icon from "../Icon.astro";
           }
         });
 
-        this.input.addEventListener("input", () => this.search());
+        this.input.addEventListener("input", () => this.render());
+        this.dialog.addEventListener("keydown", (event) =>
+          this.onKeydown(event)
+        );
         this.dialog.addEventListener("click", (event) => {
           if (event.target === this.dialog) {
             this.dialog.close();
@@ -114,16 +294,38 @@ import Icon from "../Icon.astro";
       async open() {
         this.dialog.showModal();
         this.input.focus();
-        if (this.loaded) {
-          return;
+        this.input.select();
+        if (!this.loaded) {
+          this.loaded = true;
+          try {
+            const { createSearch } = await import("blume:search-client");
+            this.searchFn = await createSearch();
+          } catch {
+            this.searchFn = null;
+          }
         }
-        this.loaded = true;
-        try {
-          const { createSearch } = await import("blume:search-client");
-          this.searchFn = await createSearch();
-        } catch {
-          this.searchFn = null;
-          this.setMessage("Search is available in the production build.");
+        this.render();
+      }
+
+      onKeydown(event: KeyboardEvent) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          this.move(1);
+        } else if (event.key === "ArrowUp") {
+          event.preventDefault();
+          this.move(-1);
+        } else if (event.key === "Enter") {
+          const item = this.selectables[this.selectedIndex];
+          if (item) {
+            event.preventDefault();
+            this.activate(item);
+          }
+        } else if (
+          (event.key === "j" || event.key === "J") &&
+          (event.metaKey || event.ctrlKey)
+        ) {
+          event.preventDefault();
+          this.togglePreview();
         }
       }
 
@@ -132,33 +334,269 @@ import Icon from "../Icon.astro";
         this.message.hidden = !text;
       }
 
-      async search() {
+      async render() {
         const query = this.input.value.trim();
+        this.selectables = [];
+        this.selectedIndex = -1;
         this.results.replaceChildren();
+        this.setMessage("");
+
         if (!query) {
-          this.setMessage("");
+          this.renderFilters([]);
+          this.renderEmpty();
+          this.finishRender();
           return;
         }
+
         if (!this.searchFn) {
-          this.setMessage("Search is available in the production build.");
+          this.renderFilters([]);
+          this.clearPreview();
+          this.setMessage(this.devOnlyMsg);
           return;
         }
-        const hits = await this.searchFn(query);
-        this.setMessage(hits.length === 0 ? "No results found." : "");
-        for (const hit of hits) {
-          const item = document.createElement("li");
-          const link = document.createElement("a");
-          link.href = hit.url;
-          link.className = RESULT_CLASS;
-          const title = document.createElement("span");
-          title.className = "block font-medium";
-          title.textContent = hit.title;
-          const excerpt = document.createElement("span");
-          excerpt.className = EXCERPT_CLASS;
-          excerpt.innerHTML = hit.excerpt;
-          link.append(title, excerpt);
-          item.appendChild(link);
-          this.results.appendChild(item);
+
+        const localeFilter =
+          this.locale && !this.allLocales ? this.locale : undefined;
+        const result = await this.searchFn(query, {
+          locale: localeFilter,
+          section: this.activeSection ?? undefined,
+        });
+        // A later keystroke may have superseded this query mid-await.
+        if (this.input.value.trim() !== query) {
+          return;
+        }
+
+        this.renderFilters(result.sections);
+
+        if (this.askEnabled) {
+          const group = this.addGroup("Ask AI");
+          const ask = this.createAskRow(query);
+          group.appendChild(ask.el);
+          this.selectables.push(ask);
+        }
+
+        if (result.hits.length > 0) {
+          const group = this.addGroup("Results");
+          for (const hit of result.hits) {
+            const item = this.createHitRow(hit, query);
+            group.appendChild(item.el);
+            this.selectables.push(item);
+          }
+        } else if (!this.askEnabled) {
+          this.setMessage(this.noResultsMsg);
+        }
+
+        this.finishRender();
+      }
+
+      renderEmpty() {
+        if (this.askEnabled) {
+          const group = this.addGroup("Ask AI");
+          const ask = this.createAskRow("");
+          group.appendChild(ask.el);
+          this.selectables.push(ask);
+        }
+        if (this.popular.length > 0) {
+          const group = this.addGroup("Popular");
+          for (const page of this.popular) {
+            const item = this.createLinkRow(page.route, page.label);
+            group.appendChild(item.el);
+            this.selectables.push(item);
+          }
+        }
+      }
+
+      renderFilters(sections: { count: number; label: string }[]) {
+        if (sections.length < 2) {
+          this.filters.hidden = true;
+          this.filters.replaceChildren();
+          return;
+        }
+        this.filters.hidden = false;
+        this.filters.replaceChildren();
+        const total = sections.reduce((sum, s) => sum + s.count, 0);
+        this.filters.appendChild(this.createPill("All", total, null));
+        for (const section of sections) {
+          this.filters.appendChild(
+            this.createPill(section.label, section.count, section.label)
+          );
+        }
+      }
+
+      createPill(label: string, count: number, value: string | null) {
+        const button = document.createElement("button");
+        button.type = "button";
+        const active = this.activeSection === value;
+        button.className = `${PILL_BASE} ${active ? PILL_ON : PILL_OFF}`;
+        button.innerHTML = `${escapeHtml(label)} <span class="opacity-60">${count}</span>`;
+        button.addEventListener("click", () => {
+          this.activeSection = value;
+          this.render();
+          this.input.focus();
+        });
+        return button;
+      }
+
+      addGroup(label: string): HTMLElement {
+        const header = document.createElement("p");
+        header.className =
+          "m-0 px-2.5 pt-3 pb-1 font-normal text-muted-foreground text-xs";
+        header.textContent = label;
+        const container = document.createElement("div");
+        this.results.append(header, container);
+        return container;
+      }
+
+      createAskRow(query: string): Selectable {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = `${ROW_CLASS} ${MARK}`;
+        const title = query
+          ? `Ask AI: <span class="text-muted-foreground">“${escapeHtml(query)}”</span>`
+          : "Ask AI";
+        el.innerHTML = `
+          <span class="mt-0.5 shrink-0 text-accent">${svg("sparkles")}</span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate font-normal text-foreground text-sm">${title}</span>
+            <span class="block truncate text-muted-foreground text-sm">Get an instant answer from AI</span>
+          </span>`;
+        const item: Selectable = { el, kind: "ask" };
+        this.bindRow(item);
+        return item;
+      }
+
+      createHitRow(hit: SearchHit, query: string): Selectable {
+        const el = document.createElement("a");
+        el.href = hit.url;
+        el.className = `${ROW_CLASS} ${MARK}`;
+        // `line-clamp-2` already sets `display`, so no `block` here (it would
+        // override the clamp and let the excerpt run to full height).
+        const excerpt = hit.excerpt
+          ? `<span class="mt-0.5 line-clamp-2 text-muted-foreground text-xs">${hit.excerpt}</span>`
+          : "";
+        el.innerHTML = `
+          <span class="mt-0.5 shrink-0 text-muted-foreground">${svg("file")}</span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate font-normal text-foreground text-sm">${hit.title}</span>
+            ${excerpt}
+          </span>`;
+        const item: Selectable = { el, hit, kind: "link", url: hit.url };
+        this.bindRow(item);
+        return item;
+      }
+
+      createLinkRow(url: string, label: string): Selectable {
+        const el = document.createElement("a");
+        el.href = url;
+        el.className = ROW_CLASS;
+        el.innerHTML = `
+          <span class="mt-0.5 shrink-0 text-muted-foreground">${svg("file")}</span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate font-normal text-foreground text-sm">${escapeHtml(label)}</span>
+          </span>`;
+        const item: Selectable = { el, kind: "link", url };
+        this.bindRow(item);
+        return item;
+      }
+
+      bindRow(item: Selectable) {
+        item.el.addEventListener("mouseenter", () => {
+          this.selectIndex(this.selectables.indexOf(item));
+        });
+        if (item.kind === "ask") {
+          item.el.addEventListener("click", (event) => {
+            event.preventDefault();
+            this.activate(item);
+          });
+        }
+      }
+
+      finishRender() {
+        if (this.selectables.length > 0) {
+          this.selectIndex(0);
+        } else {
+          this.clearPreview();
+        }
+      }
+
+      selectIndex(index: number) {
+        if (index < 0 || index >= this.selectables.length) {
+          return;
+        }
+        const current = this.selectables[this.selectedIndex];
+        if (current) {
+          current.el.classList.remove(...ROW_ON);
+          current.el.classList.add(...ROW_OFF);
+        }
+        this.selectedIndex = index;
+        const next = this.selectables[index];
+        next.el.classList.remove(...ROW_OFF);
+        next.el.classList.add(...ROW_ON);
+        next.el.scrollIntoView({ block: "nearest" });
+        this.updatePreview();
+      }
+
+      move(delta: number) {
+        if (this.selectables.length === 0) {
+          return;
+        }
+        const max = this.selectables.length - 1;
+        const next = Math.min(max, Math.max(0, this.selectedIndex + delta));
+        this.selectIndex(next);
+      }
+
+      activate(item: Selectable) {
+        if (item.kind === "ask") {
+          const query = this.input.value.trim();
+          this.dialog.close();
+          window.dispatchEvent(
+            new CustomEvent("blume:open-ask-ai", { detail: { query } })
+          );
+        } else if (item.url) {
+          window.location.href = item.url;
+        }
+      }
+
+      clearPreview() {
+        this.preview.replaceChildren();
+      }
+
+      updatePreview() {
+        if (!this.previewOn) {
+          return;
+        }
+        const item = this.selectables[this.selectedIndex];
+        if (!item || item.kind !== "link" || !item.hit) {
+          this.clearPreview();
+          return;
+        }
+        const hit = item.hit;
+        const query = this.input.value.trim();
+        const body = hit.content
+          ? highlight(matchSnippet(hit.content, query, 600), query)
+          : (hit.excerpt ?? "");
+        this.preview.innerHTML = `
+          <h3 class="m-0 mb-3 font-medium text-foreground text-lg ${MARK}">${hit.title}</h3>
+          <div class="text-muted-foreground text-sm leading-relaxed ${MARK}">${body}</div>`;
+      }
+
+      togglePreview() {
+        this.previewOn = !this.previewOn;
+        localStorage.setItem(
+          "blume-search-preview",
+          this.previewOn ? "1" : "0"
+        );
+        this.applyPreviewState();
+        this.updatePreview();
+      }
+
+      applyPreviewState() {
+        if (this.previewOn) {
+          this.grid.classList.add(GRID_COLS);
+          this.preview.classList.add("md:block");
+        } else {
+          this.grid.classList.remove(GRID_COLS);
+          this.preview.classList.remove("md:block");
         }
       }
     }

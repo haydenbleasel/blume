@@ -12,14 +12,16 @@ const FILES: Record<string, string> = {
   "(marketing)/about.md": "Just some text with no heading.\n",
   "01-intro.mdx":
     "---\ntitle: Intro\ndescription: Getting started\n---\n# Intro\n",
-  "_meta.json": '{ "title": "Documentation", "order": 1 }',
   "aliased.md": "---\nslug: custom/path\ntitle: Aliased\n---\n# Aliased\n",
+  "async-dir/meta.ts": 'export default async () => ({ title: "Async" });\n',
   "bad.md": "---\ndraft: maybe\n---\n# Bad\n",
-  "broken/_meta.json": "{ this is not valid json",
+  "broken/meta.ts": 'throw new Error("boom");\n',
+  "fn/meta.ts": 'export default () => ({ title: "Fn" });\n',
   "guide/02-setup.md": "---\ntype: blog\ntitle: Setup\n---\n# Setup\n",
-  "guide/_meta.yaml": "title: Guides\ncollapsed: true\n",
   "guide/index.md": "---\ntitle: Guide\n---\n# Guide\n",
+  "guide/meta.ts": 'export default { collapsed: true, title: "Guides" };\n',
   "index.md": "# Welcome\n\nSee the [guide](/guide).\n",
+  "meta.ts": 'export default { order: 1, title: "Documentation" };\n',
 };
 
 let root: string;
@@ -105,14 +107,21 @@ describe("discoverContent", () => {
 });
 
 describe("discoverFolderMeta", () => {
-  it("loads JSON and YAML meta keyed by directory, reporting parse errors", async () => {
-    const { meta, diagnostics } = await discoverFolderMeta(root);
+  it("loads object, function, and async-function meta keyed by directory", async () => {
+    const { meta } = await discoverFolderMeta(root);
 
     expect(meta.get("")).toStrictEqual({ order: 1, title: "Documentation" });
     expect(meta.get("guide")).toStrictEqual({
       collapsed: true,
       title: "Guides",
     });
-    expect(diagnostics.map((d) => d.code)).toContain("BLUME_META_PARSE_ERROR");
+    expect(meta.get("fn")).toStrictEqual({ title: "Fn" });
+    expect(meta.get("async-dir")).toStrictEqual({ title: "Async" });
+  });
+
+  it("reports a load failure for a meta module that throws", async () => {
+    const { diagnostics } = await discoverFolderMeta(root);
+
+    expect(diagnostics.map((d) => d.code)).toContain("BLUME_META_LOAD_FAILED");
   });
 });

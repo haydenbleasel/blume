@@ -31,7 +31,7 @@ blume build
 - **Components** — callouts, cards, steps, tabs, accordions, badges, file trees,
   and API-reference blocks, usable in MDX with no imports.
 - **Local search** — works in dev and production via Orama (Pagefind opt-in for large sites), no hosted service.
-- **Navigation** — inferred from files, refined with `_meta.json` or config.
+- **Navigation** — inferred from files, refined with `meta.ts` or config.
 - **Customization** — component overrides, React islands, custom pages, theme
   tokens and `theme.css`, and a source-component registry (`blume add`).
 - **API docs** — `blume import openapi` generates editable reference pages.

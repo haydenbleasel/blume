@@ -37,17 +37,19 @@ See [Frontmatter](/docs/reference/frontmatter) for the full page schema.
 
 ## Folder groups
 
-Add a `_meta.json` to a folder to control how its group appears and how its pages
-are ordered:
+Add a `meta.ts` to a folder to control how its group appears and how its pages
+are ordered. Export a `defineMeta` object for full type-checking:
 
-```json _meta.json lineNumbers
-{
-  "title": "Guides",
-  "icon": "book-open",
-  "order": 2,
-  "collapsed": false,
-  "pages": ["configuration", "theming", "deployment"]
-}
+```ts meta.ts lineNumbers
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Guides",
+  icon: "book-open",
+  order: 2,
+  collapsed: false,
+  pages: ["configuration", "theming", "deployment"],
+});
 ```
 
 - **`title`**, **`icon`**, **`order`** — the group's label, icon, and position
@@ -55,6 +57,18 @@ are ordered:
 - **`pages`** — explicit order for the group's children, listed by slug (numeric
   prefix and parentheses stripped). Pages you leave out still appear, after the
   listed ones.
+
+Because `meta.ts` is a real module, you can compute the meta — pass a function
+(sync or `async`) instead of an object to build it at scan time:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta(async () => ({
+  title: "Guides",
+  pages: await orderFromCms(),
+}));
+```
 
 To group pages _without_ adding a URL segment, use a parenthesized folder name —
 see [Pages](/docs/content#group-folders).
@@ -68,7 +82,7 @@ When the sidebar is generated, order is resolved highest priority first:
     An explicit `navigation.sidebar` replaces the generated tree entirely.
   </Step>
   <Step title="Folder meta">
-    The `pages` array in `_meta.json` orders a group.
+    The `pages` array in `meta.ts` orders a group.
   </Step>
   <Step title="Frontmatter">`sidebar.order` on a page.</Step>
   <Step title="File system">
@@ -123,6 +137,21 @@ navigation: {
 Each item is a page route (a string), a group (`label` + `items`), or a link
 (`label` + `href`). Groups can nest and start `collapsed`.
 
+## Repository link
+
+When you set [`github`](/docs/configuration) in your config, Blume shows a GitHub
+icon in the header — beside the theme toggle — that links to your repository. It's
+on by default; hide it with `navigation.repo`:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  repo: false, // hide the header GitHub link (default: true)
+}
+```
+
+The link only appears when `github` is configured, so projects without a repo are
+unaffected either way.
+
 ## Breadcrumbs and pagination
 
 These come for free from the sidebar tree — no configuration:
@@ -149,3 +178,6 @@ Below the table of contents, every page shows a set of quick actions:
 
 Three more hand the page to AI tools — **Copy as Markdown**, **Open in chat**, and
 **Ask AI about this page** — covered in [AI](/docs/configuration/ai#copy-as-markdown).
+
+With [`export`](/docs/configuration/export) on, an **Export** action also lets
+readers download the page as a PDF or EPUB.

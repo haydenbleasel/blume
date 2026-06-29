@@ -18,11 +18,15 @@ const page = (
   headings: [],
   id,
   links: [],
+  locale: "",
   meta: pageMetaSchema.parse({ draft, sidebar }),
+  navPath: id,
   route,
   segments: [],
+  source: { name: "filesystem", ref: id },
   sourcePath: `/abs/${id}`,
   title,
+  translationKey: route,
 });
 
 const asGroup = (node: NavNode | undefined) => {

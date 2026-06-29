@@ -4,7 +4,8 @@ import matter from "gray-matter";
 import { dirname, join } from "pathe";
 
 import type { BlumeProject } from "../core/project-graph.ts";
-import type { PageRecord } from "../core/types.ts";
+import { readEntryText } from "../core/sources/read.ts";
+import type { PageRecord, RouteManifestEntry } from "../core/types.ts";
 import {
   rewriteMintlifyGlobalVariables,
   rewriteMintlifyMarkdownSnippets,
@@ -50,19 +51,22 @@ export const sourceForMarkdown = async (
   project: BlumeProject,
   page: PageRecord
 ): Promise<string> => {
-  const raw = await readFile(page.sourcePath, "utf-8");
-  if (!isMintlifyProject(project)) {
+  const raw = await readEntryText(project, page);
+  // Snippet/variable rewriting resolves include paths relative to the source
+  // file; non-filesystem entries (no `sourcePath`) are never Mintlify content.
+  if (!(isMintlifyProject(project) && page.sourcePath)) {
     return raw;
   }
+  const { sourcePath } = page;
 
   const withSnippets = await rewriteMintlifyMarkdownSnippets(raw, {
-    filePath: page.sourcePath,
+    filePath: sourcePath,
     root: project.context.root,
   });
   const withSnippetVariables = await rewriteMintlifySnippetVariables(
     withSnippets,
     {
-      filePath: page.sourcePath,
+      filePath: sourcePath,
       root: project.context.root,
     }
   );
@@ -81,16 +85,19 @@ export const buildRawMarkdown = async (
   project: BlumeProject
 ): Promise<Record<string, string>> => {
   const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
+
+  const readRoute = async (route: RouteManifestEntry): Promise<string> => {
+    const page = pageById.get(route.id);
+    if (page) {
+      return await sourceForMarkdown(project, page);
+    }
+    return route.sourcePath ? await readFile(route.sourcePath, "utf-8") : "";
+  };
+
   const entries = await Promise.all(
-    project.manifest.routes.map(async (route) => {
-      const page = pageById.get(route.id);
-      return [
-        route.path,
-        page
-          ? await sourceForMarkdown(project, page)
-          : await readFile(route.sourcePath, "utf-8"),
-      ] as const;
-    })
+    project.manifest.routes.map(
+      async (route) => [route.path, await readRoute(route)] as const
+    )
   );
   return Object.fromEntries(entries);
 };

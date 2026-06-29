@@ -1,5 +1,12 @@
 ---
+import type { UIStrings } from "../../core/i18n-ui.ts";
 import AskAI from "./ask-ai.tsx";
+
+interface Props {
+  strings?: UIStrings["ask"];
+}
+
+const { strings } = Astro.props;
 ---
 
-<AskAI client:load />
+<AskAI client:load strings={strings} />

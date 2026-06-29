@@ -257,7 +257,7 @@ const classifyLink = (
   const { target } = link;
   const site: LinkSite = {
     column: link.column,
-    file: page.sourcePath,
+    file: page.sourcePath ?? page.id,
     line: link.line,
   };
 

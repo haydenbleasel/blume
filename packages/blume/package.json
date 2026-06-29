@@ -22,6 +22,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./ai/*": "./src/ai/*",
     "./schema": "./src/core/schema.ts",
     "./runtime": "./src/runtime/index.ts",
     "./astro": "./src/astro/index.ts",
@@ -29,6 +30,8 @@
     "./markdown": "./src/markdown/index.ts",
     "./components": "./src/components/index.ts",
     "./components/*": "./src/components/*",
+    "./core/*": "./src/core/*",
+    "./sources/*": "./src/core/sources/*",
     "./theme/*": "./src/theme/*",
     "./package.json": "./package.json"
   },
@@ -43,6 +46,7 @@
     "@astrojs/node": "^11.0.0",
     "@astrojs/react": "^6.0.0",
     "@astrojs/vercel": "^11.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@orama/orama": "^3.1.18",
     "@scalar/astro": "^0.4.5",
     "@shikijs/transformers": "^4.2.0",
@@ -56,6 +60,8 @@
     "citty": "^0.1.6",
     "consola": "^3.4.0",
     "deepmerge": "^4.3.1",
+    "epub-gen-memory": "^1.1.2",
+    "github-slugger": "^2.0.0",
     "gray-matter": "^4.0.3",
     "jiti": "^2.4.0",
     "katex": "^0.17.0",
@@ -70,7 +76,6 @@
     "tailwindcss": "^4",
     "tinyglobby": "^0.2.10",
     "typescript": "^5.7.0",
-    "yaml": "^2.6.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
@@ -82,17 +87,33 @@
     "bun-types": "^1.3.14"
   },
   "peerDependencies": {
+    "@ai-sdk/openai-compatible": "^1.0.41",
     "@mixedbread/sdk": "^0.76.0",
+    "@notionhq/client": "^2.2.15",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
     "@oramacloud/client": "^2.1.0",
+    "@sanity/client": "^6.21.0",
     "algoliasearch": "^5.55.0",
     "flexsearch": "^0.8.0",
     "typesense": "^3.0.0"
   },
   "peerDependenciesMeta": {
+    "@ai-sdk/openai-compatible": {
+      "optional": true
+    },
     "@mixedbread/sdk": {
       "optional": true
     },
+    "@openrouter/ai-sdk-provider": {
+      "optional": true
+    },
+    "@notionhq/client": {
+      "optional": true
+    },
     "@oramacloud/client": {
+      "optional": true
+    },
+    "@sanity/client": {
       "optional": true
     },
     "algoliasearch": {

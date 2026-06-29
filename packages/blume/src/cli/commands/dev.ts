@@ -8,31 +8,15 @@ import { scanProject } from "../../core/project-graph.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
-const ignoredWatchSegments = new Set([
-  ".blume",
-  ".git",
-  "build",
-  "dist",
-  "node_modules",
-]);
-
-const shouldIgnoreWatchEvent = (
-  filename: Buffer<ArrayBufferLike> | string | null
-): boolean => {
-  if (!filename) {
-    return false;
-  }
-  const value = filename.toString();
-  return value
-    .split(/[\\/]/u)
-    .some((segment) => ignoredWatchSegments.has(segment));
-};
-
 export const devCommand = defineCommand({
   args: {
     host: { description: "Network host to bind.", type: "string" },
     open: { description: "Open the browser on start.", type: "boolean" },
     port: { description: "Port to listen on.", type: "string" },
+    preview: {
+      description: "Include drafts and unpublished CMS content.",
+      type: "boolean",
+    },
     strict: { description: "Fail on diagnostics.", type: "boolean" },
   },
   meta: {
@@ -41,8 +25,16 @@ export const devCommand = defineCommand({
   },
   async run({ args }) {
     const root = process.cwd();
+    const preview = args.preview ?? false;
+    // Astro's dev server defaults to 4321 when no port is passed. Feeding the
+    // resolved URL in as the `deployment.site` fallback lets site-gated features
+    // (OG images, canonicals, sitemap) work locally without configuring a site.
+    const port = args.port ? Number(args.port) : 4321;
+    const devServerUrl = `http://localhost:${port}`;
     const project = await prepareProject({
+      devServerUrl,
       mode: "dev",
+      preview,
       root,
       strict: args.strict,
     });
@@ -59,14 +51,6 @@ export const devCommand = defineCommand({
 
     // Watch user inputs and regenerate the runtime data on change. Astro/Vite
     // hot-reloads the generated data module so nav and routes stay in sync.
-    const watchTargets = [
-      project.context.contentRoot,
-      project.context.pagesRoot,
-      project.context.configFile,
-      ...project.context.themeFiles,
-      project.context.componentsFile,
-    ].filter((target) => target !== null);
-
     let timer: ReturnType<typeof setTimeout> | null = null;
     const regenerate = () => {
       if (timer) {
@@ -74,7 +58,11 @@ export const devCommand = defineCommand({
       }
       timer = setTimeout(async () => {
         try {
-          const next = await scanProject(root, { mode: "dev" });
+          const next = await scanProject(root, {
+            devServerUrl,
+            mode: "dev",
+            preview,
+          });
           await generateRuntime(next);
         } catch (error) {
           logger.error(`Regeneration failed: ${(error as Error).message}`);
@@ -82,17 +70,27 @@ export const devCommand = defineCommand({
       }, 80);
     };
 
-    const watchers = watchTargets.map((target) =>
-      watch(target, { recursive: true }, (_event, filename) => {
-        if (!shouldIgnoreWatchEvent(filename)) {
-          regenerate();
-        }
-      })
-    );
+    // Content is watched per source (filesystem uses fs.watch; remote sources
+    // are frozen for the session). The remaining project inputs — user pages,
+    // config, theme, and component overrides — are watched directly.
+    const fileTargets = [
+      project.context.pagesRoot,
+      project.context.configFile,
+      project.context.themeFile,
+      project.context.componentsFile,
+    ].filter((target) => target !== null);
+
+    const disposers = [
+      ...project.sources.map((source) => source.watch?.(regenerate)),
+      ...fileTargets.map((target) => {
+        const watcher = watch(target, { recursive: true }, regenerate);
+        return () => watcher.close();
+      }),
+    ].filter((dispose) => dispose !== undefined);
 
     const shutdown = async () => {
-      for (const w of watchers) {
-        w.close();
+      for (const dispose of disposers) {
+        dispose();
       }
       await server.stop();
       process.exit(0);

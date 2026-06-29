@@ -1,0 +1,70 @@
+---
+title: Export
+description: Let readers download any page as a PDF or EPUB.
+---
+
+Blume can add an **Export** action to the [page
+actions](/docs/content/navigation#page-actions) beneath the table of contents,
+letting readers save the page they're on as a **PDF** or an **EPUB**. It's off by
+default and entirely client-side — no server, and [static](/docs/deployment)
+builds stay static.
+
+## Enable it
+
+Turn on both formats with a single toggle:
+
+```ts blume.config.ts
+export: true,
+```
+
+To offer just one format, pass an object instead:
+
+```ts blume.config.ts
+export: {
+  pdf: true,
+  epub: false,
+},
+```
+
+Any format you omit (or set to `false`) is left out of the menu. With both off —
+the default — the **Export** action doesn't appear at all.
+
+## PDF
+
+**Export to PDF** opens your browser's print dialog with a print stylesheet that
+strips the site chrome — header, sidebars, navigation — down to just the article.
+Choose **Save as PDF** to finish.
+
+Because it prints the live, fully-styled page, the result keeps crisp, selectable
+text, real fonts, and syntax-highlighted code. It needs no dependencies and works
+the same in dev, in production, and on static hosts.
+
+:::note
+PDF export goes through the browser's native print dialog, so the exact "Save as
+PDF" wording and options depend on the browser. Enable **Background graphics** in
+the dialog to keep code-block and callout backgrounds.
+:::
+
+## EPUB
+
+**Export to EPUB** generates a self-contained `.epub` of the current page in the
+browser and downloads it — ready for Apple Books, Calibre, or any e-reader. The
+generator is loaded only when a reader clicks Export, so it never weighs down the
+rest of your site.
+
+To keep the file readable on a device with no stylesheet or JavaScript of its
+own, Blume rewrites the page into clean, standalone HTML: syntax-highlighted code
+becomes plain monospace, decorative icons and copy buttons are dropped, and a
+built-in e-reader stylesheet handles spacing, code blocks, and tables.
+
+## What gets exported
+
+Both formats export the **single page** a reader is viewing — not the whole site
+— which matches where the action lives, beneath that page's table of contents.
+
+:::note
+In an EPUB there's no JavaScript to switch tabs, so tabbed content — like
+[package-install](/docs/content/syntax) blocks and code groups — is expanded to
+show every panel at once. Client-rendered embeds such as Mermaid diagrams aren't
+included.
+:::

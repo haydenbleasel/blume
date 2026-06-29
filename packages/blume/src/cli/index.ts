@@ -9,6 +9,7 @@ import { ejectCommand } from "./commands/eject.ts";
 import { initCommand } from "./commands/init.ts";
 import { migrateCommand } from "./commands/migrate.ts";
 import { previewCommand } from "./commands/preview.ts";
+import { syncCommand } from "./commands/sync.ts";
 import { validateCommand } from "./commands/validate.ts";
 import { logger } from "./log.ts";
 
@@ -40,6 +41,7 @@ const blumeSubCommands = {
   init: initCommand,
   migrate: migrateCommand,
   preview: previewCommand,
+  sync: syncCommand,
   validate: validateCommand,
 };
 

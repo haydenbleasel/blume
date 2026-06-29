@@ -1,6 +1,9 @@
 ---
-import type { Navigation } from "../../core/types.ts";
+import type { UIStrings } from "../../core/i18n-ui.ts";
+import type { LocaleSwitchOption, Navigation } from "../../core/types.ts";
+import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
+import LanguageSwitcher from "./LanguageSwitcher.astro";
 import Search from "./Search.astro";
 
 interface Props {
@@ -15,9 +18,15 @@ interface Props {
   navigation: Navigation;
   route: string;
   searchEnabled: boolean;
+  askEnabled?: boolean;
   // The mobile menu button toggles the docs sidebar drawer; custom pages
   // without a sidebar (e.g. a landing page) pass `false` to hide it.
   hasSidebar?: boolean;
+  searchStrings?: UIStrings["search"];
+  switcherStrings?: UIStrings["languageSwitcher"];
+  localeSwitch?: LocaleSwitchOption[];
+  /** Active locale for per-language search filtering. */
+  searchLocale?: string;
 }
 
 const {
@@ -26,7 +35,12 @@ const {
   navigation,
   route,
   searchEnabled,
+  askEnabled = false,
   hasSidebar = true,
+  searchStrings,
+  switcherStrings,
+  localeSwitch,
+  searchLocale,
 } = Astro.props;
 
 // The logo is resolved upstream: an inline `svg` (so a currentColor mark
@@ -119,15 +133,56 @@ const clickScript = `document.addEventListener("click",(e)=>{const t=e.target.cl
   }
   <div class="flex-1"></div>
   <slot name="ask" />
-  {searchEnabled && <Search />}
-  <button
-    aria-label="Toggle color theme"
-    class={iconButton}
-    data-blume-theme-toggle
-    type="button"
-  >
-    <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
-    <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
-  </button>
+  {
+    localeSwitch && localeSwitch.length > 1 && (
+      <LanguageSwitcher
+        label={switcherStrings?.label ?? "Language"}
+        options={localeSwitch}
+        untranslatedLabel={switcherStrings?.untranslated ?? "Not translated"}
+      />
+    )
+  }
+  {
+    searchEnabled && (
+      <Search
+        askEnabled={askEnabled}
+        locale={searchLocale}
+        navigation={navigation}
+        strings={searchStrings}
+      />
+    )
+  }
+  <div class="flex items-center gap-2">
+    {
+      navigation.repoUrl && (
+        <a
+          aria-label="GitHub repository"
+          class={iconButton}
+          href={navigation.repoUrl}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <svg
+            aria-hidden="true"
+            fill="currentColor"
+            height="18"
+            set:html={GITHUB_MARK}
+            viewBox="0 0 16 16"
+            width="18"
+            xmlns="http://www.w3.org/2000/svg"
+          />
+        </a>
+      )
+    }
+    <button
+      aria-label="Toggle color theme"
+      class={iconButton}
+      data-blume-theme-toggle
+      type="button"
+    >
+      <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
+      <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
+    </button>
+  </div>
 </header>
 <script is:inline set:html={clickScript} />

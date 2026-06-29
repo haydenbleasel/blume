@@ -68,4 +68,44 @@ describe("loadConfig", () => {
     expect(error).toBeInstanceOf(BlumeError);
     expect(error.diagnostic.code).toBe("BLUME_CONFIG_LOAD_FAILED");
   });
+
+  it("enables OG images by default once deployment.site is set", async () => {
+    const dir = await makeDir(
+      'export default { deployment: { site: "https://example.com" } };'
+    );
+    const result = await loadConfig(dir);
+    expect(result.config.seo.og.enabled).toBe(true);
+  });
+
+  it("leaves OG images off by default without deployment.site", async () => {
+    const result = await loadConfig(await makeDir());
+    expect(result.config.seo.og.enabled).toBe(false);
+  });
+
+  it("falls back to the dev server URL for deployment.site (dev only)", async () => {
+    const dir = await makeDir();
+    const result = await loadConfig(dir, {
+      devServerUrl: "http://localhost:4321",
+    });
+    expect(result.config.deployment.site).toBe("http://localhost:4321");
+    // The localhost fallback is a known site URL, so OG turns on with it.
+    expect(result.config.seo.og.enabled).toBe(true);
+    // No fallback (the build path) leaves the site unset.
+    const built = await loadConfig(dir);
+    expect(built.config.deployment.site).toBeUndefined();
+  });
+
+  it("honors an explicit seo.og.enabled over the site-based default", async () => {
+    const offDir = await makeDir(
+      'export default { deployment: { site: "https://example.com" }, seo: { og: { enabled: false } } };'
+    );
+    const off = await loadConfig(offDir);
+    expect(off.config.seo.og.enabled).toBe(false);
+
+    const onDir = await makeDir(
+      "export default { seo: { og: { enabled: true } } };"
+    );
+    const on = await loadConfig(onDir);
+    expect(on.config.seo.og.enabled).toBe(true);
+  });
 });

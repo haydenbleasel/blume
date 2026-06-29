@@ -9,6 +9,7 @@ import {
 
 import { codeTitleTransformer } from "./code-title.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
+import { headingAnchorPlugin } from "./heading-anchors.ts";
 import { inlineCodeHighlightPlugin } from "./inline-code.ts";
 import { languageIconTransformer } from "./language-icon.ts";
 import { mathPlugin } from "./math.ts";
@@ -30,6 +31,7 @@ export {
   codeTitleTransformer,
 } from "./code-title.ts";
 export { calloutTypeFor } from "./directives.ts";
+export { headingAnchorPlugin } from "./heading-anchors.ts";
 export { mermaidPlugin } from "./mermaid.ts";
 export { mintlifyCodeGroupPlugin } from "./mintlify-code-group.ts";
 export {
@@ -54,9 +56,22 @@ type HastPlugin = NonNullable<
   NonNullable<Parameters<typeof satteri>[0]>["hastPlugins"]
 >[number];
 
-/** Hast plugins enabled by config: inline `` `code`{:lang} `` highlighting. */
-const blumeHastPlugins = (inline?: boolean): HastPlugin[] =>
-  inline ? [inlineCodeHighlightPlugin() as unknown as HastPlugin] : [];
+/**
+ * Hast plugins enabled by config. Inline `` `code`{:lang} `` highlighting is
+ * opt-in; self-linking heading anchors (`<h2>`–`<h6>` wrapped in an `<a>` to
+ * their own id) are on unless `markdown.headingAnchors` is `false`. Inline code
+ * runs first so the anchor wrap re-refs already-highlighted code.
+ */
+const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => {
+  const plugins: HastPlugin[] = [];
+  if (options.inline) {
+    plugins.push(inlineCodeHighlightPlugin() as unknown as HastPlugin);
+  }
+  if (options.headingAnchors !== false) {
+    plugins.push(headingAnchorPlugin() as unknown as HastPlugin);
+  }
+  return plugins;
+};
 
 /**
  * Shiki transformers enabled by default for every code block. The four upstream
@@ -104,6 +119,11 @@ const FEATURES = { subscript: true, superscript: true };
 
 /** Options shared by both processors. */
 export interface BlumeMarkdownOptions {
+  /**
+   * Wrap `<h2>`–`<h6>` in self-linking anchors (`markdown.headingAnchors`).
+   * On unless explicitly `false`.
+   */
+  headingAnchors?: boolean;
   /** Highlight inline `` `code`{:lang} `` snippets (`markdown.code.inline`). */
   inline?: boolean;
 }
@@ -112,7 +132,7 @@ export interface BlumeMarkdownOptions {
 export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
   satteri({
     features: { ...FEATURES },
-    hastPlugins: blumeHastPlugins(options.inline),
+    hastPlugins: blumeHastPlugins(options),
   });
 
 export interface BlumeMdxOptions extends BlumeMarkdownOptions {
@@ -148,7 +168,7 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) => {
       directive: true,
       ...(options.math ? { math: true } : {}),
     },
-    hastPlugins: blumeHastPlugins(options.inline),
+    hastPlugins: blumeHastPlugins(options),
     mdastPlugins: plugins as unknown as MdastPlugin[],
   });
 };
