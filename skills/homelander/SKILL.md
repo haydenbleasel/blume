@@ -1,114 +1,105 @@
 ---
 name: homelander
-description: Agent-native docs harness for creating or maintaining documentation directly from a codebase. Use when asked to run DeepSec-style docs analysis, generate first-pass docs from source code, compare merged PRs or changed public surfaces against Markdown/MDX docs, ignore feature-flagged or unreleased behavior, validate docs changes, produce evidence reports, or open focused blume/* documentation PRs from Codex, Cursor, Claude, or scheduled automations.
+description: Agent-native DeepSec-style docs authoring framework for building or maintaining Blume documentation directly from a codebase. Use when asked to generate docs from an empty repo or Blume scaffold, classify public code surfaces into composable docs template packs, create Markdown/MDX folders and Blume meta.ts navigation, compare code or merged PRs against docs, ignore feature-flagged or unreleased behavior, run evidence-based docs review, validate docs, or open focused blume/* documentation PRs from Codex, Cursor, Claude, or scheduled automations.
 ---
 
 # Homelander
 
 ## Overview
 
-Use Homelander as an agent-invoked docs harness. The skill is the UX and policy
-layer; bundled scripts, templates, validators, and references are the reliable
-substrate. The user or automation invokes the skill, then the agent runs the
-tools and follows the procedure.
+Use Homelander as a docs authoring harness for agent-native execution. The skill
+is the UX and policy layer; bundled scripts, pack templates, validators, and
+references are the reliable substrate. The agent invokes the tools because the
+user or automation invoked the skill.
 
-Homelander has three modes:
+Homelander builds a **docs portfolio**, not a single archetype. A repo can select
+multiple composable packs, such as platform app + HTTP API + model provider +
+SDK + CLI. The output is a Blume docs source tree: MDX files, folders, and
+`meta.ts` navigation.
 
+## Modes
+
+- **Init mode**: start from no docs, or a minimal `blume init` scaffold, and
+  build a first useful docs tree from code.
 - **Maintenance mode**: compare recent merged work and current public surfaces
-  against existing docs, update stale Markdown/MDX, validate, and open or update
-  a focused `blume/*` PR.
-- **Init mode**: inspect a repo with little or no docs and generate a first
-  useful documentation set from the codebase.
-- **Audit-only mode**: inspect and report evidence without editing files.
+  against existing docs, update stale MDX, validate, and open or update a
+  focused `blume/*` PR.
+- **Audit-only mode**: inspect, classify, plan, and produce findings without
+  editing files.
 
 ## Required First Steps
 
-1. Read the nearest repo instructions: `AGENTS.md`, `CLAUDE.md`, Cursor rules,
-   contribution docs, PR template, and package scripts.
-2. Inspect the current branch and worktree. Do not overwrite unrelated user
-   changes.
-3. Choose a mode:
-   - No docs root or empty docs root: use init mode.
-   - Existing docs plus recent merged work or a schedule: use maintenance mode.
-   - User asks for findings only: use audit-only mode.
-4. Run the evidence scanner from the repo root. Replace `skills/homelander` with
-   the installed skill path if the skill lives elsewhere:
+1. Read repo instructions: `AGENTS.md`, `CLAUDE.md`, Cursor rules, contribution
+   docs, PR template, and package scripts.
+2. Inspect branch and worktree. Do not overwrite unrelated user changes.
+3. If init mode and no docs project exists, run the repo-appropriate Blume
+   bootstrap first, such as `blume init`, then let Homelander replace the
+   scaffold with evidence-backed docs.
+4. Run the harness from the repo root:
 
 ```bash
 python3 skills/homelander/scripts/docs_harness.py \
   --repo . \
-  --mode maintenance \
-  --lookback-days 7 \
+  --mode init \
+  --packs auto \
   --output .homelander/evidence.md \
-  --json-output .homelander/evidence.json
+  --json-output .homelander/evidence.json \
+  --plan-output .homelander/docs-plan.json
 ```
 
-Use `--mode init` for new docs and `--mode audit` for read-only inspection. Add
-`--docs-root path/to/docs` when the repo uses a nonstandard docs location.
+Use `--include-packs api,models,sdk` or `--exclude-packs billing,integrations`
+when the user or repo policy constrains the docs portfolio. Use `--write-stubs`
+only after reviewing the plan.
 
 ## Workflow
 
-1. **Collect evidence**
+1. **Scan and classify**
    - Run `scripts/docs_harness.py`.
-   - Read `.homelander/evidence.md`.
-   - Use the JSON output for exact lists when planning pages or validating links.
+   - Read `.homelander/evidence.md` and `.homelander/docs-plan.json`.
+   - Read `references/pack-composition.md` when pack selection or output shape
+     needs interpretation.
 
-2. **Plan documentation work**
-   - Read `references/operating-procedure.md` for mode-specific steps and PR
-     gates.
-   - Read `references/source-patterns.md` when scanner output needs manual
-     follow-up across routes, APIs, SDK exports, CLI commands, config, env vars,
-     schemas, or components.
-   - Build a short plan from evidence, not from memory.
+2. **Plan the docs portfolio**
+   - Treat selected packs as docs obligations.
+   - Keep skipped packs skipped unless there is clear evidence or user override.
+   - The core outputs are MDX pages, folders, and Blume `meta.ts` files.
+   - Do not generate screenshots, fake OpenAPI specs, app code, dependencies, or
+     marketing-heavy pages in v1.
 
-3. **Update or create docs**
-   - Edit the smallest set of docs needed in maintenance mode.
-   - In init mode, scaffold a coherent first docs set. Prefer copying and
-     adapting files from `assets/templates/`.
-   - Preserve existing docs voice, frontmatter, navigation, and component style.
-   - Never document feature-flagged, unreleased, private, or speculative behavior
-     as generally available.
+3. **Write stubs and author MDX**
+   - Run the harness again with `--write-stubs` when the plan is acceptable.
+   - Replace every `HOMELANDER:` comment, bracket placeholder, `TODO`, and `TBD`
+     with sourced content before PR.
+   - Use code, schemas, CLI help, generated types, tests, examples, changelogs,
+     and release notes as primary evidence.
+   - Do not document feature-flagged, private, experimental, or unreleased
+     behavior as generally available.
 
-4. **Validate**
-   - Run the repo's documented docs build and the strongest reasonable focused
-     checks.
-   - Validate links, frontmatter, navigation entries, generated snippets,
-     examples, imports, and commands affected by the change.
-   - Fix failures caused by your docs changes. Report unrelated failures
-     separately.
+4. **Run the DeepSec-style review turn**
+   - Re-run the harness after authoring.
+   - Read `references/review-turn.md`.
+   - Treat review findings like security findings: evidence first, severity,
+     affected page, pack, required fix.
+   - Fix high-confidence factual issues before opening a PR.
+   - Leave product-intent gaps as explicit PR questions.
 
-5. **Report and open PR**
-   - Always produce an evidence report in the final summary or PR body.
-   - If no docs changes are needed, do not open a PR. Report inspected surfaces
-     and the no-op result.
-   - If docs changed, create or update a focused branch named
-     `blume/docs-refresh-YYYY-MM-DD`, `blume/docs-init-YYYY-MM-DD`, or another
-     repo-approved `blume/*` name.
-   - Open or update a PR to the repo default branch with evidence, files changed,
-     validation results, skipped items, and remaining questions.
-
-## Evidence Rules
-
-- Treat docs as an extension of the codebase. Public code surfaces are the source
-  of truth, and docs are the user-facing projection.
-- Prefer deterministic scanner output over broad prompt-only reasoning.
-- Cross-check scanner findings manually before editing docs.
-- Use primary sources inside the repo first: code, schemas, CLI help, generated
-  types, tests, examples, changelogs, and release notes.
-- Skip feature-flagged or unreleased behavior unless the repo explicitly
-  documents that audience.
-- Surface uncertainty as a remaining question instead of inventing product
-  intent.
+5. **Validate and PR**
+   - Run the repo docs build and strongest reasonable focused checks.
+   - If no docs changed, report the no-op evidence and do not open a PR.
+   - If docs changed, create or update a focused `blume/*` branch and PR.
+   - Do not commit `.homelander/` artifacts unless the repo explicitly wants
+     audit artifacts in source control.
 
 ## Resources
 
-- `scripts/docs_harness.py`: deterministic first-pass scanner for public
-  surfaces, docs inventory, feature-flag signals, link/frontmatter issues,
-  recent git changes, and evidence reports.
-- `references/operating-procedure.md`: detailed init, maintenance, validation,
-  and PR workflow.
-- `references/source-patterns.md`: scanner coverage and manual inspection
-  patterns for public surfaces and unreleased work.
-- `references/automation-examples.md`: Codex, Cursor, Claude, and weekly
-  scheduled automation prompts.
-- `assets/templates/*.mdx`: starter page templates for generated docs.
+- `scripts/docs_harness.py`: scanner, pack classifier, docs portfolio planner,
+  safe stub writer, and DeepSec-style review reporter.
+- `references/pack-composition.md`: pack model, selected/skipped pack policy, and
+  output contract.
+- `references/source-patterns.md`: public surface scanners and unreleased-work
+  detection.
+- `references/review-turn.md`: required adversarial review procedure.
+- `references/operating-procedure.md`: mode-specific workflow and PR gates.
+- `references/automation-examples.md`: Codex, Cursor, Claude, and scheduled run
+  examples.
+- `assets/packs/*`: composable MDX templates for the selected docs packs.

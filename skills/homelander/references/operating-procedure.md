@@ -5,57 +5,44 @@ evidence report.
 
 ## Mode selection
 
+- **Init mode**: use when the repo has no useful docs, only a README, or a fresh
+  Blume scaffold.
 - **Maintenance mode**: use when docs already exist and the task mentions recent
-  PRs, merged work, releases, drift, weekly automation, or "keep docs updated."
-- **Init mode**: use when the repo has no useful docs root, only a README, or the
-  user asks to create docs from a codebase.
+  PRs, merged work, releases, drift, weekly automation, or keeping docs updated.
 - **Audit-only mode**: use when the user asks for findings, gaps, review, or an
   evidence report without edits.
 
+## Init mode
+
+1. If no docs project exists, run the repo-appropriate `blume init` flow before
+   writing final docs.
+2. Run the harness with `--mode init --packs auto`.
+3. Review selected packs, skipped packs, and planned pages.
+4. Add `--include-packs` or `--exclude-packs` only when repo evidence or user
+   intent is clear.
+5. Run `--write-stubs` after the plan is acceptable.
+6. Replace every scaffold marker with evidence-backed MDX.
+7. Re-run the harness and fix DeepSec-style review findings.
+8. Validate the docs build and open a focused `blume/docs-init-*` PR.
+
 ## Maintenance mode
 
-1. Identify the docs root, target branch, lookback window, and branch naming
-   policy from repo instructions or the user prompt.
-2. Run the scanner with `--mode maintenance` and the configured
-   `--lookback-days`.
+1. Identify docs root, target branch, lookback window, and branch naming policy.
+2. Run the harness with `--mode maintenance`.
 3. Compare recent merged work, current public surfaces, changelogs, tests, and
-   examples against Markdown/MDX docs.
+   examples against the existing docs portfolio.
 4. Ignore feature-flagged, private, experimental, deprecated-but-hidden, or
    unreleased behavior unless the docs explicitly target that audience.
 5. Edit only pages with factual drift. Avoid subjective rewrites.
 6. Update navigation/meta files when pages are added, renamed, moved, or removed.
-7. Validate the touched docs with the repo's docs build, link/frontmatter checks,
-   and focused examples or commands.
+7. Re-run the review turn and validation.
 8. Open or update one focused `blume/*` PR only when docs changed.
-
-## Init mode
-
-1. Run the scanner with `--mode init`.
-2. Identify the product type from public surfaces:
-   - Library or SDK: exported package entrypoints, examples, types, and tests.
-   - CLI: package bins, command files, CLI help, config, and env vars.
-   - Web app: routes, API handlers, components, auth flows, and config.
-   - Framework or plugin: configuration schema, extension points, generated
-     outputs, and examples.
-3. Draft an information architecture before writing pages:
-   - Start with `index`, `quickstart`, and the strongest reference page.
-   - Add concept pages only for ideas required to use the product correctly.
-   - Add migration/change docs only when the repo contains release or migration
-     evidence.
-4. Copy the closest templates from `assets/templates/` into the docs root, then
-   replace every placeholder with evidence from code, tests, or examples.
-5. Include "unknown" or "needs product decision" in the evidence report rather
-   than fabricating positioning, roadmap, pricing, or support promises.
-6. Validate that the generated docs build and navigation works.
 
 ## Audit-only mode
 
-1. Run the scanner with `--mode audit`.
-2. Manually inspect the highest-risk findings: undocumented CLI/config/env
-   surfaces, missing quickstart path, broken local links, and feature-flag
-   signals.
-3. Produce the evidence report and recommended edits. Do not modify files unless
-   the user confirms.
+1. Run the harness with `--mode audit`.
+2. Inspect selected packs, skipped packs, gaps, and review findings.
+3. Produce recommendations without modifying files unless the user confirms.
 
 ## Validation gates
 
@@ -65,29 +52,20 @@ Run the strongest reasonable local checks for the repo. Prefer this order:
 2. Docs lint, Markdown lint, typecheck, or frontmatter validation.
 3. Link checker when available.
 4. Focused tests for generated snippets, examples, config schemas, or CLI help.
-5. Full repo QA when the docs change shared generated artifacts or public
-   examples used by tests.
+5. Full repo QA when docs change shared generated artifacts or public examples
+   used by tests.
 
 Report every command and result. If a check fails for an unrelated existing
 issue, include the failing command, exact failure, and why it is unrelated.
 
 ## PR rules
 
-- Use an existing open docs-maintenance PR if it targets the same goal and branch
-  prefix.
-- Otherwise create a branch named `blume/docs-refresh-YYYY-MM-DD` for
-  maintenance or `blume/docs-init-YYYY-MM-DD` for init.
-- Keep the diff focused on docs, templates, scanner output needed by the PR, and
+- Use an existing open Homelander PR if it targets the same branch and goal.
+- Otherwise create a branch named `blume/docs-init-YYYY-MM-DD` for init or
+  `blume/docs-refresh-YYYY-MM-DD` for maintenance.
+- Keep the diff focused on docs source files, skill resources, templates, and
   navigation changes.
 - Do not commit `.homelander/` reports unless the repo explicitly wants audit
   artifacts in source control.
-- PR title examples:
-  - `blume: refresh docs for 2026-06-29`
-  - `blume: scaffold docs from codebase`
-- PR body must include:
-  - Evidence report summary.
-  - Public surfaces inspected.
-  - Docs changed or generated.
-  - Skipped flagged/unreleased/private work.
-  - Validation commands and results.
-  - Remaining questions or follow-up.
+- PR body must include selected packs, skipped packs, docs changed, skipped
+  flagged/unreleased work, validation results, and remaining questions.

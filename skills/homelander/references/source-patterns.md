@@ -65,5 +65,9 @@ Map surfaces to docs like this:
 - HTTP endpoints, schemas, request/response objects -> API reference.
 - Breaking changes, renamed options, migrations -> migration/change docs.
 
+Then map those pages into packs. Do not force one product archetype. A repo can
+select multiple packs when evidence supports them, such as platform app + HTTP
+API + SDK + CLI.
+
 When evidence is thin, create a smaller docs set and list remaining questions.
-Do not invent positioning or support guarantees.
+Do not invent positioning, support guarantees, pricing, model limits, or roadmap.

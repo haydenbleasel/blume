@@ -30,15 +30,15 @@ missing or stale docs.
 
 ## Choose a skill
 
-| Skill                | Use it for                                                         |
-| -------------------- | ------------------------------------------------------------------ |
-| `self-updating-docs` | Narrow scheduled maintenance for existing Blume docs.              |
-| `homelander`         | Full docs harness: maintain docs or generate first docs from code. |
+| Skill                | Use it for                                                      |
+| -------------------- | --------------------------------------------------------------- |
+| `self-updating-docs` | Narrow scheduled maintenance for existing Blume docs.           |
+| `homelander`         | Composable docs authoring framework that builds docs from code. |
 
 `self-updating-docs` is intentionally small: it packages policy for weekly docs
 drift checks. `homelander` goes further. It gives the agent deterministic
-scanners, evidence reports, references, and templates so docs can be treated as
-an extension of the codebase rather than a separate app.
+scanners, pack classification, evidence reports, references, and templates so an
+empty Blume scaffold can become a full docs source tree from the codebase.
 
 ## Install the skills
 
@@ -96,14 +96,14 @@ uses a different layout.
 Run this when a repository has little or no documentation:
 
 ```text
-Use the homelander skill. Run init mode. Inspect the codebase, infer the public product surface, scaffold a first useful Blume docs set from templates, validate the docs build, and open a blume/docs-init-* PR with an evidence report and remaining questions.
+Use the homelander skill. Run init mode. If no docs project exists, bootstrap with blume init first. Inspect the codebase, classify composable docs packs, scaffold MDX folders and meta.ts files with --write-stubs, author evidence-backed docs from the selected packs, run the DeepSec-style docs review turn, validate the docs build, and open a blume/docs-init-* PR with selected packs, skipped packs, review findings, and remaining questions.
 ```
 
-Use this when docs already exist but you want deeper code-surface coverage than
-the lightweight maintenance skill:
+Use this when docs already exist but you want composable code-surface coverage
+across app, API, model, SDK, CLI, framework, integration, and migration docs:
 
 ```text
-Use the homelander skill. Run maintenance mode with a 7 day lookback window. Compare recent merged work, routes, APIs, SDK exports, CLI commands, env vars, config, schemas, and components against the docs inventory. Skip feature-flagged and unreleased behavior. Update docs only for factual drift, validate changes, and open or update one blume/* PR to main. Always produce an evidence report.
+Use the homelander skill. Run maintenance mode with a 7 day lookback window and --packs auto. Compare recent merged work, routes, APIs, model surfaces, SDK exports, CLI commands, env vars, config, schemas, integrations, and components against the docs portfolio. Skip feature-flagged and unreleased behavior. Update docs only for factual drift, run the DeepSec-style docs review turn, validate changes, and open or update one blume/* PR to main. Always produce an evidence report.
 ```
 
 ### Release readiness
