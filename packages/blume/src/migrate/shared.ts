@@ -35,7 +35,8 @@ export interface CalloutRewriteOptions {
   typeDirectives: Record<string, string>;
 }
 
-const attribute = (attrs: string, name: string): string | undefined => {
+/** Read a quoted string attribute (`name="…"` or `name='…'`) from a tag. */
+export const attribute = (attrs: string, name: string): string | undefined => {
   const match = attrs.match(
     new RegExp(`\\b${name}=(?:"(?<dq>[^"]*)"|'(?<sq>[^']*)')`, "u")
   );
@@ -70,7 +71,7 @@ const directiveBlock = (
  * expression attributes (so a `>` inside `icon={"<svg…>"}` is not mistaken for
  * the tag end). Returns -1 if unterminated.
  */
-const findOpenTagEnd = (source: string, from: number): number => {
+export const findOpenTagEnd = (source: string, from: number): number => {
   let depth = 0;
   let quote: '"' | "'" | "`" | null = null;
   for (let index = from; index < source.length; index += 1) {

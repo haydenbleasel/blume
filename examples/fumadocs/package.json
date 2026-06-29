@@ -1,0 +1,14 @@
+{
+  "name": "@blume-examples/fumadocs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate": "blume migrate fumadocs",
+    "dev": "blume dev",
+    "build": "blume build",
+    "preview": "blume preview"
+  },
+  "dependencies": {
+    "blume": "workspace:*"
+  }
+}
