@@ -1,0 +1,145 @@
+---
+title: Self-updating docs
+description: Configure your agent runner to keep Blume docs current.
+---
+
+Blume publishes docs in formats that coding agents can read: `llms.txt`, raw
+Markdown URLs, and the optional MCP server. Pair those surfaces with the
+`self-updating-docs` skill and your own automation runner to keep docs in sync
+with the product.
+
+Blume does not host the automation. You configure the schedule, trigger,
+permissions, and prompt in Codex, Cursor, Claude, or another agent runner. The
+skill supplies the docs-maintenance workflow: audit user-facing drift, ignore
+feature-flagged work that is not ready, update only stale docs, verify the docs
+build, and open a `blume/*` pull request when changes are needed.
+
+## How it works
+
+Each automation needs four pieces:
+
+| Piece        | You configure                                      |
+| ------------ | -------------------------------------------------- |
+| Trigger      | Weekly schedule, release event, PR merge, or cron. |
+| Context      | Repository, docs path, lookback window, and tools. |
+| Instructions | The prompt and the `self-updating-docs` skill.     |
+| Outcome      | No-op report or a verified `blume/*` PR.           |
+
+Keep the automation narrow. It should update docs only when it can connect a
+merged PR, release note, schema change, CLI change, or public behavior change to
+missing or stale docs.
+
+## Install the skill
+
+Download the packaged skill:
+
+```bash
+curl -L https://blume.dev/skills/self-updating-docs.skill \
+  -o self-updating-docs.skill
+```
+
+The package contains only `SKILL.md` and a reference checklist. It does not ship
+executable scripts.
+
+Install it where your agent reads project skills:
+
+| Agent       | Project skill location |
+| ----------- | ---------------------- |
+| Codex       | `.agents/skills/`      |
+| Cursor      | `.cursor/skills/`      |
+| Claude Code | `.claude/skills/`      |
+
+```bash
+mkdir -p .agents/skills
+unzip -o self-updating-docs.skill -d .agents/skills
+```
+
+Use `.cursor/skills` for Cursor, or `.claude/skills` for Claude Code. Use a
+personal skills directory instead when you want the same workflow available in
+many repositories.
+
+## Recipes
+
+### Weekly docs drift
+
+Run this weekly for active docs:
+
+```text
+Use the self-updating-docs skill. Monitor the PRs merged within the last 7 days. Compare them to apps/docs markdown contents and evaluate whether the docs need updates. Be aware that if something is behind a feature flag, it is not ready to be considered. If you modify the docs, verify the docs build and create a blume/* PR to main. If no docs changes are needed, report the PRs and docs areas checked and do not open a PR.
+```
+
+Replace `apps/docs` with `docs` or your configured Blume docs root if your repo
+uses a different layout.
+
+### Release readiness
+
+Run this before a release branch or launch milestone:
+
+```text
+Use the self-updating-docs skill. Review the release changes and compare them to the Blume docs. Update quickstarts, configuration pages, API references, and changelogs only for behavior that is released or enabled for the documented audience. Verify the docs build and open a blume/* PR to main if changes are needed.
+```
+
+### CLI and config drift
+
+Run this when CLI commands or configuration schemas change frequently:
+
+```text
+Use the self-updating-docs skill. Compare current CLI help, config schema defaults, environment variables, and public package exports against the docs markdown. Update stale commands, options, defaults, and examples. Do not document feature-flagged behavior as generally available. Verify docs before opening a blume/* PR to main.
+```
+
+### Editorial audit
+
+Run this monthly for stable docs:
+
+```text
+Use the self-updating-docs skill. Audit docs markdown for broken links, stale screenshots or examples, outdated provider links, duplicate setup instructions, and pages that conflict with current product behavior. Avoid subjective rewrites. Open a blume/* PR to main only for factual maintenance changes.
+```
+
+## Codex
+
+[Codex Automations](https://developers.openai.com/codex/app/automations) can
+run on a schedule and explicitly trigger a skill with `$skill-name`. Install the
+skill in `.agents/skills`, then test it once in a normal thread:
+
+```text
+$self-updating-docs Monitor the PRs merged within the last 7 days. Compare them to apps/docs markdown contents and open a blume/* PR to main only if docs need updates.
+```
+
+Create a project-scoped automation in the Codex app, choose the schedule or
+trigger, and use a dedicated worktree so the run cannot touch unfinished local
+work. Use one of the recipes above, or keep the explicit `$self-updating-docs`
+prefix if your Codex setup has several similar skills.
+
+## Cursor
+
+[Cursor Automations](https://cursor.com/docs/cloud-agent/automations) run Cloud
+Agents on schedules or events. Install the skill in `.cursor/skills`, give the
+automation repository and PR permissions, then create a scheduled automation
+with one of the recipes above.
+
+If your Cursor setup exposes skills through slash commands, start the prompt
+with:
+
+```text
+/self-updating-docs Monitor the PRs merged within the last 7 days. Compare them to apps/docs markdown contents and open a blume/* PR to main only if docs need updates.
+```
+
+Add any required MCPs or environment variables for private changelogs, issue
+trackers, release notes, or docs sources the agent must inspect.
+
+## Claude
+
+[Claude Code skills](https://docs.anthropic.com/en/docs/claude-code/skills) can
+live in `.claude/skills`. For durable weekly automation, use a
+[Claude Routine](https://code.claude.com/docs/en/scheduled-tasks) or Desktop
+scheduled task rather than a session-scoped `/loop`, which is better for
+short-lived polling.
+
+Use this routine prompt:
+
+```text
+/self-updating-docs Monitor the PRs merged within the last 7 days. Compare them to apps/docs markdown contents and open a blume/* PR to main only if docs need updates.
+```
+
+Claude cloud routines default to `claude/`-prefixed branches. Enable unrestricted
+branch pushes for the repository when you want the exact `blume/*` branch prefix.
