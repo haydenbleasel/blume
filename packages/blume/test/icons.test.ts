@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { hasIcon, resolveIcon } from "../src/theme/icons.ts";
 
