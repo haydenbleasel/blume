@@ -147,9 +147,6 @@ Deliverables:
 - `blume migrate fumadocs`
 - `blume eject`
 - generated diff preview
-- Mintlify migration converts a `docs.json` project into native Blume content
-  plus `blume.config.ts`; until then, the Mintlify bridge exists to run the
-  original project locally.
 
 Exit criteria:
 

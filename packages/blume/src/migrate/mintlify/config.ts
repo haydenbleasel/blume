@@ -2,13 +2,13 @@ import { readFile } from "node:fs/promises";
 
 import { dirname, relative, resolve } from "pathe";
 
-import { BlumeError } from "./diagnostics.ts";
+import { BlumeError } from "../../core/diagnostics.ts";
 import type {
   BlumeConfig,
   DirectoryMode,
   ResolvedConfig,
   SidebarItemConfig,
-} from "./schema.ts";
+} from "../../core/schema.ts";
 
 type JsonObject = Record<string, unknown>;
 type NavigationSelectors = ResolvedConfig["navigation"]["selectors"];

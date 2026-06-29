@@ -38,13 +38,6 @@ import { twoslashCss } from "../theme/twoslash.ts";
 
 const POSIX = (path: string): string => path.split("\\").join("/");
 
-const readThemeFiles = async (paths: string[]): Promise<string> => {
-  const contents = await Promise.all(
-    paths.map((path) => readFile(path, "utf-8"))
-  );
-  return contents.join("\n");
-};
-
 /**
  * Promote the generated runtime into the project as an owned Astro app. After
  * eject the project has a normal `astro.config.mjs` and `src/`, the `blume` CLI
@@ -65,7 +58,9 @@ export const eject = async (root: string): Promise<string[]> => {
   const [pages, needsReactRaw, userTheme, rawMarkdown] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(root),
-    readThemeFiles(context.themeFiles),
+    context.themeFile
+      ? readFile(context.themeFile, "utf-8")
+      : Promise.resolve(""),
     buildRawMarkdown(project),
   ]);
   const needsReact = needsReactRaw || askEnabled;

@@ -5,61 +5,12 @@ import { dirname, join, relative } from "pathe";
 import { glob } from "tinyglobby";
 
 import type { BlumeConfig } from "../core/schema.ts";
+import { migrateMintlifyProject } from "./mintlify/index.ts";
 
 export interface MigrationResult {
   moved: number;
   warnings: string[];
 }
-
-/** A Mintlify `navigation.languages[]` entry. */
-interface MintlifyLanguage {
-  language: string;
-  default?: boolean;
-}
-
-/**
- * A display label for a locale code — the language's native name when the
- * runtime knows it (`fr` -> `Français`), else the code itself.
- */
-const localeLabel = (code: string): string => {
-  try {
-    const native = new Intl.DisplayNames([code], { type: "language" }).of(code);
-    if (native && native !== code) {
-      return native.charAt(0).toUpperCase() + native.slice(1);
-    }
-  } catch {
-    // Unknown code or no ICU data; fall through to the code.
-  }
-  return code;
-};
-
-/**
- * Map a Mintlify `navigation.languages[]` array to a Blume `i18n` config. The
- * entry marked `default: true` becomes `defaultLocale`; translated content
- * already lives in ISO-code directories, which match Blume's `dir` parser.
- */
-const mintlifyI18n = (
-  spec: Record<string, unknown>
-): BlumeConfig["i18n"] | null => {
-  const navigation = spec.navigation as
-    | { languages?: MintlifyLanguage[] }
-    | undefined;
-  const languages = navigation?.languages;
-  if (!Array.isArray(languages) || languages.length < 2) {
-    return null;
-  }
-  const defaultLocale =
-    languages.find((entry) => entry.default)?.language ??
-    languages[0]?.language ??
-    "en";
-  return {
-    defaultLocale,
-    locales: languages.map((entry) => ({
-      code: entry.language,
-      label: localeLabel(entry.language),
-    })),
-  };
-};
 
 const writeBlumeConfig = async (
   root: string,
@@ -145,57 +96,13 @@ const moveIntoDocs = async (
   return { moved, warnings };
 };
 
-/** Migrate a Mintlify project (mint.json / docs.json + MDX content). */
-export const migrateMintlify = async (
-  root: string
-): Promise<MigrationResult> => {
-  const configFile = existsSync(join(root, "docs.json"))
-    ? join(root, "docs.json")
-    : join(root, "mint.json");
-
-  const warnings: string[] = [];
-  let spec: Record<string, unknown> = {};
-  if (existsSync(configFile)) {
-    spec = JSON.parse(await readFile(configFile, "utf-8"));
-  } else {
-    warnings.push("No mint.json or docs.json found; using defaults.");
-  }
-
-  const files = await glob(["**/*.{md,mdx}"], {
-    absolute: true,
-    cwd: root,
-    ignore: ["node_modules/**", "docs/**", ".blume/**", "dist/**"],
-  });
-  const result = await moveIntoDocs(root, files);
-
-  const colors = spec.colors as { primary?: string } | undefined;
-  const config: BlumeConfig = {
-    title: (spec.name as string) ?? (spec.title as string) ?? "Documentation",
-  };
-  if (typeof spec.description === "string") {
-    config.description = spec.description;
-  }
-  if (colors?.primary) {
-    config.theme = { accent: colors.primary };
-  }
-  const i18n = mintlifyI18n(spec);
-  if (i18n) {
-    config.i18n = i18n;
-  }
-  await writeBlumeConfig(root, config);
-
-  warnings.push(
-    "Navigation is now inferred from files; add a meta.ts for custom ordering.",
-    "Mintlify components (Card, Callout, Tabs, Steps, Accordion) map to Blume built-ins."
-  );
-  if (i18n) {
-    warnings.push(
-      `Mapped ${i18n.locales.length} languages to i18n.locales (default: ${i18n.defaultLocale}); review the locale labels.`
-    );
-  }
-
-  return { moved: result.moved, warnings: [...result.warnings, ...warnings] };
-};
+/**
+ * Migrate a Mintlify project (`docs.json`/`mint.json` + MDX). Translates the
+ * config, rewrites pages to idiomatic Blume MDX in place, and relocates assets.
+ * Unlike the other migrators, content stays at the project root.
+ */
+export const migrateMintlify = (root: string): Promise<MigrationResult> =>
+  migrateMintlifyProject(root);
 
 const migrateFromContentDir = async (
   root: string,

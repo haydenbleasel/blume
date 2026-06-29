@@ -1,4 +1,3 @@
-export { blumeContentLoader } from "./content-loader.ts";
 export { generateRuntime } from "./generate.ts";
 export type { GenerateResult } from "./generate.ts";
 export { blumeIntegration } from "./integration.ts";

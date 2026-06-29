@@ -61,7 +61,6 @@ const makeProject = (pages: PageRecord[]): BlumeProject =>
       description: "Desc",
       title: "Docs",
     }),
-    context: { configFile: null, root },
     graph: { pages },
     manifest: {
       routes: pages.map((page) => ({
@@ -106,8 +105,8 @@ describe("buildLlmsFiles — index", () => {
     expect(index).toContain("> Desc");
     const links = index.split("\n").filter((line) => line.startsWith("- ["));
     expect(links).toStrictEqual([
-      "- [Alpha](https://example.com/a.md): First",
-      "- [Beta](https://example.com/b.md)",
+      "- [Alpha](https://example.com/a): First",
+      "- [Beta](https://example.com/b)",
     ]);
     expect(index).not.toContain("Gamma");
   });

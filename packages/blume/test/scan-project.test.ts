@@ -23,7 +23,7 @@ const makeProject = async (files: Record<string, string>): Promise<string> => {
 };
 
 const CONTENT: Record<string, string> = {
-  "docs/bad.md": "---\ndraft: maybe\n---\n# Bad\n",
+  "docs/bad.md": "---\nnope: 1\n---\n# Bad\n",
   "docs/draft.md": "---\ntitle: Draft\ndraft: true\n---\n# Draft\n",
   "docs/index.md": "# Home\n",
 };

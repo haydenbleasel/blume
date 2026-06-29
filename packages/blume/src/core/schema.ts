@@ -69,93 +69,6 @@ const changelogMetaSchema = z
   })
   .strict();
 
-const mintlifySearchMetaSchema = z
-  .object({
-    boost: z.number().optional(),
-    exclude: z.boolean().optional(),
-    tags: z.array(z.string()).optional(),
-  })
-  .passthrough();
-
-const mintlifySidebarMetaSchema = z
-  .object({
-    badge: z.string().optional(),
-    hidden: z.boolean().optional(),
-    icon: iconName.optional(),
-    label: z.string().optional(),
-    order: z.number().optional(),
-  })
-  .passthrough();
-
-const mintlifyPageMetaInputSchema = z
-  .object({
-    api: z.unknown().optional(),
-    asyncapi: z.string().optional(),
-    boost: z.number().optional(),
-    hidden: z.boolean().optional(),
-    icon: iconName.optional(),
-    noindex: z.boolean().optional(),
-    openapi: z.string().optional(),
-    search: mintlifySearchMetaSchema.optional(),
-    sidebar: mintlifySidebarMetaSchema.optional(),
-    sidebarTitle: z.string().optional(),
-    tag: z.string().optional(),
-    type: z.string().optional(),
-  })
-  .passthrough();
-
-type MintlifyPageMetaInput = z.infer<typeof mintlifyPageMetaInputSchema>;
-
-const normalizedMintlifySearch = (meta: MintlifyPageMetaInput) => ({
-  ...meta.search,
-  ...(meta.boost !== undefined && meta.search?.boost === undefined
-    ? { boost: meta.boost }
-    : {}),
-});
-
-const normalizedMintlifySidebar = (meta: MintlifyPageMetaInput) => ({
-  ...meta.sidebar,
-  ...(meta.sidebarTitle !== undefined && meta.sidebar?.label === undefined
-    ? { label: meta.sidebarTitle }
-    : {}),
-  ...(meta.icon !== undefined && meta.sidebar?.icon === undefined
-    ? { icon: meta.icon }
-    : {}),
-  ...(meta.tag !== undefined && meta.sidebar?.badge === undefined
-    ? { badge: meta.tag }
-    : {}),
-  ...(meta.hidden === true && meta.sidebar?.hidden === undefined
-    ? { hidden: true }
-    : {}),
-});
-
-const mintlifyPageType = (meta: MintlifyPageMetaInput): string | undefined =>
-  meta.type ??
-  (meta.openapi !== undefined ||
-  meta.asyncapi !== undefined ||
-  meta.api !== undefined
-    ? "api"
-    : undefined);
-
-const mintlifyNoindex = (meta: MintlifyPageMetaInput): boolean | undefined =>
-  meta.hidden === true && meta.noindex === undefined ? true : meta.noindex;
-
-const normalizeMintlifyPageMeta = (value: unknown): unknown => {
-  const result = mintlifyPageMetaInputSchema.safeParse(value);
-  if (!result.success) {
-    return value;
-  }
-
-  const meta = result.data;
-  return {
-    ...meta,
-    noindex: mintlifyNoindex(meta),
-    search: normalizedMintlifySearch(meta),
-    sidebar: normalizedMintlifySidebar(meta),
-    type: mintlifyPageType(meta),
-  };
-};
-
 /** Frontmatter accepted on any content page. */
 const pageMetaBaseSchema = z
   .object({
@@ -187,12 +100,9 @@ const pageMetaBaseSchema = z
     title: z.string().optional(),
     type: z.string().default("doc"),
   })
-  .passthrough();
+  .strict();
 
-export const pageMetaSchema = z.preprocess(
-  normalizeMintlifyPageMeta,
-  pageMetaBaseSchema
-);
+export const pageMetaSchema = pageMetaBaseSchema;
 
 export type PageMeta = z.infer<typeof pageMetaBaseSchema>;
 export type PageMetaInput = z.input<typeof pageMetaBaseSchema>;

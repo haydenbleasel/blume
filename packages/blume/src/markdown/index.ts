@@ -14,8 +14,6 @@ import { inlineCodeHighlightPlugin } from "./inline-code.ts";
 import { languageIconTransformer } from "./language-icon.ts";
 import { mathPlugin } from "./math.ts";
 import { mermaidPlugin } from "./mermaid.ts";
-import { mintlifyCodeGroupPlugin } from "./mintlify-code-group.ts";
-import { mintlifySvgIconPlugin } from "./mintlify-svg-icons.ts";
 import { packageInstallPlugin } from "./package-install.ts";
 
 /** A Shiki transformer, derived from the upstream factories' return type. */
@@ -33,17 +31,6 @@ export {
 export { calloutTypeFor } from "./directives.ts";
 export { headingAnchorPlugin } from "./heading-anchors.ts";
 export { mermaidPlugin } from "./mermaid.ts";
-export { mintlifyCodeGroupPlugin } from "./mintlify-code-group.ts";
-export {
-  mintlifySvgIconPlugin,
-  rewriteMintlifySvgIconProps,
-} from "./mintlify-svg-icons.ts";
-export {
-  rewriteMintlifyGlobalVariables,
-  rewriteMintlifyMarkdownSnippets,
-  rewriteMintlifySnippetVariables,
-  rewriteMintlifyUserVariable,
-} from "./mintlify-snippets.ts";
 export { packageInstallPlugin } from "./package-install.ts";
 
 /** Element type of Satteri's `mdastPlugins`, sourced from the (alpha) core. */
@@ -155,8 +142,6 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) => {
   const plugins: unknown[] = [
     packageInstallPlugin(),
     directiveToCalloutPlugin(),
-    mintlifySvgIconPlugin(),
-    mintlifyCodeGroupPlugin(),
     mermaidPlugin(),
   ];
   if (options.math) {

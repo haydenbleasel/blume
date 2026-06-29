@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "mint dev --port 4323",
-    "build": "mint build",
-    "preview": "mint preview"
+    "migrate": "blume migrate mintlify",
+    "dev": "blume dev",
+    "build": "blume build",
+    "preview": "blume preview"
   },
   "dependencies": {
     "blume": "workspace:*"

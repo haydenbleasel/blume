@@ -1,5 +1,3 @@
-import { rewriteMintlifySvgIconProps } from "../markdown/index.ts";
-import { rewriteMintlifyGlobalVariables } from "../markdown/mintlify-snippets.ts";
 import { loadConfig } from "./config.ts";
 import { buildContentGraph } from "./graph.ts";
 import { i18nDiagnostics } from "./i18n.ts";
@@ -36,47 +34,6 @@ export interface BlumeProject {
   /** The instantiated content sources, for lazy entry reads (search/AI/raw). */
   sources: ContentSource[];
 }
-
-const mintlifySourceTransform = (
-  context: ProjectContext,
-  config: ResolvedConfig
-): ((source: string) => string) | undefined => {
-  if (context.configFile?.endsWith("docs.json") !== true) {
-    return undefined;
-  }
-  return (source) => {
-    const withSvgIcons = rewriteMintlifySvgIconProps(source);
-    return rewriteMintlifyGlobalVariables(withSvgIcons, config.variables);
-  };
-};
-
-// Mintlify global variables (`{{name}}`) appear in frontmatter too (e.g.
-// `title: "{{product-name}} Intro"`). The filesystem source parses frontmatter
-// before the body transform runs, so substitute configured variables across the
-// parsed metadata as well. Unknown `{{…}}` tokens pass through untouched.
-const substituteDataVariables = (
-  data: Record<string, unknown>,
-  variables: Record<string, string>
-): Record<string, unknown> => {
-  const visit = (value: unknown): unknown => {
-    if (typeof value === "string") {
-      return rewriteMintlifyGlobalVariables(value, variables);
-    }
-    if (Array.isArray(value)) {
-      return value.map(visit);
-    }
-    if (value && typeof value === "object") {
-      return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([key, val]) => [
-          key,
-          visit(val),
-        ])
-      );
-    }
-    return value;
-  };
-  return visit(data) as Record<string, unknown>;
-};
 
 /**
  * Run the full core pipeline for a project root: load config, resolve paths,
@@ -120,34 +77,20 @@ export const scanProject = async (
     discoverFolderMeta(context.contentRoot),
   ]);
 
-  // Mintlify (docs.json) projects rewrite SVG icon props and global variables in
-  // the source body at scan time so extracted headings/links match the rendered
-  // output. Native Blume projects skip this entirely.
-  const transformSource = mintlifySourceTransform(context, config);
-
   const allPages: PageRecord[] = [];
   const contentDiagnostics: Diagnostic[] = [];
   for (const { source, entries, diagnostics } of loaded) {
     contentDiagnostics.push(...diagnostics);
     for (const entry of entries) {
-      const normalized = normalizeEntry(
-        transformSource
-          ? {
-              ...entry,
-              body: { ...entry.body, text: transformSource(entry.body.text) },
-              data: substituteDataVariables(entry.data, config.variables),
-            }
-          : entry,
-        {
-          defaultType: config.content.defaultType,
-          i18n: config.i18n,
-          source: {
-            name: source.name,
-            prefix: source.prefix,
-            staged: source.staged,
-          },
-        }
-      );
+      const normalized = normalizeEntry(entry, {
+        defaultType: config.content.defaultType,
+        i18n: config.i18n,
+        source: {
+          name: source.name,
+          prefix: source.prefix,
+          staged: source.staged,
+        },
+      });
       allPages.push(...normalized.pages);
       contentDiagnostics.push(...normalized.diagnostics);
     }

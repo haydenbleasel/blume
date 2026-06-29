@@ -1,8 +1,7 @@
 import { applyDeploymentEnv } from "./deployment-env.ts";
 import { BlumeError, diagnosticsFromZod } from "./diagnostics.ts";
 import { createModuleLoader } from "./load-module.ts";
-import { loadMintlifyConfig } from "./mintlify.ts";
-import { findBlumeConfigFile, findMintlifyConfigFile } from "./project.ts";
+import { findConfigFile } from "./project.ts";
 import { blumeConfigSchema } from "./schema.ts";
 import type { BlumeConfig, ResolvedConfig } from "./schema.ts";
 import type { Diagnostic } from "./types.ts";
@@ -36,26 +35,20 @@ export const loadConfig = async (
    */
   options: { devServerUrl?: string } = {}
 ): Promise<ConfigLoadResult> => {
-  const blumeConfigFile = findBlumeConfigFile(root);
-  const mintlifyConfigFile = blumeConfigFile
-    ? null
-    : findMintlifyConfigFile(root);
-  const configFile = blumeConfigFile ?? mintlifyConfigFile;
+  const configFile = findConfigFile(root);
 
   let raw: unknown = {};
-  if (blumeConfigFile) {
+  if (configFile) {
     try {
-      raw = await importConfigModule(blumeConfigFile);
+      raw = await importConfigModule(configFile);
     } catch (error) {
       throw new BlumeError({
         code: "BLUME_CONFIG_LOAD_FAILED",
-        file: blumeConfigFile,
+        file: configFile,
         message: `Failed to load config: ${(error as Error).message}`,
         severity: "error",
       });
     }
-  } else if (mintlifyConfigFile) {
-    raw = await loadMintlifyConfig(root, mintlifyConfigFile);
   }
 
   const parsed = blumeConfigSchema.safeParse(raw ?? {});

@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
 import {
-  cp,
   mkdir,
   readFile,
   rename,
@@ -15,7 +14,6 @@ import { dirname, join, normalize, relative } from "pathe";
 import { glob } from "tinyglobby";
 
 import { resolveAskBackend } from "../ai/ask.ts";
-import { writeLlmsArtifacts } from "../ai/llms.ts";
 import { buildRawMarkdown } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
@@ -140,53 +138,6 @@ const readOptional = async (path: string | null): Promise<string> => {
   } catch {
     return "";
   }
-};
-
-const copyIfExists = async (from: string, to: string): Promise<void> => {
-  if (!existsSync(from)) {
-    return;
-  }
-  await cp(from, to, { force: true, recursive: true });
-};
-
-const mintlifyStaticCandidates = [
-  "assets",
-  "files",
-  "fonts",
-  "images",
-  "img",
-  "logo",
-  "logos",
-  "videos",
-  "favicon.ico",
-  "favicon.png",
-  "favicon.svg",
-  "robots.txt",
-];
-
-const preparePublicAssets = async (project: BlumeProject): Promise<void> => {
-  const { context } = project;
-  const sourcePublic = join(context.root, "public");
-  if (context.publicRoot === sourcePublic) {
-    return;
-  }
-
-  await rm(context.publicRoot, { force: true, recursive: true });
-  await mkdir(context.publicRoot, { recursive: true });
-  await copyIfExists(sourcePublic, context.publicRoot);
-
-  if (context.configFile?.endsWith("docs.json") !== true) {
-    return;
-  }
-
-  await Promise.all(
-    mintlifyStaticCandidates.map((candidate) =>
-      copyIfExists(
-        join(context.root, candidate),
-        join(context.publicRoot, candidate)
-      )
-    )
-  );
 };
 
 /** Heuristically detect whether the project uses React islands. */
@@ -653,23 +604,6 @@ export interface GenerateResult {
 }
 
 /**
- * Mintlify projects use a custom public root (`.blume/public`); mirror the
- * llms artifacts there, since `preparePublicAssets` only copies a user's own
- * `public/` directory. A no-op for standard projects.
- */
-const writeCustomPublicRootArtifacts = async (
-  project: BlumeProject
-): Promise<void> => {
-  const { context, config } = project;
-  if (context.publicRoot === join(context.root, "public")) {
-    return;
-  }
-  if (config.ai.llmsTxt) {
-    await writeLlmsArtifacts(project, context.publicRoot);
-  }
-};
-
-/**
  * Write (or update) the generated `.blume/` Astro runtime for a project.
  * Only files whose content changed are rewritten so Vite HMR stays fast.
  */
@@ -692,9 +626,6 @@ export const generateRuntime = async (
   };
 
   await ensureDepsLink(out);
-  await preparePublicAssets(project);
-  await writeCustomPublicRootArtifacts(project);
-  await rm(join(srcDir, "middleware.ts"), { force: true });
 
   const askEnabled = config.ai.ask?.enabled ?? false;
   const exportPdf = config.export.pdf;
@@ -805,12 +736,6 @@ export const generateRuntime = async (
   }
 
   await writeMcpFiles(project, mcp, write);
-
-  // Mintlify imports can leave a generated API proxy playground behind; Blume's
-  // local compatibility doesn't serve one, so drop it if present.
-  await rm(join(srcDir, "pages", "api", "blume", "proxy.ts"), {
-    force: true,
-  });
 
   if (config.seo.og.enabled) {
     await write(

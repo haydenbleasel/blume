@@ -17,7 +17,7 @@ const makeMigrateCommand = (source: keyof typeof migrators) =>
         logger.error(`No migrator for ${source}.`);
         process.exit(1);
       }
-      logger.success(`Moved ${result.moved} content file(s) into docs/`);
+      logger.success(`Migrated ${result.moved} content file(s).`);
       for (const warning of result.warnings) {
         logger.warn(warning);
       }

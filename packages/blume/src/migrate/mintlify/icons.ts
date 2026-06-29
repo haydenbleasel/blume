@@ -1,32 +1,3 @@
-import type { MdastNode } from "./mdast.ts";
-
-interface MdxJsxAttributeNode extends MdastNode {
-  name?: string;
-  value?:
-    | string
-    | null
-    | {
-        type?: string;
-        value?: string;
-      };
-}
-
-interface MdxJsxElementNode extends MdastNode {
-  attributes?: MdxJsxAttributeNode[];
-  name?: string | null;
-}
-
-const ICON_COMPONENTS = new Set([
-  "Accordion",
-  "Badge",
-  "Callout",
-  "Card",
-  "Icon",
-  "Prompt",
-  "Tab",
-  "View",
-]);
-
 const JSX_ATTRIBUTE_ALIASES: Record<string, string> = {
   className: "class",
   clipPath: "clip-path",
@@ -121,7 +92,11 @@ const startsWithSvgExpression = (value: string): boolean => {
   return trimmed.startsWith("<svg") || trimmed.startsWith("(<svg");
 };
 
-/** Rewrite source-level Mintlify SVG icon JSX props before Astro compiles MDX. */
+/**
+ * Rewrite Mintlify inline-SVG icon JSX props (`icon={<svg .../>}`) to plain
+ * string props so the migrated MDX compiles under Astro. Runs once at
+ * migration time; non-SVG `icon={...}` expressions are left untouched.
+ */
 export const rewriteMintlifySvgIconProps = (source: string): string => {
   let output = "";
   let cursor = 0;
@@ -151,33 +126,3 @@ export const rewriteMintlifySvgIconProps = (source: string): string => {
   }
   return output;
 };
-
-const rewriteSvgIconAttribute = (node: MdxJsxElementNode) => {
-  if (!ICON_COMPONENTS.has(node.name ?? "")) {
-    return;
-  }
-
-  for (const attribute of node.attributes ?? []) {
-    if (attribute.name !== "icon" || typeof attribute.value !== "object") {
-      continue;
-    }
-    if (attribute.value?.type !== "mdxJsxAttributeValueExpression") {
-      continue;
-    }
-    const svg = normalizeJsxSvg(attribute.value.value ?? "");
-    if (svg) {
-      attribute.value = svg;
-    }
-  }
-};
-
-/**
- * Mintlify supports custom SVG JSX in icon props. Astro's MDX postprocess does
- * not accept those nested JSX expressions in generated imports, so normalize
- * static SVG props to strings before MDX compilation.
- */
-export const mintlifySvgIconPlugin = () => ({
-  mdxJsxFlowElement: rewriteSvgIconAttribute,
-  mdxJsxTextElement: rewriteSvgIconAttribute,
-  name: "blume-mintlify-svg-icons",
-});

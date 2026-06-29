@@ -22,6 +22,9 @@ const FILES: Record<string, string> = {
   "guide/meta.ts": 'export default { collapsed: true, title: "Guides" };\n',
   "index.md": "# Welcome\n\nSee the [guide](/guide).\n",
   "meta.ts": 'export default { order: 1, title: "Documentation" };\n',
+  // A dependency that ships its own meta.ts must never be scanned (matters when
+  // the content root is the project root, e.g. a migrated Mintlify project).
+  "node_modules/pkg/meta.ts": "export default { notARealMetaKey: true };\n",
 };
 
 let root: string;
@@ -123,5 +126,14 @@ describe("discoverFolderMeta", () => {
     const { diagnostics } = await discoverFolderMeta(root);
 
     expect(diagnostics.map((d) => d.code)).toContain("BLUME_META_LOAD_FAILED");
+  });
+
+  it("never descends into node_modules", async () => {
+    const { meta, diagnostics } = await discoverFolderMeta(root);
+
+    expect(meta.has(join("node_modules", "pkg"))).toBe(false);
+    expect(diagnostics.some((d) => d.file?.includes("node_modules"))).toBe(
+      false
+    );
   });
 });

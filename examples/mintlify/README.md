@@ -1,31 +1,39 @@
-# Blume Starter Kit
+# Mintlify → Blume migration example
 
-Use the starter kit to get your docs deployed and ready to customize.
+A small Mintlify project (a `docs.json`, root-level MDX pages, snippets, and
+`logo/`/`favicon.svg` assets) used to exercise `blume migrate mintlify`. It
+mirrors the Mintlify starter layout so the migration covers config translation,
+snippet inlining, component rewrites, frontmatter mapping, and asset relocation.
 
-The fixture mirrors the Mintlify starter layout with Blume branding. It is intended to test whether a Mintlify project runs after swapping the docs dependency and CLI command to Blume.
+## Migrate it
 
-## Compatibility status
-
-This fixture passes with Blume out of the box through the Mintlify-compatible
-`mint` alias.
-
-```bash
-bun --filter @blume-examples/mintlify build
-bun --filter @blume-examples/mintlify dev
-```
-
-The build reads `docs.json`, discovers root-level MDX pages, applies the Blume default theme, renders Mintlify-style MDX components, and serves root-level static assets such as `favicon.svg` and `logo/`.
-
-## Development
-
-Run the following command at the root of your documentation, where your `docs.json` is located:
+From this directory:
 
 ```bash
-mint dev
+blume migrate mintlify
 ```
 
-View your local preview at `http://localhost:4323`.
+That converts `docs.json` into `blume.config.ts`, rewrites every page to
+idiomatic Blume MDX in place (content stays at the project root), moves `logo/`
+and `favicon.svg` into `public/`, and inlines `snippets/`. Then run:
 
-Blume's `mint` alias supports local `dev`, `build`, and `preview` for existing
-Mintlify projects. Hosted platform and quality commands such as
-`mint broken-links` are intentionally out of scope for this fixture.
+```bash
+blume dev
+```
+
+## What converts automatically
+
+- `docs.json` → `blume.config.ts` (theme, navigation, navbar, footer, banner,
+  SEO, redirects, …).
+- Mintlify snippets (`<Snippet />` imports, `{variable}` interpolation, and
+  `{{global}}` substitution) are inlined.
+- Mintlify callouts (`<Note>`, `<Warning>`, `<Callout type="…">`, …) become
+  `:::` directives; `<RequestExample>`/`<ResponseExample>` become `<CodeGroup>`.
+- Page frontmatter (`sidebarTitle`, `icon`, `noindex`, `canonical`, …) folds
+  into Blume's shape.
+
+Most Mintlify components (`Card`, `Tabs`, `Steps`, `Accordion`, `Frame`,
+`Tooltip`, `Tree`, …) have direct Blume equivalents and need no changes. The
+migration prints warnings for anything that needs manual review — for example
+API components (`ParamField`/`ResponseField`), which Blume renders from an
+OpenAPI spec via its Scalar reference instead.

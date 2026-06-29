@@ -45,11 +45,7 @@ const projectWith = (
   pages: PageRecord[],
   routes: RouteManifestEntry[]
 ): BlumeProject =>
-  ({
-    context: { configFile: null, root },
-    graph: { pages },
-    manifest: { routes },
-  }) as unknown as BlumeProject;
+  ({ graph: { pages }, manifest: { routes } }) as unknown as BlumeProject;
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "blume-search-"));
@@ -106,7 +102,6 @@ describe("buildSearchDocuments with includeWhenDisabled", () => {
   const projectNoSearch = (over: Record<string, unknown> = {}): BlumeProject =>
     ({
       config: blumeConfigSchema.parse({ search: { provider: "none" } }),
-      context: { configFile: null, root },
       graph: {
         pages: [
           page({

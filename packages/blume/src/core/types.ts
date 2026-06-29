@@ -49,12 +49,8 @@ export interface ProjectContext {
   pagesRoot: string | null;
   /** Absolute path to the generated runtime (`<root>/.blume`). */
   outDir: string;
-  /** Absolute path to the directory Astro serves as static public assets. */
-  publicRoot: string;
-  /** Absolute path to the first user theme stylesheet, if present. */
+  /** Absolute path to the user `theme.css`, if present. */
   themeFile: string | null;
-  /** Absolute paths to user theme stylesheets, in cascade order. */
-  themeFiles: string[];
   /** Absolute path to the user `components.ts`/`.tsx`, if present. */
   componentsFile: string | null;
   /** Absolute path to the resolved config file, if any was found. */

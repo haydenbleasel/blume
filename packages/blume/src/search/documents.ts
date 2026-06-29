@@ -4,11 +4,6 @@ import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readEntryText } from "../core/sources/read.ts";
 import type { NavNode } from "../core/types.ts";
-import {
-  rewriteMintlifyGlobalVariables,
-  rewriteMintlifyMarkdownSnippets,
-  rewriteMintlifySnippetVariables,
-} from "../markdown/mintlify-snippets.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
 export interface SearchDocument {
@@ -44,7 +39,6 @@ export interface SearchRecord {
 }
 
 const CODE_FENCE = /```[\s\S]*?```/gu;
-const MDX_ESM_LINE = /^(?:import|export)\s.+$/gmu;
 const INLINE_CODE = /`(?<code>[^`]+)`/gu;
 const HTML_OR_JSX = /<[^>]+>/gu;
 const IMAGE = /!\[[^\]]*\]\([^)]*\)/gu;
@@ -56,7 +50,6 @@ const WHITESPACE = /\s+/gu;
 /** Reduce Markdown/MDX to plain, searchable text. */
 const toPlainText = (markdown: string): string =>
   markdown
-    .replaceAll(MDX_ESM_LINE, " ")
     .replaceAll(CODE_FENCE, " ")
     .replaceAll(IMAGE, " ")
     .replaceAll(LINK, "$<text>")
@@ -66,32 +59,6 @@ const toPlainText = (markdown: string): string =>
     .replaceAll(MARKDOWN_PUNCT, " ")
     .replaceAll(WHITESPACE, " ")
     .trim();
-
-const sourceForSearch = async (options: {
-  project: BlumeProject;
-  raw: string;
-  sourcePath: string;
-}): Promise<string> => {
-  const { project, raw, sourcePath } = options;
-  if (project.context.configFile?.endsWith("docs.json") !== true) {
-    return raw;
-  }
-  const withSnippets = await rewriteMintlifyMarkdownSnippets(raw, {
-    filePath: sourcePath,
-    root: project.context.root,
-  });
-  const withSnippetVariables = await rewriteMintlifySnippetVariables(
-    withSnippets,
-    {
-      filePath: sourcePath,
-      root: project.context.root,
-    }
-  );
-  return rewriteMintlifyGlobalVariables(
-    withSnippetVariables,
-    project.config.variables
-  );
-};
 
 interface Crumbs {
   breadcrumb: string[];
@@ -164,15 +131,7 @@ export const buildSearchDocuments = async (
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
       const raw = page ? await readEntryText(project, page) : "";
-      const source =
-        raw && page?.sourcePath
-          ? await sourceForSearch({
-              project,
-              raw,
-              sourcePath: page.sourcePath,
-            })
-          : raw;
-      const body = source ? toPlainText(matter(source).content) : "";
+      const body = raw ? toPlainText(matter(raw).content) : "";
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       return {

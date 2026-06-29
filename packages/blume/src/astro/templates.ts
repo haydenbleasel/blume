@@ -72,106 +72,6 @@ const ADAPTER_OPTIONS: Record<string, string> = {
   node: '{ mode: "standalone" }',
 };
 
-const mintlifyFsImport = (enabled: boolean): string =>
-  enabled ? 'import { existsSync } from "node:fs";\n' : "";
-
-// Framework renderer imports are only wired in when an island (or Ask AI, for
-// React) needs them. The core theme is Astro-first and ships no client JS.
-const rendererImports = (options: {
-  needsReact: boolean;
-  needsVue?: boolean;
-  needsSvelte?: boolean;
-}): string =>
-  [
-    options.needsReact ? 'import react from "@astrojs/react";\n' : "",
-    options.needsVue ? 'import vue from "@astrojs/vue";\n' : "",
-    options.needsSvelte ? 'import svelte from "@astrojs/svelte";\n' : "",
-  ].join("");
-
-const markdownImportNames = (isMintlifyProject: boolean): string =>
-  [
-    "blumeMarkdownProcessor",
-    "blumeMdxProcessor",
-    "blumeShikiTransformers",
-    ...(isMintlifyProject
-      ? [
-          "rewriteMintlifyGlobalVariables",
-          "rewriteMintlifyMarkdownSnippets",
-          "rewriteMintlifySvgIconProps",
-          "rewriteMintlifyUserVariable",
-        ]
-      : []),
-  ].join(", ");
-
-const fsAllowConfig = (options: { mathEnabled: boolean; root: string }) => {
-  // The project root plus the workspace root, so hoisted dependencies (e.g.
-  // KaTeX fonts under a monorepo's root node_modules) stay servable in dev.
-  const basePaths = [
-    ...new Set([findWorkspaceRoot(options.root), options.root]),
-  ].map((path) => JSON.stringify(path));
-  if (!options.mathEnabled) {
-    return {
-      imports: "",
-      paths: basePaths,
-      setup: "",
-    };
-  }
-  return {
-    imports:
-      'import { createRequire } from "node:module";\nimport { dirname } from "node:path";\n',
-    paths: [...basePaths, 'dirname(require.resolve("katex/package.json"))'],
-    setup: "const require = createRequire(import.meta.url);\n",
-  };
-};
-
-const mintlifyRootImportPluginTemplate = (root: string): string => `{
-        name: "blume-mintlify-root-imports",
-        enforce: "pre",
-        resolveId(source) {
-          const projectRoot = ${JSON.stringify(root)};
-          const candidate = projectRoot + source;
-          if (
-            /^\\/(?!@fs\\/|@vite\\/|node_modules\\/).+\\.(?:md|mdx|js|jsx|ts|tsx)$/u.test(source) &&
-            !source.startsWith(projectRoot + "/") &&
-            existsSync(candidate)
-          ) {
-            return candidate;
-          }
-        },
-      }`;
-
-const mintlifyMdxSnippetPluginTemplate = (
-  root: string,
-  variables: Record<string, string>
-): string => `{
-        name: "blume-mintlify-mdx-snippets",
-        enforce: "pre",
-        async transform(code, id) {
-          const contentPath = id.split("?")[0];
-          if (/\\.mdx?$/u.test(contentPath)) {
-            const withSnippets = await rewriteMintlifyMarkdownSnippets(code, { filePath: contentPath, root: ${JSON.stringify(root)} });
-            const withSvgIcons = rewriteMintlifySvgIconProps(withSnippets);
-            const withVariables = rewriteMintlifyGlobalVariables(withSvgIcons, ${JSON.stringify(variables)});
-            return { code: rewriteMintlifyUserVariable(withVariables), map: null };
-          }
-        },
-      }`;
-
-const vitePluginEntries = (options: {
-  isMintlifyProject: boolean;
-  root: string;
-  variables: Record<string, string>;
-}): string[] => {
-  const plugins = ["tailwindcss()"];
-  if (options.isMintlifyProject) {
-    plugins.push(
-      mintlifyRootImportPluginTemplate(options.root),
-      mintlifyMdxSnippetPluginTemplate(options.root, options.variables)
-    );
-  }
-  return plugins;
-};
-
 /**
  * Integration packages the generated runtime imports. Declaring them in
  * `.blume/package.json` lets Astro's framework-package crawl discover and bundle
@@ -234,21 +134,14 @@ export const astroConfigTemplate = (options: {
   themePath: string;
   searchClientPath: string;
 }): string => {
-  const {
-    config,
-    contentRoutes,
-    context,
-    dataPath,
-    needsReact,
-    needsSvelte,
-    needsVue,
-    pages,
-    searchClientPath,
-    themePath,
-  } = options;
+  const { context, config, needsReact, pages, dataPath, themePath } = options;
+  const { contentRoutes, needsSvelte, needsVue, searchClientPath } = options;
   const { deployment } = config;
   const server = deployment.output === "server";
-  const isMintlifyProject = context.configFile?.endsWith("docs.json") === true;
+
+  // The project root plus the workspace root, so hoisted dependencies (e.g.
+  // KaTeX fonts under a monorepo's root node_modules) stay servable in dev.
+  const fsAllow = [...new Set([findWorkspaceRoot(context.root), context.root])];
 
   const adapterImport =
     server && deployment.adapter
@@ -314,13 +207,14 @@ export const astroConfigTemplate = (options: {
     ? `import { defineConfig, fontProviders } from "astro/config";`
     : `import { defineConfig } from "astro/config";`;
 
-  const fsImport = mintlifyFsImport(isMintlifyProject);
-  const rendererImport = rendererImports({ needsReact, needsSvelte, needsVue });
+  // Framework renderers are only wired in when an island (or Ask AI, for React)
+  // needs them. The core theme is Astro-first and ships no client JS.
+  const reactImport = needsReact ? `import react from "@astrojs/react";\n` : "";
+  const vueImport = needsVue ? `import vue from "@astrojs/vue";\n` : "";
+  const svelteImport = needsSvelte
+    ? `import svelte from "@astrojs/svelte";\n`
+    : "";
   const blumeImport = `import { blumeIntegration } from "blume/astro";\n`;
-  const fsAllow = fsAllowConfig({
-    mathEnabled: config.markdown.math,
-    root: context.root,
-  });
 
   // Twoslash runs first, before the always-on transformers, but only on fences
   // with the `twoslash` meta (explicitTrigger) — so it's opt-in per block with
@@ -350,27 +244,18 @@ export const astroConfigTemplate = (options: {
   integrations.push(
     `blumeIntegration(${JSON.stringify({ contentRoutes, pages })})`
   );
-  const vitePlugins = vitePluginEntries({
-    isMintlifyProject,
-    root: context.root,
-    variables: config.variables,
-  });
-  const markdownImports = markdownImportNames(isMintlifyProject);
-  const codeBlockThemes = JSON.stringify(config.markdown.codeBlocks.theme);
 
   return `// Generated by Blume. Do not edit; this file is recreated on each run.
 ${defineConfigImport}
 import mdx from "@astrojs/mdx";
 import tailwindcss from "@tailwindcss/vite";
-import { ${markdownImports} } from "blume/markdown";
-${twoslashImport}${fsAllow.imports}${fsImport}${rendererImport}${blumeImport}${adapterImport}
-${fsAllow.setup}
+import { blumeMarkdownProcessor, blumeMdxProcessor, blumeShikiTransformers } from "blume/markdown";
+${twoslashImport}${reactImport}${vueImport}${svelteImport}${blumeImport}${adapterImport}
 export default defineConfig({
   root: ${JSON.stringify(context.outDir)},
   srcDir: ${JSON.stringify(`${context.outDir}/src`)},
   outDir: ${JSON.stringify(`${context.root}/dist`)},
-  publicDir: ${JSON.stringify(context.publicRoot)},
-  cacheDir: ${JSON.stringify(`${context.root}/node_modules/.cache/blume/astro`)},
+  publicDir: ${JSON.stringify(`${context.root}/public`)},
   output: ${JSON.stringify(deployment.output)},${adapterOption}${siteOption}${baseOption}${redirectsOption}${i18nOption}${fontsOption}
   integrations: [${integrations.join(", ")}],
   markdown: {
@@ -379,7 +264,10 @@ export default defineConfig({
       inline: config.markdown.code.inline,
     })}),
     shikiConfig: {
-      themes: ${codeBlockThemes},
+      themes: {
+        light: "github-light",
+        dark: "github-dark",
+      },
       defaultColor: false,
       transformers: [${twoslashTransformer}...blumeShikiTransformers(${JSON.stringify(
         { icons: config.markdown.code.icons }
@@ -388,7 +276,7 @@ export default defineConfig({
   },
   devToolbar: { enabled: false },
   vite: {
-    plugins: [${vitePlugins.join(", ")}],
+    plugins: [tailwindcss()],
     // @takumi-rs/core (OG image rendering) is a native NAPI addon that loads a
     // platform-specific .node binding via createRequire(import.meta.url). Astro's
     // build bundles it into the per-environment output by default, which
@@ -411,7 +299,7 @@ export default defineConfig({
     },
     server: {
       fs: {
-        allow: [${fsAllow.paths.join(", ")}],
+        allow: ${JSON.stringify(fsAllow)},
       },
     },
   },
@@ -451,13 +339,13 @@ const staged = defineCollection({
 
   return `// Generated by Blume. Do not edit.
 import { defineCollection } from "astro:content";
-import { blumeContentLoader } from "blume/astro";
+import { glob } from "astro/loaders";
 
 const docs = defineCollection({
-  loader: blumeContentLoader({
-    base: ${JSON.stringify(context.contentRoot)},
-    ignore: ${JSON.stringify(config.content.exclude)},
+  loader: glob({
     pattern: ${JSON.stringify(config.content.include)},
+    base: ${JSON.stringify(context.contentRoot)},
+    generateId: ({ entry }) => entry,
   }),
 });
 ${stagedBlock}
@@ -659,7 +547,7 @@ export const POST: APIRoute = async ({ request }) => {
 
 /**
  * Generate the raw-Markdown endpoints (`[...slug].md.ts` and `[...slug].mdx.ts`).
- * Each route's source is served so `/<route>.md` returns plain Markdown.
+ * Each route's source is served verbatim so `/<route>.md` returns plain Markdown.
  */
 export const rawMarkdownEndpointTemplate = (): string =>
   `// Generated by Blume. Do not edit.

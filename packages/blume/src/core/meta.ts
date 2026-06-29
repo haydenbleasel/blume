@@ -38,6 +38,9 @@ export const discoverFolderMeta = async (
   const files = await glob(META_FILES, {
     absolute: true,
     cwd: contentRoot,
+    // Never descend into dependencies or build output — relevant when the
+    // content root is the project root (e.g. a migrated Mintlify project).
+    ignore: ["**/node_modules/**", "**/.blume/**", "**/dist/**"],
     onlyFiles: true,
   });
 
