@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-Fix `blume build` failing under isolated package-manager linkers (Bun's `isolated` mode, pnpm) with `Cannot find package 'zod'` (or `shiki`, `sharp`, `@takumi-rs/core`, …) during static page generation. Astro's static build emits a self-contained SSR bundle to `dist/.prerender/` and runs it to render the HTML; that bundle leaves Blume's render-time dependencies external, so Node resolves them by walking up from `dist/.prerender/`. The earlier dependency-link fix only repaired resolution rooted at `.blume/`, and `dist/` is a separate tree an isolated linker never hoists Blume's deps into, so prerendering died. Blume now drops the same `node_modules` symlink beside the prerender bundle (removed again with `dist/.prerender/` once generation finishes, so nothing leaks into your published output), and forces Blume's render-time deps external on both build environments so an isolated linker doesn't bundle a symlinked store copy and strand one of its own transitive dependencies (e.g. `batchwork` via `@astrojs/markdown-satteri`) as an unresolvable import.

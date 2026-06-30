@@ -1,5 +1,13 @@
 # blume
 
+## 0.1.2
+
+### Patch Changes
+
+- b6a2506: Surface a clear, actionable diagnostic for the split-layout Astro conflict that a symlink can't repair. When a hoisted install pulls a second Astro to the project root (e.g. a dependency with a type-only `astro@6`) that shadows Blume's, and `@astrojs/mdx` is hoisted away from Blume's own Astro, `ensureDepsLink` can't reconcile the split with one symlink and leaves it for a root `overrides`/`resolutions` pin. Previously it did so silently, and the build later crashed deep in Astro on a missing export (e.g. `chunkToString`) with no hint at the cause. `blume dev`/`build` now warn up front — naming the conflicting versions and telling you to pin Blume's Astro with a package.json `overrides` (npm/bun/pnpm) or `resolutions` (yarn) entry — and the warning clears itself once the pin is in place.
+- 40c7bd7: Make `<Component>`'s examples directory configurable. `<Component path>` previously only resolved live previews (and their source) from a top-level `examples/` directory, so projects whose examples live elsewhere — e.g. a registry layout like `registry/<pkg>/…`, which also doubles as the shadcn payload — couldn't adopt it. Set `examples` in `blume.config.ts` to point at any directory under the project root (default `"examples"`); a `<Component path>` key is then relative to that directory. For example, with `examples: "registry/files-sdk"`, a file at `registry/files-sdk/file-list/basic.tsx` is `<Component path="file-list/basic" />`.
+- b6a2506: Fix `blume build` failing under isolated package-manager linkers (Bun's `isolated` mode, pnpm) with `Cannot find package 'zod'` (or `shiki`, `sharp`, `@takumi-rs/core`, …) during static page generation. Astro's static build emits a self-contained SSR bundle to `dist/.prerender/` and runs it to render the HTML; that bundle leaves Blume's render-time dependencies external, so Node resolves them by walking up from `dist/.prerender/`. The earlier dependency-link fix only repaired resolution rooted at `.blume/`, and `dist/` is a separate tree an isolated linker never hoists Blume's deps into, so prerendering died. Blume now drops the same `node_modules` symlink beside the prerender bundle (removed again with `dist/.prerender/` once generation finishes, so nothing leaks into your published output), and forces Blume's render-time deps external on both build environments so an isolated linker doesn't bundle a symlinked store copy and strand one of its own transitive dependencies (e.g. `batchwork` via `@astrojs/markdown-satteri`) as an unresolvable import.
+
 ## 0.1.1
 
 ### Patch Changes
