@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-Repair `blume dev`/`build` when a hoisted install resolves the _wrong_ Astro. Previously `ensureDepsLink` only relinked Blume's deps when Astro was unresolvable from `.blume/` (isolated linkers, pnpm); if a sibling workspace pinned an older major (e.g. `astro@6` for a type-only import) and the package manager hoisted it to the project root, `.blume/` resolved that shadowing copy, `@astrojs/mdx@7` bound to it, and the build crashed on a missing export. The link decision now compares _which_ Astro resolves — Blume's own versus a shadowing one — and links Blume's dependency directory in whenever they differ, not just when Astro is missing. This only happens when Blume's deps are a co-located, consistent set (Astro beside the `@astrojs/mdx` that binds to it); a split layout, where the integration is hoisted away from a conflicting Astro, can't be fixed by one symlink and still needs a root `overrides`/`resolutions` pin, so it's left untouched rather than half-fixed.
