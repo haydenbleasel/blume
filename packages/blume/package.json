@@ -1,7 +1,7 @@
 {
   "name": "blume",
   "version": "0.0.0",
-  "description": "Open-source, markdown-first documentation framework powered by Astro and Vite.",
+  "description": "Documentation that's fast, AI-ready, and zero-config.",
   "keywords": [
     "astro",
     "docs",
