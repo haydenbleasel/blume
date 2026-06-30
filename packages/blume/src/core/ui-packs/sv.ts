@@ -12,12 +12,8 @@ export const sv: UIStringsOverride = {
     copyMarkdown: "Kopiera som Markdown",
     copyServerUrl: "Kopiera server-URL",
     edit: "Redigera på GitHub",
-    feedbackPlaceholder: "Lämna din feedback…",
-    giveFeedback: "Ge feedback",
-    markdownSupported: "Markdown stöds",
     openInChat: "Öppna i chatt",
     scrollToTop: "Till toppen",
-    send: "Skicka",
   },
   ask: {
     empty: "Ställ en fråga om dokumentationen.",
@@ -26,6 +22,12 @@ export const sv: UIStringsOverride = {
     placeholder: "Ställ en fråga…",
     send: "Skicka",
     title: "Fråga AI",
+  },
+  feedback: {
+    no: "Nej",
+    question: "Var den här sidan till hjälp?",
+    thanks: "Tack för din feedback!",
+    yes: "Ja",
   },
   languageSwitcher: { label: "Språk", untranslated: "Inte översatt" },
   page: {

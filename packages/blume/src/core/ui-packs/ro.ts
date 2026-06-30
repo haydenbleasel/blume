@@ -12,12 +12,8 @@ export const ro: UIStringsOverride = {
     copyMarkdown: "Copiază ca Markdown",
     copyServerUrl: "Copiază URL-ul serverului",
     edit: "Editează pe GitHub",
-    feedbackPlaceholder: "Lasă-ne feedbackul tău…",
-    giveFeedback: "Trimite feedback",
-    markdownSupported: "Markdown acceptat",
     openInChat: "Deschide în chat",
     scrollToTop: "Sus de tot",
-    send: "Trimite",
   },
   ask: {
     empty: "Pune o întrebare despre documentație.",
@@ -26,6 +22,12 @@ export const ro: UIStringsOverride = {
     placeholder: "Pune o întrebare…",
     send: "Trimite",
     title: "Întreabă AI",
+  },
+  feedback: {
+    no: "Nu",
+    question: "Ți-a fost utilă această pagină?",
+    thanks: "Mulțumim pentru feedback!",
+    yes: "Da",
   },
   languageSwitcher: { label: "Limbă", untranslated: "Netradus" },
   page: {

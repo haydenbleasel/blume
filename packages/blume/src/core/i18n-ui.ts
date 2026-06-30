@@ -22,12 +22,8 @@ const uiStringsObject = z.object({
       copyMarkdown: z.string().default("Copy as Markdown"),
       copyServerUrl: z.string().default("Copy server URL"),
       edit: z.string().default("Edit on GitHub"),
-      feedbackPlaceholder: z.string().default("Leave your feedback…"),
-      giveFeedback: z.string().default("Give feedback"),
-      markdownSupported: z.string().default("Markdown supported"),
       openInChat: z.string().default("Open in chat"),
       scrollToTop: z.string().default("Scroll to top"),
-      send: z.string().default("Send"),
     })
     .default({}),
   ask: z
@@ -38,6 +34,14 @@ const uiStringsObject = z.object({
       placeholder: z.string().default("Ask a question…"),
       send: z.string().default("Send"),
       title: z.string().default("Ask AI"),
+    })
+    .default({}),
+  feedback: z
+    .object({
+      no: z.string().default("No"),
+      question: z.string().default("Was this page helpful?"),
+      thanks: z.string().default("Thanks for your feedback!"),
+      yes: z.string().default("Yes"),
     })
     .default({}),
   languageSwitcher: z

@@ -12,12 +12,8 @@ export const fa: UIStringsOverride = {
     copyMarkdown: "کپی به‌صورت Markdown",
     copyServerUrl: "کپی نشانی سرور",
     edit: "ویرایش در GitHub",
-    feedbackPlaceholder: "بازخورد خود را بنویسید…",
-    giveFeedback: "ارسال بازخورد",
-    markdownSupported: "Markdown پشتیبانی می‌شود",
     openInChat: "باز کردن در گفتگو",
     scrollToTop: "بازگشت به بالا",
-    send: "ارسال",
   },
   ask: {
     empty: "سؤالی درباره مستندات بپرسید.",
@@ -26,6 +22,12 @@ export const fa: UIStringsOverride = {
     placeholder: "یک سؤال بپرسید…",
     send: "ارسال",
     title: "از هوش مصنوعی بپرسید",
+  },
+  feedback: {
+    no: "خیر",
+    question: "آیا این صفحه مفید بود؟",
+    thanks: "از بازخورد شما سپاسگزاریم!",
+    yes: "بله",
   },
   languageSwitcher: { label: "زبان", untranslated: "ترجمه‌نشده" },
   page: {

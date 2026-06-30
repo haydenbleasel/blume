@@ -12,12 +12,8 @@ export const th: UIStringsOverride = {
     copyMarkdown: "คัดลอกเป็น Markdown",
     copyServerUrl: "คัดลอก URL ของเซิร์ฟเวอร์",
     edit: "แก้ไขบน GitHub",
-    feedbackPlaceholder: "แสดงความคิดเห็นของคุณ…",
-    giveFeedback: "ส่งความคิดเห็น",
-    markdownSupported: "รองรับ Markdown",
     openInChat: "เปิดในแชท",
     scrollToTop: "กลับไปด้านบน",
-    send: "ส่ง",
   },
   ask: {
     empty: "ถามคำถามเกี่ยวกับเอกสาร",
@@ -26,6 +22,12 @@ export const th: UIStringsOverride = {
     placeholder: "ถามคำถาม…",
     send: "ส่ง",
     title: "ถาม AI",
+  },
+  feedback: {
+    no: "ไม่",
+    question: "หน้านี้มีประโยชน์หรือไม่?",
+    thanks: "ขอบคุณสำหรับความคิดเห็นของคุณ!",
+    yes: "ใช่",
   },
   languageSwitcher: { label: "ภาษา", untranslated: "ยังไม่ได้แปล" },
   page: {

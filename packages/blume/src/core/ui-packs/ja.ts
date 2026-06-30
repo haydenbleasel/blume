@@ -12,12 +12,8 @@ export const ja: UIStringsOverride = {
     copyMarkdown: "Markdown としてコピー",
     copyServerUrl: "サーバー URL をコピー",
     edit: "GitHub で編集",
-    feedbackPlaceholder: "フィードバックを入力…",
-    giveFeedback: "フィードバックを送る",
-    markdownSupported: "Markdown 対応",
     openInChat: "チャットで開く",
     scrollToTop: "トップに戻る",
-    send: "送信",
   },
   ask: {
     empty: "ドキュメントについて質問してください。",
@@ -26,6 +22,12 @@ export const ja: UIStringsOverride = {
     placeholder: "質問を入力…",
     send: "送信",
     title: "AI に質問",
+  },
+  feedback: {
+    no: "いいえ",
+    question: "このページは役に立ちましたか？",
+    thanks: "フィードバックありがとうございます！",
+    yes: "はい",
   },
   languageSwitcher: { label: "言語", untranslated: "未翻訳" },
   page: {

@@ -12,12 +12,8 @@ export const ar: UIStringsOverride = {
     copyMarkdown: "نسخ بصيغة Markdown",
     copyServerUrl: "نسخ عنوان URL للخادم",
     edit: "التعديل على GitHub",
-    feedbackPlaceholder: "اترك ملاحظاتك…",
-    giveFeedback: "إرسال ملاحظات",
-    markdownSupported: "Markdown مدعوم",
     openInChat: "فتح في المحادثة",
     scrollToTop: "العودة إلى الأعلى",
-    send: "إرسال",
   },
   ask: {
     empty: "اطرح سؤالاً حول الوثائق.",
@@ -26,6 +22,12 @@ export const ar: UIStringsOverride = {
     placeholder: "اطرح سؤالاً…",
     send: "إرسال",
     title: "اسأل الذكاء الاصطناعي",
+  },
+  feedback: {
+    no: "لا",
+    question: "هل كانت هذه الصفحة مفيدة؟",
+    thanks: "شكراً على ملاحظاتك!",
+    yes: "نعم",
   },
   languageSwitcher: { label: "اللغة", untranslated: "غير مترجم" },
   page: {

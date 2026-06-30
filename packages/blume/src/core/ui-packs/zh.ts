@@ -12,12 +12,8 @@ export const zh: UIStringsOverride = {
     copyMarkdown: "复制为 Markdown",
     copyServerUrl: "复制服务器 URL",
     edit: "在 GitHub 上编辑",
-    feedbackPlaceholder: "留下你的反馈…",
-    giveFeedback: "提供反馈",
-    markdownSupported: "支持 Markdown",
     openInChat: "在聊天中打开",
     scrollToTop: "回到顶部",
-    send: "发送",
   },
   ask: {
     empty: "就文档提出问题。",
@@ -26,6 +22,12 @@ export const zh: UIStringsOverride = {
     placeholder: "提出问题…",
     send: "发送",
     title: "向 AI 提问",
+  },
+  feedback: {
+    no: "没有帮助",
+    question: "这个页面有帮助吗？",
+    thanks: "感谢你的反馈！",
+    yes: "有帮助",
   },
   languageSwitcher: { label: "语言", untranslated: "未翻译" },
   page: {

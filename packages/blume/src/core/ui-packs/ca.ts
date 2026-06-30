@@ -12,12 +12,8 @@ export const ca: UIStringsOverride = {
     copyMarkdown: "Copia com a Markdown",
     copyServerUrl: "Copia l'URL del servidor",
     edit: "Edita a GitHub",
-    feedbackPlaceholder: "Deixa el teu comentari…",
-    giveFeedback: "Envia comentaris",
-    markdownSupported: "Markdown compatible",
     openInChat: "Obre al xat",
     scrollToTop: "Torna a dalt",
-    send: "Envia",
   },
   ask: {
     empty: "Fes una pregunta sobre la documentació.",
@@ -26,6 +22,12 @@ export const ca: UIStringsOverride = {
     placeholder: "Fes una pregunta…",
     send: "Envia",
     title: "Pregunta a la IA",
+  },
+  feedback: {
+    no: "No",
+    question: "Aquesta pàgina t'ha estat útil?",
+    thanks: "Gràcies pels teus comentaris!",
+    yes: "Sí",
   },
   languageSwitcher: { label: "Idioma", untranslated: "Sense traduir" },
   page: {

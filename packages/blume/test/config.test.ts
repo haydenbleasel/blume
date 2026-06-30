@@ -45,7 +45,14 @@ describe("loadConfig", () => {
     const result = await loadConfig(await makeDir());
     expect(result.configFile).toBeNull();
     expect(result.config.title).toBe("Documentation");
+    expect(result.config.feedback).toBe(true);
     expect(result.diagnostics).toStrictEqual([]);
+  });
+
+  it("lets the page-feedback rating be disabled", async () => {
+    const dir = await makeDir("export default { feedback: false };");
+    const result = await loadConfig(dir);
+    expect(result.config.feedback).toBe(false);
   });
 
   it("loads and validates a config module", async () => {

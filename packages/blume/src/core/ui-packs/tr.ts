@@ -12,12 +12,8 @@ export const tr: UIStringsOverride = {
     copyMarkdown: "Markdown olarak kopyala",
     copyServerUrl: "Sunucu URL'sini kopyala",
     edit: "GitHub'da düzenle",
-    feedbackPlaceholder: "Geri bildiriminizi bırakın…",
-    giveFeedback: "Geri bildirim gönder",
-    markdownSupported: "Markdown destekleniyor",
     openInChat: "Sohbette aç",
     scrollToTop: "Başa dön",
-    send: "Gönder",
   },
   ask: {
     empty: "Belgeler hakkında bir soru sorun.",
@@ -26,6 +22,12 @@ export const tr: UIStringsOverride = {
     placeholder: "Bir soru sorun…",
     send: "Gönder",
     title: "Yapay zekâya sor",
+  },
+  feedback: {
+    no: "Hayır",
+    question: "Bu sayfa yardımcı oldu mu?",
+    thanks: "Geri bildiriminiz için teşekkürler!",
+    yes: "Evet",
   },
   languageSwitcher: { label: "Dil", untranslated: "Çevrilmemiş" },
   page: {

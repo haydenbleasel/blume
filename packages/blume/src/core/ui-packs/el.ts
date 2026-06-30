@@ -12,12 +12,8 @@ export const el: UIStringsOverride = {
     copyMarkdown: "Αντιγραφή ως Markdown",
     copyServerUrl: "Αντιγραφή URL διακομιστή",
     edit: "Επεξεργασία στο GitHub",
-    feedbackPlaceholder: "Αφήστε τα σχόλιά σας…",
-    giveFeedback: "Αφήστε σχόλια",
-    markdownSupported: "Υποστηρίζεται Markdown",
     openInChat: "Άνοιγμα στη συνομιλία",
     scrollToTop: "Επιστροφή στην κορυφή",
-    send: "Αποστολή",
   },
   ask: {
     empty: "Κάντε μια ερώτηση σχετικά με την τεκμηρίωση.",
@@ -26,6 +22,12 @@ export const el: UIStringsOverride = {
     placeholder: "Κάντε μια ερώτηση…",
     send: "Αποστολή",
     title: "Ρωτήστε την AI",
+  },
+  feedback: {
+    no: "Όχι",
+    question: "Σας φάνηκε χρήσιμη αυτή η σελίδα;",
+    thanks: "Ευχαριστούμε για τα σχόλιά σας!",
+    yes: "Ναι",
   },
   languageSwitcher: { label: "Γλώσσα", untranslated: "Δεν έχει μεταφραστεί" },
   page: {

@@ -998,6 +998,7 @@ export const blumeConfigSchema = z
     description: z.string().optional(),
     export: exportConfigSchema.default(false),
     favicon: faviconConfigSchema.optional(),
+    feedback: z.boolean().default(true),
     footer: footerConfigSchema.default({}),
     github: githubConfigSchema.optional(),
     i18n: i18nConfigSchema.optional(),

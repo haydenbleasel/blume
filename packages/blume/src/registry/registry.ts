@@ -62,22 +62,6 @@ const layoutComponent = (config: {
 
 /** The built-in, Blume-owned source registry. */
 export const registry: RegistryItem[] = [
-  {
-    description: "A 'Was this helpful?' feedback widget (static, no server).",
-    files: [
-      {
-        source: "registry/items/feedback/components/blume/Feedback.astro",
-        target: "components/blume/Feedback.astro",
-      },
-    ],
-    name: "feedback",
-    postInstall: [
-      "Register it in components.ts:",
-      '  import Feedback from "./components/blume/Feedback.astro";',
-      "  export default defineComponents({ mdx: { Feedback } });",
-      "Then use <Feedback /> in any MDX page.",
-    ],
-  },
   layoutComponent({
     description: "The top navigation bar (logo, search, nav links).",
     file: "Header.astro",

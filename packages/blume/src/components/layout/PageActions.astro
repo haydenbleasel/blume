@@ -7,7 +7,6 @@ import Icon from "../Icon.astro";
 interface Props {
   route: string;
   editUrl?: string | null;
-  repoUrl?: string | null;
   askEnabled?: boolean;
   /** Show the "Export to PDF" action (native browser print). */
   exportPdf?: boolean;
@@ -24,7 +23,6 @@ interface Props {
 const {
   route,
   editUrl,
-  repoUrl,
   askEnabled,
   exportPdf,
   exportEpub,
@@ -60,8 +58,6 @@ const PROVIDERS = [
   { key: "cursor", label: "Open in Cursor" },
 ];
 
-const EMOJI = ["😭", "🙁", "🙂", "🤩"];
-
 // Top-level actions match the ToC links: flat, no background/padding, color
 // shift on hover only.
 const rowClass =
@@ -94,52 +90,6 @@ const menuRowClass =
     <Icon name="arrow-up" size={16} />
     {a.scrollToTop}
   </button>
-
-  {
-    repoUrl && (
-      <details class="group relative">
-        <summary
-          class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
-        >
-          <Icon name="thumbs-up" size={16} />
-          {a.giveFeedback}
-        </summary>
-        <div
-          class="absolute right-0 left-0 z-50 mt-2 rounded-blume border border-border bg-background p-2.5 shadow-xl"
-          data-blume-feedback
-          data-repo={repoUrl}
-        >
-          <textarea
-            class="block max-h-40 min-h-20 w-full resize-y rounded-md border border-border bg-transparent px-2 py-1.5 text-foreground text-sm"
-            data-feedback-text
-            placeholder={a.feedbackPlaceholder}
-          />
-          <p class="mt-1 mb-2 text-muted-foreground text-xs">
-            {a.markdownSupported}
-          </p>
-          <div class="flex items-center gap-1">
-            {EMOJI.map((emoji) => (
-              <button
-                aria-pressed="false"
-                class="rounded-md px-1.5 py-1 text-base leading-none transition-colors hover:bg-muted aria-[pressed=true]:bg-muted aria-[pressed=true]:ring-1 aria-[pressed=true]:ring-accent"
-                data-feedback-emoji={emoji}
-                type="button"
-              >
-                {emoji}
-              </button>
-            ))}
-            <button
-              class="ms-auto rounded-md bg-accent px-3 py-1 font-medium text-accent-foreground text-sm hover:opacity-90"
-              data-feedback-send
-              type="button"
-            >
-              {a.send}
-            </button>
-          </div>
-        </div>
-      </details>
-    )
-  }
 
   <button class={rowClass} data-blume-copy-page type="button">
     <Icon name="copy" size={16} />
@@ -484,37 +434,5 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
         }
       }
     });
-
-    const feedback = root.querySelector("[data-blume-feedback]");
-    if (feedback) {
-      const repo = feedback.getAttribute("data-repo") ?? "";
-      let mood = "";
-      const emojis = feedback.querySelectorAll("[data-feedback-emoji]");
-      for (const button of emojis) {
-        button.addEventListener("click", () => {
-          mood = button.getAttribute("data-feedback-emoji") ?? "";
-          for (const other of emojis) {
-            other.setAttribute(
-              "aria-pressed",
-              other === button ? "true" : "false"
-            );
-          }
-        });
-      }
-      feedback
-        .querySelector("[data-feedback-send]")
-        ?.addEventListener("click", () => {
-          const field = feedback.querySelector("[data-feedback-text]");
-          const text =
-            field instanceof HTMLTextAreaElement ? field.value.trim() : "";
-          const title = `Docs feedback: ${location.pathname}`;
-          const body = `${mood ? `${mood} ` : ""}${text}\n\n---\nPage: ${location.href}`;
-          window.open(
-            `${repo}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`,
-            "_blank",
-            "noreferrer"
-          );
-        });
-    }
   }
 </script>

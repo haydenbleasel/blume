@@ -1,0 +1,58 @@
+---
+import { EN_UI } from "../../core/i18n-ui.ts";
+import type { UIStrings } from "../../core/i18n-ui.ts";
+import Icon from "../Icon.astro";
+
+interface Props {
+  /** Localized feedback labels. */
+  strings?: UIStrings["feedback"];
+}
+
+const { strings } = Astro.props;
+const f = strings ?? EN_UI.feedback;
+
+const buttonClass =
+  "inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-foreground text-sm transition-colors hover:border-foreground";
+---
+
+<section
+  aria-label={f.question}
+  class="mx-auto mt-12 flex max-w-[42rem] items-center justify-between gap-4 border-border border-t pt-6"
+  data-blume-page-feedback
+>
+  <p class="text-muted-foreground text-sm">{f.question}</p>
+  <div class="flex items-center gap-2" data-feedback-actions>
+    <button class={buttonClass} data-feedback-value="yes" type="button">
+      <Icon name="thumbs-up" size={16} />
+      {f.yes}
+    </button>
+    <button class={buttonClass} data-feedback-value="no" type="button">
+      <Icon name="thumbs-down" size={16} />
+      {f.no}
+    </button>
+  </div>
+  <p class="hidden text-muted-foreground text-sm" data-feedback-thanks>
+    {f.thanks}
+  </p>
+</section>
+
+<script>
+  import { track } from "./analytics-client.ts";
+
+  const root = document.querySelector("[data-blume-page-feedback]");
+  if (root) {
+    const actions = root.querySelector("[data-feedback-actions]");
+    const thanks = root.querySelector("[data-feedback-thanks]");
+    for (const button of root.querySelectorAll("[data-feedback-value]")) {
+      button.addEventListener("click", () => {
+        track("feedback", {
+          helpful: button.getAttribute("data-feedback-value") ?? "",
+          path: location.pathname,
+          title: document.title,
+        });
+        actions?.classList.add("hidden");
+        thanks?.classList.remove("hidden");
+      });
+    }
+  }
+</script>

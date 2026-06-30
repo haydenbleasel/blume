@@ -12,12 +12,8 @@ export const ko: UIStringsOverride = {
     copyMarkdown: "Markdown으로 복사",
     copyServerUrl: "서버 URL 복사",
     edit: "GitHub에서 편집",
-    feedbackPlaceholder: "의견을 남겨 주세요…",
-    giveFeedback: "의견 보내기",
-    markdownSupported: "Markdown 지원",
     openInChat: "채팅에서 열기",
     scrollToTop: "맨 위로",
-    send: "보내기",
   },
   ask: {
     empty: "문서에 대해 질문하세요.",
@@ -26,6 +22,12 @@ export const ko: UIStringsOverride = {
     placeholder: "질문하기…",
     send: "보내기",
     title: "AI에게 질문",
+  },
+  feedback: {
+    no: "아니요",
+    question: "이 페이지가 도움이 되었나요?",
+    thanks: "의견 주셔서 감사합니다!",
+    yes: "예",
   },
   languageSwitcher: { label: "언어", untranslated: "번역되지 않음" },
   page: {

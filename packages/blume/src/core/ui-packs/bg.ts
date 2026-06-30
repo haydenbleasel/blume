@@ -12,12 +12,8 @@ export const bg: UIStringsOverride = {
     copyMarkdown: "Копирай като Markdown",
     copyServerUrl: "Копирай URL на сървъра",
     edit: "Редактирай в GitHub",
-    feedbackPlaceholder: "Оставете вашата обратна връзка…",
-    giveFeedback: "Дай обратна връзка",
-    markdownSupported: "Markdown се поддържа",
     openInChat: "Отвори в чата",
     scrollToTop: "Нагоре",
-    send: "Изпрати",
   },
   ask: {
     empty: "Задайте въпрос за документацията.",
@@ -26,6 +22,12 @@ export const bg: UIStringsOverride = {
     placeholder: "Задайте въпрос…",
     send: "Изпрати",
     title: "Попитай ИИ",
+  },
+  feedback: {
+    no: "Не",
+    question: "Беше ли полезна тази страница?",
+    thanks: "Благодарим за обратната връзка!",
+    yes: "Да",
   },
   languageSwitcher: { label: "Език", untranslated: "Непреведено" },
   page: {

@@ -12,12 +12,8 @@ export const ptBR: UIStringsOverride = {
     copyMarkdown: "Copiar como Markdown",
     copyServerUrl: "Copiar URL do servidor",
     edit: "Editar no GitHub",
-    feedbackPlaceholder: "Deixe seu feedback…",
-    giveFeedback: "Enviar feedback",
-    markdownSupported: "Markdown suportado",
     openInChat: "Abrir no chat",
     scrollToTop: "Voltar ao topo",
-    send: "Enviar",
   },
   ask: {
     empty: "Faça uma pergunta sobre a documentação.",
@@ -26,6 +22,12 @@ export const ptBR: UIStringsOverride = {
     placeholder: "Faça uma pergunta…",
     send: "Enviar",
     title: "Perguntar à IA",
+  },
+  feedback: {
+    no: "Não",
+    question: "Esta página foi útil?",
+    thanks: "Obrigado pelo seu feedback!",
+    yes: "Sim",
   },
   languageSwitcher: { label: "Idioma", untranslated: "Não traduzido" },
   page: {

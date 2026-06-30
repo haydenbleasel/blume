@@ -12,12 +12,8 @@ export const hu: UIStringsOverride = {
     copyMarkdown: "Másolás Markdownként",
     copyServerUrl: "Szerver URL másolása",
     edit: "Szerkesztés a GitHubon",
-    feedbackPlaceholder: "Írd le a véleményed…",
-    giveFeedback: "Visszajelzés küldése",
-    markdownSupported: "Markdown támogatott",
     openInChat: "Megnyitás a csevegésben",
     scrollToTop: "Vissza a tetejére",
-    send: "Küldés",
   },
   ask: {
     empty: "Tegyél fel kérdést a dokumentációval kapcsolatban.",
@@ -26,6 +22,12 @@ export const hu: UIStringsOverride = {
     placeholder: "Tegyél fel egy kérdést…",
     send: "Küldés",
     title: "Kérdezd az AI-t",
+  },
+  feedback: {
+    no: "Nem",
+    question: "Hasznos volt ez az oldal?",
+    thanks: "Köszönjük a visszajelzésed!",
+    yes: "Igen",
   },
   languageSwitcher: { label: "Nyelv", untranslated: "Nincs lefordítva" },
   page: {

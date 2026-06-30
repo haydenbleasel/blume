@@ -12,12 +12,8 @@ export const vi: UIStringsOverride = {
     copyMarkdown: "Sao chép dưới dạng Markdown",
     copyServerUrl: "Sao chép URL máy chủ",
     edit: "Chỉnh sửa trên GitHub",
-    feedbackPlaceholder: "Để lại phản hồi của bạn…",
-    giveFeedback: "Gửi phản hồi",
-    markdownSupported: "Hỗ trợ Markdown",
     openInChat: "Mở trong trò chuyện",
     scrollToTop: "Lên đầu trang",
-    send: "Gửi",
   },
   ask: {
     empty: "Đặt câu hỏi về tài liệu.",
@@ -26,6 +22,12 @@ export const vi: UIStringsOverride = {
     placeholder: "Đặt câu hỏi…",
     send: "Gửi",
     title: "Hỏi AI",
+  },
+  feedback: {
+    no: "Không",
+    question: "Trang này có hữu ích không?",
+    thanks: "Cảm ơn phản hồi của bạn!",
+    yes: "Có",
   },
   languageSwitcher: { label: "Ngôn ngữ", untranslated: "Chưa dịch" },
   page: {

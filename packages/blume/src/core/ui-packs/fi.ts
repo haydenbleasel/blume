@@ -12,12 +12,8 @@ export const fi: UIStringsOverride = {
     copyMarkdown: "Kopioi Markdownina",
     copyServerUrl: "Kopioi palvelimen URL",
     edit: "Muokkaa GitHubissa",
-    feedbackPlaceholder: "Jätä palautteesi…",
-    giveFeedback: "Anna palautetta",
-    markdownSupported: "Markdown tuettu",
     openInChat: "Avaa keskustelussa",
     scrollToTop: "Takaisin ylös",
-    send: "Lähetä",
   },
   ask: {
     empty: "Kysy kysymys dokumentaatiosta.",
@@ -26,6 +22,12 @@ export const fi: UIStringsOverride = {
     placeholder: "Kysy kysymys…",
     send: "Lähetä",
     title: "Kysy tekoälyltä",
+  },
+  feedback: {
+    no: "Ei",
+    question: "Oliko tästä sivusta apua?",
+    thanks: "Kiitos palautteestasi!",
+    yes: "Kyllä",
   },
   languageSwitcher: { label: "Kieli", untranslated: "Ei käännetty" },
   page: {

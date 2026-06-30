@@ -12,12 +12,8 @@ export const uk: UIStringsOverride = {
     copyMarkdown: "Скопіювати як Markdown",
     copyServerUrl: "Скопіювати URL сервера",
     edit: "Редагувати на GitHub",
-    feedbackPlaceholder: "Залиште свій відгук…",
-    giveFeedback: "Залишити відгук",
-    markdownSupported: "Markdown підтримується",
     openInChat: "Відкрити в чаті",
     scrollToTop: "Нагору",
-    send: "Надіслати",
   },
   ask: {
     empty: "Поставте запитання щодо документації.",
@@ -26,6 +22,12 @@ export const uk: UIStringsOverride = {
     placeholder: "Поставте запитання…",
     send: "Надіслати",
     title: "Запитати ШІ",
+  },
+  feedback: {
+    no: "Ні",
+    question: "Чи була ця сторінка корисною?",
+    thanks: "Дякуємо за ваш відгук!",
+    yes: "Так",
   },
   languageSwitcher: { label: "Мова", untranslated: "Не перекладено" },
   page: {

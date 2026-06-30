@@ -127,8 +127,8 @@ describe("eject", () => {
 
 describe("registry", () => {
   it("finds a registered item by name", () => {
-    const item = findItem("feedback");
-    expect(item?.name).toBe("feedback");
+    const item = findItem("header");
+    expect(item?.name).toBe("header");
     expect(item?.files.length).toBeGreaterThan(0);
     expect(item?.postInstall.length).toBeGreaterThan(0);
   });

@@ -12,12 +12,8 @@ export const bn: UIStringsOverride = {
     copyMarkdown: "Markdown হিসেবে অনুলিপি করুন",
     copyServerUrl: "সার্ভার URL অনুলিপি করুন",
     edit: "GitHub-এ সম্পাদনা করুন",
-    feedbackPlaceholder: "আপনার মতামত দিন…",
-    giveFeedback: "মতামত দিন",
-    markdownSupported: "Markdown সমর্থিত",
     openInChat: "চ্যাটে খুলুন",
     scrollToTop: "উপরে যান",
-    send: "পাঠান",
   },
   ask: {
     empty: "ডকুমেন্টেশন সম্পর্কে একটি প্রশ্ন করুন।",
@@ -26,6 +22,12 @@ export const bn: UIStringsOverride = {
     placeholder: "একটি প্রশ্ন করুন…",
     send: "পাঠান",
     title: "AI-কে জিজ্ঞাসা করুন",
+  },
+  feedback: {
+    no: "না",
+    question: "এই পৃষ্ঠাটি কি সহায়ক ছিল?",
+    thanks: "আপনার মতামতের জন্য ধন্যবাদ!",
+    yes: "হ্যাঁ",
   },
   languageSwitcher: { label: "ভাষা", untranslated: "অনূদিত নয়" },
   page: {

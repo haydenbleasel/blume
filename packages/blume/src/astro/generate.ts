@@ -442,6 +442,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       codeWrap: config.markdown.code.wrap,
       description: config.description,
       favicon: resolveFavicon(project),
+      feedback: config.feedback,
       i18n: i18n
         ? {
             defaultLocale: i18n.defaultLocale,

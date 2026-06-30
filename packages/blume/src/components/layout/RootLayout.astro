@@ -19,6 +19,7 @@ import { findBreadcrumbs, flattenPages, getPagination } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
 import { resolveSlot } from "./overrides.ts";
 import PageActions from "./PageActions.astro";
+import PageFeedback from "./PageFeedback.astro";
 import Pagination from "./Pagination.astro";
 import TableOfContents from "./TableOfContents.astro";
 
@@ -64,8 +65,9 @@ interface Props {
   ogImage?: string | null;
   canonical?: string | null;
   editUrl?: string | null;
-  repoUrl?: string | null;
   askEnabled?: boolean;
+  /** Show the "Was this page helpful?" rating below the content. */
+  feedback?: boolean;
   exportPdf?: boolean;
   exportEpub?: boolean;
   feeds?: { title: string; href: string }[];
@@ -120,8 +122,8 @@ const {
   ogImage,
   canonical,
   editUrl,
-  repoUrl,
   askEnabled,
+  feedback = false,
   exportPdf,
   exportEpub,
   feeds,
@@ -308,6 +310,7 @@ const bannerScript = banner?.dismissible
             </p>
           )
         }
+        {feedback && <PageFeedback strings={strings.feedback} />}
         <PaginationSlot next={next} prev={prev} strings={strings.page} />
       </main>
       <aside
@@ -326,7 +329,6 @@ const bannerScript = banner?.dismissible
           exportPdf={exportPdf}
           mcpName={mcp?.name}
           mcpUrl={mcpUrl}
-          repoUrl={repoUrl}
           route={page.route}
           strings={strings.actions}
         />

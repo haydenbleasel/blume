@@ -12,12 +12,8 @@ export const he: UIStringsOverride = {
     copyMarkdown: "העתק כ-Markdown",
     copyServerUrl: "העתק כתובת URL של השרת",
     edit: "ערוך ב-GitHub",
-    feedbackPlaceholder: "השאר את המשוב שלך…",
-    giveFeedback: "שלח משוב",
-    markdownSupported: "Markdown נתמך",
     openInChat: "פתח בצ'אט",
     scrollToTop: "חזרה למעלה",
-    send: "שלח",
   },
   ask: {
     empty: "שאל שאלה על התיעוד.",
@@ -26,6 +22,12 @@ export const he: UIStringsOverride = {
     placeholder: "שאל שאלה…",
     send: "שלח",
     title: "שאל את ה-AI",
+  },
+  feedback: {
+    no: "לא",
+    question: "האם העמוד הזה היה מועיל?",
+    thanks: "תודה על המשוב שלך!",
+    yes: "כן",
   },
   languageSwitcher: { label: "שפה", untranslated: "לא מתורגם" },
   page: {

@@ -12,12 +12,8 @@ export const id: UIStringsOverride = {
     copyMarkdown: "Salin sebagai Markdown",
     copyServerUrl: "Salin URL server",
     edit: "Edit di GitHub",
-    feedbackPlaceholder: "Tinggalkan masukan Anda…",
-    giveFeedback: "Beri masukan",
-    markdownSupported: "Markdown didukung",
     openInChat: "Buka di obrolan",
     scrollToTop: "Kembali ke atas",
-    send: "Kirim",
   },
   ask: {
     empty: "Ajukan pertanyaan tentang dokumentasi.",
@@ -26,6 +22,12 @@ export const id: UIStringsOverride = {
     placeholder: "Ajukan pertanyaan…",
     send: "Kirim",
     title: "Tanya AI",
+  },
+  feedback: {
+    no: "Tidak",
+    question: "Apakah halaman ini membantu?",
+    thanks: "Terima kasih atas masukan Anda!",
+    yes: "Ya",
   },
   languageSwitcher: { label: "Bahasa", untranslated: "Belum diterjemahkan" },
   page: {

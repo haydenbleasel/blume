@@ -12,12 +12,8 @@ export const sk: UIStringsOverride = {
     copyMarkdown: "Kopírovať ako Markdown",
     copyServerUrl: "Kopírovať URL servera",
     edit: "Upraviť na GitHube",
-    feedbackPlaceholder: "Zanechajte spätnú väzbu…",
-    giveFeedback: "Poslať spätnú väzbu",
-    markdownSupported: "Markdown podporovaný",
     openInChat: "Otvoriť v chate",
     scrollToTop: "Späť nahor",
-    send: "Odoslať",
   },
   ask: {
     empty: "Opýtajte sa na dokumentáciu.",
@@ -26,6 +22,12 @@ export const sk: UIStringsOverride = {
     placeholder: "Položiť otázku…",
     send: "Odoslať",
     title: "Opýtať sa AI",
+  },
+  feedback: {
+    no: "Nie",
+    question: "Bola táto stránka užitočná?",
+    thanks: "Ďakujeme za vašu spätnú väzbu!",
+    yes: "Áno",
   },
   languageSwitcher: { label: "Jazyk", untranslated: "Nepreložené" },
   page: {

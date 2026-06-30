@@ -12,12 +12,8 @@ export const hi: UIStringsOverride = {
     copyMarkdown: "Markdown के रूप में कॉपी करें",
     copyServerUrl: "सर्वर URL कॉपी करें",
     edit: "GitHub पर संपादित करें",
-    feedbackPlaceholder: "अपनी प्रतिक्रिया दें…",
-    giveFeedback: "प्रतिक्रिया दें",
-    markdownSupported: "Markdown समर्थित",
     openInChat: "चैट में खोलें",
     scrollToTop: "ऊपर जाएँ",
-    send: "भेजें",
   },
   ask: {
     empty: "दस्तावेज़ के बारे में एक प्रश्न पूछें।",
@@ -26,6 +22,12 @@ export const hi: UIStringsOverride = {
     placeholder: "एक प्रश्न पूछें…",
     send: "भेजें",
     title: "AI से पूछें",
+  },
+  feedback: {
+    no: "नहीं",
+    question: "क्या यह पेज सहायक था?",
+    thanks: "आपकी प्रतिक्रिया के लिए धन्यवाद!",
+    yes: "हाँ",
   },
   languageSwitcher: { label: "भाषा", untranslated: "अनुवादित नहीं" },
   page: {
