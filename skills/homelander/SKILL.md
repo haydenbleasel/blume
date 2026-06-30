@@ -26,6 +26,8 @@ SDK + CLI. The output is a Blume docs source tree: MDX files, folders, and
   focused `blume/*` PR.
 - **Audit-only mode**: inspect, classify, plan, and produce findings without
   editing files.
+- **Eval mode**: compare Homelander's blind codebase-to-docs output against an
+  existing docs corpus or OSS target to improve pack classifiers and templates.
 
 ## Required First Steps
 
@@ -90,12 +92,23 @@ only after reviewing the plan.
    - Do not commit `.homelander/` artifacts unless the repo explicitly wants
      audit artifacts in source control.
 
+6. **Compare against real docs when evaluating Homelander**
+   - Use `scripts/docs_eval.py` when the task asks to compare Homelander against
+     OSS repos, official docs, or template quality.
+   - Read `references/evaluation.md` before interpreting eval output.
+   - Keep `.homelander-evals/` uncommitted unless the user explicitly asks for
+     benchmark artifacts in source control.
+
 ## Resources
 
 - `scripts/docs_harness.py`: scanner, pack classifier, docs portfolio planner,
   safe stub writer, and DeepSec-style review reporter.
+- `scripts/docs_eval.py`: comparison evaluator for existing docs analysis and
+  blind codebase-to-Blume-docs generation.
 - `references/pack-composition.md`: pack model, selected/skipped pack policy, and
   output contract.
+- `references/evaluation.md`: OSS/codebase comparison workflow and report
+  interpretation.
 - `references/source-patterns.md`: public surface scanners and unreleased-work
   detection.
 - `references/review-turn.md`: required adversarial review procedure.

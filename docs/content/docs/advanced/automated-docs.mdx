@@ -39,6 +39,9 @@ missing or stale docs.
 drift checks. `homelander` goes further. It gives the agent deterministic
 scanners, pack classification, evidence reports, references, and templates so an
 empty Blume scaffold can become a full docs source tree from the codebase.
+It can also run evals that compare blind codebase-generated docs against an
+existing docs corpus, which is useful when tuning templates against mature OSS
+documentation.
 
 ## Install the skills
 
@@ -104,6 +107,14 @@ across app, API, model, SDK, CLI, framework, integration, and migration docs:
 
 ```text
 Use the homelander skill. Run maintenance mode with a 7 day lookback window and --packs auto. Compare recent merged work, routes, APIs, model surfaces, SDK exports, CLI commands, env vars, config, schemas, integrations, and components against the docs portfolio. Skip feature-flagged and unreleased behavior. Update docs only for factual drift, run the DeepSec-style docs review turn, validate changes, and open or update one blume/* PR to main. Always produce an evidence report.
+```
+
+### Compare templates to existing docs
+
+Run this when tuning Homelander against OSS docs or your own mature docs:
+
+```text
+Use the homelander skill in eval mode. Analyze the existing Markdown/MDX docs, run blind codebase-to-Blume-docs planning into .homelander-evals, compare official-implied packs against generated packs, and report classifier misses, noisy packs, required page mismatches, and template gap candidates. Do not open a PR for the target repo.
 ```
 
 ### Release readiness

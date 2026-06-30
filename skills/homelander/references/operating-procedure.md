@@ -11,6 +11,8 @@ evidence report.
   PRs, merged work, releases, drift, weekly automation, or keeping docs updated.
 - **Audit-only mode**: use when the user asks for findings, gaps, review, or an
   evidence report without edits.
+- **Eval mode**: use when the user asks to compare Homelander output against
+  existing docs, OSS repos, official docs, or template-pack coverage.
 
 ## Init mode
 
@@ -44,6 +46,17 @@ evidence report.
 2. Inspect selected packs, skipped packs, gaps, and review findings.
 3. Produce recommendations without modifying files unless the user confirms.
 
+## Eval mode
+
+1. Read `references/evaluation.md`.
+2. Choose a small target set before running broad benchmarks.
+3. Run `scripts/docs_eval.py` against each target.
+4. Compare official-implied packs, blind generated packs, required pages, and
+   official pages without generated analogues.
+5. Use results to revise classifiers, obligations, and pack templates. Do not
+   treat one repo's docs taxonomy as universal.
+6. Keep `.homelander-evals/` artifacts uncommitted by default.
+
 ## Validation gates
 
 Run the strongest reasonable local checks for the repo. Prefer this order:
@@ -65,7 +78,7 @@ issue, include the failing command, exact failure, and why it is unrelated.
   `blume/docs-refresh-YYYY-MM-DD` for maintenance.
 - Keep the diff focused on docs source files, skill resources, templates, and
   navigation changes.
-- Do not commit `.homelander/` reports unless the repo explicitly wants audit
-  artifacts in source control.
+- Do not commit `.homelander/` or `.homelander-evals/` reports unless the repo
+  explicitly wants audit artifacts in source control.
 - PR body must include selected packs, skipped packs, docs changed, skipped
   flagged/unreleased work, validation results, and remaining questions.

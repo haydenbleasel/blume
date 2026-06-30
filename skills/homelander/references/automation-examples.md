@@ -39,3 +39,9 @@ For a scheduled Claude routine:
 ```text
 Use the homelander skill. Run maintenance mode with --lookback-days 7 and --packs auto. Compare recent merged work, routes, APIs, model surfaces, SDK exports, CLI commands, env vars, config, schemas, integrations, and components against the docs portfolio. Skip feature-flagged and unreleased behavior. Update docs only for factual drift, run the DeepSec-style review turn, validate changes, and open or update one blume/* PR to main. Always produce an evidence report.
 ```
+
+## Template evaluation run
+
+```text
+Use the homelander skill in eval mode. Select 3 representative OSS repos and one multi-pack repo. For each target, run scripts/docs_eval.py to analyze existing Markdown/MDX docs, run blind codebase-to-Blume-docs planning into .homelander-evals, and compare official-implied packs against generated packs. Do not open PRs for target repos. Summarize classifier misses, noisy generated packs, required page mismatches, and template gap candidates.
+```
