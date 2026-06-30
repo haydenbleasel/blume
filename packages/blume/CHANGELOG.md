@@ -1,5 +1,13 @@
 # blume
 
+## 0.1.4
+
+### Patch Changes
+
+- a41a9d7: Insulate the `<Component>` live preview from the page's prose styles. The preview renders inside the content's `.prose` wrapper, so Tailwind Typography bled into the previewed component (heading sizes, link colors, list markers, paragraph spacing), making it look unlike its real rendering. The Preview pane now carries `not-prose`; the Code pane keeps prose so the highlighted source stays styled.
+- a1155c4: Add a default 404 page. Blume now generates a not-found page at Astro's reserved `src/pages/404.astro` path, so static builds ship a `dist/404.html` and `blume dev` serves it for unmatched routes — previously an unknown URL fell back to Astro's unstyled default. The page renders through `PageLayout` (header + search, no sidebar), is centered and `noindex`, and its copy comes from new translatable `notFound` UI strings (`title`, `description`, `home`), overridable per locale via `i18n.ui`. Drop a `pages/404.astro` to replace it entirely: Blume skips the default when the project already owns `/404` (a custom page or a `404.md` content page), so the override never collides. The same default is written on `blume eject`.
+- 875eac0: Navigation tabs now scope the sidebar to their section. Previously `navigation.tabs` rendered as header links but every page still showed one global sidebar; the `sidebarVariants` data the model carried was never consumed at render time. Now, when the current route falls under a tab's `path`, the sidebar shows only that tab's section (the folder at that path) — so a multi-section site (e.g. Adapters / API / AI tabs) drills each tab into its own pages, the way Fumadocs' root folders do. It needs no extra config beyond the tabs: each group carries its URL path, and the renderer picks the section matching the route, falling back to the full sidebar when no tab matches. Breadcrumbs and pagination follow the scoped tree.
+
 ## 0.1.3
 
 ### Patch Changes
