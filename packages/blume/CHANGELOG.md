@@ -1,5 +1,12 @@
 # blume
 
+## 0.1.3
+
+### Patch Changes
+
+- 46f539c: Let `<Component>`'s `examples` config be a glob, not just a directory. When it contains glob magic (`*`, `?`, `[]`, `{}`, or `!`), only matching files are discovered and a `<Component path>` key is relative to the glob's static prefix. This lets a shadcn-style registry that colocates each component's source (named exports, no default) with its example (default export) be targeted directly — e.g. `examples: "registry/<pkg>/**/examples/*"` previews just the examples instead of sweeping in the sources and failing the build with `"default" is not exported`. Also makes `blume eject` honor the configured `examples` directory, which it previously ignored.
+- 84ef03c: Stop the search preflight from falsely warning `Search provider "orama" needs "@orama/orama", which isn't installed` on a successful build. The check resolved the provider SDK from the project root only, so under isolated linkers (Bun's `isolated` mode, pnpm) a SDK Blume ships — Orama, the default provider — looked missing even though the index built fine via the `.blume` deps link. It now also resolves from Blume's own package (the same dependency set the build uses), so a shipped SDK is recognized; a genuinely uninstalled peer (Algolia, Typesense, …) still warns.
+
 ## 0.1.2
 
 ### Patch Changes
