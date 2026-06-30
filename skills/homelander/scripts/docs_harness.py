@@ -1067,6 +1067,14 @@ def build_review_findings(
     plan: dict[str, Any],
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
+
+    def pack_for_page(page_path: str) -> str:
+        for plan_page in plan["planned_pages"]:
+            planned_path = plan_page["path"]
+            if page_path == planned_path or page_path.endswith(f"/{planned_path}"):
+                return plan_page["pack"]
+        return "site-shell"
+
     for plan_page in plan["planned_pages"]:
         if plan_page["status"] == "missing" and plan_page["required"]:
             findings.append(
@@ -1086,7 +1094,7 @@ def build_review_findings(
                 "high",
                 "placeholder or scaffold text left behind",
                 issue["path"],
-                "site-shell",
+                pack_for_page(issue["path"]),
                 "Replace scaffold markers with evidence-backed prose before opening a PR.",
                 f"{issue['path']}:{issue['line']} {issue['snippet']}",
             )
