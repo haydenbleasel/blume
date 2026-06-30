@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import {
+  lstat,
   mkdir,
   readFile,
   rename,
@@ -68,8 +69,6 @@ import {
 
 /** Absolute path to the Blume package `src` directory. */
 const BLUME_SRC = join(packageRoot(), "src");
-/** The Blume package's own `node_modules` (where Astro and friends live). */
-const BLUME_NODE_MODULES = join(packageRoot(), "node_modules");
 
 /** Whether a module specifier resolves from a directory via node resolution. */
 const canResolveFrom = (fromDir: string, spec: string): boolean => {
@@ -86,24 +85,64 @@ const canResolveAstro = (fromDir: string): boolean =>
   canResolveFrom(fromDir, "astro/package.json");
 
 /**
+ * Locate the directory that holds Blume's installed dependencies (Astro and its
+ * integrations).
+ *
+ * With hoisted installs this is moot — the deps sit in a `node_modules` the
+ * generated `.blume/` already walks up into, and {@link canResolveAstro}
+ * short-circuits before we need it. But under isolated linkers (Bun's
+ * `isolated` mode, pnpm) Blume's deps are NOT hoisted into the project; they
+ * live beside the Blume package in a virtual store, invisible to the upward
+ * walk from `.blume/`. Two layouts are possible, so probe for `astro`:
+ *   - `<blume>/node_modules` — deps nested under the package (workspace source)
+ *   - `dirname(<blume>)`     — deps as siblings in the store (isolated/pnpm)
+ *
+ * `packageRoot()` resolves to Blume's real on-disk path (Node follows the
+ * install symlink), so its parent is the store's package directory where the
+ * isolated linker places the siblings. The previous fixed
+ * `packageRoot()/node_modules` assumption missed the sibling layout entirely,
+ * which is why isolated-linker projects had to redeclare Blume's deps by hand.
+ */
+export const blumeDepsDir = (pkgDir: string = packageRoot()): string | null => {
+  const candidates = [join(pkgDir, "node_modules"), dirname(pkgDir)];
+  return candidates.find((dir) => existsSync(join(dir, "astro"))) ?? null;
+};
+
+/**
  * Make the generated runtime resolve Astro and its integrations. When they are
  * hoisted into the project (the usual case for published installs), resolution
- * already works. When they are nested and unreachable (workspaces, strict
- * package managers), symlink Blume's own dependencies into `.blume`.
+ * already works and this is a no-op. When they are unreachable from `.blume/`
+ * (workspaces under isolated linkers, strict package managers), symlink Blume's
+ * dependency directory in as `.blume/node_modules`, so the generated config's
+ * bare specifiers (`astro`, `@astrojs/mdx`, …) resolve without the project
+ * having to redeclare Blume's deps.
  */
-const ensureDepsLink = async (outDir: string): Promise<void> => {
+export const ensureDepsLink = async (
+  outDir: string,
+  pkgDir: string = packageRoot()
+): Promise<void> => {
   if (canResolveAstro(outDir)) {
     return;
   }
-  if (!existsSync(join(BLUME_NODE_MODULES, "astro"))) {
+  const depsDir = blumeDepsDir(pkgDir);
+  if (!depsDir) {
     return;
   }
   const link = join(outDir, "node_modules");
-  if (existsSync(link)) {
-    return;
+  // `lstat`, not `existsSync`, so a broken junction (target since moved) is
+  // still detected — `existsSync` follows the link and reports a dangling one
+  // as absent. Reaching here means Astro doesn't resolve from `outDir`, so any
+  // existing link is stale: replace a link we own (a junction/symlink) and
+  // leave a real directory untouched.
+  const existing = await lstat(link).catch(() => null);
+  if (existing) {
+    if (!existing.isSymbolicLink()) {
+      return;
+    }
+    await rm(link, { force: true });
   }
   await mkdir(outDir, { recursive: true });
-  await symlink(BLUME_NODE_MODULES, link, "junction");
+  await symlink(depsDir, link, "junction");
 };
 
 /** Astro integration package each non-React island framework needs installed. */
