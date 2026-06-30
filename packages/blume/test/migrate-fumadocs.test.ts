@@ -15,7 +15,10 @@ import {
   unsupportedFumadocsComponents,
 } from "../src/migrate/fumadocs/content.ts";
 import { normalizeFumadocsPageMeta } from "../src/migrate/fumadocs/frontmatter.ts";
-import { translateFumadocsMeta } from "../src/migrate/fumadocs/meta.ts";
+import {
+  parseFumadocsPages,
+  translateFumadocsMeta,
+} from "../src/migrate/fumadocs/meta.ts";
 import { migrateFumadocs } from "../src/migrate/migrate.ts";
 
 const dirs: string[] = [];
@@ -77,6 +80,16 @@ describe("translateFumadocsMeta", () => {
     expect(warnings.some((w) => w.includes("description"))).toBe(true);
   });
 
+  it("keeps an extract `...folder` as a folder ordering key and warns", () => {
+    const { meta, warnings } = translateFumadocsMeta({
+      pages: ["index", "...providers", "guides"],
+    });
+
+    expect(meta.pages).toEqual(["index", "providers", "guides"]);
+    expect(warnings.some((w) => w.includes('"...providers"'))).toBe(true);
+    expect(meta.pages).not.toContain("...providers");
+  });
+
   it("ignores non-object meta and non-string page entries", () => {
     expect(translateFumadocsMeta(null).meta).toEqual({});
     expect(translateFumadocsMeta([1, 2]).meta).toEqual({});
@@ -85,6 +98,55 @@ describe("translateFumadocsMeta", () => {
       pages: ["index", 5, "  ", "guides"],
     });
     expect(meta.pages).toEqual(["index", "guides"]);
+  });
+});
+
+describe("parseFumadocsPages", () => {
+  it("splits lead items from separator-introduced sections", () => {
+    const structure = parseFumadocsPages([
+      "index",
+      "guides",
+      "---Getting Started---",
+      "installation",
+      "...providers",
+      "[GitHub](https://github.com)",
+      "...",
+    ]);
+
+    expect(structure.hasSections).toBe(true);
+    expect(structure.lead).toEqual([
+      { kind: "ref", name: "index" },
+      { kind: "ref", name: "guides" },
+    ]);
+    expect(structure.sections).toHaveLength(1);
+    const [section] = structure.sections;
+    expect(section?.label).toBe("Getting Started");
+    expect(section?.items).toEqual([
+      { kind: "ref", name: "installation" },
+      { kind: "extract", name: "providers" },
+      { href: "https://github.com", kind: "link", text: "GitHub" },
+    ]);
+  });
+
+  it("reports no sections for a flat, separator-free list", () => {
+    const structure = parseFumadocsPages(["index", "guides", "..."]);
+    expect(structure.hasSections).toBe(false);
+    expect(structure.sections).toEqual([]);
+    expect(structure.lead).toEqual([
+      { kind: "ref", name: "index" },
+      { kind: "ref", name: "guides" },
+    ]);
+  });
+
+  it("defaults an unlabeled separator and ignores non-arrays", () => {
+    expect(parseFumadocsPages("nope")).toEqual({
+      hasSections: false,
+      lead: [],
+      sections: [],
+    });
+    expect(parseFumadocsPages(["------", "a"]).sections[0]?.label).toBe(
+      "Section"
+    );
   });
 });
 
@@ -397,8 +459,11 @@ describe("migrateFumadocs end to end", () => {
     const rootMeta = await readFile(join(root, "docs", "meta.ts"), "utf-8");
     expect(rootMeta).toContain('"title": "Docs"');
     expect(rootMeta).toContain('"index"');
+    expect(rootMeta).toContain('"guides"');
+    // The "Resources" section held only a link, so it leaves no group folder.
     expect(rootMeta).not.toContain("Resources");
     expect(rootMeta).not.toContain("GitHub");
+    expect(existsSync(join(root, "docs", "(Resources)"))).toBe(false);
 
     const guidesMeta = await readFile(
       join(root, "docs", "guides", "meta.ts"),
@@ -408,9 +473,63 @@ describe("migrateFumadocs end to end", () => {
     expect(guidesMeta).toContain('"collapsed": false');
 
     expect(existsSync(join(root, "content"))).toBe(false);
-    expect(result.warnings.some((w) => w.includes("separator"))).toBe(true);
+    expect(result.warnings.some((w) => w.includes("link"))).toBe(true);
     expect(result.warnings.some((w) => w.includes("full"))).toBe(true);
     expect(result.warnings.some((w) => w.includes("/docs"))).toBe(true);
+  });
+
+  it("rebuilds flat-file sections as route-transparent group folders", async () => {
+    const root = await project({
+      "content/docs/configuration.mdx": "# Config\n",
+      "content/docs/index.mdx": "# Home\n",
+      "content/docs/installation.mdx": "# Install\n",
+      "content/docs/meta.json": JSON.stringify({
+        pages: [
+          "index",
+          "---Getting Started---",
+          "installation",
+          "configuration",
+          "---Providers---",
+          "...providers",
+        ],
+        title: "Docs",
+      }),
+      "content/docs/providers/anthropic.mdx": "# Anthropic\n",
+      "content/docs/providers/openai.mdx": "# OpenAI\n",
+    });
+
+    const result = await migrateFumadocs(root);
+
+    // The "Getting Started" section's flat files move into a group folder,
+    // which is stripped from URLs, so the pages keep their routes.
+    const groupDir = join(root, "docs", "(Getting Started)");
+    expect(existsSync(join(groupDir, "installation.mdx"))).toBe(true);
+    expect(existsSync(join(groupDir, "configuration.mdx"))).toBe(true);
+    expect(existsSync(join(root, "docs", "installation.mdx"))).toBe(false);
+
+    // A meta.ts inside the group preserves the section's authored page order.
+    const sectionMeta = await readFile(join(groupDir, "meta.ts"), "utf-8");
+    expect(sectionMeta.indexOf("installation")).toBeLessThan(
+      sectionMeta.indexOf("configuration")
+    );
+
+    // The single-folder "Providers" section keeps the folder in place — wrapping
+    // it would stack two headings.
+    expect(existsSync(join(root, "docs", "providers", "openai.mdx"))).toBe(
+      true
+    );
+    expect(existsSync(join(root, "docs", "(Providers)"))).toBe(false);
+
+    // The lead page stays at the top level; the parent meta orders the sections.
+    expect(existsSync(join(root, "docs", "index.mdx"))).toBe(true);
+    const rootMeta = await readFile(join(root, "docs", "meta.ts"), "utf-8");
+    expect(rootMeta.indexOf('"index"')).toBeLessThan(
+      rootMeta.indexOf('"Getting Started"')
+    );
+    expect(rootMeta.indexOf('"Getting Started"')).toBeLessThan(
+      rootMeta.indexOf('"providers"')
+    );
+    expect(result.warnings.some((w) => w.includes("...providers"))).toBe(true);
   });
 
   it("writes a default config when there is no content/docs", async () => {

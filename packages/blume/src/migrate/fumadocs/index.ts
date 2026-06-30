@@ -5,6 +5,7 @@ import { dirname, join, relative } from "pathe";
 import { glob } from "tinyglobby";
 
 import matter from "../../core/frontmatter.ts";
+import type { FolderMeta } from "../../core/schema.ts";
 import { writeBlumeConfig } from "../shared.ts";
 import { loadFumadocsConfig } from "./config.ts";
 import {
@@ -16,7 +17,13 @@ import {
   unsupportedFumadocsComponents,
 } from "./content.ts";
 import { normalizeFumadocsPageMeta } from "./frontmatter.ts";
-import { translateFumadocsMeta } from "./meta.ts";
+import { reshapeFumadocsGroups } from "./groups.ts";
+import {
+  parseFumadocsPages,
+  renderMetaModule,
+  translateFumadocsMeta,
+  translateFumadocsSelfMeta,
+} from "./meta.ts";
 
 export interface FumadocsMigrationResult {
   moved: number;
@@ -82,6 +89,24 @@ const movePage = async (
   };
 };
 
+/** Write a `FolderMeta` to `dest` unless it already exists. */
+const writeMeta = async (
+  dest: string,
+  meta: FolderMeta,
+  rel: string,
+  warnings: string[]
+): Promise<string[]> => {
+  if (Object.keys(meta).length === 0) {
+    return warnings;
+  }
+  if (existsSync(dest)) {
+    return [...warnings, `Skipped ${rel} (target already exists)`];
+  }
+  await mkdir(dirname(dest), { recursive: true });
+  await writeFile(dest, renderMetaModule(meta), "utf-8");
+  return warnings;
+};
+
 /** Convert one `meta.json` into a typed `meta.ts`, or relocate it if unparseable. */
 const convertMeta = async (
   abs: string,
@@ -105,23 +130,32 @@ const convertMeta = async (
     ];
   }
 
-  const { meta, warnings } = translateFumadocsMeta(parsed);
   const dir = dirname(rel) === "." ? "" : dirname(rel);
-  if (Object.keys(meta).length > 0) {
-    const dest = join(root, "docs", dir, "meta.ts");
-    if (existsSync(dest)) {
-      await rm(abs, { force: true });
-      return [...warnings, `Skipped ${rel} (target already exists)`];
+  const docsDir = join(root, "docs", dir);
+  const dest = join(docsDir, "meta.ts");
+
+  // A `pages` array with `---Section---` separators can't round-trip through a
+  // flat `meta.ts` ordering, so rebuild its sections as group folders instead.
+  const structure = parseFumadocsPages((parsed as { pages?: unknown }).pages);
+  if (structure.hasSections && !existsSync(dest)) {
+    const self = translateFumadocsSelfMeta(parsed);
+    const reshape = await reshapeFumadocsGroups(structure, docsDir);
+    const meta: FolderMeta = { ...self.meta };
+    if (reshape.order.length > 0) {
+      meta.pages = reshape.order;
     }
-    await mkdir(dirname(dest), { recursive: true });
-    await writeFile(
-      dest,
-      `import { defineMeta } from "blume";\n\nexport default defineMeta(${JSON.stringify(meta, null, 2)});\n`,
-      "utf-8"
-    );
+    const result = await writeMeta(dest, meta, rel, [
+      ...self.warnings,
+      ...reshape.warnings,
+    ]);
+    await rm(abs, { force: true });
+    return result;
   }
+
+  const { meta, warnings } = translateFumadocsMeta(parsed);
+  const result = await writeMeta(dest, meta, rel, warnings);
   await rm(abs, { force: true });
-  return warnings;
+  return result;
 };
 
 interface PageSummary {
@@ -221,10 +255,17 @@ export const migrateFumadocsProject = async (
     pageFiles.map((abs) => movePage(abs, base, root))
   );
   const pages = summarizePages(pageResults);
-  const metaResults = await Promise.all(
-    metaFiles.map((abs) => convertMeta(abs, base, root))
+  // Convert metas deepest-first and sequentially: a parent's group-folder
+  // reshape can move a child folder, so the child's own reshape must finish
+  // first (and the two can't race over the same `docs/` paths).
+  const orderedMetas = metaFiles.toSorted(
+    (a, b) => b.split("/").length - a.split("/").length
   );
-  const metaWarnings = metaResults.flat();
+  const metaWarnings: string[] = [];
+  for (const abs of orderedMetas) {
+    // oxlint-disable-next-line no-await-in-loop -- sequential to avoid move races
+    metaWarnings.push(...(await convertMeta(abs, base, root)));
+  }
 
   await writeBlumeConfig(root, config);
   const cleanupWarnings = await cleanupSourceDirs(root);
