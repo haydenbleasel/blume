@@ -1,4 +1,15 @@
 export { defineConfig } from "./core/config.ts";
+export type {
+  BlumeBanner,
+  BlumeData,
+  BlumeDataConfig,
+  BlumeDataI18n,
+  BlumeDataLocale,
+  BlumeFavicon,
+  BlumeFeed,
+  BlumeLogo,
+  BlumeRoute,
+} from "./core/data.ts";
 export { defineComponents } from "./core/define-components.ts";
 export type {
   ComponentOverride,
@@ -10,6 +21,7 @@ export type {
   FolderMetaDefinition,
   FolderMetaFactory,
 } from "./core/define-meta.ts";
+export type { UIStrings } from "./core/i18n-ui.ts";
 export type {
   BlumeConfig,
   FolderMeta,

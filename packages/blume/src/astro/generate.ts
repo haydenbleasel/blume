@@ -18,6 +18,12 @@ import { resolveAskBackend } from "../ai/ask.ts";
 import { buildRawMarkdown } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
+import type {
+  BlumeBanner,
+  BlumeData,
+  BlumeFavicon,
+  BlumeLogo,
+} from "../core/data.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import { resolveFallbackLocale } from "../core/i18n.ts";
 import { packageRoot } from "../core/package-root.ts";
@@ -286,20 +292,12 @@ const writeStagedContent = async (
 };
 
 /** The logo shape the runtime consumes: an inline SVG or image URL(s). */
-interface ResolvedLogo {
-  svg?: string;
-  light?: string;
-  dark?: string;
-  alt: string;
-  href: string;
-}
-
 /**
  * Resolve the configured logo. A single SVG is read and inlined so a
  * `currentColor` logo follows the theme; other images keep their URL for an
  * `<img>`. The file is looked up under `public/` and the project root.
  */
-const resolveLogo = (project: BlumeProject): ResolvedLogo | null => {
+const resolveLogo = (project: BlumeProject): BlumeLogo | null => {
   const { logo } = project.config;
   if (!logo) {
     return null;
@@ -322,12 +320,6 @@ const resolveLogo = (project: BlumeProject): ResolvedLogo | null => {
   }
   return { alt, dark, href, light };
 };
-
-/** The favicon shape the runtime consumes: a link href plus optional MIME type. */
-interface ResolvedFavicon {
-  href: string;
-  type?: string;
-}
 
 /**
  * Favicon filenames Blume auto-detects, in priority order. Mirrors the Next.js
@@ -363,7 +355,7 @@ const inlineDataUri = (file: string, type: string): string =>
   `data:${type};base64,${readFileSync(file).toString("base64")}`;
 
 /** The bundled Blume favicon, inlined as a data URI so it needs no public file. */
-const defaultFavicon = (): ResolvedFavicon => ({
+const defaultFavicon = (): BlumeFavicon => ({
   href: inlineDataUri(join(BLUME_SRC, "assets", "icon.png"), "image/png"),
   type: "image/png",
 });
@@ -389,7 +381,7 @@ const APPLE_ICON_CANDIDATES = [
 const resolveIconFile = (
   project: BlumeProject,
   candidates: string[]
-): ResolvedFavicon | null => {
+): BlumeFavicon | null => {
   const { root } = project.context;
   for (const name of candidates) {
     if (existsSync(join(root, "public", name))) {
@@ -410,7 +402,7 @@ const resolveIconFile = (
  * Resolve the site favicon by convention, falling back to the bundled Blume mark
  * when the project ships no `icon.*`/`favicon.*` file.
  */
-const resolveFavicon = (project: BlumeProject): ResolvedFavicon =>
+const resolveFavicon = (project: BlumeProject): BlumeFavicon =>
   resolveIconFile(project, FAVICON_CANDIDATES) ?? defaultFavicon();
 
 /**
@@ -419,20 +411,11 @@ const resolveFavicon = (project: BlumeProject): ResolvedFavicon =>
  * `data:`-URI apple-touch-icons, so a `public/` file (served by URL) is the
  * reliable path; a root-level file is still inlined for symmetry with favicons.
  */
-const resolveAppleIcon = (project: BlumeProject): ResolvedFavicon | null =>
+const resolveAppleIcon = (project: BlumeProject): BlumeFavicon | null =>
   resolveIconFile(project, APPLE_ICON_CANDIDATES);
 
-/** The announcement banner shape the runtime consumes. */
-interface ResolvedBanner {
-  content: string;
-  link?: { href: string; text: string };
-  dismissible: boolean;
-  /** Dismissal key: the configured id, else the content itself. */
-  key: string;
-}
-
 /** Normalize the banner config (string shorthand or object) for the runtime. */
-const resolveBanner = (config: ResolvedConfig): ResolvedBanner | null => {
+const resolveBanner = (config: ResolvedConfig): BlumeBanner | null => {
   const { banner } = config;
   if (!banner) {
     return null;
@@ -512,7 +495,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       )
     : {};
 
-  const data = {
+  const data: BlumeData = {
     config: {
       analytics: config.analytics ?? null,
       appleIcon: resolveAppleIcon(project),
@@ -540,7 +523,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       mcp: config.mcp.enabled
         ? { name: config.mcp.name ?? config.title, route: config.mcp.route }
         : null,
-      og: { enabled: config.seo.og.enabled },
+      // `og.enabled` is resolved to a definite boolean in `loadConfig`; coerce
+      // the optional schema type so the serialized shape stays `boolean`.
+      og: { enabled: config.seo.og.enabled ?? false },
       repoUrl,
       search: {
         enabled: config.search.provider !== "none",

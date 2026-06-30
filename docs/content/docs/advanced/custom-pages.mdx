@@ -69,31 +69,67 @@ import data from "blume:data";
 </ul>
 ```
 
+Inside a Blume project the module is typed automatically. You can also pull the
+shape in explicitly — for typed helpers, props, or your own tsconfig — with
+`import type { BlumeData } from "blume"`:
+
+```ts
+import type { BlumeData, BlumeRoute } from "blume";
+
+const indexable = (data: BlumeData): BlumeRoute[] =>
+  data.routes.filter((route) => route.indexable);
+```
+
 The module exposes:
 
 <TypeTable
   type={{
     config: {
-      type: "object",
+      type: "BlumeDataConfig",
       required: true,
       description:
-        "Resolved site config — title, description, logo, banner, theme, site URL, repoUrl, and search settings.",
+        "Resolved site settings: title, description, logo, favicon, appleIcon, banner, theme, site, repoUrl, search, i18n, mcp, og, analytics, feedback, structuredData, codeWrap, and imageZoom.",
     },
     navigation: {
-      type: "object",
-      required: true,
-      description: "The sidebar and tab tree inferred from your content.",
-    },
-    routes: {
-      type: "Route[]",
+      type: "Navigation",
       required: true,
       description:
-        "Every content page: { id, path, title, indexable, hidden, draft, editUrl }.",
+        "The sidebar, tabs, and selectors inferred from your content (default locale).",
+    },
+    navigationByLocale: {
+      type: "Record<string, Navigation>",
+      required: true,
+      description:
+        "Per-locale navigation trees, keyed by locale code. Empty unless i18n is configured.",
+    },
+    routes: {
+      type: "BlumeRoute[]",
+      required: true,
+      description:
+        "Every content page: { id, path, title, locale, indexable, hidden, draft, fallback, editUrl, lastModified, alternates, collection, entryId }.",
     },
     feeds: {
-      type: "Feed[]",
+      type: "BlumeFeed[]",
       required: true,
       description: "Generated RSS feeds: { href, title }.",
+    },
+    fontCssVars: {
+      type: "string[]",
+      required: true,
+      description:
+        "CSS variable names for the configured fonts (Astro <Font> integration).",
+    },
+    ui: {
+      type: "UIStrings",
+      required: true,
+      description:
+        "Resolved UI chrome strings for the default locale (search, sidebar, and footer labels).",
+    },
+    uiByLocale: {
+      type: "Record<string, UIStrings>",
+      required: true,
+      description:
+        "Per-locale UI strings, keyed by locale code. Empty unless i18n is configured.",
     },
   }}
 />

@@ -659,6 +659,12 @@ describe("env / package / tsconfig templates", () => {
     expect(envTemplate()).toContain('types="astro/client"');
   });
 
+  it("types the blume:data module from the public BlumeData type", () => {
+    const out = envTemplate();
+    expect(out).toContain('declare module "blume:data"');
+    expect(out).toContain('import("blume").BlumeData');
+  });
+
   it("emits an empty dependency map by default", () => {
     expect(runtimePackageTemplate()).toContain('"dependencies": {}');
   });

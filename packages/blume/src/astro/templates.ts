@@ -1245,6 +1245,11 @@ ${entries}
 export const envTemplate =
   (): string => `/// <reference path="../.astro/types.d.ts" />
 /// <reference types="astro/client" />
+
+declare module "blume:data" {
+  const data: import("blume").BlumeData;
+  export default data;
+}
 `;
 
 /** Generate `.blume/package.json`. */
