@@ -1,0 +1,25 @@
+---
+title: Webhooks
+description: Webhook events and verification.
+---
+
+## Support status
+
+The code scan did not find public inbound webhook routes, webhook event
+schemas, signing-secret verification, retry behavior, or replay behavior.
+Blume does use external providers and generated server endpoints for features
+such as Ask AI and MCP, but those are not webhook receivers.
+
+## Related surfaces
+
+| Surface           | Use                                                   |
+| ----------------- | ----------------------------------------------------- |
+| `mcp`             | Hosted MCP endpoint and discovery documents.          |
+| `ai.ask`          | Generated Ask AI endpoint.                            |
+| `content.sources` | Pull content from external providers.                 |
+| `search`          | Sync search indexes to hosted providers during build. |
+
+## Documentation rule
+
+Do not document webhook setup until the codebase exposes webhook handlers,
+event payloads, signature verification, and delivery semantics.

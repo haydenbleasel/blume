@@ -1,0 +1,61 @@
+---
+title: SDK Quickstart
+description: Install and call the SDK.
+---
+
+## Prerequisites
+
+Install the `blume` package in a project that can run Node.js `>=22.12.0`.
+
+## Install
+
+```bash
+npm install blume
+```
+
+## Configure credentials
+
+Core package helpers do not require credentials. Provider-specific features
+such as hosted search, Notion, Sanity, Ask AI, or GitHub metadata may require
+environment variables documented in [Configuration Reference](../reference/config).
+
+## Import
+
+```ts
+import { defineConfig, defineMeta } from "blume";
+```
+
+## Initialize the client
+
+```ts
+export default defineConfig({
+  title: "My Docs",
+  content: {
+    root: "docs",
+  },
+});
+```
+
+## Make the first call
+
+```ts
+export default defineMeta({
+  title: "Reference",
+  pages: ["cli", "configuration"],
+});
+```
+
+## Verify the result
+
+```bash
+blume build
+```
+
+## Runtime variants
+
+| Runtime                 | Package or entrypoint | Notes                                                                   |
+| ----------------------- | --------------------- | ----------------------------------------------------------------------- |
+| Config authoring        | `blume`               | Public helpers for project config, meta files, and component overrides. |
+| Generated Astro runtime | `.blume/`             | Created by `dev`, `build`, and `sync`; should not be edited by hand.    |
+| Component imports       | `blume/components`    | Shipped UI components and component subpaths.                           |
+| Source adapters         | `blume/sources/*`     | Advanced source adapter entrypoints exposed by package exports.         |

@@ -1,0 +1,63 @@
+---
+title: Getting Started
+description: Get from setup to the first working result.
+---
+
+## Prerequisites
+
+Blume's package metadata requires Node.js `>=22.12.0`. The repository uses Bun,
+but published projects can run Blume through any package manager that installs
+the `blume` package and exposes the `blume` binary.
+
+## Before you start
+
+| Requirement   | Version or value | Evidence                      |
+| ------------- | ---------------- | ----------------------------- |
+| Node.js       | `>=22.12.0`      | `packages/blume/package.json` |
+| CLI binary    | `blume`          | `packages/blume/package.json` |
+| Config helper | `defineConfig`   | `packages/blume/src/index.ts` |
+
+## Install
+
+```bash
+npm install blume
+```
+
+## Configure
+
+Create a Blume project:
+
+```bash
+blume init
+```
+
+The init command writes `package.json`, `blume.config.ts`, and an initial
+Markdown or MDX content page. By default, content lives in `docs/`. Use
+`--content-dir` when the content root should be somewhere else.
+
+## Create your first working result
+
+```bash
+blume dev
+```
+
+## What this creates
+
+| File or resource  | Purpose                                                       |
+| ----------------- | ------------------------------------------------------------- |
+| `blume.config.ts` | Site and feature configuration.                               |
+| `docs/index.mdx`  | First content page when using the default content root.       |
+| `.blume/`         | Generated Astro runtime created by `dev`, `build`, or `sync`. |
+
+## Verify it works
+
+```bash
+blume build
+```
+
+## Next steps
+
+- Use [Configuration Reference](./reference/configuration) to set content,
+  navigation, search, AI, OpenAPI, and deployment options.
+- Use [CLI Reference](./reference/cli) for command behavior and flags.
+- Use [Runtime Model](./concepts/runtime) to understand what Blume generates.

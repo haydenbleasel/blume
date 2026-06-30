@@ -1,0 +1,41 @@
+---
+title: Integrations
+description: Connect external providers.
+---
+
+| Provider    | Setup                               | Required secrets                            | Evidence                             |
+| ----------- | ----------------------------------- | ------------------------------------------- | ------------------------------------ |
+| Filesystem  | `content.root` or `content.sources` | none                                        | Content source schema                |
+| Notion      | `content.sources`                   | `NOTION_TOKEN` when private content is used | Notion source adapter                |
+| Sanity      | `content.sources`                   | `SANITY_TOKEN` when private content is used | Sanity source adapter                |
+| OpenAPI     | `openapi`                           | none for public specs                       | Scalar reference generator           |
+| AsyncAPI    | `asyncapi`                          | none for public specs                       | Scalar reference generator           |
+| Algolia     | `search`                            | `ALGOLIA_ADMIN_API_KEY` for sync            | Search sync provider                 |
+| Orama Cloud | `search`                            | `ORAMA_PRIVATE_API_KEY` for sync            | Search sync provider                 |
+| Typesense   | `search`                            | `TYPESENSE_ADMIN_API_KEY` for sync          | Search sync provider                 |
+| Ask AI      | `ai.ask`                            | Provider API key for the configured backend | Ask backend resolver                 |
+| MCP         | `mcp`                               | none by default                             | MCP discovery and endpoint generator |
+
+## Choose an integration path
+
+| Path               | Use when                                                | Entry point             |
+| ------------------ | ------------------------------------------------------- | ----------------------- |
+| Content source     | Content lives outside the repository.                   | `content.sources`       |
+| Search provider    | Search should run locally or sync to a hosted provider. | `search.provider`       |
+| Reference renderer | A verified OpenAPI or AsyncAPI spec exists.             | `openapi` or `asyncapi` |
+| AI or MCP          | The docs site should expose agent-facing features.      | `ai` or `mcp`           |
+
+## Lifecycle
+
+| Action     | Required permissions                            | Side effects                                 | Evidence       |
+| ---------- | ----------------------------------------------- | -------------------------------------------- | -------------- |
+| Build      | Provider credentials for enabled hosted syncs   | Search indexes and LLM files may be written. | `buildCommand` |
+| Dev        | Provider credentials for enabled remote sources | Runtime data regenerates after changes.      | `devCommand`   |
+| Sync       | Provider credentials for enabled remote sources | Remote content sources refresh.              | `syncCommand`  |
+| Force sync | Same as sync                                    | `.blume/cache` is cleared before refresh.    | `syncCommand`  |
+
+## Operational notes
+
+Provider SDKs are optional peer dependencies. Install only the provider package
+used by the configured feature. Missing provider packages are reported as
+diagnostics by the relevant source or runtime path.

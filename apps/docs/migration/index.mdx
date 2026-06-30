@@ -1,0 +1,53 @@
+---
+title: Migration Guide
+description: Upgrade and migration path.
+---
+
+## What changed
+
+Blume ships migrators for projects using Fumadocs, Mintlify, Nextra, or
+Starlight. Each migrator runs from the current project root and reports moved
+content files plus warnings.
+
+## Before you migrate
+
+| Requirement      | Current                                  | Target                                      | Evidence          |
+| ---------------- | ---------------------------------------- | ------------------------------------------- | ----------------- |
+| Source framework | Fumadocs, Mintlify, Nextra, or Starlight | Blume                                       | `migrateCommand`  |
+| Project root     | Existing docs project                    | Blume project                               | Migrator dispatch |
+| Validation       | Source-specific                          | `blume validate --strict` and `blume build` | CLI validators    |
+
+## Similarities and differences
+
+| Area          | Before                           | After                                          |
+| ------------- | -------------------------------- | ---------------------------------------------- |
+| Content files | Source framework Markdown or MDX | Blume-compatible Markdown or MDX               |
+| Config        | Source framework config          | `blume.config.ts`                              |
+| Navigation    | Source framework navigation      | Blume folder meta and navigation config        |
+| Components    | Source framework components      | Blume components or project-owned replacements |
+
+## Upgrade steps
+
+1. Run the source-specific `blume migrate` command from the project root.
+2. Review moved content and warnings.
+3. Review `blume.config.ts`.
+4. Run `blume validate --strict`.
+5. Run `blume build`.
+
+## Automated helpers
+
+The `migrate` command dispatches to source-specific migrators. It does not infer
+an arbitrary docs framework; choose one of the supported subcommands.
+
+## Manual checklist
+
+- Resolve unsupported components reported by the migrator.
+- Check local links and anchors.
+- Check navigation group order.
+- Check frontmatter that was normalized from the source framework.
+- Verify generated OpenAPI or AsyncAPI references still point to real specs.
+
+## Known gaps
+
+The code scan only found migrators for Fumadocs, Mintlify, Nextra, and
+Starlight. Other docs frameworks require manual conversion or a new migrator.

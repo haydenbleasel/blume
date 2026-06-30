@@ -1,0 +1,41 @@
+---
+title: Runtime Model
+description: How the framework executes user projects.
+---
+
+## Lifecycle
+
+Blume commands prepare a project in three phases:
+
+1. Load and validate `blume.config.ts`.
+2. Scan content sources, folder metadata, navigation, and project inputs into a
+   content graph.
+3. Generate a hidden Astro runtime under `.blume/` and run Astro in dev,
+   preview, or build mode.
+
+## Runtime boundaries
+
+| Boundary       | What runs there                                                            | Evidence                |
+| -------------- | -------------------------------------------------------------------------- | ----------------------- |
+| Project root   | User config, content, theme, pages, and component overrides.               | `resolveProjectContext` |
+| `.blume/`      | Generated Astro app, runtime data, pages, endpoints, and Tailwind entry.   | `generateRuntime`       |
+| Build mode     | Static or server output, search artifacts, LLM files, sitemap, and robots. | `buildCommand`          |
+| Dev mode       | Astro dev server plus file watchers that regenerate runtime data.          | `devCommand`            |
+| Server runtime | Ask AI and MCP endpoints when enabled.                                     | `serverFeatures`        |
+
+## Local, preview, and production
+
+| Mode            | Command or environment | Difference                                                             |
+| --------------- | ---------------------- | ---------------------------------------------------------------------- |
+| Dev             | `blume dev`            | Keeps drafts, runs Astro dev server, and hot-regenerates runtime data. |
+| Preview content | `--preview`            | Includes drafts and unpublished CMS content.                           |
+| Build           | `blume build`          | Drops drafts unless `--preview` is set and writes production output.   |
+| Preview build   | `blume preview`        | Serves the last generated Astro build.                                 |
+
+## Constraints
+
+- `.blume/` is generated output and should not be edited by hand.
+- Server-only features cannot ship with static output.
+- Server output requires a deployment adapter.
+- Vue and Svelte islands require the project to install their Astro
+  integrations; React is shipped with Blume.

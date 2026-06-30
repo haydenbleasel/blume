@@ -1,0 +1,27 @@
+---
+title: OAuth Apps
+description: Configure OAuth-based integrations.
+---
+
+## Support status
+
+The code scan did not find a public OAuth app framework, OAuth callback route,
+scope registry, or token exchange flow. Blume integrations are configured
+through content sources, search providers, Ask AI providers, OpenAPI or AsyncAPI
+specs, MCP settings, and deployment adapters.
+
+## What to use instead
+
+| Need                            | Blume surface                                        |
+| ------------------------------- | ---------------------------------------------------- |
+| Read external content           | `content.sources` for Notion or Sanity.              |
+| Render a verified API reference | `openapi` or `asyncapi`.                             |
+| Connect agent tools             | `mcp`.                                               |
+| Add Ask AI                      | `ai.ask`.                                            |
+| Configure provider credentials  | Environment variables read by the selected provider. |
+
+## Documentation rule
+
+Do not document OAuth setup as generally available unless the codebase adds
+public OAuth routes, app registration settings, scopes, and token lifecycle
+behavior.

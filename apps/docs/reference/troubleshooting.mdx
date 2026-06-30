@@ -1,0 +1,27 @@
+---
+title: Troubleshooting
+description: CLI errors, diagnostics, and recovery steps.
+---
+
+| Symptom                               | Likely cause                                                 | Diagnostic command        | Fix                                                                    |
+| ------------------------------------- | ------------------------------------------------------------ | ------------------------- | ---------------------------------------------------------------------- |
+| `No build found` from `blume preview` | `.blume/` has not been built yet                             | `blume build`             | Build first, then run `blume preview`.                                 |
+| Server features fail a static build   | Ask AI or MCP is enabled while output is static              | `blume doctor`            | Set `deployment.output` to `server` and configure an adapter.          |
+| Server output lacks an adapter        | `deployment.output` is `server` without `deployment.adapter` | `blume doctor`            | Set an adapter such as `vercel`.                                       |
+| Link validation fails                 | Broken local link, missing anchor, or missing asset          | `blume validate --strict` | Fix the target path, heading, or public asset.                         |
+| Hosted search does not sync           | Provider admin key is missing                                | `blume build`             | Set the provider-specific admin key for the configured search backend. |
+| Config fails to load                  | `blume.config.ts` throws or does not match schema            | `blume doctor`            | Fix the module error or invalid option.                                |
+
+## Logs and debug output
+
+Blume reports structured diagnostics through `BlumeError`, `reportDiagnostics`,
+and schema validation. CLI commands decide whether diagnostics are warnings or
+fatal errors through command flags such as `--strict`.
+
+## Recovery steps
+
+1. Reproduce with the narrowest command, usually `blume doctor`, `blume build`,
+   or `blume validate --strict`.
+2. Inspect the diagnostic code, file, and suggestion.
+3. Fix the content, config, environment variable, or missing generated build.
+4. Re-run the same command, then run `blume build` before shipping.

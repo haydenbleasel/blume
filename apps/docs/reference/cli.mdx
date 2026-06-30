@@ -1,0 +1,74 @@
+---
+title: CLI Reference
+description: Commands, flags, and examples.
+---
+
+## Usage
+
+```bash
+blume [command] [options]
+```
+
+## Commands
+
+| Command    | Description                                                      |
+| ---------- | ---------------------------------------------------------------- |
+| `init`     | Scaffold a minimal Blume project.                                |
+| `dev`      | Start the Blume development server.                              |
+| `build`    | Build the docs site for production.                              |
+| `preview`  | Preview the last production build.                               |
+| `validate` | Validate internal, anchor, asset, and optionally external links. |
+| `doctor`   | Diagnose configuration and content problems.                     |
+| `sync`     | Re-fetch remote content sources and regenerate the runtime.      |
+| `add`      | Install a source component or template from the registry.        |
+| `eject`    | Promote the generated runtime into an owned Astro project.       |
+| `migrate`  | Migrate from another docs tool.                                  |
+
+## `blume init`
+
+```bash
+blume init --content-dir docs --yes
+```
+
+Creates `package.json`, `blume.config.ts`, and an initial `index.mdx` under the
+configured content directory. Existing files are skipped.
+
+## `blume dev`
+
+```bash
+blume dev --port 4321 --host 0.0.0.0 --open --preview --strict
+```
+
+Runs the generated Astro app in development mode, watches project inputs, and
+regenerates runtime data after content, config, theme, component, or source
+changes.
+
+## `blume build`
+
+```bash
+blume build --preview --strict
+```
+
+Builds static or server output, then writes search files, `llms.txt`,
+`llms-full.txt`, sitemap, and robots output when the corresponding config
+enables them.
+
+## `blume validate`
+
+```bash
+blume validate --external --strict
+```
+
+Checks local links, anchors, assets, and optionally external HTTP links. In
+strict mode, warnings cause the command to exit with failure.
+
+## Other commands
+
+| Command   | Common flags                                  | Behavior                                                                                             |
+| --------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `doctor`  | none                                          | Reports page count, output mode, search provider, and diagnostics.                                   |
+| `sync`    | `--force`, `--preview`, `--strict`            | Clears source cache when forced, refreshes remote sources, and regenerates runtime data.             |
+| `preview` | `--host`, `--port`                            | Serves the last generated Astro build.                                                               |
+| `add`     | `--force`, `name`                             | Installs registry files, rewriting built-in package imports when required.                           |
+| `eject`   | `--yes`                                       | Writes `astro.config.mjs` and `src/`, updates scripts to Astro commands, and keeps Blume importable. |
+| `migrate` | `fumadocs`, `mintlify`, `nextra`, `starlight` | Runs the matching migrator in the current project root.                                              |

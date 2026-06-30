@@ -1,0 +1,48 @@
+---
+title: Configuration Reference
+description: Options, defaults, and validation.
+---
+
+## Config file
+
+`blume.config.ts`
+
+## Minimal config
+
+```ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  title: "My Docs",
+  description: "Documentation powered by Blume.",
+});
+```
+
+## Options
+
+| Option                                  | Applies to               | Description                                                       |
+| --------------------------------------- | ------------------------ | ----------------------------------------------------------------- |
+| `content`                               | Scan and graph           | Filesystem and remote content source configuration.               |
+| `navigation`                            | UI and graph             | Sidebar, tabs, and navigation structure.                          |
+| `search`                                | Build and runtime        | Local or hosted search provider selection and provider options.   |
+| `openapi`, `asyncapi`                   | Generated references     | Render verified specs through Scalar-backed reference pages.      |
+| `ai`                                    | Build and server runtime | `llms.txt`, raw Markdown, and optional Ask AI backend.            |
+| `mcp`                                   | Server runtime           | MCP discovery and hosted MCP endpoint.                            |
+| `deployment`                            | Build output             | Static/server output, site URL, and adapter.                      |
+| `markdown`                              | Content parsing          | Markdown, MDX, math, directives, Mermaid, and related transforms. |
+| `theme`, `styling`, `icons`, `logo`     | UI                       | Theme tokens, styling, icons, fonts, and brand surfaces.          |
+| `redirects`, `seo`, `analytics`, `i18n` | Output and metadata      | Redirects, SEO, analytics, and localization.                      |
+
+## Environment loading
+
+`loadConfig` applies deployment environment defaults after schema validation.
+Provider credentials are read by the feature that needs them; the config schema
+does not require secrets for disabled providers.
+
+## Related options
+
+- Ask AI and MCP require server output in production builds.
+- `openapi` and `asyncapi` render references from existing specs; do not
+  duplicate endpoint tables by hand when a verified spec exists.
+- `deployment.site` enables absolute sitemap, robots, canonical, and Open Graph
+  behavior.

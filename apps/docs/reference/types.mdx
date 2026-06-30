@@ -1,0 +1,34 @@
+---
+title: Types
+description: Public types, interfaces, and generated declarations.
+---
+
+## Type index
+
+| Type                              | Used by                                                                      |
+| --------------------------------- | ---------------------------------------------------------------------------- |
+| `BlumeConfig`                     | User-authored config accepted by `defineConfig`.                             |
+| `ResolvedConfig`                  | Config after schema defaults and deployment defaults are applied.            |
+| `FolderMeta`                      | Resolved folder navigation metadata.                                         |
+| `FolderMetaDefinition`            | Authorable `meta.ts` definition.                                             |
+| `FolderMetaFactory`               | Function form for dynamic folder metadata.                                   |
+| `ComponentOverride`               | One component override entry.                                                |
+| `ComponentOverrides`              | Component override map accepted by `defineComponents`.                       |
+| `IslandDescriptor`                | Discovered client island metadata.                                           |
+| `HydrationMode`                   | Island hydration mode.                                                       |
+| `Diagnostic`                      | Structured diagnostic emitted by config, content, graph, or link validation. |
+| `Heading`                         | Parsed page heading record.                                                  |
+| `Navigation`, `NavNode`, `NavTab` | Navigation graph records.                                                    |
+| `PageRecord`                      | Normalized content page record.                                              |
+
+## Generated declarations
+
+The source package is TypeScript-first and exposes source `.ts` files directly
+through package exports. Projects import types from `blume`; Blume does not
+generate per-project declaration files for authored docs.
+
+## Related exports
+
+- [`defineConfig`](./sdk)
+- [`defineMeta`](./sdk)
+- [`defineComponents`](./sdk)

@@ -1,0 +1,50 @@
+---
+title: Configuration Reference
+description: Config files, defaults, and environment variables.
+---
+
+## Config file
+
+Blume loads `blume.config.ts` through `loadConfig`, validates it with
+`blumeConfigSchema`, then applies deployment environment defaults before
+generating the runtime.
+
+## Precedence
+
+| Source                 | Precedence                          | Notes                                                                        |
+| ---------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| CLI flag               | Highest for command-scoped behavior | Examples include `--preview`, `--strict`, `--port`, `--host`, and `--force`. |
+| `blume.config.ts`      | Site-wide behavior                  | Parsed by `loadConfig` and validated against `blumeConfigSchema`.            |
+| Deployment environment | Fills deployment defaults           | `applyDeploymentEnv` can provide platform-derived deployment values.         |
+| Schema default         | Fallback                            | Zod defaults in `src/core/schema.ts` make the zero-config path work.         |
+
+## Options
+
+| Option                | Default          | Purpose                                            |
+| --------------------- | ---------------- | -------------------------------------------------- |
+| `content.root`        | `docs`           | Filesystem content root.                           |
+| `content.pages`       | `pages`          | Project-owned custom pages root.                   |
+| `content.include`     | `**/*.{md,mdx}`  | Content source include globs.                      |
+| `content.exclude`     | `**/_*`, `**/.*` | Content source exclude globs.                      |
+| `content.defaultType` | `doc`            | Default page type for content entries.             |
+| `search.provider`     | `orama`          | Default local search provider.                     |
+| `openapi.enabled`     | `false`          | Enables rendered OpenAPI references.               |
+| `asyncapi.enabled`    | `false`          | Enables rendered AsyncAPI references.              |
+| `ai.llmsTxt`          | `true`           | Emits `llms.txt` and `llms-full.txt` during build. |
+
+## Environment variables
+
+Blume reads provider credentials only when the matching feature is configured.
+Keep these values out of MDX content and committed config.
+
+| Variable                  | Used by                                             |
+| ------------------------- | --------------------------------------------------- |
+| `ALGOLIA_ADMIN_API_KEY`   | Hosted Algolia search sync.                         |
+| `ORAMA_PRIVATE_API_KEY`   | Orama Cloud search sync.                            |
+| `TYPESENSE_ADMIN_API_KEY` | Typesense search sync.                              |
+| `MIXEDBREAD_API_KEY`      | Ask AI embeddings or retrieval integrations.        |
+| `OPENROUTER_API_KEY`      | Ask AI with OpenRouter.                             |
+| `LLMGATEWAY_API_KEY`      | Ask AI through an OpenAI-compatible gateway preset. |
+| `NOTION_TOKEN`            | Notion content source.                              |
+| `SANITY_TOKEN`            | Sanity content source.                              |
+| `GITHUB_TOKEN`            | GitHub-backed metadata and repository integrations. |

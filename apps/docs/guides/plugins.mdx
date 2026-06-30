@@ -1,0 +1,55 @@
+---
+title: Plugins and Adapters
+description: Extend or integrate with the framework.
+---
+
+## Extension points
+
+| Extension            | Purpose                                                            | Evidence              |
+| -------------------- | ------------------------------------------------------------------ | --------------------- |
+| Component overrides  | Replace supported Blume components with project-owned components.  | `defineComponents`    |
+| Registry items       | Install packaged source components or templates.                   | `blume add`           |
+| Eject                | Promote the generated Astro runtime into owned source files.       | `blume eject --yes`   |
+| Content sources      | Load filesystem, Notion, or Sanity-backed content.                 | `content.sources`     |
+| Search providers     | Use local or hosted search providers.                              | `search.provider`     |
+| OpenAPI and AsyncAPI | Render verified specs instead of hand-writing endpoint references. | `openapi`, `asyncapi` |
+| Deployment adapters  | Enable server output for server features.                          | `deployment.adapter`  |
+
+## Install or enable
+
+```bash
+blume add
+```
+
+Running `blume add` without a name lists available registry items. Running it
+with a name writes the item files into the current project and skips existing
+files unless `--force` is passed.
+
+## Configure
+
+```ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  deployment: {
+    output: "server",
+    adapter: "vercel",
+  },
+});
+```
+
+## Authoring API
+
+| Hook or adapter method | When it runs            | Inputs and outputs                                        |
+| ---------------------- | ----------------------- | --------------------------------------------------------- |
+| `defineConfig`         | Config load             | User config in, typed config out.                         |
+| `defineMeta`           | Folder meta discovery   | Folder navigation metadata in, resolved nav metadata out. |
+| `defineComponents`     | Component override load | Override map in, component override map out.              |
+| `blume add <name>`     | CLI invocation          | Registry item name in, files written to project.          |
+| `blume eject --yes`    | CLI invocation          | Generated runtime promoted into project source.           |
+
+## Ordering and compatibility
+
+Ask AI and MCP require server output. Vue and Svelte islands require matching
+Astro integrations in the project. Static output works for ordinary content,
+search, references, LLM files, sitemap, and robots output.

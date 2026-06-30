@@ -1,0 +1,65 @@
+---
+title: SDK Reference
+description: Public exports, types, and examples.
+---
+
+## Exports
+
+### `defineConfig`
+
+Identity helper for authoring `blume.config.ts` with type inference.
+
+```ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  title: "My Docs",
+});
+```
+
+### `defineMeta`
+
+Folder navigation helper for `meta.ts` files.
+
+```ts
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Guides",
+  pages: ["getting-started", "integrations"],
+});
+```
+
+### `defineComponents`
+
+Helper for component override maps.
+
+```ts
+import { defineComponents } from "blume";
+
+export default defineComponents({
+  // component overrides
+});
+```
+
+### `getBlumeVersion`
+
+Returns the package version used by the CLI and generated templates.
+
+## Type exports
+
+Blume also exports public types for config, folder meta, component overrides,
+hydration modes, navigation, diagnostics, headings, and page records. See
+[Types](./types).
+
+## Package subpaths
+
+| Subpath            | Purpose                                                    |
+| ------------------ | ---------------------------------------------------------- |
+| `blume/schema`     | Config and schema-related types.                           |
+| `blume/runtime`    | Runtime entry exports.                                     |
+| `blume/astro`      | Astro integration internals and generated runtime helpers. |
+| `blume/markdown`   | Markdown processors and utilities.                         |
+| `blume/components` | Shipped UI components.                                     |
+| `blume/sources/*`  | Content source adapters.                                   |
+| `blume/theme/*`    | Theme helpers.                                             |
