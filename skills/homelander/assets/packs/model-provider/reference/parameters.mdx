@@ -5,6 +5,30 @@ description: Generation parameters and defaults.
 
 <!-- HOMELANDER: derive defaults from schemas, config, or code. -->
 
-| Parameter | Type     | Default     | Description         |
-| --------- | -------- | ----------- | ------------------- |
-| `[name]`  | `[type]` | `[default]` | [verified behavior] |
+## Required fields
+
+| Parameter | Type     | Supported models | Description         |
+| --------- | -------- | ---------------- | ------------------- |
+| `[name]`  | `[type]` | [models]         | [verified behavior] |
+
+## Optional fields
+
+| Parameter | Type     | Default source  | Allowed values or range | Interactions     |
+| --------- | -------- | --------------- | ----------------------- | ---------------- |
+| `[name]`  | `[type]` | [schema/config] | [verified values]       | [related fields] |
+
+## Response format
+
+[Document response-shaping, structured output, JSON mode, or schema fields only when implemented.]
+
+## Streaming and tool fields
+
+[Document stream, tool, tool choice, parallel tool, or event fields only from evidence.]
+
+## Example request
+
+```json
+{
+  "[parameter]": "[verified value]"
+}
+```

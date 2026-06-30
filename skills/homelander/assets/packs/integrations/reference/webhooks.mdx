@@ -5,6 +5,33 @@ description: Webhook events and verification.
 
 <!-- HOMELANDER: derive events, signing, and retry behavior from handlers and tests. -->
 
-| Event   | Payload  | Description         |
-| ------- | -------- | ------------------- |
-| [event] | [schema] | [verified behavior] |
+## Endpoint setup
+
+| Setting | Value            | Evidence |
+| ------- | ---------------- | -------- |
+| URL     | [verified route] | [source] |
+| Method  | [method]         | [source] |
+
+## Events
+
+| Event   | Payload schema | Trigger             | Evidence |
+| ------- | -------------- | ------------------- | -------- |
+| [event] | [schema]       | [verified behavior] | [source] |
+
+## Signature verification
+
+```ts
+[verified signature verification example]
+```
+
+## Delivery behavior
+
+| Behavior | Value             | Evidence |
+| -------- | ----------------- | -------- |
+| Retry    | [verified policy] | [source] |
+| Replay   | [verified policy] | [source] |
+| Timeout  | [verified policy] | [source] |
+
+## Local testing and debugging
+
+[Document local forwarding, delivery logs, idempotency, request IDs, and failure recovery only from evidence.]

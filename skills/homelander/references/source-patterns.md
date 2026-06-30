@@ -63,6 +63,9 @@ Map surfaces to docs like this:
 - Config keys, defaults, and env vars -> config reference.
 - Exported SDK functions, classes, and types -> SDK reference.
 - HTTP endpoints, schemas, request/response objects -> API reference.
+- OpenAPI or AsyncAPI specs -> docs-framework rendered API reference first; do
+  not duplicate generated endpoint tables unless the spec is missing or
+  incomplete.
 - Breaking changes, renamed options, migrations -> migration/change docs.
 
 Then map those pages into packs. Do not force one product archetype. A repo can

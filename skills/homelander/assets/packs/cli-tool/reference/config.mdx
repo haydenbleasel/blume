@@ -9,8 +9,23 @@ description: Config files, defaults, and environment variables.
 
 `[config file]`
 
+## Precedence
+
+Document precedence only when verified by code or tests.
+
+1. CLI flag
+2. Environment variable
+3. Config file
+4. Default
+
 ## Options
 
-| Option     | Type     | Default     | Description         |
-| ---------- | -------- | ----------- | ------------------- |
-| `[option]` | `[type]` | `[default]` | [verified behavior] |
+| Option     | Type     | Default     | Env var | Description         |
+| ---------- | -------- | ----------- | ------- | ------------------- |
+| `[option]` | `[type]` | `[default]` | [name]  | [verified behavior] |
+
+## Environment variables
+
+| Variable | Required | Used by       | Security note   |
+| -------- | -------- | ------------- | --------------- |
+| `[NAME]` | [yes/no] | [source file] | [verified note] |

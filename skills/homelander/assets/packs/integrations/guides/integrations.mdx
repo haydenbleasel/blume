@@ -8,3 +8,21 @@ description: Connect external providers.
 | Provider   | Setup            | Required secrets | Evidence |
 | ---------- | ---------------- | ---------------- | -------- |
 | [provider] | [verified setup] | [env vars]       | [source] |
+
+## Choose an integration path
+
+| Path              | Use when             | Entry point           |
+| ----------------- | -------------------- | --------------------- |
+| Dashboard install | [verified condition] | [path]                |
+| API or SDK setup  | [verified condition] | [endpoint or export]  |
+| Marketplace app   | [verified condition] | [listing or manifest] |
+
+## Lifecycle
+
+| Action                       | Required permissions | Side effects        | Evidence |
+| ---------------------------- | -------------------- | ------------------- | -------- |
+| [install, update, uninstall] | [scopes/roles]       | [verified behavior] | [source] |
+
+## Operational notes
+
+[Document sync cadence, retries, disabled states, billing, transfer, or support behavior only from evidence.]

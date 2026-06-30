@@ -46,5 +46,7 @@ Allowed generated or modified files:
 - Minimal `blume.config.ts` only through the repo's `blume init` bootstrap path.
 
 Do not generate screenshots, fake OpenAPI specs, custom app code, package
-dependencies, or marketing-heavy pages in v1. Evidence and plan artifacts under
-`.homelander/` stay uncommitted by default.
+dependencies, or marketing-heavy pages in v1. When a verified OpenAPI or
+AsyncAPI spec exists, prefer rendering it through Blume, Mintlify, or the repo's
+existing docs framework instead of hand-authoring endpoint tables. Evidence and plan
+artifacts under `.homelander/` stay uncommitted by default.

@@ -5,6 +5,22 @@ description: Error responses and failure modes.
 
 <!-- HOMELANDER: derive errors from schemas, handlers, middleware, and tests. -->
 
+## Error shape
+
+```json
+{
+  "[field]": "[verified type or example]"
+}
+```
+
 | Status   | Code   | Meaning              | Recovery            |
 | -------- | ------ | -------------------- | ------------------- |
 | [status] | [code] | [verified condition] | [verified recovery] |
+
+## Request IDs and diagnostics
+
+[Document request IDs, trace IDs, logs, or SDK exception mapping only from evidence.]
+
+## Streaming errors
+
+[Document event-stream, chunk, or connection errors only when implemented.]

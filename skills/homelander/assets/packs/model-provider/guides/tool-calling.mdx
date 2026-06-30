@@ -11,6 +11,24 @@ description: Let models call external tools.
 [verified tool definition]
 ```
 
+## Tool call loop
+
+1. Send available tools with the request.
+2. Receive the model-selected tool call.
+3. Execute the tool in application code.
+4. Return the tool result.
+5. Continue or finish the response.
+
+## Tool choice
+
+| Mode   | Behavior            | Evidence |
+| ------ | ------------------- | -------- |
+| [mode] | [verified behavior] | [source] |
+
 ## Handle tool calls
 
 [Describe the verified loop or callback behavior.]
+
+## Parallel calls and errors
+
+[Document parallel calls, strict schema behavior, validation failures, or recovery only when implemented.]

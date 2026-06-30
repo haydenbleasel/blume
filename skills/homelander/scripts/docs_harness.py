@@ -147,7 +147,9 @@ PACKS: dict[str, dict[str, Any]] = {
         ],
         "obligations": [
             page("concepts/workspaces.mdx", "Workspaces", "Account, org, or project model.", required=False),
+            page("concepts/projects.mdx", "Projects", "Project, app, or environment model.", required=False),
             page("concepts/users-and-roles.mdx", "Users and Roles", "Users, teams, roles, and permissions.", required=False),
+            page("guides/dashboard.mdx", "Dashboard", "User-facing dashboard and admin workflows.", required=False),
             page("guides/billing.mdx", "Billing", "Billing and plan-management workflows.", required=False),
             page("guides/integrations.mdx", "Integrations", "Connected services and setup flows.", required=False),
             page("reference/env.mdx", "Environment Variables", "Runtime and deployment variables.", required=False),
@@ -184,10 +186,12 @@ PACKS: dict[str, dict[str, Any]] = {
         ],
         "obligations": [
             page("models/overview.mdx", "Models", "Model catalog and capabilities.", required=True),
+            page("models/lifecycle.mdx", "Model Lifecycle", "Model IDs, versions, aliases, and deprecations.", required=False),
             page("guides/text-generation.mdx", "Text Generation", "Generate text with the model API.", required=False),
             page("guides/streaming.mdx", "Streaming", "Stream incremental model output.", required=False),
             page("guides/structured-output.mdx", "Structured Output", "Generate schema-shaped output.", required=False),
             page("guides/tool-calling.mdx", "Tool Calling", "Let models call external tools.", required=False),
+            page("guides/production.mdx", "Production", "Operate model workloads with limits, retries, cost, and observability.", required=False),
             page("concepts/tokens-and-context.mdx", "Tokens and Context", "Token budgets and context windows.", required=False),
             page("reference/parameters.mdx", "Parameters", "Generation parameters and defaults.", required=True),
         ],
@@ -200,6 +204,7 @@ PACKS: dict[str, dict[str, Any]] = {
         "obligations": [
             page("guides/sdk-quickstart.mdx", "SDK Quickstart", "Install and call the SDK.", required=False),
             page("reference/sdk.mdx", "SDK Reference", "Public exports, types, and examples.", required=True),
+            page("reference/types.mdx", "Types", "Public types, interfaces, and generated declarations.", required=False),
         ],
     },
     "cli-tool": {
@@ -210,6 +215,7 @@ PACKS: dict[str, dict[str, Any]] = {
         "obligations": [
             page("reference/cli.mdx", "CLI Reference", "Commands, flags, and examples.", required=True),
             page("reference/config.mdx", "Configuration Reference", "Config files, defaults, and env vars.", required=False),
+            page("reference/troubleshooting.mdx", "Troubleshooting", "CLI errors, diagnostics, and recovery steps.", required=False),
         ],
     },
     "framework-tool": {

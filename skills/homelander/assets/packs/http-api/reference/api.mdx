@@ -5,6 +5,21 @@ description: Public endpoints, requests, and responses.
 
 <!-- HOMELANDER: do not invent endpoints or schemas. Prefer OpenAPI, route handlers, generated clients, and tests. -->
 
+## Reference source
+
+If a verified OpenAPI or AsyncAPI spec exists, render that spec with Blume,
+Mintlify, or the repository's existing docs framework instead of hand-authoring
+endpoint tables. Use this page for the API overview, auth model, workflow
+examples, and links to the rendered reference.
+
+```ts
+// blume.config.ts
+openapi: {
+  enabled: true,
+  spec: "[verified spec path or URL]",
+}
+```
+
 ## Base URL
 
 `[base URL from config, tests, deployment, or examples]`
@@ -14,6 +29,10 @@ description: Public endpoints, requests, and responses.
 [Document auth only from evidence.]
 
 ## Endpoints
+
+Only include manual endpoint sections when no verified spec exists, or when the
+spec is incomplete and the missing behavior is proven by route handlers, schemas,
+or tests.
 
 ### `[METHOD] /path`
 
@@ -27,10 +46,19 @@ description: Public endpoints, requests, and responses.
 }
 ```
 
-#### Response
+#### Response variants
 
-```json
-{
-  "[field]": "[type or example]"
-}
+- Success: [verified status and schema]
+- Error: [verified status, code, and error shape]
+- Streaming: [event or chunk shape, if implemented]
+
+## Examples
+
+```bash
+[verified curl or SDK request]
 ```
+
+## Related operations
+
+- [Errors](./errors)
+- [Rate Limits](./rate-limits)

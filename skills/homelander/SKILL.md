@@ -63,6 +63,9 @@ only after reviewing the plan.
    - Treat selected packs as docs obligations.
    - Keep skipped packs skipped unless there is clear evidence or user override.
    - The core outputs are MDX pages, folders, and Blume `meta.ts` files.
+   - When a verified OpenAPI or AsyncAPI spec exists, render it through Blume,
+     Mintlify, or the repo's existing docs framework instead of duplicating the
+     reference by hand.
    - Do not generate screenshots, fake OpenAPI specs, app code, dependencies, or
      marketing-heavy pages in v1.
 
