@@ -1,0 +1,14 @@
+---
+interface Props {
+  title?: string;
+}
+
+const { title = "Hello from Astro" } = Astro.props;
+---
+
+<div class="rounded-blume border border-border bg-muted/30 px-5 py-4">
+  <p class="m-0 font-semibold text-foreground text-sm">{title}</p>
+  <p class="m-0 mt-1 text-muted-foreground text-sm">
+    A static, server-rendered example — no client JavaScript ships.
+  </p>
+</div>

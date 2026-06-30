@@ -1,0 +1,44 @@
+---
+// Render a git-style diff with `@pierre/diffs`, fully at build time. The library
+// emits a self-contained blob whose styles are scoped to `:host`, so we mount it
+// in a declarative shadow root — no client JS. `--blume-diff-color-scheme`
+// (set in the theme entry from `data-theme`) drives the diff's `light-dark()`.
+//
+// Inputs (one of): `patch`/`src` (unified patch), `before`+`after` (file paths),
+// or `old`+`new` (inline strings, with optional `lang`).
+import { renderDiff } from "./diff.ts";
+
+interface Props {
+  after?: string;
+  before?: string;
+  lang?: string;
+  new?: string;
+  old?: string;
+  patch?: string;
+  src?: string;
+}
+
+let html: string | undefined;
+let error: string | undefined;
+
+try {
+  html = await renderDiff(Astro.props);
+} catch (cause) {
+  error = cause instanceof Error ? cause.message : String(cause);
+}
+
+const COLOR_SCHEME =
+  "<style>:host{color-scheme:var(--blume-diff-color-scheme, light dark)}</style>";
+---
+
+{
+  error ? (
+    <div class="not-prose my-6 rounded-blume border border-border px-3 py-2 text-muted-foreground text-sm">
+      Could not render diff: {error}
+    </div>
+  ) : (
+    <blume-diff class="not-prose my-6 block overflow-hidden rounded-blume border border-border">
+      <template shadowrootmode="open" set:html={html + COLOR_SCHEME} />
+    </blume-diff>
+  )
+}

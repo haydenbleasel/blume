@@ -1,6 +1,6 @@
 ---
 title: Components
-description: The built-in JSX components — cards, columns, steps, tabs, accordions, badges, code groups, frames, trees, tooltips, type tables, and a GitHub card — usable in any MDX page.
+description: The built-in JSX components — cards, columns, steps, tabs, accordions, badges, code groups, frames, trees, tooltips, type tables, live component previews, diffs, and a GitHub card — usable in any MDX page.
 ---
 
 Blume ships an accessible, themeable component set available in any `.mdx` page
@@ -563,3 +563,60 @@ variable to lift the API rate limit.
 <!-- Or point it at any repository -->
 <GithubInfo owner="withastro" repo="astro" />
 ```
+
+## Component
+
+`Component` renders an example file from your project's `examples/` directory as
+a live preview alongside its highlighted source, in tabs. Point it at a file with
+`path` — its location under `examples/`, without the extension (so
+`examples/counter.tsx` is `path="counter"`). React, Vue, Svelte, and Astro
+examples are all supported; framework examples hydrate, Astro ones render
+statically. It keeps the preview and the code in sync from a single file.
+
+<Component path="counter" />
+
+```astro
+<!-- examples/counter.tsx -->
+<Component path="counter" />
+```
+
+An Astro example renders live with no client JavaScript:
+
+<Component path="card" />
+
+## Diff
+
+`Diff` renders a git-style diff, highlighted with the same Shiki theme as your
+code blocks and produced entirely at build time — no client JavaScript. Give it
+two inline strings (`old` / `new`), two file paths (`before` / `after`), or a
+unified patch (an inline `patch` string or a `src` file).
+
+<Diff
+  lang="ts"
+  old={`export function greet(name) {
+  return "Hi, " + name;
+}`}
+  new={`export function greet(name: string): string {
+  return "Hi, " + name + "!";
+}`}
+/>
+
+```astro
+<Diff
+  lang="ts"
+  old={`export function greet(name) {
+  return "Hi, " + name;
+}`}
+  new={`export function greet(name: string): string {
+  return "Hi, " + name + "!";
+}`}
+/>
+```
+
+Diff two files in your project, relative to its root:
+
+<Diff before="diffs/button-before.ts" after="diffs/button-after.ts" />
+
+Or render a unified patch from a file:
+
+<Diff src="diffs/greet.patch" />

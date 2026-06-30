@@ -2,13 +2,15 @@
 import Icon from "../Icon.astro";
 
 interface Props {
+  class?: string;
   icon?: string;
   iconType?: string;
   id?: string;
+  style?: string;
   title: string;
 }
 
-const { icon, iconType, id, title } = Astro.props;
+const { class: className, icon, iconType, id, style, title } = Astro.props;
 const slugify = (value: string): string =>
   value
     .toLowerCase()
@@ -21,8 +23,12 @@ const tabId = id ?? slugify(title);
 ---
 
 <div
-  class="px-4 py-3 [&:has(>pre)]:p-0 [&>:first-child]:mt-0! [&>:last-child]:mb-0!"
+  class:list={[
+    "px-4 py-3 [&:has(>pre)]:p-0 [&>:first-child]:mt-0! [&>:last-child]:mb-0!",
+    className,
+  ]}
   data-blume-tab-panel
+  style={style}
   data-icon={icon}
   data-tab-id={tabId}
   data-title={title}

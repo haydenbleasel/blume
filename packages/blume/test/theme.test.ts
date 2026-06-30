@@ -139,6 +139,18 @@ describe("tailwindEntryTemplate", () => {
     // Headings pick up the display font (defaults to body when unset).
     expect(entry).toContain("font-family: var(--font-display);");
   });
+
+  it("styles the Diff and Component panes", () => {
+    expect(entry).toContain("blume-diff");
+    expect(entry).toContain("pre.blume-source > code");
+  });
+
+  // A stray backtick in a CSS comment silently terminates the template literal,
+  // emitting raw `${...}` interpolation markers into the stylesheet (which then
+  // fails to parse at build time). Guard against that regression.
+  it("emits no uninterpolated template markers", () => {
+    expect(entry).not.toContain("${");
+  });
 });
 
 describe("buildFontEntries", () => {

@@ -1,0 +1,92 @@
+---
+// Render an example file (under the project's `examples/` dir) as a live,
+// hydrated preview alongside its highlighted source, in tabs. `path` is the
+// file's location under `examples/` without its extension, e.g.
+// `<Component path="forms/login" />` for `examples/forms/login.tsx`.
+//
+// Blume discovers `examples/` at build time and generates `blume:examples`: a
+// map of path → { Component (a static hydration wrapper), code, lang }. React,
+// Vue, Svelte, and Astro examples are all supported. The source is highlighted
+// with the same Shiki setup as ordinary code fences.
+import { codeToHtml } from "shiki";
+
+import { blumeShikiTransformers } from "../../markdown/index.ts";
+import Tab from "./Tab.astro";
+import Tabs from "./Tabs.astro";
+// Generated per project; resolves to an empty map when there are no examples.
+import { examples } from "blume:examples";
+
+interface Props {
+  path: string;
+}
+
+const { path } = Astro.props;
+const entry = examples[path];
+const Preview = entry?.Component;
+
+// Shiki's bare output is `<pre class="shiki">`; the theme styles code blocks via
+// `pre.astro-code`, so add that class to match normal fences. `blume-source`
+// makes the inner `<code>` (not the `<pre>`) the scroll/height-capped box — see
+// the theme entry — so the copy button, pinned to the `<pre>`, stays put.
+const astroCodeParity = {
+  name: "blume:component-source",
+  pre(node: { properties: Record<string, unknown> }) {
+    const className =
+      typeof node.properties.class === "string" ? node.properties.class : "";
+    node.properties.class = `astro-code blume-source ${className}`.trim();
+  },
+};
+
+let codeHtml: string | undefined;
+if (entry) {
+  try {
+    codeHtml = await codeToHtml(entry.code, {
+      defaultColor: false,
+      lang: entry.lang,
+      themes: { dark: "github-dark", light: "github-light" },
+      transformers: [...blumeShikiTransformers(), astroCodeParity],
+    });
+  } catch {
+    // Unknown language or highlighter failure: fall back to a plain block below.
+  }
+}
+
+// Both tabs share one height so toggling them never shifts the layout. Size it
+// to the source (≈21px/line + padding), clamped to a comfortable 18rem floor and
+// a 400px ceiling — taller sources scroll inside the pane.
+const LINE_PX = 21;
+const PADDING_PX = 36;
+const lineCount = entry ? entry.code.replace(/\n+$/u, "").split("\n").length : 0;
+const paneHeight = Math.min(400, Math.max(288, lineCount * LINE_PX + PADDING_PX));
+const paneStyle = `height:${paneHeight}px`;
+---
+
+{
+  entry ? (
+    // `sync={false}`: each preview's Preview/Code tabs are independent — unlike
+    // CodeGroup, switching one Component must not switch the others.
+    <Tabs hash={false} sync={false}>
+      <Tab
+        class="flex items-center justify-center overflow-auto"
+        style={paneStyle}
+        title="Preview"
+      >
+        <Preview />
+      </Tab>
+      <Tab class="overflow-hidden" style={paneStyle} title="Code">
+        {codeHtml ? (
+          <Fragment set:html={codeHtml} />
+        ) : (
+          <pre class="astro-code blume-source">
+            <code>{entry.code}</code>
+          </pre>
+        )}
+      </Tab>
+    </Tabs>
+  ) : (
+    <div class="not-prose my-6 rounded-blume border border-border px-3 py-2 text-muted-foreground text-sm">
+      No example found at <code class="font-mono">{path}</code>. Add it under{" "}
+      <code class="font-mono">examples/</code> in your project.
+    </div>
+  )
+}

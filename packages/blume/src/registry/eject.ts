@@ -5,11 +5,13 @@ import { join, relative } from "pathe";
 
 import { resolveAskBackend } from "../ai/ask.ts";
 import { buildRawMarkdown } from "../ai/markdown.ts";
+import { discoverExamples } from "../astro/examples.ts";
 import {
   buildRuntimeData,
   collectStaged,
   detectNeedsReact,
 } from "../astro/generate.ts";
+import { discoverIslands } from "../astro/islands.ts";
 import { discoverPages } from "../astro/pages.ts";
 import {
   askEndpointTemplate,
@@ -17,6 +19,11 @@ import {
   catchAllPageTemplate,
   contentConfigTemplate,
   envTemplate,
+  exampleMapTemplate,
+  exampleWrapperTemplate,
+  exampleSlug,
+  islandMapTemplate,
+  islandWrapperTemplate,
   mixedbreadSearchEndpointTemplate,
   ogEndpointTemplate,
   rawMarkdownEndpointTemplate,
@@ -55,15 +62,28 @@ export const eject = async (root: string): Promise<string[]> => {
   const exportPdf = config.export.pdf;
   const exportEpub = config.export.epub;
 
-  const [pages, needsReactRaw, userTheme, rawMarkdown] = await Promise.all([
-    context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
-    detectNeedsReact(root),
-    context.themeFile
-      ? readFile(context.themeFile, "utf-8")
-      : Promise.resolve(""),
-    buildRawMarkdown(project),
+  const [pages, needsReactRaw, userTheme, rawMarkdown, islands, examples] =
+    await Promise.all([
+      context.pagesRoot
+        ? discoverPages(context.pagesRoot)
+        : Promise.resolve([]),
+      detectNeedsReact(root),
+      context.themeFile
+        ? readFile(context.themeFile, "utf-8")
+        : Promise.resolve(""),
+      buildRawMarkdown(project),
+      discoverIslands(root),
+      discoverExamples(root),
+    ]);
+  // Island/example frameworks drive which Astro renderers the ejected config
+  // wires in; React also switches on for project `.tsx`/`.jsx` and Ask AI.
+  const frameworks = new Set<string>([
+    ...islands.islands.map((island) => island.framework),
+    ...examples.examples.map((example) => example.framework),
   ]);
-  const needsReact = needsReactRaw || askEnabled;
+  const needsReact = needsReactRaw || askEnabled || frameworks.has("react");
+  const needsVue = frameworks.has("vue");
+  const needsSvelte = frameworks.has("svelte");
 
   // A project-relative context so generated files use portable paths.
   const relContext: ProjectContext = {
@@ -95,7 +115,10 @@ export const eject = async (root: string): Promise<string[]> => {
         contentRoutes: project.manifest.routes.map((route) => route.path),
         context: relContext,
         dataPath: "./src/generated/data.json",
+        examplesPath: "./src/generated/examples.ts",
         needsReact,
+        needsSvelte,
+        needsVue,
         pages: relPages,
         searchClientPath: "./src/generated/search-client.ts",
         themePath: "./src/generated/app.css",
@@ -128,6 +151,16 @@ export const eject = async (root: string): Promise<string[]> => {
     {
       content: userComponentsTemplate(componentsImport),
       path: join(genDir, "components.ts"),
+    },
+    // Island/example maps the catch-all imports; written even when empty so the
+    // relative import and the `blume:examples` alias always resolve.
+    {
+      content: islandMapTemplate(islands.islands),
+      path: join(genDir, "islands.ts"),
+    },
+    {
+      content: exampleMapTemplate(examples.examples),
+      path: join(genDir, "examples.ts"),
     },
     {
       content: tailwindEntryTemplate({
@@ -232,6 +265,18 @@ export const eject = async (root: string): Promise<string[]> => {
       });
     }
   }
+
+  // Per-island and per-example live wrappers referenced by the maps above.
+  files.push(
+    ...islands.islands.map((island) => ({
+      content: islandWrapperTemplate(island),
+      path: join(genDir, "islands", `${island.name}.astro`),
+    })),
+    ...examples.examples.map((example) => ({
+      content: exampleWrapperTemplate(example),
+      path: join(genDir, "examples", `${exampleSlug(example.path)}.astro`),
+    }))
+  );
 
   // Materialize staged source bodies under `<root>/blume-staged/<source>/<ref>`,
   // matching the relative `staged` collection base in the ejected config.

@@ -33,6 +33,7 @@
     "@openrouter/ai-sdk-provider": "^1.5.4",
     "@orama/orama": "^3.1.18",
     "@oramacloud/client": "^2.1.0",
+    "@pierre/diffs": "^1.2.11",
     "@sanity/client": "^6.21.0",
     "@scalar/astro": "^0.4.5",
     "@shikijs/twoslash": "^4.2.0",

@@ -53,7 +53,7 @@ const ISLAND_FILE = /\.(?<ext>jsx|svelte|tsx|vue)$/u;
 const CLIENT_EXPORT =
   /export\s+const\s+client\s*(?::[^=]+)?=\s*["'](?<mode>\w+)["']/u;
 
-const readClientMode = (
+export const readClientMode = (
   source: string,
   file: string,
   warnings: string[]

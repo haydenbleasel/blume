@@ -328,6 +328,7 @@ const KITCHEN_SINK: Record<string, string> = {
   "docs/changelog/v1.md":
     "---\ntitle: v1\ntype: changelog\nchangelog:\n  date: 2024-02-01\n---\n# v1\n",
   "docs/index.md": "# Home\n",
+  "examples/demo.tsx": "export default function Demo() { return null; }\n",
   "islands/Counter.tsx":
     'export const client = "load";\nexport default function Counter() { return null; }\n',
   "openapi.json": JSON.stringify({
@@ -372,6 +373,8 @@ describe("generateRuntime", () => {
     expect(has("src/generated/mcp-data.json")).toBe(true);
     expect(has("src/pages/reference.astro")).toBe(true);
     expect(has("src/generated/islands/Counter.astro")).toBe(true);
+    expect(has("src/generated/examples.ts")).toBe(true);
+    expect(has("src/generated/examples/demo.astro")).toBe(true);
     expect(has("src/generated/data.json")).toBe(true);
     expect(has("blume.manifest.json")).toBe(true);
     // ensureDepsLink symlinked the package's node_modules into .blume.

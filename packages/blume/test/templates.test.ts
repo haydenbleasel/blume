@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "pathe";
 
 import { resolveAskBackend } from "../src/ai/ask.ts";
+import type { ExampleSpec } from "../src/astro/examples.ts";
 import type { IslandSpec } from "../src/astro/islands.ts";
 import {
   askEndpointTemplate,
@@ -13,6 +14,9 @@ import {
   changelogIndexTemplate,
   contentConfigTemplate,
   envTemplate,
+  exampleMapTemplate,
+  exampleSlug,
+  exampleWrapperTemplate,
   islandMapTemplate,
   islandWrapperTemplate,
   mcpEndpointTemplate,
@@ -37,6 +41,7 @@ import type { ProjectContext } from "../src/core/types.ts";
 const config = blumeConfigSchema.parse({});
 
 const DATA_PATH = "/p/.blume/src/generated/data.json";
+const EXAMPLES_PATH = "/p/.blume/src/generated/examples.ts";
 const SEARCH_CLIENT_PATH = "/p/.blume/src/generated/search-client.ts";
 const THEME_PATH = "/p/.blume/src/generated/app.css";
 
@@ -64,6 +69,16 @@ const island = (over: Partial<IslandSpec> = {}): IslandSpec => ({
   file: "/project/islands/Counter.tsx",
   framework: "react",
   name: "Counter",
+  ...over,
+});
+
+const example = (over: Partial<ExampleSpec> = {}): ExampleSpec => ({
+  client: "visible",
+  file: "/project/examples/counter.tsx",
+  framework: "react",
+  lang: "tsx",
+  path: "counter",
+  source: "export default function Counter() {}",
   ...over,
 });
 
@@ -106,6 +121,18 @@ describe("catchAllPageTemplate", () => {
   it("no longer imports the removed Warning component", () => {
     const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
     expect(out).not.toContain("Warning");
+  });
+
+  it("registers the Component and Diff content components", () => {
+    const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
+    expect(out).toContain(
+      'import Component from "blume/components/content/Component.astro"'
+    );
+    expect(out).toContain(
+      'import Diff from "blume/components/content/Diff.astro"'
+    );
+    expect(out).toContain("Component,");
+    expect(out).toContain("Diff,");
   });
 
   it("imports Math and AskAI when those features are on", () => {
@@ -170,6 +197,57 @@ describe("islandMapTemplate", () => {
     expect(out).toContain('import I1 from "./islands/Chart.astro"');
     expect(out).toContain("Counter: I0,");
     expect(out).toContain("Chart: I1,");
+  });
+});
+
+describe("exampleSlug", () => {
+  it("replaces path separators and unsafe characters", () => {
+    expect(exampleSlug("forms/login")).toBe("forms__login");
+    expect(exampleSlug("a/b-c")).toBe("a__b-c");
+  });
+});
+
+describe("exampleWrapperTemplate", () => {
+  it("applies the framework's hydration directive and forwards props", () => {
+    const out = exampleWrapperTemplate(example());
+    expect(out).toContain(
+      'import Example from "/project/examples/counter.tsx"'
+    );
+    expect(out).toContain(
+      "<Example client:visible {...Astro.props}><slot /></Example>"
+    );
+  });
+
+  it("applies client:only with the framework name", () => {
+    expect(
+      exampleWrapperTemplate(example({ client: "only", framework: "vue" }))
+    ).toContain('<Example client:only="vue" {...Astro.props}>');
+  });
+
+  it("emits no client directive for an astro example", () => {
+    const out = exampleWrapperTemplate(
+      example({ client: undefined, framework: "astro", lang: "astro" })
+    );
+    expect(out).toContain("<Example {...Astro.props}><slot /></Example>");
+    expect(out).not.toContain("client:");
+  });
+});
+
+describe("exampleMapTemplate", () => {
+  it("exports an empty map when there are no examples", () => {
+    expect(exampleMapTemplate([])).toContain("export const examples = {}");
+  });
+
+  it("maps each path to its wrapper, source, and language", () => {
+    const out = exampleMapTemplate([
+      example(),
+      example({ lang: "astro", path: "forms/login" }),
+    ]);
+    expect(out).toContain('import E0 from "./examples/counter.astro"');
+    expect(out).toContain('import E1 from "./examples/forms__login.astro"');
+    expect(out).toContain('"counter": { Component: E0,');
+    expect(out).toContain('"forms/login": { Component: E1,');
+    expect(out).toContain('lang: "tsx"');
   });
 });
 
@@ -240,6 +318,7 @@ describe("astroConfigTemplate", () => {
       contentRoutes: ["/"],
       context: context(),
       dataPath: DATA_PATH,
+      examplesPath: EXAMPLES_PATH,
       needsReact: false,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
@@ -253,6 +332,7 @@ describe("astroConfigTemplate", () => {
     expect(out).not.toContain('import react from "@astrojs/react"');
     expect(out).toContain("blumeIntegration(");
     expect(out).not.toContain("adapter:");
+    expect(out).toContain(`"blume:examples": ${JSON.stringify(EXAMPLES_PATH)}`);
   });
 
   it("wires the adapter, site, base, redirects, i18n and renderers", () => {
@@ -275,6 +355,7 @@ describe("astroConfigTemplate", () => {
       contentRoutes: [],
       context: context(),
       dataPath: DATA_PATH,
+      examplesPath: EXAMPLES_PATH,
       needsReact: true,
       needsSvelte: true,
       needsVue: true,
@@ -307,6 +388,7 @@ describe("astroConfigTemplate", () => {
       contentRoutes: [],
       context: context(),
       dataPath: DATA_PATH,
+      examplesPath: EXAMPLES_PATH,
       needsReact: false,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
@@ -342,6 +424,7 @@ describe("astroConfigTemplate workspace root", () => {
         root,
       }),
       dataPath: DATA_PATH,
+      examplesPath: EXAMPLES_PATH,
       needsReact: false,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,

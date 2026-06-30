@@ -326,6 +326,19 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   text-decoration: var(--shiki-dark-text-decoration, inherit);
 }
 
+/* The Diff component (@pierre/diffs) renders into a declarative shadow root and
+   themes itself with light-dark(). Drive that from Blume's data-theme instead
+   of the OS, scoped to the diff host: the custom property pierces the shadow
+   boundary, where the appended host color-scheme rule consumes it. */
+blume-diff {
+  --blume-diff-color-scheme: light;
+  display: block;
+}
+
+:root[data-theme="dark"] blume-diff {
+  --blume-diff-color-scheme: dark;
+}
+
 .prose :where(pre[data-language]) {
   padding-top: 3.75rem;
 }
@@ -397,6 +410,22 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 blume-tabs pre,
 .not-prose > div > pre {
   background: var(--blume-code-background);
+}
+
+/* The Component source pane fills its tab's fixed height (set inline to match the
+   preview tab) and scrolls the inner code element, leaving the pre static so the
+   copy button — absolute, pinned to the pre — doesn't drift while it scrolls. */
+pre.blume-source {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+pre.blume-source > code {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Code blocks inside tabs sit flush; the tab container owns the frame. These

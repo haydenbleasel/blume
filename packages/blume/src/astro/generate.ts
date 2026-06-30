@@ -35,6 +35,7 @@ import { tailwindEntryTemplate } from "../theme/entry.ts";
 import { buildFontsCss, configuredCssVars } from "../theme/fonts.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
+import { discoverExamples } from "./examples.ts";
 import { discoverIslands } from "./islands.ts";
 import { discoverPages } from "./pages.ts";
 import {
@@ -44,6 +45,9 @@ import {
   changelogIndexTemplate,
   contentConfigTemplate,
   envTemplate,
+  exampleMapTemplate,
+  exampleWrapperTemplate,
+  exampleSlug,
   islandMapTemplate,
   islandWrapperTemplate,
   mcpEndpointTemplate,
@@ -619,6 +623,7 @@ export const generateRuntime = async (
   const dataPath = join(srcDir, "generated", "data.json");
   const themePath = join(srcDir, "generated", "app.css");
   const searchClientPath = join(srcDir, "generated", "search-client.ts");
+  const examplesPath = join(srcDir, "generated", "examples.ts");
 
   // Record every file this pass writes so orphans (from a now-disabled feature)
   // can be pruned afterwards. `write` wraps the atomic writer and tracks paths.
@@ -633,21 +638,26 @@ export const generateRuntime = async (
   const askEnabled = config.ai.ask?.enabled ?? false;
   const exportPdf = config.export.pdf;
   const exportEpub = config.export.epub;
-  const [pages, detectedReact, userTheme, islandDiscovery] = await Promise.all([
-    context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
-    detectNeedsReact(context.root),
-    readOptional(context.themeFile),
-    discoverIslands(context.root),
+  const [pages, detectedReact, userTheme, islandDiscovery, exampleDiscovery] =
+    await Promise.all([
+      context.pagesRoot
+        ? discoverPages(context.pagesRoot)
+        : Promise.resolve([]),
+      detectNeedsReact(context.root),
+      readOptional(context.themeFile),
+      discoverIslands(context.root),
+      discoverExamples(context.root),
+    ]);
+  // Each island/example framework enables its Astro renderer. React also
+  // switches on for any project `.tsx`/`.jsx` and for Ask AI; Vue/Svelte are
+  // island/example-driven. `.astro` examples need no renderer.
+  const frameworks = new Set<string>([
+    ...islandDiscovery.islands.map((island) => island.framework),
+    ...exampleDiscovery.examples.map((example) => example.framework),
   ]);
-  // Each island's framework enables its Astro renderer. React also switches on
-  // for any project `.tsx`/`.jsx` and for Ask AI; Vue/Svelte are island-driven.
-  const islandFrameworks = new Set(
-    islandDiscovery.islands.map((island) => island.framework)
-  );
-  const needsReact =
-    detectedReact || askEnabled || islandFrameworks.has("react");
-  const needsVue = islandFrameworks.has("vue");
-  const needsSvelte = islandFrameworks.has("svelte");
+  const needsReact = detectedReact || askEnabled || frameworks.has("react");
+  const needsVue = frameworks.has("vue");
+  const needsSvelte = frameworks.has("svelte");
 
   // The hosted MCP server. The `.well-known` discovery docs are injected as
   // prerendered routes alongside user pages; the server endpoint itself is a
@@ -668,6 +678,7 @@ export const generateRuntime = async (
         contentRoutes: project.manifest.routes.map((route) => route.path),
         context,
         dataPath,
+        examplesPath,
         needsReact,
         needsSvelte,
         needsVue,
@@ -706,6 +717,10 @@ export const generateRuntime = async (
       islandMapTemplate(islandDiscovery.islands)
     ),
     write(
+      join(srcDir, "generated", "examples.ts"),
+      exampleMapTemplate(exampleDiscovery.examples)
+    ),
+    write(
       themePath,
       tailwindEntryTemplate({
         configTokens: `${buildThemeCss(config.theme)}${buildFontsCss(config.theme.fonts)}`,
@@ -727,6 +742,22 @@ export const generateRuntime = async (
       write(
         join(srcDir, "generated", "islands", `${island.name}.astro`),
         islandWrapperTemplate(island)
+      )
+    )
+  );
+
+  // Per-example live wrappers for the `examples/` convention, resolved by
+  // `<Component path>` through the `examples.ts` map (written above, always).
+  await Promise.all(
+    exampleDiscovery.examples.map((example) =>
+      write(
+        join(
+          srcDir,
+          "generated",
+          "examples",
+          `${exampleSlug(example.path)}.astro`
+        ),
+        exampleWrapperTemplate(example)
       )
     )
   );
@@ -827,7 +858,11 @@ export const generateRuntime = async (
 
   // API/AsyncAPI reference pages (Scalar). One self-contained page per source,
   // mounted on its configured route and regenerated each run.
-  const warnings: string[] = [...mcp.warnings, ...islandDiscovery.warnings];
+  const warnings: string[] = [
+    ...mcp.warnings,
+    ...islandDiscovery.warnings,
+    ...exampleDiscovery.warnings,
+  ];
 
   // The new provider SDKs are optional peers; warn (rather than fail opaquely in
   // Vite) when the configured provider's package isn't installed.
@@ -841,7 +876,7 @@ export const generateRuntime = async (
 
   // React ships with Blume; Vue/Svelte islands need their Astro integration
   // installed by the project. Warn early rather than let Vite fail to resolve it.
-  warnings.push(...islandFrameworkWarnings(islandFrameworks, context.root));
+  warnings.push(...islandFrameworkWarnings(frameworks, context.root));
   if (hasReferences(config)) {
     const references = await buildReferenceFiles({
       config,

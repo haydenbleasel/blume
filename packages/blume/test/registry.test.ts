@@ -55,6 +55,9 @@ describe("eject", () => {
       "docs/blog/hello.md":
         "---\ntitle: Hello\ntype: blog\ndate: 2024-01-01\n---\n# Hello\n",
       "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
+      // An island and an example so eject materializes their wrappers + maps.
+      "examples/demo.tsx": "export default function Demo() { return null; }\n",
+      "islands/Counter.tsx": "export default function Counter() {}\n",
       // A local OpenAPI spec inlined into the reference page.
       "openapi.json": '{"openapi":"3.1.0","info":{"title":"API"}}',
       // A custom `.astro` page so the relPages branch runs.
@@ -74,6 +77,11 @@ describe("eject", () => {
     expect(has("src/content.config.ts")).toBe(true);
     expect(has("src/pages/[...slug].astro")).toBe(true);
     expect(has("src/generated/data.json")).toBe(true);
+    // The island/example maps the catch-all imports, plus their live wrappers.
+    expect(has("src/generated/islands.ts")).toBe(true);
+    expect(has("src/generated/examples.ts")).toBe(true);
+    expect(has("src/generated/islands/Counter.astro")).toBe(true);
+    expect(has("src/generated/examples/demo.astro")).toBe(true);
 
     // Feature-gated endpoints: Ask AI, OG images, mixedbread search, the RSS
     // feed, and the OpenAPI reference page.
