@@ -14,6 +14,9 @@
     "typecheck": "turbo run typecheck",
     "check": "ultracite check",
     "fix": "ultracite fix",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "turbo run build && changeset publish",
     "bundle-docs": "node packages/blume/scripts/bundle-docs.mjs",
     "prepare": "husky && node packages/blume/scripts/bundle-docs.mjs"
   },
