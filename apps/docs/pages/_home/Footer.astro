@@ -25,19 +25,29 @@ const pagesOf = (nodes: typeof data.navigation.sidebar): FooterLink[] =>
     node.kind === "page" ? [{ href: node.route, label: node.label }] : []
   );
 
-// The primary nav is a single top-level group; its lead pages become a
-// "Get started" column and each section group becomes its own column. The
-// release-notes "Changelog" group is skipped — it's history, not navigation.
+// Resolve the docs section root. With tabs configured, the sidebar's top level
+// is one group per tab ("Docs", "Changelog", …) and the real doc sections live
+// inside the "Docs" group; without tabs the sidebar holds the sections directly.
+// Drop the release-notes "Changelog" group (history, not navigation), then
+// descend through any single wrapping group until we reach the level that holds
+// the section sub-groups. From there the lead pages become a "Getting Started"
+// column and each section group becomes its own column.
 const sidebar = data.navigation?.sidebar ?? [];
-const roots =
-  sidebar.length === 1 && sidebar[0].kind === "group"
-    ? sidebar[0].children
-    : sidebar;
+let roots = sidebar.filter(
+  (node) => !(node.kind === "group" && node.label === "Changelog")
+);
+while (
+  roots.length === 1 &&
+  roots[0].kind === "group" &&
+  roots[0].children.some((child) => child.kind === "group")
+) {
+  roots = roots[0].children;
+}
 
 const columns: FooterColumn[] = [];
 const lead = pagesOf(roots);
 if (lead.length > 0) {
-  columns.push({ links: lead, title: "Get started" });
+  columns.push({ links: lead, title: "Getting Started" });
 }
 for (const node of roots) {
   if (node.kind !== "group" || node.label === "Changelog") {

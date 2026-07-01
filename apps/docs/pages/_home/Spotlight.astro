@@ -22,12 +22,6 @@ const ctaLabel = "Visit Quiver";
 // `currentColor`, so it tracks the accent text colour.
 const quiverLogo =
   '<svg class="size-full" viewBox="0 0 325 325" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M162.184 0C251.755 0.000255644 324.366 72.6125 324.366 162.184V324.366H162.184C72.6125 324.366 0.00025571 251.755 0 162.184C0 72.6123 72.6123 0 162.184 0ZM86.7959 77.1211C80.8505 75.1287 75.191 80.7986 77.1943 86.7402L143.065 282.081C145.811 290.223 157.844 288.249 157.844 279.656V157.267H279.43C288.03 157.266 289.995 145.217 281.84 142.484L86.7959 77.1211Z" fill="currentColor"/></svg>';
-
-// Placeholder stats — swap each `value`/`label` for the real numbers from Quiver.
-const stats = [
-  { label: "command to migrate", value: "1" },
-  { label: "of content preserved", value: "100%" },
-];
 ---
 
 <!-- Customer spotlight: Quiver's Mintlify → Blume migration as a split card. -->
@@ -83,23 +77,8 @@ const stats = [
       </div>
 
       <div>
-        <dl class="flex flex-wrap gap-x-12 gap-y-6">
-          {
-            stats.map((stat) => (
-              <div>
-                <dt class="font-medium text-4xl tracking-tight sm:text-5xl">
-                  {stat.value}
-                </dt>
-                <dd class="mt-2 max-w-[9rem] text-sm text-white/70 leading-snug">
-                  {stat.label}
-                </dd>
-              </div>
-            ))
-          }
-        </dl>
-
         <a
-          class="mt-8 inline-flex items-center gap-1.5 rounded-blume bg-background px-5 py-3 font-medium text-foreground text-sm transition-colors hover:bg-background/90"
+          class="mt-8 inline-flex items-center gap-1.5 rounded-blume bg-background/10 px-5 py-3 font-medium text-white text-sm transition-colors hover:bg-background/90"
           href={ctaHref}
           rel="noopener noreferrer"
           target="_blank"
