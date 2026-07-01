@@ -8,7 +8,7 @@ export default defineConfig({
     vercel: true,
   },
   banner: {
-    content: "Blume is in beta — expect breaking changes.",
+    content: "Blume is now publicly available.",
     dismissible: true,
     id: "beta",
   },
