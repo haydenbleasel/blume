@@ -7,7 +7,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "turbo run build",
+    "build": "turbo run build --filter=!video",
     "dev": "turbo run dev",
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
@@ -16,7 +16,7 @@
     "fix": "ultracite fix",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo run build && changeset publish",
+    "release": "turbo run build --filter=!video && changeset publish",
     "bundle-docs": "node packages/blume/scripts/bundle-docs.mjs",
     "prepare": "husky && node packages/blume/scripts/bundle-docs.mjs",
     "bump-deps": "npx npm-check-updates -u --deep && bun i"

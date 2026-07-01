@@ -15,5 +15,10 @@ export default defineConfig({
     "**/*.astro",
     // Blume's generated runtime is an implementation detail.
     "**/.blume",
+    // Vendored agent-skill assets (e.g. remotion-best-practices example code)
+    // are upstream content, not project source; linting them just diverges from
+    // upstream and gets clobbered on the next skill update.
+    "**/.agents/skills/**",
+    "**/.claude/skills/**",
   ],
 });
