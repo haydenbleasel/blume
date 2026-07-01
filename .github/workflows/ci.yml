@@ -21,4 +21,4 @@ jobs:
       - name: Test
         run: bun run test
       - name: Build docs
-        run: cd docs && bun run build
+        run: cd apps/docs && bun run build

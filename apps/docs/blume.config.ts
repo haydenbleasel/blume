@@ -22,7 +22,7 @@ export default defineConfig({
     "Open-source, markdown-first documentation powered by Astro and Vite.",
   export: true,
   github: {
-    dir: "docs",
+    dir: "apps/docs",
     owner: "haydenbleasel",
     repo: "blume",
   },
