@@ -114,13 +114,56 @@ const sectionChildren = (nodes: NavNode[], base: string): NavNode[] | null => {
   return null;
 };
 
+/** Whether a group maps to a header tab (matched on its path or link route). */
+const isTabSection = (node: NavNode, tabPaths: Set<string>): boolean =>
+  node.kind === "group" &&
+  ((node.path !== undefined && tabPaths.has(node.path)) ||
+    (node.route !== undefined && tabPaths.has(node.route)));
+
+/**
+ * Drop the groups that already own a header tab from the tree, at any depth —
+ * so a root/un-tabbed route lists only the pages outside every tab's section
+ * instead of duplicating each tab as a sidebar group. A container left empty by
+ * this pruning is dropped too, so no bare heading is stranded. The root tab
+ * (`/`) spans everything, so it never removes anything.
+ */
+const withoutTabSections = (nodes: NavNode[], tabs: NavTab[]): NavNode[] => {
+  const tabPaths = new Set(
+    tabs.filter((tab) => tab.path !== "/").map((tab) => tab.path)
+  );
+  if (tabPaths.size === 0) {
+    return nodes;
+  }
+  const prune = (items: NavNode[]): NavNode[] => {
+    const kept: NavNode[] = [];
+    for (const item of items) {
+      if (isTabSection(item, tabPaths)) {
+        continue;
+      }
+      if (item.kind === "group") {
+        const children = prune(item.children);
+        if (children.length === 0) {
+          continue;
+        }
+        kept.push({ ...item, children });
+      } else {
+        kept.push(item);
+      }
+    }
+    return kept;
+  };
+  return prune(nodes);
+};
+
 /**
  * Scope the sidebar to the active tab's section. With tabs configured, a route
  * under one tab shows only that tab's group — so a multi-section site (e.g.
  * Adapters / API / AI tabs) drills each tab into its own pages instead of one
- * global tree, the way Fumadocs' root folders do. Falls back to the full
- * sidebar when no tab matches (or the tab maps to no group), so a route is
- * never left with a blank sidebar.
+ * global tree, the way Fumadocs' root folders do. On a route under no tab (or
+ * the root `/` tab), the tab-owned groups are hidden so the root sidebar shows
+ * only pages that don't belong to a tab. Falls back to the full sidebar when a
+ * matched tab maps to no group, or when hiding the tab sections would blank the
+ * sidebar, so a route is never left empty.
  */
 export const sidebarForRoute = (
   sidebar: NavNode[],
@@ -128,10 +171,11 @@ export const sidebarForRoute = (
   route: string
 ): NavNode[] => {
   const tab = activeTab(tabs, route);
-  if (!tab) {
-    return sidebar;
+  if (tab) {
+    return sectionChildren(sidebar, tab.path) ?? sidebar;
   }
-  return sectionChildren(sidebar, tab.path) ?? sidebar;
+  const scoped = withoutTabSections(sidebar, tabs);
+  return scoped.length > 0 ? scoped : sidebar;
 };
 
 /** Resolve previous/next pages around the current route. */

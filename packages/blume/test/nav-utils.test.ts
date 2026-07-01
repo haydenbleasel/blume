@@ -95,14 +95,69 @@ describe("sidebarForRoute", () => {
     ]);
   });
 
-  it("returns the full sidebar on a route under no tab", () => {
-    expect(labels(sidebarForRoute(TREE, TABS, "/changelog"))).toStrictEqual([
-      "Adapters",
-      "API",
+  it("hides tab-owned groups on a route under no tab, keeping loose content", () => {
+    // Root-level pages and a non-tab group ("Help") alongside the section
+    // groups. On a non-scoped route the sections (which already have header
+    // tabs) drop out; the loose pages and the non-tab group stay.
+    const tree: NavNode[] = [
+      page("Overview", "/"),
+      page("Changelog", "/changelog"),
+      group("Help", "/help", [page("FAQ", "/help/faq")]),
+      ...TREE,
+    ];
+    expect(labels(sidebarForRoute(tree, TABS, "/changelog"))).toStrictEqual([
+      "Overview",
+      "Changelog",
+      "Help",
     ]);
   });
 
-  it("never scopes for the root tab", () => {
+  it("hides tab-owned groups for the root tab, keeping loose pages", () => {
+    const tabs: NavTab[] = [{ label: "Home", path: "/" }, ...TABS];
+    const tree: NavNode[] = [page("Overview", "/"), ...TREE];
+    expect(labels(sidebarForRoute(tree, tabs, "/"))).toStrictEqual([
+      "Overview",
+    ]);
+  });
+
+  it("hides a config-style tab section matched by its group route", () => {
+    // Config-built groups carry a link `route` instead of a `path`.
+    const tree: NavNode[] = [
+      page("Home", "/"),
+      {
+        children: [page("Files", "/api/files")],
+        kind: "group",
+        label: "API",
+        route: "/api",
+      },
+    ];
+    const tabs: NavTab[] = [{ label: "API", path: "/api" }];
+    expect(labels(sidebarForRoute(tree, tabs, "/"))).toStrictEqual(["Home"]);
+  });
+
+  it("drops a container left empty once its sections become tabs", () => {
+    // A container that only holds tab sections, next to a loose page. On the
+    // root route the sections drop out and the emptied "Reference" heading is
+    // dropped too, so it is not stranded above the surviving page.
+    const tree: NavNode[] = [
+      page("Home", "/"),
+      group("Reference", "/reference", [
+        group("Adapters", "/reference/adapters", [
+          page("S3", "/reference/adapters/s3"),
+        ]),
+        group("API", "/reference/api", [page("Files", "/reference/api/files")]),
+      ]),
+    ];
+    const tabs: NavTab[] = [
+      { label: "Adapters", path: "/reference/adapters" },
+      { label: "API", path: "/reference/api" },
+    ];
+    expect(labels(sidebarForRoute(tree, tabs, "/"))).toStrictEqual(["Home"]);
+  });
+
+  it("falls back to the full sidebar when every group is a tab (never blanks)", () => {
+    // No loose pages: hiding the sections would blank the sidebar, so the full
+    // tree is shown instead.
     const tabs: NavTab[] = [{ label: "Home", path: "/" }, ...TABS];
     expect(labels(sidebarForRoute(TREE, tabs, "/"))).toStrictEqual([
       "Adapters",
