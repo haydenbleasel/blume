@@ -6,6 +6,7 @@ import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
 import LanguageSwitcher from "./LanguageSwitcher.astro";
 import Logo from "./Logo.astro";
+import NavSelector from "./NavSelector.astro";
 import { resolveSlot } from "./overrides.ts";
 import Search from "./Search.astro";
 
@@ -86,6 +87,15 @@ const clickScript = `document.addEventListener("click",(e)=>{const t=e.target.cl
     )
   }
   <LogoSlot logo={logo} site={site} />
+  {
+    navigation.selectors.length > 0 && (
+      <div class="flex items-center gap-1.5">
+        {navigation.selectors.map((selector) => (
+          <NavSelector route={route} selector={selector} />
+        ))}
+      </div>
+    )
+  }
   {
     navigation.tabs.length > 0 && (
       <nav aria-label="Sections" class="hidden gap-1 md:flex">

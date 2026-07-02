@@ -1,0 +1,75 @@
+---
+// A top-level navigation selector (Mintlify-style): a dropdown that switches
+// between partitions of the site — a product, a version, or any grouped set of
+// destinations (`navigation.selectors` in the config). Zero-JS, built on
+// <details>/<summary> like the language switcher.
+import type { NavSelector } from "../../core/types.ts";
+import Icon from "../Icon.astro";
+
+interface Props {
+  selector: NavSelector;
+  route: string;
+}
+
+const { selector, route } = Astro.props;
+
+// The active item is the deepest path that prefixes the current route, falling
+// back to the first item so the summary always shows something meaningful.
+const active =
+  selector.items.find((item) => item.path === route) ??
+  selector.items
+    .filter((item) => route.startsWith(item.path))
+    .toSorted((a, b) => b.path.length - a.path.length)[0] ??
+  selector.items[0];
+
+const iconButton =
+  "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground";
+const menuRowClass =
+  "flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=true]:text-foreground";
+---
+
+{
+  selector.items.length > 0 && (
+    <details class="group relative">
+      <summary
+        aria-label={selector.label}
+        class={`${iconButton} list-none [&::-webkit-details-marker]:hidden`}
+      >
+        {active?.icon && <Icon name={active.icon} size={16} />}
+        <span class="max-sm:hidden">{active?.label ?? selector.label}</span>
+        <Icon
+          class="transition-transform group-open:rotate-180"
+          name="chevron-down"
+          size={14}
+        />
+      </summary>
+      <div class="absolute start-0 z-50 mt-2 min-w-56 rounded-blume border border-border bg-background p-1 shadow-xl">
+        {selector.items.map((item) => (
+          <a
+            aria-current={item.path === active?.path ? "true" : undefined}
+            class={menuRowClass}
+            href={item.path}
+          >
+            {item.icon && <Icon class="mt-0.5" name={item.icon} size={16} />}
+            <span class="flex-1">
+              <span class="flex items-center gap-2">
+                {item.label}
+                {item.tag && (
+                  <span class="rounded-full bg-muted px-1.5 py-0.5 text-[0.65rem] text-muted-foreground">
+                    {item.tag}
+                  </span>
+                )}
+              </span>
+              {item.description && (
+                <span class="mt-0.5 block text-muted-foreground text-xs">
+                  {item.description}
+                </span>
+              )}
+            </span>
+            {item.path === active?.path && <Icon name="check" size={14} />}
+          </a>
+        ))}
+      </div>
+    </details>
+  )
+}

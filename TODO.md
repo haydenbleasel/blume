@@ -11,8 +11,6 @@
 
 ### Navigation (plan 06)
 
-- [ ] Render `navigation.selectors` (validates + builds into the graph but no component consumes it)
-
 ### Deployment (plan 19)
 
 - [ ] Emit platform redirect files (`_redirects` / `vercel.json`) + a redirect manifest for hosts needing manual wiring
