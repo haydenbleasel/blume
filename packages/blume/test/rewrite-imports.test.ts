@@ -54,4 +54,17 @@ describe("rewriteImports", () => {
       'import { useState } from "react";\nimport Icon from "blume/components/Icon.astro";';
     expect(rewriteImports(src, FILE, SRC)).toBe(src);
   });
+
+  it("rewrites a multiline import statement", () => {
+    const src = 'import {\n  a,\n  b,\n} from "./nav-utils.ts";';
+    expect(rewriteImports(src, FILE, SRC)).toContain(
+      'from "blume/components/layout/nav-utils.ts"'
+    );
+  });
+
+  it("ignores a relative-from inside a string or JSX text", () => {
+    // Not a statement — the line starts with `<p>`, not import/export.
+    const src = '<p>Run import x from "./setup.ts" first.</p>';
+    expect(rewriteImports(src, FILE, SRC)).toBe(src);
+  });
 });

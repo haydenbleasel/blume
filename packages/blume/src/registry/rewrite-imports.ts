@@ -1,10 +1,16 @@
 import { dirname, relative, resolve } from "pathe";
 
-// The module specifier in `... from "<spec>"` and side-effect `import "<spec>"`,
-// limited to relative specifiers (those starting with `.`). Capturing the
-// keyword, gap, and quote lets us rebuild the statement verbatim.
-const RELATIVE_IMPORT =
-  /(?<kw>\bfrom|\bimport)(?<gap>\s+)(?<quote>["'])(?<spec>\.[^"']*)\k<quote>/gu;
+// A relative specifier (starting with `.`) in an `import … from "…"` or
+// `export … from "…"` statement. Anchored to the start of a line (`m` flag) and
+// bounded by `[^;]` so it only matches a real statement — not a `from "./…"`
+// that happens to appear inside a string or JSX text — while still allowing a
+// multiline import body between the keyword and `from`.
+const FROM_IMPORT =
+  /(?<prefix>^[ \t]*(?:import|export)\b[^;]*?\bfrom[ \t]*)(?<quote>["'])(?<spec>\.[^"']*)\k<quote>/gmu;
+
+// A side-effect `import "./…"` at the start of a line.
+const SIDE_EFFECT_IMPORT =
+  /(?<prefix>^[ \t]*import[ \t]+)(?<quote>["'])(?<spec>\.[^"']*)\k<quote>/gmu;
 
 /**
  * Rewrite a built-in component's relative imports to `blume/*` package
@@ -22,18 +28,24 @@ export const rewriteImports = (
   content: string,
   sourceFile: string,
   srcRoot: string
-): string =>
-  content.replaceAll(
-    RELATIVE_IMPORT,
-    (match, kw: string, gap: string, quote: string, spec: string) => {
-      const resolved = resolve(dirname(sourceFile), spec);
-      if (resolved === sourceFile) {
-        return match;
-      }
-      const rel = relative(srcRoot, resolved);
-      if (rel.startsWith("..")) {
-        return match;
-      }
-      return `${kw}${gap}${quote}blume/${rel}${quote}`;
+): string => {
+  const rewrite = (
+    match: string,
+    prefix: string,
+    quote: string,
+    spec: string
+  ): string => {
+    const resolved = resolve(dirname(sourceFile), spec);
+    if (resolved === sourceFile) {
+      return match;
     }
-  );
+    const rel = relative(srcRoot, resolved);
+    if (rel.startsWith("..")) {
+      return match;
+    }
+    return `${prefix}${quote}blume/${rel}${quote}`;
+  };
+  return content
+    .replaceAll(FROM_IMPORT, rewrite)
+    .replaceAll(SIDE_EFFECT_IMPORT, rewrite);
+};
