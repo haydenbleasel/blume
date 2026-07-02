@@ -50,7 +50,8 @@ export const prefersMarkdown = (accept: string | null | undefined): boolean => {
  */
 export const markdownVariantUrl = (
   rawUrl: string | null | undefined,
-  routes: ReadonlySet<string>
+  routes: ReadonlySet<string>,
+  base?: string
 ): string | null => {
   if (!rawUrl) {
     return null;
@@ -58,11 +59,24 @@ export const markdownVariantUrl = (
   const queryIndex = rawUrl.indexOf("?");
   const query = queryIndex === -1 ? "" : rawUrl.slice(queryIndex);
   const rawPath = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex);
+
+  // A non-root `deployment.base` prefixes the dev-server URL but not the logical
+  // content routes, so strip it before matching and re-add it to the variant.
+  const prefix = base && base !== "/" ? base.replace(/\/$/u, "") : "";
+  let path = rawPath;
+  if (prefix) {
+    if (path === prefix || path.startsWith(`${prefix}/`)) {
+      path = path.slice(prefix.length) || "/";
+    } else {
+      return null;
+    }
+  }
+
   const pathname =
-    rawPath !== "/" && rawPath.endsWith("/") ? rawPath.slice(0, -1) : rawPath;
+    path !== "/" && path.endsWith("/") ? path.slice(0, -1) : path;
   if (!routes.has(pathname)) {
     return null;
   }
   const target = pathname === "/" ? "/index" : pathname;
-  return `${target}.md${query}`;
+  return `${prefix}${target}.md${query}`;
 };

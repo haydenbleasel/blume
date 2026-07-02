@@ -72,6 +72,8 @@ export interface BlumeIntegrationOptions {
   pages: BlumePageRoute[];
   /** Page routes that have a raw-Markdown variant (the content manifest). */
   contentRoutes: string[];
+  /** Configured `deployment.base`, stripped from dev URLs before matching. */
+  base?: string;
 }
 
 /**
@@ -83,13 +85,13 @@ export interface BlumeIntegrationOptions {
  * keep serving HTML.
  */
 const negotiateMarkdown =
-  (routes: ReadonlySet<string>) =>
+  (routes: ReadonlySet<string>, base?: string) =>
   (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
     if (
       (req.method === "GET" || req.method === "HEAD") &&
       prefersMarkdown(req.headers.accept)
     ) {
-      const variant = markdownVariantUrl(req.url, routes);
+      const variant = markdownVariantUrl(req.url, routes, base);
       if (variant) {
         res.setHeader("Vary", "Accept");
         req.url = variant;
@@ -124,7 +126,7 @@ export const blumeIntegration = (
       // Prepend so the rewrite happens before Astro's own request handler,
       // letting the rewritten URL resolve to the `.md` endpoint.
       server.middlewares.stack.unshift({
-        handle: negotiateMarkdown(new Set(options.contentRoutes)),
+        handle: negotiateMarkdown(new Set(options.contentRoutes), options.base),
         route: "",
       });
     },

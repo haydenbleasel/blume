@@ -57,4 +57,18 @@ describe("markdownVariantUrl", () => {
     expect(markdownVariantUrl("/favicon.ico", routes)).toBeNull();
     expect(markdownVariantUrl("/not-a-doc", routes)).toBeNull();
   });
+
+  it("strips and re-adds a non-root base", () => {
+    // The dev URL is base-prefixed; routes are not.
+    expect(markdownVariantUrl("/docs/guides/intro", routes, "/docs")).toBe(
+      "/docs/guides/intro.md"
+    );
+    expect(markdownVariantUrl("/docs", routes, "/docs")).toBe("/docs/index.md");
+    // A trailing slash on the base is tolerated.
+    expect(markdownVariantUrl("/docs/guides/intro", routes, "/docs/")).toBe(
+      "/docs/guides/intro.md"
+    );
+    // A URL outside the base isn't a content route.
+    expect(markdownVariantUrl("/guides/intro", routes, "/docs")).toBeNull();
+  });
 });
