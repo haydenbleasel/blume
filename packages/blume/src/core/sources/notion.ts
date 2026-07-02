@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { join } from "pathe";
 
 import { BlumeError } from "../diagnostics.ts";
@@ -136,6 +138,44 @@ const blockField = (block: NotionBlock): NotionRichText[] =>
   ((block[block.type] as { rich_text?: NotionRichText[] })?.rich_text ??
     []) as NotionRichText[];
 
+const RATE_LIMITED = 429;
+const MAX_RETRIES = 4;
+const BASE_DELAY_MS = 500;
+const SECOND_MS = 1000;
+
+/**
+ * Retry a Notion API call on a `429 rate_limited`, honoring the `Retry-After`
+ * header and otherwise backing off exponentially. A large workspace fans out
+ * many concurrent block-children requests, so without this a single 429 would
+ * reject the batch and abort the whole import.
+ */
+const withNotionRetry = async <T>(call: () => Promise<T>): Promise<T> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- sequential retry attempts
+      return await call();
+    } catch (error) {
+      lastError = error;
+      const { status } = error as { status?: number };
+      if (status !== RATE_LIMITED || attempt === MAX_RETRIES) {
+        throw error;
+      }
+      const retryAfter = Number(
+        (error as { headers?: Record<string, string> }).headers?.["retry-after"]
+      );
+      const wait =
+        retryAfter > 0 ? retryAfter * SECOND_MS : BASE_DELAY_MS * 2 ** attempt;
+      // oxlint-disable-next-line no-await-in-loop -- back off before retrying
+      await sleep(wait);
+    }
+  }
+  // Unreachable — the loop always returns or rethrows — but keeps types honest.
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Notion request failed after retries.");
+};
+
 /** Paginate a Notion list endpoint via recursion (no await-in-loop). */
 const collectAll = async <T>(
   page: (cursor?: string) => Promise<NotionList<T>>,
@@ -251,7 +291,9 @@ export const notionSource = (
     blockId: string
   ): Promise<NotionBlock[]> =>
     collectAll((cursor) =>
-      client.blocks.children.list({ block_id: blockId, start_cursor: cursor })
+      withNotionRetry(() =>
+        client.blocks.children.list({ block_id: blockId, start_cursor: cursor })
+      )
     );
 
   // `render` is injected (rather than referenced) so this stays a forward-free
@@ -396,10 +438,12 @@ export const notionSource = (
       async () => {
         const client = await resolveClient();
         const pages = await collectAll((cursor) =>
-          client.databases.query({
-            database_id: options.database,
-            start_cursor: cursor,
-          })
+          withNotionRetry(() =>
+            client.databases.query({
+              database_id: options.database,
+              start_cursor: cursor,
+            })
+          )
         );
         const built = await Promise.all(
           pages.map((page) => toEntry(client, page))

@@ -161,6 +161,39 @@ describe("notionSource", () => {
     expect(entry?.lastModified).toBe("2024-05-01T00:00:00Z");
   });
 
+  it("retries a rate-limited query and recovers", async () => {
+    let calls = 0;
+    const flaky = {
+      ...client(),
+      databases: {
+        query: () => {
+          calls += 1;
+          if (calls === 1) {
+            return Promise.reject(
+              Object.assign(new Error("rate limited"), {
+                headers: { "retry-after": "0" },
+                status: 429,
+              })
+            );
+          }
+          return Promise.resolve({
+            has_more: false,
+            next_cursor: null,
+            results: [PAGE],
+          });
+        },
+      },
+    } as unknown as NotionClientLike;
+
+    const source = notionSource(
+      { client: flaky, database: "db1", fetchImpl, name: "handbook" },
+      await ctxFor()
+    );
+    const { entries } = await source.load();
+    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(entries).toHaveLength(1);
+  });
+
   it("converts blocks to MDX with Blume components", async () => {
     const source = notionSource(
       { client: client(), database: "db1", fetchImpl, name: "handbook" },
