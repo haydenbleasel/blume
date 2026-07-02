@@ -13,8 +13,7 @@ This guide explains how to display captions in Remotion, assuming you already ha
 
 Read [Transcribing audio](transcribe-captions.md) for how to generate captions.
 
-First, the [`@remotion/captions`](https://www.remotion.dev/docs/captions) package needs to be installed.
-If it is not installed, use the following command:
+First, the [`@remotion/captions`](https://www.remotion.dev/docs/captions) package needs to be installed. If it is not installed, use the following command:
 
 ```bash
 npx remotion add @remotion/captions

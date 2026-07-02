@@ -11,8 +11,7 @@ To transcribe audio to generate captions in Remotion, you can use the [`transcri
 
 ## Prerequisites
 
-First, the @remotion/install-whisper-cpp package needs to be installed.
-If it is not installed, use the following command:
+First, the @remotion/install-whisper-cpp package needs to be installed. If it is not installed, use the following command:
 
 ```bash
 npx remotion add @remotion/install-whisper-cpp

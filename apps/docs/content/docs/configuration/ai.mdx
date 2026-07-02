@@ -3,15 +3,11 @@ title: AI
 description: Machine-readable docs with llms.txt and an optional in-page Ask AI assistant.
 ---
 
-Blume has several opt-in AI features: machine-readable docs for external tools
-(`llms.txt`), an in-page **Ask AI** assistant, and a hosted **MCP server** for
-coding agents. Everything is off by default, and static docs stay fully static
-until you turn a feature on.
+Blume has several opt-in AI features: machine-readable docs for external tools (`llms.txt`), an in-page **Ask AI** assistant, and a hosted **MCP server** for coding agents. Everything is off by default, and static docs stay fully static until you turn a feature on.
 
 ## llms.txt
 
-Emit machine-readable versions of your docs that coding agents and chat
-assistants can consume:
+Emit machine-readable versions of your docs that coding agents and chat assistants can consume:
 
 ```ts blume.config.ts lineNumbers
 ai: {
@@ -21,19 +17,14 @@ ai: {
 
 With this on, `blume build` writes two files to the root of your site:
 
-- **`/llms.txt`** — a compact index: your site title and description, then a
-  linked list of every page with its summary.
-- **`/llms-full.txt`** — the entire corpus: each page's full Markdown body, with
-  its source URL, in one file.
+- **`/llms.txt`** — a compact index: your site title and description, then a linked list of every page with its summary.
+- **`/llms-full.txt`** — the entire corpus: each page's full Markdown body, with its source URL, in one file.
 
-Draft pages are excluded. Set [`deployment.site`](/docs/deployment) so the links and
-source URLs resolve to absolute addresses.
+Draft pages are excluded. Set [`deployment.site`](/docs/deployment) so the links and source URLs resolve to absolute addresses.
 
 ## Raw Markdown
 
-Append `.md` or `.mdx` to any page's URL to fetch its raw Markdown source —
-perfect for LLMs, coding agents, and "copy as Markdown" workflows. It's available
-for every page, in dev and production, with no configuration.
+Append `.md` or `.mdx` to any page's URL to fetch its raw Markdown source — perfect for LLMs, coding agents, and "copy as Markdown" workflows. It's available for every page, in dev and production, with no configuration.
 
 | URL               | Returns                 |
 | ----------------- | ----------------------- |
@@ -41,38 +32,25 @@ for every page, in dev and production, with no configuration.
 | `/quickstart.md`  | The raw Markdown source |
 | `/quickstart.mdx` | The raw Markdown source |
 
-Nested routes work the same way (`/content/syntax.md`), and the home page is
-served at `/index.md`.
+Nested routes work the same way (`/content/syntax.md`), and the home page is served at `/index.md`.
 
 ## Copy as Markdown
 
-Every page carries a **Copy as Markdown** action — in the [page
-actions](/docs/content/navigation#page-actions) beneath the table of contents — that copies the
-page's raw Markdown to the clipboard. It's the same source served at the [`.md`
-URL](#raw-markdown) above, ready to paste into an LLM, an issue, or your notes.
-It's available on every page, in dev and production, with no configuration.
+Every page carries a **Copy as Markdown** action — in the [page actions](/docs/content/navigation#page-actions) beneath the table of contents — that copies the page's raw Markdown to the clipboard. It's the same source served at the [`.md` URL](#raw-markdown) above, ready to paste into an LLM, an issue, or your notes. It's available on every page, in dev and production, with no configuration.
 
 ## Open in chat
 
-The **Open in chat** action opens the current page in an AI assistant — v0,
-ChatGPT, Claude, T3 Chat, Scira, or Cursor — pre-filled with a prompt that points
-it at the page's raw Markdown so it can answer questions about what you're
-reading:
+The **Open in chat** action opens the current page in an AI assistant — v0, ChatGPT, Claude, T3 Chat, Scira, or Cursor — pre-filled with a prompt that points it at the page's raw Markdown so it can answer questions about what you're reading:
 
-> Read `https://your-site/this-page.md` so I can ask you questions about this
-> page.
+> Read `https://your-site/this-page.md` so I can ask you questions about this page.
 
-Like Copy as Markdown, it needs no setup. The assistant fetches the page over its
-public URL, so it works as soon as the page is deployed.
+Like Copy as Markdown, it needs no setup. The assistant fetches the page over its public URL, so it works as soon as the page is deployed.
 
-To embed a ready-to-copy prompt inline in your content — rather than a whole-page
-action — use the [Prompt component](/docs/content/components#prompt), which renders
-a labelled row with a **Copy prompt** button and an optional open-in-Cursor link.
+To embed a ready-to-copy prompt inline in your content — rather than a whole-page action — use the [Prompt component](/docs/content/components#prompt), which renders a labelled row with a **Copy prompt** button and an optional open-in-Cursor link.
 
 ## Ask AI
 
-Add an assistant that answers reader questions in an in-page chat panel, backed
-by a streaming server endpoint and the [AI SDK](https://ai-sdk.dev):
+Add an assistant that answers reader questions in an in-page chat panel, backed by a streaming server endpoint and the [AI SDK](https://ai-sdk.dev):
 
 ```ts blume.config.ts lineNumbers
 ai: {
@@ -86,26 +64,15 @@ ai: {
 
 ### Grounding
 
-Ask AI is **grounded in your docs**. For each question it retrieves the most
-relevant pages — using the same lexical [Orama](/docs/configuration/search) index
-that powers on-page search — and injects them into the model's system prompt, so
-answers come from your content instead of the model's own knowledge. The
-assistant is told to answer only from the retrieved pages, to say when something
-isn't covered, and to cite the pages it drew from.
+Ask AI is **grounded in your docs**. For each question it retrieves the most relevant pages — using the same lexical [Orama](/docs/configuration/search) index that powers on-page search — and injects them into the model's system prompt, so answers come from your content instead of the model's own knowledge. The assistant is told to answer only from the retrieved pages, to say when something isn't covered, and to cite the pages it drew from.
 
-The page the reader is currently on is added to the context first and used to
-scope retrieval to that page's language, so answers stay relevant to where they
-are in the docs. Retrieval runs at request time from a snapshot baked into the
-build, so it works regardless of your [search](/docs/configuration/search)
-provider — even when search is set to `none` — and needs no configuration.
+The page the reader is currently on is added to the context first and used to scope retrieval to that page's language, so answers stay relevant to where they are in the docs. Retrieval runs at request time from a snapshot baked into the build, so it works regardless of your [search](/docs/configuration/search) provider — even when search is set to `none` — and needs no configuration.
 
-Grounding is on for every backend except **[Inkeep](#backends)**, which runs its
-own retrieval over the content you've indexed in its dashboard.
+Grounding is on for every backend except **[Inkeep](#backends)**, which runs its own retrieval over the content you've indexed in its dashboard.
 
 ### Server output required
 
-Ask AI is a server route (`POST /api/ask`), so it can't run on a static build.
-Switch to server output and pick an adapter:
+Ask AI is a server route (`POST /api/ask`), so it can't run on a static build. Switch to server output and pick an adapter:
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -114,28 +81,21 @@ deployment: {
 }
 ```
 
-A static build with Ask AI enabled fails fast with a message telling you to set
-`deployment.output` to `server`. See [Deployment](/docs/deployment) for the adapters.
+A static build with Ask AI enabled fails fast with a message telling you to set `deployment.output` to `server`. See [Deployment](/docs/deployment) for the adapters.
 
 ### Backends
 
-By default Ask AI routes through the **Vercel AI Gateway**: `model` is a
-`provider/model` string, so you switch models by changing it (`openai/gpt-5.5`,
-`anthropic/claude-sonnet-4-5`, and so on) with no provider SDK to install. The
-gateway reads `AI_GATEWAY_API_KEY` from your environment and is wired up
-automatically when you deploy on Vercel.
+By default Ask AI routes through the **Vercel AI Gateway**: `model` is a `provider/model` string, so you switch models by changing it (`openai/gpt-5.5`, `anthropic/claude-sonnet-4-5`, and so on) with no provider SDK to install. The gateway reads `AI_GATEWAY_API_KEY` from your environment and is wired up automatically when you deploy on Vercel.
 
-Set `provider` to point Ask AI somewhere else. Each backend reads its API key
-from an environment variable, and the matching provider SDK is added to your
-project's runtime automatically when you build — only the one you use:
+Set `provider` to point Ask AI somewhere else. Each backend reads its API key from an environment variable, and the matching provider SDK is added to your project's runtime automatically when you build — only the one you use:
 
-| `provider`          | `model`                                       | API key env var      |
-| ------------------- | --------------------------------------------- | -------------------- |
-| `gateway` (default) | a `provider/model` string via the AI Gateway  | `AI_GATEWAY_API_KEY` |
-| `openrouter`        | any [OpenRouter](https://openrouter.ai) model | `OPENROUTER_API_KEY` |
-| `llmgateway`        | any [LLMGateway](https://llmgateway.io) model | `LLMGATEWAY_API_KEY` |
-| `inkeep`            | an [Inkeep](https://inkeep.com) QA model      | `INKEEP_API_KEY`     |
-| `openai-compatible` | whatever your endpoint serves                 | set with `apiKeyEnv` |
+| `provider` | `model` | API key env var |
+| --- | --- | --- |
+| `gateway` (default) | a `provider/model` string via the AI Gateway | `AI_GATEWAY_API_KEY` |
+| `openrouter` | any [OpenRouter](https://openrouter.ai) model | `OPENROUTER_API_KEY` |
+| `llmgateway` | any [LLMGateway](https://llmgateway.io) model | `LLMGATEWAY_API_KEY` |
+| `inkeep` | an [Inkeep](https://inkeep.com) QA model | `INKEEP_API_KEY` |
+| `openai-compatible` | whatever your endpoint serves | set with `apiKeyEnv` |
 
 For example, to use OpenRouter:
 
@@ -149,8 +109,7 @@ ai: {
 }
 ```
 
-Any OpenAI-compatible endpoint works through `openai-compatible` — supply the
-`baseUrl` and the env var holding its key:
+Any OpenAI-compatible endpoint works through `openai-compatible` — supply the `baseUrl` and the env var holding its key:
 
 ```ts blume.config.ts lineNumbers
 ai: {
@@ -164,36 +123,19 @@ ai: {
 }
 ```
 
-Set `apiKeyEnv` (and, for the named providers, `baseUrl`) on any backend to point
-at a different env var or proxy.
+Set `apiKeyEnv` (and, for the named providers, `baseUrl`) on any backend to point at a different env var or proxy.
 
-:::note
-**Inkeep** answers from the content you've indexed in the Inkeep dashboard — it
-runs its own retrieval — so Blume leaves it ungrounded. Every other backend is
-[grounded](#grounding) in this site's pages.
-:::
+:::note **Inkeep** answers from the content you've indexed in the Inkeep dashboard — it runs its own retrieval — so Blume leaves it ungrounded. Every other backend is [grounded](#grounding) in this site's pages. :::
 
-Keys are read with `process.env`, which covers the Node, Vercel, and Netlify
-adapters. On Cloudflare, expose the key through the platform's [runtime
-binding](https://docs.astro.build/en/guides/integrations-guide/cloudflare/#environment-variables-and-secrets).
-Enabling Ask AI also turns on React for the in-page island — see
-[Customization](/docs/configuration/customization#interactive-islands).
+Keys are read with `process.env`, which covers the Node, Vercel, and Netlify adapters. On Cloudflare, expose the key through the platform's [runtime binding](https://docs.astro.build/en/guides/integrations-guide/cloudflare/#environment-variables-and-secrets). Enabling Ask AI also turns on React for the in-page island — see [Customization](/docs/configuration/customization#interactive-islands).
 
 ### Rate limiting
 
-The `POST /api/ask` endpoint is **unauthenticated** — it has to be, so the
-in-page assistant can call it. Blume validates each request (rejecting
-malformed bodies and capping it to 1–40 messages) to bound how much a single
-call can spend against your model, but it can't stop someone from calling the
-endpoint repeatedly. If cost abuse is a concern, put the route behind a rate
-limiter — your host's (e.g. Vercel's) edge rate limiting, a middleware, or your
-model provider's per-key spend limits.
+The `POST /api/ask` endpoint is **unauthenticated** — it has to be, so the in-page assistant can call it. Blume validates each request (rejecting malformed bodies and capping it to 1–40 messages) to bound how much a single call can spend against your model, but it can't stop someone from calling the endpoint repeatedly. If cost abuse is a concern, put the route behind a rate limiter — your host's (e.g. Vercel's) edge rate limiting, a middleware, or your model provider's per-key spend limits.
 
 ## MCP server
 
-Host a [Model Context Protocol](https://modelcontextprotocol.io) server so coding
-agents (Claude Code, Cursor, VS Code, claude.ai connectors) can search and read
-your docs directly — no scraping:
+Host a [Model Context Protocol](https://modelcontextprotocol.io) server so coding agents (Claude Code, Cursor, VS Code, claude.ai connectors) can search and read your docs directly — no scraping:
 
 ```ts blume.config.ts lineNumbers
 mcp: {
@@ -209,20 +151,13 @@ mcp: {
 | `name`         | title   | Server name shown to clients (defaults to title). |
 | `instructions` | —       | Optional system hint passed to connecting agents. |
 
-The server exposes four read-only tools — `search_docs`, `get_page`,
-`list_pages`, and `get_navigation` — and publishes discovery documents at
-`/.well-known/mcp.json` and `/.well-known/mcp/server-card.json`. Each page's
-**Connect to MCP** menu offers copy-and-go install for Claude Code, Cursor, and
-VS Code (shown once [`deployment.site`](/docs/deployment) is set).
+The server exposes four read-only tools — `search_docs`, `get_page`, `list_pages`, and `get_navigation` — and publishes discovery documents at `/.well-known/mcp.json` and `/.well-known/mcp/server-card.json`. Each page's **Connect to MCP** menu offers copy-and-go install for Claude Code, Cursor, and VS Code (shown once [`deployment.site`](/docs/deployment) is set).
 
-`search_docs` runs its own full-text index, so it works regardless of your
-[search](/docs/configuration/search) provider — and even when search is set to
-`none`. The MCP server is a separate feature from on-page search.
+`search_docs` runs its own full-text index, so it works regardless of your [search](/docs/configuration/search) provider — and even when search is set to `none`. The MCP server is a separate feature from on-page search.
 
 ### Server output required
 
-The MCP server is a live endpoint (`/mcp`), so it can't run on a static build.
-Switch to server output and pick an adapter:
+The MCP server is a live endpoint (`/mcp`), so it can't run on a static build. Switch to server output and pick an adapter:
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -232,9 +167,7 @@ deployment: {
 }
 ```
 
-A static build with `mcp.enabled` fails fast with a message telling you to set
-`deployment.output` to `server`. See [Deployment](/docs/deployment) for the
-adapters. Once deployed, connect from Claude Code with:
+A static build with `mcp.enabled` fails fast with a message telling you to set `deployment.output` to `server`. See [Deployment](/docs/deployment) for the adapters. Once deployed, connect from Claude Code with:
 
 ```bash
 claude mcp add --transport http my-docs https://docs.example.com/mcp
@@ -242,14 +175,10 @@ claude mcp add --transport http my-docs https://docs.example.com/mcp
 
 ## Agent skill
 
-Building a Blume site with the help of a coding agent? Install the Blume
-[agent skill](https://docs.claude.com/en/docs/claude-code/skills) so it knows
-how Blume works without you explaining it:
+Building a Blume site with the help of a coding agent? Install the Blume [agent skill](https://docs.claude.com/en/docs/claude-code/skills) so it knows how Blume works without you explaining it:
 
 ```bash
 npx skills add haydenbleasel/blume
 ```
 
-The skill teaches the agent what Blume is and how to scaffold, write, and
-configure a site, and points it at the full docs bundled in the installed
-package (`node_modules/blume/docs`).
+The skill teaches the agent what Blume is and how to scaffold, write, and configure a site, and points it at the full docs bundled in the installed package (`node_modules/blume/docs`).

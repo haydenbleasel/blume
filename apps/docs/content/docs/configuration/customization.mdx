@@ -5,9 +5,7 @@ description: Override components, add interactive islands, mount custom pages, i
 
 ## Component overrides
 
-Add a `components.ts` (or `components.tsx`) to your project root and export
-`defineComponents`. The `mdx` map either **replaces** a built-in component or
-**adds** a new one — available in every `.mdx` page with no import.
+Add a `components.ts` (or `components.tsx`) to your project root and export `defineComponents`. The `mdx` map either **replaces** a built-in component or **adds** a new one — available in every `.mdx` page with no import.
 
 ```ts components.ts lineNumbers
 import { defineComponents } from "blume";
@@ -22,8 +20,7 @@ export default defineComponents({
 });
 ```
 
-Keys are the names you write in MDX (`<Callout>`, `<Pricing>`). Use the `.tsx`
-filename when you import React components.
+Keys are the names you write in MDX (`<Callout>`, `<Pricing>`). Use the `.tsx` filename when you import React components.
 
 ### Reference form
 
@@ -42,28 +39,21 @@ export default defineComponents({
 });
 ```
 
-The **descriptor** form adds a hydration mode so an interactive
-React/Vue/Svelte component ships its JavaScript and comes alive on the client.
-Without a `client` mode a framework component renders as static HTML — Blume
-prints a build warning when it spots one, since that's usually a mistake.
+The **descriptor** form adds a hydration mode so an interactive React/Vue/Svelte component ships its JavaScript and comes alive on the client. Without a `client` mode a framework component renders as static HTML — Blume prints a build warning when it spots one, since that's usually a mistake.
 
-| `client`    | Hydrates                                                         |
-| ----------- | ---------------------------------------------------------------- |
-| `"load"`    | Immediately on page load                                         |
-| `"idle"`    | When the main thread is idle                                     |
-| `"visible"` | When scrolled into view                                          |
-| `"media"`   | When a `media` query matches (add `media: "(min-width: 40rem)"`) |
-| `"only"`    | Client only, never server-rendered                               |
+| `client` | Hydrates |
+| --- | --- |
+| `"load"` | Immediately on page load |
+| `"idle"` | When the main thread is idle |
+| `"visible"` | When scrolled into view |
+| `"media"` | When a `media` query matches (add `media: "(min-width: 40rem)"`) |
+| `"only"` | Client only, never server-rendered |
 
-For interactive components you use across many pages, the [`islands`
-group](/docs/content/islands#registering-islands-in-componentsts) is a shorthand
-for the descriptor form with `client: "visible"`.
+For interactive components you use across many pages, the [`islands` group](/docs/content/islands#registering-islands-in-componentsts) is a shorthand for the descriptor form with `client: "visible"`.
 
 ### Typing an override
 
-When you replace a built-in, import its prop type from `blume/components` so your
-component matches the contract — the types are derived from the components
-themselves, so they never drift:
+When you replace a built-in, import its prop type from `blume/components` so your component matches the contract — the types are derived from the components themselves, so they never drift:
 
 ```tsx components/Callout.tsx
 import type { CalloutProps } from "blume/components";
@@ -73,14 +63,11 @@ export default function Callout(props: CalloutProps) {
 }
 ```
 
-Prop types are exported for the content components (`CalloutProps`, `CardProps`,
-`TabsProps`, `StepsProps`, `BadgeProps`, and more).
+Prop types are exported for the content components (`CalloutProps`, `CardProps`, `TabsProps`, `StepsProps`, `BadgeProps`, and more).
 
 ## Layout slots
 
-The `layout` map replaces a piece of Blume's chrome with your own component. Each
-override receives the same props as the built-in it replaces, so you can wrap the
-default or start from scratch.
+The `layout` map replaces a piece of Blume's chrome with your own component. Each override receives the same props as the built-in it replaces, so you can wrap the default or start from scratch.
 
 ```ts components.ts
 import { defineComponents } from "blume";
@@ -97,34 +84,28 @@ export default defineComponents({
 
 Wired slots:
 
-| Slot              | Replaces                                                 | Props                                                          |
-| ----------------- | -------------------------------------------------------- | -------------------------------------------------------------- |
-| `Layout`          | The entire page shell (`RootLayout`)                     | Everything the built-in layout receives, plus the `layout` map |
-| `Header`          | The top navigation bar                                   | `site`, `logo`, `navigation`, `route`, `searchEnabled`, …      |
-| `Logo`            | The brand link (mark + title) in the header              | `site`, `logo`                                                 |
-| `Search`          | The header search trigger + modal                        | `navigation`, `strings`, `locale`, `askEnabled`                |
-| `Sidebar`         | The primary navigation tree                              | `items`, `currentRoute`                                        |
-| `MobileNav`       | The nav inside the mobile drawer (defaults to `Sidebar`) | `items`, `currentRoute`                                        |
-| `Breadcrumbs`     | The breadcrumb trail                                     | `crumbs`                                                       |
-| `TableOfContents` | The on-this-page outline                                 | `headings`, `title`, `variant`                                 |
-| `Pagination`      | The prev/next footer links                               | `prev`, `next`, `strings`                                      |
-| `PageHeader`      | An injection point above the article (no built-in)       | `page`, `headings`, `route`                                    |
-| `PageFooter`      | An injection point below the article (no built-in)       | `page`, `headings`, `route`                                    |
-| `Footer`          | A site-wide footer after the content grid (no built-in)  | `site`, `navigation`, `ui`                                     |
+| Slot | Replaces | Props |
+| --- | --- | --- |
+| `Layout` | The entire page shell (`RootLayout`) | Everything the built-in layout receives, plus the `layout` map |
+| `Header` | The top navigation bar | `site`, `logo`, `navigation`, `route`, `searchEnabled`, … |
+| `Logo` | The brand link (mark + title) in the header | `site`, `logo` |
+| `Search` | The header search trigger + modal | `navigation`, `strings`, `locale`, `askEnabled` |
+| `Sidebar` | The primary navigation tree | `items`, `currentRoute` |
+| `MobileNav` | The nav inside the mobile drawer (defaults to `Sidebar`) | `items`, `currentRoute` |
+| `Breadcrumbs` | The breadcrumb trail | `crumbs` |
+| `TableOfContents` | The on-this-page outline | `headings`, `title`, `variant` |
+| `Pagination` | The prev/next footer links | `prev`, `next`, `strings` |
+| `PageHeader` | An injection point above the article (no built-in) | `page`, `headings`, `route` |
+| `PageFooter` | An injection point below the article (no built-in) | `page`, `headings`, `route` |
+| `Footer` | A site-wide footer after the content grid (no built-in) | `site`, `navigation`, `ui` |
 
-`PageHeader`, `PageFooter`, and `Footer` have no built-in component — they render
-nothing until you set them, which makes them handy injection points for a
-promo banner, a "last updated" note, or a marketing footer.
+`PageHeader`, `PageFooter`, and `Footer` have no built-in component — they render nothing until you set them, which makes them handy injection points for a promo banner, a "last updated" note, or a marketing footer.
 
-Layout slots accept the same [three reference forms](#reference-form) as MDX
-overrides, so a slot can be a path string or a hydrated descriptor
-(`{ component, client }`) when you want an interactive header or footer.
+Layout slots accept the same [three reference forms](#reference-form) as MDX overrides, so a slot can be a path string or a hydrated descriptor (`{ component, client }`) when you want an interactive header or footer.
 
 ## Interactive islands
 
-For interactive UI (React, Vue, or Svelte), drop a component into an `islands/`
-folder and use it in any MDX page — Blume hydrates it for you, no wrapper or
-registration needed:
+For interactive UI (React, Vue, or Svelte), drop a component into an `islands/` folder and use it in any MDX page — Blume hydrates it for you, no wrapper or registration needed:
 
 ```tsx islands/Counter.tsx lineNumbers
 import { useState } from "react";
@@ -139,51 +120,37 @@ export default function Counter() {
 Use it anywhere: <Counter />
 ```
 
-See [Islands](/docs/content/islands) for hydration strategies and framework
-setup.
+See [Islands](/docs/content/islands) for hydration strategies and framework setup.
 
 ## Custom pages
 
-Add `.astro` files under your `pages/` folder to mount fully custom routes
-alongside your docs — a landing page, a pricing page, or a hand-built index. They
-keep their location, so relative imports and `getStaticPaths` work as usual, and
-they can read your config, navigation, and routes from the `blume:data` module.
+Add `.astro` files under your `pages/` folder to mount fully custom routes alongside your docs — a landing page, a pricing page, or a hand-built index. They keep their location, so relative imports and `getStaticPaths` work as usual, and they can read your config, navigation, and routes from the `blume:data` module.
 
 See [Custom Pages](/docs/advanced/custom-pages) for the full guide.
 
 ## Registry
 
-`blume add` copies a Blume-maintained component into your project as **source** —
-you own it and can edit it freely. Run it with no arguments to list what's
-available:
+`blume add` copies a Blume-maintained component into your project as **source** — you own it and can edit it freely. Run it with no arguments to list what's available:
 
 ```bash
 blume add
 ```
 
-Install a layout slot (header, sidebar, breadcrumbs, table of contents,
-pagination, or feedback) or any content component (callout, card, tabs, steps,
-accordion, and more):
+Install a layout slot (header, sidebar, breadcrumbs, table of contents, pagination, or feedback) or any content component (callout, card, tabs, steps, accordion, and more):
 
 ```bash
 blume add callout
 blume add pagination
 ```
 
-The copy imports the rest of the framework from `blume/*`, so it renders exactly
-like the built-in until you change it. `blume add` prints the `defineComponents`
-snippet to register it — content components under `mdx`, layout pieces under
-`layout`.
+The copy imports the rest of the framework from `blume/*`, so it renders exactly like the built-in until you change it. `blume add` prints the `defineComponents` snippet to register it — content components under `mdx`, layout pieces under `layout`.
 
 ## Eject
 
-When you want full control, eject the generated runtime into a standalone Astro
-project:
+When you want full control, eject the generated runtime into a standalone Astro project:
 
 ```bash
 blume eject --yes
 ```
 
-Eject is a one-way step: the hidden `.blume/` runtime becomes a normal Astro app
-you own and can modify directly. The `blume` package stays importable, so you
-keep its components, theme, and Markdown processors.
+Eject is a one-way step: the hidden `.blume/` runtime becomes a normal Astro app you own and can modify directly. The `blume` package stays importable, so you keep its components, theme, and Markdown processors.

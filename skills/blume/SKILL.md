@@ -5,33 +5,16 @@ description: Build and maintain documentation sites with Blume, the markdown-fir
 
 # Blume
 
-Blume is an open-source, **markdown-first** documentation framework built on
-Astro and Vite. Drop Markdown or MDX into a folder, run `blume dev`, and get a
-production-grade docs site — navigation, search, theming, Open Graph images, and
-a rich component library — with no app boilerplate to write or maintain.
+Blume is an open-source, **markdown-first** documentation framework built on Astro and Vite. Drop Markdown or MDX into a folder, run `blume dev`, and get a production-grade docs site — navigation, search, theming, Open Graph images, and a rich component library — with no app boilerplate to write or maintain.
 
-The core idea: **the framework _is_ the template.** There's no starter to clone
-and no project to own before you've written a word. The only thing you touch is
-your content. When you outgrow the defaults, you add configuration one file at a
-time — and you can `blume eject` to a plain Astro project the day you want full
-control.
+The core idea: **the framework _is_ the template.** There's no starter to clone and no project to own before you've written a word. The only thing you touch is your content. When you outgrow the defaults, you add configuration one file at a time — and you can `blume eject` to a plain Astro project the day you want full control.
 
 ## What makes it different
 
-- **Fast by default** — Static HTML on Astro/Vite. The core theme is React-free
-  and ships **zero client JavaScript**, so pages score well on Core Web Vitals
-  out of the box. You opt into server features only when you need them.
-- **AI-ready out of the box** — Emits `llms.txt`/`llms-full.txt`, serves any
-  page's raw Markdown by appending `.md` to its URL, offers **Copy as Markdown**
-  and **Open in chat** on every page, and can host an optional **Ask AI**
-  assistant or an **MCP server** so coding agents read your docs directly.
-- **Zero configuration — even the template** — A folder of docs is a complete
-  project. Navigation is inferred from files, search works in dev and production
-  with no hosted service, and theming is a handful of tokens.
-- **Type-safe to the core** — `blume.config.ts` and every `meta.ts` are real
-  TypeScript, validated by a schema and authored with `defineConfig` and
-  `defineMeta`. Your editor autocompletes options and catches mistakes before a
-  build.
+- **Fast by default** — Static HTML on Astro/Vite. The core theme is React-free and ships **zero client JavaScript**, so pages score well on Core Web Vitals out of the box. You opt into server features only when you need them.
+- **AI-ready out of the box** — Emits `llms.txt`/`llms-full.txt`, serves any page's raw Markdown by appending `.md` to its URL, offers **Copy as Markdown** and **Open in chat** on every page, and can host an optional **Ask AI** assistant or an **MCP server** so coding agents read your docs directly.
+- **Zero configuration — even the template** — A folder of docs is a complete project. Navigation is inferred from files, search works in dev and production with no hosted service, and theming is a handful of tokens.
+- **Type-safe to the core** — `blume.config.ts` and every `meta.ts` are real TypeScript, validated by a schema and authored with `defineConfig` and `defineMeta`. Your editor autocompletes options and catches mistakes before a build.
 
 ## Quickstart
 
@@ -44,14 +27,11 @@ blume dev        # dev server with hot reload
 blume build      # static HTML to dist/, with a local search index
 ```
 
-Blume works with any package manager and never requires you to set up Astro or
-Tailwind yourself.
+Blume works with any package manager and never requires you to set up Astro or Tailwind yourself.
 
 ### Writing a page
 
-Every page is Markdown or MDX with a little frontmatter. The `title` and
-`description` render as the page heading and intro automatically; built-in
-components (callouts, cards, tabs, steps, and more) need **no imports**.
+Every page is Markdown or MDX with a little frontmatter. The `title` and `description` render as the page heading and intro automatically; built-in components (callouts, cards, tabs, steps, and more) need **no imports**.
 
 ```mdx
 ---
@@ -61,48 +41,32 @@ description: Welcome to my docs.
 
 Welcome! Use **Markdown** and built-in components — no imports required:
 
-:::note
-Blume ships callouts, cards, tabs, steps, and more.
-:::
+:::note Blume ships callouts, cards, tabs, steps, and more. :::
 ```
 
-Navigation, search, and page metadata are inferred from your files as you add
-them.
+Navigation, search, and page metadata are inferred from your files as you add them.
 
 ## What's included
 
-- **Components** — callouts, cards, steps, tabs, accordions, badges, file trees,
-  and parameter tables, usable in MDX with no imports.
-- **Local search** — Orama in dev and production; Pagefind is one flag away for
-  large sites. No hosted index.
-- **AI** — `llms.txt`, raw Markdown URLs, Copy as Markdown, Open in chat, an Ask
-  AI assistant, and a hosted MCP server.
+- **Components** — callouts, cards, steps, tabs, accordions, badges, file trees, and parameter tables, usable in MDX with no imports.
+- **Local search** — Orama in dev and production; Pagefind is one flag away for large sites. No hosted index.
+- **AI** — `llms.txt`, raw Markdown URLs, Copy as Markdown, Open in chat, an Ask AI assistant, and a hosted MCP server.
 - **Navigation** — inferred from files, refined with `meta.ts` or config.
 - **SEO** — metadata, Open Graph images, RSS feeds, and JSON-LD.
-- **Customization** — component overrides, React islands, custom pages, theme
-  tokens, and a source-component registry via `blume add`.
+- **Customization** — component overrides, React islands, custom pages, theme tokens, and a source-component registry via `blume add`.
 - **Migration** — `blume migrate mintlify | starlight | fumadocs`.
-- **Eject** — `blume eject` produces a standalone Astro project that still uses
-  the `blume` package.
+- **Eject** — `blume eject` produces a standalone Astro project that still uses the `blume` package.
 
 ## How it works
 
-The Blume CLI discovers your content, builds a content graph, and generates a
-hidden Astro project under `.blume/` that it drives for dev and build. The
-generated runtime is an implementation detail — you write Markdown, Blume
-handles the rest — until you choose to eject and own it.
+The Blume CLI discovers your content, builds a content graph, and generates a hidden Astro project under `.blume/` that it drives for dev and build. The generated runtime is an implementation detail — you write Markdown, Blume handles the rest — until you choose to eject and own it.
 
 ## Full documentation
 
-This is a high-level overview. For complete, authoritative docs — configuration
-reference, every CLI command and flag, component APIs, content authoring,
-navigation, search, SEO, AI features, theming, migration, and deployment — read
-the bundled docs in the installed package:
+This is a high-level overview. For complete, authoritative docs — configuration reference, every CLI command and flag, component APIs, content authoring, navigation, search, SEO, AI features, theming, migration, and deployment — read the bundled docs in the installed package:
 
 ```
 node_modules/blume/docs
 ```
 
-Start with `node_modules/blume/docs/index.mdx` (Introduction) and
-`node_modules/blume/docs/01-quickstart.mdx`, then browse the `configuration/`,
-`content/`, `reference/`, and `advanced/` sections for specifics.
+Start with `node_modules/blume/docs/index.mdx` (Introduction) and `node_modules/blume/docs/01-quickstart.mdx`, then browse the `configuration/`, `content/`, `reference/`, and `advanced/` sections for specifics.

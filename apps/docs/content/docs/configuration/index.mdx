@@ -5,9 +5,7 @@ sidebar:
   label: blume.config.ts
 ---
 
-Blume reads `blume.config.ts` from your project root. Wrap your config in
-`defineConfig` for autocomplete and type-checking — every field is optional, with
-a sensible default.
+Blume reads `blume.config.ts` from your project root. Wrap your config in `defineConfig` for autocomplete and type-checking — every field is optional, with a sensible default.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -20,8 +18,7 @@ export default defineConfig({
 
 ## A complete example
 
-A broader example touching the most common options (see each feature's guide for
-the rest):
+A broader example touching the most common options (see each feature's guide for the rest):
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -90,25 +87,22 @@ export default defineConfig({
 
 ## Site
 
-| Option        | Default           | Description                                             |
-| ------------- | ----------------- | ------------------------------------------------------- |
-| `title`       | `"Documentation"` | Site name — shown in the header, page titles, OG cards. |
-| `description` | —                 | Default meta description, used for SEO and OG.          |
-| `logo`        | —                 | Brand logo shown beside the title in the header.        |
-| `banner`      | —                 | Site-wide announcement bar above the header.            |
+| Option | Default | Description |
+| --- | --- | --- |
+| `title` | `"Documentation"` | Site name — shown in the header, page titles, OG cards. |
+| `description` | — | Default meta description, used for SEO and OG. |
+| `logo` | — | Brand logo shown beside the title in the header. |
+| `banner` | — | Site-wide announcement bar above the header. |
 
 ### Logo
 
-Point `logo` at an SVG and Blume inlines it, so a `currentColor` logo follows
-the light and dark theme automatically:
+Point `logo` at an SVG and Blume inlines it, so a `currentColor` logo follows the light and dark theme automatically:
 
 ```ts blume.config.ts
 logo: "/logo.svg",
 ```
 
-The SVG can live at your project root or in `public/`. For raster images — or
-separate light and dark artwork — use the object form (these must live in
-`public/`):
+The SVG can live at your project root or in `public/`. For raster images — or separate light and dark artwork — use the object form (these must live in `public/`):
 
 ```ts blume.config.ts lineNumbers
 logo: {
@@ -123,9 +117,7 @@ logo: {
 
 ### Favicon
 
-There's no favicon option — Blume auto-detects one by filename, the way Next.js
-does. Drop an `icon` or `favicon` file (`.svg`, `.png`, or `.ico`) in your
-project root or `public/` directory and it becomes the browser tab icon:
+There's no favicon option — Blume auto-detects one by filename, the way Next.js does. Drop an `icon` or `favicon` file (`.svg`, `.png`, or `.ico`) in your project root or `public/` directory and it becomes the browser tab icon:
 
 ```
 my-docs/
@@ -134,17 +126,11 @@ my-docs/
 └─ docs/
 ```
 
-SVG wins over PNG over ICO when several are present, and a file in `public/` is
-preferred over one at the root. If Blume finds no icon, it falls back to its own
-mark.
+SVG wins over PNG over ICO when several are present, and a file in `public/` is preferred over one at the root. If Blume finds no icon, it falls back to its own mark.
 
 ### Apple touch icon
 
-The icon iOS uses when someone adds your site to their home screen is detected
-the same way. Drop an `apple-icon` file (`.png`, `.jpg`, or `.jpeg`) — or an
-`apple-touch-icon.png`, the name most favicon generators emit — in your project
-root or `public/` directory and Blume wires up `<link rel="apple-touch-icon">`
-for you. There's no default; if no file is found, no tag is emitted.
+The icon iOS uses when someone adds your site to their home screen is detected the same way. Drop an `apple-icon` file (`.png`, `.jpg`, or `.jpeg`) — or an `apple-touch-icon.png`, the name most favicon generators emit — in your project root or `public/` directory and Blume wires up `<link rel="apple-touch-icon">` for you. There's no default; if no file is found, no tag is emitted.
 
 ```
 my-docs/
@@ -153,14 +139,11 @@ my-docs/
 └─ docs/
 ```
 
-Put the file in `public/` rather than the project root: iOS ignores the inlined
-data URI Blume uses for a root-level icon, so only a `public/` file (served at
-`/apple-icon.png`) reliably reaches the home screen.
+Put the file in `public/` rather than the project root: iOS ignores the inlined data URI Blume uses for a root-level icon, so only a `public/` file (served at `/apple-icon.png`) reliably reaches the home screen.
 
 ### Banner
 
-Show a site-wide announcement bar above the header. Pass a string, or an object
-with a link and a dismiss button:
+Show a site-wide announcement bar above the header. Pass a string, or an object with a link and a dismiss button:
 
 ```ts blume.config.ts
 banner: "Docs are in beta — expect changes.",
@@ -175,15 +158,11 @@ banner: {
 },
 ```
 
-When `dismissible` is on, the bar shows a close button and stays hidden for that
-visitor afterward. The dismissal key defaults to the content text, so editing
-the message brings the banner back; set a stable `id` to keep it dismissed
-across edits.
+When `dismissible` is on, the bar shows a close button and stays hidden for that visitor afterward. The dismissal key defaults to the content text, so editing the message brings the banner back; set a stable `id` to keep it dismissed across edits.
 
 ## Content
 
-Where your content lives and how Blume discovers it. See [Pages](/docs/content) for
-how files become routes.
+Where your content lives and how Blume discovers it. See [Pages](/docs/content) for how files become routes.
 
 ```ts blume.config.ts lineNumbers
 content: {
@@ -191,35 +170,30 @@ content: {
 }
 ```
 
-| Option        | Default              | Description                                  |
-| ------------- | -------------------- | -------------------------------------------- |
-| `root`        | `"docs"`             | Folder Blume scans for content.              |
-| `include`     | `["**/*.{md,mdx}"]`  | Globs that match content files.              |
-| `exclude`     | `["**/_*", "**/.*"]` | Globs to ignore (underscore- and dot-files). |
-| `pages`       | `"pages"`            | Folder for custom `.astro` pages.            |
-| `defaultType` | `"doc"`              | Page `type` used when frontmatter omits it.  |
+| Option | Default | Description |
+| --- | --- | --- |
+| `root` | `"docs"` | Folder Blume scans for content. |
+| `include` | `["**/*.{md,mdx}"]` | Globs that match content files. |
+| `exclude` | `["**/_*", "**/.*"]` | Globs to ignore (underscore- and dot-files). |
+| `pages` | `"pages"` | Folder for custom `.astro` pages. |
+| `defaultType` | `"doc"` | Page `type` used when frontmatter omits it. |
 
 ## Last modified
 
-Show a "Last updated on …" line at the bottom of each page. Off by default; set
-`lastModified` to `true` to derive each page's date from its git history:
+Show a "Last updated on …" line at the bottom of each page. Off by default; set `lastModified` to `true` to derive each page's date from its git history:
 
 ```ts blume.config.ts
 lastModified: true,
 ```
 
-| Value                     | Description                                                    |
-| ------------------------- | -------------------------------------------------------------- |
-| `false`                   | Disabled (default).                                            |
-| `true`                    | Read the date from git history (commit dates).                 |
-| `{ type: "git" }`         | Same as `true`, written explicitly.                            |
+| Value | Description |
+| --- | --- |
+| `false` | Disabled (default). |
+| `true` | Read the date from git history (commit dates). |
+| `{ type: "git" }` | Same as `true`, written explicitly. |
 | `{ type: "frontmatter" }` | Never run git — use only the `lastModified` frontmatter field. |
 
-The git source reads the most recent commit that touched each file, so it works
-in any git repository — including monorepos — and needs the repo's history at
-build time (avoid a shallow `--depth 1` checkout in CI). A page's own
-`lastModified` frontmatter always wins, which is handy for pinning a date or for
-files that aren't committed yet:
+The git source reads the most recent commit that touched each file, so it works in any git repository — including monorepos — and needs the repo's history at build time (avoid a shallow `--depth 1` checkout in CI). A page's own `lastModified` frontmatter always wins, which is handy for pinning a date or for files that aren't committed yet:
 
 ```mdx page.mdx
 ---
@@ -228,14 +202,11 @@ lastModified: 2026-06-20
 ---
 ```
 
-When enabled, the date is also emitted as schema.org `dateModified` in the
-page's structured data.
+When enabled, the date is also emitted as schema.org `dateModified` in the page's structured data.
 
 ## SEO
 
-Open Graph images, RSS feeds, and JSON-LD structured data, grouped under `seo`.
-See the [SEO guide](/docs/configuration/seo) for metadata, frontmatter overrides, and
-the full reference.
+Open Graph images, RSS feeds, and JSON-LD structured data, grouped under `seo`. See the [SEO guide](/docs/configuration/seo) for metadata, frontmatter overrides, and the full reference.
 
 ```ts blume.config.ts lineNumbers
 seo: {
@@ -247,22 +218,21 @@ seo: {
 }
 ```
 
-| Option           | Default                 | Description                                             |
-| ---------------- | ----------------------- | ------------------------------------------------------- |
-| `og.enabled`     | auto                    | Per-page Open Graph images — on when a site URL is set. |
-| `rss.enabled`    | `true`                  | Build feeds for blog and changelog content.             |
-| `rss.types`      | `["blog", "changelog"]` | Content types that each get a feed.                     |
-| `rss.limit`      | `50`                    | Maximum items per feed.                                 |
-| `sitemap`        | `true`                  | Generate sitemap.xml (needs deployment.site).           |
-| `robots`         | `true`                  | Generate robots.txt with a Sitemap link.                |
-| `structuredData` | `true`                  | Emit schema.org JSON-LD in each page's head.            |
+| Option | Default | Description |
+| --- | --- | --- |
+| `og.enabled` | auto | Per-page Open Graph images — on when a site URL is set. |
+| `rss.enabled` | `true` | Build feeds for blog and changelog content. |
+| `rss.types` | `["blog", "changelog"]` | Content types that each get a feed. |
+| `rss.limit` | `50` | Maximum items per feed. |
+| `sitemap` | `true` | Generate sitemap.xml (needs deployment.site). |
+| `robots` | `true` | Generate robots.txt with a Sitemap link. |
+| `structuredData` | `true` | Emit schema.org JSON-LD in each page's head. |
 
 These work best with an absolute [`deployment.site`](/docs/deployment) for full URLs.
 
 ## Table of contents
 
-The on-this-page outline is on by default and lists `H2`–`H3` headings. Turn it
-off, or change the heading range, with `toc`:
+The on-this-page outline is on by default and lists `H2`–`H3` headings. Turn it off, or change the heading range, with `toc`:
 
 ```ts blume.config.ts
 export default defineConfig({
@@ -276,23 +246,22 @@ export default defineConfig({
 
 Each of these has its own guide. The config field is the entry point:
 
-| Field        | What it configures                                  | Guide                                      |
-| ------------ | --------------------------------------------------- | ------------------------------------------ |
-| `theme`      | Accent color, corner radius, fonts, light/dark mode | [Theming](/docs/configuration/theming)     |
-| `navigation` | Explicit sidebar and header tabs                    | [Navigation](/docs/content/navigation)     |
-| `search`     | Provider (Orama or Pagefind) and indexing           | [Search](/docs/configuration/search)       |
-| `markdown`   | Opt-in Markdown features like math                  | [Syntax](/docs/content/syntax)             |
-| `ai`         | `llms.txt`, Ask AI, and the MCP server              | [AI](/docs/configuration/ai)               |
-| `mcp`        | Hosted MCP server for coding agents                 | [AI](/docs/configuration/ai#mcp-server)    |
-| `analytics`  | Vercel, PostHog, and custom scripts                 | [Analytics](/docs/configuration/analytics) |
-| `seo`        | Metadata, OG images, feeds, structured data         | [SEO](/docs/configuration/seo)             |
-| `deployment` | Output mode, adapter, and site URL                  | [Deployment](/docs/deployment)             |
-| `redirects`  | Permanent and temporary redirects                   | [Deployment](/docs/deployment#redirects)   |
+| Field | What it configures | Guide |
+| --- | --- | --- |
+| `theme` | Accent color, corner radius, fonts, light/dark mode | [Theming](/docs/configuration/theming) |
+| `navigation` | Explicit sidebar and header tabs | [Navigation](/docs/content/navigation) |
+| `search` | Provider (Orama or Pagefind) and indexing | [Search](/docs/configuration/search) |
+| `markdown` | Opt-in Markdown features like math | [Syntax](/docs/content/syntax) |
+| `ai` | `llms.txt`, Ask AI, and the MCP server | [AI](/docs/configuration/ai) |
+| `mcp` | Hosted MCP server for coding agents | [AI](/docs/configuration/ai#mcp-server) |
+| `analytics` | Vercel, PostHog, and custom scripts | [Analytics](/docs/configuration/analytics) |
+| `seo` | Metadata, OG images, feeds, structured data | [SEO](/docs/configuration/seo) |
+| `deployment` | Output mode, adapter, and site URL | [Deployment](/docs/deployment) |
+| `redirects` | Permanent and temporary redirects | [Deployment](/docs/deployment#redirects) |
 
 ## Precedence
 
-Settings resolve from lowest to highest priority, so you only override what you
-need:
+Settings resolve from lowest to highest priority, so you only override what you need:
 
 <Steps>
   <Step title="Blume defaults">A sensible default for every field.</Step>

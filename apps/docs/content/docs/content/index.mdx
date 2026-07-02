@@ -3,24 +3,18 @@ title: Pages
 description: How files in your content folder become pages, and how to organize them.
 ---
 
-Your docs are just a folder of Markdown and MDX files. Blume turns each file into
-a page — routing, navigation, and metadata are inferred from the file system, so
-there's no manifest to keep in sync.
+Your docs are just a folder of Markdown and MDX files. Blume turns each file into a page — routing, navigation, and metadata are inferred from the file system, so there's no manifest to keep in sync.
 
-Content lives under your **content root** (`docs/` by default; change it with
-`content.root` in [`blume.config.ts`](/docs/configuration)).
+Content lives under your **content root** (`docs/` by default; change it with `content.root` in [`blume.config.ts`](/docs/configuration)).
 
 ## Markdown and MDX
 
 Blume renders two kinds of file:
 
-- **`.md`** — Markdown for plain prose: GFM, frontmatter, smart punctuation, and
-  super/subscript.
-- **`.mdx`** — everything `.md` has, plus [components](/docs/content/components) and
-  the MDX-only [directives, package installs, and math](/docs/content/syntax).
+- **`.md`** — Markdown for plain prose: GFM, frontmatter, smart punctuation, and super/subscript.
+- **`.mdx`** — everything `.md` has, plus [components](/docs/content/components) and the MDX-only [directives, package installs, and math](/docs/content/syntax).
 
-Reach for `.md` when a page is just prose, and `.mdx` when it needs components or
-directives. Switching is as simple as renaming the file.
+Reach for `.md` when a page is just prose, and `.mdx` when it needs components or directives. Switching is as simple as renaming the file.
 
 ## Files and routes
 
@@ -33,26 +27,22 @@ Each file maps to a route by its path under the content root:
 | `docs/guides/theming.mdx` | `/guides/theming` |
 | `docs/guides/index.mdx`   | `/guides`         |
 
-Nested folders become nested routes, and an `index.mdx` inside a folder becomes
-that folder's own page.
+Nested folders become nested routes, and an `index.mdx` inside a folder becomes that folder's own page.
 
 ## Ordering with numeric prefixes
 
-Prefix a file or folder with a number to control its order in the sidebar. The
-prefix is stripped from the URL, so you can reorder pages without breaking links:
+Prefix a file or folder with a number to control its order in the sidebar. The prefix is stripped from the URL, so you can reorder pages without breaking links:
 
 ```txt
 01-introduction.mdx  ->  /introduction
 02-installation.mdx  ->  /installation
 ```
 
-Ordering has several layers — see [Navigation](/docs/content/navigation) for the full
-precedence rules.
+Ordering has several layers — see [Navigation](/docs/content/navigation) for the full precedence rules.
 
 ## Group folders
 
-Wrap a folder name in parentheses to group its pages in the sidebar **without**
-adding a URL segment:
+Wrap a folder name in parentheses to group its pages in the sidebar **without** adding a URL segment:
 
 ```txt
 docs/(internal)/security.mdx  ->  /security
@@ -62,8 +52,7 @@ The pages share an “Internal” sidebar group but keep flat, parenthesis-free 
 
 ## Drafts
 
-Mark a page as a draft to keep it out of production builds while still previewing
-it in `blume dev`:
+Mark a page as a draft to keep it out of production builds while still previewing it in `blume dev`:
 
 ```yaml lineNumbers
 ---
@@ -76,9 +65,7 @@ draft: true
 
 ## Content types
 
-Every page has a **type**, set with the `type` frontmatter field (default
-`doc`). Types let Blume treat groups of pages differently — most importantly,
-`blog` and `changelog` pages are collected into [feeds](#feeds).
+Every page has a **type**, set with the `type` frontmatter field (default `doc`). Types let Blume treat groups of pages differently — most importantly, `blog` and `changelog` pages are collected into [feeds](#feeds).
 
 ```yaml lineNumbers
 ---
@@ -91,25 +78,18 @@ changelog:
 ---
 ```
 
-The type is independent of where the file lives, but by convention blog posts
-go under `blog/` and changelog entries under `changelog/`. Both get an RSS feed
-automatically, and changelog entries are also collected into a generated
-[`/changelog` timeline](/docs/advanced/changelog). See [Blog](/docs/advanced/blog) and
-[Changelog](/docs/advanced/changelog) for authoring each.
+The type is independent of where the file lives, but by convention blog posts go under `blog/` and changelog entries under `changelog/`. Both get an RSS feed automatically, and changelog entries are also collected into a generated [`/changelog` timeline](/docs/advanced/changelog). See [Blog](/docs/advanced/blog) and [Changelog](/docs/advanced/changelog) for authoring each.
 
 ## Feeds
 
-Blume generates an RSS feed automatically for each content type listed in
-[`rss.types`](/docs/configuration/seo#rss-feeds) — `blog` and `changelog` by default —
-as long as it has at least one page. Feeds are served at `/<type>/rss.xml`:
+Blume generates an RSS feed automatically for each content type listed in [`rss.types`](/docs/configuration/seo#rss-feeds) — `blog` and `changelog` by default — as long as it has at least one page. Feeds are served at `/<type>/rss.xml`:
 
 | Type        | Feed                 |
 | ----------- | -------------------- |
 | `blog`      | `/blog/rss.xml`      |
 | `changelog` | `/changelog/rss.xml` |
 
-Give each entry a `date` so items sort newest-first and carry a `pubDate`. An
-unquoted YAML date is fine — Blume normalizes it:
+Give each entry a `date` so items sort newest-first and carry a `pubDate`. An unquoted YAML date is fine — Blume normalizes it:
 
 ```yaml lineNumbers
 ---
@@ -120,25 +100,15 @@ description: Why we built a markdown-first docs framework.
 ---
 ```
 
-Feeds need an absolute site URL, so set [`deployment.site`](/docs/deployment). Blume
-adds `<link rel="alternate">` tags to every page so browsers and feed readers
-discover them automatically. See [Blog](/docs/advanced/blog) and
-[Changelog](/docs/advanced/changelog) for authoring each content type.
+Feeds need an absolute site URL, so set [`deployment.site`](/docs/deployment). Blume adds `<link rel="alternate">` tags to every page so browsers and feed readers discover them automatically. See [Blog](/docs/advanced/blog) and [Changelog](/docs/advanced/changelog) for authoring each content type.
 
 ## On this page
 
-Every page gets an automatic table of contents, built from its headings. On wide
-screens it sits in a sticky sidebar beside your content; on narrower screens it
-collapses into an **On this page** panel above the page. As you scroll, the entry
-for the section you're reading is highlighted, so you always know where you are in
-a long page.
+Every page gets an automatic table of contents, built from its headings. On wide screens it sits in a sticky sidebar beside your content; on narrower screens it collapses into an **On this page** panel above the page. As you scroll, the entry for the section you're reading is highlighted, so you always know where you are in a long page.
 
-Blume slugifies each heading into an anchor, so every entry links straight to its
-section — and you can deep-link to any heading by appending its slug to the URL
-(`.../my-page#getting-started`).
+Blume slugifies each heading into an anchor, so every entry links straight to its section — and you can deep-link to any heading by appending its slug to the URL (`.../my-page#getting-started`).
 
-The contents list your `##` and `###` headings (H2 and H3). A page with no
-headings at that level simply has no table of contents.
+The contents list your `##` and `###` headings (H2 and H3). A page with no headings at that level simply has no table of contents.
 
 ## Where to next
 

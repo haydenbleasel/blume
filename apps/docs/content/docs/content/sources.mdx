@@ -3,16 +3,11 @@ title: Content sources
 description: Pull docs from local files, a remote repo, or any custom backend — and mix several sources into one site.
 ---
 
-By default Blume reads a folder of `.md`/`.mdx` files. **Content sources** let
-you pull pages from somewhere else — a remote repository, a CMS, or any custom
-backend — and mix several sources into a single site. Sources are read at
-build time; Blume stays static-first.
+By default Blume reads a folder of `.md`/`.mdx` files. **Content sources** let you pull pages from somewhere else — a remote repository, a CMS, or any custom backend — and mix several sources into a single site. Sources are read at build time; Blume stays static-first.
 
 ## The default
 
-With no configuration, Blume scans your content root (`docs` by default) as one
-implicit filesystem source. The top-level `content.root`/`include`/`exclude`
-options still work exactly as before — nothing to change.
+With no configuration, Blume scans your content root (`docs` by default) as one implicit filesystem source. The top-level `content.root`/`include`/`exclude` options still work exactly as before — nothing to change.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -24,10 +19,7 @@ export default defineConfig({
 
 ## Multiple sources
 
-Add a `content.sources` array to compose sources. Each entry is namespaced by an
-optional `prefix`, so its routes nest under `/<prefix>/…`. When `sources` is
-present it replaces the implicit default, so include a `filesystem` entry for
-your local docs.
+Add a `content.sources` array to compose sources. Each entry is namespaced by an optional `prefix`, so its routes nest under `/<prefix>/…`. When `sources` is present it replaces the implicit default, so include a `filesystem` entry for your local docs.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -49,14 +41,11 @@ export default defineConfig({
 });
 ```
 
-If two sources resolve to the same route, Blume reports a `BLUME_DUPLICATE_ROUTE`
-build error — give each source a distinct `prefix`.
+If two sources resolve to the same route, Blume reports a `BLUME_DUPLICATE_ROUTE` build error — give each source a distinct `prefix`.
 
 ## Remote MDX
 
-The built-in `mdx-remote` source fetches raw `.md`/`.mdx` over HTTP. Enumerate
-files either from a GitHub repo subtree (`github`) or explicitly against a raw
-base URL (`url` + `files`):
+The built-in `mdx-remote` source fetches raw `.md`/`.mdx` over HTTP. Enumerate files either from a GitHub repo subtree (`github`) or explicitly against a raw base URL (`url` + `files`):
 
 ```ts blume.config.ts
 {
@@ -67,34 +56,19 @@ base URL (`url` + `files`):
 }
 ```
 
-A private repo's token is read from the `GITHUB_TOKEN` environment variable — it
-is never inlined into your config or generated output.
+A private repo's token is read from the `GITHUB_TOKEN` environment variable — it is never inlined into your config or generated output.
 
-Remote pages are rendered with full MDX-plus-component fidelity: their bodies are
-materialized into a hidden staging directory and rendered through Astro
-alongside your local docs, so callouts, tabs, and every other Blume component
-keep working.
+Remote pages are rendered with full MDX-plus-component fidelity: their bodies are materialized into a hidden staging directory and rendered through Astro alongside your local docs, so callouts, tabs, and every other Blume component keep working.
 
 ### Caching and offline builds
 
-Each remote source keeps a snapshot under `.blume/cache/<source>/`. If a fetch
-fails — a network blip or a CMS outage — Blume serves the last-known-good
-snapshot with a warning rather than failing the build. The cache lives inside
-`.blume/` and is regenerated, never committed.
+Each remote source keeps a snapshot under `.blume/cache/<source>/`. If a fetch fails — a network blip or a CMS outage — Blume serves the last-known-good snapshot with a warning rather than failing the build. The cache lives inside `.blume/` and is regenerated, never committed.
 
-In dev, remote content is fetched once and frozen for the session; restart the
-dev server to refresh it. Local filesystem sources hot-reload as usual. To poll
-a remote source for changes instead, set `pollInterval` (seconds) on it — the
-dev server re-fetches on that interval and reloads only when the content
-actually changes. Leave it unset to avoid hitting the API while you work.
+In dev, remote content is fetched once and frozen for the session; restart the dev server to refresh it. Local filesystem sources hot-reload as usual. To poll a remote source for changes instead, set `pollInterval` (seconds) on it — the dev server re-fetches on that interval and reloads only when the content actually changes. Leave it unset to avoid hitting the API while you work.
 
 ## GitHub Releases
 
-The built-in `github-releases` source turns a repo's releases into a changelog:
-each release becomes a `type: changelog` entry, so your release notes _are_ your
-changelog — nothing to write twice. Combined with the generated
-[changelog timeline](/docs/advanced/changelog), publishing a GitHub release
-ships a changelog entry.
+The built-in `github-releases` source turns a repo's releases into a changelog: each release becomes a `type: changelog` entry, so your release notes _are_ your changelog — nothing to write twice. Combined with the generated [changelog timeline](/docs/advanced/changelog), publishing a GitHub release ships a changelog entry.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -117,25 +91,13 @@ export default defineConfig({
 });
 ```
 
-Each release maps to the changelog fields automatically: its name (or tag)
-becomes the title, its published date drives the timeline order, the tag becomes
-`changelog.version`, and prereleases are tagged `Prerelease` (others `Release`).
-The notes render as the entry body. Give the source a `prefix` so its release
-pages nest under a route like `/changelog/v1-2-0`.
+Each release maps to the changelog fields automatically: its name (or tag) becomes the title, its published date drives the timeline order, the tag becomes `changelog.version`, and prereleases are tagged `Prerelease` (others `Release`). The notes render as the entry body. Give the source a `prefix` so its release pages nest under a route like `/changelog/v1-2-0`.
 
-A private repo authenticates with the `GITHUB_TOKEN` environment variable — the
-same token the other GitHub features use, never inlined into your config. Like
-every remote source it's cached under `.blume/cache/<source>/` and served
-offline if the API is unreachable. Because a changelog is supplementary, a fetch
-failure with no cache (say a CI build without a token) degrades to an empty
-changelog with a warning rather than failing the build — set `GITHUB_TOKEN` in
-your CI and deploy environments to populate it.
+A private repo authenticates with the `GITHUB_TOKEN` environment variable — the same token the other GitHub features use, never inlined into your config. Like every remote source it's cached under `.blume/cache/<source>/` and served offline if the API is unreachable. Because a changelog is supplementary, a fetch failure with no cache (say a CI build without a token) degrades to an empty changelog with a warning rather than failing the build — set `GITHUB_TOKEN` in your CI and deploy environments to populate it.
 
 ## Sanity
 
-The built-in `sanity` source runs a GROQ query and maps each document's fields
-to frontmatter and its Portable Text body to Markdown. The `@sanity/client`
-package is an optional peer dependency — install it only if you use this source.
+The built-in `sanity` source runs a GROQ query and maps each document's fields to frontmatter and its Portable Text body to Markdown. The `@sanity/client` package is an optional peer dependency — install it only if you use this source.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -158,17 +120,11 @@ export default defineConfig({
 });
 ```
 
-A read token for a private dataset comes from the `SANITY_TOKEN` environment
-variable. Custom Portable Text block types map to Blume components through the
-adapter's `serializers` option, available when you construct `sanitySource`
-directly via a [custom source](#custom-sources).
+A read token for a private dataset comes from the `SANITY_TOKEN` environment variable. Custom Portable Text block types map to Blume components through the adapter's `serializers` option, available when you construct `sanitySource` directly via a [custom source](#custom-sources).
 
 ## Notion
 
-The built-in `notion` source turns a Notion database into a collection: each row
-becomes a page, its properties become frontmatter, and its block tree becomes
-MDX. Callouts, toggles, columns, and code blocks map to the matching Blume
-components. `@notionhq/client` is an optional peer dependency.
+The built-in `notion` source turns a Notion database into a collection: each row becomes a page, its properties become frontmatter, and its block tree becomes MDX. Callouts, toggles, columns, and code blocks map to the matching Blume components. `@notionhq/client` is an optional peer dependency.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -190,29 +146,14 @@ export default defineConfig({
 });
 ```
 
-The integration token comes from the `NOTION_TOKEN` environment variable (share
-the database with your integration). By default every page is imported; set
-`publishedValue` to make the `Status` property a publish gate — any other value
-then maps to `draft: true`, which production builds drop. **Notion image URLs
-are signed and expire**, so the adapter downloads them at build time into the
-site's assets and rewrites the references — a CMS image never rots a static
-build.
+The integration token comes from the `NOTION_TOKEN` environment variable (share the database with your integration). By default every page is imported; set `publishedValue` to make the `Status` property a publish gate — any other value then maps to `draft: true`, which production builds drop. **Notion image URLs are signed and expire**, so the adapter downloads them at build time into the site's assets and rewrites the references — a CMS image never rots a static build.
 
 ## Preview and sync
 
 Two flags control how remote content is fetched and what's included:
 
-- **`--preview`** on `blume dev` or `blume build` renders drafts and pulls
-  unpublished CMS content — Sanity switches to its `previewDrafts` perspective,
-  and Notion stops filtering by `Status`. Production builds without the flag
-  exclude drafts as usual, so a preview build is a safe way to review
-  unpublished work before it ships.
-- **`blume sync`** re-fetches every remote source and regenerates the runtime.
-  Dev is cache-first — a remote source is fetched once and served from
-  `.blume/cache` on restart (fast and offline-tolerant), so `blume sync` is how
-  you pull the latest CMS content without restarting the dev server (a running
-  server hot-reloads). Add `--force` to drop the cache first, or set
-  `pollInterval` on a source to refresh automatically.
+- **`--preview`** on `blume dev` or `blume build` renders drafts and pulls unpublished CMS content — Sanity switches to its `previewDrafts` perspective, and Notion stops filtering by `Status`. Production builds without the flag exclude drafts as usual, so a preview build is a safe way to review unpublished work before it ships.
+- **`blume sync`** re-fetches every remote source and regenerates the runtime. Dev is cache-first — a remote source is fetched once and served from `.blume/cache` on restart (fast and offline-tolerant), so `blume sync` is how you pull the latest CMS content without restarting the dev server (a running server hot-reloads). Add `--force` to drop the cache first, or set `pollInterval` on a source to refresh automatically.
 
 ```sh
 blume dev --preview      # author workflow: see drafts live
@@ -223,9 +164,7 @@ blume sync --force        # ...ignoring any cached snapshot
 
 ## Custom sources
 
-Any object implementing the `ContentSource` interface can be passed directly,
-which is how an adapter with custom serializers — or any backend not built in —
-plugs in without its SDK touching the core install:
+Any object implementing the `ContentSource` interface can be passed directly, which is how an adapter with custom serializers — or any backend not built in — plugs in without its SDK touching the core install:
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -254,6 +193,4 @@ export default defineConfig({
 });
 ```
 
-A source normalizes its native shape (Portable Text, Notion blocks, remote HTML)
-to Markdown/MDX text, so the same components and markdown features apply no
-matter where a page comes from.
+A source normalizes its native shape (Portable Text, Notion blocks, remote HTML) to Markdown/MDX text, so the same components and markdown features apply no matter where a page comes from.

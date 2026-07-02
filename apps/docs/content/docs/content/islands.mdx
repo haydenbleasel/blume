@@ -3,15 +3,11 @@ title: Islands
 description: Drop an interactive component into islands/ and use it in any MDX page — hydrated automatically, no per-page import.
 ---
 
-Blume renders your docs as static HTML with **zero JavaScript** by default. When
-you need something interactive — a live demo, a chart, a playground — you add an
-**island**: a framework component that ships JS only for itself, only on the
-pages that use it.
+Blume renders your docs as static HTML with **zero JavaScript** by default. When you need something interactive — a live demo, a chart, a playground — you add an **island**: a framework component that ships JS only for itself, only on the pages that use it.
 
 ## The `islands/` convention
 
-Drop a component into an `islands/` folder at your project root. Its filename
-becomes a component you can use in **any** `.mdx` page, with no import:
+Drop a component into an `islands/` folder at your project root. Its filename becomes a component you can use in **any** `.mdx` page, with no import:
 
 ```tsx islands/Counter.tsx lineNumbers
 import { useState } from "react";
@@ -26,23 +22,13 @@ export default function Counter() {
 Here's a live counter: <Counter />
 ```
 
-The filename is the component name, so it **must be a PascalCase identifier** —
-letters, digits, and underscores only (`Counter.tsx` → `<Counter />`).
-Lowercase filenames, names with dashes/dots/spaces (like `Time-Picker.tsx`), and
-two islands that resolve to the same name are skipped with a build warning.
+The filename is the component name, so it **must be a PascalCase identifier** — letters, digits, and underscores only (`Counter.tsx` → `<Counter />`). Lowercase filenames, names with dashes/dots/spaces (like `Time-Picker.tsx`), and two islands that resolve to the same name are skipped with a build warning.
 
-:::note
-Islands are for **interactive** UI. For a static component you reuse across
-pages (a styled callout, a pricing table), use an [MDX
-override](/docs/configuration/customization) instead — it ships no JavaScript.
-:::
+:::note Islands are for **interactive** UI. For a static component you reuse across pages (a styled callout, a pricing table), use an [MDX override](/docs/configuration/customization) instead — it ships no JavaScript. :::
 
 ## Registering islands in `components.ts`
 
-If you'd rather keep islands next to the rest of your components — or give them a
-different name than the file — register them with `defineComponents`. The
-`islands` group is exactly like the `islands/` folder: each entry is available in
-every MDX page and hydrates (defaulting to `client: "visible"`).
+If you'd rather keep islands next to the rest of your components — or give them a different name than the file — register them with `defineComponents`. The `islands` group is exactly like the `islands/` folder: each entry is available in every MDX page and hydrates (defaulting to `client: "visible"`).
 
 ```ts components.ts
 import { defineComponents } from "blume";
@@ -55,8 +41,7 @@ export default defineComponents({
 });
 ```
 
-Reference the component by import or by a path string, and set a hydration mode
-per island with the descriptor form:
+Reference the component by import or by a path string, and set a hydration mode per island with the descriptor form:
 
 ```ts components.ts
 export default defineComponents({
@@ -68,9 +53,7 @@ export default defineComponents({
 
 ## Hydration
 
-By default an island uses `client:visible`: it hydrates when the reader scrolls
-it into view, so a page full of islands still loads instantly. Opt into a
-different strategy with an `export const client` in the island file:
+By default an island uses `client:visible`: it hydrates when the reader scrolls it into view, so a page full of islands still loads instantly. Opt into a different strategy with an `export const client` in the island file:
 
 ```tsx islands/Chart.tsx lineNumbers
 // Skip server rendering entirely — for components that touch the DOM/window.
@@ -81,20 +64,18 @@ export default function Chart() {
 }
 ```
 
-| `client` value          | Hydrates                           | Use it for                                                |
-| ----------------------- | ---------------------------------- | --------------------------------------------------------- |
-| `"visible"` _(default)_ | When scrolled into view            | Most islands                                              |
-| `"load"`                | Immediately on page load           | Above-the-fold, must-be-instant UI                        |
-| `"idle"`                | When the main thread is idle       | Non-urgent interactivity                                  |
-| `"only"`                | Client only, never server-rendered | Libraries that need `window`/`document` (charts, editors) |
+| `client` value | Hydrates | Use it for |
+| --- | --- | --- |
+| `"visible"` _(default)_ | When scrolled into view | Most islands |
+| `"load"` | Immediately on page load | Above-the-fold, must-be-instant UI |
+| `"idle"` | When the main thread is idle | Non-urgent interactivity |
+| `"only"` | Client only, never server-rendered | Libraries that need `window`/`document` (charts, editors) |
 
 ## Frameworks
 
-**React works out of the box** — Blume turns it on automatically the moment your
-project contains a `.tsx`/`.jsx` island.
+**React works out of the box** — Blume turns it on automatically the moment your project contains a `.tsx`/`.jsx` island.
 
-**Vue and Svelte** are supported too; install the matching Astro integration and
-Blume wires up the renderer when it sees a `.vue` or `.svelte` island:
+**Vue and Svelte** are supported too; install the matching Astro integration and Blume wires up the renderer when it sees a `.vue` or `.svelte` island:
 
 ```bash
 # Vue
@@ -115,19 +96,13 @@ const on = ref(false);
 </template>
 ```
 
-Props you pass in MDX (`<Counter start={5} />`) are forwarded to the component,
-and children (`<Counter>label</Counter>`) arrive as the default slot.
+Props you pass in MDX (`<Counter start={5} />`) are forwarded to the component, and children (`<Counter>label</Counter>`) arrive as the default slot.
 
-:::tip
-Islands hydrate on the client, so anything you pass as a prop must be
-serializable — strings, numbers, plain objects, not functions.
-:::
+:::tip Islands hydrate on the client, so anything you pass as a prop must be serializable — strings, numbers, plain objects, not functions. :::
 
 ## Hooks
 
-Islands hydrate on their own, so there's no React context to thread project data
-through. Instead, `blume/hooks` reads a small snapshot the layout serializes into
-the page — no props to drill:
+Islands hydrate on their own, so there's no React context to thread project data through. Instead, `blume/hooks` reads a small snapshot the layout serializes into the page — no props to drill:
 
 ```tsx islands/PageInfo.tsx lineNumbers
 import { useBlume, usePage } from "blume/hooks";
@@ -146,19 +121,16 @@ export default function PageInfo() {
 }
 ```
 
-| Hook          | Returns                                                               |
-| ------------- | --------------------------------------------------------------------- |
-| `useBlume()`  | `{ config, navigation }` for the site, or `null` before mount         |
-| `usePage()`   | `{ route, title }` for the current page, or `null` before mount       |
+| Hook | Returns |
+| --- | --- |
+| `useBlume()` | `{ config, navigation }` for the site, or `null` before mount |
+| `usePage()` | `{ route, title }` for the current page, or `null` before mount |
 | `useSearch()` | `{ search, results, loading }` — query the configured search provider |
-| `useAskAI()`  | `{ ask, messages, loading, reset }` — stream from the Ask AI endpoint |
+| `useAskAI()` | `{ ask, messages, loading, reset }` — stream from the Ask AI endpoint |
 
-`useBlume()` and `usePage()` return `null` until the island mounts (so server and
-client render the same first frame) — guard for it. The snapshot is emitted only
-on pages that ship React, so a fully static site pays nothing.
+`useBlume()` and `usePage()` return `null` until the island mounts (so server and client render the same first frame) — guard for it. The snapshot is emitted only on pages that ship React, so a fully static site pays nothing.
 
-On [custom pages](/docs/advanced/custom-pages) built with `PageLayout`, pass
-`clientData` so islands there can read it:
+On [custom pages](/docs/advanced/custom-pages) built with `PageLayout`, pass `clientData` so islands there can read it:
 
 ```astro
 <PageLayout

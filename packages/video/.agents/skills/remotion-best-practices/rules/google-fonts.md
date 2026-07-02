@@ -13,8 +13,7 @@ The recommended way to use Google Fonts. It's type-safe and automatically blocks
 
 ### Prerequisites
 
-First, the @remotion/google-fonts package needs to be installed.
-If it is not installed, use the following command:
+First, the @remotion/google-fonts package needs to be installed. If it is not installed, use the following command:
 
 ```bash
 npx remotion add @remotion/google-fonts # If project uses npm

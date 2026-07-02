@@ -21,8 +21,7 @@ const fps = useVideoConfig();
 </Sequence>;
 ```
 
-The animation appears 15 frames into its progress - the first 15 frames are trimmed off.
-Inside `<MyAnimation>`, `useCurrentFrame()` starts at 15 instead of 0.
+The animation appears 15 frames into its progress - the first 15 frames are trimmed off. Inside `<MyAnimation>`, `useCurrentFrame()` starts at 15 instead of 0.
 
 ## Trim the End
 

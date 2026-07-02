@@ -8,8 +8,7 @@ sidebar:
 
 ## Deploy anywhere (static)
 
-`blume build` compiles your docs to plain HTML, CSS, and a local search index in
-`dist/`. There's no server to run — point any static host at the folder.
+`blume build` compiles your docs to plain HTML, CSS, and a local search index in `dist/`. There's no server to run — point any static host at the folder.
 
 | Setting          | Value         |
 | ---------------- | ------------- |
@@ -17,9 +16,7 @@ sidebar:
 | Output directory | `dist`        |
 | Node version     | 22 or newer   |
 
-These settings work on Vercel, Netlify, Cloudflare Pages, GitHub Pages, Amazon
-S3 + CloudFront, or any bucket or CDN. Make sure `blume` is a dependency so the
-host can run the build.
+These settings work on Vercel, Netlify, Cloudflare Pages, GitHub Pages, Amazon S3 + CloudFront, or any bucket or CDN. Make sure `blume` is a dependency so the host can run the build.
 
 A static build includes:
 
@@ -32,12 +29,9 @@ A static build includes:
 
 ### Set your site URL
 
-Sitemaps, canonical tags, RSS, and Open Graph images need an absolute origin. On
-**Vercel**, **Netlify**, and **Cloudflare Pages**, Blume detects it from the
-platform's environment at build time — no config required.
+Sitemaps, canonical tags, RSS, and Open Graph images need an absolute origin. On **Vercel**, **Netlify**, and **Cloudflare Pages**, Blume detects it from the platform's environment at build time — no config required.
 
-Set `deployment.site` to override the detected value, or to provide one on hosts
-that don't expose it (GitHub Pages, S3, a custom CDN):
+Set `deployment.site` to override the detected value, or to provide one on hosts that don't expose it (GitHub Pages, S3, a custom CDN):
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -45,18 +39,13 @@ deployment: {
 }
 ```
 
-When detecting automatically, Blume prefers your stable production domain over
-per-deploy preview URLs, so the canonical origin stays put across deploys.
+When detecting automatically, Blume prefers your stable production domain over per-deploy preview URLs, so the canonical origin stays put across deploys.
 
-During `blume dev`, the site URL falls back to your local dev server (e.g.
-`http://localhost:4321`) when none is set, so site-gated features — Open Graph
-images, canonicals, the sitemap — work out of the box. Builds never use this
-fallback, so production output is never pointed at localhost.
+During `blume dev`, the site URL falls back to your local dev server (e.g. `http://localhost:4321`) when none is set, so site-gated features — Open Graph images, canonicals, the sitemap — work out of the box. Builds never use this fallback, so production output is never pointed at localhost.
 
 ## Preview locally
 
-Before you ship, preview the production build exactly as a static host would
-serve it:
+Before you ship, preview the production build exactly as a static host would serve it:
 
 ```bash
 blume build
@@ -65,9 +54,7 @@ blume preview
 
 ## Subpath deploys
 
-Serving docs under a path like `example.com/docs`? Set `deployment.base` — common
-for GitHub Pages project sites. Internal links and assets are rewritten to
-include the base path.
+Serving docs under a path like `example.com/docs`? Set `deployment.base` — common for GitHub Pages project sites. Internal links and assets are rewritten to include the base path.
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -77,8 +64,7 @@ deployment: {
 
 ## Server rendering
 
-Static output covers most docs. Switch to server output when you need
-request-time features — most notably the [Ask AI](/docs/configuration/ai) endpoint:
+Static output covers most docs. Switch to server output when you need request-time features — most notably the [Ask AI](/docs/configuration/ai) endpoint:
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -96,19 +82,11 @@ Choosing an adapter pulls in the matching Astro adapter automatically:
 | `node`       | `@astrojs/node`       | Self-hosted Node servers, containers |
 | `cloudflare` | `@astrojs/cloudflare` | Cloudflare Workers and Pages         |
 
-On **Vercel**, **Netlify**, and **Cloudflare Pages**, Blume picks the matching
-adapter automatically for server output — set `output: "server"` and deploy. Set
-`adapter` explicitly to override the detected value, or when self-hosting with
-`node`.
+On **Vercel**, **Netlify**, and **Cloudflare Pages**, Blume picks the matching adapter automatically for server output — set `output: "server"` and deploy. Set `adapter` explicitly to override the detected value, or when self-hosting with `node`.
 
-A server build includes everything a static build does, plus any Astro endpoints
-or middleware you add. The `node` adapter produces a standalone server you can
-run directly.
+A server build includes everything a static build does, plus any Astro endpoints or middleware you add. The `node` adapter produces a standalone server you can run directly.
 
-:::note
-Server features have their own configuration — for example, Ask AI needs a model
-API key. See the [AI guide](/docs/configuration/ai) for setup.
-:::
+:::note Server features have their own configuration — for example, Ask AI needs a model API key. See the [AI guide](/docs/configuration/ai) for setup. :::
 
 ## Redirects
 
@@ -118,31 +96,20 @@ Map old URLs to new ones in `blume.config.ts`:
 redirects: [{ from: "/old", to: "/new", status: 301 }];
 ```
 
-`status` accepts `301`, `302`, `307`, or `308` (default `301`). Server builds
-handle redirects at request time. Static builds emit redirect pages **and**
-platform files so your host issues a real HTTP redirect: `_redirects` (Netlify,
-Cloudflare Pages), `vercel.json` (Vercel), and `blume-redirects.json` — a
-structured manifest for anything else (nginx/Apache rules, an edge worker). A
-`_redirects` or `vercel.json` you ship in `public/` is left untouched.
+`status` accepts `301`, `302`, `307`, or `308` (default `301`). Server builds handle redirects at request time. Static builds emit redirect pages **and** platform files so your host issues a real HTTP redirect: `_redirects` (Netlify, Cloudflare Pages), `vercel.json` (Vercel), and `blume-redirects.json` — a structured manifest for anything else (nginx/Apache rules, an edge worker). A `_redirects` or `vercel.json` you ship in `public/` is left untouched.
 
 ## Environment variables
 
-When a feature needs a runtime secret, Blume warns at `blume dev`/`build` if it's
-missing — so the problem surfaces early instead of at the first request:
+When a feature needs a runtime secret, Blume warns at `blume dev`/`build` if it's missing — so the problem surfaces early instead of at the first request:
 
-| Feature                                 | Variable                              |
-| --------------------------------------- | ------------------------------------- |
-| Ask AI (AI Gateway)                     | `AI_GATEWAY_API_KEY` (or Vercel OIDC) |
-| Ask AI (OpenRouter / OpenAI-compatible) | the provider's `apiKeyEnv`            |
-| Mixedbread search                       | `MIXEDBREAD_API_KEY`                  |
+| Feature | Variable |
+| --- | --- |
+| Ask AI (AI Gateway) | `AI_GATEWAY_API_KEY` (or Vercel OIDC) |
+| Ask AI (OpenRouter / OpenAI-compatible) | the provider's `apiKeyEnv` |
+| Mixedbread search | `MIXEDBREAD_API_KEY` |
 
-Set them in `.env.local` for local dev and in your host's environment for
-production. Build-time secrets for search-index sync (Algolia, Orama Cloud,
-Typesense) are warned about separately during the sync step.
+Set them in `.env.local` for local dev and in your host's environment for production. Build-time secrets for search-index sync (Algolia, Orama Cloud, Typesense) are warned about separately during the sync step.
 
 ## Build summary
 
-Every build prints a summary — output mode, adapter, resolved site URL, search
-provider, redirect count, sitemap and `llms.txt` status, and any enabled server
-features — so you can confirm what shipped (including anything auto-detected)
-before you deploy.
+Every build prints a summary — output mode, adapter, resolved site URL, search provider, redirect count, sitemap and `llms.txt` status, and any enabled server features — so you can confirm what shipped (including anything auto-detected) before you deploy.

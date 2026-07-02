@@ -13,8 +13,7 @@ If you don't have a .srt file, read [Transcribing audio](transcribe-captions.md)
 
 ## Prerequisites
 
-First, the @remotion/captions package needs to be installed.
-If it is not installed, use the following command:
+First, the @remotion/captions package needs to be installed. If it is not installed, use the following command:
 
 ```bash
 npx remotion add @remotion/captions # If project uses npm

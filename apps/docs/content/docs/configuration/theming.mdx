@@ -3,10 +3,7 @@ title: Theming
 description: Tune the look with config tokens, override any CSS variable in theme.css, or use Tailwind utilities.
 ---
 
-Blume's theme is token-driven and works in light and dark mode out of the box.
-Reach for as little or as much as you need: a few config tokens for the common
-cases, a `theme.css` to override any design token, or Tailwind utilities for
-custom components.
+Blume's theme is token-driven and works in light and dark mode out of the box. Reach for as little or as much as you need: a few config tokens for the common cases, a `theme.css` to override any design token, or Tailwind utilities for custom components.
 
 ## Config tokens
 
@@ -27,8 +24,7 @@ theme: {
 
 ### Accent
 
-The accent color tints interactive and highlighted elements — step markers,
-active tabs, badges, card hovers, and more. Use a named preset or any CSS color:
+The accent color tints interactive and highlighted elements — step markers, active tabs, badges, card hovers, and more. Use a named preset or any CSS color:
 
 ```ts blume.config.ts lineNumbers
 theme: {
@@ -36,13 +32,11 @@ theme: {
 }
 ```
 
-Named presets: `blue` (default), `green`, `orange`, `pink`, `purple`, `red`, and
-`teal`.
+Named presets: `blue` (default), `green`, `orange`, `pink`, `purple`, `red`, and `teal`.
 
 ### Radius
 
-`radius` sets the corner rounding shared by cards, code blocks, callouts, and
-inputs — `none`, `sm`, `md` (default), or `lg`.
+`radius` sets the corner rounding shared by cards, code blocks, callouts, and inputs — `none`, `sm`, `md` (default), or `lg`.
 
 ### Color mode
 
@@ -51,9 +45,7 @@ inputs — `none`, `sm`, `md` (default), or `lg`.
 - **`system`** (default) — follow the reader's OS preference
 - **`light`** / **`dark`** — default to one scheme
 
-A toggle in the header always lets readers switch, and their choice is remembered
-across visits. Dark mode is applied with a `data-theme="dark"` attribute on the
-`<html>` element.
+A toggle in the header always lets readers switch, and their choice is remembered across visits. Dark mode is applied with a `data-theme="dark"` attribute on the `<html>` element.
 
 ### Fonts
 
@@ -83,26 +75,21 @@ theme: {
 }
 ```
 
-Fonts are **self-hosted**: Blume downloads them at build time and serves them from
-your own site, so there's no runtime request to Google and no layout shift (Astro
-generates fallback-metric faces automatically).
+Fonts are **self-hosted**: Blume downloads them at build time and serves them from your own site, so there's no runtime request to Google and no layout shift (Astro generates fallback-metric faces automatically).
 
 Each value is a Google Fonts slug from the curated set below:
 
-| Category | Slugs                                                                                                                                                            |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sans     | `dm-sans` `figtree` `geist` `ibm-plex-sans` `inter` `inter-tight` `manrope` `open-sans` `plus-jakarta-sans` `roboto` `source-sans-3` `space-grotesk` `work-sans` |
-| Serif    | `ibm-plex-serif` `lora` `merriweather` `playfair-display` `source-serif-4`                                                                                       |
-| Mono     | `fira-code` `geist-mono` `ibm-plex-mono` `jetbrains-mono` `roboto-mono` `source-code-pro` `space-mono`                                                           |
+| Category | Slugs |
+| --- | --- |
+| Sans | `dm-sans` `figtree` `geist` `ibm-plex-sans` `inter` `inter-tight` `manrope` `open-sans` `plus-jakarta-sans` `roboto` `source-sans-3` `space-grotesk` `work-sans` |
+| Serif | `ibm-plex-serif` `lora` `merriweather` `playfair-display` `source-serif-4` |
+| Mono | `fira-code` `geist-mono` `ibm-plex-mono` `jetbrains-mono` `roboto-mono` `source-code-pro` `space-mono` |
 
-Need a font that isn't listed, or want to drop back to the system stack? Override
-the `--blume-font-*` tokens directly in [`theme.css`](#themecss).
+Need a font that isn't listed, or want to drop back to the system stack? Override the `--blume-font-*` tokens directly in [`theme.css`](#themecss).
 
 ### Dark-mode colors
 
-By default light and dark share one `accent`. Set `accentDark` for a different
-accent in dark mode, and `background` / `backgroundDark` to override the page
-background per mode:
+By default light and dark share one `accent`. Set `accentDark` for a different accent in dark mode, and `background` / `backgroundDark` to override the page background per mode:
 
 ```ts blume.config.ts lineNumbers
 theme: {
@@ -117,8 +104,7 @@ Each takes a named preset or any CSS color, exactly like `accent`.
 
 ### Action color
 
-`action` is a secondary accent for primary calls to action and the `action`
-Tailwind utilities (`bg-action`, `text-action`). It defaults to your `accent`:
+`action` is a secondary accent for primary calls to action and the `action` Tailwind utilities (`bg-action`, `text-action`). It defaults to your `accent`:
 
 ```ts blume.config.ts
 theme: {
@@ -128,8 +114,7 @@ theme: {
 
 ### Background decoration
 
-Add a subtle, theme-aware pattern behind your content with `backgroundDecoration`
-— `gradient`, `grid`, or `windows`:
+Add a subtle, theme-aware pattern behind your content with `backgroundDecoration` — `gradient`, `grid`, or `windows`:
 
 ```ts blume.config.ts
 theme: {
@@ -137,8 +122,7 @@ theme: {
 }
 ```
 
-For a full background image, set `backgroundImage` (and `backgroundImageDark` for
-a dark variant) to a URL or a path under `public/`:
+For a full background image, set `backgroundImage` (and `backgroundImageDark` for a dark variant) to a URL or a path under `public/`:
 
 ```ts blume.config.ts lineNumbers
 theme: {
@@ -149,8 +133,7 @@ theme: {
 
 ## theme.css
 
-Drop a `theme.css` in your project root to override any design token. It's the
-last layer in the cascade, so it wins over the defaults and config tokens:
+Drop a `theme.css` in your project root to override any design token. It's the last layer in the cascade, so it wins over the defaults and config tokens:
 
 ```css theme.css lineNumbers
 :root {
@@ -163,8 +146,7 @@ last layer in the cascade, so it wins over the defaults and config tokens:
 }
 ```
 
-Set a token under `:root` for light mode and under `:root[data-theme="dark"]` for
-dark mode.
+Set a token under `:root` for light mode and under `:root[data-theme="dark"]` for dark mode.
 
 ### Design tokens
 
@@ -184,8 +166,7 @@ dark mode.
 | `--blume-font-body`         | Body / UI font                            |
 | `--blume-font-mono`         | Code font                                 |
 
-Set a `--blume-font-*` token to any font stack to use a font outside the curated
-list, or to fall back to the system stack:
+Set a `--blume-font-*` token to any font stack to use a font outside the curated list, or to fall back to the system stack:
 
 ```css theme.css lineNumbers
 :root {
@@ -195,10 +176,7 @@ list, or to fall back to the system stack:
 
 ## Tailwind utilities
 
-Blume's theme is built with Tailwind v4 internally, and your project's `.astro`,
-`.tsx`, and `.jsx` files are scanned too — so you can style custom components and
-pages with utility classes, no Tailwind setup required. Every token is exposed as
-a utility, so your components track the theme automatically:
+Blume's theme is built with Tailwind v4 internally, and your project's `.astro`, `.tsx`, and `.jsx` files are scanned too — so you can style custom components and pages with utility classes, no Tailwind setup required. Every token is exposed as a utility, so your components track the theme automatically:
 
 | Token                       | Utilities                  |
 | --------------------------- | -------------------------- |

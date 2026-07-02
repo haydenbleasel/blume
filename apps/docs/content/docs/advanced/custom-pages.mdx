@@ -3,10 +3,7 @@ title: Custom Pages
 description: Mount fully custom .astro routes alongside your docs and read your site's config, navigation, and content from the blume:data module.
 ---
 
-Most of a Blume site is Markdown, but sometimes you need a route that _isn't_ a
-doc — a landing page, a pricing page, a hand-built blog or changelog index, or an
-interactive dashboard. Drop an `.astro` file under your **pages** folder and
-Blume mounts it as a real route, right alongside your content.
+Most of a Blume site is Markdown, but sometimes you need a route that _isn't_ a doc — a landing page, a pricing page, a hand-built blog or changelog index, or an interactive dashboard. Drop an `.astro` file under your **pages** folder and Blume mounts it as a real route, right alongside your content.
 
 ## Add a page
 
@@ -20,19 +17,13 @@ import data from "blume:data";
 <h1>Pricing for {data.config.title}</h1>
 ```
 
-`blume dev` picks it up immediately and `blume build` prerenders it to static
-HTML. The folder name is configurable with [`content.pages`](/docs/configuration#content)
-(default `"pages"`).
+`blume dev` picks it up immediately and `blume build` prerenders it to static HTML. The folder name is configurable with [`content.pages`](/docs/configuration#content) (default `"pages"`).
 
-Custom pages keep their original location on disk, so relative imports, component
-imports, and [`getStaticPaths`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
-all work exactly as they do in a plain Astro project — Blume mounts each file
-where it sits rather than copying it.
+Custom pages keep their original location on disk, so relative imports, component imports, and [`getStaticPaths`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths) all work exactly as they do in a plain Astro project — Blume mounts each file where it sits rather than copying it.
 
 ## Files and routes
 
-Each file's path under the pages folder becomes its route. `index` maps to the
-parent folder, and dynamic `[param]` segments are preserved:
+Each file's path under the pages folder becomes its route. `index` maps to the parent folder, and dynamic `[param]` segments are preserved:
 
 | File                      | Route         |
 | ------------------------- | ------------- |
@@ -41,14 +32,11 @@ parent folder, and dynamic `[param]` segments are preserved:
 | `pages/blog/[slug].astro` | `/blog/:slug` |
 | `pages/changelog.astro`   | `/changelog`  |
 
-A custom page **wins** over a generated route at the same path. Adding
-`pages/changelog.astro`, for example, replaces Blume's
-[generated changelog timeline](/docs/advanced/changelog) with your own.
+A custom page **wins** over a generated route at the same path. Adding `pages/changelog.astro`, for example, replaces Blume's [generated changelog timeline](/docs/advanced/changelog) with your own.
 
 ## Reading site data
 
-Import `blume:data` to read the same resolved config, navigation, routes, and
-feeds the rest of the site uses:
+Import `blume:data` to read the same resolved config, navigation, routes, and feeds the rest of the site uses:
 
 ```astro pages/all-pages.astro lineNumbers
 ---
@@ -69,9 +57,7 @@ import data from "blume:data";
 </ul>
 ```
 
-Inside a Blume project the module is typed automatically. You can also pull the
-shape in explicitly — for typed helpers, props, or your own tsconfig — with
-`import type { BlumeData } from "blume"`:
+Inside a Blume project the module is typed automatically. You can also pull the shape in explicitly — for typed helpers, props, or your own tsconfig — with `import type { BlumeData } from "blume"`:
 
 ```ts
 import type { BlumeData, BlumeRoute } from "blume";
@@ -134,9 +120,7 @@ The module exposes:
   }}
 />
 
-`routes` carries page metadata but not frontmatter like `type` or `date`. To
-build a list filtered by content type — a blog or changelog index — pair it with
-Astro's `docs` content collection, which holds the frontmatter:
+`routes` carries page metadata but not frontmatter like `type` or `date`. To build a list filtered by content type — a blog or changelog index — pair it with Astro's `docs` content collection, which holds the frontmatter:
 
 ```astro pages/blog/index.astro lineNumbers
 ---
@@ -169,12 +153,9 @@ const posts = (await getCollection("docs"))
 
 ## Runtime helpers
 
-`blume/runtime` bundles the common data patterns so you don't reach into
-`blume:data` internals.
+`blume/runtime` bundles the common data patterns so you don't reach into `blume:data` internals.
 
-**`getBlumeCollection(data, query?)`** selects content routes — filtered by
-collection, locale, or path prefix, with drafts and hidden pages excluded and the
-result sorted by path — which is exactly what a custom index needs:
+**`getBlumeCollection(data, query?)`** selects content routes — filtered by collection, locale, or path prefix, with drafts and hidden pages excluded and the result sorted by path — which is exactly what a custom index needs:
 
 ```astro pages/blog/index.astro lineNumbers
 ---
@@ -191,10 +172,7 @@ const posts = getBlumeCollection(data, { prefix: "/blog" });
 </ul>
 ```
 
-**`<BlumePage>`** renders a content entry's body inside a custom page, with
-Blume's built-in MDX components (callouts, cards, steps…) already wired in — for
-featuring a doc on a landing page or building a bespoke index that shows real
-content:
+**`<BlumePage>`** renders a content entry's body inside a custom page, with Blume's built-in MDX components (callouts, cards, steps…) already wired in — for featuring a doc on a landing page or building a bespoke index that shows real content:
 
 ```astro pages/index.astro lineNumbers
 ---
@@ -208,18 +186,11 @@ const [intro] = getBlumeCollection(data, { prefix: "/docs" });
 {intro && <BlumePage id={intro.entryId} />}
 ```
 
-Pass `components` to add your own overrides or islands (which live in the
-generated runtime and aren't imported by default), and `collection` to read from
-a collection other than `"docs"`.
+Pass `components` to add your own overrides or islands (which live in the generated runtime and aren't imported by default), and `collection` to read from a collection other than `"docs"`.
 
 ## Using the site layout
 
-`RootLayout` gives a custom page the full docs chrome — header, sidebar, search,
-TOC, and theme — by wrapping it in the same 3-column grid the generated pages
-use. For a landing or marketing page that grid is in the way, so reach for
-**`PageLayout`** instead: it provides the document shell, header, theme, and
-fonts, then a single full-width `<slot />` (no sidebar, no prose, no TOC). An
-optional `footer` slot renders after `<main>`:
+`RootLayout` gives a custom page the full docs chrome — header, sidebar, search, TOC, and theme — by wrapping it in the same 3-column grid the generated pages use. For a landing or marketing page that grid is in the way, so reach for **`PageLayout`** instead: it provides the document shell, header, theme, and fonts, then a single full-width `<slot />` (no sidebar, no prose, no TOC). An optional `footer` slot renders after `<main>`:
 
 ```astro pages/index.astro lineNumbers
 ---
@@ -251,15 +222,7 @@ const { config } = data;
 </PageLayout>
 ```
 
-Passing `siteUrl` (and `ogEnabled`) derives the page's `canonical` and a
-generated `og:image` automatically: Blume renders an Open Graph card for every
-static custom page — the home included, the most-shared URL — served at
-`/og/<route>.png` (`/og/index.png` for `/`). The home card uses the site title
-with the description as its eyebrow; a deeper page is titled from its last path
-segment. Set `ogImage` or `canonical` explicitly to override either. `ogImage`
-takes a root-relative path — a file in `public/`, resolved against
-[`deployment.site`](/docs/deployment) to the absolute URL crawlers need — or an
-external URL, which passes through untouched:
+Passing `siteUrl` (and `ogEnabled`) derives the page's `canonical` and a generated `og:image` automatically: Blume renders an Open Graph card for every static custom page — the home included, the most-shared URL — served at `/og/<route>.png` (`/og/index.png` for `/`). The home card uses the site title with the description as its eyebrow; a deeper page is titled from its last path segment. Set `ogImage` or `canonical` explicitly to override either. `ogImage` takes a root-relative path — a file in `public/`, resolved against [`deployment.site`](/docs/deployment) to the absolute URL crawlers need — or an external URL, which passes through untouched:
 
 ```astro pages/index.astro lineNumbers
 <PageLayout
@@ -272,13 +235,9 @@ external URL, which passes through untouched:
 </PageLayout>
 ```
 
-Only this page changes — every other route keeps its generated card — so it's how
-you give the home page alone a bespoke share image.
+Only this page changes — every other route keeps its generated card — so it's how you give the home page alone a bespoke share image.
 
-`page.title` is used verbatim as the document title (no `- siteTitle` suffix),
-since marketing pages usually set their own. To give a custom page the full docs
-chrome instead — sidebar, TOC, and all — wrap it in `RootLayout`, the layout the
-generated pages use. Pull the required props straight from `blume:data`:
+`page.title` is used verbatim as the document title (no `- siteTitle` suffix), since marketing pages usually set their own. To give a custom page the full docs chrome instead — sidebar, TOC, and all — wrap it in `RootLayout`, the layout the generated pages use. Pull the required props straight from `blume:data`:
 
 ```astro pages/pricing.astro lineNumbers
 ---
@@ -301,24 +260,13 @@ import data from "blume:data";
 </RootLayout>
 ```
 
-:::note
-`RootLayout` is part of the generated runtime, so its props can change between
-releases. When you want a layout that's fully yours,
-[`blume eject`](/docs/configuration/customization#eject) turns `.blume/` into a
-standard Astro project you own outright.
-:::
+:::note `RootLayout` is part of the generated runtime, so its props can change between releases. When you want a layout that's fully yours, [`blume eject`](/docs/configuration/customization#eject) turns `.blume/` into a standard Astro project you own outright. :::
 
 ## 404 page
 
-Blume ships a default **not found** page out of the box: a centered "404" message
-wrapped in the site chrome (header, search, theme), served for any unmatched URL.
-`blume build` writes it to `404.html`, which static hosts serve automatically, and
-`blume dev` shows it for unknown routes.
+Blume ships a default **not found** page out of the box: a centered "404" message wrapped in the site chrome (header, search, theme), served for any unmatched URL. `blume build` writes it to `404.html`, which static hosts serve automatically, and `blume dev` shows it for unknown routes.
 
-To replace it with your own, add a `pages/404.astro`. It owns the `/404` route the
-same way `pages/changelog.astro` takes over the changelog — your page wins and the
-default is dropped. Build it like any other custom page, in `PageLayout` or
-`RootLayout`:
+To replace it with your own, add a `pages/404.astro`. It owns the `/404` route the same way `pages/changelog.astro` takes over the changelog — your page wins and the default is dropped. Build it like any other custom page, in `PageLayout` or `RootLayout`:
 
 ```astro pages/404.astro lineNumbers
 ---
@@ -342,16 +290,11 @@ import data from "blume:data";
 </PageLayout>
 ```
 
-To keep the default design but change its wording — including for other languages
-— override the `notFound` [UI strings](/docs/content/i18n) (`title`, `description`,
-`home`) via `i18n.ui`.
+To keep the default design but change its wording — including for other languages — override the `notFound` [UI strings](/docs/content/i18n) (`title`, `description`, `home`) via `i18n.ui`.
 
 ## Interactive pages
 
-Custom pages are ordinary Astro, so you can drop in React (or any framework)
-[islands](/docs/configuration/customization#interactive-islands) with a hydration directive.
-React switches on automatically the moment your project contains a `.tsx` or
-`.jsx` file.
+Custom pages are ordinary Astro, so you can drop in React (or any framework) [islands](/docs/configuration/customization#interactive-islands) with a hydration directive. React switches on automatically the moment your project contains a `.tsx` or `.jsx` file.
 
 <CardGroup cols={2}>
   <Card

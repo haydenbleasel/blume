@@ -6,9 +6,7 @@ sidebar:
   order: 0
 ---
 
-Drop Markdown or MDX into a folder, run `blume dev`, and get a production-grade
-docs site — navigation, search, theming, Open Graph images, and a rich component
-library — with no app boilerplate to write or maintain.
+Drop Markdown or MDX into a folder, run `blume dev`, and get a production-grade docs site — navigation, search, theming, Open Graph images, and a rich component library — with no app boilerplate to write or maintain.
 
 <CardGroup cols={2}>
   <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
@@ -29,61 +27,34 @@ Blume takes the best of both worlds. The framework is the template, so the only 
 
 ### Fast by default
 
-Blume builds on Astro and Vite and renders static HTML by default — fast,
-cacheable, and cheap to host. The core theme is React-free and ships **zero
-client JavaScript**, so pages score well on Core Web Vitals out of the box. Dev
-startup and hot reload feel Vite-native, and you opt into server features only
-when you need them.
+Blume builds on Astro and Vite and renders static HTML by default — fast, cacheable, and cheap to host. The core theme is React-free and ships **zero client JavaScript**, so pages score well on Core Web Vitals out of the box. Dev startup and hot reload feel Vite-native, and you opt into server features only when you need them.
 
 ### AI-ready out of the box
 
-Every Blume site speaks fluent machine. It emits [`llms.txt` and
-`llms-full.txt`](/docs/configuration/ai), serves any page's raw Markdown by
-appending `.md` to its URL, and gives readers **Copy as Markdown** and **Open in
-chat** actions on every page. Add an optional in-page **Ask AI** assistant, or
-host an [**MCP server**](/docs/configuration/ai#mcp-server) so coding agents like
-Claude Code and Cursor can search and read your docs directly — no scraping, no
-hosted service. Your Markdown is the source of truth for both humans and models.
+Every Blume site speaks fluent machine. It emits [`llms.txt` and `llms-full.txt`](/docs/configuration/ai), serves any page's raw Markdown by appending `.md` to its URL, and gives readers **Copy as Markdown** and **Open in chat** actions on every page. Add an optional in-page **Ask AI** assistant, or host an [**MCP server**](/docs/configuration/ai#mcp-server) so coding agents like Claude Code and Cursor can search and read your docs directly — no scraping, no hosted service. Your Markdown is the source of truth for both humans and models.
 
 ### Zero configuration — even the template
 
-A folder of docs is a complete project. There's no starter to clone, no Astro or
-Tailwind to set up, and no template to maintain. Navigation is inferred from your
-files, [search](/docs/configuration/search) works in dev and production without a hosted
-service, and theming is a handful of tokens. Everything has a sensible default;
-configuration is something you reach for, not something you start with.
+A folder of docs is a complete project. There's no starter to clone, no Astro or Tailwind to set up, and no template to maintain. Navigation is inferred from your files, [search](/docs/configuration/search) works in dev and production without a hosted service, and theming is a handful of tokens. Everything has a sensible default; configuration is something you reach for, not something you start with.
 
 ### Type-safe to the core
 
-Your [`blume.config.ts`](/docs/configuration) and every
-[`meta.ts`](/docs/content/meta) are real TypeScript — validated by a schema and
-authored with `defineConfig` and `defineMeta`. Your editor autocompletes every
-option and catches typos, invalid values, and missing fields as you type, long
-before a build. Configuration is code you can refactor, compute, and trust — not
-loosely-typed YAML.
+Your [`blume.config.ts`](/docs/configuration) and every [`meta.ts`](/docs/content/meta) are real TypeScript — validated by a schema and authored with `defineConfig` and `defineMeta`. Your editor autocompletes every option and catches typos, invalid values, and missing fields as you type, long before a build. Configuration is code you can refactor, compute, and trust — not loosely-typed YAML.
 
 ## Everything included
 
-- **Components** — callouts, cards, steps, tabs, accordions, badges, file trees,
-  and parameter tables, usable in MDX with [no imports](/docs/content/components).
-- **Local search** — Orama works in dev and production; Pagefind is one flag away
-  for large sites. No hosted index.
-- **AI** — [`llms.txt`, raw Markdown URLs, Copy as Markdown, Open in chat, an
-  Ask AI assistant, and a hosted MCP server](/docs/configuration/ai).
+- **Components** — callouts, cards, steps, tabs, accordions, badges, file trees, and parameter tables, usable in MDX with [no imports](/docs/content/components).
+- **Local search** — Orama works in dev and production; Pagefind is one flag away for large sites. No hosted index.
+- **AI** — [`llms.txt`, raw Markdown URLs, Copy as Markdown, Open in chat, an Ask AI assistant, and a hosted MCP server](/docs/configuration/ai).
 - **Navigation** — inferred from files, refined with `meta.ts` or config.
 - **SEO** — metadata, Open Graph images, RSS feeds, and JSON-LD, [built in](/docs/configuration/seo).
-- **Customization** — component overrides, React islands, custom pages, theme
-  tokens, and a source-component registry via `blume add`.
+- **Customization** — component overrides, React islands, custom pages, theme tokens, and a source-component registry via `blume add`.
 - **Migration** — `blume migrate mintlify | starlight | nextra | fumadocs`.
-- **Eject** — `blume eject` produces a standalone Astro project that still uses
-  the `blume` package.
+- **Eject** — `blume eject` produces a standalone Astro project that still uses the `blume` package.
 
 ## How it works
 
-The Blume CLI discovers your content, builds a content graph, and generates a
-hidden Astro project under `.blume/` that it drives for dev and build. The
-generated runtime is an implementation detail — you write Markdown, Blume handles
-the rest — until you choose to eject and own it.
+The Blume CLI discovers your content, builds a content graph, and generates a hidden Astro project under `.blume/` that it drives for dev and build. The generated runtime is an implementation detail — you write Markdown, Blume handles the rest — until you choose to eject and own it.
 
 ## Next steps
 

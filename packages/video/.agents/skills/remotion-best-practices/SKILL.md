@@ -115,9 +115,7 @@ export const MyComposition = () => {
 };
 ```
 
-To delay content wrap it in `<Sequence>` and use `from`.
-To limit the duration of an element, use `durationInFrames` of `<Sequence>`.
-`<Sequence>` by default is an absolute fill. For inline content, use `layout="none"`.
+To delay content wrap it in `<Sequence>` and use `from`. To limit the duration of an element, use `durationInFrames` of `<Sequence>`. `<Sequence>` by default is an absolute fill. For inline content, use `layout="none"`.
 
 ```tsx
 import { Sequence } from "remotion";
@@ -358,8 +356,7 @@ See [rules/parameters.md](rules/parameters.md) for making a composition parametr
 
 ## Maps
 
-For simple maps with little flyovers, consider using static map images.
-For complex maps with animated routes or flyovers, load the maps rule: [rules/maplibre.md](rules/maplibre.md)
+For simple maps with little flyovers, consider using static map images. For complex maps with animated routes or flyovers, load the maps rule: [rules/maplibre.md](rules/maplibre.md)
 
 ## Voiceover
 

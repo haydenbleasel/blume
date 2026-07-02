@@ -7,8 +7,7 @@ metadata:
 
 Use this rule only when the top-level skill lists an effect that matches the requested look, or when the user asks to create a reusable custom effect.
 
-Docs: https://www.remotion.dev/docs/effects
-Custom effect docs: https://www.remotion.dev/docs/create-effect
+Docs: https://www.remotion.dev/docs/effects Custom effect docs: https://www.remotion.dev/docs/create-effect
 
 ## Usage
 

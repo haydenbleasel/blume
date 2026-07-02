@@ -9,19 +9,19 @@ blume <command> [options]
 
 ## Commands
 
-| Command                | Description                                            |
-| ---------------------- | ------------------------------------------------------ |
-| `blume init`           | Scaffold a minimal project.                            |
-| `blume dev`            | Start the dev server with hot reload.                  |
-| `blume build`          | Build the static (or server) site.                     |
-| `blume preview`        | Preview the last build.                                |
-| `blume add <item>`     | Install a source component from the registry.          |
+| Command | Description |
+| --- | --- |
+| `blume init` | Scaffold a minimal project. |
+| `blume dev` | Start the dev server with hot reload. |
+| `blume build` | Build the static (or server) site. |
+| `blume preview` | Preview the last build. |
+| `blume add <item>` | Install a source component from the registry. |
 | `blume migrate <tool>` | Migrate from Mintlify, Starlight, Nextra, or Fumadocs. |
-| `blume sync`           | Re-fetch remote content sources and regenerate.        |
-| `blume eject`          | Promote the runtime into a standalone Astro app.       |
-| `blume check`          | Type-check the site with `astro check`.                |
-| `blume doctor`         | Diagnose config and content problems.                  |
-| `blume validate`       | Validate links across your content.                    |
+| `blume sync` | Re-fetch remote content sources and regenerate. |
+| `blume eject` | Promote the runtime into a standalone Astro app. |
+| `blume check` | Type-check the site with `astro check`. |
+| `blume doctor` | Diagnose config and content problems. |
+| `blume validate` | Validate links across your content. |
 
 ## Common flags
 
@@ -45,17 +45,11 @@ blume <command> [options]
 - `blume eject --yes` — skip the confirmation prompt.
 - `blume validate --external` — also check external links over the network.
 - `blume validate --strict` — exit non-zero on warnings too.
-- `blume validate --json` / `blume doctor --json` — emit diagnostics as JSON on
-  stdout (with `code`, `severity`, `file`, `line`/`column`, and `docsUrl`) for CI
-  and editor integrations.
+- `blume validate --json` / `blume doctor --json` — emit diagnostics as JSON on stdout (with `code`, `severity`, `file`, `line`/`column`, and `docsUrl`) for CI and editor integrations.
 
 ## Type-checking
 
-`blume check` runs [`astro check`](https://docs.astro.build/en/reference/cli-reference/#astro-check)
-over your project. It regenerates the `.blume` runtime, syncs Astro's content
-types, then reports any TypeScript errors — in your `blume.config.ts`, in custom
-`.astro` pages, and in the components they import. It exits non-zero when there
-are errors, so it works as a `typecheck` step in CI:
+`blume check` runs [`astro check`](https://docs.astro.build/en/reference/cli-reference/#astro-check) over your project. It regenerates the `.blume` runtime, syncs Astro's content types, then reports any TypeScript errors — in your `blume.config.ts`, in custom `.astro` pages, and in the components they import. It exits non-zero when there are errors, so it works as a `typecheck` step in CI:
 
 ```json title="package.json"
 {
@@ -65,8 +59,7 @@ are errors, so it works as a `typecheck` step in CI:
 }
 ```
 
-Add a `tsconfig.json` extending Astro's config to your project root so authored
-pages resolve `blume/*` imports and virtual modules like `blume:data`:
+Add a `tsconfig.json` extending Astro's config to your project root so authored pages resolve `blume/*` imports and virtual modules like `blume:data`:
 
 ```json title="tsconfig.json"
 {
@@ -81,11 +74,7 @@ Without a project `tsconfig.json`, only the generated runtime is checked.
 
 `blume validate` checks every link discovered in your content:
 
-- **Internal page links** (`/guides/intro`, `./sibling`) must resolve to a real
-  page — broken ones are reported as errors.
-- **Anchor links** (`#section`, `/guides/intro#setup`) must match a heading on
-  the target page — misses are warnings.
+- **Internal page links** (`/guides/intro`, `./sibling`) must resolve to a real page — broken ones are reported as errors.
+- **Anchor links** (`#section`, `/guides/intro#setup`) must match a heading on the target page — misses are warnings.
 - **Asset links** (`/logo.png`) are checked against the `public/` directory.
-- **External links** are only checked with `--external` (off by default since it
-  requires the network); dead links (404/410/unreachable) are errors, while
-  rate-limited or transient responses (403/429/5xx/timeout) are warnings.
+- **External links** are only checked with `--external` (off by default since it requires the network); dead links (404/410/unreachable) are errors, while rate-limited or transient responses (403/429/5xx/timeout) are warnings.

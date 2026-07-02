@@ -3,38 +3,23 @@ title: Search
 description: Client-side search out of the box, with optional hosted and semantic backends.
 ---
 
-Blume ships local search with no hosted infrastructure and no API keys. It runs
-in the browser, works in both `blume dev` and `blume build`, and indexes only
-your real content — navigation chrome and excluded pages are skipped. When you
-outgrow it, you can switch to a hosted or semantic backend without changing how
-search looks or behaves — only the `search.provider` you configure changes.
+Blume ships local search with no hosted infrastructure and no API keys. It runs in the browser, works in both `blume dev` and `blume build`, and indexes only your real content — navigation chrome and excluded pages are skipped. When you outgrow it, you can switch to a hosted or semantic backend without changing how search looks or behaves — only the `search.provider` you configure changes.
 
-Blume reaches parity with Fumadocs' provider set: **Orama**, **FlexSearch**,
-**Algolia**, **Orama Cloud**, **Typesense**, and **Mixedbread** (plus
-**Pagefind**). Only the configured provider's SDK is installed into your project,
-so picking one backend never pulls in the others.
+Blume reaches parity with Fumadocs' provider set: **Orama**, **FlexSearch**, **Algolia**, **Orama Cloud**, **Typesense**, and **Mixedbread** (plus **Pagefind**). Only the configured provider's SDK is installed into your project, so picking one backend never pulls in the others.
 
 ## Using search
 
-Open search with <Badge variant="accent">⌘K</Badge> (or `Ctrl K`), or press `/`
-when you're not typing in a field. `Esc` closes it, and `⌘J` (or `Ctrl J`)
-toggles the result preview pane.
+Open search with <Badge variant="accent">⌘K</Badge> (or `Ctrl K`), or press `/` when you're not typing in a field. `Esc` closes it, and `⌘J` (or `Ctrl J`) toggles the result preview pane.
 
-Queries match page **titles**, **descriptions**, and **body text**, with title
-matches ranked highest and descriptions above body.
+Queries match page **titles**, **descriptions**, and **body text**, with title matches ranked highest and descriptions above body.
 
 ## What's indexed
 
-For every indexable page, Blume indexes its title, description, and body reduced
-to plain text — code blocks, images, and markup are stripped, so results stay
-relevant. The index is built from your source files, so it's identical in dev and
-production.
+For every indexable page, Blume indexes its title, description, and body reduced to plain text — code blocks, images, and markup are stripped, so results stay relevant. The index is built from your source files, so it's identical in dev and production.
 
 ## Tags
 
-Add `search.tags` to a page's frontmatter to group it under a filter in the
-search dialog — readers can narrow results to a tag with a click. Tags also
-become a facet on the hosted providers.
+Add `search.tags` to a page's frontmatter to group it under a filter in the search dialog — readers can narrow results to a tag with a click. Tags also become a facet on the hosted providers.
 
 ```yaml
 search:
@@ -43,16 +28,11 @@ search:
 
 ## Providers
 
-The client-side providers are keyless and need no extra config. The hosted ones
-take **public** credentials in `blume.config.ts` (safe to ship to the browser)
-and read their **secret** admin key from an environment variable at build time —
-the secret never lands in the config or the client bundle.
+The client-side providers are keyless and need no extra config. The hosted ones take **public** credentials in `blume.config.ts` (safe to ship to the browser) and read their **secret** admin key from an environment variable at build time — the secret never lands in the config or the client bundle.
 
 ### Orama (default)
 
-Blume's default engine. It builds a JSON index served at `/blume-search.json` and
-queries it in the browser — instant, client-side, and live in `blume dev` as you
-edit. No keys, no service.
+Blume's default engine. It builds a JSON index served at `/blume-search.json` and queries it in the browser — instant, client-side, and live in `blume dev` as you edit. No keys, no service.
 
 ```ts blume.config.ts lineNumbers
 search: {
@@ -62,9 +42,7 @@ search: {
 
 ### FlexSearch
 
-A second keyless, client-side option. It reuses the same `/blume-search.json`
-index Orama ships and builds a [FlexSearch](https://github.com/nextapps-de/flexsearch)
-document index in the browser. Works in `blume dev` and `blume build`.
+A second keyless, client-side option. It reuses the same `/blume-search.json` index Orama ships and builds a [FlexSearch](https://github.com/nextapps-de/flexsearch) document index in the browser. Works in `blume dev` and `blume build`.
 
 ```ts blume.config.ts lineNumbers
 search: {
@@ -74,9 +52,7 @@ search: {
 
 ### Pagefind
 
-For very large docs, opt into [Pagefind](https://pagefind.app). It indexes your
-built HTML and loads the index in shards on demand, keeping the initial payload
-tiny no matter how big the site grows.
+For very large docs, opt into [Pagefind](https://pagefind.app). It indexes your built HTML and loads the index in shards on demand, keeping the initial payload tiny no matter how big the site grows.
 
 ```ts blume.config.ts lineNumbers
 search: {
@@ -84,16 +60,11 @@ search: {
 }
 ```
 
-Pagefind only runs during `blume build`, so search isn't available in `blume dev`
-with this provider.
+Pagefind only runs during `blume build`, so search isn't available in `blume dev` with this provider.
 
 ### Algolia
 
-The browser queries [Algolia](https://www.algolia.com) directly with your
-search-only key. Each `blume build` replaces the index using the admin key from
-`ALGOLIA_ADMIN_API_KEY` (the build warns and skips the upload if it's unset).
-The whole index is replaced on every sync, so pages you delete or rename don't
-linger as stale results.
+The browser queries [Algolia](https://www.algolia.com) directly with your search-only key. Each `blume build` replaces the index using the admin key from `ALGOLIA_ADMIN_API_KEY` (the build warns and skips the upload if it's unset). The whole index is replaced on every sync, so pages you delete or rename don't linger as stale results.
 
 ```ts blume.config.ts lineNumbers
 search: {
@@ -108,9 +79,7 @@ search: {
 
 ### Orama Cloud
 
-Hosted Orama. The browser queries your index endpoint with the public API key;
-`blume build` pushes records to the index using `ORAMA_PRIVATE_API_KEY`. Set
-`indexId` to enable the sync.
+Hosted Orama. The browser queries your index endpoint with the public API key; `blume build` pushes records to the index using `ORAMA_PRIVATE_API_KEY`. Set `indexId` to enable the sync.
 
 ```ts blume.config.ts lineNumbers
 search: {
@@ -125,11 +94,7 @@ search: {
 
 ### Typesense
 
-Self-hosted or cloud [Typesense](https://typesense.org). The browser queries the
-collection with the search-only key; `blume build` recreates the collection and
-imports documents using `TYPESENSE_ADMIN_API_KEY`. The collection is dropped and
-rebuilt on every sync so deleted or renamed pages don't linger as stale results
-— if you hand-tune the collection's settings, reapply them after a build.
+Self-hosted or cloud [Typesense](https://typesense.org). The browser queries the collection with the search-only key; `blume build` recreates the collection and imports documents using `TYPESENSE_ADMIN_API_KEY`. The collection is dropped and rebuilt on every sync so deleted or renamed pages don't linger as stale results — if you hand-tune the collection's settings, reapply them after a build.
 
 ```ts blume.config.ts lineNumbers
 search: {
@@ -145,11 +110,7 @@ search: {
 
 ### Mixedbread
 
-Semantic search via [Mixedbread](https://www.mixedbread.com). Queries are proxied
-through a generated `/api/search` endpoint that holds your key, so this provider
-**requires server output** (`deployment.output: "server"`). The endpoint reads
-`MIXEDBREAD_API_KEY`. Sync your content to the store with the Mixedbread CLI in
-your build, e.g. `mxbai vs sync <STORE_ID> ./content --ci`.
+Semantic search via [Mixedbread](https://www.mixedbread.com). Queries are proxied through a generated `/api/search` endpoint that holds your key, so this provider **requires server output** (`deployment.output: "server"`). The endpoint reads `MIXEDBREAD_API_KEY`. Sync your content to the store with the Mixedbread CLI in your build, e.g. `mxbai vs sync <STORE_ID> ./content --ci`.
 
 ```ts blume.config.ts lineNumbers
 search: {
@@ -170,16 +131,14 @@ search: {
 
 ## Excluding pages
 
-Only indexable pages are searched. A page is left out of the index when it sets
-`search.exclude` in frontmatter:
+Only indexable pages are searched. A page is left out of the index when it sets `search.exclude` in frontmatter:
 
 ```yaml
 search:
   exclude: true
 ```
 
-[Hidden pages](/docs/content/navigation#hidden-pages) are also excluded by default.
-To index them anyway, opt in:
+[Hidden pages](/docs/content/navigation#hidden-pages) are also excluded by default. To index them anyway, opt in:
 
 ```ts blume.config.ts lineNumbers
 search: {

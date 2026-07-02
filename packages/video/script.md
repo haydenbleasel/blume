@@ -1,10 +1,6 @@
 # Blume — Launch Video Script
 
-**Runtime:** 60 seconds · 1800 frames @ 30fps · 1280×720 (the reference stage size the remocn components assume)
-**Style:** On-screen text only, no voiceover. Music-driven. Must play well muted.
-**Tone:** Confident and minimal. Short declarative lines. Let the motion carry it — never two ideas on screen at once.
-**Look:** Light theme throughout, matching the remocn defaults — near-black text (`#171717`) on white/off-white, Geist Sans, tight letter-spacing. The terminal and glass-code scenes provide the only dark surfaces, which makes them land harder.
-**Music:** Minimal electronic with a clear pulse. One build into the Scene 2 reveal, a second build into the Scene 7 end card. Cut scene transitions on the beat.
+**Runtime:** 60 seconds · 1800 frames @ 30fps · 1280×720 (the reference stage size the remocn components assume) **Style:** On-screen text only, no voiceover. Music-driven. Must play well muted. **Tone:** Confident and minimal. Short declarative lines. Let the motion carry it — never two ideas on screen at once. **Look:** Light theme throughout, matching the remocn defaults — near-black text (`#171717`) on white/off-white, Geist Sans, tight letter-spacing. The terminal and glass-code scenes provide the only dark surfaces, which makes them land harder. **Music:** Minimal electronic with a clear pulse. One build into the Scene 2 reveal, a second build into the Scene 7 end card. Cut scene transitions on the beat.
 
 ---
 
@@ -92,9 +88,7 @@ Install the SDK to get started:
 comet
 ```
 
-:::note
-Sandbox keys are free — no credit card required.
-:::
+:::note Sandbox keys are free — no credit card required. :::
 ````
 
 _(The "Comet" fictional brand matches the product mock on the Blume homepage — keep the fiction consistent.)_

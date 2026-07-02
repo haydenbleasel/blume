@@ -9,8 +9,7 @@ metadata:
 
 ## Prerequisites
 
-First, the @remotion/media package needs to be installed.
-If it is not installed, use the following command:
+First, the @remotion/media package needs to be installed. If it is not installed, use the following command:
 
 ```bash
 npx remotion add @remotion/media
@@ -35,8 +34,7 @@ Remote URLs are also supported:
 <Audio src="https://remotion.media/audio.mp3" />
 ```
 
-By default, audio plays from the start, at full volume and full length.
-Multiple audio tracks can be layered by adding multiple `<Audio>` components.
+By default, audio plays from the start, at full volume and full length. Multiple audio tracks can be layered by adding multiple `<Audio>` components.
 
 ## Trimming
 

@@ -55,7 +55,7 @@
     "turbo": "^2.3.0",
     "typescript": "^5.7.0",
     "typesense": "^3.0.0",
-    "ultracite": "^7.8.3"
+    "ultracite": "^7.8.4"
   },
   "optionalDependencies": {
     "@takumi-rs/core-darwin-arm64": "^1.8.7",

@@ -3,16 +3,11 @@ title: Blog
 description: Publish posts as content, get an RSS feed and article structured data for free, and build a custom index page.
 ---
 
-A blog in Blume is just content with a type. Mark a page `type: blog` and Blume
-gives it an RSS feed and richer article metadata automatically. Unlike the
-[changelog](/docs/advanced/changelog), there's no generated index page — you compose
-the landing page yourself, which keeps the design entirely in your hands.
+A blog in Blume is just content with a type. Mark a page `type: blog` and Blume gives it an RSS feed and richer article metadata automatically. Unlike the [changelog](/docs/advanced/changelog), there's no generated index page — you compose the landing page yourself, which keeps the design entirely in your hands.
 
 ## Write a post
 
-A post is a regular `.md` or `.mdx` page with `type: blog` in its frontmatter. By
-convention posts live under `blog/`, but the type — not the folder — is what
-matters:
+A post is a regular `.md` or `.mdx` page with `type: blog` in its frontmatter. By convention posts live under `blog/`, but the type — not the folder — is what matters:
 
 ```mdx blog/introducing-blume.mdx lineNumbers
 ---
@@ -22,19 +17,14 @@ date: 2026-06-22
 description: Why we built a markdown-first docs framework.
 ---
 
-Documentation should be fast, AI-ready, and zero-config — down to not needing a
-starter template at all. Here's the thinking behind Blume.
+Documentation should be fast, AI-ready, and zero-config — down to not needing a starter template at all. Here's the thinking behind Blume.
 ```
 
-Give every post a `date` so feed items sort newest-first and carry a `pubDate`,
-and a `description` — it's used for both the feed summary and SEO.
+Give every post a `date` so feed items sort newest-first and carry a `pubDate`, and a `description` — it's used for both the feed summary and SEO.
 
 ## The RSS feed
 
-Blume builds a blog feed at **`/blog/rss.xml`**, sorted newest-first by `date`.
-Feeds need an absolute site URL, so set [`deployment.site`](/docs/deployment); Blume
-then injects a `<link rel="alternate">` tag on every page so readers discover it
-automatically.
+Blume builds a blog feed at **`/blog/rss.xml`**, sorted newest-first by `date`. Feeds need an absolute site URL, so set [`deployment.site`](/docs/deployment); Blume then injects a `<link rel="alternate">` tag on every page so readers discover it automatically.
 
 The feed is on by default. Tune it under [`seo.rss`](/docs/configuration/seo#rss-feeds):
 
@@ -52,14 +42,11 @@ Remove `"blog"` from `rss.types` to skip the feed.
 
 ## Structured data
 
-When [structured data](/docs/configuration/seo#structured-data) is on, each post is
-emitted as a schema.org **`BlogPosting`** with its description and publish date —
-the richer article type search engines expect for blog content.
+When [structured data](/docs/configuration/seo#structured-data) is on, each post is emitted as a schema.org **`BlogPosting`** with its description and publish date — the richer article type search engines expect for blog content.
 
 ## Building an index
 
-Blume doesn't generate a `/blog` landing page, so you build one. The simplest
-option is a content page that links to each post by hand:
+Blume doesn't generate a `/blog` landing page, so you build one. The simplest option is a content page that links to each post by hand:
 
 ```mdx blog/index.mdx lineNumbers
 ---
@@ -74,9 +61,7 @@ description: News and writing from the team.
 </CardGroup>
 ```
 
-To list posts automatically instead, add a [custom page](/docs/advanced/custom-pages)
-at `pages/blog/index.astro` that reads from Astro's `docs` content collection and
-pairs each entry with its route from `blume:data`:
+To list posts automatically instead, add a [custom page](/docs/advanced/custom-pages) at `pages/blog/index.astro` that reads from Astro's `docs` content collection and pairs each entry with its route from `blume:data`:
 
 ```astro pages/blog/index.astro lineNumbers
 ---
@@ -108,8 +93,7 @@ const posts = (await getCollection("docs"))
 </ul>
 ```
 
-See [Custom Pages](/docs/advanced/custom-pages#using-the-site-layout) for wrapping this
-in the full site layout.
+See [Custom Pages](/docs/advanced/custom-pages#using-the-site-layout) for wrapping this in the full site layout.
 
 <CardGroup cols={2}>
   <Card title="Custom Pages" href="/docs/advanced/custom-pages" icon="folder">

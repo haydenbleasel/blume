@@ -3,24 +3,15 @@ title: Analytics
 description: First-party web analytics — Vercel Web Analytics, PostHog, or any custom script — wired up from blume.config.ts.
 ---
 
-Blume injects analytics for you from a single `analytics` block in
-`blume.config.ts`. Vercel Web Analytics and PostHog are first-class, and a
-`scripts` escape hatch covers every other provider — Plausible, Fathom, Google
-Analytics, Umami, and the rest.
+Blume injects analytics for you from a single `analytics` block in `blume.config.ts`. Vercel Web Analytics and PostHog are first-class, and a `scripts` escape hatch covers every other provider — Plausible, Fathom, Google Analytics, Umami, and the rest.
 
-Analytics loads in **production builds only**. The scripts are emitted by
-`blume build`, never by `blume dev`, so local traffic never reaches your
-dashboards and you don't need a separate "development" project.
+Analytics loads in **production builds only**. The scripts are emitted by `blume build`, never by `blume dev`, so local traffic never reaches your dashboards and you don't need a separate "development" project.
 
-:::note
-Analytics is opt-in. With no `analytics` block, Blume injects nothing.
-:::
+:::note Analytics is opt-in. With no `analytics` block, Blume injects nothing. :::
 
 ## Vercel Web Analytics
 
-Set `vercel: true` to add [Vercel Web Analytics](https://vercel.com/docs/analytics).
-Blume injects Vercel's first-party script, which is served from your own domain
-once Web Analytics is enabled for the project in the Vercel dashboard.
+Set `vercel: true` to add [Vercel Web Analytics](https://vercel.com/docs/analytics). Blume injects Vercel's first-party script, which is served from your own domain once Web Analytics is enabled for the project in the Vercel dashboard.
 
 ```ts blume.config.ts lineNumbers
 analytics: {
@@ -28,15 +19,11 @@ analytics: {
 }
 ```
 
-No keys are needed — the script reports to the project it's deployed under. This
-only collects data on Vercel deployments, where the `/_vercel/insights` endpoint
-exists.
+No keys are needed — the script reports to the project it's deployed under. This only collects data on Vercel deployments, where the `/_vercel/insights` endpoint exists.
 
 ## PostHog
 
-Provide your **project API key** to add [PostHog](https://posthog.com). The host
-defaults to PostHog Cloud US; set `host` for EU Cloud
-(`https://eu.i.posthog.com`) or a self-hosted instance.
+Provide your **project API key** to add [PostHog](https://posthog.com). The host defaults to PostHog Cloud US; set `host` for EU Cloud (`https://eu.i.posthog.com`) or a self-hosted instance.
 
 ```ts blume.config.ts lineNumbers
 analytics: {
@@ -47,14 +34,11 @@ analytics: {
 }
 ```
 
-The project API key is safe to ship to the browser — it's a public,
-write-only key.
+The project API key is safe to ship to the browser — it's a public, write-only key.
 
 ## Custom scripts
 
-Use `scripts` to load any other analytics provider. Each entry renders one
-`<script>` tag and must set **exactly one** of `src` (external) or `content`
-(inline).
+Use `scripts` to load any other analytics provider. Each entry renders one `<script>` tag and must set **exactly one** of `src` (external) or `content` (inline).
 
 ```ts blume.config.ts lineNumbers
 analytics: {
@@ -79,20 +63,18 @@ analytics: {
 }
 ```
 
-`attributes` is a map of extra HTML attributes (`data-*`, `id`, …) spread onto
-the tag, and `strategy` adds `async` or `defer` to external scripts.
+`attributes` is a map of extra HTML attributes (`data-*`, `id`, …) spread onto the tag, and `strategy` adds `async` or `defer` to external scripts.
 
 ## Options
 
-| Option                 | Default                    | Description                                             |
-| ---------------------- | -------------------------- | ------------------------------------------------------- |
-| `vercel`               | `false`                    | Add Vercel Web Analytics (Vercel deployments only).     |
-| `posthog.key`          | —                          | PostHog project API key. Enables PostHog when set.      |
-| `posthog.host`         | `https://us.i.posthog.com` | PostHog ingestion host (EU Cloud or self-hosted).       |
-| `scripts[].src`        | —                          | External script URL. Mutually exclusive with `content`. |
-| `scripts[].content`    | —                          | Inline script body. Mutually exclusive with `src`.      |
-| `scripts[].strategy`   | —                          | `async` or `defer` for an external script.              |
-| `scripts[].attributes` | —                          | Extra HTML attributes spread onto the `<script>` tag.   |
+| Option | Default | Description |
+| --- | --- | --- |
+| `vercel` | `false` | Add Vercel Web Analytics (Vercel deployments only). |
+| `posthog.key` | — | PostHog project API key. Enables PostHog when set. |
+| `posthog.host` | `https://us.i.posthog.com` | PostHog ingestion host (EU Cloud or self-hosted). |
+| `scripts[].src` | — | External script URL. Mutually exclusive with `content`. |
+| `scripts[].content` | — | Inline script body. Mutually exclusive with `src`. |
+| `scripts[].strategy` | — | `async` or `defer` for an external script. |
+| `scripts[].attributes` | — | Extra HTML attributes spread onto the `<script>` tag. |
 
-All three can be combined — enable Vercel, PostHog, and custom scripts together.
-For deploying your built site, see [Deployment](/docs/deployment).
+All three can be combined — enable Vercel, PostHog, and custom scripts together. For deploying your built site, see [Deployment](/docs/deployment).

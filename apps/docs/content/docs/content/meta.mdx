@@ -3,16 +3,11 @@ title: Folder meta
 description: Configure a sidebar group — its title, icon, order, display mode, and page order — with a meta.ts file.
 ---
 
-Every folder in your content tree becomes a sidebar group. Drop a `meta.ts`
-beside its pages to control how that group looks and how its children are
-ordered. It's entirely optional: without one, the group's label is the humanized
-folder name and its pages sort by [index, numeric prefix, then
-alphabetically](/docs/content/navigation#ordering).
+Every folder in your content tree becomes a sidebar group. Drop a `meta.ts` beside its pages to control how that group looks and how its children are ordered. It's entirely optional: without one, the group's label is the humanized folder name and its pages sort by [index, numeric prefix, then alphabetically](/docs/content/navigation#ordering).
 
 ## Defining meta
 
-Export a `defineMeta` object for a fully typed config. Place the file at the root
-of the folder it configures — `guides/meta.ts` configures the **Guides** group:
+Export a `defineMeta` object for a fully typed config. Place the file at the root of the folder it configures — `guides/meta.ts` configures the **Guides** group:
 
 ```ts meta.ts lineNumbers
 import { defineMeta } from "blume";
@@ -31,45 +26,32 @@ Every field is optional — set only what you want to override.
 
 ## Fields
 
-| Field       | Type                          | Description                                                                            |
-| ----------- | ----------------------------- | -------------------------------------------------------------------------------------- |
-| `title`     | `string`                      | The group's label. Defaults to the humanized folder name.                              |
-| `icon`      | `string`                      | Icon shown next to the label.                                                          |
-| `order`     | `number`                      | Position among sibling groups and pages. Lower numbers sort first.                     |
-| `display`   | `"flat" \| "group" \| "page"` | How the group renders in the sidebar. Defaults to `flat`. See [below](#display-modes). |
-| `collapsed` | `boolean`                     | For `display: "group"`, whether the group starts collapsed.                            |
-| `pages`     | `string[]`                    | Explicit order for the group's children, by slug.                                      |
+| Field | Type | Description |
+| --- | --- | --- |
+| `title` | `string` | The group's label. Defaults to the humanized folder name. |
+| `icon` | `string` | Icon shown next to the label. |
+| `order` | `number` | Position among sibling groups and pages. Lower numbers sort first. |
+| `display` | `"flat" \| "group" \| "page"` | How the group renders in the sidebar. Defaults to `flat`. See [below](#display-modes). |
+| `collapsed` | `boolean` | For `display: "group"`, whether the group starts collapsed. |
+| `pages` | `string[]` | Explicit order for the group's children, by slug. |
 
-The `pages` array lists children by slug — the folder or file name with its
-numeric prefix and any parentheses stripped (so `01-quickstart.mdx` is
-`"quickstart"`). Children you leave out still appear, after the listed ones.
+The `pages` array lists children by slug — the folder or file name with its numeric prefix and any parentheses stripped (so `01-quickstart.mdx` is `"quickstart"`). Children you leave out still appear, after the listed ones.
 
 ## Display modes
 
 `display` controls how a group and its items appear in the sidebar:
 
 - **`flat`** (default) — a non-collapsible header with its pages listed beneath.
-- **`group`** — a collapsible `<details>` disclosure. Pair it with `collapsed`
-  to set the initial state; a group containing the current page always starts
-  open.
-- **`page`** — a single row that, when clicked, slides the sidebar into a
-  sub-panel showing only that group's items, with a back arrow at the top. The
-  panel is route-aware, so landing directly on a page inside the group opens
-  straight to it.
+- **`group`** — a collapsible `<details>` disclosure. Pair it with `collapsed` to set the initial state; a group containing the current page always starts open.
+- **`page`** — a single row that, when clicked, slides the sidebar into a sub-panel showing only that group's items, with a back arrow at the top. The panel is route-aware, so landing directly on a page inside the group opens straight to it.
 
-:::tip
-`page` mode keeps deep sections tidy — reach for it when a group has many
-children and you'd rather drill into it than scroll past it.
-:::
+:::tip `page` mode keeps deep sections tidy — reach for it when a group has many children and you'd rather drill into it than scroll past it. :::
 
-`display` works the same on a group in an [explicit
-sidebar](/docs/content/navigation#explicit-sidebar) config.
+`display` works the same on a group in an [explicit sidebar](/docs/content/navigation#explicit-sidebar) config.
 
 ## Computed meta
 
-Because `meta.ts` is a real module, you can compute the meta — pass a function
-(sync or `async`) instead of an object to build it at scan time. Handy for
-ordering pages from an external source:
+Because `meta.ts` is a real module, you can compute the meta — pass a function (sync or `async`) instead of an object to build it at scan time. Handy for ordering pages from an external source:
 
 ```ts meta.ts
 import { defineMeta } from "blume";
@@ -82,30 +64,21 @@ export default defineMeta(async () => ({
 
 ## Ordering within a group
 
-The `pages` array sets the order of a group's children. Anything it omits falls
-back to each page's frontmatter `sidebar.order`, then the file system (an `index`
-page first, then numeric prefixes, then alphabetical). For the full sidebar
-precedence — including an explicit config sidebar — see [Navigation ›
-Ordering](/docs/content/navigation#ordering).
+The `pages` array sets the order of a group's children. Anything it omits falls back to each page's frontmatter `sidebar.order`, then the file system (an `index` page first, then numeric prefixes, then alphabetical). For the full sidebar precedence — including an explicit config sidebar — see [Navigation › Ordering](/docs/content/navigation#ordering).
 
-To group pages _without_ adding a URL segment, you don't need a `meta.ts` at all:
-use a parenthesized folder name — see [Pages › Group
-folders](/docs/content#group-folders).
+To group pages _without_ adding a URL segment, you don't need a `meta.ts` at all: use a parenthesized folder name — see [Pages › Group folders](/docs/content#group-folders).
 
 ## Internationalization
 
-Under [i18n](/docs/content/i18n), folder meta resolves per locale: put a
-`meta.ts` under `fr/guides/` to order the French group independently.
+Under [i18n](/docs/content/i18n), folder meta resolves per locale: put a `meta.ts` under `fr/guides/` to order the French group independently.
 
-For folder meta that's identical in every language, add a `$` marker so one file
-serves all locales without duplication:
+For folder meta that's identical in every language, add a `$` marker so one file serves all locales without duplication:
 
 ```txt
 docs/guides/meta.$.ts   (folder meta applied to every locale)
 ```
 
-A locale-specific `meta.ts` still overrides the shared `meta.$.ts` for that
-language.
+A locale-specific `meta.ts` still overrides the shared `meta.$.ts` for that language.
 
 ## Where to next
 

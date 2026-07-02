@@ -3,16 +3,11 @@ title: Components
 description: The built-in JSX components — cards, columns, steps, tabs, accordions, badges, code groups, frames, trees, tooltips, type tables, live component previews, diffs, and a GitHub card — usable in any MDX page.
 ---
 
-Blume ships an accessible, themeable component set available in any `.mdx` page
-with **no imports**. Each one is shown below with a live preview and its source.
-Components are vanilla and React-free; React only switches on if you add your own
-island.
+Blume ships an accessible, themeable component set available in any `.mdx` page with **no imports**. Each one is shown below with a live preview and its source. Components are vanilla and React-free; React only switches on if you add your own island.
 
 ## Card and CardGroup
 
-Cards link to a destination with an icon, title, and short blurb. Group them with
-`CardGroup` for a responsive grid. Reach for them on landing pages, section
-indexes, and “next steps” — anywhere you’re guiding the reader onward.
+Cards link to a destination with an icon, title, and short blurb. Group them with `CardGroup` for a responsive grid. Reach for them on landing pages, section indexes, and “next steps” — anywhere you’re guiding the reader onward.
 
 <CardGroup cols={2}>
   <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
@@ -34,13 +29,11 @@ indexes, and “next steps” — anywhere you’re guiding the reader onward.
 </CardGroup>
 ```
 
-`Card` takes `title`, an optional `href` (omit it for a non-clickable card), and
-an `icon` from Blume's built-in icon set. `CardGroup` takes `cols` (default `2`).
+`Card` takes `title`, an optional `href` (omit it for a non-clickable card), and an `icon` from Blume's built-in icon set. `CardGroup` takes `cols` (default `2`).
 
 ## Steps
 
-A numbered vertical sequence for ordered instructions — installs, setup flows,
-and tutorials where the order matters. Each `Step` takes a `title`.
+A numbered vertical sequence for ordered instructions — installs, setup flows, and tutorials where the order matters. Each `Step` takes a `title`.
 
 <Steps>
   <Step title="Install Blume">Add the package to your project.</Step>
@@ -62,9 +55,7 @@ and tutorials where the order matters. Each `Step` takes a `title`.
 
 ## Tabs
 
-Switch between equivalent content in place — language variants, OS-specific
-commands, or alternative approaches — without stacking everything on the page.
-Each `Tab` takes a `title`.
+Switch between equivalent content in place — language variants, OS-specific commands, or alternative approaches — without stacking everything on the page. Each `Tab` takes a `title`.
 
 <Tabs>
   <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
@@ -80,8 +71,7 @@ Each `Tab` takes a `title`.
 
 ## Badge
 
-A small inline label for status or metadata — version tags, “new” or “beta”
-markers, stability levels. The `variant` tunes the color to the meaning.
+A small inline label for status or metadata — version tags, “new” or “beta” markers, stability levels. The `variant` tunes the color to the meaning.
 
 ### Default
 
@@ -135,9 +125,7 @@ A negative or breaking state, such as a deprecation.
 
 ## Icon
 
-Render an icon from Blume's built-in set by name — the same set the `icon` props
-on cards, tiles, tabs, and sidebar entries draw from. Names are lowercase and
-kebab-cased (`rocket`, `book-open`, `chevron-right`).
+Render an icon from Blume's built-in set by name — the same set the `icon` props on cards, tiles, tabs, and sidebar entries draw from. Names are lowercase and kebab-cased (`rocket`, `book-open`, `chevron-right`).
 
 <Icon icon="rocket" size={20} />
 
@@ -145,16 +133,11 @@ kebab-cased (`rocket`, `book-open`, `chevron-right`).
 <Icon icon="rocket" size={20} />
 ```
 
-`icon` is the icon name; `size` sets the pixel size (default `16`) and `color`
-tints it (any CSS color; defaults to `currentColor`). Pass a raw `<svg>` string,
-an image URL, or a local image path in place of a name to render your own art,
-and add a `label` to expose it to assistive tech — without one, the icon is
-decorative.
+`icon` is the icon name; `size` sets the pixel size (default `16`) and `color` tints it (any CSS color; defaults to `currentColor`). Pass a raw `<svg>` string, an image URL, or a local image path in place of a name to render your own art, and add a `label` to expose it to assistive tech — without one, the icon is decorative.
 
 ## File tree
 
-Illustrate a project or folder layout. Wrap a normal Markdown list and Blume
-styles it as a tree — handy for explaining structure in setup and config guides.
+Illustrate a project or folder layout. Wrap a normal Markdown list and Blume styles it as a tree — handy for explaining structure in setup and config guides.
 
 <FileTree>
 
@@ -180,10 +163,7 @@ styles it as a tree — handy for explaining structure in setup and config guide
 
 ## Accordion
 
-Stack related collapsibles in a single bordered container with dividers between
-them — FAQs, optional steps, or long examples. Each child is an `AccordionItem`
-(`title`, optional `icon`, `description`, `defaultOpen`). For a single standalone
-disclosure, use [Expandable](#expandable).
+Stack related collapsibles in a single bordered container with dividers between them — FAQs, optional steps, or long examples. Each child is an `AccordionItem` (`title`, optional `icon`, `description`, `defaultOpen`). For a single standalone disclosure, use [Expandable](#expandable).
 
 <Accordion>
   <AccordionItem title="Does it support MDX?">
@@ -207,9 +187,7 @@ disclosure, use [Expandable](#expandable).
 
 ## Expandable
 
-A lightweight inline disclosure for nested detail — expanding a field's
-sub-properties or an optional aside. `title` labels the toggle (defaults to
-“Show more”); set `defaultOpen` to start expanded.
+A lightweight inline disclosure for nested detail — expanding a field's sub-properties or an optional aside. `title` labels the toggle (defaults to “Show more”); set `defaultOpen` to start expanded.
 
 <Expandable title="Show advanced options">
   These settings are optional and rarely need changing.
@@ -223,8 +201,7 @@ sub-properties or an optional aside. `title` labels the toggle (defaults to
 
 ## Columns
 
-Lay cards or blocks out in a responsive grid of equal columns that reflows on
-mobile. `Columns` takes `cols`; wrap each cell in a `Column`.
+Lay cards or blocks out in a responsive grid of equal columns that reflows on mobile. `Columns` takes `cols`; wrap each cell in a `Column`.
 
 <Columns cols={2}>
   <Column>
@@ -256,9 +233,7 @@ mobile. `Columns` takes `cols`; wrap each cell in a `Column`.
 
 ## CodeGroup
 
-Group several code blocks into one tabbed switcher — a tab per language or file.
-The tab label is each block's title (the text after the language). Add `dropdown`
-to switch with a menu instead of a tab bar.
+Group several code blocks into one tabbed switcher — a tab per language or file. The tab label is each block's title (the text after the language). Add `dropdown` to switch with a menu instead of a tab bar.
 
 <CodeGroup>
 
@@ -302,8 +277,7 @@ fn greet(name: &str) -> String {
 
 ## Frame
 
-Wrap an image or any visual in a centered, bordered frame with an optional
-`caption` (rendered as Markdown) and `hint`.
+Wrap an image or any visual in a centered, bordered frame with an optional `caption` (rendered as Markdown) and `hint`.
 
 <Frame
   caption="A **framed** illustration."
@@ -331,10 +305,7 @@ Wrap an image or any visual in a centered, bordered frame with an optional
 
 ## Color
 
-Show color swatches with copyable hex values — useful for documenting a palette
-or brand colors. Use `variant="compact"` for a swatch list, or `variant="table"`
-with `Color.Row` to group them. Each `Color.Item` takes a `name` and a `value`
-(a hex string, or `{ light, dark }` for theme-aware colors).
+Show color swatches with copyable hex values — useful for documenting a palette or brand colors. Use `variant="compact"` for a swatch list, or `variant="table"` with `Color.Row` to group them. Each `Color.Item` takes a `name` and a `value` (a hex string, or `{ light, dark }` for theme-aware colors).
 
 <Color variant="compact">
   <Color.Item name="blue-500" value="#3B82F6" />
@@ -352,10 +323,7 @@ with `Color.Row` to group them. Each `Color.Item` takes a `name` and a `value`
 
 ## Tree
 
-Render a hierarchical file/folder structure with expandable folders. (For a
-quick, list-driven version see [File tree](#file-tree); `Tree` gives per-folder
-control.) Use `Tree.Folder` (`name`, optional `defaultOpen`, `openable`) and
-`Tree.File` (`name`).
+Render a hierarchical file/folder structure with expandable folders. (For a quick, list-driven version see [File tree](#file-tree); `Tree` gives per-folder control.) Use `Tree.Folder` (`name`, optional `defaultOpen`, `openable`) and `Tree.File` (`name`).
 
 <Tree>
   <Tree.Folder name="src" defaultOpen>
@@ -395,8 +363,7 @@ A titled container for supplementary, set-aside content. `title` is optional.
 
 ## Tooltip
 
-Reveal a definition or hint on hover for an inline term. `tip` is the hover text;
-add an optional `headline` and a `cta` + `href` for a follow-up link.
+Reveal a definition or hint on hover for an inline term. `tip` is the hover text; add an optional `headline` and a `cta` + `href` for a follow-up link.
 
 Hover the <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/docs/quickstart">API</Tooltip> term to learn more.
 
@@ -406,9 +373,7 @@ Hover the <Tooltip tip="A set of protocols software uses to communicate." headli
 
 ## Tile
 
-A clickable preview that leads with a visual — an icon or image — above a title
-and description. Good for galleries and showcases. Takes `title`, `description`,
-and `href`; the child is the visual.
+A clickable preview that leads with a visual — an icon or image — above a title and description. Good for galleries and showcases. Takes `title`, `description`, and `href`; the child is the visual.
 
 <Tile
   title="Quickstart"
@@ -430,10 +395,7 @@ and `href`; the child is the visual.
 
 ## Prompt
 
-A single row with a label and a copy button. The `description` (Markdown) is the
-visible label; the body is the prompt itself — hidden, and copied to the
-clipboard when the **Copy prompt** button is pressed. `actions` controls the
-buttons (e.g. `["copy", "cursor"]`).
+A single row with a label and a copy button. The `description` (Markdown) is the visible label; the body is the prompt itself — hidden, and copied to the clipboard when the **Copy prompt** button is pressed. `actions` controls the buttons (e.g. `["copy", "cursor"]`).
 
 <Prompt
   description="Ask the model to **document** an endpoint."
@@ -453,8 +415,7 @@ buttons (e.g. `["copy", "cursor"]`).
 
 ## Visibility
 
-Show or hide content by audience. `for="web"` renders only on the site;
-`for="agents"` targets the generated Markdown (`llms.txt`) that AI agents read.
+Show or hide content by audience. `for="web"` renders only on the site; `for="agents"` targets the generated Markdown (`llms.txt`) that AI agents read.
 
 <Visibility for="web">
   This note appears on the website but is omitted from the agent-facing
@@ -468,17 +429,11 @@ Show or hide content by audience. `for="web"` renders only on the site;
 
 ## Type tables
 
-Tables for documenting an object's properties — its props, types, and defaults.
-Write the rows by hand with `TypeTable`, or generate them straight from a
-TypeScript interface or type alias with `AutoTypeTable`.
+Tables for documenting an object's properties — its props, types, and defaults. Write the rows by hand with `TypeTable`, or generate them straight from a TypeScript interface or type alias with `AutoTypeTable`.
 
 ### Type table
 
-A **Prop / Type** grid where each row expands to reveal its description and
-details. Pass a `type` map keyed by property name; each entry takes a `type`,
-plus an optional `description`, `default`, `required` flag, `typeDescription`,
-and `typeDescriptionLink`. Optional props (`required` unset) show a `?` after the
-name.
+A **Prop / Type** grid where each row expands to reveal its description and details. Pass a `type` map keyed by property name; each entry takes a `type`, plus an optional `description`, `default`, `required` flag, `typeDescription`, and `typeDescriptionLink`. Optional props (`required` unset) show a `?` after the name.
 
 <TypeTable
   type={{
@@ -516,17 +471,13 @@ name.
 
 ### Auto type table
 
-Generate a type table from a TypeScript type so the docs stay in sync with the
-source. Point `AutoTypeTable` at a file with `path` (resolved from your project
-root) and a type `name`. Descriptions come from JSDoc comments, defaults from
-`@default` tags, and optional properties (`?`) are marked accordingly.
+Generate a type table from a TypeScript type so the docs stay in sync with the source. Point `AutoTypeTable` at a file with `path` (resolved from your project root) and a type `name`. Descriptions come from JSDoc comments, defaults from `@default` tags, and optional properties (`?`) are marked accordingly.
 
 ```astro
 <AutoTypeTable path="./src/button.ts" name="ButtonProps" />
 ```
 
-You can also pass the type inline with `type` instead of a `path` — handy for
-small examples:
+You can also pass the type inline with `type` instead of a `path` — handy for small examples:
 
 <AutoTypeTable
   name="ButtonProps"
@@ -566,11 +517,7 @@ export interface ButtonProps {
 
 ## GitHub info
 
-A card linking to a GitHub repository with its live star and fork counts.
-Counts are fetched at build time — no client JavaScript — and the card still
-renders if the API is unreachable. Pass `owner` and `repo`, or omit them to use
-the repository from your `blume.config`. Set a `GITHUB_TOKEN` environment
-variable to lift the API rate limit.
+A card linking to a GitHub repository with its live star and fork counts. Counts are fetched at build time — no client JavaScript — and the card still renders if the API is unreachable. Pass `owner` and `repo`, or omit them to use the repository from your `blume.config`. Set a `GITHUB_TOKEN` environment variable to lift the API rate limit.
 
 <GithubInfo owner="withastro" repo="astro" />
 
@@ -584,16 +531,9 @@ variable to lift the API rate limit.
 
 ## Component
 
-`Component` renders an example file from your project's `examples/` directory as
-a live preview alongside its highlighted source, in tabs. Point it at a file with
-`path` — its location under `examples/`, without the extension (so
-`examples/counter.tsx` is `path="counter"`). React, Vue, Svelte, and Astro
-examples are all supported; framework examples hydrate, Astro ones render
-statically. It keeps the preview and the code in sync from a single file.
+`Component` renders an example file from your project's `examples/` directory as a live preview alongside its highlighted source, in tabs. Point it at a file with `path` — its location under `examples/`, without the extension (so `examples/counter.tsx` is `path="counter"`). React, Vue, Svelte, and Astro examples are all supported; framework examples hydrate, Astro ones render statically. It keeps the preview and the code in sync from a single file.
 
-The directory is configurable — set `examples` in `blume.config.ts` when your
-examples live elsewhere (e.g. a registry layout). `path` is always relative to
-it:
+The directory is configurable — set `examples` in `blume.config.ts` when your examples live elsewhere (e.g. a registry layout). `path` is always relative to it:
 
 ```ts
 // blume.config.ts
@@ -607,11 +547,7 @@ export default defineConfig({
 <Component path="file-list/basic" />
 ```
 
-`examples` can also be a glob (anything with `*`, `?`, `[]`, `{}`, or `!`). Only
-matching files are discovered, and `path` is relative to the glob's static prefix
-(the part before the first wildcard). This is for a registry that colocates each
-component's source with its example — point at just the examples so the sources,
-which have no default export to preview, aren't swept in:
+`examples` can also be a glob (anything with `*`, `?`, `[]`, `{}`, or `!`). Only matching files are discovered, and `path` is relative to the glob's static prefix (the part before the first wildcard). This is for a registry that colocates each component's source with its example — point at just the examples so the sources, which have no default export to preview, aren't swept in:
 
 ```ts
 // blume.config.ts
@@ -640,9 +576,7 @@ An Astro example renders live with no client JavaScript:
 
 ## CodeBlock
 
-`CodeBlock` highlights a code string with the same Shiki theme and transformers
-as your fenced code — including the light/dark swap — for places a fence can't
-go, like a landing page or a custom component. Pass `code` and a `lang`:
+`CodeBlock` highlights a code string with the same Shiki theme and transformers as your fenced code — including the light/dark swap — for places a fence can't go, like a landing page or a custom component. Pass `code` and a `lang`:
 
 <CodeBlock
   lang="ts"
@@ -658,8 +592,7 @@ import CodeBlock from "blume/components/content/CodeBlock.astro";
 <CodeBlock lang="ts" code={source} />
 ```
 
-To highlight to an HTML string yourself (e.g. inside your own component), import
-the underlying helper from `blume/markdown`:
+To highlight to an HTML string yourself (e.g. inside your own component), import the underlying helper from `blume/markdown`:
 
 ```ts
 import { highlightCode } from "blume/markdown";
@@ -669,10 +602,7 @@ const html = await highlightCode(source, "ts");
 
 ## Diff
 
-`Diff` renders a git-style diff, highlighted with the same Shiki theme as your
-code blocks and produced entirely at build time — no client JavaScript. Give it
-two inline strings (`old` / `new`), two file paths (`before` / `after`), or a
-unified patch (an inline `patch` string or a `src` file).
+`Diff` renders a git-style diff, highlighted with the same Shiki theme as your code blocks and produced entirely at build time — no client JavaScript. Give it two inline strings (`old` / `new`), two file paths (`before` / `after`), or a unified patch (an inline `patch` string or a `src` file).
 
 <Diff
   lang="ts"

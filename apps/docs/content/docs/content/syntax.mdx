@@ -3,19 +3,11 @@ title: Syntax
 description: Every Markdown and MDX feature Blume renders — formatting, lists, tables, callouts, code blocks, package installs, and math.
 ---
 
-Blume renders standard Markdown and MDX with a curated, GitHub-flavored feature
-set — no imports, no configuration. Write content the way you already do; this
-page shows everything that's supported, with a live preview and the source for
-each.
+Blume renders standard Markdown and MDX with a curated, GitHub-flavored feature set — no imports, no configuration. Write content the way you already do; this page shows everything that's supported, with a live preview and the source for each.
 
 ## Headings
 
-Structure a page with headings. Blume renders your frontmatter `title` as the
-page heading, so start your content at `##` — `##` and `###` become entries
-in the table of contents. Every `##`–`######` heading is also wrapped in a link
-to its own anchor, so readers can click a heading to copy, bookmark, or share a
-permalink straight to that section (hover to reveal the `#`). Turn this off with
-`markdown: { headingAnchors: false }` in `blume.config.ts`.
+Structure a page with headings. Blume renders your frontmatter `title` as the page heading, so start your content at `##` — `##` and `###` become entries in the table of contents. Every `##`–`######` heading is also wrapped in a link to its own anchor, so readers can click a heading to copy, bookmark, or share a permalink straight to that section (hover to reveal the `#`). Turn this off with `markdown: { headingAnchors: false }` in `blume.config.ts`.
 
 ```md
 ## Section
@@ -27,8 +19,7 @@ permalink straight to that section (hover to reveal the `#`). Turn this off with
 
 ## Emphasis
 
-Inline formatting for stressing words, marking deletions, and showing code or
-keystrokes mid-sentence.
+Inline formatting for stressing words, marking deletions, and showing code or keystrokes mid-sentence.
 
 **Bold**, _italic_, ~~strikethrough~~, and `inline code`.
 
@@ -48,8 +39,7 @@ E = mc^2^ and H~2~O.
 
 ## Blockquotes
 
-Set off a quotation, callout aside, or an editorial note from the surrounding
-text.
+Set off a quotation, callout aside, or an editorial note from the surrounding text.
 
 > Documentation that's fast, AI-ready, and zero-config — down to the template.
 
@@ -59,8 +49,7 @@ text.
 
 ## Lists
 
-Use unordered lists for unordered sets, ordered lists for sequences, and task
-lists for checklists and roadmaps.
+Use unordered lists for unordered sets, ordered lists for sequences, and task lists for checklists and roadmaps.
 
 - Markdown-first authoring
 - Static by default
@@ -90,8 +79,7 @@ lists for checklists and roadmaps.
 
 ## Tables
 
-Tabulate structured data — config options, comparison matrices, parameter lists.
-Use colons in the divider row to align columns.
+Tabulate structured data — config options, comparison matrices, parameter lists. Use colons in the divider row to align columns.
 
 | Command       | Description           | Output  |
 | ------------- | --------------------- | :-----: |
@@ -107,8 +95,7 @@ Use colons in the divider row to align columns.
 
 ## Links and images
 
-Link to other pages or external sites. Images accept any path under `public/` or
-a remote URL.
+Link to other pages or external sites. Images accept any path under `public/` or a remote URL.
 
 Read the [quickstart](/docs/quickstart) to get started.
 
@@ -118,9 +105,7 @@ Read the [quickstart](/docs/quickstart) to get started.
 ![Alt text](/screenshot.png)
 ```
 
-Content images are click-to-zoom by default — readers can click any image to open
-it in a lightbox. Turn this off with `markdown: { imageZoom: false }` in
-`blume.config.ts`, or opt a single image out with `data-no-zoom`.
+Content images are click-to-zoom by default — readers can click any image to open it in a lightbox. Turn this off with `markdown: { imageZoom: false }` in `blume.config.ts`, or opt a single image out with `data-no-zoom`.
 
 ## Horizontal rule
 
@@ -134,10 +119,7 @@ Separate major shifts in topic within a long page.
 
 ## Code blocks
 
-Fenced code blocks are syntax-highlighted with a header showing the language —
-with a brand icon for recognized languages — and a copy button. Add a **title**
-after the language — typically a filename — and it replaces the language label in
-the header.
+Fenced code blocks are syntax-highlighted with a header showing the language — with a brand icon for recognized languages — and a copy button. Add a **title** after the language — typically a filename — and it replaces the language label in the header.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -157,14 +139,11 @@ export default defineConfig({
 ```
 ````
 
-Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span
-and it's colored like a tiny code block — `useState(){:js}` or
-`T extends object{:ts}`. Turn it on with `markdown: { code: { inline: true } }`.
+Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span and it's colored like a tiny code block — `useState(){:js}` or `T extends object{:ts}`. Turn it on with `markdown: { code: { inline: true } }`.
 
 ### Line numbers
 
-Append `lineNumbers` to render a line-number gutter — on its own or alongside a
-title:
+Append `lineNumbers` to render a line-number gutter — on its own or alongside a title:
 
 ```ts server.ts lineNumbers
 import { serve } from "blume";
@@ -182,9 +161,7 @@ serve({ port: 3000 });
 
 ### Highlighting
 
-Annotate code with GitHub-style comments to draw attention to lines, words, and
-changes. The comments are stripped from the rendered output, so the code stays
-copy-paste clean. All four are on by default — no configuration.
+Annotate code with GitHub-style comments to draw attention to lines, words, and changes. The comments are stripped from the rendered output, so the code stays copy-paste clean. All four are on by default — no configuration.
 
 Mark a line with `// [!code highlight]` to give it a highlighted background:
 
@@ -194,8 +171,7 @@ const config = defineConfig({
 });
 ```
 
-Show changes with `// [!code ++]` for additions and `// [!code --]` for
-removals, rendered as a green/red diff:
+Show changes with `// [!code ++]` for additions and `// [!code --]` for removals, rendered as a green/red diff:
 
 ```ts
 export default defineConfig({
@@ -212,8 +188,7 @@ import { serve } from "blume"; // [!code word:serve]
 serve({ port: 3000 });
 ```
 
-Dim everything except the lines you mark with `// [!code focus]` (the rest
-sharpens on hover):
+Dim everything except the lines you mark with `// [!code focus]` (the rest sharpens on hover):
 
 ```ts
 export default defineConfig({
@@ -222,9 +197,7 @@ export default defineConfig({
 });
 ```
 
-Or highlight lines by **number** instead of comments — useful when you can't edit
-the code. Put a brace range after the language; single lines, comma lists, and
-`start-end` spans all work:
+Or highlight lines by **number** instead of comments — useful when you can't edit the code. Put a brace range after the language; single lines, comma lists, and `start-end` spans all work:
 
 ```ts {1,4-5}
 import { defineConfig } from "blume";
@@ -248,10 +221,7 @@ export default defineConfig({
 
 ### Display types
 
-Mark a TypeScript block `twoslash` to display real types straight from the
-compiler — powered by [Twoslash](https://shiki.style/packages/twoslash). Hover
-any token to see its inferred type, and add an inline `^?` query to pin a type
-below the line.
+Mark a TypeScript block `twoslash` to display real types straight from the compiler — powered by [Twoslash](https://shiki.style/packages/twoslash). Hover any token to see its inferred type, and add an inline `^?` query to pin a type below the line.
 
 ```ts twoslash
 const config = {
@@ -272,15 +242,11 @@ config.title;
 ```
 ````
 
-:::note
-Hide the language icons or wrap long lines instead of scrolling with
-`markdown: { code: { icons: false, wrap: true } }` in `blume.config.ts`.
-:::
+:::note Hide the language icons or wrap long lines instead of scrolling with `markdown: { code: { icons: false, wrap: true } }` in `blume.config.ts`. :::
 
 ## Package install
 
-A `package-install` block turns a single install command into a tabbed snippet
-for npm, pnpm, yarn, and bun — so readers copy the one that matches their setup.
+A `package-install` block turns a single install command into a tabbed snippet for npm, pnpm, yarn, and bun — so readers copy the one that matches their setup.
 
 ```package-install
 npm i blume
@@ -294,9 +260,7 @@ npm i blume
 
 ## Diagrams
 
-A `mermaid` block renders a [Mermaid](https://mermaid.js.org) diagram — flowcharts,
-sequence diagrams, and more — straight from text. Diagrams follow the active color
-theme and re-render when it changes.
+A `mermaid` block renders a [Mermaid](https://mermaid.js.org) diagram — flowcharts, sequence diagrams, and more — straight from text. Diagrams follow the active color theme and re-render when it changes.
 
 ```mermaid
 flowchart LR
@@ -314,105 +278,77 @@ flowchart LR
 ```
 ````
 
-Diagrams render on the client, so this is an MDX-only feature, and the Mermaid
-library loads only on pages that include one.
+Diagrams render on the client, so this is an MDX-only feature, and the Mermaid library loads only on pages that include one.
 
 ## Callouts
 
-Callouts pull a reader's attention to context, advice, or risk. Write them as
-`:::type` directives; add a title in brackets, like `:::warning[Heads up]`.
+Callouts pull a reader's attention to context, advice, or risk. Write them as `:::type` directives; add a title in brackets, like `:::warning[Heads up]`.
 
 ### Note
 
 Neutral, supporting context the reader should keep in mind.
 
-:::note
-Blume regenerates `.blume/` on every run — never edit it by hand.
-:::
+:::note Blume regenerates `.blume/` on every run — never edit it by hand. :::
 
 ```md
-:::note
-Blume regenerates `.blume/` on every run — never edit it by hand.
-:::
+:::note Blume regenerates `.blume/` on every run — never edit it by hand. :::
 ```
 
 ### Tip
 
 A helpful shortcut or best practice that isn't required but makes life easier.
 
-:::tip
-Set `deployment.site` so sitemaps and Open Graph images use absolute URLs.
-:::
+:::tip Set `deployment.site` so sitemaps and Open Graph images use absolute URLs. :::
 
 ```md
-:::tip
-Set `deployment.site` so sitemaps and Open Graph images use absolute URLs.
-:::
+:::tip Set `deployment.site` so sitemaps and Open Graph images use absolute URLs. :::
 ```
 
 ### Success
 
 Confirm a positive outcome or that a step completed as expected.
 
-:::success
-Your docs built successfully and are ready to deploy.
-:::
+:::success Your docs built successfully and are ready to deploy. :::
 
 ```md
-:::success
-Your docs built successfully and are ready to deploy.
-:::
+:::success Your docs built successfully and are ready to deploy. :::
 ```
 
 ### Warning
 
 Flag something that needs care to avoid a mistake or surprising behavior.
 
-:::warning[Heads up]
-Switching to `output: "server"` requires an adapter before you can deploy.
-:::
+:::warning[Heads up] Switching to `output: "server"` requires an adapter before you can deploy. :::
 
 ```md
-:::warning[Heads up]
-Switching to `output: "server"` requires an adapter before you can deploy.
-:::
+:::warning[Heads up] Switching to `output: "server"` requires an adapter before you can deploy. :::
 ```
 
 ### Danger
 
 Call out a destructive or breaking action that can't easily be undone.
 
-:::danger
-`blume eject` is a one-way step — the generated Astro project becomes yours.
-:::
+:::danger `blume eject` is a one-way step — the generated Astro project becomes yours. :::
 
 ```md
-:::danger
-`blume eject` is a one-way step — the generated Astro project becomes yours.
-:::
+:::danger `blume eject` is a one-way step — the generated Astro project becomes yours. :::
 ```
 
 ### Info
 
 An informational aside; an alias-friendly default that reads as neutral.
 
-:::info
-The core theme ships zero client JavaScript.
-:::
+:::info The core theme ships zero client JavaScript. :::
 
 ```md
-:::info
-The core theme ships zero client JavaScript.
-:::
+:::info The core theme ships zero client JavaScript. :::
 ```
 
-The names `caution`, `error`, `important`, and `warn` are accepted as aliases for
-`warning`, `danger`, `note`, and `warning` respectively.
+The names `caution`, `error`, `important`, and `warn` are accepted as aliases for `warning`, `danger`, `note`, and `warning` respectively.
 
 ## Math
 
-Render LaTeX with KaTeX for formulas in prose or as centered blocks — useful for
-math-heavy or scientific docs. Inline math goes in `$…$`; block math in `$$…$$`.
+Render LaTeX with KaTeX for formulas in prose or as centered blocks — useful for math-heavy or scientific docs. Inline math goes in `$…$`; block math in `$$…$$`.
 
 The Pythagorean theorem is $a^2 + b^2 = c^2$.
 
@@ -428,15 +364,11 @@ $$
 $$
 ```
 
-:::note
-Math is opt-in because `$` is common in prose and code. Enable it with
-`markdown: { math: true }` in `blume.config.ts`.
-:::
+:::note Math is opt-in because `$` is common in prose and code. Enable it with `markdown: { math: true }` in `blume.config.ts`. :::
 
 ## Smart punctuation
 
-Blume converts straight quotes and dashes to typographic equivalents as you
-write, so prose reads like it was typeset — no special characters required.
+Blume converts straight quotes and dashes to typographic equivalents as you write, so prose reads like it was typeset — no special characters required.
 
 "Quotes" become curly, -- becomes an en dash, --- an em dash, and ... an ellipsis.
 
