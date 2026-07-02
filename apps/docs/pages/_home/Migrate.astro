@@ -104,6 +104,7 @@ const migrateScript = `(()=>{const root=document.querySelector("[data-migrate]")
 
       <!-- Brand menu (this keeps its own dropdown chrome) -->
       <div
+        aria-label="Choose a docs tool to migrate from"
         class="pointer-events-none absolute left-1/2 z-20 mt-3 w-56 -translate-x-1/2 translate-y-1 rounded-blume border border-border bg-background p-1.5 text-left font-normal text-base tracking-normal opacity-0 shadow-black/5 shadow-lg transition data-[open=true]:pointer-events-auto data-[open=true]:translate-y-0 data-[open=true]:opacity-100"
         data-migrate-menu
         data-open="false"
@@ -115,6 +116,7 @@ const migrateScript = `(()=>{const root=document.querySelector("[data-migrate]")
               aria-selected={source.id === active.id ? "true" : "false"}
               class="group flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-foreground text-sm transition-colors hover:bg-muted aria-selected:bg-muted"
               data-label={source.name}
+              role="option"
               data-migrate-option={source.id}
               role="option"
               type="button"

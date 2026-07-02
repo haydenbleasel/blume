@@ -18,6 +18,9 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   retries: process.env.CI ? 1 : 0,
   testDir: "./e2e",
+  // `.e2e.ts`, not `.spec.ts`, so Bun's test runner (`bun test`) doesn't try to
+  // load these Playwright specs under the wrong runner.
+  testMatch: "**/*.e2e.ts",
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "on-first-retry",
