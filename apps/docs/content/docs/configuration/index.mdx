@@ -259,6 +259,19 @@ seo: {
 
 These work best with an absolute [`deployment.site`](/docs/deployment) for full URLs.
 
+## Table of contents
+
+The on-this-page outline is on by default and lists `H2`–`H3` headings. Turn it
+off, or change the heading range, with `toc`:
+
+```ts blume.config.ts
+export default defineConfig({
+  toc: false, // hide it everywhere
+  // …or narrow the range:
+  toc: { minHeadingLevel: 2, maxHeadingLevel: 4 },
+});
+```
+
 ## Feature options
 
 Each of these has its own guide. The config field is the entry point:

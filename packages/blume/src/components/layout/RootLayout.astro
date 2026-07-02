@@ -122,6 +122,8 @@ interface Props {
    * JSON `<script>` when present; omitted for zero-JS pages that need no islands.
    */
   clientData?: BlumeClientData | null;
+  /** Table-of-contents settings (`toc` config): visibility + heading range. */
+  toc?: { enabled: boolean; maxLevel: number; minLevel: number };
 }
 
 const {
@@ -164,6 +166,7 @@ const {
   localeSwitch,
   layout = {},
   clientData,
+  toc = { enabled: true, maxLevel: 3, minLevel: 2 },
 } = Astro.props;
 
 // Serialized once for island hooks; `<` escaped so content can't break the tag.
@@ -195,7 +198,11 @@ const strings = ui ?? EN_UI;
 // Filter search to the active language only when the site is multi-locale.
 const searchLocale =
   localeSwitch && localeSwitch.length > 1 ? locale : undefined;
-const tocHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
+// TOC entries: the configured heading range, or none when the TOC is disabled
+// (an empty list makes TableOfContents render nothing).
+const tocHeadings = toc.enabled
+  ? headings.filter((h) => h.depth >= toc.minLevel && h.depth <= toc.maxLevel)
+  : [];
 const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
 const description = page.description ?? site.description;
 

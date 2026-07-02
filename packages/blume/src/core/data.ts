@@ -108,6 +108,8 @@ export interface BlumeDataConfig {
   structuredData: boolean;
   theme: ResolvedConfig["theme"];
   title: string;
+  /** Table-of-contents settings: whether to show it and the heading range. */
+  toc: ResolvedConfig["toc"];
 }
 
 /**

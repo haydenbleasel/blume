@@ -30,3 +30,25 @@ describe("defineComponents", () => {
     expect(defineComponents(overrides)).toBe(overrides);
   });
 });
+
+describe("toc config", () => {
+  it("defaults to enabled, H2–H3", () => {
+    expect(blumeConfigSchema.parse({}).toc).toStrictEqual({
+      enabled: true,
+      maxLevel: 3,
+      minLevel: 2,
+    });
+  });
+
+  it("disables the toc with `false`", () => {
+    expect(blumeConfigSchema.parse({ toc: false }).toc.enabled).toBe(false);
+  });
+
+  it("narrows the heading range from an object", () => {
+    expect(
+      blumeConfigSchema.parse({
+        toc: { maxHeadingLevel: 4, minHeadingLevel: 2 },
+      }).toc
+    ).toStrictEqual({ enabled: true, maxLevel: 4, minLevel: 2 });
+  });
+});

@@ -1073,6 +1073,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   localeSwitch={localeSwitch}
   page={{ title: seo.title ?? title, description: seo.description ?? frontmatter.description, route }}
   headings={headings}
+  toc={data.config.toc}
   themeMode={data.config.theme.mode}
   fontCssVars={data.fontCssVars}
   searchEnabled={data.config.search.enabled}
@@ -1226,6 +1227,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
     route: "/changelog",
   }}
   headings={headings}
+  toc={data.config.toc}
   themeMode={data.config.theme.mode}
   fontCssVars={data.fontCssVars}
   searchEnabled={data.config.search.enabled}

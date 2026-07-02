@@ -1037,6 +1037,33 @@ const asyncapiConfigSchema = z
   .strict();
 
 /** Full user-facing config schema. All fields optional with defaults. */
+/**
+ * Table-of-contents config. `true`/`false` toggles it; an object narrows the
+ * heading range. Normalized to `{ enabled, minLevel, maxLevel }` (default: on,
+ * H2–H3, matching the historical hardcoded range).
+ */
+const tocConfigSchema = z
+  .union([
+    z.boolean(),
+    z
+      .object({
+        maxHeadingLevel: z.number().int().min(1).max(6).optional(),
+        minHeadingLevel: z.number().int().min(1).max(6).optional(),
+      })
+      .strict(),
+  ])
+  .default(true)
+  .transform((value) => {
+    if (typeof value === "boolean") {
+      return { enabled: value, maxLevel: 3, minLevel: 2 };
+    }
+    return {
+      enabled: true,
+      maxLevel: value.maxHeadingLevel ?? 3,
+      minLevel: value.minHeadingLevel ?? 2,
+    };
+  });
+
 export const blumeConfigSchema = z
   .object({
     ai: aiConfigSchema.default({}),
@@ -1081,6 +1108,7 @@ export const blumeConfigSchema = z
     styling: stylingConfigSchema.default({}),
     theme: themeConfigSchema.default({}),
     title: z.string().default("Documentation"),
+    toc: tocConfigSchema,
     variables: variablesConfigSchema,
   })
   .strict();

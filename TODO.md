@@ -22,8 +22,6 @@
 
 ### Content types & meta (plan 15 / 17)
 
-- [ ] `toc` config in blume.config.ts (`toc: true` shorthand + `{ minHeadingLevel, maxHeadingLevel }`)
-
 ---
 
 ## P3 — Tooling & quality (plan 13 / 14)

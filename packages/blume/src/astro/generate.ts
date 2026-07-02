@@ -665,6 +665,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       structuredData: config.seo.structuredData,
       theme: config.theme,
       title: config.title,
+      toc: config.toc,
     },
     feeds: buildRssFeeds(project).map((feed) => ({
       href: feed.path,
