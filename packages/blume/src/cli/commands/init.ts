@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 
 import { defineCommand } from "citty";
-import { basename, dirname, join } from "pathe";
+import { basename, dirname, isAbsolute, join, relative } from "pathe";
 
 import { getBlumeVersion } from "../../core/version.ts";
 import { eject } from "../../registry/eject.ts";
@@ -190,6 +190,17 @@ export const initCommand = defineCommand({
   async run({ args }) {
     const root = process.cwd();
     const contentDir = args["content-dir"] ?? "docs";
+    // The content dir is joined into every scaffolded file path, so an absolute
+    // or `../`-escaping value would write outside the project. Reject it.
+    if (
+      isAbsolute(contentDir) ||
+      relative(root, join(root, contentDir)).startsWith("..")
+    ) {
+      logger.error(
+        `Invalid --content-dir "${contentDir}" (must be a path inside the project).`
+      );
+      process.exit(1);
+    }
 
     const template = (args.template ?? "docs") as Template;
     if (!TEMPLATES.includes(template)) {
