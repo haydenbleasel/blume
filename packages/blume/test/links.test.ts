@@ -76,6 +76,13 @@ describe(extractLinks, () => {
     const body = ["```md", "[x](/nope)", "```", "[y](/yes)"].join("\n");
     expect(extractLinks(body).map((l) => l.target)).toStrictEqual(["/yes"]);
   });
+
+  it("reports the target column even when the label repeats it", () => {
+    // The target starts after `[/a/b](`, at column 8 — not inside the label.
+    expect(extractLinks("[/a/b](/a/b)")).toStrictEqual([
+      { column: 8, line: 1, target: "/a/b" },
+    ]);
+  });
 });
 
 describe(validateLinks, () => {

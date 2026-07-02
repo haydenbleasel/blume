@@ -137,8 +137,13 @@ export const extractLinks = (body: string): PageLink[] => {
       if (target === undefined || match.index === undefined) {
         continue;
       }
+      // Locate the target from the `](` boundary rather than searching for the
+      // target text from the match start — otherwise a label that contains the
+      // same text (e.g. `[/a/b](/a/b)`) reports the column inside the label. The
+      // label can't contain `]`, so `](` is unambiguous.
+      const targetOffset = match.index + match[0].indexOf("](") + "](".length;
       links.push({
-        column: line.indexOf(target, match.index) + 1,
+        column: targetOffset + 1,
         line: lineNumber,
         target,
       });
