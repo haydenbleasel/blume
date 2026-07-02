@@ -93,21 +93,21 @@ const AskAI = ({ strings }: { strings?: UIStrings["ask"] }) => {
         headers: { "content-type": "application/json" },
         method: "POST",
       });
-      const reader = response.body?.getReader();
+      // A 4xx/5xx still has a body; without this guard its error text would be
+      // decoded and shown as the assistant's answer instead of the error notice.
+      if (!(response.ok && response.body)) {
+        throw new Error(`Ask AI request failed (${response.status}).`);
+      }
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      if (reader) {
-        let done = false;
-        while (!done) {
-          // oxlint-disable-next-line no-await-in-loop -- sequential stream reads
-          const chunk = await reader.read();
-          ({ done } = chunk);
-          if (chunk.value) {
-            assistant.content += decoder.decode(chunk.value);
-            setMessages((current) => [
-              ...current.slice(0, -1),
-              { ...assistant },
-            ]);
-          }
+      let done = false;
+      while (!done) {
+        // oxlint-disable-next-line no-await-in-loop -- sequential stream reads
+        const chunk = await reader.read();
+        ({ done } = chunk);
+        if (chunk.value) {
+          assistant.content += decoder.decode(chunk.value);
+          setMessages((current) => [...current.slice(0, -1), { ...assistant }]);
         }
       }
     } catch {
