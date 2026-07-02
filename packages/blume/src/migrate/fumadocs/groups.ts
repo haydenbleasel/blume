@@ -3,6 +3,7 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 
 import { basename, join } from "pathe";
 
+import { isInsideRoot } from "../shared.ts";
 import { renderMetaModule } from "./meta.ts";
 import type {
   FumadocsPageItem,
@@ -47,6 +48,12 @@ const isDirectory = (path: string): boolean => {
 
 /** Resolve a `pages` name to its on-disk page file or folder under `docsDir`. */
 const resolveEntry = (docsDir: string, name: string): ResolvedEntry | null => {
+  // A `pages` entry is author-controlled; reject any that escapes `docsDir`
+  // (e.g. `"../../victim"`) so the later `rename` can't move a file out of the
+  // docs tree.
+  if (!isInsideRoot(docsDir, join(docsDir, name))) {
+    return null;
+  }
   for (const ext of PAGE_EXTS) {
     const file = join(docsDir, `${name}${ext}`);
     if (existsSync(file)) {

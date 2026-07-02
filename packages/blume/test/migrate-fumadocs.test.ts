@@ -327,7 +327,7 @@ describe("inlineFumadocsIncludes", () => {
 
     const result = await inlineFumadocsIncludes(
       await readFile(join(root, "page.mdx"), "utf-8"),
-      { filePath: join(root, "page.mdx") }
+      { filePath: join(root, "page.mdx"), root }
     );
 
     expect(result.content).toContain("Shared content.");
@@ -339,10 +339,22 @@ describe("inlineFumadocsIncludes", () => {
     const root = await project({ "page.mdx": "x\n" });
     const result = await inlineFumadocsIncludes(
       "<include>./missing.mdx</include>",
-      { filePath: join(root, "page.mdx") }
+      { filePath: join(root, "page.mdx"), root }
     );
     expect(result.content).toContain("<include>");
     expect(result.warnings.some((w) => w.includes("not found"))).toBe(true);
+  });
+
+  it("refuses an include that escapes the docs root", async () => {
+    const root = await project({ "page.mdx": "x\n" });
+    const result = await inlineFumadocsIncludes(
+      "<include>../../secret.txt</include>",
+      { filePath: join(root, "docs", "page.mdx"), root: join(root, "docs") }
+    );
+    expect(result.content).toContain("<include>");
+    expect(
+      result.warnings.some((w) => w.includes("outside the docs tree"))
+    ).toBe(true);
   });
 
   it("ignores an empty include and reports a circular one", async () => {
@@ -353,7 +365,7 @@ describe("inlineFumadocsIncludes", () => {
 
     const result = await inlineFumadocsIncludes(
       await readFile(join(root, "page.mdx"), "utf-8"),
-      { filePath: join(root, "page.mdx") }
+      { filePath: join(root, "page.mdx"), root }
     );
 
     expect(result.warnings.some((w) => w.includes("Circular"))).toBe(true);

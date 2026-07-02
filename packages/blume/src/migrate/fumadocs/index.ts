@@ -85,7 +85,10 @@ const movePage = async (
   }
 
   const raw = await readFile(abs, "utf-8");
-  const included = await inlineFumadocsIncludes(raw, { filePath: abs });
+  const included = await inlineFumadocsIncludes(raw, {
+    filePath: abs,
+    root: base,
+  });
   let text = stripFumadocsImports(included.content);
   text = rewriteFumadocsCallouts(text);
   text = rewriteFumadocsContainers(text);

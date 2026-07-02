@@ -4,7 +4,12 @@ import { readFile as readFileFromDisk } from "node:fs/promises";
 import { dirname, resolve } from "pathe";
 
 import matter from "../../core/frontmatter.ts";
-import { findOpenTagEnd, renameTag, rewriteCallouts } from "../shared.ts";
+import {
+  findOpenTagEnd,
+  isInsideRoot,
+  renameTag,
+  rewriteCallouts,
+} from "../shared.ts";
 
 /**
  * Source-to-source rewrites that turn Fumadocs-only MDX into idiomatic Blume
@@ -291,6 +296,8 @@ const INCLUDE = /<include\b[^>]*>(?<path>[\s\S]*?)<\/include>/gu;
 interface IncludeOptions {
   filePath: string;
   readFile?: (file: string) => Promise<string>;
+  /** Docs root the include must stay within; targets escaping it are skipped. */
+  root: string;
   seen?: Set<string>;
 }
 
@@ -321,6 +328,12 @@ export const inlineFumadocsIncludes = async (
       continue;
     }
     const target = resolve(dirname(options.filePath), rawPath);
+    if (!isInsideRoot(options.root, target)) {
+      warnings.push(
+        `<include> target "${rawPath}" is outside the docs tree — left as-is.`
+      );
+      continue;
+    }
     if (seen.has(target)) {
       warnings.push(`Circular <include> "${rawPath}" — left as-is.`);
       continue;

@@ -1,10 +1,21 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 
-import { join } from "pathe";
+import { isAbsolute, join, relative } from "pathe";
 
 import type { BlumeConfig } from "../core/schema.ts";
 import { pageMetaSchema } from "../core/schema.ts";
+
+/**
+ * Whether `candidate` resolves to a path inside `root` (or is `root` itself).
+ * Guards migrators against `../` traversal in author-controlled source paths
+ * (`pages` entries, `<include>` targets) that would otherwise read or move
+ * files outside the docs tree.
+ */
+export const isInsideRoot = (root: string, candidate: string): boolean => {
+  const rel = relative(root, candidate);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+};
 
 /**
  * Framework-agnostic helpers shared by more than one migrator. Each piece here
