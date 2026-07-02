@@ -13,6 +13,7 @@ import { previewCommand } from "./commands/preview.ts";
 import { syncCommand } from "./commands/sync.ts";
 import { validateCommand } from "./commands/validate.ts";
 import { loadEnvFiles } from "./env.ts";
+import { reportInternalError } from "./internal-error.ts";
 
 const main = defineCommand({
   meta: {
@@ -38,5 +39,17 @@ const main = defineCommand({
 // Load `.env`/`.env.local` before any command runs so remote content sources
 // can read their tokens (e.g. `GITHUB_TOKEN`) during the content scan.
 loadEnvFiles(process.cwd());
+
+// Backstop for unexpected async failures that escape a command's own handling
+// (e.g. a rejected timer/watcher in `blume dev`), so even those report through
+// the stable internal-error contract rather than a bare stack trace.
+process.on("uncaughtException", (error) => {
+  reportInternalError(error);
+  process.exit(1);
+});
+process.on("unhandledRejection", (error) => {
+  reportInternalError(error);
+  process.exit(1);
+});
 
 runMain(main);

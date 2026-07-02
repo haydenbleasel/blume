@@ -4,6 +4,7 @@ import { BlumeError } from "../../core/diagnostics.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import { serverFeatures } from "../../core/server-features.ts";
 import type { Diagnostic } from "../../core/types.ts";
+import { reportInternalError } from "../internal-error.ts";
 import { logger, reportDiagnostics, reportDiagnosticsJson } from "../log.ts";
 
 const MIN_NODE_MAJOR = 20;
@@ -67,7 +68,8 @@ export const doctorCommand = defineCommand({
       if (error instanceof BlumeError) {
         diagnostics.push(error.diagnostic);
       } else {
-        throw error;
+        reportInternalError(error);
+        process.exit(1);
       }
     }
 

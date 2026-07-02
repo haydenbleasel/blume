@@ -7,6 +7,7 @@ import { BlumeError } from "../../core/diagnostics.ts";
 import { validateLinks } from "../../core/links.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import type { Diagnostic } from "../../core/types.ts";
+import { reportInternalError } from "../internal-error.ts";
 import { logger, reportDiagnostics, reportDiagnosticsJson } from "../log.ts";
 
 export const validateCommand = defineCommand({
@@ -50,7 +51,8 @@ export const validateCommand = defineCommand({
       if (error instanceof BlumeError) {
         diagnostics.push(error.diagnostic);
       } else {
-        throw error;
+        reportInternalError(error);
+        process.exit(1);
       }
     }
 

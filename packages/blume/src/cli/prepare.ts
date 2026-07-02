@@ -4,6 +4,7 @@ import { scanProject } from "../core/project-graph.ts";
 import type { BlumeProject, BuildMode } from "../core/project-graph.ts";
 import { serverFeatures } from "../core/server-features.ts";
 import { loadEnvFiles } from "./env.ts";
+import { reportInternalError } from "./internal-error.ts";
 import { logger, reportDiagnostics } from "./log.ts";
 
 export interface PrepareOptions {
@@ -40,9 +41,10 @@ export const prepareProject = async (
   } catch (error) {
     if (error instanceof BlumeError) {
       reportDiagnostics([error.diagnostic], options.root);
-      process.exit(1);
+    } else {
+      reportInternalError(error);
     }
-    throw error;
+    process.exit(1);
   }
 
   // Hard gate: server-only features cannot ship in a static build.

@@ -8,7 +8,6 @@
 - [ ] Remap `.blume/` stack frames back to user source
 - [ ] Missing-component diagnostic (unknown MDX tag → suggest `blume add`)
 - [ ] Hydration-mismatch diagnostic
-- [ ] Stable internal-error contract (code + version dump) instead of raw re-throws
 
 ### CLI flags (plan 02)
 
