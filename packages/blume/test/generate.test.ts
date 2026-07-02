@@ -17,6 +17,7 @@ import {
   buildRuntimeData,
   collectStaged,
   detectNeedsReact,
+  ensureDepsLink,
   generateRuntime,
   pruneOrphans,
 } from "../src/astro/generate.ts";
@@ -577,5 +578,68 @@ describe("generateRuntime", () => {
       "utf-8"
     );
     expect(contentConfig).toContain("const staged = defineCollection(");
+  });
+
+  it("plans components.ts overrides and surfaces nav + component diagnostics", async () => {
+    const project = await scanProject(
+      await writeProject({
+        // A hydrated island override — statically analyzed, never executed —
+        // so `buildComponentSlots` reads and plans a hydration wrapper.
+        "Counter.tsx": "export default function Counter() { return null; }\n",
+        "blume.config.ts": `export default {
+  navigation: {
+    tabs: [
+      { label: "Docs", path: "/" },
+      { label: "Ghost", path: "/ghost" },
+    ],
+  },
+};
+`,
+        "components.ts": `import Counter from "./Counter.tsx";
+export default { islands: { Counter } };
+`,
+        "docs/index.md": "# Home\n",
+        // An unknown `<Fancy>` tag that isn't a built-in, island, or override.
+        "docs/page.mdx": "---\ntitle: Page\n---\n\nUse the <Fancy /> widget.\n",
+      })
+    );
+    const out = project.context.outDir;
+    const result = await generateRuntime(project);
+    // The island override was analyzed and emitted as a per-override wrapper.
+    expect(
+      existsSync(join(out, "src/generated/component-slots/mdx-Counter.astro"))
+    ).toBe(true);
+    // A nav tab pointing at a route no page serves is flagged.
+    expect(result.warnings.some((w) => w.includes("/ghost"))).toBe(true);
+    // The unknown MDX component tag is flagged.
+    expect(result.warnings.some((w) => w.includes("<Fancy>"))).toBe(true);
+  });
+});
+
+describe("ensureDepsLink version-less conflict", () => {
+  const conflictDirs: string[] = [];
+
+  afterAll(async () => {
+    await Promise.all(
+      conflictDirs.map((dir) => rm(dir, { force: true, recursive: true }))
+    );
+  });
+
+  it("degrades to a version-less warning when neither Astro resolves", async () => {
+    // A split layout where the `astro` directory holds no package.json, so
+    // `resolvedAstroPath` yields null and `readPkgVersion` takes its null-path
+    // guard — the diagnostic falls back to its version-less form.
+    const dir = await mkdtemp(join(tmpdir(), "blume-conflict-"));
+    conflictDirs.push(dir);
+    const pkgDir = join(dir, "node_modules", "blume");
+    await mkdir(join(pkgDir, "node_modules", "astro"), { recursive: true });
+    const outDir = join(dir, ".blume");
+    await mkdir(outDir, { recursive: true });
+
+    const warning = await ensureDepsLink(outDir, pkgDir);
+
+    expect(warning).toContain("Astro version conflict");
+    expect(warning).toContain("a second copy of Astro");
+    expect(warning).toContain("<Blume's astro version>");
   });
 });

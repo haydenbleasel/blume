@@ -35,6 +35,20 @@ describe("checkRequiredSecrets", () => {
     expect(checkRequiredSecrets(config)).toEqual([]);
   });
 
+  it("warns when a non-gateway Ask AI backend has no API key", () => {
+    Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
+    const config = blumeConfigSchema.parse({
+      ai: { ask: { enabled: true, provider: "openrouter" } },
+    });
+    expect(
+      checkRequiredSecrets(config).some(
+        (d) =>
+          d.code === "BLUME_MISSING_SECRET" &&
+          d.message.includes("OPENROUTER_API_KEY")
+      )
+    ).toBe(true);
+  });
+
   it("warns for mixedbread search without its key", () => {
     Reflect.deleteProperty(process.env, "MIXEDBREAD_API_KEY");
     const config = blumeConfigSchema.parse({

@@ -1,18 +1,24 @@
-import { afterAll, describe, expect, it } from "bun:test";
+import { afterAll, describe, expect, it, spyOn } from "bun:test";
 import { existsSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
-import { acquireDevLock, isDevLocked } from "../src/cli/dev-lock.ts";
+import {
+  acquireDevLock,
+  isDevLocked,
+  refuseIfDevRunning,
+} from "../src/cli/dev-lock.ts";
+import { logger } from "../src/cli/log.ts";
 
 const dirs: string[] = [];
-const outDir = async (): Promise<string> => {
+const rootDir = async (): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), "blume-lock-"));
   dirs.push(dir);
-  return join(dir, ".blume");
+  return dir;
 };
+const outDir = async (): Promise<string> => join(await rootDir(), ".blume");
 
 afterAll(async () => {
   await Promise.all(
@@ -53,5 +59,56 @@ describe("dev lock", () => {
     release();
     // Release must not clobber the other process's lock.
     expect(existsSync(join(dir, "dev.lock"))).toBe(true);
+  });
+
+  it("treats a non-positive or non-integer pid as unlocked", async () => {
+    const dir = await outDir();
+    // Acquire-and-release just to create the dir, then plant an invalid pid.
+    acquireDevLock(dir)();
+    writeFileSync(join(dir, "dev.lock"), "0");
+    expect(isDevLocked(dir)).toBe(false);
+  });
+
+  it("is safe to call the release function twice", async () => {
+    const dir = await outDir();
+    const release = acquireDevLock(dir);
+    release();
+    // The second call early-returns without touching the filesystem.
+    expect(() => release()).not.toThrow();
+  });
+});
+
+describe("refuseIfDevRunning", () => {
+  it("does nothing when .blume is not locked", async () => {
+    const root = await rootDir();
+    const exit = spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("exit");
+    }) as never);
+    try {
+      expect(() => refuseIfDevRunning(root, "building")).not.toThrow();
+      expect(exit).not.toHaveBeenCalled();
+    } finally {
+      exit.mockRestore();
+    }
+  });
+
+  it("logs an error and exits when a dev server owns .blume", async () => {
+    const root = await rootDir();
+    // Hold a live lock (our own pid) on <root>/.blume without releasing it.
+    acquireDevLock(join(root, ".blume"));
+    const errorSpy = spyOn(logger, "error").mockImplementation((() => {
+      // Swallow the diagnostic so the test output stays clean.
+    }) as never);
+    const exit = spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("exit");
+    }) as never);
+    try {
+      expect(() => refuseIfDevRunning(root, "building")).toThrow("exit");
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      exit.mockRestore();
+      errorSpy.mockRestore();
+    }
   });
 });

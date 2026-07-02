@@ -10,6 +10,7 @@ import {
   blumeMarkdownProcessor,
   blumeMdxProcessor,
   blumeShikiTransformers,
+  highlightCode,
 } from "../src/markdown/index.ts";
 import {
   inlineCodeHighlightPlugin,
@@ -755,6 +756,40 @@ describe("toPackageCommands (verb and flag normalization)", () => {
   it("treats blank input and a bare manager as install-all", () => {
     expect(toPackageCommands("   ").npm).toBe("npm install");
     expect(toPackageCommands("npm").npm).toBe("npm install");
+  });
+});
+
+describe("highlightCode", () => {
+  it("tags the highlighted block with the astro-code class", async () => {
+    const html = await highlightCode("const x = 1;", "ts");
+    expect(html).toContain("astro-code");
+    expect(html).toContain("const");
+  });
+
+  it("emits a data-language and title header on the titled path", async () => {
+    const html = await highlightCode("const x = 1;", "ts", {
+      title: "file.ts",
+    });
+    expect(html).toContain('data-language="ts"');
+    expect(html).toContain('data-title="file.ts"');
+  });
+
+  it("applies an extra className to the <pre>", async () => {
+    const html = await highlightCode("const x = 1;", "ts", {
+      className: "blume-source",
+    });
+    expect(html).toContain("blume-source");
+    expect(html).toContain("astro-code");
+  });
+
+  it("falls back to an escaped plain block for an unknown language", async () => {
+    const html = await highlightCode("<a> & </a>", "this-is-not-a-lang", {
+      className: "blume-source",
+    });
+    expect(html).toContain('<pre class="astro-code blume-source">');
+    // The raw input is HTML-escaped so it renders as text, not markup.
+    expect(html).toContain("&lt;a&gt; &amp; &lt;/a&gt;");
+    expect(html).not.toContain("<a>");
   });
 });
 

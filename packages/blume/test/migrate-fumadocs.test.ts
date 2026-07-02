@@ -15,10 +15,12 @@ import {
   unsupportedFumadocsComponents,
 } from "../src/migrate/fumadocs/content.ts";
 import { normalizeFumadocsPageMeta } from "../src/migrate/fumadocs/frontmatter.ts";
+import { reshapeFumadocsGroups } from "../src/migrate/fumadocs/groups.ts";
 import {
   parseFumadocsPages,
   translateFumadocsMeta,
 } from "../src/migrate/fumadocs/meta.ts";
+import type { FumadocsPagesStructure } from "../src/migrate/fumadocs/meta.ts";
 import { migrateFumadocs } from "../src/migrate/migrate.ts";
 
 const dirs: string[] = [];
@@ -442,6 +444,31 @@ describe("loadFumadocsConfig", () => {
     // "Web" (from the apps/web package name) is a weak title; the repo dir wins.
     expect(config.title).toBe("Myrepo");
   });
+
+  it("prettifies a generic package name when no git repo is found above it", async () => {
+    // No `.git` anywhere up the tmp tree, so the repo-name fallback is skipped
+    // and the generic name is title-cased directly.
+    const root = await project({
+      "package.json": JSON.stringify({ name: "web" }),
+    });
+    const { config } = await loadFumadocsConfig(root);
+    expect(config.title).toBe("Web");
+  });
+
+  it("keeps the generic package name when the repo dir prettifies to nothing", async () => {
+    const base = await mkdtemp(join(tmpdir(), "blume-fuma-repo-"));
+    dirs.push(base);
+    // A repo dir whose basename yields no words (`___`) can't title the docs, so
+    // the migrator falls back to prettifying the generic package name.
+    const repo = join(base, "___");
+    await mkdir(join(repo, ".git"), { recursive: true });
+    const app = join(repo, "apps", "web");
+    await mkdir(app, { recursive: true });
+    await writeFile(join(app, "package.json"), JSON.stringify({ name: "web" }));
+
+    const { config } = await loadFumadocsConfig(app);
+    expect(config.title).toBe("Web");
+  });
 });
 
 describe("migrateFumadocs end to end", () => {
@@ -665,5 +692,130 @@ describe("migrateFumadocs end to end", () => {
     );
     expect(result.warnings.some((w) => w.includes("ImageZoom"))).toBe(true);
     expect(result.warnings.some((w) => w.includes("Kept"))).toBe(true);
+  });
+});
+
+describe("reshapeFumadocsGroups", () => {
+  it("keeps lead links out (warning) and lead extracts in (warning)", async () => {
+    const docsDir = await project({ "guide.mdx": "# Guide\n" });
+    const structure: FumadocsPagesStructure = {
+      hasSections: false,
+      lead: [
+        { kind: "ref", name: "guide" },
+        { kind: "extract", name: "providers" },
+        { href: "https://example.com", kind: "link", text: "GitHub" },
+      ],
+      sections: [],
+    };
+
+    const { order, warnings } = await reshapeFumadocsGroups(structure, docsDir);
+
+    expect(order).toEqual(["guide", "providers"]);
+    expect(warnings.some((w) => w.includes("Dropped sidebar link"))).toBe(true);
+    expect(warnings.some((w) => w.includes('"...providers"'))).toBe(true);
+  });
+
+  it("leaves a single-folder section in place and warns when the label differs", async () => {
+    const docsDir = await project({ "openai/index.mdx": "# OpenAI\n" });
+    const structure: FumadocsPagesStructure = {
+      hasSections: true,
+      lead: [],
+      sections: [
+        { items: [{ kind: "ref", name: "openai" }], label: "Providers" },
+      ],
+    };
+
+    const { order, warnings } = await reshapeFumadocsGroups(structure, docsDir);
+
+    expect(order).toEqual(["openai"]);
+    // A lone folder keeps its place — no wrapping `(Providers)/` group folder.
+    expect(existsSync(join(docsDir, "(Providers)"))).toBe(false);
+    expect(existsSync(join(docsDir, "openai"))).toBe(true);
+    expect(warnings.some((w) => w.includes('wraps folder "openai"'))).toBe(
+      true
+    );
+  });
+
+  it("wraps a single-file section into a group folder", async () => {
+    const docsDir = await project({ "solo.mdx": "# Solo\n" });
+    const structure: FumadocsPagesStructure = {
+      hasSections: true,
+      lead: [],
+      sections: [{ items: [{ kind: "ref", name: "solo" }], label: "Solo" }],
+    };
+
+    const { order } = await reshapeFumadocsGroups(structure, docsDir);
+
+    expect(order).toEqual(["Solo"]);
+    expect(existsSync(join(docsDir, "(Solo)", "solo.mdx"))).toBe(true);
+    expect(existsSync(join(docsDir, "solo.mdx"))).toBe(false);
+  });
+
+  it("leaves a slash-labeled section ungrouped and warns", async () => {
+    const docsDir = await project({ "a.mdx": "# A\n", "b.mdx": "# B\n" });
+    const structure: FumadocsPagesStructure = {
+      hasSections: true,
+      lead: [],
+      sections: [
+        {
+          items: [
+            { kind: "ref", name: "a" },
+            { href: "https://example.com", kind: "link", text: "L" },
+            { kind: "ref", name: "b" },
+          ],
+          label: "Group/Sub",
+        },
+      ],
+    };
+
+    const { order, warnings } = await reshapeFumadocsGroups(structure, docsDir);
+
+    expect(order).toEqual(["a", "b"]);
+    expect(warnings.some((w) => w.includes("slash in its name"))).toBe(true);
+    // No group folder is created; the files stay at the top level.
+    expect(existsSync(join(docsDir, "a.mdx"))).toBe(true);
+  });
+
+  it("skips missing, duplicate, and escaping items when moving a section", async () => {
+    const docsDir = await project({
+      "(Group)/dup.mdx": "# Existing dup\n",
+      "dup.mdx": "# Dup\n",
+      "ext.mdx": "# Ext\n",
+      "keep.mdx": "# Keep\n",
+    });
+    const structure: FumadocsPagesStructure = {
+      hasSections: true,
+      lead: [],
+      sections: [
+        {
+          items: [
+            { kind: "ref", name: "keep" },
+            { kind: "ref", name: "missing" },
+            { kind: "ref", name: "dup" },
+            { kind: "ref", name: "../escape" },
+            { kind: "extract", name: "ext" },
+            { href: "https://example.com", kind: "link", text: "L" },
+          ],
+          label: "Group",
+        },
+      ],
+    };
+
+    const { order, warnings } = await reshapeFumadocsGroups(structure, docsDir);
+
+    expect(order).toEqual(["Group"]);
+    // Movable files land in the group; the extract does too (with a warning).
+    expect(existsSync(join(docsDir, "(Group)", "keep.mdx"))).toBe(true);
+    expect(existsSync(join(docsDir, "(Group)", "ext.mdx"))).toBe(true);
+    // A name whose destination already exists is left where it was.
+    expect(existsSync(join(docsDir, "dup.mdx"))).toBe(true);
+    expect(warnings.some((w) => w.includes("matched no page or folder"))).toBe(
+      true
+    );
+    expect(warnings.some((w) => w.includes("target already exists"))).toBe(
+      true
+    );
+    expect(warnings.some((w) => w.includes("Dropped sidebar link"))).toBe(true);
+    expect(warnings.some((w) => w.includes('"...ext"'))).toBe(true);
   });
 });

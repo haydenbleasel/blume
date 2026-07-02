@@ -8,6 +8,7 @@ import {
   buildFontsCss,
   configuredCssVars,
 } from "../src/theme/fonts.ts";
+import { hasIcon, resolveIcon } from "../src/theme/icons.ts";
 import {
   buildThemeCss,
   resolveAccent,
@@ -242,5 +243,18 @@ describe("theme.fonts schema", () => {
     });
     expect(result.success).toBeFalsy();
     expect(result.error?.issues[0]?.message).toContain("Unknown font");
+  });
+});
+
+describe("resolveIcon library-prefix stripping", () => {
+  it("strips a hyphenated library prefix before resolving", () => {
+    // `lucide-`/`tabler-` prefixes are dropped so the bare name resolves.
+    expect(resolveIcon("lucide-sparkles")?.name).toBe("sparkles");
+    expect(resolveIcon("tabler-star")?.name).toBe("star");
+  });
+
+  it("strips a colon-namespaced library prefix before resolving", () => {
+    expect(resolveIcon("lucide:star")?.name).toBe("star");
+    expect(hasIcon("fa:github")).toBeTruthy();
   });
 });

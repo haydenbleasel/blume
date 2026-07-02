@@ -1,11 +1,39 @@
-import { describe, expect, it } from "bun:test";
+import { afterAll, describe, expect, it } from "bun:test";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+
+import { dirname, join } from "pathe";
 
 import { planComponentSlots } from "../src/astro/component-slots.ts";
 import { analyzeComponentOverrides } from "../src/core/component-overrides.ts";
+import type {
+  ComponentOverrideAnalysis,
+  NormalizedOverride,
+} from "../src/core/component-overrides.ts";
 
 const FILE = "/project/components.ts";
 
 const analyze = (source: string) => analyzeComponentOverrides(source, FILE);
+
+const mdxAnalysis = (
+  override: Partial<NormalizedOverride>
+): ComponentOverrideAnalysis => ({
+  islands: [],
+  layout: [],
+  mdx: [
+    {
+      identifier: false,
+      key: "Widget",
+      source: {
+        framework: "react",
+        name: "default",
+        path: "/project/Widget.tsx",
+      },
+      ...override,
+    },
+  ],
+  warnings: [],
+});
 
 describe("analyzeComponentOverrides", () => {
   it("returns empty groups when there is no default export object", () => {
@@ -129,6 +157,142 @@ describe("analyzeComponentOverrides", () => {
       "svelte",
     ]);
   });
+
+  it("unwraps a parenthesized `as` default export to the object", () => {
+    const result = analyze(
+      'export default ({ layout: { F: "./F.astro" } }) as const;'
+    );
+    expect(result.layout).toHaveLength(1);
+    expect(result.layout[0]?.key).toBe("F");
+  });
+
+  it("returns empty groups when defineComponents gets a non-object arg", () => {
+    const result = analyze("export default defineComponents(123);");
+    expect(result.mdx).toEqual([]);
+    expect(result.layout).toEqual([]);
+    expect(result.islands).toEqual([]);
+  });
+
+  it("returns empty groups when the default export is not an object shape", () => {
+    const result = analyze(`
+      const config = 42;
+      export default config;
+    `);
+    expect(result.mdx).toEqual([]);
+    expect(result.layout).toEqual([]);
+    expect(result.islands).toEqual([]);
+  });
+
+  it("resolves a shorthand `component` inside a descriptor object", () => {
+    const result = analyze(`
+      import component from "./Widget.tsx";
+      export default { mdx: { Widget: { component } } };
+    `);
+    const [widget] = result.mdx;
+    expect(widget?.key).toBe("Widget");
+    expect(widget?.source?.path).toBe("/project/Widget.tsx");
+    expect(widget?.source?.framework).toBe("react");
+  });
+
+  it("warns and drops an island whose component can't be resolved", () => {
+    const result = analyze("export default { islands: { Counter } };");
+    expect(result.islands).toEqual([]);
+    expect(result.warnings.join(" ")).toContain(
+      "couldn't be resolved to a file"
+    );
+  });
+
+  it("warns when client: only can't infer a framework", () => {
+    const result = analyze(
+      'export default { mdx: { Solo: { component: "./Solo.astro", client: "only" } } };'
+    );
+    expect(result.warnings.join(" ")).toContain('client: "only"');
+  });
+
+  it("ignores a spread entry in a group object", () => {
+    const result = analyze(`
+      const extra = {};
+      export default { mdx: { ...extra } };
+    `);
+    expect(result.mdx).toEqual([]);
+  });
+
+  it("ignores an entry with a computed property name", () => {
+    const result = analyze(`
+      const dynamic = "X";
+      export default { mdx: { [dynamic]: "./X.tsx" } };
+    `);
+    expect(result.mdx).toEqual([]);
+  });
+
+  it("resolves a bare identifier value for an override", () => {
+    const result = analyze(`
+      import MyChart from "./Chart.tsx";
+      export default { mdx: { Chart: MyChart } };
+    `);
+    const [chart] = result.mdx;
+    expect(chart?.key).toBe("Chart");
+    expect(chart?.identifier).toBe(true);
+    expect(chart?.source?.path).toBe("/project/Chart.tsx");
+    expect(result.warnings.join(" ")).toContain("no hydration mode");
+  });
+
+  it("warns when a descriptor object has no `component` field", () => {
+    const result = analyze(`
+      export default { mdx: { X: { client: "load" } } };
+    `);
+    expect(result.mdx).toEqual([]);
+    expect(result.warnings.join(" ")).toContain("without a `component` field");
+  });
+});
+
+describe("analyzeComponentOverrides with real files", () => {
+  const dirs: string[] = [];
+
+  afterAll(async () => {
+    await Promise.all(
+      dirs.map((dir) => rm(dir, { force: true, recursive: true }))
+    );
+  });
+
+  const makeProject = async (
+    files: Record<string, string>
+  ): Promise<string> => {
+    const dir = await mkdtemp(join(tmpdir(), "blume-overrides-"));
+    dirs.push(dir);
+    await Promise.all(
+      Object.entries(files).map(async ([rel, content]) => {
+        const abs = join(dir, rel);
+        await mkdir(dirname(abs), { recursive: true });
+        await writeFile(abs, content);
+      })
+    );
+    return dir;
+  };
+
+  it("probes extensions for an extensionless relative path", async () => {
+    const dir = await makeProject({
+      "Widget.tsx": "export default () => null;",
+    });
+    const result = analyzeComponentOverrides(
+      'export default { mdx: { Widget: "./Widget" } };',
+      join(dir, "components.ts")
+    );
+    const [widget] = result.mdx;
+    expect(widget?.source?.path).toBe(join(dir, "Widget.tsx"));
+    expect(widget?.source?.framework).toBe("react");
+  });
+
+  it("keeps an extensionless path unresolved when no file is found", async () => {
+    const dir = await makeProject({ "keep.txt": "noop" });
+    const result = analyzeComponentOverrides(
+      'export default { mdx: { Missing: "./DoesNotExist" } };',
+      join(dir, "components.ts")
+    );
+    const [missing] = result.mdx;
+    expect(missing?.source?.path).toBe(join(dir, "DoesNotExist"));
+    expect(missing?.source?.framework).toBeNull();
+  });
 });
 
 describe("planComponentSlots", () => {
@@ -195,5 +359,39 @@ describe("planComponentSlots", () => {
     const contents = plan.wrappers.map((w) => w.content).join("\n");
     expect(contents).toContain('client:media="(min-width: 40rem)"');
     expect(contents).toContain('client:only="react"');
+  });
+
+  it("emits client:idle for an idle-hydrated override", () => {
+    const plan = planComponentSlots(FILE, mdxAnalysis({ client: "idle" }));
+    expect(plan.wrappers[0]?.content).toContain("client:idle");
+  });
+
+  it("falls back to client:load when client:media has no media query", () => {
+    const plan = planComponentSlots(FILE, mdxAnalysis({ client: "media" }));
+    const content = plan.wrappers[0]?.content ?? "";
+    expect(content).toContain("client:load");
+    expect(content).not.toContain("client:media");
+  });
+
+  it("falls back to client:load for client:only without a framework", () => {
+    const plan = planComponentSlots(
+      FILE,
+      mdxAnalysis({
+        client: "only",
+        source: {
+          framework: null,
+          name: "default",
+          path: "/project/Solo.astro",
+        },
+      })
+    );
+    const content = plan.wrappers[0]?.content ?? "";
+    expect(content).toContain("client:load");
+    expect(content).not.toContain("client:only");
+  });
+
+  it("emits client:load for the default hydration mode", () => {
+    const plan = planComponentSlots(FILE, mdxAnalysis({ client: "load" }));
+    expect(plan.wrappers[0]?.content).toContain("client:load");
   });
 });

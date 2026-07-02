@@ -1,6 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 
-import { flushStdout, reportDiagnostics } from "../src/cli/log.ts";
+import {
+  flushStdout,
+  reportDiagnostics,
+  reportDiagnosticsJson,
+} from "../src/cli/log.ts";
 import type { Diagnostic } from "../src/core/types.ts";
 
 const warning: Diagnostic = {
@@ -46,6 +50,61 @@ describe("reportDiagnostics", () => {
     const hadErrors = reportDiagnostics([error, warning]);
     expect(hadErrors).toBe(true);
     expect(output).toContain("1 error(s), 1 warning(s)");
+  });
+});
+
+const captureStdout = (
+  run: () => boolean
+): { out: string; result: boolean } => {
+  let out = "";
+  const spy = spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    out += String(chunk);
+    return true;
+  });
+  let result: boolean;
+  try {
+    result = run();
+  } finally {
+    spy.mockRestore();
+  }
+  return { out, result };
+};
+
+describe("reportDiagnosticsJson", () => {
+  const secret: Diagnostic = {
+    code: "BLUME_MISSING_SECRET",
+    file: "/root/apps/docs/blume.config.ts",
+    message: "needs a secret",
+    severity: "error",
+  };
+
+  it("emits enriched diagnostics with a root-relative file and reports errors", () => {
+    const { out, result } = captureStdout(() =>
+      reportDiagnosticsJson([secret, warning], "/root")
+    );
+    expect(result).toBe(true);
+    const payload = JSON.parse(out) as {
+      diagnostics: Diagnostic[];
+      summary: Record<string, number>;
+    };
+    // enrichDiagnostic fills docsUrl from the code map.
+    expect(payload.diagnostics[0]?.docsUrl).toBe(
+      "https://useblume.dev/docs/deployment"
+    );
+    // The absolute file is made relative to root.
+    expect(payload.diagnostics[0]?.file).toBe("apps/docs/blume.config.ts");
+    expect(payload.summary).toEqual({ error: 1, info: 0, warning: 1 });
+  });
+
+  it("leaves the file absolute when no root is given and reports no errors", () => {
+    const { out, result } = captureStdout(() =>
+      reportDiagnosticsJson([{ ...secret, severity: "warning" }])
+    );
+    expect(result).toBe(false);
+    const payload = JSON.parse(out) as { diagnostics: Diagnostic[] };
+    expect(payload.diagnostics[0]?.file).toBe(
+      "/root/apps/docs/blume.config.ts"
+    );
   });
 });
 

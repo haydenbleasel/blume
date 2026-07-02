@@ -70,6 +70,24 @@ describe("scanProject", () => {
     );
   });
 
+  it("applies CLI config overrides over the loaded config", async () => {
+    const root = await makeProject({ "guides/index.md": "# Home\n" });
+    const project = await scanProject(root, {
+      overrides: {
+        adapter: "node",
+        base: "/docs",
+        contentRoot: "guides",
+        output: "server",
+      },
+    });
+
+    expect(project.config.content.root).toBe("guides");
+    expect(project.config.deployment.adapter).toBe("node");
+    expect(project.config.deployment.base).toBe("/docs");
+    expect(project.config.deployment.output).toBe("server");
+    expect(project.context.contentRoot.endsWith("guides")).toBe(true);
+  });
+
   it("throws a BlumeError when the content root is missing", async () => {
     const root = await makeProject({ "README.md": "# no docs here\n" });
     let thrown: unknown;

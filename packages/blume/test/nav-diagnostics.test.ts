@@ -65,6 +65,54 @@ describe("validateNavIcons", () => {
     expect(result).toEqual([]);
   });
 
+  it("collects icons from tab items and selectors", () => {
+    const result = validateNavIcons(
+      nav({
+        selectors: [
+          {
+            items: [{ icon: "bad-selector-icon", label: "V1", path: "/v1" }],
+            kind: "version",
+            label: "Version",
+          },
+        ],
+        tabs: [
+          {
+            items: [{ icon: "bad-tab-item-icon", label: "Sub", path: "/sub" }],
+            label: "Home",
+            path: "/",
+          },
+        ],
+      })
+    );
+    const messages = result.map((d) => d.message).join(" ");
+    expect(messages).toContain("bad-tab-item-icon");
+    expect(messages).toContain("bad-selector-icon");
+  });
+
+  it("collects icons from sidebar variants", () => {
+    const result = validateNavIcons(
+      nav({
+        sidebarVariants: [
+          {
+            path: "/guides",
+            sidebar: [
+              {
+                icon: "bogus-variant-icon",
+                kind: "page",
+                label: "A",
+                pageId: "a",
+                route: "/a",
+              },
+            ],
+          },
+        ],
+      })
+    );
+    expect(result.map((d) => d.message).join(" ")).toContain(
+      "bogus-variant-icon"
+    );
+  });
+
   it("recurses into groups and dedupes repeated unknown icons", () => {
     const result = validateNavIcons(
       nav({
@@ -125,6 +173,22 @@ describe("validateNavTargets", () => {
     expect(result).toEqual([]);
   });
 
+  it("warns when a selector item points at a route with no pages", () => {
+    const result = validateNavTargets(
+      nav({
+        selectors: [
+          {
+            items: [{ label: "V2", path: "/v2" }],
+            kind: "version",
+            label: "Version",
+          },
+        ],
+      }),
+      new Set(["/v1"])
+    );
+    expect(result.map((d) => d.code)).toContain("BLUME_NAV_MISSING_PAGE");
+  });
+
   it("ignores external tab paths", () => {
     const result = validateNavTargets(
       nav({ tabs: [{ label: "Blog", path: "https://x.dev/blog" }] }),
@@ -148,12 +212,48 @@ describe("validateNavStructure", () => {
     expect(result.map((d) => d.code)).toContain("BLUME_NAV_DUPLICATE_LABEL");
   });
 
+  it("warns on duplicate labels within a sidebar variant section", () => {
+    const result = validateNavStructure(
+      nav({
+        sidebarVariants: [
+          {
+            path: "/guides",
+            sidebar: [
+              { kind: "page", label: "Intro", pageId: "a", route: "/a" },
+              { kind: "page", label: "Intro", pageId: "b", route: "/b" },
+            ],
+          },
+        ],
+      }),
+      []
+    );
+    const dup = result.find((d) => d.code === "BLUME_NAV_DUPLICATE_LABEL");
+    expect(dup?.message).toContain('in the "/guides" section');
+  });
+
   it("warns when a hidden page appears in the sidebar", () => {
     const result = validateNavStructure(
       nav({
         sidebar: [{ kind: "page", label: "Secret", pageId: "s", route: "/s" }],
       }),
       [page("s", true), page("v", false)]
+    );
+    expect(result.map((d) => d.code)).toContain("BLUME_NAV_HIDDEN_IN_SIDEBAR");
+  });
+
+  it("warns when a hidden page appears in a sidebar variant", () => {
+    const result = validateNavStructure(
+      nav({
+        sidebarVariants: [
+          {
+            path: "/guides",
+            sidebar: [
+              { kind: "page", label: "Secret", pageId: "s", route: "/s" },
+            ],
+          },
+        ],
+      }),
+      [page("s", true)]
     );
     expect(result.map((d) => d.code)).toContain("BLUME_NAV_HIDDEN_IN_SIDEBAR");
   });
