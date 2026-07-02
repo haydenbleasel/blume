@@ -37,15 +37,43 @@ blume <command> [options]
 - `blume build --output static|server --adapter vercel|node|netlify|cloudflare --base /docs` — override the deployment output, adapter, and base path from `blume.config.ts`.
 - `blume build --analyze` — print the client JavaScript bundle sizes (largest first) after the build.
 - `blume build --budget-js <kb> --budget-css <kb>` — fail the build when total client JavaScript/CSS exceeds the budget, turning a performance target into a CI gate.
+- `blume build --isolated` — build into a throwaway `.blume-verify/` runtime (and its own `dist/`) instead of `.blume/`, so a running `blume dev` server and your real `dist/` are left untouched. See [Verifying while the dev server runs](#verifying-while-the-dev-server-runs).
 - `blume preview --host --port <n>` — bind the preview server.
 - `blume sync --force` — re-fetch remote sources, dropping the cached snapshot first.
 - `blume add <item> --force` — overwrite files that already exist.
 - `blume check --preview` — include drafts and unpublished CMS content when checking.
 - `blume check --strict` — fail on content diagnostics as well as type errors.
+- `blume check --isolated` — type-check in a throwaway `.blume-verify/` runtime so a running `blume dev` server is left untouched. See [Verifying while the dev server runs](#verifying-while-the-dev-server-runs).
 - `blume eject --yes` — skip the confirmation prompt.
 - `blume validate --external` — also check external links over the network.
 - `blume validate --strict` — exit non-zero on warnings too.
 - `blume validate --json` / `blume doctor --json` — emit diagnostics as JSON on stdout (with `code`, `severity`, `file`, `line`/`column`, and `docsUrl`) for CI and editor integrations.
+
+## Verifying while the dev server runs
+
+`blume dev` serves a live Astro server rooted at the generated `.blume/` runtime and regenerates it on every change. `blume build` and `blume check` regenerate the _same_ `.blume/`, so running either while the dev server is live would corrupt it — both refuse with an error and exit non-zero:
+
+```
+A `blume dev` server is running against .blume; building would corrupt it.
+Stop the dev server, or re-run with --isolated to build/verify against
+.blume-verify without touching it.
+```
+
+The `--isolated` flag is the escape hatch. It relocates the entire generated runtime (and, for `build`, its output `dist/`) to a sibling `.blume-verify/` directory, so the verification never writes anything the dev server — or your real `dist/` — depends on:
+
+```bash
+# In a second terminal, while `blume dev` is running:
+blume check --isolated   # fast: type-check the .astro/config changes
+blume build --isolated   # thorough: full production render into .blume-verify/dist
+```
+
+`check --isolated` is the quick path (Astro type + template diagnostics, no `dist/`); `build --isolated` is the heavier one that also catches runtime render errors. Isolated builds skip the deploy post-steps (search index, hosted-provider sync, `llms.txt`, sitemap/robots, redirects) — a verify only needs to confirm the site compiles and renders, not publish it. Blume adds `.blume-verify/` to your `.gitignore` automatically.
+
+This is especially useful when a coding agent needs to verify changes while you keep the dev server open. To make plain `blume build`/`blume check` isolate without the flag — for example in an agent's shell — set `BLUME_RUNTIME_DIR` to the runtime directory to use:
+
+```bash
+export BLUME_RUNTIME_DIR=.blume-verify
+```
 
 ## Type-checking
 

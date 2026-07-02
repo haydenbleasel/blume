@@ -60,10 +60,32 @@ describe("resolveProjectContext", () => {
     expect(ctx.root).toBe(dir);
     expect(ctx.contentRoot).toBe(join(dir, "docs"));
     expect(ctx.outDir).toBe(join(dir, ".blume"));
+    expect(ctx.distDir).toBe(join(dir, "dist"));
     expect(ctx.pagesRoot).toBe(join(dir, "pages"));
     expect(ctx.componentsFile).toBe(join(dir, "components.ts"));
     expect(ctx.themeFile).toBe(join(dir, "theme.css"));
     expect(ctx.configFile).toBe(join(dir, "blume.config.ts"));
+  });
+
+  it("relocates the runtime and its dist under a runtimeDir override", async () => {
+    const dir = await makeDir([]);
+    const ctx = resolveProjectContext(dir, defaults, {
+      runtimeDir: ".blume-verify",
+    });
+    expect(ctx.outDir).toBe(join(dir, ".blume-verify"));
+    expect(ctx.distDir).toBe(join(dir, ".blume-verify", "dist"));
+    // Everything else stays anchored at the real project root.
+    expect(ctx.root).toBe(dir);
+    expect(ctx.contentRoot).toBe(join(dir, "docs"));
+  });
+
+  it("keeps an absolute runtimeDir override unchanged", async () => {
+    const dir = await makeDir([]);
+    const ctx = resolveProjectContext(dir, defaults, {
+      runtimeDir: "/abs/.blume-verify",
+    });
+    expect(ctx.outDir).toBe("/abs/.blume-verify");
+    expect(ctx.distDir).toBe(join("/abs/.blume-verify", "dist"));
   });
 
   it("leaves optional paths null when their files are absent", async () => {

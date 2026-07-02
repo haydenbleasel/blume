@@ -5,11 +5,18 @@ import { sync } from "astro";
 import { defineCommand } from "citty";
 import { join } from "pathe";
 
+import { ensureGitignore } from "../../core/gitignore.ts";
+import { refuseIfDevRunning } from "../dev-lock.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
 export const checkCommand = defineCommand({
   args: {
+    isolated: {
+      description:
+        "Type-check in an isolated .blume-verify runtime so a running dev server is untouched. For verifying changes while `blume dev` runs.",
+      type: "boolean",
+    },
     preview: {
       description: "Include drafts and unpublished CMS content.",
       type: "boolean",
@@ -25,10 +32,23 @@ export const checkCommand = defineCommand({
   },
   async run({ args }) {
     const root = process.cwd();
+
+    // `blume check` regenerates `.blume` just like `build`, so it must refuse a
+    // live dev server unless isolated. `--isolated` (or BLUME_RUNTIME_DIR)
+    // relocates the runtime to `.blume-verify`, which dev never locks.
+    const runtimeDir = args.isolated
+      ? ".blume-verify"
+      : process.env.BLUME_RUNTIME_DIR;
+    refuseIfDevRunning(root, "checking", runtimeDir);
+    if (args.isolated) {
+      await ensureGitignore(root, [".blume-verify/"]);
+    }
+
     const project = await prepareProject({
       mode: "build",
       preview: args.preview,
       root,
+      runtimeDir,
       strict: args.strict,
     });
 

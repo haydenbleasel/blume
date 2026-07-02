@@ -8,6 +8,7 @@ import {
 
 import { join } from "pathe";
 
+import { resolveRuntimeDir } from "../core/project.ts";
 import { logger } from "./log.ts";
 
 /**
@@ -71,13 +72,20 @@ export const acquireDevLock = (outDir: string): (() => void) => {
 };
 
 /**
- * Exit with an error when a live `blume dev` owns the `.blume` dir under `root`.
- * `action` names the operation being refused (e.g. "building").
+ * Exit with an error when a live `blume dev` owns the runtime dir under `root`.
+ * `action` names the operation being refused (e.g. "building"). `runtimeDir`
+ * relocates the checked dir: an isolated verify (`.blume-verify`) targets a dir
+ * dev never locks, so it proceeds; a default or `--runtime-dir .blume` run still
+ * refuses.
  */
-export const refuseIfDevRunning = (root: string, action: string): void => {
-  if (isDevLocked(join(root, ".blume"))) {
+export const refuseIfDevRunning = (
+  root: string,
+  action: string,
+  runtimeDir?: string
+): void => {
+  if (isDevLocked(resolveRuntimeDir(root, runtimeDir))) {
     logger.error(
-      `A \`blume dev\` server is running against .blume; ${action} would corrupt it. Stop the dev server first.`
+      `A \`blume dev\` server is running against .blume; ${action} would corrupt it. Stop the dev server, or re-run with --isolated to build/verify against .blume-verify without touching it.`
     );
     process.exit(1);
   }

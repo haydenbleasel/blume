@@ -24,6 +24,8 @@ export interface PrepareOptions {
   refresh?: boolean;
   /** CLI config overrides (e.g. `--output`, `--content-dir`). */
   overrides?: ConfigOverrides;
+  /** Relocate the generated runtime (e.g. `.blume-verify` for `--isolated`). */
+  runtimeDir?: string;
 }
 
 /**
@@ -45,6 +47,7 @@ export const prepareProject = async (
       overrides: options.overrides,
       preview: options.preview,
       refresh: options.refresh,
+      runtimeDir: options.runtimeDir,
     });
   } catch (error) {
     if (error instanceof BlumeError) {

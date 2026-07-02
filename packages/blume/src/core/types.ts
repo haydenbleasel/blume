@@ -54,6 +54,13 @@ export interface ProjectContext {
   pagesRoot: string | null;
   /** Absolute path to the generated runtime (`<root>/.blume`). */
   outDir: string;
+  /**
+   * Absolute path to the Astro build output. `<root>/dist` normally; for a
+   * relocated runtime (isolated verify build) it lives under the runtime dir so
+   * it never empties the real `dist/`. Optional so hand-built test contexts and
+   * older callers still typecheck; `resolveProjectContext` always sets it.
+   */
+  distDir?: string;
   /** Absolute path to the user `theme.css`, if present. */
   themeFile: string | null;
   /** Absolute path to the user `components.ts`/`.tsx`, if present. */

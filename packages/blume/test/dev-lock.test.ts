@@ -111,4 +111,41 @@ describe("refuseIfDevRunning", () => {
       errorSpy.mockRestore();
     }
   });
+
+  it("proceeds for an isolated runtime dir even when .blume is locked", async () => {
+    const root = await rootDir();
+    // Dev owns <root>/.blume, but an isolated build targets .blume-verify.
+    acquireDevLock(join(root, ".blume"));
+    const exit = spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("exit");
+    }) as never);
+    try {
+      expect(() =>
+        refuseIfDevRunning(root, "building", ".blume-verify")
+      ).not.toThrow();
+      expect(exit).not.toHaveBeenCalled();
+    } finally {
+      exit.mockRestore();
+    }
+  });
+
+  it("still refuses when the runtime dir override points back at .blume", async () => {
+    const root = await rootDir();
+    acquireDevLock(join(root, ".blume"));
+    const errorSpy = spyOn(logger, "error").mockImplementation((() => {
+      // Swallow the diagnostic so the test output stays clean.
+    }) as never);
+    const exit = spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("exit");
+    }) as never);
+    try {
+      expect(() => refuseIfDevRunning(root, "building", ".blume")).toThrow(
+        "exit"
+      );
+      expect(exit).toHaveBeenCalledWith(1);
+    } finally {
+      exit.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
 });

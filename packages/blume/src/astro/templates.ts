@@ -180,6 +180,10 @@ const renderUserAliases = (
     )
     .join("");
 
+/** Astro's build output dir: the runtime's own `distDir`, else `<root>/dist`. */
+const astroOutDir = (context: ProjectContext): string =>
+  context.distDir ?? `${context.root}/dist`;
+
 export const astroConfigTemplate = (options: {
   context: ProjectContext;
   config: ResolvedConfig;
@@ -326,7 +330,7 @@ ${twoslashImport}${reactImport}${vueImport}${svelteImport}${blumeImport}${adapte
 export default defineConfig({
   root: ${JSON.stringify(context.outDir)},
   srcDir: ${JSON.stringify(`${context.outDir}/src`)},
-  outDir: ${JSON.stringify(`${context.root}/dist`)},
+  outDir: ${JSON.stringify(astroOutDir(context))},
   publicDir: ${JSON.stringify(`${context.root}/public`)},
   output: ${JSON.stringify(deployment.output)},${adapterOption}${siteOption}${baseOption}${redirectsOption}${i18nOption}${fontsOption}
   integrations: [${integrations.join(", ")}],

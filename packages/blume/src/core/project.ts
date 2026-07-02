@@ -29,12 +29,26 @@ export const findConfigFile = (root: string): string | null =>
   firstExisting(root, CONFIG_FILENAMES);
 
 /**
+ * Resolve the generated runtime directory for a project. Defaults to
+ * `<root>/.blume`; an override (e.g. `.blume-verify` for an isolated build that
+ * runs alongside a live `blume dev`) may be relative to the root or absolute.
+ */
+export const resolveRuntimeDir = (
+  root: string,
+  runtimeDir = ".blume"
+): string =>
+  isAbsolute(runtimeDir) ? runtimeDir : join(resolve(root), runtimeDir);
+
+/**
  * Resolve every path Blume needs from a project root and its resolved config.
- * Paths are absolute and normalized.
+ * Paths are absolute and normalized. `options.runtimeDir` relocates the whole
+ * generated runtime (and its build output) so a verify build/check can run
+ * without touching a live dev server's `.blume/` or the real `dist/`.
  */
 export const resolveProjectContext = (
   root: string,
-  config: ResolvedConfig
+  config: ResolvedConfig,
+  options?: { runtimeDir?: string }
 ): ProjectContext => {
   const absoluteRoot = resolve(root);
   const contentRoot = isAbsolute(config.content.root)
@@ -44,11 +58,19 @@ export const resolveProjectContext = (
   const pagesPath = join(absoluteRoot, config.content.pages);
   const pagesRoot = existsSync(pagesPath) ? pagesPath : null;
 
+  const outDir = resolveRuntimeDir(absoluteRoot, options?.runtimeDir);
+  // A relocated runtime keeps its build output self-contained under itself, so a
+  // verify build never empties the user's real `<root>/dist`.
+  const distDir = options?.runtimeDir
+    ? join(outDir, "dist")
+    : join(absoluteRoot, "dist");
+
   return {
     componentsFile: firstExisting(absoluteRoot, COMPONENTS_FILENAMES),
     configFile: findConfigFile(absoluteRoot),
     contentRoot,
-    outDir: join(absoluteRoot, ".blume"),
+    distDir,
+    outDir,
     pagesRoot,
     root: absoluteRoot,
     themeFile: firstExisting(absoluteRoot, THEME_FILENAMES),

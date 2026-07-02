@@ -6,6 +6,8 @@ import { defineCommand } from "citty";
 import { join } from "pathe";
 
 import { buildLlmsFiles } from "../../ai/llms.ts";
+import { ensureGitignore } from "../../core/gitignore.ts";
+import type { BlumeProject } from "../../core/project-graph.ts";
 import type { ResolvedConfig } from "../../core/schema.ts";
 import { serverFeatures } from "../../core/server-features.ts";
 import {
@@ -169,6 +171,82 @@ const enforceBudget = async (
   return passed ? "pass" : "fail";
 };
 
+/**
+ * Run every deploy post-step of a real (non-isolated) build: the search index +
+ * hosted-provider sync, llms.txt, sitemap/robots, redirect files, the summary
+ * box, and the optional bundle report / budget gate. Exits non-zero if a budget
+ * is exceeded. Isolated verify builds skip all of this.
+ */
+const publishBuildArtifacts = async (
+  project: BlumeProject,
+  distDir: string,
+  args: { analyze?: boolean; "budget-css"?: string; "budget-js"?: string }
+): Promise<void> => {
+  if (project.config.search.provider === "pagefind") {
+    logger.start("Building search index");
+    const indexed = await buildSearchIndex(distDir);
+    logger.success(`Indexed ${indexed} page(s) for search`);
+  }
+
+  // Upload the index to a hosted provider (Algolia, Orama Cloud, Typesense).
+  // Skipped with a warning when its admin key isn't configured.
+  await syncSearchProvider(project, {
+    start: (message) => logger.start(message),
+    success: (message) => logger.success(message),
+    warn: (message) => logger.warn(message),
+  });
+
+  if (project.config.ai.llmsTxt) {
+    const { index, full } = await buildLlmsFiles(project);
+    await Promise.all([
+      writeFile(join(distDir, "llms.txt"), index, "utf-8"),
+      writeFile(join(distDir, "llms-full.txt"), full, "utf-8"),
+    ]);
+    logger.success("Generated llms.txt and llms-full.txt");
+  }
+
+  // A user's own public/ file (copied into dist by Astro) always wins.
+  const sitemap = buildSitemap(project);
+  if (sitemap && !existsSync(join(distDir, "sitemap.xml"))) {
+    await writeFile(join(distDir, "sitemap.xml"), sitemap, "utf-8");
+    logger.success("Generated sitemap.xml");
+  }
+
+  const robots = buildRobots(project);
+  if (robots && !existsSync(join(distDir, "robots.txt"))) {
+    await writeFile(join(distDir, "robots.txt"), robots, "utf-8");
+    logger.success("Generated robots.txt");
+  }
+
+  await emitRedirectFiles(project.config, distDir);
+
+  const { config } = project;
+  const features = serverFeatures(config);
+  logger.box(
+    [
+      `Output     ${config.deployment.output}`,
+      `Adapter    ${config.deployment.adapter ?? "none"}`,
+      `Site       ${config.deployment.site ?? "not set"}`,
+      `Search     ${config.search.provider}`,
+      `Redirects  ${config.redirects.length}`,
+      `Sitemap    ${sitemap ? "yes" : "no (set deployment.site)"}`,
+      `Robots     ${robots ? "yes" : "no"}`,
+      `LLM files  ${config.ai.llmsTxt ? "yes" : "no"}`,
+      `Server features  ${features.length > 0 ? features.join(", ") : "none"}`,
+    ].join("\n")
+  );
+
+  if (args.analyze) {
+    await reportBundleSizes(distDir);
+  }
+
+  if ((await enforceBudget(distDir, args)) === "fail") {
+    process.exit(1);
+  }
+
+  logger.success(`Built to ${distDir}`);
+};
+
 export const buildCommand = defineCommand({
   args: {
     adapter: {
@@ -191,6 +269,11 @@ export const buildCommand = defineCommand({
       description: "Fail if total client JavaScript exceeds this many kB.",
       type: "string",
     },
+    isolated: {
+      description:
+        "Build into an isolated .blume-verify runtime (and its own dist) so a running dev server and the real dist/ are untouched. For verifying changes while `blume dev` runs.",
+      type: "boolean",
+    },
     output: {
       description: "Output mode: static | server.",
       type: "string",
@@ -207,7 +290,18 @@ export const buildCommand = defineCommand({
   },
   async run({ args }) {
     const root = process.cwd();
-    refuseIfDevRunning(root, "building");
+
+    // `--isolated` (or BLUME_RUNTIME_DIR) relocates the whole runtime to a
+    // sibling dir so this build never touches a live dev server's `.blume/` or
+    // the user's real `dist/`. A non-default runtime dir has no dev lock, so the
+    // refusal below lets it proceed; a plain build still refuses.
+    const runtimeDir = args.isolated
+      ? ".blume-verify"
+      : process.env.BLUME_RUNTIME_DIR;
+    refuseIfDevRunning(root, "building", runtimeDir);
+    if (args.isolated) {
+      await ensureGitignore(root, [".blume-verify/"]);
+    }
 
     if (args.output && args.output !== "static" && args.output !== "server") {
       logger.error(`Invalid --output "${args.output}" (use static | server).`);
@@ -230,6 +324,7 @@ export const buildCommand = defineCommand({
       },
       preview: args.preview,
       root,
+      runtimeDir,
       strict: args.strict,
     });
 
@@ -242,70 +337,19 @@ export const buildCommand = defineCommand({
       root: project.context.outDir,
     });
 
-    const distDir = join(root, "dist");
+    const distDir = project.context.distDir ?? join(root, "dist");
 
-    if (project.config.search.provider === "pagefind") {
-      logger.start("Building search index");
-      const indexed = await buildSearchIndex(distDir);
-      logger.success(`Indexed ${indexed} page(s) for search`);
+    // An isolated build is a throwaway verify: it only needs to confirm the site
+    // compiles and renders. Skip the network post-steps (search sync) and
+    // deploy artifacts (index/llms/sitemap/robots/redirects) that only matter
+    // for a real publish and would push to hosted providers.
+    if (runtimeDir) {
+      logger.success(
+        `Isolated build OK — output at ${distDir} (not published).`
+      );
+      return;
     }
 
-    // Upload the index to a hosted provider (Algolia, Orama Cloud, Typesense).
-    // Skipped with a warning when its admin key isn't configured.
-    await syncSearchProvider(project, {
-      start: (message) => logger.start(message),
-      success: (message) => logger.success(message),
-      warn: (message) => logger.warn(message),
-    });
-
-    if (project.config.ai.llmsTxt) {
-      const { index, full } = await buildLlmsFiles(project);
-      await Promise.all([
-        writeFile(join(distDir, "llms.txt"), index, "utf-8"),
-        writeFile(join(distDir, "llms-full.txt"), full, "utf-8"),
-      ]);
-      logger.success("Generated llms.txt and llms-full.txt");
-    }
-
-    // A user's own public/ file (copied into dist by Astro) always wins.
-    const sitemap = buildSitemap(project);
-    if (sitemap && !existsSync(join(distDir, "sitemap.xml"))) {
-      await writeFile(join(distDir, "sitemap.xml"), sitemap, "utf-8");
-      logger.success("Generated sitemap.xml");
-    }
-
-    const robots = buildRobots(project);
-    if (robots && !existsSync(join(distDir, "robots.txt"))) {
-      await writeFile(join(distDir, "robots.txt"), robots, "utf-8");
-      logger.success("Generated robots.txt");
-    }
-
-    await emitRedirectFiles(project.config, distDir);
-
-    const { config } = project;
-    const features = serverFeatures(config);
-    logger.box(
-      [
-        `Output     ${config.deployment.output}`,
-        `Adapter    ${config.deployment.adapter ?? "none"}`,
-        `Site       ${config.deployment.site ?? "not set"}`,
-        `Search     ${config.search.provider}`,
-        `Redirects  ${config.redirects.length}`,
-        `Sitemap    ${sitemap ? "yes" : "no (set deployment.site)"}`,
-        `Robots     ${robots ? "yes" : "no"}`,
-        `LLM files  ${config.ai.llmsTxt ? "yes" : "no"}`,
-        `Server features  ${features.length > 0 ? features.join(", ") : "none"}`,
-      ].join("\n")
-    );
-
-    if (args.analyze) {
-      await reportBundleSizes(distDir);
-    }
-
-    if ((await enforceBudget(distDir, args)) === "fail") {
-      process.exit(1);
-    }
-
-    logger.success(`Built to ${distDir}`);
+    await publishBuildArtifacts(project, distDir, args);
   },
 });

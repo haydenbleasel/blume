@@ -88,6 +88,8 @@ export const scanProject = async (
     refresh?: boolean;
     /** CLI overrides applied over the loaded config (e.g. `--output`). */
     overrides?: ConfigOverrides;
+    /** Relocate the generated runtime (e.g. `.blume-verify` for isolation). */
+    runtimeDir?: string;
   } = {}
 ): Promise<BlumeProject> => {
   const mode = options.mode ?? "dev";
@@ -97,7 +99,9 @@ export const scanProject = async (
   });
   const { bridge } = configResult;
   const config = applyConfigOverrides(configResult.config, options.overrides);
-  const context = resolveProjectContext(root, config);
+  const context = resolveProjectContext(root, config, {
+    runtimeDir: options.runtimeDir,
+  });
 
   // Each source validates itself (e.g. the filesystem source checks its root
   // exists), replacing the single hard `contentRoot` check.
