@@ -4,8 +4,6 @@
 
 ### Errors & diagnostics (plan 18)
 
-- [ ] Remap `.blume/` stack frames back to user source
-
 ### Config (plan 04)
 
 - [ ] Resolve orphan config fields (favicon/navbar/footer/icons/contextual/styling/banner) — prune or wire

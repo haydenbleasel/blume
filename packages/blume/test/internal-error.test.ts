@@ -1,6 +1,9 @@
 import { describe, expect, it, spyOn } from "bun:test";
 
-import { reportInternalError } from "../src/cli/internal-error.ts";
+import {
+  remapBlumeStack,
+  reportInternalError,
+} from "../src/cli/internal-error.ts";
 
 const capture = (run: () => void): string => {
   let out = "";
@@ -30,5 +33,20 @@ describe("reportInternalError", () => {
     const out = capture(() => reportInternalError("just a string"));
     expect(out).toContain("BLUME_INTERNAL");
     expect(out).toContain("just a string");
+  });
+});
+
+describe("remapBlumeStack", () => {
+  it("relativizes and tags a .blume frame", () => {
+    const stack =
+      "at render (/Users/me/site/.blume/src/pages/[...slug].astro:12:5)";
+    const out = remapBlumeStack(stack);
+    expect(out).toContain(".blume/src/pages/[...slug].astro:12:5 (generated)");
+    expect(out).not.toContain("/Users/me/site/.blume");
+  });
+
+  it("leaves user source frames untouched", () => {
+    const stack = "at Foo (/Users/me/site/pages/index.astro:3:1)";
+    expect(remapBlumeStack(stack)).toBe(stack);
   });
 });

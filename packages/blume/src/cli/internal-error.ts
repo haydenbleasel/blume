@@ -8,6 +8,24 @@ const RESET = `${ESC}[0m`;
 
 const ISSUES_URL = "https://github.com/haydenbleasel/blume/issues";
 
+// Absolute paths into the hidden generated runtime (`…/.blume/…`), including any
+// trailing `:line:col`, stopping at whitespace or a closing paren.
+const BLUME_FRAME = /(?<abs>\/[^\s()]*\/\.blume\/[^\s()]*)/gu;
+
+/**
+ * Rewrite `.blume/` frames in a stack so the generated runtime reads clearly:
+ * the machine-absolute prefix is dropped to a project-relative `.blume/…` path
+ * and tagged `(generated)`, keeping the reader oriented instead of staring at a
+ * long path into a hidden directory. Frames in the user's own source (custom
+ * pages keep their real location; wrappers import user files by their real path)
+ * are untouched, so the actionable frame stays intact.
+ */
+export const remapBlumeStack = (stack: string): string =>
+  stack.replaceAll(BLUME_FRAME, (match) => {
+    const marker = match.indexOf("/.blume/");
+    return `${match.slice(marker + 1)} (generated)`;
+  });
+
 /**
  * Print an unexpected (non-{@link BlumeError}) failure in a stable, reportable
  * shape instead of a bare stack trace: a fixed `BLUME_INTERNAL` code, the
@@ -21,8 +39,9 @@ export const reportInternalError = (error: unknown): void => {
     `  ${err.message}`,
   ];
 
-  // A few frames are enough to locate the fault without burying the report.
-  const stack = (err.stack ?? "")
+  // A few frames are enough to locate the fault without burying the report;
+  // `.blume/` frames are relativized so the hidden runtime reads clearly.
+  const stack = remapBlumeStack(err.stack ?? "")
     .split("\n")
     .slice(1, 5)
     .map((line) => line.trim())
