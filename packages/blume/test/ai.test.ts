@@ -407,7 +407,11 @@ describe("askEndpointTemplate", () => {
     expect(out).toContain(
       'import { createAskContext } from "blume/ai/ask-context.ts";'
     );
-    expect(out).toContain('import askData from "../generated/ask-data.json";');
+    // The endpoint lives at `src/pages/api/ask.ts`; the data at
+    // `src/generated/ask-data.json` — so the import must climb two levels.
+    expect(out).toContain(
+      'import askData from "../../generated/ask-data.json";'
+    );
     expect(out).toContain("const ground = createAskContext(askData);");
     expect(out).toContain("const { messages, page } = await request.json();");
     expect(out).toContain("await ground(messages, page)");

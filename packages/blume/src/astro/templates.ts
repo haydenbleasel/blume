@@ -459,7 +459,7 @@ export const askEndpointTemplate = (
   if (grounded) {
     imports.push(
       'import { createAskContext } from "blume/ai/ask-context.ts";',
-      'import askData from "../generated/ask-data.json";'
+      'import askData from "../../generated/ask-data.json";'
     );
     setup += "\nconst ground = createAskContext(askData);\n";
   }
