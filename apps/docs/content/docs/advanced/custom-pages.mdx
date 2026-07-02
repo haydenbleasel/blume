@@ -211,7 +211,24 @@ generated `og:image` automatically: Blume renders an Open Graph card for every
 static custom page — the home included, the most-shared URL — served at
 `/og/<route>.png` (`/og/index.png` for `/`). The home card uses the site title
 with the description as its eyebrow; a deeper page is titled from its last path
-segment. Set `ogImage` or `canonical` explicitly to override.
+segment. Set `ogImage` or `canonical` explicitly to override either. `ogImage`
+takes a root-relative path — a file in `public/`, resolved against
+[`deployment.site`](/docs/deployment) to the absolute URL crawlers need — or an
+external URL, which passes through untouched:
+
+```astro pages/index.astro lineNumbers
+<PageLayout
+  siteUrl={config.site}
+  ogEnabled={config.og.enabled}
+  ogImage="/opengraph-image.png"
+  page={{ title: config.title }}
+>
+  <!-- page content -->
+</PageLayout>
+```
+
+Only this page changes — every other route keeps its generated card — so it's how
+you give the home page alone a bespoke share image.
 
 `page.title` is used verbatim as the document title (no `- siteTitle` suffix),
 since marketing pages usually set their own. To give a custom page the full docs

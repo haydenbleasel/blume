@@ -110,8 +110,17 @@ const route = page?.route ?? "/";
 const ogSlug = route === "/" ? "index" : route.slice(1);
 const resolvedCanonical =
   canonical ?? (siteUrl ? `${siteUrl}${route === "/" ? "" : route}` : null);
-const resolvedOgImage =
-  ogImage ?? (ogEnabled && siteUrl ? `${siteUrl}/og/${ogSlug}.png` : null);
+// An explicit `ogImage` wins. A root-relative path (e.g. an image dropped in
+// `public/`) is resolved against the site URL so crawlers get an absolute
+// `og:image`; an already-absolute URL passes through untouched. Otherwise fall
+// back to the generated OG card for this route.
+const absolutizeOgImage = (value: string): string =>
+  value.startsWith("/") && siteUrl ? `${siteUrl}${value}` : value;
+const resolvedOgImage = ogImage
+  ? absolutizeOgImage(ogImage)
+  : ogEnabled && siteUrl
+    ? `${siteUrl}/og/${ogSlug}.png`
+    : null;
 
 const initialThemeScript = themeInitScript(themeMode);
 const bannerScript = banner?.dismissible
