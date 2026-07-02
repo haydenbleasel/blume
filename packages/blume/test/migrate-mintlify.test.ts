@@ -45,7 +45,7 @@ const project = async (files: Record<string, string>): Promise<string> => {
 };
 
 describe("loadMintlifyConfig", () => {
-  it("maps docs.json branding, theme, navbar, and footer", async () => {
+  it("maps docs.json branding and theme", async () => {
     const root = await project({
       "docs.json": JSON.stringify({
         appearance: { default: "dark", strict: true },
@@ -66,8 +66,6 @@ describe("loadMintlifyConfig", () => {
     expect(config.theme?.accent).toBe("#16A34A");
     expect(config.theme?.mode).toBe("dark");
     expect(config.content?.root).toBe(".");
-    expect(config.navbar).toBeDefined();
-    expect(config.footer).toBeDefined();
   });
 
   it("builds a sidebar from navigation groups", async () => {
@@ -411,17 +409,13 @@ describe("loadMintlifyConfig navigation shapes", () => {
     expect(sidebarJson).toContain("Advanced");
     expect(sidebarJson).toContain("Reference");
 
-    const navbarJson = JSON.stringify(config.navbar);
-    expect(navbarJson).toContain("GitHub");
-    expect(navbarJson).toContain("Discord");
-
     expect(Array.isArray(nav?.sidebarVariants)).toBe(true);
     expect((nav?.sidebarVariants?.length ?? 0) > 0).toBe(true);
   });
 });
 
 describe("loadMintlifyConfig branding", () => {
-  it("maps banner, background, contextual, footer, redirects, and code theme", async () => {
+  it("maps banner, background, redirects, and code theme", async () => {
     const root = await project({
       "docs.json": JSON.stringify({
         background: {
@@ -485,9 +479,6 @@ describe("loadMintlifyConfig branding", () => {
     expect(banner?.color).toEqual({ dark: "#111", light: "#eee" });
     expect(config.theme?.backgroundImage).toBe("bg.png");
     expect(config.theme?.backgroundDecoration).toBe("grid");
-    expect(config.contextual?.display).toBe("toc");
-    expect(config.contextual?.options).toContain("copy");
-    expect(JSON.stringify(config.contextual?.options)).toContain("ChatGPT");
     expect(config.favicon).toEqual({
       dark: "/fav-dark.svg",
       light: "/fav-light.svg",
@@ -497,9 +488,6 @@ describe("loadMintlifyConfig branding", () => {
       href: "/",
       light: "/logo-light.svg",
     });
-    expect(JSON.stringify(config.footer?.links)).toContain("Resources");
-    expect(JSON.stringify(config.footer?.links)).not.toContain("Empty");
-    expect(config.footer?.socials).toEqual({ github: "https://gh.example" });
     expect(config.redirects).toContainEqual({ from: "/old", to: "/new" });
     expect(config.redirects).toContainEqual({ from: "/x", to: "/y" });
     expect(config.redirects).toHaveLength(2);
@@ -508,7 +496,6 @@ describe("loadMintlifyConfig branding", () => {
       light: "github-light",
     });
     expect(config.markdown?.math).toBe(false);
-    expect(config.styling?.eyebrows).toBe("breadcrumbs");
   });
 
   it("drops empty logo/favicon objects and maps code-theme variants", async () => {
@@ -597,8 +584,6 @@ describe("loadMintlifyConfig $ref and error handling", () => {
     });
 
     const config = await loadMintlifyConfig(root, join(root, "docs.json"));
-    expect(config.footer?.socials).toEqual({ x: "https://x.example" });
-    expect(JSON.stringify(config.footer?.links)).toContain("H");
     expect(config.redirects).toContainEqual({ from: "/a", to: "/b" });
     expect(JSON.stringify(config.navigation?.sidebar)).toContain("g/a");
   });

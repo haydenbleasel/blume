@@ -425,10 +425,6 @@ export const mapStarlightConfig = (
   }
 
   const social = mapSocial(options.social);
-  if (Object.keys(social.socials).length > 0) {
-    config.footer = { socials: social.socials };
-  }
-
   const github = mapEditLink(options.editLink) ?? social.github;
   if (github) {
     config.github = github;

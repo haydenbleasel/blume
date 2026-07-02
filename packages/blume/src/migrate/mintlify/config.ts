@@ -579,72 +579,6 @@ const mintlifySelectors = (spec: JsonObject): NavigationSelectors => {
   ].filter((selector) => selector.items.length > 0);
 };
 
-const navbarTypeLabel = (type: string | undefined): string | undefined => {
-  if (type === "github") {
-    return "GitHub";
-  }
-  if (type === "discord") {
-    return "Discord";
-  }
-  return undefined;
-};
-
-const navbarLinkType = (
-  type: string | undefined
-): "github" | "discord" | undefined =>
-  type === "github" || type === "discord" ? type : undefined;
-
-const navbarPrimaryType = (
-  type: string | undefined
-): "button" | "github" | "discord" =>
-  type === "github" || type === "discord" ? type : "button";
-
-const mintlifyNavbar = (value: unknown): NonNullable<BlumeConfig["navbar"]> => {
-  const object = asObject(value);
-  if (!object) {
-    return { links: [] };
-  }
-
-  const links = asArray(object.links).flatMap((item) => {
-    const itemObject = asObject(item);
-    const href = itemObject ? asString(itemObject.href) : undefined;
-    const type = itemObject ? asString(itemObject.type) : undefined;
-    const label = itemObject
-      ? (asString(itemObject.label) ?? navbarTypeLabel(type))
-      : undefined;
-    if (!itemObject || !href || !label) {
-      return [];
-    }
-    return [
-      withoutUndefined({
-        href,
-        icon: asString(itemObject.icon),
-        label,
-        type: navbarLinkType(type),
-      }),
-    ];
-  });
-
-  const primaryObject = asObject(object.primary);
-  const primaryHref = primaryObject ? asString(primaryObject.href) : undefined;
-  const primaryType = primaryObject
-    ? (asString(primaryObject.type) ?? "button")
-    : undefined;
-  const primaryLabel = primaryObject
-    ? (asString(primaryObject.label) ?? navbarTypeLabel(primaryType))
-    : undefined;
-  const primary =
-    primaryObject && primaryHref && primaryLabel
-      ? withoutUndefined({
-          href: primaryHref,
-          label: primaryLabel,
-          type: navbarPrimaryType(primaryType),
-        })
-      : undefined;
-
-  return withoutUndefined({ links, primary });
-};
-
 const mintignorePatterns = async (root: string): Promise<string[]> => {
   try {
     const raw = await readFile(resolve(root, ".mintignore"), "utf-8");
@@ -677,78 +611,6 @@ const mintlifyRedirects = (
     }
     return [{ from, to }];
   });
-
-const mintlifyContextual = (
-  value: unknown
-): NonNullable<BlumeConfig["contextual"]> => {
-  const object = asObject(value);
-  if (!object) {
-    return { options: [] };
-  }
-
-  const display = object.display === "toc" ? "toc" : "header";
-  const options: NonNullable<BlumeConfig["contextual"]>["options"] = [];
-  for (const option of asArray(object.options)) {
-    if (typeof option === "string") {
-      options.push(option);
-      continue;
-    }
-
-    const optionObject = asObject(option);
-    const title = optionObject ? asString(optionObject.title) : undefined;
-    if (!optionObject || !title) {
-      continue;
-    }
-
-    options.push(
-      withoutUndefined({
-        description: asString(optionObject.description),
-        href: asString(optionObject.href),
-        icon: asString(optionObject.icon),
-        title,
-      })
-    );
-  }
-
-  return { display, options };
-};
-
-const mintlifyFooter = (value: unknown): NonNullable<BlumeConfig["footer"]> => {
-  const object = asObject(value);
-  const socials = asObject(object?.socials);
-  const links = asArray(object?.links)
-    .flatMap((group) => {
-      const groupObject = asObject(group);
-      const items = asArray(groupObject?.items).flatMap((item) => {
-        const itemObject = asObject(item);
-        const label = itemObject ? asString(itemObject.label) : undefined;
-        const href = itemObject ? asString(itemObject.href) : undefined;
-        return label && href ? [{ href, label }] : [];
-      });
-      if (!groupObject || items.length === 0) {
-        return [];
-      }
-      return [
-        withoutUndefined({
-          header: asString(groupObject.header),
-          items,
-        }),
-      ];
-    })
-    .slice(0, 4);
-
-  return {
-    links,
-    socials: socials
-      ? Object.fromEntries(
-          Object.entries(socials).flatMap(([label, href]) => {
-            const hrefValue = asString(href);
-            return hrefValue ? [[label, hrefValue]] : [];
-          })
-        )
-      : {},
-  };
-};
 
 const mintlifyLogo = (value: unknown): BlumeConfig["logo"] => {
   if (typeof value === "string") {
@@ -826,21 +688,13 @@ const mintlifyChromeVariants = (spec: JsonObject): NavigationChromeVariants => {
     const banner = hasOwn(object, "banner")
       ? mintlifyBanner(object.banner)
       : undefined;
-    const footer = hasOwn(object, "footer")
-      ? mintlifyFooter(object.footer)
-      : undefined;
-    const navbar = hasOwn(object, "navbar")
-      ? mintlifyNavbar(object.navbar)
-      : undefined;
-    if (!banner && !footer && !navbar) {
+    if (!banner) {
       return [];
     }
 
     return [
       withoutUndefined({
         banner,
-        footer,
-        navbar,
         path,
       }),
     ];
@@ -914,19 +768,6 @@ const mintlifyMarkdown = (
   });
 };
 
-const mintlifyStyling = (
-  value: unknown
-): NonNullable<BlumeConfig["styling"]> => {
-  const object = asObject(value);
-  const eyebrows = asString(object?.eyebrows);
-  return withoutUndefined({
-    eyebrows:
-      eyebrows === "breadcrumbs" || eyebrows === "section"
-        ? eyebrows
-        : undefined,
-  });
-};
-
 const mintlifySeo = (value: unknown): NonNullable<BlumeConfig["seo"]> => {
   const object = asObject(value);
   const metatags = asObject(object?.metatags);
@@ -940,17 +781,6 @@ const mintlifySeo = (value: unknown): NonNullable<BlumeConfig["seo"]> => {
         )
       : {},
   };
-};
-
-const mintlifyIcons = (value: unknown): NonNullable<BlumeConfig["icons"]> => {
-  const object = asObject(value);
-  const library = object?.library;
-  return withoutUndefined({
-    library:
-      library === "fontawesome" || library === "lucide" || library === "tabler"
-        ? library
-        : undefined,
-  });
 };
 
 export const loadMintlifyConfig = async (
@@ -993,14 +823,10 @@ export const loadMintlifyConfig = async (
       ],
       root: ".",
     },
-    contextual: mintlifyContextual(spec.contextual),
     description: asString(spec.description),
     favicon: mintlifyFavicon(spec.favicon),
-    footer: mintlifyFooter(spec.footer),
-    icons: mintlifyIcons(spec.icons),
     logo: mintlifyLogo(spec.logo),
     markdown: mintlifyMarkdown(spec.markdown, styling),
-    navbar: mintlifyNavbar(spec.navbar),
     navigation: {
       chromeVariants: mintlifyChromeVariants(spec),
       selectors: mintlifySelectors(spec),
@@ -1016,7 +842,6 @@ export const loadMintlifyConfig = async (
       prompt: asString(search.prompt),
     },
     seo: mintlifySeo(seo),
-    styling: mintlifyStyling(styling),
     theme: {
       accent: asString(colors.primary) ?? "blue",
       accentDark: asString(colors.light),

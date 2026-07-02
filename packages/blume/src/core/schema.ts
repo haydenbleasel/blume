@@ -462,38 +462,6 @@ const sidebarVariantSchema = z
   })
   .strict();
 
-const navbarLinkTypeSchema = z.enum(["github", "discord"]);
-
-const navbarLinkSchema = z
-  .object({
-    href: z.string(),
-    icon: iconName.optional(),
-    label: z.string().optional(),
-    type: navbarLinkTypeSchema.optional(),
-  })
-  .strict()
-  .refine((value) => value.label !== undefined || value.type !== undefined, {
-    message: "Navbar links require either label or type.",
-  });
-
-const navbarPrimarySchema = z
-  .object({
-    href: z.string(),
-    label: z.string().optional(),
-    type: z.enum(["button", "github", "discord"]).default("button"),
-  })
-  .strict()
-  .refine((value) => value.label !== undefined || value.type !== "button", {
-    message: "Navbar primary button links require a label.",
-  });
-
-const navbarConfigSchema = z
-  .object({
-    links: z.array(navbarLinkSchema).default([]),
-    primary: navbarPrimarySchema.optional(),
-  })
-  .strict();
-
 const variablesConfigSchema = z
   .record(z.string().regex(/^[A-Za-z0-9-]+$/u), z.string())
   .default({});
@@ -525,12 +493,6 @@ const themeConfigSchema = z
     mode: z.enum(["system", "light", "dark"]).default("system"),
     radius: z.enum(["none", "sm", "md", "lg"]).default("md"),
     strict: z.boolean().default(false),
-  })
-  .strict();
-
-const iconsConfigSchema = z
-  .object({
-    library: z.enum(["fontawesome", "lucide", "tabler"]).default("lucide"),
   })
   .strict();
 
@@ -661,56 +623,9 @@ const aiConfigSchema = z
   })
   .strict();
 
-const contextualOptionSchema = z.union([
-  z.string(),
-  z
-    .object({
-      description: z.string().optional(),
-      href: z.string().optional(),
-      icon: iconName.optional(),
-      title: z.string(),
-    })
-    .passthrough(),
-]);
-
-const contextualConfigSchema = z
-  .object({
-    display: z.enum(["header", "toc"]).default("header"),
-    options: z.array(contextualOptionSchema).default([]),
-  })
-  .strict();
-
-const footerConfigSchema = z
-  .object({
-    links: z
-      .array(
-        z
-          .object({
-            header: z.string().optional(),
-            items: z
-              .array(
-                z
-                  .object({
-                    href: z.string(),
-                    label: z.string(),
-                  })
-                  .strict()
-              )
-              .default([]),
-          })
-          .strict()
-      )
-      .max(4)
-      .default([]),
-    socials: z.record(z.string(), z.string()).default({}),
-  })
-  .strict();
-
 const chromeVariantSchema = z
   .object({
     banner: bannerConfigSchema.optional(),
-    footer: footerConfigSchema.optional(),
-    navbar: navbarConfigSchema.optional(),
     path: z.string(),
   })
   .strict();
@@ -980,12 +895,6 @@ const markdownConfigSchema = z
   })
   .strict();
 
-const stylingConfigSchema = z
-  .object({
-    eyebrows: z.enum(["breadcrumbs", "section"]).default("section"),
-  })
-  .strict();
-
 /**
  * A single spec rendered by the API reference (Scalar). `spec` is a local path
  * or an `http(s)` URL; Scalar auto-detects OpenAPI vs AsyncAPI documents.
@@ -1071,7 +980,6 @@ export const blumeConfigSchema = z
     asyncapi: asyncapiConfigSchema.default({}),
     banner: bannerConfigSchema.optional(),
     content: contentConfigSchema.default({}),
-    contextual: contextualConfigSchema.default({}),
     deployment: deploymentConfigSchema.default({}),
     description: z.string().optional(),
     /**
@@ -1091,21 +999,17 @@ export const blumeConfigSchema = z
     export: exportConfigSchema.default(false),
     favicon: faviconConfigSchema.optional(),
     feedback: z.boolean().default(true),
-    footer: footerConfigSchema.default({}),
     github: githubConfigSchema.optional(),
     i18n: i18nConfigSchema.optional(),
-    icons: iconsConfigSchema.default({}),
     lastModified: lastModifiedConfigSchema.default(false),
     logo: logoConfigSchema.optional(),
     markdown: markdownConfigSchema.default({}),
     mcp: mcpConfigSchema.default({}),
-    navbar: navbarConfigSchema.default({}),
     navigation: navigationConfigSchema.default({}),
     openapi: openapiConfigSchema.default({}),
     redirects: z.array(redirectSchema).default([]),
     search: searchConfigSchema.default({}),
     seo: seoConfigSchema.default({}),
-    styling: stylingConfigSchema.default({}),
     theme: themeConfigSchema.default({}),
     title: z.string().default("Documentation"),
     toc: tocConfigSchema,

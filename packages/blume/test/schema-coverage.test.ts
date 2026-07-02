@@ -36,32 +36,20 @@ describe("banner color refinement", () => {
   });
 });
 
-describe("navbar link refinements", () => {
-  it("accepts links and a primary button that carry a label", () => {
-    const config = blumeConfigSchema.parse({
-      navbar: {
-        links: [{ href: "https://x.test", label: "Docs" }],
-        primary: { href: "https://x.test/start", label: "Start" },
-      },
-    });
-    expect(config.navbar.links[0]?.label).toBe("Docs");
-    expect(config.navbar.primary?.type).toBe("button");
-  });
-
-  it("rejects a bare navbar link with neither label nor type", () => {
-    expect(
-      blumeConfigSchema.safeParse({
-        navbar: { links: [{ href: "https://x.test" }] },
-      }).success
-    ).toBeFalsy();
-  });
-
-  it("rejects a primary button without a label", () => {
-    expect(
-      blumeConfigSchema.safeParse({
-        navbar: { primary: { href: "https://x.test" } },
-      }).success
-    ).toBeFalsy();
+describe("pruned Mintlify-compat fields", () => {
+  it("rejects config fields that were removed (navbar/footer/etc.)", () => {
+    for (const field of [
+      "navbar",
+      "footer",
+      "icons",
+      "contextual",
+      "styling",
+    ]) {
+      expect(
+        blumeConfigSchema.safeParse({ [field]: {} }).success,
+        `${field} should no longer be a valid config field`
+      ).toBe(false);
+    }
   });
 });
 

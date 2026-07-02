@@ -6,8 +6,6 @@
 
 ### Config (plan 04)
 
-- [ ] Resolve orphan config fields (favicon/navbar/footer/icons/contextual/styling/banner) — prune or wire
-
 ---
 
 ## P3 — Tooling & quality (plan 13 / 14)

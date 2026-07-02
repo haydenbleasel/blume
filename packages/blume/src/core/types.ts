@@ -183,8 +183,6 @@ export interface NavSidebarVariant {
 export interface NavChromeVariant {
   path: string;
   banner?: ResolvedConfig["banner"];
-  footer?: ResolvedConfig["footer"];
-  navbar?: ResolvedConfig["navbar"];
 }
 
 /** The complete navigation model derived from the content graph. */
