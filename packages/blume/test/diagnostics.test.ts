@@ -7,8 +7,10 @@ import {
   countBySeverity,
   createDiagnostic,
   diagnosticsFromZod,
+  enrichDiagnostic,
   formatDiagnostic,
   hasErrors,
+  resolveDocsUrl,
 } from "../src/core/diagnostics.ts";
 import type { Diagnostic } from "../src/core/types.ts";
 
@@ -113,6 +115,30 @@ describe("formatDiagnostic", () => {
     expect(formatDiagnostic(diag({ severity: "info" }))).toContain(
       `${ESC}[34m`
     );
+  });
+});
+
+describe("resolveDocsUrl / enrichDiagnostic", () => {
+  it("maps a known code to its docs page", () => {
+    expect(resolveDocsUrl("BLUME_FRONTMATTER_INVALID")).toBe(
+      "https://useblume.dev/docs/reference/frontmatter"
+    );
+  });
+
+  it("returns undefined for an unmapped code", () => {
+    expect(resolveDocsUrl("BLUME_TEST")).toBeUndefined();
+  });
+
+  it("fills docsUrl from the code map when absent", () => {
+    const out = enrichDiagnostic(diag({ code: "BLUME_CONFIG_INVALID" }));
+    expect(out.docsUrl).toBe("https://useblume.dev/docs/configuration");
+  });
+
+  it("keeps an explicit docsUrl", () => {
+    const out = enrichDiagnostic(
+      diag({ code: "BLUME_CONFIG_INVALID", docsUrl: "https://example.com" })
+    );
+    expect(out.docsUrl).toBe("https://example.com");
   });
 });
 

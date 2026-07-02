@@ -9,7 +9,6 @@
 - [ ] Missing-component diagnostic (unknown MDX tag → suggest `blume add`)
 - [ ] Hydration-mismatch diagnostic
 - [ ] Line/column on config + frontmatter errors (`diagnosticsFromZod` sets file/schemaPath but not line/column)
-- [ ] Populate `docsUrl` on diagnostics (field is formatted but never set)
 - [ ] `--json` diagnostics output for CI/editors
 - [ ] Stable internal-error contract (code + version dump) instead of raw re-throws
 

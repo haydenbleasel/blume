@@ -17,6 +17,46 @@ export class BlumeError extends Error {
 export const createDiagnostic = (diagnostic: Diagnostic): Diagnostic =>
   diagnostic;
 
+/** Docs site base; diagnostic help links resolve against it. */
+const DOCS_BASE = "https://useblume.dev";
+
+/** Diagnostic code → the docs page that explains it. */
+const DOCS_PATHS: Record<string, string> = {
+  BLUME_ADAPTER_REQUIRED: "/docs/deployment",
+  BLUME_ASSETS_UNCHECKED: "/docs/reference/cli",
+  BLUME_ASSET_FETCH_FAILED: "/docs/content/sources",
+  BLUME_BROKEN_ANCHOR: "/docs/reference/cli",
+  BLUME_BROKEN_ASSET: "/docs/reference/cli",
+  BLUME_BROKEN_LINK: "/docs/reference/cli",
+  BLUME_CONFIG_INVALID: "/docs/configuration",
+  BLUME_CONFIG_LOAD_FAILED: "/docs/configuration",
+  BLUME_CONTENT_ROOT_MISSING: "/docs/content/sources",
+  BLUME_DEAD_LINK: "/docs/reference/cli",
+  BLUME_DUPLICATE_ROUTE: "/docs/content/navigation",
+  BLUME_FRONTMATTER_INVALID: "/docs/reference/frontmatter",
+  BLUME_META_INVALID: "/docs/content/meta",
+  BLUME_META_LOAD_FAILED: "/docs/content/meta",
+  BLUME_NODE_VERSION: "/docs/quickstart",
+  BLUME_SERVER_FEATURE_REQUIRED: "/docs/deployment",
+  BLUME_SOURCE_FETCH_FAILED: "/docs/content/sources",
+  BLUME_SOURCE_MISCONFIGURED: "/docs/content/sources",
+  BLUME_SOURCE_OFFLINE: "/docs/content/sources",
+  BLUME_SOURCE_SDK_MISSING: "/docs/content/sources",
+  BLUME_SOURCE_UNAVAILABLE: "/docs/content/sources",
+};
+
+/** The docs URL that explains a diagnostic code, if one is mapped. */
+export const resolveDocsUrl = (code: string): string | undefined => {
+  const path = DOCS_PATHS[code];
+  return path ? `${DOCS_BASE}${path}` : undefined;
+};
+
+/** Fill in `docsUrl` from the code map where a diagnostic doesn't set its own. */
+export const enrichDiagnostic = (diagnostic: Diagnostic): Diagnostic =>
+  diagnostic.docsUrl
+    ? diagnostic
+    : { ...diagnostic, docsUrl: resolveDocsUrl(diagnostic.code) };
+
 /** Convert a ZodError into Blume diagnostics, anchored to a file. */
 export const diagnosticsFromZod = (
   error: ZodError,

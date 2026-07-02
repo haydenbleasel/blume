@@ -2,6 +2,7 @@ import { consola } from "consola";
 
 import {
   countBySeverity,
+  enrichDiagnostic,
   formatDiagnostic,
   hasErrors,
 } from "../core/diagnostics.ts";
@@ -19,7 +20,9 @@ export const reportDiagnostics = (
   }
 
   for (const diagnostic of diagnostics) {
-    process.stderr.write(`${formatDiagnostic(diagnostic, root)}\n`);
+    process.stderr.write(
+      `${formatDiagnostic(enrichDiagnostic(diagnostic), root)}\n`
+    );
   }
 
   const counts = countBySeverity(diagnostics);
