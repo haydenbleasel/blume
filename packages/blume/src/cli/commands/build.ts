@@ -24,6 +24,26 @@ import { prepareProject } from "../prepare.ts";
 const ADAPTERS = ["vercel", "node", "netlify", "cloudflare"] as const;
 
 /**
+ * Reject a non-numeric performance budget. `Number("250kb")` is `NaN` and
+ * `total > NaN` is always false, so a typo'd flag would silently pass the gate;
+ * fail up front instead.
+ */
+const validateBudgetFlags = (args: {
+  "budget-css"?: string;
+  "budget-js"?: string;
+}): void => {
+  for (const flag of ["budget-js", "budget-css"] as const) {
+    const value = args[flag];
+    if (value !== undefined && !(Number(value) > 0)) {
+      logger.error(
+        `Invalid --${flag} "${value}" (expected a positive number of kB).`
+      );
+      process.exit(1);
+    }
+  }
+};
+
+/**
  * Emit platform redirect files for a static build (adapters wire redirects
  * natively). Always writes the manifest; writes `_redirects`/`vercel.json` only
  * when the user hasn't shipped one via public/.
@@ -199,6 +219,7 @@ export const buildCommand = defineCommand({
       );
       process.exit(1);
     }
+    validateBudgetFlags(args);
 
     const project = await prepareProject({
       mode: "build",
