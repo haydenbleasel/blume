@@ -374,6 +374,28 @@ describe("directiveToCalloutPlugin", () => {
     );
   });
 
+  it("keeps formatted words in a [label] title", () => {
+    const label = {
+      children: [
+        { type: "text", value: "Read " },
+        { children: [{ type: "text", value: "this" }], type: "strong" },
+        { type: "text", value: " now" },
+      ],
+      data: { directiveLabel: true },
+      type: "paragraph",
+    };
+    const node = {
+      children: [label, body],
+      name: "note",
+      type: "containerDirective",
+    };
+    const result = captureReplacement((ctx) =>
+      directiveToCalloutPlugin().containerDirective(node, ctx)
+    ) as { attributes: { name: string; value: string }[] };
+    const title = result.attributes.find((a) => a.name === "title");
+    expect(title?.value).toBe("Read this now");
+  });
+
   it("leaves a non-callout directive untouched", () => {
     const node = {
       children: [body],

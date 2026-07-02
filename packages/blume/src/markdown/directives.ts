@@ -39,11 +39,18 @@ interface TextNode extends MdastNode {
   value?: string;
 }
 
-/** Concatenate the plain text of a node's immediate phrasing children. */
-const textOf = (node: MdastNode): string =>
-  ((node.children as TextNode[] | undefined) ?? [])
-    .map((child) => child.value ?? "")
-    .join("");
+/**
+ * Concatenate the plain text of a node, recursing through phrasing children so
+ * formatted labels keep every word — `:::note[Read **this**]` yields
+ * `Read this`, not `Read ` (the bolded run dropped).
+ */
+const textOf = (node: MdastNode): string => {
+  const { children } = node as { children?: MdastNode[] };
+  if (children && children.length > 0) {
+    return children.map(textOf).join("");
+  }
+  return (node as TextNode).value ?? "";
+};
 
 /**
  * Satteri MDAST plugin mapping container directives (`:::note`, `:::warning`,
