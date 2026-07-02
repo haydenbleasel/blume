@@ -106,7 +106,7 @@ const enumerateGithub = async (
   github: { owner: string; repo: string; ref: string; path: string },
   include: string[],
   doFetch: typeof fetch
-): Promise<RemoteRef[]> => {
+): Promise<{ refs: RemoteRef[]; truncated: boolean }> => {
   const { owner, repo, ref } = github;
   const base = github.path.replaceAll(/^\/|\/$/gu, "");
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${ref}?recursive=1`;
@@ -114,9 +114,12 @@ const enumerateGithub = async (
   if (!res.ok) {
     throw new Error(`${treeUrl} -> ${res.status}`);
   }
-  const body = (await res.json()) as { tree?: GithubTreeEntry[] };
+  const body = (await res.json()) as {
+    tree?: GithubTreeEntry[];
+    truncated?: boolean;
+  };
   const prefix = base ? `${base}/` : "";
-  return (body.tree ?? [])
+  const refs = (body.tree ?? [])
     .filter((node) => node.type === "blob" && node.path.startsWith(prefix))
     .map((node) => node.path.slice(prefix.length))
     .filter((rel) => matchesInclude(rel, include))
@@ -125,6 +128,9 @@ const enumerateGithub = async (
       fetchUrl: `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${prefix}${rel}`,
       ref: rel,
     }));
+  // GitHub caps the recursive tree response (~100k entries / 7MB) and flags it
+  // with `truncated`; ignoring it would silently import only part of the repo.
+  return { refs, truncated: body.truncated === true };
 };
 
 /**
@@ -140,19 +146,23 @@ export const mdxRemoteSource = (
   const cache = snapshotCache(ctx.cacheDir);
   let snapshot = new Map<string, SourceEntry>();
 
-  const enumerate = async (): Promise<RemoteRef[]> => {
+  const enumerate = async (): Promise<{
+    refs: RemoteRef[];
+    truncated: boolean;
+  }> => {
     if (options.github) {
       return await enumerateGithub(options.github, options.include, doFetch);
     }
     if (options.files && options.url) {
       const base = options.url.replace(/\/$/u, "");
-      return options.files
+      const refs = options.files
         .filter((ref) => matchesInclude(ref, options.include))
         .map((ref) => ({
           editUrl: `${base}/${ref}`,
           fetchUrl: `${base}/${ref}`,
           ref,
         }));
+      return { refs, truncated: false };
     }
     throw new BlumeError({
       code: "BLUME_SOURCE_MISCONFIGURED",
@@ -185,7 +195,14 @@ export const mdxRemoteSource = (
       options.name,
       cache,
       async () => {
-        const refs = await enumerate();
+        const { refs, truncated } = await enumerate();
+        if (truncated) {
+          skipped.push({
+            code: "BLUME_SOURCE_TRUNCATED",
+            message: `Source "${options.name}" hit GitHub's tree listing limit; some files were not enumerated. Narrow the source path or split the repo.`,
+            severity: "warning",
+          });
+        }
         const settled = await Promise.all(
           refs.map(async (ref) => {
             try {

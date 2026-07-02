@@ -298,6 +298,33 @@ describe("mdxRemoteSource (github mode)", () => {
       "nested/deep.md",
     ]);
   });
+
+  it("warns when GitHub truncates the tree listing", async () => {
+    const tree = {
+      tree: [{ path: "docs/a.md", type: "blob" }],
+      truncated: true,
+    };
+    const fetchImpl = ((input: string | URL): Promise<Response> => {
+      const url = typeof input === "string" ? input : input.toString();
+      return url.includes("api.github.com")
+        ? Promise.resolve(okJson(tree))
+        : Promise.resolve(ok("---\ntitle: A\n---\nbody\n"));
+    }) as unknown as typeof fetch;
+
+    const cacheDir = join(await makeProject({}), ".cache");
+    const source = mdxRemoteSource(
+      {
+        fetchImpl,
+        github: { owner: "acme", path: "docs", ref: "main", repo: "sdk" },
+        include: ["**/*.{md,mdx}"],
+        name: "sdk",
+      },
+      ctxFor(cacheDir)
+    );
+
+    const { diagnostics } = await source.load();
+    expect(diagnostics.map((d) => d.code)).toContain("BLUME_SOURCE_TRUNCATED");
+  });
 });
 
 describe("scanProject composition", () => {
