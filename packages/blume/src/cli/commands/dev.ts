@@ -4,6 +4,7 @@ import { dev } from "astro";
 import { defineCommand } from "citty";
 
 import { generateRuntime } from "../../astro/generate.ts";
+import { showBlumeErrorOverlay } from "../../astro/integration.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
@@ -67,6 +68,10 @@ export const devCommand = defineCommand({
       },
     });
 
+    // Mirror any initial diagnostics into the browser overlay now the server
+    // (and its HMR channel) is up.
+    showBlumeErrorOverlay(project.diagnostics);
+
     // Watch user inputs and regenerate the runtime data on change. Astro/Vite
     // hot-reloads the generated data module so nav and routes stay in sync.
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -83,6 +88,8 @@ export const devCommand = defineCommand({
             preview,
           });
           await generateRuntime(next);
+          // Surface any content/config errors in the browser overlay too.
+          showBlumeErrorOverlay(next.diagnostics);
         } catch (error) {
           logger.error(`Regeneration failed: ${(error as Error).message}`);
         }

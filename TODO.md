@@ -4,7 +4,6 @@
 
 ### Errors & diagnostics (plan 18)
 
-- [ ] Dev overlay (Blume diagnostics bridged into Vite/Astro overlay with snippet + fix + docs link)
 - [ ] Remap `.blume/` stack frames back to user source
 - [ ] Hydration-mismatch diagnostic
 
