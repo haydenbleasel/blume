@@ -7,6 +7,7 @@
 export const BUILTIN_MDX_TAGS = new Set<string>([
   "Accordion",
   "AccordionItem",
+  "ApiOverview",
   "AutoTypeTable",
   "Badge",
   "Callout",
@@ -25,6 +26,7 @@ export const BUILTIN_MDX_TAGS = new Set<string>([
   "GithubInfo",
   "Icon",
   "Math",
+  "Operation",
   "Panel",
   "Prompt",
   "Step",

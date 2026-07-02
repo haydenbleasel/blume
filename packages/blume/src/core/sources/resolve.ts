@@ -1,5 +1,7 @@
 import { join } from "pathe";
 
+import { blumeReferences } from "../../openapi/references.ts";
+import { openApiSource } from "../../openapi/source.ts";
 import type { ContentSourceConfig, ResolvedConfig } from "../schema.ts";
 import type { ProjectContext } from "../types.ts";
 import { filesystemSource } from "./filesystem.ts";
@@ -144,12 +146,8 @@ const baseName = (def: ContentSourceConfig): string => {
   return def.prefix ?? def.type;
 };
 
-/**
- * Build the ordered list of content sources for a project. With no
- * `content.sources` configured, the top-level `root`/`include`/`exclude` desugar
- * to a single implicit filesystem source, so existing projects are untouched.
- */
-export const resolveSources = (
+/** The content sources declared by config (implicit filesystem when none). */
+const contentSources = (
   config: ResolvedConfig,
   context: ProjectContext,
   runtime: SourceRuntime
@@ -171,4 +169,28 @@ export const resolveSources = (
   return defs.map((def) =>
     buildSource(def, nameFor(baseName(def)), context, runtime)
   );
+};
+
+/**
+ * Build the ordered list of content sources for a project. With no
+ * `content.sources` configured, the top-level `root`/`include`/`exclude` desugar
+ * to a single implicit filesystem source, so existing projects are untouched.
+ * A Blume-rendered OpenAPI reference contributes an internal staged source that
+ * lowers each operation into a real content page (routing/nav/search/OG).
+ */
+export const resolveSources = (
+  config: ResolvedConfig,
+  context: ProjectContext,
+  runtime: SourceRuntime
+): ContentSource[] => {
+  const sources = contentSources(config, context, runtime);
+
+  const references = blumeReferences(config);
+  if (references.length > 0) {
+    sources.push(
+      openApiSource(references, sourceContext(context, "openapi", runtime))
+    );
+  }
+
+  return sources;
 };

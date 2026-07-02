@@ -39,7 +39,9 @@ import { scanProject } from "../core/project-graph.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ProjectContext } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
-import { buildReferenceFiles, hasReferences } from "../openapi/scalar.ts";
+import { hasScalarReferences } from "../openapi/references.ts";
+import { buildReferenceFiles } from "../openapi/scalar.ts";
+import { isOpenApiSource } from "../openapi/source.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { servesStaticIndex } from "../search/providers.ts";
 import { tailwindEntryTemplate } from "../theme/entry.ts";
@@ -47,6 +49,12 @@ import { buildThemeCss } from "../theme/palette.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
 
 const POSIX = (path: string): string => path.split("\\").join("/");
+
+/** The `blume:openapi` payload for the ejected app (`{}` when none). */
+const ejectOpenApiData = (project: BlumeProject): unknown => {
+  const source = project.sources.find(isOpenApiSource);
+  return source ? source.openApiData() : {};
+};
 
 /**
  * The Ask AI endpoint plus, unless the backend runs its own retrieval (Inkeep),
@@ -156,6 +164,7 @@ export const eject = async (root: string): Promise<string[]> => {
         needsReact,
         needsSvelte,
         needsVue,
+        openapiPath: "./src/generated/openapi.json",
         pages: relPages,
         searchClientPath: "./src/generated/search-client.ts",
         themePath: "./src/generated/app.css",
@@ -219,6 +228,10 @@ export const eject = async (root: string): Promise<string[]> => {
       path: join(genDir, "app.css"),
     },
     { content: buildRuntimeData(project), path: join(genDir, "data.json") },
+    {
+      content: `${JSON.stringify(ejectOpenApiData(project))}\n`,
+      path: join(genDir, "openapi.json"),
+    },
     {
       content: `${JSON.stringify(rawMarkdown)}\n`,
       path: join(genDir, "raw-markdown.json"),
@@ -302,7 +315,7 @@ export const eject = async (root: string): Promise<string[]> => {
 
   // Scalar API/AsyncAPI reference pages, mirrored from the generated runtime so
   // the ejected app keeps its reference routes.
-  if (hasReferences(config)) {
+  if (hasScalarReferences(config)) {
     const references = await buildReferenceFiles({
       config,
       contentRoutes: new Set(project.graph.pages.map((page) => page.route)),

@@ -373,7 +373,7 @@ const KITCHEN_SINK: Record<string, string> = {
   logo: "/logo.svg",
   markdown: { math: true },
   mcp: { enabled: true },
-  openapi: { enabled: true, spec: "./openapi.json" },
+  openapi: { enabled: true, renderer: "scalar", spec: "./openapi.json" },
   redirects: [{ from: "/old", to: "/new" }],
 };
 `,
@@ -428,6 +428,7 @@ describe("generateRuntime", () => {
     expect(has("src/blume-mcp/server-card.ts")).toBe(true);
     expect(has("src/generated/mcp-data.json")).toBe(true);
     expect(has("src/pages/reference.astro")).toBe(true);
+    expect(has("src/generated/openapi.json")).toBe(true);
     expect(has("src/generated/islands/Counter.astro")).toBe(true);
     expect(has("src/generated/examples.ts")).toBe(true);
     expect(has("src/generated/examples/demo.astro")).toBe(true);

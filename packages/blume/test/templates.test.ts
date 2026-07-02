@@ -42,6 +42,7 @@ const config = blumeConfigSchema.parse({});
 
 const DATA_PATH = "/p/.blume/src/generated/data.json";
 const EXAMPLES_PATH = "/p/.blume/src/generated/examples.ts";
+const OPENAPI_PATH = "/p/.blume/src/generated/openapi.json";
 const SEARCH_CLIENT_PATH = "/p/.blume/src/generated/search-client.ts";
 const THEME_PATH = "/p/.blume/src/generated/app.css";
 
@@ -334,7 +335,11 @@ describe("runtimeDependencies", () => {
   it("declares the React, Scalar and Ask provider deps", () => {
     const full = blumeConfigSchema.parse({
       ai: { ask: { enabled: true, provider: "openrouter" } },
-      openapi: { enabled: true },
+      openapi: {
+        enabled: true,
+        renderer: "scalar",
+        spec: "https://x.dev/openapi.json",
+      },
     });
     const deps = runtimeDependencies({ config: full, needsReact: true });
     expect(deps).toContain("@astrojs/react");
@@ -361,6 +366,7 @@ describe("astroConfigTemplate", () => {
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       needsReact: false,
+      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -397,6 +403,7 @@ describe("astroConfigTemplate", () => {
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       needsReact: false,
+      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -430,6 +437,7 @@ describe("astroConfigTemplate", () => {
       needsReact: true,
       needsSvelte: true,
       needsVue: true,
+      openapiPath: OPENAPI_PATH,
       pages: [{ entrypoint: "/p/pages/x.astro", pattern: "/x" }],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -461,6 +469,7 @@ describe("astroConfigTemplate", () => {
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       needsReact: false,
+      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -478,6 +487,7 @@ describe("astroConfigTemplate", () => {
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       needsReact: false,
+      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -518,6 +528,7 @@ describe("astroConfigTemplate workspace root", () => {
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       needsReact: false,
+      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,

@@ -26,7 +26,11 @@ const tempDir = async (prefix: string): Promise<string> => {
 describe("scalar reference builder", () => {
   it("maps the dark theme mode onto Scalar's darkMode flag", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      openapi: {
+        enabled: true,
+        renderer: "scalar",
+        spec: "https://x.dev/openapi.json",
+      },
       theme: { mode: "dark" },
     });
     const { files } = await buildReferenceFiles({
@@ -39,7 +43,11 @@ describe("scalar reference builder", () => {
 
   it("maps the light theme mode onto Scalar's darkMode flag", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      openapi: {
+        enabled: true,
+        renderer: "scalar",
+        spec: "https://x.dev/openapi.json",
+      },
       theme: { mode: "light" },
     });
     const { files } = await buildReferenceFiles({
@@ -54,6 +62,7 @@ describe("scalar reference builder", () => {
     const config = blumeConfigSchema.parse({
       openapi: {
         enabled: true,
+        renderer: "scalar",
         spec: "https://x.dev/openapi.json",
         theme: "purple",
       },
@@ -77,6 +86,7 @@ describe("scalar reference builder", () => {
     const config = blumeConfigSchema.parse({
       openapi: {
         enabled: true,
+        renderer: "scalar",
         sources: [
           { route: "/ref", spec: "openapi.json" },
           { route: "/missing", spec: "nope.json" },
@@ -102,6 +112,7 @@ describe("scalar reference builder", () => {
     const config = blumeConfigSchema.parse({
       openapi: {
         enabled: true,
+        renderer: "scalar",
         sources: [
           { label: "Public API", spec: "https://x.dev/a.json" },
           { label: "Admin API", spec: "https://x.dev/b.json" },
@@ -121,7 +132,11 @@ describe("scalar reference builder", () => {
 
   it("skips a reference whose route collides with a content page", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: { enabled: true, spec: "https://x.dev/a.json" },
+      openapi: {
+        enabled: true,
+        renderer: "scalar",
+        spec: "https://x.dev/a.json",
+      },
     });
     const { files, warnings } = await buildReferenceFiles({
       config,
@@ -138,6 +153,7 @@ describe("scalar reference builder", () => {
     const config = blumeConfigSchema.parse({
       openapi: {
         enabled: true,
+        renderer: "scalar",
         sources: [
           { route: "/dup", spec: "https://x.dev/a.json" },
           { route: "/dup", spec: "https://x.dev/b.json" },

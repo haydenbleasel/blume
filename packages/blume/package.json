@@ -50,6 +50,7 @@
     "./components": "./src/components/index.ts",
     "./components/*": "./src/components/*",
     "./core/*": "./src/core/*",
+    "./openapi/*": "./src/openapi/*",
     "./sources/*": "./src/core/sources/*",
     "./theme/*": "./src/theme/*",
     "./package.json": "./package.json"
@@ -73,6 +74,8 @@
     "@orama/orama": "^3.1.18",
     "@pierre/diffs": "^1.2.11",
     "@scalar/astro": "^0.4.5",
+    "@scalar/openapi-parser": "^0.28.8",
+    "@scalar/openapi-types": "^0.9.1",
     "@shikijs/transformers": "^4.2.0",
     "@shikijs/twoslash": "^4.2.0",
     "@tailwindcss/typography": "^0.5.20",

@@ -4,9 +4,11 @@ import type { Crumb } from "./nav-utils.ts";
 interface Props {
   /** Full breadcrumb trail from the site root to the current page. */
   crumbs: Crumb[];
+  /** Left-align full width (for the wide API layout) instead of the prose measure. */
+  wide?: boolean;
 }
 
-const { crumbs } = Astro.props;
+const { crumbs, wide = false } = Astro.props;
 
 // The built-in shows a single "eyebrow" crumb — the parent group — rather than
 // the whole trail. An override receives the complete list and can render more.
@@ -17,7 +19,10 @@ const eyebrowCrumb = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
   eyebrowCrumb && (
     <nav
       aria-label="Breadcrumb"
-      class="mx-auto mb-2 max-w-[42rem] text-muted-foreground text-sm"
+      class:list={[
+        "mb-2 text-muted-foreground text-sm",
+        wide ? "max-w-none" : "mx-auto max-w-[42rem]",
+      ]}
     >
       {eyebrowCrumb.route ? (
         <a class="hover:text-foreground" href={eyebrowCrumb.route}>

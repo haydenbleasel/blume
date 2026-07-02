@@ -1,0 +1,58 @@
+---
+import type { SchemaLike } from "./helpers.ts";
+import SchemaTable from "./SchemaTable.astro";
+
+interface MediaTypeLike {
+  schema?: SchemaLike;
+}
+
+interface RequestBodyLike {
+  description?: string;
+  required?: boolean;
+  content?: Record<string, MediaTypeLike>;
+}
+
+interface Props {
+  requestBody: RequestBodyLike;
+  schemas: Record<string, SchemaLike>;
+  expandAll?: boolean;
+}
+
+const { requestBody, schemas, expandAll = false } = Astro.props;
+
+const entries = Object.entries(requestBody.content ?? {});
+const chosen = entries.find(([type]) => type.includes("json")) ?? entries[0];
+const contentType = chosen?.[0] ?? "application/json";
+const schema = chosen?.[1]?.schema ?? {};
+---
+
+<section class="mt-8">
+  <div class="mb-2 flex flex-wrap items-center gap-2">
+    <div
+      aria-level="2"
+      class="font-semibold text-foreground text-lg"
+      role="heading"
+    >
+      Request body
+    </div>
+    {
+      requestBody.required && (
+        <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
+          required
+        </span>
+      )
+    }
+    <code class="text-muted-foreground text-xs">{contentType}</code>
+  </div>
+  {
+    requestBody.description && (
+      <div
+        class="text-muted-foreground text-sm"
+        set:text={requestBody.description}
+      />
+    )
+  }
+  <div class="mt-3">
+    <SchemaTable expandAll={expandAll} schema={schema} schemas={schemas} />
+  </div>
+</section>

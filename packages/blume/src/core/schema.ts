@@ -903,8 +903,8 @@ const markdownConfigSchema = z
   .strict();
 
 /**
- * A single spec rendered by the API reference (Scalar). `spec` is a local path
- * or an `http(s)` URL; Scalar auto-detects OpenAPI vs AsyncAPI documents.
+ * A single spec rendered by the API reference. `spec` is a local path or an
+ * `http(s)` URL (OpenAPI for the Blume renderer; OpenAPI or AsyncAPI for Scalar).
  */
 const openapiSourceSchema = z
   .object({
@@ -920,20 +920,28 @@ const openapiSourceSchema = z
 export type OpenApiSource = z.infer<typeof openapiSourceSchema>;
 
 /**
- * OpenAPI reference, delegated wholesale to Scalar (`@scalar/astro`). The
- * reference is a self-contained embed on its own route — it does not weave into
- * Blume's sidebar, search, or llms. Set `enabled: true` to opt in.
+ * OpenAPI reference. By default (`renderer: "blume"`) Blume parses the spec with
+ * Scalar's parser and renders its own UI: one real page per operation, grouped
+ * by tag in the sidebar and included in site search, llms.txt, and OG. Set
+ * `renderer: "scalar"` to fall back to the embedded Scalar SPA (a single
+ * self-contained route that doesn't weave into the sidebar or search).
  */
 const openapiConfigSchema = z
   .object({
+    /** Code-sample languages shown per operation (Blume renderer). */
+    codeSamples: z.array(z.string()).default(["curl", "js", "python"]),
     enabled: z.boolean().default(false),
+    /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
+    expandSchemas: z.boolean().default(false),
+    /** Who renders the reference: Blume's own UI, or the embedded Scalar SPA. */
+    renderer: z.enum(["blume", "scalar"]).default("blume"),
     /** Where the reference mounts. */
     route: z.string().default("/reference"),
     /** One or more specs; each renders on its own route by default. */
     sources: z.array(openapiSourceSchema).default([]),
     /** Shorthand for a single source: `sources: [{ spec }]`. */
     spec: z.string().optional(),
-    /** Scalar theme name; defaults to a Blume-derived accent override. */
+    /** Scalar theme name (Scalar renderer only). */
     theme: z.string().optional(),
   })
   .strict();

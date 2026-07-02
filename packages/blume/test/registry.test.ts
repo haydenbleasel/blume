@@ -48,7 +48,7 @@ describe("eject", () => {
       "blume.config.ts": `export default {
         ai: { ask: { enabled: true } },
         deployment: { site: "https://example.com" },
-        openapi: { enabled: true, spec: "openapi.json" },
+        openapi: { enabled: true, renderer: "scalar", spec: "openapi.json" },
         search: { mixedbread: { storeId: "store-1" }, provider: "mixedbread" },
       };\n`,
       // A blog post so an RSS feed is produced (alongside the home page).

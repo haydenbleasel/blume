@@ -1,0 +1,28 @@
+---
+interface Props {
+  method: string;
+  class?: string;
+}
+
+const { method, class: className } = Astro.props;
+const upper = method.toUpperCase();
+
+const COLORS: Record<string, string> = {
+  DELETE: "bg-red-500/15 text-red-700 dark:text-red-300",
+  GET: "bg-green-500/15 text-green-700 dark:text-green-300",
+  HEAD: "bg-muted text-muted-foreground",
+  OPTIONS: "bg-muted text-muted-foreground",
+  PATCH: "bg-yellow-500/20 text-yellow-800 dark:text-yellow-300",
+  POST: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  PUT: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+};
+const color = COLORS[upper] ?? "bg-muted text-muted-foreground";
+---
+
+<span
+  class:list={[
+    "not-prose inline-flex items-center rounded-md px-2 py-0.5 font-mono font-semibold text-xs uppercase tracking-wide",
+    color,
+    className,
+  ]}>{upper}</span
+>

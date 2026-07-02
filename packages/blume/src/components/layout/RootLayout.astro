@@ -200,9 +200,19 @@ const searchLocale =
   localeSwitch && localeSwitch.length > 1 ? locale : undefined;
 // TOC entries: the configured heading range, or none when the TOC is disabled
 // (an empty list makes TableOfContents render nothing).
-const tocHeadings = toc.enabled
-  ? headings.filter((h) => h.depth >= toc.minLevel && h.depth <= toc.maxLevel)
-  : [];
+// API operation pages own a two-column body (docs + request panel) and their own
+// right rail, so they drop the table of contents and widen the content column.
+const isApiOperation = pageType === "openapi-operation";
+const tocHeadings =
+  toc.enabled && !isApiOperation
+    ? headings.filter((h) => h.depth >= toc.minLevel && h.depth <= toc.maxLevel)
+    : [];
+const gridClass = isApiOperation
+  ? "lg:grid-cols-[17.5rem_minmax(0,1fr)]"
+  : "lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
+const articleClass = isApiOperation
+  ? "prose max-w-none"
+  : "prose mx-auto max-w-[42rem]";
 const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
 const description = page.description ?? site.description;
 
@@ -331,7 +341,7 @@ const bannerScript = banner?.dismissible
     >
       <slot name="ask" slot="ask" />
     </HeaderSlot>
-    <div class="mx-auto grid grid-cols-1 items-start lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]">
+    <div class:list={["mx-auto grid grid-cols-1 items-start", gridClass]}>
       <aside
         aria-label="Primary"
         class="fixed top-16 start-0 z-[35] h-[calc(100dvh-4rem)] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:sticky lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0! lg:border-e-0 lg:bg-transparent lg:px-4"
@@ -354,47 +364,59 @@ const bannerScript = banner?.dismissible
         </nav>
       </aside>
       <main class="min-w-0 px-6 pt-6 pb-10 lg:px-8 xl:px-10" id="blume-content">
-        <BreadcrumbsSlot crumbs={crumbs} />
+        <BreadcrumbsSlot crumbs={crumbs} wide={isApiOperation} />
         <TableOfContentsSlot
           headings={tocHeadings}
           title={strings.toc.title}
           variant="mobile"
         />
         <PageHeaderSlot headings={tocHeadings} page={page} route={page.route} />
-        <article class="prose mx-auto max-w-[42rem]" dir={contentDir}>
+        <article class:list={[articleClass]} dir={contentDir}>
           <slot />
         </article>
-        <PageFooterSlot headings={tocHeadings} page={page} route={page.route} />
         {
-          formattedLastModified && (
-            <p class="mx-auto mt-10 max-w-[42rem] text-muted-foreground text-sm">
-              {strings.page.lastUpdated} {formattedLastModified}
-            </p>
+          !isApiOperation && (
+            <>
+              <PageFooterSlot
+                headings={tocHeadings}
+                page={page}
+                route={page.route}
+              />
+              {formattedLastModified && (
+                <p class="mx-auto mt-10 max-w-[42rem] text-muted-foreground text-sm">
+                  {strings.page.lastUpdated} {formattedLastModified}
+                </p>
+              )}
+              {feedback && <FeedbackSlot strings={strings.feedback} />}
+              <PaginationSlot next={next} prev={prev} strings={strings.page} />
+            </>
           )
         }
-        {feedback && <FeedbackSlot strings={strings.feedback} />}
-        <PaginationSlot next={next} prev={prev} strings={strings.page} />
       </main>
-      <aside
-        aria-label={strings.toc.title}
-        class="sticky top-16 hidden h-[calc(100dvh-4rem)] overflow-y-auto px-4 pt-6 pb-10 text-sm xl:block"
-      >
-        <TableOfContentsSlot
-          headings={tocHeadings}
-          title={strings.toc.title}
-          variant="desktop"
-        />
-        <PageActions
-          askEnabled={askEnabled}
-          editUrl={editUrl}
-          exportEpub={exportEpub}
-          exportPdf={exportPdf}
-          mcpName={mcp?.name}
-          mcpUrl={mcpUrl}
-          route={page.route}
-          strings={strings.actions}
-        />
-      </aside>
+      {
+        !isApiOperation && (
+          <aside
+            aria-label={strings.toc.title}
+            class="sticky top-16 hidden h-[calc(100dvh-4rem)] overflow-y-auto px-4 pt-6 pb-10 text-sm xl:block"
+          >
+            <TableOfContentsSlot
+              headings={tocHeadings}
+              title={strings.toc.title}
+              variant="desktop"
+            />
+            <PageActions
+              askEnabled={askEnabled}
+              editUrl={editUrl}
+              exportEpub={exportEpub}
+              exportPdf={exportPdf}
+              mcpName={mcp?.name}
+              mcpUrl={mcpUrl}
+              route={page.route}
+              strings={strings.actions}
+            />
+          </aside>
+        )
+      }
     </div>
     <FooterSlot navigation={navigation} site={site} ui={strings} />
     {

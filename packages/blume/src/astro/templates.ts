@@ -7,6 +7,7 @@ import type { AskBackend } from "../ai/ask.ts";
 import { resolveAssetMounts } from "../core/assets.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import type { ProjectContext } from "../core/types.ts";
+import { hasScalarReferences } from "../openapi/references.ts";
 import { searchProviderMeta } from "../search/providers.ts";
 import { buildFontEntries } from "../theme/fonts.ts";
 import type { ExampleSpec } from "./examples.ts";
@@ -99,9 +100,10 @@ export const runtimeDependencies = (options: {
   if (needsSvelte) {
     deps.push("@astrojs/svelte");
   }
-  // The Scalar integration is only declared when an API reference is configured,
-  // so projects that don't use it never pull it into the runtime.
-  if (config.openapi.enabled || config.asyncapi.enabled) {
+  // The Scalar integration is only declared for a Scalar-rendered reference
+  // (the `renderer: "scalar"` fallback, or AsyncAPI). Blume-rendered OpenAPI
+  // parses at generate time and needs no runtime Scalar dependency.
+  if (hasScalarReferences(config)) {
     deps.push("@scalar/astro");
   }
   // Only the configured search provider's SDK is declared, so a project pulls in
@@ -190,6 +192,7 @@ export const astroConfigTemplate = (options: {
   examplesPath: string;
   themePath: string;
   searchClientPath: string;
+  openapiPath: string;
   /** Project tsconfig path aliases (`find` -> absolute dir), e.g. `@` -> src. */
   aliases?: Record<string, string>;
 }): string => {
@@ -199,6 +202,7 @@ export const astroConfigTemplate = (options: {
     examplesPath,
     needsSvelte,
     needsVue,
+    openapiPath,
     searchClientPath,
   } = options;
   const { deployment } = config;
@@ -357,6 +361,7 @@ export default defineConfig({
       alias: {
         "blume:data": ${JSON.stringify(dataPath)},
         "blume:examples": ${JSON.stringify(examplesPath)},
+        "blume:openapi": ${JSON.stringify(openapiPath)},
         "blume:search-client": ${JSON.stringify(searchClientPath)},
         "blume:theme": ${JSON.stringify(themePath)},${userAliasLines}
       },
@@ -927,6 +932,8 @@ import TypeTable from "blume/components/content/TypeTable.astro";
 import Visibility from "blume/components/content/Visibility.astro";
 import YouTube from "blume/components/content/YouTube.astro";
 import Icon from "blume/components/Icon.astro";
+import ApiOverview from "blume/components/openapi/ApiOverview.astro";
+import Operation from "blume/components/openapi/Operation.astro";
 ${mathImport}import { mdxComponents as userMdx, layoutOverrides } from "../generated/components.ts";
 import { islandComponents } from "../generated/islands.ts";
 import data from "../generated/data.json";
@@ -943,6 +950,7 @@ export const prerender = true;
 const components = {
   Accordion,
   AccordionItem,
+  ApiOverview,
   AutoTypeTable,
   Badge,
   Callout,
@@ -960,6 +968,7 @@ const components = {
   Frame,
   GithubInfo,
   Icon,
+  Operation,
   Panel,
   Prompt,
   Step,
@@ -1446,6 +1455,11 @@ export const envTemplate =
 declare module "blume:data" {
   const data: import("blume").BlumeData;
   export default data;
+}
+
+declare module "blume:openapi" {
+  const specs: import("blume/openapi/model.ts").OpenApiData;
+  export default specs;
 }
 
 declare module "blume:search-client" {

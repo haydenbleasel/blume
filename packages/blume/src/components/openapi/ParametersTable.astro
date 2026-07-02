@@ -1,0 +1,97 @@
+---
+import {
+  constraints,
+  resolveSchema,
+  type SchemaLike,
+  typeLabel,
+} from "./helpers.ts";
+
+interface ParamLike {
+  name?: string;
+  in?: string;
+  description?: string;
+  required?: boolean;
+  deprecated?: boolean;
+  schema?: SchemaLike;
+}
+
+interface Props {
+  parameters: ParamLike[];
+  schemas: Record<string, SchemaLike>;
+}
+
+const { parameters, schemas } = Astro.props;
+
+const SECTIONS: { in: string; title: string }[] = [
+  { in: "path", title: "Path parameters" },
+  { in: "query", title: "Query parameters" },
+  { in: "header", title: "Header parameters" },
+  { in: "cookie", title: "Cookie parameters" },
+];
+
+const groups = SECTIONS.map((section) => ({
+  items: parameters.filter((param) => param.in === section.in),
+  title: section.title,
+})).filter((group) => group.items.length > 0);
+---
+
+{
+  groups.map((group) => (
+    <section class="mt-6">
+      <div
+        aria-level="3"
+        class="mb-2 font-semibold text-foreground text-sm"
+        role="heading"
+      >
+        {group.title}
+      </div>
+      <div class="not-prose rounded-blume border border-border px-4">
+        {group.items.map((param) => {
+          const resolved = resolveSchema(schemas, param.schema ?? {});
+          const type = param.schema ? typeLabel(param.schema, schemas) : "string";
+          const limits = constraints(resolved);
+          const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
+          return (
+            <div class="border-border border-t py-3 first:border-t-0">
+              <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <code class="font-mono text-foreground text-sm">{param.name}</code>
+                <span class="text-muted-foreground text-xs">{type}</span>
+                {param.required && (
+                  <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
+                    required
+                  </span>
+                )}
+                {param.deprecated && (
+                  <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
+                    deprecated
+                  </span>
+                )}
+              </div>
+              {param.description && (
+                <div
+                  class="mt-1 text-muted-foreground text-sm"
+                  set:text={param.description}
+                />
+              )}
+              {limits.length > 0 && (
+                <div class="mt-1 text-muted-foreground text-xs">
+                  {limits.join(" · ")}
+                </div>
+              )}
+              {enumValues && (
+                <div class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                  <span class="text-muted-foreground">Allowed:</span>
+                  {enumValues.map((value) => (
+                    <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+                      {String(value)}
+                    </code>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  ))
+}

@@ -1,0 +1,86 @@
+---
+import {
+  objectProperties,
+  refName,
+  resolveSchema,
+  type SchemaLike,
+  typeLabel,
+} from "./helpers.ts";
+import SchemaProperty from "./SchemaProperty.astro";
+
+interface Props {
+  schema: SchemaLike;
+  schemas: Record<string, SchemaLike>;
+  /** `$ref` names already on the current branch, to break circular schemas. */
+  seen?: string[];
+  expandAll?: boolean;
+}
+
+const { schema, schemas, seen = [], expandAll = false } = Astro.props;
+
+// Track the ref so a self-referential model stops instead of recursing forever.
+const refLabel =
+  typeof schema.$ref === "string" ? refName(schema.$ref) : null;
+const circular = refLabel !== null && seen.includes(refLabel);
+const nextSeen = refLabel ? [...seen, refLabel] : seen;
+const resolved = circular ? schema : resolveSchema(schemas, schema);
+
+const types = Array.isArray(resolved.type) ? resolved.type : [resolved.type];
+const isArray = types.includes("array");
+// Keep array items unresolved so a self-referential item `$ref` stays trackable
+// via `seen` — resolving here would drop the name and loop forever.
+const items = isArray ? (resolved.items ?? null) : null;
+const branches = resolved.oneOf ?? resolved.anyOf ?? null;
+
+const { properties, required } = circular
+  ? { properties: [] as [string, SchemaLike][], required: new Set<string>() }
+  : objectProperties(resolved, schemas);
+---
+
+{
+  circular ? (
+    <div class="text-muted-foreground text-sm">
+      Circular reference to <code class="text-foreground">{refLabel}</code>.
+    </div>
+  ) : isArray ? (
+    <div>
+      <div class="mb-2 text-muted-foreground text-xs">
+        Array of <code class="text-foreground">{typeLabel(items ?? {}, schemas)}</code>
+      </div>
+      {items && (
+        <Astro.self schema={items} schemas={schemas} seen={nextSeen} expandAll={expandAll} />
+      )}
+    </div>
+  ) : branches ? (
+    <div class="flex flex-col gap-3">
+      <div class="text-muted-foreground text-xs">
+        {resolved.oneOf ? "One of" : "Any of"}:
+      </div>
+      {branches.map((branch, index) => (
+        <div class="rounded-blume border border-border p-3">
+          <div class="mb-2 font-medium text-foreground text-xs">
+            {typeLabel(branch, schemas) || `Option ${index + 1}`}
+          </div>
+          <Astro.self schema={branch} schemas={schemas} seen={nextSeen} expandAll={expandAll} />
+        </div>
+      ))}
+    </div>
+  ) : properties.length > 0 ? (
+    <div class="not-prose">
+      {properties.map(([name, prop]) => (
+        <SchemaProperty
+          name={name}
+          schema={prop}
+          required={required.has(name)}
+          schemas={schemas}
+          seen={nextSeen}
+          expandAll={expandAll}
+        />
+      ))}
+    </div>
+  ) : (
+    <div class="text-muted-foreground text-sm">
+      <code class="text-foreground">{typeLabel(resolved, schemas)}</code>
+    </div>
+  )
+}

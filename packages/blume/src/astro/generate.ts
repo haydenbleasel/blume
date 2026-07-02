@@ -36,11 +36,9 @@ import type { ResolvedConfig } from "../core/schema.ts";
 import { resolveTsconfigAliases } from "../core/tsconfig-aliases.ts";
 import type { Navigation } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
-import {
-  buildReferenceFiles,
-  hasReferences,
-  referenceTabs,
-} from "../openapi/scalar.ts";
+import { hasScalarReferences, referenceTabs } from "../openapi/references.ts";
+import { buildReferenceFiles } from "../openapi/scalar.ts";
+import { isOpenApiSource } from "../openapi/source.ts";
 import { registry } from "../registry/registry.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { searchProviderMeta, servesStaticIndex } from "../search/providers.ts";
@@ -582,8 +580,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
 
   const { i18n } = config;
 
-  // API reference routes (Scalar) surface as header tabs alongside the
-  // content-derived ones, so the reference stays discoverable in every locale.
+  // API reference routes surface as header tabs alongside the content-derived
+  // ones (Blume-rendered references also own a tab-scoped sidebar of operations),
+  // so the reference stays discoverable in every locale.
   const withReferenceTabs = (nav: Navigation): Navigation => ({
     ...nav,
     repoUrl: config.navigation.repo && repoUrl ? repoUrl : null,
@@ -912,6 +911,7 @@ export const generateRuntime = async (
   const themePath = join(srcDir, "generated", "app.css");
   const searchClientPath = join(srcDir, "generated", "search-client.ts");
   const examplesPath = join(srcDir, "generated", "examples.ts");
+  const openapiPath = join(srcDir, "generated", "openapi.json");
 
   // Record every file this pass writes so orphans (from a now-disabled feature)
   // can be pruned afterwards. `write` wraps the atomic writer and tracks paths.
@@ -987,6 +987,7 @@ export const generateRuntime = async (
         needsReact,
         needsSvelte,
         needsVue,
+        openapiPath,
         pages,
         searchClientPath,
         themePath,
@@ -1235,7 +1236,7 @@ export const generateRuntime = async (
   // React ships with Blume; Vue/Svelte islands need their Astro integration
   // installed by the project. Warn early rather than let Vite fail to resolve it.
   warnings.push(...islandFrameworkWarnings(frameworks, context.root));
-  if (hasReferences(config)) {
+  if (hasScalarReferences(config)) {
     const references = await buildReferenceFiles({
       config,
       contentRoutes: new Set(project.graph.pages.map((page) => page.route)),
@@ -1253,6 +1254,14 @@ export const generateRuntime = async (
   await write(
     join(srcDir, "generated", "data.json"),
     buildRuntimeData(project)
+  );
+  // The parsed OpenAPI specs behind the `blume:openapi` alias. Always written
+  // (even as `{}`) so the alias resolves whether or not a reference is enabled;
+  // the source parsed the specs during the scan, so this is just serialization.
+  const openApiSource = project.sources.find(isOpenApiSource);
+  await write(
+    openapiPath,
+    `${JSON.stringify(openApiSource ? openApiSource.openApiData() : {})}\n`
   );
   await write(
     join(out, "blume.manifest.json"),

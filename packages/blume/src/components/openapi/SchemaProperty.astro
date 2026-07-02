@@ -1,0 +1,118 @@
+---
+import {
+  constraints,
+  isNullable,
+  refName,
+  resolveSchema,
+  type SchemaLike,
+  typeLabel,
+} from "./helpers.ts";
+import SchemaTable from "./SchemaTable.astro";
+
+interface Props {
+  name: string;
+  schema: SchemaLike;
+  required?: boolean;
+  schemas: Record<string, SchemaLike>;
+  seen?: string[];
+  expandAll?: boolean;
+}
+
+const {
+  name,
+  schema,
+  required = false,
+  schemas,
+  seen = [],
+  expandAll = false,
+} = Astro.props;
+
+const refLabel = typeof schema.$ref === "string" ? refName(schema.$ref) : null;
+const circular = refLabel !== null && seen.includes(refLabel);
+const resolved = resolveSchema(schemas, schema);
+
+const type = typeLabel(schema, schemas);
+const description = resolved.description ?? schema.description ?? "";
+const deprecated = resolved.deprecated === true;
+const nullable = isNullable(resolved);
+const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
+const limits = constraints(resolved);
+
+const types = Array.isArray(resolved.type) ? resolved.type : [resolved.type];
+const isArray = types.includes("array");
+const items = isArray ? resolveSchema(schemas, resolved.items) : null;
+
+const hasObjectShape = (candidate: SchemaLike): boolean =>
+  Boolean(
+    candidate.properties ||
+      candidate.allOf ||
+      candidate.oneOf ||
+      candidate.anyOf ||
+      typeof candidate.$ref === "string"
+  );
+const expandable =
+  !circular && (hasObjectShape(resolved) || Boolean(items && hasObjectShape(items)));
+---
+
+<div class="border-border border-t py-3 first:border-t-0 last:pb-0">
+  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <code class="font-mono text-foreground text-sm">{name}</code>
+    <span class="text-muted-foreground text-xs"
+      >{type}{nullable ? " | null" : ""}</span
+    >
+    {
+      required && (
+        <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
+          required
+        </span>
+      )
+    }
+    {
+      deprecated && (
+        <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
+          deprecated
+        </span>
+      )
+    }
+  </div>
+  {
+    description && (
+      <div class="mt-1 text-muted-foreground text-sm" set:text={description} />
+    )
+  }
+  {
+    limits.length > 0 && (
+      <div class="mt-1 text-muted-foreground text-xs">{limits.join(" · ")}</div>
+    )
+  }
+  {
+    enumValues && (
+      <div class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+        <span class="text-muted-foreground">Allowed:</span>
+        {enumValues.map((value) => (
+          <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+            {String(value)}
+          </code>
+        ))}
+      </div>
+    )
+  }
+  {
+    expandable && (
+      <details class="group mt-2" open={expandAll}>
+        <summary class="cursor-pointer select-none text-accent text-xs hover:underline">
+          <span class="group-open:hidden">Show properties</span>
+          <span class="hidden group-open:inline">Hide properties</span>
+        </summary>
+        <div class="mt-2 border-border border-l pl-4">
+          <SchemaTable
+            schema={schema}
+            schemas={schemas}
+            seen={seen}
+            expandAll={expandAll}
+          />
+        </div>
+      </details>
+    )
+  }
+</div>

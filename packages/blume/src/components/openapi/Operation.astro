@@ -1,0 +1,140 @@
+---
+import specs from "blume:openapi";
+import type { SchemaLike } from "./helpers.ts";
+import { buildRequestSample, sampleLanguages } from "./snippets.ts";
+import MethodBadge from "./MethodBadge.astro";
+import ParametersTable from "./ParametersTable.astro";
+import RequestBody from "./RequestBody.astro";
+import RequestPanel from "./RequestPanel.astro";
+import Responses from "./Responses.astro";
+
+interface Props {
+  source: string;
+  id: string;
+}
+
+interface ParamLike {
+  $ref?: string;
+  name?: string;
+  in?: string;
+  description?: string;
+  required?: boolean;
+  deprecated?: boolean;
+  schema?: SchemaLike;
+  example?: unknown;
+}
+
+interface MediaTypeLike {
+  schema?: SchemaLike;
+  example?: unknown;
+}
+
+interface FullOperation {
+  summary?: string;
+  description?: string;
+  deprecated?: boolean;
+  parameters?: ParamLike[];
+  requestBody?: {
+    description?: string;
+    required?: boolean;
+    content?: Record<string, MediaTypeLike>;
+  };
+  responses?: Record<
+    string,
+    { description?: string; content?: Record<string, MediaTypeLike> }
+  >;
+}
+
+const { source, id } = Astro.props;
+const spec = specs[source];
+const ref = spec?.operations[id];
+
+const doc = (spec?.document ?? {}) as {
+  paths?: Record<string, Record<string, unknown> & { parameters?: ParamLike[] }>;
+  components?: {
+    schemas?: Record<string, SchemaLike>;
+    parameters?: Record<string, ParamLike>;
+  };
+  servers?: { url?: string }[];
+};
+const pathItem = ref ? doc.paths?.[ref.path] : undefined;
+const operation = (
+  pathItem && ref ? pathItem[ref.method] : undefined
+) as FullOperation | undefined;
+
+const schemas = doc.components?.schemas ?? {};
+const componentParams = doc.components?.parameters ?? {};
+const PARAM_REF = /#\/components\/parameters\/(?<name>[^/]+)$/u;
+const resolveParam = (param: ParamLike): ParamLike => {
+  if (typeof param.$ref === "string") {
+    const name = PARAM_REF.exec(param.$ref)?.groups?.name;
+    return (name && componentParams[name]) || param;
+  }
+  return param;
+};
+const params = [
+  ...(pathItem?.parameters ?? []),
+  ...(operation?.parameters ?? []),
+].map(resolveParam);
+
+const sample =
+  ref && operation
+    ? buildRequestSample(
+        { parameters: params, requestBody: operation.requestBody },
+        ref.method,
+        ref.path,
+        doc.servers ?? [],
+        schemas
+      )
+    : null;
+const languages = sampleLanguages(spec?.codeSamples ?? []);
+---
+
+{
+  !(spec && ref && operation) ? (
+    <div class="text-muted-foreground">This API operation could not be found.</div>
+  ) : (
+    <div class="not-prose">
+      <div class="mb-6 flex flex-wrap items-center gap-3">
+        <MethodBadge method={ref.method} />
+        <code class="break-all font-mono text-foreground text-sm">
+          {ref.path}
+        </code>
+        {operation.deprecated && (
+          <span class="font-medium text-[0.625rem] text-orange-600 uppercase tracking-wide dark:text-orange-400">
+            deprecated
+          </span>
+        )}
+      </div>
+      <div class="grid grid-cols-1 items-start gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
+        <div>
+          <ParametersTable parameters={params} schemas={schemas} />
+          {operation.requestBody && (
+            <RequestBody
+              expandAll={spec.expandSchemas}
+              requestBody={operation.requestBody}
+              schemas={schemas}
+            />
+          )}
+          {operation.responses && (
+            <Responses
+              expandAll={spec.expandSchemas}
+              responses={operation.responses}
+              schemas={schemas}
+            />
+          )}
+        </div>
+        {sample && (
+          <div class="xl:sticky xl:top-24 xl:self-start">
+            <RequestPanel
+              languages={languages}
+              responses={operation.responses ?? {}}
+              sample={sample}
+              schemas={schemas}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

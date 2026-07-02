@@ -1,0 +1,169 @@
+---
+import { highlightCode } from "../../markdown/index.ts";
+import { exampleValue, type SchemaLike, toJson } from "./helpers.ts";
+import type { RequestSample, SampleLanguage } from "./snippets.ts";
+
+interface MediaTypeLike {
+  schema?: SchemaLike;
+  example?: unknown;
+}
+
+interface ResponseLike {
+  description?: string;
+  content?: Record<string, MediaTypeLike>;
+}
+
+interface Props {
+  sample: RequestSample;
+  languages: SampleLanguage[];
+  responses: Record<string, ResponseLike>;
+  schemas: Record<string, SchemaLike>;
+}
+
+const { sample, languages, responses, schemas } = Astro.props;
+
+// A `.prose` wrapper gives Shiki its scoped token colours; the global style at
+// the foot of this file strips the standalone code block's own box (border,
+// injected copy button, language label) so the code sits flush inside the one
+// panel border.
+const CODE_WRAP = "prose max-w-none text-xs";
+const TAB_CLASS =
+  "-mb-px cursor-pointer border-transparent border-b-2 bg-transparent py-2 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground aria-[selected=true]:border-accent aria-[selected=true]:text-foreground";
+const HEADING = "mb-2 font-semibold text-foreground text-sm";
+
+const requestSamples = await Promise.all(
+  languages.map(async (language) => ({
+    html: await highlightCode(language.build(sample), language.lang, {
+      icons: false,
+    }),
+    id: language.id,
+    label: language.label,
+  }))
+);
+
+const responseEntries = await Promise.all(
+  Object.entries(responses).map(async ([status, response]) => {
+    const media =
+      Object.entries(response.content ?? {}).find(([type]) =>
+        type.includes("json")
+      )?.[1] ?? Object.values(response.content ?? {})[0];
+    const example = media
+      ? (media.example ?? exampleValue(media.schema, schemas))
+      : undefined;
+    const html =
+      example === undefined || example === null
+        ? null
+        : await highlightCode(toJson(example), "json", { icons: false });
+    return { description: response.description ?? "", html, status };
+  })
+);
+---
+
+<div class="not-prose flex flex-col gap-6">
+  {
+    requestSamples.length > 0 && (
+      <div>
+        <div aria-level="3" class={HEADING} role="heading">
+          Request
+        </div>
+        <blume-panel-tabs class="block overflow-hidden rounded-blume border border-border bg-background">
+          <div class="flex items-center justify-between gap-2 border-border border-b px-3">
+            <div class="flex gap-4" role="tablist">
+              {requestSamples.map((entry, index) => (
+                <button
+                  aria-selected={index === 0 ? "true" : "false"}
+                  class={TAB_CLASS}
+                  data-panel-tab={entry.id}
+                  role="tab"
+                  type="button"
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+            <button
+              aria-label="Copy request"
+              class="group shrink-0 cursor-pointer rounded px-1.5 py-1 text-muted-foreground text-xs hover:text-foreground"
+              data-panel-copy
+              type="button"
+            >
+              <span class="group-data-[copied]:hidden">Copy</span>
+              <span class="hidden group-data-[copied]:inline">Copied</span>
+            </button>
+          </div>
+          {requestSamples.map((entry, index) => (
+            <div
+              class:list={[index === 0 ? "" : "hidden", CODE_WRAP]}
+              data-panel={entry.id}
+            >
+              <Fragment set:html={entry.html} />
+            </div>
+          ))}
+        </blume-panel-tabs>
+      </div>
+    )
+  }
+  {
+    responseEntries.length > 0 && (
+      <div>
+        <div aria-level="3" class={HEADING} role="heading">
+          Response
+        </div>
+        <blume-panel-tabs class="block overflow-hidden rounded-blume border border-border bg-background">
+          <div class="flex flex-wrap gap-4 border-border border-b px-3" role="tablist">
+            {responseEntries.map((entry, index) => (
+              <button
+                aria-selected={index === 0 ? "true" : "false"}
+                class={`${TAB_CLASS} font-mono`}
+                data-panel-tab={entry.status}
+                role="tab"
+                type="button"
+              >
+                {entry.status}
+              </button>
+            ))}
+          </div>
+          {responseEntries.map((entry, index) => (
+            <div
+              class:list={[index === 0 ? "" : "hidden"]}
+              data-panel={entry.status}
+            >
+              {entry.html ? (
+                <div class={CODE_WRAP}>
+                  <Fragment set:html={entry.html} />
+                </div>
+              ) : (
+                <div class="px-3 py-4 text-muted-foreground text-xs">
+                  {entry.description || "No example response."}
+                </div>
+              )}
+            </div>
+          ))}
+        </blume-panel-tabs>
+      </div>
+    )
+  }
+</div>
+
+<script>
+  import "./panel.ts";
+</script>
+
+<style is:global>
+  /* Strip the standalone code block's own chrome inside a panel: the border,
+     margin, radius, and the copy button + language label the prose code theme
+     adds — the panel supplies a single border and its own copy button. */
+  blume-panel-tabs pre.astro-code {
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0.75rem 1rem !important;
+  }
+  blume-panel-tabs pre.astro-code::before {
+    content: none !important;
+  }
+  blume-panel-tabs [data-blume-copy] {
+    display: none !important;
+  }
+</style>

@@ -1,0 +1,91 @@
+---
+import type { SchemaLike } from "./helpers.ts";
+import SchemaTable from "./SchemaTable.astro";
+
+interface MediaTypeLike {
+  schema?: SchemaLike;
+}
+
+interface ResponseLike {
+  description?: string;
+  content?: Record<string, MediaTypeLike>;
+}
+
+interface Props {
+  responses: Record<string, ResponseLike>;
+  schemas: Record<string, SchemaLike>;
+  expandAll?: boolean;
+}
+
+const { responses, schemas, expandAll = false } = Astro.props;
+
+const statusColor = (status: string): string => {
+  if (status.startsWith("2")) {
+    return "bg-green-500/15 text-green-700 dark:text-green-300";
+  }
+  if (status.startsWith("3")) {
+    return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
+  }
+  if (status.startsWith("4")) {
+    return "bg-orange-500/15 text-orange-700 dark:text-orange-300";
+  }
+  if (status.startsWith("5")) {
+    return "bg-red-500/15 text-red-700 dark:text-red-300";
+  }
+  return "bg-muted text-muted-foreground";
+};
+
+const items = Object.entries(responses);
+---
+
+{
+  items.length > 0 && (
+    <section class="mt-8">
+      <div
+        aria-level="2"
+        class="mb-3 font-semibold text-foreground text-lg"
+        role="heading"
+      >
+        Responses
+      </div>
+      <div class="flex flex-col gap-4">
+        {items.map(([status, response]) => {
+          const schema = (
+            Object.entries(response.content ?? {}).find(([type]) =>
+              type.includes("json")
+            )?.[1] ?? Object.values(response.content ?? {})[0]
+          )?.schema;
+          return (
+            <div class="rounded-blume border border-border p-4">
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  class:list={[
+                    "not-prose inline-flex items-center rounded-md px-2 py-0.5 font-mono font-semibold text-xs",
+                    statusColor(status),
+                  ]}
+                >
+                  {status}
+                </span>
+                {response.description && (
+                  <span
+                    class="text-muted-foreground text-sm"
+                    set:text={response.description}
+                  />
+                )}
+              </div>
+              {schema && (
+                <div class="mt-3">
+                  <SchemaTable
+                    expandAll={expandAll}
+                    schema={schema}
+                    schemas={schemas}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  )
+}

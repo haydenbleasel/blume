@@ -4,32 +4,19 @@ import { isAbsolute, join } from "pathe";
 
 import { scalarReferenceTemplate } from "../astro/templates.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
-import type { NavTab } from "../core/types.ts";
 import { resolveAccent, resolveRadius } from "../theme/palette.ts";
+import { resolveReferences } from "./references.ts";
+import type { ReferenceSource } from "./references.ts";
 
 /**
- * API reference support, delegated wholesale to Scalar (`@scalar/astro`). Blume
- * resolves the configured spec sources into routes, generates one self-contained
- * Scalar page per source, and adds a nav tab. OpenAPI and AsyncAPI share this
- * exact path — Scalar auto-detects the document type — so the only difference
- * between the two config blocks is their default route and nav label.
+ * The Scalar renderer: an escape hatch (`openapi.renderer: "scalar"`) and the
+ * path AsyncAPI still uses. Each Scalar-rendered spec becomes one self-contained
+ * `@scalar/astro` page loaded client-side from Scalar's CDN. Blume's own OpenAPI
+ * renderer (the default) lives in `source.ts` / the `components/openapi` set and
+ * does not pass through here.
  */
 
-type ReferenceKind = "openapi" | "asyncapi";
-
-/** A spec source resolved to a concrete route and nav label. */
-export interface ReferenceSource {
-  kind: ReferenceKind;
-  /** Normalized route the reference mounts at, e.g. `/reference`. */
-  route: string;
-  label: string;
-  /** Local path or `http(s)` URL, verbatim from config. */
-  spec: string;
-  /** Per-block Scalar theme name override, if any. */
-  theme?: string;
-}
-
-/** A generated reference page, ready to write under `src/pages`. */
+/** A generated Scalar reference page, ready to write under `src/pages`. */
 export interface ReferenceFile {
   /** Path relative to `src/pages`, e.g. `reference.astro`, `api/events.astro`. */
   pagePath: string;
@@ -37,92 +24,13 @@ export interface ReferenceFile {
 }
 
 const URL_SPEC = /^https?:\/\//u;
-const NON_SLUG = /[^a-z0-9]+/gu;
-const SLUG_EDGES = /^-+|-+$/gu;
 const ROUTE_EDGES = /^\/+|\/+$/gu;
-const TRAILING_SLASH = /\/+$/u;
-
-const slugify = (text: string): string =>
-  text.toLowerCase().replace(NON_SLUG, "-").replace(SLUG_EDGES, "");
-
-/** Normalize a configured route to a single leading slash, no trailing slash. */
-const normalizeRoute = (route: string): string => {
-  const trimmed = route.trim();
-  const withSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  const noTrailing = withSlash.replace(TRAILING_SLASH, "");
-  return noTrailing === "" ? "/" : noTrailing;
-};
 
 /** The `src/pages`-relative file path for a reference route. */
 const referencePagePath = (route: string): string => {
   const segments = route.replace(ROUTE_EDGES, "");
   return `${segments === "" ? "index" : segments}.astro`;
 };
-
-/** A spec is a single source (`spec` shorthand prepended to any `sources`). */
-type Block = ResolvedConfig["openapi"] | ResolvedConfig["asyncapi"];
-
-const sourcesOf = (
-  block: Block
-): { label?: string; route?: string; spec: string }[] => {
-  const sources = [...block.sources];
-  if (block.spec) {
-    sources.unshift({ spec: block.spec });
-  }
-  return sources;
-};
-
-const referencesFor = (
-  kind: ReferenceKind,
-  block: Block,
-  defaultLabel: string
-): ReferenceSource[] => {
-  if (!block.enabled) {
-    return [];
-  }
-  const sources = sourcesOf(block);
-  const base = normalizeRoute(block.route);
-
-  return sources.map((source, index) => {
-    const label =
-      source.label ??
-      (sources.length > 1 ? `${defaultLabel} ${index + 1}` : defaultLabel);
-
-    let route: string;
-    if (source.route) {
-      route = normalizeRoute(source.route);
-    } else if (sources.length === 1) {
-      route = base;
-    } else {
-      const suffix = source.label ? slugify(source.label) : "";
-      route = normalizeRoute(`${base}/${suffix || index + 1}`);
-    }
-
-    return { kind, label, route, spec: source.spec, theme: block.theme };
-  });
-};
-
-/**
- * Resolve every enabled reference source into its route and label. Pure (no file
- * IO), so the nav and the page generator stay in sync from one source of truth.
- */
-export const resolveReferences = (
-  config: ResolvedConfig
-): ReferenceSource[] => [
-  ...referencesFor("openapi", config.openapi, "API Reference"),
-  ...referencesFor("asyncapi", config.asyncapi, "Events"),
-];
-
-/** Nav tabs (header links) for the configured references. */
-export const referenceTabs = (config: ResolvedConfig): NavTab[] =>
-  resolveReferences(config).map((ref) => ({
-    label: ref.label,
-    path: ref.route,
-  }));
-
-/** Whether any reference block is enabled (gates dependency + page wiring). */
-export const hasReferences = (config: ResolvedConfig): boolean =>
-  config.openapi.enabled || config.asyncapi.enabled;
 
 const darkModeConfig = (
   mode: ResolvedConfig["theme"]["mode"]
@@ -180,9 +88,10 @@ const specConfiguration = async (
 };
 
 /**
- * Build the Scalar reference page(s) for the project. Reads local specs, maps
- * the theme, and skips routes that collide with a content page or another
- * source. Returns the files to write under `src/pages` plus any warnings.
+ * Build the Scalar reference page(s) for the project. Only Scalar-rendered
+ * references are emitted here (Blume-rendered OpenAPI is staged content). Reads
+ * local specs, maps the theme, and skips routes that collide with a content page
+ * or another source. Returns the files to write under `src/pages` plus warnings.
  */
 export const buildReferenceFiles = async (options: {
   config: ResolvedConfig;
@@ -196,6 +105,9 @@ export const buildReferenceFiles = async (options: {
   const seen = new Set<string>();
   const accepted: ReferenceSource[] = [];
   for (const ref of resolveReferences(config)) {
+    if (ref.renderer !== "scalar") {
+      continue;
+    }
     if (seen.has(ref.route)) {
       warnings.push(
         `Two API reference sources resolve to ${ref.route}; keeping the first.`

@@ -1,0 +1,84 @@
+---
+import specs from "blume:openapi";
+import MethodBadge from "./MethodBadge.astro";
+
+interface Props {
+  source: string;
+}
+
+const { source } = Astro.props;
+const spec = specs[source];
+const operations = Object.values(spec?.operations ?? {});
+const servers =
+  ((spec?.document ?? {}) as { servers?: { url?: string }[] }).servers ?? [];
+
+// Tags in declared order, then any operation tag not listed under `tags`.
+const declaredSlugs = new Set(spec?.tags.map((tag) => tag.slug));
+const extraSlugs = new Set<string>();
+const extraTags: { slug: string; name: string; description: string }[] = [];
+for (const operation of operations) {
+  if (!(declaredSlugs.has(operation.tagSlug) || extraSlugs.has(operation.tagSlug))) {
+    extraSlugs.add(operation.tagSlug);
+    extraTags.push({ description: "", name: operation.tag, slug: operation.tagSlug });
+  }
+}
+const sections = [...(spec?.tags ?? []), ...extraTags];
+---
+
+{
+  spec && (
+    <div>
+      {spec.version && (
+        <div class="not-prose mb-4 text-muted-foreground text-sm">
+          Version {spec.version}
+        </div>
+      )}
+      {servers.length > 0 && (
+        <div class="not-prose mb-8 flex flex-wrap items-center gap-2">
+          <span class="text-muted-foreground text-xs">Base URL</span>
+          {servers.map((server) => (
+            <code class="rounded bg-muted px-2 py-0.5 text-foreground text-xs">
+              {server.url}
+            </code>
+          ))}
+        </div>
+      )}
+      {sections.map((tag) => {
+        const ops = operations.filter(
+          (operation) => operation.tagSlug === tag.slug
+        );
+        if (ops.length === 0) {
+          return null;
+        }
+        return (
+          <section class="mb-8">
+            <h2 class="mb-1 font-semibold text-foreground text-xl">
+              {tag.name}
+            </h2>
+            {tag.description && (
+              <div class="mb-3 text-muted-foreground text-sm" set:text={tag.description} />
+            )}
+            <ul class="not-prose flex list-none flex-col gap-2 p-0">
+              {ops.map((operation) => (
+                <li>
+                  <a
+                    class="flex items-center gap-3 rounded-blume border border-border p-3 text-inherit no-underline! transition-colors hover:border-accent hover:bg-muted hover:no-underline!"
+                    href={operation.route}
+                  >
+                    <MethodBadge method={operation.method} />
+                    <span class="font-medium text-foreground text-sm">
+                      {operation.summary || operation.path}
+                    </span>
+                    <code class="ml-auto hidden text-muted-foreground text-xs sm:inline">
+                      {operation.path}
+                    </code>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
+  )
+}

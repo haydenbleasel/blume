@@ -31,8 +31,24 @@ const {
   root = depth === 0,
 } = Astro.props;
 
-const badgeClass =
-  "shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-medium text-[0.65rem] text-muted-foreground leading-none";
+const badgeBase =
+  "shrink-0 rounded-full px-1.5 py-0.5 font-medium text-[0.65rem] leading-none";
+const badgeClass = `${badgeBase} bg-muted text-muted-foreground`;
+// HTTP-method badges (from an OpenAPI reference's sidebar) are colour-coded;
+// every other badge keeps the neutral style.
+const METHOD_BADGE: Record<string, string> = {
+  DELETE: "bg-red-500/15 text-red-700 dark:text-red-300",
+  GET: "bg-green-500/15 text-green-700 dark:text-green-300",
+  HEAD: "bg-muted text-muted-foreground",
+  OPTIONS: "bg-muted text-muted-foreground",
+  PATCH: "bg-yellow-500/20 text-yellow-800 dark:text-yellow-300",
+  POST: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  PUT: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+};
+const badgeClassFor = (badge: string): string => {
+  const method = METHOD_BADGE[badge.toUpperCase()];
+  return method ? `${badgeBase} ${method}` : badgeClass;
+};
 const deprecatedClass =
   "shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-medium text-[0.65rem] text-amber-700 leading-none dark:text-amber-300";
 
@@ -154,7 +170,7 @@ const initialId =
                     />
                   )}
                   <span class="min-w-0 flex-1 truncate">{item.label}</span>
-                  {item.badge && <span class={badgeClass}>{item.badge}</span>}
+                  {item.badge && <span class={badgeClassFor(item.badge)}>{item.badge}</span>}
                   {item.deprecated && (
                     <span class={deprecatedClass}>deprecated</span>
                   )}
@@ -188,7 +204,7 @@ const initialId =
                   />
                 )}
                 <span class="min-w-0 flex-1 truncate">{item.label}</span>
-                {item.badge && <span class={badgeClass}>{item.badge}</span>}
+                {item.badge && <span class={badgeClassFor(item.badge)}>{item.badge}</span>}
                 <Icon
                   class="shrink-0 text-muted-foreground"
                   name="chevron-right"
@@ -224,7 +240,7 @@ const initialId =
                       )}
                       <span class="min-w-0 flex-1 truncate">{item.label}</span>
                       {item.badge && (
-                        <span class={badgeClass}>{item.badge}</span>
+                        <span class={badgeClassFor(item.badge)}>{item.badge}</span>
                       )}
                     </a>
                   ) : (
@@ -238,7 +254,7 @@ const initialId =
                       )}
                       <span class="min-w-0 flex-1 truncate">{item.label}</span>
                       {item.badge && (
-                        <span class={badgeClass}>{item.badge}</span>
+                        <span class={badgeClassFor(item.badge)}>{item.badge}</span>
                       )}
                     </>
                   )}
@@ -279,7 +295,7 @@ const initialId =
                   )}
                   <span class="min-w-0 truncate">{item.label}</span>
                   {item.badge && (
-                    <span class={`ml-auto ${badgeClass}`}>{item.badge}</span>
+                    <span class={`ml-auto ${badgeClassFor(item.badge)}`}>{item.badge}</span>
                   )}
                 </a>
               ) : (
@@ -293,7 +309,7 @@ const initialId =
                   )}
                   <span class="min-w-0 truncate">{item.label}</span>
                   {item.badge && (
-                    <span class={`ml-auto ${badgeClass}`}>{item.badge}</span>
+                    <span class={`ml-auto ${badgeClassFor(item.badge)}`}>{item.badge}</span>
                   )}
                 </>
               )}
