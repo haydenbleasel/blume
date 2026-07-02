@@ -27,6 +27,8 @@ blume <command> [options]
 
 - `blume init --content-dir <dir> --yes` — set the content folder (default `docs`) and skip prompts.
 - `blume dev --host --port <n> --open`
+- `blume dev --content-dir <dir>` — scan a different content folder without editing `blume.config.ts`.
+- `blume dev --debug` — verbose Astro/Vite logging for troubleshooting.
 - `blume dev --preview` / `blume build --preview` — include drafts and unpublished CMS content.
 - `blume build --strict` — fail the build on diagnostic errors (also works on `blume dev`).
 - `blume build --output static|server --adapter vercel|node|netlify|cloudflare --base /docs` — override the deployment output, adapter, and base path from `blume.config.ts`.

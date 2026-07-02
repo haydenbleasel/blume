@@ -12,7 +12,6 @@
 ### CLI flags (plan 02)
 
 - [ ] `init`: `--template docs|api|sdk|changelog`, `--package-manager`, `--eject`
-- [ ] `dev`: `--content-dir`, `--debug`
 
 ### Navigation (plan 06)
 

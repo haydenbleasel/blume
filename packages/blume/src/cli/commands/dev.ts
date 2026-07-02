@@ -10,6 +10,14 @@ import { prepareProject } from "../prepare.ts";
 
 export const devCommand = defineCommand({
   args: {
+    "content-dir": {
+      description: "Content folder to scan, overriding config (content.root).",
+      type: "string",
+    },
+    debug: {
+      description: "Verbose Astro/Vite logging for troubleshooting.",
+      type: "boolean",
+    },
     host: { description: "Network host to bind.", type: "string" },
     open: { description: "Open the browser on start.", type: "boolean" },
     port: { description: "Port to listen on.", type: "string" },
@@ -26,6 +34,9 @@ export const devCommand = defineCommand({
   async run({ args }) {
     const root = process.cwd();
     const preview = args.preview ?? false;
+    const overrides = args["content-dir"]
+      ? { contentRoot: args["content-dir"] }
+      : undefined;
     // Astro's dev server defaults to 4321 when no port is passed. Feeding the
     // resolved URL in as the `deployment.site` fallback lets site-gated features
     // (OG images, canonicals, sitemap) work locally without configuring a site.
@@ -34,6 +45,7 @@ export const devCommand = defineCommand({
     const project = await prepareProject({
       devServerUrl,
       mode: "dev",
+      overrides,
       preview,
       root,
       strict: args.strict,
@@ -46,7 +58,7 @@ export const devCommand = defineCommand({
     }
 
     const server = await dev({
-      logLevel: "info",
+      logLevel: args.debug ? "debug" : "info",
       root: project.context.outDir,
       server: {
         host: args.host ?? false,
@@ -67,6 +79,7 @@ export const devCommand = defineCommand({
           const next = await scanProject(root, {
             devServerUrl,
             mode: "dev",
+            overrides,
             preview,
           });
           await generateRuntime(next);
