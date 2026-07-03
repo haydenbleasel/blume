@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-A batch of component and markdown fixes: code-fence titles may now contain the other quote character (`title="foo's file.ts"` no longer mangles into `file.ts"`); package-manager install tabs no longer rewrite the page hash when clicked (clobbering the heading anchor the reader arrived with); search-dialog highlighting can't mark inside HTML entities anymore (querying "amp" corrupted excerpts containing `&`); a failed search-index load retries on the next open instead of disabling search until reload; the `useAskAI` hook surfaces an error message instead of streaming a 4xx/5xx body as the assistant's answer; copy buttons can't get stuck on "Copied!" after a double-click; the Cursor MCP install deeplink URL-encodes its base64 config; generated cURL samples survive apostrophes in example bodies and Python samples no longer rewrite `true`/`false`/`null` inside string values; Mermaid diagrams disconnect their theme observer when removed and drop stale renders from rapid theme toggles; and a `<blume-tabs>` moved in the DOM re-attaches its sync/hash listeners.
