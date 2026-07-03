@@ -1009,6 +1009,17 @@ const tocConfigSchema = z
     };
   });
 
+/**
+ * Which icon library bare `icon` names resolve against (mirrors Mintlify's
+ * `icons.library`). Names can always opt into a specific set with an explicit
+ * `prefix:name` (`lucide:rocket`, `fa6-brands:github`) regardless of this.
+ */
+const iconsConfigSchema = z
+  .object({
+    library: z.enum(["lucide", "fontawesome", "tabler"]).default("lucide"),
+  })
+  .strict();
+
 export const blumeConfigSchema = z
   .object({
     ai: aiConfigSchema.default({}),
@@ -1037,6 +1048,7 @@ export const blumeConfigSchema = z
     feedback: z.boolean().default(true),
     github: githubConfigSchema.optional(),
     i18n: i18nConfigSchema.optional(),
+    icons: iconsConfigSchema.default({}),
     lastModified: lastModifiedConfigSchema.default(false),
     logo: logoConfigSchema.optional(),
     markdown: markdownConfigSchema.default({}),

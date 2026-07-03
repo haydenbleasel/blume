@@ -649,6 +649,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
             })),
           }
         : null,
+      icons: config.icons,
       imageZoom: config.markdown.imageZoom,
       logo: resolveLogo(project),
       mcp: config.mcp.enabled

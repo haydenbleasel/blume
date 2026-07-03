@@ -18,7 +18,7 @@ const canRenderIcon =
   icon !== undefined &&
   (/^\s*<svg[\s\S]*<\/svg>\s*$/u.test(icon) ||
     isImageIcon(icon) ||
-    hasIcon(icon, iconType));
+    hasIcon(icon, { iconType }));
 ---
 
 <div

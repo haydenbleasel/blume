@@ -246,31 +246,59 @@ describe("theme.fonts schema", () => {
   });
 });
 
-describe("resolveIcon library-prefix stripping", () => {
-  it("strips a hyphenated library prefix before resolving", () => {
-    // `lucide-`/`tabler-` prefixes are dropped so the bare name resolves.
-    expect(resolveIcon("lucide-sparkles")?.name).toBe("sparkles");
-    expect(resolveIcon("tabler-star")?.name).toBe("star");
+describe("resolveIcon default and explicit libraries", () => {
+  it("resolves a bare name against the default (Lucide) library", () => {
+    const rocket = resolveIcon("rocket");
+    expect(rocket?.viewBox).toBe("0 0 24 24");
+    // Lucide bodies are stroke-based and self-styled.
+    expect(rocket?.body).toContain('stroke="currentColor"');
   });
 
-  it("strips a colon-namespaced library prefix before resolving", () => {
-    expect(resolveIcon("lucide:star")?.name).toBe("star");
-    expect(hasIcon("fa:github")).toBeTruthy();
+  it("resolves an explicit `prefix:name` regardless of default", () => {
+    expect(resolveIcon("lucide:star")?.viewBox).toBe("0 0 24 24");
+    expect(resolveIcon("fa6-brands:github")?.viewBox).toBe("0 0 496 512");
+    expect(resolveIcon("tabler:heart")?.viewBox).toBe("0 0 24 24");
+  });
+
+  it("ignores an unknown iconType or library and uses the default", () => {
+    expect(resolveIcon("rocket", { iconType: "nope" })?.viewBox).toBe(
+      "0 0 24 24"
+    );
+    expect(resolveIcon("rocket", { library: "nope" })?.viewBox).toBe(
+      "0 0 24 24"
+    );
   });
 });
 
-describe("resolveIcon FontAwesome coverage", () => {
-  it("resolves common FontAwesome names via the alias map", () => {
-    expect(resolveIcon("shield-halved")?.name).toBe("shield-half");
-    expect(resolveIcon("layer-group")?.name).toBe("layers");
-    expect(resolveIcon("arrows-rotate")?.name).toBe("refresh-cw");
-    expect(resolveIcon("wand-magic-sparkles")?.name).toBe("wand-sparkles");
-    expect(resolveIcon("user-shield")?.name).toBe("shield-user");
-    expect(resolveIcon("gauge-high")?.name).toBe("gauge");
+describe("resolveIcon Font Awesome coverage", () => {
+  it("resolves real Font Awesome names under the fontawesome library", () => {
+    const opts = { library: "fontawesome" };
+    for (const name of ["shield-halved", "layer-group", "gauge-high"]) {
+      const icon = resolveIcon(name, opts);
+      expect(icon?.viewBox.endsWith(" 512")).toBe(true);
+      expect(icon?.body).toContain('fill="currentColor"');
+    }
   });
 
-  it("resolves a FontAwesome alias through a library prefix and icon type", () => {
-    expect(resolveIcon("fa-layer-group")?.name).toBe("layers");
-    expect(resolveIcon("layer-group", "fa-solid")?.name).toBe("layers");
+  it("falls back to the brands set for a brand name", () => {
+    expect(resolveIcon("github", { library: "fontawesome" })?.viewBox).toBe(
+      "0 0 496 512"
+    );
+    expect(resolveIcon("github", { iconType: "brands" })?.viewBox).toBe(
+      "0 0 496 512"
+    );
+  });
+
+  it("falls Pro-only iconTypes back to solid rather than failing", () => {
+    for (const iconType of ["light", "thin", "duotone", "sharp-solid"]) {
+      expect(resolveIcon("gauge", { iconType })).not.toBeNull();
+    }
+  });
+
+  it("checks every bundled library in hasIcon", () => {
+    expect(hasIcon("gauge-high")).toBeTruthy();
+    expect(hasIcon("rocket")).toBeTruthy();
+    expect(hasIcon("fa6-brands:github")).toBeTruthy();
+    expect(hasIcon("definitely-not-an-icon-xyz")).toBeFalsy();
   });
 });

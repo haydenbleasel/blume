@@ -538,6 +538,24 @@ describe("loadMintlifyConfig fonts", () => {
   });
 });
 
+describe("loadMintlifyConfig icons", () => {
+  it("defaults the icon library to Font Awesome (Mintlify's default)", async () => {
+    const root = await project({
+      "docs.json": JSON.stringify({ name: "Docs" }),
+    });
+    const config = await loadMintlifyConfig(root, join(root, "docs.json"));
+    expect(config.icons?.library).toBe("fontawesome");
+  });
+
+  it("passes a Lucide/Tabler library through", async () => {
+    const root = await project({
+      "docs.json": JSON.stringify({ icons: { library: "lucide" }, name: "D" }),
+    });
+    const config = await loadMintlifyConfig(root, join(root, "docs.json"));
+    expect(config.icons?.library).toBe("lucide");
+  });
+});
+
 describe("loadMintlifyConfig branding", () => {
   it("maps banner, background, redirects, and code theme", async () => {
     const root = await project({

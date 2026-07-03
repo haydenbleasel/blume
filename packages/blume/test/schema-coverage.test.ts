@@ -57,13 +57,7 @@ describe("banner color refinement", () => {
 
 describe("pruned Mintlify-compat fields", () => {
   it("rejects config fields that were removed (navbar/footer/etc.)", () => {
-    for (const field of [
-      "navbar",
-      "footer",
-      "icons",
-      "contextual",
-      "styling",
-    ]) {
+    for (const field of ["navbar", "footer", "contextual", "styling"]) {
       expect(
         blumeConfigSchema.safeParse({ [field]: {} }).success,
         `${field} should no longer be a valid config field`

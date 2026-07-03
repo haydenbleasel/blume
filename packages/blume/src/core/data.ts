@@ -93,6 +93,8 @@ export interface BlumeDataConfig {
   favicon: BlumeFavicon;
   feedback: boolean;
   i18n: BlumeDataI18n | null;
+  /** Default icon library for bare `icon` names. */
+  icons: ResolvedConfig["icons"];
   /** `markdown.imageZoom`: click-to-zoom content images. */
   imageZoom: boolean;
   logo: BlumeLogo | null;

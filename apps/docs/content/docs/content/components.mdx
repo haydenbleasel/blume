@@ -125,7 +125,7 @@ A negative or breaking state, such as a deprecation.
 
 ## Icon
 
-Render an icon from Blume's built-in set by name — the same set the `icon` props on cards, tiles, tabs, and sidebar entries draw from. Names are lowercase and kebab-cased (`rocket`, `book-open`, `chevron-right`).
+Render an icon by name — the same `icon` props power cards, steps, tiles, tabs, and sidebar entries. Names come from three bundled libraries: [Lucide](https://lucide.dev) (the default), [Font Awesome](https://fontawesome.com/icons) (its free set), and [Tabler](https://tabler.io/icons). Names are lowercase and kebab-cased (`rocket`, `gauge-high`, `book-open`).
 
 <Icon icon="rocket" size={20} />
 
@@ -133,7 +133,26 @@ Render an icon from Blume's built-in set by name — the same set the `icon` pro
 <Icon icon="rocket" size={20} />
 ```
 
-`icon` is the icon name; `size` sets the pixel size (default `16`) and `color` tints it (any CSS color; defaults to `currentColor`). Pass a raw `<svg>` string, an image URL, or a local image path in place of a name to render your own art, and add a `label` to expose it to assistive tech — without one, the icon is decorative.
+A bare name resolves against your project's [`icons.library`](#default-library) (Lucide unless you change it). Two ways to reach another library for a single icon:
+
+- **`iconType`** selects a Font Awesome style — `solid` (default), `regular`, or `brands`: `<Icon icon="github" iconType="brands" />`. Font Awesome Pro styles (`light`, `thin`, `duotone`, `sharp-solid`) aren't in the bundled free data and fall back to solid.
+- **A `library:name` prefix** overrides the default per icon: `fa6-solid:gauge-high`, `fa6-brands:github`, `lucide:rocket`, `tabler:heart`.
+
+`size` sets the pixel size (default `16`) and `color` tints it (any CSS color; defaults to `currentColor`). Pass a raw `<svg>` string, an image URL, or a local image path in place of a name to render your own art, and add a `label` to expose it to assistive tech — without one, the icon is decorative.
+
+Icons resolve at build time and inline as zero-JS SVG — nothing is fetched at runtime.
+
+### Default library
+
+Set which library bare icon names resolve against:
+
+```ts title="blume.config.ts"
+export default defineConfig({
+  icons: { library: "fontawesome" }, // "lucide" (default) | "fontawesome" | "tabler"
+});
+```
+
+A `library:name` prefix always wins over this, so you can mix libraries on any default. Migrating from Mintlify sets this to `fontawesome` for you (Mintlify's default), so your existing icon names keep working.
 
 ## File tree
 

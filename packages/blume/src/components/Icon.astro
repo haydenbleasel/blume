@@ -1,10 +1,13 @@
 ---
+import data from "blume:data";
 import { resolveIcon } from "../theme/icons.ts";
 
 interface Props {
   name?: unknown;
   icon?: unknown;
   iconType?: string;
+  /** Icon library for a bare name; defaults to the project's `icons.library`. */
+  library?: string;
   size?: number;
   class?: string;
   className?: string;
@@ -16,6 +19,7 @@ const {
   color,
   icon,
   iconType,
+  library,
   name,
   size = 16,
   class: astroClass,
@@ -37,8 +41,12 @@ const isImageIcon = (value: string): boolean =>
   /\.(?:avif|gif|jpe?g|png|svg|webp)$/iu.test(value);
 const imageSrc = iconName && !rawSvg && isImageIcon(iconName) ? iconName : null;
 const resolvedIcon =
-  iconName && !(imageSrc || rawSvg) ? resolveIcon(iconName, iconType) : null;
-const markup = resolvedIcon?.markup;
+  iconName && !(imageSrc || rawSvg)
+    ? resolveIcon(iconName, {
+        iconType,
+        library: library ?? data.config.icons.library,
+      })
+    : null;
 const resolvedClass = astroClass ?? className;
 const customStyle = `display:inline-flex;width:${size}px;height:${size}px;${
   color ? `color:${color}` : ""
@@ -76,21 +84,16 @@ const style = color ? `color:${color}` : undefined;
       width={size}
     />
   ) : (
-    markup && (
+    resolvedIcon && (
     <svg
       aria-hidden={label ? undefined : "true"}
       aria-label={label}
       class={resolvedClass}
-      fill="none"
       height={size}
       role={label ? "img" : undefined}
-      set:html={markup}
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="2"
+      set:html={resolvedIcon.body}
       style={style}
-      viewBox="0 0 24 24"
+      viewBox={resolvedIcon.viewBox}
       width={size}
       xmlns="http://www.w3.org/2000/svg"
     />

@@ -747,6 +747,16 @@ const mintlifyFavicon = (value: unknown): BlumeConfig["favicon"] => {
   return withoutUndefined({ dark, light });
 };
 
+// Mintlify defaults to Font Awesome, so a migrated site's bare `icon` names are
+// FA names unless it opted into Lucide/Tabler. Set the default library to match.
+const mintlifyIcons = (value: unknown): BlumeConfig["icons"] => {
+  const library = asString(asObject(value)?.library);
+  return {
+    library:
+      library === "lucide" || library === "tabler" ? library : "fontawesome",
+  };
+};
+
 const mintlifyBanner = (value: unknown): BlumeConfig["banner"] => {
   const object = asObject(value);
   const content = object ? asString(object.content) : undefined;
@@ -964,6 +974,7 @@ export const loadMintlifyConfig = async (
     },
     description: asString(spec.description),
     favicon: mintlifyFavicon(spec.favicon),
+    icons: mintlifyIcons(spec.icons),
     logo: mintlifyLogo(spec.logo),
     markdown: mintlifyMarkdown(spec.markdown, styling),
     navigation: {
