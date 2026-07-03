@@ -270,6 +270,30 @@ describe("rewriteCallouts", () => {
       "A :::warning\nw\n::: B :::tip\nt\n::: C"
     );
   });
+
+  it("converts a callout nested inside a different callout", () => {
+    const input =
+      '<Warning>\nCareful\n\n<Callout type="info">nested</Callout>\n\nhere\n</Warning>';
+    // The inner callout converts too, and the outer fence grows so the inner
+    // ::: doesn't close it.
+    expect(rewriteCallouts(input, calloutOptions)).toBe(
+      "::::warning\nCareful\n\n:::info\nnested\n:::\n\nhere\n::::"
+    );
+  });
+
+  it("closes same-tag nesting at the outer close tag", () => {
+    const input = "<Callout>a\n<Callout>b</Callout>\nc</Callout>";
+    expect(rewriteCallouts(input, calloutOptions)).toBe(
+      "::::note\na\n:::note\nb\n:::\nc\n::::"
+    );
+  });
+
+  it("does not count a nested self-closing tag as an open", () => {
+    const input = "<Callout>a <Warning /> b</Callout>";
+    expect(rewriteCallouts(input, calloutOptions)).toBe(
+      "::::note\na :::warning\n::: b\n::::"
+    );
+  });
 });
 
 describe("stripUnknownPageMeta", () => {

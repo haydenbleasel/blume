@@ -161,14 +161,30 @@ const dedent = (value: string): string => {
   return lines.map((line) => line.slice(common)).join("\n");
 };
 
+/**
+ * A colon fence one longer than any directive fence in the body — nested
+ * container directives require the outer fence to be longer than the inner
+ * ones, or the inner `:::` closes the outer block.
+ */
+const fenceOver = (body: string): string => {
+  let max = 2;
+  for (const match of body.matchAll(/^ {0,3}(?<colons>:{3,})/gmu)) {
+    max = Math.max(max, match.groups?.colons?.length ?? 0);
+  }
+  return ":".repeat(Math.max(3, max + 1));
+};
+
 const directiveBlock = (
   directive: string,
   title: string | undefined,
   inner: string
 ): string => {
-  const head = title ? `:::${directive}[${title}]` : `:::${directive}`;
   const body = dedent(inner);
-  return `${head}\n${body}\n:::`;
+  const fence = fenceOver(body);
+  const head = title
+    ? `${fence}${directive}[${title}]`
+    : `${fence}${directive}`;
+  return `${head}\n${body}\n${fence}`;
 };
 
 /**
@@ -196,6 +212,40 @@ export const findOpenTagEnd = (source: string, from: number): number => {
     } else if (char === ">" && depth === 0) {
       return index;
     }
+  }
+  return -1;
+};
+
+/**
+ * Find the close tag matching an open tag, honoring same-tag nesting
+ * (`<Note>a<Note>b</Note>c</Note>` must close at the *outer* `</Note>`).
+ * Returns the index of the matching `</Tag>`, or -1 when unterminated.
+ */
+const findMatchingClose = (
+  source: string,
+  tag: string,
+  from: number
+): number => {
+  const scanner = new RegExp(`<(?<closing>/)?${tag}(?=[\\s/>])`, "gu");
+  scanner.lastIndex = from;
+  let depth = 0;
+  for (let match = scanner.exec(source); match; match = scanner.exec(source)) {
+    if (match.groups?.closing) {
+      if (depth === 0) {
+        return match.index;
+      }
+      depth -= 1;
+      continue;
+    }
+    // A nested open tag: skip its attributes; self-closing ones don't nest.
+    const end = findOpenTagEnd(source, match.index + tag.length + 1);
+    if (end === -1) {
+      return -1;
+    }
+    if (source[end - 1] !== "/") {
+      depth += 1;
+    }
+    scanner.lastIndex = end + 1;
   }
   return -1;
 };
@@ -256,7 +306,7 @@ export const rewriteCallouts = (
     const selfClosing = attrs.trimEnd().endsWith("/");
     const closeIndex = selfClosing
       ? openEnd
-      : source.indexOf(closeTag, openEnd + 1);
+      : findMatchingClose(source, tag, openEnd + 1);
 
     if (!directive || (!selfClosing && closeIndex === -1)) {
       output += source.slice(cursor, openEnd + 1);
@@ -272,10 +322,12 @@ export const rewriteCallouts = (
         : `:::${directive}\n:::`;
       cursor = openEnd + 1;
     } else {
+      // Recurse so nested callouts (of any tag) convert too — they'd
+      // otherwise survive as components Blume doesn't ship.
       output += directiveBlock(
         directive,
         title,
-        source.slice(openEnd + 1, closeIndex)
+        rewriteCallouts(source.slice(openEnd + 1, closeIndex), options)
       );
       cursor = closeIndex + closeTag.length;
     }
