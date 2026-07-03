@@ -8,6 +8,7 @@ import { dirname, join } from "pathe";
 import { migrateMintlify } from "../src/migrate/migrate.ts";
 import { loadMintlifyConfig } from "../src/migrate/mintlify/config.ts";
 import {
+  rewriteMintlifyAccordions,
   rewriteMintlifyCallouts,
   rewriteMintlifyExampleBlocks,
   rewriteSnippetImports,
@@ -147,6 +148,41 @@ describe("content rewrites", () => {
       "<RequestExample>\na\n</RequestExample><ResponseExample>b</ResponseExample>"
     );
     expect(out).toBe("<CodeGroup>\na\n</CodeGroup><CodeGroup>b</CodeGroup>");
+  });
+
+  it("remaps Mintlify accordions to Blume's container/item shape", () => {
+    const out = rewriteMintlifyAccordions(
+      [
+        "<AccordionGroup>",
+        '  <Accordion title="First" icon="rocket">',
+        "    One.",
+        "  </Accordion>",
+        '  <Accordion title="Second">',
+        "    Two.",
+        "  </Accordion>",
+        "</AccordionGroup>",
+      ].join("\n")
+    );
+    expect(out).toBe(
+      [
+        "<Accordion>",
+        '  <AccordionItem title="First" icon="rocket">',
+        "    One.",
+        "  </AccordionItem>",
+        '  <AccordionItem title="Second">',
+        "    Two.",
+        "  </AccordionItem>",
+        "</Accordion>",
+      ].join("\n")
+    );
+  });
+
+  it("maps a lone Mintlify accordion item to AccordionItem", () => {
+    // In Mintlify every <Accordion> is an item (the container is always
+    // <AccordionGroup>), so a standalone one becomes an <AccordionItem>.
+    expect(
+      rewriteMintlifyAccordions('<Accordion title="Solo">Body</Accordion>')
+    ).toBe('<AccordionItem title="Solo">Body</AccordionItem>');
   });
 
   it("normalizes inline-SVG icon props to strings", () => {

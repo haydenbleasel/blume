@@ -56,6 +56,22 @@ export const rewriteMintlifyExampleBlocks = (source: string): string =>
     "<$<close>CodeGroup"
   );
 
+/**
+ * Mintlify nests `<Accordion title="…">` items inside an `<AccordionGroup>`.
+ * Blume inverts that: `<Accordion>` is the container and each item is an
+ * `<AccordionItem title="…">`. Rewrite both in a single pass — the `\b` after
+ * `Accordion` keeps `<AccordionGroup>` (the `Group` branch) distinct from an
+ * item, so open/close tags of either map correctly regardless of order. Without
+ * this, migrated pages keep `<AccordionGroup>`, which Blume doesn't ship and the
+ * MDX build rejects with "Expected component AccordionGroup to be defined".
+ */
+export const rewriteMintlifyAccordions = (source: string): string =>
+  source.replaceAll(
+    /<(?<close>\/?)Accordion(?<group>Group)?\b/gu,
+    (_match, close: string, group: string | undefined) =>
+      group ? `<${close}Accordion` : `<${close}AccordionItem`
+  );
+
 const SNIPPET_IMPORT =
   /^import\s+[\s\S]*?\s+from\s+["'](?<source>\/snippets\/[^"']+)["'];?[ \t]*\n?/gmu;
 

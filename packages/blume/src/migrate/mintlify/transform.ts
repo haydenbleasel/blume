@@ -1,6 +1,7 @@
 import matter from "../../core/frontmatter.ts";
 import { stripUnknownPageMeta } from "../shared.ts";
 import {
+  rewriteMintlifyAccordions,
   rewriteMintlifyCallouts,
   rewriteMintlifyExampleBlocks,
   rewriteSnippetImports,
@@ -59,6 +60,7 @@ export const transformMintlifyContent = async (
   text = snippetImports.source;
   text = rewriteMintlifySvgIconProps(text);
   text = rewriteMintlifyExampleBlocks(text);
+  text = rewriteMintlifyAccordions(text);
   text = rewriteMintlifyCallouts(text);
 
   const unsupported = unsupportedMintlifyComponents(text);
