@@ -332,6 +332,33 @@ describe("dot parser and shared files", () => {
     expect(changelog.every((p) => p.navPath === "changelog.mdx")).toBe(true);
   });
 
+  it("applies plain meta.ts to every locale under the dot parser", async () => {
+    const resolved = config({ parser: "dot" });
+    const contentRoot = await tempContent({
+      "guides/intro.fr.mdx": "# Intro fr\n",
+      "guides/intro.mdx": "# Intro\n",
+      "guides/meta.ts": 'export default { title: "Custom Guides Title" };\n',
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const folderMeta = await discoverFolderMeta(contentRoot);
+    const graph = buildContentGraph(pages, {
+      folderMeta: folderMeta.meta,
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+      sharedFolderMeta: folderMeta.shared,
+    });
+
+    // Translations sit next to originals under `dot`, so a locale-prefixed
+    // meta key (`fr/guides`) can never exist — the plain meta must apply to
+    // every locale, not just the default one.
+    expect(labelsOf(graph.navigationByLocale.en?.sidebar ?? [])).toContain(
+      "Custom Guides Title"
+    );
+    expect(labelsOf(graph.navigationByLocale.fr?.sidebar ?? [])).toContain(
+      "Custom Guides Title"
+    );
+  });
+
   it("applies shared meta.$.ts to every locale's nav group", async () => {
     const resolved = config();
     const contentRoot = await tempContent({

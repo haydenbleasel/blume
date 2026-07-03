@@ -91,7 +91,12 @@ export const buildContentGraph = (
       navigationByLocale[code] = buildNavigation(localePages, {
         chromeVariants: options.navigation.chromeVariants,
         folderMeta: options.folderMeta,
-        metaPrefix: code === i18n.defaultLocale ? "" : code,
+        // Meta files live in locale directories only under the `dir` parser
+        // (`fr/guides/meta.ts` -> key `fr/guides`). Under `dot`, translations
+        // sit next to the originals and `guides/meta.ts` applies to every
+        // locale — prefixing would look up keys that can never exist.
+        metaPrefix:
+          i18n.parser === "dir" && code !== i18n.defaultLocale ? code : "",
         refByLogical: true,
         selectors: options.navigation.selectors,
         sharedFolderMeta: options.sharedFolderMeta,

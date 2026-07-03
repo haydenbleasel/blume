@@ -85,7 +85,7 @@ i18n: {
 
 ## Per-locale navigation
 
-Each language gets its own sidebar, built from that locale's files — so translations can diverge in structure, ordering, or labels. Folder [`meta.ts`](/docs/content/meta) files resolve per locale, too: put a `meta.ts` under `fr/guides/` to order the French group independently. Everything else about [navigation](/docs/content/navigation) works the same, per language.
+Each language gets its own sidebar, built from that locale's files — so translations can diverge in structure, ordering, or labels. Folder [`meta.ts`](/docs/content/meta) files resolve per locale, too: under the default `dir` parser, put a `meta.ts` under `fr/guides/` to order the French group independently. Under the `dot` parser translations sit next to the originals, so a folder's `meta.ts` applies to every locale. Everything else about [navigation](/docs/content/navigation) works the same, per language.
 
 ## Fallbacks
 
