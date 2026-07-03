@@ -35,6 +35,12 @@ export const mdxComponents = {};
 export const layoutOverrides = {};
 `;
 
+// A user-supplied attribute value interpolated into a generated .astro tag: a
+// stray quote or newline would produce a malformed component and an opaque
+// Astro parse error pointing at the generated file, not the user's config.
+const attributeValue = (value: string): string =>
+  value.replaceAll(/["\n\r]/gu, " ").trim();
+
 /** Astro client directive for a hydrated override. */
 const directiveFor = (override: NormalizedOverride): string => {
   const framework = override.source?.framework;
@@ -47,11 +53,13 @@ const directiveFor = (override: NormalizedOverride): string => {
     }
     case "media": {
       return override.media
-        ? `client:media="${override.media}"`
+        ? `client:media="${attributeValue(override.media)}"`
         : "client:load";
     }
     case "only": {
-      return framework ? `client:only="${framework}"` : "client:load";
+      return framework
+        ? `client:only="${attributeValue(framework)}"`
+        : "client:load";
     }
     default: {
       return "client:load";

@@ -255,7 +255,11 @@ const normalizeRef = (ref: string): string => {
     return "/";
   }
   const withSlash = ref.startsWith("/") ? ref : `/${ref}`;
-  return withSlash.endsWith("/index") ? withSlash.slice(0, -6) : withSlash;
+  const trimmed = withSlash.endsWith("/index")
+    ? withSlash.slice(0, -"/index".length)
+    : withSlash;
+  // "/index" trims to "" — that's the root, not an empty route.
+  return trimmed === "" ? "/" : trimmed;
 };
 
 const routeForRef = (

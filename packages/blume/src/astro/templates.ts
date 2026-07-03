@@ -701,8 +701,10 @@ const client = new Mixedbread({ apiKey: process.env.MIXEDBREAD_API_KEY ?? "" });
 const STORE_ID = ${JSON.stringify(storeId)};
 
 export const POST: APIRoute = async ({ request }) => {
-  const { query } = await request.json();
-  if (!query) {
+  // The endpoint is public: a malformed body must 200-empty, not 500.
+  const body = await request.json().catch(() => null);
+  const query = body?.query;
+  if (!query || typeof query !== "string") {
     return new Response("[]", {
       headers: { "Content-Type": "application/json" },
     });

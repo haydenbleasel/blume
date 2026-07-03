@@ -8,7 +8,7 @@ import { showBlumeErrorOverlay } from "../../astro/integration.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import { parsePort } from "../args.ts";
 import { coalescedRunner } from "../coalesce.ts";
-import { acquireDevLock } from "../dev-lock.ts";
+import { acquireDevLock, isDevLocked } from "../dev-lock.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
@@ -63,7 +63,15 @@ export const devCommand = defineCommand({
     }
 
     // Claim the shared `.blume` dir so a concurrent build/eject/sync refuses
-    // rather than regenerating or deleting it out from under this server.
+    // rather than regenerating or deleting it out from under this server. A
+    // second dev server would fight over the same generated tree the same
+    // way, so it must refuse too instead of silently clobbering the lock.
+    if (isDevLocked(project.context.outDir)) {
+      logger.error(
+        "Another `blume dev` is already running in this project; two dev servers would corrupt the shared .blume dir. Stop the other one first (or delete .blume/dev.lock if it crashed)."
+      );
+      process.exit(1);
+    }
     const releaseLock = acquireDevLock(project.context.outDir);
     process.on("exit", releaseLock);
 

@@ -69,6 +69,16 @@ describe("loadConfig", () => {
     expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
   });
 
+  it("reports every validation issue in one failing run", async () => {
+    // Three mistakes must not take three fix-rerun-fail loops to surface.
+    const dir = await makeDir(
+      "export default { title: 123, feedback: 5, description: [] };"
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+    expect(error.diagnostic.message).toContain("more config issue");
+  });
+
   it("throws a BlumeError when the config module fails to load", async () => {
     const dir = await makeDir('throw new Error("boom");');
     const error = await loadError(dir);

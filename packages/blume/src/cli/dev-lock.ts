@@ -38,8 +38,10 @@ export const isDevLocked = (outDir: string): boolean => {
     // Signal 0 probes liveness without actually signaling the process.
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // EPERM means the process exists but belongs to another user — still
+    // live, so the lock must hold (only ESRCH proves it's gone).
+    return (error as NodeJS.ErrnoException).code === "EPERM";
   }
 };
 

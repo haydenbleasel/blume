@@ -85,13 +85,22 @@ export const loadConfig = async (
       file: sourceFile ?? undefined,
       source,
     });
+    const [first, ...rest] = diagnostics;
+    const primary = first ?? {
+      code: "BLUME_CONFIG_INVALID",
+      file: sourceFile ?? undefined,
+      message: "Invalid Blume config.",
+      severity: "error" as const,
+    };
+    // Surface every issue in one failing run — reporting only the first turns
+    // a three-mistake config into three fix-rerun-fail loops.
     throw new BlumeError(
-      diagnostics[0] ?? {
-        code: "BLUME_CONFIG_INVALID",
-        file: sourceFile ?? undefined,
-        message: "Invalid Blume config.",
-        severity: "error",
-      }
+      rest.length > 0
+        ? {
+            ...primary,
+            message: `${primary.message}\n${rest.length} more config issue(s):\n${rest.map((d) => `  - ${d.message}`).join("\n")}`,
+          }
+        : primary
     );
   }
 

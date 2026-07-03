@@ -41,9 +41,16 @@ const isContained = (parent: string, child: string): boolean => {
 
 /** Resolve a request URL to an on-disk file within one of the mounts, if any. */
 const resolveRequest = (url: string, mounts: AssetMount[]): string | null => {
-  const pathname = decodeURIComponent(
-    (url.split("?")[0] ?? "").split("#")[0] ?? ""
-  );
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(
+      (url.split("?")[0] ?? "").split("#")[0] ?? ""
+    );
+  } catch {
+    // Malformed percent-encoding (`/images/%zz`) throws URIError; treat it as
+    // a plain miss (404) rather than a middleware exception.
+    return null;
+  }
   for (const mount of mounts) {
     if (pathname !== mount.url && !pathname.startsWith(`${mount.url}/`)) {
       continue;

@@ -170,6 +170,16 @@ describe("buildNavigation — explicit config sidebar", () => {
     expect(labels(nav.sidebar)).toStrictEqual(["Home", "Foo", "Bar"]);
   });
 
+  it("normalizes a leading-slash /index ref to the root route", () => {
+    // "/index" used to trim to "" and emit a link to nowhere.
+    const nav = buildNavigation(pages, {
+      folderMeta: empty,
+      sidebar: ["/index"],
+    });
+    const home = asPage(nav.sidebar[0]);
+    expect(home.route).toBe("/");
+  });
+
   it("passes tabs through unchanged", () => {
     const tabs = [{ label: "Docs", path: "/docs" }];
     const nav = buildNavigation(pages, {
