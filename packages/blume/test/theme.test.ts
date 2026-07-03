@@ -101,6 +101,14 @@ describe("buildThemeCss — backgrounds and dark mode", () => {
     expect(css).toContain('--blume-background-image: url("/dark.png");');
   });
 
+  it("treats prototype member names as raw colors, not presets", () => {
+    // ACCENTS["constructor"] resolves the Object constructor up the prototype
+    // chain; stringified into CSS it would break the :root rule wide open.
+    const css = buildThemeCss(themeOf({ accent: "constructor" }));
+    expect(css).not.toContain("function");
+    expect(css).toContain("--blume-accent: constructor;");
+  });
+
   it("shares the accent into dark mode when accentDark is unset", () => {
     // The base stylesheet's dark block outranks :root config tokens on
     // specificity, so the shared accent must be re-declared for dark.
@@ -313,5 +321,17 @@ describe("resolveIcon Font Awesome coverage", () => {
     expect(hasIcon("rocket")).toBeTruthy();
     expect(hasIcon("fa6-brands:github")).toBeTruthy();
     expect(hasIcon("definitely-not-an-icon-xyz")).toBeFalsy();
+  });
+
+  it("does not resolve prototype member names up the chain", () => {
+    // `constructor:x` in content (or library/iconType "constructor") used to
+    // pull the Object constructor out of the lookup maps and crash the build
+    // with a TypeError deep in resolution.
+    expect(resolveIcon("constructor:github")).toBeNull();
+    expect(resolveIcon("rocket", { library: "constructor" })?.viewBox).toBe(
+      "0 0 24 24"
+    );
+    expect(resolveIcon("rocket", { iconType: "constructor" })).not.toBeNull();
+    expect(hasIcon("constructor:nope")).toBeFalsy();
   });
 });

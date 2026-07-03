@@ -22,6 +22,17 @@ const CSS_COLOR = /^[\w\s#%.,()/+-]+$/u;
 const safeColor = (value: string, fallback: string): string =>
   CSS_COLOR.test(value.trim()) ? value.trim() : fallback;
 
+/**
+ * Resolve a named preset or fall back to {@link safeColor}. `hasOwn` keeps a
+ * value like "constructor" from resolving an Object.prototype member — which
+ * would stringify a function into the generated CSS, breaking the rule (the
+ * exact breakout safeColor exists to prevent).
+ */
+const presetOrColor = (value: string): string =>
+  Object.hasOwn(ACCENTS, value)
+    ? (ACCENTS[value] as string)
+    : safeColor(value, FALLBACK_ACCENT);
+
 /** Like {@link safeColor} but drops an unsafe/absent value to `null`. */
 const safeColorOrNull = (value: string | undefined): string | null =>
   value && CSS_COLOR.test(value.trim()) ? value.trim() : null;
@@ -133,7 +144,7 @@ ${tokens.join("\n")}
  * arbitrary colors without a config change.
  */
 export const resolveAccent = (theme: ResolvedConfig["theme"]): string =>
-  ACCENTS[theme.accent] ?? safeColor(theme.accent, FALLBACK_ACCENT);
+  presetOrColor(theme.accent);
 
 /** Resolve the configured radius preset to a CSS length. */
 export const resolveRadius = (theme: ResolvedConfig["theme"]): string =>
@@ -145,15 +156,9 @@ export const resolveRadius = (theme: ResolvedConfig["theme"]): string =>
  * arbitrary colors without a config change.
  */
 export const buildThemeCss = (theme: ResolvedConfig["theme"]): string => {
-  const accent =
-    ACCENTS[theme.accent] ?? safeColor(theme.accent, FALLBACK_ACCENT);
-  const accentDark = theme.accentDark
-    ? (ACCENTS[theme.accentDark] ??
-      safeColor(theme.accentDark, FALLBACK_ACCENT))
-    : null;
-  const action = theme.action
-    ? (ACCENTS[theme.action] ?? safeColor(theme.action, FALLBACK_ACCENT))
-    : null;
+  const accent = presetOrColor(theme.accent);
+  const accentDark = theme.accentDark ? presetOrColor(theme.accentDark) : null;
+  const action = theme.action ? presetOrColor(theme.action) : null;
   const backgroundDecoration = backgroundDecorationCss(
     theme.backgroundDecoration
   );

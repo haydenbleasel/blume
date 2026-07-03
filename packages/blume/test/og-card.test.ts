@@ -73,4 +73,19 @@ describe("renderOgImage", () => {
       title: "Hi",
     });
   });
+
+  it("falls back on a malformed hex accent instead of crashing Takumi", async () => {
+    // "#12345" (5 digits) used to pass straight through and throw a native
+    // InvalidArg inside the renderer, failing the whole build at prerender.
+    await expectPng({ accent: "#12345", brand: "Acme", title: "Hi" });
+    // A prototype member name must not resolve up the chain either.
+    await expectPng({ accent: "constructor", brand: "Acme", title: "Hi" });
+  });
+
+  it("reads a single-quoted viewBox for the aspect ratio", async () => {
+    await expectPng({
+      logo: '<svg viewBox=\'0 0 400 40\'><rect fill="currentColor" height="40" width="400" /></svg>',
+      title: "Hi",
+    });
+  });
 });

@@ -19,10 +19,19 @@ const ACCENT_HEX: Record<string, string> = {
   teal: "#14b8a6",
 };
 
+const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu;
+
 // OG rendering uses hex (Takumi's color parser does not accept oklch); named
-// presets map to hex, raw hex passes through, anything else falls back.
-const resolveAccent = (accent: string): string =>
-  ACCENT_HEX[accent] ?? (accent.startsWith("#") ? accent : "#3b82f6");
+// presets map to hex, well-formed hex passes through, anything else falls
+// back — a malformed hex (`#12345` typo) would throw inside Takumi and fail
+// the build at OG prerender with an opaque native error. `hasOwn` keeps a
+// preset name like "constructor" from resolving up the prototype chain.
+const resolveAccent = (accent: string): string => {
+  if (Object.hasOwn(ACCENT_HEX, accent)) {
+    return ACCENT_HEX[accent] as string;
+  }
+  return HEX_COLOR.test(accent) ? accent : "#3b82f6";
+};
 
 export interface OgCardOptions {
   /** Large headline — the page title. */
@@ -75,7 +84,10 @@ export const truncate = (value: string, max: number): string => {
 // stays within the lockup.
 const MARK_HEIGHT = 32;
 const MARK_MAX_WIDTH = 100;
-const VIEW_BOX = /viewBox="0 0 (?<w>[\d.]+) (?<h>[\d.]+)"/u;
+// Accept either quote style and a non-zero min-x/min-y; only width/height
+// matter for the aspect ratio. A miss falls back to a square mark.
+const VIEW_BOX =
+  /viewBox=(?<q>["'])[\d.-]+[\s,]+[\d.-]+[\s,]+(?<w>[\d.]+)[\s,]+(?<h>[\d.]+)\k<q>/u;
 
 // Render the configured logo as the brand mark. A `currentColor` logo carries
 // no intrinsic color, so it is painted in the foreground to read on the light

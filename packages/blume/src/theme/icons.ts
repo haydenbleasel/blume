@@ -75,6 +75,15 @@ const PREFIX_SETS: Record<string, string> = {
   ti: "tabler",
 };
 
+/**
+ * Own-property map lookup. Icon names and library/iconType hints come from
+ * content and config, so a value like `constructor:x` would otherwise resolve
+ * an Object.prototype member (a function) and crash resolution deep in the
+ * build with no pointer to the offending page.
+ */
+const ownEntry = <T>(map: Record<string, T>, key: string): T | undefined =>
+  Object.hasOwn(map, key) ? map[key] : undefined;
+
 export interface ResolvedIcon {
   /** Inner SVG markup (self-styled: carries its own fill/stroke). */
   body: string;
@@ -100,13 +109,13 @@ const normalize = (name: string): string =>
 /** Which set a bare name resolves against, given library/iconType hints. */
 const setFor = (options: ResolveIconOptions): string => {
   if (options.iconType) {
-    const set = ICON_TYPE_SETS[normalize(options.iconType)];
+    const set = ownEntry(ICON_TYPE_SETS, normalize(options.iconType));
     if (set) {
       return set;
     }
   }
   if (options.library) {
-    const set = LIBRARY_SETS[normalize(options.library)];
+    const set = ownEntry(LIBRARY_SETS, normalize(options.library));
     if (set) {
       return set;
     }
@@ -115,7 +124,7 @@ const setFor = (options: ResolveIconOptions): string => {
 };
 
 const fromSet = (setName: string, iconName: string): ResolvedIcon | null => {
-  const set = SETS[setName];
+  const set = ownEntry(SETS, setName);
   const data = set && getIconData(set, iconName);
   if (!data) {
     return null;
@@ -146,7 +155,7 @@ export const resolveIcon = (
   const normalized = normalize(name);
   const colon = normalized.indexOf(":");
   if (colon > 0) {
-    const setName = PREFIX_SETS[normalized.slice(0, colon)];
+    const setName = ownEntry(PREFIX_SETS, normalized.slice(0, colon));
     if (setName) {
       return resolveInSet(setName, normalized.slice(colon + 1));
     }
