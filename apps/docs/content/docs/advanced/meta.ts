@@ -4,7 +4,7 @@ export default defineMeta({
   order: 5,
   pages: [
     "migrate",
-    "self-updating-docs",
+    "skills",
     "custom-pages",
     "changelog",
     "blog",
