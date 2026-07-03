@@ -31,7 +31,7 @@ const refLabel = typeof schema.$ref === "string" ? refName(schema.$ref) : null;
 const circular = refLabel !== null && seen.includes(refLabel);
 const resolved = resolveSchema(schemas, schema);
 
-const type = typeLabel(schema, schemas);
+const type = typeLabel(schema);
 const description = resolved.description ?? schema.description ?? "";
 const deprecated = resolved.deprecated === true;
 const nullable = isNullable(resolved);

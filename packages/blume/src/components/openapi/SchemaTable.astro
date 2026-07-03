@@ -45,7 +45,7 @@ const { properties, required } = circular
   ) : isArray ? (
     <div>
       <div class="mb-2 text-muted-foreground text-xs">
-        Array of <code class="text-foreground">{typeLabel(items ?? {}, schemas)}</code>
+        Array of <code class="text-foreground">{typeLabel(items ?? {})}</code>
       </div>
       {items && (
         <Astro.self schema={items} schemas={schemas} seen={nextSeen} expandAll={expandAll} />
@@ -59,7 +59,7 @@ const { properties, required } = circular
       {branches.map((branch, index) => (
         <div class="rounded-blume border border-border p-3">
           <div class="mb-2 font-medium text-foreground text-xs">
-            {typeLabel(branch, schemas) || `Option ${index + 1}`}
+            {typeLabel(branch) || `Option ${index + 1}`}
           </div>
           <Astro.self schema={branch} schemas={schemas} seen={nextSeen} expandAll={expandAll} />
         </div>
@@ -80,7 +80,7 @@ const { properties, required } = circular
     </div>
   ) : (
     <div class="text-muted-foreground text-sm">
-      <code class="text-foreground">{typeLabel(resolved, schemas)}</code>
+      <code class="text-foreground">{typeLabel(resolved)}</code>
     </div>
   )
 }

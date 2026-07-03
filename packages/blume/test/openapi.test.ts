@@ -450,20 +450,18 @@ describe("helpers", () => {
   });
 
   it("labels types across shapes", () => {
-    expect(typeLabel({ $ref: "#/components/schemas/Pet" }, schemas)).toBe(
-      "Pet"
+    expect(typeLabel({ $ref: "#/components/schemas/Pet" })).toBe("Pet");
+    expect(typeLabel({ items: { type: "string" }, type: "array" })).toBe(
+      "string[]"
     );
-    expect(
-      typeLabel({ items: { type: "string" }, type: "array" }, schemas)
-    ).toBe("string[]");
-    expect(
-      typeLabel({ oneOf: [{ type: "string" }, { type: "number" }] }, schemas)
-    ).toBe("string | number");
-    expect(typeLabel({ allOf: [{ type: "object" }] }, schemas)).toBe("object");
-    expect(typeLabel({ format: "int64", type: "integer" }, schemas)).toBe(
+    expect(typeLabel({ oneOf: [{ type: "string" }, { type: "number" }] })).toBe(
+      "string | number"
+    );
+    expect(typeLabel({ allOf: [{ type: "object" }] })).toBe("object");
+    expect(typeLabel({ format: "int64", type: "integer" })).toBe(
       "integer<int64>"
     );
-    expect(typeLabel({}, schemas)).toBe("any");
+    expect(typeLabel({})).toBe("any");
   });
 
   it("detects nullability and lists constraints", () => {
@@ -490,6 +488,33 @@ describe("helpers", () => {
       "b",
     ]);
     expect(merged.required.has("a")).toBe(true);
+  });
+
+  it("survives circular refs through array items and allOf chains", () => {
+    const node: SchemaLike = {
+      items: { $ref: "#/components/schemas/Node" },
+      type: "array",
+    };
+    const cyclic: Record<string, SchemaLike> = {
+      Chicken: { allOf: [{ $ref: "#/components/schemas/Egg" }] },
+      Egg: {
+        allOf: [{ $ref: "#/components/schemas/Chicken" }],
+        properties: { id: { type: "string" } },
+      },
+      Node: node,
+    };
+    // Array-of-self labels by ref name instead of recursing forever.
+    expect(typeLabel(node)).toBe("Node[]");
+    expect(typeLabel({ $ref: "#/components/schemas/Node" })).toBe("Node");
+    // Mutually-recursive allOf chains terminate and still merge fields.
+    const merged = objectProperties(
+      { $ref: "#/components/schemas/Chicken" },
+      cyclic
+    );
+    expect(merged.properties.map(([name]) => name)).toStrictEqual(["id"]);
+    expect(
+      exampleValue({ $ref: "#/components/schemas/Chicken" }, cyclic)
+    ).toStrictEqual({ id: "string" });
   });
 
   it("builds example values and guards circular refs", () => {

@@ -69,17 +69,18 @@ const nonNullTypes = (type: string | string[] | undefined): string[] => {
   return (Array.isArray(type) ? type : [type]).filter((t) => t !== "null");
 };
 
-/** A short, human-readable type label for a schema row. */
-export const typeLabel = (
-  schema: SchemaLike,
-  schemas: Record<string, SchemaLike>
-): string => {
+/**
+ * A short, human-readable type label for a schema row. `$ref`s label by name
+ * (`Pet`, `Pet[]`) without resolving — which also means circular refs through
+ * array items can't recurse forever.
+ */
+export const typeLabel = (schema: SchemaLike): string => {
   if (typeof schema.$ref === "string") {
     return refName(schema.$ref);
   }
   if (schema.oneOf || schema.anyOf) {
     const branches = schema.oneOf ?? schema.anyOf ?? [];
-    const labels = branches.map((branch) => typeLabel(branch, schemas));
+    const labels = branches.map((branch) => typeLabel(branch));
     return [...new Set(labels)].join(" | ") || "any";
   }
   if (schema.allOf) {
@@ -87,8 +88,7 @@ export const typeLabel = (
   }
   const types = nonNullTypes(schema.type);
   if (types.includes("array")) {
-    const item = resolveSchema(schemas, schema.items);
-    return `${typeLabel(item, schemas)}[]`;
+    return `${typeLabel(schema.items ?? {})}[]`;
   }
   const base = types[0] ?? (schema.properties ? "object" : "any");
   return schema.format ? `${base}<${schema.format}>` : base;
@@ -136,8 +136,17 @@ export const objectProperties = (
 ): { properties: [string, SchemaLike][]; required: Set<string> } => {
   const properties = new Map<string, SchemaLike>();
   const required = new Set<string>();
+  // Cycles can only enter through `$ref`s (inline JSON can't self-nest), so
+  // tracking visited refs is enough to stop circular allOf chains recursing.
+  const seen = new Set<string>();
 
   const collect = (node: SchemaLike): void => {
+    if (typeof node.$ref === "string") {
+      if (seen.has(node.$ref)) {
+        return;
+      }
+      seen.add(node.$ref);
+    }
     const resolved = resolveSchema(schemas, node);
     for (const name of resolved.required ?? []) {
       required.add(name);

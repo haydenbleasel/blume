@@ -48,7 +48,7 @@ const groups = SECTIONS.map((section) => ({
       <div class="not-prose rounded-blume border border-border px-4">
         {group.items.map((param) => {
           const resolved = resolveSchema(schemas, param.schema ?? {});
-          const type = param.schema ? typeLabel(param.schema, schemas) : "string";
+          const type = param.schema ? typeLabel(param.schema) : "string";
           const limits = constraints(resolved);
           const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
           return (
