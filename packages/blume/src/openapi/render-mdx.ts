@@ -21,8 +21,17 @@ const ENTITIES: Record<string, string> = {
   "{": "&#123;",
   "}": "&#125;",
 };
+// MDX also parses lines starting with `import`/`export` as ESM ("import the
+// SDK…" is common spec prose). Entity-escape the keyword's first letter so the
+// construct can't match; it still renders as the literal word.
+const MDX_ESM_KEYWORD = /^(?<keyword>import|export)\b/gmu;
 const mdxSafe = (text: string): string =>
-  text.replace(MDX_UNSAFE, (char) => ENTITIES[char] ?? char);
+  text
+    .replace(MDX_UNSAFE, (char) => ENTITIES[char] ?? char)
+    .replace(
+      MDX_ESM_KEYWORD,
+      (keyword) => `&#${keyword.codePointAt(0)};${keyword.slice(1)}`
+    );
 
 /** Frontmatter + body for one operation or overview page. */
 export interface RenderedPage {

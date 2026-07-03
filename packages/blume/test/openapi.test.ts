@@ -331,6 +331,29 @@ describe("render-mdx", () => {
     ).toBe(true);
   });
 
+  it("neutralizes description lines MDX would parse as ESM", () => {
+    const op = {
+      deprecated: false,
+      description:
+        "import the SDK and call the endpoint.\n\nexport of data requires auth.\n\nSupports exports and important flags.",
+      key: "op",
+      method: "post" as const,
+      operationId: "op",
+      path: "/x",
+      route: "/api/x/op",
+      summary: "Do a thing",
+      tag: "x",
+      tagSlug: "x",
+    };
+    const page = operationMdx(specData(), op);
+    // Lines starting with import/export would be parsed as ESM by acorn and
+    // crash MDX compilation; the keyword's first letter is entity-escaped.
+    expect(page.body).toContain("&#105;mport the SDK");
+    expect(page.body).toContain("&#101;xport of data");
+    // Mid-sentence and prefixed words are left alone.
+    expect(page.body).toContain("Supports exports and important flags.");
+  });
+
   it("skips a body description that only repeats the summary", () => {
     const op = {
       deprecated: false,
