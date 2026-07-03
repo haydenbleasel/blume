@@ -287,7 +287,7 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
   line-height: 1.55;
   margin: 1.5rem 0;
   overflow-x: auto;
-  padding: 1rem 1.25rem;
+  padding: 1rem 0;
   position: relative;
 }
 
@@ -382,6 +382,19 @@ blume-diff {
   font-size: inherit;
   font-weight: 400;
   padding: 0;
+}
+
+/* Long lines scroll inside the code element, not the pre: the pre stays static
+   so its absolute header bar (::before) and copy button don't drift with the
+   scroll. The pre's horizontal padding lives here so content still scrolls
+   edge-to-edge past it. Twoslash blocks (and the popup pres nested inside them)
+   opt out — popups must escape any scroll container (see theme/twoslash.ts) —
+   as do not-prose contexts (API request panels, Component source panes), which
+   own their code layout and keep their copy control outside the pre. */
+.prose :where(pre:not(.twoslash, .twoslash pre, .not-prose *) > code) {
+  display: block;
+  overflow-x: auto;
+  padding: 0 1.25rem;
 }
 
 /* Word wrap (markdown.code.wrap): long lines wrap instead of scrolling. The

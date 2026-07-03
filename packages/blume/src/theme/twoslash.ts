@@ -33,9 +33,14 @@ const OVERRIDES = `
 
 /* Popups are absolutely positioned and must escape the pre's scroll container.
    The base prose pre rule (from the typography layer) wins the cascade here
-   despite lower specificity, so !important is needed to force visibility. */
+   despite lower specificity, so !important is needed to force visibility.
+   Regular code blocks scroll their inner code element and carry the horizontal
+   padding there; twoslash code opts out of that scroller (popups again), so the
+   padding is restored on the pre. */
 .prose pre.twoslash {
   overflow: visible !important;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
 }
 
 /* The rich renderer renders each popup's type signature as a nested Shiki
