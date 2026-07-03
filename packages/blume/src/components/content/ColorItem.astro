@@ -46,7 +46,8 @@ const displayValue =
 </button>
 
 <style>
-  :global(.dark) [data-blume-color-swatch] {
+  /* Dark mode is data-theme="dark" on <html> (see theme/entry.ts), not a class. */
+  :global([data-theme="dark"]) [data-blume-color-swatch] {
     background: var(--blume-color-dark, var(--blume-color-light));
   }
 </style>
