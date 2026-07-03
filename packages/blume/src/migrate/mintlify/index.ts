@@ -191,6 +191,35 @@ const applyRelocatedAssets = (
 };
 
 /**
+ * Remove the foreign Mintlify config now that it's been translated into
+ * `blume.config.ts`. Leaving `docs.json`/`mint.json` on disk keeps the project a
+ * bridge-mode candidate: `detectMintlifyBridge` fires on any later run where a
+ * `blume.config.*` is absent (e.g. the config is deleted to re-run the
+ * migration), silently serving the *un-migrated* Mintlify project instead of the
+ * converted one. Removing it makes the conversion permanent — matching the
+ * migrator's promise and how it already deletes inlined snippets.
+ */
+const removeForeignConfig = async (
+  root: string,
+  warnings: string[]
+): Promise<void> => {
+  const removed: string[] = [];
+  for (const name of ["docs.json", "mint.json"]) {
+    const file = join(root, name);
+    if (existsSync(file)) {
+      // oxlint-disable-next-line no-await-in-loop -- sequential fs removes
+      await rm(file, { force: true });
+      removed.push(name);
+    }
+  }
+  if (removed.length > 0) {
+    warnings.push(
+      `Removed ${removed.join(", ")} (translated to blume.config.ts) so "blume dev" no longer falls back to Mintlify bridge mode.`
+    );
+  }
+};
+
+/**
  * Scaffold the project files a config-only Mintlify repo lacks: a runnable
  * `package.json` (it ships no npm manifest) and a `.gitignore` for Blume's
  * generated `.blume/` runtime and `dist/` build output. Both are idempotent —
@@ -347,6 +376,9 @@ export const migrateMintlifyProject = async (
   }
   applyRelocatedAssets(config, assets, warnings);
   await writeBlumeConfig(root, config);
+  // Drop the source config only after the Blume config is safely on disk, so a
+  // mid-migration failure never leaves the project with neither.
+  await removeForeignConfig(root, warnings);
   await scaffoldProjectFiles(root, warnings);
 
   if (Object.keys(variables).length > 0) {

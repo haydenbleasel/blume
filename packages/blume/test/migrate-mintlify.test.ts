@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
 
+import { detectMintlifyBridge } from "../src/core/bridge.ts";
 import { migrateMintlify } from "../src/migrate/migrate.ts";
 import {
   loadMintlifyConfig,
@@ -390,6 +391,42 @@ describe("migrateMintlify end to end", () => {
     expect(
       result.warnings.some((w) => w.includes("Created a package.json"))
     ).toBe(false);
+  });
+
+  it("removes the source docs.json so the project can't fall back to bridge mode", async () => {
+    const root = await project({
+      "docs.json": JSON.stringify({
+        name: "Docs",
+        navigation: { pages: [{ group: "Start", pages: ["index"] }] },
+      }),
+      "index.mdx": "---\ntitle: Home\n---\n\nHi.\n",
+    });
+
+    const result = await migrateMintlify(root);
+
+    expect(existsSync(join(root, "blume.config.ts"))).toBe(true);
+    expect(existsSync(join(root, "docs.json"))).toBe(false);
+    // With the foreign config gone, bridge detection no longer triggers even
+    // when a Blume config isn't loaded — the migration is permanent.
+    expect(await detectMintlifyBridge(root)).toBeNull();
+    expect(result.warnings.some((w) => w.includes("Removed docs.json"))).toBe(
+      true
+    );
+  });
+
+  it("removes a mint.json source config too", async () => {
+    const root = await project({
+      "index.mdx": "---\ntitle: Home\n---\n\nHi.\n",
+      "mint.json": JSON.stringify({
+        name: "Docs",
+        navigation: [{ group: "Start", pages: ["index"] }],
+      }),
+    });
+
+    await migrateMintlify(root);
+
+    expect(existsSync(join(root, "mint.json"))).toBe(false);
+    expect(await detectMintlifyBridge(root)).toBeNull();
   });
 
   it("migrates the bundled examples/mintlify fixture without throwing", async () => {
