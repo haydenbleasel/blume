@@ -9,5 +9,6 @@ export default defineConfig({
     "packages/video/src/components",
     "packages/video/src/lib/utils.ts",
     "packages/video/src/lib/remocn-ui",
+    "packages/blume/CHANGELOG.md",
   ],
 });
