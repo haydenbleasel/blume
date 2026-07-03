@@ -432,11 +432,16 @@ const resolveLogo = (project: BlumeProject): BlumeLogo | null => {
   if (!logo) {
     return null;
   }
-  const config = typeof logo === "string" ? { light: logo } : logo;
-  const light = config.light ?? config.dark;
-  const dark = config.dark ?? config.light;
-  const alt = config.alt ?? "";
-  const href = config.href ?? "/";
+  const config = typeof logo === "string" ? { image: logo } : logo;
+  // `text` is passed through verbatim: `undefined` lets the brand fall back to
+  // the site title, `""` renders the mark alone (a logo with the wordmark baked
+  // in).
+  const { href, image: source, text } = config;
+  const image = typeof source === "string" ? { light: source } : source;
+  const light = image?.light ?? image?.dark;
+  const dark = image?.dark ?? image?.light;
+  const alt = image?.alt ?? "";
+  const brandHref = href ?? "/";
 
   if (light && light === dark && light.toLowerCase().endsWith(".svg")) {
     const rel = light.replace(/^\//u, "");
@@ -445,10 +450,10 @@ const resolveLogo = (project: BlumeProject): BlumeLogo | null => {
       join(project.context.root, rel),
     ].find((path) => existsSync(path));
     if (file) {
-      return { alt, href, svg: readFileSync(file, "utf-8") };
+      return { alt, href: brandHref, svg: readFileSync(file, "utf-8"), text };
     }
   }
-  return { alt, dark, href, light };
+  return { alt, dark, href: brandHref, light, text };
 };
 
 /**

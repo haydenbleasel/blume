@@ -19,6 +19,10 @@ const logoLight = logo?.light;
 const logoDark = logo?.dark ?? logo?.light;
 const logoAlt = logo?.alt ?? "";
 const brandHref = logo?.href ?? "/";
+// Wordmark beside the mark: the configured `logo.text`, or the site title when
+// it's omitted. An explicit `""` hides it (an image-only logo whose mark already
+// carries the wordmark).
+const brandText = logo?.text ?? site.title;
 ---
 
 <a
@@ -46,5 +50,5 @@ const brandHref = logo?.href ?? "/";
         </>
       ))
   }
-  {site.title}
+  {brandText && <span>{brandText}</span>}
 </a>

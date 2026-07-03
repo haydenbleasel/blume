@@ -150,14 +150,32 @@ export type FolderMeta = z.infer<typeof folderMetaSchema>;
 // Project config (blume.config.ts)
 // ---------------------------------------------------------------------------
 
-const logoConfigSchema = z.union([
+/** The logo mark: a single image path/URL, or light/dark variants with alt text. */
+const logoImageSchema = z.union([
   z.string(),
   z
     .object({
       alt: z.string().optional(),
       dark: z.string().optional(),
-      href: z.string().optional(),
       light: z.string().optional(),
+    })
+    .strict(),
+]);
+
+/**
+ * Site logo. A bare string is the image shorthand. The object form splits the
+ * brand into an optional `image` mark and optional wordmark `text` so a site can
+ * show an image-only logo (a mark with the wordmark baked in), a text-only logo,
+ * or both. Omit `text` to fall back to the site title; set `text: ""` to render
+ * the mark alone. `href` overrides the brand link (defaults to `/`).
+ */
+const logoConfigSchema = z.union([
+  z.string(),
+  z
+    .object({
+      href: z.string().optional(),
+      image: logoImageSchema.optional(),
+      text: z.string().optional(),
     })
     .strict(),
 ]);

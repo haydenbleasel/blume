@@ -193,7 +193,7 @@ describe("buildRuntimeData", () => {
   banner: { content: "Hello", dismissible: true, id: "promo", link: { href: "/x", text: "Go" } },
   deployment: { site: "https://example.com" },
   github: { owner: "acme", repo: "docs" },
-  logo: { alt: "Logo", dark: "/dark.png", href: "/home", light: "/light.png" },
+  logo: { href: "/home", image: { alt: "Logo", dark: "/dark.png", light: "/light.png" } },
   mcp: { enabled: true, name: "Docs MCP" },
 };
 `,
@@ -275,6 +275,46 @@ describe("buildRuntimeData", () => {
     const data = JSON.parse(buildRuntimeData(project));
     expect(data.config.logo.svg).toBeUndefined();
     expect(data.config.logo.light).toBe("/missing.svg");
+  });
+
+  it("carries an image mark alongside explicit wordmark text", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts":
+          'export default { logo: { image: "/missing.svg", text: "Acme Docs" } };\n',
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.logo.light).toBe("/missing.svg");
+    expect(data.config.logo.text).toBe("Acme Docs");
+  });
+
+  it("keeps an empty wordmark (image-only) distinct from an omitted one", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts":
+          'export default { logo: { image: "/missing.svg", text: "" } };\n',
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    // Explicit "" is preserved (the brand renders the mark alone); an omitted
+    // `text` would be dropped from the JSON and fall back to the site title.
+    expect(data.config.logo.text).toBe("");
+  });
+
+  it("supports a text-only logo with no image", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": 'export default { logo: { text: "Acme" } };\n',
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.logo.text).toBe("Acme");
+    expect(data.config.logo.light).toBeUndefined();
+    expect(data.config.logo.svg).toBeUndefined();
   });
 
   it("normalizes a string banner and inlines a root favicon", async () => {

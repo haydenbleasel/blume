@@ -17,6 +17,8 @@ export interface BlumeLogo {
   dark?: string;
   alt: string;
   href: string;
+  /** Wordmark text beside the mark; `undefined` falls back to the site title. */
+  text?: string;
 }
 
 /** A favicon or apple-touch-icon: a link href plus an optional MIME type. */

@@ -91,7 +91,7 @@ export default defineConfig({
 | --- | --- | --- |
 | `title` | `"Documentation"` | Site name — shown in the header, page titles, OG cards. |
 | `description` | — | Default meta description, used for SEO and OG. |
-| `logo` | — | Brand logo shown beside the title in the header. |
+| `logo` | — | Brand mark and/or wordmark shown in the header. |
 | `banner` | — | Site-wide announcement bar above the header. |
 
 ### Logo
@@ -102,18 +102,23 @@ Point `logo` at an SVG and Blume inlines it, so a `currentColor` logo follows th
 logo: "/logo.svg",
 ```
 
-The SVG can live at your project root or in `public/`. For raster images — or separate light and dark artwork — use the object form (these must live in `public/`):
+The SVG can live at your project root or in `public/`. The brand is a mark (`image`) plus a wordmark (`text`); the object form lets you set them independently:
 
 ```ts blume.config.ts lineNumbers
 logo: {
-  light: "/logo-light.png",
-  dark: "/logo-dark.png",
-  alt: "Acme",
-  href: "/",
+  image: "/logo.svg", // string, or { light, dark, alt } for themed raster art
+  text: "Acme",       // wordmark beside the mark
+  href: "/",          // overrides the brand link (defaults to "/")
 },
 ```
 
-`href` overrides the logo's link (it defaults to `/`).
+`image` takes the same value as the shorthand — a single path, or `{ light, dark, alt }` for separate light/dark artwork (raster images must live in `public/`).
+
+`text` controls the wordmark independently of the mark:
+
+- **Omit `text`** and the brand uses your site `title` (the default).
+- **Set `text: ""`** to show the mark alone — handy when the logo image already includes the wordmark.
+- **Set `text` with no `image`** for a text-only logo.
 
 ### Favicon
 
