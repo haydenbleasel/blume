@@ -1,5 +1,16 @@
 # blume
 
+## 0.5.1
+
+### Patch Changes
+
+- 348b6f4: Dropped `navigation.sidebarVariants`, an unused per-partition sidebar mechanism. It was built, validated, and shipped in the data module, but no layout ever read it — the sidebar has always been scoped at render by the active **tab** via `sidebarForRoute`, and that remains the model. The Mintlify migrator emitted one variant per page (each carrying the full section sidebar), which is what ballooned a large migrated site's `blume.config.ts` to ~4.9 MB / 126k lines; it no longer emits any, so migrated configs shrink to a few KB. The `sidebarVariants` config field, its schema, the `NavSidebarVariant` type, and the variant folds in nav diagnostics are all removed.
+
+  Because `navigation` config is `.strict()`, a stale config that still carries a `sidebarVariants` key will now fail validation — drop the key or re-run `blume migrate mintlify` to regenerate a clean config.
+
+- 1d5937c: `blume migrate mintlify` now rewrites Mintlify accordions to Blume's shape. Mintlify wraps `<Accordion title="…">` items in an `<AccordionGroup>`, whereas Blume inverts that: `<Accordion>` is the container and each item is an `<AccordionItem title="…">`. The migrator previously left both tags untouched, so migrated pages that used accordions failed the MDX build outright — Blume ships no `<AccordionGroup>` component, so rendering threw `Expected component AccordionGroup to be defined` — and the nested `<Accordion title=…>` items lost their title and expand behavior. The group is now remapped to `<Accordion>` and every item to `<AccordionItem>` (preserving `title`, `icon`, and other props), so those pages build and render correctly.
+- 8ac7101: `blume migrate mintlify` now drops dynamic (wildcard/param) redirects instead of emitting ones that break the build. Mintlify's `:slug*`/`:id` redirect params were translated to Astro `[...slug]`/`[id]` segments, but Blume redirects are static path-to-path — a dynamic destination matches no route, so Astro aborted the entire build (`The destination "…/[...slug]" does not match any existing route in your project`). Such redirects are now skipped, and the migrator emits a warning that names the dropped sources and points to host-level redirect files (`_redirects`, `vercel.json`), which do support wildcards. Static redirects are unaffected, so the migrated site builds.
+
 ## 0.5.0
 
 ### Minor Changes
