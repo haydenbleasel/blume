@@ -512,20 +512,35 @@ export const askEndpointTemplate = (
   }
   // Validate the client-supplied body and cap its size. The endpoint is
   // unauthenticated, so bounding message count/length limits how much a caller
-  // can spend against the model per request; front it with a rate limiter (or
-  // your provider's limits) for stronger protection.
+  // can spend against the model per request, and restricting roles to
+  // user/assistant keeps callers from injecting their own system prompt and
+  // repurposing the endpoint as a general LLM proxy; front it with a rate
+  // limiter (or your provider's limits) for stronger protection.
   const validate = `  const body = await request.json().catch(() => null);
-  const messages = body?.messages;
-  if (
-    !Array.isArray(messages) ||
-    messages.length === 0 ||
-    messages.length > 40 ||
-    JSON.stringify(messages).length > 24_000
-  ) {
-    return new Response("Invalid request: send 1-40 messages.", {
-      status: 400,
-    });
-  }`;
+  const raw = body?.messages;
+  const valid =
+    Array.isArray(raw) &&
+    raw.length > 0 &&
+    raw.length <= 40 &&
+    raw.every(
+      (m: unknown) =>
+        typeof m === "object" &&
+        m !== null &&
+        ("role" in m && (m.role === "user" || m.role === "assistant")) &&
+        ("content" in m && typeof m.content === "string")
+    ) &&
+    JSON.stringify(raw).length <= 24_000;
+  if (!valid) {
+    return new Response(
+      "Invalid request: send 1-40 user/assistant messages with string content.",
+      { status: 400 }
+    );
+  }
+  // Re-build the array so only role/content ever reach the model.
+  const messages = raw.map((m: { role: "user" | "assistant"; content: string }) => ({
+    content: m.content,
+    role: m.role,
+  }));`;
   const stream = grounded
     ? `    const system =
       (await ground(messages, body.page)) ??

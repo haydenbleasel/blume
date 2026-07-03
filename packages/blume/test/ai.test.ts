@@ -416,7 +416,11 @@ describe("askEndpointTemplate", () => {
     expect(out).toContain("await ground(messages, body.page)");
     // Hardened: validates the body, caps it, and handles stream errors.
     expect(out).toContain("await request.json().catch(() => null)");
-    expect(out).toContain("!Array.isArray(messages)");
+    expect(out).toContain("Array.isArray(raw)");
+    // Only user/assistant roles pass — a caller can't inject a system prompt
+    // and repurpose the endpoint as an open LLM proxy.
+    expect(out).toContain('m.role === "user" || m.role === "assistant"');
+    expect(out).toContain('typeof m.content === "string"');
     expect(out).toContain("status: 400");
     expect(out).toContain("status: 500");
   });

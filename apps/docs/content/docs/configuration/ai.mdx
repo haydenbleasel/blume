@@ -133,7 +133,7 @@ Keys are read with `process.env`, which covers the Node, Vercel, and Netlify ada
 
 ### Rate limiting
 
-The `POST /api/ask` endpoint is **unauthenticated** — it has to be, so the in-page assistant can call it. Blume validates each request (rejecting malformed bodies and capping it to 1–40 messages) to bound how much a single call can spend against your model, but it can't stop someone from calling the endpoint repeatedly. If cost abuse is a concern, put the route behind a rate limiter — your host's (e.g. Vercel's) edge rate limiting, a middleware, or your model provider's per-key spend limits.
+The `POST /api/ask` endpoint is **unauthenticated** — it has to be, so the in-page assistant can call it. Blume validates each request — rejecting malformed bodies, capping it to 1–40 messages, and accepting only `user`/`assistant` roles so a caller can't inject their own system prompt and repurpose the route as a general LLM proxy — to bound how much a single call can spend against your model, but it can't stop someone from calling the endpoint repeatedly. If cost abuse is a concern, put the route behind a rate limiter — your host's (e.g. Vercel's) edge rate limiting, a middleware, or your model provider's per-key spend limits.
 
 ## MCP server
 
