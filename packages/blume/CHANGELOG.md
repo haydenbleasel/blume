@@ -1,5 +1,18 @@
 # blume
 
+## 0.5.2
+
+### Patch Changes
+
+- 34ccd52: `blume dev` in Mintlify bridge mode is no longer slow and noisy. Bridge mode roots content at the project directory, which contains Blume's generated `.blume/` output — and the dev server rewrites `.blume/.astro/*` (its data store and font cache) on every request. Two things fed on those writes:
+
+  - The Mintlify source's recursive `fs.watch` saw them and re-ran a full rescan + runtime regeneration, whose own writes landed back under `.blume/` and re-fired the watcher — a self-sustaining storm that stalled page renders (8–26s). The watcher now ignores events under `.blume/`, `node_modules`, and other non-content trees.
+  - Astro's content-layer `docs` collection was rooted at the project directory even though, in bridge mode, every page renders through the staged collection — so its glob loader watched `.blume/.astro/fonts/` and warned `No entry type found` for each `.woff2` on every rebuild. The `docs` collection now globs nothing when no filesystem source feeds it (glob-pattern negations can't exclude a subtree from Astro's watcher, so an empty pattern is the only reliable fix), which also avoids double-loading the staged bodies under `.blume/content`.
+
+  Normal (non-bridge) projects were unaffected, since their content root sits below `.blume/`.
+
+- b47f927: `blume migrate mintlify` now scaffolds the project files a config-only Mintlify repo lacks. Mintlify docs are driven by `docs.json`/`mint.json` and ship no npm manifest, so a fresh migration previously left nothing to run `blume dev` with. The migrator now writes a minimal, runnable `package.json` with `blume` pinned as a dependency and `dev`/`build`/`doctor` scripts (derived name, `private: true`), plus a `.gitignore` for Blume's generated `.blume/` runtime and `dist/` build output — so `npm install && npm run dev` works immediately and the generated output stays untracked. Both are idempotent: an existing `package.json` is left untouched and an existing `.gitignore` is only extended. The `package.json` template is now shared with `blume init`.
+
 ## 0.5.1
 
 ### Patch Changes
