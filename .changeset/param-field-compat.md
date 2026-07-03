@@ -1,5 +1,0 @@
----
-"blume": minor
----
-
-Added Mintlify-compatible `<ParamField>`, `<ResponseField>`, and `<RequestField>` components for documenting request/response fields (CLI flags, SDK arguments, endpoint parameters). Each renders a labeled field row — name, type, and `required`/`deprecated`/`default` badges styled to match the native OpenAPI reference — with the description taken from the element's body (rich MDX, including a nested `<Expandable>`). `<ParamField>` reads the field's location from the attribute that names it (`path`, `query`, `header`, `body`, or a plain `name`) and shows it as a small label. Previously these had no Blume equivalent, so ~488 uses across a migrated Mintlify site failed to compile as undefined MDX components; they now render as-is in both a migrated project and live Bridge mode. The Mintlify migrator no longer flags them (or points at the OpenAPI reference for surfaces a spec doesn't cover); Mintlify's `<Update>` changelog component remains flagged since Blume's changelog is frontmatter-driven.
