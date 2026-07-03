@@ -69,6 +69,8 @@ interface LoadedSpec {
   slug: string;
   spec: ApiSpecData;
   entries: SourceEntry[];
+  /** Non-fatal notes from the load (e.g. an offline cache fallback). */
+  diagnostics: Diagnostic[];
 }
 
 export const openApiSource = (
@@ -81,7 +83,11 @@ export const openApiSource = (
     reference: ReferenceSource
   ): Promise<LoadedSpec | Diagnostic> => {
     try {
-      const { document } = await parseSpec(reference.spec, ctx.projectRoot);
+      const { document, warnings } = await parseSpec(
+        reference.spec,
+        ctx.projectRoot,
+        { cacheDir: ctx.cacheDir, refresh: ctx.refresh }
+      );
       const { operations, tags } = extractOperations(document, reference.route);
       const info = document.info ?? { title: reference.label, version: "" };
       const spec: ApiSpecData = {
@@ -100,6 +106,11 @@ export const openApiSource = (
         version: info.version ?? "",
       };
       return {
+        diagnostics: warnings.map((message) => ({
+          code: "BLUME_OPENAPI_STALE",
+          message,
+          severity: "warning" as const,
+        })),
         entries: specEntries(spec, operations),
         slug: reference.slug,
         spec,
@@ -108,7 +119,12 @@ export const openApiSource = (
       return {
         code: "BLUME_OPENAPI_UNAVAILABLE",
         message: `Could not load OpenAPI spec "${reference.spec}" for ${reference.route} (${(error as Error).message}); its reference pages were skipped.`,
-        severity: "warning",
+        // A configured-but-unloadable spec ships a dead nav tab (a 404 route),
+        // so fail loudly in build (blocks under --strict) while staying a warning
+        // in dev so offline work still runs.
+        severity: ctx.mode === "build" ? "error" : "warning",
+        suggestion:
+          "Check the spec URL/path is reachable from the build environment; behind a proxy, set HTTP(S)_PROXY.",
       };
     }
   };
@@ -125,6 +141,7 @@ export const openApiSource = (
       }
       data[result.slug] = result.spec;
       entries.push(...result.entries);
+      diagnostics.push(...result.diagnostics);
     }
     parsed = data;
     return { diagnostics, entries };

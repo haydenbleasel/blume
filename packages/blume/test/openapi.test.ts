@@ -129,6 +129,28 @@ const tempSpec = async (contents: unknown): Promise<string> => {
 const respondWith = (response: Response): typeof fetch =>
   (() => Promise.resolve(response)) as unknown as typeof fetch;
 
+// A `fetch` stub that yields queued responses (repeating the last), and records
+// how many times it was called plus the last init it received.
+const queued = (responses: Response[]) => {
+  let count = 0;
+  let lastInit: RequestInit | undefined;
+  const stub = ((_url: string, init?: RequestInit) => {
+    lastInit = init;
+    const response = responses[Math.min(count, responses.length - 1)];
+    count += 1;
+    return Promise.resolve(response);
+  }) as unknown as typeof fetch;
+  return {
+    get calls() {
+      return count;
+    },
+    fetch: stub,
+    get lastInit() {
+      return lastInit;
+    },
+  };
+};
+
 describe("references", () => {
   it("resolves a Blume-rendered OpenAPI reference by default", () => {
     const config = blumeConfigSchema.parse({
@@ -287,6 +309,161 @@ describe("parse.parseSpec", () => {
       ).rejects.toThrow();
     } finally {
       globalThis.fetch = original;
+    }
+  });
+});
+
+describe("parse.parseSpec remote hardening", () => {
+  const remoteSpec = {
+    info: { title: "Remote", version: "1" },
+    openapi: "3.0.0",
+    paths: {},
+  };
+
+  it("retries a transient 5xx, sends a User-Agent, and succeeds", async () => {
+    const original = globalThis.fetch;
+    const stub = queued([
+      new Response("busy", { status: 503 }),
+      Response.json(remoteSpec),
+    ]);
+    globalThis.fetch = stub.fetch;
+    try {
+      const { document } = await parseSpec(
+        "https://api.test/openapi.json",
+        "/"
+      );
+      expect(document.info?.title).toBe("Remote");
+      expect(stub.calls).toBe(2);
+      const headers = stub.lastInit?.headers as Record<string, string>;
+      expect(headers["user-agent"]).toContain("blume");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("gives up after repeated failures and throws", async () => {
+    const original = globalThis.fetch;
+    const stub = queued([new Response("down", { status: 502 })]);
+    globalThis.fetch = stub.fetch;
+    try {
+      await expect(
+        parseSpec("https://api.test/openapi.json", "/")
+      ).rejects.toThrow(/502/u);
+      expect(stub.calls).toBe(3);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("retries a thrown network error, then rethrows it", async () => {
+    const original = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (() => {
+      calls += 1;
+      return Promise.reject(new Error("ECONNRESET"));
+    }) as unknown as typeof fetch;
+    try {
+      await expect(
+        parseSpec("https://api.test/openapi.json", "/")
+      ).rejects.toThrow(/ECONNRESET/u);
+      expect(calls).toBe(3);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("dev cache-first with no cached copy falls through to the network", async () => {
+    const original = globalThis.fetch;
+    const cacheDir = await mkdtemp(join(tmpdir(), "blume-openapi-cache-"));
+    const stub = queued([Response.json(remoteSpec)]);
+    globalThis.fetch = stub.fetch;
+    try {
+      const { document } = await parseSpec(
+        "https://api.test/openapi.json",
+        "/",
+        { cacheDir, refresh: false }
+      );
+      expect(document.info?.title).toBe("Remote");
+      expect(stub.calls).toBe(1);
+    } finally {
+      globalThis.fetch = original;
+      await rm(cacheDir, { force: true, recursive: true });
+    }
+  });
+
+  it("routes through a proxy when a *_PROXY env var is set", async () => {
+    const original = globalThis.fetch;
+    const hadProxy = process.env.HTTPS_PROXY;
+    const { getGlobalDispatcher, setGlobalDispatcher } = await import("undici");
+    const previous = getGlobalDispatcher();
+    process.env.HTTPS_PROXY = "http://127.0.0.1:9";
+    globalThis.fetch = queued([Response.json(remoteSpec)]).fetch;
+    try {
+      const { document } = await parseSpec(
+        "https://api.test/openapi.json",
+        "/"
+      );
+      expect(document.info?.title).toBe("Remote");
+    } finally {
+      globalThis.fetch = original;
+      setGlobalDispatcher(previous);
+      if (hadProxy === undefined) {
+        delete process.env.HTTPS_PROXY;
+      } else {
+        process.env.HTTPS_PROXY = hadProxy;
+      }
+    }
+  });
+
+  it("caches a good fetch and serves it when a later fetch fails", async () => {
+    const original = globalThis.fetch;
+    const cacheDir = await mkdtemp(join(tmpdir(), "blume-openapi-cache-"));
+    try {
+      globalThis.fetch = queued([Response.json(remoteSpec)]).fetch;
+      const first = await parseSpec("https://api.test/openapi.json", "/", {
+        cacheDir,
+        refresh: true,
+      });
+      expect(first.warnings).toStrictEqual([]);
+
+      // A 404 is non-retryable, so this fails fast and falls back to the cache.
+      globalThis.fetch = queued([new Response("gone", { status: 404 })]).fetch;
+      const second = await parseSpec("https://api.test/openapi.json", "/", {
+        cacheDir,
+        refresh: true,
+      });
+      expect(second.document.info?.title).toBe("Remote");
+      expect(second.warnings[0]).toContain("last cached copy");
+    } finally {
+      globalThis.fetch = original;
+      await rm(cacheDir, { force: true, recursive: true });
+    }
+  });
+
+  it("is cache-first in dev: a cached spec skips the network", async () => {
+    const original = globalThis.fetch;
+    const cacheDir = await mkdtemp(join(tmpdir(), "blume-openapi-cache-"));
+    try {
+      // Prime the cache with a build-style refresh.
+      globalThis.fetch = queued([Response.json(remoteSpec)]).fetch;
+      await parseSpec("https://api.test/openapi.json", "/", {
+        cacheDir,
+        refresh: true,
+      });
+
+      // Dev (refresh: false) must not touch the network, even if it would fail.
+      const offline = queued([new Response("nope", { status: 500 })]);
+      globalThis.fetch = offline.fetch;
+      const { document } = await parseSpec(
+        "https://api.test/openapi.json",
+        "/",
+        { cacheDir, refresh: false }
+      );
+      expect(document.info?.title).toBe("Remote");
+      expect(offline.calls).toBe(0);
+    } finally {
+      globalThis.fetch = original;
+      await rm(cacheDir, { force: true, recursive: true });
     }
   });
 });
@@ -475,7 +652,39 @@ describe("source.openApiSource", () => {
     await rm(dir, { force: true, recursive: true });
   });
 
-  it("degrades to a warning when a spec cannot be loaded", async () => {
+  const missingReference = {
+    display: { codeSamples: [], expandSchemas: false },
+    kind: "openapi" as const,
+    label: "API",
+    renderer: "blume" as const,
+    route: "/api",
+    slug: "api",
+    spec: "missing.json",
+  };
+
+  it("errors in build when a spec cannot be loaded (dead tab otherwise)", async () => {
+    const source = openApiSource([missingReference], ctx("/no/such/root"));
+    const { entries, diagnostics } = await source.load();
+    expect(entries).toStrictEqual([]);
+    expect(diagnostics[0]?.code).toBe("BLUME_OPENAPI_UNAVAILABLE");
+    expect(diagnostics[0]?.severity).toBe("error");
+    expect(source.openApiData()).toStrictEqual({});
+  });
+
+  it("degrades to a warning in dev so offline work still runs", async () => {
+    const source = openApiSource([missingReference], {
+      cacheDir: "/no/such/root/.blume/cache/openapi",
+      mode: "dev",
+      projectRoot: "/no/such/root",
+    });
+    const { diagnostics } = await source.load();
+    expect(diagnostics[0]?.code).toBe("BLUME_OPENAPI_UNAVAILABLE");
+    expect(diagnostics[0]?.severity).toBe("warning");
+  });
+
+  it("warns (BLUME_OPENAPI_STALE) when a remote spec is served from cache", async () => {
+    const original = globalThis.fetch;
+    const cacheDir = await mkdtemp(join(tmpdir(), "blume-openapi-src-"));
     const reference = {
       display: { codeSamples: [], expandSchemas: false },
       kind: "openapi" as const,
@@ -483,13 +692,38 @@ describe("source.openApiSource", () => {
       renderer: "blume" as const,
       route: "/api",
       slug: "api",
-      spec: "missing.json",
+      spec: "https://api.test/openapi.json",
     };
-    const source = openApiSource([reference], ctx("/no/such/root"));
-    const { entries, diagnostics } = await source.load();
-    expect(entries).toStrictEqual([]);
-    expect(diagnostics[0]?.code).toBe("BLUME_OPENAPI_UNAVAILABLE");
-    expect(source.openApiData()).toStrictEqual({});
+    const sctx = {
+      cacheDir,
+      mode: "build" as const,
+      projectRoot: "/",
+      refresh: true,
+    };
+    try {
+      // Prime the cache with a good fetch, then fail so the load falls back.
+      globalThis.fetch = queued([
+        Response.json({
+          info: { title: "Remote", version: "1" },
+          openapi: "3.0.0",
+          paths: {},
+        }),
+      ]).fetch;
+      const primed = await openApiSource([reference], sctx).load();
+      expect(primed.diagnostics).toStrictEqual([]);
+
+      globalThis.fetch = queued([new Response("gone", { status: 404 })]).fetch;
+      const { diagnostics, entries } = await openApiSource(
+        [reference],
+        sctx
+      ).load();
+      expect(entries.length).toBeGreaterThan(0);
+      expect(diagnostics[0]?.code).toBe("BLUME_OPENAPI_STALE");
+      expect(diagnostics[0]?.severity).toBe("warning");
+    } finally {
+      globalThis.fetch = original;
+      await rm(cacheDir, { force: true, recursive: true });
+    }
   });
 });
 
