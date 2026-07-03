@@ -311,7 +311,9 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
           .replace(/[^a-z0-9]+/gu, "-")
           .replace(/^-+|-+$/gu, "") || "docs";
 
-      const cursorConfig = btoa(JSON.stringify({ url: mcpUrl }));
+      // Base64 output can contain `+`/`=`, which a query string mangles
+      // (`+` decodes as a space) — it must be URL-encoded like any other value.
+      const cursorConfig = encodeURIComponent(btoa(JSON.stringify({ url: mcpUrl })));
       root
         .querySelector("[data-mcp-cursor]")
         ?.setAttribute(
@@ -325,20 +327,22 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
           `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: id, type: "http", url: mcpUrl }))}`
         );
 
-      const flash = (el: Element | null, text: string, reset: string) => {
-        if (el) {
-          el.textContent = text;
-          setTimeout(() => {
-            el.textContent = reset;
-          }, 1500);
+      const flash = (el: Element | null, text: string) => {
+        if (!(el instanceof HTMLElement)) {
+          return;
         }
+        // Remember the element's own (localized) label once — capturing it at
+        // click time would capture "Copied!" on a double-click and stick.
+        el.dataset.blumeLabel ??= el.textContent ?? "";
+        el.textContent = text;
+        setTimeout(() => {
+          el.textContent = el.dataset.blumeLabel ?? "";
+        }, 1500);
       };
       const copy = async (value: string, el: Element | null) => {
-        // Restore the element's own label, so localized text round-trips.
-        const reset = el?.textContent ?? "";
         try {
           await navigator.clipboard.writeText(value);
-          flash(el, copiedLabel, reset);
+          flash(el, copiedLabel);
         } catch {
           // Clipboard unavailable; nothing to do.
         }
@@ -359,10 +363,12 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     }
 
     const label = root.querySelector("[data-blume-copy-label]");
+    // Captured once — inside the handler a double-click would capture and
+    // permanently restore "Copied!".
+    const original = label?.textContent ?? "";
     root
       .querySelector("[data-blume-copy-page]")
       ?.addEventListener("click", async () => {
-        const original = label?.textContent ?? "";
         try {
           const response = await fetch(md);
           await navigator.clipboard.writeText(await response.text());

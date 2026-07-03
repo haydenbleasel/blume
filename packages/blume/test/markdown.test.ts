@@ -181,6 +181,13 @@ describe(codeTitleTransformer, () => {
     expect(metaAttrs('title="My File"').dataTitle).toBe("My File");
   });
 
+  it("allows the other quote character inside a quoted title", () => {
+    // `title="foo's file.ts"` used to fail the match, and the bare-token
+    // fallback then promoted the mangled `file.ts"` fragment instead.
+    expect(metaAttrs(`title="foo's file.ts"`).dataTitle).toBe("foo's file.ts");
+    expect(metaAttrs(`title='say "hi".ts'`).dataTitle).toBe('say "hi".ts');
+  });
+
   it("sets data-line-numbers and keeps the title", () => {
     const attrs = metaAttrs("file.ts lineNumbers");
     expect(attrs.dataTitle).toBe("file.ts");
@@ -431,7 +438,8 @@ describe("packageInstallPlugin", () => {
     expect(result).toStrictEqual(
       jsxFlowElement(
         "Tabs",
-        [],
+        // hash off so switching package managers can't clobber the page hash.
+        [jsxAttribute("hash", "false")],
         PACKAGE_MANAGERS.map((manager) =>
           jsxFlowElement(
             "Tab",

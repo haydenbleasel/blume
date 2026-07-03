@@ -78,10 +78,12 @@ const displayValue =
         return;
       }
 
-      const original = status.textContent;
+      // Remember the real value once — capturing at click time would capture
+      // "Copied" on a double-click and stick until reload.
+      status.dataset.blumeLabel ??= status.textContent ?? "";
       status.textContent = "Copied";
       window.setTimeout(() => {
-        status.textContent = original;
+        status.textContent = status.dataset.blumeLabel ?? "";
       }, 1500);
     });
   }

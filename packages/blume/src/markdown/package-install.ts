@@ -31,7 +31,9 @@ export const packageInstallPlugin = () => ({
       node,
       jsxFlowElement(
         "Tabs",
-        [],
+        // hash off: clicking "pnpm" in an install block must not rewrite the
+        // page hash (clobbering the heading anchor the reader arrived with).
+        [jsxAttribute("hash", "false")],
         PACKAGE_MANAGERS.map((manager) => tabNode(manager, commands[manager]))
       )
     );

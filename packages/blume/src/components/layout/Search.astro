@@ -296,10 +296,13 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         this.input.focus();
         this.input.select();
         if (!this.loaded) {
-          this.loaded = true;
           try {
             const { createSearch } = await import("blume:search-client");
             this.searchFn = await createSearch();
+            // Only latch on success — a transient failure (flaky network
+            // fetching the index) must retry on the next open, not disable
+            // search until a full page reload.
+            this.loaded = true;
           } catch {
             this.searchFn = null;
           }

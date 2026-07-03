@@ -110,14 +110,18 @@ const secondaryButton =
           return;
         }
 
-        const label = copy.querySelector("[data-blume-prompt-copy-label]");
+        const label = copy.querySelector<HTMLElement>(
+          "[data-blume-prompt-copy-label]"
+        );
         if (!label) {
           return;
         }
-        const previous = label.textContent ?? "Copy prompt";
+        // Remember the real label once — capturing at click time would
+        // capture "Copied" on a double-click and stick until reload.
+        label.dataset.blumeLabel ??= label.textContent ?? "Copy prompt";
         label.textContent = "Copied";
         setTimeout(() => {
-          label.textContent = previous;
+          label.textContent = label.dataset.blumeLabel ?? "Copy prompt";
         }, 1500);
       });
     }

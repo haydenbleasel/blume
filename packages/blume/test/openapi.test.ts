@@ -588,6 +588,26 @@ describe("snippets", () => {
     expect(python).toContain("import requests");
   });
 
+  it("keeps code samples correct on hostile example values", () => {
+    const sample = {
+      body: '{\n  "note": "it\'s true",\n  "active": true,\n  "tags": null\n}',
+      bodyValue: { active: true, note: "it's true", tags: null },
+      headers: {},
+      method: "POST",
+      url: "https://api.test/v1/pet",
+    };
+    const [curl, python] = sampleLanguages(["curl", "python"]).map((language) =>
+      language.build(sample)
+    );
+    // The apostrophe must not terminate the shell's single-quoted -d value.
+    expect(curl).toContain(String.raw`it'\''s true`);
+    // Keyword rewriting applies outside JSON strings only — the *value*
+    // "it's true" keeps its lowercase true.
+    expect(python).toContain('"note": "it\'s true"');
+    expect(python).toContain('"active": True');
+    expect(python).toContain('"tags": None');
+  });
+
   it("resolves language ids through aliases and drops unknowns", () => {
     const ids = sampleLanguages(["shell", "typescript", "nope"]).map(
       (language) => language.id

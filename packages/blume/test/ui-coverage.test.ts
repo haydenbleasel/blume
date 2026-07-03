@@ -244,6 +244,17 @@ describe("search text helpers", () => {
     expect(highlight("the brown fox", "brown")).toContain("<mark>brown</mark>");
   });
 
+  it("never marks inside HTML entities produced by escaping", () => {
+    // Matching used to run on the escaped text, so "amp" matched inside the
+    // "&amp;" generated from "a & b" and corrupted the rendered excerpt.
+    expect(highlight("a & b", "amp")).toBe("a &amp; b");
+    expect(highlight("1 < 2", "lt")).toBe("1 &lt; 2");
+    // Matches in the raw text still escape and mark correctly.
+    expect(highlight("amp & volts", "amp")).toBe(
+      "<mark>amp</mark> &amp; volts"
+    );
+  });
+
   it("returns a leading window and ellipsis for an empty query", () => {
     // An empty query yields no tokens, so matchIndex short-circuits to -1.
     const snippet = matchSnippet("a".repeat(50), "", 10);

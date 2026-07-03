@@ -115,7 +115,9 @@ const curlSnippet = (sample: RequestSample): string => {
     ...headerLines(sample.headers, (key, value) => `  -H "${key}: ${value}"`),
   ];
   if (sample.body) {
-    lines.push(`  -d '${sample.body}'`);
+    // Close-quote/escaped-quote/reopen: the POSIX way to put a literal ' in a
+    // single-quoted string, so an example like "it's" doesn't break the shell.
+    lines.push(`  -d '${sample.body.replaceAll("'", String.raw`'\''`)}'`);
   }
   return lines.join(" \\\n");
 };
@@ -137,12 +139,23 @@ const fetchSnippet = (sample: RequestSample): string => {
   )}\n});`;
 };
 
+// Split-with-capture: odd segments are JSON string literals, kept verbatim so
+// a string *value* containing the words true/false/null isn't rewritten.
+const JSON_STRING = /(?<literal>"(?:\\.|[^"\\])*")/gu;
+
 /** Turn a JSON literal into an equivalent Python literal (`true` -> `True`). */
 const toPython = (json: string): string =>
   json
-    .replaceAll(/\btrue\b/gu, "True")
-    .replaceAll(/\bfalse\b/gu, "False")
-    .replaceAll(/\bnull\b/gu, "None");
+    .split(JSON_STRING)
+    .map((part, index) =>
+      index % 2 === 1
+        ? part
+        : part
+            .replaceAll(/\btrue\b/gu, "True")
+            .replaceAll(/\bfalse\b/gu, "False")
+            .replaceAll(/\bnull\b/gu, "None")
+    )
+    .join("");
 
 const pythonSnippet = (sample: RequestSample): string => {
   const args = [`    "${sample.url}"`];

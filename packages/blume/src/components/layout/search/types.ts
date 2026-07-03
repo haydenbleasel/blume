@@ -74,15 +74,26 @@ const queryTokens = (query: string): string[] =>
     .filter(Boolean)
     .map((token) => token.replaceAll(REGEXP_SPECIAL, String.raw`\$&`));
 
-/** Wrap query matches in `<mark>`, after HTML-escaping the source text. */
+/**
+ * Wrap query matches in `<mark>`, HTML-escaping the source text. Matching runs
+ * on the *raw* text and escaping on each segment — matching after escaping
+ * would let a query like "amp" or "lt" mark the inside of an entity produced
+ * from the source (`&amp;` in "a & b"), corrupting the rendered excerpt.
+ */
 export const highlight = (text: string, query: string): string => {
-  const escaped = escapeHtml(text);
   const tokens = queryTokens(query);
   if (tokens.length === 0) {
-    return escaped;
+    return escapeHtml(text);
   }
-  const pattern = new RegExp(`(?<match>${tokens.join("|")})`, "giu");
-  return escaped.replaceAll(pattern, "<mark>$<match></mark>");
+  const pattern = new RegExp(`(${tokens.join("|")})`, "giu");
+  return text
+    .split(pattern)
+    .map((segment, index) =>
+      index % 2 === 1
+        ? `<mark>${escapeHtml(segment)}</mark>`
+        : escapeHtml(segment)
+    )
+    .join("");
 };
 
 /** First index in `text` where any query token matches (case-insensitive). */

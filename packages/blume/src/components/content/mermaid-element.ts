@@ -24,6 +24,9 @@ const prefersDark = () => document.documentElement.dataset.theme === "dark";
 let counter = 0;
 
 class BlumeMermaid extends HTMLElement {
+  #observer: MutationObserver | null = null;
+  #renderToken = 0;
+
   connectedCallback() {
     const source = this.dataset.source ?? "";
     if (!source.trim()) {
@@ -35,6 +38,8 @@ class BlumeMermaid extends HTMLElement {
     this.replaceChildren(output);
 
     const render = async () => {
+      this.#renderToken += 1;
+      const token = this.#renderToken;
       const mermaid = await loadMermaid();
       mermaid.initialize({
         securityLevel: "strict",
@@ -47,7 +52,11 @@ class BlumeMermaid extends HTMLElement {
           `blume-mermaid-${counter}`,
           source
         );
-        output.innerHTML = svg;
+        // A newer render (rapid theme toggles) superseded this one — dropping
+        // the stale result keeps the diagram in the latest theme.
+        if (token === this.#renderToken) {
+          output.innerHTML = svg;
+        }
       } catch {
         output.textContent = "Could not render this diagram.";
       }
@@ -57,9 +66,18 @@ class BlumeMermaid extends HTMLElement {
     render();
 
     // Re-render on color-theme changes so the diagram tracks light and dark.
-    new MutationObserver(() => render()).observe(document.documentElement, {
+    // One observer per connection, disconnected on removal — otherwise every
+    // DOM move stacks another observer that renders into detached DOM forever.
+    this.#observer?.disconnect();
+    this.#observer = new MutationObserver(() => render());
+    this.#observer.observe(document.documentElement, {
       attributeFilter: ["data-theme"],
     });
+  }
+
+  disconnectedCallback() {
+    this.#observer?.disconnect();
+    this.#observer = null;
   }
 }
 

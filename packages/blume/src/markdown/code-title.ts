@@ -25,7 +25,9 @@ export interface CodeTitleTransformer {
   pre: (this: CodeMetaContext, node: PreNode) => void;
 }
 
-const TITLE_ATTR = /title=(?<quote>["'])(?<title>[^"']*)\k<quote>/u;
+// The body excludes only the delimiting quote, so `title="foo's file.ts"`
+// (an apostrophe inside double quotes) still matches.
+const TITLE_ATTR = /title=(?:"(?<dq>[^"]*)"|'(?<sq>[^']*)')/u;
 const LINE_NUMBERS = /(?:^|\s)lineNumbers(?=\s|$)/u;
 
 const parseTitle = (raw: string | undefined): string | undefined => {
@@ -33,8 +35,9 @@ const parseTitle = (raw: string | undefined): string | undefined => {
     return undefined;
   }
   const explicit = raw.match(TITLE_ATTR);
-  if (explicit?.groups?.title) {
-    return explicit.groups.title;
+  const attrTitle = explicit?.groups?.dq ?? explicit?.groups?.sq;
+  if (attrTitle) {
+    return attrTitle;
   }
   // The first bare token is the title (```ts blume.config.ts), skipping Shiki
   // line ranges (`{1,3-5}`), `key=value` attrs, and the reserved `lineNumbers`

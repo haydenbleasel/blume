@@ -154,6 +154,14 @@ export const useAskAI = (): UseAskAI => {
           headers: { "content-type": "application/json" },
           method: "POST",
         });
+        if (!response.ok) {
+          // An error body (JSON, HTML error page) must not stream in as the
+          // assistant's answer.
+          assistant.content =
+            "Something went wrong answering that. Please try again.";
+          setMessages([...history, { ...assistant }]);
+          return;
+        }
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         if (reader) {

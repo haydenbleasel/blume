@@ -3,7 +3,7 @@ interface Props {
   borderBottom?: boolean;
   defaultTabIndex?: number;
   dropdown?: boolean;
-  hash?: boolean;
+  hash?: boolean | "false" | "true";
   sync?: boolean;
 }
 
@@ -14,6 +14,10 @@ const {
   hash = true,
   sync = true,
 } = Astro.props;
+
+// MDX string attributes (`hash="false"` from generated markup) must read as
+// their boolean meaning — the string "false" is truthy.
+const hashEnabled = String(hash) !== "false";
 ---
 
 <blume-tabs
@@ -21,7 +25,7 @@ const {
   data-border-bottom={borderBottom ? "true" : "false"}
   data-default-tab-index={defaultTabIndex}
   data-dropdown={dropdown ? "true" : "false"}
-  data-hash={hash ? "true" : "false"}
+  data-hash={hashEnabled ? "true" : "false"}
   data-sync={sync ? "true" : "false"}
 >
   <div class:list={[dropdown ? "" : "overflow-x-auto"]}>
@@ -100,6 +104,13 @@ const {
         return;
       }
       if (this.dataset.blumeTabsReady === "true") {
+        // The built DOM survives a move; the listeners removed by
+        // disconnectedCallback don't — re-attach them (addEventListener with
+        // the same reference is idempotent).
+        if (this.#syncEnabled()) {
+          document.addEventListener(SYNC_EVENT, this.#sync);
+        }
+        window.addEventListener("hashchange", this.#hashChange);
         return;
       }
       this.dataset.blumeTabsReady = "true";
