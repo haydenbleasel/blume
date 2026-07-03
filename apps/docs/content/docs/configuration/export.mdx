@@ -30,7 +30,9 @@ Any format you omit (or set to `false`) is left out of the menu. With both off �
 
 Because it prints the live, fully-styled page, the result keeps crisp, selectable text, real fonts, and syntax-highlighted code. It needs no dependencies and works the same in dev, in production, and on static hosts.
 
-:::note PDF export goes through the browser's native print dialog, so the exact "Save as PDF" wording and options depend on the browser. Enable **Background graphics** in the dialog to keep code-block and callout backgrounds. :::
+:::note
+PDF export goes through the browser's native print dialog, so the exact "Save as PDF" wording and options depend on the browser. Enable **Background graphics** in the dialog to keep code-block and callout backgrounds.
+:::
 
 ## EPUB
 
@@ -42,4 +44,6 @@ To keep the file readable on a device with no stylesheet or JavaScript of its ow
 
 Both formats export the **single page** a reader is viewing — not the whole site — which matches where the action lives, beneath that page's table of contents.
 
-:::note In an EPUB there's no JavaScript to switch tabs, so tabbed content — like [package-install](/docs/content/syntax) blocks and code groups — is expanded to show every panel at once. Client-rendered embeds such as Mermaid diagrams aren't included. :::
+:::note
+In an EPUB there's no JavaScript to switch tabs, so tabbed content — like [package-install](/docs/content/syntax) blocks and code groups — is expanded to show every panel at once. Client-rendered embeds such as Mermaid diagrams aren't included.
+:::

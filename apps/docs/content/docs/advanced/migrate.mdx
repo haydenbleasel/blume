@@ -18,7 +18,9 @@ The `<tool>` is the framework you're coming from:
 | [Nextra](#nextra) | `content/` or `pages/` + `_meta` | `blume migrate nextra` |
 | [Starlight](#starlight) | `src/content/docs` + `astro.config.*` | `blume migrate starlight` |
 
-:::warning A migration **rewrites files in place** — pages, config, navigation, and assets. Commit (or stash) your work first so you can review the diff and roll back cleanly. :::
+:::warning
+A migration **rewrites files in place** — pages, config, navigation, and assets. Commit (or stash) your work first so you can review the diff and roll back cleanly.
+:::
 
 ## What a migration does
 
@@ -62,7 +64,9 @@ Reads `docs.json` (or legacy `mint.json`) and rewrites every page **in place** �
 - Fonts map to [`theme.fonts`](/docs/configuration/theming) when the family is one of Blume's curated Google Fonts (`fonts.family`, or a `heading`/`body` split); a family outside that set is warned about, not guessed. Header links (`navbar.links`/`navbar.primary`) and footer socials (`footer.socials`) have no `blume.config` equivalent yet, so they're reported as warnings rather than dropped silently — re-add them with [`navigation.tabs`](/docs/content/navigation) or a Header/Footer [layout override](/docs/advanced/custom-pages). The contextual page menu and last-updated timestamp are already Blume defaults.
 - Field components — [`<ParamField>`, `<ResponseField>`, `<RequestField>`](/docs/content/components#api-fields) — render natively via Blume's compat components, so hand-written CLI/SDK/endpoint field docs carry over unchanged. Any remaining component with no Blume equivalent (e.g. `<Update>`) is flagged for manual review.
 
-:::tip Want to preview Blume against a Mintlify codebase **without** rewriting anything? Run `blume dev` with no config and Blume serves `docs.json` as-is in [Bridge mode](/docs/advanced/bridge). Migrate when you're ready to commit. :::
+:::tip
+Want to preview Blume against a Mintlify codebase **without** rewriting anything? Run `blume dev` with no config and Blume serves `docs.json` as-is in [Bridge mode](/docs/advanced/bridge). Migrate when you're ready to commit.
+:::
 
 ### Fumadocs
 

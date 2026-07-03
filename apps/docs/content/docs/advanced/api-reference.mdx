@@ -14,7 +14,9 @@ openapi: {
 
 That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`, and adds a header tab. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically.
 
-:::note Operations are indexed for search by their **summary and tag**. The rendered schema tables and code samples aren't full-text indexed; search matches an operation's title and section, then links to its own page. :::
+:::note
+Operations are indexed for search by their **summary and tag**. The rendered schema tables and code samples aren't full-text indexed; search matches an operation's title and section, then links to its own page.
+:::
 
 ## A local spec
 
@@ -94,4 +96,6 @@ asyncapi: {
 }
 ```
 
-:::warning Scalar's AsyncAPI support is still a work in progress — it renders channels, operations, messages, and a Models section, but there's **no interactive playground** for events yet. It improves upstream over time. :::
+:::warning
+Scalar's AsyncAPI support is still a work in progress — it renders channels, operations, messages, and a Models section, but there's **no interactive playground** for events yet. It improves upstream over time.
+:::

@@ -24,7 +24,9 @@ Here's a live counter: <Counter />
 
 The filename is the component name, so it **must be a PascalCase identifier** — letters, digits, and underscores only (`Counter.tsx` → `<Counter />`). Lowercase filenames, names with dashes/dots/spaces (like `Time-Picker.tsx`), and two islands that resolve to the same name are skipped with a build warning.
 
-:::note Islands are for **interactive** UI. For a static component you reuse across pages (a styled callout, a pricing table), use an [MDX override](/docs/configuration/customization) instead — it ships no JavaScript. :::
+:::note
+Islands are for **interactive** UI. For a static component you reuse across pages (a styled callout, a pricing table), use an [MDX override](/docs/configuration/customization) instead — it ships no JavaScript.
+:::
 
 ## Registering islands in `components.ts`
 
@@ -98,7 +100,9 @@ const on = ref(false);
 
 Props you pass in MDX (`<Counter start={5} />`) are forwarded to the component, and children (`<Counter>label</Counter>`) arrive as the default slot.
 
-:::tip Islands hydrate on the client, so anything you pass as a prop must be serializable — strings, numbers, plain objects, not functions. :::
+:::tip
+Islands hydrate on the client, so anything you pass as a prop must be serializable — strings, numbers, plain objects, not functions.
+:::
 
 ## Hooks
 

@@ -22,7 +22,9 @@ i18n: {
 
 Each locale has a `code` (used in URLs), a `label` (shown in the language switcher), and an optional `dir` for right-to-left scripts (`"ltr"` by default).
 
-:::tip Migrating from Mintlify? [`blume migrate mintlify`](/docs/advanced/migrate) reads `navigation.languages[]` and writes the `i18n` block for you — the `default: true` language becomes `defaultLocale`, and translated folders already match Blume's layout. :::
+:::tip
+Migrating from Mintlify? [`blume migrate mintlify`](/docs/advanced/migrate) reads `navigation.languages[]` and writes the `i18n` block for you — the `default: true` language becomes `defaultLocale`, and translated folders already match Blume's layout.
+:::
 
 ## Organize translated content
 
@@ -98,7 +100,9 @@ i18n: {
 
 Fallback pages are excluded from the search index and aren't advertised as real translations in `hreflang`, so untranslated content doesn't compete for ranking. They still appear in that locale's sidebar, so navigation stays complete — a reader can reach every page in any language.
 
-:::tip Start by translating your most important pages — the homepage, quickstart, and top guides — and let the rest fall back. You can fill in translations over time without breaking any links. :::
+:::tip
+Start by translating your most important pages — the homepage, quickstart, and top guides — and let the rest fall back. You can fill in translations over time without breaking any links.
+:::
 
 ## The language switcher
 

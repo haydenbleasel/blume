@@ -63,7 +63,7 @@
     },
     "packages/blume": {
       "name": "blume",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "blume": "./bin/blume.mjs",
       },
@@ -175,6 +175,9 @@
         "typescript": "5.9.3",
       },
     },
+  },
+  "patchedDependencies": {
+    "oxfmt@0.55.0": "patches/oxfmt@0.55.0.patch",
   },
   "packages": {
     "@ai-sdk/gateway": ["@ai-sdk/gateway@2.0.103", "", { "dependencies": { "@ai-sdk/provider": "2.0.3", "@ai-sdk/provider-utils": "3.0.27", "@vercel/oidc": "3.1.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-f3NmeCxHOmZTIk/VG3nVrF6LnuU+S/Ls4aUBSKOI1QF+xtkF6FnREsTkSvcbzoJSsO6Jr7OyQXXEWGFDAMobLQ=="],
