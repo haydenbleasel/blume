@@ -184,3 +184,5 @@ npx skills add haydenbleasel/blume
 ```
 
 The skill teaches the agent what Blume is and how to scaffold, write, and configure a site, and points it at the full docs bundled in the installed package (`node_modules/blume/docs`).
+
+Blume also ships a [`blume-update-docs` skill](/docs/advanced/self-updating-docs) for the other direction: a scheduled agent audits your merged PRs against the docs, fixes factual drift, and opens a `blume/*` PR — pairing naturally with `llms.txt`, raw Markdown URLs, and the MCP server, since agents read the published docs in the same shape users and models see.

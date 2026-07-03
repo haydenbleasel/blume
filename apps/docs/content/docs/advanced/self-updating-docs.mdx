@@ -1,0 +1,103 @@
+---
+title: Self-updating docs
+description: Keep your docs in sync with your product using the blume-update-docs agent skill — a scheduled agent audits merged PRs against your docs, fixes factual drift, verifies the build, and opens a PR.
+---
+
+Docs drift the moment the product ships something they don't mention. Keeping them current is an **agent-driven** task: Blume ships the `blume-update-docs` **skill** — a maintenance playbook that teaches a coding agent to audit recently merged PRs, changelogs, config schemas, and CLI help against your docs, update only the pages that are factually stale, verify the docs build, and open a `blume/*` pull request. If nothing drifted, it reports a clean no-op instead of opening a noisy PR.
+
+Blume doesn't host the automation — you configure the schedule, trigger, and permissions in your agent runner (Claude Code, Codex, Cursor, or plain cron + CLI). The skill supplies the workflow and the guardrails: only document what shipped, skip feature-flagged work, make the smallest correct diff, and prefer no PR over a speculative one.
+
+## Install the skill
+
+The skill lives on GitHub, so any repo can install it:
+
+```bash
+npx skills use haydenbleasel/blume@blume-update-docs
+```
+
+Then run it in Claude Code:
+
+```
+/blume-update-docs
+```
+
+Using another agent? Point it at `skills/blume-update-docs/SKILL.md` (also bundled in the package at `node_modules/blume/skills/blume-update-docs/` once Blume is installed) and give it one of the [recipes](#recipes) below.
+
+## What the agent does
+
+Each run works a consistent loop:
+
+<Steps>
+  <Step title="Establish context">
+    The agent reads your repo instructions (`AGENTS.md`, `CLAUDE.md`), locates
+    the Blume config and content root, and honors any trigger, lookback window,
+    or PR policy your automation prompt sets.
+  </Step>
+  <Step title="Find drift">
+    It reviews PRs merged within the lookback window (default: 7 days) plus
+    changelogs, config schemas, exported APIs, and CLI help, and compares the
+    shipped user-facing changes against the docs content. Feature-flagged work
+    that isn't enabled for your audience is ignored.
+  </Step>
+  <Step title="Make the smallest correct edit">
+    Only factually stale pages are touched — wrong commands, changed defaults,
+    missing capabilities, broken workflows. Voice, frontmatter, components, and
+    [`meta.ts`](/docs/content/meta) navigation patterns are preserved;
+    subjective polish is skipped.
+  </Step>
+  <Step title="Verify">
+    `blume build` validates links, anchors, frontmatter, and duplicate routes
+    before anything is delivered.
+  </Step>
+  <Step title="Open a PR — or report a no-op">
+    Changes are pushed on a `blume/docs-refresh-YYYY-MM-DD` branch as a PR
+    listing sources checked, docs changed, and verification results. An existing
+    open `blume/*` maintenance PR is updated instead of duplicated. No drift
+    means no branch, no commit, no PR — just a report.
+  </Step>
+</Steps>
+
+## Recipes
+
+Prompts for common automations. Replace the lookback window and cadence to match your repo's pace — weekly for active products, daily during a launch or API churn, monthly for stable docs.
+
+### Weekly drift check
+
+```text
+Use the blume-update-docs skill. Review the PRs merged within the last 7 days and compare them to the docs content. Ignore work behind feature flags. If docs need updates, make them, verify the docs build, and open a blume/* PR. If not, report what you checked and do not open a PR.
+```
+
+### Release readiness
+
+```text
+Use the blume-update-docs skill. Review the changes since the last release and compare them to the docs. Update quickstarts, configuration pages, references, and changelogs only for behavior that is released or enabled for the documented audience. Verify the docs build and open a blume/* PR if changes are needed.
+```
+
+### CLI and config drift
+
+```text
+Use the blume-update-docs skill. Compare current CLI help, config schema defaults, environment variables, and public package exports against the docs. Update stale commands, options, defaults, and examples. Verify the docs build before opening a blume/* PR.
+```
+
+### Editorial audit
+
+```text
+Use the blume-update-docs skill. Audit the docs for broken links, stale examples, outdated provider links, duplicated setup instructions, and pages that conflict with current product behavior. Avoid subjective rewrites. Open a blume/* PR only for factual maintenance changes.
+```
+
+## Wiring it into a runner
+
+- **Claude Code** — install the skill, then create a [scheduled task](https://code.claude.com/docs/en/scheduled-tasks) with one of the recipes above. Cloud runs default to `claude/`-prefixed branches; allow other prefixes if you want the `blume/*` naming.
+- **Codex** — [Codex Automations](https://developers.openai.com/codex/app/automations) run on a schedule and can invoke a skill explicitly with `$blume-update-docs`. Test the prompt once in a normal thread before scheduling it.
+- **Cursor** — [Cursor Automations](https://cursor.com/docs/cloud-agent/automations) run Cloud Agents on schedules or events; give the automation repository and PR permissions and use a recipe as the prompt.
+
+Whatever the runner, give the agent read access to your repo history (merged PRs are the primary drift signal) and permission to push branches and open PRs — and add any MCP servers or environment variables it needs to reach private changelogs or issue trackers.
+
+<CardGroup cols={2}>
+  <Card title="AI configuration" href="/docs/configuration/ai" icon="bot">
+    llms.txt, raw Markdown URLs, MCP, and Ask AI — the surfaces agents read.
+  </Card>
+  <Card title="Migrate" href="/docs/advanced/migrate" icon="arrow-right-left">
+    The blume-migrate skill converts an existing docs site to Blume.
+  </Card>
+</CardGroup>
