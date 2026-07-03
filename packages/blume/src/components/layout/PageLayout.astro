@@ -191,6 +191,48 @@ const bannerScript = banner?.dismissible
     <main id="blume-content"><slot /></main>
     <slot name="footer" />
     {
+      // Mobile nav for chrome-only pages: the header's inline tab bar is hidden
+      // below `lg` and there's no sidebar drawer, so surface the tabs in a
+      // slide-in drawer instead. It reuses the header's `data-blume-nav-toggle`
+      // machinery (drawer top, scroll lock, resize-close) — the hamburger button
+      // lives in the header; this is the panel it opens.
+      navigation.tabs.length > 0 && (
+        <>
+          <aside
+            aria-label="Navigation"
+            class="fixed top-[var(--blume-drawer-top,4rem)] start-0 z-[35] h-[calc(100dvh-var(--blume-drawer-top,4rem))] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:hidden"
+          >
+            <nav aria-label="Sections">
+              <ul class="m-0 list-none p-0">
+                {navigation.tabs.map((tab) => (
+                  <li>
+                    <a
+                      aria-current={
+                        route === tab.path ||
+                        (tab.path !== "/" && route.startsWith(tab.path))
+                          ? "page"
+                          : undefined
+                      }
+                      class="block rounded-[0.65rem] px-2.5 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
+                      href={tab.path}
+                    >
+                      {tab.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </aside>
+          <button
+            aria-label="Close navigation"
+            class="fixed inset-0 z-[30] hidden cursor-pointer border-0 bg-black/40 [:where([data-blume-nav-open])_&]:block lg:hidden"
+            data-blume-nav-toggle
+            type="button"
+          />
+        </>
+      )
+    }
+    {
       clientDataJson && (
         <script
           id="blume-client-data"

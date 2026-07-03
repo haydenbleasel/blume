@@ -161,9 +161,14 @@ const withoutTabSections = (nodes: NavNode[], tabs: NavTab[]): NavNode[] => {
  * Adapters / API / AI tabs) drills each tab into its own pages instead of one
  * global tree, the way Fumadocs' root folders do. On a route under no tab (or
  * the root `/` tab), the tab-owned groups are hidden so the root sidebar shows
- * only pages that don't belong to a tab. Falls back to the full sidebar when a
- * matched tab maps to no group, or when hiding the tab sections would blank the
- * sidebar, so a route is never left empty.
+ * only pages that don't belong to a tab.
+ *
+ * When a matched tab owns no sidebar group — a standalone page like the
+ * generated changelog timeline (`/changelog`), or a tab whose source produced
+ * no pages — the sidebar is empty. It must not fall back to the full tree: that
+ * would leak every *other* tab's section (e.g. the OpenAPI operations) onto the
+ * page. On a route under no tab, hiding the tab sections falls back to the full
+ * sidebar only when it would otherwise blank, so an un-tabbed route stays full.
  */
 export const sidebarForRoute = (
   sidebar: NavNode[],
@@ -172,7 +177,7 @@ export const sidebarForRoute = (
 ): NavNode[] => {
   const tab = activeTab(tabs, route);
   if (tab) {
-    return sectionChildren(sidebar, tab.path) ?? sidebar;
+    return sectionChildren(sidebar, tab.path) ?? [];
   }
   const scoped = withoutTabSections(sidebar, tabs);
   return scoped.length > 0 ? scoped : sidebar;

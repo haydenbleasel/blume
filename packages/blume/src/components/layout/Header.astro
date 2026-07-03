@@ -57,6 +57,19 @@ const {
 const LogoSlot = resolveSlot(layout.Logo, Logo);
 const SearchSlot = resolveSlot(layout.Search, Search);
 
+// The mobile nav-toggle opens a drawer of navigation. On docs pages that drawer
+// is the sidebar tree (`hasSidebar`); on chrome-only pages (a landing page via
+// PageLayout) it's a tabs-only drawer the layout renders — so the button is also
+// needed whenever there are tabs to reveal.
+const showNavToggle = hasSidebar || navigation.tabs.length > 0;
+// Where the header's inline tab bar appears. With a sidebar it shares the `md`
+// breakpoint with the docs drawer; without one, the tabs-only drawer is the sole
+// mobile nav below `lg`, so the inline tabs wait until `lg` to avoid duplicating
+// the drawer's links between `md` and `lg`.
+const tabsNavClass = hasSidebar
+  ? "hidden gap-1 md:flex"
+  : "hidden gap-1 lg:flex";
+
 const iconButton =
   "inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
@@ -84,7 +97,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
   data-blume-header
 >
   {
-    hasSidebar && (
+    showNavToggle && (
       <button
         aria-label="Toggle navigation"
         class={`${iconButton} lg:hidden`}
@@ -107,7 +120,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
   }
   {
     navigation.tabs.length > 0 && (
-      <nav aria-label="Sections" class="hidden gap-1 md:flex">
+      <nav aria-label="Sections" class={tabsNavClass}>
         {navigation.tabs.map((tab) => (
           <a
             aria-current={

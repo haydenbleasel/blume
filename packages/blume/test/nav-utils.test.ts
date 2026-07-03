@@ -165,14 +165,22 @@ describe("sidebarForRoute", () => {
     ]);
   });
 
-  it("falls back to the full sidebar when the tab maps to no group", () => {
+  it("shows an empty sidebar when the matched tab owns no group", () => {
     const tabs: NavTab[] = [{ label: "AI", path: "/ai" }];
-    // The route matches the tab, but no group sits at /ai — show everything
-    // rather than blank the sidebar.
-    expect(labels(sidebarForRoute(TREE, tabs, "/ai/embed"))).toStrictEqual([
-      "Adapters",
-      "API",
-    ]);
+    // The route matches the tab, but no group sits at /ai — the section has no
+    // sidebar pages, so show nothing rather than leak the other tabs' groups.
+    expect(labels(sidebarForRoute(TREE, tabs, "/ai/embed"))).toStrictEqual([]);
+  });
+
+  it("does not leak other tabs' sections onto a group-less changelog tab", () => {
+    // The changelog is a generated route with its own header tab but no sidebar
+    // group (its entries render as a timeline, not sidebar pages). It must not
+    // fall through to the full tree — that showed the OpenAPI "API" section.
+    const tabs: NavTab[] = [
+      ...TABS,
+      { label: "Changelog", path: "/changelog" },
+    ];
+    expect(labels(sidebarForRoute(TREE, tabs, "/changelog"))).toStrictEqual([]);
   });
 
   it("does not treat a sibling prefix as the section (/adapters vs /adapters-x)", () => {

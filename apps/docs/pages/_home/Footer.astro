@@ -25,17 +25,25 @@ const pagesOf = (nodes: typeof data.navigation.sidebar): FooterLink[] =>
     node.kind === "page" ? [{ href: node.route, label: node.label }] : []
   );
 
-// Resolve the docs section root. With tabs configured, the sidebar's top level
-// is one group per tab ("Docs", "Changelog", …) and the real doc sections live
-// inside the "Docs" group; without tabs the sidebar holds the sections directly.
-// Drop the release-notes "Changelog" group (history, not navigation), then
-// descend through any single wrapping group until we reach the level that holds
-// the section sub-groups. From there the lead pages become a "Getting Started"
-// column and each section group becomes its own column.
+// Resolve the docs section root. Blume adds one top-level sidebar group per nav
+// tab ("Docs", "Changelog", "Example API", …). Scope the footer to the primary
+// docs tab (the first one) so only its sections drive the columns — this drops
+// the Changelog (release history) and the Example API reference (sample
+// content), which are separate tabs. Fall back to the whole sidebar when no
+// tabs are configured (sections live at the top level then). From the docs
+// group, descend through any single wrapping group until we reach the level
+// that holds the section sub-groups: the lead pages become a "Getting Started"
+// column and each section group ("Content", "Configuration", …) its own column.
 const sidebar = data.navigation?.sidebar ?? [];
+const primaryTabPath = data.navigation?.tabs?.[0]?.path;
 let roots = sidebar.filter(
-  (node) => !(node.kind === "group" && node.label === "Changelog")
+  (node) => node.kind === "group" && node.path === primaryTabPath
 );
+if (roots.length === 0) {
+  roots = sidebar.filter(
+    (node) => !(node.kind === "group" && node.label === "Changelog")
+  );
+}
 while (
   roots.length === 1 &&
   roots[0].kind === "group" &&
