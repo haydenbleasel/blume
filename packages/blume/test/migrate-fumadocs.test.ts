@@ -532,6 +532,35 @@ describe("migrateFumadocs end to end", () => {
     expect(result.warnings.some((w) => w.includes("/docs"))).toBe(true);
   });
 
+  it("keeps meta.json when the target meta.ts already exists", async () => {
+    const root = await project({
+      "content/docs/guide/index.mdx": "# Guide\n",
+      "content/docs/guide/meta.json": JSON.stringify({
+        pages: ["index"],
+        title: "Guide Title",
+      }),
+      "content/docs/index.mdx": "# Home\n",
+      // A pre-existing meta.ts at the destination: the conversion is skipped,
+      // so the source must NOT be deleted — that would silently lose the
+      // title and page ordering with nowhere to recover them from.
+      "docs/guide/meta.ts": 'export default { title: "Existing" };\n',
+    });
+
+    const result = await migrateFumadocs(root);
+
+    expect(
+      await readFile(join(root, "docs", "guide", "meta.ts"), "utf-8")
+    ).toBe('export default { title: "Existing" };\n');
+    expect(
+      existsSync(join(root, "content", "docs", "guide", "meta.json"))
+    ).toBe(true);
+    expect(
+      result.warnings.some(
+        (w) => w.includes("target already exists") && w.includes("kept")
+      )
+    ).toBe(true);
+  });
+
   it("rebuilds flat-file sections as route-transparent group folders", async () => {
     const root = await project({
       "content/docs/configuration.mdx": "# Config\n",

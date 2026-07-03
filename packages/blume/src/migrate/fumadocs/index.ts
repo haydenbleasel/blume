@@ -114,22 +114,33 @@ const movePage = async (
   };
 };
 
-/** Write a `FolderMeta` to `dest` unless it already exists. */
+/**
+ * Write a `FolderMeta` to `dest` unless it already exists. `handled` tells the
+ * caller whether the source `meta.json` is safe to delete — a skipped write
+ * (target exists) must keep the source, or its title/ordering is lost with
+ * nowhere to recover it from.
+ */
 const writeMeta = async (
   dest: string,
   meta: FolderMeta,
   rel: string,
   warnings: string[]
-): Promise<string[]> => {
+): Promise<{ handled: boolean; warnings: string[] }> => {
   if (Object.keys(meta).length === 0) {
-    return warnings;
+    return { handled: true, warnings };
   }
   if (existsSync(dest)) {
-    return [...warnings, `Skipped ${rel} (target already exists)`];
+    return {
+      handled: false,
+      warnings: [
+        ...warnings,
+        `Skipped ${rel} (target already exists); the source file was kept — merge it into the existing meta.ts by hand.`,
+      ],
+    };
   }
   await mkdir(dirname(dest), { recursive: true });
   await writeFile(dest, renderMetaModule(meta), "utf-8");
-  return warnings;
+  return { handled: true, warnings };
 };
 
 /** Convert one `meta.json` into a typed `meta.ts`, or relocate it if unparseable. */
@@ -173,14 +184,18 @@ const convertMeta = async (
       ...self.warnings,
       ...reshape.warnings,
     ]);
-    await rm(abs, { force: true });
-    return result;
+    if (result.handled) {
+      await rm(abs, { force: true });
+    }
+    return result.warnings;
   }
 
   const { meta, warnings } = translateFumadocsMeta(parsed);
   const result = await writeMeta(dest, meta, rel, warnings);
-  await rm(abs, { force: true });
-  return result;
+  if (result.handled) {
+    await rm(abs, { force: true });
+  }
+  return result.warnings;
 };
 
 interface PageSummary {
