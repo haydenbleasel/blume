@@ -91,9 +91,23 @@ interface RemoteRef {
   editUrl?: string;
 }
 
-const githubHeaders = (): Record<string, string> => {
+// Hosts the GITHUB_TOKEN may be sent to. A configured `url` base can point at
+// any server, and leaking the token there would hand a repo credential to an
+// arbitrary third party.
+const GITHUB_HOSTS = new Set(["api.github.com", "raw.githubusercontent.com"]);
+
+const githubHeaders = (url: string): Record<string, string> => {
   const token = process.env.GITHUB_TOKEN;
-  return token ? { authorization: `Bearer ${token}` } : {};
+  if (!token) {
+    return {};
+  }
+  let host = "";
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return {};
+  }
+  return GITHUB_HOSTS.has(host) ? { authorization: `Bearer ${token}` } : {};
 };
 
 interface GithubTreeEntry {
@@ -110,7 +124,7 @@ const enumerateGithub = async (
   const { owner, repo, ref } = github;
   const base = github.path.replaceAll(/^\/|\/$/gu, "");
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${ref}?recursive=1`;
-  const res = await doFetch(treeUrl, { headers: githubHeaders() });
+  const res = await doFetch(treeUrl, { headers: githubHeaders(treeUrl) });
   if (!res.ok) {
     throw new Error(`${treeUrl} -> ${res.status}`);
   }
@@ -172,7 +186,9 @@ export const mdxRemoteSource = (
   };
 
   const fetchEntry = async (item: RemoteRef): Promise<SourceEntry> => {
-    const res = await doFetch(item.fetchUrl, { headers: githubHeaders() });
+    const res = await doFetch(item.fetchUrl, {
+      headers: githubHeaders(item.fetchUrl),
+    });
     if (!res.ok) {
       throw new Error(`${item.fetchUrl} -> ${res.status}`);
     }

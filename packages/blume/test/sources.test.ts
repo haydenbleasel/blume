@@ -234,6 +234,55 @@ describe("mdxRemoteSource (files mode)", () => {
     expect(diagnostics.map((d) => d.code)).toContain("BLUME_SOURCE_OFFLINE");
   });
 
+  it("only sends GITHUB_TOKEN to GitHub hosts, never a custom url base", async () => {
+    const original = process.env.GITHUB_TOKEN;
+    process.env.GITHUB_TOKEN = "t0ken";
+    try {
+      const sent = new Map<string, Record<string, string>>();
+      const spying = ((
+        input: string | URL,
+        init?: RequestInit
+      ): Promise<Response> => {
+        const url = typeof input === "string" ? input : input.toString();
+        sent.set(url, (init?.headers ?? {}) as Record<string, string>);
+        return Promise.resolve(ok("---\ntitle: X\n---\n# X\n"));
+      }) as unknown as typeof fetch;
+
+      const load = (url: string, cacheDir: string) =>
+        mdxRemoteSource(
+          {
+            fetchImpl: spying,
+            files: ["intro.mdx"],
+            include: ["**/*.mdx"],
+            name: "sdk",
+            url,
+          },
+          ctxFor(cacheDir)
+        ).load();
+
+      const root = await makeProject({});
+      await load("https://example.com/docs", join(root, ".c1"));
+      expect(
+        sent.get("https://example.com/docs/intro.mdx")?.authorization
+      ).toBeUndefined();
+
+      await load(
+        "https://raw.githubusercontent.com/o/r/main/docs",
+        join(root, ".c2")
+      );
+      expect(
+        sent.get("https://raw.githubusercontent.com/o/r/main/docs/intro.mdx")
+          ?.authorization
+      ).toBe("Bearer t0ken");
+    } finally {
+      if (original === undefined) {
+        delete process.env.GITHUB_TOKEN;
+      } else {
+        process.env.GITHUB_TOKEN = original;
+      }
+    }
+  });
+
   it("skips a single failed file and imports the rest with a warning", async () => {
     const cacheDir = join(await makeProject({}), ".cache");
     const source = mdxRemoteSource(

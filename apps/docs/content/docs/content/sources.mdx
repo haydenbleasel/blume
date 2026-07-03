@@ -56,7 +56,7 @@ The built-in `mdx-remote` source fetches raw `.md`/`.mdx` over HTTP. Enumerate f
 }
 ```
 
-A private repo's token is read from the `GITHUB_TOKEN` environment variable — it is never inlined into your config or generated output.
+A private repo's token is read from the `GITHUB_TOKEN` environment variable — it is never inlined into your config or generated output, and it is only ever sent to GitHub's own hosts (`api.github.com`, `raw.githubusercontent.com`), never to a custom `url` base.
 
 Remote pages are rendered with full MDX-plus-component fidelity: their bodies are materialized into a hidden staging directory and rendered through Astro alongside your local docs, so callouts, tabs, and every other Blume component keep working.
 
