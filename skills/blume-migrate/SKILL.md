@@ -118,7 +118,7 @@ Also valid: `date`/`authors` (blog/changelog feeds), `changelog` (changelog meta
 
 ### Redirects are static
 
-`redirects: [{ from, to, status? }]` — map old URLs when you restructure routes. **Restructuring is the main source of these:** every page you moved in step 4 (folder-per-tab, renamed slugs, index promotion) needs an entry, or old URLs 404. `status` defaults to **301 (permanent — browsers cache it indefinitely)**; that's correct for genuine moves, but never use 301/308 for redirects you might reverse. Dynamic/wildcard patterns (`:slug*`) can't be modeled as static path-to-path; move those to host-level config (`_redirects`, `vercel.json`) and report them.
+A `redirects: [{ from, to, status? }]` array **in `blume.config.ts`** maps old URLs when you restructure routes — Blume serves these itself, so any reorganization that moves a page (folder-per-tab, materialized nested groups, renamed slugs, index promotion) is fixed by adding an entry there; no host config needed. **Restructuring is the main source of these:** every page you moved in step 4 (folder-per-tab, renamed slugs, index promotion) needs an entry, or old URLs 404. `status` defaults to **301 (permanent — browsers cache it indefinitely)**; that's correct for genuine moves, but never use 301/308 for redirects you might reverse. Dynamic/wildcard patterns (`:slug*`) can't be modeled as static path-to-path; move those to host-level config (`_redirects`, `vercel.json`) and report them.
 
 ## Verification & reporting
 
