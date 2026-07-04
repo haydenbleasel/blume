@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, relative } from "pathe";
 import { askBackendRuntimeDep } from "../ai/ask.ts";
 import type { AskBackend } from "../ai/ask.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
+import { BLUME_IGNORE_DIRS } from "../core/sources/watch.ts";
 import type { ProjectContext } from "../core/types.ts";
 import { hasScalarReferences } from "../openapi/references.ts";
 import { searchProviderMeta } from "../search/providers.ts";
@@ -432,7 +433,15 @@ export const contentConfigTemplate = (options: {
     ? [
         ...config.content.include,
         ...(config.content.exclude ?? []).map((pattern) => `!${pattern}`),
-        "!**/node_modules/**",
+        // Mirror the filesystem scan's baseline ignores (see BLUME_IGNORE_DIRS):
+        // Astro's content layer roots at the project dir, so a `.`-wide content
+        // root would otherwise re-ingest dependency trees and build output —
+        // e.g. a prior `dist/*.mdx` render — and crash the content-module graph.
+        // The runtime dir (`.blume`, or a custom distDir) is excluded precisely
+        // by `outDirIgnore` instead, so it's left out of this baseline.
+        ...BLUME_IGNORE_DIRS.filter((dir) => dir !== ".blume").map(
+          (dir) => `!**/${dir}/**`
+        ),
         ...outDirIgnore,
       ]
     : [];

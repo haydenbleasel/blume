@@ -8,6 +8,7 @@ import { BlumeError } from "../diagnostics.ts";
 import matter from "../frontmatter.ts";
 import type { ContentSource, SourceEntry, SourceLoadResult } from "./types.ts";
 import {
+  baselineScanIgnore,
   BLUME_WATCH_IGNORE_DIRS,
   excludeDirSegments,
   ignoringWatchListener,
@@ -45,7 +46,10 @@ export const filesystemSource = (
     const files = await glob(options.include, {
       absolute: true,
       cwd: contentRoot,
-      ignore: options.exclude,
+      // Union the user's `exclude` with the baseline never-content dirs so a
+      // broadly-scoped root (`.` or an app dir) can't glob `node_modules`,
+      // `dist`, `.blume`, etc. — even when the user overrode `exclude`.
+      ignore: [...options.exclude, ...baselineScanIgnore()],
       onlyFiles: true,
     });
     files.sort();

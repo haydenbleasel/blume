@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  baselineScanIgnore,
+  BLUME_IGNORE_DIRS,
   BLUME_WATCH_IGNORE_DIRS,
   excludeDirSegments,
   ignoringWatchListener,
@@ -70,5 +72,23 @@ describe("ignoringWatchListener", () => {
     expect(BLUME_WATCH_IGNORE_DIRS).toContain(".blume");
     expect(BLUME_WATCH_IGNORE_DIRS).toContain("node_modules");
     expect(BLUME_WATCH_IGNORE_DIRS).toContain(".git");
+  });
+});
+
+describe("baselineScanIgnore", () => {
+  it("covers dependency, output, and cache trees the scan must never read", () => {
+    for (const dir of [".blume", ".vercel", "dist", "node_modules"]) {
+      expect(BLUME_IGNORE_DIRS).toContain(dir);
+    }
+    // Watcher and scan share one canonical set so they never disagree.
+    expect(BLUME_WATCH_IGNORE_DIRS).toBe(BLUME_IGNORE_DIRS);
+  });
+
+  it("emits recursive globs matching each dir at the root or nested", () => {
+    expect(baselineScanIgnore()).toContain("**/node_modules/**");
+    expect(baselineScanIgnore()).toContain("**/dist/**");
+    expect(baselineScanIgnore()).toStrictEqual(
+      BLUME_IGNORE_DIRS.map((dir) => `**/${dir}/**`)
+    );
   });
 });

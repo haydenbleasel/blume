@@ -567,9 +567,14 @@ describe("contentConfigTemplate", () => {
     expect(out).toContain('"/custom/base"');
   });
 
-  it("always excludes node_modules from the docs glob", () => {
+  it("excludes dependency, output, and cache trees from the docs glob", () => {
+    // Astro's content layer roots at the project dir, so a `.`-wide content root
+    // must skip the same never-content dirs the filesystem scan does — else it
+    // re-ingests node_modules or a prior `dist/*.mdx` and breaks the module graph.
     const out = contentConfigTemplate({ config, context: context() });
-    expect(out).toContain('"!**/node_modules/**"');
+    for (const dir of ["node_modules", "dist", ".vercel", ".git"]) {
+      expect(out).toContain(`"!**/${dir}/**"`);
+    }
   });
 
   it("excludes the runtime dir when it sits inside the content root", () => {

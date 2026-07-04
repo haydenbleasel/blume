@@ -91,6 +91,32 @@ describe("filesystemSource", () => {
     expect(await source.read?.("index.mdx")).toContain("# Home");
   });
 
+  it("skips never-content dirs (node_modules, dist, .blume, …) even at a `.`-rooted scan", async () => {
+    const root = await makeProject({
+      ".blume/src/pages/gen.md": "# generated\n",
+      ".vercel/output/cached.md": "# cached\n",
+      "dist/bundle.md": "# built\n",
+      "getting-started.md": "# Start\n",
+      "guide/setup.md": "# Setup\n",
+      "node_modules/some-dep/readme.md": "# dep\n",
+    });
+    // The migrated-monorepo shape: docs live at the app root beside node_modules
+    // and build output, with `exclude` overridden away from its defaults.
+    const source = filesystemSource({
+      exclude: [],
+      include: ["**/*.{md,mdx}"],
+      name: "filesystem",
+      projectRoot: root,
+      root: ".",
+    });
+
+    const { entries } = await source.load();
+    expect(entries.map((entry) => entry.ref).toSorted()).toStrictEqual([
+      "getting-started.md",
+      "guide/setup.md",
+    ]);
+  });
+
   it("validate throws BLUME_CONTENT_ROOT_MISSING for an absent root", async () => {
     const root = await makeProject({ "README.md": "# none\n" });
     const source = filesystemSource({
