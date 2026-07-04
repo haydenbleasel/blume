@@ -46,7 +46,17 @@ A minimal result is often just `defineConfig({ title, logo, theme: { accent } })
 
 ## Icons: FontAwesome → Lucide (required)
 
-Mintlify defaults to **FontAwesome**; Blume is **Lucide-only**. Convert every icon reference — frontmatter `icon`, nav-group `icon`, `<Icon>`, `<Card icon>` — to the closest Lucide name. Discard Mintlify's `iconType` (solid/regular/brands) entirely. Common mappings:
+Mintlify defaults to **FontAwesome**; Blume is **Lucide-only**. Convert every icon reference — frontmatter `icon`, nav-group `icon`, `<Icon>`, `<Card icon>` — to the closest Lucide name. Discard Mintlify's `iconType` (solid/regular/brands) entirely.
+
+**Automate the frontmatter pass — don't hand-edit it.** `scripts/mintlify-codemod.mjs` (in this skill, zero-dependency) remaps every **frontmatter** `icon:` using the table below, drops brand/no-equivalent icons, and — in the same pass — drops/renames unsupported frontmatter keys (see [Frontmatter](#frontmatter)). It's deterministic and idempotent, and reports what it changed per file plus what it couldn't (unknown icons, OpenAPI-stub flags):
+
+```bash
+# dry run first (report only), then apply:
+node <this-skill>/scripts/mintlify-codemod.mjs <content-dir>
+node <this-skill>/scripts/mintlify-codemod.mjs --write <content-dir>
+```
+
+The codemod touches **only frontmatter**. Icons in MDX **body** (`<Icon icon="…">`, `<Card icon="…">`, nav-group icons in `docs.json`) it does not see — convert those by hand using the same table. Common mappings:
 
 | FontAwesome | Lucide |  | FontAwesome | Lucide |
 | --- | --- | --- | --- | --- |
@@ -99,21 +109,21 @@ Rewrite each page's MDX:
 
 ## Frontmatter
 
-Mintlify page frontmatter → Blume's strict schema:
+Mintlify page frontmatter → Blume's strict schema. **`scripts/mintlify-codemod.mjs --write` does the mechanical rows automatically** (rename, drop, icon-remap) and flags the judgment rows (`openapi`/`asyncapi`/`api`) for you — see [Icons](#icons-fontawesome--lucide-required) for the invocation. The table is both the mapping reference and a description of exactly what the codemod does:
 
-| Mintlify | Blume |
-| --- | --- |
-| `title` / `description` | pass through |
-| `sidebarTitle` | `sidebar.label` |
-| `icon` | `sidebar.icon` (converted to Lucide) |
-| `tag` | `sidebar.badge` |
-| `hidden: true` | `sidebar.hidden: true` **and** `noindex: true` |
-| `canonical` | `seo.canonical` |
-| `og:image` | `seo.image` |
-| `openapi`/`asyncapi`/`api` | `type: api` (but prefer deleting stub pages — Blume generates them) |
-| `mode`, `public`, `rss`, `groups`, `keywords`, `hideApiMarker`, `hideFooterPagination` | **drop** (report) |
+| Mintlify | Blume | Codemod |
+| --- | --- | --- |
+| `title` / `description` | pass through | — |
+| `sidebarTitle` | `sidebar.label` | renames |
+| `icon` | remapped to a Lucide name in place (top-level `icon` is valid Blume frontmatter; keep it there) | remaps |
+| `tag` | `sidebar.badge` | renames |
+| `canonical` | `seo.canonical` | renames |
+| `og:image` | `seo.image` | renames |
+| `hidden: true` | valid top-level in Blume — **kept as-is**; add `noindex: true` yourself if the page must also leave the search index | left (do by hand) |
+| `openapi`/`asyncapi`/`api` | usually an endpoint stub → **delete the page** (Blume generates operation pages); else `type: api` | **flags** for review — never auto-deletes a page |
+| `mode`, `public`, `rss`, `groups`, `keywords`, `hideApiMarker`, `hideFooterPagination`, `iconType` | **drop** (report) | drops |
 
-Remove any duplicate H1 in the body — `title` renders the H1.
+The codemod leaves the source key in place and reports a conflict rather than clobbering data when a rename target already exists (e.g. a page already has `sidebar.label`) or the value is too structured to move safely — resolve those by hand. Remove any duplicate H1 in the body — `title` renders the H1. (The codemod only edits frontmatter; it never touches the body.)
 
 ## OpenAPI
 
