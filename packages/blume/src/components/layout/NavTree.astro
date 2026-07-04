@@ -222,13 +222,13 @@ const initialId =
           return (
             <li class={spacing}>
               <details class="group" open={open}>
-                <summary class="mb-1 flex cursor-pointer list-none items-center gap-1.5 rounded-[0.65rem] px-2.5 py-1.5 font-medium text-foreground text-sm transition-colors hover:bg-muted [&::-webkit-details-marker]:hidden">
+                <summary class="flex cursor-pointer list-none items-center gap-1.5 rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden">
                   {item.route ? (
                     <a
                       aria-current={
                         item.route === currentRoute ? "page" : undefined
                       }
-                      class="-my-1 flex flex-1 items-center gap-1.5 rounded py-1 text-foreground transition-colors aria-[current=page]:font-semibold"
+                      class="-my-1 flex flex-1 items-center gap-1.5 rounded py-1 transition-colors aria-[current=page]:text-foreground aria-[current=page]:font-semibold"
                       href={item.route}
                     >
                       {item.icon && (
