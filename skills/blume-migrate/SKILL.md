@@ -48,7 +48,7 @@ The single biggest shift for most sources — especially Mintlify — is that **
 
 ### Tabs and selectors
 
-- **`navigation.tabs`** (`{ label, path, icon? }`) render top-of-header sections and **scope the sidebar**: under a tab's `path`, the sidebar shows only that folder. Structure content as **one folder per tab**.
+- **`navigation.tabs`** (`{ label, path, icon? }`) render top-of-header sections and **scope the sidebar by route** — the folder at a tab's `path` becomes the section, so this needs no config beyond the tabs themselves; structure content as **one folder per tab**. The filtering runs both ways: on a route **under** a tab's `path`, the sidebar shows **only** that tab's folder (a tab also highlights when the current route is under it); on a **root or untabbed** route (or a tab whose `path` is `/`), the tab folders are **hidden** and the sidebar shows only the loose pages that belong to no tab (full tree as a fallback, so it's never blank). Consequence for migrations: once you add tabs, the landing sidebar automatically drops the sectioned content — that's intended, not lost pages; don't hand-build excludes for it.
 - **`navigation.selectors`** (`{ kind, label, items: [{ label, path, icon?, description?, tag? }] }`, `kind` = `dropdown`/`product`/`version`/`language`) partition a whole site (products, versions) via a header dropdown keyed on the current route.
 
 ### Routes and pathing
