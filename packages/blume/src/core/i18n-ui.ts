@@ -19,6 +19,7 @@ const uiStringsObject = z.object({
       connectMcp: z.string().default("Connect to MCP"),
       copied: z.string().default("Copied!"),
       copyClaudeCode: z.string().default("Copy Claude Code command"),
+      copyCodex: z.string().default("Copy Codex command"),
       copyMarkdown: z.string().default("Copy as Markdown"),
       copyServerUrl: z.string().default("Copy server URL"),
       edit: z.string().default("Edit on GitHub"),
