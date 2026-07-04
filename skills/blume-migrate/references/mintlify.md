@@ -90,6 +90,7 @@ Mintlify's `navigation` object (`tabs`/`anchors`/`dropdowns`/`products`/`version
 - **`pages`** entries are page refs (paths without extension) → files at the corresponding path. An entry that's `"GET /path"` is an OpenAPI endpoint stub → **delete it** (Blume generates these; see OpenAPI).
 - **`tabs`** → `navigation.tabs` (`{ label, path, icon? }`). Put each tab's pages in **one folder** and point the tab's `path` at it — the tab then scopes the sidebar automatically (under the tab's `path`, the sidebar shows only that folder). Mintlify tabs freely mix pages from any folder; Blume tabs scope by folder, so pages shared across tabs must be **assigned to one tab's folder** (and linked from the others). **The scoping is bidirectional:** on the root/landing route Blume _hides_ every tab folder and lists only untabbed top-level pages — so a Mintlify home whose single sidebar showed everything becomes a lean root list plus one sidebar per tab. That's automatic; don't try to exclude tab folders from the root by hand.
 - **`dropdowns`/`products`/`versions`** → `navigation.selectors` (`{ kind, label, items: [{ label, path, icon?, description?, tag? }] }`). Use `kind` `dropdown`/`product`/`version` accordingly.
+- **`anchors` / `navigation.global.anchors` / `navbar.links`** (persistent header links — Blog, Changelog, Community, Contact/Support) → **`navigation.featured`** (`{ label, href, icon? }`). These pin to the **top of the sidebar, above every section, on every route** (not tab-scoped) — the right home for Mintlify's always-visible utility links. An external `href` opens in a new tab; an internal one (`/contact`) is build-time validated against your pages. Convert the FontAwesome `icon` to Lucide as usual. (This replaces the old "drop and report" for anchors.) The `navbar.primary` **CTA button** has no featured equivalent — see Dropped.
 - **`languages`** → `i18n`, not a selector (see below).
 - Only fall back to an explicit `navigation.sidebar` for a shape the filesystem genuinely can't express.
 
@@ -143,8 +144,7 @@ Mintlify serves every top-level dir (e.g. `/images`) at the site root. Blume ser
 
 ## Dropped — report these
 
-- **`navbar.links`/`navbar.primary`** (header CTAs) → re-add via `navigation.tabs` or a Header override.
-- **`navigation.global.anchors`** (external header links like Blog/Contact) → no header-links config; drop and report, or restore via a Header override.
+- **`navbar.primary`** (the prominent header **CTA button**, e.g. "Get Started"/"Sign Up") → no button equivalent; re-add via `navigation.tabs`, a `navigation.featured` link, or a Header override. (Plain `navbar.links` and `anchors` map to `navigation.featured` — see Navigation above, not here.)
 - **`footer.socials`** → suggest the `github` config, or a Footer override.
 - **Per-language banners** (`navigation.languages[].banner`) → no equivalent.
 - **Dynamic redirects** (`:slug*`/`:id` params) → can't be static path-to-path; move to host rules (`_redirects`, `vercel.json`).
