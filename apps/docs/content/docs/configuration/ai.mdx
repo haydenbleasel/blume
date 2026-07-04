@@ -62,6 +62,25 @@ ai: {
 }
 ```
 
+### Suggested questions
+
+Seed the empty state with a few starter prompts. Each renders as a clickable suggestion — click one to send it — with an optional [Lucide icon](/docs/content/components#icon) beside the label:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    suggestions: [
+      { label: "What is Blume?", icon: "rocket" },
+      { label: "How do I write a docs page?", icon: "file-text" },
+      { label: "How do I configure the theme?", icon: "settings" },
+    ],
+  },
+}
+```
+
+`label` is the question that gets asked; `icon` is optional. Leave `suggestions` unset (or empty) and the panel opens to a plain input.
+
 ### Grounding
 
 Ask AI is **grounded in your docs**. For each question it retrieves the most relevant pages — using the same lexical [Orama](/docs/configuration/search) index that powers on-page search — and injects them into the model's system prompt, so answers come from your content instead of the model's own knowledge. The assistant is told to answer only from the retrieved pages, to say when something isn't covered, and to cite the pages it drew from.

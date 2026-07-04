@@ -1,6 +1,17 @@
 import { defineConfig } from "blume";
 
 export default defineConfig({
+  ai: {
+    ask: {
+      enabled: true,
+      suggestions: [
+        { icon: "rocket", label: "What is Blume?" },
+        { icon: "file-text", label: "How do I write a docs page?" },
+        { icon: "settings", label: "How do I configure the theme?" },
+        { icon: "sparkles", label: "How does Ask AI work?" },
+      ],
+    },
+  },
   analytics: {
     vercel: true,
   },
@@ -39,6 +50,9 @@ export default defineConfig({
       inline: true,
     },
     math: true,
+  },
+  mcp: {
+    enabled: true,
   },
   navigation: {
     tabs: [

@@ -231,7 +231,8 @@ describe("createAskContext", () => {
     expect(system).toContain("<docs>");
     expect(system).toContain("Installation (/guides/install)");
     expect(system).toContain("run the dev server");
-    expect(system).toContain("Cite the page titles");
+    expect(system).toContain("Markdown link");
+    expect(system).toContain("[Page Title](/route)");
   });
 
   it("returns undefined when there is no user message to ground on", async () => {
@@ -300,6 +301,52 @@ describe("createAskContext", () => {
     expect(
       await empty([{ content: "anything", role: "user" }])
     ).toBeUndefined();
+  });
+
+  it("centers the excerpt on the query-relevant section of a long page", async () => {
+    // A long page whose answer sits well past the excerpt cap: the head is
+    // ~3.6k chars, so a naive head slice would never reach `targetword`.
+    const head = `STARTMARKER ${"alpha ".repeat(600)}`;
+    const deep = "The targetword feature is documented far below the fold. ";
+    const grounded = createAskContext({
+      documents: [
+        {
+          content: `${head}${deep}${"tail ".repeat(200)}`,
+          description: "",
+          locale: "",
+          route: "/long",
+          title: "Long",
+        },
+      ],
+      site: null,
+    });
+    const system = await grounded([
+      { content: "how does targetword work", role: "user" },
+    ]);
+    // The relevant section is injected even though it's below the fold…
+    expect(system).toContain("targetword feature");
+    // …and the skipped head (its opening marker) never reaches the prompt.
+    expect(system).not.toContain("STARTMARKER");
+    expect(system).toContain("…");
+  });
+
+  it("falls back to the page head when the query misses a long page", async () => {
+    const head = `HEADMARKER ${"alpha ".repeat(600)}`;
+    const grounded = createAskContext({
+      documents: [
+        { content: head, description: "", locale: "", route: "/p", title: "P" },
+      ],
+      site: null,
+    });
+    // The query terms don't appear in the body, but the current page is always
+    // injected — with no match to center on, it excerpts from the head.
+    const system = await grounded(
+      [{ content: "unrelated xyz", role: "user" }],
+      {
+        path: "/p",
+      }
+    );
+    expect(system).toContain("HEADMARKER");
   });
 });
 

@@ -948,7 +948,7 @@ export const catchAllPageTemplate = (options: {
     ? 'import AskAI from "blume/components/islands/AskAI.astro";\n'
     : "";
   const askSlot = options.askEnabled
-    ? '\n  <AskAI slot="ask" strings={ui.ask} />'
+    ? '\n  <AskAI slot="ask" strings={ui.ask} suggestions={data.config.ask?.suggestions ?? []} />'
     : "";
   const mathImport = options.mathEnabled
     ? 'import Math from "blume/components/content/Math.astro";\n'
@@ -1219,7 +1219,9 @@ export const changelogIndexTemplate = (options: {
   const askImport = options.askEnabled
     ? 'import AskAI from "blume/components/islands/AskAI.astro";\n'
     : "";
-  const askSlot = options.askEnabled ? '\n  <AskAI slot="ask" />' : "";
+  const askSlot = options.askEnabled
+    ? '\n  <AskAI slot="ask" strings={data.ui.ask} suggestions={data.config.ask?.suggestions ?? []} />'
+    : "";
   const clientData = options.needsReact
     ? '\n  clientData={{ config: data.config, navigation: data.navigation, page: { route: "/changelog", title: data.config.title + " changelog" } }}'
     : "";

@@ -571,6 +571,18 @@ const aiConfigSchema = z
         enabled: z.boolean().default(false),
         model: z.string().default("openai/gpt-5.5"),
         provider: z.enum(askAiProviders).default("gateway"),
+        // Empty-state prompts shown before the first question. Each renders as a
+        // clickable suggestion; `icon` is an optional Lucide name beside it.
+        suggestions: z
+          .array(
+            z
+              .object({
+                icon: iconName.optional(),
+                label: z.string().min(1),
+              })
+              .strict()
+          )
+          .default([]),
       })
       .strict()
       .superRefine((value, ctx) => {

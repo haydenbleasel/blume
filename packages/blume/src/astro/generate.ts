@@ -634,6 +634,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     config: {
       analytics: config.analytics ?? null,
       appleIcon: resolveAppleIcon(project),
+      ask: config.ai.ask?.enabled
+        ? { suggestions: config.ai.ask.suggestions }
+        : null,
       banner: resolveBanner(config),
       codeWrap: config.markdown.code.wrap,
       description: config.description,

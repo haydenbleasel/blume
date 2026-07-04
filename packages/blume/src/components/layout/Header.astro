@@ -140,7 +140,6 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
     )
   }
   <div class="flex-1"></div>
-  <slot name="ask" />
   {
     localeSwitch && localeSwitch.length > 1 && (
       <LanguageSwitcher
@@ -191,6 +190,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
       <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
       <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
     </button>
+    <slot name="ask" />
   </div>
 </header>
 <script is:inline set:html={clickScript} />

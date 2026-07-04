@@ -1,12 +1,64 @@
 ---
 import type { UIStrings } from "../../core/i18n-ui.ts";
+import { resolveIcon } from "../../theme/icons.ts";
 import AskAI from "./ask-ai.tsx";
+
+interface Suggestion {
+  icon?: string;
+  label: string;
+}
 
 interface Props {
   strings?: UIStrings["ask"];
+  suggestions?: Suggestion[];
 }
 
-const { strings } = Astro.props;
+const { strings, suggestions = [] } = Astro.props;
+
+// Icons resolve to inline SVG here (server-only module), so the client island
+// gets ready-to-render markup rather than a name it can't resolve. Bare Lucide
+// bodies carry no styling, so wrap them in a stroke-styled root like Icon.astro.
+const svgFor = (name: string | undefined): string | null => {
+  const resolved = resolveIcon(name ?? "sparkles") ?? resolveIcon("sparkles");
+  return resolved
+    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${resolved.viewBox}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${resolved.body}</svg>`
+    : null;
+};
+
+const items = suggestions.map((suggestion) => ({
+  icon: svgFor(suggestion.icon),
+  label: suggestion.label,
+}));
 ---
 
-<AskAI client:load strings={strings} />
+<AskAI client:load strings={strings} suggestions={items} />
+
+<style is:global>
+  :root {
+    --blume-ask-width: min(30rem, 100vw);
+  }
+
+  /* Desktop docks the panel and shrinks the page to fit, like vercel.com/docs.
+     On smaller screens the panel is a full-width overlay (no push). */
+  @media (min-width: 1024px) {
+    body {
+      transition: padding-inline-end 0.2s ease-out;
+    }
+
+    body[data-blume-ask="open"] {
+      padding-inline-end: var(--blume-ask-width);
+    }
+  }
+
+  /* The table of contents only shows at xl; reclaim its column for the article
+     while the panel is open so the shrunken content still has room to breathe. */
+  @media (min-width: 1280px) {
+    body[data-blume-ask="open"] [data-blume-toc] {
+      display: none;
+    }
+
+    body[data-blume-ask="open"] [data-blume-doc-grid] {
+      grid-template-columns: 17.5rem minmax(0, 1fr);
+    }
+  }
+</style>

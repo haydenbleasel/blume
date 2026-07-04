@@ -88,6 +88,10 @@ export interface BlumeDataConfig {
   analytics: NonNullable<ResolvedConfig["analytics"]> | null;
   /** Apple touch icon, or `null` when none is configured/detected. */
   appleIcon: BlumeFavicon | null;
+  /** Ask AI empty-state suggestions, or `null` when Ask AI is off. */
+  ask: {
+    suggestions: NonNullable<ResolvedConfig["ai"]["ask"]>["suggestions"];
+  } | null;
   banner: BlumeBanner | null;
   /** `markdown.code.wrap`: wrap long code lines instead of scrolling. */
   codeWrap: boolean;

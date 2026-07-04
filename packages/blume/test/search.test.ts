@@ -91,6 +91,18 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).not.toContain("#");
   });
 
+  it("keeps Markdown and fenced code when content is 'markdown'", async () => {
+    const [doc] = await buildSearchDocuments(
+      projectWith([page({ description: "Desc A", id: "a.md" })], [route({})]),
+      { content: "markdown" }
+    );
+    // The fenced example the plain extraction drops is kept for Ask AI grounding…
+    expect(doc?.content).toContain("const secret = 1;");
+    expect(doc?.content).toContain("```js");
+    // …along with heading marks and other Markdown structure.
+    expect(doc?.content).toContain("# Heading");
+  });
+
   it("yields empty content for a route with no matching page", async () => {
     const [doc] = await buildSearchDocuments(
       projectWith([], [route({ id: "missing.md", path: "/c", title: "C" })])

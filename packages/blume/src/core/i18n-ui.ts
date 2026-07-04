@@ -28,11 +28,15 @@ const uiStringsObject = z.object({
     .default({}),
   ask: z
     .object({
+      clear: z.string().default("Clear conversation"),
+      close: z.string().default("Close"),
+      copy: z.string().default("Copy conversation"),
       empty: z.string().default("Ask a question about the docs."),
       error: z.string().default("Sorry, something went wrong."),
       label: z.string().default("Ask a question"),
       placeholder: z.string().default("Ask a question…"),
       send: z.string().default("Send"),
+      tip: z.string().default("Tip: You can open and close chat with"),
       title: z.string().default("Ask AI"),
     })
     .default({}),

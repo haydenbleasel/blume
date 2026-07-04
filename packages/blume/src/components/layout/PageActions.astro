@@ -7,7 +7,6 @@ import Icon from "../Icon.astro";
 interface Props {
   route: string;
   editUrl?: string | null;
-  askEnabled?: boolean;
   /** Show the "Export to PDF" action (native browser print). */
   exportPdf?: boolean;
   /** Show the "Export to EPUB" action (client-side, current page). */
@@ -20,16 +19,8 @@ interface Props {
   strings?: UIStrings["actions"];
 }
 
-const {
-  route,
-  editUrl,
-  askEnabled,
-  exportPdf,
-  exportEpub,
-  mcpUrl,
-  mcpName,
-  strings,
-} = Astro.props;
+const { route, editUrl, exportPdf, exportEpub, mcpUrl, mcpName, strings } =
+  Astro.props;
 const a = strings ?? EN_UI.actions;
 const mdPath = route === "/" ? "/index.md" : `${route}.md`;
 
@@ -127,15 +118,6 @@ const menuRowClass =
           )}
         </div>
       </details>
-    )
-  }
-
-  {
-    askEnabled && (
-      <button class={rowClass} data-blume-ask-ai type="button">
-        <Icon name="message-circle" size={16} />
-        {a.askAI}
-      </button>
     )
   }
 
@@ -294,12 +276,6 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
       .querySelector("[data-blume-scroll-top]")
       ?.addEventListener("click", () =>
         window.scrollTo({ behavior: "smooth", top: 0 })
-      );
-
-    root
-      .querySelector("[data-blume-ask-ai]")
-      ?.addEventListener("click", () =>
-        window.dispatchEvent(new CustomEvent("blume:open-ask-ai"))
       );
 
     const mcpUrl = root.getAttribute("data-mcp-url");

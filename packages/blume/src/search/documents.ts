@@ -114,10 +114,15 @@ const buildCrumbIndex = (sidebar: NavNode[]): Map<string, Crumbs> => {
  * Pass `includeWhenDisabled` to index pages on their content merits even when
  * the search provider is `none` — used by the MCP server, which is a separate
  * feature from on-page search.
+ *
+ * `content` selects the extraction: `"plain"` (default) strips Markdown to bare
+ * searchable text; `"markdown"` keeps the body's Markdown — code blocks, lists,
+ * headings — for Ask AI grounding, where fenced examples are often the answer
+ * and stripping them makes the model unable to cite content the docs do contain.
  */
 export const buildSearchDocuments = async (
   project: BlumeProject,
-  options?: { includeWhenDisabled?: boolean }
+  options?: { includeWhenDisabled?: boolean; content?: "markdown" | "plain" }
 ): Promise<SearchDocument[]> => {
   const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
 
@@ -148,7 +153,9 @@ export const buildSearchDocuments = async (
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
       const raw = page ? await readEntryText(project, page) : "";
-      const body = raw ? toPlainText(matter(raw).content) : "";
+      const source = raw ? matter(raw).content : "";
+      const body =
+        options?.content === "markdown" ? source.trim() : toPlainText(source);
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       return {
