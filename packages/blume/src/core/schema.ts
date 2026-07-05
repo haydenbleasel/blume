@@ -482,7 +482,6 @@ const themeConfigSchema = z
     layout: z.enum(["sidebar"]).default("sidebar"),
     mode: z.enum(["system", "light", "dark"]).default("system"),
     radius: z.enum(["none", "sm", "md", "lg"]).default("md"),
-    strict: z.boolean().default(false),
   })
   .strict();
 

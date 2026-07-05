@@ -406,11 +406,6 @@ export interface ThemeConfig {
   mode?: "system" | "light" | "dark";
   /** Corner radius scale. Defaults to `md`. */
   radius?: "none" | "sm" | "md" | "lg";
-  /**
-   * Strict token mode: fail rather than silently fall back when a theme token
-   * is missing. Defaults to `false`.
-   */
-  strict?: boolean;
 }
 
 // ---------------------------------------------------------------------------

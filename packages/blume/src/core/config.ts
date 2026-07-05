@@ -56,7 +56,7 @@ import type { Diagnostic } from "./types.ts";
  *
  * **Appearance**
  * - `theme` — `accent` color, `fonts` (curated Google Font slugs), `radius`,
- *   `mode` (`system`/`light`/`dark`), `background`, and `strict` token mode.
+ *   `mode` (`system`/`light`/`dark`), and `background`.
  * - `markdown` — `code` (language icons, inline highlighting, line wrap),
  *   `headingAnchors`, `imageZoom`, and opt-in KaTeX `math`.
  * - `toc` — on-page table of contents; `true`/`false` or a heading-level range.
