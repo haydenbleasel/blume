@@ -236,6 +236,29 @@ describe("normalizeEntry", () => {
     ).toBe("/from-frontmatter");
   });
 
+  it("falls back to the configured defaultType when frontmatter has no type", () => {
+    const { pages } = normalizeEntry(fsEntry, {
+      defaultType: "guide",
+      source: { name: "filesystem", staged: false },
+    });
+    expect(pages[0]?.contentType).toBe("guide");
+
+    const typed = normalizeEntry(
+      { ...fsEntry, data: { type: "blog" } },
+      { defaultType: "guide", source: { name: "filesystem", staged: false } }
+    );
+    expect(typed.pages[0]?.contentType).toBe("blog");
+  });
+
+  it("treats top-level hidden/noindex frontmatter as the nested shorthands", () => {
+    const { pages } = normalizeEntry(
+      { ...fsEntry, data: { hidden: true, noindex: true } },
+      { defaultType: "doc", source: { name: "filesystem", staged: false } }
+    );
+    expect(pages[0]?.meta.sidebar.hidden).toBe(true);
+    expect(pages[0]?.meta.seo.noindex).toBe(true);
+  });
+
   it("reports a diagnostic for invalid frontmatter", () => {
     const { pages, diagnostics } = normalizeEntry(
       {

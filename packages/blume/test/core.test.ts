@@ -186,9 +186,10 @@ describe("astro config template", () => {
 });
 
 describe("page meta schema", () => {
-  it("defaults type to doc and draft to false", () => {
+  it("leaves type unset (deferred to content.defaultType) and defaults draft to false", () => {
     const meta = pageMetaSchema.parse({});
-    expect(meta.type).toBe("doc");
+    // No schema default: normalizeEntry falls back to `content.defaultType`.
+    expect(meta.type).toBeUndefined();
     expect(meta.draft).toBeFalsy();
     expect(meta.sidebar.hidden).toBeFalsy();
   });

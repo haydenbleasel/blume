@@ -260,6 +260,16 @@ export const normalizeEntry = (
 
   const meta = result.data;
 
+  // Top-level `hidden`/`noindex` are accepted as shorthands for their nested
+  // equivalents — the schema declares them, so silently ignoring them would
+  // strand authors with no diagnostic.
+  if (meta.hidden) {
+    meta.sidebar.hidden = true;
+  }
+  if (meta.noindex) {
+    meta.seo.noindex = true;
+  }
+
   // Locale and the locale-stripped nav path come from the entry's ref (a leading
   // dir, or a filename suffix under the `dot` parser), not the slug — the slug is
   // the logical, locale-agnostic path within a locale. A shared `$` file maps to

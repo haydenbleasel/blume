@@ -109,7 +109,8 @@ const pageMetaBaseSchema = z
     sidebar: sidebarMetaSchema.default({}),
     slug: z.string().optional(),
     title: z.string().optional(),
-    type: z.string().default("doc"),
+    // No default: an absent `type` must fall through to `content.defaultType`.
+    type: z.string().optional(),
   })
   .strict();
 

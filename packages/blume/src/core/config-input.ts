@@ -714,18 +714,13 @@ export interface GithubConfig {
 export interface CodeConfig {
   /** Show a brand language icon in the code-block header. Defaults to `true`. */
   icons?: boolean;
-  /**
-   * Syntax-highlight inline `` `code{:lang}` `` snippets. Defaults to `false`;
-   * opt a snippet in with a trailing `{:lang}` marker.
-   */
-  inline?: boolean;
   /** Wrap long lines instead of scrolling horizontally. Defaults to `false`. */
   wrap?: boolean;
 }
 
 /** Markdown / MDX rendering behavior. */
 export interface MarkdownConfig {
-  /** Code-block rendering: language icons, inline highlighting, line wrap. */
+  /** Code-block rendering: language icons, line wrap. */
   code?: CodeConfig;
   /** Syntax-highlighting themes for fenced code blocks. */
   codeBlocks?: {
@@ -744,11 +739,6 @@ export interface MarkdownConfig {
   headingAnchors?: boolean;
   /** Make content images click-to-zoom (lightbox). Defaults to `true`. */
   imageZoom?: boolean;
-  /**
-   * Enable LaTeX math (`$…$` inline, `$$…$$` block) via KaTeX. Defaults to
-   * `false` since `$` is common in prose and shell. MDX only.
-   */
-  math?: boolean;
 }
 
 // ---------------------------------------------------------------------------
