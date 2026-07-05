@@ -22,8 +22,8 @@ export type {
   FolderMetaFactory,
 } from "./core/define-meta.ts";
 export type { UIStrings } from "./core/i18n-ui.ts";
+export type { BlumeConfig } from "./core/config-input.ts";
 export type {
-  BlumeConfig,
   FolderMeta,
   HydrationMode,
   ResolvedConfig,

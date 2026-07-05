@@ -1097,8 +1097,12 @@ export type ResolvedConfig = z.infer<typeof blumeConfigSchema>;
 export type ResolvedI18nConfig = z.infer<typeof i18nConfigSchema>;
 /** A configured locale with display metadata. */
 export type LocaleConfig = z.infer<typeof localeSchema>;
-/** User-authored config: the shape accepted by `defineConfig`. */
-export type BlumeConfig = z.input<typeof blumeConfigSchema>;
+/**
+ * User-authored config, straight off the schema. The public, hand-documented
+ * authoring type is `BlumeConfig` in `./config-input.ts`, which a compile-time
+ * guard keeps structurally identical to this.
+ */
+export type BlumeConfigInput = z.input<typeof blumeConfigSchema>;
 /** A configured search backend. */
 export type SearchProvider = (typeof searchProviders)[number];
 /** Resolved robots.txt `Content-Signal` preferences (`null` when disabled). */
