@@ -156,17 +156,22 @@ describe("buildNavigation — filesystem sidebar", () => {
     expect(labels(guide.children)).toStrictEqual(["Usage", "Advanced"]);
   });
 
-  it("keeps file order and stamps groups when display is not flat", () => {
+  it("hoists root pages above groups but not recursively when display is not flat", () => {
     const nav = buildNavigation(
       [
         page("provider/biome.md", "/provider/biome", "Biome"),
+        page("guide/advanced/deep.md", "/guide/advanced/deep", "Deep"),
+        page("guide/zz-usage.md", "/guide/usage", "Usage"),
         page("rules.md", "/rules", "Rules"),
       ],
       { display: "group", folderMeta: empty }
     );
-    // Collapsible groups are unambiguous rows; no hoisting needed.
-    expect(labels(nav.sidebar)).toStrictEqual(["Provider", "Rules"]);
-    expect(asGroup(nav.sidebar[0]).display).toBe("group");
+    // Root-level loose pages hoist above groups in every display mode.
+    expect(labels(nav.sidebar)).toStrictEqual(["Rules", "Guide", "Provider"]);
+    expect(asGroup(nav.sidebar[1]).display).toBe("group");
+    // But nested pages keep file order — collapsible groups are unambiguous rows.
+    const guide = asGroup(nav.sidebar[1]);
+    expect(labels(guide.children)).toStrictEqual(["Advanced", "Usage"]);
   });
 
   it("applies folder meta: title, collapsed, and explicit page order", () => {

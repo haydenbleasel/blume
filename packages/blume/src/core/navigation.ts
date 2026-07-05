@@ -184,16 +184,20 @@ const sortNodes = (nodes: MutableNode[]): void => {
 };
 
 /**
- * In flat display a group renders as a plain section header, so a loose page
- * sorted after a group would visually read as that group's last child. Hoist
- * pages above groups at every level (relative order otherwise preserved).
+ * Hoist loose pages above groups so root-level pages read as top-level entries
+ * rather than a group's trailing children (relative order otherwise preserved).
+ * All display modes hoist the root level. Flat additionally recurses into every
+ * group: there a group renders as a plain section header, so a loose page sorted
+ * after a group would visually read as that group's last child.
  */
-const hoistPages = (nodes: MutableNode[]): void => {
+const hoistPages = (nodes: MutableNode[], recurse: boolean): void => {
   const pages = nodes.filter((node) => node.kind === "page");
   const groups = nodes.filter((node) => node.kind === "group");
   nodes.splice(0, nodes.length, ...pages, ...groups);
-  for (const group of groups) {
-    hoistPages(group.children);
+  if (recurse) {
+    for (const group of groups) {
+      hoistPages(group.children, recurse);
+    }
   }
 };
 
@@ -280,9 +284,7 @@ const buildFileSystemSidebar = (
 
   applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix);
   sortNodes(root.children);
-  if (display === "flat") {
-    hoistPages(root.children);
-  }
+  hoistPages(root.children, display === "flat");
   return root.children.map((child) => toNavNode(child, display));
 };
 
