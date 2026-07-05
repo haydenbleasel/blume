@@ -28,7 +28,7 @@ const { prev, next, strings } = Astro.props;
         >
           <Icon class="rtl:-scale-x-100" name="arrow-left" size={16} />
           <span>
-            <span class="block text-muted-foreground text-xs">
+            <span class="block text-muted-foreground text-xs max-md:hidden">
               {strings.previous}
             </span>
             <span class="block font-medium">{prev.label}</span>
@@ -43,7 +43,7 @@ const { prev, next, strings } = Astro.props;
           href={next.route}
         >
           <span>
-            <span class="block text-muted-foreground text-xs">
+            <span class="block text-muted-foreground text-xs max-md:hidden">
               {strings.next}
             </span>
             <span class="block font-medium">{next.label}</span>
