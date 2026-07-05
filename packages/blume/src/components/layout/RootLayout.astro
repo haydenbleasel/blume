@@ -367,11 +367,15 @@ const bannerScript = banner?.dismissible
       class:list={["mx-auto grid grid-cols-1 items-start", gridClass]}
       data-blume-doc-grid
     >
-      {
-        showSidebar && (
       <aside
         aria-label="Primary"
-        class="fixed top-[var(--blume-drawer-top,4rem)] start-0 z-[35] h-[calc(100dvh-var(--blume-drawer-top,4rem))] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:sticky lg:top-16 lg:z-auto lg:h-[calc(100dvh-4rem)] lg:w-auto lg:max-w-none lg:translate-x-0! lg:border-e-0 lg:bg-transparent lg:px-4"
+        class:list={[
+          "fixed top-[var(--blume-drawer-top,4rem)] start-0 z-[35] h-[calc(100dvh-var(--blume-drawer-top,4rem))] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:sticky lg:top-16 lg:z-auto lg:h-[calc(100dvh-4rem)] lg:w-auto lg:max-w-none lg:translate-x-0! lg:border-e-0 lg:bg-transparent lg:px-4",
+          // A "bare" landing (the changelog index) has no sidebar column on
+          // desktop, but the header hamburger still needs a drawer to open on
+          // mobile — without it the toggle only locked page scroll.
+          !showSidebar && "lg:hidden",
+        ]}
       >
         {
           // Pinned links (blog, changelog, contact…) sit above every section on
@@ -419,9 +423,17 @@ const bannerScript = banner?.dismissible
           // The header's tab bar is hidden below `md`, so the drawer is the only
           // way to move between sections on mobile: list the tabs above the
           // page tree, separated by a divider. Hidden from `md` up, where the
-          // header tabs take over.
+          // header tabs take over — unless the page tree is empty (a tab-scoped
+          // standalone page like the changelog), where they keep the drawer
+          // from opening blank.
           navigation.tabs.length > 0 && (
-            <nav aria-label="Sections" class="mb-4 border-border border-b pb-4 md:hidden">
+            <nav
+              aria-label="Sections"
+              class:list={[
+                "mb-4 border-border border-b pb-4",
+                sidebar.length > 0 && "md:hidden",
+              ]}
+            >
               <ul class="m-0 list-none p-0">
                 {navigation.tabs.map((tab) => (
                   <li>
@@ -460,8 +472,6 @@ const bannerScript = banner?.dismissible
           }
         </nav>
       </aside>
-        )
-      }
       <main class="px-6 pt-6 pb-10 lg:px-8 xl:px-10" id="blume-content">
         <BreadcrumbsSlot crumbs={crumbs} wide={isApiOperation} />
         <TableOfContentsSlot
