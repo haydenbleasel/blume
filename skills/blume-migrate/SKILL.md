@@ -29,7 +29,7 @@ Your job is to convert a source docs repo into an **idiomatic** Blume project �
 2. **Inventory the repo** before changing anything: the config file(s), the content tree, the nav definition, snippets/partials/includes, static assets, OpenAPI/AsyncAPI specs, redirects, i18n locales, custom components, and icon usage. Note what's declared vs. defaulted.
 3. **Write `blume.config.ts`** with `defineConfig` from `blume`. Map only declared fields (see the reference's mapping table); rely on defaults everywhere else. A minimal result is `defineConfig({ title: "…" })`.
 4. **Restructure content.** Choose `content.root` (default `docs`) — **detect where `.md`/`.mdx` actually live, don't assume a `docs/` folder.** Many repos keep content directly under an app dir (`apps/docs/api/`, `.../getting-started/`) with no `docs/` subfolder; when so, set `content.root` to that dir and scope `content.include` to the real content folders rather than leaving a bare `content.root: "."` that scans everything (see `references/monorepo.md` §1). Order with numeric prefixes (`01-intro.mdx`), group without a URL segment via `(group)/` folders, and add a `meta.ts` (`defineMeta`) only where filesystem order isn't enough. Reach for an explicit `navigation.sidebar` only when the source nav genuinely can't be expressed by files. **Reshaping into folder-per-tab moves URLs** — track every old→new path as you go; you'll turn them into `redirects` in step 5.
-5. **Rewrite pages.** Map frontmatter to Blume's strict schema; convert callout JSX to `:::` directives; rename components; inline snippets/partials (Blume has no import-based includes); fix asset paths; **rewrite internal links** to their new routes (including OpenAPI operation links — see the OpenAPI section, their slugs differ from most sources); **add a `redirects` entry for every route you moved** in step 4; **convert every icon name to Lucide** (Blume is Lucide-only — no FontAwesome/Tabler). Remove any duplicated H1 in the body (`title` renders the H1; bodies start at `##`). For **Mintlify**, run the bundled codemod first — `node <skill>/scripts/mintlify-codemod.mjs --write <content-dir>` deterministically remaps icons and drops/renames unsupported frontmatter keys, and reports the rest (unknown icons, OpenAPI-stub flags) for you to finish by hand (see `references/mintlify.md`).
+5. **Rewrite pages.** Map frontmatter to Blume's strict schema; convert callout JSX to `:::` directives; rename components; inline snippets/partials (Blume has no import-based includes); fix asset paths; **rewrite internal links** to their new routes (including OpenAPI operation links — see the OpenAPI section, their slugs differ from most sources); **add a `redirects` entry for every route you moved** in step 4; **convert every icon name to Lucide** (Blume is Lucide-only — no FontAwesome/Tabler). Remove any duplicated H1 in the body (`title` renders the H1; bodies start at `##`). **If the source has a hand-maintained changelog and the repo is open source on GitHub, offer to swap it for the `github-releases` source** (see "Changelogs" below) rather than porting the entries. For **Mintlify**, run the bundled codemod first — `node <skill>/scripts/mintlify-codemod.mjs --write <content-dir>` deterministically remaps icons and drops/renames unsupported frontmatter keys, and reports the rest (unknown icons, OpenAPI-stub flags) for you to finish by hand (see `references/mintlify.md`).
 6. **Adopt `package.json`.** Repoint `dev`/`build`/`start` → `blume dev`/`blume build`/`blume preview`, remove the old framework's deps, add `blume`. A config-only source (e.g. a bare Mintlify `docs.json`) has no manifest — scaffold one. **In a pnpm workspace:** if `pnpm-workspace.yaml`/`.npmrc` sets `minimumReleaseAge`, add **only** `blume` to `minimumReleaseAgeExclude` (don't disable the guard) so the just-published version installs. **Always regenerate the lockfile in the same change:** after editing deps run a plain `pnpm install` (from the workspace root) and commit `pnpm-lock.yaml` alongside `package.json` — CI/Vercel use `--frozen-lockfile`, so a stale lockfile fails the build before it starts. See `references/monorepo.md` §2–3.
 7. **Wire up the host repo & deploy (non-trivial repos).** For a monorepo on Vercel, emit the root-aware install/build recipe and `apps/docs/vercel.json`, and tell the user the two settings you can't commit (Vercel Root Directory, Node 22). If the workspace pins Vite and `blume build` crashes inside Astro/Vite, apply the pnpm-patch workaround. All copy-pasteable in `references/monorepo.md` §4–5.
 8. **Verify.** Run `blume build` (it validates links, anchors, frontmatter schema, and duplicate routes), fix diagnostics, then `blume dev` for a visual pass. End with a written summary of what was migrated, dropped, and approximated — **and every repo-specific edit you made** (pnpm-workspace, vercel.json, config globs) with the reason, plus any manual step left to the user (the Astro patch, Vercel dashboard settings).
@@ -120,6 +120,31 @@ Also valid: `date`/`authors` (blog/changelog feeds), `changelog` (changelog meta
 - **Vendor the spec by default.** A remote `spec:` URL makes every build depend on fetching it at build time — a single point of failure in CI, offline, or behind a proxy, and a failed fetch skips the whole reference. Prefer committing the spec into the repo (`openapi/<name>.json`) and pointing `spec` at the local path; if you keep the URL, say so and consider a `prebuild` step that refreshes the local copy with a fallback.
 - **Operation routes have their own slug scheme** — `<route>/<slugified-tag>/<slugified-operationId>` (e.g. tag `Models`, id `listModels` → `/api-reference/models/listmodels`). This rarely matches the source's endpoint links (Mintlify/others kebab-case differently), so **rewrite every inbound link to an operation** and verify it against the built routes — `blume build`'s link check does **not** catch dead links to OpenAPI-generated pages.
 - **Keep hand-written conceptual pages.** Sources often pair a written "Introduction/Authentication" page with the endpoint group in the same tab. A normal content page placed under the openapi `route` merges into the reference tab's sidebar — so keep those (auth, errors, rate limits) and delete only the per-endpoint stubs.
+
+### Changelogs
+
+If the source ships a **hand-maintained changelog** (a `changelog.mdx`, a folder of dated entries, Mintlify `<Update>` blocks) **and the project is open source on GitHub**, offer to replace it with the **`github-releases`** content source — release notes become the changelog automatically, with no files to maintain. It's an offer, not an automatic rewrite: some teams keep a curated changelog that doesn't map 1:1 to GitHub releases, so confirm the release notes are the source of truth before deleting their pages.
+
+Add it under `content.sources` alongside the filesystem source:
+
+```ts
+content: {
+  sources: [
+    { include: ["docs/**/*.mdx"], root: ".", type: "filesystem" },
+    {
+      owner: "haydenbleasel",
+      repo: "ultracite",
+      prefix: "changelog",
+      type: "github-releases",
+    },
+  ],
+},
+```
+
+- Each release materializes as a `type: changelog` page under `/<prefix>/` (`prefix: "changelog"` → `/changelog/…`); omit `prefix` to mount at the root.
+- Optional fields: `limit` (cap materialized releases, newest-first, default 100), `prereleases` (include prereleases), `drafts` (include drafts — needs a token with repo write access), `pollInterval` (dev polling seconds; omit to freeze for the session).
+- A **private** repo reads a token from `GITHUB_TOKEN`; it is never inlined in config. A public repo needs no token.
+- **Delete the old changelog pages** once the source is wired (and add `redirects` from their old routes to the new `/<prefix>/…` slugs). Pin a header/sidebar link with `navigation.featured` if the source had one.
 
 ### Redirects are static
 
