@@ -12,6 +12,7 @@ import {
   buildRuntimeData,
   collectStaged,
   detectNeedsReact,
+  detectUsesMath,
 } from "../astro/generate.ts";
 import { discoverIslands } from "../astro/islands.ts";
 import { customOgRoutes, discoverPages, routeIsTaken } from "../astro/pages.ts";
@@ -102,19 +103,25 @@ export const eject = async (root: string): Promise<string[]> => {
   const exportPdf = config.export.pdf;
   const exportEpub = config.export.epub;
 
-  const [pages, needsReactRaw, userTheme, rawMarkdown, islands, examples] =
-    await Promise.all([
-      context.pagesRoot
-        ? discoverPages(context.pagesRoot)
-        : Promise.resolve([]),
-      detectNeedsReact(root),
-      context.themeFile
-        ? readFile(context.themeFile, "utf-8")
-        : Promise.resolve(""),
-      buildRawMarkdown(project),
-      discoverIslands(root),
-      discoverExamples(root, config.examples),
-    ]);
+  const [
+    pages,
+    needsReactRaw,
+    usesMath,
+    userTheme,
+    rawMarkdown,
+    islands,
+    examples,
+  ] = await Promise.all([
+    context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
+    detectNeedsReact(root),
+    detectUsesMath(root),
+    context.themeFile
+      ? readFile(context.themeFile, "utf-8")
+      : Promise.resolve(""),
+    buildRawMarkdown(project),
+    discoverIslands(root),
+    discoverExamples(root, config.examples),
+  ]);
   // Island/example frameworks drive which Astro renderers the ejected config
   // wires in; React also switches on for project `.tsx`/`.jsx` and Ask AI.
   const frameworks = new Set<string>([
@@ -192,7 +199,7 @@ export const eject = async (root: string): Promise<string[]> => {
         askEnabled,
         exportEpub,
         exportPdf,
-        mathEnabled: config.markdown.math,
+        mathEnabled: usesMath,
         needsReact,
       }),
       path: join(srcDir, "pages", "[...slug].astro"),

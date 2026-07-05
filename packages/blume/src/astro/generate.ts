@@ -330,6 +330,26 @@ export const detectNeedsReact = async (root: string): Promise<boolean> => {
   return matches.length > 0;
 };
 
+/**
+ * Detect whether the project authors block math (`$$…$$`) in any `.mdx`. Drives
+ * whether the generated runtime imports the `<Math>` component and KaTeX's
+ * stylesheet, so a math-free site ships no KaTeX CSS. Math parsing itself is
+ * always on but block-only, so a literal `$$` in source is a necessary
+ * condition — no false negatives. A stray `$$` (e.g. inside a code fence) merely
+ * over-includes the idempotent import, which is harmless.
+ */
+export const detectUsesMath = async (root: string): Promise<boolean> => {
+  const files = await glob(["**/*.mdx"], {
+    cwd: root,
+    ignore: ["**/node_modules/**", "**/.blume/**", "**/dist/**"],
+    onlyFiles: true,
+  });
+  const contents = await Promise.all(
+    files.map((file) => readOptional(join(root, file)))
+  );
+  return contents.some((content) => content.includes("$$"));
+};
+
 const writeIfChanged = async (
   path: string,
   content: string
@@ -933,16 +953,21 @@ export const generateRuntime = async (
   const askEnabled = config.ai.ask?.enabled ?? false;
   const exportPdf = config.export.pdf;
   const exportEpub = config.export.epub;
-  const [pages, detectedReact, userTheme, islandDiscovery, exampleDiscovery] =
-    await Promise.all([
-      context.pagesRoot
-        ? discoverPages(context.pagesRoot)
-        : Promise.resolve([]),
-      detectNeedsReact(context.root),
-      readOptional(context.themeFile),
-      discoverIslands(context.root),
-      discoverExamples(context.root, config.examples),
-    ]);
+  const [
+    pages,
+    detectedReact,
+    usesMath,
+    userTheme,
+    islandDiscovery,
+    exampleDiscovery,
+  ] = await Promise.all([
+    context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
+    detectNeedsReact(context.root),
+    detectUsesMath(context.root),
+    readOptional(context.themeFile),
+    discoverIslands(context.root),
+    discoverExamples(context.root, config.examples),
+  ]);
   // Statically analyze `components.ts` overrides (never executed): drives the
   // `islands` group, hydration on layout/mdx overrides, string-path resolution,
   // and the "framework component with no client mode" diagnostic.
@@ -1028,7 +1053,7 @@ export const generateRuntime = async (
         askEnabled,
         exportEpub,
         exportPdf,
-        mathEnabled: config.markdown.math,
+        mathEnabled: usesMath,
         needsReact,
       })
     ),

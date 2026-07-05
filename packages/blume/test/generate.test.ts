@@ -411,7 +411,6 @@ const KITCHEN_SINK: Record<string, string> = {
   export: true,
   github: { dir: "site", owner: "acme", repo: "docs" },
   logo: "/logo.svg",
-  markdown: { math: true },
   mcp: { enabled: true },
   openapi: { enabled: true, renderer: "scalar", spec: "./openapi.json" },
   redirects: [{ from: "/old", to: "/new" }],
@@ -422,6 +421,8 @@ const KITCHEN_SINK: Record<string, string> = {
   "docs/changelog/v1.md":
     "---\ntitle: v1\ntype: changelog\nchangelog:\n  date: 2024-02-01\n---\n# v1\n",
   "docs/index.md": "# Home\n",
+  // Block math (`$$…$$`) in .mdx makes detectUsesMath wire in <Math>.
+  "docs/math.mdx": "# Math\n\n$$\na^2 + b^2 = c^2\n$$\n",
   "examples/demo.tsx": "export default function Demo() { return null; }\n",
   "islands/Counter.tsx":
     'export const client = "load";\nexport default function Counter() { return null; }\n',

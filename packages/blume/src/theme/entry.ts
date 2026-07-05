@@ -614,9 +614,9 @@ pre:has(.line.focused):hover .line:not(.focused) {
   content: none;
 }
 
-/* Inline code highlighting (markdown.code.inline): Shiki colors the tokens of a
-   \`code\`{:lang} snippet via the same dual-theme CSS variables as fenced blocks,
-   keeping the inline pill background. */
+/* Inline code highlighting: Shiki colors the tokens of a \`code\`{:lang} snippet
+   via the same dual-theme CSS variables as fenced blocks, keeping the inline
+   pill background. Always on — it only fires on the trailing {:lang} marker. */
 .prose code.blume-inline-code span {
   color: var(--shiki-light);
 }

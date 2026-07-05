@@ -46,15 +46,16 @@ type HastPlugin = NonNullable<
 
 /**
  * Hast plugins enabled by config. Inline `` `code`{:lang} `` highlighting is
- * opt-in; self-linking heading anchors (`<h2>`–`<h6>` wrapped in an `<a>` to
- * their own id) are on unless `markdown.headingAnchors` is `false`. Inline code
- * runs first so the anchor wrap re-refs already-highlighted code.
+ * always on: it only fires on an explicit trailing `{:lang}` marker, so plain
+ * inline code is untouched and there's nothing to opt out of. Self-linking
+ * heading anchors (`<h2>`–`<h6>` wrapped in an `<a>` to their own id) are on
+ * unless `markdown.headingAnchors` is `false`. Inline code runs first so the
+ * anchor wrap re-refs already-highlighted code.
  */
 const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => {
-  const plugins: HastPlugin[] = [];
-  if (options.inline) {
-    plugins.push(inlineCodeHighlightPlugin() as unknown as HastPlugin);
-  }
+  const plugins: HastPlugin[] = [
+    inlineCodeHighlightPlugin() as unknown as HastPlugin,
+  ];
   if (options.headingAnchors !== false) {
     plugins.push(headingAnchorPlugin() as unknown as HastPlugin);
   }
@@ -204,8 +205,6 @@ export interface BlumeMarkdownOptions {
    * On unless explicitly `false`.
    */
   headingAnchors?: boolean;
-  /** Highlight inline `` `code`{:lang} `` snippets (`markdown.code.inline`). */
-  inline?: boolean;
 }
 
 /** Sätteri processor for plain `.md`, with Blume's curated feature set. */
@@ -215,38 +214,37 @@ export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
     hastPlugins: blumeHastPlugins(options),
   });
 
-export interface BlumeMdxOptions extends BlumeMarkdownOptions {
-  /** Enable KaTeX math parsing and rendering. */
-  math?: boolean;
-}
+export type BlumeMdxOptions = BlumeMarkdownOptions;
 
 /**
  * Sätteri MDX processor: Blume's feature set plus the MDAST plugins that target
  * components — `package-install` → package-manager tabs, `:::note` →
- * `<Callout>`, and ` ```mermaid ` → a `<blume-mermaid>` element. Used as the
- * `processor` for `@astrojs/mdx` so these apply to
- * `.mdx` only (plain `.md` uses {@link blumeMarkdownProcessor}). Math is opt-in
- * via config since `$` is common in prose and code.
+ * `<Callout>`, ` ```mermaid ` → a `<blume-mermaid>` element, and block math
+ * (`$$…$$`) → the `<Math>` component. Used as the `processor` for
+ * `@astrojs/mdx` so these apply to `.mdx` only (plain `.md` uses
+ * {@link blumeMarkdownProcessor}).
+ *
+ * Math is always on but block-only: `singleDollarTextMath: false` keeps a bare
+ * `$` (currency, shell, code) as literal text and only parses `$$…$$`. The
+ * generated runtime imports the `<Math>` component (and KaTeX's stylesheet) only
+ * when content actually uses `$$`, so a math-free site ships no KaTeX CSS.
  *
  * The plugins are modeled with minimal structural types; bridge them to
  * Satteri's full `MdastPlugin` type at this single boundary.
  */
-export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) => {
-  const plugins: unknown[] = [
-    packageInstallPlugin(),
-    directiveToCalloutPlugin(),
-    mermaidPlugin(),
-  ];
-  if (options.math) {
-    plugins.push(mathPlugin());
-  }
-  return satteri({
+export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
+  satteri({
     features: {
       ...FEATURES,
       directive: true,
-      ...(options.math ? { math: true } : {}),
+      // Block-only: `$$…$$` parses, a bare `$` stays literal text.
+      math: { singleDollarTextMath: false },
     },
     hastPlugins: blumeHastPlugins(options),
-    mdastPlugins: plugins as unknown as MdastPlugin[],
+    mdastPlugins: [
+      packageInstallPlugin(),
+      directiveToCalloutPlugin(),
+      mermaidPlugin(),
+      mathPlugin(),
+    ] as unknown as MdastPlugin[],
   });
-};

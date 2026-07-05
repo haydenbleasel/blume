@@ -139,7 +139,7 @@ export default defineConfig({
 ```
 ````
 
-Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span and it's colored like a tiny code block — `useState(){:js}` or `T extends object{:ts}`. Turn it on with `markdown: { code: { inline: true } }`.
+Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span and it's colored like a tiny code block — `useState(){:js}` or `T extends object{:ts}`. It only kicks in when you add the marker, so plain inline code stays untouched — nothing to switch on.
 
 ### Line numbers
 
@@ -372,24 +372,20 @@ The names `caution`, `error`, `important`, and `warn` are accepted as aliases fo
 
 ## Math
 
-Render LaTeX with KaTeX for formulas in prose or as centered blocks — useful for math-heavy or scientific docs. Inline math goes in `$…$`; block math in `$$…$$`.
-
-The Pythagorean theorem is $a^2 + b^2 = c^2$.
+Render LaTeX with KaTeX as centered blocks — useful for math-heavy or scientific docs. Wrap a formula in `$$…$$`:
 
 $$
 \int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}
 $$
 
 ```md
-The Pythagorean theorem is $a^2 + b^2 = c^2$.
-
 $$
-\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}
+a^2 + b^2 = c^2
 $$
 ```
 
 :::note
-Math is opt-in because `$` is common in prose and code. Enable it with `markdown: { math: true }` in `blume.config.ts`.
+Math is block-only and on automatically — write `$$…$$` and it renders; write none and KaTeX's stylesheet never ships. There's no inline `$…$` math: a lone `$` (currency, shell variables, code) is always left as literal text, so there's no delimiter to escape and no setting to toggle. Math is an MDX-only feature.
 :::
 
 ## Smart punctuation

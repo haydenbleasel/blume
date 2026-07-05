@@ -678,42 +678,46 @@ const renderTo = async (
 };
 
 describe("markdown processors", () => {
-  it("wires inline highlighting and heading anchors for .md", async () => {
+  it("wires always-on inline highlighting and heading anchors for .md", async () => {
     const html = await renderTo(
-      blumeMarkdownProcessor({ inline: true }),
+      blumeMarkdownProcessor({}),
       "## Title\n\n`x{:ts}`"
     );
     expect(html).toContain("blume-inline-code");
     expect(html).toContain("blume-heading-anchor");
   });
 
-  it("drops both hast plugins when inline and anchors are off", async () => {
+  it("keeps inline highlighting but drops anchors when anchors are off", async () => {
     const html = await renderTo(
-      blumeMarkdownProcessor({ headingAnchors: false, inline: false }),
+      blumeMarkdownProcessor({ headingAnchors: false }),
       "## Title\n\n`x{:ts}`"
     );
-    expect(html).not.toContain("blume-inline-code");
+    // Inline highlighting only fires on the `{:lang}` marker, so it's always on.
+    expect(html).toContain("blume-inline-code");
     expect(html).not.toContain("blume-heading-anchor");
     // The id still lands so the TOC and in-page links resolve.
     expect(html).toContain('id="title"');
   });
 
-  it("parses math in .mdx only when enabled", async () => {
-    const withMath = await renderTo(
-      blumeMdxProcessor({ math: true }),
-      "Eq $a^2$ end"
+  it("parses block math in .mdx but leaves single-dollar prose literal", async () => {
+    // `$$…$$` is consumed into the `<Math>` component: the delimiters vanish
+    // while the surrounding prose renders normally.
+    const block = await renderTo(
+      blumeMdxProcessor({}),
+      "Before\n\n$$\na^2\n$$\n\nAfter"
     );
-    const withoutMath = await renderTo(
-      blumeMdxProcessor({ math: false }),
-      "Eq $a^2$ end"
-    );
-    expect(withMath).not.toContain("$a^2$");
-    expect(withoutMath).toContain("$a^2$");
+    expect(block).toContain("Before");
+    expect(block).toContain("After");
+    expect(block).not.toContain("$$");
+
+    // A bare `$` (currency, shell, code) stays literal — block-only math.
+    const prose = await renderTo(blumeMdxProcessor({}), "It costs $5 to $10.");
+    expect(prose).toContain("$5 to $10");
   });
 
-  it("renders .mdx through the shared inline + anchor feature set", async () => {
+  it("renders .mdx through the shared always-on inline + anchor feature set", async () => {
     const html = await renderTo(
-      blumeMdxProcessor({ inline: true }),
+      blumeMdxProcessor({}),
       "`y{:js}`\n\n## Heading"
     );
     expect(html).toContain("blume-inline-code");
