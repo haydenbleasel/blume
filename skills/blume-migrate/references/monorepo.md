@@ -186,6 +186,33 @@ This is a **manual step — do not fabricate the patch contents.** Leave the use
 
 ---
 
+## 6. Ultracite / oxfmt formatting → oxfmt patch (ship the bundled patch)
+
+If the repo uses (or the user wants to adopt) **[Ultracite](https://www.ultracite.ai)** for formatting — an `ultracite check` / `ultracite fix` script, an `ultracite` dev dep, or oxlint/oxfmt in the toolchain — it will format the migrated `.md`/`.mdx` **and break Blume's `:::` directives.** Ultracite's formatter is **oxfmt**, and under `proseWrap` oxfmt joins the opening/closing `:::` fence line into the surrounding prose, which invalidates the directive (`:::note` … `:::` callouts, tabs, steps — the exact syntax you convert callouts _into_ in step 5). Blume's own repo hits this and pins a patched oxfmt; a migrated repo needs the same patch or every directive silently degrades to literal text on the next `ultracite fix`.
+
+The fix is a committed **pnpm patch** (`patches/oxfmt@0.55.0.patch`), shipped with this skill at `assets/oxfmt@0.55.0.patch`. Unlike the Astro/Vite patch, this one is a **known, deterministic diff** — copy it in, don't regenerate it:
+
+```bash
+# 1. Copy the shipped patch into the target repo's patches/ dir (keep the exact filename):
+mkdir -p patches
+cp "<skill>/assets/oxfmt@0.55.0.patch" patches/oxfmt@0.55.0.patch
+```
+
+Then register it under `patchedDependencies` — `pnpm-workspace.yaml` on pnpm 10+, or root `package.json` (`pnpm.patchedDependencies`) on pnpm 9:
+
+```yaml
+# pnpm-workspace.yaml
+patchedDependencies:
+  oxfmt@0.55.0: patches/oxfmt@0.55.0.patch
+```
+
+Commit **both** the patch file and the `patchedDependencies` entry, then re-run `pnpm install`.
+
+- **The patch is pinned to `oxfmt@0.55.0`** (the version Ultracite 7.8.x resolves). pnpm requires an exact version match — if `pnpm why oxfmt` reports a different version, the patch won't apply. Bump the key to the resolved version (the hunk is a one-line prose-wrap guard and usually still applies cleanly); if it doesn't, tell the user and fall back to keeping directive-heavy files out of the formatter's globs.
+- **Not on pnpm?** The patch mechanism is pnpm-specific. For npm/yarn, either pin oxfmt and apply the diff with `patch-package`, or exclude `.md`/`.mdx` from Ultracite formatting so it never touches the directives — report whichever you chose.
+
+---
+
 ## Checklist for a workspace migration
 
 - [ ] Located real content folders (not assumed `docs/`); set `content.root` + scoped `content.include`.
@@ -193,4 +220,5 @@ This is a **manual step — do not fabricate the patch contents.** Leave the use
 - [ ] Ran plain `pnpm install`; committed `pnpm-lock.yaml` with the `package.json` change; verified `pnpm install --frozen-lockfile` is clean.
 - [ ] Wrote `apps/docs/vercel.json` + package scripts; told the user to set Root Directory + Node 22 in the Vercel project.
 - [ ] Checked for a workspace Vite override; if the build crashes inside Astro/Vite, gave the pnpm-patch recipe.
+- [ ] Uses Ultracite/oxfmt? Shipped `patches/oxfmt@0.55.0.patch` + registered it under `patchedDependencies` so formatting doesn't mangle `:::` directives.
 - [ ] Reported every repo-specific edit and every manual step left to the user.
