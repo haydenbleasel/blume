@@ -1,4 +1,4 @@
-import { join } from "pathe";
+import { isAbsolute, join, resolve } from "pathe";
 
 import { blumeReferences } from "../../openapi/references.ts";
 import { openApiSource } from "../../openapi/source.ts";
@@ -123,6 +123,49 @@ const buildSource = (
     },
     sourceContext(context, name, runtime)
   );
+};
+
+/** Resolve a source `root` against the project root (absolute passes through). */
+const resolveRoot = (projectRoot: string, root: string): string =>
+  isAbsolute(root) ? root : join(resolve(projectRoot), root);
+
+/**
+ * The generated `docs` glob collection: its base directory and the include /
+ * exclude globs applied under it. Astro's glob loader ids each entry by its path
+ * relative to `base`, and a filesystem source ids each entry relative to its own
+ * root — so the two only agree when the collection is rooted at that source. A
+ * project with exactly one filesystem source therefore roots the collection at
+ * *that* source (honoring a non-default `root`), rather than the global
+ * `content.root`. With no sources (the implicit source) or several, the base
+ * stays `content.root`; a second filesystem source rooted elsewhere can't share
+ * one base and is caught by the entry-id guard in `scanProject`.
+ */
+export interface DocsCollection {
+  base: string;
+  include: string[];
+  exclude: string[];
+}
+
+export const resolveDocsCollection = (
+  config: ResolvedConfig,
+  context: ProjectContext
+): DocsCollection => {
+  const filesystem = (config.content.sources ?? []).filter(
+    (def) => def.type === "filesystem"
+  );
+  const only = filesystem.length === 1 ? filesystem[0] : undefined;
+  if (only) {
+    return {
+      base: resolveRoot(context.root, only.root),
+      exclude: only.exclude,
+      include: only.include,
+    };
+  }
+  return {
+    base: context.contentRoot,
+    exclude: config.content.exclude,
+    include: config.content.include,
+  };
 };
 
 /** The base name to allocate for a source config (before deduplication). */

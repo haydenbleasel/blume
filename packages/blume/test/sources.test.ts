@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
-import { dirname, join } from "pathe";
+import { dirname, join, relative } from "pathe";
 
 import { generateRuntime } from "../src/astro/generate.ts";
 import { contentConfigTemplate } from "../src/astro/templates.ts";
@@ -12,8 +12,24 @@ import { filesystemSource } from "../src/core/sources/filesystem.ts";
 import { mdxRemoteSource } from "../src/core/sources/mdx-remote.ts";
 import { normalizeEntry } from "../src/core/sources/normalize.ts";
 import type { SourceContext, SourceEntry } from "../src/core/sources/types.ts";
-import type { ProjectContext } from "../src/core/types.ts";
+import type { NavNode, ProjectContext } from "../src/core/types.ts";
 import { eject } from "../src/registry/eject.ts";
+
+/** Recursively find the first sidebar group with a given label. */
+const findGroup = (nodes: NavNode[], label: string): NavNode | null => {
+  for (const node of nodes) {
+    if (node.kind === "group") {
+      if (node.label === label) {
+        return node;
+      }
+      const nested = findGroup(node.children, label);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return null;
+};
 
 const dirs: string[] = [];
 
@@ -534,6 +550,109 @@ describe("scanProject composition", () => {
     expect(route?.collection).toBe("staged");
     expect(route?.entryId).toBe("memory/hello.md");
     expect(route?.source.name).toBe("memory");
+  });
+
+  it("applies folder meta and resolves entry ids for a prefixed source", async () => {
+    const root = await withConfig(
+      {
+        "docs/guides/intro.mdx": "---\ntitle: Intro\n---\nIntro\n",
+        "docs/guides/meta.ts":
+          'export default { title: "Guides", order: 2 };\n',
+        "docs/index.mdx": "---\ntitle: Home\n---\nHome\n",
+        "docs/provider/biome.mdx": "---\ntitle: Biome\n---\nBiome\n",
+        "docs/provider/meta.ts":
+          'export default { title: "Providers", order: 1 };\n',
+        "docs/setup.mdx": "---\ntitle: Setup\n---\nSetup\n",
+      },
+      `export default {
+        content: {
+          sources: [
+            { type: "filesystem", root: "docs", prefix: "docs" },
+          ],
+        },
+      };\n`
+    );
+
+    const project = await scanProject(root, { mode: "build" });
+
+    // Every doc route is present and its entry id matches the id the `docs`
+    // collection (rooted at the source) would generate — so getEntry resolves.
+    const routes = new Map(
+      project.manifest.routes.map((r) => [r.path, r] as const)
+    );
+    expect([...routes.keys()].toSorted()).toStrictEqual([
+      "/docs",
+      "/docs/guides/intro",
+      "/docs/provider/biome",
+      "/docs/setup",
+    ]);
+    expect(routes.get("/docs")?.entryId).toBe("index.mdx");
+    expect(routes.get("/docs/provider/biome")?.entryId).toBe(
+      "provider/biome.mdx"
+    );
+
+    // No entry-id mismatch: the single source roots the collection.
+    expect(
+      project.diagnostics.filter((d) => d.severity === "error")
+    ).toStrictEqual([]);
+
+    // The prefixed `meta.ts` applies its title (not the humanized folder name).
+    // Humanized fallbacks would have been "Provider"/"Guides"; the meta title
+    // renames the first, proving the prefixed lookup hit.
+    const { sidebar } = project.graph.navigation;
+    expect(findGroup(sidebar, "Providers")).not.toBeNull();
+    expect(findGroup(sidebar, "Provider")).toBeNull();
+
+    // ...and its order: Providers (order 1) sorts before Guides (order 2). Both
+    // are siblings under the prefixed "Docs" section.
+    const section = findGroup(sidebar, "Docs");
+    const groupLabels =
+      section?.kind === "group"
+        ? section.children
+            .filter((child) => child.kind === "group")
+            .map((child) => child.label)
+        : [];
+    expect(groupLabels).toStrictEqual(["Providers", "Guides"]);
+
+    // End to end: the generated `docs` collection roots at the source's own
+    // root, so Astro's generated ids equal the manifest entry ids — getEntry
+    // resolves (the dev 404 is gone) and a `provider/biome.mdx` file exists there.
+    await generateRuntime(project);
+    const contentConfig = await readFile(
+      join(root, ".blume/src/content.config.ts"),
+      "utf-8"
+    );
+    expect(contentConfig).toContain(
+      `base: ${JSON.stringify(join(root, "docs"))}`
+    );
+    for (const route of project.manifest.routes) {
+      const expected = relative(join(root, "docs"), route.sourcePath ?? "");
+      expect(route.entryId).toBe(expected);
+    }
+  });
+
+  it("flags an entry-id/collection-base mismatch as an error", async () => {
+    const root = await withConfig(
+      {
+        "docs/index.md": "# Home\n",
+        "guides/intro.md": "---\ntitle: Intro\n---\n# Intro\n",
+      },
+      // Two filesystem sources rooted in different trees can't share one
+      // collection base, so the second source's ids would 404 at runtime.
+      `export default {
+        content: {
+          sources: [
+            { type: "filesystem", root: "docs" },
+            { type: "filesystem", root: "guides", prefix: "guides" },
+          ],
+        },
+      };\n`
+    );
+
+    const project = await scanProject(root, { mode: "build" });
+    expect(project.diagnostics.map((d) => d.code)).toContain(
+      "BLUME_ENTRY_ID_MISMATCH"
+    );
   });
 });
 

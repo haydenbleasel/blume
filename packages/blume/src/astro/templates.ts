@@ -405,6 +405,13 @@ export const contentConfigTemplate = (options: {
   /** Base dir for the staged collection; defaults to `<outDir>/content`. */
   stagedBase?: string;
   /**
+   * The `docs` collection's base + include/exclude globs. Defaults to
+   * `content.root` and the top-level content globs; a single filesystem source
+   * roots the collection at *its* root so entry ids resolve (see
+   * `resolveDocsCollection`).
+   */
+  collection?: { base: string; include: string[]; exclude: string[] };
+  /**
    * Whether any filesystem (non-staged) source feeds the `docs` collection.
    * When false (e.g. an all-staged project where every page is materialized by
    * a non-filesystem source), the collection globs nothing — see below.
@@ -413,12 +420,15 @@ export const contentConfigTemplate = (options: {
 }): string => {
   const { context, config } = options;
   const stagedBase = options.stagedBase ?? stagedContentDir(context.outDir);
+  const collectionBase = options.collection?.base ?? context.contentRoot;
+  const includeGlobs = options.collection?.include ?? config.content.include;
+  const excludeGlobs = options.collection?.exclude ?? config.content.exclude;
 
   // Fold the content excludes into the glob as negative patterns so the `docs`
   // collection doesn't ingest ignored trees (`node_modules`, `snippets`, the
   // staged bodies under `.blume/content`, …) as entries. This matters when
-  // `content.root` is the project root (a migrated `.`-rooted project).
-  const outDirRel = relative(context.contentRoot, context.outDir);
+  // the collection base is the project root (a migrated `.`-rooted project).
+  const outDirRel = relative(collectionBase, context.outDir);
   const outDirIgnore =
     outDirRel && !outDirRel.startsWith("..") && !isAbsolute(outDirRel)
       ? [`!${outDirRel}/**`]
@@ -436,8 +446,8 @@ export const contentConfigTemplate = (options: {
   const filesystem = options.filesystem ?? true;
   const docsPattern = filesystem
     ? [
-        ...config.content.include,
-        ...(config.content.exclude ?? []).map((pattern) => `!${pattern}`),
+        ...includeGlobs,
+        ...(excludeGlobs ?? []).map((pattern) => `!${pattern}`),
         // Mirror the filesystem scan's baseline ignores (see BLUME_IGNORE_DIRS):
         // Astro's content layer roots at the project dir, so a `.`-wide content
         // root would otherwise re-ingest dependency trees and build output —
@@ -472,7 +482,7 @@ import { glob } from "astro/loaders";
 const docs = defineCollection({
   loader: glob({
     pattern: ${JSON.stringify(docsPattern)},
-    base: ${JSON.stringify(context.contentRoot)},
+    base: ${JSON.stringify(collectionBase)},
     generateId: ({ entry }) => entry,
   }),
 });

@@ -84,6 +84,12 @@ export interface ContentSource {
   readonly staged: boolean;
   /** Optional route prefix; the source's routes namespace under `/<prefix>/`. */
   readonly prefix?: string;
+  /**
+   * Resolved on-disk root, set by filesystem-backed sources only. Drives
+   * folder-meta discovery (scan under this root) and the docs-collection base;
+   * omitted by remote/CMS/staged sources that have no local tree.
+   */
+  readonly contentRoot?: string;
   /** Pull every entry. Called once per scan. */
   load: () => Promise<SourceLoadResult>;
   /** Validate the source is usable; throws a BlumeError when not. */

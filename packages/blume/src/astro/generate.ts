@@ -33,6 +33,7 @@ import { validateNavTargets } from "../core/nav-diagnostics.ts";
 import { packageRoot } from "../core/package-root.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
+import { resolveDocsCollection } from "../core/sources/resolve.ts";
 import { resolveTsconfigAliases } from "../core/tsconfig-aliases.ts";
 import type { Navigation } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
@@ -1041,6 +1042,7 @@ export const generateRuntime = async (
     write(
       join(srcDir, "content.config.ts"),
       contentConfigTemplate({
+        collection: resolveDocsCollection(config, context),
         config,
         context,
         filesystem: hasFilesystemSource,
