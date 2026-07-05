@@ -1,5 +1,12 @@
 # blume
 
+## 0.6.5
+
+### Patch Changes
+
+- 3f3402d: Collapse `display: group` sidebar sections by default. Groups now start closed and open only along the active path — the current page's ancestor groups stay expanded, so just the section you're in is open. Top-level groups no longer force open; use `collapsed: false` in folder meta to pin a group open.
+- beb5206: Hoist root-level pages above groups in every sidebar display mode. Previously only `flat` pulled loose top-level pages to the top; now `group` and `page` modes do too, so a root page never reads as a group's trailing child. Deep per-level hoisting remains exclusive to `flat`.
+
 ## 0.6.4
 
 ### Patch Changes
