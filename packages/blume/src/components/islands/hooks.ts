@@ -171,7 +171,11 @@ export const useAskAI = (): UseAskAI => {
             const chunk = await reader.read();
             ({ done } = chunk);
             if (chunk.value) {
-              assistant.content += decoder.decode(chunk.value);
+              // Streaming mode: a multi-byte UTF-8 sequence split across
+              // chunks must not flush as U+FFFD garbage.
+              assistant.content += decoder.decode(chunk.value, {
+                stream: true,
+              });
               setMessages((current) => [
                 ...current.slice(0, -1),
                 { ...assistant },

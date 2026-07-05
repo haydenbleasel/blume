@@ -602,7 +602,20 @@ const bannerScript = banner?.dismissible
         button.setAttribute("aria-label", "Copy code");
         button.innerHTML = svg("copy");
         button.addEventListener("click", async () => {
-          const text = pre.querySelector("code")?.textContent ?? "";
+          const code = pre.querySelector("code");
+          let text = code?.textContent ?? "";
+          // Twoslash nests each hover popup's type signature and docs inside
+          // the <code>; copying textContent verbatim would interleave them
+          // with the source. Strip the popups from a clone first.
+          if (code?.querySelector(".twoslash-popup-container")) {
+            const clone = code.cloneNode(true) as HTMLElement;
+            for (const popup of clone.querySelectorAll(
+              ".twoslash-popup-container"
+            )) {
+              popup.remove();
+            }
+            text = clone.textContent ?? "";
+          }
           try {
             await navigator.clipboard.writeText(text);
           } catch {

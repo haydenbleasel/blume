@@ -133,7 +133,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
   <script
     data-blume-search-popular
     is:inline
-    set:html={JSON.stringify(popular)}
+    set:html={JSON.stringify(popular).replaceAll("<", "\\u003c")}
     type="application/json"
   />
 
@@ -190,6 +190,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       selectables: Selectable[] = [];
       selectedIndex = -1;
       activeSection: string | null = null;
+      renderGeneration = 0;
       previewOn = true;
       devOnlyMsg = "Search is available in the production build.";
       noResultsMsg = "No results found.";
@@ -339,6 +340,8 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 
       async render() {
         const query = this.input.value.trim();
+        this.renderGeneration += 1;
+        const generation = this.renderGeneration;
         this.selectables = [];
         this.selectedIndex = -1;
         this.results.replaceChildren();
@@ -364,8 +367,10 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
           locale: localeFilter,
           section: this.activeSection ?? undefined,
         });
-        // A later keystroke may have superseded this query mid-await.
-        if (this.input.value.trim() !== query) {
+        // Any newer render — a keystroke, a section pill, a locale toggle —
+        // supersedes this one mid-await, even for the same query text;
+        // appending the stale hits would duplicate rows and desync selection.
+        if (generation !== this.renderGeneration) {
           return;
         }
 

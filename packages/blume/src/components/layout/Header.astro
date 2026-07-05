@@ -28,6 +28,12 @@ interface Props {
   // The mobile menu button toggles the docs sidebar drawer; custom pages
   // without a sidebar (e.g. a landing page) pass `false` to hide it.
   hasSidebar?: boolean;
+  /**
+   * Whether the layout renders a drawer for the nav toggle to open. A shell
+   * with no drawer at all (the Scalar reference layout) passes `false`, else
+   * the hamburger would lock page scroll with nothing appearing.
+   */
+  hasDrawer?: boolean;
   searchStrings?: UIStrings["search"];
   switcherStrings?: UIStrings["languageSwitcher"];
   localeSwitch?: LocaleSwitchOption[];
@@ -49,6 +55,7 @@ const {
   searchEnabled,
   askEnabled = false,
   hasSidebar = true,
+  hasDrawer = true,
   searchStrings,
   switcherStrings,
   localeSwitch,
@@ -63,7 +70,7 @@ const SearchSlot = resolveSlot(layout.Search, Search);
 // is the sidebar tree (`hasSidebar`); on chrome-only pages (a landing page via
 // PageLayout) it's a tabs-only drawer the layout renders — so the button is also
 // needed whenever there are tabs to reveal.
-const showNavToggle = hasSidebar || navigation.tabs.length > 0;
+const showNavToggle = hasDrawer && (hasSidebar || navigation.tabs.length > 0);
 // Where the header's inline tab bar appears. With a sidebar it shares the `md`
 // breakpoint with the docs drawer; without one, the tabs-only drawer is the sole
 // mobile nav below `lg`, so the inline tabs wait until `lg` to avoid duplicating
