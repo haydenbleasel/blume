@@ -23,6 +23,7 @@ import {
   findBreadcrumbs,
   flattenPages,
   getPagination,
+  isUnderPath,
   sidebarForRoute,
 } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
@@ -427,7 +428,7 @@ const bannerScript = banner?.dismissible
                     <a
                       aria-current={
                         page.route === tab.path ||
-                        (tab.path !== "/" && page.route.startsWith(tab.path))
+                        (tab.path !== "/" && isUnderPath(page.route, tab.path))
                           ? "page"
                           : undefined
                       }

@@ -167,11 +167,21 @@ export const scanProject = async (
 
   // Run every source's `load()` in parallel, then funnel each entry through the
   // shared `normalizeEntry` so route mapping is identical regardless of origin.
+  // Under the `dir` parser, non-default locales are top-level directories whose
+  // meta keys must carry the locale in front of the source prefix (see
+  // `discoverFolderMeta`).
+  const localeDirs =
+    config.i18n && config.i18n.parser === "dir"
+      ? config.i18n.locales
+          .map((locale) => locale.code)
+          .filter((code) => code !== config.i18n?.defaultLocale)
+      : undefined;
+
   const [loaded, folderMeta] = await Promise.all([
     Promise.all(
       sources.map(async (source) => ({ source, ...(await source.load()) }))
     ),
-    discoverFolderMeta(metaSources),
+    discoverFolderMeta(metaSources, { localeDirs }),
   ]);
 
   const allPages: PageRecord[] = [];

@@ -228,6 +228,7 @@ const buildFileSystemSidebar = (
     // Group by the locale-stripped path so the locale dir is not a nav group.
     const parts = page.navPath.split("/");
     const filename = parts.at(-1) ?? page.navPath;
+    const stem = filename.replace(extname(filename), "");
     const dirs = parts.slice(0, -1);
 
     // Each group's URL path is the matching prefix of the page's route. navPath
@@ -235,13 +236,22 @@ const buildFileSystemSidebar = (
     // align the folder segments from the right (the extra leading segments are
     // that prefix). Under such a prefix the path won't match a logical tab path,
     // so tab-scoping simply no-ops — same as the header's active-tab logic.
-    const folderParts = page.route.split("/").filter(Boolean).slice(0, -1);
-    const offset = Math.max(0, folderParts.length - dirs.length);
+    // An index page's route IS its folder's route (no page segment to drop),
+    // and `(group)` folders contribute no route segment at all.
+    const routeSegments = page.route.split("/").filter(Boolean);
+    const folderParts =
+      stem === "index" ? routeSegments : routeSegments.slice(0, -1);
+    const routeDirCount = dirs.filter((dir) => !GROUP_FOLDER.test(dir)).length;
+    const offset = Math.max(0, folderParts.length - routeDirCount);
 
     let parent = root;
-    for (const [index, dir] of dirs.entries()) {
+    let consumed = offset;
+    for (const dir of dirs) {
       parent = ensureGroup(parent, dir);
-      parent.routePath ??= `/${folderParts.slice(0, offset + index + 1).join("/")}`;
+      if (!GROUP_FOLDER.test(dir)) {
+        consumed += 1;
+      }
+      parent.routePath ??= `/${folderParts.slice(0, consumed).join("/")}`;
     }
 
     parent.children.push({
@@ -249,7 +259,7 @@ const buildFileSystemSidebar = (
       deprecated: page.meta.deprecated || undefined,
       description: page.description,
       icon: page.meta.sidebar.icon,
-      key: segmentKey(filename.replace(extname(filename), "")),
+      key: segmentKey(stem),
       kind: "page",
       label: page.meta.sidebar.label ?? page.title,
       order: pageOrder(page, filename),

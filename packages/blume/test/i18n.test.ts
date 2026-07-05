@@ -382,6 +382,21 @@ describe("dot parser and shared files", () => {
       "Handbook"
     );
   });
+
+  it("hoists a dir-parser locale directory in front of the source prefix", async () => {
+    const contentRoot = await tempContent({
+      "fr/guides/meta.ts": 'export default { title: "Guides FR" };\n',
+      "guides/meta.ts": 'export default { title: "Guides" };\n',
+    });
+    const { meta } = await discoverFolderMeta(
+      [{ prefix: "docs", root: contentRoot }],
+      { localeDirs: ["fr"] }
+    );
+    // Navigation looks locale meta up as `<locale>/<prefixed group path>`, so
+    // the on-disk `fr/guides` under a `docs` prefix must key to `fr/docs/guides`.
+    expect(meta.get("fr/docs/guides")).toStrictEqual({ title: "Guides FR" });
+    expect(meta.get("docs/guides")).toStrictEqual({ title: "Guides" });
+  });
 });
 
 describe("manifest alternates and fallback", () => {

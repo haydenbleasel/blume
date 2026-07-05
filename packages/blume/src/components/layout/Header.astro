@@ -6,6 +6,7 @@ import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
 import LanguageSwitcher from "./LanguageSwitcher.astro";
 import Logo from "./Logo.astro";
+import { isUnderPath } from "./nav-utils.ts";
 import NavSelector from "./NavSelector.astro";
 import { resolveSlot } from "./overrides.ts";
 import Search from "./Search.astro";
@@ -126,7 +127,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
           <a
             aria-current={
               route === tab.path ||
-              (tab.path !== "/" && route.startsWith(tab.path))
+              (tab.path !== "/" && isUnderPath(route, tab.path))
                 ? "page"
                 : undefined
             }

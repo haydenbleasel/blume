@@ -52,9 +52,16 @@ const metaKeyFor = (prefix: string | undefined, dir: string): string => {
  * in `shared` — folder meta that applies to that directory in every locale (a
  * locale-specific `meta.*` overrides it). Each file default-exports an object or
  * a (sync/async) function returning one.
+ *
+ * `localeDirs` names the top-level locale directories of a `dir`-parser i18n
+ * project. Navigation looks locale meta up as `locale/<group path>` where the
+ * group path starts with the source prefix, so a locale directory found at a
+ * source root is hoisted in front of the prefix (`docs/fr/guides/meta.ts` keys
+ * to `fr/docs/guides`, not `docs/fr/guides`).
  */
 export const discoverFolderMeta = async (
-  sources: string | FolderMetaSource[]
+  sources: string | FolderMetaSource[],
+  options: { localeDirs?: readonly string[] } = {}
 ): Promise<{
   meta: Map<string, FolderMeta>;
   shared: Map<string, FolderMeta>;
@@ -62,6 +69,7 @@ export const discoverFolderMeta = async (
 }> => {
   const list: FolderMetaSource[] =
     typeof sources === "string" ? [{ root: sources }] : sources;
+  const localeDirs = new Set(options.localeDirs);
 
   const load = createModuleLoader();
   const meta = new Map<string, FolderMeta>();
@@ -107,7 +115,16 @@ export const discoverFolderMeta = async (
   for (const { loaded, source } of perSource) {
     for (const entry of loaded) {
       const dir = relative(source.root, dirname(entry.file));
-      const key = metaKeyFor(source.prefix, dir);
+      const [head, ...tail] = dir.split("/");
+      // A locale directory sits between the source root and the folder, but the
+      // lookup key carries the locale in front of the (prefixed) group path.
+      const key =
+        head && localeDirs.has(head)
+          ? `${head}/${metaKeyFor(source.prefix, tail.join("/"))}`.replace(
+              /\/$/u,
+              ""
+            )
+          : metaKeyFor(source.prefix, dir);
 
       if (!entry.ok) {
         diagnostics.push({

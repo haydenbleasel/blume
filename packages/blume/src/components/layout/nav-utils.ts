@@ -71,9 +71,13 @@ export const findBreadcrumbs = (nodes: NavNode[], route: string): Crumb[] => {
   return search(nodes, []) ?? [];
 };
 
-/** Whether `route` is the section root `base` or nested beneath it. */
-const isUnderPath = (route: string, base: string): boolean =>
-  route === base || route.startsWith(`${base}/`);
+/**
+ * Whether `route` is the section root `base` or nested beneath it. Requires a
+ * path boundary, so `/api-reference` is not under `/api`. The root `/` spans
+ * every route.
+ */
+export const isUnderPath = (route: string, base: string): boolean =>
+  base === "/" || route === base || route.startsWith(`${base}/`);
 
 /**
  * The tab whose `path` is the longest prefix of `route`, mirroring the header's

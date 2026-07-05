@@ -174,6 +174,52 @@ describe("buildNavigation — filesystem sidebar", () => {
   });
 });
 
+describe("buildNavigation — group route paths", () => {
+  it("keeps the folder route when the index page is inserted first", () => {
+    // index.mdx sorts before its siblings, and an index page's route has no
+    // page segment to drop — the group used to get "/" and tab scoping broke.
+    const nav = buildNavigation(
+      [
+        page("guides/index.mdx", "/guides", "Guide Home"),
+        page("guides/quickstart.mdx", "/guides/quickstart", "Quickstart"),
+      ],
+      { folderMeta: empty }
+    );
+    expect(asGroup(nav.sidebar[0]).path).toBe("/guides");
+  });
+
+  it("paths nested groups from a nested index page", () => {
+    const nav = buildNavigation([page("a/b/index.mdx", "/a/b", "B Home")], {
+      folderMeta: empty,
+    });
+    const a = asGroup(nav.sidebar[0]);
+    expect(a.path).toBe("/a");
+    expect(asGroup(a.children[0]).path).toBe("/a/b");
+  });
+
+  it("skips (group) folders when mapping dirs to route segments", () => {
+    const nav = buildNavigation(
+      [page("(main)/guides/setup.mdx", "/guides/setup", "Setup")],
+      { folderMeta: empty }
+    );
+    const main = asGroup(nav.sidebar[0]);
+    // The wrapper group contributes no route segment and spans the root.
+    expect(main.path).toBe("/");
+    expect(asGroup(main.children[0]).path).toBe("/guides");
+  });
+
+  it("right-aligns a locale/base route prefix onto the folder segments", () => {
+    const nav = buildNavigation(
+      [
+        page("guides/index.mdx", "/fr/guides", "Accueil"),
+        page("guides/setup.mdx", "/fr/guides/setup", "Setup"),
+      ],
+      { folderMeta: empty }
+    );
+    expect(asGroup(nav.sidebar[0]).path).toBe("/fr/guides");
+  });
+});
+
 describe("buildNavigation — explicit config sidebar", () => {
   const pages = [
     page("index.md", "/", "Home"),

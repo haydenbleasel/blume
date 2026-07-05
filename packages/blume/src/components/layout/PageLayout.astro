@@ -32,6 +32,7 @@ import Favicon from "./Favicon.astro";
 import Fonts from "./Fonts.astro";
 import { bannerInitScript, themeInitScript } from "./head-scripts.ts";
 import Header from "./Header.astro";
+import { isUnderPath } from "./nav-utils.ts";
 
 interface Props {
   site: { title: string; description?: string };
@@ -209,7 +210,7 @@ const bannerScript = banner?.dismissible
                     <a
                       aria-current={
                         route === tab.path ||
-                        (tab.path !== "/" && route.startsWith(tab.path))
+                        (tab.path !== "/" && isUnderPath(route, tab.path))
                           ? "page"
                           : undefined
                       }

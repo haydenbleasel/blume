@@ -5,6 +5,7 @@
 // <details>/<summary> like the language switcher.
 import type { NavSelector } from "../../core/types.ts";
 import Icon from "../Icon.astro";
+import { isUnderPath } from "./nav-utils.ts";
 
 interface Props {
   selector: NavSelector;
@@ -13,12 +14,13 @@ interface Props {
 
 const { selector, route } = Astro.props;
 
-// The active item is the deepest path that prefixes the current route, falling
-// back to the first item so the summary always shows something meaningful.
+// The active item is the deepest path the current route sits under (on a path
+// boundary, so `/api` never claims `/api-reference` routes), falling back to
+// the first item so the summary always shows something meaningful.
 const active =
   selector.items.find((item) => item.path === route) ??
   selector.items
-    .filter((item) => route.startsWith(item.path))
+    .filter((item) => isUnderPath(route, item.path))
     .toSorted((a, b) => b.path.length - a.path.length)[0] ??
   selector.items[0];
 
