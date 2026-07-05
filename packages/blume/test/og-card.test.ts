@@ -57,6 +57,12 @@ describe("renderOgImage", () => {
     await expectPng({ logo: WIDE_LOGO, title: LONG_TITLE });
   });
 
+  it("renders a logo-only header, ignoring the brand label", async () => {
+    // The header is logo only: a wordmark logo already spells the name, and
+    // a brand label beside it duplicated it ("Ultracite  Ultracite").
+    await expectPng({ brand: "Ultracite", logo: WIDE_LOGO, title: "Hi" });
+  });
+
   it("falls back to MARK_HEIGHT width for a logo without a viewBox", async () => {
     await expectPng({ logo: NO_VIEWBOX_LOGO, title: "Hi" });
   });

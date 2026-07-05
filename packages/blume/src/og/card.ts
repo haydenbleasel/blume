@@ -80,27 +80,34 @@ export const truncate = (value: string, max: number): string => {
     : value;
 };
 
-// Brand mark sizing: target this height, but scale down so a wide wordmark logo
-// stays within the lockup.
+// Brand mark sizing: target this height, but scale down so an extremely wide
+// logo stays within the lockup. The cap leaves room for a wordmark to render
+// at full height — it stands alone as the brand (no text label beside it).
 const MARK_HEIGHT = 32;
-const MARK_MAX_WIDTH = 100;
+const MARK_MAX_WIDTH = 240;
 // Accept either quote style and a non-zero min-x/min-y; only width/height
 // matter for the aspect ratio. A miss falls back to a square mark.
 const VIEW_BOX =
   /viewBox=(?<q>["'])[\d.-]+[\s,]+[\d.-]+[\s,]+(?<w>[\d.]+)[\s,]+(?<h>[\d.]+)\k<q>/u;
+
+/** The SVG's viewBox aspect ratio (w/h), or null without a usable viewBox. */
+const logoAspect = (svg: string): number | null => {
+  const box = svg.match(VIEW_BOX);
+  const w = Number(box?.groups?.w);
+  const h = Number(box?.groups?.h);
+  return w && h ? w / h : null;
+};
 
 // Render the configured logo as the brand mark. A `currentColor` logo carries
 // no intrinsic color, so it is painted in the foreground to read on the light
 // card, then handed to Takumi as a data URI sized from the SVG's aspect ratio.
 const logoMark = (svg: string): Node => {
   const painted = svg.replaceAll("currentColor", FOREGROUND);
-  const box = painted.match(VIEW_BOX);
-  const w = Number(box?.groups?.w);
-  const h = Number(box?.groups?.h);
+  const aspect = logoAspect(painted);
   let height = MARK_HEIGHT;
-  let width = w && h ? (MARK_HEIGHT * w) / h : MARK_HEIGHT;
+  let width = aspect ? MARK_HEIGHT * aspect : MARK_HEIGHT;
   if (width > MARK_MAX_WIDTH) {
-    height = w && h ? (MARK_MAX_WIDTH * h) / w : MARK_HEIGHT;
+    height = aspect ? MARK_MAX_WIDTH / aspect : MARK_HEIGHT;
     width = MARK_MAX_WIDTH;
   }
   return image({
@@ -152,19 +159,13 @@ export const renderOgImage = (options: OgCardOptions): Promise<Buffer> => {
   const repo = options.repo?.trim();
   const site = options.site?.trim();
 
+  // Logo only — no brand-name label beside it. A wordmark logo already spells
+  // the name, and rendering the site title next to it duplicated the brand
+  // ("Ultracite  Ultracite"). Without a logo, the accent tile with the brand
+  // initial stands in.
   const header = container({
-    children: [
-      logo ? logoMark(logo) : initialMark(accent, initial),
-      brand
-        ? text(brand, {
-            color: FOREGROUND,
-            fontSize: 30,
-            fontWeight: 500,
-            letterSpacing: "-0.01em",
-          })
-        : container({}),
-    ],
-    style: { alignItems: "center", display: "flex", gap: 18 },
+    children: [logo ? logoMark(logo) : initialMark(accent, initial)],
+    style: { alignItems: "center", display: "flex" },
   });
 
   const body = container({
