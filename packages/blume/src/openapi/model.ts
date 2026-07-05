@@ -144,7 +144,8 @@ export const extractOperations = (
         method,
         operationId: operation.operationId,
         path,
-        route: `${baseRoute}/${tagSlug}/${key}`,
+        // A root-mounted reference (`route: "/"`) must not emit `//tag/key`.
+        route: `${baseRoute === "/" ? "" : baseRoute}/${tagSlug}/${key}`,
         summary: operation.summary ?? "",
         tag,
         tagSlug,

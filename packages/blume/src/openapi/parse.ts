@@ -26,6 +26,9 @@ const URL_SPEC = /^https?:\/\//u;
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 500;
+// Honor Retry-After only up to a sane ceiling: a server answering with
+// `Retry-After: 3600` must not stall a build for an hour per attempt.
+const MAX_RETRY_WAIT_MS = 10_000;
 const SECOND_MS = 1000;
 // Worth another try: request timeout, too-early, rate-limited, and the 5xx range.
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -138,7 +141,12 @@ const fetchSpecText = async (spec: string): Promise<string> => {
       throw last.error;
     }
     // oxlint-disable-next-line no-await-in-loop -- back off before retrying
-    await sleep(last.retryAfter ?? BASE_BACKOFF_MS * 2 ** attempt);
+    await sleep(
+      Math.min(
+        last.retryAfter ?? BASE_BACKOFF_MS * 2 ** attempt,
+        MAX_RETRY_WAIT_MS
+      )
+    );
   }
   throw last.error;
 };

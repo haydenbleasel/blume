@@ -145,6 +145,7 @@ export const referenceTabs = (config: ResolvedConfig): NavTab[] =>
 /** Blume-rendered OpenAPI references, deduped by route (first wins). */
 export const blumeReferences = (config: ResolvedConfig): ReferenceSource[] => {
   const seen = new Set<string>();
+  const usedSlugs = new Set<string>();
   const result: ReferenceSource[] = [];
   for (const ref of resolveReferences(config)) {
     if (ref.kind !== "openapi" || ref.renderer !== "blume") {
@@ -154,7 +155,16 @@ export const blumeReferences = (config: ResolvedConfig): ReferenceSource[] => {
       continue;
     }
     seen.add(ref.route);
-    result.push(ref);
+    // Distinct routes can slugify identically (`/api/v1` and `/api-v1` both
+    // yield `api-v1`). The slug keys the `blume:openapi` data module, so a
+    // collision would let one spec silently overwrite the other while the
+    // loser's pages still point at the shared key — disambiguate.
+    let { slug } = ref;
+    for (let n = 2; usedSlugs.has(slug); n += 1) {
+      slug = `${ref.slug}-${n}`;
+    }
+    usedSlugs.add(slug);
+    result.push(slug === ref.slug ? ref : { ...ref, slug });
   }
   return result;
 };

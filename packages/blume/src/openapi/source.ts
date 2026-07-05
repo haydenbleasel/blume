@@ -59,8 +59,10 @@ const specEntries = (
   );
   // Overview last so an operation sets the section's routePath before the index
   // page is inserted (the group's routePath is derived from its first child).
+  // A root-mounted reference refs `index.mdx`, not `/index.mdx`.
+  const base = routeToRef(spec.route);
   entries.push(
-    toEntry(overviewMdx(spec), `${routeToRef(spec.route)}/index.mdx`)
+    toEntry(overviewMdx(spec), base ? `${base}/index.mdx` : "index.mdx")
   );
   return entries;
 };

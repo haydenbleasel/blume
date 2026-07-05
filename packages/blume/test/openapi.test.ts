@@ -190,6 +190,22 @@ describe("references", () => {
     expect(blumeReferences(config)).toHaveLength(1);
   });
 
+  it("disambiguates slugs when distinct routes slugify identically", () => {
+    // `/api/v1` and `/api-v1` both slugify to `api-v1`; the slug keys the
+    // `blume:openapi` data module, so a collision would clobber one spec.
+    const config = blumeConfigSchema.parse({
+      openapi: {
+        enabled: true,
+        sources: [
+          { route: "/api/v1", spec: "a.json" },
+          { route: "/api-v1", spec: "b.json" },
+        ],
+      },
+    });
+    const refs = blumeReferences(config);
+    expect(refs.map((ref) => ref.slug)).toStrictEqual(["api-v1", "api-v1-2"]);
+  });
+
   it("appends a staged openapi source when a Blume reference is configured", () => {
     const config = blumeConfigSchema.parse({
       openapi: { enabled: true, spec: "spec.json" },
@@ -220,6 +236,15 @@ describe("model.extractOperations", () => {
     const ping = operations.find((op) => op.path === "/ping");
     expect(ping?.tag).toBe("Operations");
     expect(ping?.route).toBe("/api/operations/get-ping");
+  });
+
+  it("mounts a root reference without a double slash", () => {
+    const { operations } = extractOperations(SPEC_3_1, "/");
+    for (const operation of operations) {
+      expect(operation.route.startsWith("//")).toBe(false);
+    }
+    const addPet = operations.find((op) => op.key === "addpet");
+    expect(addPet?.route).toBe("/pet/addpet");
   });
 
   it("derives an operation key from method+path when operationId is absent", () => {
@@ -548,6 +573,63 @@ describe("render-mdx", () => {
     expect(page.body).toContain("&#101;xport of data");
     // Mid-sentence and prefixed words are left alone.
     expect(page.body).toContain("Supports exports and important flags.");
+  });
+
+  it("leaves backtick code verbatim while escaping surrounding prose", () => {
+    const op = {
+      deprecated: false,
+      description: [
+        "Fetch a pet via `/pets/{petId}` with {retries} allowed:",
+        "",
+        "```json",
+        '{"name": "doggie"}',
+        "```",
+        "",
+        "import statements in prose are still escaped.",
+      ].join("\n"),
+      key: "op",
+      method: "get" as const,
+      operationId: "op",
+      path: "/x",
+      route: "/api/x/op",
+      summary: "Do a thing",
+      tag: "x",
+      tagSlug: "x",
+    };
+    const page = operationMdx(specData(), op);
+    // Code spans and fences are literal in MDX and entities are not decoded
+    // inside them — they must pass through untouched.
+    expect(page.body).toContain("`/pets/{petId}`");
+    expect(page.body).toContain('{"name": "doggie"}');
+    // Prose around the code is still neutralized.
+    expect(page.body).toContain("&#123;retries&#125;");
+    expect(page.body).toContain("&#105;mport statements");
+  });
+
+  it("renders one overview section per tag slug, not per tag name", () => {
+    const document = {
+      info: { title: "API", version: "1" },
+      openapi: "3.1.0",
+      paths: {
+        "/order": { post: { operationId: "addOrder", tags: ["store"] } },
+        "/store": { get: { operationId: "getStore", tags: ["Store"] } },
+      },
+      tags: [
+        { description: "", name: "Store" },
+        { description: "", name: "store" },
+      ],
+    } as unknown as ApiDocument;
+    const { operations, tags } = extractOperations(document, "/api");
+    const page = overviewMdx(
+      specData({
+        operations: Object.fromEntries(operations.map((op) => [op.key, op])),
+        tags,
+      })
+    );
+    // `Store` and `store` share the slug `store`; a section per NAME would
+    // list every store operation twice.
+    const sections = page.body.match(/tag="store"/gu) ?? [];
+    expect(sections).toHaveLength(1);
   });
 
   it("skips a body description that only repeats the summary", () => {

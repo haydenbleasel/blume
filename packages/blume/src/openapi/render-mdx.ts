@@ -25,13 +25,32 @@ const ENTITIES: Record<string, string> = {
 // SDK…" is common spec prose). Entity-escape the keyword's first letter so the
 // construct can't match; it still renders as the literal word.
 const MDX_ESM_KEYWORD = /^(?<keyword>import|export)\b/gmu;
-const mdxSafe = (text: string): string =>
+// Backtick code — inline spans and fences alike — is already literal in MDX,
+// and entities are NOT decoded inside it, so escaping there would render the
+// entity text verbatim (`/pets/&#123;petId&#125;`). Matching any balanced
+// backtick run covers `code`, ``code``, and ```fences``` in one shot.
+const BACKTICK_CODE = /(?<bt>`+)[\s\S]*?\k<bt>/gu;
+
+const escapeProse = (text: string): string =>
   text
     .replace(MDX_UNSAFE, (char) => ENTITIES[char] ?? char)
     .replace(
       MDX_ESM_KEYWORD,
       (keyword) => `&#${keyword.codePointAt(0)};${keyword.slice(1)}`
     );
+
+/** Escape MDX-special syntax in prose while leaving backtick code verbatim. */
+const mdxSafe = (text: string): string => {
+  let out = "";
+  let cursor = 0;
+  for (const match of text.matchAll(BACKTICK_CODE)) {
+    const start = match.index ?? 0;
+    out += escapeProse(text.slice(cursor, start));
+    out += match[0];
+    cursor = start + match[0].length;
+  }
+  return out + escapeProse(text.slice(cursor));
+};
 
 /** Frontmatter + body for one operation or overview page. */
 export interface RenderedPage {
@@ -80,8 +99,16 @@ export const overviewMdx = (spec: ApiSpecData): RenderedPage => {
   // markdown pipeline gives them ids, permalink anchors, and table-of-contents
   // entries; only the operation-link list defers to a component.
   const operations = Object.values(spec.operations);
-  const sections = [...spec.tags];
-  const known = new Set(spec.tags.map((tag) => tag.slug));
+  // Dedupe by slug: two declared tags that slugify identically (`Store` and
+  // `store`) must render one section, not the same operation list twice.
+  const sections: typeof spec.tags = [];
+  const known = new Set<string>();
+  for (const tag of spec.tags) {
+    if (!known.has(tag.slug)) {
+      known.add(tag.slug);
+      sections.push(tag);
+    }
+  }
   for (const operation of operations) {
     if (!known.has(operation.tagSlug)) {
       known.add(operation.tagSlug);
