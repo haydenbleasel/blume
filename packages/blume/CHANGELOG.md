@@ -1,5 +1,12 @@
 # blume
 
+## 0.6.6
+
+### Patch Changes
+
+- aae9653: Give changelog entry content proper vertical rhythm. Section headings (`h2`/`h3`) now carry a top margin so a subsequent heading reads as a new section rather than butting against the paragraph above it, and paragraphs gain spacing between them. The entry's first and last elements keep flush outer margins.
+- a77a968: Hoist loose pages above groups inside tab-owned sidebar sections. When a content source uses a `prefix` (so its pages nest under a group that a tab surfaces as the sidebar), the section's top-level pages now sort above its groups — matching the tree-root behavior — instead of interleaving alphabetically.
+
 ## 0.6.5
 
 ### Patch Changes
