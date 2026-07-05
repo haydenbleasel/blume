@@ -1,5 +1,14 @@
 # blume
 
+## 0.6.1
+
+### Patch Changes
+
+- 54099c6: Always-on inline code highlighting and block math; remove their config flags. `markdown.code.inline` and `markdown.math` are gone. Inline `` `code{:lang}` `` highlighting now always runs — it only fires on the explicit `{:lang}` marker, so plain inline code is untouched and there was nothing to opt out of. Math is now always on but **block-only** (`$$…$$`): a bare `$` (currency, shell, code) is always left as literal text, which is exactly why the flag existed, so there's no longer a `$`-in-prose caveat to gate. The `<Math>` component and KaTeX's stylesheet are still only shipped when a page actually uses `$$` — now detected from content instead of a config toggle — so a math-free site pays nothing. Inline `$…$` math is no longer supported (the single-dollar delimiter is reserved for literal text).
+- 7999013: Redesign the generated `/changelog` timeline and paginate it by major version. The page now renders as a focused, full-width column — no sidebar or table of contents — and each release heading links to that release's own page, so an entry is both a timeline line and a shareable permalink. When the releases follow semver and span more than one major, older majors collapse behind a **Show N.x releases** button that reveals the next-oldest major one click at a time (detected automatically; tolerates scoped monorepo tags like `pkg@2.0.0`). It's progressive enhancement — every release stays in the page HTML, RSS feed, and search index, so no-JS readers and crawlers still get the full history.
+- 5adcc8a: Add rich per-field editor docs to `blume.config.ts`. `defineConfig` gains a comprehensive JSDoc overview, and its argument is now a hand-documented `BlumeConfig` type tree so every config field — theme, navigation, content sources, search, AI, SEO, OpenAPI, i18n, and more — shows a hover description and default value with autocomplete. A compile-time guard keeps the documented type structurally in sync with the Zod schema (still the single source of validation truth), so the two can't drift. Type-only change; runtime behavior is unchanged.
+- 3a6e794: Fix `output: "server"` builds deploying a 404. The Vercel/Netlify adapters write their deploy bundle relative to the Astro project root, which Blume points at the hidden `.blume/` runtime — so the bundle (`.vercel/output`, `.netlify/`) landed at `.blume/.vercel/output`, where the platform never looks, while `dist/` held only the client assets (no root page, no function). `blume build` now surfaces a server adapter's bundle up to the real project root, writes deploy artifacts (robots.txt, sitemap.xml, llms.txt, …) into the served static dir, and adds the surfaced dir to `.gitignore`. Vercel (and any Build Output API host) then picks it up with zero config — an imported Blume project deploys on the default Astro settings. Node/Cloudflare emit into `dist/` and are unaffected.
+
 ## 0.6.0
 
 ### Minor Changes
