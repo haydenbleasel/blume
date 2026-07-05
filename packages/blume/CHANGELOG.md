@@ -1,5 +1,13 @@
 # blume
 
+## 0.6.4
+
+### Patch Changes
+
+- 7b70ddd: Order changelog entries newest-first in the sidebar. Pages with `type: changelog` now sort by publish date descending — matching the generated `/changelog` timeline — instead of alphabetically by version label, so a changelog section reads latest-at-the-top. Explicit `sidebar.order` still wins.
+- 4a7aa42: Emit `llms.txt` by default. `ai.llmsTxt` now defaults to `true`, so machine-readable docs ship out of the box alongside the already-on `agentReadability` and `contentSignals` signals — set `ai: { llmsTxt: false }` to opt out.
+- 8252012: Remove the unused `theme.strict` config field. It validated but nothing ever read it, so it was a no-op; dropping it keeps the config surface honest. Any leftover `theme: { strict: … }` is now rejected as an unknown key.
+
 ## 0.6.3
 
 ### Patch Changes
