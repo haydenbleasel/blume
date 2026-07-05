@@ -21,6 +21,10 @@ const BODY = [
   "",
   "A generic `Array<Item>` stays searchable.",
   "",
+  "Requests cost < 5 credits each. Retries are billed separately.",
+  "",
+  "> Note: quota resets at midnight.",
+  "",
   "```js",
   "const secret = 1;",
   "```",
@@ -89,6 +93,11 @@ describe("buildSearchDocuments", () => {
     // Fenced code blocks are removed entirely.
     expect(doc?.content).not.toContain("secret");
     expect(doc?.content).not.toContain("#");
+    // A bare `<` in prose is not a tag opener: the HTML strip must not swallow
+    // everything from it to the next `>` (here, a blockquote a paragraph later).
+    expect(doc?.content).toContain("5 credits each");
+    expect(doc?.content).toContain("Retries are billed separately");
+    expect(doc?.content).toContain("quota resets at midnight");
   });
 
   it("keeps Markdown and fenced code when content is 'markdown'", async () => {

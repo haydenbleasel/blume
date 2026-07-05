@@ -39,7 +39,10 @@ export interface SearchRecord {
 
 const CODE_FENCE = /```[\s\S]*?```/gu;
 const INLINE_CODE = /`(?<code>[^`]+)`/gu;
-const HTML_OR_JSX = /<[^>]+>/gu;
+// Tag-shaped only: a name (or closing slash/fragment) right after `<`, and no
+// newline inside. A bare `<` in prose ("costs < 5 credits") must not swallow
+// everything up to some later `>` — potentially whole paragraphs.
+const HTML_OR_JSX = /<\/?[a-zA-Z][^\n<>]*>|<\/?>/gu;
 const IMAGE = /!\[[^\]]*\]\([^)]*\)/gu;
 const LINK = /\[(?<text>[^\]]*)\]\([^)]*\)/gu;
 const HEADING_MARK = /^#{1,6}\s+/gmu;
