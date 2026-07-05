@@ -12,6 +12,15 @@ import type {
 const HTTP = /^https?:\/\//iu;
 const PROTOCOL_RELATIVE = /^\/\//u;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/iu;
+
+/** Percent-decode a link piece; malformed sequences stay verbatim. */
+const decodePercent = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
 const DOC_EXT = /\.(?:md|mdx)$/iu;
 const FILE_EXT = /\.[a-z0-9]+$/iu;
 
@@ -309,12 +318,18 @@ const classifyLink = (
   }
 
   const hashIndex = target.indexOf("#");
-  const fragment = hashIndex === -1 ? "" : target.slice(hashIndex + 1);
+  // Browser-copied links arrive percent-encoded (`/caf%C3%A9`, `#caf%C3%A9`)
+  // while routes and anchor slugs are stored decoded — decode before comparing
+  // so valid links aren't reported broken.
+  const fragment = decodePercent(
+    hashIndex === -1 ? "" : target.slice(hashIndex + 1)
+  );
   let rawPath = hashIndex === -1 ? target : target.slice(0, hashIndex);
   const queryIndex = rawPath.indexOf("?");
   if (queryIndex !== -1) {
     rawPath = rawPath.slice(0, queryIndex);
   }
+  rawPath = decodePercent(rawPath);
 
   if (rawPath === "") {
     return fragment ? checkAnchor(page.route, fragment, site, ctx) : null;

@@ -13,6 +13,7 @@ import {
   i18nEnabled,
   localeCodes,
   localeDir,
+  localePlacement,
   localePrefix,
   localizeRoute,
   resolveFallbackLocale,
@@ -381,6 +382,22 @@ describe("dot parser and shared files", () => {
     expect(labelsOf(graph.navigationByLocale.fr?.sidebar ?? [])).toContain(
       "Handbook"
     );
+  });
+
+  it("recognizes a default-locale dot suffix as a locale variant", () => {
+    // `intro.en.mdx` + `intro.fr.mdx` is the natural symmetric authoring; the
+    // default-locale file must strip its suffix and share the `/intro` key
+    // rather than routing to a literal `/intro.en`.
+    expect(
+      localePlacement("intro.en.mdx", ".mdx", i18nOf({ parser: "dot" }))
+    ).toStrictEqual({ locales: ["en"], navPath: "intro.mdx" });
+    expect(
+      localePlacement("intro.fr.mdx", ".mdx", i18nOf({ parser: "dot" }))
+    ).toStrictEqual({ locales: ["fr"], navPath: "intro.mdx" });
+    // A non-locale dotted name stays default-locale content, suffix intact.
+    expect(
+      localePlacement("intro.v2.mdx", ".mdx", i18nOf({ parser: "dot" }))
+    ).toStrictEqual({ locales: ["en"], navPath: "intro.v2.mdx" });
   });
 
   it("hoists a dir-parser locale directory in front of the source prefix", async () => {

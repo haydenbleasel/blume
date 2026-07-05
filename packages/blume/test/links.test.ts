@@ -194,6 +194,24 @@ describe(validateLinks, () => {
     ]);
   });
 
+  it("accepts percent-encoded links to non-ASCII routes and anchors", async () => {
+    const target = makePage({
+      headings: [heading("Café", "café")],
+      id: "café.mdx",
+      route: "/café",
+    });
+    const diagnostics = await validate([
+      makePage({
+        id: "a.mdx",
+        // Browser-copied forms of /café and #café.
+        links: [link("/caf%C3%A9"), link("/caf%C3%A9#caf%C3%A9")],
+        route: "/a",
+      }),
+      target,
+    ]);
+    expect(diagnostics).toHaveLength(0);
+  });
+
   it("reports an info note for asset links when no public dir exists", async () => {
     const diagnostics = await validate([
       makePage({ id: "a.mdx", links: [link("/logo.png")], route: "/a" }),

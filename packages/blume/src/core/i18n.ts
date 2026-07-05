@@ -111,13 +111,14 @@ export const localePlacement = (
 
   if (i18n.parser === "dot") {
     const lastDot = base.lastIndexOf(".");
-    // Only a dot inside the filename (not a directory) is a locale suffix.
+    // Only a dot inside the filename (not a directory) is a locale suffix. Any
+    // configured locale counts — including the default, so the symmetric
+    // authoring `intro.en.mdx` + `intro.fr.mdx` shares one translation key
+    // instead of routing the default file to a literal `/intro.en`.
     if (lastDot > base.lastIndexOf("/")) {
       const suffix = base.slice(lastDot + 1);
-      const isNonDefault = i18n.locales.some(
-        (locale) => locale.code !== i18n.defaultLocale && locale.code === suffix
-      );
-      if (isNonDefault) {
+      const matched = i18n.locales.some((locale) => locale.code === suffix);
+      if (matched) {
         return {
           locales: [suffix],
           navPath: `${base.slice(0, lastDot)}${ext}`,
