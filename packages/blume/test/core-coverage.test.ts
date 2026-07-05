@@ -250,7 +250,7 @@ describe("config schema validators", () => {
         sidebar: ["intro", { items: ["a", "b"], label: "Group" }],
       },
     });
-    expect(config.navigation.sidebar).toHaveLength(2);
+    expect(config.navigation.sidebar.items).toHaveLength(2);
   });
 
   it("rejects an unknown font slug", () => {

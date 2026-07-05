@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { buildNavigation } from "../src/core/navigation.ts";
-import { pageMetaSchema } from "../src/core/schema.ts";
+import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { FolderMeta, SidebarItemConfig } from "../src/core/schema.ts";
 import type { NavNode, PageRecord } from "../src/core/types.ts";
 
@@ -107,6 +107,45 @@ describe("buildNavigation — filesystem sidebar", () => {
     const group = asGroup(nav.sidebar[0]);
     expect(group.label).toBe("Legal");
     expect(labels(group.children)).toStrictEqual(["Privacy"]);
+  });
+
+  it("hoists loose pages above groups in flat display", () => {
+    const nav = buildNavigation(
+      [
+        page("provider/biome.md", "/provider/biome", "Biome"),
+        page("rules.md", "/rules", "Rules"),
+        page("setup.md", "/setup", "Setup"),
+      ],
+      { folderMeta: empty }
+    );
+    // Alphabetically "Provider" sorts before "Rules"/"Setup", but a loose page
+    // after a flat group header would read as that group's child.
+    expect(labels(nav.sidebar)).toStrictEqual(["Rules", "Setup", "Provider"]);
+  });
+
+  it("hoists pages recursively inside nested flat groups", () => {
+    const nav = buildNavigation(
+      [
+        page("guide/advanced/deep.md", "/guide/advanced/deep", "Deep"),
+        page("guide/zz-usage.md", "/guide/usage", "Usage"),
+      ],
+      { folderMeta: empty }
+    );
+    const guide = asGroup(nav.sidebar[0]);
+    expect(labels(guide.children)).toStrictEqual(["Usage", "Advanced"]);
+  });
+
+  it("keeps file order and stamps groups when display is not flat", () => {
+    const nav = buildNavigation(
+      [
+        page("provider/biome.md", "/provider/biome", "Biome"),
+        page("rules.md", "/rules", "Rules"),
+      ],
+      { display: "group", folderMeta: empty }
+    );
+    // Collapsible groups are unambiguous rows; no hoisting needed.
+    expect(labels(nav.sidebar)).toStrictEqual(["Provider", "Rules"]);
+    expect(asGroup(nav.sidebar[0]).display).toBe("group");
   });
 
   it("applies folder meta: title, collapsed, and explicit page order", () => {
@@ -221,6 +260,20 @@ describe("buildNavigation — explicit config sidebar", () => {
     expect(group.route).toBe("/foo");
   });
 
+  it("stamps the global display on config groups unless overridden", () => {
+    const sidebar: SidebarItemConfig[] = [
+      { items: ["/bar"], label: "Drill" },
+      { display: "flat", items: ["/foo"], label: "Flat" },
+    ];
+    const nav = buildNavigation(pages, {
+      display: "page",
+      folderMeta: empty,
+      sidebar,
+    });
+    expect(asGroup(nav.sidebar[0]).display).toBe("page");
+    expect(asGroup(nav.sidebar[1]).display).toBe("flat");
+  });
+
   it("renders a root-only item as a page, matched or unmatched", () => {
     const sidebar: SidebarItemConfig[] = [
       { label: "Matched", root: "/foo" },
@@ -236,5 +289,29 @@ describe("buildNavigation — explicit config sidebar", () => {
     const unmatched = asPage(nav.sidebar[1]);
     expect(unmatched.route).toBe("/missing");
     expect(unmatched.pageId).toBe("");
+  });
+});
+
+describe("navigation.sidebar config schema", () => {
+  it("defaults to flat display with no explicit items", () => {
+    const config = blumeConfigSchema.parse({});
+    expect(config.navigation.sidebar).toStrictEqual({ display: "flat" });
+  });
+
+  it("normalizes a bare array to { display: 'flat', items }", () => {
+    const config = blumeConfigSchema.parse({
+      navigation: { sidebar: ["intro"] },
+    });
+    expect(config.navigation.sidebar).toStrictEqual({
+      display: "flat",
+      items: ["intro"],
+    });
+  });
+
+  it("accepts an object with a global display mode", () => {
+    const config = blumeConfigSchema.parse({
+      navigation: { sidebar: { display: "group" } },
+    });
+    expect(config.navigation.sidebar).toStrictEqual({ display: "group" });
   });
 });

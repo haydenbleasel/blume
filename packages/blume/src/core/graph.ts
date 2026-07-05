@@ -89,6 +89,7 @@ export const buildContentGraph = (
       }
 
       navigationByLocale[code] = buildNavigation(localePages, {
+        display: options.navigation.sidebar.display,
         featured: options.navigation.featured,
         folderMeta: options.folderMeta,
         // Meta files live in locale directories only under the `dir` parser
@@ -100,7 +101,7 @@ export const buildContentGraph = (
         refByLogical: true,
         selectors: options.navigation.selectors,
         sharedFolderMeta: options.sharedFolderMeta,
-        sidebar: options.navigation.sidebar,
+        sidebar: options.navigation.sidebar.items,
         tabs,
       });
     }
@@ -112,11 +113,12 @@ export const buildContentGraph = (
     };
   } else {
     navigation = buildNavigation(pages, {
+      display: options.navigation.sidebar.display,
       featured: options.navigation.featured,
       folderMeta: options.folderMeta,
       selectors: options.navigation.selectors,
       sharedFolderMeta: options.sharedFolderMeta,
-      sidebar: options.navigation.sidebar,
+      sidebar: options.navigation.sidebar.items,
       tabs: options.navigation.tabs,
     });
   }

@@ -31,7 +31,7 @@ See [Frontmatter](/docs/reference/frontmatter) for the full page schema.
 
 ## Folder groups
 
-Each folder becomes a sidebar group. Drop a [`meta.ts`](/docs/content/meta) beside its pages to set the group's title, icon, order, [display mode](/docs/content/meta#display-modes), and the order of its children:
+Each folder becomes a sidebar group. Drop a [`meta.ts`](/docs/content/meta) beside its pages to set the group's title, icon, order, and the order of its children:
 
 ```ts meta.ts
 import { defineMeta } from "blume";
@@ -43,9 +43,31 @@ export default defineMeta({
 });
 ```
 
-See [Folder meta](/docs/content/meta) for every field, the three display modes, and computing meta at scan time.
+See [Folder meta](/docs/content/meta) for every field and computing meta at scan time.
 
 To group pages _without_ adding a URL segment, use a parenthesized folder name — see [Pages](/docs/content#group-folders).
+
+## Display modes
+
+`navigation.sidebar.display` sets how every sidebar group renders:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  sidebar: {
+    display: "flat", // "flat" | "group" | "page"
+  },
+}
+```
+
+- **`flat`** (default) — a non-collapsible header with its pages listed beneath. Pages that aren't in any group always list first, above the group sections, so they can't be mistaken for a group's children.
+- **`group`** — a collapsible `<details>` disclosure per group. Pair it with `collapsed` in [folder meta](/docs/content/meta) to set the initial state; a group containing the current page always starts open.
+- **`page`** — each group is a single row that, when clicked, slides the sidebar into a sub-panel showing only that group's items, with a back arrow at the top. The panel is route-aware, so landing directly on a page inside the group opens straight to it.
+
+:::tip
+`page` mode keeps deep sections tidy — reach for it when groups have many children and you'd rather drill into them than scroll past them.
+:::
+
+A group in an [explicit sidebar](#explicit-sidebar) can override the global mode with its own `display`.
 
 ## Ordering
 
@@ -129,7 +151,7 @@ Each link takes a `label`, an `href`, and an optional `icon` (a [built-in icon](
 
 ## Explicit sidebar
 
-For full control, define `navigation.sidebar` in config. When it's set, Blume uses it verbatim and skips file-system generation:
+For full control, list explicit items in `navigation.sidebar` — a bare array is shorthand for `sidebar.items`, and the object form combines them with a global [`display`](#display-modes). When items are set, Blume uses them verbatim and skips file-system generation:
 
 ```ts blume.config.ts lineNumbers
 navigation: {
@@ -145,7 +167,7 @@ navigation: {
 }
 ```
 
-Each item is a page route (a string), a group (`label` + `items`), or a link (`label` + `href`). Groups can nest, take a [`display` mode](/docs/content/meta#display-modes), and start `collapsed`.
+Each item is a page route (a string), a group (`label` + `items`), or a link (`label` + `href`). Groups can nest, override the global [`display` mode](#display-modes), and start `collapsed`.
 
 ## Repository link
 

@@ -59,7 +59,6 @@ interface MutableGroup {
   label: string;
   icon?: string;
   collapsed?: boolean;
-  display?: SidebarDisplay;
   order: number;
   children: MutableNode[];
   index: Map<string, MutableGroup>;
@@ -141,7 +140,6 @@ const applyFolderMeta = (
     group.icon = meta.icon ?? group.icon;
     group.order = meta.order ?? group.order;
     group.collapsed = meta.collapsed ?? group.collapsed;
-    group.display = meta.display ?? group.display;
 
     if (meta.pages) {
       const rank = new Map(meta.pages.map((key, i) => [key, i]));
@@ -175,7 +173,21 @@ const sortNodes = (nodes: MutableNode[]): void => {
   }
 };
 
-const toNavNode = (node: MutableNode): NavNode => {
+/**
+ * In flat display a group renders as a plain section header, so a loose page
+ * sorted after a group would visually read as that group's last child. Hoist
+ * pages above groups at every level (relative order otherwise preserved).
+ */
+const hoistPages = (nodes: MutableNode[]): void => {
+  const pages = nodes.filter((node) => node.kind === "page");
+  const groups = nodes.filter((node) => node.kind === "group");
+  nodes.splice(0, nodes.length, ...pages, ...groups);
+  for (const group of groups) {
+    hoistPages(group.children);
+  }
+};
+
+const toNavNode = (node: MutableNode, display: SidebarDisplay): NavNode => {
   if (node.kind === "page") {
     return {
       badge: node.badge,
@@ -189,9 +201,9 @@ const toNavNode = (node: MutableNode): NavNode => {
     };
   }
   return {
-    children: node.children.map(toNavNode),
+    children: node.children.map((child) => toNavNode(child, display)),
     collapsed: node.collapsed,
-    display: node.display,
+    display,
     icon: node.icon,
     kind: "group",
     label: node.label,
@@ -204,7 +216,8 @@ const buildFileSystemSidebar = (
   pages: PageRecord[],
   folderMeta: Map<string, FolderMeta>,
   sharedMeta: Map<string, FolderMeta>,
-  metaPrefix: string
+  metaPrefix: string,
+  display: SidebarDisplay
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
 
@@ -247,7 +260,10 @@ const buildFileSystemSidebar = (
 
   applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix);
   sortNodes(root.children);
-  return root.children.map(toNavNode);
+  if (display === "flat") {
+    hoistPages(root.children);
+  }
+  return root.children.map((child) => toNavNode(child, display));
 };
 
 const normalizeRef = (ref: string): string => {
@@ -276,7 +292,8 @@ const routeForRef = (
 /** Build the sidebar tree from an explicit config spec. */
 const buildConfigSidebar = (
   items: SidebarItemConfig[],
-  byRoute: Map<string, PageRecord>
+  byRoute: Map<string, PageRecord>,
+  display: SidebarDisplay
 ): NavNode[] => {
   const nodes: NavNode[] = [];
 
@@ -301,10 +318,10 @@ const buildConfigSidebar = (
     if (item.items) {
       nodes.push({
         badge: item.badge,
-        children: buildConfigSidebar(item.items, byRoute),
+        children: buildConfigSidebar(item.items, byRoute, display),
         collapsed: item.collapsed,
         directory: item.directory,
-        display: item.display,
+        display: item.display ?? display,
         icon: item.icon,
         kind: "group",
         label: item.label,
@@ -347,6 +364,8 @@ export const buildNavigation = (
   pages: PageRecord[],
   options: {
     folderMeta: Map<string, FolderMeta>;
+    /** Global display mode for every sidebar group (default `flat`). */
+    display?: SidebarDisplay;
     featured?: FeaturedLink[];
     selectors?: NavSelector[];
     tabs?: NavTab[];
@@ -366,6 +385,7 @@ export const buildNavigation = (
   const featured = options.featured ?? [];
   const selectors = options.selectors ?? [];
   const tabs = options.tabs ?? [];
+  const display = options.display ?? "flat";
   const metaPrefix = options.metaPrefix ?? "";
   const sharedFolderMeta = options.sharedFolderMeta ?? new Map();
   const byRoute = new Map(
@@ -379,7 +399,7 @@ export const buildNavigation = (
     return {
       featured,
       selectors,
-      sidebar: buildConfigSidebar(options.sidebar, byRoute),
+      sidebar: buildConfigSidebar(options.sidebar, byRoute, display),
       tabs,
     };
   }
@@ -391,7 +411,8 @@ export const buildNavigation = (
       pages,
       options.folderMeta,
       sharedFolderMeta,
-      metaPrefix
+      metaPrefix,
+      display
     ),
     tabs,
   };

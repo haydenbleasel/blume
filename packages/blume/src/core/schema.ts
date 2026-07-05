@@ -135,7 +135,6 @@ export type SidebarDisplay = z.infer<typeof sidebarDisplaySchema>;
 export const folderMetaSchema = z
   .object({
     collapsed: z.boolean().optional(),
-    display: sidebarDisplaySchema.optional(),
     icon: iconName.optional(),
     order: z.number().optional(),
     /** Explicit child ordering by slug segment (without numeric prefix). */
@@ -644,8 +643,28 @@ const navigationConfigSchema = z
     /** Show a GitHub repo link in the header (requires `github` configured). */
     repo: z.boolean().default(true),
     selectors: z.array(navSelectorSchema).default([]),
-    /** Explicit sidebar override; when omitted the sidebar is generated. */
-    sidebar: z.array(sidebarItemSchema).optional(),
+    /**
+     * Sidebar behavior. `display` sets how every group renders (a group in an
+     * explicit `items` config may still override it); `items` is an explicit
+     * sidebar — when omitted the sidebar is generated from the content tree.
+     * A bare array is shorthand for `{ items }`.
+     */
+    sidebar: z
+      .union([
+        z.array(sidebarItemSchema),
+        z
+          .object({
+            display: sidebarDisplaySchema.default("flat"),
+            items: z.array(sidebarItemSchema).optional(),
+          })
+          .strict(),
+      ])
+      .default({})
+      .transform((value) =>
+        Array.isArray(value)
+          ? { display: "flat" as const, items: value }
+          : value
+      ),
     tabs: z.array(navTabSchema).optional(),
   })
   .strict();
