@@ -1,5 +1,70 @@
 # blume
 
+## 0.6.0
+
+### Minor Changes
+
+- 3dcd5b2: Emit `agent-readability.json` at the site root: a manifest that indexes the project's agent-facing surface so agents can discover and cite the docs without scraping HTML. It lists the raw-Markdown mirror pattern (with content negotiation), `llms.txt`/`llms-full.txt`, the MCP server and its `.well-known/mcp.json` discovery doc, the Ask AI endpoint, the sitemap, and RSS feeds — including only the ones actually enabled. It also echoes the `seo.contentSignals` usage policy and the configured source repository. URLs are absolute when `deployment.site` is set and root-relative otherwise.
+
+  On by default; disable with `seo.agentReadability: false`. As with `sitemap.xml` and `robots.txt`, a file you ship in `public/` takes precedence.
+
+- 44646d2: Add `navigation.featured` — pinned links rendered above the sidebar sections. Each takes a `label`, an `href` (external URL or internal route), and an optional `icon`, and appears on every route and breakpoint, outside the tab-scoped sidebar tree. External links open in a new tab with an indicator; internal targets are validated against your pages at build time, and unknown icons warn like anywhere else.
+
+  ```ts
+  export default defineConfig({
+    navigation: {
+      featured: [
+        { label: "Blog", href: "https://example.com/blog", icon: "newspaper" },
+        { label: "Contact", href: "/contact", icon: "headphones" },
+      ],
+    },
+  });
+  ```
+
+  This restores a common Mintlify layout where standalone destinations (blog, changelog, support) sit at the top of the sidebar rather than folding into the generated content tree.
+
+- 3dcd5b2: Declare `Content-Signal` usage preferences in the generated `robots.txt`. Blume now emits a `Content-Signal` line **on by default** with every signal set to `yes` — `search` (traditional and AI search indexing), `ai-input` (grounding / RAG at answer time), and `ai-train` (model training) — matching its stance that docs are open to humans and agents alike:
+
+  ```
+  User-agent: *
+  Content-Signal: search=yes, ai-input=yes, ai-train=yes
+  Allow: /
+  ```
+
+  Tune it with `seo.contentSignals`. Restrict individual signals — the rest stay `yes`:
+
+  ```ts
+  export default defineConfig({
+    seo: {
+      contentSignals: { aiTrain: false }, // → search=yes, ai-input=yes, ai-train=no
+    },
+  });
+  ```
+
+  Or set `contentSignals: false` to drop the declaration entirely. Existing sites that ship their own `public/robots.txt` are unaffected — Blume never overwrites it.
+
+### Patch Changes
+
+- 0b729bc: Redesign the Ask AI assistant. The trigger is now a ghost chat-icon button on the far right of the header, and it opens a full-height docked side panel (in the style of `vercel.com/docs`): on desktop the docs content shrinks to make room and the table of contents hides while the panel is open; on smaller screens it's a full-width overlay. The panel renders answers as Markdown, streams responses, supports a `⌘I` / `Ctrl+I` toggle, and has copy/clear/close controls. The input is a single flush textarea.
+
+  Add `ai.ask.suggestions` — empty-state prompts shown before the first question, each a clickable `{ label, icon? }` chip.
+
+  Improve grounding quality:
+
+  - Retrieval now injects the section of a page most relevant to the question instead of always slicing the page head, so a long page's below-the-fold content is reachable.
+  - Ask AI grounds on Markdown (code blocks preserved) rather than search-flattened plain text, so the model can answer from fenced examples the docs actually contain.
+  - The model cites sources as Markdown links, rendered as small source pills that navigate to the cited page.
+
+  Remove the "Ask AI about this page" entry from the page actions menu.
+
+- 923877e: Exclude dependency, output, and cache trees from the generated Astro content collection. The content-layer glob previously only skipped `node_modules`, so a `.`-rooted `content.root` re-ingested build output — for example a prior `dist/*.mdx` render — and crashed the build in rolldown with an unresolvable `astro:content-layer-deferred-module` import. It now mirrors the content scan's baseline ignores (`node_modules`, `.git`, `.vercel`, `dist`, `.next`, `.turbo`, `.cache`), while the runtime directory (`.blume`, or a custom `distDir`) stays excluded precisely by the existing output-dir handling.
+- 3312c07: Check the dev lock before regenerating `.blume/`, and record the server's port in it. A second `blume dev` previously regenerated the runtime (with its own port baked in) before noticing the lock, so even a refused invocation churned the running server's generated files on its way out; it now refuses before touching anything. The lock file (`.blume/dev.lock`) stores `{pid, port}` — updated with the actual bound port if Vite bumps a busy one — so the refusal messages from `dev`, `build`, `check`, and `eject` point at the live server's URL (e.g. "A `blume dev` server is already running at http://localhost:3001 — reuse that server"), steering callers (especially agents) toward reusing the running server instead of killing it.
+- 1081989: Add a "Copy Codex command" option to the Connect to MCP menu, alongside the existing Claude Code, Cursor, and VS Code installs. It copies `codex mcp add <name> --url <url>` for the hosted MCP server. Also make `PageActions` labels fall back to the English defaults per-key, so a string missing from a translation renders the default instead of coming out blank.
+- 1081989: Improve the page-actions dropdowns (Export, Open in chat, Connect to MCP). Only one opens at a time — opening one closes the others. A menu flips above its trigger when opening downward would run past the viewport bottom (and there's room above), so the Connect to MCP menu no longer gets clipped. Menus keep a padding gap from the viewport edge and size to their content instead of the narrow sidebar column, so longer items like "Copy Claude Code command" no longer wrap.
+- 923877e: Default-ignore never-content directories during the content scan. The filesystem source now always skips `node_modules`, `.git`, `.blume`, `.vercel`, `dist`, `.next`, `.turbo`, and `.cache` — in addition to the user's `content.exclude`, and even when `exclude` is overridden. Previously a broadly-scoped `content.root` (`"."` or an app directory that also holds `node_modules`/build output — the common shape when migrating a docs app that lives at the repo or app root) would glob thousands of stray Markdown files out of dependencies and build artifacts. `content.root` still defaults to `docs/`, where this rarely bit.
+- 4ff9c26: Fix the Vercel (`output: "server"`) build failing in `astro:build:done` with `dist/server/entry.mjs does not exist`. Blume declared its render-time SSR externals under a user-owned `vite.environments.ssr` block, which collides with the internal environment Astro 7 builds the server under and detaches the adapter's server entrypoint from the rolldown input — so the SSR entry was emitted as `index.mjs` and the Vercel adapter couldn't find `entry.mjs`. The SSR externals now go through the legacy `vite.ssr.external` key (the `prerender` environment is Astro-only and stays under `environments`).
+- 923877e: Widen the dev watcher's ignore set to cover build and deploy caches. Alongside `.blume`, `.git`, and `node_modules`, the recursive content watcher now also ignores `.vercel`, `dist`, `.next`, `.turbo`, and `.cache`, sharing one canonical directory list with the content scan so the two never disagree about what counts as content. This keeps churn from build output and framework caches from needlessly re-triggering a rescan during `blume dev`.
+
 ## 0.5.4
 
 ### Patch Changes
