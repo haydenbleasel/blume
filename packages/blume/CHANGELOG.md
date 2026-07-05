@@ -1,5 +1,50 @@
 # blume
 
+## 0.6.2
+
+### Patch Changes
+
+- 7b84669: Match active header tabs and nav-selector items on path boundaries, so a `/api` tab is no longer highlighted on `/api-reference/*` routes.
+- 7ed2b2b: Decode Ask AI streams with `{ stream: true }` (in both the built-in panel and `useAskAI`), so multi-byte characters split across network chunks no longer render as `�`.
+- 6f44994: Stop downloading and rewriting image URLs that appear inside fenced code blocks when materializing remote (e.g. Notion) assets — code samples keep showing what the author wrote.
+- dfa956e: Acquire the dev lock atomically (`wx` create) so two `blume dev` processes started simultaneously can no longer both claim `.blume/` and corrupt each other's runtime.
+- 6f44994: Keep a trailing `#` that is part of a heading's text (`## What is C#`) in derived titles, search entries, and the manifest TOC — only a whitespace-preceded closing hash sequence is stripped, per CommonMark.
+- 9d60b00: Remove `markdown.math` and `markdown.code.inline` from the `BlumeConfig` authoring type — both features are always-on and the strict config schema rejects the keys, so configs written from autocomplete failed to load.
+- 5468295: Fix code-fence meta parsing: `subtitle="..."` no longer reads as the block title, and the word "lineNumbers" inside a quoted title no longer switches on the line-number gutter.
+- 9d60b00: Make `content.defaultType` actually apply: the frontmatter schema no longer forces `type: "doc"` onto every untyped page.
+- 7ed2b2b: Copy buttons on Twoslash-annotated code blocks now copy the source only, stripping the hover popups' type signatures and docs that are nested inside the code element.
+- dfa956e: Re-bake the dev runtime's `site` fallback when Vite bumps to a free port, so OG images, canonicals, and other site-gated URLs point at the port actually serving instead of the one that was busy.
+- dfa956e: `blume doctor` now checks Node against the package's declared `engines` minimum (>=22.12.0) instead of a stale hardcoded 20, so unsupported Node versions are actually flagged.
+- 36ff4da: Recognize a default-locale filename suffix under the `dot` i18n parser: `intro.en.mdx` now pairs with `intro.fr.mdx` on the `/intro` translation key instead of routing to a literal `/intro.en`.
+- dfa956e: Strip unquoted inline `# comments` from `.env` values, matching dotenv/Vite — a line like `GITHUB_TOKEN=abc # note` no longer hands sources a token with the comment appended.
+- 7e0f413: Make example wrapper filenames injective: distinct example paths like `button.demo` and `button-demo` no longer collide onto one generated wrapper (which made one example render the other's component).
+- 4ed9f6a: Align `hasIcon` with `resolveIcon` for unknown prefixes: `tabler:check` no longer passes the existence check while rendering nothing, and unknown-prefix icons now trigger the nav "unknown icon" diagnostic.
+- 7e0f413: Decode percent-encoded request paths in markdown content negotiation, so `Accept: text/markdown` requests for non-ASCII routes serve the `.md` variant instead of silently falling through to HTML.
+- 7e0f413: Check custom `.astro` pages (not just content pages) before generating the MCP endpoint and the `/changelog` index, so a user page at those routes warns and wins instead of silently colliding.
+- 6f44994: Import nested Notion blocks: children of list items (and other leaf blocks) were silently dropped; nested bullets now render indented under their parent item.
+- 4ed9f6a: Take the OG card's brand initial by code point, so a site title starting with an emoji no longer renders a blank accent tile (a split surrogate pair).
+- d660cf6: Stop entity-escaping backtick code in OpenAPI descriptions: inline code and fences like `/pets/{petId}` now render verbatim instead of showing `&#123;` entities, while surrounding prose is still MDX-neutralized.
+- d660cf6: Cap remote-spec retry backoff at 10s: a server answering 429/503 with a large `Retry-After` no longer stalls `blume build` for hours.
+- d660cf6: Mount a root-routed OpenAPI reference (`route: "/"`) without emitting `//tag/operation` double-slash routes or a malformed `/index.mdx` overview ref.
+- d660cf6: Disambiguate OpenAPI reference slugs when distinct routes slugify identically (`/api/v1` vs `/api-v1`), so one spec no longer silently overwrites the other's data in the `blume:openapi` module.
+- d660cf6: Render one OpenAPI overview section per tag slug: declared tags that slugify identically (`Store` and `store`) no longer list every shared operation twice.
+- 5468295: Map `yarn global add`/`yarn global remove` in `package-install` fences onto each manager's global form instead of rendering nonsense `npm run global add …` tabs.
+- 36ff4da: Percent-decode link paths and fragments before validation, so browser-copied links to non-ASCII routes and anchors (`/caf%C3%A9`, `#caf%C3%A9`) are no longer reported broken.
+- 6f44994: Make `pollInterval` hot-reload actually observe remote changes: the poller now fetches fresh instead of re-reading the dev snapshot cache, and seeds its baseline from what the dev server served so the first remote change is never swallowed. Applies to the GitHub-releases, Notion, Sanity, and remote-MDX sources.
+- b8a1b24: Fix folder `meta.ts` being ignored and doc pages 404ing in dev when a `content.sources` filesystem source's `root`/`prefix` diverges from `content.root`. Folder meta is now discovered per filesystem source — scanned under each source's own root and keyed by its route prefix — so a `meta.ts` inside a prefixed source (e.g. `{ type: "filesystem", root: "docs", prefix: "docs" }`) lines up with its prefixed sidebar group path and its `title`/`order` apply. A project with a single filesystem source now roots the generated `docs` collection at that source's own `root`, so entry ids resolve in dev (not just in static builds). A residual mismatch that can't be reconciled — a second filesystem source rooted outside the collection base — now raises a build-time error (`BLUME_ENTRY_ID_MISMATCH`) instead of silently 404ing at runtime.
+- 7b84669: Apply locale-specific folder meta for prefixed filesystem sources under dir-parser i18n: `docs/fr/guides/meta.ts` now keys to `fr/docs/guides`, matching the navigation lookup, instead of being silently ignored.
+- 7ed2b2b: Hide the mobile hamburger on the Scalar reference layout: it has no drawer to open, so tapping it only locked page scroll.
+- 6f44994: Compile `**/` in remote-MDX include patterns to whole path segments, matching tinyglobby semantics — `docs/**/guide.md` no longer matches `docs/subguide.md`.
+- 7e0f413: URI-encode RSS item links and guids (matching the sitemap), so routes with spaces or non-ASCII characters emit valid feed URLs.
+- 7ed2b2b: Escape `<` in the search dialog's popular-pages JSON payload, so a page title containing `</script>` can no longer terminate the inline script and inject markup.
+- 7ed2b2b: Guard search rendering with a generation counter: a section-pill or locale toggle racing an in-flight remote query no longer appends duplicate or misfiltered result rows.
+- 41bac89: Strip only tag-shaped `<name …>` markup when building the search index: a bare `<` in prose ("costs < 5 credits") no longer deletes everything up to the next `>` — potentially whole paragraphs — from search results.
+- 7e0f413: Stop prepending the site origin to an external `seo.image` URL in the generated catch-all page — `og:image`/`twitter:image` no longer render as `https://docs.example.comhttps://cdn…`.
+- 7b84669: Fix sidebar group route paths when a folder's `index` page is inserted first (the group's path collapsed to `/`, emptying the sidebar for header-tab sections) and when `(group)` folders sit between the folder and its route segments.
+- dfa956e: Make `blume sync` regenerate with a running dev server's URL as the `site` fallback (read from `dev.lock`), instead of silently dropping `site` and OG output from the live runtime.
+- 4ed9f6a: Actually apply the table-cell inline-code nowrap rule: GFM renders `<td><code>` directly, which the descendant-only selector never matched, so inline code in table cells still wrapped.
+- 9d60b00: Honor top-level `hidden` and `noindex` frontmatter as shorthands for `sidebar.hidden` and `seo.noindex` — the schema accepted both but nothing read them.
+
 ## 0.6.1
 
 ### Patch Changes
