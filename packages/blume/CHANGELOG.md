@@ -1,5 +1,12 @@
 # blume
 
+## 0.6.7
+
+### Patch Changes
+
+- 37e1434: Make changelog entry heading/paragraph spacing actually apply. The `h2`/`h3`/`p` margins were normal-weight utilities, which Tailwind Typography's `.not-prose` margin reset outranked, so subsequent section headings still butted against the paragraph above. Mark the margins `!important` so they win.
+- aa0665c: Stop the inline-code pill background from leaking into `not-prose` components. The hand-written `.prose :not(pre) > code` rule lacked the `not-prose` exclusion that Tailwind's generated prose rules carry, so components like the `<TypeTable>`, OpenAPI parameter/schema tables, and operation paths inherited a gray pill — which, as a grid cell, stretched to fill its column and painted edge-to-edge. Scope the rule to skip `not-prose` subtrees so those components render their own intended code styling.
+
 ## 0.6.6
 
 ### Patch Changes
