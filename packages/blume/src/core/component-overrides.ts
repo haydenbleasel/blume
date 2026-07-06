@@ -62,6 +62,7 @@ export interface ComponentOverrideAnalysis {
 }
 
 const GROUPS = ["mdx", "layout", "islands"] as const;
+const GROUP_SET = new Set<string>(GROUPS);
 type Group = (typeof GROUPS)[number];
 
 const FRAMEWORK_BY_EXT: Record<string, OverrideFramework> = {
@@ -121,37 +122,43 @@ const emptyAnalysis = (): ComponentOverrideAnalysis => ({
 const propName = (name: ts.PropertyName): string | undefined =>
   ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
 
+/** Record the bindings declared by one import statement into `map`. */
+const addImportBindings = (
+  map: Map<string, ImportBinding>,
+  statement: ts.Statement
+): void => {
+  if (
+    !ts.isImportDeclaration(statement) ||
+    !ts.isStringLiteral(statement.moduleSpecifier)
+  ) {
+    return;
+  }
+  const specifier = statement.moduleSpecifier.text;
+  const clause = statement.importClause;
+  if (!clause) {
+    return;
+  }
+  if (clause.name) {
+    map.set(clause.name.text, { imported: "default", specifier });
+  }
+  const named = clause.namedBindings;
+  if (named && ts.isNamedImports(named)) {
+    for (const element of named.elements) {
+      map.set(element.name.text, {
+        imported: (element.propertyName ?? element.name).text,
+        specifier,
+      });
+    }
+  }
+};
+
 /** Map each local binding name to the module + exported name it came from. */
 const collectImports = (
   sourceFile: ts.SourceFile
 ): Map<string, ImportBinding> => {
   const map = new Map<string, ImportBinding>();
-  // Extracting the body into an early-returning helper regressed coverage.
-  // oxlint-disable-next-line sonarjs/too-many-break-or-continue-in-loop
   for (const statement of sourceFile.statements) {
-    if (
-      !ts.isImportDeclaration(statement) ||
-      !ts.isStringLiteral(statement.moduleSpecifier)
-    ) {
-      continue;
-    }
-    const specifier = statement.moduleSpecifier.text;
-    const clause = statement.importClause;
-    if (!clause) {
-      continue;
-    }
-    if (clause.name) {
-      map.set(clause.name.text, { imported: "default", specifier });
-    }
-    const named = clause.namedBindings;
-    if (named && ts.isNamedImports(named)) {
-      for (const element of named.elements) {
-        map.set(element.name.text, {
-          imported: (element.propertyName ?? element.name).text,
-          specifier,
-        });
-      }
-    }
+    addImportBindings(map, statement);
   }
   return map;
 };
@@ -234,43 +241,51 @@ const resolveIdentifier = (
   return binding ? toImport(binding.specifier, binding.imported, dir) : null;
 };
 
+/** Fold one descriptor-object property into the accumulating descriptor. */
+const applyDescriptorProperty = (
+  descriptor: RawDescriptor,
+  property: ts.ObjectLiteralElementLike,
+  imports: Map<string, ImportBinding>,
+  dir: string
+): void => {
+  if (ts.isShorthandPropertyAssignment(property)) {
+    if (property.name.text === "component") {
+      descriptor.hadComponent = true;
+      descriptor.source = resolveIdentifier(property.name.text, imports, dir);
+    }
+    return;
+  }
+  if (!ts.isPropertyAssignment(property)) {
+    return;
+  }
+  const name = propName(property.name);
+  const init = property.initializer;
+  if (name === "component") {
+    descriptor.hadComponent = true;
+    if (ts.isStringLiteral(init)) {
+      descriptor.source = toImport(init.text, "default", dir);
+    } else if (ts.isIdentifier(init)) {
+      descriptor.source = resolveIdentifier(init.text, imports, dir);
+    }
+  } else if (
+    name === "client" &&
+    ts.isStringLiteral(init) &&
+    HYDRATION_MODES.has(init.text as HydrationMode)
+  ) {
+    descriptor.client = init.text as HydrationMode;
+  } else if (name === "media" && ts.isStringLiteral(init)) {
+    descriptor.media = init.text;
+  }
+};
+
 const readDescriptor = (
   object: ts.ObjectLiteralExpression,
   imports: Map<string, ImportBinding>,
   dir: string
 ): RawDescriptor => {
   const descriptor: RawDescriptor = { hadComponent: false, source: null };
-  // Extracting the body into an early-returning helper regressed coverage.
-  // oxlint-disable-next-line sonarjs/too-many-break-or-continue-in-loop
   for (const property of object.properties) {
-    if (ts.isShorthandPropertyAssignment(property)) {
-      if (property.name.text === "component") {
-        descriptor.hadComponent = true;
-        descriptor.source = resolveIdentifier(property.name.text, imports, dir);
-      }
-      continue;
-    }
-    if (!ts.isPropertyAssignment(property)) {
-      continue;
-    }
-    const name = propName(property.name);
-    const init = property.initializer;
-    if (name === "component") {
-      descriptor.hadComponent = true;
-      if (ts.isStringLiteral(init)) {
-        descriptor.source = toImport(init.text, "default", dir);
-      } else if (ts.isIdentifier(init)) {
-        descriptor.source = resolveIdentifier(init.text, imports, dir);
-      }
-    } else if (
-      name === "client" &&
-      ts.isStringLiteral(init) &&
-      HYDRATION_MODES.has(init.text as HydrationMode)
-    ) {
-      descriptor.client = init.text as HydrationMode;
-    } else if (name === "media" && ts.isStringLiteral(init)) {
-      descriptor.media = init.text;
-    }
+    applyDescriptorProperty(descriptor, property, imports, dir);
   }
   return descriptor;
 };
@@ -426,6 +441,38 @@ const normalizeEntry = (
   return { identifier: false, key, source: null };
 };
 
+/** Normalize one top-level `{ mdx | layout | islands }` group into `result`. */
+const collectGroupOverrides = (
+  property: ts.ObjectLiteralElementLike,
+  imports: Map<string, ImportBinding>,
+  dir: string,
+  result: ComponentOverrideAnalysis
+): void => {
+  if (!ts.isPropertyAssignment(property)) {
+    return;
+  }
+  const name = propName(property.name);
+  if (
+    !(name && GROUP_SET.has(name)) ||
+    !ts.isObjectLiteralExpression(property.initializer)
+  ) {
+    return;
+  }
+  const group = name as Group;
+  for (const entry of property.initializer.properties) {
+    const normalized = normalizeEntry(
+      entry,
+      group,
+      imports,
+      dir,
+      result.warnings
+    );
+    if (normalized) {
+      result[group].push(normalized);
+    }
+  }
+};
+
 /**
  * Parse a user `components.ts`/`.tsx` and return its normalized overrides. Never
  * executes the file. On a parse failure or unrecognized shape, returns empty
@@ -451,34 +498,9 @@ export const analyzeComponentOverrides = (
 
   const imports = collectImports(sourceFile);
   const dir = dirname(filePath);
-  const groupNames = new Set<string>(GROUPS);
 
-  // Extracting the body into an early-returning helper regressed coverage.
-  // oxlint-disable-next-line sonarjs/too-many-break-or-continue-in-loop
   for (const property of object.properties) {
-    if (!ts.isPropertyAssignment(property)) {
-      continue;
-    }
-    const name = propName(property.name);
-    if (
-      !(name && groupNames.has(name)) ||
-      !ts.isObjectLiteralExpression(property.initializer)
-    ) {
-      continue;
-    }
-    const group = name as Group;
-    for (const entry of property.initializer.properties) {
-      const normalized = normalizeEntry(
-        entry,
-        group,
-        imports,
-        dir,
-        result.warnings
-      );
-      if (normalized) {
-        result[group].push(normalized);
-      }
-    }
+    collectGroupOverrides(property, imports, dir, result);
   }
 
   return result;

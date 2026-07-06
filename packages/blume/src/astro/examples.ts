@@ -59,10 +59,10 @@ const GLOB_MAGIC = /[!*?[\]{}]/u;
  */
 const splitGlobBase = (pattern: string): { base: string; rest: string } => {
   const segments = pattern.split("/");
+  // Only called when the pattern contains glob magic (see the caller), and `/`
+  // is never magic, so the magic char always lands in a segment — `findIndex`
+  // is never -1 here.
   const firstMagic = segments.findIndex((segment) => GLOB_MAGIC.test(segment));
-  if (firstMagic === -1) {
-    return { base: pattern, rest: "" };
-  }
   return {
     base: segments.slice(0, firstMagic).join("/"),
     rest: segments.slice(firstMagic).join("/"),
@@ -109,14 +109,13 @@ export const discoverExamples = async (
   const warnings: string[] = [];
   const seen = new Map<string, string>();
 
-  // Two independent skip conditions read most clearly as `continue`s here;
-  // extracting the body into an early-returning helper regressed coverage.
-  // oxlint-disable-next-line sonarjs/too-many-break-or-continue-in-loop
-  for (const [index, file] of files.entries()) {
+  // Extracted so the two skip paths become early `return`s (one `continue`
+  // budget per loop under the lint rule) instead of `continue` statements.
+  const collectExample = (file: string, source: string): void => {
     const ext = file.match(EXAMPLE_FILE)?.groups?.ext;
     const framework = ext ? FRAMEWORK_BY_EXT[ext] : undefined;
     if (!(ext && framework)) {
-      continue;
+      return;
     }
     // Strip the trailing `.<ext>` to form the `<Component path>` key.
     const path = relative(dir, file).slice(0, -(ext.length + 1));
@@ -125,10 +124,9 @@ export const discoverExamples = async (
       warnings.push(
         `Two examples both resolve to "${path}" ("${existing}" and "${file}"); ignoring the second. Give them distinct paths.`
       );
-      continue;
+      return;
     }
     seen.set(path, file);
-    const source = sources[index] ?? "";
     examples.push({
       client:
         framework === "astro"
@@ -140,6 +138,10 @@ export const discoverExamples = async (
       path,
       source,
     });
+  };
+
+  for (const [index, file] of files.entries()) {
+    collectExample(file, sources[index] ?? "");
   }
 
   return { examples, warnings };

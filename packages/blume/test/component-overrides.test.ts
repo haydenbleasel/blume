@@ -244,6 +244,56 @@ describe("analyzeComponentOverrides", () => {
     expect(result.mdx).toEqual([]);
     expect(result.warnings.join(" ")).toContain("without a `component` field");
   });
+
+  it("ignores side-effect imports with no import clause", () => {
+    const result = analyze(`
+      import "./register-globals.ts";
+      import Counter from "./Counter.tsx";
+      export default { islands: { Counter } };
+    `);
+    expect(result.islands).toHaveLength(1);
+    expect(result.islands[0]?.source?.path).toBe("/project/Counter.tsx");
+  });
+
+  it("skips a spread element inside a descriptor object", () => {
+    const result = analyze(`
+      export default {
+        mdx: { Widget: { ...shared, component: "./Widget.tsx", client: "load" } },
+      };
+    `);
+    const [widget] = result.mdx;
+    expect(widget?.key).toBe("Widget");
+    expect(widget?.client).toBe("load");
+    expect(widget?.source?.path).toBe("/project/Widget.tsx");
+  });
+
+  it("skips a spread element among the top-level groups", () => {
+    const result = analyze(`
+      export default { ...base, mdx: { Widget: "./Widget.tsx" } };
+    `);
+    expect(result.mdx).toHaveLength(1);
+    expect(result.mdx[0]?.source?.path).toBe("/project/Widget.tsx");
+  });
+
+  it("ignores non-group keys and groups whose value is not an object", () => {
+    const result = analyze(`
+      export default { theme: { Foo: "./Foo.tsx" }, mdx: 123 };
+    `);
+    expect(result.mdx).toEqual([]);
+    expect(result.layout).toEqual([]);
+    expect(result.islands).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("keeps an inline-function override on the runtime object only", () => {
+    const result = analyze(`
+      export default { mdx: { Widget: () => null } };
+    `);
+    const [widget] = result.mdx;
+    expect(widget?.key).toBe("Widget");
+    expect(widget?.identifier).toBe(false);
+    expect(widget?.source).toBeNull();
+  });
 });
 
 describe("analyzeComponentOverrides with real files", () => {
