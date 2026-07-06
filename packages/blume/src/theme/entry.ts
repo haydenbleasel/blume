@@ -604,7 +604,7 @@ pre:has(.line.focused):hover .line:not(.focused) {
   }
 }
 
-.prose :not(pre) > code {
+.prose :not(pre) > code:not(:where([class~="not-prose"] *)) {
   background: var(--blume-code-background);
   padding: 0.15em 0.35em;
   border-radius: 0.3rem;
