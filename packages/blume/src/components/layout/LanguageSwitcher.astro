@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../islands/base-path.ts";
 import type { LocaleSwitchOption } from "../../core/types.ts";
 import Icon from "../Icon.astro";
 
@@ -37,7 +38,7 @@ const menuRowClass =
           <a
             aria-current={option.current ? "true" : undefined}
             class={menuRowClass}
-            href={option.href}
+            href={withBase(option.href)}
             hreflang={option.code}
             lang={option.code}
           >

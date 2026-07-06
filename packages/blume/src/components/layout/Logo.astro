@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../islands/base-path.ts";
 // The site brand: the logo mark (inline SVG so a `currentColor` mark follows the
 // theme, or light/dark `<img>` variants) followed by the site title, wrapped in
 // a link to the brand href. Extracted from the header so it can be replaced on
@@ -27,7 +28,7 @@ const brandText = logo?.text ?? site.title;
 
 <a
   class="inline-flex items-center gap-2 font-semibold text-base text-foreground"
-  href={brandHref}
+  href={withBase(brandHref)}
 >
   {
     logoSvg && (

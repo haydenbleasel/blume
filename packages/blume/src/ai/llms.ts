@@ -1,13 +1,16 @@
+import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readEntryText } from "../core/sources/read.ts";
 import type { PageRecord } from "../core/types.ts";
 
-const pageUrl = (route: string, site?: string): string => {
+// Routes carry `basePath`; a `deployment.base` subdirectory is layered on top so
+// the emitted URL matches where the page is served.
+const pageUrl = (route: string, site?: string, base = ""): string => {
   if (!site) {
     return route;
   }
-  return `${site.replace(/\/$/u, "")}${route}`;
+  return `${site.replace(/\/$/u, "")}${withBasePath(base, route)}`;
 };
 
 const orderedPages = (project: BlumeProject): PageRecord[] =>
@@ -26,7 +29,11 @@ const buildIndex = (project: BlumeProject): string => {
   lines.push("", "## Docs", "");
 
   for (const page of orderedPages(project)) {
-    const url = pageUrl(page.route, site);
+    const url = pageUrl(
+      page.route,
+      site,
+      normalizeBasePath(config.deployment.base)
+    );
     const summary = page.description ? `: ${page.description}` : "";
     lines.push(`- [${page.title}](${url})${summary}`);
   }
@@ -43,7 +50,11 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
     pages.map(async (page) => {
       const raw = await readEntryText(project, page);
       const body = matter(raw).content.trim();
-      const url = pageUrl(page.route, config.deployment.site);
+      const url = pageUrl(
+        page.route,
+        config.deployment.site,
+        normalizeBasePath(config.deployment.base)
+      );
       return [`# ${page.title}`, `Source: ${url}`, "", body].join("\n");
     })
   );

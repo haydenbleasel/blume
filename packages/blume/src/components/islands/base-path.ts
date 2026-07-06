@@ -14,6 +14,34 @@ export const joinBase = (base: string, path: string): string =>
   `${withTrailingSlash(base)}${path}`;
 
 /**
+ * Prefix a root-relative internal route with the deployment base
+ * (`/guide` under base `/sub` -> `/sub/guide`), so a rendered link points at the
+ * page's real served URL. External URLs, protocol-relative URLs, and fragments
+ * pass through untouched, and it's idempotent (a route already under the base is
+ * returned unchanged). This is applied only where a URL is *emitted* — the
+ * navigation model and active-route matching stay in base-less logical space.
+ */
+export const prefixBase = (base: string, route: string): string => {
+  if (!route.startsWith("/") || route.startsWith("//")) {
+    return route;
+  }
+  const trimmed = base.replace(/\/+$/u, "");
+  if (!trimmed || route === trimmed || route.startsWith(`${trimmed}/`)) {
+    return route;
+  }
+  return route === "/" ? trimmed : `${trimmed}${route}`;
+};
+
+/**
+ * {@link prefixBase} bound to the build-time `BASE_URL` (the resolved
+ * `deployment.base`). The ergonomic form for `.astro` templates — `href={
+ * withBase(route)}` — since `BASE_URL` is inlined by Vite wherever this module
+ * is bundled into the site.
+ */
+export const withBase = (route: string): string =>
+  prefixBase(import.meta.env.BASE_URL ?? "/", route);
+
+/**
  * A pathname with the deployment base stripped (`/docs/guide` -> `/guide`),
  * for page-context lookups against base-less document routes.
  */

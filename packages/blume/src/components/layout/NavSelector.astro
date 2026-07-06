@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../islands/base-path.ts";
 // A top-level navigation selector: a dropdown that switches
 // between partitions of the site — a product, a version, or any grouped set of
 // destinations (`navigation.selectors` in the config). Zero-JS, built on
@@ -50,7 +51,7 @@ const menuRowClass =
           <a
             aria-current={item.path === active?.path ? "true" : undefined}
             class={menuRowClass}
-            href={item.path}
+            href={withBase(item.path)}
           >
             {item.icon && <Icon class="mt-0.5" name={item.icon} size={16} />}
             <span class="flex-1">

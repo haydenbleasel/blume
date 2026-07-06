@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../islands/base-path.ts";
 import type { Crumb } from "./nav-utils.ts";
 
 interface Props {
@@ -25,7 +26,7 @@ const eyebrowCrumb = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
       ]}
     >
       {eyebrowCrumb.route ? (
-        <a class="hover:text-foreground" href={eyebrowCrumb.route}>
+        <a class="hover:text-foreground" href={withBase(eyebrowCrumb.route)}>
           {eyebrowCrumb.label}
         </a>
       ) : (

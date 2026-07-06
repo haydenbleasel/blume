@@ -1,3 +1,4 @@
+import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ContentSignalPolicy, ContentSignals } from "../core/schema.ts";
 
@@ -47,7 +48,11 @@ export const buildRobots = (project: BlumeProject): string | null => {
 
   const { site } = config.deployment;
   if (site && config.seo.sitemap) {
-    lines.push("", `Sitemap: ${site.replace(/\/$/u, "")}/sitemap.xml`);
+    const sitemapPath = withBasePath(
+      normalizeBasePath(config.deployment.base),
+      "/sitemap.xml"
+    );
+    lines.push("", `Sitemap: ${site.replace(/\/$/u, "")}${sitemapPath}`);
   }
   return `${lines.join("\n")}\n`;
 };

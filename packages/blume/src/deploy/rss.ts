@@ -1,3 +1,4 @@
+import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { PageRecord } from "../core/types.ts";
 import { escapeXml } from "./xml.ts";
@@ -52,6 +53,11 @@ export const buildRssFeeds = (project: BlumeProject): RssFeed[] => {
     return [];
   }
   const base = site.replace(/\/$/u, "");
+  // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top.
+  // The feed's own `link`/self URL points at the docs root under that base, while
+  // `path` stays base-less (it's also the on-disk output location).
+  const deployBase = normalizeBasePath(config.deployment.base);
+  const rootLink = `${base}${deployBase}`;
 
   const feeds: RssFeed[] = [];
   for (const type of rss.types) {
@@ -70,7 +76,7 @@ export const buildRssFeeds = (project: BlumeProject): RssFeed[] => {
         description: page.description,
         // Encode like the sitemap does: a route with spaces or non-ASCII
         // must still yield a valid <link>/<guid> URL after XML decoding.
-        link: encodeURI(`${base}${page.route}`),
+        link: encodeURI(`${base}${withBasePath(deployBase, page.route)}`),
         title: page.title,
       }))
       .toSorted((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
@@ -79,7 +85,7 @@ export const buildRssFeeds = (project: BlumeProject): RssFeed[] => {
     feeds.push({
       description: config.description,
       items,
-      link: base,
+      link: rootLink,
       path: `/${type}/rss.xml`,
       title: `${config.title} — ${capitalize(type)}`,
       type,

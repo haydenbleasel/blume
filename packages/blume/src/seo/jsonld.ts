@@ -1,4 +1,5 @@
 import type { Crumb } from "../components/layout/nav-utils.ts";
+import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 
 /** A date-ish value carried through frontmatter (string, YAML Date, or unset). */
 type DateInput = string | Date | null;
@@ -12,6 +13,8 @@ export interface StructuredDataInput {
   description?: string;
   /** Page route, e.g. `/blog/post`. */
   route: string;
+  /** Deployment base (`import.meta.env.BASE_URL`); prefixed onto absolute URLs. */
+  base?: string;
   /** Content type — `blog` and `changelog` map to richer article types. */
   pageType?: string;
   /** Publish date (string or YAML Date); emitted as ISO `datePublished`. */
@@ -52,7 +55,11 @@ export const buildStructuredData = (
   input: StructuredDataInput
 ): Record<string, unknown> | null => {
   const base = input.siteUrl ? trimSlash(input.siteUrl) : null;
-  const pageUrl = absolute(base, input.route);
+  // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top
+  // so JSON-LD URLs match the served location.
+  const deployBase = normalizeBasePath(input.base);
+  const pageUrl = absolute(base, withBasePath(deployBase, input.route));
+  const rootUrl = absolute(base, deployBase);
   const graph: Record<string, unknown>[] = [];
 
   if (base) {
@@ -60,7 +67,7 @@ export const buildStructuredData = (
       "@id": `${base}#website`,
       "@type": "WebSite",
       name: input.siteName,
-      url: base,
+      url: rootUrl,
     });
   }
 
@@ -101,7 +108,7 @@ export const buildStructuredData = (
             position: index + 1,
           };
           if (crumb.route) {
-            item.item = absolute(base, crumb.route);
+            item.item = absolute(base, withBasePath(deployBase, crumb.route));
           }
           return item;
         }),

@@ -142,6 +142,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 
   <script>
     import { chromeIcons as icons } from "../../theme/chrome-icons.ts";
+    import { prefixBase } from "../islands/base-path.ts";
     import {
       escapeHtml,
       highlight,
@@ -478,7 +479,10 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 
       createHitRow(hit: SearchHit, query: string): Selectable {
         const el = document.createElement("a");
-        el.href = hit.url;
+        // Index URLs are base-less logical routes; prefix the deployment base so
+        // clicking a result lands on the page's real served URL.
+        const href = prefixBase(import.meta.env.BASE_URL, hit.url);
+        el.href = href;
         el.className = `${ROW_CLASS} ${MARK}`;
         // `line-clamp-2` already sets `display`, so no `block` here (it would
         // override the clamp and let the excerpt run to full height).
@@ -491,21 +495,22 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
             <span class="block truncate font-normal text-foreground text-sm">${hit.title}</span>
             ${excerpt}
           </span>`;
-        const item: Selectable = { el, hit, kind: "link", url: hit.url };
+        const item: Selectable = { el, hit, kind: "link", url: href };
         this.bindRow(item);
         return item;
       }
 
       createLinkRow(url: string, label: string): Selectable {
         const el = document.createElement("a");
-        el.href = url;
+        const href = prefixBase(import.meta.env.BASE_URL, url);
+        el.href = href;
         el.className = ROW_CLASS;
         el.innerHTML = `
           <span class="mt-0.5 shrink-0 text-muted-foreground">${svg("file")}</span>
           <span class="flex-1">
             <span class="block truncate font-normal text-foreground text-sm">${escapeHtml(label)}</span>
           </span>`;
-        const item: Selectable = { el, kind: "link", url };
+        const item: Selectable = { el, kind: "link", url: href };
         this.bindRow(item);
         return item;
       }

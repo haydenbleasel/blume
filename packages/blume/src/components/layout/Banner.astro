@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../islands/base-path.ts";
 import Icon from "../Icon.astro";
 
 // The site-wide announcement banner, shared by RootLayout and ReferenceLayout so
@@ -29,7 +30,7 @@ const { banner } = Astro.props;
       {banner.link && (
         <a
           class="inline-flex items-center gap-1 font-medium underline underline-offset-2"
-          href={banner.link.href}
+          href={withBase(banner.link.href)}
         >
           {banner.link.text}
           <Icon name="arrow-right" size={14} />

@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../islands/base-path.ts";
 // Emits the icon <link>s for the document <head>: the favicon (rel="icon") and,
 // when the project ships one, the Apple touch icon (rel="apple-touch-icon").
 // Each href is either a URL to a file the project ships in public/, or a data
@@ -18,5 +19,5 @@ interface Props {
 const { appleIcon, favicon } = Astro.props;
 ---
 
-{favicon && <link href={favicon.href} rel="icon" type={favicon.type} />}
-{appleIcon && <link href={appleIcon.href} rel="apple-touch-icon" />}
+{favicon && <link href={withBase(favicon.href)} rel="icon" type={favicon.type} />}
+{appleIcon && <link href={withBase(appleIcon.href)} rel="apple-touch-icon" />}

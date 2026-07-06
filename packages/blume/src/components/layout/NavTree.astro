@@ -1,6 +1,7 @@
 ---
 import type { NavNode } from "../../core/types.ts";
 import Icon from "../Icon.astro";
+import { withBase } from "../islands/base-path.ts";
 import Self from "./NavTree.astro";
 
 interface PagePanel {
@@ -130,7 +131,7 @@ const initialId =
               <a
                 aria-current={panel.route === currentRoute ? "page" : undefined}
                 class="flex-1 truncate font-semibold text-foreground text-sm hover:underline"
-                href={panel.route}
+                href={withBase(panel.route)}
               >
                 {panel.label}
               </a>
@@ -159,7 +160,7 @@ const initialId =
               <a
                 aria-current={item.route === currentRoute ? "page" : undefined}
                 class="block rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground"
-                href={item.route}
+                href={withBase(item.route)}
               >
                 <span class="flex items-center gap-2">
                   {item.icon && (
@@ -231,7 +232,7 @@ const initialId =
                         item.route === currentRoute ? "page" : undefined
                       }
                       class="-my-1 flex flex-1 items-center gap-1.5 rounded py-1 transition-colors aria-[current=page]:text-foreground aria-[current=page]:font-semibold"
-                      href={item.route}
+                      href={withBase(item.route)}
                     >
                       {item.icon && (
                         <Icon
@@ -286,7 +287,7 @@ const initialId =
                 <a
                   aria-current={item.route === currentRoute ? "page" : undefined}
                   class="-ml-1 flex flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-foreground transition-colors hover:bg-muted aria-[current=page]:bg-muted"
-                  href={item.route}
+                  href={withBase(item.route)}
                 >
                   {item.icon && (
                     <Icon

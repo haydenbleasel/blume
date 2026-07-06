@@ -10,6 +10,7 @@ import type {
 import "blume:theme";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import { buildStructuredData } from "../../seo/jsonld.ts";
+import { withBase } from "../islands/base-path.ts";
 import Analytics from "./Analytics.astro";
 import Banner from "./Banner.astro";
 import Breadcrumbs from "./Breadcrumbs.astro";
@@ -250,7 +251,8 @@ const formattedLastModified =
 
 // The hosted MCP server's absolute URL, used by the page-actions install menu.
 // Needs a configured site to be useful, so the menu is hidden without one.
-const mcpUrl = mcp && siteUrl ? new URL(mcp.route, siteUrl).href : null;
+const mcpUrl =
+  mcp && siteUrl ? new URL(withBase(mcp.route), siteUrl).href : null;
 
 // Scope the sidebar (and the breadcrumbs/pagination derived from it) to the
 // active tab's section, so a multi-section site drills each tab into its own
@@ -266,6 +268,7 @@ const structuredData =
   structuredDataEnabled === false || noindex
     ? null
     : buildStructuredData({
+      base: import.meta.env.BASE_URL,
       breadcrumbs: crumbs,
       description,
       locale,
@@ -318,7 +321,7 @@ const bannerScript = banner?.dismissible
     {
       feeds?.map((feed) => (
         <link
-          href={feed.href}
+          href={withBase(feed.href)}
           rel="alternate"
           title={feed.title}
           type="application/rss+xml"
@@ -390,7 +393,7 @@ const bannerScript = banner?.dismissible
                     <li>
                       <a
                         class="block rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
-                        href={link.href}
+                        href={withBase(link.href)}
                         rel={external ? "noreferrer" : undefined}
                         target={external ? "_blank" : undefined}
                       >
@@ -445,7 +448,7 @@ const bannerScript = banner?.dismissible
                           : undefined
                       }
                       class="block rounded-[0.65rem] px-2.5 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
-                      href={tab.path}
+                      href={withBase(tab.path)}
                     >
                       {tab.label}
                     </a>

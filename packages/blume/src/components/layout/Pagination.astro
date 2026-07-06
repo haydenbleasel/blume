@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../islands/base-path.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { FlatPage } from "./nav-utils.ts";
 import Icon from "../Icon.astro";
@@ -24,7 +25,7 @@ const { prev, next, strings } = Astro.props;
       {prev ? (
         <a
           class="flex max-w-[48%] flex-1 items-center gap-2 rounded-full border border-border px-4 py-3 text-foreground transition-colors hover:border-foreground max-md:max-w-full"
-          href={prev.route}
+          href={withBase(prev.route)}
         >
           <Icon class="rtl:-scale-x-100" name="arrow-left" size={16} />
           <span>
@@ -40,7 +41,7 @@ const { prev, next, strings } = Astro.props;
       {next && (
         <a
           class="ms-auto flex max-w-[48%] flex-1 items-center justify-end gap-2 rounded-full border border-border px-4 py-3 text-end text-foreground transition-colors hover:border-foreground max-md:max-w-full"
-          href={next.route}
+          href={withBase(next.route)}
         >
           <span>
             <span class="block text-muted-foreground text-xs max-md:hidden">

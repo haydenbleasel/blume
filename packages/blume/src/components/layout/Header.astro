@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../islands/base-path.ts";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { LocaleSwitchOption, Navigation } from "../../core/types.ts";
@@ -139,7 +140,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
                 : undefined
             }
             class="rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground"
-            href={tab.path}
+            href={withBase(tab.path)}
           >
             {tab.label}
           </a>

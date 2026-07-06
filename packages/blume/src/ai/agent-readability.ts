@@ -1,3 +1,4 @@
+import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ContentSignalPolicy, ContentSignals } from "../core/schema.ts";
 import { buildRssFeeds } from "../deploy/rss.ts";
@@ -42,9 +43,13 @@ export const buildAgentReadability = (
   }
 
   const site = config.deployment.site ?? null;
-  // Concatenate rather than `new URL()` so a subpath deployment's base is kept.
+  // Every artifact is served under `deployment.base`; concatenate rather than
+  // `new URL()` so the subpath is preserved.
+  const deployBase = normalizeBasePath(config.deployment.base);
   const abs = (path: string): string =>
-    site ? `${site.replace(/\/+$/u, "")}${path}` : path;
+    site
+      ? `${site.replace(/\/+$/u, "")}${withBasePath(deployBase, path)}`
+      : path;
 
   const artifacts: Record<string, unknown> = {
     markdown: {

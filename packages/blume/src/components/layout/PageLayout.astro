@@ -25,6 +25,7 @@ import type {
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { LocaleSwitchOption, Navigation } from "../../core/types.ts";
+import { withBase } from "../islands/base-path.ts";
 import "blume:theme";
 import Analytics from "./Analytics.astro";
 import Banner from "./Banner.astro";
@@ -121,18 +122,22 @@ const route = page?.route ?? "/";
 // (`/og/<slug>.png`, `index` for the home) is generated for static custom pages
 // when `og.enabled`. Explicit props still win.
 const ogSlug = route === "/" ? "index" : route.slice(1);
+// Absolute URLs carry the deployment base too (`site + base + route`), since the
+// page is served under it. `withBase` handles a root base as a no-op.
+const basedRoute = withBase(route);
 const resolvedCanonical =
-  canonical ?? (siteUrl ? `${siteUrl}${route === "/" ? "" : route}` : null);
+  canonical ??
+  (siteUrl ? `${siteUrl}${basedRoute === "/" ? "" : basedRoute}` : null);
 // An explicit `ogImage` wins. A root-relative path (e.g. an image dropped in
 // `public/`) is resolved against the site URL so crawlers get an absolute
 // `og:image`; an already-absolute URL passes through untouched. Otherwise fall
 // back to the generated OG card for this route.
 const absolutizeOgImage = (value: string): string =>
-  value.startsWith("/") && siteUrl ? `${siteUrl}${value}` : value;
+  value.startsWith("/") && siteUrl ? `${siteUrl}${withBase(value)}` : value;
 const resolvedOgImage = ogImage
   ? absolutizeOgImage(ogImage)
   : ogEnabled && siteUrl
-    ? `${siteUrl}/og/${ogSlug}.png`
+    ? `${siteUrl}${withBase(`/og/${ogSlug}.png`)}`
     : null;
 
 const initialThemeScript = themeInitScript(themeMode);
@@ -215,7 +220,7 @@ const bannerScript = banner?.dismissible
                           : undefined
                       }
                       class="block rounded-[0.65rem] px-2.5 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
-                      href={tab.path}
+                      href={withBase(tab.path)}
                     >
                       {tab.label}
                     </a>

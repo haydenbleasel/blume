@@ -1,3 +1,4 @@
+import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { escapeXml } from "./xml.ts";
 
@@ -24,6 +25,8 @@ export const buildSitemap = (project: BlumeProject): string | null => {
   }
 
   const base = site.replace(/\/$/u, "");
+  // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top.
+  const deployBase = normalizeBasePath(project.config.deployment.base);
   const urls: string[] = [];
   for (const page of project.graph.pages) {
     if (page.meta.draft || page.meta.sidebar.hidden || page.meta.seo.noindex) {
@@ -33,7 +36,9 @@ export const buildSitemap = (project: BlumeProject): string | null => {
     // then escape XML metacharacters (notably `&`) so a route like
     // `/Tips & Tricks` doesn't produce invalid XML that gets the whole sitemap
     // rejected.
-    const loc = escapeXml(encodeURI(`${base}${page.route}`));
+    const loc = escapeXml(
+      encodeURI(`${base}${withBasePath(deployBase, page.route)}`)
+    );
     urls.push(`  <url><loc>${loc}</loc>${lastmodTag(page.lastModified)}</url>`);
   }
   urls.sort();
