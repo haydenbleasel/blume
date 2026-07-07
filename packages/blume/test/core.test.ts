@@ -137,6 +137,39 @@ describe("astro config template", () => {
     expect(output).toContain("defaultColor: false");
   });
 
+  it("threads a configured codeBlocks theme into shikiConfig and the processors", () => {
+    const config = blumeConfigSchema.parse({
+      markdown: { codeBlocks: { theme: { dark: "vesper" } } },
+    });
+    const context = {
+      outDir: "/r/.blume",
+      pagesRoot: null,
+      root: "/r",
+    } as ProjectContext;
+
+    const output = astroConfigTemplate({
+      config,
+      contentRoutes: [],
+      context,
+      dataPath: "/r/.blume/src/generated/data.json",
+      examplesPath: "/r/.blume/src/generated/examples.ts",
+      needsReact: false,
+      openapiPath: "/r/.blume/src/generated/openapi.json",
+      pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
+      themePath: "/r/.blume/src/generated/app.css",
+    });
+
+    // Fenced code (the reported bug): the dark override reaches shikiConfig while
+    // the unset light theme keeps its github default.
+    expect(output).toContain('dark: "vesper"');
+    expect(output).toContain('light: "github-light"');
+    // Inline code shares the theme via the processor's `codeThemes` option.
+    expect(output).toContain(
+      '"codeThemes":{"dark":"vesper","light":"github-light"}'
+    );
+  });
+
   const context = {
     outDir: "/r/.blume",
     pagesRoot: null,

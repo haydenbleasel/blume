@@ -10,6 +10,8 @@
 // `.prose` container (`max-w-none` so it fills its own column rather than the
 // prose reading measure); that's what makes the light/dark swap work on a bare
 // page without the manual `[data-theme]` CSS it would otherwise need.
+import data from "blume:data";
+
 import { highlightCode } from "../../markdown/index.ts";
 
 interface Props {
@@ -26,6 +28,7 @@ interface Props {
 const { code, lang = "txt", icons, title } = Astro.props;
 const html = await highlightCode(code.replace(/\n+$/u, ""), lang, {
   icons,
+  themes: data.config.codeThemes,
   title,
 });
 ---

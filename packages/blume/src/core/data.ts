@@ -93,6 +93,8 @@ export interface BlumeDataConfig {
     suggestions: NonNullable<ResolvedConfig["ai"]["ask"]>["suggestions"];
   } | null;
   banner: BlumeBanner | null;
+  /** `markdown.codeBlocks.theme`: light/dark Shiki themes for code surfaces. */
+  codeThemes: ResolvedConfig["markdown"]["codeBlocks"]["theme"];
   /** `markdown.code.wrap`: wrap long code lines instead of scrolling. */
   codeWrap: boolean;
   description: string | undefined;

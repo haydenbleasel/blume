@@ -827,6 +827,19 @@ describe("highlightCode", () => {
     expect(html).toContain("&lt;a&gt; &amp; &lt;/a&gt;");
     expect(html).not.toContain("<a>");
   });
+
+  it("honors a custom themes option (differs from the default pair)", async () => {
+    const code = "const x = 1;";
+    const [byDefault, custom] = await Promise.all([
+      highlightCode(code, "ts"),
+      highlightCode(code, "ts", {
+        themes: { dark: "vesper", light: "github-light" },
+      }),
+    ]);
+    // Theme names never appear in Shiki's dual-theme output (only the resolved
+    // colors do), so a different dark theme must change the emitted markup.
+    expect(custom).not.toBe(byDefault);
+  });
 });
 
 describe("headingAnchorPlugin (frontmatter interpolation)", () => {

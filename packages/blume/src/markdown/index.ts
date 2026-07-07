@@ -17,6 +17,8 @@ import { languageIconTransformer } from "./language-icon.ts";
 import { mathPlugin } from "./math.ts";
 import { mermaidPlugin } from "./mermaid.ts";
 import { packageInstallPlugin } from "./package-install.ts";
+import { DEFAULT_CODE_THEMES } from "./themes.ts";
+import type { CodeThemes } from "./themes.ts";
 
 /** A Shiki transformer, derived from the upstream factories' return type. */
 type ShikiTransformer = ReturnType<typeof transformerNotationDiff>;
@@ -55,7 +57,7 @@ type HastPlugin = NonNullable<
  */
 const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => {
   const plugins: HastPlugin[] = [
-    inlineCodeHighlightPlugin() as unknown as HastPlugin,
+    inlineCodeHighlightPlugin(options.codeThemes) as unknown as HastPlugin,
   ];
   if (options.headingAnchors !== false) {
     plugins.push(headingAnchorPlugin() as unknown as HastPlugin);
@@ -100,13 +102,6 @@ export const blumeShikiTransformers = (
   return transformers;
 };
 
-/**
- * The light/dark Shiki themes Blume highlights with. Kept in lockstep with the
- * generated Astro config's `shikiConfig.themes` so code highlighted outside the
- * Markdown pipeline (via {@link highlightCode}) matches fenced code exactly.
- */
-const CODE_THEMES = { dark: "github-dark", light: "github-light" } as const;
-
 const escapeHtml = (value: string): string =>
   value
     .replaceAll("&", "&amp;")
@@ -148,6 +143,11 @@ const languageAttrTransformer = (lang: string): ShikiTransformer =>
 export interface HighlightCodeOptions extends BlumeShikiOptions {
   /** Extra `<pre>` class names, e.g. `blume-source` for a height-capped pane. */
   className?: string;
+  /**
+   * Light/dark Shiki themes (`markdown.codeBlocks.theme`). Defaults to the same
+   * github pair fenced code uses, so out-of-pipeline code stays in lockstep.
+   */
+  themes?: CodeThemes;
   /** Header title (a filename), matching a fence's `title="..."` meta. */
   title?: string;
 }
@@ -177,7 +177,7 @@ export const highlightCode = async (
       meta: options.title
         ? { __raw: `title="${options.title.replaceAll('"', "")}"` }
         : undefined,
-      themes: CODE_THEMES,
+      themes: options.themes ?? DEFAULT_CODE_THEMES,
       transformers: [
         ...blumeShikiTransformers({ icons: options.icons }),
         astroCodeClassTransformer(options.className),
@@ -201,6 +201,11 @@ const FEATURES = { subscript: true, superscript: true };
 
 /** Options shared by both processors. */
 export interface BlumeMarkdownOptions {
+  /**
+   * Light/dark Shiki themes for inline `` `code`{:lang} `` highlighting
+   * (`markdown.codeBlocks.theme`). Defaults to the github pair fenced code uses.
+   */
+  codeThemes?: CodeThemes;
   /**
    * Wrap `<h2>`–`<h6>` in self-linking anchors (`markdown.headingAnchors`).
    * On unless explicitly `false`.

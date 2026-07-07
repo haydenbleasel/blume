@@ -333,6 +333,7 @@ export const astroConfigTemplate = (options: {
   const integrations = [
     `mdx({ processor: blumeMdxProcessor(${JSON.stringify({
       basePath: contentLinkBase,
+      codeThemes: config.markdown.codeBlocks.theme,
       headingAnchors: config.markdown.headingAnchors,
     })}) })`,
   ];
@@ -367,12 +368,13 @@ export default defineConfig({
   markdown: {
     processor: blumeMarkdownProcessor(${JSON.stringify({
       basePath: contentLinkBase,
+      codeThemes: config.markdown.codeBlocks.theme,
       headingAnchors: config.markdown.headingAnchors,
     })}),
     shikiConfig: {
       themes: {
-        light: "github-light",
-        dark: "github-dark",
+        light: ${JSON.stringify(config.markdown.codeBlocks.theme.light)},
+        dark: ${JSON.stringify(config.markdown.codeBlocks.theme.dark)},
       },
       defaultColor: false,
       transformers: [${twoslashTransformer}...blumeShikiTransformers(${JSON.stringify(

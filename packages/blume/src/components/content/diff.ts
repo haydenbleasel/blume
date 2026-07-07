@@ -13,6 +13,9 @@ import { readFile } from "node:fs/promises";
 import { preloadDiffHTML, preloadPatchDiff } from "@pierre/diffs/ssr";
 import { isAbsolute, join } from "pathe";
 
+import { DEFAULT_CODE_THEMES } from "../../markdown/themes.ts";
+import type { CodeThemes } from "../../markdown/themes.ts";
+
 export interface DiffOptions {
   /** Path to the "after" file, resolved relative to {@link DiffOptions.root}. */
   after?: string;
@@ -30,10 +33,12 @@ export interface DiffOptions {
   root?: string;
   /** Path to a `.patch`/`.diff` file, resolved relative to {@link DiffOptions.root}. */
   src?: string;
+  /**
+   * Light/dark Shiki themes (`markdown.codeBlocks.theme`). Defaults to the same
+   * github pair Blume's code blocks use, keeping diffs in lockstep.
+   */
+  theme?: CodeThemes;
 }
-
-/** Dual-theme config mirroring Blume's Shiki convention (see `templates.ts`). */
-const THEME = { dark: "github-dark", light: "github-light" } as const;
 
 const resolvePath = (path: string, root: string): string =>
   isAbsolute(path) ? path : join(root, path);
@@ -56,12 +61,13 @@ export const renderDiff = async (options: DiffOptions): Promise<string> => {
     patch,
     root = process.cwd(),
     src,
+    theme = DEFAULT_CODE_THEMES,
   } = options;
 
   if (patch !== undefined || src !== undefined) {
     const text = patch ?? (await readText(src as string, root));
     const result = await preloadPatchDiff({
-      options: { theme: THEME },
+      options: { theme },
       patch: text,
     });
     return result.prerenderedHTML;
@@ -74,7 +80,7 @@ export const renderDiff = async (options: DiffOptions): Promise<string> => {
     return await preloadDiffHTML({
       newFile: { contents: await readText(after, root), name: after },
       oldFile: { contents: await readText(before, root), name: before },
-      options: { theme: THEME },
+      options: { theme },
     });
   }
 
@@ -85,7 +91,7 @@ export const renderDiff = async (options: DiffOptions): Promise<string> => {
     return await preloadDiffHTML({
       newFile: { contents: newText, lang, name: "snippet" },
       oldFile: { contents: old, lang, name: "snippet" },
-      options: { disableFileHeader: true, theme: THEME },
+      options: { disableFileHeader: true, theme },
     });
   }
 

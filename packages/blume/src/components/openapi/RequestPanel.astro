@@ -1,4 +1,6 @@
 ---
+import data from "blume:data";
+
 import { highlightCode } from "../../markdown/index.ts";
 import { exampleValue, type SchemaLike, toJson } from "./helpers.ts";
 import type { RequestSample, SampleLanguage } from "./snippets.ts";
@@ -35,6 +37,7 @@ const requestSamples = await Promise.all(
   languages.map(async (language) => ({
     html: await highlightCode(language.build(sample), language.lang, {
       icons: false,
+      themes: data.config.codeThemes,
     }),
     id: language.id,
     label: language.label,
@@ -53,7 +56,10 @@ const responseEntries = await Promise.all(
     const html =
       example === undefined || example === null
         ? null
-        : await highlightCode(toJson(example), "json", { icons: false });
+        : await highlightCode(toJson(example), "json", {
+            icons: false,
+            themes: data.config.codeThemes,
+          });
     return { description: response.description ?? "", html, status };
   })
 );

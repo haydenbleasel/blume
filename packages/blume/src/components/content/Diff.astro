@@ -6,6 +6,8 @@
 //
 // Inputs (one of): `patch`/`src` (unified patch), `before`+`after` (file paths),
 // or `old`+`new` (inline strings, with optional `lang`).
+import data from "blume:data";
+
 import { renderDiff } from "./diff.ts";
 
 interface Props {
@@ -22,7 +24,7 @@ let html: string | undefined;
 let error: string | undefined;
 
 try {
-  html = await renderDiff(Astro.props);
+  html = await renderDiff({ ...Astro.props, theme: data.config.codeThemes });
 } catch (cause) {
   error = cause instanceof Error ? cause.message : String(cause);
 }

@@ -8,6 +8,8 @@
 // map of path → { Component (a static hydration wrapper), code, lang }. React,
 // Vue, Svelte, and Astro examples are all supported. The source is highlighted
 // with the same Shiki setup as ordinary code fences.
+import data from "blume:data";
+
 import { highlightCode } from "../../markdown/index.ts";
 import Tab from "./Tab.astro";
 import Tabs from "./Tabs.astro";
@@ -27,7 +29,10 @@ const Preview = entry?.Component;
 // capped box — see the theme entry — so the copy button, pinned to the `<pre>`,
 // stays put. This pane already lives inside `.prose`, so the theme styles it.
 const codeHtml = entry
-  ? await highlightCode(entry.code, entry.lang, { className: "blume-source" })
+  ? await highlightCode(entry.code, entry.lang, {
+      className: "blume-source",
+      themes: data.config.codeThemes,
+    })
   : undefined;
 
 // Both tabs share one height so toggling them never shifts the layout. Size it

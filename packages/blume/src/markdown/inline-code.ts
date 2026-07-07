@@ -12,6 +12,9 @@
  * added to the pipeline at all).
  */
 
+import { DEFAULT_CODE_THEMES } from "./themes.ts";
+import type { CodeThemes } from "./themes.ts";
+
 /** A minimal hast node (avoids a hast type dependency). */
 interface HastNode {
   children?: HastNode[];
@@ -72,7 +75,9 @@ const loadHighlighter = async (): Promise<InlineHighlighter> => {
 };
 
 /** Build the plugin. Highlights inline `` `code{:lang}` `` snippets. */
-export const inlineCodeHighlightPlugin = (): InlineCodePlugin => ({
+export const inlineCodeHighlightPlugin = (
+  themes: CodeThemes = DEFAULT_CODE_THEMES
+): InlineCodePlugin => ({
   element: {
     filter: ["code"],
     async visit(node, ctx) {
@@ -90,7 +95,7 @@ export const inlineCodeHighlightPlugin = (): InlineCodePlugin => ({
           defaultColor: false,
           lang: parsed.lang,
           structure: "inline",
-          themes: { dark: "github-dark", light: "github-light" },
+          themes,
         });
         return {
           children: root.children,

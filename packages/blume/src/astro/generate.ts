@@ -708,6 +708,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
         ? { suggestions: config.ai.ask.suggestions }
         : null,
       banner: resolveBanner(config),
+      codeThemes: config.markdown.codeBlocks.theme,
       codeWrap: config.markdown.code.wrap,
       description: config.description,
       favicon: resolveFavicon(project),

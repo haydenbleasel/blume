@@ -735,7 +735,10 @@ export interface CodeConfig {
 export interface MarkdownConfig {
   /** Code-block rendering: language icons, line wrap. */
   code?: CodeConfig;
-  /** Syntax-highlighting themes for fenced code blocks. */
+  /**
+   * Syntax-highlighting themes for every code surface — fenced blocks, inline
+   * `` `code`{:lang} ``, `<CodeBlock>`, and `<Diff>`.
+   */
   codeBlocks?: {
     /** Shiki theme names per color mode. */
     theme?: {

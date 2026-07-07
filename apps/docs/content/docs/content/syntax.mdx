@@ -141,6 +141,18 @@ export default defineConfig({
 
 Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span and it's colored like a tiny code block — `useState(){:js}` or `T extends object{:ts}`. It only kicks in when you add the marker, so plain inline code stays untouched — nothing to switch on.
 
+Highlighting uses the `github-light`/`github-dark` themes by default. Swap in any [bundled Shiki theme](https://shiki.style/themes) per color mode with `markdown.codeBlocks.theme` — it colors every code surface at once (fences, inline snippets, `<CodeBlock>`, and `<Diff>`):
+
+```ts blume.config.ts
+export default defineConfig({
+  markdown: {
+    codeBlocks: {
+      theme: { light: "github-light", dark: "vesper" },
+    },
+  },
+});
+```
+
 ### Line numbers
 
 Append `lineNumbers` to render a line-number gutter — on its own or alongside a title:
