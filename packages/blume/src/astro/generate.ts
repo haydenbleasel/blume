@@ -43,7 +43,10 @@ import { isOpenApiSource } from "../openapi/source.ts";
 import { registry } from "../registry/registry.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { searchProviderMeta, servesStaticIndex } from "../search/providers.ts";
-import { tailwindEntryTemplate } from "../theme/entry.ts";
+import {
+  examplesEntryTemplate,
+  tailwindEntryTemplate,
+} from "../theme/entry.ts";
 import { buildFontsCss, configuredCssVars } from "../theme/fonts.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
@@ -61,6 +64,7 @@ import {
   envTemplate,
   exampleMapTemplate,
   exampleWrapperTemplate,
+  examplesPageTemplate,
   exampleSlug,
   islandMapTemplate,
   islandWrapperTemplate,
@@ -392,6 +396,47 @@ const islandFrameworkWarnings = (
     }
   }
   return warnings;
+};
+
+/** Absolute path to the configured `examples.css`, or null when unset. */
+const examplesCssFile = (root: string, config: ResolvedConfig): string | null =>
+  config.examples.css ? join(root, config.examples.css) : null;
+
+/**
+ * Write the per-example preview route (`{basePath}/blume-examples/<path>`)
+ * that `<Component />` iframes embed — the iframe boundary is what isolates
+ * previews from the docs CSS. Nested under `basePath` in the filesystem so
+ * the routes stay reachable behind a proxy that only forwards the base;
+ * pruneOrphans clears a stale copy when `basePath` changes or the last
+ * example is removed. Returns (as a spreadable list) a warning when the
+ * configured `examples.css` doesn't exist.
+ */
+const writeExamplesPreview = async (options: {
+  config: ResolvedConfig;
+  hasExamples: boolean;
+  root: string;
+  srcDir: string;
+  write: (path: string, content: string) => Promise<boolean>;
+}): Promise<string[]> => {
+  const { config, hasExamples, root, srcDir, write } = options;
+  if (hasExamples) {
+    await write(
+      join(
+        srcDir,
+        "pages",
+        ...config.basePath.split("/").filter(Boolean),
+        "blume-examples",
+        "[...path].astro"
+      ),
+      examplesPageTemplate()
+    );
+  }
+  const cssFile = examplesCssFile(root, config);
+  return cssFile && !existsSync(cssFile)
+    ? [
+        `examples.css points at "${config.examples.css}", which doesn't exist; previews render without it.`,
+      ]
+    : [];
 };
 
 /** Read a file's contents, or return an empty string if it is absent. */
@@ -1036,6 +1081,7 @@ export const generateRuntime = async (
   const themePath = join(srcDir, "generated", "app.css");
   const searchClientPath = join(srcDir, "generated", "search-client.ts");
   const examplesPath = join(srcDir, "generated", "examples.ts");
+  const examplesThemePath = join(srcDir, "generated", "examples.css");
   const openapiPath = join(srcDir, "generated", "openapi.json");
 
   // Record every file this pass writes so orphans (from a now-disabled feature)
@@ -1060,6 +1106,7 @@ export const generateRuntime = async (
     detectedReact,
     usesMath,
     userTheme,
+    userExamplesCss,
     islandDiscovery,
     exampleDiscovery,
     componentSlots,
@@ -1068,8 +1115,9 @@ export const generateRuntime = async (
     detectNeedsReact(context.root),
     detectUsesMath(context.root),
     readOptional(context.themeFile),
+    readOptional(examplesCssFile(context.root, config)),
     discoverIslands(context.root),
-    discoverExamples(context.root, config.examples),
+    discoverExamples(context.root, config.examples.source),
     buildComponentSlots(context.componentsFile),
   ]);
   const {
@@ -1133,6 +1181,7 @@ export const generateRuntime = async (
           context,
           dataPath,
           examplesPath,
+          examplesThemePath,
           needsReact,
           needsSvelte,
           needsVue,
@@ -1178,7 +1227,18 @@ export const generateRuntime = async (
       ),
       write(
         join(srcDir, "generated", "examples.ts"),
-        exampleMapTemplate(exampleDiscovery.examples)
+        exampleMapTemplate(exampleDiscovery.examples, config.basePath)
+      ),
+      // The isolated Tailwind entry for `<Component />` preview frames: only
+      // example files (and the project sources they import) are scanned, so
+      // the docs theme never reaches a preview.
+      write(
+        examplesThemePath,
+        examplesEntryTemplate({
+          configTokens: buildThemeCss(config.theme),
+          sources: [`${context.root}/**/*.{astro,jsx,svelte,ts,tsx,vue}`],
+          userCss: userExamplesCss,
+        })
       ),
       write(
         themePath,
@@ -1256,12 +1316,23 @@ export const generateRuntime = async (
     );
   }
 
-  // The default 404 page (`/404`), unless the project already owns the route.
-  await writeNotFoundPage(write, srcDir, pages, project.graph.pages);
-
-  // The provider-specific client loader behind the `blume:search-client` alias
-  // is always (re)generated so the alias resolves even when search is disabled.
-  await write(searchClientPath, searchClientTemplate(config));
+  // Three independent writes: the per-example preview routes that
+  // `<Component />` iframes embed (returning a warning when the configured
+  // examples.css is missing), the default 404 page (`/404`, unless the project
+  // already owns the route), and the provider-specific client loader behind
+  // the `blume:search-client` alias — always (re)generated so the alias
+  // resolves even when search is disabled.
+  const [examplesWarnings] = await Promise.all([
+    writeExamplesPreview({
+      config,
+      hasExamples: exampleDiscovery.examples.length > 0,
+      root: context.root,
+      srcDir,
+      write,
+    }),
+    writeNotFoundPage(write, srcDir, pages, project.graph.pages),
+    write(searchClientPath, searchClientTemplate(config)),
+  ]);
 
   // Client-loaded providers (orama, flexsearch) ship a static index + endpoint.
   if (servesStaticIndex(config.search.provider)) {
@@ -1327,6 +1398,7 @@ export const generateRuntime = async (
     ...mcp.warnings,
     ...islandDiscovery.warnings,
     ...exampleDiscovery.warnings,
+    ...examplesWarnings,
     ...overrideWarnings,
   ];
 

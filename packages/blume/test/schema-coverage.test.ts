@@ -171,6 +171,27 @@ describe("export config normalization", () => {
   });
 });
 
+describe("examples config normalization", () => {
+  it("defaults to the examples directory with no css", () => {
+    expect(blumeConfigSchema.parse({}).examples).toStrictEqual({
+      source: "examples",
+    });
+  });
+
+  it("expands the string shorthand to { source }", () => {
+    expect(
+      blumeConfigSchema.parse({ examples: "registry/**/examples/*" }).examples
+    ).toStrictEqual({ source: "registry/**/examples/*" });
+  });
+
+  it("keeps the object form and defaults source", () => {
+    expect(
+      blumeConfigSchema.parse({ examples: { css: "examples/theme.css" } })
+        .examples
+    ).toStrictEqual({ css: "examples/theme.css", source: "examples" });
+  });
+});
+
 describe("analytics script refinement", () => {
   it("accepts a script that sets exactly one of src or content", () => {
     const config = blumeConfigSchema.parse({

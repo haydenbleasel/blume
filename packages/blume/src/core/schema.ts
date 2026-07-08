@@ -828,6 +828,35 @@ const codeBlocksConfigSchema = z.strictObject({
 });
 
 /**
+ * `<Component />` example previews. A string is shorthand for `{ source }`:
+ * where examples live, relative to the project root (default `examples`).
+ * `source` may be a glob (anything with `*`/`?`/`[]`/`{}`/`!`), in which case
+ * only matching files are discovered and each `<Component path>` key is
+ * relative to the glob's static prefix — use this for a registry layout that
+ * colocates component sources with their examples
+ * (`registry/<pkg>/**\/examples/*`), leaving the sources (which have no
+ * default export to wrap) out.
+ *
+ * `css` names a stylesheet (relative to the project root) injected into every
+ * preview frame after Blume's default tokens. Previews render in an isolated
+ * iframe that the site's docs styles never reach, so this is where design
+ * tokens for the previewed components live — e.g. shadcn variables and
+ * `@theme` mappings. Tailwind itself is already provided; the file should
+ * hold tokens and custom styles, not another `@import "tailwindcss"`.
+ */
+const examplesConfigSchema = z
+  .union([
+    z.string(),
+    z.strictObject({
+      css: z.string().optional(),
+      source: z.string().default("examples"),
+    }),
+  ])
+  .transform((value): { css?: string; source: string } =>
+    typeof value === "string" ? { source: value } : value
+  );
+
+/**
  * "Last updated" timestamps for content pages. `false` (default) disables the
  * feature; `true` derives each page's date from git history; an object selects
  * the source explicitly. A page's `lastModified` frontmatter always wins.
@@ -976,19 +1005,13 @@ export const blumeConfigSchema = z.strictObject({
   deployment: deploymentConfigSchema.default({}),
   description: z.string().optional(),
   /**
-   * Where `<Component path>` resolves live previews and their source from,
-   * relative to the project root. Defaults to the `examples` directory; point
-   * it elsewhere when examples live outside a top-level `examples/`.
-   *
-   * May be a glob (anything with `*`/`?`/`[]`/`{}`/`!`), in which case only
-   * matching files are discovered and a `<Component path>` key is relative to
-   * the glob's static prefix. Use this for a registry layout that colocates
-   * component sources with their examples — `registry/<pkg>/**\/examples/*`
-   * targets just the examples, leaving the sources (which have no default
-   * export to wrap) out, so the registry needn't be forked into its own
-   * examples directory.
+   * Where `<Component path>` resolves live previews and their source from.
+   * A string is shorthand for `{ source }` — the directory (or glob, for
+   * colocated registry layouts) under the project root that holds example
+   * files. The object form adds `css`: a stylesheet injected into every
+   * preview frame (design tokens, shadcn variables, `@theme` mappings).
    */
-  examples: z.string().default("examples"),
+  examples: examplesConfigSchema.default("examples"),
   export: exportConfigSchema.default(false),
   feedback: z.boolean().default(true),
   github: githubConfigSchema.optional(),

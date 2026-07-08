@@ -5,16 +5,18 @@
 // `<Component path="forms/login" />` for `examples/forms/login.tsx`.
 //
 // Blume discovers `examples/` at build time and generates `blume:examples`: a
-// map of path → { Component (a static hydration wrapper), code, lang }. React,
-// Vue, Svelte, and Astro examples are all supported. The source is highlighted
-// with the same Shiki setup as ordinary code fences.
+// map of path → { Component (a static hydration wrapper), code, lang } plus
+// the route base preview frames live under. React, Vue, Svelte, and Astro
+// examples are all supported. The source is highlighted with the same Shiki
+// setup as ordinary code fences.
 import data from "blume:data";
 
 import { highlightCode } from "../../markdown/index.ts";
+import { withBase } from "../islands/base-path.ts";
 import Tab from "./Tab.astro";
 import Tabs from "./Tabs.astro";
 // Generated per project; resolves to an empty map when there are no examples.
-import { examples } from "blume:examples";
+import { examples, examplesBase } from "blume:examples";
 
 interface Props {
   path: string;
@@ -22,7 +24,17 @@ interface Props {
 
 const { path } = Astro.props;
 const entry = examples[path];
-const Preview = entry?.Component;
+
+// The live preview renders in its own generated route, embedded as an iframe:
+// the frame boundary is what keeps the docs CSS (prose typography, component
+// chrome) out of the example entirely, so users can preview components styled
+// by their own design system (e.g. shadcn, via the configured `examples.css`).
+// The frame syncs its theme with this document before first paint.
+const previewSrc = entry
+  ? withBase(
+      `${examplesBase}/${path.split("/").map(encodeURIComponent).join("/")}`
+    )
+  : undefined;
 
 // Highlight the source with the shared helper so it matches Markdown fences.
 // `blume-source` makes the inner `<code>` (not the `<pre>`) the scroll/height-
@@ -50,16 +62,13 @@ const paneStyle = `height:${paneHeight}px`;
     // `sync={false}`: each preview's Preview/Code tabs are independent — unlike
     // CodeGroup, switching one Component must not switch the others.
     <Tabs hash={false} sync={false}>
-      <Tab
-        // `not-prose`: the preview lives inside the page's `.prose` wrapper, so
-        // without this the typography styles bleed into the live component
-        // (headings, links, lists, spacing). The Code pane below keeps prose on
-        // purpose — that's what styles the highlighted source.
-        class="not-prose flex items-center justify-center overflow-auto"
-        style={paneStyle}
-        title="Preview"
-      >
-        <Preview />
+      <Tab class="overflow-hidden p-0!" style={paneStyle} title="Preview">
+        <iframe
+          class="h-full w-full"
+          loading="lazy"
+          src={previewSrc}
+          title={`Preview of ${path}`}
+        />
       </Tab>
       <Tab class="overflow-hidden" style={paneStyle} title="Code">
         <Fragment set:html={codeHtml} />

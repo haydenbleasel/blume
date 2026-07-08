@@ -473,6 +473,9 @@ describe("generateRuntime", () => {
     expect(has("src/generated/islands/Counter.astro")).toBe(true);
     expect(has("src/generated/examples.ts")).toBe(true);
     expect(has("src/generated/examples/demo.astro")).toBe(true);
+    // The isolated preview frame: its Tailwind entry and per-example route.
+    expect(has("src/generated/examples.css")).toBe(true);
+    expect(has("src/pages/blume-examples/[...path].astro")).toBe(true);
     expect(has("src/generated/data.json")).toBe(true);
     expect(has("blume.manifest.json")).toBe(true);
     // ensureDepsLink symlinked the package's node_modules into .blume.
@@ -497,6 +500,67 @@ describe("generateRuntime", () => {
     expect(notFound).toContain("PageLayout");
     expect(notFound).toContain("export const prerender = true;");
     expect(notFound).toContain("noindex={true}");
+  });
+
+  it("skips the preview route when there are no examples", async () => {
+    const project = await scanProject(
+      await writeProject({ "docs/index.md": "# Home\n" })
+    );
+    const out = project.context.outDir;
+    await generateRuntime(project);
+    expect(
+      existsSync(join(out, "src/pages/blume-examples/[...path].astro"))
+    ).toBe(false);
+    // The examples sheet is still written so `blume:examples-theme` resolves.
+    expect(existsSync(join(out, "src/generated/examples.css"))).toBe(true);
+  });
+
+  it("nests the preview route under basePath and inlines examples.css", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  basePath: "/docs",
+  examples: { css: "examples/theme.css" },
+};
+`,
+        "docs/index.md": "# Home\n",
+        "examples/demo.tsx":
+          "export default function Demo() { return null; }\n",
+        "examples/theme.css": ":root {\n  --primary: hotpink;\n}\n",
+      })
+    );
+    const out = project.context.outDir;
+    const result = await generateRuntime(project);
+
+    expect(
+      existsSync(join(out, "src/pages/docs/blume-examples/[...path].astro"))
+    ).toBe(true);
+    const map = await readFile(join(out, "src/generated/examples.ts"), "utf-8");
+    expect(map).toContain('export const examplesBase = "/docs/blume-examples"');
+    const sheet = await readFile(
+      join(out, "src/generated/examples.css"),
+      "utf-8"
+    );
+    expect(sheet).toContain("--primary: hotpink;");
+    expect(result.warnings.some((w) => w.includes("examples.css"))).toBe(false);
+  });
+
+  it("warns when the configured examples.css is missing", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  examples: { css: "examples/theme.css" },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const result = await generateRuntime(project);
+    expect(
+      result.warnings.some((w) =>
+        w.includes('examples.css points at "examples/theme.css"')
+      )
+    ).toBe(true);
   });
 
   it("skips the default 404 when a custom pages/404.astro owns the route", async () => {

@@ -24,6 +24,7 @@ import {
   envTemplate,
   exampleMapTemplate,
   exampleWrapperTemplate,
+  examplesPageTemplate,
   exampleSlug,
   islandMapTemplate,
   islandWrapperTemplate,
@@ -45,7 +46,10 @@ import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { servesStaticIndex } from "../search/providers.ts";
-import { tailwindEntryTemplate } from "../theme/entry.ts";
+import {
+  examplesEntryTemplate,
+  tailwindEntryTemplate,
+} from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
 
@@ -86,6 +90,40 @@ const askFiles = async (
   return files;
 };
 
+/** Contents of the configured `examples.css`, or `""` when unset/absent. */
+const readExamplesCss = (
+  root: string,
+  css: string | undefined
+): Promise<string> =>
+  css && existsSync(join(root, css))
+    ? readFile(join(root, css), "utf-8")
+    : Promise.resolve("");
+
+/**
+ * The per-example preview route `<Component />` iframes embed, nested under
+ * `basePath` so it stays reachable behind a proxy that only forwards the
+ * base. Empty when the project has no examples.
+ */
+const examplesPreviewFiles = (
+  srcDir: string,
+  basePath: string,
+  hasExamples: boolean
+): { content: string; path: string }[] =>
+  hasExamples
+    ? [
+        {
+          content: examplesPageTemplate(),
+          path: join(
+            srcDir,
+            "pages",
+            ...basePath.split("/").filter(Boolean),
+            "blume-examples",
+            "[...path].astro"
+          ),
+        },
+      ]
+    : [];
+
 /**
  * Promote the generated runtime into the project as an owned Astro app. After
  * eject the project has a normal `astro.config.mjs` and `src/`, the `blume` CLI
@@ -108,6 +146,7 @@ export const eject = async (root: string): Promise<string[]> => {
     needsReactRaw,
     usesMath,
     userTheme,
+    userExamplesCss,
     rawMarkdown,
     islands,
     examples,
@@ -118,9 +157,10 @@ export const eject = async (root: string): Promise<string[]> => {
     context.themeFile
       ? readFile(context.themeFile, "utf-8")
       : Promise.resolve(""),
+    readExamplesCss(root, config.examples.css),
     buildRawMarkdown(project),
     discoverIslands(root),
-    discoverExamples(root, config.examples),
+    discoverExamples(root, config.examples.source),
   ]);
   // Island/example frameworks drive which Astro renderers the ejected config
   // wires in; React also switches on for project `.tsx`/`.jsx` and Ask AI.
@@ -168,6 +208,7 @@ export const eject = async (root: string): Promise<string[]> => {
         context: relContext,
         dataPath: "./src/generated/data.json",
         examplesPath: "./src/generated/examples.ts",
+        examplesThemePath: "./src/generated/examples.css",
         needsReact,
         needsSvelte,
         needsVue,
@@ -218,8 +259,18 @@ export const eject = async (root: string): Promise<string[]> => {
       path: join(genDir, "islands.ts"),
     },
     {
-      content: exampleMapTemplate(examples.examples),
+      content: exampleMapTemplate(examples.examples, config.basePath),
       path: join(genDir, "examples.ts"),
+    },
+    {
+      // The isolated Tailwind entry for `<Component />` preview frames.
+      // Relative sources keep the ejected app portable.
+      content: examplesEntryTemplate({
+        configTokens: buildThemeCss(config.theme),
+        sources: ["../../**/*.{astro,jsx,svelte,ts,tsx,vue}"],
+        userCss: userExamplesCss,
+      }),
+      path: join(genDir, "examples.css"),
     },
     {
       content: tailwindEntryTemplate({
@@ -345,7 +396,12 @@ export const eject = async (root: string): Promise<string[]> => {
     ...examples.examples.map((example) => ({
       content: exampleWrapperTemplate(example),
       path: join(genDir, "examples", `${exampleSlug(example.path)}.astro`),
-    }))
+    })),
+    ...examplesPreviewFiles(
+      srcDir,
+      config.basePath,
+      examples.examples.length > 0
+    )
   );
 
   // Materialize staged source bodies under `<root>/blume-staged/<source>/<ref>`,

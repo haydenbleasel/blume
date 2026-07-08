@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
 import { blumeConfigSchema } from "../src/core/schema.ts";
-import { tailwindEntryTemplate } from "../src/theme/entry.ts";
+import {
+  examplesEntryTemplate,
+  tailwindEntryTemplate,
+} from "../src/theme/entry.ts";
 import type { FontsConfig } from "../src/theme/fonts.ts";
 import {
   buildFontEntries,
@@ -187,6 +190,43 @@ describe("tailwindEntryTemplate", () => {
   // A stray backtick in a CSS comment silently terminates the template literal,
   // emitting raw `${...}` interpolation markers into the stylesheet (which then
   // fails to parse at build time). Guard against that regression.
+  it("emits no uninterpolated template markers", () => {
+    expect(entry).not.toContain("${");
+  });
+});
+
+describe("examplesEntryTemplate", () => {
+  const entry = examplesEntryTemplate({
+    configTokens: ":root { --blume-accent: red; }",
+    sources: ["../../project"],
+    userCss: ":root { --primary: hotpink; }",
+  });
+
+  it("provides Tailwind, the scanned sources, and the token defaults", () => {
+    expect(entry).toContain('@import "tailwindcss";');
+    expect(entry).toContain('@source "../../project";');
+    expect(entry).toContain("--blume-background: oklch(1 0 0);");
+    expect(entry).toContain("--color-background: var(--blume-background);");
+    expect(entry).toContain(
+      '@custom-variant dark (&:where([data-theme="dark"]'
+    );
+  });
+
+  it("carries none of the docs theme — no prose or typography plugin", () => {
+    // The iframe boundary plus this sheet is the isolation contract: an
+    // example must never pick up prose margins or component chrome.
+    expect(entry).not.toContain(".prose");
+    expect(entry).not.toContain("@plugin");
+    expect(entry).not.toContain("blume-tabs");
+  });
+
+  it("appends config tokens before the user examples css (user wins)", () => {
+    const configAt = entry.indexOf("--blume-accent: red;");
+    const userAt = entry.indexOf("--primary: hotpink;");
+    expect(configAt).toBeGreaterThan(-1);
+    expect(userAt).toBeGreaterThan(configAt);
+  });
+
   it("emits no uninterpolated template markers", () => {
     expect(entry).not.toContain("${");
   });

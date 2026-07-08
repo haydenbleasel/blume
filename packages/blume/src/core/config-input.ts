@@ -818,6 +818,25 @@ export interface AsyncApiConfig {
 // Misc top-level unions
 // ---------------------------------------------------------------------------
 
+/** `<Component />` example previews (the object form of `examples`). */
+export interface ExamplesConfig {
+  /**
+   * A stylesheet, relative to the project root, injected into every preview
+   * frame after Blume's default tokens. Previews render inside an isolated
+   * iframe the docs styles never reach, so design tokens for the previewed
+   * components — shadcn variables, `@theme` mappings, custom fonts — live
+   * here. Tailwind is already provided in the frame; the file should hold
+   * tokens and styles, not another `@import "tailwindcss"`.
+   */
+  css?: string;
+  /**
+   * Where example files live, relative to the project root. Defaults to
+   * `examples`; may be a glob to target a registry that colocates component
+   * sources with their examples (e.g. `registry/<pkg>/**\/examples/*`).
+   */
+  source?: string;
+}
+
 /**
  * Reader-facing "Export" page actions. A boolean toggles both formats; the
  * object form enables each individually. Defaults to `false`.
@@ -891,11 +910,15 @@ export interface BlumeConfig {
   /** Default meta description, used where a page sets none. */
   description?: string;
   /**
-   * Where `<Component path>` resolves live previews and their source from,
-   * relative to the project root. Defaults to `examples`. May be a glob to
-   * target a registry that colocates component sources with their examples.
+   * `<Component path>` example previews. A string is shorthand for
+   * `{ source }`: where examples live, relative to the project root (defaults
+   * to `examples`; may be a glob to target a registry that colocates
+   * component sources with their examples). The object form adds `css` — a
+   * stylesheet injected into every preview frame (previews render in an
+   * iframe the docs theme never reaches), for the previewed components'
+   * design tokens, e.g. shadcn variables.
    */
-  examples?: string;
+  examples?: string | ExamplesConfig;
   /** Reader-facing PDF/EPUB export actions. Defaults to `false`. */
   export?: ExportConfig;
   /** Show the per-page "Was this helpful?" widget. Defaults to `true`. */

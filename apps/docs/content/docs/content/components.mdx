@@ -546,7 +546,33 @@ A card linking to a GitHub repository with its live star and fork counts. Counts
 
 `Component` renders an example file from your project's `examples/` directory as a live preview alongside its highlighted source, in tabs. Point it at a file with `path` — its location under `examples/`, without the extension (so `examples/counter.tsx` is `path="counter"`). React, Vue, Svelte, and Astro examples are all supported; framework examples hydrate, Astro ones render statically. It keeps the preview and the code in sync from a single file.
 
-The directory is configurable — set `examples` in `blume.config.ts` when your examples live elsewhere (e.g. a registry layout). `path` is always relative to it:
+The preview renders in an isolated frame that the docs styles never reach — no prose margins, typography, or theme chrome bleed into your component. The frame gets Tailwind (preflight + utilities scanned from your example files and anything they import), Blume's design tokens so classes like `bg-background` follow the site palette by default, and it follows the site's light/dark toggle live.
+
+To style previews with your own design system — say, shadcn variables — point `examples.css` at a stylesheet. It's injected into every preview frame after Blume's defaults, so your tokens win. Don't `@import "tailwindcss"` in it; the frame already provides Tailwind. Both `.dark` and `[data-theme="dark"]` work for dark-mode overrides:
+
+```ts
+// blume.config.ts
+export default defineConfig({
+  examples: { css: "examples/theme.css" },
+});
+```
+
+```css
+/* examples/theme.css */
+:root {
+  --primary: oklch(0.6 0.2 260);
+}
+
+.dark {
+  --primary: oklch(0.75 0.15 260);
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+}
+```
+
+The directory is configurable too — set `source` (or use the string shorthand, `examples: "..."`) when your examples live elsewhere (e.g. a registry layout). `path` is always relative to it:
 
 ```ts
 // blume.config.ts

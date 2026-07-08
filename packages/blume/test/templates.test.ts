@@ -17,6 +17,7 @@ import {
   envTemplate,
   exampleMapTemplate,
   exampleSlug,
+  examplesPageTemplate,
   exampleWrapperTemplate,
   islandMapTemplate,
   islandWrapperTemplate,
@@ -43,6 +44,7 @@ const config = blumeConfigSchema.parse({});
 
 const DATA_PATH = "/p/.blume/src/generated/data.json";
 const EXAMPLES_PATH = "/p/.blume/src/generated/examples.ts";
+const EXAMPLES_THEME_PATH = "/p/.blume/src/generated/examples.css";
 const OPENAPI_PATH = "/p/.blume/src/generated/openapi.json";
 const SEARCH_CLIENT_PATH = "/p/.blume/src/generated/search-client.ts";
 const THEME_PATH = "/p/.blume/src/generated/app.css";
@@ -254,20 +256,51 @@ describe("exampleWrapperTemplate", () => {
 });
 
 describe("exampleMapTemplate", () => {
-  it("exports an empty map when there are no examples", () => {
-    expect(exampleMapTemplate([])).toContain("export const examples = {}");
+  it("exports an empty map (and the route base) when there are no examples", () => {
+    const out = exampleMapTemplate([], "");
+    expect(out).toContain("export const examples = {}");
+    expect(out).toContain('export const examplesBase = "/blume-examples"');
+  });
+
+  it("nests the route base under basePath", () => {
+    expect(exampleMapTemplate([], "/docs")).toContain(
+      'export const examplesBase = "/docs/blume-examples"'
+    );
   });
 
   it("maps each path to its wrapper, source, and language", () => {
-    const out = exampleMapTemplate([
-      example(),
-      example({ lang: "astro", path: "forms/login" }),
-    ]);
+    const out = exampleMapTemplate(
+      [example(), example({ lang: "astro", path: "forms/login" })],
+      ""
+    );
     expect(out).toContain('import E0 from "./examples/counter.astro"');
     expect(out).toContain('import E1 from "./examples/forms_2f_login.astro"');
     expect(out).toContain('"counter": { Component: E0,');
     expect(out).toContain('"forms/login": { Component: E1,');
     expect(out).toContain('lang: "tsx"');
+  });
+});
+
+describe("examplesPageTemplate", () => {
+  const out = examplesPageTemplate();
+
+  it("renders a bare prerendered route per example with only the example sheet", () => {
+    expect(out).toContain('import { examples } from "blume:examples"');
+    expect(out).toContain('import "blume:examples-theme"');
+    expect(out).toContain("export const prerender = true");
+    expect(out).toContain("getStaticPaths");
+    // The whole point is isolation: no layout, no docs theme.
+    expect(out).not.toContain("RootLayout");
+    expect(out).not.toContain('"blume:theme"');
+  });
+
+  it("mirrors the parent theme before paint and stays out of search results", () => {
+    expect(out).toContain("window.parent.document.documentElement");
+    expect(out).toContain("MutationObserver");
+    // Both dark-mode conventions, for Blume tokens and shadcn-style CSS alike.
+    expect(out).toContain("root.dataset.theme = theme");
+    expect(out).toContain('root.classList.toggle("dark"');
+    expect(out).toContain('<meta name="robots" content="noindex" />');
   });
 });
 
@@ -411,6 +444,7 @@ describe("astroConfigTemplate", () => {
       context: context(),
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
       openapiPath: OPENAPI_PATH,
       pages: [],
@@ -446,6 +480,9 @@ describe("astroConfigTemplate", () => {
     expect(out).not.toMatch(/environments: \{[^}]*ssr:/su);
     expect(out).not.toContain("adapter:");
     expect(out).toContain(`"blume:examples": ${JSON.stringify(EXAMPLES_PATH)}`);
+    expect(out).toContain(
+      `"blume:examples-theme": ${JSON.stringify(EXAMPLES_THEME_PATH)}`
+    );
     // The dev watcher ignores Astro's cache dir so a migrated (`.`-rooted)
     // project's docs glob-loader doesn't log noise on every `.blume/.astro`
     // write. See the `server.watch.ignored` comment in astroConfigTemplate.
@@ -473,6 +510,7 @@ describe("astroConfigTemplate", () => {
       context: context(),
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: true,
       needsSvelte: true,
       needsVue: true,
@@ -509,6 +547,7 @@ describe("astroConfigTemplate", () => {
       context: context(),
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
       openapiPath: OPENAPI_PATH,
       pages: [],
@@ -532,6 +571,7 @@ describe("astroConfigTemplate", () => {
       context: context(),
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: true,
       openapiPath: OPENAPI_PATH,
       pages: [],
@@ -551,6 +591,7 @@ describe("astroConfigTemplate", () => {
       context: context(),
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: true,
       openapiPath: OPENAPI_PATH,
       pages: [],
@@ -572,6 +613,7 @@ describe("astroConfigTemplate", () => {
       context: context(),
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
       openapiPath: OPENAPI_PATH,
       pages: [],
@@ -590,6 +632,7 @@ describe("astroConfigTemplate", () => {
       context: context(),
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
       openapiPath: OPENAPI_PATH,
       pages: [],
@@ -631,6 +674,7 @@ describe("astroConfigTemplate workspace root", () => {
       }),
       dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
       openapiPath: OPENAPI_PATH,
       pages: [],

@@ -91,8 +91,9 @@ import type { Diagnostic } from "./types.ts";
  * - `i18n` — opt-in multi-locale: `locales`, `defaultLocale`, `parser`
  *   (`dir` vs filename `dot` suffix), and per-locale UI overrides.
  *
- * - `examples` — where `<Component path>` previews resolve their source from
- *   (defaults to `examples/`; supports a glob for colocated registries).
+ * - `examples` — `<Component path>` previews: `source` (default `examples/`;
+ *   supports a glob for colocated registries) and `css`, a stylesheet injected
+ *   into the isolated preview frames (e.g. shadcn variables).
  *
  * @example Zero-config — just render the Markdown under `docs/`.
  * ```ts
