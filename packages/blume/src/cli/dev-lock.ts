@@ -118,6 +118,30 @@ const ownsLock = (outDir: string): boolean => {
 };
 
 /**
+ * One atomic claim attempt. Returns `true` when this process wins the `wx`
+ * write, `false` when the dir held a stale or our-own leftover lock (now
+ * cleared, so the caller should retry). Throws {@link DevLockHeldError} when a
+ * live foreign holder owns the dir.
+ */
+const tryClaimLock = (outDir: string, port?: number): boolean => {
+  try {
+    writeFileSync(lockPath(outDir), lockPayload(port), { flag: "wx" });
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+      throw error;
+    }
+    const existing = readDevLock(outDir);
+    if (existing && existing.pid !== process.pid) {
+      throw new DevLockHeldError(existing);
+    }
+    // Stale or our own leftover: clear it and race for the claim again.
+    rmSync(lockPath(outDir), { force: true });
+    return false;
+  }
+};
+
+/**
  * Write the current process's dev lock into `outDir` and return a release
  * function. The claim is atomic (`wx`): two `blume dev` processes racing the
  * same dir can't both pass a check-then-write — the loser gets a
@@ -128,21 +152,8 @@ const ownsLock = (outDir: string): boolean => {
  */
 export const acquireDevLock = (outDir: string, port?: number): (() => void) => {
   mkdirSync(outDir, { recursive: true });
-  for (;;) {
-    try {
-      writeFileSync(lockPath(outDir), lockPayload(port), { flag: "wx" });
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
-        throw error;
-      }
-      const existing = readDevLock(outDir);
-      if (existing && existing.pid !== process.pid) {
-        throw new DevLockHeldError(existing);
-      }
-      // Stale or our own leftover: clear it and race for the claim again.
-      rmSync(lockPath(outDir), { force: true });
-    }
+  while (!tryClaimLock(outDir, port)) {
+    // Retry until we win the claim or a live holder makes us throw.
   }
   let released = false;
   return () => {
