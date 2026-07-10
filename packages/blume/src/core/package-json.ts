@@ -15,8 +15,22 @@ export const toPackageName = (raw: string): string =>
  * dependency pinned to the installed version plus `dev`/`build`/`doctor`
  * scripts, so `npm install && npm run dev` works immediately. Shared by
  * `blume init` and the migrators, which scaffold one when a project has none.
+ * `extraDeps` adds source SDKs (e.g. `@notionhq/client`) beside `blume`.
  */
-export const blumePackageJson = (name: string): string => `{
+export const blumePackageJson = (
+  name: string,
+  extraDeps: Record<string, string> = {}
+): string => {
+  const dependencies = Object.entries({
+    blume: `^${getBlumeVersion()}`,
+    ...extraDeps,
+  })
+    .toSorted(([a], [b]) => (a < b ? -1 : 1))
+    .map(
+      ([dep, range]) => `    ${JSON.stringify(dep)}: ${JSON.stringify(range)}`
+    )
+    .join(",\n");
+  return `{
   "name": ${JSON.stringify(name)},
   "private": true,
   "type": "module",
@@ -26,7 +40,8 @@ export const blumePackageJson = (name: string): string => `{
     "doctor": "blume doctor"
   },
   "dependencies": {
-    "blume": "^${getBlumeVersion()}"
+${dependencies}
   }
 }
 `;
+};

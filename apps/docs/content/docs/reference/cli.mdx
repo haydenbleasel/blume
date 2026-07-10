@@ -11,7 +11,7 @@ blume <command> [options]
 
 | Command            | Description                                      |
 | ------------------ | ------------------------------------------------ |
-| `blume init`       | Scaffold a minimal project.                      |
+| `blume init [dir]` | Scaffold a project (interactive by default).     |
 | `blume dev`        | Start the dev server with hot reload.            |
 | `blume build`      | Build the static (or server) site.               |
 | `blume preview`    | Preview the last build.                          |
@@ -24,7 +24,9 @@ blume <command> [options]
 
 ## Common flags
 
-- `blume init --content-dir <dir> --yes` — set the content folder (default `docs`) and skip prompts.
+- `blume init` — in a terminal, walks you through a few questions (where to create the project, site name, template, content sources); each flag below pre-answers its question.
+- `blume init --yes` — skip the prompts and scaffold with defaults (also the behavior in CI or when stdin isn't a terminal).
+- `blume init --content-dir <dir>` — set the content folder (default `docs`).
 - `blume init --template docs|api|sdk|changelog` — scaffold from a starter (API reference, SDK, or changelog instead of the plain docs seed).
 - `blume init --package-manager npm|pnpm|yarn|bun` — tailor the printed next-steps to your package manager.
 - `blume init --eject` — scaffold, then eject to a standalone Astro project (falls back to guiding you through `blume eject` when dependencies aren't installed yet).

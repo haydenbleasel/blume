@@ -51,7 +51,7 @@ Blume works with any package manager and never requires you to set up Astro or T
 
 | Command            | Description                                           |
 | ------------------ | ----------------------------------------------------- |
-| `blume init`       | Scaffold a minimal project.                           |
+| `blume init [dir]` | Scaffold a project (interactive by default).          |
 | `blume dev`        | Start the dev server with hot reload.                 |
 | `blume build`      | Build the static (or server) site.                    |
 | `blume preview`    | Preview the last build.                               |
