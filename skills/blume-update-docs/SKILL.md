@@ -5,7 +5,7 @@ description: Keep a Blume docs site in sync with the product it documents. Audit
 
 # Update Blume Docs
 
-Blume is a **markdown-first** documentation framework on Astro/Vite: content lives as Markdown/MDX under a content root (default `docs/`), navigation derives from the file tree plus optional `meta.ts` files, and `blume build` validates links, anchors, frontmatter, and routes.
+Blume is a **markdown-first** documentation framework on Astro/Vite: content lives as Markdown/MDX under a content root (default `docs/`), navigation derives from the file tree plus optional `meta.ts` files, `blume build` validates frontmatter and duplicate routes, and `blume validate` checks links and anchors.
 
 Your job is **docs maintenance, not docs authorship**: find where shipped, user-facing behavior has drifted from what the docs claim, fix exactly that, prove the site still builds, and deliver the result as a pull request. A run that finds nothing actionable ends with a short report and **no branch, no commit, no PR** — prefer a no-op over a noisy PR.
 
@@ -39,7 +39,8 @@ Your job is **docs maintenance, not docs authorship**: find where shipped, user-
    - Match the surrounding pages: frontmatter shape, Blume components already in use, code-fence style, root-relative internal links.
 
 5. **Verify.**
-   - Run the docs build (`blume build` or the repo's documented docs QA) — it validates links, anchors, frontmatter, and duplicate routes.
+   - Run the docs build (`blume build` or the repo's documented docs QA) — it validates frontmatter and duplicate routes.
+   - Run `blume validate` to check internal links and anchors.
    - Run lint/format/typecheck when the repo's conventions call for them on docs changes.
    - Fix failures your edits caused; report pre-existing failures separately instead of fixing them in this PR.
 

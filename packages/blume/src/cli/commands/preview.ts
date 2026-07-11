@@ -8,6 +8,7 @@ import { loadConfig } from "../../core/config.ts";
 import { resolveProjectContext } from "../../core/project.ts";
 import { parsePort } from "../args.ts";
 import { logger } from "../log.ts";
+import { normalizeHost } from "./dev.ts";
 
 export const previewCommand = defineCommand({
   args: {
@@ -32,7 +33,9 @@ export const previewCommand = defineCommand({
       logLevel: "info",
       root: context.outDir,
       server: {
-        host: args.host ?? false,
+        // `normalizeHost` maps a bare `--host` (citty parses it as "") to
+        // `true` so Vite binds all interfaces instead of the hostname "".
+        host: normalizeHost(args.host),
         port: parsePort(args.port),
       },
     });

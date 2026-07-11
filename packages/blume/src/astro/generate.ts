@@ -383,6 +383,16 @@ const ISLAND_FRAMEWORK_DEPS: Record<string, string> = {
 };
 
 /**
+ * Adapter package the project must install itself for each deployment
+ * platform whose adapter Blume doesn't ship. Node and Vercel ship with Blume,
+ * so they never need this.
+ */
+const DEPLOYMENT_ADAPTER_DEPS: Record<string, string> = {
+  cloudflare: "@astrojs/cloudflare",
+  netlify: "@astrojs/netlify",
+};
+
+/**
  * Warn when a Vue/Svelte island is present but its Astro integration isn't
  * installed — Vite would otherwise fail opaquely on the generated config import.
  * React ships with Blume, so it never needs this.
@@ -401,6 +411,34 @@ const islandFrameworkWarnings = (
     }
   }
   return warnings;
+};
+
+/**
+ * Warn when the resolved server-output adapter is one the project must install
+ * itself (Netlify/Cloudflare; Node and Vercel ship with Blume). The generated
+ * astro.config.mjs imports the adapter package directly — and on those
+ * platforms the adapter is even auto-selected from env vars — so warn early
+ * rather than let the build die with an opaque ERR_MODULE_NOT_FOUND from the
+ * hidden generated config. Availability mirrors the search-provider check: a
+ * dep resolves from the project root or from the Blume package itself.
+ */
+const deploymentAdapterWarnings = (
+  deployment: ResolvedConfig["deployment"],
+  root: string
+): string[] => {
+  const dep =
+    deployment.output === "server" && deployment.adapter
+      ? DEPLOYMENT_ADAPTER_DEPS[deployment.adapter]
+      : undefined;
+  if (
+    dep &&
+    !(canResolveFrom(root, dep) || canResolveFrom(packageRoot(), dep))
+  ) {
+    return [
+      `Deployment adapter "${deployment.adapter}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`,
+    ];
+  }
+  return [];
 };
 
 /** Absolute path to the configured `examples.css`, or null when unset. */
@@ -1450,7 +1488,10 @@ export const generateRuntime = async (
 
   // React ships with Blume; Vue/Svelte islands need their Astro integration
   // installed by the project. Warn early rather than let Vite fail to resolve it.
-  warnings.push(...islandFrameworkWarnings(frameworks, context.root));
+  warnings.push(
+    ...deploymentAdapterWarnings(config.deployment, context.root),
+    ...islandFrameworkWarnings(frameworks, context.root)
+  );
   if (hasScalarReferences(config)) {
     const references = await buildReferenceFiles({
       config,

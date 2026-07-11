@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 
@@ -363,6 +363,57 @@ describe("changelogIndexTemplate", () => {
     expect(out).toContain("href={href}");
   });
 
+  it("timeline heading links resolve under the deployment base", async () => {
+    // The template passes base-less logical routes; Update.astro applies
+    // withBase at emit time like every other link emitter (NavTree,
+    // Pagination, ...), and pure-anchor `#id` fallbacks pass through.
+    const source = await readFile(
+      new URL("../src/components/content/Update.astro", import.meta.url),
+      "utf-8"
+    );
+    expect(source).toContain(
+      'import { withBase } from "../islands/base-path.ts"'
+    );
+    expect(source).toContain(`href={withBase(href ?? \`#\${id}\`)}`);
+  });
+
+  it("suffixes repeated heading slugs so each entry keeps its own anchor", () => {
+    const out = changelogIndexTemplate({ ...exportOpts, staged: false });
+    const start = out.indexOf("const seenIds");
+    const end = out.indexOf("// A changelog is semver-paginated");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    // The headings list is built after the dedupe pass, so the rendered ids
+    // and the TOC slugs stay in agreement.
+    expect(out.indexOf("const headings")).toBeGreaterThan(end);
+    // Run the generated dedupe pass to pin its behavior.
+    // oxlint-disable-next-line no-new-func -- evaluating our own generated output
+    const dedupe = new Function(
+      "items",
+      `${out.slice(start, end)}\nreturn items.map((item) => item.id);`
+    ) as (items: { id: string }[]) => string[];
+    const ids = (...slugs: string[]) => dedupe(slugs.map((id) => ({ id })));
+    expect(ids("v1", "v2")).toEqual(["v1", "v2"]);
+    expect(ids("update", "update", "update")).toEqual([
+      "update",
+      "update-2",
+      "update-3",
+    ]);
+    // A generated suffix never collides with a later natural slug.
+    expect(ids("v1", "v1", "v1-2")).toEqual(["v1", "v1-2", "v1-2-2"]);
+  });
+
+  it("passes the resolved UI dictionary and default-locale lang/dir to the layout", () => {
+    const out = changelogIndexTemplate({ ...exportOpts, staged: false });
+    // Mirrors the catch-all: default locale under i18n, English baseline
+    // otherwise, so /changelog chrome doesn't revert to EN_UI / dir="ltr".
+    expect(out).toContain('const htmlLang = i18n ? i18n.defaultLocale : "en";');
+    expect(out).toContain('const dir = localeMeta?.dir ?? "ltr";');
+    expect(out).toContain("locale={htmlLang}");
+    expect(out).toContain("dir={dir}");
+    expect(out).toContain("ui={data.ui}");
+  });
+
   it("paginates by major version when the releases are semver", () => {
     const out = changelogIndexTemplate({ ...exportOpts, staged: false });
     // Detects a full major.minor.patch and groups older majors behind a button.
@@ -404,6 +455,15 @@ describe("notFoundPageTemplate", () => {
       'import { withBase } from "blume/components/islands/base-path.ts"'
     );
     expect(out).toContain('href={withBase("/")}');
+  });
+
+  it("passes default-locale lang/dir with the UI dictionary, like the catch-all", () => {
+    const out = notFoundPageTemplate();
+    expect(out).toContain('const htmlLang = i18n ? i18n.defaultLocale : "en";');
+    expect(out).toContain('const dir = localeMeta?.dir ?? "ltr";');
+    expect(out).toContain("locale={htmlLang}");
+    expect(out).toContain("dir={dir}");
+    expect(out).toContain("ui={data.ui}");
   });
 });
 
@@ -926,6 +986,16 @@ describe("scalarReferenceTemplate", () => {
     expect(out).toContain('import data from "../generated/data.json"');
     expect(out).toContain('route={"/reference"}');
     expect(out).toContain('"url": "https://api/spec.json"');
+  });
+
+  it("forwards the localized UI dictionary to the layout", () => {
+    const out = scalarReferenceTemplate({
+      configuration: { url: "https://api/spec.json" },
+      dataImport: "../generated/data.json",
+      route: "/reference",
+      title: "API",
+    });
+    expect(out).toContain("ui={data.ui}");
   });
 });
 

@@ -129,19 +129,23 @@ const ogSlug = route === "/" ? "index" : route.slice(1);
 // Absolute URLs carry the deployment base too (`site + base + route`), since the
 // page is served under it. `withBase` handles a root base as a no-op.
 const basedRoute = withBase(route);
+// The schema accepts a trailing-slash site URL (`https://docs.example.com/`);
+// strip it before joining with the root-relative route so canonical/og URLs
+// don't come out double-slashed — the catch-all strips it the same way.
+const siteBase = siteUrl ? siteUrl.replace(/\/$/u, "") : null;
 const resolvedCanonical =
   canonical ??
-  (siteUrl ? `${siteUrl}${basedRoute === "/" ? "" : basedRoute}` : null);
+  (siteBase ? `${siteBase}${basedRoute === "/" ? "" : basedRoute}` : null);
 // An explicit `ogImage` wins. A root-relative path (e.g. an image dropped in
 // `public/`) is resolved against the site URL so crawlers get an absolute
 // `og:image`; an already-absolute URL passes through untouched. Otherwise fall
 // back to the generated OG card for this route.
 const absolutizeOgImage = (value: string): string =>
-  value.startsWith("/") && siteUrl ? `${siteUrl}${withBase(value)}` : value;
+  value.startsWith("/") && siteBase ? `${siteBase}${withBase(value)}` : value;
 const resolvedOgImage = ogImage
   ? absolutizeOgImage(ogImage)
-  : ogEnabled && siteUrl
-    ? `${siteUrl}${withBase(`/og/${ogSlug}.png`)}`
+  : ogEnabled && siteBase
+    ? `${siteBase}${withBase(`/og/${ogSlug}.png`)}`
     : null;
 
 const initialThemeScript = themeInitScript(themeMode);
@@ -182,7 +186,7 @@ const bannerScript = banner?.dismissible
       class="absolute start-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:start-0"
       href="#blume-content">{strings.page.skipToContent}</a
     >
-    <Banner banner={banner} />
+    <Banner banner={banner} strings={strings.banner} />
     <Header
       askEnabled={askEnabled}
       hasSidebar={false}

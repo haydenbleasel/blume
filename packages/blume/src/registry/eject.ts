@@ -275,9 +275,13 @@ const examplesPreviewFiles = (
  * eject the project has a normal `astro.config.mjs` and `src/`, the `blume` CLI
  * is no longer required, and the `blume` package remains importable.
  *
- * Returns the list of written files.
+ * Returns the written files plus non-fatal warnings, mirroring the generated
+ * runtime (e.g. a Scalar reference spec that wasn't found, or a reference
+ * route colliding with a content page).
  */
-export const eject = async (root: string): Promise<string[]> => {
+export const eject = async (
+  root: string
+): Promise<{ files: string[]; warnings: string[] }> => {
   const project = await scanProject(root, { mode: "build" });
   const { context, config } = project;
 
@@ -536,13 +540,17 @@ export const eject = async (root: string): Promise<string[]> => {
   }
 
   // Scalar API/AsyncAPI reference pages, mirrored from the generated runtime so
-  // the ejected app keeps its reference routes.
+  // the ejected app keeps its reference routes — including the warnings (a
+  // missing spec file, a route collision), which the caller surfaces exactly
+  // like the generated-runtime path does.
+  const warnings: string[] = [];
   if (hasScalarReferences(config)) {
     const references = await buildReferenceFiles({
       config,
       contentRoutes: new Set(project.graph.pages.map((page) => page.route)),
       root,
     });
+    warnings.push(...references.warnings);
     for (const file of references.files) {
       files.push({
         content: file.content,
@@ -597,5 +605,5 @@ export const eject = async (root: string): Promise<string[]> => {
   // The hidden runtime is no longer the source of truth.
   await rm(context.outDir, { force: true, recursive: true });
 
-  return written.map((file) => file.path);
+  return { files: written.map((file) => file.path), warnings };
 };

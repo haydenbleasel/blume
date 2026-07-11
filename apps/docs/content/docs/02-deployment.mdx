@@ -88,7 +88,7 @@ deployment: {
 }
 ```
 
-Choosing an adapter pulls in the matching Astro adapter automatically:
+The `vercel` and `node` adapters ship with Blume — choosing one just works. The `netlify` and `cloudflare` adapters must be installed in your project (e.g. `bun add -d @astrojs/netlify`); the CLI warns you if the package is missing:
 
 | Adapter      | Package               | Use for                              |
 | ------------ | --------------------- | ------------------------------------ |
@@ -97,7 +97,7 @@ Choosing an adapter pulls in the matching Astro adapter automatically:
 | `node`       | `@astrojs/node`       | Self-hosted Node servers, containers |
 | `cloudflare` | `@astrojs/cloudflare` | Cloudflare Workers and Pages         |
 
-On **Vercel**, **Netlify**, and **Cloudflare Pages**, Blume picks the matching adapter automatically for server output — set `output: "server"` and deploy. Set `adapter` explicitly to override the detected value, or when self-hosting with `node`.
+On **Vercel**, **Netlify**, and **Cloudflare Pages**, Blume picks the matching adapter automatically for server output — set `output: "server"` and deploy (on Netlify and Cloudflare, install the adapter package too). Set `adapter` explicitly to override the detected value, or when self-hosting with `node`.
 
 A server build includes everything a static build does, plus any Astro endpoints or middleware you add. The `node` adapter produces a standalone server you can run directly.
 
@@ -126,7 +126,7 @@ When a feature needs a runtime secret, Blume warns at `blume dev`/`build` if it'
 | Feature | Variable |
 | --- | --- |
 | Ask AI (AI Gateway) | `AI_GATEWAY_API_KEY` (or Vercel OIDC) |
-| Ask AI (OpenRouter / OpenAI-compatible) | the provider's `apiKeyEnv` |
+| Ask AI (other providers) | the provider's default key env var (`OPENROUTER_API_KEY`, `LLMGATEWAY_API_KEY`, `INKEEP_API_KEY`), or your configured `apiKeyEnv` |
 | Mixedbread search | `MIXEDBREAD_API_KEY` |
 
 Set them in `.env.local` for local dev and in your host's environment for production. Build-time secrets for search-index sync (Algolia, Orama Cloud, Typesense) are warned about separately during the sync step.

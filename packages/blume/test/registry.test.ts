@@ -70,7 +70,7 @@ describe("eject", () => {
     await mkdir(assetDir, { recursive: true });
     await writeFile(join(assetDir, "img.png"), "png-bytes");
 
-    const files = await eject(root);
+    const { files, warnings } = await eject(root);
     const has = (rel: string): boolean => existsSync(join(root, rel));
 
     // Core scaffolding.
@@ -136,9 +136,11 @@ describe("eject", () => {
       `@source "${relative(join(root, "src/generated"), join(packageRoot(), "src"))}/**/*.{astro,ts,tsx}";`
     );
 
-    // Every returned path was actually written.
+    // Every returned path was actually written; the local spec resolved, so no
+    // reference warnings surface.
     expect(files.length).toBeGreaterThan(0);
     expect(files.every((file) => existsSync(file))).toBe(true);
+    expect(warnings).toEqual([]);
   });
 
   it("emits a static search index for a static search provider", async () => {
@@ -164,11 +166,34 @@ describe("eject", () => {
       "tsconfig.json": tuned,
     });
 
-    const files = await eject(root);
+    const { files } = await eject(root);
 
     // The user's tuned config is untouched and not reported as ejected.
     expect(readFileSync(join(root, "tsconfig.json"), "utf-8")).toBe(tuned);
     expect(files.some((file) => file.endsWith("tsconfig.json"))).toBe(false);
+  });
+
+  it("returns the Scalar reference warnings instead of dropping them", async () => {
+    const root = await mkdtemp(join(tmpdir(), "blume-eject-"));
+    ejectDirs.push(root);
+    // A Scalar reference whose spec file doesn't exist: the page still ships
+    // (falling back to loading the spec as a URL, which will 404), so the
+    // warning is the only signal — eject must return it like generate does.
+    await writeFiles(root, {
+      "blume.config.ts": `export default {
+        openapi: { enabled: true, renderer: "scalar", spec: "missing.json" },
+      };\n`,
+      "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
+    });
+
+    const { warnings } = await eject(root);
+
+    expect(
+      warnings.some((warning) =>
+        warning.includes('API reference spec not found: "missing.json"')
+      )
+    ).toBe(true);
+    expect(existsSync(join(root, "src/pages/reference.astro"))).toBe(true);
   });
 
   it("emits the /changelog page for a release-backed changelog source", async () => {

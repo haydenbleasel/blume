@@ -19,6 +19,18 @@ import { logger, reportDiagnostics } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
 /**
+ * Resolve a `--host` flag value into what Astro/Vite's `server.host` expects.
+ * citty (0.1) has no mixed string/boolean arg type, so `host` is declared as a
+ * string and a bare `--host` parses as `""` — Node would bind all interfaces
+ * for `""`, but Vite's `resolveHostname` treats it as a literal hostname and
+ * prints malformed URLs like `http://:4321/`. Match Astro's own `--host`
+ * semantics instead: bare flag → `true` (bind all interfaces), `--host
+ * 10.0.0.1` → that address, absent → `false` (localhost only).
+ */
+export const normalizeHost = (host: string | undefined): boolean | string =>
+  host === "" ? true : (host ?? false);
+
+/**
  * A fingerprint of the route set: the sorted `path entryId` pairs. It changes
  * when a page is added, removed, or renamed (a folder rename shifts many at
  * once) but stays equal across pure body edits — so the dev loop can tell a
@@ -106,7 +118,7 @@ export const devCommand = defineCommand({
       dev({
         logLevel: args.debug ? "debug" : "info",
         root: project.context.outDir,
-        server: { host: args.host ?? false, open, port: listenPort },
+        server: { host: normalizeHost(args.host), open, port: listenPort },
       });
 
     let server = await createServer(explicitPort, args.open ?? false);

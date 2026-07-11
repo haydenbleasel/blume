@@ -224,11 +224,13 @@ export const scanProject = async (
     const fsPaths = pages
       .map((page) => page.sourcePath)
       .filter((path): path is string => path !== undefined);
-    const gitTimes = gitLastModifiedTimes(
-      context.root,
-      context.contentRoot,
-      fsPaths
+    // The git pathspecs must cover where the pages actually live: each
+    // filesystem source's own root, which diverges from the global
+    // `content.root` when a source configures a non-default `root`.
+    const contentRoots = sources.flatMap((source) =>
+      source.staged || !source.contentRoot ? [] : [source.contentRoot]
     );
+    const gitTimes = gitLastModifiedTimes(context.root, contentRoots, fsPaths);
     for (const page of pages) {
       if (!page.lastModified && page.sourcePath) {
         page.lastModified = gitTimes.get(page.sourcePath);

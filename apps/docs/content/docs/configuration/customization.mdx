@@ -154,3 +154,14 @@ blume eject --yes
 ```
 
 Eject is a one-way step: the hidden `.blume/` runtime becomes a normal Astro app you own and can modify directly. The `blume` package stays importable, so you keep its components, theme, and Markdown processors.
+
+### What eject leaves behind
+
+After ejecting, your `build` script runs plain `astro build` — the site itself builds the same, but the artifacts `blume build` layered on top are no longer produced. The eject command warns about the ones your config actually uses. To keep them:
+
+- **Pagefind search index** — with `search.provider: "pagefind"`, the search UI loads the index from the built site, so search breaks in production until you index it yourself. Install `pagefind` as a devDependency and index after each build: `"build": "astro build && pagefind --site dist"`.
+- **Hosted search sync** — a hosted provider's index is no longer pushed on build; re-upload your search records after each build with the provider's API or CLI.
+- **sitemap.xml** — recreate it with the standard [@astrojs/sitemap](https://docs.astro.build/en/guides/integrations-guide/sitemap/) integration.
+- **robots.txt** — ship your own as `public/robots.txt`.
+- **llms.txt / llms-full.txt and agent-readability.json** — write them by hand (or generate them in a build step of your own) and serve them from `public/`.
+- **Platform redirect files** — `_redirects` and `vercel.json` are no longer emitted for static builds. Your redirects still work as Astro-generated meta-refresh pages, or you can move them into your host's own config.

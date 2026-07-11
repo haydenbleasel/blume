@@ -1031,6 +1031,7 @@ const configuration = ${JSON.stringify(options.configuration, null, 2)};
   searchEnabled={data.config.search.enabled}
   site={{ title: data.config.title, description: data.config.description }}
   themeMode={data.config.theme.mode}
+  ui={data.ui}
 >
   <ScalarComponent configuration={configuration} renderMode="client" />
 </ReferenceLayout>
@@ -1427,6 +1428,20 @@ const items = await Promise.all(
   })
 );
 
+// Repeated labels slug to the same id (e.g. two entries with neither a title
+// nor a version both falling back to "update"); suffix the later ones -2, -3,
+// ... so every heading deep-links to its own entry. The first keeps the plain
+// slug, and the rendered ids stay in lockstep with the \`headings\` list below.
+const seenIds = new Set();
+for (const item of items) {
+  let uniqueId = item.id;
+  for (let n = 2; seenIds.has(uniqueId); n += 1) {
+    uniqueId = item.id + "-" + n;
+  }
+  seenIds.add(uniqueId);
+  item.id = uniqueId;
+}
+
 // A changelog is semver-paginated only when every visible release parses as
 // semver and they span more than one major line. Older majors then collapse
 // into groups the reader reveals one at a time; otherwise the timeline is flat.
@@ -1452,6 +1467,16 @@ const base = data.config.site ? data.config.site.replace(/\\/$/, "") : null;
 const basedRoute = withBase("/changelog");
 const canonical = base ? base + basedRoute : null;
 
+// The changelog is an unlocalized route, so its chrome renders in the default
+// locale's dictionary and direction (\`data.ui\` is the default locale's resolved
+// dictionary), mirroring the catch-all's locale wiring.
+const i18n = data.config.i18n;
+const localeMeta = i18n
+  ? i18n.locales.find((l) => l.code === i18n.defaultLocale)
+  : null;
+const dir = localeMeta?.dir ?? "ltr";
+const htmlLang = i18n ? i18n.defaultLocale : "en";
+
 const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
 ---
 
@@ -1467,6 +1492,9 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   imageZoom={data.config.imageZoom}
   codeWrap={data.config.codeWrap}
   navigation={data.navigation}
+  locale={htmlLang}
+  dir={dir}
+  ui={data.ui}
   page={{
     title: data.config.title + " changelog",
     description: "Product updates and release notes.",
@@ -1562,6 +1590,16 @@ import data from "../generated/data.json";
 export const prerender = true;
 
 const nf = data.ui.notFound;
+
+// The 404 page is an unlocalized route, so its chrome renders in the default
+// locale's dictionary and direction (\`data.ui\` is the default locale's resolved
+// dictionary), mirroring the catch-all's locale wiring.
+const i18n = data.config.i18n;
+const localeMeta = i18n
+  ? i18n.locales.find((l) => l.code === i18n.defaultLocale)
+  : null;
+const dir = localeMeta?.dir ?? "ltr";
+const htmlLang = i18n ? i18n.defaultLocale : "en";
 ---
 
 <PageLayout
@@ -1576,6 +1614,8 @@ const nf = data.ui.notFound;
   themeMode={data.config.theme.mode}
   fontCssVars={data.fontCssVars}
   searchEnabled={data.config.search.enabled}
+  locale={htmlLang}
+  dir={dir}
   ui={data.ui}
   noindex={true}
 >

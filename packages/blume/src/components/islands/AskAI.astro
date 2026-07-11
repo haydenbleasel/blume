@@ -63,13 +63,16 @@ const icons = {
   }
 
   /* The table of contents only shows at xl; reclaim its column for the article
-     while the panel is open so the shrunken content still has room to breathe. */
+     while the panel is open so the shrunken content still has room to breathe.
+     Scoped to grids that actually have a TOC column: a "bare" layout (the
+     changelog index) is single-column, and forcing the sidebar tracks onto it
+     would squeeze its only item — <main> — into the 17.5rem track. */
   @media (min-width: 1280px) {
     body[data-blume-ask="open"] [data-blume-toc] {
       display: none;
     }
 
-    body[data-blume-ask="open"] [data-blume-doc-grid] {
+    body[data-blume-ask="open"] [data-blume-doc-grid]:has([data-blume-toc]) {
       grid-template-columns: 17.5rem minmax(0, 1fr);
     }
   }

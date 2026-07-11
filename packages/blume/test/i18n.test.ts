@@ -261,6 +261,46 @@ describe("per-locale navigation", () => {
       (graph.navigationByLocale.en?.tabs ?? []).map((tab) => tab.path)
     ).toEqual(["/docs", "/"]);
   });
+
+  it("localizes tab dropdown item paths per locale", async () => {
+    const resolved = blumeConfigSchema.parse({
+      i18n: {
+        defaultLocale: "en",
+        locales: [
+          { code: "en", label: "English" },
+          { code: "fr", label: "Français" },
+        ],
+      },
+      navigation: {
+        tabs: [
+          {
+            items: [
+              { label: "Guides", path: "/docs/guides" },
+              { label: "GitHub", path: "https://github.com/acme" },
+            ],
+            label: "Docs",
+            path: "/docs",
+          },
+        ],
+      },
+    });
+    const { graph } = await buildProject(resolved);
+
+    const itemPaths = (locale: string): string[] =>
+      (graph.navigationByLocale[locale]?.tabs ?? []).flatMap((tab) =>
+        (tab.items ?? []).map((item) => item.path)
+      );
+    // Internal dropdown items follow the tab into the locale; external ones
+    // pass through untouched.
+    expect(itemPaths("fr")).toEqual([
+      "/fr/docs/guides",
+      "https://github.com/acme",
+    ]);
+    expect(itemPaths("en")).toEqual([
+      "/docs/guides",
+      "https://github.com/acme",
+    ]);
+  });
 });
 
 describe("i18n diagnostics", () => {

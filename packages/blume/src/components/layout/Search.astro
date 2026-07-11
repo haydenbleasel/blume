@@ -424,6 +424,19 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
           return;
         }
 
+        // A section picked for an earlier query can be missing from the new
+        // pool — and when the pool has fewer than two sections the pills that
+        // would clear it are hidden too, so the stale filter would silently
+        // empty the results. Drop it and search again unfiltered.
+        if (
+          this.activeSection &&
+          !result.sections.some((s) => s.label === this.activeSection)
+        ) {
+          this.activeSection = null;
+          this.render();
+          return;
+        }
+
         this.renderFilters(result.sections);
 
         if (this.askEnabled) {

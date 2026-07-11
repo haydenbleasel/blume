@@ -122,6 +122,32 @@ describe("scanProject lastModified", () => {
       "2020-01-02T00:00:00.000Z"
     );
   });
+
+  it("dates pages from a filesystem source with a non-default root", async () => {
+    // The git pathspec must follow the source's own root ("documentation");
+    // pointing it at the default `content.root` ("docs") silently dated
+    // nothing — `git log -- docs` exits 0 with empty output.
+    const root = realpathSync(
+      await makeProject({
+        "blume.config.ts": [
+          "export default {",
+          '  content: { sources: [{ type: "filesystem", root: "documentation" }] },',
+          "  lastModified: true,",
+          "};",
+          "",
+        ].join("\n"),
+        "documentation/index.md": "# Home\n",
+      })
+    );
+    initRepo(root);
+    runGit(root, ["add", "-A"]);
+    runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add docs"]);
+
+    const project = await scanProject(root);
+    expect(project.manifest.routes[0]?.lastModified).toMatch(
+      /^\d{4}-\d{2}-\d{2}T/u
+    );
+  });
 });
 
 describe("gitLastModifiedTimes", () => {
@@ -152,7 +178,11 @@ describe("gitLastModifiedTimes", () => {
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add docs"]);
 
     const untracked = join(contentRoot, "missing.md");
-    const times = gitLastModifiedTimes(root, contentRoot, [tracked, untracked]);
+    const times = gitLastModifiedTimes(
+      root,
+      [contentRoot],
+      [tracked, untracked]
+    );
 
     expect(times.get(tracked)).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
     // A path with no commit history is simply absent from the map.
@@ -161,9 +191,17 @@ describe("gitLastModifiedTimes", () => {
 
   it("returns an empty map outside a git repository", async () => {
     const root = await makeRepoDir();
-    const times = gitLastModifiedTimes(root, join(root, "docs"), [
-      join(root, "docs", "index.md"),
-    ]);
+    const times = gitLastModifiedTimes(
+      root,
+      [join(root, "docs")],
+      [join(root, "docs", "index.md")]
+    );
     expect(times.size).toBe(0);
+  });
+
+  it("skips the git scan entirely when there is nothing to date", async () => {
+    // An empty pathspec list would otherwise log the whole repository.
+    const root = await makeRepoDir();
+    expect(gitLastModifiedTimes(root, [], []).size).toBe(0);
   });
 });

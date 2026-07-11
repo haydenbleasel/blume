@@ -125,6 +125,8 @@
   },
   "peerDependencies": {
     "@ai-sdk/openai-compatible": "^1.0.41",
+    "@astrojs/cloudflare": "^14.0.0",
+    "@astrojs/netlify": "^8.0.0",
     "@mixedbread/sdk": "^0.76.0",
     "@notionhq/client": "^2.2.15",
     "@openrouter/ai-sdk-provider": "^1.5.4",
@@ -136,6 +138,12 @@
   },
   "peerDependenciesMeta": {
     "@ai-sdk/openai-compatible": {
+      "optional": true
+    },
+    "@astrojs/cloudflare": {
+      "optional": true
+    },
+    "@astrojs/netlify": {
       "optional": true
     },
     "@mixedbread/sdk": {

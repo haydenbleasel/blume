@@ -4,7 +4,7 @@
 
 **Documentation for everything you build.** Fast, AI-ready, and zero-config. Free and open source, forever.
 
-Drop Markdown or MDX into a folder, run `blume dev`, and get a production-grade docs site — navigation, search, theming, Open Graph images, and a rich component library — with no app boilerplate to write or maintain. Blume generates and drives a hidden Astro project for you; run `blume eject` to a standalone Astro app whenever you want full control.
+Drop Markdown or MDX into a folder, run `blume dev`, and get a production-grade docs site — navigation, search, theming, Open Graph images, and a rich component library — with no app boilerplate to write or maintain. Blume generates and drives a hidden Astro project for you; run `blume eject` to get a standalone Astro app whenever you want full control.
 
 **[Documentation](https://useblume.dev)** · [Quickstart](https://useblume.dev/docs/quickstart) · [Components](https://useblume.dev/docs/content/components) · [CLI](https://useblume.dev/docs/reference/cli)
 

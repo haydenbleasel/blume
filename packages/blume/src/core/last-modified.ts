@@ -42,16 +42,23 @@ export const parseGitLog = (output: string): Map<string, string> => {
 
 /**
  * Resolve each source file's last-modified date from git history, keyed by
- * absolute source path. Runs a single `git log` over the content tree and maps
- * repo-root-relative paths back to the given absolute paths (monorepo-safe via
- * `rev-parse --show-toplevel`). Returns an empty map if git is unavailable or
- * the project isn't a repo — the feature then simply shows no dates.
+ * absolute source path. Runs a single `git log` over the given content roots
+ * (each filesystem source's own root, which may diverge from `content.root`)
+ * and maps repo-root-relative paths back to the given absolute paths
+ * (monorepo-safe via `rev-parse --show-toplevel`). Returns an empty map if git
+ * is unavailable or the project isn't a repo — the feature then simply shows
+ * no dates.
  */
 export const gitLastModifiedTimes = (
   root: string,
-  contentRoot: string,
+  contentRoots: string[],
   sourcePaths: string[]
 ): Map<string, string> => {
+  // Nothing to date — don't pay for a git scan (an empty pathspec list would
+  // log the entire repository).
+  if (sourcePaths.length === 0) {
+    return new Map();
+  }
   try {
     const gitRoot = execFileSync(
       // oxlint-disable-next-line sonarjs/no-os-command-from-path -- git is a required dev-tool dependency resolved from PATH
@@ -71,7 +78,7 @@ export const gitLastModifiedTimes = (
         "--format=%x00%cI",
         "--name-only",
         "--",
-        contentRoot,
+        ...contentRoots,
       ],
       { encoding: "utf-8", maxBuffer: 256 * 1024 * 1024 }
     );

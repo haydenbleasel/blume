@@ -116,47 +116,114 @@ const nextFenceState = (line: string, fence: FenceState): FenceState => {
   return fence === delimiter ? null : fence;
 };
 // A closing hash sequence must be preceded by whitespace (CommonMark), so a
-// heading like `## What is C#` keeps its trailing `#`.
-const ATX_HEADING = /^(?<hashes>#{1,6})\s+(?<text>.+?)(?:\s+#+)?\s*$/u;
+// heading like `## What is C#` keeps its trailing `#`. Up to 3 leading spaces
+// are allowed; 4+ is an indented code block.
+const ATX_HEADING = /^ {0,3}(?<hashes>#{1,6})\s+(?<text>.+?)(?:\s+#+)?\s*$/u;
+// A setext underline: a run of `=` (level 1) or `-` (level 2) alone on a line,
+// up to 3 leading spaces. It only forms a heading directly under paragraph
+// text — see `scanHeadingLine`.
+const SETEXT_UNDERLINE = /^ {0,3}(?<marker>=+|-+)\s*$/u;
+// Lines that end a paragraph without being one (CommonMark): blank lines are
+// checked separately; these cover list items, blockquotes, and thematic
+// breaks, so a `---` after any of them stays a thematic break, not an
+// underline promoting the list/quote text to a heading.
+const PARAGRAPH_INTERRUPT = /^ {0,3}(?:[-+*][ \t]|\d{1,9}[.)][ \t]|>)/u;
+const THEMATIC_BREAK =
+  /^ {0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/u;
+const FRONT_MATTER_CLOSE = /^(?:-{3}|\.{3})\s*$/u;
 
 /**
- * Extract ATX headings from a markdown body, skipping fenced code blocks. Each
- * heading's anchor slug comes from a per-document `github-slugger` — the exact
- * slugger the renderer uses (`markdown/heading-anchors`) — advanced over every
- * `#`–`######` in document order. Matching it (rather than a hand-rolled
- * slugify) keeps the manifest's anchor ids identical to the rendered ones, so
- * `blume validate` stops false-flagging links like `#the-read--write-fallback`
- * (a hand slugify collapses `--`; github-slugger keeps it) and resolves repeated
- * headings the same way (`setup`, `setup-1`).
+ * The body lines, minus a leading front matter block. Bodies from the
+ * normalize pipeline are already frontmatter-stripped, but `extractHeadings`
+ * also runs on raw documents — where a leading `---` block (closed by `---` or
+ * `...`) is front matter, not a thematic break whose closing `---` would
+ * underline the last metadata line into a phantom setext heading.
  */
-/** Scan one line for an ATX heading; returns the next fenced-block state. */
+const linesWithoutFrontMatter = (body: string): string[] => {
+  const lines = body.split("\n");
+  if (!/^-{3}\s*$/u.test(lines[0] ?? "")) {
+    return lines;
+  }
+  const close = lines.findIndex(
+    (line, index) => index > 0 && FRONT_MATTER_CLOSE.test(line)
+  );
+  return close === -1 ? lines : lines.slice(close + 1);
+};
+
+/** Scanner state: the open fence plus the paragraph lines accumulated so far. */
+interface HeadingScanState {
+  fence: FenceState;
+  /** Consecutive paragraph lines — the candidate text for a setext underline. */
+  paragraph: string[];
+}
+
+/**
+ * Extract ATX and setext headings from a markdown body, skipping fenced code
+ * blocks, exactly as the renderer sees them: ATX headings may be indented up
+ * to 3 spaces, and a paragraph underlined with `=`/`-` is a level 1/2 setext
+ * heading. Each heading's anchor slug comes from a per-document
+ * `github-slugger` — the exact slugger the renderer uses
+ * (`markdown/heading-anchors`) — advanced over every heading in document
+ * order. Matching it (rather than a hand-rolled slugify) keeps the manifest's
+ * anchor ids identical to the rendered ones, so `blume validate` stops
+ * false-flagging links like `#the-read--write-fallback` (a hand slugify
+ * collapses `--`; github-slugger keeps it) and resolves repeated headings the
+ * same way (`setup`, `setup-1`).
+ */
+/** Scan one line for a heading, advancing the fence/paragraph state. */
 const scanHeadingLine = (
   line: string,
-  fence: FenceState,
+  state: HeadingScanState,
   slugger: GithubSlugger,
   headings: Heading[]
-): FenceState => {
-  const next = nextFenceState(line, fence);
-  // Skip fence delimiter lines themselves and anything inside a fence.
-  if (fence !== null || next !== null) {
-    return next;
+): void => {
+  const next = nextFenceState(line, state.fence);
+  // Skip fence delimiter lines themselves and anything inside a fence. A fence
+  // also ends any open paragraph, so no underline can reach across it.
+  if (state.fence !== null || next !== null) {
+    state.fence = next;
+    state.paragraph = [];
+    return;
   }
-  const match = line.match(ATX_HEADING);
-  if (match?.groups) {
-    const depth = match.groups.hashes?.length ?? 1;
-    const text = (match.groups.text ?? "").trim();
+  const atx = line.match(ATX_HEADING);
+  if (atx?.groups) {
+    const depth = atx.groups.hashes?.length ?? 1;
+    const text = (atx.groups.text ?? "").trim();
     headings.push({ depth, slug: slugger.slug(text), text });
+    state.paragraph = [];
+    return;
   }
-  return next;
+  const setext = line.match(SETEXT_UNDERLINE);
+  if (setext?.groups && state.paragraph.length > 0) {
+    // Setext wins over thematic break when it closes a paragraph (CommonMark);
+    // a multi-line paragraph renders as one heading, soft breaks as spaces.
+    const text = state.paragraph.join(" ").trim();
+    headings.push({
+      depth: setext.groups.marker?.startsWith("=") ? 1 : 2,
+      slug: slugger.slug(text),
+      text,
+    });
+    state.paragraph = [];
+    return;
+  }
+  if (
+    line.trim() === "" ||
+    THEMATIC_BREAK.test(line) ||
+    PARAGRAPH_INTERRUPT.test(line)
+  ) {
+    state.paragraph = [];
+    return;
+  }
+  state.paragraph.push(line.trim());
 };
 
 export const extractHeadings = (body: string): Heading[] => {
   const headings: Heading[] = [];
   const slugger = new GithubSlugger();
-  let fence: FenceState = null;
+  const state: HeadingScanState = { fence: null, paragraph: [] };
 
-  for (const line of body.split("\n")) {
-    fence = scanHeadingLine(line, fence, slugger, headings);
+  for (const line of linesWithoutFrontMatter(body)) {
+    scanHeadingLine(line, state, slugger, headings);
   }
 
   return headings;

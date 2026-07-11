@@ -11,6 +11,7 @@ import { ensureGitignore } from "../../core/gitignore.ts";
 import type { BlumeProject } from "../../core/project-graph.ts";
 import type { ResolvedConfig } from "../../core/schema.ts";
 import { serverFeatures } from "../../core/server-features.ts";
+import type { ProjectContext } from "../../core/types.ts";
 import {
   deployStaticDir,
   surfaceAdapterOutput,
@@ -190,10 +191,48 @@ const enforceBudget = async (
 };
 
 /**
+ * Run the optional bundle report (`--analyze`) and performance-budget gate
+ * against the directory whose `_astro/` client assets the deploy serves.
+ * Shared by real and isolated builds — an isolated CI run passing
+ * `--budget-js` must still fail on an exceeded budget rather than silently
+ * skipping the check. Exits non-zero when a budget is exceeded.
+ */
+export const runClientAssetChecks = async (
+  staticDir: string,
+  args: { analyze?: boolean } & BudgetArgs
+): Promise<void> => {
+  if (args.analyze) {
+    await reportBundleSizes(staticDir);
+  }
+  if ((await enforceBudget(staticDir, args)) === "fail") {
+    process.exit(1);
+  }
+};
+
+/**
+ * Directory holding an isolated build's client `_astro/` assets. Mirrors
+ * `deployStaticDir`, except that an isolated build never surfaces the adapter
+ * bundle to the project root — a Vercel server build's static output stays at
+ * `<runtime>/.vercel/output/static`, where `deployStaticDir` would instead
+ * point at the project-root copy (a previous real build's assets, or nothing).
+ */
+export const isolatedStaticDir = (
+  config: ResolvedConfig,
+  context: ProjectContext
+): string => {
+  const { adapter, output } = config.deployment;
+  if (output === "server" && adapter === "vercel") {
+    return join(context.outDir, ".vercel", "output", "static");
+  }
+  return context.distDir ?? join(context.outDir, "dist");
+};
+
+/**
  * Run every deploy post-step of a real (non-isolated) build: the search index +
  * hosted-provider sync, llms.txt, sitemap/robots, redirect files, the summary
  * box, and the optional bundle report / budget gate. Exits non-zero if a budget
- * is exceeded. Isolated verify builds skip all of this.
+ * is exceeded. Isolated verify builds skip all of this except the bundle
+ * report / budget gate, which they run against their own output.
  */
 const publishBuildArtifacts = async (
   project: BlumeProject,
@@ -268,13 +307,7 @@ const publishBuildArtifacts = async (
     ].join("\n")
   );
 
-  if (args.analyze) {
-    await reportBundleSizes(distDir);
-  }
-
-  if ((await enforceBudget(distDir, args)) === "fail") {
-    process.exit(1);
-  }
+  await runClientAssetChecks(distDir, args);
 
   logger.success(`Built to ${distDir}`);
 };
@@ -374,8 +407,15 @@ export const buildCommand = defineCommand({
     // An isolated build is a throwaway verify: it only needs to confirm the site
     // compiles and renders. Skip the network post-steps (search sync) and
     // deploy artifacts (index/llms/sitemap/robots/redirects) that only matter
-    // for a real publish and would push to hosted providers.
+    // for a real publish and would push to hosted providers. The bundle report
+    // and budget gate still run, though — `blume build --isolated --budget-js
+    // 100` exiting 0 without measuring anything would be a silent false pass
+    // in CI.
     if (runtimeDir) {
+      await runClientAssetChecks(
+        isolatedStaticDir(project.config, project.context),
+        args
+      );
       logger.success(
         `Isolated build OK — output at ${distDir} (not published).`
       );

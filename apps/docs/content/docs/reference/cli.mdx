@@ -68,7 +68,7 @@ blume check --isolated   # fast: type-check the .astro/config changes
 blume build --isolated   # thorough: full production render into .blume-verify/dist
 ```
 
-`check --isolated` is the quick path (Astro type + template diagnostics, no `dist/`); `build --isolated` is the heavier one that also catches runtime render errors. Isolated builds skip the deploy post-steps (search index, hosted-provider sync, `llms.txt`, sitemap/robots, redirects) — a verify only needs to confirm the site compiles and renders, not publish it. Blume adds `.blume-verify/` to your `.gitignore` automatically.
+`check --isolated` is the quick path (Astro type + template diagnostics, no `dist/`); `build --isolated` is the heavier one that also catches runtime render errors. Isolated builds skip the deploy post-steps (search index, hosted-provider sync, `llms.txt`, sitemap/robots, redirects) — a verify only needs to confirm the site compiles and renders, not publish it. `--analyze` and the `--budget-js`/`--budget-css` gates still run, measured against the isolated output. Blume adds `.blume-verify/` to your `.gitignore` automatically.
 
 This is especially useful when a coding agent needs to verify changes while you keep the dev server open. To make plain `blume build`/`blume check` isolate without the flag — for example in an agent's shell — set `BLUME_RUNTIME_DIR` to the runtime directory to use:
 

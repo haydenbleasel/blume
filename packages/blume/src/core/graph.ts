@@ -87,13 +87,19 @@ const buildLocaleNavigation = (
   options: BuildContentGraphOptions,
   i18n: ResolvedI18nConfig
 ): Navigation => {
-  // Localize internal tab paths so a header tab points to its in-locale route
-  // (e.g. `/docs` -> `/fr/docs`); external paths pass through.
+  // Localize internal tab paths — the tab's own and its dropdown items' — so a
+  // header tab points to its in-locale route (e.g. `/docs` -> `/fr/docs`);
+  // external paths pass through. Selectors are left alone: a language
+  // selector's items intentionally target specific locales.
+  const localizePath = (path: string): string =>
+    path.startsWith("/") ? localizeRoute(path, code, i18n) : path;
   const tabs = options.navigation.tabs?.map((tab) => ({
     ...tab,
-    path: tab.path.startsWith("/")
-      ? localizeRoute(tab.path, code, i18n)
-      : tab.path,
+    items: tab.items?.map((item) => ({
+      ...item,
+      path: localizePath(item.path),
+    })),
+    path: localizePath(tab.path),
   }));
   const real = pages.filter((page) => page.locale === code);
   const localePages = localePagesFor(

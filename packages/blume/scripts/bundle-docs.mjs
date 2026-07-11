@@ -2,9 +2,10 @@
 // and resolve under node_modules/blume: the docs site content
 // (apps/docs/content/docs -> docs/), the agent skills (repo-root skills/ ->
 // skills/), and the repo-root README.md and LICENSE. All generated copies are
-// gitignored; this runs on `prepare` (after install) and `prepack` (before
-// publish) to keep them fresh. The originals (apps/docs/content/docs, the
-// repo-root skills/, README.md, and LICENSE) remain the source of truth.
+// gitignored; this runs on the repo root's `prepare` (after install in the
+// monorepo) and this package's `prepack` (before publish) to keep them fresh.
+// The originals (apps/docs/content/docs, the repo-root skills/, README.md,
+// and LICENSE) remain the source of truth.
 import { cpSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
 

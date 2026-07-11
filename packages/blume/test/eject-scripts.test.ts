@@ -5,7 +5,12 @@ import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
-import { updatePackageScripts } from "../src/cli/eject-scripts.ts";
+import {
+  droppedArtifactNotices,
+  updatePackageScripts,
+} from "../src/cli/eject-scripts.ts";
+import { blumeConfigSchema } from "../src/core/schema.ts";
+import type { ResolvedConfig } from "../src/core/schema.ts";
 
 const dirs: string[] = [];
 
@@ -23,6 +28,9 @@ afterAll(async () => {
 
 const readPkg = async (root: string): Promise<Record<string, unknown>> =>
   JSON.parse(await readFile(join(root, "package.json"), "utf-8"));
+
+const config = (raw: Record<string, unknown> = {}): ResolvedConfig =>
+  blumeConfigSchema.parse(raw);
 
 describe("updatePackageScripts", () => {
   it("rewrites the Blume scripts to run Astro directly", async () => {
@@ -82,5 +90,79 @@ describe("updatePackageScripts", () => {
     expect(await readFile(join(root, "package.json"), "utf-8")).toBe(
       "not json"
     );
+  });
+});
+
+describe("droppedArtifactNotices", () => {
+  it("lists the default-on artifacts for a zero-config project", () => {
+    const notices = droppedArtifactNotices(config());
+    expect(notices).toContain("llms.txt and llms-full.txt");
+    expect(notices.some((notice) => notice.includes("robots.txt"))).toBe(true);
+    expect(notices).toContain("agent-readability.json");
+    // No deployment.site, no redirects, and the static Orama provider: no
+    // sitemap, redirect-file, Pagefind, or hosted-sync notices.
+    expect(notices.some((notice) => notice.includes("sitemap.xml"))).toBe(
+      false
+    );
+    expect(notices.some((notice) => notice.includes("_redirects"))).toBe(false);
+    expect(notices.some((notice) => notice.includes("Pagefind"))).toBe(false);
+    expect(notices.some((notice) => notice.includes("index sync"))).toBe(false);
+  });
+
+  it("gives the Pagefind index an actionable post-build hint", () => {
+    const notices = droppedArtifactNotices(
+      config({ search: { provider: "pagefind" } })
+    );
+    expect(
+      notices.some((notice) =>
+        notice.includes("astro build && pagefind --site dist")
+      )
+    ).toBe(true);
+  });
+
+  it("mentions the hosted index sync for a syncing provider", () => {
+    const notices = droppedArtifactNotices(
+      config({
+        search: {
+          algolia: { appId: "a", indexName: "i", searchApiKey: "k" },
+          provider: "algolia",
+        },
+      })
+    );
+    expect(
+      notices.some((notice) => notice.includes("hosted algolia index sync"))
+    ).toBe(true);
+  });
+
+  it("lists sitemap.xml only when deployment.site enables it", () => {
+    const notices = droppedArtifactNotices(
+      config({ deployment: { site: "https://example.com" } })
+    );
+    expect(notices.some((notice) => notice.includes("sitemap.xml"))).toBe(true);
+  });
+
+  it("lists the platform redirect files only for static output", () => {
+    const redirects = [{ from: "/old", to: "/new" }];
+    const isStatic = droppedArtifactNotices(config({ redirects }));
+    expect(isStatic.some((notice) => notice.includes("_redirects"))).toBe(true);
+
+    const server = droppedArtifactNotices(
+      config({
+        deployment: { adapter: "vercel", output: "server" },
+        redirects,
+      })
+    );
+    expect(server.some((notice) => notice.includes("_redirects"))).toBe(false);
+  });
+
+  it("returns nothing when every artifact is switched off", () => {
+    const notices = droppedArtifactNotices(
+      config({
+        ai: { llmsTxt: false },
+        search: { provider: "none" },
+        seo: { agentReadability: false, robots: false, sitemap: false },
+      })
+    );
+    expect(notices).toEqual([]);
   });
 });

@@ -97,4 +97,37 @@ describe("blume eject", () => {
     expect(output).toContain("npm run dev");
     expect(output).toContain("npm run build");
   });
+
+  it("lists the blume-build artifacts the ejected app stops producing", async () => {
+    const root = await fixture({
+      "blume.config.ts":
+        'export default { search: { provider: "pagefind" } };\n',
+      "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
+    });
+    // The confirmation (no --yes) already carries the config-aware notice, so
+    // the decision is informed before anything is written.
+    const { exitCode, output } = await runEject(root);
+    expect(exitCode).toBe(0);
+    expect(output).toContain("astro build && pagefind --site dist");
+    expect(output).toContain("llms.txt");
+    expect(output).toContain("robots.txt");
+    // No deployment.site, so no sitemap was being produced — an inactive
+    // artifact must not be listed.
+    expect(output).not.toContain("sitemap.xml");
+    expect(existsSync(join(root, "astro.config.mjs"))).toBe(false);
+  });
+
+  it("surfaces generation warnings like the runtime path does", async () => {
+    const root = await fixture({
+      "blume.config.ts":
+        'export default { openapi: { enabled: true, renderer: "scalar", spec: "missing.json" } };\n',
+      "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
+    });
+    const { exitCode, output } = await runEject(root, undefined, "--yes");
+    expect(exitCode).toBe(0);
+    // The Scalar reference's missing-spec warning must not be swallowed: the
+    // page ships pointing at a spec URL that will 404.
+    expect(output).toContain('API reference spec not found: "missing.json"');
+    expect(existsSync(join(root, "src/pages/reference.astro"))).toBe(true);
+  });
 });

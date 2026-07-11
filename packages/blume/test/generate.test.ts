@@ -725,6 +725,76 @@ describe("generateRuntime", () => {
     expect(existsSync(join(out, "src/generated/islands/Box.astro"))).toBe(true);
   });
 
+  it("warns when the netlify adapter package isn't installed", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default { deployment: { adapter: "netlify", output: "server" } };
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const result = await generateRuntime(project);
+    expect(
+      result.warnings.some(
+        (w) =>
+          w.includes('Deployment adapter "netlify"') &&
+          w.includes("@astrojs/netlify")
+      )
+    ).toBe(true);
+  });
+
+  it("warns when the cloudflare adapter package isn't installed", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default { deployment: { adapter: "cloudflare", output: "server" } };
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const result = await generateRuntime(project);
+    expect(
+      result.warnings.some(
+        (w) =>
+          w.includes('Deployment adapter "cloudflare"') &&
+          w.includes("@astrojs/cloudflare")
+      )
+    ).toBe(true);
+  });
+
+  it("stays quiet when the project installed the netlify adapter", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default { deployment: { adapter: "netlify", output: "server" } };
+`,
+        "docs/index.md": "# Home\n",
+        "node_modules/@astrojs/netlify/index.js":
+          "export default () => ({});\n",
+        "node_modules/@astrojs/netlify/package.json": `{ "main": "index.js", "name": "@astrojs/netlify", "version": "8.0.0" }
+`,
+      })
+    );
+    const result = await generateRuntime(project);
+    expect(result.warnings.some((w) => w.includes("@astrojs/netlify"))).toBe(
+      false
+    );
+  });
+
+  it("stays quiet for server output with an adapter Blume ships", async () => {
+    // Node and Vercel resolve from Blume's own dependencies, so the preflight
+    // never flags them.
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default { deployment: { adapter: "node", output: "server" } };
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const result = await generateRuntime(project);
+    expect(result.warnings.some((w) => w.includes("Deployment adapter"))).toBe(
+      false
+    );
+  });
+
   it("materializes staged content into .blume/content", async () => {
     const project = await scanStaged();
     const out = project.context.outDir;

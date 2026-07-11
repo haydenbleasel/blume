@@ -105,6 +105,18 @@ describe("config schema", () => {
     ).toBeFalsy();
   });
 
+  it("normalizes mcp.route to a leading slash, no trailing slash", () => {
+    // A slash-less route would be string-concatenated onto the site origin
+    // (`https://acme.comdocs-mcp`) by the well-known/card/agent URLs.
+    expect(
+      blumeConfigSchema.parse({ mcp: { route: "docs-mcp" } }).mcp.route
+    ).toBe("/docs-mcp");
+    expect(blumeConfigSchema.parse({ mcp: { route: "/mcp/" } }).mcp.route).toBe(
+      "/mcp"
+    );
+    expect(blumeConfigSchema.parse({}).mcp.route).toBe("/mcp");
+  });
+
   it("accepts a banner string or object, defaulting dismissible to false", () => {
     expect(blumeConfigSchema.parse({ banner: "Beta" }).banner).toBe("Beta");
     expect(
@@ -280,6 +292,58 @@ describe(extractHeadings, () => {
       "What is C#",
       "Setup",
     ]);
+  });
+
+  it("extracts ATX headings indented up to three spaces, not four", () => {
+    // CommonMark (and the renderer) accepts 1-3 leading spaces; 4 is an
+    // indented code block.
+    const body = ["   ## Indented", "    # Code block"].join("\n");
+    expect(extractHeadings(body)).toStrictEqual([
+      { depth: 2, slug: "indented", text: "Indented" },
+    ]);
+  });
+
+  it("extracts setext headings at levels 1 (=) and 2 (-)", () => {
+    const body = ["Title", "=====", "", "Section", "  ---"].join("\n");
+    expect(extractHeadings(body)).toStrictEqual([
+      { depth: 1, slug: "title", text: "Title" },
+      { depth: 2, slug: "section", text: "Section" },
+    ]);
+  });
+
+  it("joins a multi-line paragraph into one setext heading", () => {
+    const body = ["Long", "title", "===="].join("\n");
+    expect(extractHeadings(body)).toStrictEqual([
+      { depth: 1, slug: "long-title", text: "Long title" },
+    ]);
+  });
+
+  it("does not misread front matter, breaks, lists, or tables as setext", () => {
+    const body = [
+      "---",
+      "title: Foo",
+      "---",
+      "",
+      "Intro paragraph.",
+      "",
+      "---",
+      "",
+      "- item",
+      "---",
+      "> quote",
+      "===",
+      "| a |",
+      "| --- |",
+    ].join("\n");
+    // Front matter delimiters, a thematic break after a blank line, a break
+    // closing a list or blockquote, and a table delimiter row are all
+    // underline look-alikes that must not produce headings.
+    expect(extractHeadings(body)).toStrictEqual([]);
+  });
+
+  it("keeps setext underlines inside fenced code as content", () => {
+    const body = ["```", "yaml", "----", "```", "Real", "----"].join("\n");
+    expect(extractHeadings(body).map((h) => h.text)).toStrictEqual(["Real"]);
   });
 
   it("slugs anchors like the renderer: keeps `--` and disambiguates dupes", () => {

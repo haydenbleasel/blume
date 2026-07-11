@@ -1,5 +1,7 @@
 ---
 import "blume:theme";
+import { EN_UI } from "../../core/i18n-ui.ts";
+import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { Navigation } from "../../core/types.ts";
 import Analytics from "./Analytics.astro";
 import Banner from "./Banner.astro";
@@ -50,6 +52,8 @@ interface Props {
   fontCssVars?: string[];
   searchEnabled: boolean;
   pageTitle: string;
+  /** Resolved UI dictionary; English baseline when omitted. */
+  ui?: UIStrings;
 }
 
 const {
@@ -65,7 +69,10 @@ const {
   fontCssVars,
   searchEnabled,
   pageTitle,
+  ui,
 } = Astro.props;
+
+const strings = ui ?? EN_UI;
 
 // Set the theme before paint so the navbar never flashes the wrong colors
 // (mirrors RootLayout's pre-paint script).
@@ -90,7 +97,7 @@ const bannerScript = banner?.dismissible
     <Analytics analytics={analytics} />
   </head>
   <body class="bg-background font-sans text-foreground antialiased">
-    <Banner banner={banner} />
+    <Banner banner={banner} strings={strings.banner} />
     <Header
       hasDrawer={false}
       hasSidebar={false}

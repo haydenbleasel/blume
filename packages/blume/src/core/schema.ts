@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { normalizeRoute } from "../openapi/references.ts";
 import { FONT_SLUGS, isFontSlug } from "../theme/fonts.ts";
 import { normalizeBasePath } from "./base-path.ts";
 import { uiLocaleOverridesSchema } from "./i18n-ui.ts";
@@ -641,7 +642,11 @@ const mcpConfigSchema = z.strictObject({
   instructions: z.string().optional(),
   /** Server name shown to clients; defaults to the site title. */
   name: z.string().optional(),
-  route: z.string().default("/mcp"),
+  /**
+   * Normalized like `openapi.route`: a slash-less value would otherwise be
+   * string-concatenated onto the site origin (`https://acme.comdocs-mcp`).
+   */
+  route: z.string().default("/mcp").transform(normalizeRoute),
 });
 
 /** A configured locale: ISO-ish code plus display metadata for the switcher. */
