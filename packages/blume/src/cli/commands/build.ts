@@ -64,7 +64,10 @@ const validateBudgetFlags = (args: BudgetArgs): void => {
 /**
  * Emit platform redirect files for a static build (adapters wire redirects
  * natively). Always writes the manifest; writes `_redirects`/`vercel.json` only
- * when the user hasn't shipped one via public/.
+ * when the user hasn't shipped one via public/. Note that Vercel's
+ * git-integration builds read `vercel.json` from the repository root only —
+ * the copy emitted here takes effect when the dist folder itself is deployed
+ * directly via the Vercel CLI.
  */
 const emitRedirectFiles = async (
   config: ResolvedConfig,
@@ -210,6 +213,22 @@ export const runClientAssetChecks = async (
 };
 
 /**
+ * Root of an isolated build's output. The runtime-local `dist/`, except for a
+ * Vercel server build, whose deploy bundle lands at `<runtime>/.vercel/output`
+ * and is never surfaced to the project root.
+ */
+export const isolatedOutputDir = (
+  config: ResolvedConfig,
+  context: ProjectContext
+): string => {
+  const { adapter, output } = config.deployment;
+  if (output === "server" && adapter === "vercel") {
+    return join(context.outDir, ".vercel", "output");
+  }
+  return context.distDir ?? join(context.outDir, "dist");
+};
+
+/**
  * Directory holding an isolated build's client `_astro/` assets. Mirrors
  * `deployStaticDir`, except that an isolated build never surfaces the adapter
  * bundle to the project root — a Vercel server build's static output stays at
@@ -221,14 +240,14 @@ export const isolatedStaticDir = (
   context: ProjectContext
 ): string => {
   const { adapter, output } = config.deployment;
+  const outputDir = isolatedOutputDir(config, context);
   if (output === "server" && adapter === "vercel") {
-    return join(context.outDir, ".vercel", "output", "static");
+    return join(outputDir, "static");
   }
-  const dist = context.distDir ?? join(context.outDir, "dist");
   if (output === "server" && adapter === "node") {
-    return join(dist, "client");
+    return join(outputDir, "client");
   }
-  return dist;
+  return outputDir;
 };
 
 /**
@@ -442,8 +461,6 @@ export const buildCommand = defineCommand({
       root: project.context.outDir,
     });
 
-    const distDir = project.context.distDir ?? join(root, "dist");
-
     // An isolated build is a throwaway verify: it only needs to confirm the site
     // compiles and renders. Skip the network post-steps (search sync) and
     // deploy artifacts (index/llms/sitemap/robots/redirects) that only matter
@@ -457,7 +474,7 @@ export const buildCommand = defineCommand({
         args
       );
       logger.success(
-        `Isolated build OK — output at ${distDir} (not published).`
+        `Isolated build OK — output at ${isolatedOutputDir(project.config, project.context)} (not published).`
       );
       return;
     }

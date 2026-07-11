@@ -1,15 +1,24 @@
 ---
+import { EN_UI } from "../../core/i18n-ui.ts";
+import type { UIStrings } from "../../core/i18n-ui.ts";
 import { withBase } from "../islands/base-path.ts";
 import type { Crumb } from "./nav-utils.ts";
 
 interface Props {
   /** Full breadcrumb trail from the site root to the current page. */
   crumbs: Crumb[];
+  /** Localized nav labels (the landmark's `aria-label`); English when omitted. */
+  strings?: UIStrings["nav"];
   /** Left-align full width (for the wide API layout) instead of the prose measure. */
   wide?: boolean;
 }
 
-const { crumbs, wide = false } = Astro.props;
+const { crumbs, strings, wide = false } = Astro.props;
+
+// Merge over the English defaults so a label missing from a translation (or
+// from a not-yet-regenerated snapshot) still renders instead of coming out
+// blank — the PageActions pattern.
+const n = { ...EN_UI.nav, ...strings };
 
 // The built-in shows a single "eyebrow" crumb — the parent group — rather than
 // the whole trail. An override receives the complete list and can render more.
@@ -19,7 +28,7 @@ const eyebrowCrumb = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
 {
   eyebrowCrumb && (
     <nav
-      aria-label="Breadcrumb"
+      aria-label={n.breadcrumb}
       class:list={[
         "mb-2 text-muted-foreground text-sm",
         wide ? "max-w-none" : "mx-auto max-w-[42rem]",

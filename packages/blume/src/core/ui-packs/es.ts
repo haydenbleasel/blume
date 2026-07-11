@@ -24,6 +24,10 @@ export const es: UIStringsOverride = {
     title: "Preguntar a la IA",
   },
   banner: { dismiss: "Cerrar el anuncio" },
+  changelog: {
+    description: "Novedades del producto y notas de la versión.",
+    title: "Registro de cambios",
+  },
   feedback: {
     no: "No",
     question: "¿Te ha resultado útil esta página?",
@@ -31,13 +35,16 @@ export const es: UIStringsOverride = {
     yes: "Sí",
   },
   languageSwitcher: { label: "Idioma", untranslated: "Sin traducir" },
+  nav: { breadcrumb: "Ruta de navegación" },
   page: {
     lastUpdated: "Última actualización el",
     next: "Siguiente",
+    pagination: "Paginación",
     previous: "Anterior",
     skipToContent: "Saltar al contenido",
   },
   search: {
+    all: "Todos",
     button: "Buscar",
     devOnly: "La búsqueda está disponible en la compilación de producción.",
     label: "Buscar en la documentación",

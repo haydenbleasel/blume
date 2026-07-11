@@ -24,6 +24,10 @@ export const ru: UIStringsOverride = {
     title: "Спросить ИИ",
   },
   banner: { dismiss: "Закрыть объявление" },
+  changelog: {
+    description: "Обновления продукта и примечания к выпускам.",
+    title: "Журнал изменений",
+  },
   feedback: {
     no: "Нет",
     question: "Эта страница была полезной?",
@@ -31,13 +35,16 @@ export const ru: UIStringsOverride = {
     yes: "Да",
   },
   languageSwitcher: { label: "Язык", untranslated: "Не переведено" },
+  nav: { breadcrumb: "Навигационная цепочка" },
   page: {
     lastUpdated: "Последнее обновление",
     next: "Далее",
+    pagination: "Пагинация",
     previous: "Назад",
     skipToContent: "Перейти к содержимому",
   },
   search: {
+    all: "Все",
     button: "Поиск",
     devOnly: "Поиск доступен в production-сборке.",
     label: "Поиск по документации",

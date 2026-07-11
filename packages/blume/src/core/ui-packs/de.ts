@@ -24,6 +24,10 @@ export const de: UIStringsOverride = {
     title: "KI fragen",
   },
   banner: { dismiss: "Ankündigung schließen" },
+  changelog: {
+    description: "Produkt-Updates und Versionshinweise.",
+    title: "Änderungsprotokoll",
+  },
   feedback: {
     no: "Nein",
     question: "War diese Seite hilfreich?",
@@ -31,13 +35,16 @@ export const de: UIStringsOverride = {
     yes: "Ja",
   },
   languageSwitcher: { label: "Sprache", untranslated: "Nicht übersetzt" },
+  nav: { breadcrumb: "Brotkrümelnavigation" },
   page: {
     lastUpdated: "Zuletzt aktualisiert am",
     next: "Weiter",
+    pagination: "Seitennummerierung",
     previous: "Zurück",
     skipToContent: "Zum Inhalt springen",
   },
   search: {
+    all: "Alle",
     button: "Suchen",
     devOnly: "Die Suche ist im Produktions-Build verfügbar.",
     label: "Dokumentation durchsuchen",

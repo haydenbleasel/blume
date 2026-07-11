@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
@@ -391,6 +391,66 @@ describe("buildRssFeeds — pages without a date", () => {
     const xml = renderRssFeed(feed as RssFeed);
     expect(xml).toContain("<title>A</title>");
     expect(xml).not.toContain("<pubDate>");
+  });
+});
+
+const layoutSource = (name: string): Promise<string> =>
+  readFile(
+    new URL(`../src/components/layout/${name}`, import.meta.url),
+    "utf-8"
+  );
+
+describe("layout chrome sources", () => {
+  it("toggles the search dialog on ⌘K and guards re-entrant opens", async () => {
+    const source = await layoutSource("Search.astro");
+    // ⌘K closes an open dialog (mirroring Ask AI's ⌘I toggle) instead of
+    // calling showModal on it — a no-op on evergreen browsers but an
+    // InvalidStateError on older ones.
+    expect(source).toContain("this.dialog.close();");
+    expect(source).toMatch(
+      /if \(this\.dialog\.open\) \{\s*this\.dialog\.close\(\);\s*\} else \{\s*this\.open\(\);/u
+    );
+    // "/" stays open-only behind the field guard.
+    expect(source).toContain(
+      'event.key === "/" && !this.isField(event.target)'
+    );
+    // open() itself refuses to re-showModal an already-open dialog.
+    expect(source).toMatch(
+      /async open\(\) \{[^}]*if \(this\.dialog\.open\) \{\s*return;/u
+    );
+  });
+
+  it("localizes the search section-filter All pill", async () => {
+    const source = await layoutSource("Search.astro");
+    expect(source).toContain("data-i18n-all={s.all}");
+    expect(source).toContain("this.createPill(this.allMsg, total, null)");
+    expect(source).not.toContain('this.createPill("All"');
+  });
+
+  it("localizes the breadcrumb and pagination landmark labels", async () => {
+    const breadcrumbs = await layoutSource("Breadcrumbs.astro");
+    expect(breadcrumbs).toContain("aria-label={n.breadcrumb}");
+    const pagination = await layoutSource("Pagination.astro");
+    expect(pagination).toContain("aria-label={s.pagination}");
+    // RootLayout forwards the nav dictionary to the breadcrumbs slot.
+    const root = await layoutSource("RootLayout.astro");
+    expect(root).toContain("strings={navStrings}");
+  });
+
+  it("mirrors the NavTree back arrow and drill-in chevron under RTL", async () => {
+    const source = await layoutSource("NavTree.astro");
+    expect(source).toContain('class="rtl:-scale-x-100" name="arrow-left"');
+    expect(source).toContain(
+      'class="shrink-0 text-muted-foreground rtl:-scale-x-100"'
+    );
+  });
+
+  it("gives the reference shell lang/dir and a skip link", async () => {
+    const source = await layoutSource("ReferenceLayout.astro");
+    expect(source).toContain("<html dir={dir} lang={locale}>");
+    expect(source).toContain('href="#blume-content"');
+    expect(source).toContain('id="blume-content"');
+    expect(source).toContain("{strings.page.skipToContent}");
   });
 });
 

@@ -134,6 +134,30 @@ describe("i18n helpers", () => {
     });
   });
 
+  it("detects a locale dir case-insensitively, keeping the configured casing", () => {
+    // BCP 47 codes are case-insensitive: the conventional lowercase folder
+    // `pt-br/` must resolve to a configured `pt-BR`, with the configured
+    // casing flowing into the locale (and thus routes and labels).
+    const i18n = i18nOf({
+      locales: [
+        { code: "en", label: "English" },
+        { code: "pt-BR", label: "Português" },
+      ],
+    });
+    expect(detectLocale(["pt-br", "x.mdx"], i18n)).toEqual({
+      locale: "pt-BR",
+      rest: ["x.mdx"],
+    });
+    expect(detectLocale(["PT-br", "x.mdx"], i18n)).toEqual({
+      locale: "pt-BR",
+      rest: ["x.mdx"],
+    });
+    expect(detectLocale(["pt-pt", "x.mdx"], i18n)).toEqual({
+      locale: "en",
+      rest: ["pt-pt", "x.mdx"],
+    });
+  });
+
   it("hides the default-locale prefix unless opted out", () => {
     expect(localePrefix("en", i18nOf())).toBe("");
     expect(localePrefix("fr", i18nOf())).toBe("/fr");
@@ -199,6 +223,36 @@ describe("i18n content discovery", () => {
     const frHome = byId.get("fr/index.mdx");
     expect(frHome?.route).toBe("/fr");
     expect(frHome?.translationKey).toBe("/");
+  });
+});
+
+describe("case-insensitive locale folders", () => {
+  const ptLocales = [
+    { code: "en", label: "English" },
+    { code: "pt-BR", label: "Português" },
+  ];
+
+  it("routes a lowercase folder for a mixed-case configured locale", async () => {
+    // A configured `pt-BR` with the conventional lowercase `pt-br/` folder
+    // used to fall through as default-locale content at a literal /pt-br/…
+    // route — while the unconfigured-locale diagnostic (which compares
+    // case-insensitively) stayed silent.
+    const resolved = config({ locales: ptLocales });
+    const contentRoot = await tempContent({
+      "guides/quickstart.mdx": "# Quickstart\n",
+      "pt-br/guides/quickstart.mdx": "# Início\n",
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const byId = new Map(pages.map((page) => [page.source.ref, page]));
+
+    const pt = byId.get("pt-br/guides/quickstart.mdx");
+    expect(pt?.locale).toBe("pt-BR");
+    expect(pt?.route).toBe("/pt-BR/guides/quickstart");
+    expect(pt?.translationKey).toBe("/guides/quickstart");
+    expect(pt?.navPath).toBe("guides/quickstart.mdx");
+
+    // The folder now routes as configured content, and the diagnostic agrees.
+    expect(i18nDiagnostics(pages, i18nOf({ locales: ptLocales }))).toEqual([]);
   });
 });
 
@@ -440,6 +494,25 @@ describe("dot parser and shared files", () => {
     ).toStrictEqual({ locales: ["en"], navPath: "intro.v2.mdx" });
   });
 
+  it("matches a mixed-case dot suffix case-insensitively", () => {
+    const i18n = i18nOf({
+      locales: [
+        { code: "en", label: "English" },
+        { code: "pt-BR", label: "Português" },
+      ],
+      parser: "dot",
+    });
+    // The lowercase suffix matches the configured `pt-BR` and adopts its casing.
+    expect(localePlacement("intro.pt-br.mdx", ".mdx", i18n)).toStrictEqual({
+      locales: ["pt-BR"],
+      navPath: "intro.mdx",
+    });
+    expect(localePlacement("intro.PT-BR.mdx", ".mdx", i18n)).toStrictEqual({
+      locales: ["pt-BR"],
+      navPath: "intro.mdx",
+    });
+  });
+
   it("hoists a dir-parser locale directory in front of the source prefix", async () => {
     const contentRoot = await tempContent({
       "fr/guides/meta.ts": 'export default { title: "Guides FR" };\n',
@@ -546,6 +619,41 @@ describe("UI dictionaries", () => {
       expect(
         pack.banner?.dismiss,
         `pack "${code}" misses banner.dismiss`
+      ).toBeTruthy();
+    }
+  });
+
+  it("localizes the landmark labels and changelog chrome in every shipped pack", () => {
+    // Formerly hardcoded English: the breadcrumb/pagination nav landmarks, the
+    // search section-filter "All" pill, and the generated changelog index's
+    // heading/description. Now dictionary-driven with English fallback.
+    expect(EN_UI.search.all).toBe("All");
+    expect(EN_UI.nav.breadcrumb).toBe("Breadcrumb");
+    expect(EN_UI.page.pagination).toBe("Pagination");
+    expect(EN_UI.changelog.title).toBe("Changelog");
+    expect(EN_UI.changelog.description).toBe(
+      "Product updates and release notes."
+    );
+    const dict = resolveUIStrings("fr", { defaultLocale: "en" });
+    expect(dict.nav.breadcrumb).toBe("Fil d'Ariane");
+    expect(dict.changelog.title).toBe("Journal des modifications");
+    for (const [code, pack] of Object.entries(UI_PACKS)) {
+      expect(pack.search?.all, `pack "${code}" misses search.all`).toBeTruthy();
+      expect(
+        pack.nav?.breadcrumb,
+        `pack "${code}" misses nav.breadcrumb`
+      ).toBeTruthy();
+      expect(
+        pack.page?.pagination,
+        `pack "${code}" misses page.pagination`
+      ).toBeTruthy();
+      expect(
+        pack.changelog?.title,
+        `pack "${code}" misses changelog.title`
+      ).toBeTruthy();
+      expect(
+        pack.changelog?.description,
+        `pack "${code}" misses changelog.description`
       ).toBeTruthy();
     }
   });

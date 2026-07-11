@@ -24,6 +24,10 @@ export const nl: UIStringsOverride = {
     title: "AI vragen",
   },
   banner: { dismiss: "Aankondiging sluiten" },
+  changelog: {
+    description: "Productupdates en releaseopmerkingen.",
+    title: "Wijzigingslogboek",
+  },
   feedback: {
     no: "Nee",
     question: "Was deze pagina nuttig?",
@@ -31,13 +35,16 @@ export const nl: UIStringsOverride = {
     yes: "Ja",
   },
   languageSwitcher: { label: "Taal", untranslated: "Niet vertaald" },
+  nav: { breadcrumb: "Kruimelpad" },
   page: {
     lastUpdated: "Laatst bijgewerkt op",
     next: "Volgende",
+    pagination: "Paginering",
     previous: "Vorige",
     skipToContent: "Naar inhoud springen",
   },
   search: {
+    all: "Alle",
     button: "Zoeken",
     devOnly: "Zoeken is beschikbaar in de productiebuild.",
     label: "Documentatie doorzoeken",

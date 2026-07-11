@@ -24,6 +24,10 @@ export const hu: UIStringsOverride = {
     title: "Kérdezd az AI-t",
   },
   banner: { dismiss: "Közlemény bezárása" },
+  changelog: {
+    description: "Termékfrissítések és kiadási megjegyzések.",
+    title: "Változásnapló",
+  },
   feedback: {
     no: "Nem",
     question: "Hasznos volt ez az oldal?",
@@ -31,13 +35,16 @@ export const hu: UIStringsOverride = {
     yes: "Igen",
   },
   languageSwitcher: { label: "Nyelv", untranslated: "Nincs lefordítva" },
+  nav: { breadcrumb: "Morzsamenü" },
   page: {
     lastUpdated: "Utoljára frissítve",
     next: "Következő",
+    pagination: "Lapozás",
     previous: "Előző",
     skipToContent: "Ugrás a tartalomra",
   },
   search: {
+    all: "Összes",
     button: "Keresés",
     devOnly: "A keresés az éles buildben érhető el.",
     label: "Keresés a dokumentációban",

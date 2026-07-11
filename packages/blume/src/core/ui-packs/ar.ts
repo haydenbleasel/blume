@@ -24,6 +24,10 @@ export const ar: UIStringsOverride = {
     title: "اسأل الذكاء الاصطناعي",
   },
   banner: { dismiss: "إغلاق الإعلان" },
+  changelog: {
+    description: "تحديثات المنتج وملاحظات الإصدارات.",
+    title: "سجل التغييرات",
+  },
   feedback: {
     no: "لا",
     question: "هل كانت هذه الصفحة مفيدة؟",
@@ -31,13 +35,16 @@ export const ar: UIStringsOverride = {
     yes: "نعم",
   },
   languageSwitcher: { label: "اللغة", untranslated: "غير مترجم" },
+  nav: { breadcrumb: "مسار التنقل" },
   page: {
     lastUpdated: "آخر تحديث في",
     next: "التالي",
+    pagination: "ترقيم الصفحات",
     previous: "السابق",
     skipToContent: "الانتقال إلى المحتوى",
   },
   search: {
+    all: "الكل",
     button: "بحث",
     devOnly: "البحث متاح في إصدار الإنتاج.",
     label: "البحث في الوثائق",

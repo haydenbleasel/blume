@@ -74,12 +74,16 @@ export const detectLocale = (
   parts: string[],
   i18n: ResolvedI18nConfig
 ): { locale: string; rest: string[] } => {
-  const [first] = parts;
-  const isNonDefault = i18n.locales.some(
-    (locale) => locale.code !== i18n.defaultLocale && locale.code === first
+  // BCP 47 codes are case-insensitive: a conventional lowercase folder
+  // (`pt-br/`) must match a configured `pt-BR`. The configured casing is what
+  // flows into routes and labels.
+  const first = parts[0]?.toLowerCase();
+  const matched = i18n.locales.find(
+    (locale) =>
+      locale.code !== i18n.defaultLocale && locale.code.toLowerCase() === first
   );
-  if (first !== undefined && isNonDefault) {
-    return { locale: first, rest: parts.slice(1) };
+  if (matched) {
+    return { locale: matched.code, rest: parts.slice(1) };
   }
   return { locale: i18n.defaultLocale, rest: parts };
 };
@@ -116,11 +120,15 @@ export const localePlacement = (
     // authoring `intro.en.mdx` + `intro.fr.mdx` shares one translation key
     // instead of routing the default file to a literal `/intro.en`.
     if (lastDot > base.lastIndexOf("/")) {
-      const suffix = base.slice(lastDot + 1);
-      const matched = i18n.locales.some((locale) => locale.code === suffix);
+      // Case-insensitive, like `detectLocale`: `intro.pt-br.mdx` matches a
+      // configured `pt-BR` and adopts its casing.
+      const suffix = base.slice(lastDot + 1).toLowerCase();
+      const matched = i18n.locales.find(
+        (locale) => locale.code.toLowerCase() === suffix
+      );
       if (matched) {
         return {
-          locales: [suffix],
+          locales: [matched.code],
           navPath: `${base.slice(0, lastDot)}${ext}`,
         };
       }

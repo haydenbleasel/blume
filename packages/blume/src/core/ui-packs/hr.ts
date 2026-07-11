@@ -24,6 +24,10 @@ export const hr: UIStringsOverride = {
     title: "Pitaj AI",
   },
   banner: { dismiss: "Zatvori obavijest" },
+  changelog: {
+    description: "Ažuriranja proizvoda i napomene o izdanjima.",
+    title: "Popis promjena",
+  },
   feedback: {
     no: "Ne",
     question: "Je li vam ova stranica bila korisna?",
@@ -31,13 +35,16 @@ export const hr: UIStringsOverride = {
     yes: "Da",
   },
   languageSwitcher: { label: "Jezik", untranslated: "Nije prevedeno" },
+  nav: { breadcrumb: "Navigacijski put" },
   page: {
     lastUpdated: "Posljednje ažuriranje",
     next: "Sljedeće",
+    pagination: "Straničenje",
     previous: "Prethodno",
     skipToContent: "Prijeđi na sadržaj",
   },
   search: {
+    all: "Sve",
     button: "Pretraži",
     devOnly: "Pretraživanje je dostupno u produkcijskoj verziji.",
     label: "Pretraži dokumentaciju",

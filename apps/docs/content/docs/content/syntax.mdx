@@ -261,7 +261,7 @@ Hide the language icons or wrap long lines instead of scrolling with `markdown: 
 
 ## Package install
 
-A `package-install` block turns a single install command into a tabbed snippet for npm, pnpm, yarn, and bun — so readers copy the one that matches their setup.
+A `package-install` block turns a single install command into a tabbed snippet for npm, pnpm, yarn, and bun — so readers copy the one that matches their setup. Like diagrams and math, this is an MDX-only feature — in a `.md` file the block renders as a plain code fence.
 
 ```package-install
 npm i blume
@@ -297,7 +297,7 @@ Diagrams render on the client, so this is an MDX-only feature, and the Mermaid l
 
 ## Callouts
 
-Callouts pull a reader's attention to context, advice, or risk. Write them as `:::type` directives; add a title in brackets, like `:::warning[Heads up]`.
+Callouts pull a reader's attention to context, advice, or risk. Write them as `:::type` directives; add a title in brackets, like `:::warning[Heads up]`. Directives are an MDX-only feature — in a `.md` file a `:::note` line stays literal text.
 
 ### Note
 

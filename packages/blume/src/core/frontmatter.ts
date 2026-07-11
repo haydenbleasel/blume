@@ -11,6 +11,7 @@ import { dump, load } from "js-yaml";
 
 type MatterInput = Parameters<typeof baseMatter>[0];
 type MatterOptions = Parameters<typeof baseMatter>[1];
+type ReadArgs = Parameters<typeof baseMatter.read>;
 type StringifyArgs = Parameters<typeof baseMatter.stringify>;
 
 const yamlEngine = {
@@ -27,11 +28,17 @@ const withYamlEngine = <O>(options: O): O =>
     },
   }) as O;
 
+// Every helper that parses or emits YAML (`read`, `stringify`) must be
+// re-wrapped here — Object.assign copies gray-matter's own helpers, which use
+// its default `safeLoad` engine and would reintroduce the crash. `test` only
+// checks for a delimiter, so the copied original is safe.
 const matter = Object.assign(
   (input: MatterInput, options?: MatterOptions) =>
     baseMatter(input, withYamlEngine(options)),
   baseMatter,
   {
+    read: (filepath: ReadArgs[0], options?: ReadArgs[1]) =>
+      baseMatter.read(filepath, withYamlEngine(options)),
     stringify: (
       file: StringifyArgs[0],
       data: StringifyArgs[1],

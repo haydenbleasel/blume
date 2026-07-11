@@ -24,6 +24,10 @@ export const sk: UIStringsOverride = {
     title: "Opýtať sa AI",
   },
   banner: { dismiss: "Zavrieť oznámenie" },
+  changelog: {
+    description: "Novinky produktu a poznámky k vydaniu.",
+    title: "Zoznam zmien",
+  },
   feedback: {
     no: "Nie",
     question: "Bola táto stránka užitočná?",
@@ -31,13 +35,16 @@ export const sk: UIStringsOverride = {
     yes: "Áno",
   },
   languageSwitcher: { label: "Jazyk", untranslated: "Nepreložené" },
+  nav: { breadcrumb: "Omrvinková navigácia" },
   page: {
     lastUpdated: "Naposledy aktualizované",
     next: "Ďalej",
+    pagination: "Stránkovanie",
     previous: "Predchádzajúce",
     skipToContent: "Prejsť na obsah",
   },
   search: {
+    all: "Všetko",
     button: "Hľadať",
     devOnly: "Vyhľadávanie je dostupné v produkčnom builde.",
     label: "Prehľadať dokumentáciu",

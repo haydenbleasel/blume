@@ -136,7 +136,7 @@ const initialId =
               data-nav-back={panel.parentId}
               type="button"
             >
-              <Icon name="arrow-left" size={16} />
+              <Icon class="rtl:-scale-x-100" name="arrow-left" size={16} />
             </button>
             {panel.route ? (
               <a
@@ -219,7 +219,7 @@ const initialId =
                 <span class="flex-1 truncate">{item.label}</span>
                 {item.badge && <span class={badgeClassFor(item.badge)}>{item.badge}</span>}
                 <Icon
-                  class="shrink-0 text-muted-foreground"
+                  class="shrink-0 text-muted-foreground rtl:-scale-x-100"
                   name="chevron-right"
                   size={14}
                 />

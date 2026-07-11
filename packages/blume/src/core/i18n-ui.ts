@@ -55,8 +55,10 @@ const uiStringsObject = z.object({
     .default({}),
   changelog: z
     .object({
+      description: z.string().default("Product updates and release notes."),
       // `{version}` is replaced with the major line ("2.x") at render time.
       showReleases: z.string().default("Show {version} releases"),
+      title: z.string().default("Changelog"),
     })
     .default({}),
   content: z
@@ -81,6 +83,7 @@ const uiStringsObject = z.object({
   nav: z
     .object({
       back: z.string().default("Back"),
+      breadcrumb: z.string().default("Breadcrumb"),
       closeNavigation: z.string().default("Close navigation"),
       deprecated: z.string().default("deprecated"),
       featured: z.string().default("Featured"),
@@ -105,12 +108,14 @@ const uiStringsObject = z.object({
     .object({
       lastUpdated: z.string().default("Last updated on"),
       next: z.string().default("Next"),
+      pagination: z.string().default("Pagination"),
       previous: z.string().default("Previous"),
       skipToContent: z.string().default("Skip to content"),
     })
     .default({}),
   search: z
     .object({
+      all: z.string().default("All"),
       allLanguages: z.string().default("All languages"),
       askAi: z.string().default("Ask AI"),
       askAiHint: z.string().default("Get an instant answer from AI"),

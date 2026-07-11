@@ -24,6 +24,10 @@ export const ja: UIStringsOverride = {
     title: "AI に質問",
   },
   banner: { dismiss: "お知らせを閉じる" },
+  changelog: {
+    description: "製品のアップデートとリリースノート。",
+    title: "変更履歴",
+  },
   feedback: {
     no: "いいえ",
     question: "このページは役に立ちましたか？",
@@ -31,13 +35,16 @@ export const ja: UIStringsOverride = {
     yes: "はい",
   },
   languageSwitcher: { label: "言語", untranslated: "未翻訳" },
+  nav: { breadcrumb: "パンくずリスト" },
   page: {
     lastUpdated: "最終更新",
     next: "次へ",
+    pagination: "ページネーション",
     previous: "前へ",
     skipToContent: "コンテンツにスキップ",
   },
   search: {
+    all: "すべて",
     button: "検索",
     devOnly: "検索は本番ビルドで利用できます。",
     label: "ドキュメントを検索",

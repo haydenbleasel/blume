@@ -154,6 +154,13 @@ const AskAI = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   // Where focus came from when the panel opened, restored on close.
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  // The stream writes into the conversation via functional updates, so "Clear
+  // conversation" mid-answer must revoke the in-flight stream's right to write
+  // — otherwise its next chunk re-appends the assistant bubble onto the
+  // emptied list as an orphaned answer. Clearing bumps the generation (stale
+  // streams stop writing) and aborts the request (the stream stops arriving).
+  const abortRef = useRef<AbortController | null>(null);
+  const generationRef = useRef(0);
 
   // Portal target (document.body) only exists after mount; guards SSR. The
   // one-time false→true flip is deliberate, so the initial `false` is required.
@@ -239,6 +246,9 @@ const AskAI = ({
     setMessages([...history, assistant]);
     setInput("");
     setBusy(true);
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const response = await fetch(ASK_ENDPOINT, {
@@ -248,6 +258,7 @@ const AskAI = ({
         }),
         headers: { "content-type": "application/json" },
         method: "POST",
+        signal: controller.signal,
       });
       // A 4xx/5xx still has a body; without this guard its error text would be
       // decoded and shown as the assistant's answer instead of the error notice.
@@ -266,16 +277,30 @@ const AskAI = ({
           // must not flush as U+FFFD garbage.
           // oxlint-disable-next-line react/react-compiler -- local streaming accumulator, spread into state below
           assistant.content += decoder.decode(chunk.value, { stream: true });
-          setMessages((current) => [...current.slice(0, -1), { ...assistant }]);
+          if (generationRef.current === generation) {
+            setMessages((current) => [
+              ...current.slice(0, -1),
+              { ...assistant },
+            ]);
+          }
         }
       }
     } catch {
-      // oxlint-disable-next-line react/react-compiler -- local streaming accumulator, spread into state below
-      assistant.content = t.error;
-      setMessages((current) => [...current.slice(0, -1), { ...assistant }]);
+      // A cleared (aborted) stream must not resurrect its bubble as an error.
+      if (generationRef.current === generation) {
+        // oxlint-disable-next-line react/react-compiler -- local streaming accumulator, spread into state below
+        assistant.content = t.error;
+        setMessages((current) => [...current.slice(0, -1), { ...assistant }]);
+      }
     } finally {
       setBusy(false);
     }
+  };
+
+  const clearConversation = () => {
+    generationRef.current += 1;
+    abortRef.current?.abort();
+    setMessages([]);
   };
 
   const onSubmit = (event: FormEvent) => {
@@ -332,7 +357,7 @@ const AskAI = ({
             aria-label={t.clear}
             className={ICON_BUTTON_CLASS}
             disabled={!hasMessages}
-            onClick={() => setMessages([])}
+            onClick={clearConversation}
             type="button"
           >
             <Glyph path={icons.clear} />

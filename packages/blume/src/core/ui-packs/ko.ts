@@ -24,6 +24,10 @@ export const ko: UIStringsOverride = {
     title: "AI에게 질문",
   },
   banner: { dismiss: "공지 닫기" },
+  changelog: {
+    description: "제품 업데이트 및 릴리스 노트.",
+    title: "변경 로그",
+  },
   feedback: {
     no: "아니요",
     question: "이 페이지가 도움이 되었나요?",
@@ -31,13 +35,16 @@ export const ko: UIStringsOverride = {
     yes: "예",
   },
   languageSwitcher: { label: "언어", untranslated: "번역되지 않음" },
+  nav: { breadcrumb: "탐색 경로" },
   page: {
     lastUpdated: "마지막 업데이트",
     next: "다음",
+    pagination: "페이지네이션",
     previous: "이전",
     skipToContent: "본문으로 건너뛰기",
   },
   search: {
+    all: "전체",
     button: "검색",
     devOnly: "검색은 프로덕션 빌드에서 사용할 수 있습니다.",
     label: "문서 검색",

@@ -24,6 +24,10 @@ export const fi: UIStringsOverride = {
     title: "Kysy tekoälyltä",
   },
   banner: { dismiss: "Sulje ilmoitus" },
+  changelog: {
+    description: "Tuotepäivitykset ja julkaisutiedot.",
+    title: "Muutosloki",
+  },
   feedback: {
     no: "Ei",
     question: "Oliko tästä sivusta apua?",
@@ -31,13 +35,16 @@ export const fi: UIStringsOverride = {
     yes: "Kyllä",
   },
   languageSwitcher: { label: "Kieli", untranslated: "Ei käännetty" },
+  nav: { breadcrumb: "Murupolku" },
   page: {
     lastUpdated: "Viimeksi päivitetty",
     next: "Seuraava",
+    pagination: "Sivutus",
     previous: "Edellinen",
     skipToContent: "Siirry sisältöön",
   },
   search: {
+    all: "Kaikki",
     button: "Hae",
     devOnly: "Haku on käytettävissä tuotantokäännöksessä.",
     label: "Hae dokumentaatiosta",

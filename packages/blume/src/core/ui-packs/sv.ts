@@ -24,6 +24,10 @@ export const sv: UIStringsOverride = {
     title: "Fråga AI",
   },
   banner: { dismiss: "Stäng meddelandet" },
+  changelog: {
+    description: "Produktuppdateringar och versionsinformation.",
+    title: "Ändringslogg",
+  },
   feedback: {
     no: "Nej",
     question: "Var den här sidan till hjälp?",
@@ -31,13 +35,16 @@ export const sv: UIStringsOverride = {
     yes: "Ja",
   },
   languageSwitcher: { label: "Språk", untranslated: "Inte översatt" },
+  nav: { breadcrumb: "Brödsmulor" },
   page: {
     lastUpdated: "Senast uppdaterad",
     next: "Nästa",
+    pagination: "Paginering",
     previous: "Föregående",
     skipToContent: "Hoppa till innehåll",
   },
   search: {
+    all: "Alla",
     button: "Sök",
     devOnly: "Sökning är tillgänglig i produktionsbygget.",
     label: "Sök i dokumentationen",

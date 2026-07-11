@@ -24,6 +24,10 @@ export const bn: UIStringsOverride = {
     title: "AI-কে জিজ্ঞাসা করুন",
   },
   banner: { dismiss: "ঘোষণা বন্ধ করুন" },
+  changelog: {
+    description: "পণ্য আপডেট এবং রিলিজ নোট।",
+    title: "পরিবর্তন লগ",
+  },
   feedback: {
     no: "না",
     question: "এই পৃষ্ঠাটি কি সহায়ক ছিল?",
@@ -31,13 +35,16 @@ export const bn: UIStringsOverride = {
     yes: "হ্যাঁ",
   },
   languageSwitcher: { label: "ভাষা", untranslated: "অনূদিত নয়" },
+  nav: { breadcrumb: "ব্রেডক্রাম্ব" },
   page: {
     lastUpdated: "সর্বশেষ আপডেট",
     next: "পরবর্তী",
+    pagination: "পেজিনেশন",
     previous: "পূর্ববর্তী",
     skipToContent: "বিষয়বস্তুতে যান",
   },
   search: {
+    all: "সব",
     button: "অনুসন্ধান",
     devOnly: "অনুসন্ধান প্রোডাকশন বিল্ডে উপলব্ধ।",
     label: "ডকুমেন্টেশন অনুসন্ধান করুন",

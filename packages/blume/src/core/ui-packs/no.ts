@@ -24,6 +24,10 @@ export const no: UIStringsOverride = {
     title: "Spør AI",
   },
   banner: { dismiss: "Lukk kunngjøringen" },
+  changelog: {
+    description: "Produktoppdateringer og utgivelsesnotater.",
+    title: "Endringslogg",
+  },
   feedback: {
     no: "Nei",
     question: "Var denne siden nyttig?",
@@ -31,13 +35,16 @@ export const no: UIStringsOverride = {
     yes: "Ja",
   },
   languageSwitcher: { label: "Språk", untranslated: "Ikke oversatt" },
+  nav: { breadcrumb: "Brødsmulesti" },
   page: {
     lastUpdated: "Sist oppdatert",
     next: "Neste",
+    pagination: "Paginering",
     previous: "Forrige",
     skipToContent: "Hopp til innhold",
   },
   search: {
+    all: "Alle",
     button: "Søk",
     devOnly: "Søk er tilgjengelig i produksjonsbygget.",
     label: "Søk i dokumentasjonen",

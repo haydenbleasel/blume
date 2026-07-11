@@ -52,6 +52,10 @@ interface Props {
   fontCssVars?: string[];
   searchEnabled: boolean;
   pageTitle: string;
+  /** Active locale code for `<html lang>` (defaults to `en`). */
+  locale?: string;
+  /** Text direction for `<html dir>` (defaults to `ltr`). */
+  dir?: "ltr" | "rtl";
   /** Resolved UI dictionary; English baseline when omitted. */
   ui?: UIStrings;
 }
@@ -69,6 +73,8 @@ const {
   fontCssVars,
   searchEnabled,
   pageTitle,
+  locale = "en",
+  dir = "ltr",
   ui,
 } = Astro.props;
 
@@ -85,7 +91,7 @@ const bannerScript = banner?.dismissible
 ---
 
 <!doctype html>
-<html lang="en">
+<html dir={dir} lang={locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -97,6 +103,10 @@ const bannerScript = banner?.dismissible
     <Analytics analytics={analytics} />
   </head>
   <body class="bg-background font-sans text-foreground antialiased">
+    <a
+      class="absolute start-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:start-0"
+      href="#blume-content">{strings.page.skipToContent}</a
+    >
     <Banner banner={banner} strings={strings.banner} />
     <Header
       hasDrawer={false}
@@ -109,6 +119,7 @@ const bannerScript = banner?.dismissible
     />
     <div
       class="h-[calc(100dvh-4rem)] overflow-auto border-border border-t [&>[data-scalar-client]]:h-full"
+      id="blume-content"
     >
       <slot />
     </div>

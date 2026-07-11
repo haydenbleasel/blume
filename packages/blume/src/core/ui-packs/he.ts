@@ -24,6 +24,10 @@ export const he: UIStringsOverride = {
     title: "שאל את ה-AI",
   },
   banner: { dismiss: "סגירת ההודעה" },
+  changelog: {
+    description: "עדכוני מוצר והערות גרסה.",
+    title: "יומן שינויים",
+  },
   feedback: {
     no: "לא",
     question: "האם העמוד הזה היה מועיל?",
@@ -31,13 +35,16 @@ export const he: UIStringsOverride = {
     yes: "כן",
   },
   languageSwitcher: { label: "שפה", untranslated: "לא מתורגם" },
+  nav: { breadcrumb: "פירורי לחם" },
   page: {
     lastUpdated: "עודכן לאחרונה",
     next: "הבא",
+    pagination: "עימוד",
     previous: "הקודם",
     skipToContent: "דלג לתוכן",
   },
   search: {
+    all: "הכל",
     button: "חיפוש",
     devOnly: "החיפוש זמין בבנייה לייצור.",
     label: "חפש בתיעוד",

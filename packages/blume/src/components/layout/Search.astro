@@ -33,6 +33,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 <blume-search
   class="contents"
   data-ask={askEnabled ? "" : undefined}
+  data-i18n-all={s.all}
   data-i18n-ask={s.askAi}
   data-i18n-ask-hint={s.askAiHint}
   data-i18n-dev={s.devOnly}
@@ -211,6 +212,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       errorMsg = "Something went wrong. Please try again.";
       askMsg = "Ask AI";
       askHintMsg = "Get an instant answer from AI";
+      allMsg = "All";
       popularMsg = "Popular";
       resultsMsg = "Results";
       // The active locale to filter to (null when i18n is off), and whether the
@@ -227,6 +229,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         this.askMsg = this.getAttribute("data-i18n-ask") || this.askMsg;
         this.askHintMsg =
           this.getAttribute("data-i18n-ask-hint") || this.askHintMsg;
+        this.allMsg = this.getAttribute("data-i18n-all") || this.allMsg;
         this.popularMsg =
           this.getAttribute("data-i18n-popular") || this.popularMsg;
         this.resultsMsg =
@@ -293,12 +296,22 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         );
 
         document.addEventListener("keydown", (event) => {
-          const inField = this.isField(event.target);
           if (
-            ((event.key === "k" || event.key === "K") &&
-              (event.metaKey || event.ctrlKey)) ||
-            (event.key === "/" && !inField)
+            (event.key === "k" || event.key === "K") &&
+            (event.metaKey || event.ctrlKey)
           ) {
+            // ⌘K toggles, mirroring the Ask AI panel's ⌘I: pressing it with
+            // the dialog open must close it, not re-showModal an open dialog
+            // (an InvalidStateError on older engines).
+            event.preventDefault();
+            if (this.dialog.open) {
+              this.dialog.close();
+            } else {
+              this.open();
+            }
+          } else if (event.key === "/" && !this.isField(event.target)) {
+            // "/" stays open-only; the field guard keeps it inert while
+            // typing (including in the search input itself).
             event.preventDefault();
             this.open();
           }
@@ -326,6 +339,11 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       }
 
       async open() {
+        // Re-entrant opens (e.g. the open button while already shown) must
+        // not call showModal on an open dialog.
+        if (this.dialog.open) {
+          return;
+        }
         this.dialog.showModal();
         this.input.focus();
         this.input.select();
@@ -499,7 +517,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         this.filters.hidden = false;
         this.filters.replaceChildren();
         const total = sections.reduce((sum, s) => sum + s.count, 0);
-        this.filters.appendChild(this.createPill("All", total, null));
+        this.filters.appendChild(this.createPill(this.allMsg, total, null));
         for (const section of sections) {
           this.filters.appendChild(
             this.createPill(section.label, section.count, section.label)

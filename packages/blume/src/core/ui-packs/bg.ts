@@ -24,6 +24,10 @@ export const bg: UIStringsOverride = {
     title: "Попитай ИИ",
   },
   banner: { dismiss: "Затваряне на съобщението" },
+  changelog: {
+    description: "Актуализации на продукта и бележки към изданията.",
+    title: "Дневник на промените",
+  },
   feedback: {
     no: "Не",
     question: "Беше ли полезна тази страница?",
@@ -31,13 +35,16 @@ export const bg: UIStringsOverride = {
     yes: "Да",
   },
   languageSwitcher: { label: "Език", untranslated: "Непреведено" },
+  nav: { breadcrumb: "Навигационна пътека" },
   page: {
     lastUpdated: "Последна актуализация",
     next: "Напред",
+    pagination: "Пагинация",
     previous: "Назад",
     skipToContent: "Към съдържанието",
   },
   search: {
+    all: "Всички",
     button: "Търсене",
     devOnly: "Търсенето е достъпно в производствената компилация.",
     label: "Търсене в документацията",

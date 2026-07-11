@@ -24,6 +24,10 @@ export const fa: UIStringsOverride = {
     title: "از هوش مصنوعی بپرسید",
   },
   banner: { dismiss: "بستن اطلاعیه" },
+  changelog: {
+    description: "به‌روزرسانی‌های محصول و یادداشت‌های انتشار.",
+    title: "گزارش تغییرات",
+  },
   feedback: {
     no: "خیر",
     question: "آیا این صفحه مفید بود؟",
@@ -31,13 +35,16 @@ export const fa: UIStringsOverride = {
     yes: "بله",
   },
   languageSwitcher: { label: "زبان", untranslated: "ترجمه‌نشده" },
+  nav: { breadcrumb: "مسیر ناوبری" },
   page: {
     lastUpdated: "آخرین به‌روزرسانی",
     next: "بعدی",
+    pagination: "صفحه‌بندی",
     previous: "قبلی",
     skipToContent: "پرش به محتوا",
   },
   search: {
+    all: "همه",
     button: "جستجو",
     devOnly: "جستجو در نسخه تولید در دسترس است.",
     label: "جستجو در مستندات",

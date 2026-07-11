@@ -192,6 +192,31 @@ describe("examples config normalization", () => {
   });
 });
 
+describe("toc heading-range refinement", () => {
+  it("rejects a minHeadingLevel above the maxHeadingLevel", () => {
+    const result = blumeConfigSchema.safeParse({
+      toc: { maxHeadingLevel: 2, minHeadingLevel: 4 },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an explicit min above the default max", () => {
+    // maxHeadingLevel defaults to 3, so min 5 would match no headings and
+    // silently render an empty TOC on every page.
+    expect(
+      blumeConfigSchema.safeParse({ toc: { minHeadingLevel: 5 } }).success
+    ).toBe(false);
+  });
+
+  it("accepts an equal min and max", () => {
+    expect(
+      blumeConfigSchema.parse({
+        toc: { maxHeadingLevel: 2, minHeadingLevel: 2 },
+      }).toc
+    ).toStrictEqual({ enabled: true, maxLevel: 2, minLevel: 2 });
+  });
+});
+
 describe("analytics script refinement", () => {
   it("accepts a script that sets exactly one of src or content", () => {
     const config = blumeConfigSchema.parse({

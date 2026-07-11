@@ -24,6 +24,10 @@ export const ca: UIStringsOverride = {
     title: "Pregunta a la IA",
   },
   banner: { dismiss: "Tanca l'anunci" },
+  changelog: {
+    description: "Actualitzacions del producte i notes de la versió.",
+    title: "Registre de canvis",
+  },
   feedback: {
     no: "No",
     question: "Aquesta pàgina t'ha estat útil?",
@@ -31,13 +35,16 @@ export const ca: UIStringsOverride = {
     yes: "Sí",
   },
   languageSwitcher: { label: "Idioma", untranslated: "Sense traduir" },
+  nav: { breadcrumb: "Ruta de navegació" },
   page: {
     lastUpdated: "Última actualització el",
     next: "Següent",
+    pagination: "Paginació",
     previous: "Anterior",
     skipToContent: "Vés al contingut",
   },
   search: {
+    all: "Tots",
     button: "Cerca",
     devOnly: "La cerca està disponible a la compilació de producció.",
     label: "Cerca a la documentació",

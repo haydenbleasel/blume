@@ -24,6 +24,10 @@ export const ro: UIStringsOverride = {
     title: "Întreabă AI",
   },
   banner: { dismiss: "Închide anunțul" },
+  changelog: {
+    description: "Actualizări ale produsului și note de lansare.",
+    title: "Jurnal de modificări",
+  },
   feedback: {
     no: "Nu",
     question: "Ți-a fost utilă această pagină?",
@@ -31,13 +35,16 @@ export const ro: UIStringsOverride = {
     yes: "Da",
   },
   languageSwitcher: { label: "Limbă", untranslated: "Netradus" },
+  nav: { breadcrumb: "Cale de navigare" },
   page: {
     lastUpdated: "Ultima actualizare",
     next: "Următorul",
+    pagination: "Paginare",
     previous: "Anteriorul",
     skipToContent: "Sari la conținut",
   },
   search: {
+    all: "Toate",
     button: "Caută",
     devOnly: "Căutarea este disponibilă în versiunea de producție.",
     label: "Caută în documentație",

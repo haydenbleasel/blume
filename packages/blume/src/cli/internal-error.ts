@@ -8,9 +8,14 @@ const RESET = `${ESC}[0m`;
 
 const ISSUES_URL = "https://github.com/haydenbleasel/blume/issues";
 
-// Absolute paths into the hidden generated runtime (`…/.blume/…`), including any
-// trailing `:line:col`, stopping at whitespace or a closing paren.
-const BLUME_FRAME = /(?<abs>\/[^\s()]*\/\.blume\/[^\s()]*)/gu;
+// Absolute paths into the hidden generated runtime — POSIX (`…/.blume/…`) or
+// Windows drive-letter (`C:\…\.blume\…`) — including any trailing `:line:col`,
+// stopping at whitespace or a closing paren.
+const BLUME_FRAME =
+  /(?<abs>(?:\/[^\s()]*\/|[A-Za-z]:\\[^\s()]*\\)\.blume[/\\][^\s()]*)/gu;
+
+// The separator immediately before `.blume/` (or `.blume\`) in a matched path.
+const BLUME_MARKER = /[/\\]\.blume[/\\]/u;
 
 /**
  * Rewrite `.blume/` frames in a stack so the generated runtime reads clearly:
@@ -22,7 +27,7 @@ const BLUME_FRAME = /(?<abs>\/[^\s()]*\/\.blume\/[^\s()]*)/gu;
  */
 export const remapBlumeStack = (stack: string): string =>
   stack.replaceAll(BLUME_FRAME, (match) => {
-    const marker = match.indexOf("/.blume/");
+    const marker = match.search(BLUME_MARKER);
     return `${match.slice(marker + 1)} (generated)`;
   });
 

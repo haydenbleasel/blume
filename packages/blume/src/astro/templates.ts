@@ -1023,12 +1023,24 @@ import data from ${JSON.stringify(options.dataImport)};
 export const prerender = true;
 
 const configuration = ${JSON.stringify(options.configuration, null, 2)};
+
+// The reference is an unlocalized route, so its chrome renders in the default
+// locale's language and direction (\`data.ui\` is the default locale's resolved
+// dictionary), mirroring the changelog index's locale wiring.
+const i18n = data.config.i18n;
+const localeMeta = i18n
+  ? i18n.locales.find((l) => l.code === i18n.defaultLocale)
+  : null;
+const dir = localeMeta?.dir ?? "ltr";
+const htmlLang = i18n ? i18n.defaultLocale : "en";
 ---
 
 <ReferenceLayout
   analytics={data.config.analytics}
   banner={data.config.banner}
+  dir={dir}
   fontCssVars={data.fontCssVars}
+  locale={htmlLang}
   logo={data.config.logo}
   favicon={data.config.favicon}
   appleIcon={data.config.appleIcon}
@@ -1341,7 +1353,7 @@ export const changelogIndexTemplate = (options: {
     ? '\n  <AskAI slot="ask" strings={data.ui.ask} suggestions={data.config.ask?.suggestions ?? []} />'
     : "";
   const clientData = options.needsReact
-    ? '\n  clientData={{ config: data.config, navigation: data.navigation, page: { route: "/changelog", title: data.config.title + " changelog" } }}'
+    ? '\n  clientData={{ config: data.config, navigation: data.navigation, page: { route: "/changelog", title: pageTitle } }}'
     : "";
   // Staged sources (e.g. GitHub Releases) render through a parallel collection,
   // so fold them in alongside filesystem entries when one exists.
@@ -1484,6 +1496,14 @@ const localeMeta = i18n
 const dir = localeMeta?.dir ?? "ltr";
 const htmlLang = i18n ? i18n.defaultLocale : "en";
 
+// The page chrome (h1, title, description) comes from the same translatable
+// \`changelog\` group as the reveal button; optional chaining tolerates a
+// not-yet-regenerated data snapshot from before these keys existed.
+const changelogTitle = data.ui.changelog?.title ?? "Changelog";
+const changelogDescription =
+  data.ui.changelog?.description ?? "Product updates and release notes.";
+const pageTitle = data.config.title + " " + changelogTitle;
+
 const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
 ---
 
@@ -1503,8 +1523,8 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   dir={dir}
   ui={data.ui}
   page={{
-    title: data.config.title + " changelog",
-    description: "Product updates and release notes.",
+    title: pageTitle,
+    description: changelogDescription,
     route: "/changelog",
   }}
   headings={headings}
@@ -1524,7 +1544,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   noindex={false}
   structuredDataEnabled={data.config.structuredData}
 >${askSlot}
-  <h1>Changelog</h1>
+  <h1>{changelogTitle}</h1>
   {
     items.length === 0 ? (
       <p>No changelog entries yet.</p>

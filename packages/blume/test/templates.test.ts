@@ -412,6 +412,33 @@ describe("changelogIndexTemplate", () => {
     expect(out).toContain("ui={data.ui}");
   });
 
+  it("localizes the changelog heading, page title, and description", () => {
+    const out = changelogIndexTemplate({ ...exportOpts, staged: false });
+    // The chrome comes from the same translatable `changelog` group as the
+    // reveal button, with English fallback for a stale data snapshot.
+    expect(out).toContain(
+      'const changelogTitle = data.ui.changelog?.title ?? "Changelog";'
+    );
+    expect(out).toContain(
+      'data.ui.changelog?.description ?? "Product updates and release notes.";'
+    );
+    expect(out).toContain(
+      'const pageTitle = data.config.title + " " + changelogTitle;'
+    );
+    expect(out).toContain("<h1>{changelogTitle}</h1>");
+    expect(out).toContain("description: changelogDescription,");
+    expect(out).not.toContain("<h1>Changelog</h1>");
+    // The island-hooks snapshot reuses the same localized page title.
+    const reactOut = changelogIndexTemplate({
+      ...exportOpts,
+      needsReact: true,
+      staged: false,
+    });
+    expect(reactOut).toContain(
+      'page: { route: "/changelog", title: pageTitle }'
+    );
+  });
+
   it("paginates by major version when the releases are semver", () => {
     const out = changelogIndexTemplate({ ...exportOpts, staged: false });
     // Detects a full major.minor.patch and groups older majors behind a button.
@@ -994,6 +1021,21 @@ describe("scalarReferenceTemplate", () => {
       title: "API",
     });
     expect(out).toContain("ui={data.ui}");
+  });
+
+  it("passes the default locale's lang/dir to the reference shell", () => {
+    const out = scalarReferenceTemplate({
+      configuration: { url: "https://api/spec.json" },
+      dataImport: "../generated/data.json",
+      route: "/reference",
+      title: "API",
+    });
+    // Mirrors the changelog index: default locale under i18n, English baseline
+    // otherwise, so the reference no longer hardcodes lang="en" / dir="ltr".
+    expect(out).toContain('const htmlLang = i18n ? i18n.defaultLocale : "en";');
+    expect(out).toContain('const dir = localeMeta?.dir ?? "ltr";');
+    expect(out).toContain("locale={htmlLang}");
+    expect(out).toContain("dir={dir}");
   });
 });
 

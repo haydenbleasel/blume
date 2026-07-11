@@ -24,6 +24,10 @@ export const th: UIStringsOverride = {
     title: "ถาม AI",
   },
   banner: { dismiss: "ปิดประกาศ" },
+  changelog: {
+    description: "อัปเดตผลิตภัณฑ์และบันทึกประจำรุ่น",
+    title: "บันทึกการเปลี่ยนแปลง",
+  },
   feedback: {
     no: "ไม่",
     question: "หน้านี้มีประโยชน์หรือไม่?",
@@ -31,13 +35,16 @@ export const th: UIStringsOverride = {
     yes: "ใช่",
   },
   languageSwitcher: { label: "ภาษา", untranslated: "ยังไม่ได้แปล" },
+  nav: { breadcrumb: "เส้นทางนำทาง" },
   page: {
     lastUpdated: "อัปเดตล่าสุดเมื่อ",
     next: "ถัดไป",
+    pagination: "การแบ่งหน้า",
     previous: "ก่อนหน้า",
     skipToContent: "ข้ามไปยังเนื้อหา",
   },
   search: {
+    all: "ทั้งหมด",
     button: "ค้นหา",
     devOnly: "การค้นหาพร้อมใช้งานในบิลด์โปรดักชัน",
     label: "ค้นหาเอกสาร",

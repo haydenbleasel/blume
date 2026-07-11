@@ -24,6 +24,10 @@ export const hi: UIStringsOverride = {
     title: "AI से पूछें",
   },
   banner: { dismiss: "घोषणा बंद करें" },
+  changelog: {
+    description: "उत्पाद अपडेट और रिलीज़ नोट्स।",
+    title: "परिवर्तन लॉग",
+  },
   feedback: {
     no: "नहीं",
     question: "क्या यह पेज सहायक था?",
@@ -31,13 +35,16 @@ export const hi: UIStringsOverride = {
     yes: "हाँ",
   },
   languageSwitcher: { label: "भाषा", untranslated: "अनुवादित नहीं" },
+  nav: { breadcrumb: "ब्रेडक्रम" },
   page: {
     lastUpdated: "अंतिम अपडेट",
     next: "अगला",
+    pagination: "पृष्ठांकन",
     previous: "पिछला",
     skipToContent: "सामग्री पर जाएँ",
   },
   search: {
+    all: "सभी",
     button: "खोजें",
     devOnly: "खोज प्रोडक्शन बिल्ड में उपलब्ध है।",
     label: "दस्तावेज़ खोजें",

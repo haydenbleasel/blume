@@ -24,6 +24,10 @@ export const tr: UIStringsOverride = {
     title: "Yapay zekâya sor",
   },
   banner: { dismiss: "Duyuruyu kapat" },
+  changelog: {
+    description: "Ürün güncellemeleri ve sürüm notları.",
+    title: "Değişiklik günlüğü",
+  },
   feedback: {
     no: "Hayır",
     question: "Bu sayfa yardımcı oldu mu?",
@@ -31,13 +35,16 @@ export const tr: UIStringsOverride = {
     yes: "Evet",
   },
   languageSwitcher: { label: "Dil", untranslated: "Çevrilmemiş" },
+  nav: { breadcrumb: "Gezinme yolu" },
   page: {
     lastUpdated: "Son güncelleme",
     next: "Sonraki",
+    pagination: "Sayfalama",
     previous: "Önceki",
     skipToContent: "İçeriğe geç",
   },
   search: {
+    all: "Tümü",
     button: "Ara",
     devOnly: "Arama, üretim derlemesinde kullanılabilir.",
     label: "Belgelerde ara",

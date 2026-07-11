@@ -24,6 +24,10 @@ export const id: UIStringsOverride = {
     title: "Tanya AI",
   },
   banner: { dismiss: "Tutup pengumuman" },
+  changelog: {
+    description: "Pembaruan produk dan catatan rilis.",
+    title: "Log perubahan",
+  },
   feedback: {
     no: "Tidak",
     question: "Apakah halaman ini membantu?",
@@ -31,13 +35,16 @@ export const id: UIStringsOverride = {
     yes: "Ya",
   },
   languageSwitcher: { label: "Bahasa", untranslated: "Belum diterjemahkan" },
+  nav: { breadcrumb: "Remah roti" },
   page: {
     lastUpdated: "Terakhir diperbarui",
     next: "Berikutnya",
+    pagination: "Penomoran halaman",
     previous: "Sebelumnya",
     skipToContent: "Lewati ke konten",
   },
   search: {
+    all: "Semua",
     button: "Cari",
     devOnly: "Pencarian tersedia di build produksi.",
     label: "Cari dokumentasi",

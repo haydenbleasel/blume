@@ -45,6 +45,21 @@ describe("remapBlumeStack", () => {
     expect(out).not.toContain("/Users/me/site/.blume");
   });
 
+  it("relativizes and tags a Windows drive-letter .blume frame", () => {
+    const stack =
+      "at render (C:\\Users\\me\\site\\.blume\\src\\pages\\[...slug].astro:12:5)";
+    const out = remapBlumeStack(stack);
+    expect(out).toContain(
+      ".blume\\src\\pages\\[...slug].astro:12:5 (generated)"
+    );
+    expect(out).not.toContain("C:\\Users\\me\\site\\.blume");
+  });
+
+  it("leaves Windows user source frames untouched", () => {
+    const stack = "at Foo (C:\\Users\\me\\site\\pages\\index.astro:3:1)";
+    expect(remapBlumeStack(stack)).toBe(stack);
+  });
+
   it("leaves user source frames untouched", () => {
     const stack = "at Foo (/Users/me/site/pages/index.astro:3:1)";
     expect(remapBlumeStack(stack)).toBe(stack);

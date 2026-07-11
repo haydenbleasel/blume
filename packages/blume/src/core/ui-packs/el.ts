@@ -24,6 +24,10 @@ export const el: UIStringsOverride = {
     title: "Ρωτήστε την AI",
   },
   banner: { dismiss: "Κλείσιμο ανακοίνωσης" },
+  changelog: {
+    description: "Ενημερώσεις προϊόντος και σημειώσεις έκδοσης.",
+    title: "Ιστορικό αλλαγών",
+  },
   feedback: {
     no: "Όχι",
     question: "Σας φάνηκε χρήσιμη αυτή η σελίδα;",
@@ -31,13 +35,16 @@ export const el: UIStringsOverride = {
     yes: "Ναι",
   },
   languageSwitcher: { label: "Γλώσσα", untranslated: "Δεν έχει μεταφραστεί" },
+  nav: { breadcrumb: "Διαδρομή πλοήγησης" },
   page: {
     lastUpdated: "Τελευταία ενημέρωση",
     next: "Επόμενο",
+    pagination: "Σελιδοποίηση",
     previous: "Προηγούμενο",
     skipToContent: "Μετάβαση στο περιεχόμενο",
   },
   search: {
+    all: "Όλα",
     button: "Αναζήτηση",
     devOnly: "Η αναζήτηση είναι διαθέσιμη στην έκδοση παραγωγής.",
     label: "Αναζήτηση στην τεκμηρίωση",

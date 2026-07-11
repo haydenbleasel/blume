@@ -26,7 +26,7 @@ export const MCP_TOOLS: McpToolMeta[] = [
   {
     annotations: READ_ONLY,
     description:
-      "Fetch a single documentation page as its original Markdown source (frontmatter included). Pass a route from `search_docs` or `list_pages`, e.g. `/guides/install`.",
+      "Fetch a single documentation page as agent-optimized Markdown (frontmatter included, components downleveled to plain Markdown). Pass a route from `search_docs` or `list_pages`, e.g. `/guides/install`.",
     name: "get_page",
     title: "Get page Markdown",
   },

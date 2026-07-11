@@ -599,8 +599,11 @@ const aiConfigSchema = z.strictObject({
   // not in components.tsx — because the config file is executed at build
   // time while the components file is only statically analyzed. A same-name
   // entry replaces the built-in serializer.
+  // Two-argument `z.record` — the single-argument form throws at
+  // schema-construction time under Zod 4 (see uiStringsOverrideSchema).
   markdownComponents: z
     .record(
+      z.string(),
       z.custom<ComponentMarkdown>((value) => typeof value === "function", {
         message: "Expected a serializer function.",
       })
@@ -1018,6 +1021,12 @@ const tocConfigSchema = z
       maxLevel: value.maxHeadingLevel ?? 3,
       minLevel: value.minHeadingLevel ?? 2,
     };
+  })
+  // Checked after defaults apply, so `{ minHeadingLevel: 5 }` (default max 3)
+  // is caught too — an inverted range would silently render an empty TOC.
+  .refine((value) => value.minLevel <= value.maxLevel, {
+    message:
+      "toc.minHeadingLevel must be less than or equal to toc.maxHeadingLevel.",
   });
 
 export const blumeConfigSchema = z.strictObject({

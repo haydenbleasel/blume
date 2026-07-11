@@ -122,6 +122,46 @@ describe("runClientAssetChecks", () => {
   });
 });
 
+describe("isolatedOutputDir", () => {
+  it("reports the runtime-local output root per output/adapter", async () => {
+    const { exitCode, output } = await runScript(`
+      const { isolatedOutputDir } = await import(${JSON.stringify(BUILD)});
+      const context = {
+        distDir: "/proj/.blume-verify/dist",
+        outDir: "/proj/.blume-verify",
+      };
+      const config = (deployment) => ({ deployment });
+      console.log(
+        JSON.stringify({
+          missingDist: isolatedOutputDir(
+            config({ output: "static" }),
+            { ...context, distDir: null }
+          ),
+          nodeServer: isolatedOutputDir(
+            config({ adapter: "node", output: "server" }),
+            context
+          ),
+          static: isolatedOutputDir(config({ output: "static" }), context),
+          vercelServer: isolatedOutputDir(
+            config({ adapter: "vercel", output: "server" }),
+            context
+          ),
+        })
+      );
+    `);
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(output);
+    // A Vercel server bundle stays inside the runtime dir — the success
+    // message must point there, not at the never-populated dist/.
+    expect(parsed.vercelServer).toBe("/proj/.blume-verify/.vercel/output");
+    expect(parsed.static).toBe("/proj/.blume-verify/dist");
+    // Node's standalone output root is dist/ (server + client inside).
+    expect(parsed.nodeServer).toBe("/proj/.blume-verify/dist");
+    expect(parsed.missingDist).toBe("/proj/.blume-verify/dist");
+  });
+});
+
 describe("isolatedStaticDir", () => {
   it("resolves the runtime-local static dir per output/adapter", async () => {
     const { exitCode, output } = await runScript(`

@@ -24,6 +24,10 @@ export const uk: UIStringsOverride = {
     title: "Запитати ШІ",
   },
   banner: { dismiss: "Закрити оголошення" },
+  changelog: {
+    description: "Оновлення продукту та примітки до випусків.",
+    title: "Журнал змін",
+  },
   feedback: {
     no: "Ні",
     question: "Чи була ця сторінка корисною?",
@@ -31,13 +35,16 @@ export const uk: UIStringsOverride = {
     yes: "Так",
   },
   languageSwitcher: { label: "Мова", untranslated: "Не перекладено" },
+  nav: { breadcrumb: "Навігаційний ланцюжок" },
   page: {
     lastUpdated: "Останнє оновлення",
     next: "Далі",
+    pagination: "Пагінація",
     previous: "Назад",
     skipToContent: "Перейти до вмісту",
   },
   search: {
+    all: "Усі",
     button: "Пошук",
     devOnly: "Пошук доступний у production-збірці.",
     label: "Пошук у документації",

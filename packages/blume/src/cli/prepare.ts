@@ -35,8 +35,9 @@ export interface PrepareOptions {
 export const prepareProject = async (
   options: PrepareOptions
 ): Promise<BlumeProject> => {
-  // Honor a `--root` that differs from cwd: remote sources read env during the
-  // scan below, and `loadEnvFiles` is a no-op for vars already set (cwd load).
+  // Load `.env` files from the project root before the scan: remote sources
+  // read their tokens from `process.env` during `scanProject`, and
+  // `loadEnvFiles` never overrides variables that are already set.
   loadEnvFiles(options.root);
 
   let project: BlumeProject;

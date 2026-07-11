@@ -1,5 +1,6 @@
 ---
 import { resolveIcon } from "../theme/icons.ts";
+import { withBase } from "./islands/base-path.ts";
 
 interface Props {
   name?: unknown;
@@ -69,7 +70,7 @@ const style = color ? `color:${color}` : undefined;
       aria-hidden={label ? undefined : "true"}
       class={resolvedClass}
       height={size}
-      src={imageSrc}
+      src={withBase(imageSrc)}
       width={size}
     />
   ) : (

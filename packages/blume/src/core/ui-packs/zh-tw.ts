@@ -24,6 +24,10 @@ export const zhTW: UIStringsOverride = {
     title: "向 AI 提問",
   },
   banner: { dismiss: "關閉公告" },
+  changelog: {
+    description: "產品更新與版本說明。",
+    title: "更新日誌",
+  },
   feedback: {
     no: "沒有幫助",
     question: "這個頁面有幫助嗎？",
@@ -31,13 +35,16 @@ export const zhTW: UIStringsOverride = {
     yes: "有幫助",
   },
   languageSwitcher: { label: "語言", untranslated: "未翻譯" },
+  nav: { breadcrumb: "麵包屑導覽" },
   page: {
     lastUpdated: "最後更新於",
     next: "下一頁",
+    pagination: "分頁",
     previous: "上一頁",
     skipToContent: "跳至內容",
   },
   search: {
+    all: "全部",
     button: "搜尋",
     devOnly: "搜尋在正式版組建中可用。",
     label: "搜尋文件",

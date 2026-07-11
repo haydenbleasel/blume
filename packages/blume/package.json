@@ -128,6 +128,8 @@
     "@ai-sdk/openai-compatible": "^1.0.41",
     "@astrojs/cloudflare": "^14.0.0",
     "@astrojs/netlify": "^8.0.0",
+    "@astrojs/svelte": "^9.0.0",
+    "@astrojs/vue": "^7.0.0",
     "@mixedbread/sdk": "^0.76.0",
     "@notionhq/client": "^2.2.15",
     "@openrouter/ai-sdk-provider": "^1.5.4",
@@ -145,6 +147,12 @@
       "optional": true
     },
     "@astrojs/netlify": {
+      "optional": true
+    },
+    "@astrojs/svelte": {
+      "optional": true
+    },
+    "@astrojs/vue": {
       "optional": true
     },
     "@mixedbread/sdk": {

@@ -501,7 +501,11 @@ const bannerScript = banner?.dismissible
         </nav>
       </aside>
       <main class="px-6 pt-6 pb-10 lg:px-8 xl:px-10" id="blume-content">
-        <BreadcrumbsSlot crumbs={crumbs} wide={isApiOperation} />
+        <BreadcrumbsSlot
+          crumbs={crumbs}
+          strings={navStrings}
+          wide={isApiOperation}
+        />
         <TableOfContentsSlot
           headings={tocHeadings}
           title={strings.toc.title}
