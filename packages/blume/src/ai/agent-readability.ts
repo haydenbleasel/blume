@@ -58,7 +58,7 @@ export const buildAgentReadability = (
       pattern: abs("/{route}.md"),
     },
   };
-  if (config.ai.llmsTxt) {
+  if (config.ai.llmsTxt.enabled) {
     artifacts.llmsFullTxt = abs("/llms-full.txt");
     artifacts.llmsTxt = abs("/llms.txt");
   }

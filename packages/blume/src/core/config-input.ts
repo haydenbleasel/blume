@@ -513,12 +513,27 @@ export interface AskConfig {
   suggestions?: AskSuggestion[];
 }
 
+/** What the `llms.txt`/`llms-full.txt` files include. */
+export interface LlmsTxtConfig {
+  /** Emit `llms.txt` and `llms-full.txt`. Defaults to `true`. */
+  enabled?: boolean;
+  /**
+   * Include the generated API reference pages (OpenAPI/AsyncAPI). Defaults to
+   * `true`; set `false` to keep a placeholder or example spec's pages out of
+   * the LLM-facing files.
+   */
+  openapi?: boolean;
+}
+
 /** AI-facing features: the Ask AI assistant and an `llms.txt` manifest. */
 export interface AiConfig {
   /** The Ask AI chat assistant. */
   ask?: AskConfig;
-  /** Emit `llms.txt` (an index of the docs for LLMs). Defaults to `true`. */
-  llmsTxt?: boolean;
+  /**
+   * Emit `llms.txt` (an index of the docs for LLMs). Defaults to `true`.
+   * The object form adds knobs for what the files include.
+   */
+  llmsTxt?: boolean | LlmsTxtConfig;
   /**
    * Markdown serializers for custom components in agent-facing output (the
    * `.md` mirror, `llms-full.txt`, MCP `get_page`), keyed by JSX name. Each

@@ -25,7 +25,7 @@ export const droppedArtifactNotices = (config: ResolvedConfig): string[] => {
       `the hosted ${config.search.provider} index sync — new and updated pages stop being pushed; re-upload your search records after each build with the provider's API or CLI.`
     );
   }
-  if (config.ai.llmsTxt) {
+  if (config.ai.llmsTxt.enabled) {
     notices.push("llms.txt and llms-full.txt");
   }
   if (config.deployment.site && config.seo.sitemap) {

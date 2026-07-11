@@ -18,6 +18,7 @@ import {
   askEndpointTemplate,
   runtimeDependencies,
 } from "../src/astro/templates.ts";
+import { buildContentGraph } from "../src/core/graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { AskAiConfig } from "../src/core/schema.ts";
@@ -61,21 +62,31 @@ const makePage = (
   ...over,
 });
 
-const makeProject = (pages: PageRecord[]): BlumeProject =>
-  ({
-    config: blumeConfigSchema.parse({
-      deployment: { site: "https://example.com/" },
-      description: "Desc",
-      title: "Docs",
+const makeProject = (
+  pages: PageRecord[],
+  config: Record<string, unknown> = {}
+): BlumeProject => {
+  const parsed = blumeConfigSchema.parse({
+    deployment: { site: "https://example.com/" },
+    description: "Desc",
+    title: "Docs",
+    ...config,
+  });
+  return {
+    config: parsed,
+    graph: buildContentGraph(pages, {
+      folderMeta: new Map(),
+      i18n: parsed.i18n,
+      navigation: parsed.navigation,
     }),
-    graph: { pages },
     manifest: {
       routes: pages.map((page) => ({
         path: page.route,
         sourcePath: page.sourcePath,
       })),
     },
-  }) as unknown as BlumeProject;
+  } as unknown as BlumeProject;
+};
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "blume-ai-"));
@@ -127,16 +138,168 @@ const project = (): BlumeProject =>
   ]);
 
 describe("buildLlmsFiles — index", () => {
-  it("lists non-draft pages in route order with absolute links", async () => {
+  it("lists non-draft pages under a Docs section with absolute links", async () => {
     const { index } = await buildLlmsFiles(project());
     expect(index).toContain("# Docs");
     expect(index).toContain("> Desc");
+    expect(index).toContain("## Docs");
     const links = index.split("\n").filter((line) => line.startsWith("- ["));
     expect(links).toStrictEqual([
       "- [Alpha](https://example.com/a): First",
       "- [Beta](https://example.com/b)",
     ]);
     expect(index).not.toContain("Gamma");
+  });
+});
+
+describe("buildLlmsFiles — navigation structure", () => {
+  it("mirrors the sidebar tree: folders become nested headings", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject([
+        makePage("index.md", "/", "Home", {
+          body: { format: "md", text: "Home body." },
+        }),
+        makePage("guides/install.md", "/guides/install", "Install", {
+          body: { format: "md", text: "Install body." },
+          navPath: "guides/install.md",
+        }),
+        makePage(
+          "guides/advanced/tuning.md",
+          "/guides/advanced/tuning",
+          "Tuning",
+          {
+            body: { format: "md", text: "Tuning body." },
+            navPath: "guides/advanced/tuning.md",
+          }
+        ),
+      ])
+    );
+    // Root loose pages get a Docs section; each folder is a heading whose
+    // depth follows its nesting.
+    expect(index).toContain("## Docs\n\n- [Home](https://example.com/)");
+    expect(index).toContain(
+      "## Guides\n\n- [Install](https://example.com/guides/install)"
+    );
+    expect(index).toContain(
+      "### Advanced\n\n- [Tuning](https://example.com/guides/advanced/tuning)"
+    );
+  });
+
+  it("appends pages an explicit sidebar omits under Other, route-sorted", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject(
+        [
+          makePage("a.md", "/a", "Alpha", { description: "First" }),
+          makePage("c.md", "/c", "Gamma"),
+          makePage("b.md", "/b", "Beta"),
+        ],
+        { navigation: { sidebar: ["a"] } }
+      )
+    );
+    expect(index).toContain("## Docs\n\n- [Alpha](https://example.com/a)");
+    expect(index).toContain(
+      "## Other\n\n- [Beta](https://example.com/b)\n- [Gamma](https://example.com/c)"
+    );
+  });
+
+  it("labels non-default locale trees with the locale under i18n", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject(
+        [
+          makePage("a.md", "/a", "Alpha", { locale: "en" }),
+          makePage("a.md", "/fr/a", "Alpha FR", {
+            locale: "fr",
+            navPath: "a.md",
+          }),
+        ],
+        {
+          i18n: {
+            defaultLocale: "en",
+            locales: [
+              { code: "en", label: "English" },
+              { code: "fr", label: "Français" },
+            ],
+          },
+        }
+      )
+    );
+    // The default locale renders unlabeled; other locales get a section whose
+    // own groups start one level deeper.
+    expect(index).toContain("## Docs\n\n- [Alpha](https://example.com/a)");
+    expect(index).toContain(
+      "## Français\n\n### Docs\n\n- [Alpha FR](https://example.com/fr/a)"
+    );
+  });
+
+  it("falls back to a flat Docs list when locale trees are missing", async () => {
+    const proj = makeProject(
+      [makePage("a.md", "/a", "Alpha", { locale: "en" })],
+      {
+        i18n: {
+          defaultLocale: "en",
+          locales: [
+            { code: "en", label: "English" },
+            { code: "fr", label: "Français" },
+          ],
+        },
+      }
+    );
+    proj.graph.navigationByLocale = {};
+    const { index } = await buildLlmsFiles(proj);
+    // Every page lands in the leftover pass, which titles itself "Docs" when
+    // nothing else was emitted.
+    expect(index).toContain("## Docs\n\n- [Alpha](https://example.com/a)");
+    expect(index).not.toContain("## Other");
+  });
+});
+
+describe("buildLlmsFiles — ai.llmsTxt.openapi", () => {
+  const apiPage = (): PageRecord =>
+    makePage("openapi:reference/get-pet.mdx", "/reference/get-pet", "Get Pet", {
+      body: { format: "mdx", text: "API operation body." },
+      navPath: "reference/get-pet.mdx",
+      source: { name: "openapi", ref: "reference/get-pet.mdx" },
+    });
+
+  it("includes generated API reference pages by default", async () => {
+    const { full, index } = await buildLlmsFiles(
+      makeProject([makePage("a.md", "/a", "Alpha"), apiPage()])
+    );
+    expect(index).toContain("## Reference");
+    expect(index).toContain(
+      "- [Get Pet](https://example.com/reference/get-pet)"
+    );
+    expect(full).toContain("API operation body.");
+  });
+
+  it("drops them from both files when openapi is false", async () => {
+    const { full, index } = await buildLlmsFiles(
+      makeProject([makePage("a.md", "/a", "Alpha"), apiPage()], {
+        ai: { llmsTxt: { openapi: false } },
+      })
+    );
+    expect(index).toContain("- [Alpha]");
+    expect(index).not.toContain("Get Pet");
+    // The section left empty by the exclusion emits no heading at all.
+    expect(index).not.toContain("## Reference");
+    expect(full).toContain("Body A.");
+    expect(full).not.toContain("API operation body.");
+  });
+});
+
+describe("ai.llmsTxt schema", () => {
+  it("resolves the boolean shorthand and the object form", () => {
+    expect(blumeConfigSchema.parse({}).ai.llmsTxt).toStrictEqual({
+      enabled: true,
+      openapi: true,
+    });
+    expect(
+      blumeConfigSchema.parse({ ai: { llmsTxt: false } }).ai.llmsTxt
+    ).toStrictEqual({ enabled: false, openapi: true });
+    expect(
+      blumeConfigSchema.parse({ ai: { llmsTxt: { openapi: false } } }).ai
+        .llmsTxt
+    ).toStrictEqual({ enabled: true, openapi: false });
   });
 });
 
@@ -183,13 +346,12 @@ describe("buildLlmsFiles — visibility and encoding", () => {
 });
 
 const sitelessProject = (config: Record<string, unknown> = {}): BlumeProject =>
-  ({
-    config: blumeConfigSchema.parse({ title: "Docs", ...config }),
-    graph: {
-      pages: [makePage("a.md", "/a", "Alpha", { description: "First" })],
-    },
-    manifest: { routes: [{ path: "/a", sourcePath: join(root, "a.md") }] },
-  }) as unknown as BlumeProject;
+  makeProject([makePage("a.md", "/a", "Alpha", { description: "First" })], {
+    deployment: {},
+    description: undefined,
+    title: "Docs",
+    ...config,
+  });
 
 describe("buildLlmsFiles — without a deployment site", () => {
   it("emits root-relative links when no site is configured", async () => {

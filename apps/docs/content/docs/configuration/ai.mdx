@@ -17,10 +17,21 @@ ai: {
 
 While enabled, `blume build` writes two files to the root of your site:
 
-- **`/llms.txt`** — a compact index: your site title and description, then a linked list of every page with its summary.
+- **`/llms.txt`** — a compact index: your site title and description, then a linked list of every page with its summary, organized into sections that mirror your sidebar — folders and groups become headings, so an agent sees the docs' structure, not one flat blob.
 - **`/llms-full.txt`** — the entire corpus: each page's full Markdown body, with its source URL, in one file.
 
 Draft pages are excluded. Set [`deployment.site`](/docs/deployment) so the links and source URLs resolve to absolute addresses.
+
+`llmsTxt` also takes an object form with knobs for what the files include. If your [API reference](/docs/advanced/api-reference) documents a placeholder or example spec, set `openapi: false` to keep its generated pages out of both files:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  llmsTxt: {
+    enabled: true, // default
+    openapi: false, // exclude generated API reference pages
+  },
+}
+```
 
 To take full control of either file, add your own `llms.txt` or `llms-full.txt` to your `public/` folder. Like a custom favicon, it's picked up automatically and ships in place of the generated file — override one and Blume still generates the other.
 

@@ -11,6 +11,9 @@ export default defineConfig({
         { icon: "sparkles", label: "How does Ask AI work?" },
       ],
     },
+    // The API reference below documents the Petstore example spec, not Blume —
+    // keep it out of the LLM-facing files.
+    llmsTxt: { openapi: false },
   },
   analytics: {
     vercel: true,

@@ -577,7 +577,23 @@ const aiConfigSchema = z.strictObject({
       }
     })
     .optional(),
-  llmsTxt: z.boolean().default(true),
+  /**
+   * `llms.txt`/`llms-full.txt` emission. A bare boolean toggles it; the object
+   * form adds `openapi: false` to keep generated API reference pages out of
+   * both files (e.g. when the configured spec is example content).
+   */
+  llmsTxt: z
+    .union([
+      z.boolean(),
+      z.strictObject({
+        enabled: z.boolean().default(true),
+        openapi: z.boolean().default(true),
+      }),
+    ])
+    .default(true)
+    .transform((value) =>
+      typeof value === "boolean" ? { enabled: value, openapi: true } : value
+    ),
   // Serializers for the agent-facing Markdown downlevel (the `.md` mirror,
   // llms-full.txt, MCP get_page), keyed by JSX name. Functions live here —
   // not in components.tsx — because the config file is executed at build

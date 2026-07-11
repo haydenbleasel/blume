@@ -293,7 +293,7 @@ const publishBuildArtifacts = async (
     warn: (message) => logger.warn(message),
   });
 
-  if (project.config.ai.llmsTxt) {
+  if (project.config.ai.llmsTxt.enabled) {
     await publishLlmsFiles(project, distDir);
   }
 
@@ -342,7 +342,7 @@ const publishBuildArtifacts = async (
       `Sitemap    ${sitemap ? "yes" : sitemapNote}`,
       `Robots     ${robots ? "yes" : "no"}`,
       `Agent JSON ${agentReadability ? "yes" : "no"}`,
-      `LLM files  ${config.ai.llmsTxt ? "yes" : "no"}`,
+      `LLM files  ${config.ai.llmsTxt.enabled ? "yes" : "no"}`,
       `Server features  ${features.length > 0 ? features.join(", ") : "none"}`,
     ].join("\n")
   );
