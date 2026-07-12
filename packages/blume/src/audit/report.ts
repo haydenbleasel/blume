@@ -111,8 +111,24 @@ const skippedTiers = (tiers: Record<AuditTier, boolean>): string[] =>
       return `  ${COLORS.dim}⊘ ${tier.padEnd(12)} skipped — pass ${TIER_FLAG[tier]} (${label} checks)${COLORS.reset}`;
     });
 
-const summaryLine = (counts: Record<DiagnosticSeverity, number>): string =>
+/** How many checks actually ran, i.e. those whose tier was enabled. */
+const activeChecks = (tiers: Record<AuditTier, boolean>): number =>
+  CHECKS.filter((check) => tiers[check.tier]).length;
+
+/**
+ * Individual checks performed: every rule that ran, against every page crawled.
+ * The headline number — it's what makes "39 warnings" legible as a proportion
+ * rather than a bare count.
+ */
+export const auditCount = (result: AuditResult): number =>
+  activeChecks(result.tiers) * result.pages;
+
+const summaryLine = (
+  counts: Record<DiagnosticSeverity, number>,
+  audits: number
+): string =>
   [
+    `${audits.toLocaleString("en-US")} audit${audits === 1 ? "" : "s"}`,
     `${counts.error} error${counts.error === 1 ? "" : "s"}`,
     `${counts.warning} warning${counts.warning === 1 ? "" : "s"}`,
     `${counts.info} note${counts.info === 1 ? "" : "s"}`,
@@ -148,7 +164,7 @@ export const formatReport = (
   lines.push(
     "",
     `  ${COLORS.bold}blume audit${COLORS.reset}  ${COLORS.dim}${result.pages} pages · ${where}${COLORS.reset}`,
-    `  ${summaryLine(counts)}`,
+    `  ${summaryLine(counts, auditCount(result))}`,
     ""
   );
 
@@ -215,6 +231,8 @@ export const reportJson = (result: AuditResult, root: string): string => {
   return `${JSON.stringify(
     {
       audit: {
+        /** Checks run × pages crawled — the total number of individual audits. */
+        audits: auditCount(result),
         checks: rollup(result.diagnostics).map((group) => ({
           category: group.category,
           count: group.count,

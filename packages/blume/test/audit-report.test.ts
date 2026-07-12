@@ -7,6 +7,7 @@ import {
   finding,
 } from "../src/audit/catalog.ts";
 import {
+  auditCount,
   formatCatalog,
   formatReport,
   reportJson,
@@ -121,6 +122,29 @@ describe("formatReport", () => {
     expect(text).toContain("10 pages");
   });
 
+  it("leads with the total number of audits performed", () => {
+    // Rules × pages. It's what makes "39 warnings" legible as a proportion
+    // rather than a bare count.
+    const staticChecks = CHECKS.filter(
+      (check) => check.tier === "static"
+    ).length;
+    const text = strip(formatReport(result([]), "/root"));
+    expect(text).toContain(
+      `${(staticChecks * 10).toLocaleString("en-US")} audits`
+    );
+  });
+
+  it("counts only the checks whose tier actually ran", () => {
+    // Network checks that never ran must not be counted as audits performed —
+    // that would inflate the headline with work the audit didn't do.
+    const offline = auditCount(result([]));
+    const online = auditCount({
+      ...result([]),
+      tiers: { external: true, network: true, static: true },
+    });
+    expect(online).toBeGreaterThan(offline);
+  });
+
   it("rolls affected pages up under the check, not the other way round", () => {
     const diagnostics = Array.from({ length: 6 }, (_, index) =>
       finding("BLUME_AUDIT_TITLE_MISSING", { url: `/p${index}` }, "x")
@@ -191,6 +215,7 @@ describe("reportJson", () => {
       url: "/docs/a",
     });
     expect(payload.audit).toMatchObject({
+      audits: auditCount(result([])),
       origin: null,
       pages: 10,
       staticDir: "dist",
