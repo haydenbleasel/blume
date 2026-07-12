@@ -74,6 +74,9 @@ export default defineConfig({
       },
     ],
   },
+  seo: {
+    x: { creator: "@haydenbleasel", handle: "@haydenbleasel" },
+  },
   theme: {
     accent: "teal",
   },
