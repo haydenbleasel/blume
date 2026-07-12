@@ -21,6 +21,7 @@ blume <command> [options]
 | `blume check`      | Type-check the site with `astro check`.          |
 | `blume doctor`     | Diagnose config and content problems.            |
 | `blume validate`   | Validate links across your content.              |
+| `blume audit`      | Audit the built site for SEO and health issues.  |
 
 ## Common flags
 
@@ -49,6 +50,13 @@ blume <command> [options]
 - `blume validate --external` — also check external links over the network.
 - `blume validate --strict` — exit non-zero on warnings too.
 - `blume validate --json` / `blume doctor --json` — emit diagnostics as JSON on stdout (with `code`, `severity`, `file`, `line`/`column`, and `docsUrl`) for CI and editor integrations.
+- `blume audit --fail-on error|warning|info` — the CI gate; defaults to `error`. `--strict` is an alias for `--fail-on warning`.
+- `blume audit --url <origin>` — also probe a live deployment for status codes, response headers, and redirect chains.
+- `blume audit --external` — probe outbound links over the network.
+- `blume audit --only <check|category>` / `--skip <check|category>` — narrow the report while you work through it (comma-separated).
+- `blume audit --list-checks` — print every check the audit can report.
+- `blume audit --verbose` — list every affected page instead of the first few.
+- `blume audit --json` — emit the report as JSON on stdout.
 
 ## Verifying while the dev server runs
 
@@ -107,3 +115,60 @@ Without a project `tsconfig.json`, only the generated runtime is checked.
 - **Anchor links** (`#section`, `/guides/intro#setup`) must match a heading on the target page — misses are warnings.
 - **Asset links** (`/logo.png`) are checked against the `public/` directory.
 - **External links** are only checked with `--external` (off by default since it requires the network); dead links (404/410/unreachable) are errors, while rate-limited or transient responses (403/429/5xx/timeout) are warnings.
+
+## Auditing the built site
+
+`blume validate` reads your _content_; `blume audit` reads the _built site_. It crawls the HTML in `dist/` after a build and reports SEO and site-health issues — titles, meta descriptions, canonicals, Open Graph and X cards, headings, hreflang, images, the sitemap, `robots.txt`, and structured data.
+
+Because Blume built the site, every finding names the source file **and the front matter line** that fixes it, not just the URL a crawler would see:
+
+```
+⚠ Meta description too long or too short   5 pages
+    /docs/configuration/export    content/docs/configuration/export.mdx:3
+    fix: Rewrite `description` in the frontmatter to fit the length range.
+```
+
+Run it after a build:
+
+```bash
+blume build
+blume audit
+```
+
+Findings are grouped by check rather than listed per page, so the report reads as a to-do list. Use `--verbose` to expand every affected page, and `--only`/`--skip` to work through one category at a time. `blume audit --list-checks` prints the full catalog.
+
+### Failing CI
+
+The exit code is the contract. By default `blume audit` fails only on errors — things that are definitely broken, like a link to a page that was never built, a redirect loop, or an invalid sitemap. Advisory findings (a short description, a duplicate title) are warnings and do not fail the build:
+
+```bash
+blume audit                      # fails on errors
+blume audit --fail-on warning    # also fails on warnings
+```
+
+### Checking a live deployment
+
+Some things only the real server can tell you: whether a page that exists in `dist/` actually 404s behind a bad rewrite, whether responses are compressed, and whether an `X-Robots-Tag` header is quietly deindexing a page whose HTML looks perfectly fine. Point the audit at a deployment to add those checks:
+
+```bash
+blume audit --url https://docs.example.com
+blume audit --url https://docs.example.com --external   # also probe outbound links
+```
+
+Outbound links are graded rather than flatly failed: a 404 is a broken link you can fix, while a 403 or 5xx is usually rate limiting or someone else's outage and is reported as a warning.
+
+### What it does and doesn't check
+
+The check set is deliberately narrower than a general-purpose SEO crawler's. Much of what such a crawler reports cannot happen to a Blume site — it never emits `rel=nofollow`, and Vite's content-hashed bundles are never missing or redirecting — and reporting those as permanent zeroes would just teach you to ignore the report.
+
+Two limits worth stating plainly:
+
+- **Structured data** is validated for well-formedness (valid JSON, a `@context`, a `@type` on every node). Blume does not validate against the full schema.org vocabulary or Google's rich-results rules.
+- **Core Web Vitals** are not checked. They need a real browser, and a flag that quietly measured nothing would be worse than not having one — so `blume audit` reports the layout-shift causes it _can_ see offline (images with no `width`/`height`, oversized assets) and leaves the rest alone for now.
+
+Anything the audit did not run is reported as skipped rather than silently passing:
+
+```
+⊘ network      skipped — pass --url <origin> (9 checks)
+⊘ external     skipped — pass --external (2 checks)
+```

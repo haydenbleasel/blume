@@ -19,6 +19,13 @@ export interface Diagnostic {
   file?: string;
   line?: number;
   column?: number;
+  /**
+   * The built URL this diagnostic is about, for findings that are a property of
+   * the output rather than of a source file (`blume audit`). Set alongside
+   * `file`/`line` where the page maps back to authored content, so a finding can
+   * name both the URL that's wrong and the frontmatter line that fixes it.
+   */
+  url?: string;
   schemaPath?: string;
   suggestion?: string;
   docsUrl?: string;

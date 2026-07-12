@@ -7,6 +7,7 @@
     "build": "blume build",
     "preview": "blume preview",
     "typecheck": "blume check",
+    "audit": "blume audit",
     "test:e2e": "playwright test"
   },
   "dependencies": {

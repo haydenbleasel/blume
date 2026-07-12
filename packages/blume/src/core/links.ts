@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { basename, join } from "pathe";
 
 import { stripBasePath, withBasePath } from "./base-path.ts";
+import { gradeExternal, probeAll } from "./probe.ts";
 import type {
   ContentGraph,
   Diagnostic,
@@ -24,13 +25,6 @@ const decodePercent = (value: string): string => {
 };
 const DOC_EXT = /\.(?:md|mdx)$/iu;
 const FILE_EXT = /\.[a-z0-9]+$/iu;
-
-const EXTERNAL_CONCURRENCY = 8;
-const EXTERNAL_TIMEOUT_MS = 10_000;
-const STATUS_NOT_FOUND = 404;
-const STATUS_GONE = 410;
-const STATUS_METHOD_NOT_ALLOWED = 405;
-const STATUS_NOT_IMPLEMENTED = 501;
 
 /** Source position shared by every diagnostic raised for a link. */
 interface LinkSite {
@@ -214,94 +208,11 @@ const checkPathLink = (
   };
 };
 
-/** Probe a URL with the given method, normalizing failures to a result. */
-const request = async (
-  url: string,
-  method: "GET" | "HEAD"
-): Promise<{
-  ok: boolean;
-  status?: number;
-  timedOut?: boolean;
-  error?: string;
-}> => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), EXTERNAL_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      method,
-      redirect: "follow",
-      signal: controller.signal,
-    });
-    return { ok: response.ok, status: response.status };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return { ok: false, timedOut: true };
-    }
-    return {
-      error: error instanceof Error ? error.message : String(error),
-      ok: false,
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-};
-
-/** Probe a single URL: HEAD first, falling back to GET when needed. */
-const probe = async (
-  url: string
-): Promise<Awaited<ReturnType<typeof request>>> => {
-  const head = await request(url, "HEAD");
-  const unreachable = !head.ok && head.status === undefined && !head.timedOut;
-  const retry =
-    head.status === STATUS_METHOD_NOT_ALLOWED ||
-    head.status === STATUS_NOT_IMPLEMENTED ||
-    unreachable;
-  return retry ? await request(url, "GET") : head;
-};
-
-/** Grade a probe result into a diagnostic severity + detail, or null if OK. */
-const gradeExternal = (
-  result: Awaited<ReturnType<typeof request>>
-): { severity: Diagnostic["severity"]; detail: string } | null => {
-  if (result.ok) {
-    return null;
-  }
-  if (result.timedOut) {
-    return { detail: "request timed out", severity: "warning" };
-  }
-  if (result.status === undefined) {
-    return { detail: result.error ?? "unreachable", severity: "error" };
-  }
-  if (result.status === STATUS_NOT_FOUND || result.status === STATUS_GONE) {
-    return { detail: `HTTP ${result.status}`, severity: "error" };
-  }
-  return { detail: `HTTP ${result.status}`, severity: "warning" };
-};
-
 /** Probe queued external links with bounded concurrency. */
 const checkExternalLinks = async (
   refs: ExternalRef[]
 ): Promise<Diagnostic[]> => {
-  const unique = [...new Set(refs.map((ref) => ref.url))];
-  const results = new Map<string, Awaited<ReturnType<typeof probe>>>();
-
-  let cursor = 0;
-  const worker = async (): Promise<void> => {
-    while (cursor < unique.length) {
-      const url = unique[cursor];
-      cursor += 1;
-      if (url !== undefined) {
-        // oxlint-disable-next-line no-await-in-loop -- bounded-concurrency pool
-        results.set(url, await probe(url));
-      }
-    }
-  };
-  await Promise.all(
-    Array.from(
-      { length: Math.min(EXTERNAL_CONCURRENCY, unique.length) },
-      worker
-    )
-  );
+  const results = await probeAll(refs.map((ref) => ref.url));
 
   const diagnostics: Diagnostic[] = [];
   for (const ref of refs) {
