@@ -9,7 +9,12 @@ import type {
 } from "../../core/types.ts";
 import "blume:theme";
 import type { ComponentOverride } from "../../core/define-components.ts";
-import { buildStructuredData } from "../../seo/jsonld.ts";
+import {
+  OG_IMAGE_HEIGHT,
+  OG_IMAGE_TYPE,
+  OG_IMAGE_WIDTH,
+} from "../../og/dimensions.ts";
+import { buildStructuredData, toIso } from "../../seo/jsonld.ts";
 import { withBase } from "../islands/base-path.ts";
 import Analytics from "./Analytics.astro";
 import Banner from "./Banner.astro";
@@ -79,6 +84,13 @@ interface Props {
   searchEnabled: boolean;
   indexable: boolean;
   ogImage?: string | null;
+  /**
+   * Whether `ogImage` is Blume's generated card (rather than a user `seo.image`).
+   * Only the generated card has known dimensions and format, so `og:image:width`
+   * / `og:image:height` / `og:image:type` are declared for it alone — asserting
+   * 1200x630 PNG over someone's arbitrary JPEG would be a lie crawlers act on.
+   */
+  ogGenerated?: boolean;
   canonical?: string | null;
   editUrl?: string | null;
   askEnabled?: boolean;
@@ -154,6 +166,7 @@ const {
   searchEnabled,
   indexable,
   ogImage,
+  ogGenerated = false,
   canonical,
   editUrl,
   askEnabled,
@@ -244,6 +257,15 @@ if (isBare) {
 }
 const pageTitle = page.title ? `${page.title} - ${site.title}` : site.title;
 const description = page.description ?? site.description;
+// Blog posts and changelog entries are dated writing, so they take `og:type:
+// article` — the same split JSON-LD makes when it picks an article @type. Docs
+// pages (and the changelog index, which has no `type`) stay `website`.
+const ogType =
+  pageType === "blog" || pageType === "changelog" ? "article" : "website";
+// `article:*` timestamps only belong on an article; a docs page carrying them
+// would be declaring properties its `og:type` doesn't define.
+const articlePublished = ogType === "article" ? toIso(published) : undefined;
+const articleModified = ogType === "article" ? toIso(lastModified) : undefined;
 
 // "Last updated on <date>" — formatted in UTC to match the changelog timeline.
 const lastModifiedDate = lastModified ? new Date(lastModified) : null;
@@ -313,12 +335,36 @@ const bannerScript = banner?.dismissible
     {xDefault && <link href={xDefault} hreflang="x-default" rel="alternate" />}
     {noindex && <meta name="robots" content="noindex" />}
     {description && <meta name="description" content={description} />}
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content={site.title} />
     <meta property="og:title" content={pageTitle} />
     {description && <meta property="og:description" content={description} />}
+    {canonical && <meta property="og:url" content={canonical} />}
+    {
+      articlePublished && (
+        <meta property="article:published_time" content={articlePublished} />
+      )
+    }
+    {
+      articleModified && (
+        <meta property="article:modified_time" content={articleModified} />
+      )
+    }
     {
       ogImage && (
         <>
           <meta property="og:image" content={ogImage} />
+          {ogGenerated && (
+            <>
+              <meta property="og:image:type" content={OG_IMAGE_TYPE} />
+              <meta property="og:image:width" content={String(OG_IMAGE_WIDTH)} />
+              <meta
+                property="og:image:height"
+                content={String(OG_IMAGE_HEIGHT)}
+              />
+              <meta property="og:image:alt" content={pageTitle} />
+            </>
+          )}
           <meta name="twitter:image" content={ogImage} />
           <meta name="twitter:card" content="summary_large_image" />
         </>

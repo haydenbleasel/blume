@@ -25,8 +25,10 @@ Every page renders the standard `<head>` tags from your config and frontmatter:
 
 - `<title>` — the page title plus your site `title`.
 - `<meta name="description">` and `og:description` — the page `description`, falling back to the site `description`.
-- `og:title` — the page title.
-- `<link rel="canonical">` — the page's absolute URL (when `deployment.site` is set).
+- `og:title` and `og:site_name` — the page title and your site `title`.
+- `<link rel="canonical">` and `og:url` — the page's absolute URL (when `deployment.site` is set).
+- `og:type` — `article` on blog posts and changelog entries, `website` elsewhere. Article pages also emit `article:published_time` and `article:modified_time` from the page's `date` and last-modified timestamp.
+- `og:image` — the [OG image](#open-graph-images) for the page. A generated card also declares its `og:image:width`, `og:image:height`, `og:image:type`, and `og:image:alt`, so a crawler can lay the card out without fetching it first; an `seo.image` you supply yourself declares none of these, since its size and format are unknown.
 
 Override any of these per page with `seo` frontmatter:
 

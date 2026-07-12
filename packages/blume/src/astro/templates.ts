@@ -1227,6 +1227,9 @@ const ogRel = seo.image ?? ogPath;
 // an external URL, which passes through verbatim (mirrors PageLayout).
 const ogImage =
   ogRel && base && ogRel.startsWith("/") ? \`\${base}\${withBase(ogRel)}\` : ogRel;
+// Blume's generated card has known dimensions the layout can declare; a user's
+// \`seo.image\` could be any size or format, so it gets none.
+const ogGenerated = !seo.image && Boolean(ogPath);
 
 const basedRoute = withBase(route);
 const canonical =
@@ -1323,6 +1326,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   searchEnabled={data.config.search.enabled}
   indexable={indexable}
   ogImage={ogImage}
+  ogGenerated={ogGenerated}
   canonical={canonical}
   editUrl={editUrl}
   feedback={data.config.feedback}

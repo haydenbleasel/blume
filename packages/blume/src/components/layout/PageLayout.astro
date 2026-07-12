@@ -25,6 +25,11 @@ import type {
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { LocaleSwitchOption, Navigation } from "../../core/types.ts";
+import {
+  OG_IMAGE_HEIGHT,
+  OG_IMAGE_TYPE,
+  OG_IMAGE_WIDTH,
+} from "../../og/dimensions.ts";
 import { withBase } from "../islands/base-path.ts";
 import "blume:theme";
 import Analytics from "./Analytics.astro";
@@ -147,6 +152,9 @@ const resolvedOgImage = ogImage
   : ogEnabled && siteBase
     ? `${siteBase}${withBase(`/og/${ogSlug}.png`)}`
     : null;
+// Only the generated card has a known size and format, so its dimensions are
+// declared for crawlers; a user-supplied `ogImage` could be any image.
+const ogGenerated = !ogImage && Boolean(resolvedOgImage);
 
 const initialThemeScript = themeInitScript(themeMode);
 const bannerScript = banner?.dismissible
@@ -166,12 +174,25 @@ const bannerScript = banner?.dismissible
     {noindex && <meta content="noindex" name="robots" />}
     {description && <meta content={description} name="description" />}
     <meta content="website" property="og:type" />
+    <meta content={site.title} property="og:site_name" />
     <meta content={pageTitle} property="og:title" />
     {description && <meta content={description} property="og:description" />}
+    {resolvedCanonical && <meta content={resolvedCanonical} property="og:url" />}
     {
       resolvedOgImage && (
         <>
           <meta content={resolvedOgImage} property="og:image" />
+          {ogGenerated && (
+            <>
+              <meta content={OG_IMAGE_TYPE} property="og:image:type" />
+              <meta content={String(OG_IMAGE_WIDTH)} property="og:image:width" />
+              <meta
+                content={String(OG_IMAGE_HEIGHT)}
+                property="og:image:height"
+              />
+              <meta content={pageTitle} property="og:image:alt" />
+            </>
+          )}
           <meta content={resolvedOgImage} name="twitter:image" />
           <meta content="summary_large_image" name="twitter:card" />
         </>

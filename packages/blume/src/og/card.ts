@@ -2,6 +2,8 @@ import { Renderer } from "@takumi-rs/core";
 import { container, image, text } from "@takumi-rs/helpers";
 import type { Node } from "@takumi-rs/helpers";
 
+import { OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH } from "./dimensions.ts";
+
 // Reuse one renderer (and its loaded default fonts) across all images.
 let renderer: Renderer | null = null;
 const getRenderer = (): Renderer => {
@@ -53,8 +55,8 @@ export interface OgCardOptions {
   site?: string;
 }
 
-const WIDTH = 1200;
-const HEIGHT = 630;
+const WIDTH = OG_IMAGE_WIDTH;
+const HEIGHT = OG_IMAGE_HEIGHT;
 
 // Light neutral scale mirrored from the docs homepage theme tokens:
 // FOREGROUND = --foreground, MUTED = --muted-foreground, FAINT = that lighter,

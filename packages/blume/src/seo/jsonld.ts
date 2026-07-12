@@ -37,7 +37,13 @@ const trimSlash = (value: string): string => value.replace(/\/$/u, "");
 const absolute = (base: string | null, path: string): string =>
   base ? `${base}${path}` : path;
 
-const toIso = (value: DateInput | undefined): string | undefined => {
+/**
+ * Frontmatter date → ISO 8601, or undefined when absent/unparseable. Shared with
+ * the layout's `article:published_time`/`article:modified_time` so both date
+ * surfaces treat a malformed date the same way: omit it rather than emit
+ * "Invalid Date".
+ */
+export const toIso = (value: DateInput | undefined): string | undefined => {
   if (!value) {
     return;
   }
