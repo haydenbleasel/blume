@@ -1,5 +1,11 @@
 # blume
 
+## 1.0.1
+
+### Patch Changes
+
+- 6afb56a: Declare the `blume` bin as `bin/blume.mjs` instead of `./bin/blume.mjs`. The leading `./` is redundant and some package managers normalize it away when linking the binary; dropping it keeps the published manifest consistent with what installers actually write.
+
 ## 1.0.0
 
 ### Major Changes
