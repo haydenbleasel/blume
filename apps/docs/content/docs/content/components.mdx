@@ -532,14 +532,14 @@ export interface ButtonProps {
 
 A card linking to a GitHub repository with its live star and fork counts. Counts are fetched at build time — no client JavaScript — and the card still renders if the API is unreachable. Pass `owner` and `repo`, or omit them to use the repository from your `blume.config`. Set a `GITHUB_TOKEN` environment variable to lift the API rate limit.
 
-<GithubInfo owner="withastro" repo="astro" />
+<GithubInfo owner="haydenbleasel" repo="blume" />
 
 ```astro lineNumbers
 <!-- Uses the repo from blume.config -->
 <GithubInfo />
 
 <!-- Or point it at any repository -->
-<GithubInfo owner="withastro" repo="astro" />
+<GithubInfo owner="haydenbleasel" repo="blume" />
 ```
 
 ## Component
