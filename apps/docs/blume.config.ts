@@ -1,20 +1,6 @@
 import { defineConfig } from "blume";
 
 export default defineConfig({
-  ai: {
-    ask: {
-      enabled: true,
-      suggestions: [
-        { icon: "rocket", label: "What is Blume?" },
-        { icon: "file-text", label: "How do I write a docs page?" },
-        { icon: "settings", label: "How do I configure the theme?" },
-        { icon: "sparkles", label: "How does Ask AI work?" },
-      ],
-    },
-    // The API reference below documents the Petstore example spec, not Blume —
-    // keep it out of the LLM-facing files.
-    llmsTxt: { openapi: false },
-  },
   analytics: {
     vercel: true,
   },
@@ -26,10 +12,7 @@ export default defineConfig({
   content: {
     root: "content",
     sources: [
-      // Local docs under content/
       { root: "content", type: "filesystem" },
-      // The changelog is sourced from this repo's GitHub releases. Private repo,
-      // so the API token is read from GITHUB_TOKEN (.env.local / .env).
       {
         owner: "haydenbleasel",
         prefix: "changelog",
@@ -38,11 +21,8 @@ export default defineConfig({
       },
     ],
   },
-  // Ask AI and the MCP server need on-demand rendering, so the site deploys as
-  // a Vercel server function rather than a static export.
   deployment: {
     adapter: "vercel",
-    output: "server",
   },
   description:
     "Open-source, markdown-first documentation powered by Astro and Vite.",
@@ -54,24 +34,10 @@ export default defineConfig({
   },
   lastModified: true,
   logo: "/logo.svg",
-  mcp: {
-    enabled: true,
-  },
   navigation: {
     tabs: [
       { label: "Docs", path: "/docs" },
       { label: "Changelog", path: "/changelog" },
-    ],
-  },
-  // The "Example API" navbar tab is added automatically from this reference.
-  openapi: {
-    enabled: true,
-    route: "/api",
-    sources: [
-      {
-        label: "Example API",
-        spec: "https://petstore3.swagger.io/api/v3/openapi.json",
-      },
     ],
   },
   seo: {
