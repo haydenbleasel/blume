@@ -1,5 +1,53 @@
 # blume
 
+## 1.0.0
+
+### Major Changes
+
+- 7372fe8: Blume v1.
+
+### Patch Changes
+
+- e922ff5: Stop "Clear conversation" from resurrecting an orphaned answer bubble while a reply is still streaming. Clearing mid-answer emptied the panel, but the in-flight stream kept re-appending its assistant message to the cleared conversation — a growing answer with no question above it. Clearing now aborts the in-flight request and revokes the stream's right to write into the conversation, and asking a new question right after a clear works as before.
+- e922ff5: Match locale folders and dot suffixes case-insensitively, the way BCP 47 codes are defined. A configured `pt-BR` with the conventional lowercase `pt-br/` folder (or an `intro.pt-br.mdx` suffix under the `dot` parser) previously fell through as default-locale content at a literal `/pt-br/…` route — and the unconfigured-locale warning, which already compared case-insensitively, stayed silent about it. Those files now route as the configured locale, with the configured casing in routes and labels.
+- e922ff5: The generated changelog index's heading, page title, and meta description now come from the translatable `changelog.title` and `changelog.description` UI strings (translated in every built-in pack), joining the reveal button the template already localized. Previously the page rendered a hardcoded English "Changelog" heading, an English " changelog" title suffix, and an English description even on non-English default locales.
+- 1e5446f: Lengthen the default changelog description. "Product updates and release notes." is 34 characters — under the 50-character floor search engines want from a meta description, and the generated `/changelog` page uses it for both its meta tag and its on-page subtitle. It now reads "Product updates, new features, and fixes from every release." Sites that set `ui.changelog.description` are unaffected.
+- e922ff5: The syntax docs now label callouts and `package-install` blocks as MDX-only, matching the existing notes on diagrams and math. Previously a reader following the page could write `:::note` or a `package-install` fence in a `.md` file and get literal text or a plain code fence with no hint why.
+- e922ff5: Apply the js-yaml 4-safe YAML engine to `matter.read` as well. The front-matter wrapper previously exposed gray-matter's own `read` helper unwrapped, so reading a file through it would parse with the removed `safeLoad` default and crash with "Function yaml.safeLoad is removed in js-yaml 4" — the exact failure the wrapper exists to prevent for `matter()` and `matter.stringify()`.
+- 68520af: Exclude Vite's pre-bundled dep cache (`node_modules/.vite/`) from @vitejs/plugin-react. Astro's react() replaces the plugin's default `node_modules` exclude, so Babel (carrying the React Compiler) was re-parsing every 500KB+ optimized dep chunk in dev — the source of the "[BABEL] Note: The code generator has deoptimised the styling" messages. Blume's own components stay covered by the compiler.
+- e922ff5: Serve image-path icons from under `deployment.base`. `<Icon>` emitted an image icon's path (`/brand/mark.png`) as-is, so on a site deployed under a base path the request went to the domain root and 404'd while `<Card img>`, the logo, and every other image emitter were correctly rebased. Image icons now get the same `withBase` treatment; external URLs, data URIs, and relative paths are untouched.
+- e922ff5: `@astrojs/vue` and `@astrojs/svelte` are now declared as optional peer dependencies, matching `@astrojs/netlify` and `@astrojs/cloudflare`. Projects using Vue or Svelte islands must install the matching integration themselves, and package managers now surface and satisfy that requirement instead of the build relying on an undeclared package.
+- e922ff5: `blume build --isolated` now reports the build's actual output directory on success. A `server` output build with the Vercel adapter lands its deploy bundle at `.blume-verify/.vercel/output` (it is never surfaced to the project root), but the message previously pointed at `.blume-verify/dist`, which that build never populates.
+- e922ff5: The breadcrumb and pagination `<nav>` landmark labels are now translatable via the new `nav.breadcrumb` and `page.pagination` UI strings, with translations in every built-in language pack. Previously both were hardcoded English ("Breadcrumb", "Pagination") while the sibling chrome landmarks were dictionary-driven, so screen readers announced English landmark names on localized sites.
+- e922ff5: Fix `ai.markdownComponents` crashing config validation in projects that resolve Zod 4. The schema used the single-argument `z.record(...)` form, which Zod 4 rejects at schema-construction time, so any config parse failed before your settings were even read; it now uses the dual-compatible two-argument form.
+- e922ff5: The MCP `get_page` tool's description — shipped user-facing in `tools/list` and the server card — no longer claims to return a page's original Markdown source. The tool serves the agent variant (components downleveled to plain Markdown, `<Visibility>` resolved for agents), and the description now says so.
+- e922ff5: The sidebar's panel-stack back arrow and drill-in chevrons now mirror under RTL locales (`rtl:-scale-x-100`), matching the pagination arrows and the panel slide animation, which already flipped direction. Previously the arrows pointed against the reading direction on RTL sites.
+- d9590fc: Emit a complete Open Graph card in the page head, so crawlers and social validators stop flagging the metadata as incomplete:
+
+  - `og:url` — the page's canonical URL (rendered only when `deployment.site` is set, or a page overrides `seo.canonical`).
+  - `og:type` — `article` on blog posts and changelog entries, `website` everywhere else. Article pages also emit `article:published_time` and `article:modified_time`.
+  - `og:site_name` — the site `title`.
+  - `og:image:width`, `og:image:height`, `og:image:type`, and `og:image:alt` on Blume's generated OG card, so a crawler can lay it out without fetching the image. An `seo.image` you supply yourself declares none of these, since its dimensions and format are unknown.
+
+- 1e5446f: Give every generated OpenAPI page its own meta description. Operation and overview pages set no `description`, so all of them fell back to the site-wide default — a spec with twenty operations shipped twenty pages carrying one identical description, which search engines treat as duplicate content. Each operation page now derives a description from the spec's own prose (its description, or its summary) followed by the endpoint it documents, and the overview page uses the spec description. These land in `seo.description`, so they feed the meta tag without also printing as a visible subtitle above the body prose.
+- 80eb252: Emit X (Twitter) card tags, and add `seo.x` for account attribution:
+
+  ```ts
+  seo: {
+    x: { handle: "@acme", creator: "@jane" },
+  }
+  ```
+
+  `handle` becomes `twitter:site` and `creator` becomes `twitter:creator` — the one piece of X card metadata with no Open Graph equivalent to fall back to. A page can credit its own author with `seo.x.creator` frontmatter, which is what a guest post wants. The `@` is optional in both places.
+
+  Every page also now emits `twitter:card`, `twitter:title`, `twitter:description`, and `twitter:image:alt` on the generated card. `twitter:card` previously rendered only when a page had an image; a page without one now gets the compact `summary` card instead of sharing as a bare link.
+
+- e922ff5: The Scalar API reference shell now sets `<html lang>` and `dir` from the default locale, mirroring the changelog index's locale wiring, and renders the same localized skip-to-content link as the other layouts. Previously it hardcoded `lang="en"` with no `dir` — so RTL default locales rendered LTR chrome — and offered keyboard users no way to skip past the navbar.
+- e922ff5: The search dialog's section-filter "All" pill is now translatable via the new `search.all` UI string, with translations in every built-in language pack. Previously it rendered hardcoded English inside an otherwise fully localized dialog.
+- e922ff5: ⌘K / Ctrl+K now toggles the search dialog: pressing it while the dialog is open closes it, matching how ⌘I toggles the Ask AI panel. Previously the shortcut unconditionally re-opened, calling `showModal()` on an already-open dialog — a silent no-op on evergreen browsers but an `InvalidStateError` on older engines. The `/` shortcut stays open-only, and `open()` itself now guards against an already-open dialog.
+- e922ff5: Reject a `toc` config whose `minHeadingLevel` exceeds its `maxHeadingLevel`. An inverted range (including an explicit min above the default max of 3) previously validated fine and silently rendered an empty table of contents on every page; it now fails config validation with a clear message.
+- e922ff5: Internal-error stack traces now relativize `.blume/` runtime frames on Windows too. The remap previously matched only POSIX absolute paths, so drive-letter frames like `C:\...\.blume\...` printed the full machine path instead of the project-relative `.blume\...` form tagged `(generated)`.
+
 ## 0.8.0
 
 ### Minor Changes
