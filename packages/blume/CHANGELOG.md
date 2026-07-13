@@ -1,5 +1,13 @@
 # blume
 
+## 1.0.3
+
+### Patch Changes
+
+- e2f902c: Render the Ask AI trigger from the shared header instead of wiring it up per page. Custom pages built on `PageLayout` (a landing page, most of all) never passed the header's `ask` slot, so the Ask AI button — and the search modal's hand-off to it — silently went missing on them while the generated docs, changelog, and reference pages had it. The header now owns the trigger and reads whether Ask AI is on from the config, so every page gets it; pass `askEnabled={false}` to opt a page out.
+- 66b721b: Move the MCP server config under `ai` in `blume.config.ts`, alongside the other agent-facing features. Rename `mcp: { … }` to `ai: { mcp: { … } }` — the shape of the block is unchanged.
+- c8ae77e: Fix `ERR_MODULE_NOT_FOUND` in a deployed server function. Surfacing an adapter's deploy bundle out of `.blume` resolved every traced dependency's symlink against the source dir, so the links pointed into a directory the same step then deleted — the function died on its first external import (`Cannot find package '@orama/orama'` with Ask AI or the MCP server enabled). The bundle is now copied verbatim, leaving those links relative and internal to it.
+
 ## 1.0.2
 
 ### Patch Changes
