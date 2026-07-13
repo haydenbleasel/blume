@@ -77,6 +77,7 @@ const ADAPTER_IMPORTS: Record<string, string> = {
 };
 
 const ADAPTER_OPTIONS: Record<string, string> = {
+  cloudflare: '{ prerenderEnvironment: "node" }',
   node: '{ mode: "standalone" }',
 };
 

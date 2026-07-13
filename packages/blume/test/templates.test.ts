@@ -739,6 +739,28 @@ describe("astroConfigTemplate", () => {
     expect(out).not.toContain("babel-plugin-react-compiler");
   });
 
+  it("prerenders cloudflare adapter builds in Node so build-time node: imports resolve", () => {
+    const cloudflareConfig = blumeConfigSchema.parse({
+      deployment: { adapter: "cloudflare", output: "server" },
+    });
+    const out = astroConfigTemplate({
+      askPath: ASK_PATH,
+      config: cloudflareConfig,
+      contentRoutes: [],
+      context: context(),
+      dataPath: DATA_PATH,
+      examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
+      needsReact: false,
+      openapiPath: OPENAPI_PATH,
+      pages: [],
+      searchClientPath: SEARCH_CLIENT_PATH,
+      themePath: THEME_PATH,
+    });
+    expect(out).toContain('import adapter from "@astrojs/cloudflare"');
+    expect(out).toContain('adapter: adapter({ prerenderEnvironment: "node" })');
+  });
+
   it("omits adapter options for adapters that need none", () => {
     const vercelConfig = blumeConfigSchema.parse({
       deployment: { adapter: "vercel", output: "server" },
