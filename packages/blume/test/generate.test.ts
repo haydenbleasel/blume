@@ -295,6 +295,25 @@ describe("buildRuntimeData", () => {
     expect(data.config.logo.href).toBe("/");
   });
 
+  it("reserves dimensions for per-mode SVG logos", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  logo: { image: { dark: "/dark.svg", light: "/light.svg" } },
+};
+`,
+        "docs/index.md": "# Home\n",
+        "public/dark.svg": '<svg viewBox="0 0 608 96"></svg>',
+        "public/light.svg": '<svg height="191" width="1214"></svg>',
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.logo.dimensions).toEqual({
+      dark: { height: 96, width: 608 },
+      light: { height: 191, width: 1214 },
+    });
+  });
+
   it("falls back to an <img> logo when the SVG file is absent", async () => {
     const project = await scanProject(
       await writeProject({

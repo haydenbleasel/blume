@@ -15,6 +15,10 @@ export interface BlumeLogo {
   svg?: string;
   light?: string;
   dark?: string;
+  dimensions?: {
+    dark?: { height: number; width: number };
+    light?: { height: number; width: number };
+  };
   alt: string;
   href: string;
   /** Wordmark text beside the mark; `undefined` falls back to the site title. */

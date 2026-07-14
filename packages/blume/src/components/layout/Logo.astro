@@ -18,6 +18,8 @@ const { site, logo } = Astro.props;
 const logoSvg = logo?.svg;
 const logoLight = logo?.light;
 const logoDark = logo?.dark ?? logo?.light;
+const logoLightDimensions = logo?.dimensions?.light;
+const logoDarkDimensions = logo?.dimensions?.dark ?? logo?.dimensions?.light;
 const logoAlt = logo?.alt ?? "";
 const brandHref = logo?.href ?? "/";
 // Wordmark beside the mark: the configured `logo.text`, or the site title when
@@ -43,18 +45,28 @@ const brandText = logo?.text ?? site.title;
     !logoSvg &&
       logoLight &&
       (logoLight === logoDark ? (
-        <img alt={logoAlt} class="h-5 w-auto" src={withBase(logoLight)} />
+        <img
+          alt={logoAlt}
+          class="h-5 w-auto"
+          height={logoLightDimensions?.height}
+          src={withBase(logoLight)}
+          width={logoLightDimensions?.width}
+        />
       ) : (
         <>
           <img
             alt={logoAlt}
             class="h-5 w-auto dark:hidden"
+            height={logoLightDimensions?.height}
             src={withBase(logoLight)}
+            width={logoLightDimensions?.width}
           />
           <img
             alt={logoAlt}
             class="hidden h-5 w-auto dark:block"
+            height={logoDarkDimensions?.height}
             src={withBase(logoDark)}
+            width={logoDarkDimensions?.width}
           />
         </>
       ))

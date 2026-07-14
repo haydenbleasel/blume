@@ -626,7 +626,56 @@ const writeStagedContent = async (
   }
 };
 
-/** The logo shape the runtime consumes: an inline SVG or image URL(s). */
+interface LogoDimensions {
+  height: number;
+  width: number;
+}
+
+const SVG_ROOT = /<svg\b(?<attributes>[^>]*)>/u;
+const SVG_WIDTH = /\bwidth\s*=\s*["'](?<value>[^"']+)["']/u;
+const SVG_HEIGHT = /\bheight\s*=\s*["'](?<value>[^"']+)["']/u;
+const SVG_LENGTH = /^\s*(?<value>[\d.]+)(?:px)?\s*$/u;
+const SVG_VIEW_BOX =
+  /\bviewBox\s*=\s*["'][\d.-]+[\s,]+[\d.-]+[\s,]+(?<width>[\d.]+)[\s,]+(?<height>[\d.]+)["']/u;
+
+const parseSvgLength = (value: string | undefined): number | undefined => {
+  const length = Number(value?.match(SVG_LENGTH)?.groups?.value);
+  return length > 0 ? length : undefined;
+};
+
+/** Read dimensions from an SVG's explicit size or its view box. */
+const svgDimensions = (svg: string | undefined): LogoDimensions | undefined => {
+  const attributes = svg?.match(SVG_ROOT)?.groups?.attributes;
+  const width = parseSvgLength(attributes?.match(SVG_WIDTH)?.groups?.value);
+  const height = parseSvgLength(attributes?.match(SVG_HEIGHT)?.groups?.value);
+  if (width && height) {
+    return { height, width };
+  }
+
+  const viewBox = attributes?.match(SVG_VIEW_BOX);
+  const viewBoxWidth = Number(viewBox?.groups?.width);
+  const viewBoxHeight = Number(viewBox?.groups?.height);
+  return viewBoxWidth > 0 && viewBoxHeight > 0
+    ? { height: viewBoxHeight, width: viewBoxWidth }
+    : undefined;
+};
+
+/** Read a local SVG logo from the project root or public directory. */
+const readLogoSvg = (
+  project: BlumeProject,
+  source: string | undefined
+): string | undefined => {
+  if (!source?.toLowerCase().endsWith(".svg")) {
+    return;
+  }
+  const rel = source.replace(/^\//u, "");
+  const file = [
+    join(project.context.root, "public", rel),
+    join(project.context.root, rel),
+  ].find((path) => existsSync(path));
+  return file ? readFileSync(file, "utf-8") : undefined;
+};
+
 /**
  * Resolve the configured logo. A single SVG is read and inlined so a
  * `currentColor` logo follows the theme; other images keep their URL for an
@@ -647,18 +696,20 @@ const resolveLogo = (project: BlumeProject): BlumeLogo | null => {
   const dark = image?.dark ?? image?.light;
   const alt = image?.alt ?? "";
   const brandHref = href ?? "/";
+  const lightSvg = readLogoSvg(project, light);
+  const darkSvg = dark === light ? lightSvg : readLogoSvg(project, dark);
 
-  if (light && light === dark && light.toLowerCase().endsWith(".svg")) {
-    const rel = light.replace(/^\//u, "");
-    const file = [
-      join(project.context.root, "public", rel),
-      join(project.context.root, rel),
-    ].find((path) => existsSync(path));
-    if (file) {
-      return { alt, href: brandHref, svg: readFileSync(file, "utf-8"), text };
-    }
+  if (light && light === dark && lightSvg) {
+    return { alt, href: brandHref, svg: lightSvg, text };
   }
-  return { alt, dark, href: brandHref, light, text };
+
+  const lightDimensions = svgDimensions(lightSvg);
+  const darkDimensions = svgDimensions(darkSvg);
+  const dimensions =
+    lightDimensions || darkDimensions
+      ? { dark: darkDimensions, light: lightDimensions }
+      : undefined;
+  return { alt, dark, dimensions, href: brandHref, light, text };
 };
 
 /**
