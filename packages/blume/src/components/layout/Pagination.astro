@@ -34,11 +34,11 @@ const s = { ...EN_UI.page, ...strings };
           href={withBase(prev.route)}
         >
           <Icon class="rtl:-scale-x-100" name="arrow-left" size={16} />
-          <span>
+          <span class="min-w-0">
             <span class="block text-muted-foreground text-xs max-md:hidden">
               {s.previous}
             </span>
-            <span class="block font-medium">{prev.label}</span>
+            <span class="block truncate font-medium">{prev.label}</span>
           </span>
         </a>
       ) : (
@@ -49,11 +49,11 @@ const s = { ...EN_UI.page, ...strings };
           class="ms-auto flex max-w-[48%] flex-1 items-center justify-end gap-2 rounded-full border border-border px-4 py-3 text-end text-foreground transition-colors hover:border-foreground max-md:max-w-full"
           href={withBase(next.route)}
         >
-          <span>
+          <span class="min-w-0">
             <span class="block text-muted-foreground text-xs max-md:hidden">
               {s.next}
             </span>
-            <span class="block font-medium">{next.label}</span>
+            <span class="block truncate font-medium">{next.label}</span>
           </span>
           <Icon class="rtl:-scale-x-100" name="arrow-right" size={16} />
         </a>

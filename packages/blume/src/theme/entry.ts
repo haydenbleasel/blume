@@ -457,7 +457,8 @@ blume-diff {
    never matches (a cell is not its own descendant). */
 .prose :where(td, th) > code,
 .prose :where(td, th) :not(pre) > code {
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 blume-tabs pre,
