@@ -453,6 +453,12 @@ blume-diff {
   font-size: 0.8125rem;
 }
 
+/* Scroll wide tables in place; the wrapper is added by the blume:table-wrap hast plugin. */
+.blume-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* GFM renders cells as <td><code> directly, which the descendant form alone
    never matches (a cell is not its own descendant). */
 .prose :where(td, th) > code,

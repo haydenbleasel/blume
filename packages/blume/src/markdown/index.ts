@@ -17,6 +17,7 @@ import { languageIconTransformer } from "./language-icon.ts";
 import { mathPlugin } from "./math.ts";
 import { mermaidPlugin } from "./mermaid.ts";
 import { packageInstallPlugin } from "./package-install.ts";
+import { tableWrapPlugin } from "./table-wrap.ts";
 import { DEFAULT_CODE_THEMES } from "./themes.ts";
 import type { CodeThemes } from "./themes.ts";
 
@@ -58,6 +59,7 @@ type HastPlugin = NonNullable<
 const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => {
   const plugins: HastPlugin[] = [
     inlineCodeHighlightPlugin(options.codeThemes) as unknown as HastPlugin,
+    tableWrapPlugin() as unknown as HastPlugin,
   ];
   if (options.headingAnchors !== false) {
     plugins.push(headingAnchorPlugin() as unknown as HastPlugin);
