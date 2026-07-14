@@ -53,6 +53,24 @@ describe("renderOgImage", () => {
     });
   });
 
+  it("renders a custom logo and palette", async () => {
+    await expectPng({
+      brand: "Acme",
+      description: "Branded documentation.",
+      logo: SQUARE_LOGO,
+      palette: {
+        accent: "#ff5410",
+        background: "#1d1d1d",
+        border: "#323232",
+        foreground: "#fff6f2",
+        muted: "#a6a19f",
+      },
+      repo: "acme/docs",
+      site: "docs.acme.com",
+      title: "Getting started",
+    });
+  });
+
   it("scales down a wide wordmark logo and a long title", async () => {
     await expectPng({ logo: WIDE_LOGO, title: LONG_TITLE });
   });

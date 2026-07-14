@@ -106,7 +106,26 @@ seo: {
 }
 ```
 
-Each card is derived from your content and theme — the **page title** as the headline, your **site title** as the eyebrow, and your theme **accent** for the mark. Images are served at `/og/<slug>.png`, mirroring each route, and are prerendered as static files even in server mode:
+### Brand the generated card
+
+Set a local SVG and hex palette to match the generated card to your brand. The logo can live in `public/` or at the project root. Omit any palette value to keep its default.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    logo: "/logo/og.svg",
+    palette: {
+      accent: "#ff5410",
+      background: "#1d1d1d",
+      foreground: "#fff6f2",
+      muted: "#a6a19f",
+      border: "#323232",
+    },
+  },
+}
+```
+
+By default, each card is derived from your content and theme — the **page title** as the headline, your **site title** as the eyebrow, and your theme **accent** for the mark. Images are served at `/og/<slug>.png`, mirroring each route, and are prerendered as static files even in server mode:
 
 | Page route          | Image URL                  |
 | ------------------- | -------------------------- |

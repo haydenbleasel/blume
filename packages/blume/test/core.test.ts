@@ -106,6 +106,30 @@ describe("config schema", () => {
     ).toBeFalsy();
   });
 
+  it("accepts Open Graph branding and rejects non-hex palette colors", () => {
+    const { og } = blumeConfigSchema.parse({
+      seo: {
+        og: {
+          logo: "/og-logo.svg",
+          palette: {
+            accent: "#ff5410",
+            background: "#1d1d1d",
+            border: "#323232",
+            foreground: "#fff6f2",
+            muted: "#a6a19f",
+          },
+        },
+      },
+    }).seo;
+    expect(og.logo).toBe("/og-logo.svg");
+    expect(og.palette?.background).toBe("#1d1d1d");
+    expect(
+      blumeConfigSchema.safeParse({
+        seo: { og: { palette: { background: "black" } } },
+      }).success
+    ).toBeFalsy();
+  });
+
   it("normalizes seo.x handles to a leading @", () => {
     // `twitter:site`/`twitter:creator` require the `@`; a handle configured
     // without one is the obvious typo to absorb rather than reject.

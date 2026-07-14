@@ -109,7 +109,11 @@ export interface BlumeDataConfig {
   /** Hosted MCP server, or `null` when MCP is off. */
   mcp: { name: string; route: string } | null;
   /** Open Graph image generation. */
-  og: { enabled: boolean };
+  og: {
+    enabled: boolean;
+    logo?: string;
+    palette?: ResolvedConfig["seo"]["og"]["palette"];
+  };
   /** Repository URL for header/edit links, or `null`. */
   repoUrl: string | null;
   search: { enabled: boolean; provider: SearchProvider };

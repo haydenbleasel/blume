@@ -802,6 +802,18 @@ const xConfigSchema = z.strictObject({
   handle: xHandleSchema,
 });
 
+const ogColorSchema = z
+  .string()
+  .regex(/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu);
+
+const ogPaletteSchema = z.strictObject({
+  accent: ogColorSchema.optional(),
+  background: ogColorSchema.optional(),
+  border: ogColorSchema.optional(),
+  foreground: ogColorSchema.optional(),
+  muted: ogColorSchema.optional(),
+});
+
 const ogConfigSchema = z.strictObject({
   /**
    * Generate a per-page Open Graph image. Defaults to on once a deployment
@@ -810,6 +822,10 @@ const ogConfigSchema = z.strictObject({
    * `loadConfig`. An explicit value here always wins.
    */
   enabled: z.boolean().optional(),
+  /** Local SVG used in the generated card instead of the site logo. */
+  logo: z.string().optional(),
+  /** Optional generated-card colors. */
+  palette: ogPaletteSchema.optional(),
 });
 
 const rssConfigSchema = z.strictObject({

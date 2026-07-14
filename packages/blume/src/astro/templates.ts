@@ -1034,10 +1034,11 @@ const siteHost = (() => {
 
 export async function GET({ props }) {
   const png = await renderOgImage({
-    accent: data.config.theme.accent.light,
+    accent: data.config.og.palette?.accent ?? data.config.theme.accent.light,
     brand: data.config.title,
     description: data.config.description,
-    logo: data.config.logo?.svg,
+    logo: data.config.og.logo,
+    palette: data.config.og.palette,
     repo: repoSlug,
     site: siteHost,
     title: props.title,

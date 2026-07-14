@@ -1114,7 +1114,10 @@ describe("static endpoint templates", () => {
   });
 
   it("renders the OG image endpoint", () => {
-    expect(ogEndpointTemplate()).toContain("renderOgImage");
+    const endpoint = ogEndpointTemplate();
+    expect(endpoint).toContain("renderOgImage");
+    expect(endpoint).toContain("logo: data.config.og.logo");
+    expect(endpoint).toContain("palette: data.config.og.palette");
   });
 
   it("serves one RSS feed per section", () => {

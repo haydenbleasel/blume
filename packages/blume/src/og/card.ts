@@ -35,6 +35,17 @@ const resolveAccent = (accent: string): string => {
   return HEX_COLOR.test(accent) ? accent : "#3b82f6";
 };
 
+const resolveColor = (color: string | undefined, fallback: string): string =>
+  color && HEX_COLOR.test(color) ? color : fallback;
+
+export interface OgCardPalette {
+  accent?: string;
+  background?: string;
+  border?: string;
+  foreground?: string;
+  muted?: string;
+}
+
 export interface OgCardOptions {
   /** Large headline — the page title. */
   title: string;
@@ -45,10 +56,12 @@ export interface OgCardOptions {
   /** Muted subtitle under the headline (usually the site description). */
   description?: string;
   /**
-   * Inlined SVG markup of the configured logo (`config.logo.svg`), painted into
+   * Inlined SVG markup of the configured logo, painted into
    * the brand lockup. Falls back to an accent mark when absent.
    */
   logo?: string;
+  /** Optional colors for the generated card. */
+  palette?: OgCardPalette;
   /** Footer-left repository slug, e.g. `owner/repo`. */
   repo?: string;
   /** Footer-right site host, e.g. `docs.acme.com`. */
@@ -66,6 +79,17 @@ const FOREGROUND = "#0a0a0a";
 const MUTED = "#737373";
 const FAINT = "#a3a3a3";
 const BORDER = "#e5e5e5";
+
+const resolvePalette = (
+  options: OgCardOptions
+): Required<OgCardPalette> & { faint: string } => ({
+  accent: resolveAccent(options.palette?.accent ?? options.accent ?? "blue"),
+  background: resolveColor(options.palette?.background, BG),
+  border: resolveColor(options.palette?.border, BORDER),
+  faint: resolveColor(options.palette?.muted, FAINT),
+  foreground: resolveColor(options.palette?.foreground, FOREGROUND),
+  muted: resolveColor(options.palette?.muted, MUTED),
+});
 
 /**
  * Truncate to `max` code points with an ellipsis. Slices by code points, not
@@ -103,8 +127,8 @@ const logoAspect = (svg: string): number | null => {
 // Render the configured logo as the brand mark. A `currentColor` logo carries
 // no intrinsic color, so it is painted in the foreground to read on the light
 // card, then handed to Takumi as a data URI sized from the SVG's aspect ratio.
-const logoMark = (svg: string): Node => {
-  const painted = svg.replaceAll("currentColor", FOREGROUND);
+const logoMark = (svg: string, foreground: string): Node => {
+  const painted = svg.replaceAll("currentColor", foreground);
   const aspect = logoAspect(painted);
   let height = MARK_HEIGHT;
   let width = aspect ? MARK_HEIGHT * aspect : MARK_HEIGHT;
@@ -151,7 +175,8 @@ const titleSize = (title: string): number => {
 
 /** Render a 1200x630 Open Graph card to a PNG buffer. */
 export const renderOgImage = (options: OgCardOptions): Promise<Buffer> => {
-  const accent = resolveAccent(options.accent ?? "blue");
+  const { accent, background, border, faint, foreground, muted } =
+    resolvePalette(options);
   const brand = options.brand?.trim();
   const logo = options.logo?.trim();
   // Slice by code point, not code unit — `charAt(0)` would split a leading
@@ -166,14 +191,16 @@ export const renderOgImage = (options: OgCardOptions): Promise<Buffer> => {
   // ("Ultracite  Ultracite"). Without a logo, the accent tile with the brand
   // initial stands in.
   const header = container({
-    children: [logo ? logoMark(logo) : initialMark(accent, initial)],
+    children: [
+      logo ? logoMark(logo, foreground) : initialMark(accent, initial),
+    ],
     style: { alignItems: "center", display: "flex" },
   });
 
   const body = container({
     children: [
       text(truncate(options.title, 64), {
-        color: FOREGROUND,
+        color: foreground,
         fontSize: titleSize(options.title),
         fontWeight: 600,
         letterSpacing: "-0.03em",
@@ -183,7 +210,7 @@ export const renderOgImage = (options: OgCardOptions): Promise<Buffer> => {
       }),
       description
         ? text(truncate(description, 140), {
-            color: MUTED,
+            color: muted,
             fontSize: 30,
             lineHeight: 1.4,
             marginTop: 28,
@@ -200,15 +227,15 @@ export const renderOgImage = (options: OgCardOptions): Promise<Buffer> => {
       ? container({
           children: [
             container({
-              style: { backgroundColor: BORDER, height: 1, width: "100%" },
+              style: { backgroundColor: border, height: 1, width: "100%" },
             }),
             container({
               children: [
                 repo
-                  ? text(repo, { color: MUTED, fontSize: 22 })
+                  ? text(repo, { color: muted, fontSize: 22 })
                   : container({}),
                 site
-                  ? text(site, { color: FAINT, fontSize: 22 })
+                  ? text(site, { color: faint, fontSize: 22 })
                   : container({}),
               ],
               style: {
@@ -227,8 +254,8 @@ export const renderOgImage = (options: OgCardOptions): Promise<Buffer> => {
   const node = container({
     children: [header, body, footer],
     style: {
-      backgroundColor: BG,
-      color: FOREGROUND,
+      backgroundColor: background,
+      color: foreground,
       display: "flex",
       flexDirection: "column",
       height: HEIGHT,

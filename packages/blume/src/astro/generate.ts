@@ -37,6 +37,7 @@ import { resolveDocsCollection } from "../core/sources/resolve.ts";
 import { resolveTsconfigAliases } from "../core/tsconfig-aliases.ts";
 import type { Navigation } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
+import { resolveOgLogo } from "../og/logo.ts";
 import { hasScalarReferences, referenceTabs } from "../openapi/references.ts";
 import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
@@ -779,6 +780,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     ? `https://github.com/${github.owner}/${github.repo}`
     : null;
   const editBase = github ? `${repoUrl}/edit/${github.branch}` : null;
+  const logo = resolveLogo(project);
+  const ogLogo = config.seo.og.logo
+    ? resolveOgLogo(project, config.seo.og.logo)
+    : logo?.svg;
 
   const editUrlFor = (sourcePath?: string): string | null => {
     if (!(editBase && sourcePath)) {
@@ -865,7 +870,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
           }
         : null,
       imageZoom: config.markdown.imageZoom,
-      logo: resolveLogo(project),
+      logo,
       mcp: config.ai.mcp.enabled
         ? {
             name: config.ai.mcp.name ?? config.title,
@@ -874,7 +879,11 @@ export const buildRuntimeData = (project: BlumeProject): string => {
         : null,
       // `og.enabled` is resolved to a definite boolean in `loadConfig`; coerce
       // the optional schema type so the serialized shape stays `boolean`.
-      og: { enabled: config.seo.og.enabled ?? false },
+      og: {
+        enabled: config.seo.og.enabled ?? false,
+        logo: ogLogo,
+        palette: config.seo.og.palette,
+      },
       repoUrl,
       search: {
         enabled: config.search.provider !== "none",

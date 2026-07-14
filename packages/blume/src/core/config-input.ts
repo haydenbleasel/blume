@@ -711,6 +711,34 @@ export interface RssConfig {
   types?: string[];
 }
 
+/** Colors used by generated Open Graph cards. Values must be hex colors. */
+export interface OgPaletteConfig {
+  /** Fallback mark color. Defaults to the light theme accent. */
+  accent?: string;
+  /** Card background. */
+  background?: string;
+  /** Footer divider. */
+  border?: string;
+  /** Headline and `currentColor` logo color. */
+  foreground?: string;
+  /** Description and footer text. */
+  muted?: string;
+}
+
+/** Per-page Open Graph image generation. */
+export interface OgConfig {
+  /**
+   * Generate an OG image per page. Defaults to on once a deployment `site`
+   * URL is known and off otherwise (`og:image` must be absolute). An explicit
+   * value always wins.
+   */
+  enabled?: boolean;
+  /** Local SVG used in the generated card instead of the site logo. */
+  logo?: string;
+  /** Optional generated-card colors. */
+  palette?: OgPaletteConfig;
+}
+
 /** Discoverability: OG images, feeds, sitemap, robots, and structured data. */
 export interface SeoConfig {
   /**
@@ -721,14 +749,7 @@ export interface SeoConfig {
   /** robots.txt `Content-Signal` usage declaration. Defaults to `true`. */
   contentSignals?: ContentSignalsConfig;
   /** Per-page Open Graph image generation. */
-  og?: {
-    /**
-     * Generate an OG image per page. Defaults to on once a deployment `site`
-     * URL is known and off otherwise (`og:image` must be absolute). An explicit
-     * value always wins.
-     */
-    enabled?: boolean;
-  };
+  og?: OgConfig;
   /** Generate robots.txt (with a Sitemap reference when available). Defaults to `true`. */
   robots?: boolean;
   /** RSS/Atom feeds. */

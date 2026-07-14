@@ -293,6 +293,52 @@ describe("buildRuntimeData", () => {
     const data = JSON.parse(buildRuntimeData(project));
     expect(data.config.logo.svg).toContain('id="brand"');
     expect(data.config.logo.href).toBe("/");
+    expect(data.config.og.logo).toContain('id="brand"');
+  });
+
+  it("resolves custom Open Graph branding", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  seo: {
+    og: {
+      logo: "/og-logo.svg",
+      palette: {
+        accent: "#ff5410",
+        background: "#1d1d1d",
+        border: "#323232",
+        foreground: "#fff6f2",
+        muted: "#a6a19f",
+      },
+    },
+  },
+};
+`,
+        "docs/index.md": "# Home\n",
+        "public/og-logo.svg": '<svg id="og-brand"></svg>',
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.og.logo).toContain('id="og-brand"');
+    expect(data.config.og.palette).toEqual({
+      accent: "#ff5410",
+      background: "#1d1d1d",
+      border: "#323232",
+      foreground: "#fff6f2",
+      muted: "#a6a19f",
+    });
+  });
+
+  it("ignores a non-SVG Open Graph logo", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts":
+          'export default { seo: { og: { logo: "/logo.png" } } };\n',
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.og.logo).toBeUndefined();
   });
 
   it("falls back to an <img> logo when the SVG file is absent", async () => {
