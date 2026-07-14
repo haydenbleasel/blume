@@ -158,6 +158,14 @@ describe("tailwindEntryTemplate", () => {
     expect(entry).toContain('[data-theme="dark"]');
   });
 
+  it("matches native controls to the active color theme", () => {
+    expect(entry).toContain(`html {
+    color-scheme: light;`);
+    expect(entry).toContain(`html[data-theme="dark"] {
+    color-scheme: dark;
+  }`);
+  });
+
   it("appends config tokens before the user theme (user wins)", () => {
     const configAt = entry.indexOf("--blume-accent: red;");
     const userAt = entry.indexOf(".prose { color: green; }");

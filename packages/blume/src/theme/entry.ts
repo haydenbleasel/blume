@@ -159,9 +159,13 @@ ${THEME_MAPPING}
     cursor: pointer;
   }
   html {
+    color-scheme: light;
     scroll-behavior: smooth;
     scroll-padding-top: 4.5rem;
     text-rendering: optimizeLegibility;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
   }
   /* Headings use the display font (defaults to the body font when unset). */
   h1,
