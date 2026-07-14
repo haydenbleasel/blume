@@ -816,6 +816,17 @@ describe("highlightCode", () => {
     expect(html).toContain('data-title="file.ts"');
   });
 
+  it("omits data-language on the header-less path so the icon gate hides it", async () => {
+    // The icon transformer still runs (data-icon is set), but without a title
+    // there's no header bar (data-language), so the theme's `pre[data-language]
+    // [data-icon]` gate keeps the absolutely-positioned icon from overlapping
+    // the first code line. See https://github.com/haydenbleasel/blume/issues/56
+    const html = await highlightCode("const x = 1;", "ts");
+    expect(html).not.toContain("data-language");
+    expect(html).toContain("data-icon");
+    expect(html).toContain("blume-lang-icon");
+  });
+
   it("applies an extra className to the <pre>", async () => {
     const html = await highlightCode("const x = 1;", "ts", {
       className: "blume-source",
