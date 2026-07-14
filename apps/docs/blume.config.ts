@@ -1,6 +1,9 @@
 import { defineConfig } from "blume";
 
 export default defineConfig({
+  ai: {
+    llmsTxt: { openapi: false },
+  },
   analytics: {
     vercel: true,
   },
@@ -35,9 +38,20 @@ export default defineConfig({
   lastModified: true,
   logo: "/logo.svg",
   navigation: {
+    generatedTabs: false,
     tabs: [
       { label: "Docs", path: "/docs" },
       { label: "Changelog", path: "/changelog" },
+    ],
+  },
+  openapi: {
+    enabled: true,
+    route: "/api",
+    sources: [
+      {
+        label: "Example API",
+        spec: "https://petstore3.swagger.io/api/v3/openapi.json",
+      },
     ],
   },
   seo: {

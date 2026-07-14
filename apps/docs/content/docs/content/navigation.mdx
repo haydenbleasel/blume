@@ -109,6 +109,17 @@ navigation: {
 }
 ```
 
+Enabled OpenAPI and AsyncAPI references are added as header tabs automatically. Set `generatedTabs: false` to render only your explicit tabs while keeping generated destinations available at their routes:
+
+```ts blume.config.ts
+navigation: {
+  generatedTabs: false,
+  tabs: [
+    { label: "Docs", path: "/docs" },
+  ],
+}
+```
+
 Tabs also **scope the sidebar**: when the current route falls under a tab's `path`, the sidebar shows only that section's pages — so `/adapters/*` lists the adapters and nothing else. The folder at a tab's `path` becomes the section, so this needs no extra config beyond the tabs themselves; structure your content into a folder per tab and point each tab at it.
 
 On a route under no tab (or a tab whose `path` is `/`), the sidebar shows the pages that _don't_ belong to a tab — each tab's folder is hidden from it, since that section already has its own tab in the header. So a root landing page lists your loose top-level pages while the sectioned content stays behind its tab, mirroring Fumadocs' root folders. If a route has no pages of its own to show this way, the full tree is shown instead, so the sidebar is never left blank.
