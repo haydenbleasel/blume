@@ -16,6 +16,15 @@ interface TailwindEntryOptions {
 const DARK_VARIANT = `/* Dark mode is driven by data-theme on the <html> element. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));`;
 
+/** Keep browser-provided UI in sync with the active theme in both sheets. */
+const COLOR_SCHEME_DEFAULTS = `:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}`;
+
 /**
  * The default `--blume-*` design tokens (light + dark), shared by the app
  * sheet and the isolated example-preview sheet so previews inherit the site's
@@ -141,6 +150,8 @@ ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 
 ${DARK_VARIANT}
 
+${COLOR_SCHEME_DEFAULTS}
+
 ${TOKEN_DEFAULTS}
 
 ${THEME_MAPPING}
@@ -159,13 +170,9 @@ ${THEME_MAPPING}
     cursor: pointer;
   }
   html {
-    color-scheme: light;
     scroll-behavior: smooth;
     scroll-padding-top: 4.5rem;
     text-rendering: optimizeLegibility;
-  }
-  html[data-theme="dark"] {
-    color-scheme: dark;
   }
   /* Headings use the display font (defaults to the body font when unset). */
   h1,
@@ -720,6 +727,8 @@ export const examplesEntryTemplate = (options: ExamplesEntryOptions): string =>
 ${options.sources.map((source) => `@source "${source}";`).join("\n")}
 
 ${DARK_VARIANT}
+
+${COLOR_SCHEME_DEFAULTS}
 
 ${TOKEN_DEFAULTS}
 
