@@ -27,10 +27,10 @@ import { BANNER_INIT_SCRIPT, THEME_INIT_SCRIPT } from "./head-scripts.ts";
 import Header from "./Header.astro";
 import Icon from "../Icon.astro";
 import {
+  activeTabForRoute,
   findBreadcrumbs,
   flattenPages,
   getPagination,
-  isUnderPath,
   sidebarForRoute,
 } from "./nav-utils.ts";
 import NavTree from "./NavTree.astro";
@@ -307,6 +307,7 @@ const mcpUrl =
 // active tab's section, so a multi-section site drills each tab into its own
 // pages. Without tabs — or on a route under none — this is the full sidebar.
 const sidebar = sidebarForRoute(navigation.sidebar, navigation.tabs, page.route);
+const activeTab = activeTabForRoute(navigation.tabs, page.route);
 const crumbs = findBreadcrumbs(sidebar, page.route);
 const { prev, next } = getPagination(flattenPages(sidebar), page.route);
 
@@ -526,12 +527,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
                 {navigation.tabs.map((tab) => (
                   <li>
                     <a
-                      aria-current={
-                        page.route === tab.path ||
-                        (tab.path !== "/" && isUnderPath(page.route, tab.path))
-                          ? "page"
-                          : undefined
-                      }
+                      aria-current={tab === activeTab ? "page" : undefined}
                       class="block rounded-[0.65rem] px-2.5 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
                       href={withBase(tab.path)}
                     >

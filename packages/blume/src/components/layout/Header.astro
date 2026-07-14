@@ -10,7 +10,7 @@ import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
 import LanguageSwitcher from "./LanguageSwitcher.astro";
 import Logo from "./Logo.astro";
-import { isUnderPath } from "./nav-utils.ts";
+import { activeTabForRoute } from "./nav-utils.ts";
 import NavSelector from "./NavSelector.astro";
 import { resolveSlot } from "./overrides.ts";
 import Search from "./Search.astro";
@@ -94,6 +94,7 @@ const SearchSlot = resolveSlot(layout.Search, Search);
 // PageLayout) it's a tabs-only drawer the layout renders — so the button is also
 // needed whenever there are tabs to reveal.
 const showNavToggle = hasDrawer && (hasSidebar || navigation.tabs.length > 0);
+const activeTab = activeTabForRoute(navigation.tabs, route);
 // Where the header's inline tab bar appears. With a sidebar it shares the `md`
 // breakpoint with the docs drawer; without one, the tabs-only drawer is the sole
 // mobile nav below `lg`, so the inline tabs wait until `lg` to avoid duplicating
@@ -155,12 +156,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
       <nav aria-label={n.sections} class={tabsNavClass}>
         {navigation.tabs.map((tab) => (
           <a
-            aria-current={
-              route === tab.path ||
-              (tab.path !== "/" && isUnderPath(route, tab.path))
-                ? "page"
-                : undefined
-            }
+            aria-current={tab === activeTab ? "page" : undefined}
             class="rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground"
             href={withBase(tab.path)}
           >

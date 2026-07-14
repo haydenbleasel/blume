@@ -80,14 +80,16 @@ export const isUnderPath = (route: string, base: string): boolean =>
   base === "/" || route === base || route.startsWith(`${base}/`);
 
 /**
- * The tab whose `path` is the longest prefix of `route`, mirroring the header's
- * active-tab highlight. The root tab (`/`) is skipped — it spans everything and
- * so never scopes the sidebar.
+ * The tab whose `path` is the longest prefix of `route`. The root tab (`/`)
+ * acts as the fallback when no more specific tab matches.
  */
-const activeTab = (tabs: NavTab[], route: string): NavTab | null => {
+export const activeTabForRoute = (
+  tabs: NavTab[],
+  route: string
+): NavTab | null => {
   let match: NavTab | null = null;
   for (const tab of tabs) {
-    if (tab.path === "/" || !isUnderPath(route, tab.path)) {
+    if (!isUnderPath(route, tab.path)) {
       continue;
     }
     if (!match || tab.path.length > match.path.length) {
@@ -187,8 +189,8 @@ export const sidebarForRoute = (
   tabs: NavTab[],
   route: string
 ): NavNode[] => {
-  const tab = activeTab(tabs, route);
-  if (tab) {
+  const tab = activeTabForRoute(tabs, route);
+  if (tab && tab.path !== "/") {
     return sectionChildren(sidebar, tab.path) ?? [];
   }
   const scoped = withoutTabSections(sidebar, tabs);

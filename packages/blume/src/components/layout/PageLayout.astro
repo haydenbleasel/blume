@@ -39,7 +39,7 @@ import Favicon from "./Favicon.astro";
 import Fonts from "./Fonts.astro";
 import { BANNER_INIT_SCRIPT, THEME_INIT_SCRIPT } from "./head-scripts.ts";
 import Header from "./Header.astro";
-import { isUnderPath } from "./nav-utils.ts";
+import { activeTabForRoute } from "./nav-utils.ts";
 
 interface Props {
   site: { title: string; description?: string };
@@ -137,6 +137,7 @@ const searchLocale =
 const pageTitle = page?.title ?? site.title;
 const description = page?.description ?? site.description;
 const route = page?.route ?? "/";
+const activeTab = activeTabForRoute(navigation.tabs, route);
 
 // Derive canonical + og:image from the site URL the same way the catch-all does
 // for content pages, so a custom page gets both for free. The matching OG card
@@ -267,12 +268,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
                 {navigation.tabs.map((tab) => (
                   <li>
                     <a
-                      aria-current={
-                        route === tab.path ||
-                        (tab.path !== "/" && isUnderPath(route, tab.path))
-                          ? "page"
-                          : undefined
-                      }
+                      aria-current={tab === activeTab ? "page" : undefined}
                       class="block rounded-[0.65rem] px-2.5 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
                       href={withBase(tab.path)}
                     >

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
-import { sidebarForRoute } from "../src/components/layout/nav-utils.ts";
+import {
+  activeTabForRoute,
+  sidebarForRoute,
+} from "../src/components/layout/nav-utils.ts";
 import type { NavNode, NavTab } from "../src/core/types.ts";
 
 const page = (label: string, route: string): NavNode => ({
@@ -32,6 +35,28 @@ const TABS: NavTab[] = [
 ];
 
 const labels = (nodes: NavNode[]): string[] => nodes.map((node) => node.label);
+
+describe("activeTabForRoute", () => {
+  it("uses the root tab as a fallback for child routes", () => {
+    const documentation: NavTab = { label: "Documentation", path: "/" };
+    const examples: NavTab = { label: "Examples", path: "/examples" };
+    const tabs = [documentation, examples];
+
+    expect(activeTabForRoute(tabs, "/guides/services")).toBe(documentation);
+  });
+
+  it("prefers the longest matching tab path", () => {
+    const documentation: NavTab = { label: "Documentation", path: "/" };
+    const examples: NavTab = { label: "Examples", path: "/examples" };
+    const tabs = [documentation, examples];
+
+    expect(activeTabForRoute(tabs, "/examples/hello-world")).toBe(examples);
+  });
+
+  it("returns null when no tab matches", () => {
+    expect(activeTabForRoute(TABS, "/changelog")).toBeNull();
+  });
+});
 
 describe("sidebarForRoute", () => {
   it("scopes to the active tab's section group", () => {
