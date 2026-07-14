@@ -797,7 +797,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
   const withReferenceTabs = (nav: Navigation): Navigation => ({
     ...nav,
     repoUrl: config.navigation.repo && repoUrl ? repoUrl : null,
-    tabs: [...nav.tabs, ...referenceTabs(config)],
+    tabs: config.navigation.generatedTabs
+      ? [...nav.tabs, ...referenceTabs(config)]
+      : nav.tabs,
   });
 
   // Resolved UI dictionaries: one per locale under i18n, English baseline

@@ -14,6 +14,7 @@ import {
   flattenPages,
   getPagination,
 } from "../src/components/layout/nav-utils.ts";
+import type { NavigationConfig } from "../src/core/config-input.ts";
 import { extractHeadings, slugify } from "../src/core/content.ts";
 import { buildContentGraph } from "../src/core/graph.ts";
 import { buildManifest } from "../src/core/manifest.ts";
@@ -27,6 +28,9 @@ import { referenceTabs, resolveReferences } from "../src/openapi/references.ts";
 import { buildReferenceFiles } from "../src/openapi/scalar.ts";
 import { buildStructuredData } from "../src/seo/jsonld.ts";
 import { normalizeXHandle } from "../src/seo/x-handle.ts";
+
+const tabLabels = (tabs: NonNullable<NavigationConfig["tabs"]>): string[] =>
+  tabs.map((tab) => tab.label);
 
 const makePage = (
   over: Pick<PageRecord, "id" | "route" | "title"> & Partial<PageRecord>
@@ -956,6 +960,30 @@ describe("agent-readability.json", () => {
 });
 
 describe("api reference (scalar)", () => {
+  it("exposes configured navigation tabs as an array", () => {
+    expect(tabLabels([{ label: "Docs", path: "/docs" }])).toStrictEqual([
+      "Docs",
+    ]);
+  });
+
+  it("enables generated navigation tabs by default", () => {
+    const config = blumeConfigSchema.parse({});
+    expect(config.navigation.generatedTabs).toBe(true);
+  });
+
+  it("supports disabling generated navigation tabs", () => {
+    const config = blumeConfigSchema.parse({
+      navigation: {
+        generatedTabs: false,
+        tabs: [{ label: "Docs", path: "/docs" }],
+      },
+    });
+    expect(config.navigation.generatedTabs).toBe(false);
+    expect(config.navigation.tabs).toStrictEqual([
+      { label: "Docs", path: "/docs" },
+    ]);
+  });
+
   it("defaults openapi and asyncapi to disabled with sensible routes", () => {
     const config = blumeConfigSchema.parse({});
     expect(config.openapi.enabled).toBeFalsy();
