@@ -433,6 +433,43 @@ const buildConfigSidebar = (
   return nodes;
 };
 
+/**
+ * Resolve a tab's clickable target. A tab's `path` scopes its sidebar section
+ * but need not be a real route — a section with no index page would 404 if the
+ * tab linked straight to it. Prefer an exact page/group at the path; otherwise
+ * fall back to the first linkable route in the section (sidebar order).
+ */
+const resolveTabHref = (sidebar: NavNode[], path: string): string => {
+  let first: string | undefined;
+  const walk = (nodes: NavNode[]): boolean => {
+    for (const node of nodes) {
+      const { route } = node;
+      if (route === path) {
+        return true;
+      }
+      if (
+        first === undefined &&
+        route !== undefined &&
+        route.startsWith(`${path}/`)
+      ) {
+        first = route;
+      }
+      if (node.kind === "group" && walk(node.children)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  return walk(sidebar) ? path : (first ?? path);
+};
+
+/** Attach a resolved `href` to each tab whose section has no index page. */
+const withTabHrefs = (tabs: NavTab[], sidebar: NavNode[]): NavTab[] =>
+  tabs.map((tab) => {
+    const href = resolveTabHref(sidebar, tab.path);
+    return href === tab.path ? tab : { ...tab, href };
+  });
+
 /** Build the complete navigation model from pages, meta, and config. */
 export const buildNavigation = (
   pages: PageRecord[],
@@ -519,11 +556,17 @@ export const buildNavigation = (
   }
 
   if (options.sidebar) {
+    const sidebar = buildConfigSidebar(
+      options.sidebar,
+      byRoute,
+      display,
+      basePath
+    );
     return {
       featured,
       selectors,
-      sidebar: buildConfigSidebar(options.sidebar, byRoute, display, basePath),
-      tabs,
+      sidebar,
+      tabs: withTabHrefs(tabs, sidebar),
     };
   }
 
@@ -534,19 +577,18 @@ export const buildNavigation = (
   // prefix (`/docs`, `/fr`) and a bare `"/"` check would miss the match (or,
   // under a base, falsely scope a group named like the prefix).
   const rootTabPath = withBasePath(basePath, options.localizedRoot ?? "/");
+  const sidebar = buildFileSystemSidebar(
+    pages,
+    options.folderMeta,
+    sharedFolderMeta,
+    metaPrefix,
+    display,
+    new Set(tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path])))
+  );
   return {
     featured,
     selectors,
-    sidebar: buildFileSystemSidebar(
-      pages,
-      options.folderMeta,
-      sharedFolderMeta,
-      metaPrefix,
-      display,
-      new Set(
-        tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path]))
-      )
-    ),
-    tabs,
+    sidebar,
+    tabs: withTabHrefs(tabs, sidebar),
   };
 };

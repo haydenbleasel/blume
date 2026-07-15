@@ -158,7 +158,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
           <a
             aria-current={tab === activeTab ? "page" : undefined}
             class="rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground"
-            href={withBase(tab.path)}
+            href={withBase(tab.href ?? tab.path)}
           >
             {tab.label}
           </a>

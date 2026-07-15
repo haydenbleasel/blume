@@ -159,7 +159,17 @@ export type NavNode =
 /** Top-level tab/section. */
 export interface NavTab {
   label: string;
+  /**
+   * The tab's section prefix, used to scope the sidebar and match the active
+   * tab. Not necessarily a linkable route — a section may have no index page.
+   */
   path: string;
+  /**
+   * The clickable target. Equals `path` when the section has an index page;
+   * otherwise it's resolved to the section's first page so the tab never links
+   * to a 404. Absent when it matches `path`.
+   */
+  href?: string;
   icon?: string;
   items?: NavSelectorItem[];
 }

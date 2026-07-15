@@ -231,6 +231,39 @@ describe("buildNavigation — filesystem sidebar", () => {
     );
   });
 
+  it("resolves a tab with no index page to its first section page", () => {
+    // `/examples` has no index page, so linking straight to it would 404. The
+    // tab should resolve to the first page shown in the section (sidebar order).
+    const folderMeta = new Map<string, FolderMeta>([
+      ["examples", { order: 0, pages: ["hello-world", "goodbye"] }],
+    ]);
+    const nav = buildNavigation(
+      [
+        page("examples/goodbye.mdx", "/examples/goodbye", "Goodbye"),
+        page(
+          "examples/hello-world.mdx",
+          "/examples/hello-world",
+          "Hello World"
+        ),
+      ],
+      { folderMeta, tabs: [{ label: "Examples", path: "/examples" }] }
+    );
+    const firstPage = asPage(asGroup(nav.sidebar[0]).children[0]);
+    expect(firstPage.route).toBe("/examples/hello-world");
+    expect(nav.tabs[0]?.href).toBe("/examples/hello-world");
+  });
+
+  it("leaves a tab's href unset when its section has an index page", () => {
+    const nav = buildNavigation(
+      [
+        page("docs/index.mdx", "/docs", "Overview"),
+        page("docs/usage.mdx", "/docs/usage", "Usage"),
+      ],
+      { folderMeta: empty, tabs: [{ label: "Docs", path: "/docs" }] }
+    );
+    expect(nav.tabs[0]?.href).toBeUndefined();
+  });
+
   it("applies folder meta: title, collapsed, and explicit page order", () => {
     const folderMeta = new Map<string, FolderMeta>([
       [
