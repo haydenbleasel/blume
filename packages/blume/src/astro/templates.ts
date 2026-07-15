@@ -80,6 +80,30 @@ const ADAPTER_OPTIONS: Record<string, string> = {
   node: '{ mode: "standalone" }',
 };
 
+const WRANGLER_CONFIG_FILES = [
+  "wrangler.jsonc",
+  "wrangler.json",
+  "wrangler.toml",
+];
+
+const resolveCloudflareAdapterArgs = (context: ProjectContext): string => {
+  const args: string[] = ['prerenderEnvironment: "node"'];
+  const wranglerPath = WRANGLER_CONFIG_FILES.map((file) =>
+    join(context.root, file)
+  ).find((file) => existsSync(file));
+  if (wranglerPath) {
+    let configPath = relative(context.outDir, wranglerPath);
+    // The wrangler config always lives at the project root, above the `.blume`
+    // runtime, so `relative` yields a `../…` path; normalize the theoretical
+    // sibling case to an explicit `./` so it reads as a relative import.
+    if (!configPath.startsWith(".") && !configPath.startsWith("/")) {
+      configPath = `./${configPath}`;
+    }
+    args.push(`configPath: ${JSON.stringify(configPath)}`);
+  }
+  return `{ ${args.join(", ")} }`;
+};
+
 /**
  * Integration packages the generated runtime imports. Declaring them in
  * `.blume/package.json` lets Astro's framework-package crawl discover and bundle
@@ -263,10 +287,15 @@ export const astroConfigTemplate = (options: {
     server && deployment.adapter
       ? `import adapter from "${ADAPTER_IMPORTS[deployment.adapter]}";\n`
       : "";
-  const adapterArgs =
-    server && deployment.adapter
-      ? (ADAPTER_OPTIONS[deployment.adapter] ?? "")
-      : "";
+  const adapterArgs = (() => {
+    if (!server || !deployment.adapter) {
+      return "";
+    }
+    if (deployment.adapter === "cloudflare") {
+      return resolveCloudflareAdapterArgs(context);
+    }
+    return ADAPTER_OPTIONS[deployment.adapter] ?? "";
+  })();
   const adapterOption =
     server && deployment.adapter ? `\n  adapter: adapter(${adapterArgs}),` : "";
 

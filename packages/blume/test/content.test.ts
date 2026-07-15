@@ -123,9 +123,21 @@ describe("discoverFolderMeta", () => {
   });
 
   it("reports a load failure for a meta module that throws", async () => {
-    const { diagnostics } = await discoverFolderMeta(root);
+    // Isolated root so the throwing module is imported exactly once. jiti caches
+    // an errored module by path and returns empty exports without re-throwing on
+    // a second import, so reusing the shared `root` (where an earlier test already
+    // consumed the throw) would silently pass with no diagnostics here.
+    const throwRoot = await mkdtemp(join(tmpdir(), "blume-content-"));
+    await mkdir(join(throwRoot, "broken"), { recursive: true });
+    await writeFile(
+      join(throwRoot, "broken", "meta.ts"),
+      'throw new Error("boom");\n'
+    );
+    const { diagnostics } = await discoverFolderMeta(throwRoot);
 
     expect(diagnostics.map((d) => d.code)).toContain("BLUME_META_LOAD_FAILED");
+
+    await rm(throwRoot, { force: true, recursive: true });
   });
 
   it("never descends into node_modules", async () => {
