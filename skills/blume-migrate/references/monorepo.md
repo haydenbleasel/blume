@@ -145,7 +145,7 @@ If the repo uses **Turborepo**, you can instead build through the root pipeline 
 
 Report every piece you wrote and the two dashboard settings the user must set by hand (Root Directory, Node version) — those can't be committed.
 
-Redirects still work as normal: a static build emits `vercel.json` redirect rules into `dist/`. If you commit your own `apps/docs/vercel.json` (as above), Blume leaves a `public/vercel.json` untouched — so put redirect overrides in `public/vercel.json`, not the project-root one, to avoid a collision. (Most migrations use `blume.config.ts` `redirects` and never touch this.)
+**Redirect caveat on this deploy path:** a static build emits `vercel.json` redirect rules into `dist/`, but Vercel's **git-integration** builds read `vercel.json` only from the project's Root Directory — the copy inside `dist/` is honored only when the dist folder is deployed directly via the Vercel CLI. On the §4 setup, `blume.config.ts` redirects still work (Blume also emits per-route meta-refresh pages), but they're soft redirects, not real 3xx. If real 3xx responses matter (SEO for a large moved site), copy the generated redirect rules from `dist/vercel.json` after a build into the committed `apps/docs/vercel.json`'s `redirects` array, and note they must be re-synced when `redirects` change. (Most migrations are fine with the soft fallback — say which you chose.)
 
 ---
 
