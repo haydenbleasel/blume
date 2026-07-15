@@ -128,6 +128,24 @@ describe("renderOgImage", () => {
     await expectPng({ accent: "#12345", brand: "Acme", title: "Hi" });
     // A prototype member name must not resolve up the chain either.
     await expectPng({ accent: "constructor", brand: "Acme", title: "Hi" });
+    // Malformed oklch is screened out the same way.
+    await expectPng({ accent: "oklch(bogus)", brand: "Acme", title: "Hi" });
+  });
+
+  it("passes an oklch accent through to the initial mark", async () => {
+    // Takumi v2 parses oklch; a theme accent token must color the mark rather
+    // than fall back to the default blue.
+    const oklch = await renderOgImage({
+      accent: "oklch(0.7 0.15 200)",
+      brand: "Acme",
+      title: "Hi",
+    });
+    const fallback = await renderOgImage({
+      accent: "not-a-color",
+      brand: "Acme",
+      title: "Hi",
+    });
+    expect(Buffer.from(oklch).equals(Buffer.from(fallback))).toBe(false);
   });
 
   it("paints an xmlns-less logo instead of silently rendering blank", async () => {

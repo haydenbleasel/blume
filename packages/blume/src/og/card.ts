@@ -16,15 +16,23 @@ const ACCENT_HEX: Record<string, string> = {
 
 const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu;
 
-// Named presets map to hex, well-formed hex passes through, anything else
-// falls back — a malformed color would throw inside Takumi and fail the build
-// at OG prerender with an opaque native error. `hasOwn` keeps a preset name
-// like "constructor" from resolving up the prototype chain.
+// Loose oklch shape: number-or-percentage L, numeric C, numeric-or-angle H,
+// optional alpha. Enough to admit theme accent tokens while screening out the
+// typos Takumi would reject.
+const OKLCH_COLOR =
+  /^oklch\(\s*[\d.]+%?\s+[\d.]+\s+[\d.]+(?:deg)?\s*(?:\/\s*[\d.]+%?\s*)?\)$/iu;
+
+// Named presets map to hex; well-formed hex or oklch passes through, anything
+// else falls back — a malformed color would throw inside Takumi and fail the
+// build at OG prerender with an opaque native error. `hasOwn` keeps a preset
+// name like "constructor" from resolving up the prototype chain.
 const resolveAccent = (accent: string): string => {
   if (Object.hasOwn(ACCENT_HEX, accent)) {
     return ACCENT_HEX[accent] as string;
   }
-  return HEX_COLOR.test(accent) ? accent : "#3b82f6";
+  return HEX_COLOR.test(accent) || OKLCH_COLOR.test(accent)
+    ? accent
+    : "#3b82f6";
 };
 
 const resolveColor = (color: string | undefined, fallback: string): string =>
@@ -119,8 +127,9 @@ const logoAspect = (svg: string): number | null => {
 // Render the configured logo as the brand mark. A `currentColor` logo carries
 // no intrinsic color, so it is painted in the foreground to read on the light
 // card, then handed to Takumi as a data URI sized from the SVG's aspect ratio.
-// Takumi's SVG parser silently renders nothing without a root `xmlns`, which
-// inline logos routinely omit, so one is injected when missing.
+// Takumi 2.2 silently renders nothing without a root `xmlns` (accepted
+// upstream after 2.2.0), which inline logos routinely omit, so one is
+// injected when missing.
 const logoMark = (svg: string, foreground: string): Node => {
   let painted = svg.replaceAll("currentColor", foreground);
   if (!/<svg[^>]*\sxmlns=/u.test(painted)) {
