@@ -59,7 +59,15 @@ const secondaryButton =
               data-blume-prompt-copy
               type="button"
             >
-              <span data-blume-prompt-copy-label>Copy prompt</span>
+              {/* Both labels share one grid cell so the button is always sized
+                  to the wider ("Copy prompt") — swapping to "Copied" on copy
+                  can't resize it and shift the description beside it. */}
+              <span class="grid *:col-start-1 *:row-start-1 *:text-center">
+                <span data-blume-prompt-copy-idle>Copy prompt</span>
+                <span aria-hidden="true" class="invisible" data-blume-prompt-copy-done>
+                  Copied
+                </span>
+              </span>
             </button>
           )}
           {enabledActions.has("cursor") && (
@@ -99,6 +107,13 @@ const secondaryButton =
       const copy = this.querySelector<HTMLButtonElement>(
         "[data-blume-prompt-copy]"
       );
+      const idle = copy?.querySelector<HTMLElement>(
+        "[data-blume-prompt-copy-idle]"
+      );
+      const done = copy?.querySelector<HTMLElement>(
+        "[data-blume-prompt-copy-done]"
+      );
+      let resetTimer: ReturnType<typeof setTimeout> | undefined;
       copy?.addEventListener("click", async () => {
         const text = promptText();
         if (!text) {
@@ -110,18 +125,15 @@ const secondaryButton =
           return;
         }
 
-        const label = copy.querySelector<HTMLElement>(
-          "[data-blume-prompt-copy-label]"
-        );
-        if (!label) {
-          return;
-        }
-        // Remember the real label once — capturing at click time would
-        // capture "Copied" on a double-click and stick until reload.
-        label.dataset.blumeLabel ??= label.textContent ?? "Copy prompt";
-        label.textContent = "Copied";
-        setTimeout(() => {
-          label.textContent = label.dataset.blumeLabel ?? "Copy prompt";
+        // Toggle visibility rather than swapping text: both labels occupy the
+        // same grid cell, so the button width never changes. Clearing the timer
+        // keeps the "Copied" state 1.5s past the last of several rapid clicks.
+        clearTimeout(resetTimer);
+        idle?.classList.add("invisible");
+        done?.classList.remove("invisible");
+        resetTimer = setTimeout(() => {
+          idle?.classList.remove("invisible");
+          done?.classList.add("invisible");
         }, 1500);
       });
     }
