@@ -2,4 +2,4 @@
 "blume": patch
 ---
 
-Accept oklch OG accent colors
+Accept any CSS color for the OG card accent

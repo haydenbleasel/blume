@@ -14,29 +14,13 @@ const ACCENT_HEX: Record<string, string> = {
   teal: "#14b8a6",
 };
 
-const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu;
-
-// Loose oklch shape: number-or-percentage L, numeric C, numeric-or-angle H,
-// optional alpha. Enough to admit theme accent tokens while screening out the
-// typos Takumi would reject.
-const OKLCH_COLOR =
-  /^oklch\(\s*[\d.]+%?\s+[\d.]+\s+[\d.]+(?:deg)?\s*(?:\/\s*[\d.]+%?\s*)?\)$/iu;
-
-// Named presets map to hex; well-formed hex or oklch passes through, anything
-// else falls back — a malformed color would throw inside Takumi and fail the
-// build at OG prerender with an opaque native error. `hasOwn` keeps a preset
-// name like "constructor" from resolving up the prototype chain.
-const resolveAccent = (accent: string): string => {
-  if (Object.hasOwn(ACCENT_HEX, accent)) {
-    return ACCENT_HEX[accent] as string;
-  }
-  return HEX_COLOR.test(accent) || OKLCH_COLOR.test(accent)
-    ? accent
-    : "#3b82f6";
-};
-
-const resolveColor = (color: string | undefined, fallback: string): string =>
-  color && HEX_COLOR.test(color) ? color : fallback;
+// Named presets map to Blume's palette hex (the preset "blue" is not CSS
+// blue); anything else is handed to Takumi as-is — it parses the full CSS
+// color grammar, and a genuinely malformed value fails the build with a
+// parse error naming it. `hasOwn` keeps a preset name like "constructor"
+// from resolving up the prototype chain.
+const resolveAccent = (accent: string): string =>
+  Object.hasOwn(ACCENT_HEX, accent) ? (ACCENT_HEX[accent] as string) : accent;
 
 export interface OgCardPalette {
   accent?: string;
@@ -49,7 +33,7 @@ export interface OgCardPalette {
 export interface OgCardOptions {
   /** Large headline — the page title. */
   title: string;
-  /** Accent color (named preset or hex) for the fallback brand mark. */
+  /** Accent color (named preset or any CSS color) for the fallback brand mark. */
   accent?: string;
   /** Brand/site name shown in the top-left lockup. */
   brand?: string;
@@ -84,11 +68,11 @@ const resolvePalette = (
   options: OgCardOptions
 ): Required<OgCardPalette> & { faint: string } => ({
   accent: resolveAccent(options.palette?.accent ?? options.accent ?? "blue"),
-  background: resolveColor(options.palette?.background, BG),
-  border: resolveColor(options.palette?.border, BORDER),
-  faint: resolveColor(options.palette?.muted, FAINT),
-  foreground: resolveColor(options.palette?.foreground, FOREGROUND),
-  muted: resolveColor(options.palette?.muted, MUTED),
+  background: options.palette?.background ?? BG,
+  border: options.palette?.border ?? BORDER,
+  faint: options.palette?.muted ?? FAINT,
+  foreground: options.palette?.foreground ?? FOREGROUND,
+  muted: options.palette?.muted ?? MUTED,
 });
 
 /**

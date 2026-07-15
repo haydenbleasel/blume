@@ -122,30 +122,24 @@ describe("renderOgImage", () => {
     });
   });
 
-  it("falls back on a malformed hex accent instead of crashing Takumi", async () => {
-    // "#12345" (5 digits) used to pass straight through and throw a native
-    // InvalidArg inside the renderer, failing the whole build at prerender.
-    await expectPng({ accent: "#12345", brand: "Acme", title: "Hi" });
-    // A prototype member name must not resolve up the chain either.
-    await expectPng({ accent: "constructor", brand: "Acme", title: "Hi" });
-    // Malformed oklch is screened out the same way.
-    await expectPng({ accent: "oklch(bogus)", brand: "Acme", title: "Hi" });
+  it("hands non-preset accents to Takumi's CSS color parser", async () => {
+    // Anything beyond the named presets passes through verbatim; Takumi
+    // parses the full CSS color grammar.
+    await expectPng({ accent: "oklch(0.7 0.15 200)", brand: "A", title: "Hi" });
+    await expectPng({ accent: "rebeccapurple", brand: "A", title: "Hi" });
   });
 
-  it("passes an oklch accent through to the initial mark", async () => {
-    // Takumi v2 parses oklch; a theme accent token must color the mark rather
-    // than fall back to the default blue.
-    const oklch = await renderOgImage({
-      accent: "oklch(0.7 0.15 200)",
-      brand: "Acme",
-      title: "Hi",
-    });
-    const fallback = await renderOgImage({
-      accent: "not-a-color",
-      brand: "Acme",
-      title: "Hi",
-    });
-    expect(Buffer.from(oklch).equals(Buffer.from(fallback))).toBe(false);
+  it("fails the render on a malformed accent", () => {
+    // Deliberate fail-fast: a color typo surfaces as a build error naming the
+    // value instead of silently shipping a default-colored card.
+    expect(
+      renderOgImage({ accent: "#12345", brand: "Acme", title: "Hi" })
+    ).rejects.toThrow();
+    // A prototype member name must not resolve up the preset chain into a
+    // function; it reaches Takumi as a (rejected) color string instead.
+    expect(
+      renderOgImage({ accent: "constructor", brand: "Acme", title: "Hi" })
+    ).rejects.toThrow();
   });
 
   it("paints an xmlns-less logo instead of silently rendering blank", async () => {
