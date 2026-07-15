@@ -3,7 +3,7 @@ title: OpenAPI / AsyncAPI
 description: Drop in an OpenAPI spec and get a native API reference — one real page per operation, in your sidebar and search.
 ---
 
-Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, and generated code samples. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. These docs ship one: the [Example API](/api) reference is generated from the Petstore spec by the config below.
+Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, and generated code samples. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. The config below points Blume at the public Petstore spec as an example.
 
 ```ts blume.config.ts lineNumbers
 openapi: {
