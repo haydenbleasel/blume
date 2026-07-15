@@ -49,6 +49,8 @@ describe("ignoringWatchListener", () => {
     listener("change", ".blume/.astro/data-store.json.tmp");
     listener("change", "packages/x/node_modules/dep/index.js");
     listener("change", ".git/HEAD");
+    // The isolated check runtime is written while dev runs; it must not reload.
+    listener("change", ".blume-verify/src/generated/data.json");
     // Windows-style separators are handled too.
     listener("change", ".blume\\.astro\\settings.json");
     expect(calls).toBe(0);
@@ -73,6 +75,7 @@ describe("ignoringWatchListener", () => {
 
   it("always ships the loop-critical dirs in its default set", () => {
     expect(BLUME_WATCH_IGNORE_DIRS).toContain(".blume");
+    expect(BLUME_WATCH_IGNORE_DIRS).toContain(".blume-verify");
     expect(BLUME_WATCH_IGNORE_DIRS).toContain("node_modules");
     expect(BLUME_WATCH_IGNORE_DIRS).toContain(".git");
   });

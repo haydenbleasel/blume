@@ -349,7 +349,12 @@ describe("planComponentSlots", () => {
   it("returns empty maps when there is no components file", () => {
     const plan = planComponentSlots(null, null);
     expect(plan.wrappers).toEqual([]);
-    expect(plan.module).toContain("export const mdxComponents = {}");
+    expect(plan.module).toContain(
+      "export const mdxComponents: Record<string, ComponentOverride> = {}"
+    );
+    expect(plan.module).toContain(
+      "export const layoutOverrides: Record<string, ComponentOverride> = {}"
+    );
   });
 
   it("falls back to raw re-exports when analysis is null", () => {

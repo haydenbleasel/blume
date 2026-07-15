@@ -23,6 +23,11 @@ import type { WatchListener } from "node:fs";
  */
 export const BLUME_IGNORE_DIRS = [
   ".blume",
+  // The isolated `blume check --isolated` runtime. A sibling of `.blume`, it is
+  // written while a dev server runs; without this the content-layer watcher (or
+  // a `.`-rooted fs.watch) would treat its generation as a content change and
+  // reload — the very thing `--isolated` promises not to do.
+  ".blume-verify",
   ".cache",
   ".git",
   ".next",

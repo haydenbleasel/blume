@@ -354,7 +354,7 @@ describe("changelogIndexTemplate", () => {
     expect(out).toContain(
       "data.routes.map((route) => [route.entryId, route.path])"
     );
-    expect(out).toContain("href: routeByEntry.get(entry.id) ?? null");
+    expect(out).toContain("href: routeByEntry.get(entry.id) ?? undefined");
     expect(out).toContain("href={href}");
   });
 
