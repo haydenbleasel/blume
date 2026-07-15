@@ -453,10 +453,32 @@ blume-diff {
   font-size: 0.8125rem;
 }
 
-/* Scroll wide tables in place; the wrapper is added by the blume:table-wrap hast plugin. */
+/* Scroll wide tables in place; the wrapper is added by the blume:table-wrap hast
+   plugin. The border+radius frames the scroll viewport so a clipped wide table
+   reads as scrollable rather than cut off, and carries the table's vertical
+   rhythm (the inner table's own margin is zeroed so it fills the frame). */
 .blume-table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  margin: 1.5rem 0;
+  border: 1px solid var(--blume-border);
+  border-radius: var(--blume-radius);
+}
+.blume-table-scroll > table {
+  margin: 0;
+}
+/* Restore inner padding on every cell. Typography zeroes the first/last cell's
+   inline padding so a borderless table aligns to the prose margin; inside the
+   framed wrapper that leaves edge text touching the border. The :is() selector
+   outweighs Typography's :where()-scoped rules so the outer columns get it too. */
+.blume-table-scroll :is(th, td) {
+  padding: 0.5rem 0.75rem;
+}
+/* Keep column labels on one line so a two-word header does not wrap into a
+   ragged stack; the table just scrolls a little wider instead. Body cells keep
+   wrapping so a wide table stays a scroll away, not an endless horizontal run. */
+.blume-table-scroll th {
+  white-space: nowrap;
 }
 
 /* GFM renders cells as <td><code> directly, which the descendant form alone
