@@ -299,7 +299,7 @@ export const ensureDepsLink = async (
 
 /**
  * Vite plugin that makes Blume's externalized runtime deps (zod, shiki, sharp,
- * `@takumi-rs/core`, …) resolvable when Astro executes the static prerender
+ * `takumi-js`, …) resolvable when Astro executes the static prerender
  * bundle under an isolated linker (Bun's `isolated` mode, pnpm).
  *
  * Astro's static build emits a self-contained SSR bundle to

@@ -5,7 +5,7 @@ import type { OgCardOptions } from "../src/og/card.ts";
 
 const expectPng = async (options: OgCardOptions): Promise<void> => {
   const buffer = await renderOgImage(options);
-  expect(Buffer.isBuffer(buffer)).toBe(true);
+  expect(buffer).toBeInstanceOf(Uint8Array);
   expect(buffer.length).toBeGreaterThan(0);
 };
 

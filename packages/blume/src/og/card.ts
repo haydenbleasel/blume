@@ -1,15 +1,8 @@
-import { Renderer } from "@takumi-rs/core";
-import { container, image, text } from "@takumi-rs/helpers";
-import type { Node } from "@takumi-rs/helpers";
+import { render } from "takumi-js";
+import { container, image, text } from "takumi-js/helpers";
+import type { Node } from "takumi-js/helpers";
 
 import { OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH } from "./dimensions.ts";
-
-// Reuse one renderer (and its loaded default fonts) across all images.
-let renderer: Renderer | null = null;
-const getRenderer = (): Renderer => {
-  renderer ??= new Renderer();
-  return renderer;
-};
 
 const ACCENT_HEX: Record<string, string> = {
   blue: "#3b82f6",
@@ -23,11 +16,10 @@ const ACCENT_HEX: Record<string, string> = {
 
 const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu;
 
-// OG rendering uses hex (Takumi's color parser does not accept oklch); named
-// presets map to hex, well-formed hex passes through, anything else falls
-// back — a malformed hex (`#12345` typo) would throw inside Takumi and fail
-// the build at OG prerender with an opaque native error. `hasOwn` keeps a
-// preset name like "constructor" from resolving up the prototype chain.
+// Named presets map to hex, well-formed hex passes through, anything else
+// falls back — a malformed color would throw inside Takumi and fail the build
+// at OG prerender with an opaque native error. `hasOwn` keeps a preset name
+// like "constructor" from resolving up the prototype chain.
 const resolveAccent = (accent: string): string => {
   if (Object.hasOwn(ACCENT_HEX, accent)) {
     return ACCENT_HEX[accent] as string;
@@ -174,7 +166,7 @@ const titleSize = (title: string): number => {
 };
 
 /** Render a 1200x630 Open Graph card to a PNG buffer. */
-export const renderOgImage = (options: OgCardOptions): Promise<Buffer> => {
+export const renderOgImage = (options: OgCardOptions): Promise<Uint8Array> => {
   const { accent, background, border, faint, foreground, muted } =
     resolvePalette(options);
   const brand = options.brand?.trim();
@@ -265,7 +257,7 @@ export const renderOgImage = (options: OgCardOptions): Promise<Buffer> => {
     },
   });
 
-  return getRenderer().render(node, {
+  return render(node, {
     format: "png",
     height: HEIGHT,
     width: WIDTH,

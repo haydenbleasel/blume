@@ -595,7 +595,7 @@ describe("astroConfigTemplate", () => {
     // Blume's render-time deps are forced external on both build environments so
     // native bindings load at runtime and isolated linkers don't bundle (and
     // strand the children of) symlinked store copies.
-    expect(out).toContain('"@takumi-rs/core"');
+    expect(out).toContain('"takumi-js"');
     expect(out).toContain('"@astrojs/markdown-satteri"');
     expect(out).toMatch(/prerender: \{ resolve: \{ external: \[/u);
     // SSR externals use the legacy `ssr.external` key, not `environments.ssr`: a

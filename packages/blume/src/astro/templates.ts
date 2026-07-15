@@ -166,11 +166,12 @@ export const runtimeDependencies = (options: {
  * static-prerender Vite environments.
  *
  * Two reasons a dep lands here:
- *   - `@takumi-rs/core` (OG image rendering) is a native NAPI addon that loads a
- *     platform-specific `.node` binding via `createRequire(import.meta.url)`.
- *     Bundling it relocates `import.meta.url` and breaks the binding lookup
- *     ("Cannot find native binding") on other platforms (e.g. the Linux CI
- *     runner), so it must resolve from `node_modules` at runtime instead.
+ *   - `takumi-js` (OG image rendering) loads `@takumi-rs/core`, a native NAPI
+ *     addon that finds its platform-specific `.node` binding via
+ *     `createRequire(import.meta.url)`. Bundling it relocates `import.meta.url`
+ *     and breaks the binding lookup ("Cannot find native binding") on other
+ *     platforms (e.g. the Linux CI runner), so it must resolve from
+ *     `node_modules` at runtime instead.
  *   - The rest are pure-JS packages kept external so an isolated linker (Bun's
  *     `isolated` mode, pnpm) doesn't bundle their symlinked store copies. When
  *     Vite bundles such a package but leaves its own `node_modules` child
@@ -188,12 +189,11 @@ const RENDER_EXTERNAL_DEPS = [
   "@astrojs/markdown-satteri",
   "@pierre/diffs",
   "@shikijs/transformers",
-  "@takumi-rs/core",
-  "@takumi-rs/helpers",
   "github-slugger",
   "katex",
   "shiki",
   "simple-icons",
+  "takumi-js",
   "zod",
 ];
 
