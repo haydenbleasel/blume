@@ -21,6 +21,9 @@ const WIDE_LOGO =
 const NO_VIEWBOX_LOGO =
   '<svg height="24" width="24"><path d="M0 0h24v24H0z" fill="currentColor" /></svg>';
 
+const filledLogo = (fill: string): string =>
+  `<svg viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="${fill}" /></svg>`;
+
 // 46 chars: past the 40-char threshold but within 60 (titleSize → 64).
 const MEDIUM_TITLE = "Documentation for the Blume framework here now";
 // Well past 60 chars (titleSize → 52).
@@ -40,8 +43,24 @@ describe("renderOgImage", () => {
   });
 
   it("renders an emoji-leading brand without splitting the surrogate pair", async () => {
-    // `charAt(0)` used to emit a lone surrogate half, blanking the mark.
-    await expectPng({ brand: "🚀 Rocket Docs", title: "Hi" });
+    // Takumi's default twemoji provider fetches each glyph SVG from a CDN;
+    // stub it so the test is hermetic (and immune to Bun's fetch keeping a
+    // once-seen HTTPS_PROXY for the rest of the process — the openapi proxy
+    // test would otherwise poison this one).
+    const original = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response(
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e00"/></svg>',
+          { headers: { "Content-Type": "image/svg+xml" } }
+        )
+      )) as unknown as typeof fetch;
+    try {
+      // `charAt(0)` used to emit a lone surrogate half, blanking the mark.
+      await expectPng({ brand: "🚀 Rocket Docs", title: "Hi" });
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 
   it("renders a square currentColor logo, hex accent, and long description", async () => {
@@ -109,6 +128,20 @@ describe("renderOgImage", () => {
     await expectPng({ accent: "#12345", brand: "Acme", title: "Hi" });
     // A prototype member name must not resolve up the chain either.
     await expectPng({ accent: "constructor", brand: "Acme", title: "Hi" });
+  });
+
+  it("paints an xmlns-less logo instead of silently rendering blank", async () => {
+    // Takumi's SVG parser draws nothing without a root xmlns; logoMark injects
+    // one. If the logo went blank, both renders would produce identical pixels.
+    const red = await renderOgImage({
+      logo: filledLogo("#ff0000"),
+      title: "Hi",
+    });
+    const blue = await renderOgImage({
+      logo: filledLogo("#0000ff"),
+      title: "Hi",
+    });
+    expect(Buffer.from(red).equals(Buffer.from(blue))).toBe(false);
   });
 
   it("reads a single-quoted viewBox for the aspect ratio", async () => {

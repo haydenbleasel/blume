@@ -119,8 +119,16 @@ const logoAspect = (svg: string): number | null => {
 // Render the configured logo as the brand mark. A `currentColor` logo carries
 // no intrinsic color, so it is painted in the foreground to read on the light
 // card, then handed to Takumi as a data URI sized from the SVG's aspect ratio.
+// Takumi's SVG parser silently renders nothing without a root `xmlns`, which
+// inline logos routinely omit, so one is injected when missing.
 const logoMark = (svg: string, foreground: string): Node => {
-  const painted = svg.replaceAll("currentColor", foreground);
+  let painted = svg.replaceAll("currentColor", foreground);
+  if (!/<svg[^>]*\sxmlns=/u.test(painted)) {
+    painted = painted.replace(
+      "<svg",
+      '<svg xmlns="http://www.w3.org/2000/svg"'
+    );
+  }
   const aspect = logoAspect(painted);
   let height = MARK_HEIGHT;
   let width = aspect ? MARK_HEIGHT * aspect : MARK_HEIGHT;
