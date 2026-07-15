@@ -406,6 +406,38 @@ describe(extractHeadings, () => {
       "setup-1",
     ]);
   });
+
+  it("skips headings inside <Prompt> — its children render into a hidden node", () => {
+    const body = [
+      "# Title",
+      "<Prompt",
+      '  description="Copy this"',
+      '  actions={["copy"]}',
+      ">",
+      "## Setup",
+      "## Never do",
+      "</Prompt>",
+      "## Real",
+    ].join("\n");
+    expect(extractHeadings(body).map((h) => h.text)).toStrictEqual([
+      "Title",
+      "Real",
+    ]);
+  });
+
+  it("does not treat a self-closing <Prompt /> as opening a hidden region", () => {
+    const body = ['<Prompt description="x" />', "## Real"].join("\n");
+    expect(extractHeadings(body).map((h) => h.text)).toStrictEqual(["Real"]);
+  });
+
+  it("does not match <PromptCard> as the Prompt component", () => {
+    const body = ["<PromptCard>", "## Still a heading", "</PromptCard>"].join(
+      "\n"
+    );
+    expect(extractHeadings(body).map((h) => h.text)).toStrictEqual([
+      "Still a heading",
+    ]);
+  });
 });
 
 describe("content graph", () => {

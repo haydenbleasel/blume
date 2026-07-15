@@ -131,6 +131,17 @@ const PARAGRAPH_INTERRUPT = /^ {0,3}(?:[-+*][ \t]|\d{1,9}[.)][ \t]|>)/u;
 const THEMATIC_BREAK =
   /^ {0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/u;
 const FRONT_MATTER_CLOSE = /^(?:-{3}|\.{3})\s*$/u;
+// `<Prompt>` renders its children into a permanently `hidden` DOM node (see
+// `Prompt.astro`) — the agent-facing prompt text is never visible page
+// content, only read by client JS for the copy button. Any `##` inside it
+// must not surface in the page's heading-derived table of contents. Tracked
+// as an open/close depth, the same way fenced code blocks are tracked above.
+const PROMPT_SELF_CLOSE = /<Prompt\b[^>]*\/>/u;
+// `\b` alone already rejects `<PromptCard>` (word char followed by word char is
+// no boundary); the extra lookahead also rejects a hyphenated tag like
+// `<Prompt-Custom>`, where `\b` would otherwise still match right after `t`.
+const PROMPT_OPEN = /<Prompt\b(?![\w-])/u;
+const PROMPT_CLOSE = /<\/Prompt>/u;
 
 /**
  * The body lines, minus a leading front matter block. Bodies from the
@@ -155,13 +166,16 @@ interface HeadingScanState {
   fence: FenceState;
   /** Consecutive paragraph lines — the candidate text for a setext underline. */
   paragraph: string[];
+  /** Nesting depth inside `<Prompt>...</Prompt>` — 0 when outside one. */
+  promptDepth: number;
 }
 
 /**
  * Extract ATX and setext headings from a markdown body, skipping fenced code
- * blocks, exactly as the renderer sees them: ATX headings may be indented up
- * to 3 spaces, and a paragraph underlined with `=`/`-` is a level 1/2 setext
- * heading. Each heading's anchor slug comes from a per-document
+ * blocks and `<Prompt>` children, exactly as the renderer sees them: ATX
+ * headings may be indented up to 3 spaces, and a paragraph underlined with
+ * `=`/`-` is a level 1/2 setext heading. Each heading's anchor slug comes
+ * from a per-document
  * `github-slugger` — the exact slugger the renderer uses
  * (`markdown/heading-anchors`) — advanced over every heading in document
  * order. Matching it (rather than a hand-rolled slugify) keeps the manifest's
@@ -182,6 +196,27 @@ const scanHeadingLine = (
   // also ends any open paragraph, so no underline can reach across it.
   if (state.fence !== null || next !== null) {
     state.fence = next;
+    state.paragraph = [];
+    return;
+  }
+  // A self-closing `<Prompt ... />` has no children and needs no depth
+  // change. An opening/closing tag may not share a line with a heading, so
+  // each just updates depth and moves on, same as a fence delimiter line.
+  if (PROMPT_SELF_CLOSE.test(line)) {
+    state.paragraph = [];
+    return;
+  }
+  if (PROMPT_CLOSE.test(line)) {
+    state.promptDepth = Math.max(0, state.promptDepth - 1);
+    state.paragraph = [];
+    return;
+  }
+  if (PROMPT_OPEN.test(line)) {
+    state.promptDepth += 1;
+    state.paragraph = [];
+    return;
+  }
+  if (state.promptDepth > 0) {
     state.paragraph = [];
     return;
   }
@@ -220,7 +255,11 @@ const scanHeadingLine = (
 export const extractHeadings = (body: string): Heading[] => {
   const headings: Heading[] = [];
   const slugger = new GithubSlugger();
-  const state: HeadingScanState = { fence: null, paragraph: [] };
+  const state: HeadingScanState = {
+    fence: null,
+    paragraph: [],
+    promptDepth: 0,
+  };
 
   for (const line of linesWithoutFrontMatter(body)) {
     scanHeadingLine(line, state, slugger, headings);
