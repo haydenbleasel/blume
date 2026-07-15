@@ -37,7 +37,7 @@ import { resolveDocsCollection } from "../core/sources/resolve.ts";
 import { resolveTsconfigAliases } from "../core/tsconfig-aliases.ts";
 import type { Navigation } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
-import { hasScalarReferences, referenceTabs } from "../openapi/references.ts";
+import { hasScalarReferences, referenceRoutes } from "../openapi/references.ts";
 import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
 import { registry } from "../registry/registry.ts";
@@ -791,13 +791,12 @@ export const buildRuntimeData = (project: BlumeProject): string => {
 
   const { i18n } = config;
 
-  // API reference routes surface as header tabs alongside the content-derived
-  // ones (Blume-rendered references also own a tab-scoped sidebar of operations),
-  // so the reference stays discoverable in every locale.
-  const withReferenceTabs = (nav: Navigation): Navigation => ({
+  // Resolve the header repo link per locale. API references no longer add a tab
+  // automatically — authors point a `navigation.tabs` entry at the reference
+  // route to surface it (see `referenceRoutes`).
+  const withRepoUrl = (nav: Navigation): Navigation => ({
     ...nav,
     repoUrl: config.navigation.repo && repoUrl ? repoUrl : null,
-    tabs: [...nav.tabs, ...referenceTabs(config)],
   });
 
   // Resolved UI dictionaries: one per locale under i18n, English baseline
@@ -824,7 +823,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     ? Object.fromEntries(
         i18n.locales.map(({ code }) => [
           code,
-          withReferenceTabs(
+          withRepoUrl(
             graph.navigationByLocale[code] ?? {
               featured: [],
               selectors: [],
@@ -894,7 +893,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     // CSS variables for Astro's <Font> component; matches the astro.config
     // `fonts:` entries derived from the same theme.fonts config.
     fontCssVars: configuredCssVars(config.theme.fonts),
-    navigation: withReferenceTabs(graph.navigation),
+    navigation: withRepoUrl(graph.navigation),
     // Per-locale navigation; the catch-all selects the active locale's tree.
     navigationByLocale,
     routes: manifest.routes.map((route) => ({
@@ -1441,11 +1440,11 @@ export const generateRuntime = async (
 
   // Missing-navigation-target check, now that every servable route is known:
   // content routes, custom `.astro` pages, the generated changelog, and any
-  // OpenAPI reference tabs.
+  // OpenAPI reference routes (so a tab an author points at one still validates).
   const navTargetRoutes = new Set<string>([
     ...project.graph.routes.keys(),
     ...pages.map((page) => page.pattern),
-    ...referenceTabs(config).map((tab) => tab.path),
+    ...referenceRoutes(config),
   ]);
   if (hasGeneratedChangelog(project, pages)) {
     navTargetRoutes.add("/changelog");

@@ -672,7 +672,7 @@ const navigationConfigSchema = z.strictObject({
     .transform((value) =>
       Array.isArray(value) ? { display: "flat" as const, items: value } : value
     ),
-  tabs: z.array(navTabSchema).optional(),
+  tabs: z.array(navTabSchema).default([]),
 });
 
 export type AskAiProvider = (typeof askAiProviders)[number];

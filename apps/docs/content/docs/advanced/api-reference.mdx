@@ -3,7 +3,7 @@ title: OpenAPI / AsyncAPI
 description: Drop in an OpenAPI spec and get a native API reference — one real page per operation, in your sidebar and search.
 ---
 
-Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, and generated code samples. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. These docs ship one: the [Example API](/api) reference is generated from the Petstore spec by the config below.
+Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, and generated code samples. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. The config below points Blume at the public Petstore spec as an example.
 
 ```ts blume.config.ts lineNumbers
 openapi: {
@@ -12,7 +12,15 @@ openapi: {
 }
 ```
 
-That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`, and adds a header tab. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically.
+That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically.
+
+The reference doesn't add a header tab on its own. To surface it, point a [navigation tab](/docs/content/navigation#tabs) at its route — this also scopes the operations sidebar for the native renderer:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [{ label: "API", path: "/reference" }],
+}
+```
 
 :::note
 Operations are indexed for search by their **summary and tag**. The rendered schema tables and code samples aren't full-text indexed; search matches an operation's title and section, then links to its own page.
@@ -31,7 +39,7 @@ openapi: {
 
 ## Route
 
-`route` controls where the reference mounts — the overview page and the prefix for every operation route (and the header tab's target):
+`route` controls where the reference mounts — the overview page and the prefix for every operation route (and the route you point a navigation tab at):
 
 ```ts blume.config.ts lineNumbers
 openapi: {

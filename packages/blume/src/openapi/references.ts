@@ -1,14 +1,13 @@
 import { withBasePath } from "../core/base-path.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { trimChar, trimEnd } from "../core/trim.ts";
-import type { NavTab } from "../core/types.ts";
 
 /**
  * Pure resolution of the configured API reference blocks into concrete routes,
- * labels, and a renderer choice — no file IO, so the content source, the nav
- * tabs, the Scalar page generator, and the `blume:openapi` data module all share
- * one source of truth. Kept free of any Astro/template imports so `core` can
- * depend on it without a cycle.
+ * labels, and a renderer choice — no file IO, so the content source, the
+ * nav-target validation, the Scalar page generator, and the `blume:openapi`
+ * data module all share one source of truth. Kept free of any Astro/template
+ * imports so `core` can depend on it without a cycle.
  */
 
 export type ReferenceKind = "openapi" | "asyncapi";
@@ -155,18 +154,22 @@ export const resolveReferences = (
   ),
 ];
 
-/** Nav tabs (header links) for every reference, regardless of renderer. */
-export const referenceTabs = (config: ResolvedConfig): NavTab[] =>
-  resolveReferences(config).map((ref) => ({
-    label: ref.label,
+/**
+ * Mounted route for every reference, regardless of renderer. References no
+ * longer add a header tab automatically — authors point a `navigation.tabs`
+ * entry at one of these routes to surface it (and, for Blume-rendered specs, to
+ * scope its operations sidebar). These routes are whitelisted as valid nav
+ * targets so such a tab doesn't read as a broken link.
+ */
+export const referenceRoutes = (config: ResolvedConfig): string[] =>
+  resolveReferences(config).map((ref) =>
     // Blume-rendered operation pages flow through the content pipeline and are
-    // mounted under `basePath`, so their tab must be too. Scalar references are
-    // a single embedded page injected at the raw `route`, left root-anchored.
-    path:
-      ref.renderer === "blume"
-        ? withBasePath(config.basePath, ref.route)
-        : ref.route,
-  }));
+    // mounted under `basePath`. Scalar references are a single embedded page
+    // injected at the raw `route`, left root-anchored.
+    ref.renderer === "blume"
+      ? withBasePath(config.basePath, ref.route)
+      : ref.route
+  );
 
 /**
  * Accept one resolved reference into the deduped Blume-rendered set, or return
