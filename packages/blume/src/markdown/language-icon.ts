@@ -7,7 +7,8 @@
  * hex colors are skipped because dark-on-dark logos (Next.js, Rust…) vanish.
  *
  * The theme styles `.blume-lang-icon` and shifts the language label
- * (`pre[data-icon]::before`) to make room.
+ * (`pre[data-language][data-icon]::before`) to make room — gated on
+ * `data-language` so the icon only shows when a header bar exists to hold it.
  */
 
 import {
