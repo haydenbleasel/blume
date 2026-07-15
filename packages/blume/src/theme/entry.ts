@@ -397,13 +397,16 @@ blume-diff {
 
 /* Language icon (simple-icons) sits at the header's left edge; the label shifts
    right to make room. Injected at build time by the language-icon transformer.
-   Shown only for top-level prose blocks, which have a header — flush code in
-   tabs and API panels is nested deeper, so the child combinator skips it. */
+   The icon is gated on data-language (the header bar), not just data-icon: the
+   transformer runs whenever icons are on, but a header-less standalone
+   CodeBlock (no title) never gets data-language, so without this gate the
+   absolutely-positioned icon would overlap the first code line. Fenced code
+   and titled blocks always have a header, so the icon shows there. */
 .blume-lang-icon {
   display: none;
 }
 
-.prose > :where(pre[data-icon]) > .blume-lang-icon {
+.prose > :where(pre[data-language][data-icon]) > .blume-lang-icon {
   color: var(--blume-muted-foreground);
   display: block;
   height: 0.875rem;
@@ -413,7 +416,7 @@ blume-diff {
   width: 0.875rem;
 }
 
-.prose > :where(pre[data-icon])::before {
+.prose > :where(pre[data-language][data-icon])::before {
   padding-left: 2.5rem;
 }
 
