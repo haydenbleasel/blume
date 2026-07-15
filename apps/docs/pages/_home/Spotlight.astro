@@ -4,10 +4,10 @@ import { glyph } from "./shared.ts";
 // Customer spotlight — full-bleed cards side by side, one per customer. Each
 // card carries a dark backdrop (a decorative photo or a brand-tinted gradient)
 // with a scrim over it, and the copy (logo, two-tone headline, and a CTA pill)
-// pinned top-and-bottom on the left. Highlights Quiver's and Specific's
+// pinned top-and-bottom on the left. Highlights QuiverAI's and Specific's
 // migrations from Mintlify and Neon shipping their Postgres docs on Blume.
 
-// Quiver's mark — fills its box and inherits the panel's foreground via
+// QuiverAI's mark — fills its box and inherits the panel's foreground via
 // `currentColor`, so it tracks the card's text colour.
 const quiverLogo =
   '<svg class="size-full" viewBox="0 0 325 325" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M162.184 0C251.755 0.000255644 324.366 72.6125 324.366 162.184V324.366H162.184C72.6125 324.366 0.00025571 251.755 0 162.184C0 72.6123 72.6123 0 162.184 0ZM86.7959 77.1211C80.8505 75.1287 75.191 80.7986 77.1943 86.7402L143.065 282.081C145.811 290.223 157.844 288.249 157.844 279.656V157.267H279.43C288.03 157.266 289.995 145.217 281.84 142.484L86.7959 77.1211Z" fill="currentColor"/></svg>';
@@ -28,16 +28,16 @@ const specificLogo =
 // its scrim, falling back to a plain black panel if one is ever omitted.
 const cards = [
   {
-    cta: { href: "https://docs.quiver.ai", label: "Visit Quiver" },
+    cta: { href: "https://docs.quiver.ai", label: "Visit QuiverAI" },
     headline: [
       { t: "See how " },
-      { em: true, t: "Quiver" },
+      { em: true, t: "QuiverAI" },
       { t: " migrated from Mintlify to " },
       { em: true, t: "Blume" },
     ],
     logo: quiverLogo,
     logoClass: "text-white",
-    name: "Quiver",
+    name: "QuiverAI",
     photo: "/quiver.jpg",
   },
   {
@@ -104,7 +104,7 @@ const customerLogos = [
 ];
 ---
 
-<!-- Customer spotlight: Quiver's, Neon's, and Specific's moves to Blume. -->
+<!-- Customer spotlight: QuiverAI's, Neon's, and Specific's moves to Blume. -->
 <section>
   <div class="mx-auto max-w-2xl text-center">
     <h2 class="text-balance font-medium text-3xl tracking-tight sm:text-4xl">
