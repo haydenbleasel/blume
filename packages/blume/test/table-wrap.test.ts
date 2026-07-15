@@ -21,4 +21,11 @@ describe("tableWrapPlugin", () => {
     expect(result?.properties?.className).toEqual(["blume-table-scroll"]);
     expect(result?.children).toEqual([table]);
   });
+
+  it("makes the wrapper keyboard-focusable so it can be scrolled", () => {
+    const table = { tagName: "table", type: "element" };
+    const result = tableWrapPlugin().element.visit(table as never);
+
+    expect(result?.properties?.tabIndex).toBe(0);
+  });
 });
