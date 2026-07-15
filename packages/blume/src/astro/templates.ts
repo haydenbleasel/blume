@@ -439,6 +439,18 @@ export default defineConfig({
   devToolbar: { enabled: false },
   vite: {
     plugins: [tailwindcss(), prerenderDepsPlugin(), serverAppResolvePlugin()],
+    // Mermaid (lazy-loaded client-side for diagrams) statically imports dayjs as
+    // CJS (\`dayjs/dayjs.min.js\`). In dev, an un-pre-bundled dependency is served
+    // as raw ESM, and that UMD file exposes no \`default\` export, so mermaid
+    // throws on load and diagrams render blank. Forcing mermaid through the dep
+    // optimizer bundles dayjs with correct CJS interop. In a standalone install
+    // Blume's dynamic \`import("mermaid")\` lives inside \`node_modules/blume\`,
+    // which Vite's optimizer scan doesn't crawl, so mermaid is never discovered
+    // on its own — hence the explicit include. mermaid resolves through the
+    // \`blume\` package (it isn't a direct dep of the generated project), so the
+    // nested \`blume > mermaid\` form is required. Production (Rollup) already
+    // handles the interop, so this only affects dev.
+    optimizeDeps: { include: ["blume > mermaid"] },
     // Blume's render-time deps are forced external on both build environments so
     // native bindings resolve at runtime and isolated linkers don't bundle
     // symlinked store copies (which would surface their children as unresolvable
