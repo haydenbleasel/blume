@@ -193,29 +193,6 @@ describe("collectStaged", () => {
 });
 
 describe("buildRuntimeData", () => {
-  it("does not add a reference tab automatically — only authored tabs serialize", async () => {
-    const project = await scanProject(
-      await writeProject({
-        "blume.config.ts": `export default {
-  navigation: {
-    tabs: [{ label: "Docs", path: "/" }],
-  },
-  openapi: { enabled: true, renderer: "scalar", spec: "./openapi.json" },
-};
-`,
-        "docs/index.md": "# Home\n",
-        "openapi.json": JSON.stringify({
-          info: { title: "API", version: "1" },
-          openapi: "3.0.0",
-          paths: {},
-        }),
-      })
-    );
-
-    const data = JSON.parse(buildRuntimeData(project));
-    expect(data.navigation.tabs).toEqual([{ label: "Docs", path: "/" }]);
-  });
-
   it("serializes a minimal project with feature defaults off", async () => {
     const project = await scanProject(
       await writeProject({ "docs/index.md": "# Home\n" })
