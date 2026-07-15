@@ -619,7 +619,6 @@ An Astro example renders live with no client JavaScript:
 
 <CodeBlock
   lang="ts"
-  icons={false}
   code={`export const greet = (name: string): string =>
   \`Hello, \${name}!\`;`}
 />
@@ -629,7 +628,7 @@ An Astro example renders live with no client JavaScript:
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 ---
 
-<CodeBlock lang="ts" code={source} icons={false} />
+<CodeBlock lang="ts" code={source} />
 ```
 
 To highlight to an HTML string yourself (e.g. inside your own component), import the underlying helper from `blume/markdown`:
