@@ -109,13 +109,12 @@ navigation: {
 }
 ```
 
-Enabled OpenAPI and AsyncAPI references are added as header tabs automatically. Set `generatedTabs: false` to render only your explicit tabs while keeping generated destinations available at their routes:
+An enabled [OpenAPI or AsyncAPI reference](/docs/advanced/api-reference) mounts at its route but doesn't add a tab on its own — point a tab at that route to surface it in the header (and, for the native renderer, to scope its operations sidebar), with whatever label you like:
 
 ```ts blume.config.ts
 navigation: {
-  generatedTabs: false,
   tabs: [
-    { label: "Docs", path: "/docs" },
+    { label: "API", path: "/reference" },
   ],
 }
 ```

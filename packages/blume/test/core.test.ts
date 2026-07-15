@@ -14,7 +14,6 @@ import {
   flattenPages,
   getPagination,
 } from "../src/components/layout/nav-utils.ts";
-import type { NavigationConfig } from "../src/core/config-input.ts";
 import { extractHeadings, slugify } from "../src/core/content.ts";
 import { buildContentGraph } from "../src/core/graph.ts";
 import { buildManifest } from "../src/core/manifest.ts";
@@ -24,13 +23,13 @@ import type { PageRecord, ProjectContext } from "../src/core/types.ts";
 import { buildRobots } from "../src/deploy/robots.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
 import { buildSitemap } from "../src/deploy/sitemap.ts";
-import { referenceTabs, resolveReferences } from "../src/openapi/references.ts";
+import {
+  referenceRoutes,
+  resolveReferences,
+} from "../src/openapi/references.ts";
 import { buildReferenceFiles } from "../src/openapi/scalar.ts";
 import { buildStructuredData } from "../src/seo/jsonld.ts";
 import { normalizeXHandle } from "../src/seo/x-handle.ts";
-
-const tabLabels = (tabs: NonNullable<NavigationConfig["tabs"]>): string[] =>
-  tabs.map((tab) => tab.label);
 
 const makePage = (
   over: Pick<PageRecord, "id" | "route" | "title"> & Partial<PageRecord>
@@ -960,25 +959,11 @@ describe("agent-readability.json", () => {
 });
 
 describe("api reference (scalar)", () => {
-  it("exposes configured navigation tabs as an array", () => {
-    expect(tabLabels([{ label: "Docs", path: "/docs" }])).toStrictEqual([
-      "Docs",
-    ]);
-  });
-
-  it("enables generated navigation tabs by default", () => {
-    const config = blumeConfigSchema.parse({});
-    expect(config.navigation.generatedTabs).toBe(true);
-  });
-
-  it("supports disabling generated navigation tabs", () => {
+  it("defaults navigation tabs to an empty array and preserves configured ones", () => {
+    expect(blumeConfigSchema.parse({}).navigation.tabs).toStrictEqual([]);
     const config = blumeConfigSchema.parse({
-      navigation: {
-        generatedTabs: false,
-        tabs: [{ label: "Docs", path: "/docs" }],
-      },
+      navigation: { tabs: [{ label: "Docs", path: "/docs" }] },
     });
-    expect(config.navigation.generatedTabs).toBe(false);
     expect(config.navigation.tabs).toStrictEqual([
       { label: "Docs", path: "/docs" },
     ]);
@@ -1032,15 +1017,12 @@ describe("api reference (scalar)", () => {
     expect(routes).toStrictEqual(["/reference/public-api", "/admin"]);
   });
 
-  it("emits both openapi and asyncapi references as nav tabs", () => {
+  it("exposes both openapi and asyncapi reference routes as nav targets", () => {
     const config = blumeConfigSchema.parse({
       asyncapi: { enabled: true, spec: "https://x.dev/async.yaml" },
       openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
     });
-    expect(referenceTabs(config)).toStrictEqual([
-      { label: "API Reference", path: "/reference" },
-      { label: "Events", path: "/events" },
-    ]);
+    expect(referenceRoutes(config)).toStrictEqual(["/reference", "/events"]);
   });
 
   it("declares @scalar/astro only for a Scalar-rendered reference", () => {

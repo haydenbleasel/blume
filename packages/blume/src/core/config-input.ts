@@ -366,8 +366,6 @@ export type SidebarConfig =
 export interface NavigationConfig {
   /** Pinned links shown above the generated sidebar sections. */
   featured?: FeaturedLink[];
-  /** Append auto-generated reference tabs (OpenAPI, AsyncAPI). Defaults to `true`. */
-  generatedTabs?: boolean;
   /** Show a GitHub repo link in the header (requires `github` configured). */
   repo?: boolean;
   /** Context switchers shown in the header (versions, languages, …). */

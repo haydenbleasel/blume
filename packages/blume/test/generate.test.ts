@@ -193,12 +193,11 @@ describe("collectStaged", () => {
 });
 
 describe("buildRuntimeData", () => {
-  it("serializes configured tabs when generated tabs are disabled", async () => {
+  it("does not add a reference tab automatically — only authored tabs serialize", async () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts": `export default {
   navigation: {
-    generatedTabs: false,
     tabs: [{ label: "Docs", path: "/" }],
   },
   openapi: { enabled: true, renderer: "scalar", spec: "./openapi.json" },

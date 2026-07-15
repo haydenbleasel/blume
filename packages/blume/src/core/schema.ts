@@ -651,8 +651,6 @@ const featuredLinkSchema = z.strictObject({
 const navigationConfigSchema = z.strictObject({
   /** Pinned links shown above the generated sidebar sections. */
   featured: z.array(featuredLinkSchema).default([]),
-  /** Append auto-generated reference tabs (OpenAPI, AsyncAPI). */
-  generatedTabs: z.boolean().default(true),
   /** Show a GitHub repo link in the header (requires `github` configured). */
   repo: z.boolean().default(true),
   selectors: z.array(navSelectorSchema).default([]),
