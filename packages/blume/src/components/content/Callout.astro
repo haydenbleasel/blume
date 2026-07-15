@@ -60,8 +60,14 @@ const iconClass: Record<CalloutType, string> = {
   <span class:list={["mt-0.5 shrink-0", color ? "" : iconClass[type]]}>
     <Icon color={color} icon={icon ?? iconByType[type]} size={16} />
   </span>
-  <div class="flex-1 [&>:first-child]:mt-0! [&>:last-child]:mb-0!">
-    {title && <p class="mb-1 font-semibold text-foreground">{title}</p>}
+  {/* The global prose rule leaks a 1rem margin onto these paragraphs/lists even
+      though the callout is not-prose; with a title the body isn't the first
+      child, so that margin stacks under the title's own gap and reads as too
+      much space. Override it here for a uniform, compact gap (important beats
+      the unlayered prose rule): every child a small top margin, none on the
+      first, and no trailing bottom margin. */}
+  <div class="flex-1 [&>*]:mt-2! [&>*]:mb-0! [&>:first-child]:mt-0!">
+    {title && <p class="font-semibold text-foreground">{title}</p>}
     <slot />
   </div>
 </aside>
