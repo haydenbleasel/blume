@@ -1,5 +1,6 @@
 import { exampleValue, toJson } from "./helpers.ts";
 import type { SchemaLike } from "./helpers.ts";
+import type { SampleAuth } from "./security.ts";
 
 /**
  * Request example + code-sample generation for an operation. Kept separate from
@@ -43,10 +44,14 @@ const jsonContentType = (
   return entries.find(([type]) => type.includes("json")) ?? entries[0];
 };
 
-/** The `?a=1&b=2` query string from an operation's required query params. */
+/**
+ * The `?a=1&b=2` query string from an operation's required query params, plus
+ * any extra entries (a query-borne API key from the security requirements).
+ */
 const queryString = (
   params: ParamLike[],
-  schemas: Record<string, SchemaLike>
+  schemas: Record<string, SchemaLike>,
+  extra: Record<string, string>
 ): string => {
   const query: string[] = [];
   for (const param of params) {
@@ -60,7 +65,31 @@ const queryString = (
       )}`
     );
   }
+  for (const [name, value] of Object.entries(extra)) {
+    query.push(`${encodeURIComponent(name)}=${encodeURIComponent(value)}`);
+  }
   return query.length > 0 ? `?${query.join("&")}` : "";
+};
+
+/**
+ * The sample's headers: auth placeholders first, so a spec that also declares
+ * the credential as an explicit header parameter overrides them with its own
+ * (better) example.
+ */
+const headerValues = (
+  params: ParamLike[],
+  schemas: Record<string, SchemaLike>,
+  auth: SampleAuth | undefined
+): Record<string, string> => {
+  const headers: Record<string, string> = { ...auth?.headers };
+  for (const param of params) {
+    if (param.in === "header" && param.required && param.name) {
+      headers[param.name] = String(
+        param.example ?? exampleValue(param.schema, schemas) ?? ""
+      );
+    }
+  }
+  return headers;
 };
 
 /** Assemble a representative request from an operation and the spec servers. */
@@ -69,7 +98,8 @@ export const buildRequestSample = (
   method: string,
   path: string,
   servers: { url?: string }[],
-  schemas: Record<string, SchemaLike>
+  schemas: Record<string, SchemaLike>,
+  auth?: SampleAuth
 ): RequestSample => {
   const base = (servers[0]?.url ?? "").replace(TRAILING_SLASH, "");
   const params = operation.parameters ?? [];
@@ -85,16 +115,8 @@ export const buildRequestSample = (
     }
   }
 
-  const search = queryString(params, schemas);
-
-  const headers: Record<string, string> = {};
-  for (const param of params) {
-    if (param.in === "header" && param.required && param.name) {
-      headers[param.name] = String(
-        param.example ?? exampleValue(param.schema, schemas) ?? ""
-      );
-    }
-  }
+  const search = queryString(params, schemas, auth?.query ?? {});
+  const headers = headerValues(params, schemas, auth);
 
   const media = jsonContentType(operation.requestBody?.content);
   let body: string | undefined;

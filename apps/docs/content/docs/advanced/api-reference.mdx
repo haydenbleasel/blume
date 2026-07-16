@@ -78,6 +78,17 @@ openapi: {
 
 `spec` is shorthand for a single-entry `sources`, so you only reach for `sources` when you have more than one.
 
+## Authorization
+
+Operations that declare [security requirements](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) render an **Authorization** section above their parameters, and the generated code samples send a placeholder credential (`Authorization: Bearer YOUR_TOKEN`, an API-key header, or a query key — whatever the scheme calls for). There's nothing to configure: Blume reads `security` from the spec, so the reference always matches what the API actually enforces.
+
+The OpenAPI semantics carry over as written:
+
+- An operation's own `security` overrides the document's root default; `security: []` marks it **public** and renders no Authorization section.
+- Multiple requirement entries are alternatives — rendered as "or" groups; every scheme inside one entry is required together. The first alternative feeds the code samples.
+- An empty `{}` entry means auth is **optional** for that operation, and the section says so.
+- OAuth2 scopes are listed per scheme; scheme `description`s from `components.securitySchemes` render inline.
+
 ## The Scalar renderer
 
 The native renderer is the default. If you'd rather embed [Scalar](https://scalar.com)'s self-contained API reference — its own sidebar, search, theme, and "Try it" playground on a single route — set `renderer: "scalar"`:

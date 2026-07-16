@@ -1,0 +1,80 @@
+---
+import {
+  type OperationSecurity,
+  schemeCarrier,
+  schemeLabel,
+} from "./security.ts";
+
+interface Props {
+  security: OperationSecurity;
+}
+
+const { security } = Astro.props;
+---
+
+{
+  security.alternatives.length > 0 && (
+    <section class="mt-6">
+      <div
+        aria-level="3"
+        class="mb-2 font-semibold text-foreground text-sm"
+        role="heading"
+      >
+        Authorization
+      </div>
+      {security.optional && (
+        <p class="mb-2 text-muted-foreground text-sm">
+          Optional — this operation also accepts unauthenticated requests.
+        </p>
+      )}
+      {security.alternatives.map((alternative, index) => (
+        <>
+          {index > 0 && (
+            <div class="my-2 font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide">
+              or
+            </div>
+          )}
+          <div class="not-prose rounded-blume border border-border px-4">
+            {alternative.map((resolved) => {
+              const carrier = schemeCarrier(resolved);
+              return (
+                <div class="border-border border-t py-3 first:border-t-0">
+                  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <code class="font-mono text-foreground text-sm">
+                      {carrier?.name ?? resolved.key}
+                    </code>
+                    <span class="text-muted-foreground text-xs">
+                      {schemeLabel(resolved)}
+                      {carrier ? ` · ${carrier.in}` : ""}
+                    </span>
+                    {!security.optional && (
+                      <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
+                        required
+                      </span>
+                    )}
+                  </div>
+                  {resolved.scheme?.description && (
+                    <div
+                      class="mt-1 text-muted-foreground text-sm"
+                      set:text={resolved.scheme.description}
+                    />
+                  )}
+                  {resolved.scopes.length > 0 && (
+                    <div class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                      <span class="text-muted-foreground">Scopes:</span>
+                      {resolved.scopes.map((scope) => (
+                        <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+                          {scope}
+                        </code>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ))}
+    </section>
+  )
+}
