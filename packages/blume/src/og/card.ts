@@ -1,4 +1,5 @@
 import { render } from "takumi-js";
+import type { RenderOptions } from "takumi-js";
 import { container, image, text } from "takumi-js/helpers";
 import type { Node } from "takumi-js/helpers";
 
@@ -50,6 +51,10 @@ export interface OgCardOptions {
   repo?: string;
   /** Footer-right site host, e.g. `docs.acme.com`. */
   site?: string;
+  /** Fonts to be used in the card. Defaults to Geist with latin subset. */
+  fonts?: RenderOptions["fonts"];
+  /** Custom image loaders to be used in the card. */
+  images?: RenderOptions["images"];
 }
 
 const WIDTH = OG_IMAGE_WIDTH;
@@ -111,17 +116,8 @@ const logoAspect = (svg: string): number | null => {
 // Render the configured logo as the brand mark. A `currentColor` logo carries
 // no intrinsic color, so it is painted in the foreground to read on the light
 // card, then handed to Takumi as a data URI sized from the SVG's aspect ratio.
-// Takumi 2.2 silently renders nothing without a root `xmlns` (accepted
-// upstream after 2.2.0), which inline logos routinely omit, so one is
-// injected when missing.
 const logoMark = (svg: string, foreground: string): Node => {
-  let painted = svg.replaceAll("currentColor", foreground);
-  if (!/<svg[^>]*\sxmlns=/u.test(painted)) {
-    painted = painted.replace(
-      "<svg",
-      '<svg xmlns="http://www.w3.org/2000/svg"'
-    );
-  }
+  const painted = svg.replaceAll("currentColor", foreground);
   const aspect = logoAspect(painted);
   let height = MARK_HEIGHT;
   let width = aspect ? MARK_HEIGHT * aspect : MARK_HEIGHT;
@@ -259,8 +255,10 @@ export const renderOgImage = (options: OgCardOptions): Promise<Uint8Array> => {
   });
 
   return render(node, {
+    fonts: options.fonts,
     format: "png",
     height: HEIGHT,
+    images: options.images,
     width: WIDTH,
   });
 };
