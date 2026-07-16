@@ -192,6 +192,47 @@ describe("examples config normalization", () => {
   });
 });
 
+describe("code block themes", () => {
+  it("rejects custom themes without token rules or with malformed colors", () => {
+    for (const theme of [
+      {},
+      { colors: {} },
+      { settings: {} },
+      { colors: [], tokenColors: [] },
+      { colors: {}, tokenColors: {} },
+    ]) {
+      const result = blumeConfigSchema.safeParse({
+        markdown: { codeBlocks: { theme: { dark: theme } } },
+      });
+      expect(result.success, JSON.stringify(theme)).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]).toMatchObject({
+          message: "Expected a Shiki theme name or custom theme object",
+          path: ["markdown", "codeBlocks", "theme", "dark"],
+        });
+      }
+    }
+  });
+
+  it("accepts the settings (TextMate) and tokenColors (VS Code) theme forms", () => {
+    for (const theme of [
+      // The shape createCssVariablesTheme() and Shiki-normalized themes use.
+      {
+        name: "css-variables",
+        settings: [{ scope: ["keyword"], settings: { foreground: "#abcdef" } }],
+        type: "dark",
+      },
+      { tokenColors: [] },
+      { colors: { "editor.background": "#010203" }, tokenColors: [] },
+    ]) {
+      const result = blumeConfigSchema.safeParse({
+        markdown: { codeBlocks: { theme: { dark: theme } } },
+      });
+      expect(result.success, JSON.stringify(theme)).toBe(true);
+    }
+  });
+});
+
 describe("toc heading-range refinement", () => {
   it("rejects a minHeadingLevel above the maxHeadingLevel", () => {
     const result = blumeConfigSchema.safeParse({

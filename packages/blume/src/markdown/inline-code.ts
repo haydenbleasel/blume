@@ -64,7 +64,7 @@ type InlineHighlighter = (
     defaultColor: false;
     lang: string;
     structure: "inline";
-    themes: { dark: string; light: string };
+    themes: CodeThemes;
   }
 ) => Promise<{ children: HastNode[] }>;
 

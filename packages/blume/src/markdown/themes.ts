@@ -6,6 +6,11 @@
  * single home for the github fallback used when nothing is configured.
  */
 
+import type { ThemeRegistrationAny } from "shiki";
+
+/** A bundled Shiki theme name or an inline custom Shiki theme definition. */
+export type CodeTheme = string | ThemeRegistrationAny;
+
 /**
  * A light/dark Shiki theme pair (`markdown.codeBlocks.theme`). A `type` (not an
  * `interface`) so it keeps the implicit index signature Shiki's `themes`
@@ -13,8 +18,8 @@
  */
 // oxlint-disable-next-line typescript/consistent-type-definitions -- interface loses the implicit index signature Shiki's `themes` param needs
 export type CodeThemes = {
-  dark: string;
-  light: string;
+  dark: CodeTheme;
+  light: CodeTheme;
 };
 
 /** The default pair, used when `markdown.codeBlocks.theme` is unset. */

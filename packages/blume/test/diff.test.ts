@@ -39,6 +39,82 @@ describe("renderDiff", () => {
     expect(html).toContain("newInline");
   });
 
+  it("renders with inline custom Shiki themes", async () => {
+    const html = await renderDiff({
+      lang: "ts",
+      new: "let value = 2;",
+      old: "const value = 1;",
+      theme: {
+        dark: {
+          colors: {
+            "editor.background": "#010203",
+            "editor.foreground": "#fefefe",
+          },
+          name: "acme-diff-dark",
+          tokenColors: [],
+          type: "dark",
+        },
+        light: "github-light",
+      },
+    });
+
+    expect(html).toContain("#010203");
+  });
+
+  it("registers equal-content theme objects under one stable name", async () => {
+    // Distinct object instances with identical content — as produced when a
+    // dev-server reload re-evaluates the config module. The content-derived
+    // registration name makes the second render an idempotent re-register
+    // instead of a stale or duplicate entry.
+    const theme = {
+      colors: {
+        "editor.background": "#040506",
+        "editor.foreground": "#fefefe",
+      },
+      name: "acme-reload-dark",
+      tokenColors: [],
+      type: "dark" as const,
+    };
+    const options = {
+      lang: "ts",
+      new: "let value = 2;",
+      old: "const value = 1;",
+    };
+
+    const first = await renderDiff({
+      ...options,
+      theme: { dark: theme, light: "github-light" },
+    });
+    const second = await renderDiff({
+      ...options,
+      theme: { dark: structuredClone(theme), light: "github-light" },
+    });
+
+    expect(second).toBe(first);
+    expect(first).toContain("#040506");
+  });
+
+  it("renders with a settings-form (TextMate) custom theme", async () => {
+    const html = await renderDiff({
+      lang: "ts",
+      new: "let value = 2;",
+      old: "const value = 1;",
+      theme: {
+        dark: "github-dark",
+        light: {
+          name: "acme-diff-light",
+          settings: [
+            { scope: ["keyword"], settings: { foreground: "#abcdef" } },
+          ],
+          type: "light" as const,
+        },
+      },
+    });
+
+    // Shiki normalizes token colors to uppercase hex.
+    expect(html).toContain("#ABCDEF");
+  });
+
   it("renders before/after file paths (absolute)", async () => {
     const html = await renderDiff({
       after: join(root, "after.ts"),
