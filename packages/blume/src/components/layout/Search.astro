@@ -13,19 +13,27 @@ import { flattenPages } from "./nav-utils.ts";
 interface Props {
   askEnabled?: boolean;
   navigation?: Navigation;
+  /** Curated empty-state pages; falls back to the first sidebar pages when omitted. */
+  popularPages?: { label: string; route: string }[];
   strings?: UIStrings["search"];
   /** Active locale to filter results to; omitted disables locale filtering. */
   locale?: string;
 }
 
-const { askEnabled = false, navigation, strings, locale } = Astro.props;
+const { askEnabled = false, navigation, popularPages, strings, locale } =
+  Astro.props;
 // Merge over the English baseline per key (rather than `strings ?? …`) so a
 // partial — or empty `{}` — strings object still resolves every label to a
 // default, matching the pattern PageActions uses for its own dictionary.
 const s = { ...EN_UI.search, ...strings };
 
 // Pages shown in the empty state, before the user has typed anything.
-const popular = navigation ? flattenPages(navigation.sidebar).slice(0, 6) : [];
+const popular =
+  popularPages && popularPages.length > 0
+    ? popularPages
+    : navigation
+      ? flattenPages(navigation.sidebar).slice(0, 6)
+      : [];
 
 const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 ---

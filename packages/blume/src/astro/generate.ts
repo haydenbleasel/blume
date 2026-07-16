@@ -43,6 +43,7 @@ import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
 import { registry } from "../registry/registry.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
+import { resolveSearchPopular } from "../search/popular.ts";
 import { searchProviderMeta, servesStaticIndex } from "../search/providers.ts";
 import {
   examplesEntryTemplate,
@@ -937,6 +938,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       repoUrl,
       search: {
         enabled: config.search.provider !== "none",
+        popular:
+          config.search.popular.length > 0
+            ? resolveSearchPopular(config.search.popular)
+            : [],
         provider: config.search.provider,
       },
       site: config.deployment.site ?? null,

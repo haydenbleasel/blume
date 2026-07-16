@@ -516,6 +516,12 @@ const PROVIDER_CONFIG_KEY = {
   typesense: "typesense",
 } as const;
 
+/** Curated link for the search dialog empty state (internal route or external URL). */
+const searchPopularLinkSchema = z.strictObject({
+  href: z.string(),
+  label: z.string(),
+});
+
 const searchConfigSchema = z
   .strictObject({
     algolia: algoliaSearchSchema.optional(),
@@ -526,6 +532,8 @@ const searchConfigSchema = z
       .default({}),
     mixedbread: mixedbreadSearchSchema.optional(),
     oramaCloud: oramaCloudSearchSchema.optional(),
+    /** Curated links for the Cmd+K empty state; defaults to the first sidebar pages. */
+    popular: z.array(searchPopularLinkSchema).default([]),
     provider: z.enum(searchProviders).default("orama"),
     typesense: typesenseSearchSchema.optional(),
   })

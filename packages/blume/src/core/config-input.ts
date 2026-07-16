@@ -453,6 +453,14 @@ export interface MixedbreadSearch {
   storeId: string;
 }
 
+/** A curated link for the search dialog empty state. */
+export interface SearchPopularLink {
+  /** Internal route or external URL. */
+  href: string;
+  /** Link label shown in the dialog. */
+  label: string;
+}
+
 /**
  * Search backend. The default `orama` builds a local index at build time (and
  * runs in dev); hosted providers need their credential block below. `none`
@@ -470,6 +478,11 @@ export interface SearchConfig {
   mixedbread?: MixedbreadSearch;
   /** Orama Cloud credentials (required when `provider` is `orama-cloud`). */
   oramaCloud?: OramaCloudSearch;
+  /**
+   * Curated links for the Cmd+K empty state. When omitted or empty, the first
+   * sidebar pages are shown instead.
+   */
+  popular?: SearchPopularLink[];
   /** Which backend powers search. Defaults to `orama`. */
   provider?: SearchProvider;
   /** Typesense credentials (required when `provider` is `typesense`). */
