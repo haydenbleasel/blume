@@ -222,7 +222,7 @@ ${THEME_MAPPING}
   --tw-prose-links: var(--blume-foreground);
   --tw-prose-bold: var(--blume-foreground);
   --tw-prose-counters: var(--blume-muted-foreground);
-  --tw-prose-bullets: var(--blume-border);
+  --tw-prose-bullets: var(--blume-muted-foreground);
   --tw-prose-hr: var(--blume-border);
   --tw-prose-quotes: var(--blume-muted-foreground);
   --tw-prose-quote-borders: var(--blume-border);
