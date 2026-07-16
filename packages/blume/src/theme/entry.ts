@@ -55,6 +55,10 @@ const TOKEN_DEFAULTS = `:root {
   --blume-code-word-border: oklch(0.55 0.16 255 / 0.5);
   --blume-radius: 0.75rem;
 
+  /* Max width of the prose content column (article, breadcrumb, TOC, feedback,
+     pagination, last-updated). Override to re-measure the whole column at once. */
+  --blume-content-width: 42rem;
+
   /*
    * Font tokens resolve through optional src variables that Astro's Fonts API
    * populates (via theme.fonts). When unset they fall back to the system
@@ -128,6 +132,7 @@ const THEME_MAPPING = `@theme inline {
   --color-action-foreground: var(--blume-action-foreground);
   --color-code: var(--blume-code-background);
   --radius-blume: var(--blume-radius);
+  --container-content: var(--blume-content-width);
   --font-sans: var(--blume-font-body);
   --font-mono: var(--blume-font-mono);
   --font-display: var(--blume-font-display);

@@ -31,7 +31,7 @@ const eyebrowCrumb = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
       aria-label={n.breadcrumb}
       class:list={[
         "mb-2 text-muted-foreground text-sm",
-        wide ? "max-w-none" : "mx-auto max-w-[42rem]",
+        wide ? "max-w-none" : "mx-auto max-w-content",
       ]}
     >
       {eyebrowCrumb.route ? (
