@@ -109,7 +109,7 @@ describe("config schema", () => {
     ).toBeFalsy();
   });
 
-  it("accepts Open Graph branding and rejects non-hex palette colors", () => {
+  it("accepts Open Graph branding and any CSS palette color", () => {
     const { og } = blumeConfigSchema.parse({
       seo: {
         og: {
@@ -126,11 +126,18 @@ describe("config schema", () => {
     }).seo;
     expect(og.logo).toBe("/og-logo.svg");
     expect(og.palette?.background).toBe("#1d1d1d");
+    // Non-hex colors reach Takumi's CSS parser rather than being rejected here,
+    // so the palette accepts the same grammar `theme.accent` already does.
     expect(
-      blumeConfigSchema.safeParse({
+      blumeConfigSchema.parse({
+        seo: { og: { palette: { accent: "oklch(0.7 0.15 200)" } } },
+      }).seo.og.palette?.accent
+    ).toBe("oklch(0.7 0.15 200)");
+    expect(
+      blumeConfigSchema.parse({
         seo: { og: { palette: { background: "black" } } },
-      }).success
-    ).toBeFalsy();
+      }).seo.og.palette?.background
+    ).toBe("black");
   });
 
   it("normalizes seo.x handles to a leading @", () => {

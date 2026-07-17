@@ -51,14 +51,35 @@ export interface OgCardOptions {
   repo?: string;
   /** Footer-right site host, e.g. `docs.acme.com`. */
   site?: string;
-  /** Fonts to be used in the card. Defaults to Geist with latin subset. */
-  fonts?: RenderOptions["fonts"];
-  /** Custom image loaders to be used in the card. */
+  /**
+   * Pre-fetched image entries, or a group controlling how remote images (and
+   * emoji glyphs) are fetched. Blume merges in a shared glyph cache; see
+   * {@link resolveImages}.
+   */
   images?: RenderOptions["images"];
 }
 
 const WIDTH = OG_IMAGE_WIDTH;
 const HEIGHT = OG_IMAGE_HEIGHT;
+
+// Emoji in a title render as Twemoji glyphs Takumi fetches from a CDN, once per
+// render. A build prerenders one card per page, so an emoji in the site title
+// would otherwise refetch the same glyph for every page. This cache is keyed by
+// URL and holds the in-flight promise, so concurrent renders share one request
+// and a build fetches each glyph once. Unbounded on purpose: it is scoped to the
+// glyphs a site's own titles reference, which is a handful.
+const imageFetchCache = new Map<string, Promise<ArrayBuffer>>();
+
+/**
+ * Merge the shared glyph cache into the caller's `images`. An explicit
+ * `fetchCache` wins, so a caller can scope or opt out of the cache.
+ */
+const resolveImages = (
+  images: OgCardOptions["images"]
+): OgCardOptions["images"] =>
+  Array.isArray(images)
+    ? { fetchCache: imageFetchCache, sources: images }
+    : { fetchCache: imageFetchCache, ...images };
 
 // Light neutral scale mirrored from the docs homepage theme tokens:
 // FOREGROUND = --foreground, MUTED = --muted-foreground, FAINT = that lighter,
@@ -255,10 +276,9 @@ export const renderOgImage = (options: OgCardOptions): Promise<Uint8Array> => {
   });
 
   return render(node, {
-    fonts: options.fonts,
     format: "png",
     height: HEIGHT,
-    images: options.images,
+    images: resolveImages(options.images),
     width: WIDTH,
   });
 };

@@ -802,9 +802,14 @@ const xConfigSchema = z.strictObject({
   handle: xHandleSchema,
 });
 
-const ogColorSchema = z
-  .string()
-  .regex(/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu);
+/**
+ * Any CSS color. Takumi parses the full grammar, so this stays unvalidated
+ * here and a bad value fails the OG prerender with a parse error naming it —
+ * the same fail-fast the card's accent relies on. Validating hex-only here
+ * would reject `oklch(…)`, which `theme.accent` (the card's default accent)
+ * already accepts.
+ */
+const ogColorSchema = z.string();
 
 const ogPaletteSchema = z.strictObject({
   accent: ogColorSchema.optional(),
