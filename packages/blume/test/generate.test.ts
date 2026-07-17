@@ -206,6 +206,7 @@ describe("buildRuntimeData", () => {
     expect(data.config.mcp).toBeNull();
     expect(data.config.og.enabled).toBe(false);
     expect(data.config.search.provider).toBe("orama");
+    expect(data.config.search.popular).toStrictEqual([]);
     expect(data.config.favicon.href.startsWith("data:image/png")).toBe(true);
     expect(data.navigationByLocale).toEqual({});
     expect(data.uiByLocale).toEqual({});
@@ -214,6 +215,56 @@ describe("buildRuntimeData", () => {
       (route: { editUrl: string | null; path: string }) => route.path === "/"
     );
     expect(home.editUrl).toBeNull();
+  });
+
+  it("resolves search.popular into runtime data", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  search: {
+    popular: [
+      { href: "/guides/start", icon: "rocket", label: "Start" },
+      { href: "https://example.com", label: "Blog" },
+    ],
+  },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.search.popular).toStrictEqual([
+      { icon: "rocket", label: "Start", route: "/guides/start" },
+      { label: "Blog", route: "https://example.com" },
+    ]);
+  });
+
+  it("bases search.popular routes under basePath", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  basePath: "/docs",
+  search: {
+    popular: [
+      { href: "/guides/start", label: "Start" },
+      { href: "/docs/guides/hand-written", label: "Hand written" },
+      { href: "https://example.com", label: "Blog" },
+    ],
+  },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    // Curated hrefs are authored root-relative, so they gain the base — the
+    // sidebar fallback's routes are already based. An author-written base is
+    // not doubled, and external URLs pass through.
+    expect(data.config.search.popular).toStrictEqual([
+      { label: "Start", route: "/docs/guides/start" },
+      { label: "Hand written", route: "/docs/guides/hand-written" },
+      { label: "Blog", route: "https://example.com" },
+    ]);
   });
 
   it("resolves github edit urls, repo url, banner, logo, mcp and og", async () => {

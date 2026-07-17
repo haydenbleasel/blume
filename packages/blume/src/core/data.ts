@@ -120,7 +120,12 @@ export interface BlumeDataConfig {
   };
   /** Repository URL for header/edit links, or `null`. */
   repoUrl: string | null;
-  search: { enabled: boolean; provider: SearchProvider };
+  search: {
+    enabled: boolean;
+    /** Resolved empty-state links; empty when unset (Search falls back to sidebar). */
+    popular: { icon?: string; label: string; route: string }[];
+    provider: SearchProvider;
+  };
   /** Deployment site URL, or `null` when none is configured/detected. */
   site: string | null;
   structuredData: boolean;

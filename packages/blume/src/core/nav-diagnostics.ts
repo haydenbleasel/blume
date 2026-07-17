@@ -55,10 +55,13 @@ const collectIcons = (
 };
 
 /** Warn about icon names that aren't in Blume's set (skipping image/SVG icons). */
-export const validateNavIcons = (navigation: Navigation): Diagnostic[] => {
+const unknownIconDiagnostics = (
+  icons: { icon: string; where: string }[],
+  suggestion: string
+): Diagnostic[] => {
   const seen = new Set<string>();
   const diagnostics: Diagnostic[] = [];
-  for (const { icon, where } of collectIcons(navigation)) {
+  for (const { icon, where } of icons) {
     if (isAssetIcon(icon) || hasIcon(icon) || seen.has(icon)) {
       continue;
     }
@@ -67,12 +70,36 @@ export const validateNavIcons = (navigation: Navigation): Diagnostic[] => {
       code: "BLUME_UNKNOWN_ICON",
       message: `Unknown icon "${icon}" (${where}) — it isn't in Blume's icon set.`,
       severity: "warning",
-      suggestion:
-        "Use a built-in icon name, an image path/URL, or inline SVG markup.",
+      suggestion,
     });
   }
   return diagnostics;
 };
+
+/** Warn about icon names that aren't in Blume's set (skipping image/SVG icons). */
+export const validateNavIcons = (navigation: Navigation): Diagnostic[] =>
+  unknownIconDiagnostics(
+    collectIcons(navigation),
+    "Use a built-in icon name, an image path/URL, or inline SVG markup."
+  );
+
+/**
+ * Warn about unknown icons on curated `search.popular` links. Separate from
+ * {@link validateNavIcons} because these live under `search`, not the built
+ * navigation — and unlike nav icons they resolve in a *client* island, so only
+ * set names work (an image/SVG icon quietly falls back to the file glyph).
+ */
+export const validateSearchPopularIcons = (
+  popular: { icon?: string; label: string }[]
+): Diagnostic[] =>
+  unknownIconDiagnostics(
+    popular.flatMap((link) =>
+      link.icon
+        ? [{ icon: link.icon, where: `popular link "${link.label}"` }]
+        : []
+    ),
+    "Use a built-in icon name."
+  );
 
 /** Whether an internal path resolves to a page or a section that has pages. */
 const resolvesToPages = (routes: Set<string>, path: string): boolean =>

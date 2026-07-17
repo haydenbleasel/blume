@@ -29,7 +29,10 @@ import type {
 } from "../core/data.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import { resolveFallbackLocale } from "../core/i18n.ts";
-import { validateNavTargets } from "../core/nav-diagnostics.ts";
+import {
+  validateNavTargets,
+  validateSearchPopularIcons,
+} from "../core/nav-diagnostics.ts";
 import { packageRoot } from "../core/package-root.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
@@ -43,6 +46,7 @@ import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
 import { registry } from "../registry/registry.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
+import { resolveSearchPopular } from "../search/popular.ts";
 import { searchProviderMeta, servesStaticIndex } from "../search/providers.ts";
 import {
   examplesEntryTemplate,
@@ -937,6 +941,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       repoUrl,
       search: {
         enabled: config.search.provider !== "none",
+        popular: resolveSearchPopular(config.search.popular, config.basePath),
         provider: config.search.provider,
       },
       site: config.deployment.site ?? null,
@@ -1509,12 +1514,18 @@ export const generateRuntime = async (
   if (hasGeneratedChangelog(project, pages)) {
     navTargetRoutes.add("/changelog");
   }
+  // Curated `search.popular` icons live outside the navigation model, so they
+  // miss `validateNavIcons` in the graph build — they're checked here too,
+  // where the search config is known. A typo otherwise just renders the
+  // default glyph.
   warnings.push(
-    ...validateNavTargets(project.graph.navigation, navTargetRoutes).map(
-      (diagnostic) =>
-        diagnostic.suggestion
-          ? `${diagnostic.message} ${diagnostic.suggestion}`
-          : diagnostic.message
+    ...[
+      ...validateNavTargets(project.graph.navigation, navTargetRoutes),
+      ...validateSearchPopularIcons(config.search.popular),
+    ].map((diagnostic) =>
+      diagnostic.suggestion
+        ? `${diagnostic.message} ${diagnostic.suggestion}`
+        : diagnostic.message
     )
   );
 
