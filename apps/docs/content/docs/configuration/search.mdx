@@ -29,6 +29,15 @@ search: {
 
 Each entry takes an `href` (internal route or external URL) and a `label`. Omit `popular` or leave it empty to keep the sidebar fallback.
 
+Write `href` as if the site were mounted at the root — a `basePath` is applied for you, the same as `navigation.featured`. External URLs pass through untouched.
+
+<Callout type="warning">
+  A curated list is a single set of links shared by every language. On a site
+  with `i18n` configured, the sidebar fallback follows the reader's locale, but
+  `popular` entries point wherever their `href` says — so pin locale-prefixed
+  routes only if you want every reader sent to that one language.
+</Callout>
+
 ## What's indexed
 
 For every indexable page, Blume indexes its title, description, and body reduced to plain text — code blocks, images, and markup are stripped, so results stay relevant. The index is built from your source files, so it's identical in dev and production.

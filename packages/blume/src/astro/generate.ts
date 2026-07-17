@@ -938,10 +938,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       repoUrl,
       search: {
         enabled: config.search.provider !== "none",
-        popular:
-          config.search.popular.length > 0
-            ? resolveSearchPopular(config.search.popular)
-            : [],
+        popular: resolveSearchPopular(config.search.popular, config.basePath),
         provider: config.search.provider,
       },
       site: config.deployment.site ?? null,

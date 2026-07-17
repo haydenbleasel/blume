@@ -13,7 +13,7 @@ import { flattenPages } from "./nav-utils.ts";
 interface Props {
   askEnabled?: boolean;
   navigation?: Navigation;
-  /** Curated empty-state pages; falls back to the first sidebar pages when omitted. */
+  /** Curated empty-state pages; falls back to the first sidebar pages when empty or omitted. */
   popularPages?: { label: string; route: string }[];
   strings?: UIStrings["search"];
   /** Active locale to filter results to; omitted disables locale filtering. */

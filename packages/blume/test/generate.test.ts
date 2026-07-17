@@ -221,7 +221,6 @@ describe("buildRuntimeData", () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts": `export default {
-  basePath: "/docs",
   search: {
     popular: [
       { href: "/guides/start", label: "Start" },
@@ -236,6 +235,34 @@ describe("buildRuntimeData", () => {
     const data = JSON.parse(buildRuntimeData(project));
     expect(data.config.search.popular).toStrictEqual([
       { label: "Start", route: "/guides/start" },
+      { label: "Blog", route: "https://example.com" },
+    ]);
+  });
+
+  it("bases search.popular routes under basePath", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  basePath: "/docs",
+  search: {
+    popular: [
+      { href: "/guides/start", label: "Start" },
+      { href: "/docs/guides/hand-written", label: "Hand written" },
+      { href: "https://example.com", label: "Blog" },
+    ],
+  },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    // Curated hrefs are authored root-relative, so they gain the base — the
+    // sidebar fallback's routes are already based. An author-written base is
+    // not doubled, and external URLs pass through.
+    expect(data.config.search.popular).toStrictEqual([
+      { label: "Start", route: "/docs/guides/start" },
+      { label: "Hand written", route: "/docs/guides/hand-written" },
       { label: "Blog", route: "https://example.com" },
     ]);
   });

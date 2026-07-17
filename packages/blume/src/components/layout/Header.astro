@@ -182,11 +182,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
         askEnabled={askEnabled}
         locale={searchLocale}
         navigation={navigation}
-        popularPages={
-          data.config.search.popular.length > 0
-            ? data.config.search.popular
-            : undefined
-        }
+        popularPages={data.config.search.popular}
         strings={searchStrings}
       />
     )
