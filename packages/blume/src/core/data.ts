@@ -123,7 +123,7 @@ export interface BlumeDataConfig {
   search: {
     enabled: boolean;
     /** Resolved empty-state links; empty when unset (Search falls back to sidebar). */
-    popular: { label: string; route: string }[];
+    popular: { icon?: string; label: string; route: string }[];
     provider: SearchProvider;
   };
   /** Deployment site URL, or `null` when none is configured/detected. */

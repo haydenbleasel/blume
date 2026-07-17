@@ -457,6 +457,8 @@ export interface MixedbreadSearch {
 export interface SearchPopularLink {
   /** Internal route or external URL. */
   href: string;
+  /** Built-in icon name shown beside the label; defaults to the file glyph. */
+  icon?: string;
   /** Link label shown in the dialog. */
   label: string;
 }

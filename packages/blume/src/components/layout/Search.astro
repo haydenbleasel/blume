@@ -2,6 +2,7 @@
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { Navigation } from "../../core/types.ts";
+import { resolveIcon } from "../../theme/icons.ts";
 import Icon from "../Icon.astro";
 import { flattenPages } from "./nav-utils.ts";
 
@@ -14,7 +15,7 @@ interface Props {
   askEnabled?: boolean;
   navigation?: Navigation;
   /** Curated empty-state pages; falls back to the first sidebar pages when empty or omitted. */
-  popularPages?: { label: string; route: string }[];
+  popularPages?: { icon?: string; label: string; route: string }[];
   strings?: UIStrings["search"];
   /** Active locale to filter results to; omitted disables locale filtering. */
   locale?: string;
@@ -27,10 +28,26 @@ const { askEnabled = false, navigation, popularPages, strings, locale } =
 // default, matching the pattern PageActions uses for its own dictionary.
 const s = { ...EN_UI.search, ...strings };
 
-// Pages shown in the empty state, before the user has typed anything.
+// Icons resolve to inline SVG here (`theme/icons.ts` is a server-only module —
+// far too large to ship to the browser), so the island gets ready-to-render
+// markup rather than a name it can't resolve. Same approach as AskAI.astro.
+// A name outside the set falls through to the island's own file glyph.
+const iconSvg = (name: string | undefined): string | undefined => {
+  const resolved = name ? resolveIcon(name) : null;
+  return resolved
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="${resolved.viewBox}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${resolved.body}</svg>`
+    : undefined;
+};
+
+// Pages shown in the empty state, before the user has typed anything. Only
+// curated entries carry an icon; sidebar-derived rows keep the file glyph.
 const popular =
   popularPages && popularPages.length > 0
-    ? popularPages
+    ? popularPages.map((page) => ({
+        icon: iconSvg(page.icon),
+        label: page.label,
+        route: page.route,
+      }))
     : navigation
       ? flattenPages(navigation.sidebar).slice(0, 6)
       : [];
@@ -174,6 +191,8 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
     }
 
     interface PopularPage {
+      /** Pre-resolved inline SVG from the server; absent falls back to `file`. */
+      icon?: string;
       label: string;
       route: string;
     }
@@ -509,7 +528,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         if (this.popular.length > 0) {
           const group = this.addGroup(this.popularMsg);
           for (const page of this.popular) {
-            const item = this.createLinkRow(page.route, page.label);
+            const item = this.createLinkRow(page.route, page.label, page.icon);
             group.appendChild(item.el);
             this.selectables.push(item);
           }
@@ -598,13 +617,15 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         return item;
       }
 
-      createLinkRow(url: string, label: string): Selectable {
+      createLinkRow(url: string, label: string, icon?: string): Selectable {
         const el = document.createElement("a");
         const href = prefixBase(import.meta.env.BASE_URL, url);
         el.href = href;
         el.className = ROW_CLASS;
+        // `icon` is server-resolved markup from the bundled icon set, not
+        // author HTML — the label still goes through `escapeHtml`.
         el.innerHTML = `
-          <span class="mt-0.5 shrink-0 text-muted-foreground">${svg("file")}</span>
+          <span class="mt-0.5 shrink-0 text-muted-foreground">${icon ?? svg("file")}</span>
           <span class="flex-1">
             <span class="block truncate font-normal text-foreground text-sm">${escapeHtml(label)}</span>
           </span>`;

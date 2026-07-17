@@ -2,6 +2,8 @@ import { withBasePath } from "../core/base-path.ts";
 
 /** A resolved search empty-state link passed to the Search dialog. */
 export interface SearchPopularPage {
+  /** Built-in icon name; `Search.astro` resolves it to markup at render time. */
+  icon?: string;
   label: string;
   route: string;
 }
@@ -16,12 +18,16 @@ export interface SearchPopularPage {
  *
  * `deployment.base` is deliberately *not* applied: routes stay deploy-base-less
  * so `createLinkRow` can prefix it at click time, same as sidebar-derived pages.
+ *
+ * `icon` stays a name here (like `navigation.featured`): the icon set is a
+ * server-only module, so `Search.astro` resolves it to inline SVG at render.
  */
 export const resolveSearchPopular = (
-  popular: { href: string; label: string }[],
+  popular: { href: string; icon?: string; label: string }[],
   basePath: string
 ): SearchPopularPage[] =>
-  popular.map(({ href, label }) => ({
+  popular.map(({ href, icon, label }) => ({
+    ...(icon ? { icon } : {}),
     label,
     route: withBasePath(basePath, href),
   }));

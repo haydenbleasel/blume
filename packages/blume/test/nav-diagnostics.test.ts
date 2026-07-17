@@ -4,6 +4,7 @@ import {
   validateNavIcons,
   validateNavStructure,
   validateNavTargets,
+  validateSearchPopularIcons,
 } from "../src/core/nav-diagnostics.ts";
 import type { Navigation, PageRecord } from "../src/core/types.ts";
 
@@ -13,6 +14,27 @@ const nav = (over: Partial<Navigation> = {}): Navigation => ({
   sidebar: [],
   tabs: [],
   ...over,
+});
+
+describe("validateSearchPopularIcons", () => {
+  it("warns about an unknown icon name, naming the link", () => {
+    const result = validateSearchPopularIcons([
+      { icon: "not-a-real-icon", label: "Start" },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.code).toBe("BLUME_UNKNOWN_ICON");
+    expect(result[0]?.message).toContain("not-a-real-icon");
+    expect(result[0]?.message).toContain('popular link "Start"');
+  });
+
+  it("accepts a known built-in icon and an entry with none", () => {
+    expect(
+      validateSearchPopularIcons([
+        { icon: "rocket", label: "Start" },
+        { label: "No icon" },
+      ])
+    ).toEqual([]);
+  });
 });
 
 describe("validateNavIcons", () => {

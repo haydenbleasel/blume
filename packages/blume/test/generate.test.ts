@@ -223,7 +223,7 @@ describe("buildRuntimeData", () => {
         "blume.config.ts": `export default {
   search: {
     popular: [
-      { href: "/guides/start", label: "Start" },
+      { href: "/guides/start", icon: "rocket", label: "Start" },
       { href: "https://example.com", label: "Blog" },
     ],
   },
@@ -234,7 +234,7 @@ describe("buildRuntimeData", () => {
     );
     const data = JSON.parse(buildRuntimeData(project));
     expect(data.config.search.popular).toStrictEqual([
-      { label: "Start", route: "/guides/start" },
+      { icon: "rocket", label: "Start", route: "/guides/start" },
       { label: "Blog", route: "https://example.com" },
     ]);
   });

@@ -519,6 +519,7 @@ const PROVIDER_CONFIG_KEY = {
 /** Curated link for the search dialog empty state (internal route or external URL). */
 const searchPopularLinkSchema = z.strictObject({
   href: z.string(),
+  icon: iconName.optional(),
   label: z.string(),
 });
 

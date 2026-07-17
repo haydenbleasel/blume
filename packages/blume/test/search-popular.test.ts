@@ -23,6 +23,25 @@ describe("search.popular config", () => {
     ]);
   });
 
+  it("parses an optional icon", () => {
+    const config = blumeConfigSchema.parse({
+      search: {
+        popular: [{ href: "/guides/start", icon: "rocket", label: "Start" }],
+      },
+    });
+    expect(config.search.popular).toStrictEqual([
+      { href: "/guides/start", icon: "rocket", label: "Start" },
+    ]);
+  });
+
+  it("rejects an empty icon name", () => {
+    expect(
+      blumeConfigSchema.safeParse({
+        search: { popular: [{ href: "/x", icon: "", label: "X" }] },
+      }).success
+    ).toBe(false);
+  });
+
   it("rejects entries missing href or label", () => {
     expect(
       blumeConfigSchema.safeParse({
@@ -81,5 +100,22 @@ describe("resolveSearchPopular", () => {
         "/docs"
       )
     ).toStrictEqual([{ label: "Start", route: "/docs/guides/start" }]);
+  });
+
+  it("passes an icon name through, omitting the key when unset", () => {
+    // The name resolves to markup in `Search.astro` — the icon set is a
+    // server-only module the client island can't import.
+    expect(
+      resolveSearchPopular(
+        [
+          { href: "/guides/start", icon: "rocket", label: "Start" },
+          { href: "/guides/next", label: "Next" },
+        ],
+        ""
+      )
+    ).toStrictEqual([
+      { icon: "rocket", label: "Start", route: "/guides/start" },
+      { label: "Next", route: "/guides/next" },
+    ]);
   });
 });

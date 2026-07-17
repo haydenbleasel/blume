@@ -20,14 +20,16 @@ Before a reader types a query, the search dialog shows a **Popular** list. By de
 ```ts blume.config.ts lineNumbers
 search: {
   popular: [
-    { href: "/guides/getting-started", label: "Getting started" },
-    { href: "/guides/install", label: "Install" },
+    { href: "/guides/getting-started", icon: "rocket", label: "Getting started" },
+    { href: "/guides/install", icon: "download", label: "Install" },
     { href: "/concepts/overview", label: "Overview" },
   ],
 },
 ```
 
-Each entry takes an `href` (internal route or external URL) and a `label`. Omit `popular` or leave it empty to keep the sidebar fallback.
+Each entry takes an `href` (internal route or external URL) and a `label`, plus an optional `icon` — a built-in icon name shown beside the label, defaulting to a file glyph. Omit `popular` or leave it empty to keep the sidebar fallback.
+
+Unlike icons elsewhere in Blume, `icon` here must be a built-in name: these rows render in a client island, so an image path or inline SVG isn't supported and falls back to the file glyph.
 
 Write `href` as if the site were mounted at the root — a `basePath` is applied for you, the same as `navigation.featured`. External URLs pass through untouched.
 
