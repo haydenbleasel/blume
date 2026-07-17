@@ -153,6 +153,39 @@ describe("ensureDepsLink", () => {
     expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
   });
 
+  it("links when pnpm's bin shim exposes Astro only through NODE_PATH", async () => {
+    const { outDir, pkgDir, store } = await isolatedFixture();
+    const generateUrl = pathToFileURL(
+      join(import.meta.dir, "../src/astro/generate.ts")
+    ).href;
+    const script = `
+      const { ensureDepsLink } = await import(${JSON.stringify(generateUrl)});
+      await ensureDepsLink(${JSON.stringify(outDir)}, ${JSON.stringify(pkgDir)});
+    `;
+
+    // pnpm's generated `node_modules/.bin/blume` wrapper prepends this virtual
+    // store directory to NODE_PATH. CommonJS `require.resolve` sees Astro there,
+    // while the generated config's ESM `import "astro/config"` does not. Run in
+    // a child process because NODE_PATH is read when the runtime starts.
+    const proc = Bun.spawn([process.execPath, "-e", script], {
+      env: { ...process.env, NODE_PATH: store },
+      stderr: "pipe",
+      stdout: "ignore",
+    });
+    const [exitCode, stderr] = await Promise.all([
+      proc.exited,
+      new Response(proc.stderr).text(),
+    ]);
+    if (exitCode !== 0) {
+      throw new Error(stderr);
+    }
+
+    const link = join(outDir, "node_modules");
+    const stats = await lstat(link);
+    expect(stats.isSymbolicLink()).toBe(true);
+    expect(await readlink(link)).toBe(store);
+  });
+
   it("is a no-op when Astro already resolves (hoisted install)", async () => {
     const outDir = join(root, "app", ".blume");
     await mkdir(join(root, "app", "node_modules"), { recursive: true });
