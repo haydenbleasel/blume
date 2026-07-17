@@ -18,6 +18,13 @@ import {
 } from "../src/components/openapi/helpers.ts";
 import type { SchemaLike } from "../src/components/openapi/helpers.ts";
 import {
+  effectiveSecurity,
+  resolveSecurity,
+  sampleAuth,
+  schemeCarrier,
+  schemeLabel,
+} from "../src/components/openapi/security.ts";
+import {
   buildRequestSample,
   sampleLanguages,
 } from "../src/components/openapi/snippets.ts";
@@ -1381,5 +1388,222 @@ describe("snippets", () => {
       "js",
       "python",
     ]);
+  });
+});
+
+describe("security", () => {
+  const SCHEMES = {
+    apiCookie: { in: "cookie", name: "session", type: "apiKey" },
+    apiHeader: {
+      description: "Key from the dashboard.",
+      in: "header",
+      name: "X-Api-Key",
+      type: "apiKey",
+    },
+    apiQuery: { in: "query", name: "api_key", type: "apiKey" },
+    basicAuth: { scheme: "basic", type: "http" },
+    bearerAuth: { bearerFormat: "JWT", scheme: "bearer", type: "http" },
+    oauth: { type: "oauth2" },
+    oidc: { type: "openIdConnect" },
+    tls: { type: "mutualTLS" },
+  };
+
+  it("prefers the operation's security and treats [] as public", () => {
+    const root = [{ bearerAuth: [] }];
+    expect(effectiveSecurity(undefined, root)).toStrictEqual(root);
+    expect(effectiveSecurity([], root)).toStrictEqual([]);
+    expect(effectiveSecurity([{ apiHeader: [] }], root)).toStrictEqual([
+      { apiHeader: [] },
+    ]);
+    expect(effectiveSecurity()).toStrictEqual([]);
+  });
+
+  it("resolves requirement names against the component schemes", () => {
+    const { alternatives, optional } = resolveSecurity(
+      [{ bearerAuth: [] }, { apiHeader: [], apiQuery: [] }],
+      SCHEMES
+    );
+    expect(optional).toBe(false);
+    // Two OR alternatives; the second requires both schemes together.
+    expect(alternatives).toHaveLength(2);
+    expect(alternatives[0]?.[0]?.scheme).toBe(SCHEMES.bearerAuth);
+    expect(alternatives[1]?.map((entry) => entry.key)).toStrictEqual([
+      "apiHeader",
+      "apiQuery",
+    ]);
+  });
+
+  it("keeps an unknown scheme ref instead of dropping the requirement", () => {
+    const { alternatives } = resolveSecurity([{ ghost: [] }], SCHEMES);
+    expect(alternatives[0]?.[0]).toStrictEqual({
+      key: "ghost",
+      scheme: undefined,
+      scopes: [],
+    });
+  });
+
+  it("flags an empty requirement as optional auth, not an alternative", () => {
+    const { alternatives, optional } = resolveSecurity(
+      [{}, { bearerAuth: [] }],
+      SCHEMES
+    );
+    expect(optional).toBe(true);
+    expect(alternatives).toHaveLength(1);
+  });
+
+  it("carries OAuth scopes and ignores malformed entries", () => {
+    const { alternatives } = resolveSecurity(
+      [{ oauth: ["read:pets", "write:pets"] }],
+      SCHEMES
+    );
+    expect(alternatives[0]?.[0]?.scopes).toStrictEqual([
+      "read:pets",
+      "write:pets",
+    ]);
+    const malformed = resolveSecurity(
+      [{ oauth: "read" }] as unknown as Record<string, string[]>[],
+      SCHEMES
+    );
+    expect(malformed.alternatives[0]?.[0]?.scopes).toStrictEqual([]);
+  });
+
+  it("labels schemes and locates their credential", () => {
+    const resolved = (key: keyof typeof SCHEMES) => ({
+      key,
+      scheme: SCHEMES[key],
+      scopes: [],
+    });
+    expect(schemeLabel(resolved("bearerAuth"))).toBe("Bearer token (JWT)");
+    expect(schemeLabel(resolved("basicAuth"))).toBe("Basic auth");
+    expect(schemeLabel(resolved("apiHeader"))).toBe("API key");
+    expect(schemeLabel(resolved("oauth"))).toBe("OAuth2 access token");
+    expect(schemeLabel(resolved("oidc"))).toBe("OpenID Connect token");
+    expect(schemeLabel(resolved("tls"))).toBe("Mutual TLS");
+    // A format-less bearer and a non-bearer/basic HTTP scheme.
+    expect(
+      schemeLabel({
+        key: "plain",
+        scheme: { scheme: "bearer", type: "http" },
+        scopes: [],
+      })
+    ).toBe("Bearer token");
+    expect(
+      schemeLabel({
+        key: "digest",
+        scheme: { scheme: "digest", type: "http" },
+        scopes: [],
+      })
+    ).toBe("HTTP digest");
+    // Unknown ref: the component name is the only label available.
+    expect(schemeLabel({ key: "ghost", scopes: [] })).toBe("ghost");
+
+    expect(schemeCarrier(resolved("bearerAuth"))).toStrictEqual({
+      in: "header",
+      name: "Authorization",
+    });
+    expect(schemeCarrier(resolved("apiQuery"))).toStrictEqual({
+      in: "query",
+      name: "api_key",
+    });
+    expect(schemeCarrier(resolved("tls"))).toBeUndefined();
+    expect(schemeCarrier({ key: "ghost", scopes: [] })).toBeUndefined();
+  });
+
+  it("builds placeholder credentials from the first alternative only", () => {
+    const security = resolveSecurity(
+      [{ apiCookie: [], apiHeader: [], apiQuery: [], bearerAuth: [] }],
+      SCHEMES
+    );
+    const auth = sampleAuth(security);
+    expect(auth.headers.Authorization).toBe("Bearer YOUR_TOKEN");
+    expect(auth.headers["X-Api-Key"]).toBe("YOUR_API_KEY");
+    expect(auth.headers.Cookie).toBe("session=YOUR_API_KEY");
+    expect(auth.query).toStrictEqual({ api_key: "YOUR_API_KEY" });
+
+    const second = sampleAuth(
+      resolveSecurity([{ basicAuth: [] }, { apiHeader: [] }], SCHEMES)
+    );
+    expect(second.headers).toStrictEqual({
+      Authorization: "Basic YOUR_CREDENTIALS",
+    });
+
+    // OAuth2 (and OpenID Connect) degrade to a bearer access token.
+    expect(
+      sampleAuth(resolveSecurity([{ oauth: ["read:pets"] }], SCHEMES)).headers
+    ).toStrictEqual({ Authorization: "Bearer YOUR_ACCESS_TOKEN" });
+
+    // Mutual TLS travels outside the request; an unknown ref can't be guessed.
+    expect(
+      sampleAuth(resolveSecurity([{ ghost: [], tls: [] }], SCHEMES))
+    ).toStrictEqual({ headers: {}, query: {} });
+
+    // Public operation: nothing to add.
+    expect(sampleAuth(resolveSecurity([], SCHEMES))).toStrictEqual({
+      headers: {},
+      query: {},
+    });
+  });
+
+  it("threads auth placeholders into the request sample and snippets", () => {
+    const security = resolveSecurity([{ bearerAuth: [] }], SCHEMES);
+    const sample = buildRequestSample(
+      { parameters: [] },
+      "post",
+      "/pet",
+      [{ url: "https://api.test/v1" }],
+      {},
+      sampleAuth(security)
+    );
+    expect(sample.headers.Authorization).toBe("Bearer YOUR_TOKEN");
+    const [curl] = sampleLanguages(["curl"]).map((language) =>
+      language.build(sample)
+    );
+    expect(curl).toContain('-H "Authorization: Bearer YOUR_TOKEN"');
+  });
+
+  it("appends a query API key to the sample URL", () => {
+    const security = resolveSecurity([{ apiQuery: [] }], SCHEMES);
+    const sample = buildRequestSample(
+      {
+        parameters: [
+          {
+            in: "query",
+            name: "verbose",
+            required: true,
+            schema: { type: "boolean" },
+          },
+        ],
+      },
+      "get",
+      "/pet",
+      [{ url: "https://api.test/v1" }],
+      {},
+      sampleAuth(security)
+    );
+    expect(sample.url).toBe(
+      "https://api.test/v1/pet?verbose=true&api_key=YOUR_API_KEY"
+    );
+  });
+
+  it("lets an explicit header parameter override the auth placeholder", () => {
+    const security = resolveSecurity([{ bearerAuth: [] }], SCHEMES);
+    const sample = buildRequestSample(
+      {
+        parameters: [
+          {
+            example: "Bearer from-the-spec",
+            in: "header",
+            name: "Authorization",
+            required: true,
+          },
+        ],
+      },
+      "get",
+      "/pet",
+      [{ url: "https://api.test/v1" }],
+      {},
+      sampleAuth(security)
+    );
+    expect(sample.headers.Authorization).toBe("Bearer from-the-spec");
   });
 });

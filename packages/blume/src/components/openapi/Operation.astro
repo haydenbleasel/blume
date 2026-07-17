@@ -6,7 +6,15 @@ import {
   resolveComponentRef,
   type SchemaLike,
 } from "./helpers.ts";
+import {
+  effectiveSecurity,
+  resolveSecurity,
+  sampleAuth,
+  type SecurityRequirementLike,
+  type SecuritySchemeLike,
+} from "./security.ts";
 import { buildRequestSample, sampleLanguages } from "./snippets.ts";
+import Authorization from "./Authorization.astro";
 import MethodBadge from "./MethodBadge.astro";
 import ParametersTable from "./ParametersTable.astro";
 import RequestBody from "./RequestBody.astro";
@@ -43,6 +51,7 @@ interface FullOperation {
   parameters?: ParameterLike[];
   requestBody?: RequestBodyLike;
   responses?: Record<string, ResponseLike>;
+  security?: SecurityRequirementLike[];
 }
 
 const { source, id } = Astro.props;
@@ -59,7 +68,9 @@ const doc = (spec?.document ?? {}) as {
     parameters?: Record<string, ParameterLike>;
     requestBodies?: Record<string, RequestBodyLike>;
     responses?: Record<string, ResponseLike>;
+    securitySchemes?: Record<string, SecuritySchemeLike>;
   };
+  security?: SecurityRequirementLike[];
   servers?: { url?: string }[];
 };
 const pathItem = ref ? doc.paths?.[ref.path] : undefined;
@@ -84,6 +95,11 @@ const responses = Object.fromEntries(
   ])
 );
 
+const security = resolveSecurity(
+  effectiveSecurity(operation?.security, doc.security),
+  doc.components?.securitySchemes
+);
+
 const sample =
   ref && operation
     ? buildRequestSample(
@@ -91,7 +107,8 @@ const sample =
         ref.method,
         ref.path,
         doc.servers ?? [],
-        schemas
+        schemas,
+        sampleAuth(security)
       )
     : null;
 const languages = sampleLanguages(spec?.codeSamples ?? []);
@@ -115,6 +132,7 @@ const languages = sampleLanguages(spec?.codeSamples ?? []);
       </div>
       <div class="grid grid-cols-1 items-start gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
         <div>
+          <Authorization security={security} />
           <ParametersTable parameters={params} schemas={schemas} />
           {requestBody && (
             <RequestBody
