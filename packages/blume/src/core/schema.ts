@@ -1,3 +1,4 @@
+import type { AstroIntegration } from "astro";
 import { z } from "zod";
 
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
@@ -1156,6 +1157,7 @@ export const blumeConfigSchema = z.strictObject({
   frontmatter: frontmatterConfigSchema.default({}),
   github: githubConfigSchema.optional(),
   i18n: i18nConfigSchema.optional(),
+  integrations: z.array(z.custom<AstroIntegration>()).default([]),
   lastModified: lastModifiedConfigSchema.default(false),
   logo: logoConfigSchema.optional(),
   markdown: markdownConfigSchema.default({}),

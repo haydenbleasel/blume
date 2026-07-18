@@ -84,6 +84,10 @@ import type { Diagnostic } from "./types.ts";
  * - `analytics` — PostHog, Vercel, or arbitrary `scripts` (Plausible, Fathom,
  *   GA, …).
  *
+ * **Astro**
+ * - `integrations` — Astro integrations appended after Blume's built-ins, in
+ *   declaration order. Install and maintain each integration in the site.
+ *
  * **Deployment & i18n**
  * - `deployment` — `site` URL (needed for absolute links, sitemaps, and OG),
  *   `adapter` (`vercel`/`node`/`netlify`/`cloudflare`), `output`

@@ -583,6 +583,62 @@ const KITCHEN_SINK: Record<string, string> = {
 };
 
 describe("generateRuntime", () => {
+  it("bridges configured integrations without serializing config source", async () => {
+    const root = await writeProject({
+      "blume.config.ts": `
+        const secret = "must-not-leak";
+        export default {
+          integrations: [{ hooks: {}, name: "probe-" + secret.length }],
+        };
+      `,
+      "docs/index.md": "# Home\n",
+    });
+    const project = await scanProject(root);
+    await generateRuntime(project);
+    const generated = await readFile(
+      join(project.context.outDir, "astro.config.mjs"),
+      "utf-8"
+    );
+
+    expect(generated).toContain("createModuleLoader");
+    expect(generated).toContain("...(blumeConfig?.integrations ?? [])");
+    expect(generated).toContain('"../blume.config.ts"');
+    expect(generated).toMatch(/Blume config source SHA-256: [a-f0-9]{64}/u);
+    expect(generated).not.toContain("must-not-leak");
+  });
+
+  it("rewrites generated config when integration source changes", async () => {
+    const root = await writeProject({
+      "blume.config.ts": `export default {
+        integrations: [{ hooks: {}, name: "first" }],
+      };\n`,
+      "docs/index.md": "# Home\n",
+    });
+    const configPath = join(root, "blume.config.ts");
+    const firstProject = await scanProject(root);
+    await generateRuntime(firstProject);
+    const generatedPath = join(firstProject.context.outDir, "astro.config.mjs");
+    const first = await readFile(generatedPath, "utf-8");
+
+    await writeFile(
+      configPath,
+      `export default {
+        integrations: [{ hooks: {}, name: "second" }],
+      };\n`
+    );
+    const secondProject = await scanProject(root);
+    const result = await generateRuntime(secondProject);
+    const second = await readFile(generatedPath, "utf-8");
+
+    expect(result.structuralChange).toBe(true);
+    expect(second).not.toBe(first);
+    expect(second).not.toContain('name: "second"');
+    const hashPattern = /Blume config source SHA-256: (?<hash>[a-f0-9]{64})/u;
+    const firstHash = first.match(hashPattern)?.groups?.hash;
+    const secondHash = second.match(hashPattern)?.groups?.hash;
+    expect(secondHash).not.toBe(firstHash);
+  });
+
   it("writes the full runtime for a feature-rich project", async () => {
     const project = await scanProject(await writeProject(KITCHEN_SINK));
     const out = project.context.outDir;

@@ -1,3 +1,4 @@
+import type { AstroIntegration } from "astro";
 import type { z } from "zod";
 
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
@@ -1045,6 +1046,8 @@ export interface BlumeConfig {
   github?: GithubConfig;
   /** Internationalization (opt-in multi-locale). */
   i18n?: I18nConfig;
+  /** Astro integrations appended after Blume's built-ins, in declaration order. */
+  integrations?: AstroIntegration[];
   /** "Last updated" timestamps from git history or frontmatter. Defaults to `false`. */
   lastModified?: LastModifiedConfig;
   /** Site logo / brand mark. */

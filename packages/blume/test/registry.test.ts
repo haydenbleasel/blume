@@ -34,6 +34,28 @@ const writeFiles = async (
 };
 
 describe("eject", () => {
+  it("keeps configured integrations through a portable config bridge", async () => {
+    const root = await mkdtemp(join(tmpdir(), "blume-eject-"));
+    ejectDirs.push(root);
+    await writeFiles(root, {
+      "blume.config.ts": `export default {
+        integrations: [{ hooks: {}, name: "eject-probe" }],
+      };\n`,
+      "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
+    });
+
+    await eject(root);
+
+    const astroConfig = readFileSync(join(root, "astro.config.mjs"), "utf-8");
+    expect(astroConfig).toContain("createModuleLoader");
+    expect(astroConfig).toContain("...(blumeConfig?.integrations ?? [])");
+    const configLoad = astroConfig
+      .split("\n")
+      .find((line) => line.includes("await loadBlumeConfig"));
+    expect(configLoad).toContain('"blume.config.ts"');
+    expect(configLoad).not.toContain(root);
+  });
+
   it("promotes the runtime, writing every feature-gated file", async () => {
     const root = await mkdtemp(join(tmpdir(), "blume-eject-"));
     ejectDirs.push(root);

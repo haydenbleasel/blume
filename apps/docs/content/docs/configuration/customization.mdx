@@ -145,6 +145,31 @@ blume add pagination
 
 The copy imports the rest of the framework from `blume/*`, so it renders exactly like the built-in until you change it. `blume add` prints the `defineComponents` snippet to register it — content components under `mdx`, layout pieces under `layout`.
 
+## Astro integrations
+
+Add any Astro integration from the top-level `integrations` array in `blume.config.ts`. Install the integration in your site first; Blume does not add it to the generated runtime's dependencies or manage its Astro compatibility.
+
+```bash
+npm install @astrojs/sitemap
+```
+
+```ts blume.config.ts lineNumbers
+import sitemap from "@astrojs/sitemap";
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  integrations: [
+    sitemap({
+      filter: (page) => !page.includes("/drafts/"),
+    }),
+  ],
+});
+```
+
+Blume keeps its built-in integrations in their existing order, then appends your entries in declaration order. It does not sort or deduplicate them, so two integrations with the same `name` both run. Blume validates that `integrations` is an array, while Astro validates each entry and reports invalid integrations.
+
+The same integrations run in `blume dev` and `blume build`. Editing `blume.config.ts` during `blume dev` regenerates the hidden Astro config and triggers a config restart; if you don't see an edited integration take effect, restart `blume dev`. If you eject, the owned `astro.config.mjs` keeps a relative bridge to `blume.config.ts`, so the configured integrations continue to run; you can later move them directly into the Astro config as part of taking full ownership.
+
 ## Eject
 
 When you want full control, eject the generated runtime into a standalone Astro project:

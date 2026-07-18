@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import {
   lstat,
@@ -555,6 +556,22 @@ export const detectUsesMath = async (
     files.map((file) => readOptional(join(root, file)))
   );
   return [...contents, ...staged].some(containsMath);
+};
+
+const hashConfigSource = (source: string): string =>
+  createHash("sha256").update(source).digest("hex");
+
+const loadIntegrationBridge = async (
+  config: ResolvedConfig,
+  context: BlumeProject["context"]
+): Promise<Parameters<typeof astroConfigTemplate>[0]["integrationBridge"]> => {
+  if (config.integrations.length === 0 || !context.configFile) {
+    return;
+  }
+  return {
+    configFile: relative(context.outDir, context.configFile),
+    sourceHash: hashConfigSource(await readOptional(context.configFile)),
+  };
 };
 
 const writeIfChanged = async (
@@ -1227,6 +1244,7 @@ export const generateRuntime = async (
     usesMath,
     userTheme,
     userExamplesCss,
+    integrationBridge,
     islandDiscovery,
     exampleDiscovery,
     componentSlots,
@@ -1236,6 +1254,7 @@ export const generateRuntime = async (
     detectUsesMath(context.root, staged.values()),
     readOptional(context.themeFile),
     readOptional(examplesCssFile(context.root, config)),
+    loadIntegrationBridge(config, context),
     discoverIslands(context.root),
     discoverExamples(context.root, config.examples.source),
     buildComponentSlots(context.componentsFile),
@@ -1300,6 +1319,7 @@ export const generateRuntime = async (
           dataPath,
           examplesPath,
           examplesThemePath,
+          integrationBridge,
           needsReact,
           needsSvelte,
           needsVue,
