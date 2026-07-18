@@ -1,5 +1,5 @@
 ---
-"blume": patch
+"blume": minor
 ---
 
 Add `blume audit`, an offline site audit that replaces a hosted SEO crawler.
