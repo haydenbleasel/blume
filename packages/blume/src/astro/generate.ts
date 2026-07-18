@@ -954,6 +954,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       // the optional schema type so the serialized shape stays `boolean`.
       og: {
         enabled: config.seo.og.enabled ?? false,
+        fonts: config.seo.og.fonts ?? [],
         logo: ogLogo,
         palette: config.seo.og.palette,
       },

@@ -1,7 +1,49 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 
 import { renderOgImage } from "../src/og/card.ts";
 import type { OgCardOptions } from "../src/og/card.ts";
+
+// A real woff2 (shipped by katex) to serve as the subset bytes, so `googleFonts`
+// + `render` run end-to-end without a real network fetch or a checked-in fixture.
+const SUBSET_WOFF2 = readFileSync(
+  createRequire(import.meta.url).resolve(
+    "katex/dist/fonts/KaTeX_Main-Regular.woff2"
+  )
+);
+
+// Stub `fetch` so `googleFonts` is hermetic: a css2 request returns one
+// `@font-face` block, and the subset URL returns the woff2 bytes. Returns the
+// css2 request count so a test can assert the metadata is fetched once. Mirrors
+// `withStubbedGlyphFetch`, and shields against Bun's fetch retaining a proxy.
+const withStubbedFonts = async (
+  body: (css2Requests: string[]) => Promise<void>
+): Promise<void> => {
+  const original = globalThis.fetch;
+  const css2Requests: string[] = [];
+  globalThis.fetch = ((input: RequestInfo | URL) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.includes("css2")) {
+      css2Requests.push(url);
+      const css =
+        "@font-face { font-family: 'Noto Sans JP'; font-style: normal; font-weight: 400; " +
+        "src: url(https://fonts.gstatic.com/s/notosansjp/x.woff2) format('woff2'); " +
+        "unicode-range: U+0000-00FF, U+3040-30FF; }";
+      return Promise.resolve(
+        new Response(css, { headers: { "Content-Type": "text/css" } })
+      );
+    }
+    return Promise.resolve(
+      new Response(SUBSET_WOFF2, { headers: { "Content-Type": "font/woff2" } })
+    );
+  }) as unknown as typeof fetch;
+  try {
+    await body(css2Requests);
+  } finally {
+    globalThis.fetch = original;
+  }
+};
 
 const expectPng = async (options: OgCardOptions): Promise<void> => {
   const buffer = await renderOgImage(options);
@@ -184,6 +226,30 @@ describe("renderOgImage", () => {
     await expectPng({
       logo: '<svg viewBox=\'0 0 400 40\'><rect fill="currentColor" height="40" width="400" /></svg>',
       title: "Hi",
+    });
+  });
+
+  it("loads a Google Font family so a non-Latin title isn't tofu", async () => {
+    // The fix for #62: `googleFonts` fetches a family that covers the script and
+    // `render` registers the subsets the title uses. The object form exercises
+    // the weight/style fields.
+    await withStubbedFonts(async () => {
+      await expectPng({
+        fonts: [{ name: "Noto Sans JP", style: "normal", weight: 400 }],
+        title: "こんにちは",
+      });
+    });
+  });
+
+  it("fetches the css2 metadata once across cards with the same fonts", async () => {
+    // A build prerenders one card per page, so the same family set must not
+    // refetch the css2 metadata per card. Two renders exercise both the
+    // cache-miss and cache-hit branches of loadFonts. Uses a family no other
+    // test loads, since `googleFonts` keeps a process-wide css2 cache.
+    await withStubbedFonts(async (css2Requests) => {
+      await expectPng({ fonts: ["Noto Sans KR"], title: "안녕하세요" });
+      await expectPng({ fonts: ["Noto Sans KR"], title: "감사합니다" });
+      expect(css2Requests).toHaveLength(1);
     });
   });
 });

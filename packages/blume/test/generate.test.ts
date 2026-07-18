@@ -392,6 +392,41 @@ describe("buildRuntimeData", () => {
     expect(data.config.og.logo).toBeUndefined();
   });
 
+  it("passes Open Graph Google Font families through to the runtime data", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  seo: {
+    og: {
+      fonts: [
+        "Noto Sans JP",
+        { name: "Inter", weight: [400, 700], style: "italic" },
+      ],
+    },
+  },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.og.fonts).toEqual([
+      "Noto Sans JP",
+      { name: "Inter", style: "italic", weight: [400, 700] },
+    ]);
+  });
+
+  it("omits Open Graph fonts when none are configured", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": "export default {};\n",
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.og.fonts).toEqual([]);
+  });
+
   it("reserves dimensions for per-mode SVG logos", async () => {
     const project = await scanProject(
       await writeProject({

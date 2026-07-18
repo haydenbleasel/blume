@@ -1,3 +1,4 @@
+import type { OgFont } from "../og/card.ts";
 import type { UIStrings } from "./i18n-ui.ts";
 import type { ResolvedConfig, SearchProvider } from "./schema.ts";
 import type { Navigation, RouteAlternate } from "./types.ts";
@@ -115,6 +116,8 @@ export interface BlumeDataConfig {
   /** Open Graph image generation. */
   og: {
     enabled: boolean;
+    /** Extra fonts for the card renderer, resolved to absolute file paths. */
+    fonts?: OgFont[];
     logo?: string;
     palette?: ResolvedConfig["seo"]["og"]["palette"];
   };

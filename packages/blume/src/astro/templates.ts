@@ -1112,6 +1112,7 @@ export async function GET({ props }: { props: { title: string } }) {
     accent: data.config.og.palette?.accent ?? data.config.theme.accent.light,
     brand: data.config.title,
     description: data.config.description,
+    fonts: data.config.og.fonts,
     logo: data.config.og.logo,
     palette: data.config.og.palette,
     repo: repoSlug,

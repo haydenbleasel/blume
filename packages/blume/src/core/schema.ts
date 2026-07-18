@@ -830,6 +830,28 @@ const ogPaletteSchema = z.strictObject({
   muted: ogColorSchema.optional(),
 });
 
+/**
+ * A Google Font family to load into the OG card renderer. A bare string is the
+ * family name; the object form pins the weight (a number, a list, or a variable
+ * range like `"100..900"`) and style. Fetched from Google Fonts at build and
+ * handed to Takumi, which does per-glyph fallback so a family covering a script
+ * (e.g. Noto Sans JP for CJK) fixes tofu without touching how Latin renders.
+ */
+const ogFontWeightSchema = z.union([
+  z.number().int().positive(),
+  z.array(z.number().int().positive()),
+  z.string().regex(/^\d+\.\.\d+$/u),
+]);
+const ogFontStyleSchema = z.enum(["normal", "italic"]);
+const ogFontSchema = z.union([
+  z.string(),
+  z.strictObject({
+    name: z.string(),
+    style: z.union([ogFontStyleSchema, z.array(ogFontStyleSchema)]).optional(),
+    weight: ogFontWeightSchema.optional(),
+  }),
+]);
+
 const ogConfigSchema = z.strictObject({
   /**
    * Generate a per-page Open Graph image. Defaults to on once a deployment
@@ -838,6 +860,12 @@ const ogConfigSchema = z.strictObject({
    * `loadConfig`. An explicit value here always wins.
    */
   enabled: z.boolean().optional(),
+  /**
+   * Google Font families for the generated card, extending Takumi's Latin-only
+   * default so non-Latin titles (CJK, and so on) render instead of tofu.
+   * Fetched from Google Fonts at build.
+   */
+  fonts: z.array(ogFontSchema).optional(),
   /** Local SVG used in the generated card instead of the site logo. */
   logo: z.string().optional(),
   /** Optional generated-card colors. */

@@ -1,9 +1,26 @@
 import { render } from "takumi-js";
 import type { RenderOptions } from "takumi-js";
-import { container, image, text } from "takumi-js/helpers";
-import type { Node } from "takumi-js/helpers";
+import { container, googleFonts, image, text } from "takumi-js/helpers";
+import type { FontSubset, GoogleFontFamily, Node } from "takumi-js/helpers";
 
 import { OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH } from "./dimensions.ts";
+
+/**
+ * A Google Font family to load into the OG card renderer. A bare string is the
+ * family name (weight 400, normal style); the object form pins weight and style.
+ * Handed straight to Takumi's `googleFonts` helper, which fetches the family
+ * from Google Fonts at build and returns per-glyph coverage subsets.
+ */
+export type OgFont =
+  | string
+  | {
+      /** Google Fonts family name, e.g. `"Noto Sans JP"`. */
+      name: string;
+      /** `400`, `[400, 700]`, or a variable range like `"100..900"`. */
+      weight?: number | number[] | string;
+      /** `"normal"`, `"italic"`, or both. */
+      style?: "normal" | "italic" | ("normal" | "italic")[];
+    };
 
 const ACCENT_HEX: Record<string, string> = {
   blue: "#3b82f6",
@@ -57,6 +74,12 @@ export interface OgCardOptions {
    * {@link resolveImages}.
    */
   images?: RenderOptions["images"];
+  /**
+   * Google Font families for non-Latin titles. Takumi's built-in font covers
+   * only Latin, so a CJK (etc.) title renders as tofu without a family that
+   * covers its script — see {@link loadFonts}.
+   */
+  fonts?: OgFont[];
 }
 
 const WIDTH = OG_IMAGE_WIDTH;
@@ -80,6 +103,29 @@ const resolveImages = (
   Array.isArray(images)
     ? { fetchCache: imageFetchCache, sources: images }
     : { fetchCache: imageFetchCache, ...images };
+
+// Google Fonts subsets keyed by the family set, so a build's identical per-page
+// renders build the subset list once. `googleFonts` also caches the css2 request
+// process-wide and the shared renderer skips subset files it has already loaded,
+// so this only avoids rebuilding the list per card.
+const fontSubsetCache = new Map<string, Promise<FontSubset[]>>();
+
+/**
+ * Load the configured Google Font families as coverage subsets for `render`'s
+ * `fonts` option. `googleFonts` fetches the families from Google Fonts in one
+ * css2 request; `render` then registers only the subsets a card's text uses. A
+ * fetch failure rejects, failing the build with the cause rather than silently
+ * shipping tofu — the same fail-fast the OG accent relies on.
+ */
+const loadFonts = (fonts: OgFont[]): Promise<FontSubset[]> => {
+  const key = JSON.stringify(fonts);
+  let pending = fontSubsetCache.get(key);
+  if (!pending) {
+    pending = googleFonts(fonts as GoogleFontFamily[]);
+    fontSubsetCache.set(key, pending);
+  }
+  return pending;
+};
 
 // Light neutral scale mirrored from the docs homepage theme tokens:
 // FOREGROUND = --foreground, MUTED = --muted-foreground, FAINT = that lighter,
@@ -184,7 +230,9 @@ const titleSize = (title: string): number => {
 };
 
 /** Render a 1200x630 Open Graph card to a PNG buffer. */
-export const renderOgImage = (options: OgCardOptions): Promise<Uint8Array> => {
+export const renderOgImage = async (
+  options: OgCardOptions
+): Promise<Uint8Array> => {
   const { accent, background, border, faint, foreground, muted } =
     resolvePalette(options);
   const brand = options.brand?.trim();
@@ -275,7 +323,13 @@ export const renderOgImage = (options: OgCardOptions): Promise<Uint8Array> => {
     },
   });
 
+  const fonts = options.fonts ?? [];
+  // `render` registers only the subsets a card's text uses and skips files it
+  // has already loaded, so passing the full family list per page is cheap.
+  const fontSubsets = fonts.length ? await loadFonts(fonts) : undefined;
+
   return render(node, {
+    fonts: fontSubsets,
     format: "png",
     height: HEIGHT,
     images: resolveImages(options.images),

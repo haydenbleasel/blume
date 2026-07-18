@@ -149,6 +149,23 @@ Every palette color accepts any CSS color — hex, `oklch(…)`, `rgb(…)`, and
 
 Emoji in a page title or site title render as [Twemoji](https://github.com/jdecked/twemoji) glyphs, fetched from a CDN while the card renders — so a build whose titles contain emoji needs network access. Each glyph is fetched once per build, however many pages use it.
 
+### Non-Latin titles
+
+The card's built-in font covers only Latin glyphs, so a title in another script (Japanese, Chinese, Korean, Arabic, …) renders as tofu — empty boxes. List one or more [Google Fonts](https://fonts.google.com) families in `og.fonts` that cover your script, by name:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    fonts: [
+      "Noto Sans JP",
+      { name: "Inter", weight: [400, 700] },
+    ],
+  },
+}
+```
+
+Each entry is a family name, or an object pinning its `weight` (a number, a list, or a variable range like `"100..900"`) and `style` (`"normal"`, `"italic"`, or both). The families are fetched from Google Fonts at build — so a build that uses them needs network access — and the renderer only pulls the glyph subsets each title actually uses. Fallback is per-glyph, so adding a family only affects glyphs the built-in font can't draw; Latin text renders exactly as before.
+
 `seo.image` is frontmatter, so it only covers Markdown and MDX content. To give a custom [`.astro` page](/docs/advanced/custom-pages) its own social image — a marketing home or landing page, and the way to give the home page alone a bespoke share image — pass the `ogImage` prop to `PageLayout`.
 
 ## RSS feeds
