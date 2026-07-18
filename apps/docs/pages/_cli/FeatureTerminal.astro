@@ -1,0 +1,260 @@
+---
+// A terminal window used by the CLI page — the counterpart to the homepage's
+// <FeatureBrowser>. The same component renders in the sticky desktop graphic
+// (crossfaded per feature) and inline on mobile, so each `kind` lives in one
+// place. Unlike the theme-aware browser mock it is always dark, like a real
+// terminal, so its colors are fixed rather than design tokens. Transcripts are
+// data (lines of colored segments), mirroring the CLI's actual output — the
+// prompts from `blume init`, consola's ✔ lines, and the audit report format.
+interface Props {
+  kind: string;
+}
+const { kind } = Astro.props;
+
+type Seg = { c?: string; t: string };
+type Line = Seg[];
+
+// ANSI-ish palette, keyed by role. Fixed hues (not theme tokens) because the
+// terminal stays dark in both themes.
+const palette: Record<string, string> = {
+  ask: "text-teal-400",
+  bold: "font-medium text-zinc-100",
+  cmd: "text-zinc-100",
+  dim: "text-zinc-500",
+  err: "text-red-400",
+  fix: "text-cyan-300",
+  info: "text-sky-400",
+  ok: "text-emerald-400",
+  out: "text-zinc-400",
+  prompt: "text-teal-400",
+  warn: "text-amber-300",
+};
+
+// Tiny line constructors so the transcripts below read like transcripts.
+const cmd = (t: string): Line => [{ c: "prompt", t: "❯ " }, { c: "cmd", t }];
+const ok = (t: string): Line => [{ c: "ok", t: "✔ " }, { c: "out", t }];
+const dim = (t: string): Line => [{ c: "dim", t }];
+const out = (t: string): Line => [{ c: "out", t }];
+const ask = (q: string, a: string, hint?: string): Line => [
+  { c: "ask", t: "◆ " },
+  { c: "out", t: `${q}  ` },
+  { c: "cmd", t: a },
+  ...(hint ? [{ c: "dim", t: `  ${hint}` }] : []),
+];
+const blank: Line = [];
+
+const terminals: Record<string, { title: string; lines: Line[] }> = {
+  // The hero transcript: the whole lifecycle — scaffold, dev, build, audit —
+  // compressed into one clean session.
+  hero: {
+    lines: [
+      cmd("npx blume init"),
+      ok("Scaffolded my-docs"),
+      blank,
+      cmd("blume dev"),
+      [
+        { c: "bold", t: "  Local  " },
+        { c: "fix", t: "http://localhost:3000/" },
+      ],
+      blank,
+      cmd("blume build --budget-js 120"),
+      ok("Built to dist — 40.3 kB JS, under budget"),
+      blank,
+      cmd("blume audit"),
+      ok("No issues found."),
+    ],
+    title: "~/my-docs",
+  },
+  init: {
+    lines: [
+      cmd("npx blume init"),
+      ask("Where should we create your project?", "./my-docs"),
+      ask("What's your docs site called?", "Comet"),
+      ask("Which template?", "docs", "Markdown docs site"),
+      ask("Where does your content live?", "filesystem", "Local .mdx files"),
+      blank,
+      ok("Scaffolded my-docs"),
+      blank,
+      dim("Next steps:"),
+      out("  cd my-docs"),
+      out("  npm install"),
+      out("  npx blume dev"),
+    ],
+    title: "~ — npx blume init",
+  },
+  dev: {
+    lines: [
+      cmd("blume dev"),
+      ok("Generated runtime — 24 pages"),
+      ok("Indexed 24 page(s) for search"),
+      blank,
+      [
+        { c: "bold", t: "  Local    " },
+        { c: "fix", t: "http://localhost:3000/" },
+      ],
+      [
+        { c: "bold", t: "  Network  " },
+        { c: "dim", t: "use --host to expose" },
+      ],
+      blank,
+      [
+        { c: "warn", t: "● " },
+        { c: "dim", t: "content/docs/quickstart.mdx changed" },
+      ],
+      ok("Reloaded in 38 ms"),
+      blank,
+      [
+        { c: "warn", t: "● " },
+        { c: "dim", t: "blume.config.ts changed" },
+      ],
+      ok("Reloaded in 74 ms"),
+    ],
+    title: "my-docs — blume dev",
+  },
+  build: {
+    lines: [
+      cmd("blume build --analyze --budget-js 120"),
+      ok("Built 24 page(s) — static output"),
+      ok("Generated sitemap.xml and robots.txt"),
+      ok("Generated agent-readability.json"),
+      ok("Indexed 24 page(s) for search"),
+      blank,
+      [{ c: "bold", t: "  Client bundles, largest first" }],
+      [
+        { c: "out", t: "  search.js   " },
+        { c: "dim", t: "38.2 kB" },
+      ],
+      [
+        { c: "out", t: "  theme.js    " },
+        { c: "dim", t: " 2.1 kB" },
+      ],
+      [
+        { c: "out", t: "  Total       " },
+        { c: "ok", t: "40.3 kB — under budget (120 kB)" },
+      ],
+      blank,
+      ok("Built to dist"),
+    ],
+    title: "my-docs — blume build",
+  },
+  checkup: {
+    lines: [
+      cmd("blume validate"),
+      [
+        { c: "err", t: "✖ " },
+        { c: "out", t: "content/docs/guides/intro.mdx:12" },
+      ],
+      [{ c: "dim", t: "    Broken link: /guides/setup resolves to nothing" }],
+      [
+        { c: "warn", t: "⚠ " },
+        { c: "out", t: "content/docs/faq.mdx:31" },
+      ],
+      [{ c: "dim", t: "    Anchor #pricing not found on /overview" }],
+      blank,
+      dim("1 error(s), 1 warning(s)"),
+      blank,
+      cmd("blume check"),
+      ok("No type errors."),
+      blank,
+      cmd("blume doctor"),
+      ok("No problems found."),
+    ],
+    title: "my-docs — blume validate",
+  },
+  eject: {
+    lines: [
+      cmd("blume add accordion"),
+      ok("Added components/accordion.astro"),
+      blank,
+      cmd("blume eject"),
+      [
+        { c: "out", t: "This promotes .blume/ into a standalone Astro app you own. Continue? " },
+        { c: "ask", t: "yes" },
+      ],
+      ok("Ejected 42 file(s)"),
+      ok("Ejected to a standalone Astro project."),
+      blank,
+      dim("Next steps:"),
+      out("  npm install"),
+      out("  npm run dev"),
+    ],
+    title: "my-docs — blume eject",
+  },
+  // Mirrors the real `formatReport` output: header + summary, findings grouped
+  // by check with source files and a fix line, then the skipped tiers.
+  audit: {
+    lines: [
+      cmd("blume audit"),
+      blank,
+      [
+        { c: "bold", t: "  blume audit  " },
+        { c: "dim", t: "128 pages · dist · offline" },
+      ],
+      [{ c: "out", t: "  3,712 audits · 0 errors · 2 warnings · 1 note" }],
+      blank,
+      [{ c: "bold", t: "  content" }],
+      [
+        { c: "warn", t: "  ⚠ Meta description too long or too short" },
+        { c: "dim", t: "  2 pages" },
+      ],
+      [
+        { c: "out", t: "      /docs/configuration/export   " },
+        { c: "dim", t: "content/docs/configuration/export.mdx:3" },
+      ],
+      [
+        { c: "out", t: "      /docs/advanced/skills        " },
+        { c: "dim", t: "content/docs/advanced/skills.mdx:3" },
+      ],
+      [
+        { c: "fix", t: "      fix: Rewrite `description` in the front matter to fit the length range." },
+      ],
+      blank,
+      [{ c: "bold", t: "  media" }],
+      [
+        { c: "info", t: "  ℹ Image missing explicit dimensions" },
+        { c: "dim", t: "  1 page" },
+      ],
+      [
+        { c: "out", t: "      /docs/quickstart             " },
+        { c: "dim", t: "content/docs/quickstart.mdx:41" },
+      ],
+      [
+        { c: "fix", t: "      fix: Add width and height so the layout doesn't shift." },
+      ],
+      blank,
+      dim("  ⊘ network      skipped — pass --url <origin> (9 checks)"),
+      dim("  ⊘ external     skipped — pass --external (2 checks)"),
+    ],
+    title: "my-docs — blume audit",
+  },
+};
+
+const terminal = terminals[kind] ?? terminals.init;
+---
+
+<div class="flex h-full flex-col bg-[#0d0f12] text-left">
+  {/* Window chrome: traffic lights + the running command as the title. */}
+  <div class="flex items-center gap-1.5 border-white/10 border-b px-4 py-3">
+    <span aria-hidden="true" class="size-2.5 rounded-full bg-[#ff5f57]"></span>
+    <span aria-hidden="true" class="size-2.5 rounded-full bg-[#febc2e]"></span>
+    <span aria-hidden="true" class="size-2.5 rounded-full bg-[#28c840]"></span>
+    <span class="ml-2 truncate font-mono text-[11px] text-zinc-500">
+      {terminal.title}
+    </span>
+  </div>
+  <div
+    class="flex-1 overflow-x-auto p-4 font-mono text-[12px] leading-6 sm:p-5 sm:text-[13px]"
+  >
+    {
+      terminal.lines.map((line) => (
+        <div class="whitespace-pre">
+          {line.length === 0
+            ? " "
+            : line.map((seg) => (
+                <span class={palette[seg.c ?? "out"]}>{seg.t}</span>
+              ))}
+        </div>
+      ))
+    }
+  </div>
+</div>

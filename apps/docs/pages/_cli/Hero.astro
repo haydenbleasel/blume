@@ -1,0 +1,70 @@
+---
+// CLI page hero: a side-by-side split (x.ai-style) to differentiate from the
+// homepage's centered hero. Copy and CTAs on the left; on the right, the hero
+// terminal — the whole lifecycle in one session — floating on an accent panel.
+import { glyph } from "../_home/shared.ts";
+import FeatureTerminal from "./FeatureTerminal.astro";
+
+const referenceHref = "/docs/reference/cli";
+const startHref = "/docs/quickstart";
+const arrowRight = glyph("arrow-right");
+const primaryButton =
+  "inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 font-medium text-background text-sm transition-opacity hover:opacity-90";
+const secondaryButton =
+  "inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 font-medium text-foreground text-sm transition-colors hover:border-foreground";
+---
+
+<section
+  class="grid items-center gap-12 py-4 lg:grid-cols-2 lg:gap-16 sm:py-8"
+>
+  <div>
+    <span class="text-muted-foreground text-xs">The Blume CLI</span>
+    <h1
+      class="mt-5 text-balance font-medium text-4xl tracking-tight sm:text-5xl lg:text-6xl"
+    >
+      <span class="block">World-class docs,</span>
+      <span class="block text-muted-foreground"
+        >straight from your terminal.</span
+      >
+    </h1>
+    <p class="mt-6 max-w-xl text-balance text-lg text-muted-foreground">
+      One CLI to scaffold, preview, build, validate, and audit your
+      documentation. Fast by default, scriptable in CI, and built to work with
+      your favorite coding agents.
+    </p>
+    <div class="mt-8 flex flex-wrap items-center gap-3">
+      <a class={primaryButton} href={startHref}>
+        Get started
+        <svg
+          fill="none"
+          height="16"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="16"
+          xmlns="http://www.w3.org/2000/svg"
+          set:html={arrowRight}
+        ></svg>
+      </a>
+      <a class={secondaryButton} href={referenceHref}>CLI reference</a>
+    </div>
+  </div>
+
+  <!-- The terminal, floating on an accent panel. -->
+  <div
+    class="relative overflow-hidden rounded-[2rem] bg-accent p-6 sm:p-10 lg:p-12"
+  >
+    <div
+      aria-hidden="true"
+      class="absolute inset-0 bg-gradient-to-tr from-black/25 via-transparent to-white/25"
+    >
+    </div>
+    <div
+      class="relative overflow-hidden rounded-blume shadow-2xl shadow-black/30"
+    >
+      <FeatureTerminal kind="hero" />
+    </div>
+  </div>
+</section>

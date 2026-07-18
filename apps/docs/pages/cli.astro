@@ -1,0 +1,53 @@
+---
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import data from "blume:data";
+import Audit from "./_cli/Audit.astro";
+import CommandIndex from "./_cli/CommandIndex.astro";
+import Commands from "./_cli/Commands.astro";
+import Hero from "./_cli/Hero.astro";
+import Footer from "./_home/Footer.astro";
+import InstallCta from "./_home/InstallCta.astro";
+import { installCopyScript } from "./_home/shared.ts";
+
+// The CLI landing page: the homepage's structure and styling with the story
+// retold around the command line — a hero, the sticky-terminal parallax scroll
+// (x.ai/cli-style), the `blume audit` spotlight, and the command index.
+// PageLayout supplies the document shell, header, theme, and fonts, and — with
+// siteUrl + ogEnabled — this page's canonical and generated OG card.
+const { config } = data;
+const pageTitle = `${config.title} CLI — world-class docs from your terminal`;
+const pageDescription =
+  "Scaffold, preview, build, validate, and audit production-grade documentation from one command line — fast by default, scriptable in CI, and agent-ready.";
+---
+
+<PageLayout
+  analytics={config.analytics}
+  banner={config.banner}
+  favicon={config.favicon}
+  fontCssVars={data.fontCssVars}
+  logo={config.logo}
+  navigation={data.navigation}
+  ogEnabled={config.og.enabled}
+  page={{ description: pageDescription, route: "/cli", title: pageTitle }}
+  searchEnabled={config.search.enabled}
+  site={{ description: config.description, title: config.title }}
+  siteUrl={config.site}
+  themeMode={config.theme.mode}
+  x={config.x}
+>
+  <div
+    class="mx-auto grid max-w-[1400px] gap-16 px-6 py-20 sm:py-24 lg:gap-24 xl:gap-32"
+  >
+    <Hero />
+
+    <Commands />
+
+    <Audit />
+
+    <CommandIndex />
+
+    <InstallCta />
+  </div>
+  <script is:inline set:html={installCopyScript} />
+  <Footer slot="footer" />
+</PageLayout>

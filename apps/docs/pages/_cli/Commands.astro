@@ -1,0 +1,172 @@
+---
+// The CLI page's parallax scroll — the same sticky-graphic pattern as the
+// homepage's "Batteries included" section (x.ai/cli-style), with the browser
+// window swapped for a terminal. A column of feature blocks scrolls past one
+// sticky terminal that crossfades its transcript per feature.
+import { glyph, icons } from "../_home/shared.ts";
+import FeatureTerminal from "./FeatureTerminal.astro";
+
+const features = [
+  {
+    body: "blume init asks a few questions and scaffolds a complete project — content folder, config, and scripts. No starter repo to clone, nothing to keep in sync with upstream.",
+    checklist: [
+      "Interactive by default, --yes in CI",
+      "Four templates: docs, api, sdk, and changelog",
+      "Next steps tailored to your package manager",
+    ],
+    icon: glyph("rocket"),
+    kind: "init",
+    title: "Zero to docs site in one command",
+  },
+  {
+    body: "The dev server regenerates the runtime on every change and hot-reloads before you've switched windows. Search, theming, and OG images all work in dev, exactly as they will in production.",
+    checklist: [
+      "Hot reload for content, config, and components",
+      "Include drafts and unpublished content with --preview",
+      "Verbose --debug logging when something's off",
+    ],
+    icon: icons.fast,
+    kind: "dev",
+    title: "A dev server that keeps up",
+  },
+  {
+    body: "One command renders the whole site — static or server — and wires up the sitemap, robots.txt, redirects, and search index. Performance isn't a hope, it's a flag.",
+    checklist: [
+      "Deploy to Vercel, Node, Netlify, or Cloudflare",
+      "--analyze prints client bundles, largest first",
+      "--budget-js fails the build when it's over budget",
+    ],
+    icon: glyph("gauge"),
+    kind: "build",
+    title: "Builds that hold the line",
+  },
+  {
+    body: "Three commands keep a site honest: check type-checks your pages, validate chases every link and anchor, and doctor diagnoses config and content problems before they ship.",
+    checklist: [
+      "Broken links, anchors, and assets caught in CI",
+      "TypeScript errors in custom pages and config",
+      "--json output for CI and editor integrations",
+    ],
+    icon: glyph("shield-check"),
+    kind: "checkup",
+    title: "A linter for your docs",
+  },
+  {
+    body: "The registry and the escape hatch cut both ways: add pulls a component's source into your project to make it yours, and eject promotes the entire runtime into a standalone Astro app you own outright.",
+    checklist: [
+      "blume add installs source components",
+      "blume sync re-fetches remote content sources",
+      "blume eject hands you a plain Astro project",
+    ],
+    icon: icons.eject,
+    kind: "eject",
+    title: "No lock-in, ever",
+  },
+];
+
+// Same rAF-throttled scroll tracker as the homepage's Batteries section: dims
+// the feature blocks that aren't nearest the viewport center and crossfades
+// the sticky terminal to the active feature's transcript.
+const commandsScript = `(()=>{const r=document.querySelector("[data-blume-cli]");if(!r)return;const items=[...r.querySelectorAll("[data-feature]")];if(!items.length)return;const panels=[...r.querySelectorAll("[data-panel]")];let raf=0,cur=-1;const update=()=>{raf=0;const mid=innerHeight/2;let best=0,bd=Infinity;items.forEach((it,j)=>{const b=it.getBoundingClientRect();const d=Math.abs(b.top+b.height/2-mid);if(d<bd){bd=d;best=j;}});if(best===cur)return;cur=best;items.forEach((it,j)=>{it.dataset.active=String(j===best);});panels.forEach((p,j)=>{p.dataset.active=String(j===best);});};const onScroll=()=>{if(!raf)raf=requestAnimationFrame(update);};addEventListener("scroll",onScroll,{passive:true});addEventListener("resize",onScroll,{passive:true});update();})();`;
+---
+
+<!-- One sticky terminal whose transcript morphs per command (x.ai/cli-style) -->
+<section data-blume-cli>
+  <div class="mx-auto max-w-2xl text-center">
+    <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
+      One CLI, the whole workflow.
+    </h2>
+    <p class="mx-auto mt-4 max-w-lg text-balance text-muted-foreground">
+      Everything between a blank folder and a deployed docs site — scaffolding,
+      a dev server, production builds, and verification — lives in a single
+      command.
+    </p>
+  </div>
+
+  <div class="mt-8 lg:grid lg:grid-cols-[5fr_7fr] lg:gap-x-10">
+    <!-- Feature blocks. The column is padded top and bottom so the sticky
+         graphic (range = column height − 100vh) stays centered through the
+         first and last features instead of easing in/out over them. -->
+    <div class="lg:py-[15vh]">
+      {
+        features.map((feature, index) => (
+          <article
+            class="transition-opacity duration-500 lg:flex lg:min-h-[72vh] lg:flex-col lg:justify-center lg:data-[active=false]:opacity-40"
+            data-feature={index}
+          >
+            <div class="pt-10 lg:pt-0">
+              <span class="inline-flex size-10 items-center justify-center rounded-blume bg-muted text-accent">
+                <svg
+                  class="size-5"
+                  fill="none"
+                  height="20"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="20"
+                  set:html={feature.icon}
+                />
+              </span>
+              <h3 class="mt-5 font-medium text-foreground text-xl tracking-tight sm:text-2xl">
+                {feature.title}
+              </h3>
+              <p class="mt-3 max-w-md text-muted-foreground leading-relaxed">
+                {feature.body}
+              </p>
+              <ul class="mt-6 space-y-3">
+                {feature.checklist.map((item) => (
+                  <li class="flex items-start gap-2.5 text-foreground text-sm">
+                    <svg
+                      class="mt-0.5 size-4 shrink-0 text-accent"
+                      fill="none"
+                      height="16"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="16"
+                      set:html={icons.check}
+                    />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* Inline terminal for mobile; desktop uses the shared sticky one. */}
+            <div class="pt-6 pb-10 lg:hidden">
+              <div class="overflow-hidden rounded-blume border border-zinc-800 shadow-xl shadow-foreground/[0.06]">
+                <FeatureTerminal kind={feature.kind} />
+              </div>
+            </div>
+          </article>
+        ))
+      }
+    </div>
+
+    <!-- One sticky terminal; the active feature's transcript crossfades in. -->
+    <div class="hidden lg:block">
+      <div class="sticky top-0 flex h-screen flex-col justify-center">
+        <div
+          class="relative h-[460px] overflow-hidden rounded-blume border border-zinc-800 bg-[#0d0f12] shadow-2xl shadow-foreground/10"
+        >
+          {
+            features.map((feature, index) => (
+              <div
+                class="absolute inset-0 opacity-0 transition-opacity duration-500 data-[active=true]:opacity-100"
+                data-active={index === 0 ? "true" : "false"}
+                data-panel={index}
+              >
+                <FeatureTerminal kind={feature.kind} />
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script is:inline set:html={commandsScript} />

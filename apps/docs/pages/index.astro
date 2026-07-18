@@ -10,6 +10,7 @@ import Hero from "./_home/Hero.astro";
 import InstallCta from "./_home/InstallCta.astro";
 import MarkdownShowcase from "./_home/MarkdownShowcase.astro";
 import ProductPreview from "./_home/ProductPreview.astro";
+import { installCopyScript } from "./_home/shared.ts";
 import Spotlight from "./_home/Spotlight.astro";
 
 // Everything the landing page needs comes from the resolved Blume config, so it
@@ -23,11 +24,6 @@ const pageTitle = `${config.title} — fast, AI-ready, markdown-first docs`;
 // from the site-wide default (which other pages fall back to).
 const pageDescription =
   "Ship beautiful, fast, AI-ready documentation from plain markdown. Blume gives you search, theming, SEO, and one-command deploys on Astro and Vite.";
-
-// Copy-to-clipboard for the install boxes; briefly swaps the glyph for a check.
-// One delegated handler covers every box on the page. Page-specific (the docs
-// chrome's copy buttons are separate), so it stays here.
-const copyScript = `(()=>{const CHECK='<svg class="size-4" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="16"><path d="M20 6 9 17l-5-5"/></svg>';document.addEventListener("click",async(e)=>{const b=e.target.closest("[data-blume-copy-install]");if(!b){return;}try{await navigator.clipboard.writeText(b.dataset.command);}catch{return;}const o=b.innerHTML;b.innerHTML=CHECK;setTimeout(()=>{b.innerHTML=o;},1500);});})();`;
 ---
 
 <PageLayout
@@ -67,6 +63,6 @@ const copyScript = `(()=>{const CHECK='<svg class="size-4" fill="none" height="1
 
     <InstallCta />
   </div>
-  <script is:inline set:html={copyScript} />
+  <script is:inline set:html={installCopyScript} />
   <Footer slot="footer" />
 </PageLayout>

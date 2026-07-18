@@ -1,0 +1,77 @@
+---
+// Every command at a glance — a compact grid mirroring the CLI reference's
+// command table, with a link through to the full flag documentation.
+import { glyph } from "../_home/shared.ts";
+
+const referenceHref = "/docs/reference/cli";
+const chevronRight = glyph("chevron-right");
+
+const commands = [
+  { name: "blume init", text: "Scaffold a project, interactive by default." },
+  { name: "blume dev", text: "Start the dev server with hot reload." },
+  { name: "blume build", text: "Build the static (or server) site." },
+  { name: "blume preview", text: "Preview the last build." },
+  { name: "blume add", text: "Install a source component from the registry." },
+  { name: "blume sync", text: "Re-fetch remote content sources." },
+  {
+    name: "blume eject",
+    text: "Promote the runtime into a standalone Astro app.",
+  },
+  { name: "blume check", text: "Type-check the site with astro check." },
+  { name: "blume doctor", text: "Diagnose config and content problems." },
+  { name: "blume validate", text: "Validate links across your content." },
+  {
+    name: "blume audit",
+    text: "Audit the built site for SEO and health issues.",
+  },
+];
+---
+
+<section>
+  <div class="mx-auto max-w-2xl text-center">
+    <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
+      Every command.
+    </h2>
+    <p class="mx-auto mt-4 max-w-lg text-balance text-muted-foreground">
+      Eleven commands cover the whole life of a docs site. Every flag is
+      documented in the CLI reference.
+    </p>
+  </div>
+
+  <div class="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      commands.map((command) => (
+        <div class="rounded-blume border border-border p-5">
+          <code class="font-medium font-mono text-foreground text-sm">
+            {command.name}
+          </code>
+          <p class="mt-2 text-muted-foreground text-sm leading-relaxed">
+            {command.text}
+          </p>
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="mt-8 text-center text-sm">
+    <a
+      class="inline-flex items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground"
+      href={referenceHref}
+    >
+      See every flag in the CLI reference
+      <svg
+        class="size-3.5"
+        fill="none"
+        height="14"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="14"
+        xmlns="http://www.w3.org/2000/svg"
+        set:html={chevronRight}
+      ></svg>
+    </a>
+  </div>
+</section>

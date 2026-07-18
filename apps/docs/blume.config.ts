@@ -37,6 +37,7 @@ export default defineConfig({
   navigation: {
     tabs: [
       { label: "Docs", path: "/docs" },
+      { label: "CLI", path: "/cli" },
       { label: "Changelog", path: "/changelog" },
     ],
   },
