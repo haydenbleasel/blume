@@ -17,6 +17,7 @@ import {
   deployStaticDir,
   surfaceAdapterOutput,
 } from "../../deploy/adapter-output.ts";
+import { buildNetlifyHeaders } from "../../deploy/headers.ts";
 import {
   applyBaseToPlatformRedirects,
   buildNetlifyRedirects,
@@ -99,6 +100,33 @@ const emitRedirectFiles = async (
     )
   );
   logger.success(`Emitted redirect files for ${redirects.length} redirect(s)`);
+};
+
+/**
+ * Emit a `_headers` file for a static build so Netlify / Cloudflare static
+ * hosts serve the raw AI-ready endpoints (`*.md`, `*.mdx`, `*.txt`) with an
+ * explicit `charset=utf-8`. Without it those hosts send `text/markdown` /
+ * `text/plain` with no charset and browsers fall back to Windows-1252, garbling
+ * any non-ASCII docs (#82). A `_headers` shipped in `public/` (copied into dist
+ * by Astro before this runs) wins, exactly like `_redirects`. Server adapters
+ * set the Content-Type on the Response directly, so this is static-only.
+ */
+const emitHeaderFiles = async (
+  config: ResolvedConfig,
+  distDir: string
+): Promise<void> => {
+  if (
+    config.deployment.output !== "static" ||
+    existsSync(join(distDir, "_headers"))
+  ) {
+    return;
+  }
+  await writeFile(
+    join(distDir, "_headers"),
+    buildNetlifyHeaders(config),
+    "utf-8"
+  );
+  logger.success("Emitted _headers (UTF-8 Content-Type for raw endpoints)");
 };
 
 const formatBytes = (bytes: number): string => {
@@ -348,6 +376,7 @@ const publishBuildArtifacts = async (
   }
 
   await emitRedirectFiles(project.config, distDir);
+  await emitHeaderFiles(project.config, distDir);
 
   const { config } = project;
   const features = serverFeatures(config);

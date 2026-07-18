@@ -123,6 +123,10 @@ redirects: [{ from: "/old", to: "/new", status: 301 }];
 Write both `from` and `to` as if mounted at root — under [`deployment.base`](#subpath-deploys) and [`basePath`](#mount-the-docs-under-a-path) alike, Blume rewrites both sides for you, so a redirect lands inside the base. A base you've already written into `to` by hand is preserved rather than doubled.
 :::
 
+## Content types
+
+A static build also emits a `_headers` file that pins `charset=utf-8` onto the raw AI-ready endpoints — `/<route>.md`, `/<route>.mdx`, and the `.txt` files (`llms.txt`, `llms-full.txt`). Those responses are valid UTF-8, but many static hosts serve them as `text/markdown` / `text/plain` with **no** charset, and browsers then fall back to Windows-1252 — so non-ASCII docs (Japanese, accented Latin, …) render as mojibake when the raw URL is opened directly. HTML pages are unaffected because they carry `<meta charset>`. Netlify and Cloudflare (Pages/Workers static assets) read `_headers`; hosts that don't (Vercel, S3) ignore the file harmlessly. A `_headers` you ship in `public/` is left untouched.
+
 ## Environment variables
 
 When a feature needs a runtime secret, Blume warns at `blume dev`/`build` if it's missing — so the problem surfaces early instead of at the first request:
