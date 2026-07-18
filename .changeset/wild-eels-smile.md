@@ -12,7 +12,9 @@ Add `blume audit`, an offline site audit that replaces a hosted SEO crawler.
     fix: Rewrite `description` in the frontmatter to fit the length range.
 ```
 
-74 checks across content, duplicates, indexability, links, redirects, social tags, localization, assets, sitemap, robots.txt, and structured data. Findings are rolled up by check rather than dumped per page, and any tier that did not run says so rather than silently reporting nothing.
+75 checks across content, duplicates, indexability, links, redirects, social tags, localization, assets, sitemap, robots.txt, and structured data. Findings are rolled up by check rather than dumped per page, and any tier that did not run says so rather than silently reporting nothing.
+
+The checks are platform-aware where the config is: on a Vercel/Netlify/Cloudflare adapter, a build without `deployment.site` reports `SITE_INFERRED_AT_DEPLOY` (info) — the platform sets the site from its env on every deploy, so the fix is to audit a production-like build or pass `--url`, never to hardcode the URL — instead of `SITE_NOT_SET` (warning), which remains the advice for projects with no platform to infer it from.
 
 The check set is deliberately smaller than a general-purpose crawler's, because most of what such a crawler reports cannot happen to an Astro-built site: Blume never emits `rel=nofollow`, and Vite's content-hashed bundles are never missing or redirecting. Shipping those as permanent zeroes teaches people to ignore the report. In their place are checks a crawler can't do, including `INDEXABLE_PAGE_NOT_IN_SITEMAP` (a page a stray `draft`/`hidden` quietly excluded) and `REDIRECT_SOURCE_IS_PAGE` (a configured redirect shadowed by a real page, so it never fires).
 

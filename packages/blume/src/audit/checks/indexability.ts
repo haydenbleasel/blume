@@ -1,3 +1,4 @@
+import { SITE_INFERRING_ADAPTERS } from "../../core/deployment-env.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { finding } from "../catalog.ts";
 import { pageSite } from "../locate.ts";
@@ -122,12 +123,28 @@ export const indexabilityChecks: CheckModule = {
     // That's one fact about the config, not a defect on each of 200 pages —
     // report it once, and let the checks that depend on it stay quiet.
     if (!context.project.config.deployment.site) {
+      const { adapter } = context.project.config.deployment;
+      const site = {
+        file: context.project.context.configFile ?? undefined,
+        url: "/",
+      };
+      // On a platform adapter the value arrives from the platform's env vars
+      // at deploy time (`applyDeploymentEnv`), so only this local artifact is
+      // missing it — the deployed site won't be. Hardcoding `deployment.site`
+      // would duplicate state the platform owns, so the finding (which agents
+      // apply verbatim via `--claude`/`--codex`) must not suggest it.
       found.push(
-        finding(
-          "BLUME_AUDIT_SITE_NOT_SET",
-          { file: context.project.context.configFile ?? undefined, url: "/" },
-          "deployment.site is not set, so no canonical URLs, Open Graph images, or sitemap can be generated."
-        )
+        adapter && SITE_INFERRING_ADAPTERS.has(adapter)
+          ? finding(
+              "BLUME_AUDIT_SITE_INFERRED_AT_DEPLOY",
+              site,
+              `deployment.site is not set in this build — on ${adapter} it is inferred from the platform env at deploy time, so canonical URLs, Open Graph images, and the sitemap are only missing from this local artifact.`
+            )
+          : finding(
+              "BLUME_AUDIT_SITE_NOT_SET",
+              site,
+              "deployment.site is not set, so no canonical URLs, Open Graph images, or sitemap can be generated."
+            )
       );
     }
 

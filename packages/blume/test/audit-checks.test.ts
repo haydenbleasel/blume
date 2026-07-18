@@ -191,6 +191,31 @@ describe("indexability checks", () => {
     expect(found).not.toContain("CANONICAL_MISSING");
   });
 
+  it("does not tell a platform-adapter project to set deployment.site", () => {
+    // On Vercel/Netlify/Cloudflare the site arrives from platform env vars at
+    // deploy time, so only the local artifact is missing it. Suggesting a
+    // hardcoded `deployment.site` here would have `--claude`/`--codex` (which
+    // apply suggestions verbatim) duplicate state the platform owns.
+    const ctx = context({ adapter: "vercel" });
+    const found = indexabilityChecks.run(ctx) as Diagnostic[];
+    const ids = found.map((d) => d.code);
+    expect(ids).toContain("BLUME_AUDIT_SITE_INFERRED_AT_DEPLOY");
+    expect(ids).not.toContain("BLUME_AUDIT_SITE_NOT_SET");
+
+    const inferred = found.find(
+      (d) => d.code === "BLUME_AUDIT_SITE_INFERRED_AT_DEPLOY"
+    );
+    expect(inferred?.severity).toBe("info");
+    expect(inferred?.message).toContain("vercel");
+    expect(inferred?.suggestion).toContain("Do not hardcode");
+  });
+
+  it("still tells an adapterless project to set deployment.site", () => {
+    // With no platform to infer it from, setting it explicitly is the fix.
+    const ctx = context({ adapter: "node" });
+    expect(run(indexabilityChecks, ctx)).toContain("SITE_NOT_SET");
+  });
+
   it("reports a missing canonical once a site is configured", () => {
     const ctx = context({ pages: [snapshot({ canonical: null })], site: SITE });
     expect(run(indexabilityChecks, ctx)).toContain("CANONICAL_MISSING");

@@ -48,6 +48,7 @@ export const snapshot = (
 
 interface ContextOptions {
   pages?: PageSnapshot[];
+  adapter?: string;
   site?: string;
   redirects?: { from: string; to: string; status: number }[];
   sitemap?: SitemapDoc | null;
@@ -65,7 +66,11 @@ export const context = (options: ContextOptions = {}): AuditContext => {
   const project = {
     config: {
       basePath: "",
-      deployment: { base: undefined, site: options.site },
+      deployment: {
+        adapter: options.adapter ?? null,
+        base: undefined,
+        site: options.site,
+      },
       redirects,
       seo: {
         robots: options.seo?.robots ?? true,

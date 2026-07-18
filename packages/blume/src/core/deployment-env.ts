@@ -45,6 +45,15 @@ const PLATFORMS: Platform[] = [
 ];
 
 /**
+ * Adapters whose `deployment.site` arrives from platform env vars at deploy
+ * time. Consumers (e.g. the audit) use this to tell "site is missing" apart
+ * from "site is missing *here*, but the platform will set it".
+ */
+export const SITE_INFERRING_ADAPTERS: ReadonlySet<string> = new Set(
+  PLATFORMS.map((platform) => platform.adapter)
+);
+
+/**
  * Fill in `deployment.adapter` and `deployment.site` from platform env vars
  * (Vercel, Netlify, Cloudflare Pages) when the user hasn't set them. Explicit
  * config always wins, and the adapter is only inferred for server output (it

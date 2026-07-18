@@ -163,6 +163,14 @@ export const CHECKS = [
   },
   {
     category: "indexability",
+    fix: "Audit a production-like build (e.g. `VERCEL=1 VERCEL_PROJECT_PRODUCTION_URL=<host> blume build`) or the deployment itself with `--url <origin>`. Do not hardcode `deployment.site` — the platform sets it on every deploy.",
+    id: "BLUME_AUDIT_SITE_INFERRED_AT_DEPLOY",
+    severity: "info",
+    tier: "static",
+    title: "deployment.site is inferred at deploy time",
+  },
+  {
+    category: "indexability",
     fix: "Set `deployment.site` so Blume can emit absolute canonical URLs.",
     id: "BLUME_AUDIT_CANONICAL_MISSING",
     severity: "warning",
