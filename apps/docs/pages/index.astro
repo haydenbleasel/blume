@@ -19,6 +19,10 @@ import Spotlight from "./_home/Spotlight.astro";
 // this page used to hand-roll all live there now.
 const { config } = data;
 const pageTitle = `${config.title} — fast, AI-ready, markdown-first docs`;
+// A landing-page-specific meta description so the home page reads distinctly
+// from the site-wide default (which other pages fall back to).
+const pageDescription =
+  "Ship beautiful, fast, AI-ready documentation from plain markdown. Blume gives you search, theming, SEO, and one-command deploys on Astro and Vite.";
 
 // Copy-to-clipboard for the install boxes; briefly swaps the glyph for a check.
 // One delegated handler covers every box on the page. Page-specific (the docs
@@ -35,7 +39,7 @@ const copyScript = `(()=>{const CHECK='<svg class="size-4" fill="none" height="1
   navigation={data.navigation}
   ogEnabled={config.og.enabled}
   ogImage="/opengraph-image.png"
-  page={{ description: config.description, route: "/", title: pageTitle }}
+  page={{ description: pageDescription, route: "/", title: pageTitle }}
   searchEnabled={config.search.enabled}
   site={{ description: config.description, title: config.title }}
   siteUrl={config.site}
