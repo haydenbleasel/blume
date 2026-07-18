@@ -6,6 +6,7 @@ import { duplicateChecks } from "../src/audit/checks/duplicates.ts";
 import { i18nChecks } from "../src/audit/checks/i18n.ts";
 import { indexabilityChecks } from "../src/audit/checks/indexability.ts";
 import { linkChecks } from "../src/audit/checks/links.ts";
+import { llmsChecks } from "../src/audit/checks/llms.ts";
 import { redirectChecks } from "../src/audit/checks/redirects.ts";
 import { disallowMatches, robotsChecks } from "../src/audit/checks/robots.ts";
 import { sitemapChecks } from "../src/audit/checks/sitemap.ts";
@@ -1076,5 +1077,382 @@ describe("i18n checks", () => {
       site: SITE,
     });
     expect(run(i18nChecks, ctx)).toContain("HREFLANG_NO_RETURN_TAG");
+  });
+});
+
+describe("anchor checks", () => {
+  it("is silent when the fragment matches an id on the target page", () => {
+    const ctx = context({
+      pages: [
+        snapshot({ links: [link("/b#setup")], url: "/a" }),
+        snapshot({ ids: new Set(["setup"]), url: "/b" }),
+      ],
+    });
+    expect(run(linkChecks, ctx)).not.toContain("ANCHOR_BROKEN");
+  });
+
+  it("reports a fragment that matches no id on the target page", () => {
+    // The page itself loads fine (a healthy 200), which is exactly why no
+    // crawler reports this — the reader just lands at the top, lost.
+    const ctx = context({
+      pages: [
+        snapshot({ links: [link("/b#nope")], url: "/a" }),
+        snapshot({ ids: new Set(["setup"]), url: "/b" }),
+      ],
+    });
+    expect(run(linkChecks, ctx)).toContain("ANCHOR_BROKEN");
+  });
+
+  it("checks same-page anchors too", () => {
+    const ctx = context({
+      pages: [
+        snapshot({ ids: new Set(["real"]), links: [link("#gone")], url: "/a" }),
+      ],
+    });
+    expect(run(linkChecks, ctx)).toContain("ANCHOR_BROKEN");
+  });
+
+  it("allows the browser-magic fragments # and #top", () => {
+    const ctx = context({
+      pages: [snapshot({ links: [link("#"), link("#top")], url: "/a" })],
+    });
+    expect(run(linkChecks, ctx)).not.toContain("ANCHOR_BROKEN");
+  });
+
+  it("matches a percent-encoded fragment against its decoded id", () => {
+    const ctx = context({
+      pages: [
+        snapshot({
+          ids: new Set(["café"]),
+          links: [link("#caf%C3%A9")],
+          url: "/a",
+        }),
+      ],
+    });
+    expect(run(linkChecks, ctx)).not.toContain("ANCHOR_BROKEN");
+  });
+
+  it("deduplicates a broken chrome anchor across pages", () => {
+    // The table of contents is chrome, rendered on every page — one broken
+    // target must not become one finding per page.
+    const pages = [
+      ...Array.from({ length: 4 }, (_, index) =>
+        snapshot({ links: [link("/b#nope", false)], url: `/p${index}` })
+      ),
+      snapshot({ ids: new Set(["real"]), url: "/b" }),
+    ];
+    const found = run(linkChecks, context({ pages }));
+    expect(found.filter((code) => code === "ANCHOR_BROKEN")).toHaveLength(1);
+  });
+});
+
+describe("URL style", () => {
+  it("names every offense the slug commits", () => {
+    const ctx = context({ pages: [snapshot({ url: "/Docs_Setup" })] });
+    const found = (
+      urlChecks.run(
+        context({ pages: [snapshot({ url: "/Docs_Setup" })] })
+      ) as Diagnostic[]
+    ).find((d) => d.code === "BLUME_AUDIT_URL_STYLE");
+    expect(run(urlChecks, ctx)).toContain("URL_STYLE");
+    expect(found?.message).toContain("uppercase letters and underscores");
+  });
+
+  it("is silent on a clean slug", () => {
+    const ctx = context({
+      pages: [snapshot({ url: "/docs/getting-started" })],
+    });
+    expect(run(urlChecks, ctx)).not.toContain("URL_STYLE");
+  });
+});
+
+describe("canonical on noindex", () => {
+  it("reports a page that pairs noindex with a canonical", () => {
+    const ctx = context({
+      pages: [
+        snapshot({
+          canonical: "https://x.dev/a",
+          indexable: false,
+          robots: "noindex",
+          url: "/a",
+        }),
+      ],
+      site: SITE,
+    });
+    expect(run(indexabilityChecks, ctx)).toContain("CANONICAL_ON_NOINDEX");
+  });
+
+  it("is silent on a noindex page without a canonical", () => {
+    const ctx = context({
+      pages: [
+        snapshot({
+          canonical: null,
+          indexable: false,
+          robots: "noindex",
+          url: "/a",
+        }),
+      ],
+      site: SITE,
+    });
+    expect(run(indexabilityChecks, ctx)).not.toContain("CANONICAL_ON_NOINDEX");
+  });
+
+  it("is silent on error routes, which are noindex by design", () => {
+    const ctx = context({
+      pages: [
+        snapshot({
+          canonical: "https://x.dev/404",
+          indexable: false,
+          robots: "noindex",
+          url: "/404",
+        }),
+      ],
+      site: SITE,
+    });
+    expect(run(indexabilityChecks, ctx)).not.toContain("CANONICAL_ON_NOINDEX");
+  });
+});
+
+describe("draft leak", () => {
+  it("reports a draft page that made it into the build", () => {
+    const ctx = context({
+      pages: [
+        snapshot({
+          route: { draft: true, hidden: false } as never,
+          url: "/wip",
+        }),
+      ],
+    });
+    expect(run(indexabilityChecks, ctx)).toContain("DRAFT_PAGE_PUBLISHED");
+  });
+
+  it("is silent on published pages and custom pages with no route", () => {
+    const ctx = context({
+      pages: [
+        snapshot({
+          route: { draft: false, hidden: false } as never,
+          url: "/a",
+        }),
+        snapshot({ url: "/b" }),
+      ],
+    });
+    expect(run(indexabilityChecks, ctx)).not.toContain("DRAFT_PAGE_PUBLISHED");
+  });
+});
+
+describe("heading skips", () => {
+  it("reports the first skipped heading level", () => {
+    const ctx = context({
+      pages: [
+        snapshot({
+          headings: [
+            { depth: 1, text: "Title" },
+            { depth: 2, text: "Section" },
+            { depth: 4, text: "Detail" },
+            { depth: 6, text: "Deeper" },
+          ],
+        }),
+      ],
+    });
+    const found = run(contentChecks, ctx);
+    expect(found.filter((code) => code === "HEADING_SKIP")).toHaveLength(1);
+  });
+
+  it("is silent on a well-nested outline", () => {
+    const ctx = context({
+      pages: [
+        snapshot({
+          headings: [
+            { depth: 1, text: "Title" },
+            { depth: 2, text: "Section" },
+            { depth: 3, text: "Detail" },
+            { depth: 2, text: "Another" },
+          ],
+        }),
+      ],
+    });
+    expect(run(contentChecks, ctx)).not.toContain("HEADING_SKIP");
+  });
+});
+
+/** A context whose one page's front matter carries the given `date`. */
+const dated = (date: string) =>
+  context({
+    pages: [snapshot({ source: "/src/a.mdx", url: "/a" })],
+    sources: new Map([
+      ["/src/a.mdx", `---\ntitle: A\ndate: ${date}\n---\n\nBody.\n`],
+    ]),
+  });
+
+describe("future-dated pages", () => {
+  it("reports a page dated in the future", () => {
+    expect(run(contentChecks, dated('"2999-01-02"'))).toContain(
+      "FUTURE_DATED_PAGE"
+    );
+  });
+
+  it("accepts YAML's unquoted date form too", () => {
+    // js-yaml hands back a Date for an unquoted timestamp, a string otherwise.
+    expect(run(contentChecks, dated("2999-01-02"))).toContain(
+      "FUTURE_DATED_PAGE"
+    );
+  });
+
+  it("is silent on past dates, bad dates, and undated pages", () => {
+    expect(run(contentChecks, dated('"2020-01-01"'))).not.toContain(
+      "FUTURE_DATED_PAGE"
+    );
+    expect(run(contentChecks, dated('"not a date"'))).not.toContain(
+      "FUTURE_DATED_PAGE"
+    );
+    const undated = context({ pages: [snapshot({ url: "/a" })] });
+    expect(run(contentChecks, undated)).not.toContain("FUTURE_DATED_PAGE");
+  });
+});
+
+/** A context whose sitemap gives the one page the given `lastmod`. */
+const withLastmod = (lastmod: string) =>
+  context({
+    pages: [snapshot({ canonical: "https://x.dev/", url: "/" })],
+    site: SITE,
+    sitemap: {
+      bytes: 100,
+      file: "/dist/sitemap.xml",
+      lastmod: new Map([["https://x.dev/", lastmod]]),
+      urls: ["https://x.dev/"],
+    },
+  });
+
+describe("sitemap lastmod", () => {
+  it("reports a lastmod in the future", () => {
+    expect(run(sitemapChecks, withLastmod("2999-01-01"))).toContain(
+      "SITEMAP_LASTMOD_INVALID"
+    );
+  });
+
+  it("reports a lastmod that is not a date", () => {
+    expect(run(sitemapChecks, withLastmod("soon"))).toContain(
+      "SITEMAP_LASTMOD_INVALID"
+    );
+  });
+
+  it("is silent on a real past date", () => {
+    expect(run(sitemapChecks, withLastmod("2026-01-01"))).not.toContain(
+      "SITEMAP_LASTMOD_INVALID"
+    );
+  });
+});
+
+/** A manifest route as the llms checks read it. */
+const route = (over: Record<string, unknown> = {}) =>
+  ({ draft: false, hidden: false, source: { name: "docs" }, ...over }) as never;
+
+describe("llms.txt checks", () => {
+  it("reports a missing llms.txt when the feature is enabled", () => {
+    const ctx = context({ pages: [snapshot()] });
+    expect(run(llmsChecks, ctx)).toContain("LLMS_TXT_MISSING");
+  });
+
+  it("stays quiet when the feature is disabled", () => {
+    const ctx = context({ llmsTxt: false, pages: [snapshot()] });
+    expect(run(llmsChecks, ctx)).toEqual([]);
+    const objectForm = context({
+      llmsTxt: { enabled: false, openapi: true },
+      pages: [snapshot()],
+    });
+    expect(run(llmsChecks, objectForm)).toEqual([]);
+  });
+
+  it("reports an entry the build does not serve", () => {
+    const ctx = context({
+      llms: {
+        entries: [{ line: 3, url: "https://x.dev/gone" }],
+        file: "/dist/llms.txt",
+      },
+      pages: [snapshot({ url: "/" })],
+      site: SITE,
+    });
+    expect(run(llmsChecks, ctx)).toContain("LLMS_TXT_STALE_ENTRY");
+  });
+
+  it("reports an indexable nav page that is not listed", () => {
+    const ctx = context({
+      llms: {
+        entries: [{ line: 3, url: "https://x.dev/" }],
+        file: "/dist/llms.txt",
+      },
+      pages: [
+        snapshot({ route: route(), url: "/" }),
+        snapshot({ route: route(), url: "/missing" }),
+      ],
+      site: SITE,
+    });
+    const found = run(llmsChecks, ctx);
+    expect(found).toContain("LLMS_TXT_PAGE_MISSING");
+    expect(
+      found.filter((code) => code === "LLMS_TXT_PAGE_MISSING")
+    ).toHaveLength(1);
+  });
+
+  it("skips pages the generator deliberately excludes", () => {
+    const ctx = context({
+      llms: { entries: [], file: "/dist/llms.txt" },
+      llmsTxt: { enabled: true, openapi: false },
+      pages: [
+        snapshot({ route: route({ hidden: true }), url: "/hidden" }),
+        snapshot({ route: route({ draft: true }), url: "/draft" }),
+        snapshot({
+          indexable: false,
+          robots: "noindex",
+          route: route(),
+          url: "/noindex",
+        }),
+        snapshot({
+          route: route({ source: { name: "openapi" } }),
+          url: "/api",
+        }),
+        snapshot({ url: "/custom" }),
+      ],
+      site: SITE,
+    });
+    expect(run(llmsChecks, ctx)).not.toContain("LLMS_TXT_PAGE_MISSING");
+  });
+
+  it("ignores off-site and unparseable entries", () => {
+    const ctx = context({
+      llms: {
+        entries: [
+          { line: 1, url: "https://other.dev/x" },
+          { line: 2, url: "mailto:x@x.dev" },
+          // An absolute URL that doesn't parse at all.
+          { line: 3, url: "https://[half" },
+        ],
+        file: "/dist/llms.txt",
+      },
+      pages: [snapshot({ url: "/" })],
+      site: SITE,
+    });
+    expect(run(llmsChecks, ctx)).not.toContain("LLMS_TXT_STALE_ENTRY");
+  });
+
+  it("still checks a path whose percent-encoding is malformed", () => {
+    // decodeURI throws on "%E0%A4%A"; the raw spelling is compared instead.
+    const ctx = context({
+      llms: {
+        entries: [{ line: 1, url: "/%E0%A4%A" }],
+        file: "/dist/llms.txt",
+      },
+      pages: [snapshot({ url: "/" })],
+      site: SITE,
+    });
+    expect(run(llmsChecks, ctx)).toContain("LLMS_TXT_STALE_ENTRY");
+  });
+
+  it("accepts path-only entries when no site is configured", () => {
+    const ctx = context({
+      llms: { entries: [{ line: 1, url: "/" }], file: "/dist/llms.txt" },
+      pages: [snapshot({ url: "/" })],
+    });
+    expect(run(llmsChecks, ctx)).not.toContain("LLMS_TXT_STALE_ENTRY");
   });
 });

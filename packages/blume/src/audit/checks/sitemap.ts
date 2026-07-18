@@ -7,6 +7,13 @@ import { normalizePath, siteOrigin } from "../url.ts";
 const MAX_SITEMAP_BYTES = 50 * 1024 * 1024;
 const MAX_SITEMAP_URLS = 50_000;
 
+/**
+ * Slack for future `<lastmod>` values. A date-only stamp written in a timezone
+ * ahead of UTC parses as "tomorrow" from behind it; a day of grace keeps that
+ * from being reported as a lie.
+ */
+const LASTMOD_SLACK_MS = 24 * 60 * 60 * 1000;
+
 /** Error routes are never crawlable destinations, so they belong out of the sitemap. */
 const ERROR_ROUTES = new Set(["/404", "/500"]);
 
@@ -157,6 +164,30 @@ export const sitemapChecks: CheckModule = {
           `sitemap.xml holds ${sitemap.urls.length} URLs in ${Math.round(sitemap.bytes / 1024 / 1024)} MB.`
         )
       );
+    }
+
+    // A `<lastmod>` that lies — malformed, or claiming the future — teaches
+    // search engines to distrust every lastmod in the file, which throws away
+    // the recrawl-priority signal the field exists to provide.
+    for (const [loc, lastmod] of sitemap.lastmod ?? []) {
+      const time = Date.parse(lastmod);
+      if (Number.isNaN(time)) {
+        found.push(
+          finding(
+            "BLUME_AUDIT_SITEMAP_LASTMOD_INVALID",
+            { file: sitemap.file, url: loc },
+            `sitemap.xml gives ${loc} a lastmod of "${lastmod}", which is not a valid W3C date.`
+          )
+        );
+      } else if (time > Date.now() + LASTMOD_SLACK_MS) {
+        found.push(
+          finding(
+            "BLUME_AUDIT_SITEMAP_LASTMOD_INVALID",
+            { file: sitemap.file, url: loc },
+            `sitemap.xml gives ${loc} a lastmod of ${lastmod}, which is in the future.`
+          )
+        );
+      }
     }
 
     const origin = siteOrigin(site);

@@ -24,6 +24,7 @@ export type AuditCategory =
   | "sitemap"
   | "robots"
   | "structured-data"
+  | "ai"
   | "network";
 
 /** A check's static metadata. The catalog is the source of truth for all of it. */
@@ -98,6 +99,8 @@ export interface PageSnapshot {
   wordCount: number;
   /** Hash of the normalized prose, for exact-duplicate detection. */
   contentHash: string;
+  /** Every element `id` on the page — the targets `#fragment` links can hit. */
+  ids: Set<string>;
 }
 
 /** A configured redirect resolved through to its final destination. */
@@ -116,8 +119,17 @@ export interface SitemapDoc {
   bytes: number;
   /** Absolute `<loc>` URLs, in document order. */
   urls: string[];
+  /** Each `<url>` block's `<lastmod>`, keyed by its `<loc>`. */
+  lastmod?: Map<string, string>;
   /** Parse failure, when the document isn't usable. */
   error?: string;
+}
+
+/** A parsed `llms.txt` index. */
+export interface LlmsDoc {
+  file: string;
+  /** Markdown link targets in document order, with their 1-based line. */
+  entries: { url: string; line: number }[];
 }
 
 /** A parsed `robots.txt`. */
@@ -190,6 +202,7 @@ export interface AuditContext {
   redirects: RedirectResolution[];
   sitemap: SitemapDoc | null;
   robots: RobotsDoc | null;
+  llms: LlmsDoc | null;
   thresholds: AuditThresholds;
 }
 

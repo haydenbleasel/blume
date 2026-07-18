@@ -345,7 +345,9 @@ const bannerKey = banner?.dismissible ? banner.key : null;
     <title>{pageTitle}</title>
     <Favicon favicon={favicon} appleIcon={appleIcon} />
     <Fonts cssVars={fontCssVars ?? []} />
-    {canonical && <link rel="canonical" href={canonical} />}
+    {/* Google warns against pairing a canonical with noindex — the canonical
+        says "index that URL", the robots meta says "distrust this page". */}
+    {canonical && !noindex && <link rel="canonical" href={canonical} />}
     {
       localeAlternates?.map((alt) => (
         <link href={alt.href} hreflang={alt.hreflang} rel="alternate" />

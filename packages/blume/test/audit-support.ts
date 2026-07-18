@@ -3,6 +3,7 @@ import { resolveRedirects } from "../src/audit/redirects.ts";
 import { DEFAULT_THRESHOLDS } from "../src/audit/types.ts";
 import type {
   AuditContext,
+  LlmsDoc,
   PageSnapshot,
   RobotsDoc,
   SitemapDoc,
@@ -23,6 +24,7 @@ export const snapshot = (
   file: "/dist/index.html",
   headings: [{ depth: 1, text: "Heading" }],
   hreflang: [],
+  ids: new Set<string>(),
   images: [],
   indexable: true,
   jsonld: [],
@@ -55,6 +57,8 @@ interface ContextOptions {
   redirects?: { from: string; to: string; status: number }[];
   sitemap?: SitemapDoc | null;
   robots?: RobotsDoc | null;
+  llms?: LlmsDoc | null;
+  llmsTxt?: boolean | { enabled: boolean; openapi: boolean };
   files?: Map<string, number>;
   sources?: Map<string, string>;
   seo?: { robots?: boolean; sitemap?: boolean };
@@ -67,6 +71,7 @@ export const context = (options: ContextOptions = {}): AuditContext => {
   const redirects = options.redirects ?? [];
   const project = {
     config: {
+      ai: { llmsTxt: options.llmsTxt ?? { enabled: true, openapi: true } },
       basePath: "",
       deployment: {
         adapter: options.adapter ?? null,
@@ -87,6 +92,7 @@ export const context = (options: ContextOptions = {}): AuditContext => {
     byUrl,
     files: options.files ?? new Map(),
     graph: buildGraph(pages, siteOrigin(options.site)),
+    llms: options.llms ?? null,
     origin: null,
     pages,
     project,

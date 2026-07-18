@@ -12,7 +12,9 @@ import { duplicateChecks } from "./checks/duplicates.ts";
 import { i18nChecks } from "./checks/i18n.ts";
 import { indexabilityChecks } from "./checks/indexability.ts";
 import { linkChecks } from "./checks/links.ts";
+import { llmsChecks } from "./checks/llms.ts";
 import { externalChecks, networkChecks } from "./checks/network.ts";
+import { ogImageChecks } from "./checks/og-image.ts";
 import { redirectChecks } from "./checks/redirects.ts";
 import { robotsChecks } from "./checks/robots.ts";
 import { sitemapChecks } from "./checks/sitemap.ts";
@@ -40,10 +42,12 @@ const MODULES: CheckModule[] = [
   linkChecks,
   redirectChecks,
   socialChecks,
+  ogImageChecks,
   i18nChecks,
   assetChecks,
   sitemapChecks,
   robotsChecks,
+  llmsChecks,
   structuredDataChecks,
   urlChecks,
   networkChecks,
@@ -135,6 +139,7 @@ export const runAudit = async (options: AuditOptions): Promise<AuditResult> => {
     byUrl,
     files: crawl.files,
     graph: buildGraph(crawl.pages, siteOrigin(project.config.deployment.site)),
+    llms: crawl.llms,
     origin,
     pages: crawl.pages,
     project,

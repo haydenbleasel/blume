@@ -148,6 +148,12 @@ export const buildSnapshot = (options: {
         lang: link.getAttribute("hreflang")?.trim() ?? "",
       }))
       .filter((alternate) => alternate.href && alternate.lang),
+    ids: new Set(
+      document
+        .querySelectorAll("[id]")
+        .map((element) => element.getAttribute("id") ?? "")
+        .filter((id) => id.length > 0)
+    ),
     images: collectAssets(document, "img[src]", "src"),
     // A page is indexable unless it says otherwise. Blume only ever emits
     // `noindex` (never `nofollow`), but an ejected layout could emit either.

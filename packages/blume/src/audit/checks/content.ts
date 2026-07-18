@@ -1,8 +1,29 @@
+import matter from "../../core/frontmatter.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { finding } from "../catalog.ts";
 import { pageSite } from "../locate.ts";
 import { ERROR_ROUTES } from "../types.ts";
 import type { AuditContext, CheckModule, PageSnapshot } from "../types.ts";
+
+/**
+ * The `date` a source file's front matter declares, when it parses to a real
+ * date. YAML hands back a `Date` for an unquoted `2026-01-01` and a string for
+ * a quoted one, so both spellings are accepted; malformed front matter or an
+ * unparseable value simply yields nothing — `BLUME_FRONTMATTER_INVALID` is the
+ * build's finding, not the audit's.
+ */
+const frontmatterDate = (source: string): Date | null => {
+  try {
+    const { date } = matter(source).data as { date?: unknown };
+    if (typeof date !== "string" && !(date instanceof Date)) {
+      return null;
+    }
+    const parsed = date instanceof Date ? date : new Date(date);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  } catch {
+    return null;
+  }
+};
 
 const titleChecks = (
   context: AuditContext,
@@ -117,6 +138,49 @@ const headingChecks = (
       ),
     ];
   }
+
+  // A skipped level (h2 -> h4) breaks table-of-contents nesting and screen-
+  // reader outlines. The first skip is the finding — one wrong heading early
+  // in a page cascades, and listing every knock-on skip buries the fix.
+  let previous: number | null = null;
+  for (const heading of page.headings) {
+    if (previous !== null && heading.depth > previous + 1) {
+      return [
+        finding(
+          "BLUME_AUDIT_HEADING_SKIP",
+          pageSite(context, page),
+          `Headings jump from h${previous} to h${heading.depth} at "${heading.text}".`
+        ),
+      ];
+    }
+    previous = heading.depth;
+  }
+  return [];
+};
+
+/**
+ * A page dated in the future usually means scheduled content that leaked into
+ * the build early. Only the front matter knows — the rendered page looks
+ * perfectly ordinary.
+ */
+const futureDateChecks = (
+  context: AuditContext,
+  page: PageSnapshot
+): Diagnostic[] => {
+  const source = page.source && context.sources.get(page.source);
+  if (!source) {
+    return [];
+  }
+  const date = frontmatterDate(source);
+  if (date && date.getTime() > Date.now()) {
+    return [
+      finding(
+        "BLUME_AUDIT_FUTURE_DATED_PAGE",
+        pageSite(context, page, ["date"]),
+        `Page is dated ${date.toISOString().slice(0, 10)}, which is in the future.`
+      ),
+    ];
+  }
   return [];
 };
 
@@ -137,7 +201,8 @@ export const contentChecks: CheckModule = {
       found.push(
         ...titleChecks(context, page),
         ...descriptionChecks(context, page),
-        ...headingChecks(context, page)
+        ...headingChecks(context, page),
+        ...futureDateChecks(context, page)
       );
 
       if (page.wordCount < context.thresholds.minWordCount && page.indexable) {

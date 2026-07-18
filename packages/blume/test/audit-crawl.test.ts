@@ -6,7 +6,7 @@ import { dirname, join } from "pathe";
 
 import { i18nChecks } from "../src/audit/checks/i18n.ts";
 import { sitemapChecks } from "../src/audit/checks/sitemap.ts";
-import { crawlStaticDir } from "../src/audit/crawl.ts";
+import { crawlStaticDir, parseLlms, parseSitemap } from "../src/audit/crawl.ts";
 import { pageSite } from "../src/audit/locate.ts";
 import { resolveHref } from "../src/audit/url.ts";
 import type { BlumeManifest, Diagnostic } from "../src/core/types.ts";
@@ -67,6 +67,19 @@ describe("crawlStaticDir", () => {
     expect(result.sitemap?.urls).toEqual(["https://x.dev/"]);
     expect(result.sitemap?.bytes).toBeGreaterThan(0);
     expect(result.robots?.disallow).toEqual(["/private"]);
+  });
+
+  it("reads llms.txt alongside the sitemap and robots.txt", async () => {
+    const dir = await build({
+      "index.html": page("Home"),
+      "llms.txt": "# Site\n\n- [Home](https://x.dev/): The home page.\n",
+    });
+    const result = await crawlStaticDir({
+      basePath: "",
+      manifest: manifest([]),
+      staticDir: dir,
+    });
+    expect(result.llms?.entries).toEqual([{ line: 3, url: "https://x.dev/" }]);
   });
 
   it("excludes <Component /> example preview frames from the audit", async () => {
@@ -134,6 +147,35 @@ describe("crawlStaticDir", () => {
     });
     expect(result.sitemap).toBeNull();
     expect(result.robots).toBeNull();
+  });
+});
+
+describe("parseSitemap lastmod", () => {
+  it("keys each lastmod by its own loc", () => {
+    const doc = parseSitemap(
+      "/dist/sitemap.xml",
+      `<urlset>
+        <url><loc>https://x.dev/a</loc><lastmod>2026-01-01</lastmod></url>
+        <url><loc>https://x.dev/b</loc></url>
+      </urlset>`,
+      200
+    );
+    expect(doc.lastmod?.get("https://x.dev/a")).toBe("2026-01-01");
+    expect(doc.lastmod?.has("https://x.dev/b")).toBe(false);
+    expect(doc.urls).toEqual(["https://x.dev/a", "https://x.dev/b"]);
+  });
+});
+
+describe("parseLlms", () => {
+  it("collects Markdown link targets with their line numbers", () => {
+    const doc = parseLlms(
+      "/dist/llms.txt",
+      "# Site\n\n## Docs\n\n- [A](https://x.dev/a): One.\n- [B](/b)\n"
+    );
+    expect(doc.entries).toEqual([
+      { line: 5, url: "https://x.dev/a" },
+      { line: 6, url: "/b" },
+    ]);
   });
 });
 

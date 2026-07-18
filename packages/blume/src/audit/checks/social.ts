@@ -161,18 +161,40 @@ export const structuredDataChecks: CheckModule = {
 };
 
 /** Pages whose own URL contains a `//`, which is always a `basePath` mistake. */
+/** What makes a slug untidy, with the human name for each offense. */
+const URL_STYLE: { name: string; test: RegExp }[] = [
+  { name: "uppercase letters", test: /[A-Z]/u },
+  { name: "underscores", test: /_/u },
+  { name: "spaces", test: /%20| /u },
+];
+
 export const urlChecks: CheckModule = {
   category: "links",
   run(context) {
-    return context.pages
-      .filter((page) => page.url.includes("//"))
-      .map((page) =>
-        finding(
-          "BLUME_AUDIT_DOUBLE_SLASH_URL",
-          pageSite(context, page),
-          `URL ${normalizePath(page.url)} contains a double slash.`
-        )
-      );
+    const found: Diagnostic[] = [];
+    for (const page of context.pages) {
+      if (page.url.includes("//")) {
+        found.push(
+          finding(
+            "BLUME_AUDIT_DOUBLE_SLASH_URL",
+            pageSite(context, page),
+            `URL ${normalizePath(page.url)} contains a double slash.`
+          )
+        );
+      }
+
+      const untidy = URL_STYLE.filter((style) => style.test.test(page.url));
+      if (untidy.length > 0) {
+        found.push(
+          finding(
+            "BLUME_AUDIT_URL_STYLE",
+            pageSite(context, page),
+            `URL ${page.url} contains ${untidy.map((style) => style.name).join(" and ")}.`
+          )
+        );
+      }
+    }
+    return found;
   },
   tier: "static",
 };

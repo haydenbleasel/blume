@@ -119,6 +119,22 @@ export const CHECKS = [
   },
   {
     category: "content",
+    fix: "Adjust the heading to the next level down — skipped levels break table-of-contents nesting and screen-reader outlines.",
+    id: "BLUME_AUDIT_HEADING_SKIP",
+    severity: "info",
+    tier: "static",
+    title: "Heading levels skip (e.g. h2 to h4)",
+  },
+  {
+    category: "content",
+    fix: "Correct the `date`, or hold the page back until it is meant to be live.",
+    id: "BLUME_AUDIT_FUTURE_DATED_PAGE",
+    severity: "info",
+    tier: "static",
+    title: "Page is dated in the future",
+  },
+  {
+    category: "content",
     fix: "Restore the viewport <meta> in your ejected layout.",
     id: "BLUME_AUDIT_VIEWPORT_MISSING",
     severity: "error",
@@ -168,6 +184,22 @@ export const CHECKS = [
     severity: "info",
     tier: "static",
     title: "deployment.site is inferred at deploy time",
+  },
+  {
+    category: "indexability",
+    fix: "Drop the canonical from noindex pages — Google treats the pairing as contradictory and may ignore one of the two.",
+    id: "BLUME_AUDIT_CANONICAL_ON_NOINDEX",
+    severity: "warning",
+    tier: "static",
+    title: "Page is noindex but declares a canonical",
+  },
+  {
+    category: "indexability",
+    fix: "Rebuild without `--preview` before deploying, or remove `draft: true` if the page is ready to ship.",
+    id: "BLUME_AUDIT_DRAFT_PAGE_PUBLISHED",
+    severity: "warning",
+    tier: "static",
+    title: "Draft page is in the build",
   },
   {
     category: "indexability",
@@ -275,6 +307,22 @@ export const CHECKS = [
     tier: "static",
     title: "Double slash in URL",
   },
+  {
+    category: "links",
+    fix: "Point the fragment at a heading that exists on the target page, or fix the heading it meant.",
+    id: "BLUME_AUDIT_ANCHOR_BROKEN",
+    severity: "warning",
+    tier: "static",
+    title: "Link fragment matches no id on the target page",
+  },
+  {
+    category: "links",
+    fix: "Rename the source file to a lowercase, hyphenated slug — and add a redirect from the old URL if it was already published.",
+    id: "BLUME_AUDIT_URL_STYLE",
+    severity: "info",
+    tier: "static",
+    title: "URL contains uppercase, underscores, or spaces",
+  },
 
   // Redirects
   {
@@ -342,6 +390,22 @@ export const CHECKS = [
     severity: "warning",
     tier: "static",
     title: "Open Graph image missing",
+  },
+  {
+    category: "social",
+    fix: "Point `seo.image` at a file that exists, or rebuild — a dead og:image renders as a blank card everywhere the page is shared.",
+    id: "BLUME_AUDIT_OG_IMAGE_BROKEN",
+    severity: "warning",
+    tier: "static",
+    title: "Open Graph image is not in the build",
+  },
+  {
+    category: "social",
+    fix: "Use an image of at least 1200×630 — smaller ones render blurry or get cropped into small-card layouts.",
+    id: "BLUME_AUDIT_OG_IMAGE_SMALL",
+    severity: "warning",
+    tier: "static",
+    title: "Open Graph image is too small for large cards",
   },
   {
     category: "social",
@@ -535,6 +599,14 @@ export const CHECKS = [
   },
   {
     category: "sitemap",
+    fix: "Use a real W3C date that is not in the future — search engines that catch a sitemap lying about freshness stop trusting its lastmod entirely.",
+    id: "BLUME_AUDIT_SITEMAP_LASTMOD_INVALID",
+    severity: "warning",
+    tier: "static",
+    title: "Sitemap lastmod is invalid or in the future",
+  },
+  {
+    category: "sitemap",
     fix: "A sitemap may only list URLs on its own origin.",
     id: "BLUME_AUDIT_SITEMAP_OUT_OF_SCOPE",
     severity: "warning",
@@ -590,6 +662,33 @@ export const CHECKS = [
     severity: "error",
     tier: "network",
     title: "robots.txt is not accessible",
+  },
+
+  // AI discovery. `llms.txt` is the sitemap of the AI era, and no SEO crawler
+  // audits it — they audit for Google. Blume emits it, so Blume checks it.
+  {
+    category: "ai",
+    fix: "Rebuild — `ai.llmsTxt` is enabled but the build has no llms.txt. If that's intentional, set `ai.llmsTxt: false`.",
+    id: "BLUME_AUDIT_LLMS_TXT_MISSING",
+    severity: "warning",
+    tier: "static",
+    title: "llms.txt missing from the build",
+  },
+  {
+    category: "ai",
+    fix: "Rebuild so llms.txt matches the site — a stale entry sends an AI agent to a page that is not there.",
+    id: "BLUME_AUDIT_LLMS_TXT_STALE_ENTRY",
+    severity: "warning",
+    tier: "static",
+    title: "llms.txt lists a page the build does not serve",
+  },
+  {
+    category: "ai",
+    fix: "Rebuild so llms.txt matches the site; if the page is deliberately excluded, mark it `seo.noindex` or `sidebar.hidden`.",
+    id: "BLUME_AUDIT_LLMS_TXT_PAGE_MISSING",
+    severity: "warning",
+    tier: "static",
+    title: "Indexable page missing from llms.txt",
   },
 
   // Structured data. Note we validate only what Blume itself emits — we do not

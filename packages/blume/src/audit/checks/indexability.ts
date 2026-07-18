@@ -166,6 +166,32 @@ export const indexabilityChecks: CheckModule = {
             `Page declares robots "${page.robots}" and will not be indexed.`
           )
         );
+
+        // Google warns against pairing the two: the canonical says "index that
+        // URL", the robots meta says "don't trust this page's signals" — and
+        // which one wins is undefined.
+        if (!page.indexable && page.canonical) {
+          found.push(
+            finding(
+              "BLUME_AUDIT_CANONICAL_ON_NOINDEX",
+              pageSite(context, page, ["noindex"]),
+              `Page is noindex but declares ${page.canonical} as its canonical.`
+            )
+          );
+        }
+      }
+
+      // Only the manifest knows a page was a draft — the built HTML looks like
+      // any other page, which is exactly why deploying a `--preview` build is
+      // so easy to miss.
+      if (page.route?.draft) {
+        found.push(
+          finding(
+            "BLUME_AUDIT_DRAFT_PAGE_PUBLISHED",
+            pageSite(context, page, ["draft"]),
+            `${page.url} is marked draft in its front matter but is in the build.`
+          )
+        );
       }
 
       if (page.bytes > context.thresholds.maxHtmlBytes) {

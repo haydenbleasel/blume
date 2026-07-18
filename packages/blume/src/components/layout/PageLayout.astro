@@ -186,7 +186,11 @@ const bannerKey = banner?.dismissible ? banner.key : null;
     <title>{pageTitle}</title>
     <Favicon appleIcon={appleIcon} favicon={favicon} />
     <Fonts cssVars={fontCssVars ?? []} />
-    {resolvedCanonical && <link href={resolvedCanonical} rel="canonical" />}
+    {/* Google warns against pairing a canonical with noindex — the canonical
+        says "index that URL", the robots meta says "distrust this page". */}
+    {resolvedCanonical && !noindex && (
+      <link href={resolvedCanonical} rel="canonical" />
+    )}
     {noindex && <meta content="noindex" name="robots" />}
     {description && <meta content={description} name="description" />}
     <meta content="website" property="og:type" />

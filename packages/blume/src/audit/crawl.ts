@@ -7,7 +7,7 @@ import { examplesRouteBase } from "../astro/templates.ts";
 import { stripBasePath } from "../core/base-path.ts";
 import type { BlumeManifest, RouteManifestEntry } from "../core/types.ts";
 import { buildSnapshot } from "./snapshot.ts";
-import type { PageSnapshot, RobotsDoc, SitemapDoc } from "./types.ts";
+import type { LlmsDoc, PageSnapshot, RobotsDoc, SitemapDoc } from "./types.ts";
 
 /**
  * The route prefix `<Component />` preview frames live under. They are bare
@@ -24,6 +24,7 @@ export interface CrawlResult {
   files: Map<string, number>;
   sitemap: SitemapDoc | null;
   robots: RobotsDoc | null;
+  llms: LlmsDoc | null;
 }
 
 /**
@@ -73,7 +74,9 @@ const routeIndex = (
   return index;
 };
 
+const SITEMAP_URL = /<url>(?<block>[\s\S]*?)<\/url>/gu;
 const SITEMAP_LOC = /<loc>(?<loc>[\s\S]*?)<\/loc>/gu;
+const SITEMAP_LASTMOD = /<lastmod>(?<date>[\s\S]*?)<\/lastmod>/u;
 const XML_ENTITIES: Record<string, string> = {
   "&amp;": "&",
   "&apos;": "'",
@@ -98,7 +101,7 @@ export const parseSitemap = (
   xml: string,
   bytes: number
 ): SitemapDoc => {
-  const doc: SitemapDoc = { bytes, file, urls: [] };
+  const doc: SitemapDoc = { bytes, file, lastmod: new Map(), urls: [] };
   if (!xml.includes("<urlset")) {
     doc.error = xml.includes("<sitemapindex")
       ? "sitemap is an index, not a urlset"
@@ -111,7 +114,41 @@ export const parseSitemap = (
       doc.urls.push(loc);
     }
   }
+  // `<lastmod>` is scoped per `<url>` block so it stays attached to its `<loc>`
+  // — the flat loc scan above deliberately isn't, so a sitemap with stray text
+  // between blocks still yields its URL list.
+  for (const match of xml.matchAll(SITEMAP_URL)) {
+    const block = match.groups?.block ?? "";
+    const loc = unescapeXml(
+      (
+        new RegExp(SITEMAP_LOC.source, "u").exec(block)?.groups?.loc ?? ""
+      ).trim()
+    );
+    const lastmod = SITEMAP_LASTMOD.exec(block)?.groups?.date?.trim();
+    if (loc && lastmod) {
+      doc.lastmod?.set(loc, lastmod);
+    }
+  }
   return doc;
+};
+
+/**
+ * Parse the `llms.txt` index into its Markdown link targets. Deliberately
+ * shallow, like {@link parseSitemap}: the checks only need "which pages does
+ * this file claim exist", not a Markdown AST.
+ */
+export const parseLlms = (file: string, text: string): LlmsDoc => {
+  const entries: LlmsDoc["entries"] = [];
+  const link = /\]\((?<url>[^)\s]+)\)/gu;
+  for (const [index, line] of text.split(/\r?\n/u).entries()) {
+    for (const match of line.matchAll(link)) {
+      const url = match.groups?.url;
+      if (url) {
+        entries.push({ line: index + 1, url });
+      }
+    }
+  }
+  return { entries, file };
 };
 
 const ROBOTS_DIRECTIVE = /^(?<field>[a-z-]+)\s*:\s*(?<value>.*)$/iu;
@@ -201,10 +238,13 @@ export const crawlStaticDir = async (options: {
   const sitemapXml = await readIfPresent(sitemapFile);
   const robotsFile = join(staticDir, "robots.txt");
   const robotsTxt = await readIfPresent(robotsFile);
+  const llmsFile = join(staticDir, "llms.txt");
+  const llmsText = await readIfPresent(llmsFile);
   const files = await indexFiles(staticDir);
 
   return {
     files,
+    llms: llmsText === null ? null : parseLlms(llmsFile, llmsText),
     pages,
     robots: robotsTxt === null ? null : parseRobots(robotsFile, robotsTxt),
     sitemap:

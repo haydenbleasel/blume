@@ -21,6 +21,15 @@ const snap = (html: string, route?: RouteManifestEntry) =>
   buildSnapshot({ file: "/dist/index.html", html, route, url: "/docs/x" });
 
 describe("buildSnapshot", () => {
+  it("collects every element id as an anchor target", () => {
+    const result = snap(
+      page(
+        '<main><h1 id="setup">Setup</h1><h2 id="install">Install</h2><div id="app"></div><p>No id here.</p></main>'
+      )
+    );
+    expect(result.ids).toEqual(new Set(["setup", "install", "app"]));
+  });
+
   it("pulls the head tags an audit reads", () => {
     const result = snap(
       page(
