@@ -66,7 +66,10 @@ describe("content checks", () => {
     const ctx = context({
       pages: [
         snapshot({
-          descriptions: ["A description long enough to pass the check.", "Two"],
+          descriptions: [
+            "A description that is comfortably longer than the hundred and ten characters the audit's length check wants to see here.",
+            "Two",
+          ],
         }),
       ],
     });
@@ -78,6 +81,25 @@ describe("content checks", () => {
       pages: [snapshot({ descriptions: ["x".repeat(200)] })],
     });
     expect(run(contentChecks, ctx)).toContain("DESCRIPTION_LENGTH");
+  });
+
+  it("reports a description that is too short", () => {
+    // The bar is Ahrefs' 110–160: a 60-character description renders as a
+    // half-empty snippet, so it warns even though it "has" a description.
+    const ctx = context({
+      pages: [snapshot({ descriptions: ["x".repeat(60)] })],
+    });
+    expect(run(contentChecks, ctx)).toContain("DESCRIPTION_LENGTH");
+  });
+
+  it("does not grade descriptions on error routes", () => {
+    // A 404's description never renders as a search snippet, and it usually
+    // inherits the site default — grading it would flag every site.
+    const ctx = context({
+      pages: [snapshot({ descriptions: ["x".repeat(60)], url: "/404" })],
+    });
+    expect(run(contentChecks, ctx)).not.toContain("DESCRIPTION_LENGTH");
+    expect(run(contentChecks, ctx)).not.toContain("DESCRIPTION_MISSING");
   });
 
   it("reports a missing h1", () => {
@@ -127,7 +149,9 @@ describe("duplicate checks", () => {
         snapshot({ contentHash: "a", titles: ["Alpha page"], url: "/a" }),
         snapshot({
           contentHash: "b",
-          descriptions: ["A different description, also long enough."],
+          descriptions: [
+            "A different description, also comfortably longer than the hundred and ten characters the audit's length check wants to see.",
+          ],
           titles: ["Beta page"],
           url: "/b",
         }),

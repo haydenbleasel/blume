@@ -142,6 +142,9 @@ export interface LinkGraph {
   chromeIn: Map<string, Set<string>>;
 }
 
+/** Astro's reserved error routes. Never indexable, never crawlable — by design. */
+export const ERROR_ROUTES: ReadonlySet<string> = new Set(["/404", "/500"]);
+
 /** Tunable limits. Not yet configurable — CLI-only until the ids settle. */
 export interface AuditThresholds {
   titleMin: number;
@@ -155,8 +158,10 @@ export interface AuditThresholds {
 }
 
 export const DEFAULT_THRESHOLDS: AuditThresholds = {
+  // Ahrefs' guidance: 110–160 characters. Under ~110 wastes the snippet
+  // space search results give you; over ~160 gets truncated.
   descriptionMax: 160,
-  descriptionMin: 50,
+  descriptionMin: 110,
   maxAssetBytes: 500 * 1024,
   // Googlebot stops reading an HTML document at 2 MB.
   maxHtmlBytes: 2 * 1024 * 1024,

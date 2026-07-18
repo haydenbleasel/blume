@@ -12,7 +12,7 @@ Add `blume audit`, an offline site audit that replaces a hosted SEO crawler.
     fix: Rewrite `description` in the frontmatter to fit the length range.
 ```
 
-75 checks across content, duplicates, indexability, links, redirects, social tags, localization, assets, sitemap, robots.txt, and structured data. Findings are rolled up by check rather than dumped per page, and any tier that did not run says so rather than silently reporting nothing.
+75 checks across content, duplicates, indexability, links, redirects, social tags, localization, assets, sitemap, robots.txt, and structured data. Meta descriptions are graded against Ahrefs' 110–160 character guidance. Findings are rolled up by check rather than dumped per page, and any tier that did not run says so rather than silently reporting nothing.
 
 Pages that can't act on a finding aren't audited: `<Component />` example preview frames (bare iframe documents under `/blume-examples/`) are excluded from the crawl, and error routes (`/404`, `/500`) are never asked for a canonical.
 

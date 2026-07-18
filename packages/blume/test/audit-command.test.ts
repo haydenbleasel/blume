@@ -117,7 +117,8 @@ ${options.body ?? ""}
 const HOME = html({
   body: '<a href="/broken">The broken page</a>',
   canonical: "https://x.dev/",
-  description: "A home page description that is long enough to pass the check.",
+  description:
+    "A home page description that is comfortably longer than the hundred and ten characters the audit's length check wants.",
   title: "The home page of the site",
 });
 

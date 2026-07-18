@@ -1,6 +1,7 @@
 import type { Diagnostic } from "../../core/types.ts";
 import { finding } from "../catalog.ts";
 import { pageSite } from "../locate.ts";
+import { ERROR_ROUTES } from "../types.ts";
 import type { AuditContext, CheckModule, PageSnapshot } from "../types.ts";
 
 const titleChecks = (
@@ -47,6 +48,13 @@ const descriptionChecks = (
   context: AuditContext,
   page: PageSnapshot
 ): Diagnostic[] => {
+  // An error route is noindex by design, so its description never renders as
+  // a search snippet — grading it would put a guaranteed finding on every
+  // site whose 404 inherits the site-default description.
+  if (ERROR_ROUTES.has(page.url)) {
+    return [];
+  }
+
   const { descriptionMin, descriptionMax } = context.thresholds;
   const [description] = page.descriptions;
 

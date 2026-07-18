@@ -2,11 +2,9 @@ import { SITE_INFERRING_ADAPTERS } from "../../core/deployment-env.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { finding } from "../catalog.ts";
 import { pageSite } from "../locate.ts";
+import { ERROR_ROUTES } from "../types.ts";
 import type { AuditContext, CheckModule, PageSnapshot } from "../types.ts";
 import { normalizePath, siteOrigin } from "../url.ts";
-
-/** Astro's reserved error routes. Never indexable, never crawlable — by design. */
-const ERROR_ROUTES = new Set(["/404", "/500"]);
 
 /** The canonical URL parsed, or null when it isn't a usable absolute URL. */
 const parseCanonical = (page: PageSnapshot): URL | null => {

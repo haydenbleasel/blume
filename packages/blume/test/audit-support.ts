@@ -17,7 +17,9 @@ export const snapshot = (
   bytes: 1000,
   canonical: null,
   contentHash: "hash",
-  descriptions: ["A description that is comfortably long enough to pass."],
+  descriptions: [
+    "A description that is comfortably long enough to pass the audit's length check, which wants at least a hundred and ten characters.",
+  ],
   file: "/dist/index.html",
   headings: [{ depth: 1, text: "Heading" }],
   hreflang: [],
