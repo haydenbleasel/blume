@@ -74,6 +74,19 @@ export const sampleBrand = {
   ],
 };
 
+// Render a prose string whose code spans are marked with backticks (`--flag`,
+// `blume init`) as HTML: everything else is escaped, each span becomes a
+// styled <code>. For the landing-page sections whose copy lives in data
+// arrays, where inline <code> elements can't be authored directly.
+const escapeHtml = (text: string): string =>
+  text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+export const inlineCode = (text: string): string =>
+  escapeHtml(text).replaceAll(
+    /`(?<span>[^`]+)`/gu,
+    '<code class="font-mono text-[0.925em] text-foreground">$<span></code>'
+  );
+
 // The command shown in the install box (rendered by InstallBox.astro), shared
 // with the hero and install CTA so they stay identical.
 export const installCommand = "npx blume init";

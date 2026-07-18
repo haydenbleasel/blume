@@ -43,7 +43,20 @@ const ask = (q: string, a: string, hint?: string): Line => [
 ];
 const blank: Line = [];
 
-const terminals: Record<string, { title: string; lines: Line[] }> = {
+// A terminal's transcript is `lines` (fixed-width, `whitespace-pre`), plus two
+// optional Codex-session blocks rendered after it: `banner`, the agent's
+// startup box, drawn with a CSS border rather than box-drawing glyphs (which
+// gap vertically at any comfortable line height), and `prompt`, the echoed
+// agent prompt on a lighter panel, wrapping naturally — paragraph groups
+// separated by a blank line, lines within a group stacked directly.
+const terminals: Record<
+  string,
+  {
+    banner?: { rows: { label: string; value: string }[]; title: string };
+    lines: Line[];
+    prompt?: string[][];
+  }
+> = {
   // The hero transcript: the whole lifecycle — scaffold, dev, build, audit —
   // compressed into one clean session.
   hero: {
@@ -63,7 +76,6 @@ const terminals: Record<string, { title: string; lines: Line[] }> = {
       cmd("blume audit"),
       ok("No issues found."),
     ],
-    title: "~/my-docs",
   },
   init: {
     lines: [
@@ -80,7 +92,6 @@ const terminals: Record<string, { title: string; lines: Line[] }> = {
       out("  npm install"),
       out("  npx blume dev"),
     ],
-    title: "~ — npx blume init",
   },
   dev: {
     lines: [
@@ -109,7 +120,6 @@ const terminals: Record<string, { title: string; lines: Line[] }> = {
       ],
       ok("Reloaded in 74 ms"),
     ],
-    title: "my-docs — blume dev",
   },
   build: {
     lines: [
@@ -135,7 +145,6 @@ const terminals: Record<string, { title: string; lines: Line[] }> = {
       blank,
       ok("Built to dist"),
     ],
-    title: "my-docs — blume build",
   },
   checkup: {
     lines: [
@@ -159,7 +168,6 @@ const terminals: Record<string, { title: string; lines: Line[] }> = {
       cmd("blume doctor"),
       ok("No problems found."),
     ],
-    title: "my-docs — blume validate",
   },
   eject: {
     lines: [
@@ -178,54 +186,44 @@ const terminals: Record<string, { title: string; lines: Line[] }> = {
       out("  npm install"),
       out("  npm run dev"),
     ],
-    title: "my-docs — blume eject",
   },
-  // Mirrors the real `formatReport` output: header + summary, findings grouped
-  // by check with source files and a fix line, then the skipped tiers.
+  // The `--codex` handoff: the report header + summary, the handoff line, then
+  // the Codex session it opens — the banner box, and the real `fixPrompt` text
+  // echoed on Codex's prompt panel (via `prompt`, so it wraps naturally).
   audit: {
+    banner: {
+      rows: [
+        { label: "model:     ", value: "gpt-5.6-sol xhigh" },
+        { label: "directory: ", value: "~/GitHub/blume/apps/docs" },
+      ],
+      title: ">_ OpenAI Codex (v0.144.3)",
+    },
     lines: [
-      cmd("blume audit"),
+      cmd("blume audit --codex"),
       blank,
       [
         { c: "bold", t: "  blume audit  " },
         { c: "dim", t: "128 pages · dist · offline" },
       ],
-      [{ c: "out", t: "  3,712 audits · 0 errors · 2 warnings · 1 note" }],
+      [{ c: "out", t: "  3,712 audits · 32 errors · 56 warnings · 3 notes" }],
       blank,
-      [{ c: "bold", t: "  content" }],
-      [
-        { c: "warn", t: "  ⚠ Meta description too long or too short" },
-        { c: "dim", t: "  2 pages" },
-      ],
-      [
-        { c: "out", t: "      /docs/configuration/export   " },
-        { c: "dim", t: "content/docs/configuration/export.mdx:3" },
-      ],
-      [
-        { c: "out", t: "      /docs/advanced/skills        " },
-        { c: "dim", t: "content/docs/advanced/skills.mdx:3" },
-      ],
-      [
-        { c: "fix", t: "      fix: Rewrite `description` in the front matter to fit the length range." },
-      ],
-      blank,
-      [{ c: "bold", t: "  media" }],
-      [
-        { c: "info", t: "  ℹ Image missing explicit dimensions" },
-        { c: "dim", t: "  1 page" },
-      ],
-      [
-        { c: "out", t: "      /docs/quickstart             " },
-        { c: "dim", t: "content/docs/quickstart.mdx:41" },
-      ],
-      [
-        { c: "fix", t: "      fix: Add width and height so the layout doesn't shift." },
-      ],
-      blank,
-      dim("  ⊘ network      skipped — pass --url <origin> (9 checks)"),
-      dim("  ⊘ external     skipped — pass --external (2 checks)"),
+      [{ c: "out", t: "  Handing 91 findings to Codex…" }],
     ],
-    title: "my-docs — blume audit",
+    prompt: [
+      ["Fix the issues found by `blume audit` in this project."],
+      [
+        "The full audit report is at report.json. It is JSON: each entry in `diagnostics` is one finding, with the check `code`, a `message` explaining what is wrong, the affected page `url`, the source `file` to edit (relative to the current directory, with a `line` when the finding points at a specific front matter key), and a `suggestion` describing the fix.",
+      ],
+      [
+        "Work through every finding:",
+        "1. Read the report and group the findings by `file`.",
+        "2. Apply each finding's `suggestion` by editing the named source file — most fixes are front matter edits at the cited line.",
+        "3. Never fix a finding by deleting a page, removing content, or hiding it from the audit; if a finding genuinely needs a human decision, leave it and say so in your summary.",
+      ],
+      [
+        "When you are done, run `blume build` and then `blume audit` to verify, and repeat until the audit reports no issues.",
+      ],
+    ],
   },
 };
 
@@ -233,14 +231,11 @@ const terminal = terminals[kind] ?? terminals.init;
 ---
 
 <div class="flex h-full flex-col bg-[#0d0f12] text-left">
-  {/* Window chrome: traffic lights + the running command as the title. */}
+  {/* Window chrome: traffic lights only. */}
   <div class="flex items-center gap-1.5 border-white/10 border-b px-4 py-3">
     <span aria-hidden="true" class="size-2.5 rounded-full bg-[#ff5f57]"></span>
     <span aria-hidden="true" class="size-2.5 rounded-full bg-[#febc2e]"></span>
     <span aria-hidden="true" class="size-2.5 rounded-full bg-[#28c840]"></span>
-    <span class="ml-2 truncate font-mono text-[11px] text-zinc-500">
-      {terminal.title}
-    </span>
   </div>
   <div
     class="flex-1 overflow-x-auto p-4 font-mono text-[12px] leading-6 sm:p-5 sm:text-[13px]"
@@ -255,6 +250,41 @@ const terminal = terminals[kind] ?? terminals.init;
               ))}
         </div>
       ))
+    }
+    {
+      terminal.banner && (
+        <div class="mt-6 inline-block rounded-md border border-zinc-700 px-4 py-3">
+          <div class={palette.bold}>{terminal.banner.title}</div>
+          <div class="mt-3">
+            {terminal.banner.rows.map((row) => (
+              <div class="whitespace-pre">
+                <span class={palette.dim}>{row.label}</span>
+                <span class={palette.cmd}>{row.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+    {
+      terminal.prompt && (
+        <div class="mt-4 rounded-md bg-white/[0.06] p-4">
+          <div class="relative pl-[2ch]">
+            <span aria-hidden="true" class="absolute left-0 text-teal-400">
+              ›
+            </span>
+            {terminal.prompt.map((group, groupIndex) => (
+              <div
+                class={groupIndex === 0 ? "text-zinc-100" : "mt-6 text-zinc-400"}
+              >
+                {group.map((text) => (
+                  <p>{text}</p>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )
     }
   </div>
 </div>

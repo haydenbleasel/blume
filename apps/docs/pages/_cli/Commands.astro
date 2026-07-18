@@ -3,14 +3,14 @@
 // homepage's "Batteries included" section (x.ai/cli-style), with the browser
 // window swapped for a terminal. A column of feature blocks scrolls past one
 // sticky terminal that crossfades its transcript per feature.
-import { glyph, icons } from "../_home/shared.ts";
+import { glyph, icons, inlineCode } from "../_home/shared.ts";
 import FeatureTerminal from "./FeatureTerminal.astro";
 
 const features = [
   {
-    body: "blume init asks a few questions and scaffolds a complete project — content folder, config, and scripts. No starter repo to clone, nothing to keep in sync with upstream.",
+    body: "`blume init` asks a few questions and scaffolds a complete project — content folder, config, and scripts. No starter repo to clone, nothing to keep in sync with upstream.",
     checklist: [
-      "Interactive by default, --yes in CI",
+      "Interactive by default, `--yes` in CI",
       "Four templates: docs, api, sdk, and changelog",
       "Next steps tailored to your package manager",
     ],
@@ -22,8 +22,8 @@ const features = [
     body: "The dev server regenerates the runtime on every change and hot-reloads before you've switched windows. Search, theming, and OG images all work in dev, exactly as they will in production.",
     checklist: [
       "Hot reload for content, config, and components",
-      "Include drafts and unpublished content with --preview",
-      "Verbose --debug logging when something's off",
+      "Include drafts and unpublished content with `--preview`",
+      "Verbose `--debug` logging when something's off",
     ],
     icon: icons.fast,
     kind: "dev",
@@ -33,30 +33,30 @@ const features = [
     body: "One command renders the whole site — static or server — and wires up the sitemap, robots.txt, redirects, and search index. Performance isn't a hope, it's a flag.",
     checklist: [
       "Deploy to Vercel, Node, Netlify, or Cloudflare",
-      "--analyze prints client bundles, largest first",
-      "--budget-js fails the build when it's over budget",
+      "`--analyze` prints client bundles, largest first",
+      "`--budget-js` fails the build when it's over budget",
     ],
     icon: glyph("gauge"),
     kind: "build",
     title: "Builds that hold the line",
   },
   {
-    body: "Three commands keep a site honest: check type-checks your pages, validate chases every link and anchor, and doctor diagnoses config and content problems before they ship.",
+    body: "Three commands keep a site honest: `check` type-checks your pages, `validate` chases every link and anchor, and `doctor` diagnoses config and content problems before they ship.",
     checklist: [
       "Broken links, anchors, and assets caught in CI",
       "TypeScript errors in custom pages and config",
-      "--json output for CI and editor integrations",
+      "`--json` output for CI and editor integrations",
     ],
     icon: glyph("shield-check"),
     kind: "checkup",
     title: "A linter for your docs",
   },
   {
-    body: "The registry and the escape hatch cut both ways: add pulls a component's source into your project to make it yours, and eject promotes the entire runtime into a standalone Astro app you own outright.",
+    body: "The registry and the escape hatch cut both ways: `add` pulls a component's source into your project to make it yours, and `eject` promotes the entire runtime into a standalone Astro app you own outright.",
     checklist: [
-      "blume add installs source components",
-      "blume sync re-fetches remote content sources",
-      "blume eject hands you a plain Astro project",
+      "`blume add` installs source components",
+      "`blume sync` re-fetches remote content sources",
+      "`blume eject` hands you a plain Astro project",
     ],
     icon: icons.eject,
     kind: "eject",
@@ -74,7 +74,7 @@ const commandsScript = `(()=>{const r=document.querySelector("[data-blume-cli]")
 <section data-blume-cli>
   <div class="mx-auto max-w-2xl text-center">
     <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
-      One CLI, the whole workflow.
+      The whole workflow, built in.
     </h2>
     <p class="mx-auto mt-4 max-w-lg text-balance text-muted-foreground">
       Everything between a blank folder and a deployed docs site — scaffolding,
@@ -112,9 +112,10 @@ const commandsScript = `(()=>{const r=document.querySelector("[data-blume-cli]")
               <h3 class="mt-5 font-medium text-foreground text-xl tracking-tight sm:text-2xl">
                 {feature.title}
               </h3>
-              <p class="mt-3 max-w-md text-muted-foreground leading-relaxed">
-                {feature.body}
-              </p>
+              <p
+                class="mt-3 max-w-md text-muted-foreground leading-relaxed"
+                set:html={inlineCode(feature.body)}
+              />
               <ul class="mt-6 space-y-3">
                 {feature.checklist.map((item) => (
                   <li class="flex items-start gap-2.5 text-foreground text-sm">
@@ -130,7 +131,7 @@ const commandsScript = `(()=>{const r=document.querySelector("[data-blume-cli]")
                       width="16"
                       set:html={icons.check}
                     />
-                    <span>{item}</span>
+                    <span set:html={inlineCode(item)} />
                   </li>
                 ))}
               </ul>

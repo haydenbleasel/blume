@@ -1,7 +1,7 @@
 ---
 // CLI page hero: a side-by-side split (x.ai-style) to differentiate from the
 // homepage's centered hero. Copy and CTAs on the left; on the right, the hero
-// terminal — the whole lifecycle in one session — floating on an accent panel.
+// terminal — the whole lifecycle in one session.
 import { glyph } from "../_home/shared.ts";
 import FeatureTerminal from "./FeatureTerminal.astro";
 
@@ -18,17 +18,17 @@ const secondaryButton =
   class="grid items-center gap-12 py-4 lg:grid-cols-2 lg:gap-16 sm:py-8"
 >
   <div>
-    <span class="text-muted-foreground text-xs">The Blume CLI</span>
     <h1
-      class="mt-5 text-balance font-medium text-4xl tracking-tight sm:text-5xl lg:text-6xl"
+      class="text-balance font-medium text-4xl tracking-tight sm:text-5xl lg:text-6xl"
     >
-      <span class="block">World-class docs,</span>
+      <span class="block">Everything included,</span>
       <span class="block text-muted-foreground"
-        >straight from your terminal.</span
+        >right in your terminal.</span
       >
     </h1>
     <p class="mt-6 max-w-xl text-balance text-lg text-muted-foreground">
-      One CLI to scaffold, preview, build, validate, and audit your
+      No separate install, no extra setup — every Blume project comes with a
+      command line that scaffolds, previews, builds, validates, and audits your
       documentation. Fast by default, scriptable in CI, and built to work with
       your favorite coding agents.
     </p>
@@ -52,19 +52,9 @@ const secondaryButton =
     </div>
   </div>
 
-  <!-- The terminal, floating on an accent panel. -->
   <div
-    class="relative overflow-hidden rounded-[2rem] bg-accent p-6 sm:p-10 lg:p-12"
+    class="overflow-hidden rounded-blume border border-zinc-800 shadow-2xl shadow-foreground/10"
   >
-    <div
-      aria-hidden="true"
-      class="absolute inset-0 bg-gradient-to-tr from-black/25 via-transparent to-white/25"
-    >
-    </div>
-    <div
-      class="relative overflow-hidden rounded-blume shadow-2xl shadow-black/30"
-    >
-      <FeatureTerminal kind="hero" />
-    </div>
+    <FeatureTerminal kind="hero" />
   </div>
 </section>

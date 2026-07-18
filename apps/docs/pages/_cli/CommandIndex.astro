@@ -1,5 +1,5 @@
 ---
-// Every command at a glance — a compact grid mirroring the CLI reference's
+// Every command at a glance — a divided list mirroring the CLI reference's
 // command table, with a link through to the full flag documentation.
 import { glyph } from "../_home/shared.ts";
 
@@ -38,14 +38,14 @@ const commands = [
     </p>
   </div>
 
-  <div class="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  <div class="mx-auto mt-10 max-w-3xl divide-y divide-border">
     {
       commands.map((command) => (
-        <div class="rounded-blume border border-border p-5">
+        <div class="grid gap-1.5 py-4 sm:grid-cols-[10rem_1fr] sm:items-baseline sm:gap-6">
           <code class="font-medium font-mono text-foreground text-sm">
             {command.name}
           </code>
-          <p class="mt-2 text-muted-foreground text-sm leading-relaxed">
+          <p class="text-muted-foreground text-sm leading-relaxed">
             {command.text}
           </p>
         </div>
