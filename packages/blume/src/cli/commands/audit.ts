@@ -1,5 +1,12 @@
 import { defineCommand } from "citty";
 
+import {
+  AGENTS,
+  fixPrompt,
+  launchAgent,
+  writeAgentReport,
+} from "../../audit/agent.ts";
+import type { AgentKind } from "../../audit/agent.ts";
 import { formatCatalog, formatReport, reportJson } from "../../audit/report.ts";
 import { NoBuildError, runAudit } from "../../audit/run.ts";
 import type { AuditResult } from "../../audit/run.ts";
@@ -34,6 +41,14 @@ export const shouldFail = (
 
 export const auditCommand = defineCommand({
   args: {
+    claude: {
+      description: "Hand the findings to Claude Code to fix interactively.",
+      type: "boolean",
+    },
+    codex: {
+      description: "Hand the findings to Codex to fix interactively.",
+      type: "boolean",
+    },
     external: {
       description: "Probe outbound links over the network.",
       type: "boolean",
@@ -92,6 +107,18 @@ export const auditCommand = defineCommand({
       );
       process.exit(1);
     }
+    const agents = (Object.keys(AGENTS) as AgentKind[]).filter(
+      (kind) => args[kind]
+    );
+    if (agents.length > 1) {
+      logger.error("Pass at most one of --claude or --codex.");
+      process.exit(1);
+    }
+    const [agent] = agents;
+    if (agent && args.json) {
+      logger.error(`--json and --${agent} are mutually exclusive.`);
+      process.exit(1);
+    }
     let result: AuditResult;
     try {
       // `scanProject`, not `prepareProject`: the audit reads the *existing*
@@ -116,6 +143,40 @@ export const auditCommand = defineCommand({
       }
       reportInternalError(error);
       process.exit(1);
+    }
+
+    if (agent) {
+      // Show the same report a plain run would, so the terminal records what
+      // was handed off before the agent's own UI takes over the screen.
+      process.stderr.write(
+        formatReport(result, root, { verbose: args.verbose })
+      );
+      if (result.diagnostics.length === 0) {
+        return;
+      }
+      const cli = AGENTS[agent];
+      const report = await writeAgentReport(result, root);
+      const count = result.diagnostics.length;
+      // Straight to stderr like the report above it, not `logger.info` —
+      // consola drops info-level lines in test and CI environments.
+      process.stderr.write(
+        `  Handing ${count} finding${count === 1 ? "" : "s"} to ${cli.name}…\n\n`
+      );
+      let code: number;
+      try {
+        code = await launchAgent(cli.bin, fixPrompt(report));
+      } catch {
+        logger.error(
+          `${cli.name} (\`${cli.bin}\`) was not found on PATH. Install it with \`${cli.install}\`.`
+        );
+        process.exit(1);
+      }
+      if (code !== 0) {
+        process.exit(code);
+      }
+      // The gate is a CI concern; a handoff run succeeds when the agent
+      // session does, not when the pre-fix site was already clean.
+      return;
     }
 
     if (args.json) {

@@ -20,6 +20,8 @@ Pass `--url <origin>` to also probe a live deployment for the things a `dist/` f
 
 Core Web Vitals are not included: they need a real browser, and a flag that quietly measured nothing would be worse than not having one.
 
+Pass `--claude` or `--codex` to hand the findings to Claude Code or Codex: the audit writes the complete JSON report to a file and opens the agent interactively with a prompt to fix each finding at the source it names, then re-run `blume build` and `blume audit` until clean. The handoff is interactive by design — edits go through the agent's own permission flow rather than a headless process with blanket write access.
+
 Other flags: `--fail-on <severity>` (default `error`) as the CI gate, `--only`/`--skip` to triage, `--json`, `--verbose`, and `--list-checks`.
 
 `blume validate` is unchanged — it remains the fast source-level link check that needs no build.

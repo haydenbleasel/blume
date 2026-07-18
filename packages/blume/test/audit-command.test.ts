@@ -1,5 +1,12 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
@@ -36,12 +43,16 @@ const fixture = async (files: Record<string, string>): Promise<string> => {
   return root;
 };
 
-const audit = async (
+const auditEnv = async (
   cwd: string,
+  env: Record<string, string>,
   ...args: string[]
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> => {
-  const proc = Bun.spawn(["bun", CLI, "audit", ...args], {
+  // `process.execPath`, not `"bun"`: the agent tests replace PATH, and the
+  // CLI still has to be launchable without one.
+  const proc = Bun.spawn([process.execPath, CLI, "audit", ...args], {
     cwd,
+    env: { ...process.env, ...env },
     stderr: "pipe",
     stdout: "pipe",
   });
@@ -51,6 +62,33 @@ const audit = async (
     new Response(proc.stdout).text(),
   ]);
   return { exitCode, stderr, stdout };
+};
+
+const audit = (
+  cwd: string,
+  ...args: string[]
+): Promise<{ exitCode: number; stderr: string; stdout: string }> =>
+  auditEnv(cwd, {}, ...args);
+
+/**
+ * A fake agent executable (`claude`/`codex`) dropped into the fixture. It
+ * records the prompt it was launched with, so the tests can assert on the
+ * handoff without a real agent CLI installed.
+ */
+const agentBin = async (
+  root: string,
+  name: string,
+  exitCode = 0
+): Promise<string> => {
+  const dir = join(root, "agent-bin");
+  await mkdir(dir, { recursive: true });
+  const bin = join(dir, name);
+  await writeFile(
+    bin,
+    `#!/bin/sh\nprintf '%s' "$1" > "$(dirname "$0")/prompt.txt"\nexit ${exitCode}\n`
+  );
+  await chmod(bin, 0o755);
+  return dir;
 };
 
 const CONFIG = `export default {
@@ -225,6 +263,90 @@ describe("blume audit", () => {
     const { exitCode, stderr } = await audit(root);
     expect(exitCode).toBe(1);
     expect(stderr).toContain("Run `blume build` first");
+  });
+
+  it("hands the full report to Claude Code with --claude", async () => {
+    const root = await fixture(site());
+    const bin = await agentBin(root, "claude");
+    const { exitCode, stderr, stdout } = await auditEnv(
+      root,
+      { PATH: `${bin}:${process.env.PATH}` },
+      "--claude"
+    );
+
+    // The site has errors, but a handoff run succeeds when the agent does —
+    // the point is fixing, not gating.
+    expect(exitCode).toBe(0);
+    expect(stderr + stdout).toContain("Claude Code");
+
+    const prompt = await readFile(join(bin, "prompt.txt"), "utf-8");
+    const reportPath = /(?<path>\/\S+\/report\.json)/u.exec(prompt)?.groups
+      ?.path;
+    expect(reportPath).toBeDefined();
+
+    // The prompt points at the machine report, and the report carries every
+    // finding with the root-relative source file the agent should edit.
+    const payload = JSON.parse(await readFile(reportPath ?? "", "utf-8"));
+    expect(
+      payload.diagnostics.some(
+        (d: { code: string; file?: string }) =>
+          d.code === "BLUME_AUDIT_LINK_TO_BROKEN" &&
+          d.file === "docs/broken.mdx"
+      )
+    ).toBe(true);
+  });
+
+  it("propagates the agent's exit code with --codex", async () => {
+    const root = await fixture(site());
+    const bin = await agentBin(root, "codex", 7);
+    const { exitCode, stderr, stdout } = await auditEnv(
+      root,
+      { PATH: `${bin}:${process.env.PATH}` },
+      "--codex"
+    );
+    expect(exitCode).toBe(7);
+    expect(stderr + stdout).toContain("Codex");
+  });
+
+  it("does not launch an agent when there is nothing to fix", async () => {
+    const root = await fixture(healthyLinks());
+    const bin = await agentBin(root, "claude");
+    const { exitCode, stderr } = await auditEnv(
+      root,
+      { PATH: `${bin}:${process.env.PATH}` },
+      "--claude",
+      "--only",
+      "link_to_broken"
+    );
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain("No issues found");
+    await expect(readFile(join(bin, "prompt.txt"), "utf-8")).rejects.toThrow();
+  });
+
+  it("rejects --claude together with --codex, and with --json", async () => {
+    const root = await fixture(site());
+    const both = await audit(root, "--claude", "--codex");
+    expect(both.exitCode).toBe(1);
+    expect(both.stderr + both.stdout).toContain("at most one");
+
+    const json = await audit(root, "--json", "--claude");
+    expect(json.exitCode).toBe(1);
+    expect(json.stderr + json.stdout).toContain("mutually exclusive");
+  });
+
+  it("says how to install the agent when its CLI is missing", async () => {
+    const root = await fixture(site());
+    // A PATH with only the runtime on it — wherever the developer installed
+    // their real agent CLI, it isn't here.
+    const { exitCode, stderr, stdout } = await auditEnv(
+      root,
+      { PATH: dirname(process.execPath) },
+      "--claude"
+    );
+    expect(exitCode).toBe(1);
+    expect(stderr + stdout).toContain(
+      "npm install -g @anthropic-ai/claude-code"
+    );
   });
 
   it("ignores component fragments that Astro emits alongside real pages", async () => {

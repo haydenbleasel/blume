@@ -57,6 +57,7 @@ blume <command> [options]
 - `blume audit --list-checks` — print every check the audit can report.
 - `blume audit --verbose` — list every affected page instead of the first few.
 - `blume audit --json` — emit the report as JSON on stdout.
+- `blume audit --claude` / `--codex` — hand the findings to Claude Code or Codex to fix interactively.
 
 ## Verifying while the dev server runs
 
@@ -156,6 +157,18 @@ blume audit --url https://docs.example.com --external   # also probe outbound li
 ```
 
 Outbound links are graded rather than flatly failed: a 404 is a broken link you can fix, while a 403 or 5xx is usually rate limiting or someone else's outage and is reported as a warning.
+
+### Fixing the findings with an agent
+
+If you use [Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex/cli), the audit can hand its findings straight to it:
+
+```bash
+blume audit --claude   # or --codex
+```
+
+This writes the complete JSON report — every affected page, not the terminal's three-page preview — to a file and opens the agent interactively with a prompt that walks it through the findings: edit the source file each finding names, apply its suggested fix, then run `blume build` and `blume audit` again until the report is clean. The session is interactive by design: you review the edits through the agent's own permission flow, and the agent is told never to fix a finding by deleting content.
+
+`--only` and `--skip` narrow the handoff the same way they narrow the report, so you can send one category at a time.
 
 ### What it does and doesn't check
 
