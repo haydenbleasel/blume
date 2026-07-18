@@ -6,11 +6,25 @@ import type { BlumePageRoute } from "./integration.ts";
 
 const PAGE_GLOB = ["**/*.astro"];
 
+/**
+ * Astro's routing convention: a file or folder whose name starts with `_` is a
+ * private partial — importable (shared layouts, home-page sections), but never
+ * built into a route. Blume injects pages itself, so it must reproduce the same
+ * exclusion or every `pages/_home/Hero.astro`-style component ships as an HTML
+ * page.
+ */
+const isPrivatePage = (rel: string): boolean =>
+  rel.split("/").some((segment) => segment.startsWith("_"));
+
 /** Map discovered page files to routes; shared by the async/sync discoverers. */
 const toPageRoutes = (pagesRoot: string, files: string[]): BlumePageRoute[] => {
   files.sort();
-  return files.map((file) => {
+  const routes: BlumePageRoute[] = [];
+  for (const file of files) {
     const rel = relative(pagesRoot, file);
+    if (isPrivatePage(rel)) {
+      continue;
+    }
     const withoutExt = rel.slice(0, rel.length - extname(rel).length);
     const parts = withoutExt.split("/");
     // Only a trailing `index` maps to its parent dir; a folder literally named
@@ -19,8 +33,9 @@ const toPageRoutes = (pagesRoot: string, files: string[]): BlumePageRoute[] => {
       parts.pop();
     }
     const pattern = parts.length === 0 ? "/" : `/${parts.join("/")}`;
-    return { entrypoint: file, pattern };
-  });
+    routes.push({ entrypoint: file, pattern });
+  }
+  return routes;
 };
 
 /**

@@ -23,6 +23,11 @@ const FILES = [
   // A folder literally named `index` keeps its segment (only a trailing
   // `index` file collapses to the parent).
   "index/nested.astro",
+  // Astro's private-partial convention: an underscore-prefixed file or folder
+  // is importable but never routed, so none of these ship as a page.
+  "_FeatureBrowser.astro",
+  "_home/Hero.astro",
+  "blog/_draft.astro",
 ];
 
 beforeAll(async () => {
@@ -51,6 +56,14 @@ describe("discoverPages", () => {
       "/index/nested",
       "/nested/deep",
     ]);
+  });
+
+  it("excludes underscore-prefixed private files and folders", async () => {
+    const routes = await discoverPages(root);
+    const patterns = routes.map((route) => route.pattern);
+    expect(patterns).not.toContain("/_FeatureBrowser");
+    expect(patterns).not.toContain("/_home/Hero");
+    expect(patterns).not.toContain("/blog/_draft");
   });
 
   it("keeps the original file as the entrypoint", async () => {
