@@ -221,6 +221,16 @@ describe("indexability checks", () => {
     expect(run(indexabilityChecks, ctx)).toContain("CANONICAL_MISSING");
   });
 
+  it("does not demand a canonical on error routes", () => {
+    // /404 is noindex by design; a canonical there is meaningless, so its
+    // absence is not a defect.
+    const ctx = context({
+      pages: [snapshot({ canonical: null, url: "/404" })],
+      site: SITE,
+    });
+    expect(run(indexabilityChecks, ctx)).not.toContain("CANONICAL_MISSING");
+  });
+
   it("is silent on a self-canonical page", () => {
     const ctx = context({
       pages: [snapshot({ canonical: `${SITE}/`, url: "/" })],

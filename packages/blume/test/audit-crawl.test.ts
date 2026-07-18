@@ -69,6 +69,24 @@ describe("crawlStaticDir", () => {
     expect(result.robots?.disallow).toEqual(["/private"]);
   });
 
+  it("excludes <Component /> example preview frames from the audit", async () => {
+    // Preview frames are bare iframe documents with no front matter to fix;
+    // auditing them reports short titles and missing descriptions nobody ships.
+    const dir = await build({
+      "blume-examples/card/index.html": page("card"),
+      "docs/blume-examples/counter/index.html": page("counter"),
+      "index.html": page("Home"),
+    });
+    const result = await crawlStaticDir({
+      basePath: "/docs",
+      manifest: manifest([]),
+      staticDir: dir,
+    });
+    // Both spellings are excluded: with the basePath baked into the built
+    // tree, and without.
+    expect(result.pages.map((p) => p.url)).toEqual(["/"]);
+  });
+
   it("joins a built page to the source file in the route manifest", async () => {
     // This join is the feature: without it a finding can only name a URL.
     const dir = await build({ "docs/api/index.html": page("API") });

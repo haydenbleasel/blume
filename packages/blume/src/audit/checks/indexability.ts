@@ -27,6 +27,13 @@ const canonicalChecks = (
   const { site } = context.project.config.deployment;
   const origin = siteOrigin(site);
 
+  // Error routes are noindex by design, so a canonical on them is meaningless
+  // and its absence isn't a defect — flagging /404 would be a guaranteed
+  // finding on every site that has an error page.
+  if (ERROR_ROUTES.has(page.url)) {
+    return [];
+  }
+
   if (!page.canonical) {
     // Without `deployment.site` Blume has no absolute URL to canonicalize to, so
     // report the root cause once (in the sitemap/robots checks) rather than

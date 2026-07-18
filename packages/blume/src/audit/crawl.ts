@@ -3,10 +3,19 @@ import { readFile, stat } from "node:fs/promises";
 import { join, relative } from "pathe";
 import { glob } from "tinyglobby";
 
+import { examplesRouteBase } from "../astro/templates.ts";
 import { stripBasePath } from "../core/base-path.ts";
 import type { BlumeManifest, RouteManifestEntry } from "../core/types.ts";
 import { buildSnapshot } from "./snapshot.ts";
 import type { PageSnapshot, RobotsDoc, SitemapDoc } from "./types.ts";
+
+/**
+ * The route prefix `<Component />` preview frames live under. They are bare
+ * documents rendered for iframes — deliberately noindex, no title worth
+ * grading, no front matter to fix — so auditing them as pages only produces
+ * findings nobody can act on.
+ */
+const EXAMPLES_PREFIX = `${examplesRouteBase("")}/`;
 
 /** Everything read off disk in one pass over the built site. */
 export interface CrawlResult {
@@ -171,6 +180,9 @@ export const crawlStaticDir = async (options: {
   const snapshots = await Promise.all(
     htmlFiles.toSorted().map(async (file) => {
       const url = fileToUrl(staticDir, file);
+      if (stripBasePath(basePath, url).startsWith(EXAMPLES_PREFIX)) {
+        return null;
+      }
       const html = await readFile(file, "utf-8");
       if (!isDocument(html)) {
         return null;
