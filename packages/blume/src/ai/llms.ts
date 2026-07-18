@@ -3,6 +3,7 @@ import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readEntryText } from "../core/sources/read.ts";
 import type { NavNode, Navigation, PageRecord } from "../core/types.ts";
+import { buildRssFeeds } from "../deploy/rss.ts";
 import { downlevelComponents } from "./component-markdown.ts";
 import { applyAgentVisibility } from "./visibility.ts";
 
@@ -133,6 +134,20 @@ const buildIndex = (project: BlumeProject): string => {
     blocks.push(
       blocks.length > 0 ? "## Other" : "## Docs",
       leftover.map(line).join("\n")
+    );
+  }
+
+  // Surface the RSS feeds so agents can find fresh content (new blog posts,
+  // changelog entries) without re-crawling the index. `buildRssFeeds` is empty
+  // unless RSS is enabled and an absolute `site` is set — the same condition
+  // under which agent-readability.json lists `artifacts.feeds`.
+  const feeds = buildRssFeeds(project);
+  if (feeds.length > 0) {
+    blocks.push(
+      "## RSS Feeds",
+      feeds
+        .map((feed) => `- [${feed.title}](${pageUrl(feed.path, site, base)})`)
+        .join("\n")
     );
   }
 

@@ -152,6 +152,55 @@ describe("buildLlmsFiles — index", () => {
   });
 });
 
+describe("buildLlmsFiles — RSS feeds", () => {
+  it("links the RSS feed for each content type that has pages", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject([
+        makePage("a.md", "/blog/post", "Post", { contentType: "blog" }),
+        makePage("b.md", "/b", "Beta"),
+      ])
+    );
+    expect(index).toContain("## RSS Feeds");
+    expect(index).toContain(
+      "- [Docs — Blog](https://example.com/blog/rss.xml)"
+    );
+    // Changelog is a default RSS type but has no pages here, so no feed.
+    expect(index).not.toContain("/changelog/rss.xml");
+  });
+
+  it("layers deployment.base onto the feed link", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject(
+        [makePage("a.md", "/blog/post", "Post", { contentType: "blog" })],
+        { deployment: { base: "/docs", site: "https://example.com/" } }
+      )
+    );
+    expect(index).toContain(
+      "- [Docs — Blog](https://example.com/docs/blog/rss.xml)"
+    );
+  });
+
+  it("omits the feeds section when RSS is disabled", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject(
+        [makePage("a.md", "/blog/post", "Post", { contentType: "blog" })],
+        { seo: { rss: { enabled: false } } }
+      )
+    );
+    expect(index).not.toContain("## RSS Feeds");
+  });
+
+  it("omits the feeds section without a deployment site", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject(
+        [makePage("a.md", "/blog/post", "Post", { contentType: "blog" })],
+        { deployment: {} }
+      )
+    );
+    expect(index).not.toContain("## RSS Feeds");
+  });
+});
+
 describe("buildLlmsFiles — navigation structure", () => {
   it("mirrors the sidebar tree: folders become nested headings", async () => {
     const { index } = await buildLlmsFiles(
