@@ -997,8 +997,8 @@ describe("ensureDepsLink version-less conflict", () => {
 
   it("degrades to a version-less warning when neither Astro resolves", async () => {
     // A split layout where the `astro` directory holds no package.json, so
-    // `resolvedAstroPath` yields null and `readPkgVersion` takes its null-path
-    // guard — the diagnostic falls back to its version-less form.
+    // The direct Astro package lookup yields null and `readPkgVersion` takes its
+    // null-path guard — the diagnostic falls back to its version-less form.
     const dir = await mkdtemp(join(tmpdir(), "blume-conflict-"));
     conflictDirs.push(dir);
     const pkgDir = join(dir, "node_modules", "blume");

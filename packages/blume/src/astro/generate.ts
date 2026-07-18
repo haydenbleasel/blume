@@ -149,20 +149,39 @@ const reactCompilerWarnings = (
       ]
     : [];
 
-/**
- * Realpath of the `astro` package node resolves from a directory, or null when
- * none resolves. Comparing this for `.blume/` against Blume's own deps tells
- * whether the runtime would bind to the *same* astro Blume uses or a different
- * one shadowing it (the hoisted-conflict failure mode).
- */
-const resolvedAstroPath = (fromDir: string): string | null => {
+/** Resolve Astro's package.json directly inside a node_modules directory. */
+const resolveAstroPackageJson = (modulesDir: string): string | null => {
   try {
-    const pkg = createRequire(
-      pathToFileURL(join(fromDir, "_.js")).href
-    ).resolve("astro/package.json");
-    return realpathSync(pkg);
+    return realpathSync(join(modulesDir, "astro", "package.json"));
   } catch {
     return null;
+  }
+};
+
+/**
+ * Realpath of the `astro` package reachable through the normal node_modules
+ * ancestor walk from a generated runtime, or null when none resolves.
+ *
+ * This deliberately does not use `createRequire().resolve()`. pnpm's generated
+ * bin shim adds Blume's virtual-store dependencies to `NODE_PATH`, which
+ * CommonJS resolution honors but ESM package resolution ignores. The generated
+ * Astro config uses ESM imports, so treating a NODE_PATH-only result as
+ * reachable skips the dependency link and makes `import "astro/config"` fail.
+ * Walking the physical node_modules ancestors mirrors the lookup that config
+ * actually gets.
+ */
+const resolvedAstroPath = (fromDir: string): string | null => {
+  let dir = normalize(fromDir);
+  while (true) {
+    const resolved = resolveAstroPackageJson(join(dir, "node_modules"));
+    if (resolved) {
+      return resolved;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      return null;
+    }
+    dir = parent;
   }
 };
 
@@ -282,7 +301,7 @@ export const ensureDepsLink = async (
   }
   // Already correct when `.blume/` resolves the very same astro Blume's deps
   // provide — the clean hoisted case, nothing to do.
-  const blumeAstro = resolvedAstroPath(depsDir);
+  const blumeAstro = resolveAstroPackageJson(depsDir);
   const outDirAstro = resolvedAstroPath(outDir);
   if (blumeAstro && outDirAstro === blumeAstro) {
     return null;
