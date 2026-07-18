@@ -261,7 +261,7 @@ if (isBare) {
 } else if (isApiOperation) {
   gridClass = "lg:grid-cols-[17.5rem_minmax(0,1fr)]";
 }
-let articleClass = "prose mx-auto max-w-[42rem]";
+let articleClass = "prose mx-auto max-w-content";
 if (isBare) {
   articleClass = "prose mx-auto max-w-[54rem]";
 } else if (isApiOperation) {
@@ -592,7 +592,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
                 route={page.route}
               />
               {formattedLastModified && (
-                <p class="mx-auto mt-10 max-w-[42rem] text-muted-foreground text-sm">
+                <p class="mx-auto mt-10 max-w-content text-muted-foreground text-sm">
                   {strings.page.lastUpdated} {formattedLastModified}
                 </p>
               )}

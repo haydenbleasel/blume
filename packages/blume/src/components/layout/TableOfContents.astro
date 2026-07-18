@@ -19,7 +19,7 @@ const { headings, title, variant } = Astro.props;
 
 {
   headings.length > 0 && variant === "mobile" && (
-    <details class="group mx-auto mb-6 max-w-[42rem] rounded-blume border border-border xl:hidden">
+    <details class="group mx-auto mb-6 max-w-content rounded-blume border border-border xl:hidden">
       <summary class="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-medium text-foreground text-sm [&::-webkit-details-marker]:hidden">
         <span>{title}</span>
         <Icon
