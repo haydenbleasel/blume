@@ -94,6 +94,17 @@ describe("withAdapterRoot", () => {
     );
   });
 
+  it("collapses any run of trailing slashes to a single directory slash", async () => {
+    // The trim runs on library-supplied input, so it must stay linear no matter
+    // how many trailing slashes arrive — and still yield one clean directory URL.
+    const seen: Seen = {};
+    const wrapped = withAdapterRoot(spyIntegration(seen), "/proj////");
+
+    await call(wrapped, "file:///proj/.blume/");
+
+    expect(seen.setup?.href).toBe("file:///proj/");
+  });
+
   it("passes the rest of the hook options through untouched", async () => {
     let srcDir: unknown;
     const integration: AstroIntegration = {

@@ -35,11 +35,21 @@ import type { AstroIntegration } from "astro";
  * `config`; an adapter reads `root` from one or both and closes over it for its
  * later build hooks, so overriding it there covers the whole adapter.
  */
+const stripTrailingSlashes = (value: string): string => {
+  let end = value.length;
+
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
+};
+
 export const withAdapterRoot = (
   integration: AstroIntegration,
   root: string
 ): AstroIntegration => {
-  const rootUrl = pathToFileURL(`${root.replace(/\/+$/u, "")}/`);
+  const rootUrl = pathToFileURL(`${stripTrailingSlashes(root)}/`);
   const setup = integration.hooks["astro:config:setup"];
   const done = integration.hooks["astro:config:done"];
 
