@@ -503,6 +503,32 @@ describe("content graph", () => {
       graph.diagnostics.some((d) => d.code === "BLUME_DUPLICATE_ROUTE")
     ).toBeTruthy();
   });
+
+  it("flags two sidebar siblings sharing an explicit order", () => {
+    const graph = buildContentGraph(
+      [
+        makePage({
+          id: "guide/a.mdx",
+          meta: pageMetaSchema.parse({ sidebar: { order: 1 } }),
+          route: "/guide/a",
+          title: "A",
+        }),
+        makePage({
+          id: "guide/b.mdx",
+          meta: pageMetaSchema.parse({ sidebar: { order: 1 } }),
+          route: "/guide/b",
+          title: "B",
+        }),
+      ],
+      {
+        folderMeta: new Map(),
+        navigation: blumeConfigSchema.parse({}).navigation,
+      }
+    );
+    expect(
+      graph.diagnostics.some((d) => d.code === "BLUME_DUPLICATE_SIDEBAR_ORDER")
+    ).toBeTruthy();
+  });
 });
 
 describe("manifest indexability", () => {

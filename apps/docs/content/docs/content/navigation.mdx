@@ -86,6 +86,8 @@ When the sidebar is generated, order is resolved highest priority first:
   </Step>
 </Steps>
 
+Two siblings that land on the same explicit or numeric order fall back to alphabetical order between themselves — Blume reports a `BLUME_DUPLICATE_SIDEBAR_ORDER` warning so the tie doesn't go unnoticed.
+
 ## Hidden pages
 
 Hide a page from the sidebar — and from previous/next pagination — while keeping it built and reachable by its URL:
