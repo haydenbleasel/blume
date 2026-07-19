@@ -8,10 +8,12 @@ import {
   useVideoConfig,
 } from "remotion";
 
-// Audit money shot: a single frosted terminal card telling the whole 1.1 story
-// in three beats — `blume audit` dumps a findings report (grouped by check,
-// exactly the shape the real CLI prints), `blume audit --codex` hands the
-// findings to Codex, and a rerun comes back green.
+// The two audit terminal scenes, sharing one frosted-card renderer:
+//   AuditReport — `blume audit` dumps a findings report (grouped by check,
+//   exactly the shape the real CLI prints).
+//   AuditAgent — `blume audit --codex` hands the findings to Codex (the
+//   startup banner and the echoed fix prompt, mirroring the docs CLI page's
+//   Audit spotlight), then a rerun comes back green.
 
 const SANS =
   "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif";
@@ -36,6 +38,10 @@ const LINE_H = 23;
 const VIEW_H = CARD_H - CHROME_H - PAD_TOP - PAD_BOTTOM;
 // Real report columns: url.padEnd(34) before the dim source file.
 const URL_COL_W = 296;
+// Block heights for the Codex session pieces — fixed so the scroll math and
+// the layout agree exactly (the wrappers are sized to these).
+const BANNER_H = 104;
+const PROMPT_H = 340;
 
 const EASE = Easing.bezier(0.22, 1, 0.36, 1);
 const CHARS_PER_FRAME = 2;
@@ -55,6 +61,8 @@ interface TermLine {
     | "more"
     | "fix"
     | "hand"
+    | "banner"
+    | "prompt"
     | "ok";
   text?: string;
   /** header: the dim `pages · dir` tail; finding: the dim page count. */
@@ -68,18 +76,44 @@ interface TermLine {
   pause?: number;
 }
 
-// The script. Copy mirrors `formatReport` in packages/blume/src/audit/report.ts
-// — real check titles, real fix strings, counts that add up (2 errors +
-// 3 warnings = 5 findings handed off).
-const LINES: TermLine[] = [
+// The Codex session it opens — the startup banner and the echoed agent prompt,
+// copy lifted from the docs CLI page (which mirrors `fixPrompt` in
+// packages/blume/src/audit/agent.ts).
+const CODEX_BANNER = {
+  rows: [
+    { label: "model:     ", value: "gpt-5.6-sol xhigh" },
+    { label: "directory: ", value: "~/acme" },
+  ],
+  title: ">_ OpenAI Codex (v0.144.3)",
+};
+
+const CODEX_PROMPT: string[][] = [
+  ["Fix the issues found by `blume audit` in this project."],
+  [
+    "The full audit report is at report.json. It is JSON: each entry in `diagnostics` is one finding, with the check `code`, a `message` explaining what is wrong, the affected page `url`, the source `file` to edit (relative to the current directory, with a `line` when the finding points at a specific front matter key), and a `suggestion` describing the fix.",
+  ],
+  [
+    "Work through every finding:",
+    "1. Read the report and group the findings by `file`.",
+    "2. Apply each finding's `suggestion` by editing the named source file — most fixes are front matter edits at the cited line.",
+    "3. Never fix a finding by deleting a page, removing content, or hiding it from the audit; if a finding genuinely needs a human decision, leave it and say so in your summary.",
+  ],
+  [
+    "When you are done, run `blume build` and then `blume audit` to verify, and repeat until the audit reports no issues.",
+  ],
+];
+
+const REPORT_HEADER_META = "124 pages · dist · offline";
+const REPORT_SUMMARY = "10,788 audits · 2 errors · 3 warnings · 0 notes";
+
+// Scene 1's script. Copy mirrors `formatReport` in
+// packages/blume/src/audit/report.ts — real check titles, real fix strings,
+// counts that add up (2 errors + 3 warnings = 5 findings handed off later).
+const REPORT_LINES: TermLine[] = [
   { delay: 16, kind: "cmd", text: "blume audit" },
   { delay: 10, kind: "blank" },
-  { delay: 0, kind: "header", meta: "124 pages · dist · offline" },
-  {
-    delay: 3,
-    kind: "summary",
-    text: "10,788 audits · 2 errors · 3 warnings · 0 notes",
-  },
+  { delay: 0, kind: "header", meta: REPORT_HEADER_META },
+  { delay: 3, kind: "summary", text: REPORT_SUMMARY },
   { delay: 3, kind: "blank" },
   { delay: 2, kind: "category", text: "content" },
   {
@@ -138,23 +172,27 @@ const LINES: TermLine[] = [
   {
     delay: 2,
     kind: "fix",
-    // Hold here so the full report can be scanned before the next beat.
-    pause: 48,
     text: "fix: Fix the link target, or create the page it points at.",
   },
-  { delay: 8, kind: "blank" },
-  { delay: 0, kind: "cmd", text: "blume audit --codex" },
-  {
-    delay: 14,
-    kind: "hand",
-    // The beat where Codex works, elided between prompts.
-    pause: 36,
-    text: "Handing 5 findings to Codex…",
-  },
+];
+
+// Scene 2's script: the handoff — header + summary again for continuity (the
+// real `--codex` run re-prints the report before handing off), the Codex
+// session, then the clean rerun.
+const AGENT_LINES: TermLine[] = [
+  { delay: 16, kind: "cmd", text: "blume audit --codex" },
+  { delay: 10, kind: "blank" },
+  { delay: 0, kind: "header", meta: REPORT_HEADER_META },
+  { delay: 3, kind: "summary", text: REPORT_SUMMARY },
+  { delay: 3, kind: "blank" },
+  { delay: 4, kind: "hand", text: "Handing 5 findings to Codex…" },
+  { delay: 8, kind: "banner", pause: 10 },
+  // The Codex session holds on screen — the beat where the agent works.
+  { delay: 6, kind: "prompt", pause: 85 },
   { delay: 10, kind: "blank" },
   { delay: 0, kind: "cmd", text: "blume audit" },
   { delay: 10, kind: "blank" },
-  { delay: 0, kind: "header", meta: "124 pages · dist · offline" },
+  { delay: 0, kind: "header", meta: REPORT_HEADER_META },
   {
     delay: 3,
     kind: "summary",
@@ -170,7 +208,27 @@ const arrival = (line: TermLine): number =>
     ? Math.ceil((line.text?.length ?? 0) / CHARS_PER_FRAME)
     : 0;
 
-const computeStarts = (lines: TermLine[]): number[] => {
+const heightOf = (line: TermLine): number => {
+  if (line.kind === "banner") {
+    return BANNER_H;
+  }
+  if (line.kind === "prompt") {
+    return PROMPT_H;
+  }
+  return LINE_H;
+};
+
+interface TermScript {
+  duration: number;
+  lines: TermLine[];
+  scrollSteps: { start: number; delta: number }[];
+  starts: number[];
+}
+
+// Compile a script: absolute start frames, total duration, and the terminal
+// scroll — once the content outgrows the viewport, each new line eases the
+// buffer up just far enough to stay visible (monotonic by construction).
+const makeScript = (lines: TermLine[], tailHold: number): TermScript => {
   const starts: number[] = [];
   let acc = 14;
   for (const line of lines) {
@@ -178,32 +236,27 @@ const computeStarts = (lines: TermLine[]): number[] => {
     starts.push(acc);
     acc += arrival(line) + (line.pause ?? 0);
   }
-  return starts;
-};
 
-const STARTS = computeStarts(LINES);
-const LAST = LINES.length - 1;
-const TAIL_HOLD = 56;
-export const AUDIT_TERMINAL_DURATION =
-  STARTS[LAST] + arrival(LINES[LAST]) + TAIL_HOLD;
-
-// Terminal scroll: once the content outgrows the viewport, each new line eases
-// the buffer up just far enough to stay visible — monotonic by construction.
-const scrollSteps = (): { start: number; delta: number }[] => {
-  const steps: { start: number; delta: number }[] = [];
+  const scrollSteps: { start: number; delta: number }[] = [];
   let target = 0;
-  for (const [i, start] of STARTS.entries()) {
-    const bottom = (i + 1) * LINE_H;
+  let bottom = 0;
+  for (const [i, start] of starts.entries()) {
+    bottom += heightOf(lines[i]);
     const next = Math.max(target, bottom - VIEW_H);
     if (next > target) {
-      steps.push({ delta: next - target, start });
+      scrollSteps.push({ delta: next - target, start });
       target = next;
     }
   }
-  return steps;
+
+  return { duration: acc + tailHold, lines, scrollSteps, starts };
 };
 
-const SCROLL_STEPS = scrollSteps();
+const REPORT_SCRIPT = makeScript(REPORT_LINES, 76);
+const AGENT_SCRIPT = makeScript(AGENT_LINES, 56);
+
+export const AUDIT_REPORT_DURATION = REPORT_SCRIPT.duration;
+export const AUDIT_AGENT_DURATION = AGENT_SCRIPT.duration;
 
 const SEVERITY_COLOR: Record<Severity, string> = {
   error: ERROR,
@@ -221,6 +274,79 @@ const TrafficLight = ({ color }: { color: string }) => (
       width: 11,
     }}
   />
+);
+
+// The Codex startup banner — a bordered box, like the real CLI draws (with a
+// CSS border rather than box-drawing glyphs, which gap at this line height).
+const CodexBanner = () => (
+  <div style={{ height: BANNER_H, paddingTop: 8 }}>
+    <div
+      style={{
+        border: "1px solid rgba(0,0,0,0.22)",
+        borderRadius: 8,
+        display: "inline-block",
+        padding: "11px 16px",
+      }}
+    >
+      <div
+        style={{
+          color: INK,
+          fontSize: 13.5,
+          fontWeight: 600,
+          lineHeight: "20px",
+        }}
+      >
+        {CODEX_BANNER.title}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        {CODEX_BANNER.rows.map((row) => (
+          <div
+            key={row.label}
+            style={{ fontSize: 13.5, lineHeight: "21px", whiteSpace: "pre" }}
+          >
+            <span style={{ color: FAINT }}>{row.label}</span>
+            <span style={{ color: INK }}>{row.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// The echoed agent prompt on a subtle panel, wrapping naturally — paragraph
+// groups separated by a gap, lines within a group stacked directly.
+const CodexPrompt = () => (
+  <div style={{ height: PROMPT_H, paddingTop: 10 }}>
+    <div
+      style={{
+        background: "rgba(0,0,0,0.05)",
+        borderRadius: 8,
+        height: PROMPT_H - 10,
+        overflow: "hidden",
+        padding: "14px 16px",
+      }}
+    >
+      <div style={{ paddingLeft: 22, position: "relative" }}>
+        <span style={{ color: ACCENT, left: 0, position: "absolute" }}>›</span>
+        {CODEX_PROMPT.map((group, groupIndex) => (
+          <div
+            key={group[0]}
+            style={{
+              color: groupIndex === 0 ? INK : MUTED,
+              fontSize: 13,
+              lineHeight: "20px",
+              marginTop: groupIndex === 0 ? 0 : 14,
+              whiteSpace: "normal",
+            }}
+          >
+            {group.map((text) => (
+              <div key={text}>{text}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
 );
 
 const LineBody = ({ line }: { line: TermLine }) => {
@@ -276,6 +402,12 @@ const LineBody = ({ line }: { line: TermLine }) => {
     case "hand": {
       return <span style={{ color: INK }}>{`  ${line.text}`}</span>;
     }
+    case "banner": {
+      return <CodexBanner />;
+    }
+    case "prompt": {
+      return <CodexPrompt />;
+    }
     case "ok": {
       return (
         <span style={{ color: GREEN, fontWeight: 600 }}>
@@ -289,9 +421,10 @@ const LineBody = ({ line }: { line: TermLine }) => {
   }
 };
 
-export const AuditTerminal = () => {
+const TerminalCard = ({ script }: { script: TermScript }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const { lines, scrollSteps, starts } = script;
 
   const cardOpacity = interpolate(frame, [0, 14], [0, 1], clamp);
   const cardScale = interpolate(frame, [0, 20], [0.985, 1], {
@@ -303,10 +436,10 @@ export const AuditTerminal = () => {
     easing: EASE,
   });
 
-  const scroll = SCROLL_STEPS.reduce(
+  const scroll = scrollSteps.reduce(
     (acc, step) =>
       acc +
-      interpolate(frame, [step.start, step.start + 12], [0, step.delta], {
+      interpolate(frame, [step.start, step.start + 16], [0, step.delta], {
         ...clamp,
         easing: EASE,
       }),
@@ -315,7 +448,7 @@ export const AuditTerminal = () => {
 
   const cursorOn = Math.floor((frame / fps) * 2) % 2 === 0;
   let activeIndex = -1;
-  for (const [i, start] of STARTS.entries()) {
+  for (const [i, start] of starts.entries()) {
     if (frame >= start) {
       activeIndex = i;
     }
@@ -399,11 +532,11 @@ export const AuditTerminal = () => {
               transform: `translateY(${-scroll}px)`,
             }}
           >
-            {LINES.map((line, i) => {
-              if (frame < STARTS[i]) {
+            {lines.map((line, i) => {
+              if (frame < starts[i]) {
                 return null;
               }
-              const local = frame - STARTS[i];
+              const local = frame - starts[i];
               const landed = interpolate(local, [0, 4], [0, 1], clamp);
 
               if (line.kind === "cmd") {
@@ -446,7 +579,11 @@ export const AuditTerminal = () => {
               return (
                 <div
                   key={`${line.kind}-${i}`}
-                  style={{ height: LINE_H, opacity: landed, whiteSpace: "pre" }}
+                  style={{
+                    height: heightOf(line),
+                    opacity: landed,
+                    whiteSpace: "pre",
+                  }}
                 >
                   <LineBody line={line} />
                 </div>
@@ -458,3 +595,6 @@ export const AuditTerminal = () => {
     </AbsoluteFill>
   );
 };
+
+export const AuditReport = () => <TerminalCard script={REPORT_SCRIPT} />;
+export const AuditAgent = () => <TerminalCard script={AGENT_SCRIPT} />;

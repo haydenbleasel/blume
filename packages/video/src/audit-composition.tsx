@@ -15,8 +15,10 @@ import { SharedAxisY } from "@/components/remocn/shared-axis-y";
 import { SoftBlurIn } from "@/components/remocn/soft-blur-in";
 import { Typewriter } from "@/components/remocn/typewriter";
 import {
-  AUDIT_TERMINAL_DURATION,
-  AuditTerminal,
+  AUDIT_AGENT_DURATION,
+  AUDIT_REPORT_DURATION,
+  AuditAgent,
+  AuditReport,
 } from "@/scenes/audit-terminal";
 import { BlumeLogo } from "@/scenes/blume-logo";
 
@@ -98,11 +100,32 @@ const SceneTagline = () => (
   </>
 );
 
-// ─── Scene 2 · The money shot ───────────────────────────────────────────────
-// One frosted terminal: audit → findings → hand to Codex → clean rerun.
-const SceneMoneyShot = () => <AuditTerminal />;
+// ─── Scene 2 · The report ───────────────────────────────────────────────────
+// A frosted terminal: `blume audit` dumps the findings report.
+const SceneReport = () => <AuditReport />;
 
-// ─── Scene 3 · The feature run ──────────────────────────────────────────────
+// ─── Scene 3 · The question ─────────────────────────────────────────────────
+// The pivot between the two terminals, in the tagline's two-line rhythm.
+const QUESTION_DURATION = 80;
+
+const SceneQuestion = () => (
+  <>
+    <Positioned dy={-37}>
+      <SoftBlurIn text="But who wants to fix" fontSize={62} color={WHITE} />
+    </Positioned>
+    <Sequence from={8} layout="none">
+      <Positioned dy={37}>
+        <SoftBlurIn text="all that manually?" fontSize={62} color={WHITE} />
+      </Positioned>
+    </Sequence>
+  </>
+);
+
+// ─── Scene 4 · The handoff ──────────────────────────────────────────────────
+// The payoff terminal: `--codex` hands the findings to Codex, rerun goes green.
+const SceneAgent = () => <AuditAgent />;
+
+// ─── Scene 5 · The feature run ──────────────────────────────────────────────
 const SNAPS = [
   "87 checks. Zero setup.",
   "Broken links. Redirect loops.",
@@ -177,11 +200,13 @@ const FONT_VARS = {
 const REF_W = 1280;
 const REF_H = 720;
 
-// Scene starts, derived so the terminal scene can grow without hand-retiming
-// everything after it.
+// Scene starts, derived so the terminal scenes can grow without hand-retiming
+// everything after them.
 const TAGLINE_END = 90;
-const TERMINAL_END = TAGLINE_END + AUDIT_TERMINAL_DURATION;
-const FEATURES_END = TERMINAL_END + FEATURES_DURATION;
+const REPORT_END = TAGLINE_END + AUDIT_REPORT_DURATION;
+const QUESTION_END = REPORT_END + QUESTION_DURATION;
+const AGENT_END = QUESTION_END + AUDIT_AGENT_DURATION;
+const FEATURES_END = AGENT_END + FEATURES_DURATION;
 const CTA_END = FEATURES_END + 90;
 export const AUDIT_VIDEO_DURATION = CTA_END + 90;
 
@@ -215,13 +240,27 @@ export const AuditVideo = () => {
           </Sequence>
           <Sequence
             from={TAGLINE_END}
-            durationInFrames={AUDIT_TERMINAL_DURATION}
+            durationInFrames={AUDIT_REPORT_DURATION}
             layout="none"
           >
-            <SceneMoneyShot />
+            <SceneReport />
           </Sequence>
           <Sequence
-            from={TERMINAL_END}
+            from={REPORT_END}
+            durationInFrames={QUESTION_DURATION}
+            layout="none"
+          >
+            <SceneQuestion />
+          </Sequence>
+          <Sequence
+            from={QUESTION_END}
+            durationInFrames={AUDIT_AGENT_DURATION}
+            layout="none"
+          >
+            <SceneAgent />
+          </Sequence>
+          <Sequence
+            from={AGENT_END}
             durationInFrames={FEATURES_DURATION}
             layout="none"
           >
