@@ -57,6 +57,8 @@ interface MutablePage {
   badge?: string;
   deprecated?: boolean;
   pageId: string;
+  /** Absolute source path (filesystem adapter only), to anchor diagnostics. */
+  file?: string;
   order: number;
   /**
    * Whether `order` reflects a deliberate authoring choice (explicit
@@ -141,8 +143,13 @@ const pageOrder = (
       return { order: -time, orderIsAuthored: false };
     }
   }
+  // An undated changelog entry's numeric filename prefix is usually a date
+  // (`2024-01-05-release.md`) rather than a rank, so it is derived too.
   const order = numericOrder(filename);
-  return { order, orderIsAuthored: Number.isFinite(order) };
+  return {
+    order,
+    orderIsAuthored: page.contentType !== "changelog" && Number.isFinite(order),
+  };
 };
 
 /**
@@ -225,10 +232,22 @@ const duplicateOrderDiagnostics = (nodes: MutableNode[]): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
   for (const [order, tied] of byOrder) {
     if (tied.length > 1) {
+      const names = tied.map((node) => `"${node.label}"`);
+      const list =
+        names.length > 2
+          ? `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`
+          : names.join(" and ");
       const verb = tied.length > 2 ? "all have" : "both have";
+      // Anchor the diagnostic to one tied source file so tooling can point
+      // somewhere concrete; the message names the rest. Folder-only ties
+      // (folder-meta `order`) have no single file, so `file` stays unset.
+      const file = tied.find(
+        (node): node is MutablePage => node.kind === "page"
+      )?.file;
       diagnostics.push({
         code: "BLUME_DUPLICATE_SIDEBAR_ORDER",
-        message: `${tied.map((node) => `"${node.label}"`).join(" and ")} ${verb} sidebar order ${order}; falling back to alphabetical order.`,
+        file,
+        message: `${list} ${verb} sidebar order ${order}; falling back to alphabetical order.`,
         severity: "warning",
         suggestion:
           "Give each item a distinct sidebar.order (or folder meta order).",
@@ -325,7 +344,7 @@ const buildFileSystemSidebar = (
   metaPrefix: string,
   display: SidebarDisplay,
   tabPaths: Set<string>,
-  diagnostics: Diagnostic[]
+  diagnostics: Diagnostic[] = []
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
 
@@ -368,6 +387,7 @@ const buildFileSystemSidebar = (
       badge: page.meta.sidebar.badge,
       deprecated: page.meta.deprecated || undefined,
       description: page.description,
+      file: page.sourcePath,
       icon: page.meta.sidebar.icon,
       key: segmentKey(stem),
       kind: "page",
@@ -527,10 +547,6 @@ const resolveTabHref = (sidebar: NavNode[], path: string): string => {
   return walk(sidebar) ? path : (first ?? path);
 };
 
-/** Resolve the diagnostics sink an option object opted into, or a throwaway one. */
-const diagnosticsSink = (diagnostics?: Diagnostic[]): Diagnostic[] =>
-  diagnostics ?? [];
-
 /** Attach a resolved `href` to each tab whose section has no index page. */
 const withTabHrefs = (tabs: NavTab[], sidebar: NavNode[]): NavTab[] =>
   tabs.map((tab) => {
@@ -659,7 +675,7 @@ export const buildNavigation = (
     new Set(
       tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path]))
     ),
-    diagnosticsSink(options.diagnostics)
+    options.diagnostics
   );
   return {
     featured,

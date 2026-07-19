@@ -387,6 +387,29 @@ describe("i18n diagnostics", () => {
     // FILES ships an `fr/` folder, and `fr` is a configured locale.
     expect(i18nDiagnostics(pages, i18nOf())).toEqual([]);
   });
+
+  it("reports a shared duplicate sidebar order once, not once per locale", async () => {
+    // The tie lives in untranslated default-locale content, which is padded
+    // into the fr tree as fallback — without dedup it would be reported twice.
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "guides/alpha.mdx":
+        "---\ntitle: Alpha\nsidebar:\n  order: 1\n---\n# Alpha\n",
+      "guides/beta.mdx":
+        "---\ntitle: Beta\nsidebar:\n  order: 1\n---\n# Beta\n",
+      "index.mdx": "---\ntitle: Home\n---\n# Home\n",
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const graph = buildContentGraph(pages, {
+      folderMeta: new Map<string, FolderMeta>(),
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+    });
+    const duplicates = graph.diagnostics.filter(
+      (d) => d.code === "BLUME_DUPLICATE_SIDEBAR_ORDER"
+    );
+    expect(duplicates).toHaveLength(1);
+  });
 });
 
 describe("dot parser and shared files", () => {
