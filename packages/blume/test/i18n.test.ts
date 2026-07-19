@@ -478,6 +478,84 @@ describe("dot parser and shared files", () => {
     );
   });
 
+  it("reports an index-title mismatch once, not once per locale", async () => {
+    // Under `dot` every locale resolves the same meta entry, and the
+    // untranslated index page pads every locale's tree as a fallback fill — a
+    // single divergence must not repeat for each configured locale.
+    const resolved = config({ parser: "dot" });
+    const contentRoot = await tempContent({
+      "guides/index.mdx": "---\ntitle: Guide Home\n---\n# Guide Home\n",
+      "guides/intro.fr.mdx": "---\ntitle: Intro fr\n---\n# Intro fr\n",
+      "guides/intro.mdx": "---\ntitle: Intro\n---\n# Intro\n",
+      "guides/meta.ts": 'export default { title: "Guides" };\n',
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const folderMeta = await discoverFolderMeta(contentRoot);
+    const graph = buildContentGraph(pages, {
+      folderMeta: folderMeta.meta,
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+      sharedFolderMeta: folderMeta.shared,
+    });
+
+    const mismatches = graph.diagnostics.filter(
+      (d) => d.code === "BLUME_NAV_INDEX_TITLE_MISMATCH"
+    );
+    expect(mismatches).toHaveLength(1);
+    expect(mismatches[0]?.file).toContain("guides/index.mdx");
+  });
+
+  it("does not flag a fallback-filled index page against translated meta", async () => {
+    // `fr` translated the folder meta but not the index page, so the English
+    // page pads the French tree. That drift is a missing translation — telling
+    // the author to change the English frontmatter to the French title would
+    // break the default locale.
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "fr/guides/meta.ts": 'export default { title: "Guides FR" };\n',
+      "guides/index.mdx": "---\ntitle: Guides\n---\n# Guides\n",
+      "guides/meta.ts": 'export default { title: "Guides" };\n',
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const folderMeta = await discoverFolderMeta(contentRoot);
+    const graph = buildContentGraph(pages, {
+      folderMeta: folderMeta.meta,
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+      sharedFolderMeta: folderMeta.shared,
+    });
+
+    expect(
+      graph.diagnostics.some((d) => d.code === "BLUME_NAV_INDEX_TITLE_MISMATCH")
+    ).toBeFalsy();
+  });
+
+  it("flags a translated index page drifting from its locale's meta", async () => {
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "fr/guides/index.mdx": "---\ntitle: Accueil\n---\n# Accueil\n",
+      "fr/guides/meta.ts": 'export default { title: "Guides FR" };\n',
+      "guides/index.mdx": "---\ntitle: Guides\n---\n# Guides\n",
+      "guides/meta.ts": 'export default { title: "Guides" };\n',
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const folderMeta = await discoverFolderMeta(contentRoot);
+    const graph = buildContentGraph(pages, {
+      folderMeta: folderMeta.meta,
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+      sharedFolderMeta: folderMeta.shared,
+    });
+
+    const mismatches = graph.diagnostics.filter(
+      (d) => d.code === "BLUME_NAV_INDEX_TITLE_MISMATCH"
+    );
+    expect(mismatches).toHaveLength(1);
+    // The drift is the French page's, and the diagnostic must say so.
+    expect(mismatches[0]?.file).toContain("fr/guides/index.mdx");
+    expect(mismatches[0]?.message).toContain('"Guides FR"');
+  });
+
   it("recognizes a default-locale dot suffix as a locale variant", () => {
     // `intro.en.mdx` + `intro.fr.mdx` is the natural symmetric authoring; the
     // default-locale file must strip its suffix and share the `/intro` key

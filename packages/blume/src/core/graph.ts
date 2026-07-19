@@ -70,6 +70,7 @@ const localePagesFor = (
     if (!present.has(key)) {
       filled.push({
         ...source,
+        fallback: true,
         locale: code,
         route: withBasePath(basePath, localizeRoute(key, code, i18n)),
       });

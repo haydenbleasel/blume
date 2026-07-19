@@ -45,7 +45,7 @@ export default defineMeta({
 
 See [Folder meta](/docs/content/meta) for every field and computing meta at scan time.
 
-A folder's `meta.title` and its own `index` page's frontmatter `title` are resolved independently — translating one under i18n and forgetting the other renders a correct sidebar with a stale `<title>`/heading on the landing page itself. Blume reports a `BLUME_NAV_INDEX_TITLE_MISMATCH` warning when they diverge.
+A folder's `meta.title` and its own `index` page's frontmatter `title` are resolved independently — translating one under i18n and forgetting the other renders a correct sidebar with a stale `<title>`/heading on the landing page itself. Blume reports a `BLUME_NAV_INDEX_TITLE_MISMATCH` warning when they diverge. Untranslated pages filled in from the fallback locale are exempt — their title belongs to the fallback locale, and the fix is translating the page, not editing its frontmatter.
 
 To group pages _without_ adding a URL segment, use a parenthesized folder name — see [Pages](/docs/content#group-folders).
 

@@ -191,22 +191,28 @@ const applyFolderMeta = (
  * filename, so it almost never coincidentally matches a custom folder title —
  * flagging that would be noise on exactly the plain-landing-page case this is
  * least worth warning about. The root group's `meta.title` (an empty
- * `group.path`) is also skipped: nothing ever renders it as a sidebar label,
+ * `folderPath`) is also skipped: nothing ever renders it as a sidebar label,
  * so a mismatch there wouldn't correspond to anything visible.
+ *
+ * Fallback-filled pages are exempt: their title belongs to the fallback
+ * locale, so comparing it against this locale's `meta.title` would flag every
+ * not-yet-translated index page (once per locale) and point the suggestion at
+ * the fallback locale's source file, where "fixing" it would break that
+ * locale. The default locale's own build still checks the real page.
  */
 const indexTitleMismatchDiagnostic = (
   page: PageRecord,
-  group: MutableGroup,
+  folderPath: string,
   folderMeta: Map<string, FolderMeta>,
   sharedMeta: Map<string, FolderMeta>,
   metaPrefix: string
 ): Diagnostic | undefined => {
-  if (!page.meta.title || group.path === "") {
+  if (!page.meta.title || page.fallback || folderPath === "") {
     return undefined;
   }
   const meta =
-    folderMeta.get(metaKey(group.path, metaPrefix)) ??
-    sharedMeta.get(group.path);
+    folderMeta.get(metaKey(folderPath, metaPrefix)) ??
+    sharedMeta.get(folderPath);
   if (!meta?.title || meta.title === page.title) {
     return undefined;
   }
@@ -305,19 +311,35 @@ const buildFileSystemSidebar = (
   metaPrefix: string,
   display: SidebarDisplay,
   tabPaths: Set<string>,
-  diagnostics: Diagnostic[]
+  diagnostics: Diagnostic[] | undefined
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
 
   for (const page of pages) {
-    if (page.meta.sidebar.hidden) {
-      continue;
-    }
     // Group by the locale-stripped path so the locale dir is not a nav group.
     const parts = page.navPath.split("/");
     const filename = parts.at(-1) ?? page.navPath;
     const stem = filename.replace(extname(filename), "");
     const dirs = parts.slice(0, -1);
+
+    // Checked before the hidden filter: a sidebar-hidden index page still
+    // renders with its own <title>, so title drift matters there just the same.
+    if (isIndexStem(stem)) {
+      const diagnostic = indexTitleMismatchDiagnostic(
+        page,
+        dirs.join("/"),
+        folderMeta,
+        sharedMeta,
+        metaPrefix
+      );
+      if (diagnostic) {
+        diagnostics?.push(diagnostic);
+      }
+    }
+
+    if (page.meta.sidebar.hidden) {
+      continue;
+    }
 
     // Each group's URL path is the matching prefix of the page's route. navPath
     // is locale-stripped while the route may carry a locale/base prefix, so
@@ -355,19 +377,6 @@ const buildFileSystemSidebar = (
       pageId: page.id,
       route: page.route,
     });
-
-    if (isIndexStem(stem)) {
-      const diagnostic = indexTitleMismatchDiagnostic(
-        page,
-        parent,
-        folderMeta,
-        sharedMeta,
-        metaPrefix
-      );
-      if (diagnostic) {
-        diagnostics.push(diagnostic);
-      }
-    }
   }
 
   applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix);
@@ -525,10 +534,6 @@ const withTabHrefs = (tabs: NavTab[], sidebar: NavNode[]): NavTab[] =>
     return href === tab.path ? tab : { ...tab, href };
   });
 
-/** Resolve the diagnostics sink an option object opted into, or a throwaway one. */
-const diagnosticsSink = (diagnostics?: Diagnostic[]): Diagnostic[] =>
-  diagnostics ?? [];
-
 /** Build the complete navigation model from pages, meta, and config. */
 export const buildNavigation = (
   pages: PageRecord[],
@@ -651,7 +656,7 @@ export const buildNavigation = (
     new Set(
       tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path]))
     ),
-    diagnosticsSink(options.diagnostics)
+    options.diagnostics
   );
   return {
     featured,

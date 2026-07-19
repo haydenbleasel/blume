@@ -585,6 +585,33 @@ describe("buildNavigation — index title / folder meta title diagnostics", () =
     });
     expect(diagnostics).toHaveLength(0);
   });
+
+  it("warns for a sidebar-hidden index page, which still renders its own <title>", () => {
+    const folderMeta = new Map<string, FolderMeta>([
+      ["guide", { title: "Guides" }],
+    ]);
+    const diagnostics: Diagnostic[] = [];
+    const nav = buildNavigation(
+      [page("guide/index.md", "/guide", "Guide Home", { hidden: true })],
+      { diagnostics, folderMeta }
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_NAV_INDEX_TITLE_MISMATCH");
+    // Hidden means hidden: the diagnostic must not leak the page into the tree.
+    expect(nav.sidebar).toHaveLength(0);
+  });
+
+  it("does not warn about a fallback-filled index page (its title belongs to another locale)", () => {
+    const folderMeta = new Map<string, FolderMeta>([
+      ["guide", { title: "Guides" }],
+    ]);
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [{ ...page("guide/index.md", "/guide", "Guide Home"), fallback: true }],
+      { diagnostics, folderMeta }
+    );
+    expect(diagnostics).toHaveLength(0);
+  });
 });
 
 describe("navigation.sidebar config schema", () => {

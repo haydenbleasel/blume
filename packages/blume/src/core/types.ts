@@ -109,6 +109,13 @@ export interface PageRecord {
    */
   translationKey: string;
   /**
+   * True for entries filled in from the fallback locale to pad a locale's
+   * navigation for pages it hasn't translated yet. The record's content —
+   * title included — belongs to the fallback locale, so per-locale content
+   * checks skip these.
+   */
+  fallback?: boolean;
+  /**
    * Content-relative path with the leading locale directory stripped, used for
    * sidebar grouping so the locale dir is not surfaced as a nav group. Equals
    * `id` for single-locale projects.
