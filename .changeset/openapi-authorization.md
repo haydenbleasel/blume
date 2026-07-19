@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-Render authentication requirements in the native OpenAPI reference. Operations that declare security requirements — their own `security`, or the document's root default — now show an **Authorization** section above their parameters: the credential's carrier (`Authorization` header, API-key header/query/cookie), a human label per scheme type (Bearer token, Basic auth, API key, OAuth2, OpenID Connect, Mutual TLS), the scheme's description, and OAuth scopes. Multiple requirement alternatives render as "or" groups (schemes within one requirement are required together), an empty `{}` requirement marks auth as optional, and `security: []` on an operation keeps it public with no section. The generated code samples now send a matching placeholder credential (e.g. `-H "Authorization: Bearer YOUR_TOKEN"`), with a spec-declared explicit header parameter still taking precedence, and a query-borne API key appended to the sample URL. Previously the renderer ignored `security` entirely, so authenticated endpoints were indistinguishable from public ones.
