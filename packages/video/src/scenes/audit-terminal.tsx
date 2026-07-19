@@ -15,8 +15,6 @@ import {
 //   startup banner and the echoed fix prompt, mirroring the docs CLI page's
 //   Audit spotlight), then Codex works through the findings and reports done.
 
-const SANS =
-  "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif";
 const MONO = "var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace";
 
 const INK = "rgba(0,0,0,0.85)";
@@ -498,17 +496,6 @@ const TerminalCard = ({ script }: { script: TermScript }) => {
             }}
           >
             ~/acme
-          </div>
-          <div
-            style={{
-              color: INK,
-              fontFamily: SANS,
-              fontSize: 14,
-              fontWeight: 600,
-              marginLeft: "auto",
-            }}
-          >
-            Terminal
           </div>
         </div>
 
