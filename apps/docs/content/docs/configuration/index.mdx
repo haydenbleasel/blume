@@ -21,6 +21,7 @@ export default defineConfig({
 A broader example touching the most common options (see each feature's guide for the rest):
 
 ```ts blume.config.ts lineNumbers
+import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "blume";
 
 export default defineConfig({
@@ -28,6 +29,9 @@ export default defineConfig({
   title: "My Docs",
   description: "Documentation for my project.",
   logo: "/logo.svg",
+
+  // Astro integrations — installed and versioned by this site
+  integrations: [sitemap()],
 
   // Content
   content: {
@@ -311,6 +315,7 @@ Each of these has its own guide. The config field is the entry point:
 | `seo` | Metadata, OG images, feeds, structured data | [SEO](/docs/configuration/seo) |
 | `deployment` | Output mode, adapter, and site URL | [Deployment](/docs/deployment) |
 | `redirects` | Permanent and temporary redirects | [Deployment](/docs/deployment#redirects) |
+| `integrations` | Astro integrations appended after Blume's built-ins | [Customization](/docs/configuration/customization#astro-integrations) |
 
 ## Precedence
 

@@ -2,12 +2,14 @@ import { afterAll, describe, expect, it } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
+import type { AstroIntegration } from "astro";
 import { join } from "pathe";
 
 import { defineConfig, loadConfig } from "../src/core/config.ts";
 import { BlumeError } from "../src/core/diagnostics.ts";
 
 const dirs: string[] = [];
+const setup = () => {};
 
 const makeDir = async (configSource?: string): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), "blume-config-"));
@@ -34,9 +36,18 @@ afterAll(async () => {
 });
 
 describe("defineConfig", () => {
-  it("returns the config unchanged (typed identity)", () => {
-    const config = { title: "Docs" };
-    expect(defineConfig(config)).toBe(config);
+  it("returns the config and integration instances unchanged", () => {
+    const integration = {
+      hooks: { "astro:config:setup": setup },
+      name: "probe",
+    } satisfies AstroIntegration;
+    const config = { integrations: [integration], title: "Docs" };
+
+    const defined = defineConfig(config);
+
+    expect(defined).toBe(config);
+    expect(defined.integrations?.[0]).toBe(integration);
+    expect(defined.integrations?.[0]?.hooks["astro:config:setup"]).toBe(setup);
   });
 });
 
@@ -46,7 +57,41 @@ describe("loadConfig", () => {
     expect(result.configFile).toBeNull();
     expect(result.config.title).toBe("Documentation");
     expect(result.config.feedback).toBe(true);
+    expect(result.config.integrations).toEqual([]);
     expect(result.diagnostics).toStrictEqual([]);
+  });
+
+  it("preserves function-bearing integration instances", async () => {
+    const dir = await makeDir(`
+      const setup = () => undefined;
+      export default {
+        integrations: [{ name: "probe", hooks: { "astro:config:setup": setup } }],
+      };
+    `);
+    const result = await loadConfig(dir);
+    const [integration] = result.config.integrations;
+
+    expect(integration?.name).toBe("probe");
+    expect(typeof integration?.hooks["astro:config:setup"]).toBe("function");
+  });
+
+  it("rejects a non-array integrations value", async () => {
+    const dir = await makeDir('export default { integrations: "probe" };');
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+  });
+
+  it("leaves integration element validation to Astro", async () => {
+    const dir = await makeDir(
+      'export default { integrations: ["not-an-integration"] };'
+    );
+    const result = await loadConfig(dir);
+    // Blume only validates the array boundary; an invalid element passes
+    // through unchanged for Astro to reject, hence the `as unknown` cast to
+    // compare against the resolved `AstroIntegration[]` type.
+    expect(result.config.integrations).toEqual([
+      "not-an-integration",
+    ] as unknown as typeof result.config.integrations);
   });
 
   it("lets the page-feedback rating be disabled", async () => {

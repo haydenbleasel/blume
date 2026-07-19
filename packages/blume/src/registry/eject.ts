@@ -271,6 +271,15 @@ const examplesPreviewFiles = (
       ]
     : [];
 
+const ejectIntegrationBridge = (
+  config: BlumeProject["config"],
+  root: string,
+  configFile: string | null
+): Parameters<typeof astroConfigTemplate>[0]["integrationBridge"] =>
+  config.integrations.length > 0 && configFile
+    ? { configFile: toPosix(relative(root, configFile)) }
+    : undefined;
+
 /**
  * Promote the generated runtime into the project as an owned Astro app. After
  * eject the project has a normal `astro.config.mjs` and `src/`, the `blume` CLI
@@ -364,6 +373,11 @@ export const eject = async (
         dataPath: "./src/generated/data.json",
         examplesPath: "./src/generated/examples.ts",
         examplesThemePath: "./src/generated/examples.css",
+        integrationBridge: ejectIntegrationBridge(
+          config,
+          root,
+          context.configFile
+        ),
         needsReact,
         needsSvelte,
         needsVue,

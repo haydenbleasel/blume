@@ -557,6 +557,50 @@ describe("askComponentTemplate", () => {
 });
 
 describe("astroConfigTemplate", () => {
+  it("loads configured integrations after every built-in integration", () => {
+    const configured = blumeConfigSchema.parse({
+      integrations: [
+        { hooks: {}, name: "duplicate" },
+        { hooks: {}, name: "duplicate" },
+      ],
+    });
+    const out = astroConfigTemplate({
+      askPath: ASK_PATH,
+      config: configured,
+      contentRoutes: [],
+      context: context(),
+      dataPath: DATA_PATH,
+      examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
+      integrationBridge: {
+        configFile: "../blume.config.ts",
+        sourceHash: "a".repeat(64),
+      },
+      needsReact: false,
+      openapiPath: OPENAPI_PATH,
+      pages: [],
+      searchClientPath: SEARCH_CLIENT_PATH,
+      themePath: THEME_PATH,
+    });
+
+    expect(out).toContain(
+      'import { createModuleLoader } from "blume/core/load-module.ts"'
+    );
+    expect(out).toContain(
+      'resolve(dirname(fileURLToPath(import.meta.url)), "../blume.config.ts")'
+    );
+    expect(out).toContain(`// Blume config source SHA-256: ${"a".repeat(64)}`);
+    const builtIn = out.lastIndexOf("blumeIntegration(");
+    const user = out.indexOf("...(blumeConfig?.integrations ?? [])");
+    expect(builtIn).toBeGreaterThan(-1);
+    expect(user).toBeGreaterThan(builtIn);
+    expect(
+      out.match(/\.\.\.\(blumeConfig\?\.integrations \?\? \[\]\)/gu)
+    ).toHaveLength(1);
+    expect(out).not.toContain('"duplicate"');
+    expect(out).not.toContain("new Set");
+  });
+
   it("emits a static config with fonts and no framework renderers by default", () => {
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
