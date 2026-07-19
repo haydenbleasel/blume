@@ -13,7 +13,7 @@ import {
 //   exactly the shape the real CLI prints).
 //   AuditAgent — `blume audit --codex` hands the findings to Codex (the
 //   startup banner and the echoed fix prompt, mirroring the docs CLI page's
-//   Audit spotlight), then a rerun comes back green.
+//   Audit spotlight), then Codex works through the findings and reports done.
 
 const SANS =
   "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif";
@@ -63,6 +63,7 @@ interface TermLine {
     | "hand"
     | "banner"
     | "prompt"
+    | "working"
     | "ok";
   text?: string;
   /** header: the dim `pages · dir` tail; finding: the dim page count. */
@@ -178,7 +179,7 @@ const REPORT_LINES: TermLine[] = [
 
 // Scene 2's script: the handoff — header + summary again for continuity (the
 // real `--codex` run re-prints the report before handing off), the Codex
-// session, then the clean rerun.
+// session, then Codex works through the findings and reports done.
 const AGENT_LINES: TermLine[] = [
   { delay: 16, kind: "cmd", text: "blume audit --codex" },
   { delay: 10, kind: "blank" },
@@ -187,19 +188,12 @@ const AGENT_LINES: TermLine[] = [
   { delay: 3, kind: "blank" },
   { delay: 4, kind: "hand", text: "Handing 5 findings to Codex…" },
   { delay: 8, kind: "banner", pause: 10 },
-  // The Codex session holds on screen — the beat where the agent works.
-  { delay: 6, kind: "prompt", pause: 85 },
-  { delay: 10, kind: "blank" },
-  { delay: 0, kind: "cmd", text: "blume audit" },
-  { delay: 10, kind: "blank" },
-  { delay: 0, kind: "header", meta: REPORT_HEADER_META },
-  {
-    delay: 3,
-    kind: "summary",
-    text: "10,788 audits · 0 errors · 0 warnings · 0 notes",
-  },
-  { delay: 3, kind: "blank" },
-  { delay: 2, kind: "ok", text: "✔ No issues found." },
+  { delay: 6, kind: "prompt", pause: 20 },
+  { delay: 8, kind: "blank" },
+  // The spinner runs through the pause — the beat where the agent works —
+  // and settles when the completion line lands.
+  { delay: 0, kind: "working", pause: 75, text: "Fixing 5 issues…" },
+  { delay: 8, kind: "ok", text: "✔ All issues fixed" },
 ];
 
 /** Frames a line spends arriving: cmd lines type, output lines just land. */
@@ -263,6 +257,9 @@ const SEVERITY_COLOR: Record<Severity, string> = {
   warning: WARNING,
 };
 const GLYPH: Record<Severity, string> = { error: "✖", warning: "⚠" };
+
+// Braille spinner for the Codex working line, advanced every 3 frames.
+const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 const TrafficLight = ({ color }: { color: string }) => (
   <span
@@ -572,6 +569,35 @@ const TerminalCard = ({ script }: { script: TermScript }) => {
                         }}
                       />
                     )}
+                  </div>
+                );
+              }
+
+              if (line.kind === "working") {
+                // Spins until the completion line lands, then settles to a
+                // dim bullet.
+                const doneIndex = lines.findIndex(
+                  (next, j) => j > i && next.kind === "ok"
+                );
+                const stopped = doneIndex !== -1 && frame >= starts[doneIndex];
+                const glyph = stopped
+                  ? "•"
+                  : SPINNER[Math.floor(local / 3) % SPINNER.length];
+                return (
+                  <div
+                    key={`${line.kind}-${i}`}
+                    style={{
+                      height: LINE_H,
+                      opacity: landed,
+                      whiteSpace: "pre",
+                    }}
+                  >
+                    <span style={{ color: stopped ? FAINT : ACCENT }}>
+                      {`  ${glyph} `}
+                    </span>
+                    <span style={{ color: stopped ? MUTED : INK }}>
+                      {line.text}
+                    </span>
                   </div>
                 );
               }
