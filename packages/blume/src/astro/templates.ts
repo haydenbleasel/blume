@@ -410,9 +410,10 @@ export const astroConfigTemplate = (options: {
   // Twoslash runs first, before the always-on transformers, but only on fences
   // with the `twoslash` meta (explicitTrigger) — so it's opt-in per block with
   // no config flag; the TypeScript compiler only spins up when a block uses it.
-  const twoslashImport = `import { transformerTwoslash } from "@shikijs/twoslash";\n`;
-  const twoslashTransformer =
-    "transformerTwoslash({ explicitTrigger: true }), ";
+  // Blume's preconfigured transformer compiles with the package's own pinned
+  // classic TypeScript, so the user's project can be on any version (see
+  // markdown/twoslash.ts).
+  const twoslashTransformer = "blumeTwoslashTransformer(), ";
 
   // Content links are rewritten to their real served URL: the `deployment.base`
   // subdirectory (Astro doesn't rewrite `<a href>`) layered over the site-wide
@@ -449,8 +450,8 @@ export const astroConfigTemplate = (options: {
 ${defineConfigImport}
 import mdx from "@astrojs/mdx";
 import tailwindcss from "@tailwindcss/vite";
-import { blumeMarkdownProcessor, blumeMdxProcessor, blumeShikiTransformers } from "blume/markdown";
-${twoslashImport}${reactImport}${vueImport}${svelteImport}${blumeImport}${adapterImport}
+import { blumeMarkdownProcessor, blumeMdxProcessor, blumeShikiTransformers, blumeTwoslashTransformer } from "blume/markdown";
+${reactImport}${vueImport}${svelteImport}${blumeImport}${adapterImport}
 export default defineConfig({
   root: ${JSON.stringify(context.outDir)},
   srcDir: ${JSON.stringify(`${context.outDir}/src`)},

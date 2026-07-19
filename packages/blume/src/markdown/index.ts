@@ -37,6 +37,7 @@ export { calloutTypeFor } from "./directives.ts";
 export { headingAnchorPlugin } from "./heading-anchors.ts";
 export { mermaidPlugin } from "./mermaid.ts";
 export { packageInstallPlugin } from "./package-install.ts";
+export { blumeTwoslashTransformer } from "./twoslash.ts";
 
 /** Element type of Satteri's `mdastPlugins`, sourced from the (alpha) core. */
 type MdastPlugin = NonNullable<

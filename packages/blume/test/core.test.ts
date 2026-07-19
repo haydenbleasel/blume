@@ -284,12 +284,16 @@ describe("astro config template", () => {
     expect(output).toContain('cssVariable: "--blume-ff-ibm-plex-mono"');
   });
 
-  it("always wires Twoslash in with an explicit per-block trigger", () => {
+  it("always wires Twoslash in through Blume's pinned-TypeScript transformer", () => {
     const output = configTemplate(blumeConfigSchema.parse({}));
+    // The preconfigured transformer (explicit per-block trigger, compiled with
+    // Blume's own classic TypeScript) comes from blume/markdown — the config
+    // must not resolve the user's hoisted typescript via @shikijs/twoslash.
+    expect(output).toContain("blumeTwoslashTransformer()");
     expect(output).toContain(
-      'import { transformerTwoslash } from "@shikijs/twoslash"'
+      'blumeTwoslashTransformer } from "blume/markdown"'
     );
-    expect(output).toContain("transformerTwoslash({ explicitTrigger: true })");
+    expect(output).not.toContain("@shikijs/twoslash");
   });
 });
 

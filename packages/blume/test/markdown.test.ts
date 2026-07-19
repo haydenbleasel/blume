@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
+import { codeToHtml } from "shiki";
+
 import { codeTitleTransformer } from "../src/markdown/code-title.ts";
 import {
   calloutTypeFor,
@@ -10,6 +12,7 @@ import {
   blumeMarkdownProcessor,
   blumeMdxProcessor,
   blumeShikiTransformers,
+  blumeTwoslashTransformer,
   highlightCode,
 } from "../src/markdown/index.ts";
 import {
@@ -856,6 +859,34 @@ describe("highlightCode", () => {
     // Theme names never appear in Shiki's dual-theme output (only the resolved
     // colors do), so a different dark theme must change the emitted markup.
     expect(custom).not.toBe(byDefault);
+  });
+});
+
+describe("blumeTwoslashTransformer", () => {
+  it("renders hover info for a twoslash fence with the pinned TypeScript", async () => {
+    // End-to-end through the language service: this only succeeds when the
+    // injected tsModule is a classic compiler and tsLibDirectory holds the
+    // default lib.*.d.ts files (missing libs surface as thrown twoslash
+    // errors), so it proves the transformer never needs the hoisted root
+    // typescript. See https://github.com/haydenbleasel/blume/issues/85
+    const html = await codeToHtml("const x = 1;\n", {
+      defaultColor: false,
+      lang: "ts",
+      meta: { __raw: "twoslash" },
+      themes: { dark: "github-dark", light: "github-light" },
+      transformers: [blumeTwoslashTransformer()],
+    });
+    expect(html).toContain("twoslash-hover");
+  });
+
+  it("leaves fences without the twoslash meta untouched", async () => {
+    const html = await codeToHtml("const x = 1;\n", {
+      defaultColor: false,
+      lang: "ts",
+      themes: { dark: "github-dark", light: "github-light" },
+      transformers: [blumeTwoslashTransformer()],
+    });
+    expect(html).not.toContain("twoslash-hover");
   });
 });
 

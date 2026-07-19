@@ -112,6 +112,7 @@
     "tailwindcss": "^4",
     "takumi-js": "^2.2.1",
     "tinyglobby": "^0.2.10",
+    "twoslash": "^0.3.9",
     "typescript": "^6.0.3",
     "undici": "^8.6.0",
     "zod": "^3.24.0"
