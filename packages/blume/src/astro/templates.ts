@@ -1966,6 +1966,12 @@ ${entries}
  * live toggles — and sets both `data-theme` and a `dark` class so either
  * dark-mode convention works in user CSS. When the page is opened directly
  * (no parent), it falls back to the stored preference, then the OS setting.
+ *
+ * A second script reports the example's rendered height to the parent
+ * (`blume:example-height` via postMessage) so the docs page can size the
+ * preview pane to the content instead of guessing from the source line count.
+ * A ResizeObserver keeps the report live, so examples that grow or shrink
+ * after load (chat threads, accordions) stay in sync.
  */
 export const examplesPageTemplate = (): string =>
   `---
@@ -2020,7 +2026,37 @@ const Example = entry.Component;
   <!-- Flex + margin:auto centers the example and, unlike place-items, keeps
        the top edge reachable when the example outgrows the frame. -->
   <body style="display:flex;min-height:100svh;padding:1.5rem">
-    <div style="margin:auto"><Example /></div>
+    <div data-blume-example style="margin:auto"><Example /></div>
+    <script is:inline>
+      (() => {
+        // Report the example's rendered height so the embedding docs page can
+        // size the preview pane to the content. The wrapper is observed rather
+        // than the body: the body stretches to the frame's own height, so it
+        // would only echo the pane back. Direct opens have no distinct parent
+        // and skip out; the frame is same-origin with the docs page (see the
+        // theme sync above), so the origin is pinned on both ends.
+        if (window.parent === window) {
+          return;
+        }
+        const wrapper = document.querySelector("[data-blume-example]");
+        if (!wrapper) {
+          return;
+        }
+        // The body's 1.5rem padding frames the example; fold it into the
+        // report so the parent can apply the number as-is.
+        const PADDING_PX = 48;
+        new ResizeObserver(() => {
+          window.parent.postMessage(
+            {
+              height:
+                Math.ceil(wrapper.getBoundingClientRect().height) + PADDING_PX,
+              type: "blume:example-height",
+            },
+            window.location.origin
+          );
+        }).observe(wrapper);
+      })();
+    </script>
   </body>
 </html>
 `;

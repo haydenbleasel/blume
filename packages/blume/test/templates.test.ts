@@ -319,6 +319,17 @@ describe("examplesPageTemplate", () => {
     expect(out).toContain('root.classList.toggle("dark"');
     expect(out).toContain('<meta name="robots" content="noindex" />');
   });
+
+  it("reports the example's rendered height to the embedding page", () => {
+    // The docs page sizes the preview pane from this report, so the wrapper
+    // marker, the observer, and the message type all need to survive edits.
+    expect(out).toContain("<div data-blume-example");
+    expect(out).toContain("ResizeObserver");
+    expect(out).toContain('type: "blume:example-height"');
+    // Pinned to the docs origin — never a wildcard target.
+    expect(out).toContain("window.location.origin");
+    expect(out).not.toContain('"*"');
+  });
 });
 
 describe("changelogIndexTemplate", () => {

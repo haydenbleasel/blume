@@ -47,14 +47,20 @@ const codeHtml = entry
     })
   : undefined;
 
-// Both tabs share one height so toggling them never shifts the layout. Size it
-// to the source (≈21px/line + padding), clamped to a comfortable 18rem floor and
-// a 400px ceiling — taller sources scroll inside the pane.
+// Both tabs share one height so toggling them never shifts the layout. The
+// line-count estimate (≈21px/line + padding, 18rem floor) is only the initial
+// SSR/no-JS height: once the frame loads it reports its rendered height (see
+// the script below) and both panes follow it, so previews fit the example —
+// including ones that grow or shrink after load. The code tab scrolls inside
+// whatever height it's given (`pre.blume-source`), so no ceiling is needed.
 const LINE_PX = 21;
 const PADDING_PX = 36;
 const lineCount = entry ? entry.code.replace(/\n+$/u, "").split("\n").length : 0;
-const paneHeight = Math.min(400, Math.max(288, lineCount * LINE_PX + PADDING_PX));
+const paneHeight = Math.max(288, lineCount * LINE_PX + PADDING_PX);
 const paneStyle = `height:${paneHeight}px`;
+// Animate the settle from the estimate to the measured height so the lazy
+// frame's load doesn't snap the layout.
+const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
 ---
 
 {
@@ -62,15 +68,20 @@ const paneStyle = `height:${paneHeight}px`;
     // `sync={false}`: each preview's Preview/Code tabs are independent — unlike
     // CodeGroup, switching one Component must not switch the others.
     <Tabs hash={false} sync={false}>
-      <Tab class="overflow-hidden p-0!" style={paneStyle} title="Preview">
+      <Tab
+        class={`overflow-hidden p-0! ${paneClass}`}
+        style={paneStyle}
+        title="Preview"
+      >
         <iframe
           class="h-full w-full"
+          data-blume-example-frame
           loading="lazy"
           src={previewSrc}
           title={`Preview of ${path}`}
         />
       </Tab>
-      <Tab class="overflow-hidden" style={paneStyle} title="Code">
+      <Tab class={`overflow-hidden ${paneClass}`} style={paneStyle} title="Code">
         <Fragment set:html={codeHtml} />
       </Tab>
     </Tabs>
@@ -81,3 +92,39 @@ const paneStyle = `height:${paneHeight}px`;
     </div>
   )
 }
+
+<script>
+  // Preview frames measure their rendered example and report the height (see
+  // `examplesPageTemplate`). One listener serves every <Component> on the
+  // page; the sender is matched to its iframe through `event.source`. The
+  // measured height replaces the server's line-count estimate on both tab
+  // panels together, preserving the shared-height invariant that keeps
+  // Preview/Code toggles from shifting the layout.
+  const MIN_PANE_PX = 288;
+
+  window.addEventListener("message", (event) => {
+    if (
+      event.origin !== window.location.origin ||
+      event.data?.type !== "blume:example-height" ||
+      typeof event.data.height !== "number"
+    ) {
+      return;
+    }
+    const frames = document.querySelectorAll<HTMLIFrameElement>(
+      "iframe[data-blume-example-frame]"
+    );
+    const frame = Array.from(frames).find(
+      (candidate) => candidate.contentWindow === event.source
+    );
+    const tabs = frame?.closest("blume-tabs");
+    if (!tabs) {
+      return;
+    }
+    const height = `${Math.max(MIN_PANE_PX, event.data.height)}px`;
+    for (const panel of tabs.querySelectorAll<HTMLElement>(
+      "[data-blume-tab-panel]"
+    )) {
+      panel.style.height = height;
+    }
+  });
+</script>
