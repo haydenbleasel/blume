@@ -186,6 +186,29 @@ const resolvedAstroPath = (fromDir: string): string | null => {
 };
 
 /**
+ * The two places an installer can put Blume's dependencies:
+ *   - `<blume>/node_modules` — deps nested under the package (workspace source,
+ *     or npm nesting them away from a conflicting hoisted copy)
+ *   - `dirname(<blume>)`     — deps as siblings in the store (isolated/pnpm)
+ *
+ * `packageRoot()` resolves to Blume's real on-disk path (Node follows the
+ * install symlink), so its parent is the store's package directory where the
+ * isolated linker places the siblings.
+ */
+const depsCandidates = (pkgDir: string): string[] => [
+  join(pkgDir, "node_modules"),
+  dirname(pkgDir),
+];
+
+/** First dependency candidate containing the package dir `segments`, or null. */
+const candidateHolding = (
+  pkgDir: string,
+  ...segments: string[]
+): string | null =>
+  depsCandidates(pkgDir).find((dir) => existsSync(join(dir, ...segments))) ??
+  null;
+
+/**
  * Locate the directory that holds Blume's installed dependencies (Astro and its
  * integrations).
  *
@@ -194,19 +217,28 @@ const resolvedAstroPath = (fromDir: string): string | null => {
  * short-circuits before we need it. But under isolated linkers (Bun's
  * `isolated` mode, pnpm) Blume's deps are NOT hoisted into the project; they
  * live beside the Blume package in a virtual store, invisible to the upward
- * walk from `.blume/`. Two layouts are possible, so probe for `astro`:
- *   - `<blume>/node_modules` — deps nested under the package (workspace source)
- *   - `dirname(<blume>)`     — deps as siblings in the store (isolated/pnpm)
+ * walk from `.blume/` — so probe the {@link depsCandidates}.
  *
- * `packageRoot()` resolves to Blume's real on-disk path (Node follows the
- * install symlink), so its parent is the store's package directory where the
- * isolated linker places the siblings. The previous fixed
- * `packageRoot()/node_modules` assumption missed the sibling layout entirely,
- * which is why isolated-linker projects had to redeclare Blume's deps by hand.
+ * Astro alone is a bad probe: an npm split install (an `overrides` pin plus an
+ * incremental install) hoists `astro` to the project root while Blume's other
+ * deps stay nested, and probing for astro then picks the root directory — one
+ * that holds none of them. Prefer a candidate with the full set (astro beside
+ * `@astrojs/mdx`, the integration every generated runtime declares), then one
+ * with the integrations (astro hoisted away — the rest of Blume's deps sit
+ * there too), then one with astro alone.
  */
+const holdsAstro = (dir: string): boolean => existsSync(join(dir, "astro"));
+const holdsMdx = (dir: string): boolean =>
+  existsSync(join(dir, "@astrojs", "mdx"));
+
 export const blumeDepsDir = (pkgDir: string = packageRoot()): string | null => {
-  const candidates = [join(pkgDir, "node_modules"), dirname(pkgDir)];
-  return candidates.find((dir) => existsSync(join(dir, "astro"))) ?? null;
+  const candidates = depsCandidates(pkgDir);
+  return (
+    candidates.find((dir) => holdsAstro(dir) && holdsMdx(dir)) ??
+    candidates.find(holdsMdx) ??
+    candidates.find(holdsAstro) ??
+    null
+  );
 };
 
 /**
@@ -271,7 +303,7 @@ const astroConflictWarning = (
 
 /**
  * Make the generated runtime resolve Astro and its integrations against Blume's
- * own dependency set. Two failure modes this repairs:
+ * own dependency set. Three failure modes this repairs:
  *
  *   - Astro is *unreachable* from `.blume/` (workspaces under isolated linkers,
  *     pnpm) — the deps live in a store the upward walk can't see.
@@ -280,38 +312,49 @@ const astroConflictWarning = (
  *     `astro@7`, so `@astrojs/mdx@7` binds to it and crashes the build on a
  *     missing export. Resolving merely *an* astro isn't enough; it must be the
  *     same one Blume uses.
+ *   - The *integrations* are unreachable while astro is fine — npm's split
+ *     install. An `overrides` pin plus an incremental `npm install` hoists
+ *     astro to the project root (deleting Blume's nested copy) but leaves
+ *     `@astrojs/mdx` and friends nested under `blume/node_modules`, where the
+ *     upward walk from `.blume/` can't see them.
  *
- * In both cases we symlink Blume's dependency directory in as
+ * The repair is the same symlink: Blume's dependency directory linked in as
  * `.blume/node_modules` so the generated config's bare specifiers (`astro`,
- * `@astrojs/mdx`, …) bind to the matching set. We only do this when those deps
- * are a *co-located, consistent* set (astro beside the `@astrojs/mdx` that binds
- * to it). A split layout — an integration hoisted away from a conflicting astro
- * — can't be made consistent by a single symlink and needs a root `overrides`/
- * `resolutions` pin instead. We can't fix that from `.blume/`, so we return a
- * diagnostic naming the conflict rather than silently shipping a runtime that
- * crashes downstream. Returns the warning, or null when nothing needs saying.
+ * `@astrojs/mdx`, …) bind to a consistent set. That's safe when the linked
+ * directory holds the full set, or when it holds only the integrations but the
+ * runtime already resolves Blume's astro — the junction has no `astro` entry,
+ * so astro lookups fall through to the hoisted copy the integrations bind to
+ * anyway. What it can't fix is the inverse split: Blume's astro nested under a
+ * *conflicting* hoisted astro with the integrations hoisted away from it. No
+ * single directory yields a consistent set there; only a root `overrides`/
+ * `resolutions` pin does, so we return a diagnostic naming the conflict rather
+ * than silently shipping a runtime that crashes downstream. Returns the
+ * warning, or null when nothing needs saying.
  */
 export const ensureDepsLink = async (
   outDir: string,
   pkgDir: string = packageRoot()
 ): Promise<string | null> => {
-  const depsDir = blumeDepsDir(pkgDir);
-  if (!depsDir) {
+  const astroDir = candidateHolding(pkgDir, "astro");
+  if (!astroDir) {
     return null;
   }
-  // Already correct when `.blume/` resolves the very same astro Blume's deps
-  // provide — the clean hoisted case, nothing to do.
-  const blumeAstro = resolveAstroPackageJson(depsDir);
+  const mdxDir = candidateHolding(pkgDir, "@astrojs", "mdx");
+  const blumeAstro = resolveAstroPackageJson(astroDir);
   const outDirAstro = resolvedAstroPath(outDir);
-  if (blumeAstro && outDirAstro === blumeAstro) {
+  // `.blume/` resolves the very same astro Blume's deps provide.
+  const astroCorrect = blumeAstro !== null && outDirAstro === blumeAstro;
+  // Clean hoisted install: astro is correct and the integrations sit beside
+  // it, so they resolve through the same walk — nothing to do.
+  if (astroCorrect && mdxDir === astroDir) {
     return null;
   }
-  // A co-located, consistent set (astro beside the @astrojs/mdx that binds to
-  // it) can be linked in wholesale; this repairs the unreachable and the
-  // repairable-conflict cases. Any existing link here is stale and gets
-  // replaced.
-  if (existsSync(join(depsDir, "@astrojs", "mdx"))) {
-    await linkDepsJunction(join(outDir, "node_modules"), depsDir);
+  // Linking the integrations' directory yields a consistent set when it also
+  // holds Blume's astro (the unreachable and repairable-conflict cases) or
+  // when the correct astro is reachable without it (the npm split install).
+  // Any existing link here is stale and gets replaced.
+  if (mdxDir && (mdxDir === astroDir || astroCorrect)) {
+    await linkDepsJunction(join(outDir, "node_modules"), mdxDir);
     return null;
   }
   // Split layout: Blume's astro is nested (a conflicting astro took the root

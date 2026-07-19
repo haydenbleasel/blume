@@ -102,6 +102,26 @@ const hoistedConflictFixture = async (
   return { depsDir, outDir, pkgDir };
 };
 
+// npm's split install (issue #90): an `overrides` astro pin plus an incremental
+// `npm install` hoists astro to the project root — deleting Blume's nested copy
+// — but keeps the existing nested placement for Blume's other deps. The root
+// astro IS Blume's astro (npm deduped to a single copy); only the integrations
+// are stranded where `.blume/` can't walk up to them.
+const npmSplitFixture = async (): Promise<{
+  nestedDeps: string;
+  outDir: string;
+  pkgDir: string;
+}> => {
+  const projectModules = join(root, "node_modules");
+  await fakePackage(projectModules, "astro");
+  const pkgDir = join(projectModules, "blume");
+  const nestedDeps = join(pkgDir, "node_modules");
+  await fakePackage(nestedDeps, "@astrojs/mdx");
+  const outDir = join(root, ".blume");
+  await mkdir(outDir, { recursive: true });
+  return { nestedDeps, outDir, pkgDir };
+};
+
 describe("blumeDepsDir", () => {
   it("finds deps nested under the package (workspace source layout)", async () => {
     const pkgDir = join(root, "pkg");
@@ -124,6 +144,15 @@ describe("blumeDepsDir", () => {
     await mkdir(pkgDir, { recursive: true });
 
     expect(blumeDepsDir(pkgDir)).toBeNull();
+  });
+
+  it("prefers the dir holding the integrations when astro was hoisted away", async () => {
+    // npm split install: probing for astro alone would pick the project root,
+    // which holds none of Blume's other deps (zod, sharp, …) — they stayed
+    // nested beside @astrojs/mdx.
+    const { nestedDeps, pkgDir } = await npmSplitFixture();
+
+    expect(blumeDepsDir(pkgDir)).toBe(nestedDeps);
   });
 });
 
@@ -232,6 +261,31 @@ describe("ensureDepsLink", () => {
     expect(existsSync(join(link, "@astrojs", "mdx", "package.json"))).toBe(
       true
     );
+  });
+
+  it("links the nested integrations when npm hoists astro away from them", async () => {
+    // Issue #90: astro hoisted to the root (an `overrides` pin + incremental
+    // `npm install`), @astrojs/mdx left nested. `.blume/` resolves the right
+    // astro but not the integrations. The junction must link the nested dir —
+    // it holds no `astro` entry, so astro lookups still fall through to the
+    // hoisted copy the integrations bind to.
+    const { nestedDeps, outDir, pkgDir } = await npmSplitFixture();
+    expect(resolvesAstro(outDir)).toBe(true);
+
+    const warning = await ensureDepsLink(outDir, pkgDir);
+
+    expect(warning).toBeNull();
+    const link = join(outDir, "node_modules");
+    const stats = await lstat(link);
+    expect(stats.isSymbolicLink()).toBe(true);
+    expect(await readlink(link)).toBe(nestedDeps);
+    expect(existsSync(join(link, "@astrojs", "mdx", "package.json"))).toBe(
+      true
+    );
+    // Astro is deliberately NOT shadowed by the junction; it keeps resolving
+    // from the hoisted copy through the ancestor walk.
+    expect(existsSync(join(link, "astro"))).toBe(false);
+    expect(resolvesAstro(outDir)).toBe(true);
   });
 
   it("warns (without linking) on a split layout the symlink can't fix", async () => {
