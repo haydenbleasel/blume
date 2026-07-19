@@ -503,6 +503,28 @@ describe("content graph", () => {
       graph.diagnostics.some((d) => d.code === "BLUME_DUPLICATE_ROUTE")
     ).toBeTruthy();
   });
+
+  it("flags an index page whose title diverges from its folder's meta.title", () => {
+    const graph = buildContentGraph(
+      [
+        makePage({
+          id: "guide/index.mdx",
+          // An explicit frontmatter title, not a derived default — only an
+          // authored title is compared against the folder's meta.title.
+          meta: pageMetaSchema.parse({ title: "Guide Home" }),
+          route: "/guide",
+          title: "Guide Home",
+        }),
+      ],
+      {
+        folderMeta: new Map([["guide", { title: "Guides" }]]),
+        navigation: blumeConfigSchema.parse({}).navigation,
+      }
+    );
+    expect(
+      graph.diagnostics.some((d) => d.code === "BLUME_NAV_INDEX_TITLE_MISMATCH")
+    ).toBeTruthy();
+  });
 });
 
 describe("manifest indexability", () => {

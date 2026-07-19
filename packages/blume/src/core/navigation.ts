@@ -7,6 +7,7 @@ import type {
   SidebarItemConfig,
 } from "./schema.ts";
 import type {
+  Diagnostic,
   FeaturedLink,
   NavNode,
   Navigation,
@@ -178,6 +179,46 @@ const applyFolderMeta = (
   }
 };
 
+/**
+ * Warn when an index page's own frontmatter title diverges from its folder's
+ * explicit `meta.title`. The sidebar label and the page's own `<title>`/heading
+ * are resolved from two independent sources — under i18n, a translator can
+ * update the folder's `meta.ts` and forget the index page's own frontmatter
+ * (or vice versa), and a correct-looking sidebar hides the mismatch.
+ *
+ * Only fires when the page has an explicit frontmatter `title` of its own:
+ * when it's absent, `page.title` is derived from the first heading or the
+ * filename, so it almost never coincidentally matches a custom folder title —
+ * flagging that would be noise on exactly the plain-landing-page case this is
+ * least worth warning about. The root group's `meta.title` (an empty
+ * `group.path`) is also skipped: nothing ever renders it as a sidebar label,
+ * so a mismatch there wouldn't correspond to anything visible.
+ */
+const indexTitleMismatchDiagnostic = (
+  page: PageRecord,
+  group: MutableGroup,
+  folderMeta: Map<string, FolderMeta>,
+  sharedMeta: Map<string, FolderMeta>,
+  metaPrefix: string
+): Diagnostic | undefined => {
+  if (!page.meta.title || group.path === "") {
+    return undefined;
+  }
+  const meta =
+    folderMeta.get(metaKey(group.path, metaPrefix)) ??
+    sharedMeta.get(group.path);
+  if (!meta?.title || meta.title === page.title) {
+    return undefined;
+  }
+  return {
+    code: "BLUME_NAV_INDEX_TITLE_MISMATCH",
+    file: page.sourcePath ?? page.id,
+    message: `Index page "${page.navPath}" has title "${page.title}", but its folder's meta.title is "${meta.title}" — the sidebar shows the folder title while the page's own <title>/heading still say "${page.title}".`,
+    severity: "warning",
+    suggestion: `Update the page's frontmatter title to match ("${meta.title}"), or leave it if the divergence is intentional.`,
+  };
+};
+
 const sortNodes = (nodes: MutableNode[]): void => {
   nodes.sort((a, b) => {
     if (a.order !== b.order) {
@@ -263,7 +304,8 @@ const buildFileSystemSidebar = (
   sharedMeta: Map<string, FolderMeta>,
   metaPrefix: string,
   display: SidebarDisplay,
-  tabPaths: Set<string>
+  tabPaths: Set<string>,
+  diagnostics: Diagnostic[]
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
 
@@ -313,6 +355,19 @@ const buildFileSystemSidebar = (
       pageId: page.id,
       route: page.route,
     });
+
+    if (isIndexStem(stem)) {
+      const diagnostic = indexTitleMismatchDiagnostic(
+        page,
+        parent,
+        folderMeta,
+        sharedMeta,
+        metaPrefix
+      );
+      if (diagnostic) {
+        diagnostics.push(diagnostic);
+      }
+    }
   }
 
   applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix);
@@ -470,6 +525,10 @@ const withTabHrefs = (tabs: NavTab[], sidebar: NavNode[]): NavTab[] =>
     return href === tab.path ? tab : { ...tab, href };
   });
 
+/** Resolve the diagnostics sink an option object opted into, or a throwaway one. */
+const diagnosticsSink = (diagnostics?: Diagnostic[]): Diagnostic[] =>
+  diagnostics ?? [];
+
 /** Build the complete navigation model from pages, meta, and config. */
 export const buildNavigation = (
   pages: PageRecord[],
@@ -500,6 +559,12 @@ export const buildNavigation = (
      * scoping.
      */
     localizedRoot?: string;
+    /**
+     * Sink for diagnostics produced while building the tree (currently just
+     * index-page title/folder-meta-title mismatches). Pushed into in place;
+     * omit to discard.
+     */
+    diagnostics?: Diagnostic[];
   }
 ): Navigation => {
   const basePath = options.basePath ?? "";
@@ -583,7 +648,10 @@ export const buildNavigation = (
     sharedFolderMeta,
     metaPrefix,
     display,
-    new Set(tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path])))
+    new Set(
+      tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path]))
+    ),
+    diagnosticsSink(options.diagnostics)
   );
   return {
     featured,
