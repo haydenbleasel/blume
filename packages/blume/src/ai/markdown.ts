@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readEntryText } from "../core/sources/read.ts";
 import type { RouteManifestEntry } from "../core/types.ts";
@@ -47,9 +48,12 @@ export const buildRawMarkdown = async (
   const entries = await Promise.all(
     project.manifest.routes.map(async (route) => {
       const source = applyAgentVisibility(await readRoute(route));
+      // The `.md` variant keeps the front-matter block in the output, but its
+      // data must also be in scope for `prop={frontmatter.*}` expressions.
       const md = downlevelComponents(
         source,
-        project.config.ai.markdownComponents
+        project.config.ai.markdownComponents,
+        matter(source).data
       );
       const entry: RawMarkdownEntry =
         md === source ? { mdx: source } : { md, mdx: source };

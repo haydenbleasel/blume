@@ -63,6 +63,12 @@ export interface ComponentMarkdownContext extends EvaluatedProps {
   childComponents: (name: string) => ComponentMarkdownChild[];
   /** The element's body, downleveled and dedented (empty if self-closing). */
   children: string;
+  /**
+   * The page's parsed front-matter (empty when the caller has none). Lets a
+   * serializer read page metadata directly, even when a prop expression is
+   * not statically evaluable.
+   */
+  frontmatter: Record<string, unknown>;
 }
 
 /**
@@ -78,15 +84,22 @@ export type ComponentMarkdown = (
  * Statically evaluate an MDX attribute expression (`prop={...}`). Component
  * data props are object/array/number literals in practice; evaluation runs at
  * build time over the author's own content — the same trust level as the MDX
- * itself, which Astro compiles and executes. Expressions that reference
- * imports or scope throw and report as not evaluable.
+ * itself, which Astro compiles and executes. The page's `frontmatter` is in
+ * scope, mirroring what Astro provides an MDX body at render time, so
+ * `prop={frontmatter.status}` resolves; expressions that reference imports or
+ * other scope throw and report as not evaluable.
  */
-const evaluateExpression = (raw: string): { ok: boolean; value: unknown } => {
+const evaluateExpression = (
+  raw: string,
+  frontmatter: Record<string, unknown> | undefined
+): { ok: boolean; value: unknown } => {
   try {
     // Build-time eval of the author's own attribute literals; a throw falls
     // back to leaving the JSX verbatim.
     // oxlint-disable-next-line no-new-func
-    const value = new Function(`"use strict"; return (${raw});`)();
+    const value = new Function("frontmatter", `"use strict"; return (${raw});`)(
+      frontmatter
+    );
     return { ok: true, value };
   } catch {
     return { ok: false, value: undefined };
@@ -94,7 +107,10 @@ const evaluateExpression = (raw: string): { ok: boolean; value: unknown } => {
 };
 
 /** Evaluate an element's attributes into a plain props object. */
-const readProps = (node: MdastNode): EvaluatedProps => {
+const readProps = (
+  node: MdastNode,
+  frontmatter: Record<string, unknown> | undefined
+): EvaluatedProps => {
   const props: Record<string, unknown> = {};
   let lossy = false;
   for (const attribute of node.attributes ?? []) {
@@ -109,7 +125,7 @@ const readProps = (node: MdastNode): EvaluatedProps => {
     } else if (typeof attribute.value === "string") {
       props[attribute.name] = attribute.value;
     } else {
-      const result = evaluateExpression(attribute.value.value);
+      const result = evaluateExpression(attribute.value.value, frontmatter);
       if (result.ok) {
         props[attribute.name] = result.value;
       } else {
@@ -347,8 +363,9 @@ const componentHint = (registry: Record<string, ComponentMarkdown>): RegExp =>
 
 const BUILT_IN_HINT = componentHint(SERIALIZERS);
 
-/** One downlevel pass's inputs: the full source and the active registry. */
+/** One downlevel pass's inputs: the source, registry, and page metadata. */
 interface Walk {
+  frontmatter: Record<string, unknown> | undefined;
   registry: Record<string, ComponentMarkdown>;
   source: string;
 }
@@ -388,15 +405,16 @@ const serializeElement = (
   node: MdastNode
 ): string | null =>
   serializer({
-    ...readProps(node),
+    ...readProps(node, walk.frontmatter),
     childComponents: (name) =>
       (node.children ?? [])
         .filter((child) => isJsxElement(child) && child.name === name)
         .map((child) => ({
-          ...readProps(child),
+          ...readProps(child, walk.frontmatter),
           children: renderChildren(walk, child),
         })),
     children: renderChildren(walk, node),
+    frontmatter: walk.frontmatter ?? {},
   });
 
 /**
@@ -438,10 +456,16 @@ const collectSplices = (
  * `components` adds user serializers from `ai.markdownComponents`, layered
  * over the built-ins: a same-name entry replaces the built-in serializer, and
  * one that always returns `null` effectively opts that component out.
+ *
+ * `frontmatter` is the page's parsed front-matter data. It is put in scope
+ * when evaluating attribute expressions — so `prop={frontmatter.status}`
+ * resolves the way it does when Astro renders the page — and handed to
+ * serializers on their context.
  */
 export const downlevelComponents = (
   source: string,
-  components?: Record<string, ComponentMarkdown>
+  components?: Record<string, ComponentMarkdown>,
+  frontmatter?: Record<string, unknown>
 ): string => {
   const custom = components && Object.keys(components).length > 0;
   const registry = custom ? { ...SERIALIZERS, ...components } : SERIALIZERS;
@@ -456,6 +480,10 @@ export const downlevelComponents = (
     return source;
   }
   const splices: Splice[] = [];
-  collectSplices({ registry, source }, tree.children ?? [], splices);
+  collectSplices(
+    { frontmatter, registry, source },
+    tree.children ?? [],
+    splices
+  );
   return splices.length > 0 ? applySplices(source, splices) : source;
 };

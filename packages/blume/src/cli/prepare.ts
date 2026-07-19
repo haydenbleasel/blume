@@ -83,12 +83,20 @@ export const prepareProject = async (
   }
 
   const hadErrors = reportDiagnostics(project.diagnostics, options.root);
+  const dropped =
+    project.droppedPages > 0
+      ? `${project.droppedPages} page(s) failed frontmatter validation and were dropped from the site. `
+      : "";
   if (hadErrors && options.strict) {
-    logger.error("Aborting due to errors (strict mode).");
+    logger.error(
+      `Aborting due to errors. ${dropped}Fix the diagnostics above, or pass --no-strict to continue despite them.`
+    );
     process.exit(1);
   }
   if (hasErrors(project.diagnostics) && !options.strict) {
-    logger.warn("Continuing despite errors. Use --strict to fail the build.");
+    logger.warn(
+      `Continuing despite errors. ${dropped}Use --strict to fail instead.`
+    );
   }
 
   const { warnings } = await generateRuntime(project);

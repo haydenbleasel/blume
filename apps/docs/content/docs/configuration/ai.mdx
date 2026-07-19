@@ -47,11 +47,11 @@ Append `.md` or `.mdx` to any page's URL to fetch its raw Markdown source — pe
 
 Nested routes work the same way (`/content/syntax.md`), and the home page is served at `/index.md`.
 
-The `.md` variant _downlevels_ components to plain Markdown for consumers that can't interpret JSX: `<TypeTable>` becomes a Markdown table, `<Callout>` a labeled blockquote, `<Steps>` an ordered list, `<Tabs>` bold-labeled sections, and `<YouTube>` a link. Anything that can't be converted faithfully — a custom component, or a prop computed from an import — is left as-is, and component markup inside fenced code blocks is never touched. The same conversion applies to `llms-full.txt` and the MCP server's `get_page` tool, so every agent-facing surface reads clean Markdown. When you want the untransformed source, use the `.mdx` variant.
+The `.md` variant _downlevels_ components to plain Markdown for consumers that can't interpret JSX: `<TypeTable>` becomes a Markdown table, `<Callout>` a labeled blockquote, `<Steps>` an ordered list, `<Tabs>` bold-labeled sections, and `<YouTube>` a link. Props are evaluated with the page's `frontmatter` in scope, so a prop like `title={frontmatter.status}` resolves to the same value the rendered page shows. Anything that can't be converted faithfully — a custom component, or a prop computed from an import — is left as-is, and component markup inside fenced code blocks is never touched. The same conversion applies to `llms-full.txt` and the MCP server's `get_page` tool, so every agent-facing surface reads clean Markdown. When you want the untransformed source, use the `.mdx` variant.
 
 ### Custom component serializers
 
-Give your own components a Markdown form with `ai.markdownComponents` — a map of JSX name to serializer. Each serializer receives the component's `props` (statically evaluated from the MDX attributes) and its `children` (already downleveled to Markdown), and returns the replacement — or `null` to leave the JSX as-is:
+Give your own components a Markdown form with `ai.markdownComponents` — a map of JSX name to serializer. Each serializer receives the component's `props` (statically evaluated from the MDX attributes, with the page's `frontmatter` in scope), its `children` (already downleveled to Markdown), and the page's `frontmatter` data, and returns the replacement — or `null` to leave the JSX as-is:
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";

@@ -170,9 +170,11 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
       // Resolve `<Visibility>` audiences (web-only content omitted from the
       // agent-facing output, agents-only unwrapped), then downlevel supported
       // components to plain Markdown.
+      const parsed = matter(raw);
       const body = downlevelComponents(
-        applyAgentVisibility(matter(raw).content),
-        config.ai.markdownComponents
+        applyAgentVisibility(parsed.content),
+        config.ai.markdownComponents,
+        parsed.data
       ).trim();
       const url = pageUrl(
         page.route,

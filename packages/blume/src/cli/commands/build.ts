@@ -402,6 +402,13 @@ const publishBuildArtifacts = async (
 
   await runClientAssetChecks(distDir, args);
 
+  // Only reachable with --no-strict (strict aborts earlier): repeat the missing
+  // count next to the success banner so it can't scroll away unseen.
+  if (project.droppedPages > 0) {
+    logger.warn(
+      `${project.droppedPages} page(s) failed frontmatter validation and are missing from this build.`
+    );
+  }
   logger.success(`Built to ${distDir}`);
 };
 
@@ -440,7 +447,12 @@ export const buildCommand = defineCommand({
       description: "Include drafts and unpublished CMS content.",
       type: "boolean",
     },
-    strict: { description: "Fail on diagnostics.", type: "boolean" },
+    strict: {
+      default: true,
+      description:
+        "Fail on error diagnostics (default; pass --no-strict to build anyway, dropping pages that fail validation).",
+      type: "boolean",
+    },
   },
   meta: {
     description: "Build the docs site for production.",

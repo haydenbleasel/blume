@@ -404,11 +404,82 @@ describe("attribute evaluation", () => {
   });
 
   it("treats unevaluable expressions as absent without failing the rest", () => {
-    // `title` references runtime scope, so it drops; the id still converts.
+    // Without page data passed, `frontmatter.title` can't resolve, so it
+    // drops; the id still converts.
     expect(
       downlevelComponents(
         '<YouTube id="dQw4w9WgXcQ" title={frontmatter.title} />\n'
       )
     ).toBe("[Watch on YouTube](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n");
+  });
+});
+
+describe("frontmatter in scope", () => {
+  it("resolves {frontmatter.*} expressions against the page data", () => {
+    const out = downlevelComponents(
+      '<YouTube id="dQw4w9WgXcQ" title={frontmatter.video_title} start={frontmatter.start} />\n',
+      undefined,
+      { start: 90, video_title: "Launch video" }
+    );
+    expect(out).toBe(
+      "[Launch video](https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=90s)\n"
+    );
+  });
+
+  it("resolves compound expressions such as template literals", () => {
+    const out = downlevelComponents(
+      `<Callout title={\`Since v\${frontmatter.version}\`}>Body.</Callout>\n`,
+      undefined,
+      { version: 2 }
+    );
+    expect(out).toBe("> **Since v2**\n>\n> Body.\n");
+  });
+
+  it("treats a missing key as undefined, matching render-time semantics", () => {
+    // `frontmatter.missing` is `undefined`, not an error: the prop is set but
+    // empty, so the serializer's own default applies and nothing is lossy.
+    const out = downlevelComponents(
+      '<YouTube id="dQw4w9WgXcQ" title={frontmatter.missing} />\n',
+      undefined,
+      {}
+    );
+    expect(out).toBe(
+      "[Watch on YouTube](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n"
+    );
+  });
+
+  it("still reports non-frontmatter scope as lossy", () => {
+    const source = "<TypeTable type={imported.props} />\n";
+    expect(downlevelComponents(source, undefined, { a: 1 })).toBe(source);
+  });
+
+  it("delivers frontmatter props to custom serializers (the #93 shape)", () => {
+    const out = downlevelComponents(
+      "<StatusBanner status={frontmatter.status} lastVerified={frontmatter.last_verified} />\n",
+      {
+        StatusBanner: ({ lossy, props }) =>
+          lossy
+            ? null
+            : `> Status: ${String(props.status)} (verified ${String(props.lastVerified)})`,
+      },
+      { last_verified: "2026-07-01", status: "retracted" }
+    );
+    expect(out).toBe("> Status: retracted (verified 2026-07-01)\n");
+  });
+
+  it("exposes the page frontmatter on the serializer context", () => {
+    const out = downlevelComponents(
+      "<StatusBanner />\n",
+      { StatusBanner: ({ frontmatter }) => `> ${String(frontmatter.status)}` },
+      { status: "draft" }
+    );
+    expect(out).toBe("> draft\n");
+  });
+
+  it("defaults the context frontmatter to an empty object", () => {
+    const out = downlevelComponents("<Probe />\n", {
+      Probe: ({ frontmatter }) => `keys:${Object.keys(frontmatter).length}`,
+    });
+    expect(out).toBe("keys:0\n");
   });
 });

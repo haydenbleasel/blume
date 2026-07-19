@@ -197,6 +197,14 @@ describe("islandWrapperTemplate", () => {
       islandWrapperTemplate(island({ client: "only", framework: "vue" }))
     ).toContain('<Island client:only="vue" {...Astro.props}>');
   });
+
+  // Without a `Props` alias the spread contributes nothing to the JSX props
+  // type, so an island with a required prop fails `astro check` (#91).
+  it("types Props from the island so required props type-check", () => {
+    const out = islandWrapperTemplate(island());
+    expect(out).toContain("type Props = typeof Island extends (");
+    expect(out).toContain("infer P extends object");
+  });
 });
 
 describe("islandMapTemplate", () => {
@@ -255,6 +263,12 @@ describe("exampleWrapperTemplate", () => {
     );
     expect(out).toContain("<Example {...Astro.props}><slot /></Example>");
     expect(out).not.toContain("client:");
+  });
+
+  it("types Props from the example so required props type-check", () => {
+    expect(exampleWrapperTemplate(example())).toContain(
+      "type Props = typeof Example extends ("
+    );
   });
 });
 
@@ -1294,6 +1308,11 @@ describe("static endpoint templates", () => {
     expect(endpoint).toContain("renderOgImage");
     expect(endpoint).toContain("logo: data.config.og.logo");
     expect(endpoint).toContain("palette: data.config.og.palette");
+    // An unannotated `const customRoutes = []` is an implicit any[] under a
+    // strict tsconfig, failing `blume check` on the generated file (#91).
+    expect(endpoint).toContain(
+      "const customRoutes: { slug: string; title: string }[] = []"
+    );
   });
 
   it("serves one RSS feed per section", () => {

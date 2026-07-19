@@ -91,7 +91,10 @@ export const llmsChecks: CheckModule = {
         continue;
       }
       listed.add(path);
-      if (!context.byUrl.has(path)) {
+      // A listed target may be a served asset rather than a page — Blume's own
+      // llms.txt links the changelog RSS feed — so the file index vouches for
+      // it too, the same way redirect targets may land on a served asset.
+      if (!context.byUrl.has(path) && !context.files.has(path)) {
         found.push(
           finding(
             "BLUME_AUDIT_LLMS_TXT_STALE_ENTRY",

@@ -94,6 +94,8 @@ beforeAll(async () => {
     "a.md": "---\ntitle: Alpha\n---\n# Alpha\n\nBody A.\n",
     "b.md": "---\ntitle: Beta\n---\n# Beta\n\nBody B.\n",
     "c.md": "---\ntitle: Gamma\n---\n# Gamma\n\nDraft body.\n",
+    "f.md":
+      '---\ntitle: Lifecycle\nstatus: retracted\n---\n# F\n\n<Callout type="warning" title={frontmatter.status}>Withdrawn.</Callout>\n',
     "t.md":
       '---\ntitle: Table\n---\n# Table\n\n<Callout type="warning">Mind the gap.</Callout>\n',
     "v.md": [
@@ -462,6 +464,17 @@ describe("component downleveling in agent surfaces", () => {
     expect(raw["/t"]?.md).toContain("NOTE: Mind the gap.");
     const { full } = await buildLlmsFiles(customized);
     expect(full).toContain("NOTE: Mind the gap.");
+  });
+
+  it("evaluates {frontmatter.*} props against the page front-matter", async () => {
+    // The single-source-of-truth pattern from #93: a prop bound to a
+    // front-matter key must survive downleveling on both agent surfaces.
+    const fmProject = makeProject([makePage("f.md", "/f", "Lifecycle")]);
+    const raw = await buildRawMarkdown(fmProject);
+    expect(raw["/f"]?.md).toContain("> **retracted**\n>\n> Withdrawn.");
+    expect(raw["/f"]?.md).not.toContain("<Callout");
+    const { full } = await buildLlmsFiles(fmProject);
+    expect(full).toContain("> **retracted**\n>\n> Withdrawn.");
   });
 
   it("validates markdownComponents entries are functions", () => {

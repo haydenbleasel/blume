@@ -614,6 +614,134 @@ describe("buildNavigation — index title / folder meta title diagnostics", () =
   });
 });
 
+describe("buildNavigation — duplicate sidebar order diagnostics", () => {
+  it("warns when two pages share an explicit sidebar.order", () => {
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        page("guide/alpha.md", "/guide/alpha", "Alpha", { order: 1 }),
+        page("guide/beta.md", "/guide/beta", "Beta", { order: 1 }),
+      ],
+      { diagnostics, folderMeta: empty }
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_DUPLICATE_SIDEBAR_ORDER");
+    expect(diagnostics[0]?.message).toContain('"Alpha"');
+    expect(diagnostics[0]?.message).toContain('"Beta"');
+    // Anchored to the first tied page's source file.
+    expect(diagnostics[0]?.file).toBe("/abs/guide/alpha.md");
+  });
+
+  it("lists a three-way tie with commas", () => {
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        page("guide/a.md", "/guide/a", "A", { order: 2 }),
+        page("guide/b.md", "/guide/b", "B", { order: 2 }),
+        page("guide/c.md", "/guide/c", "C", { order: 2 }),
+      ],
+      { diagnostics, folderMeta: empty }
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.message).toContain('"A", "B", and "C" all have');
+  });
+
+  it("warns when two folders share a folder-meta order", () => {
+    const folderMeta = new Map<string, FolderMeta>([
+      ["guide", { order: 4 }],
+      ["reference", { order: 4 }],
+    ]);
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        page("guide/setup.md", "/guide/setup", "Setup"),
+        page("reference/api.md", "/reference/api", "Api"),
+      ],
+      { diagnostics, folderMeta }
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_DUPLICATE_SIDEBAR_ORDER");
+    // A folder-only tie has no single source file to anchor to.
+    expect(diagnostics[0]?.file).toBeUndefined();
+  });
+
+  it("does not warn when both sides fall back to the default order", () => {
+    // Neither page has a numeric prefix or explicit order — both land on the
+    // same fallback order and sort alphabetically, which is intentional.
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        page("guide/alpha.md", "/guide/alpha", "Alpha"),
+        page("guide/beta.md", "/guide/beta", "Beta"),
+      ],
+      { diagnostics, folderMeta: empty }
+    );
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("does not throw when no diagnostics sink is passed", () => {
+    expect(() =>
+      buildNavigation(
+        [
+          page("guide/alpha.md", "/guide/alpha", "Alpha", { order: 1 }),
+          page("guide/beta.md", "/guide/beta", "Beta", { order: 1 }),
+        ],
+        { folderMeta: empty }
+      )
+    ).not.toThrow();
+  });
+
+  it("does not warn when two changelog entries share a publish date", () => {
+    // The order is derived from the date, not chosen by the author, so a
+    // same-day release pair isn't a duplicate-order authoring mistake.
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        changelogPage("app-1", "app@1.0.1", "2024-01-01"),
+        changelogPage("app-2", "app@1.0.2", "2024-01-01"),
+      ],
+      { diagnostics, folderMeta: empty }
+    );
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("does not warn for undated changelog entries with date-prefixed filenames", () => {
+    // With no date, the order falls back to the numeric filename prefix — a
+    // date stamp (`2024-...`), not an authored rank, so the tie isn't flagged.
+    const undated = (ref: string, title: string): PageRecord => ({
+      ...changelogPage(ref, title, "2024-01-01"),
+      meta: pageMetaSchema.parse({ type: "changelog" }),
+    });
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        undated("2024-01-05-first", "app@1.0.0"),
+        undated("2024-01-09-second", "app@1.1.0"),
+      ],
+      { diagnostics, folderMeta: empty }
+    );
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("warns when a folder-meta pages[] rank collides with an explicit sidebar.order", () => {
+    // "alpha" gets rank 0 from meta.pages; "beta" separately claims order 0
+    // via its own frontmatter. Both are authored, so the tie is real.
+    const folderMeta = new Map<string, FolderMeta>([
+      ["guide", { pages: ["alpha"] }],
+    ]);
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        page("guide/alpha.md", "/guide/alpha", "Alpha"),
+        page("guide/beta.md", "/guide/beta", "Beta", { order: 0 }),
+      ],
+      { diagnostics, folderMeta }
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_DUPLICATE_SIDEBAR_ORDER");
+  });
+});
+
 describe("navigation.sidebar config schema", () => {
   it("defaults to flat display with no explicit items", () => {
     const config = blumeConfigSchema.parse({});

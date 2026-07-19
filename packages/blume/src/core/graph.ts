@@ -159,8 +159,14 @@ const buildI18nNavigation = (
   }
 
   // Each locale gets an independent tree, so navigation may diverge per language.
+  // Untranslated pages are padded into every locale from the fallback, so a tie
+  // in shared content would otherwise be re-reported once per locale — dedupe on
+  // code + file + message, which are all locale-stable for padded pages. A
+  // locale-specific tie names its own translated files/labels and survives.
   const navigationByLocale: Record<string, Navigation> = {};
+  const seen = new Set<string>();
   for (const { code } of i18n.locales) {
+    const localeDiagnostics: Diagnostic[] = [];
     navigationByLocale[code] = buildLocaleNavigation(
       code,
       pages,
@@ -168,8 +174,15 @@ const buildI18nNavigation = (
       fallbackByKey,
       options,
       i18n,
-      diagnostics
+      localeDiagnostics
     );
+    for (const diagnostic of localeDiagnostics) {
+      const key = `${diagnostic.code}\n${diagnostic.file ?? ""}\n${diagnostic.message}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        diagnostics.push(diagnostic);
+      }
+    }
   }
   const navigation = navigationByLocale[i18n.defaultLocale] ?? {
     featured: [],

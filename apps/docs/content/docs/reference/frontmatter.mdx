@@ -109,4 +109,6 @@ reviewedAt: 2026-06-20
 
 Schemas are accepted through the [Standard Schema](https://standardschema.dev) interface, so Zod (whichever version your project installs), Valibot, and ArkType all work. Every declared key is validated on every page — absent ones included — so a required schema enforces the key site-wide; mark it `.optional()` to validate only where present. All other keys stay strictly validated, and built-in fields can't be redeclared.
 
+A page that fails validation fails `blume build` with a diagnostic naming the file and key. With [`--no-strict`](/docs/reference/cli#common-flags), the build succeeds anyway and the failing pages are dropped from the output — the build summary reports how many.
+
 Schemas are exported from `blume/schema` for editor and migration tooling.

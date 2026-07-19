@@ -568,9 +568,11 @@ export interface AiConfig {
   /**
    * Markdown serializers for custom components in agent-facing output (the
    * `.md` mirror, `llms-full.txt`, MCP `get_page`), keyed by JSX name. Each
-   * receives the component's statically-evaluated `props` and downleveled
-   * `children` and returns replacement Markdown — or `null` to leave the JSX
-   * verbatim. A same-name entry replaces a built-in serializer.
+   * receives the component's statically-evaluated `props` (with the page's
+   * `frontmatter` in scope, so `prop={frontmatter.status}` resolves), its
+   * downleveled `children`, and the page's `frontmatter` data, and returns
+   * replacement Markdown — or `null` to leave the JSX verbatim. A same-name
+   * entry replaces a built-in serializer.
    *
    * These live in `blume.config.ts` (which is executed at build time), not in
    * `components.tsx` (which is only statically analyzed, never run).

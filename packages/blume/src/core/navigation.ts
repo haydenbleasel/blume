@@ -57,7 +57,17 @@ interface MutablePage {
   badge?: string;
   deprecated?: boolean;
   pageId: string;
+  /** Absolute source path (filesystem adapter only), to anchor diagnostics. */
+  file?: string;
   order: number;
+  /**
+   * Whether `order` reflects a deliberate authoring choice (explicit
+   * `sidebar.order`, a numeric filename prefix, or a folder-meta `pages` rank)
+   * rather than a derived value like a changelog entry's publish date — two
+   * changelog entries published on the same day aren't an authoring mistake,
+   * so they're excluded from the duplicate-order diagnostic.
+   */
+  orderIsAuthored: boolean;
 }
 
 interface MutableGroup {
@@ -111,24 +121,35 @@ const ensureGroup = (
   return group;
 };
 
-const pageOrder = (page: PageRecord, filename: string): number => {
+const pageOrder = (
+  page: PageRecord,
+  filename: string
+): { order: number; orderIsAuthored: boolean } => {
   if (page.meta.sidebar.order !== undefined) {
-    return page.meta.sidebar.order;
+    return { order: page.meta.sidebar.order, orderIsAuthored: true };
   }
   if (isIndexStem(filename.replace(extname(filename), ""))) {
-    return Number.NEGATIVE_INFINITY;
+    return { order: Number.NEGATIVE_INFINITY, orderIsAuthored: false };
   }
   // Changelog entries read newest-first, matching the generated timeline. Sort
   // on the negated publish timestamp so a later date yields a smaller order
   // under the ascending comparator; undated entries fall back to filename order.
+  // The date is derived, not an authoring choice, so same-day entries aren't a
+  // duplicate-order mistake.
   if (page.contentType === "changelog") {
     const iso = page.meta.date ?? page.meta.changelog?.date;
     const time = iso ? Date.parse(iso) : Number.NaN;
     if (!Number.isNaN(time)) {
-      return -time;
+      return { order: -time, orderIsAuthored: false };
     }
   }
-  return numericOrder(filename);
+  // An undated changelog entry's numeric filename prefix is usually a date
+  // (`2024-01-05-release.md`) rather than a rank, so it is derived too.
+  const order = numericOrder(filename);
+  return {
+    order,
+    orderIsAuthored: page.contentType !== "changelog" && Number.isFinite(order),
+  };
 };
 
 /**
@@ -167,6 +188,9 @@ const applyFolderMeta = (
         const position = rank.get(child.key);
         if (position !== undefined) {
           child.order = position;
+          if (child.kind === "page") {
+            child.orderIsAuthored = true;
+          }
         }
       }
     }
@@ -225,7 +249,62 @@ const indexTitleMismatchDiagnostic = (
   };
 };
 
-const sortNodes = (nodes: MutableNode[]): void => {
+/** Whether a node's `order` reflects a deliberate authoring choice. */
+const isAuthoredOrder = (node: MutableNode): boolean =>
+  node.kind === "group" || node.orderIsAuthored;
+
+/**
+ * Warn when two sibling nodes share an explicit/numeric order (frontmatter
+ * `sidebar.order`, a numeric filename prefix, or folder-meta `order`) — they'd
+ * otherwise fall back to a silent, arbitrary alphabetical tiebreak. Nodes at
+ * the default fallback order (no numeric prefix, no explicit order) are
+ * excluded: that's the common, intentional case of "just sort alphabetically."
+ * So is a derived, non-authored order (e.g. two changelog entries published
+ * on the same day) — not an authoring mistake.
+ */
+const duplicateOrderDiagnostics = (nodes: MutableNode[]): Diagnostic[] => {
+  const byOrder = new Map<number, MutableNode[]>();
+  for (const node of nodes) {
+    if (!Number.isFinite(node.order) || !isAuthoredOrder(node)) {
+      continue;
+    }
+    const tied = byOrder.get(node.order);
+    if (tied) {
+      tied.push(node);
+    } else {
+      byOrder.set(node.order, [node]);
+    }
+  }
+  const diagnostics: Diagnostic[] = [];
+  for (const [order, tied] of byOrder) {
+    if (tied.length > 1) {
+      const names = tied.map((node) => `"${node.label}"`);
+      const list =
+        names.length > 2
+          ? `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`
+          : names.join(" and ");
+      const verb = tied.length > 2 ? "all have" : "both have";
+      // Anchor the diagnostic to one tied source file so tooling can point
+      // somewhere concrete; the message names the rest. Folder-only ties
+      // (folder-meta `order`) have no single file, so `file` stays unset.
+      const file = tied.find(
+        (node): node is MutablePage => node.kind === "page"
+      )?.file;
+      diagnostics.push({
+        code: "BLUME_DUPLICATE_SIDEBAR_ORDER",
+        file,
+        message: `${list} ${verb} sidebar order ${order}; falling back to alphabetical order.`,
+        severity: "warning",
+        suggestion:
+          "Give each item a distinct sidebar.order (or folder meta order).",
+      });
+    }
+  }
+  return diagnostics;
+};
+
+const sortNodes = (nodes: MutableNode[], diagnostics: Diagnostic[]): void => {
+  diagnostics.push(...duplicateOrderDiagnostics(nodes));
   nodes.sort((a, b) => {
     if (a.order !== b.order) {
       return a.order - b.order;
@@ -234,7 +313,7 @@ const sortNodes = (nodes: MutableNode[]): void => {
   });
   for (const node of nodes) {
     if (node.kind === "group") {
-      sortNodes(node.children);
+      sortNodes(node.children, diagnostics);
     }
   }
 };
@@ -311,7 +390,7 @@ const buildFileSystemSidebar = (
   metaPrefix: string,
   display: SidebarDisplay,
   tabPaths: Set<string>,
-  diagnostics: Diagnostic[] | undefined
+  diagnostics: Diagnostic[] = []
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
 
@@ -333,7 +412,7 @@ const buildFileSystemSidebar = (
         metaPrefix
       );
       if (diagnostic) {
-        diagnostics?.push(diagnostic);
+        diagnostics.push(diagnostic);
       }
     }
 
@@ -365,22 +444,25 @@ const buildFileSystemSidebar = (
       parent.routePath ??= `/${folderParts.slice(0, consumed).join("/")}`;
     }
 
+    const { order, orderIsAuthored } = pageOrder(page, filename);
     parent.children.push({
       badge: page.meta.sidebar.badge,
       deprecated: page.meta.deprecated || undefined,
       description: page.description,
+      file: page.sourcePath,
       icon: page.meta.sidebar.icon,
       key: segmentKey(stem),
       kind: "page",
       label: page.meta.sidebar.label ?? page.title,
-      order: pageOrder(page, filename),
+      order,
+      orderIsAuthored,
       pageId: page.id,
       route: page.route,
     });
   }
 
   applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix);
-  sortNodes(root.children);
+  sortNodes(root.children, diagnostics);
   hoistPages(root.children, display === "flat");
   hoistTabSections(root.children, tabPaths, display === "flat");
   return root.children.map((child) => toNavNode(child, display));
@@ -565,9 +647,9 @@ export const buildNavigation = (
      */
     localizedRoot?: string;
     /**
-     * Sink for diagnostics produced while building the tree (currently just
-     * index-page title/folder-meta-title mismatches). Pushed into in place;
-     * omit to discard.
+     * Sink for diagnostics produced while building the tree (duplicate sidebar
+     * `order` values, index-page title/folder-meta-title mismatches). Pushed
+     * into in place; omit to discard.
      */
     diagnostics?: Diagnostic[];
   }

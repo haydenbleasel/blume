@@ -1450,6 +1450,21 @@ describe("llms.txt checks", () => {
     expect(run(llmsChecks, ctx)).toContain("LLMS_TXT_STALE_ENTRY");
   });
 
+  it("accepts an entry that resolves to a served asset", () => {
+    // The generator itself links non-page assets — the changelog RSS feed —
+    // so a target the file index vouches for is not stale.
+    const ctx = context({
+      files: new Map([["/changelog/rss.xml", 512]]),
+      llms: {
+        entries: [{ line: 3, url: "https://x.dev/changelog/rss.xml" }],
+        file: "/dist/llms.txt",
+      },
+      pages: [snapshot({ url: "/" })],
+      site: SITE,
+    });
+    expect(run(llmsChecks, ctx)).not.toContain("LLMS_TXT_STALE_ENTRY");
+  });
+
   it("reports an indexable nav page that is not listed", () => {
     const ctx = context({
       llms: {
