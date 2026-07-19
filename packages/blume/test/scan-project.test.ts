@@ -68,6 +68,9 @@ describe("scanProject", () => {
     expect(project.diagnostics.map((d) => d.code)).toContain(
       "BLUME_FRONTMATTER_INVALID"
     );
+    // The invalid entry yields no pages — surfaced as a dropped-page count so
+    // the CLI can fail (or at least say so) instead of reporting a clean build.
+    expect(project.droppedPages).toBe(1);
   });
 
   it("applies CLI config overrides over the loaded config", async () => {
@@ -86,6 +89,7 @@ describe("scanProject", () => {
     expect(project.config.deployment.base).toBe("/docs");
     expect(project.config.deployment.output).toBe("server");
     expect(project.context.contentRoot.endsWith("guides")).toBe(true);
+    expect(project.droppedPages).toBe(0);
   });
 
   it("auto-detects the platform adapter when --output server is a CLI override", async () => {

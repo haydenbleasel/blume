@@ -35,7 +35,7 @@ blume <command> [options]
 - `blume dev --content-dir <dir>` — scan a different content folder without editing `blume.config.ts`.
 - `blume dev --debug` — verbose Astro/Vite logging for troubleshooting.
 - `blume dev --preview` / `blume build --preview` — include drafts and unpublished CMS content.
-- `blume build --strict` — fail the build on diagnostic errors (also works on `blume dev`).
+- `blume build --no-strict` — build despite diagnostic errors. By default `blume build` fails (exit 1) on any error diagnostic, because pages that fail frontmatter validation are dropped from the output; with `--no-strict` the build succeeds and reports how many pages are missing. `blume dev --strict` opts dev into the same fail-fast behavior.
 - `blume build --output static|server --adapter vercel|node|netlify|cloudflare --base /docs` — override the deployment output, adapter, and base path from `blume.config.ts`.
 - `blume build --analyze` — print the client JavaScript bundle sizes (largest first) after the build.
 - `blume build --budget-js <kb> --budget-css <kb>` — fail the build when total client JavaScript/CSS exceeds the budget, turning a performance target into a CI gate.

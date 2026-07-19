@@ -15,7 +15,7 @@ import { resolveProjectContext } from "./project.ts";
 import type { ResolvedConfig } from "./schema.ts";
 import { normalizeEntry } from "./sources/normalize.ts";
 import { resolveDocsCollection, resolveSources } from "./sources/resolve.ts";
-import type { ContentSource } from "./sources/types.ts";
+import type { ContentSource, SourceLoadResult } from "./sources/types.ts";
 import type {
   BlumeManifest,
   ContentGraph,
@@ -70,6 +70,8 @@ export interface BlumeProject {
   graph: ContentGraph;
   manifest: BlumeManifest;
   diagnostics: Diagnostic[];
+  /** Entries excluded from the graph because their frontmatter failed validation. */
+  droppedPages: number;
   /** The instantiated content sources, for lazy entry reads (search/AI/raw). */
   sources: ContentSource[];
 }
@@ -114,6 +116,51 @@ const entryIdDiagnostics = (
     }
   }
   return diagnostics;
+};
+
+/**
+ * Funnel every loaded source's entries through the shared `normalizeEntry`,
+ * collecting pages, diagnostics, and the count of entries dropped outright —
+ * an entry that yields no pages but did yield diagnostics was rejected for
+ * invalid frontmatter, and callers surface that count so a build with missing
+ * pages can't read as clean.
+ */
+const normalizeLoadedEntries = (
+  loaded: ({ source: ContentSource } & SourceLoadResult)[],
+  config: ResolvedConfig
+): { pages: PageRecord[]; diagnostics: Diagnostic[]; droppedPages: number } => {
+  // Only thread `frontmatter.extend` through when a project opts in, so the
+  // known-key split in `normalizeEntry` stays off the default path.
+  const frontmatterExtend =
+    Object.keys(config.frontmatter.extend).length > 0
+      ? config.frontmatter.extend
+      : undefined;
+
+  const pages: PageRecord[] = [];
+  const allDiagnostics: Diagnostic[] = [];
+  let droppedPages = 0;
+  for (const { source, entries, diagnostics } of loaded) {
+    allDiagnostics.push(...diagnostics);
+    for (const entry of entries) {
+      const normalized = normalizeEntry(entry, {
+        basePath: config.basePath,
+        defaultType: config.content.defaultType,
+        frontmatterExtend,
+        i18n: config.i18n,
+        source: {
+          name: source.name,
+          prefix: source.prefix,
+          staged: source.staged,
+        },
+      });
+      if (normalized.pages.length === 0 && normalized.diagnostics.length > 0) {
+        droppedPages += 1;
+      }
+      pages.push(...normalized.pages);
+      allDiagnostics.push(...normalized.diagnostics);
+    }
+  }
+  return { diagnostics: allDiagnostics, droppedPages, pages };
 };
 
 /**
@@ -190,33 +237,11 @@ export const scanProject = async (
     discoverFolderMeta(metaSources, { localeDirs }),
   ]);
 
-  // Only thread `frontmatter.extend` through when a project opts in, so the
-  // known-key split in `normalizeEntry` stays off the default path.
-  const frontmatterExtend =
-    Object.keys(config.frontmatter.extend).length > 0
-      ? config.frontmatter.extend
-      : undefined;
-
-  const allPages: PageRecord[] = [];
-  const contentDiagnostics: Diagnostic[] = [];
-  for (const { source, entries, diagnostics } of loaded) {
-    contentDiagnostics.push(...diagnostics);
-    for (const entry of entries) {
-      const normalized = normalizeEntry(entry, {
-        basePath: config.basePath,
-        defaultType: config.content.defaultType,
-        frontmatterExtend,
-        i18n: config.i18n,
-        source: {
-          name: source.name,
-          prefix: source.prefix,
-          staged: source.staged,
-        },
-      });
-      allPages.push(...normalized.pages);
-      contentDiagnostics.push(...normalized.diagnostics);
-    }
-  }
+  const {
+    diagnostics: contentDiagnostics,
+    droppedPages,
+    pages: allPages,
+  } = normalizeLoadedEntries(loaded, config);
 
   // Drafts render in dev and in preview, but are excluded from production builds.
   const pages =
@@ -267,6 +292,7 @@ export const scanProject = async (
       ...graph.diagnostics,
       ...i18nWarnings,
     ],
+    droppedPages,
     graph,
     manifest,
     mode,
