@@ -87,7 +87,7 @@ content: {
 }
 ```
 
-The release name becomes the title, its tag becomes `changelog.version`, and its published date sorts the timeline. A private repo authenticates with the `GITHUB_TOKEN` environment variable. See [Content sources](/docs/content/sources#github-releases) for every option.
+The release name becomes the title, its tag becomes `changelog.version`, and its published date sorts the timeline. Each release page also gets a unique meta description summarized from its notes — markdown stripped, section headings and changeset commit-hash prefixes dropped, trimmed to the search-snippet length [`blume audit`](/docs/reference/cli#auditing-the-built-site) checks for — instead of falling back to the site description. A private repo authenticates with the `GITHUB_TOKEN` environment variable. See [Content sources](/docs/content/sources#github-releases) for every option.
 
 ## The RSS feed
 

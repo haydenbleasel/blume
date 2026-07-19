@@ -165,6 +165,65 @@ describe("githubReleasesSource", () => {
     expect(entry?.lastModified).toBe("2026-06-24T00:00:00Z");
   });
 
+  it("derives a unique seo.description from the release notes", async () => {
+    const body = [
+      "### Patch Changes",
+      "",
+      "- cf8fa22: Fix the spacing inside directive callouts (`:::note`). The global prose paragraph rule leaks a 1rem margin onto the callout's paragraphs even though the callout is `not-prose`.",
+      "- bb5944d: Gate the [language icon](https://example.com/docs) on `data-language`.",
+    ].join("\n");
+    const { fetchImpl } = releasesFetch({ 1: [makeRelease({ body })] });
+    const source = githubReleasesSource(
+      { fetchImpl, name: "changelog", owner: "acme", repo: "sdk" },
+      ctxFor(await tempDir())
+    );
+    const { entries } = await source.load();
+    const meta = entries[0]?.data as { seo?: { description?: string } };
+    const description = meta.seo?.description ?? "";
+    // The section heading and changeset hash prefixes are noise, not summary.
+    expect(description).toStartWith("Fix the spacing inside directive");
+    expect(description).not.toContain("Patch Changes");
+    expect(description).not.toContain("cf8fa22");
+    // Trimmed to the audit's snippet range at a word boundary.
+    expect(description.length).toBeGreaterThanOrEqual(110);
+    expect(description.length).toBeLessThanOrEqual(160);
+    expect(description).toEndWith("…");
+    // The description rides the frontmatter into the cached raw entry.
+    expect(entries[0]?.raw).toContain("seo:");
+  });
+
+  it("keeps a short body as-is and omits seo for an empty one", async () => {
+    const { fetchImpl } = releasesFetch({
+      1: [
+        makeRelease({ body: "- abc1234: Added widgets", id: 1 }),
+        makeRelease({ body: "  ", id: 2, tag_name: "v1.1.0" }),
+      ],
+    });
+    const source = githubReleasesSource(
+      { fetchImpl, name: "changelog", owner: "acme", repo: "sdk" },
+      ctxFor(await tempDir())
+    );
+    const { entries } = await source.load();
+    const short = entries[0]?.data as { seo?: { description?: string } };
+    expect(short.seo?.description).toBe("Added widgets");
+    const empty = entries[1]?.data as { seo?: { description?: string } };
+    expect(empty.seo).toBeUndefined();
+  });
+
+  it("hard-cuts a description whose word boundary falls under the minimum", async () => {
+    const body = `Fix ${"a".repeat(200)}`;
+    const { fetchImpl } = releasesFetch({ 1: [makeRelease({ body })] });
+    const source = githubReleasesSource(
+      { fetchImpl, name: "changelog", owner: "acme", repo: "sdk" },
+      ctxFor(await tempDir())
+    );
+    const { entries } = await source.load();
+    const meta = entries[0]?.data as { seo?: { description?: string } };
+    const description = meta.seo?.description ?? "";
+    expect(description.length).toBe(160);
+    expect(description).toEndWith("…");
+  });
+
   it("normalizes into a staged /changelog/<version> page", async () => {
     const { fetchImpl } = releasesFetch({ 1: [makeRelease({})] });
     const source = githubReleasesSource(

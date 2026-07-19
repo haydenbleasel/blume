@@ -56,6 +56,63 @@ const LEADING_V = /^v/iu;
 const NON_SLUG = /[^a-z0-9]+/gu;
 const EDGE_DASHES = /^-+|-+$/gu;
 
+// `blume audit` grades meta descriptions against the 110–160 character search
+// snippet range (audit/types.ts thresholds), so the derived summary aims for
+// the longest word-boundary cut under the cap.
+const DESCRIPTION_MAX = 160;
+const DESCRIPTION_MIN = 110;
+
+const CODE_FENCE = /```[\s\S]*?```/gu;
+const HEADING_LINE = /^#{1,6}\s.*$/gmu;
+const LIST_MARK = /^\s*(?:[-*+]|\d+[.)])\s+/u;
+// Changesets-generated release bullets open with the changeset's short commit
+// hash (`- cf8fa22: Fix …`) — noise in a search snippet.
+const CHANGESET_HASH = /^[0-9a-f]{7,40}:\s+/u;
+const IMAGE = /!\[[^\]]*\]\([^)]*\)/gu;
+const LINK = /\[(?<text>[^\]]*)\]\([^)]*\)/gu;
+const INLINE_CODE = /`(?<code>[^`]+)`/gu;
+// Tag-shaped only: a bare `<` in prose must not swallow text up to a later `>`.
+const HTML_OR_JSX = /<\/?[a-zA-Z][^\n<>]*>|<\/?>/gu;
+const MARKDOWN_PUNCT = /[*_~>]+/gu;
+const WHITESPACE = /\s+/gu;
+const TRAILING_FRAGMENT = /[\s,;:.—–-]+$/u;
+
+/**
+ * Derive a meta description from release notes: markdown reduced to plain
+ * text — section headings ("### Patch Changes") and changesets' commit-hash
+ * bullet prefixes dropped — then cut at a word boundary to fit the search
+ * snippet cap. Undefined when the notes have no prose at all.
+ */
+const releaseDescription = (body: string): string | undefined => {
+  const text = body
+    .replaceAll(CODE_FENCE, " ")
+    .replaceAll(HEADING_LINE, "")
+    .split("\n")
+    .map((line) => line.replace(LIST_MARK, "").replace(CHANGESET_HASH, ""))
+    .join("\n")
+    .replaceAll(IMAGE, " ")
+    .replaceAll(LINK, "$<text>")
+    .replaceAll(INLINE_CODE, "$<code>")
+    .replaceAll(HTML_OR_JSX, " ")
+    .replaceAll(MARKDOWN_PUNCT, " ")
+    .replaceAll(WHITESPACE, " ")
+    .trim();
+  if (!text) {
+    return undefined;
+  }
+  if (text.length <= DESCRIPTION_MAX) {
+    return text;
+  }
+  // Cut before the cap at a word boundary (kept only when it doesn't drop the
+  // summary under the minimum), shed any dangling punctuation, and mark the cut.
+  const slice = text.slice(0, DESCRIPTION_MAX - 1);
+  const boundary = slice.lastIndexOf(" ");
+  const head = (
+    boundary >= DESCRIPTION_MIN ? slice.slice(0, boundary) : slice
+  ).replace(TRAILING_FRAGMENT, "");
+  return `${head}…`;
+};
+
 /** Slugify a tag into a stable, URL-safe source ref (`v1.2.0` -> `v1-2-0`). */
 const slugifyTag = (tag: string): string =>
   tag.toLowerCase().replaceAll(NON_SLUG, "-").replaceAll(EDGE_DASHES, "");
@@ -71,9 +128,10 @@ const githubHeaders = (): Headers => {
 };
 
 /**
- * Lower one release to a staged Markdown entry: the notes become the body and
+ * Lower one release to a staged Markdown entry: the notes become the body,
  * `type: changelog` frontmatter (title/date/version/category) drives the
- * generated `/changelog` timeline and RSS feed.
+ * generated `/changelog` timeline and RSS feed, and a summary derived from the
+ * notes becomes the release page's meta description.
  */
 const releaseToEntry = (release: GithubRelease): SourceEntry => {
   const version = release.tag_name.replace(LEADING_V, "");
@@ -81,9 +139,14 @@ const releaseToEntry = (release: GithubRelease): SourceEntry => {
   const date = release.published_at ?? release.created_at;
   const category = release.prerelease ? "Prerelease" : "Release";
   const body = (release.body ?? "").replaceAll("\r\n", "\n").trim();
+  // A summary in `seo.description` gives each release page a unique meta
+  // description (instead of the site-wide fallback) without also rendering the
+  // visible lede paragraph a top-level `description` would add.
+  const description = releaseDescription(body);
   const data = {
     changelog: { category, version },
     date,
+    ...(description ? { seo: { description } } : {}),
     title,
     type: "changelog",
   };
