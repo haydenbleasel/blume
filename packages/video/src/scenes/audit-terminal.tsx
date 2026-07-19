@@ -103,11 +103,11 @@ const CODEX_PROMPT: string[][] = [
 ];
 
 const REPORT_HEADER_META = "124 pages · dist · offline";
-const REPORT_SUMMARY = "10,788 audits · 2 errors · 3 warnings · 0 notes";
+const REPORT_SUMMARY = "10,788 audits · 39 errors · 52 warnings · 0 notes";
 
 // Scene 1's script. Copy mirrors `formatReport` in
 // packages/blume/src/audit/report.ts — real check titles, real fix strings,
-// counts that add up (2 errors + 3 warnings = 5 findings handed off later).
+// counts that add up (39 errors + 52 warnings = 91 findings handed off later).
 const REPORT_LINES: TermLine[] = [
   { delay: 16, kind: "cmd", text: "blume audit" },
   { delay: 10, kind: "blank" },
@@ -118,7 +118,7 @@ const REPORT_LINES: TermLine[] = [
   {
     delay: 3,
     kind: "finding",
-    meta: "1 page",
+    meta: "16 pages",
     severity: "error",
     text: "Title tag missing or empty",
   },
@@ -128,6 +128,7 @@ const REPORT_LINES: TermLine[] = [
     kind: "page",
     text: "/guides/webhooks",
   },
+  { delay: 2, kind: "more", text: "… and 15 more (--verbose)" },
   {
     delay: 2,
     kind: "fix",
@@ -136,7 +137,7 @@ const REPORT_LINES: TermLine[] = [
   {
     delay: 4,
     kind: "finding",
-    meta: "3 pages",
+    meta: "52 pages",
     severity: "warning",
     text: "Meta description missing or empty",
   },
@@ -147,7 +148,7 @@ const REPORT_LINES: TermLine[] = [
     kind: "page",
     text: "/guides/rate-limits",
   },
-  { delay: 2, kind: "more", text: "… and 1 more (--verbose)" },
+  { delay: 2, kind: "more", text: "… and 50 more (--verbose)" },
   {
     delay: 2,
     kind: "fix",
@@ -158,7 +159,7 @@ const REPORT_LINES: TermLine[] = [
   {
     delay: 3,
     kind: "finding",
-    meta: "1 page",
+    meta: "23 pages",
     severity: "error",
     text: "Page has links to a broken page",
   },
@@ -168,6 +169,7 @@ const REPORT_LINES: TermLine[] = [
     kind: "page",
     text: "/quickstart",
   },
+  { delay: 2, kind: "more", text: "… and 22 more (--verbose)" },
   {
     delay: 2,
     kind: "fix",
@@ -184,13 +186,13 @@ const AGENT_LINES: TermLine[] = [
   { delay: 0, kind: "header", meta: REPORT_HEADER_META },
   { delay: 3, kind: "summary", text: REPORT_SUMMARY },
   { delay: 3, kind: "blank" },
-  { delay: 4, kind: "hand", text: "Handing 5 findings to Codex…" },
+  { delay: 4, kind: "hand", text: "Handing 91 findings to Codex…" },
   { delay: 8, kind: "banner", pause: 10 },
   { delay: 6, kind: "prompt", pause: 20 },
   { delay: 8, kind: "blank" },
   // The spinner runs through the pause — the beat where the agent works —
   // and settles when the completion line lands.
-  { delay: 0, kind: "working", pause: 75, text: "Fixing 5 issues…" },
+  { delay: 0, kind: "working", pause: 75, text: "Fixing 91 issues…" },
   { delay: 8, kind: "ok", text: "✔ All issues fixed" },
 ];
 
