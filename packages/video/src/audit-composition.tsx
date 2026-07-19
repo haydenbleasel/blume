@@ -90,7 +90,7 @@ const CenteredLine = ({
 const SceneTagline = () => (
   <>
     <Positioned dy={-37}>
-      <SoftBlurIn text="Your docs build." fontSize={70} color={WHITE} />
+      <SoftBlurIn text="Your docs are fast." fontSize={70} color={WHITE} />
     </Positioned>
     <Sequence from={8} layout="none">
       <Positioned dy={37}>
