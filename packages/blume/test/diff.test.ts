@@ -94,6 +94,40 @@ describe("renderDiff", () => {
     expect(first).toContain("#040506");
   });
 
+  it("registers a typeless theme object shared by both modes once per mode", async () => {
+    // Without a per-mode memo, the light slot would reuse the dark-typed
+    // registration made first. Rendering the shared object must match
+    // rendering two independent copies, which register per mode correctly.
+    const shared = {
+      colors: {
+        "editor.background": "#070809",
+        "editor.foreground": "#fefefe",
+      },
+      name: "acme-shared",
+      tokenColors: [],
+    };
+    const options = {
+      lang: "ts",
+      new: "let value = 2;",
+      old: "const value = 1;",
+    };
+
+    const fromShared = await renderDiff({
+      ...options,
+      theme: { dark: shared, light: shared },
+    });
+    const fromCopies = await renderDiff({
+      ...options,
+      theme: {
+        dark: structuredClone(shared),
+        light: structuredClone(shared),
+      },
+    });
+
+    expect(fromShared).toBe(fromCopies);
+    expect(fromShared).toContain("#070809");
+  });
+
   it("renders with a settings-form (TextMate) custom theme", async () => {
     const html = await renderDiff({
       lang: "ts",

@@ -48,20 +48,29 @@ const resolvePath = (path: string, root: string): string =>
 const readText = (path: string, root: string): Promise<string> =>
   readFile(resolvePath(path, root), "utf-8");
 
-const registeredDiffThemes = new WeakMap<object, string>();
+const registeredDiffThemes = new WeakMap<object, Map<string, string>>();
 
 /**
  * Pierre accepts custom Shiki themes through its registry, while Shiki itself
  * accepts the object directly. Register each configured object under a name
- * derived from its content so registration survives dev-server reloads: the
- * same theme re-registers under the same name (harmless overwrite), and an
- * edited theme gets a fresh name instead of a stale cached entry.
+ * derived from its content and resolved type, so registration survives
+ * dev-server reloads: the same theme re-registers under the same name (a
+ * harmless collision in Pierre's registry, which keeps the identical loader),
+ * while an edited theme gets a fresh name instead of a stale entry. The memo
+ * is keyed per resolved type as well — a typeless object shared between both
+ * modes must not hand light mode the dark-typed registration.
  */
 const diffThemeName = (theme: CodeTheme, mode: "dark" | "light"): string => {
   if (typeof theme === "string") {
     return theme;
   }
-  const cached = registeredDiffThemes.get(theme);
+  const type = theme.type ?? mode;
+  let byType = registeredDiffThemes.get(theme);
+  if (!byType) {
+    byType = new Map();
+    registeredDiffThemes.set(theme, byType);
+  }
+  const cached = byType.get(type);
   if (cached) {
     return cached;
   }
@@ -69,10 +78,10 @@ const diffThemeName = (theme: CodeTheme, mode: "dark" | "light"): string => {
     .update(JSON.stringify(theme))
     .digest("hex")
     .slice(0, 12);
-  const name = `blume-custom-${mode}-${hash}`;
-  const registered = { ...theme, name, type: theme.type ?? mode };
+  const name = `blume-custom-${hash}-${type}`;
+  const registered = { ...theme, name, type };
   registerCustomTheme(name, () => Promise.resolve(registered));
-  registeredDiffThemes.set(theme, name);
+  byType.set(type, name);
   return name;
 };
 
