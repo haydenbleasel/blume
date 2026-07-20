@@ -1,5 +1,14 @@
 # blume
 
+## 1.1.2
+
+### Patch Changes
+
+- 6cf2995: Allow custom Shiki theme objects in `markdown.codeBlocks.theme.light` and `markdown.codeBlocks.theme.dark`. Custom themes now flow through fenced code, inline highlighted code, `<CodeBlock>`, and `<Diff>` alongside bundled Shiki theme names.
+- cb30a40: Recognize the localized/based root tab when scoping the sidebar. With i18n enabled and header tabs configured, a non-default locale's tabs arrive localized (`/` becomes `/en`), but render-time scoping compared the active tab against a bare `/` — so on any `/en/...` route the root tab was misread as a section tab, and a root-level `(group)` folder (whose path is exactly the locale prefix) collapsed the sidebar to that one group. The same bare comparison blanked the sidebar entirely under a `basePath` with a root tab. The navigation now carries its root in the tabs' own path space (`/`, `/en`, `/docs`) and the sidebar scoping compares against it, so non-default locales show the full tree minus tab-owned sections, matching the default locale.
+- aa3f588: Size `<Component>` preview panes to the rendered example instead of the source line count. The generated frame page now observes the example with a ResizeObserver and reports its height to the docs page, which applies it to both the Preview and Code tabs — so short sources that render tall UIs no longer clip, and long sources that render small components no longer float in dead space. The line-count estimate remains the SSR/no-JS initial height (288px floor, 400px ceiling; the measured height is unceilinged up to the viewport), with a height transition so the settle on lazy load doesn't snap. Examples that resize after load keep the pane in sync, and viewport-tracking examples (`h-screen`) can't feed the measurement back into unbounded growth.
+- 103733d: Re-point a cache-restored `.blume/node_modules` junction that resolves a superseded Blume install. A restored build cache (e.g. Vercel's) could resurrect the junction pointing into the previous release's store directory; because releases rarely bump Astro, every astro-based health check passed straight through the stale link, and the freshly generated Astro config then imported the old package — crashing on any export added since (`blumeTwoslashTransformer is not a function`). The junction is now dropped and relinked whenever the directory behind it holds a `blume` other than the one running.
+
 ## 1.1.1
 
 ### Patch Changes
