@@ -1,6 +1,7 @@
 import type { z } from "zod";
 
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
+import type { CodeTheme } from "../markdown/themes.ts";
 import type { FontSlug } from "../theme/fonts.ts";
 import type {
   blumeConfigSchema,
@@ -848,12 +849,12 @@ export interface MarkdownConfig {
    * `` `code`{:lang} ``, `<CodeBlock>`, and `<Diff>`.
    */
   codeBlocks?: {
-    /** Shiki theme names per color mode. */
+    /** Bundled Shiki theme names or inline custom Shiki themes per color mode. */
     theme?: {
-      /** Dark-mode theme. Defaults to `github-dark`. */
-      dark?: string;
-      /** Light-mode theme. Defaults to `github-light`. */
-      light?: string;
+      /** Dark-mode theme name or custom theme. Defaults to `github-dark`. */
+      dark?: CodeTheme;
+      /** Light-mode theme name or custom theme. Defaults to `github-light`. */
+      light?: CodeTheme;
     };
   };
   /**

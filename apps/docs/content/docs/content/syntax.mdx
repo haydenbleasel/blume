@@ -154,6 +154,20 @@ export default defineConfig({
 });
 ```
 
+You can also provide a custom [Shiki theme definition](https://shiki.style/guide/load-theme) directly. Import a VS Code-compatible theme JSON file (using an import attribute when your runtime requires one) and assign it to either color mode; bundled names and custom definitions can be mixed:
+
+```ts blume.config.ts
+import darkTheme from "./themes/acme-dark.json" with { type: "json" };
+
+export default defineConfig({
+  markdown: {
+    codeBlocks: {
+      theme: { light: "github-light", dark: darkTheme },
+    },
+  },
+});
+```
+
 ### Line numbers
 
 Append `lineNumbers` to render a line-number gutter — on its own or alongside a title:

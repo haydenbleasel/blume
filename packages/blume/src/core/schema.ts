@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
+import type { CodeTheme } from "../markdown/themes.ts";
 import { normalizeRoute } from "../openapi/references.ts";
 import { normalizeXHandle } from "../seo/x-handle.ts";
 import { FONT_SLUGS, isFontSlug } from "../theme/fonts.ts";
@@ -950,9 +951,38 @@ const githubConfigSchema = z.strictObject({
   repo: z.string(),
 });
 
+const codeThemeSchema = z.custom<CodeTheme>((value) => {
+  if (typeof value === "string") {
+    return true;
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  // Token rules live in `settings` (Shiki's canonical field, also the TextMate
+  // form themes like createCssVariablesTheme() produce) or `tokenColors` (the
+  // VS Code spelling Shiki falls back to). A colors-only theme (editor fg/bg,
+  // no token rules) is also valid — Shiki renders it from `colors` alone. Each
+  // field present must have the right shape, and at least one must be present.
+  const theme = value as Record<string, unknown>;
+  const settingsValid =
+    theme.settings === undefined || Array.isArray(theme.settings);
+  const tokenColorsValid =
+    theme.tokenColors === undefined || Array.isArray(theme.tokenColors);
+  const colorsValid =
+    theme.colors === undefined ||
+    (typeof theme.colors === "object" &&
+      theme.colors !== null &&
+      !Array.isArray(theme.colors));
+  const hasContent =
+    theme.settings !== undefined ||
+    theme.tokenColors !== undefined ||
+    theme.colors !== undefined;
+  return settingsValid && tokenColorsValid && colorsValid && hasContent;
+}, "Expected a Shiki theme name or custom theme object");
+
 const codeBlockThemeSchema = z.strictObject({
-  dark: z.string().default("github-dark"),
-  light: z.string().default("github-light"),
+  dark: codeThemeSchema.default("github-dark"),
+  light: codeThemeSchema.default("github-light"),
 });
 
 const codeBlocksConfigSchema = z.strictObject({

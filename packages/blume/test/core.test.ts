@@ -243,6 +243,47 @@ describe("astro config template", () => {
     );
   });
 
+  it("preserves inline custom Shiki themes in generated config", () => {
+    const customDark = {
+      colors: {
+        "editor.background": "#010203",
+        "editor.foreground": "#fefefe",
+      },
+      name: "acme-dark",
+      tokenColors: [
+        { scope: ["keyword"], settings: { foreground: "#abcdef" } },
+      ],
+      type: "dark" as const,
+    };
+    const config = blumeConfigSchema.parse({
+      markdown: { codeBlocks: { theme: { dark: customDark } } },
+    });
+    const context = {
+      outDir: "/r/.blume",
+      pagesRoot: null,
+      root: "/r",
+    } as ProjectContext;
+
+    const output = astroConfigTemplate({
+      askPath: "/r/.blume/src/generated/Ask.astro",
+      config,
+      contentRoutes: [],
+      context,
+      dataPath: "/r/.blume/src/generated/data.json",
+      examplesPath: "/r/.blume/src/generated/examples.ts",
+      examplesThemePath: "/r/.blume/src/generated/examples.css",
+      needsReact: false,
+      openapiPath: "/r/.blume/src/generated/openapi.json",
+      pages: [],
+      searchClientPath: "/r/.blume/src/generated/search-client.ts",
+      themePath: "/r/.blume/src/generated/app.css",
+    });
+
+    expect(config.markdown.codeBlocks.theme.dark).toStrictEqual(customDark);
+    expect(output).toContain('dark: {"colors":{"editor.background":"#010203"');
+    expect(output).toContain('"codeThemes":{"dark":{"colors"');
+  });
+
   const context = {
     outDir: "/r/.blume",
     pagesRoot: null,

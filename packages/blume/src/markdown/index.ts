@@ -21,6 +21,8 @@ import { tableWrapPlugin } from "./table-wrap.ts";
 import { DEFAULT_CODE_THEMES } from "./themes.ts";
 import type { CodeThemes } from "./themes.ts";
 
+export type { CodeTheme, CodeThemes } from "./themes.ts";
+
 /** A Shiki transformer, derived from the upstream factories' return type. */
 type ShikiTransformer = ReturnType<typeof transformerNotationDiff>;
 

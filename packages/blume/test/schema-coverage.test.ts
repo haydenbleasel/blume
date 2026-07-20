@@ -192,6 +192,49 @@ describe("examples config normalization", () => {
   });
 });
 
+describe("code block themes", () => {
+  it("rejects empty custom themes and malformed theme fields", () => {
+    for (const theme of [
+      {},
+      { settings: {} },
+      { colors: [], tokenColors: [] },
+      { colors: {}, tokenColors: {} },
+    ]) {
+      const result = blumeConfigSchema.safeParse({
+        markdown: { codeBlocks: { theme: { dark: theme } } },
+      });
+      expect(result.success, JSON.stringify(theme)).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]).toMatchObject({
+          message: "Expected a Shiki theme name or custom theme object",
+          path: ["markdown", "codeBlocks", "theme", "dark"],
+        });
+      }
+    }
+  });
+
+  it("accepts the settings (TextMate), tokenColors (VS Code), and colors-only theme forms", () => {
+    for (const theme of [
+      // The shape createCssVariablesTheme() and Shiki-normalized themes use.
+      {
+        name: "css-variables",
+        settings: [{ scope: ["keyword"], settings: { foreground: "#abcdef" } }],
+        type: "dark",
+      },
+      { tokenColors: [] },
+      { colors: { "editor.background": "#010203" }, tokenColors: [] },
+      // Colors-only: no token rules — Shiki renders from editor fg/bg alone.
+      { colors: { "editor.background": "#010203" }, type: "dark" },
+      { colors: {} },
+    ]) {
+      const result = blumeConfigSchema.safeParse({
+        markdown: { codeBlocks: { theme: { dark: theme } } },
+      });
+      expect(result.success, JSON.stringify(theme)).toBe(true);
+    }
+  });
+});
+
 describe("toc heading-range refinement", () => {
   it("rejects a minHeadingLevel above the maxHeadingLevel", () => {
     const result = blumeConfigSchema.safeParse({
