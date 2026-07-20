@@ -60,10 +60,13 @@ const codeHtml = entry
 const LINE_PX = 21;
 const PADDING_PX = 36;
 const ESTIMATE_MAX_PX = 400;
+// The floor also clamps the measured height client-side; it rides along on the
+// iframe as `data-blume-min-pane` so the script and this estimate can't drift.
+const MIN_PANE_PX = 288;
 const lineCount = entry ? entry.code.replace(/\n+$/u, "").split("\n").length : 0;
 const paneHeight = Math.min(
   ESTIMATE_MAX_PX,
-  Math.max(288, lineCount * LINE_PX + PADDING_PX)
+  Math.max(MIN_PANE_PX, lineCount * LINE_PX + PADDING_PX)
 );
 const paneStyle = `height:${paneHeight}px`;
 // Animate the settle from the estimate to the measured height so the lazy
@@ -84,6 +87,7 @@ const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
         <iframe
           class="h-full w-full"
           data-blume-example-frame
+          data-blume-min-pane={MIN_PANE_PX}
           loading="lazy"
           src={previewSrc}
           title={`Preview of ${path}`}
@@ -107,8 +111,34 @@ const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
   // page; the sender is matched to its iframe through `event.source`. The
   // measured height replaces the server's line-count estimate on both tab
   // panels together, preserving the shared-height invariant that keeps
-  // Preview/Code toggles from shifting the layout.
-  const MIN_PANE_PX = 288;
+  // Preview/Code toggles from shifting the layout. The floor comes from the
+  // iframe's `data-blume-min-pane` (written next to the server estimate) so
+  // there is one source of truth for it.
+
+  // Refuse growth beyond the viewport. An example that sizes itself to the
+  // frame's viewport (h-screen/100svh) tracks whatever height this listener
+  // sets, so each report would come back as the pane height plus the frame
+  // padding — unbounded growth. Clamping to the viewport parks that cycle:
+  // once the pane reaches it, the frame's content stops changing size and
+  // the observer goes quiet. Genuinely tall examples scroll inside the
+  // frame past this point, which a taller-than-screen pane wouldn't have
+  // spared them anyway.
+  const applyMeasuredHeight = (frame: HTMLIFrameElement) => {
+    const tabs = frame.closest("blume-tabs");
+    const reported = Number(frame.dataset.blumeReportedHeight);
+    if (!tabs || !Number.isFinite(reported)) {
+      return;
+    }
+    const height = `${Math.max(
+      Number(frame.dataset.blumeMinPane) || 0,
+      Math.min(reported, window.innerHeight)
+    )}px`;
+    for (const panel of tabs.querySelectorAll<HTMLElement>(
+      "[data-blume-tab-panel]"
+    )) {
+      panel.style.height = height;
+    }
+  };
 
   window.addEventListener("message", (event) => {
     if (
@@ -124,26 +154,23 @@ const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
     const frame = Array.from(frames).find(
       (candidate) => candidate.contentWindow === event.source
     );
-    const tabs = frame?.closest("blume-tabs");
-    if (!tabs) {
+    if (!frame) {
       return;
     }
-    // Refuse growth beyond the viewport. An example that sizes itself to the
-    // frame's viewport (h-screen/100svh) tracks whatever height this listener
-    // sets, so each report would come back as the pane height plus the frame
-    // padding — unbounded growth. Clamping to the viewport parks that cycle:
-    // once the pane reaches it, the frame's content stops changing size and
-    // the observer goes quiet. Genuinely tall examples scroll inside the
-    // frame past this point, which a taller-than-screen pane wouldn't have
-    // spared them anyway.
-    const height = `${Math.max(
-      MIN_PANE_PX,
-      Math.min(event.data.height, window.innerHeight)
-    )}px`;
-    for (const panel of tabs.querySelectorAll<HTMLElement>(
-      "[data-blume-tab-panel]"
+    // Keep the raw report around so the viewport clamp can be recomputed
+    // when the window resizes, not only when the frame next reports.
+    frame.dataset.blumeReportedHeight = String(event.data.height);
+    applyMeasuredHeight(frame);
+  });
+
+  // A pane capped by a small viewport would otherwise stay small after the
+  // window grows: the frame's content stopped changing size, so its observer
+  // has nothing new to report.
+  window.addEventListener("resize", () => {
+    for (const frame of document.querySelectorAll<HTMLIFrameElement>(
+      "iframe[data-blume-example-frame][data-blume-reported-height]"
     )) {
-      panel.style.height = height;
+      applyMeasuredHeight(frame);
     }
   });
 </script>

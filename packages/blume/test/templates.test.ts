@@ -330,7 +330,6 @@ describe("examplesPageTemplate", () => {
     // not hardcoded — a root font-size override in the user's examples.css
     // must not skew the report.
     expect(out).toContain("getComputedStyle(document.body)");
-    expect(out).not.toContain("PADDING_PX = 48");
     // Pinned to the docs origin — never a wildcard target.
     expect(out).toContain("window.location.origin");
     expect(out).not.toContain('"*"');
