@@ -2042,14 +2042,19 @@ const Example = entry.Component;
         if (!wrapper) {
           return;
         }
-        // The body's 1.5rem padding frames the example; fold it into the
-        // report so the parent can apply the number as-is.
-        const PADDING_PX = 48;
+        // The body's padding frames the example; fold it into the report so
+        // the parent can apply the number as-is. Read from the live value —
+        // the user's examples.css is injected after Blume's defaults precisely
+        // so their tokens win, so a root font-size override must be honored
+        // rather than assuming 1.5rem is 48px.
+        const bodyStyle = getComputedStyle(document.body);
+        const paddingPx =
+          parseFloat(bodyStyle.paddingTop) + parseFloat(bodyStyle.paddingBottom);
         new ResizeObserver(() => {
           window.parent.postMessage(
             {
               height:
-                Math.ceil(wrapper.getBoundingClientRect().height) + PADDING_PX,
+                Math.ceil(wrapper.getBoundingClientRect().height) + paddingPx,
               type: "blume:example-height",
             },
             window.location.origin
