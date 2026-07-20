@@ -960,16 +960,24 @@ const codeThemeSchema = z.custom<CodeTheme>((value) => {
   }
   // Token rules live in `settings` (Shiki's canonical field, also the TextMate
   // form themes like createCssVariablesTheme() produce) or `tokenColors` (the
-  // VS Code spelling Shiki falls back to). `colors` is optional in both forms.
+  // VS Code spelling Shiki falls back to). A colors-only theme (editor fg/bg,
+  // no token rules) is also valid — Shiki renders it from `colors` alone. Each
+  // field present must have the right shape, and at least one must be present.
   const theme = value as Record<string, unknown>;
-  const hasTokenRules =
-    Array.isArray(theme.settings) || Array.isArray(theme.tokenColors);
+  const settingsValid =
+    theme.settings === undefined || Array.isArray(theme.settings);
+  const tokenColorsValid =
+    theme.tokenColors === undefined || Array.isArray(theme.tokenColors);
   const colorsValid =
     theme.colors === undefined ||
     (typeof theme.colors === "object" &&
       theme.colors !== null &&
       !Array.isArray(theme.colors));
-  return hasTokenRules && colorsValid;
+  const hasContent =
+    theme.settings !== undefined ||
+    theme.tokenColors !== undefined ||
+    theme.colors !== undefined;
+  return settingsValid && tokenColorsValid && colorsValid && hasContent;
 }, "Expected a Shiki theme name or custom theme object");
 
 const codeBlockThemeSchema = z.strictObject({

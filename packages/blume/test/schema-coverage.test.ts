@@ -193,10 +193,9 @@ describe("examples config normalization", () => {
 });
 
 describe("code block themes", () => {
-  it("rejects custom themes without token rules or with malformed colors", () => {
+  it("rejects empty custom themes and malformed theme fields", () => {
     for (const theme of [
       {},
-      { colors: {} },
       { settings: {} },
       { colors: [], tokenColors: [] },
       { colors: {}, tokenColors: {} },
@@ -214,7 +213,7 @@ describe("code block themes", () => {
     }
   });
 
-  it("accepts the settings (TextMate) and tokenColors (VS Code) theme forms", () => {
+  it("accepts the settings (TextMate), tokenColors (VS Code), and colors-only theme forms", () => {
     for (const theme of [
       // The shape createCssVariablesTheme() and Shiki-normalized themes use.
       {
@@ -224,6 +223,9 @@ describe("code block themes", () => {
       },
       { tokenColors: [] },
       { colors: { "editor.background": "#010203" }, tokenColors: [] },
+      // Colors-only: no token rules — Shiki renders from editor fg/bg alone.
+      { colors: { "editor.background": "#010203" }, type: "dark" },
+      { colors: {} },
     ]) {
       const result = blumeConfigSchema.safeParse({
         markdown: { codeBlocks: { theme: { dark: theme } } },

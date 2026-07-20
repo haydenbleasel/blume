@@ -49,16 +49,18 @@ const readText = (path: string, root: string): Promise<string> =>
   readFile(resolvePath(path, root), "utf-8");
 
 const registeredDiffThemes = new WeakMap<object, Map<string, string>>();
+const registeredDiffThemeNames = new Set<string>();
 
 /**
  * Pierre accepts custom Shiki themes through its registry, while Shiki itself
  * accepts the object directly. Register each configured object under a name
  * derived from its content and resolved type, so registration survives
- * dev-server reloads: the same theme re-registers under the same name (a
- * harmless collision in Pierre's registry, which keeps the identical loader),
- * while an edited theme gets a fresh name instead of a stale entry. The memo
- * is keyed per resolved type as well — a typeless object shared between both
- * modes must not hand light mode the dark-typed registration.
+ * dev-server reloads: the same theme resolves to the same name (already
+ * registered, so it's skipped — Pierre logs a console error on a same-name
+ * re-register), while an edited theme gets a fresh name instead of a stale
+ * entry. The memo is keyed per resolved type as well — a typeless object
+ * shared between both modes must not hand light mode the dark-typed
+ * registration.
  */
 const diffThemeName = (theme: CodeTheme, mode: "dark" | "light"): string => {
   if (typeof theme === "string") {
@@ -79,8 +81,11 @@ const diffThemeName = (theme: CodeTheme, mode: "dark" | "light"): string => {
     .digest("hex")
     .slice(0, 12);
   const name = `blume-custom-${hash}-${type}`;
-  const registered = { ...theme, name, type };
-  registerCustomTheme(name, () => Promise.resolve(registered));
+  if (!registeredDiffThemeNames.has(name)) {
+    const registered = { ...theme, name, type };
+    registerCustomTheme(name, () => Promise.resolve(registered));
+    registeredDiffThemeNames.add(name);
+  }
   byType.set(type, name);
   return name;
 };
