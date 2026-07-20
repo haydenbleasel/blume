@@ -707,6 +707,15 @@ export const buildNavigation = (
     }
   }
 
+  // A tab pointing at the tree root spans the whole sidebar rather than one
+  // section, so it must not feed tab-section hoisting. `tabs` carries final
+  // paths (localized, then based), so the root is compared in the same space —
+  // a root-level `(group)` folder's routePath is exactly the based/localized
+  // prefix (`/docs`, `/fr`) and a bare `"/"` check would miss the match (or,
+  // under a base, falsely scope a group named like the prefix). Carried on the
+  // returned navigation so render-time scoping compares in the same space too.
+  const rootTabPath = withBasePath(basePath, options.localizedRoot ?? "/");
+
   if (options.sidebar) {
     const sidebar = buildConfigSidebar(
       options.sidebar,
@@ -716,19 +725,13 @@ export const buildNavigation = (
     );
     return {
       featured,
+      root: rootTabPath,
       selectors,
       sidebar,
       tabs: withTabHrefs(tabs, sidebar),
     };
   }
 
-  // A tab pointing at the tree root spans the whole sidebar rather than one
-  // section, so it must not feed tab-section hoisting. `tabs` carries final
-  // paths (localized, then based), so the root is compared in the same space —
-  // a root-level `(group)` folder's routePath is exactly the based/localized
-  // prefix (`/docs`, `/fr`) and a bare `"/"` check would miss the match (or,
-  // under a base, falsely scope a group named like the prefix).
-  const rootTabPath = withBasePath(basePath, options.localizedRoot ?? "/");
   const sidebar = buildFileSystemSidebar(
     pages,
     options.folderMeta,
@@ -742,6 +745,7 @@ export const buildNavigation = (
   );
   return {
     featured,
+    root: rootTabPath,
     selectors,
     sidebar,
     tabs: withTabHrefs(tabs, sidebar),

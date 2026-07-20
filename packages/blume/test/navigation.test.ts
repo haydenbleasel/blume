@@ -231,6 +231,10 @@ describe("buildNavigation — filesystem sidebar", () => {
     expect(labels(asGroup(based.sidebar[0]).children)).toStrictEqual(
       labels(asGroup(baseless.sidebar[0]).children)
     );
+    // The root is carried on the navigation (in based/localized path space) so
+    // render-time tab scoping recognizes the root tab the same way.
+    expect(based.root).toBe("/docs");
+    expect(baseless.root).toBe("/");
   });
 
   it("resolves a tab with no index page to its first section page", () => {

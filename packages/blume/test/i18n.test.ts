@@ -314,6 +314,10 @@ describe("per-locale navigation", () => {
     expect(
       (graph.navigationByLocale.en?.tabs ?? []).map((tab) => tab.path)
     ).toEqual(["/docs", "/"]);
+    // Each locale's navigation carries its root in the same localized space,
+    // so render-time scoping recognizes `/fr` as the root tab, not a section.
+    expect(graph.navigationByLocale.fr?.root).toBe("/fr");
+    expect(graph.navigationByLocale.en?.root).toBe("/");
   });
 
   it("localizes tab dropdown item paths per locale", async () => {

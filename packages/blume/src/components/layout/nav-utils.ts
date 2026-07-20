@@ -135,12 +135,16 @@ const isTabSection = (node: NavNode, tabPaths: Set<string>): boolean => {
  * so a root/un-tabbed route lists only the pages outside every tab's section
  * instead of duplicating each tab as a sidebar group. A container left empty by
  * this pruning is dropped too, so no bare heading is stranded. The root tab
- * (`/`) spans everything, so it never removes anything.
+ * spans everything, so it never removes anything.
  */
-const withoutTabSections = (nodes: NavNode[], tabs: NavTab[]): NavNode[] => {
+const withoutTabSections = (
+  nodes: NavNode[],
+  tabs: NavTab[],
+  root: string
+): NavNode[] => {
   const tabPaths = new Set<string>();
   for (const tab of tabs) {
-    if (tab.path !== "/") {
+    if (tab.path !== root) {
       tabPaths.add(tab.path);
     }
   }
@@ -174,8 +178,14 @@ const withoutTabSections = (nodes: NavNode[], tabs: NavTab[]): NavNode[] => {
  * under one tab shows only that tab's group — so a multi-section site (e.g.
  * Adapters / API / AI tabs) drills each tab into its own pages instead of one
  * global tree, the way Fumadocs' root folders do. On a route under no tab (or
- * the root `/` tab), the tab-owned groups are hidden so the root sidebar shows
+ * the root tab), the tab-owned groups are hidden so the root sidebar shows
  * only pages that don't belong to a tab.
+ *
+ * `root` is the tree root in the tabs' own path space (`Navigation.root`) —
+ * tab paths arrive localized and based, so under i18n or a `basePath` the root
+ * tab is `/en` or `/docs`, not `/`. Comparing against `/` would misread it as
+ * a section tab: a root-level `(group)` folder's path is exactly that prefix,
+ * so the sidebar collapsed to that one group (or blanked entirely).
  *
  * When a matched tab owns no sidebar group — a standalone page like the
  * generated changelog timeline (`/changelog`), or a tab whose source produced
@@ -187,13 +197,14 @@ const withoutTabSections = (nodes: NavNode[], tabs: NavTab[]): NavNode[] => {
 export const sidebarForRoute = (
   sidebar: NavNode[],
   tabs: NavTab[],
-  route: string
+  route: string,
+  root = "/"
 ): NavNode[] => {
   const tab = activeTabForRoute(tabs, route);
-  if (tab && tab.path !== "/") {
+  if (tab && tab.path !== root) {
     return sectionChildren(sidebar, tab.path) ?? [];
   }
-  const scoped = withoutTabSections(sidebar, tabs);
+  const scoped = withoutTabSections(sidebar, tabs, root);
   return scoped.length > 0 ? scoped : sidebar;
 };
 

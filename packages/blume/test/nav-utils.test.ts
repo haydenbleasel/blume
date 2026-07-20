@@ -208,6 +208,46 @@ describe("sidebarForRoute", () => {
     expect(labels(sidebarForRoute(TREE, tabs, "/changelog"))).toStrictEqual([]);
   });
 
+  it("treats the localized root tab as the root, not a section tab", () => {
+    // Under i18n, tab paths arrive localized (`/` -> `/en`) and a root-level
+    // `(group)` folder's path is exactly the locale prefix. Comparing the
+    // active tab against a bare `/` misread `/en` as a section tab and
+    // collapsed the sidebar to that one group (#102).
+    const tree: NavNode[] = [
+      group("Overview", "/en", [page("Introduction", "/en/introduction")]),
+      group("CLI", "/en/cli", [page("Quickstart", "/en/cli/quickstart")]),
+      group("Cookbook", "/en/cookbook", [page("Index", "/en/cookbook")]),
+    ];
+    const tabs: NavTab[] = [
+      { label: "Docs", path: "/en" },
+      { label: "Cookbook", path: "/en/cookbook" },
+    ];
+    // Root tab active: full tree minus the tab-owned Cookbook section.
+    expect(
+      labels(sidebarForRoute(tree, tabs, "/en/introduction", "/en"))
+    ).toStrictEqual(["Overview", "CLI"]);
+    // Section-tab scoping is unchanged by the localized root.
+    expect(
+      labels(sidebarForRoute(tree, tabs, "/en/cookbook", "/en"))
+    ).toStrictEqual(["Index"]);
+  });
+
+  it("treats the based root tab as the root under a basePath", () => {
+    // With a basePath, tab paths are rebased (`/` -> `/docs`); the bare-`/`
+    // comparison found no group at `/docs` and blanked the sidebar entirely.
+    const tree: NavNode[] = [
+      page("Home", "/docs"),
+      group("API", "/docs/api", [page("Files", "/docs/api/files")]),
+    ];
+    const tabs: NavTab[] = [
+      { label: "Docs", path: "/docs" },
+      { label: "API", path: "/docs/api" },
+    ];
+    expect(labels(sidebarForRoute(tree, tabs, "/docs", "/docs"))).toStrictEqual(
+      ["Home"]
+    );
+  });
+
   it("does not treat a sibling prefix as the section (/adapters vs /adapters-x)", () => {
     const tree: NavNode[] = [
       group("Adapters", "/adapters", [page("S3", "/adapters/s3")]),

@@ -306,7 +306,15 @@ const mcpUrl =
 // Scope the sidebar (and the breadcrumbs/pagination derived from it) to the
 // active tab's section, so a multi-section site drills each tab into its own
 // pages. Without tabs — or on a route under none — this is the full sidebar.
-const sidebar = sidebarForRoute(navigation.sidebar, navigation.tabs, page.route);
+// `navigation.root` keeps the root-tab check in the tabs' localized/based
+// path space (`/en`, `/docs`), so a locale or base prefix doesn't misread the
+// root tab as a section tab.
+const sidebar = sidebarForRoute(
+  navigation.sidebar,
+  navigation.tabs,
+  page.route,
+  navigation.root
+);
 const activeTab = activeTabForRoute(navigation.tabs, page.route);
 const crumbs = findBreadcrumbs(sidebar, page.route);
 const { prev, next } = getPagination(flattenPages(sidebar), page.route);

@@ -227,6 +227,13 @@ export interface Navigation {
   tabs: NavTab[];
   selectors: NavSelector[];
   sidebar: NavNode[];
+  /**
+   * The tree root in final path space — localized and based (`/`, `/en`,
+   * `/docs`). Tab paths arrive in the same space, so the tab sitting at this
+   * path spans the whole tree and must be scoped as the root tab, not as a
+   * section tab. Absent on older serialized graphs; treat as `/`.
+   */
+  root?: string;
   /** Pinned links shown above the sidebar sections, unscoped by tab. */
   featured: FeaturedLink[];
   /** Repo URL for the header link, or null when hidden (`navigation.repo`). */
