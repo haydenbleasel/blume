@@ -47,14 +47,31 @@ const codeHtml = entry
     })
   : undefined;
 
-// Both tabs share one height so toggling them never shifts the layout. Size it
-// to the source (≈21px/line + padding), clamped to a comfortable 18rem floor and
-// a 400px ceiling — taller sources scroll inside the pane.
+// Both tabs share one height so toggling them never shifts the layout. The
+// line-count estimate (≈21px/line + padding, 18rem floor, 25rem ceiling) is
+// only the initial SSR/no-JS height: once the frame loads it reports its
+// rendered height (see the script below) and both panes follow it, so
+// previews fit the example — including ones that grow or shrink after load.
+// The measured height is never ceilinged — the code tab scrolls inside
+// whatever height it's given (`pre.blume-source`) — but the estimate is:
+// a long source would otherwise render a thousands-of-pixels placeholder
+// whose collapse to the measured height no transition could hide. No-JS
+// readers aren't hurt by the cap, since the source scrolls at any height.
 const LINE_PX = 21;
 const PADDING_PX = 36;
+const ESTIMATE_MAX_PX = 400;
+// The floor also clamps the measured height client-side; it rides along on the
+// iframe as `data-blume-min-pane` so the script and this estimate can't drift.
+const MIN_PANE_PX = 288;
 const lineCount = entry ? entry.code.replace(/\n+$/u, "").split("\n").length : 0;
-const paneHeight = Math.min(400, Math.max(288, lineCount * LINE_PX + PADDING_PX));
+const paneHeight = Math.min(
+  ESTIMATE_MAX_PX,
+  Math.max(MIN_PANE_PX, lineCount * LINE_PX + PADDING_PX)
+);
 const paneStyle = `height:${paneHeight}px`;
+// Animate the settle from the estimate to the measured height so the lazy
+// frame's load doesn't snap the layout.
+const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
 ---
 
 {
@@ -62,15 +79,21 @@ const paneStyle = `height:${paneHeight}px`;
     // `sync={false}`: each preview's Preview/Code tabs are independent — unlike
     // CodeGroup, switching one Component must not switch the others.
     <Tabs hash={false} sync={false}>
-      <Tab class="overflow-hidden p-0!" style={paneStyle} title="Preview">
+      <Tab
+        class={`overflow-hidden p-0! ${paneClass}`}
+        style={paneStyle}
+        title="Preview"
+      >
         <iframe
           class="h-full w-full"
+          data-blume-example-frame
+          data-blume-min-pane={MIN_PANE_PX}
           loading="lazy"
           src={previewSrc}
           title={`Preview of ${path}`}
         />
       </Tab>
-      <Tab class="overflow-hidden" style={paneStyle} title="Code">
+      <Tab class={`overflow-hidden ${paneClass}`} style={paneStyle} title="Code">
         <Fragment set:html={codeHtml} />
       </Tab>
     </Tabs>
@@ -81,3 +104,73 @@ const paneStyle = `height:${paneHeight}px`;
     </div>
   )
 }
+
+<script>
+  // Preview frames measure their rendered example and report the height (see
+  // `examplesPageTemplate`). One listener serves every <Component> on the
+  // page; the sender is matched to its iframe through `event.source`. The
+  // measured height replaces the server's line-count estimate on both tab
+  // panels together, preserving the shared-height invariant that keeps
+  // Preview/Code toggles from shifting the layout. The floor comes from the
+  // iframe's `data-blume-min-pane` (written next to the server estimate) so
+  // there is one source of truth for it.
+
+  // Refuse growth beyond the viewport. An example that sizes itself to the
+  // frame's viewport (h-screen/100svh) tracks whatever height this listener
+  // sets, so each report would come back as the pane height plus the frame
+  // padding — unbounded growth. Clamping to the viewport parks that cycle:
+  // once the pane reaches it, the frame's content stops changing size and
+  // the observer goes quiet. Genuinely tall examples scroll inside the
+  // frame past this point, which a taller-than-screen pane wouldn't have
+  // spared them anyway.
+  const applyMeasuredHeight = (frame: HTMLIFrameElement) => {
+    const tabs = frame.closest("blume-tabs");
+    const reported = Number(frame.dataset.blumeReportedHeight);
+    if (!tabs || !Number.isFinite(reported)) {
+      return;
+    }
+    const height = `${Math.max(
+      Number(frame.dataset.blumeMinPane) || 0,
+      Math.min(reported, window.innerHeight)
+    )}px`;
+    for (const panel of tabs.querySelectorAll<HTMLElement>(
+      "[data-blume-tab-panel]"
+    )) {
+      panel.style.height = height;
+    }
+  };
+
+  window.addEventListener("message", (event) => {
+    if (
+      event.origin !== window.location.origin ||
+      event.data?.type !== "blume:example-height" ||
+      !Number.isFinite(event.data.height)
+    ) {
+      return;
+    }
+    const frames = document.querySelectorAll<HTMLIFrameElement>(
+      "iframe[data-blume-example-frame]"
+    );
+    const frame = Array.from(frames).find(
+      (candidate) => candidate.contentWindow === event.source
+    );
+    if (!frame) {
+      return;
+    }
+    // Keep the raw report around so the viewport clamp can be recomputed
+    // when the window resizes, not only when the frame next reports.
+    frame.dataset.blumeReportedHeight = String(event.data.height);
+    applyMeasuredHeight(frame);
+  });
+
+  // A pane capped by a small viewport would otherwise stay small after the
+  // window grows: the frame's content stopped changing size, so its observer
+  // has nothing new to report.
+  window.addEventListener("resize", () => {
+    for (const frame of document.querySelectorAll<HTMLIFrameElement>(
+      "iframe[data-blume-example-frame][data-blume-reported-height]"
+    )) {
+      applyMeasuredHeight(frame);
+    }
+  });
+</script>
