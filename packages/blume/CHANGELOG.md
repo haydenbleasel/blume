@@ -1,5 +1,17 @@
 # blume
 
+## 1.1.3
+
+### Patch Changes
+
+- 42522fc: Downlevel `<Component>` to its example's source in agent-facing Markdown. The `/<route>.md` mirror, `llms-full.txt`, and the MCP `get_page` tool now render `<Component path="…" />` as a fenced code block of the example's source (the same code the on-page "Code" tab shows) instead of leaving the raw JSX tag, so agents reading a page get the component's code rather than an opaque element. An unknown path (or a missing `path`) is left verbatim, and a same-name `ai.markdownComponents` serializer still overrides the built-in.
+- a71f70e: Add a `dateFormat` config option for the "last updated" stamp and the changelog timeline. Both surfaces previously hardcoded `dateStyle: "long"`; they now share a configurable pass-through to `Intl.DateTimeFormat` options, defaulting to `{ dateStyle: "long" }` so existing sites are unchanged. Set a preset (`dateFormat: { dateStyle: "medium" }`) or a numeric house style (`dateFormat: { year: "numeric", month: "2-digit", day: "2-digit" }`); dates still render in the site's locale and in UTC unless a `timeZone` is given.
+- 68fc939: Harden the agent-facing code-fence helper against a polynomial-time regex (ReDoS). Trailing newlines are now stripped with an unambiguous pattern, so example source with many interior blank lines can't force quadratic backtracking.
+- ee77cfd: Stop long OpenAPI routes from overflowing the native API reference layout. An operation's heading now wraps a long `METHOD /path` title instead of clipping it off the content column, and the overview list rows stack the summary over the route (each getting the full row width) and wrap a long route inside the card — dropping the duplicate path that overlapped the label when a spec sets no summary.
+- 93a94a2: Fix two responsive/mobile layout issues. Twoslash code blocks now wrap their lines on narrow screens instead of pushing the page sideways (hover popups still escape as before), and a long site title in the header now truncates on one line instead of wrapping into the fixed-height bar.
+- a27c543: Add a `scalar` passthrough object to the `openapi` and `asyncapi` config blocks (Scalar renderer). Any [Scalar configuration](https://github.com/scalar/scalar/blob/main/documentation/configuration.md) set there is forwarded verbatim to the embedded `<ScalarComponent>` — `localization` (to translate Scalar's own UI), `agent`, `hideTestRequestButton`, `orderSchemaPropertiesBy`, and the rest. Options in the `scalar` object win over Blume's derived spec/theme config, making it a full escape hatch to Scalar's API; the dedicated `theme` field remains the ergonomic shorthand.
+- fa07dc4: Create the `.blume/node_modules` dependency junction when an isolated linker (Bun's `isolated` mode, pnpm) dedupes the workspace's own `astro` dependency to Blume's copy. The walk from `.blume/` found the "correct" astro through the workspace's direct-dep symlink — in a directory holding none of Blume's integrations — so the junction was skipped and the build died on `Cannot find module '@astrojs/mdx'`.
+
 ## 1.1.2
 
 ### Patch Changes
