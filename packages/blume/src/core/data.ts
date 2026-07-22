@@ -104,6 +104,8 @@ export interface BlumeDataConfig {
   codeThemes: ResolvedConfig["markdown"]["codeBlocks"]["theme"];
   /** `markdown.code.wrap`: wrap long code lines instead of scrolling. */
   codeWrap: boolean;
+  /** `dateFormat`: `Intl.DateTimeFormat` options for the date stamps. */
+  dateFormat: ResolvedConfig["dateFormat"];
   description: string | undefined;
   favicon: BlumeFavicon;
   feedback: boolean;

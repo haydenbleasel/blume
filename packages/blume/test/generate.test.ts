@@ -217,6 +217,33 @@ describe("buildRuntimeData", () => {
     expect(home.editUrl).toBeNull();
   });
 
+  it("serializes dateFormat, defaulting to the long style", async () => {
+    const project = await scanProject(
+      await writeProject({ "docs/index.md": "# Home\n" })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.dateFormat).toStrictEqual({ dateStyle: "long" });
+  });
+
+  it("carries a configured dateFormat into runtime data", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  dateFormat: { day: "2-digit", month: "short", timeZone: "Australia/Sydney", year: "numeric" },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.dateFormat).toStrictEqual({
+      day: "2-digit",
+      month: "short",
+      timeZone: "Australia/Sydney",
+      year: "numeric",
+    });
+  });
+
   it("resolves search.popular into runtime data", async () => {
     const project = await scanProject(
       await writeProject({
