@@ -31,6 +31,22 @@ export interface Diagnostic {
   docsUrl?: string;
 }
 
+/** One discovered `examples/` file reduced to what Markdown downleveling needs. */
+export interface ExampleMarkdownEntry {
+  /** Shiki language for the fenced block — the file's extension. */
+  lang: string;
+  /** Raw example source, shown verbatim in the agent-facing code fence. */
+  source: string;
+}
+
+/**
+ * Discovered examples keyed by their `<Component path>` (the file's location
+ * under `examples/`, sans extension). Lets the agent-facing Markdown downlevel
+ * `<Component path="…" />` to the example's source, since the live preview
+ * can't survive the trip to plain Markdown.
+ */
+export type ExampleLookup = Record<string, ExampleMarkdownEntry>;
+
 /** A heading extracted from page content, used for the TOC and search. */
 export interface Heading {
   depth: number;

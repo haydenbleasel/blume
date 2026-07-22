@@ -4,7 +4,10 @@ import type { BlumeProject } from "../core/project-graph.ts";
 import { readEntryText } from "../core/sources/read.ts";
 import type { NavNode, Navigation, PageRecord } from "../core/types.ts";
 import { buildRssFeeds } from "../deploy/rss.ts";
-import { downlevelComponents } from "./component-markdown.ts";
+import {
+  downlevelComponents,
+  exampleComponentSerializers,
+} from "./component-markdown.ts";
 import { applyAgentVisibility } from "./visibility.ts";
 
 // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top —
@@ -163,6 +166,12 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
   const pages = eligiblePages(project).toSorted((a, b) =>
     a.route.localeCompare(b.route)
   );
+  // Downlevel `<Component>` to its example's source; a same-name user
+  // `markdownComponents` entry is spread last and still wins.
+  const components = {
+    ...exampleComponentSerializers(project.examples ?? {}),
+    ...config.ai.markdownComponents,
+  };
 
   const sections = await Promise.all(
     pages.map(async (page) => {
@@ -173,7 +182,7 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
       const parsed = matter(raw);
       const body = downlevelComponents(
         applyAgentVisibility(parsed.content),
-        config.ai.markdownComponents,
+        components,
         parsed.data
       ).trim();
       const url = pageUrl(

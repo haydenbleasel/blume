@@ -94,6 +94,8 @@ beforeAll(async () => {
     "a.md": "---\ntitle: Alpha\n---\n# Alpha\n\nBody A.\n",
     "b.md": "---\ntitle: Beta\n---\n# Beta\n\nBody B.\n",
     "c.md": "---\ntitle: Gamma\n---\n# Gamma\n\nDraft body.\n",
+    "comp.md":
+      '---\ntitle: Comp\n---\n# Comp\n\n<Component path="forms/login" />\n',
     "f.md":
       '---\ntitle: Lifecycle\nstatus: retracted\n---\n# F\n\n<Callout type="warning" title={frontmatter.status}>Withdrawn.</Callout>\n',
     "t.md":
@@ -449,6 +451,33 @@ describe("component downleveling in agent surfaces", () => {
     const { full } = await buildLlmsFiles(tableProject());
     expect(full).toContain("> **Warning**\n>\n> Mind the gap.");
     expect(full).not.toContain("<Callout");
+  });
+
+  it("downlevels <Component> to its example source when examples are attached", async () => {
+    const withExample = makeProject([makePage("comp.md", "/comp", "Comp")]);
+    withExample.examples = {
+      "forms/login": {
+        lang: "tsx",
+        source: "export const Login = () => null;\n",
+      },
+    };
+    const raw = await buildRawMarkdown(withExample);
+    expect(raw["/comp"]?.mdx).toContain('<Component path="forms/login" />');
+    expect(raw["/comp"]?.md).toContain(
+      "```tsx\nexport const Login = () => null;\n```"
+    );
+    expect(raw["/comp"]?.md).not.toContain("<Component");
+    const { full } = await buildLlmsFiles(withExample);
+    expect(full).toContain("```tsx\nexport const Login = () => null;\n```");
+  });
+
+  it("leaves <Component> verbatim when no example matches", async () => {
+    const raw = await buildRawMarkdown(
+      makeProject([makePage("comp.md", "/comp", "Comp")])
+    );
+    // No examples attached (project.examples is undefined) → JSX untouched.
+    expect(raw["/comp"]?.md).toBeUndefined();
+    expect(raw["/comp"]?.mdx).toContain('<Component path="forms/login" />');
   });
 
   it("honors ai.markdownComponents serializers from the config", async () => {

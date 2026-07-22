@@ -9,7 +9,7 @@ import { buildRawMarkdown } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
 import { planComponentSlots } from "../astro/component-slots.ts";
-import { discoverExamples } from "../astro/examples.ts";
+import { discoverExamples, exampleMarkdownLookup } from "../astro/examples.ts";
 import {
   buildRuntimeData,
   collectStaged,
@@ -292,6 +292,11 @@ export const eject = async (
   const exportPdf = config.export.pdf;
   const exportEpub = config.export.epub;
 
+  // Discover examples first and expose them on the project, so the agent-facing
+  // Markdown built below (raw `.md`, MCP) downlevels `<Component>` to its source.
+  const examples = await discoverExamples(root, config.examples.source);
+  project.examples = exampleMarkdownLookup(examples.examples);
+
   const [
     pages,
     needsReactRaw,
@@ -300,7 +305,6 @@ export const eject = async (
     userExamplesCss,
     rawMarkdown,
     islands,
-    examples,
   ] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(root),
@@ -311,7 +315,6 @@ export const eject = async (
     readExamplesCss(root, config.examples.css),
     buildRawMarkdown(project),
     discoverIslands(root),
-    discoverExamples(root, config.examples.source),
   ]);
   // Island/example frameworks drive which Astro renderers the ejected config
   // wires in; React also switches on for project `.tsx`/`.jsx` and Ask AI.

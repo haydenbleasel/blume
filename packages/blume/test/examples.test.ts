@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
 
-import { discoverExamples } from "../src/astro/examples.ts";
+import {
+  discoverExamples,
+  exampleMarkdownLookup,
+} from "../src/astro/examples.ts";
 
 let root: string;
 
@@ -143,5 +146,18 @@ describe("discoverExamples", () => {
     expect(map.size).toBe(1);
 
     await rm(reg, { force: true, recursive: true });
+  });
+});
+
+describe("exampleMarkdownLookup", () => {
+  it("keys each example's lang and source by its <Component path>", async () => {
+    const { examples } = await discoverExamples(root);
+    const lookup = exampleMarkdownLookup(examples);
+    expect(lookup["forms/login"]).toStrictEqual({
+      lang: "tsx",
+      source: "export default function Login() {}",
+    });
+    expect(lookup.counter?.lang).toBe("tsx");
+    expect(Object.keys(lookup)).toHaveLength(examples.length);
   });
 });

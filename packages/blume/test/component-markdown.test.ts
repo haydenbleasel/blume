@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
-import { downlevelComponents } from "../src/ai/component-markdown.ts";
+import {
+  downlevelComponents,
+  exampleComponentSerializers,
+} from "../src/ai/component-markdown.ts";
 
 describe("downlevelComponents engine", () => {
   it("returns component-free markdown byte-identical", () => {
@@ -481,5 +484,50 @@ describe("frontmatter in scope", () => {
       Probe: ({ frontmatter }) => `keys:${Object.keys(frontmatter).length}`,
     });
     expect(out).toBe("keys:0\n");
+  });
+});
+
+describe("exampleComponentSerializers (<Component> downleveling)", () => {
+  const examples = exampleComponentSerializers({
+    "forms/login": {
+      lang: "tsx",
+      source: "export const Login = () => null;\n",
+    },
+  });
+
+  it("downlevels a <Component> to its example source as a fenced block", () => {
+    const out = downlevelComponents(
+      '## Preview\n\n<Component path="forms/login" />\n',
+      examples
+    );
+    expect(out).toBe(
+      "## Preview\n\n```tsx\nexport const Login = () => null;\n```\n"
+    );
+  });
+
+  it("leaves an unknown example path verbatim", () => {
+    const source = '<Component path="forms/missing" />\n';
+    expect(downlevelComponents(source, examples)).toBe(source);
+  });
+
+  it("leaves a <Component> with no path prop verbatim", () => {
+    const source = "<Component />\n";
+    expect(downlevelComponents(source, examples)).toBe(source);
+  });
+
+  it("lets a user markdownComponents override win over the example serializer", () => {
+    const out = downlevelComponents('<Component path="forms/login" />\n', {
+      ...examples,
+      Component: ({ props }) => `see \`${String(props.path)}\``,
+    });
+    expect(out).toBe("see `forms/login`\n");
+  });
+
+  it("widens the fence when the example source contains a triple backtick", () => {
+    const withTicks = exampleComponentSerializers({
+      md: { lang: "md", source: "```ts\nconst x = 1;\n```\n" },
+    });
+    const out = downlevelComponents('<Component path="md" />\n', withTicks);
+    expect(out).toBe("````md\n```ts\nconst x = 1;\n```\n````\n");
   });
 });

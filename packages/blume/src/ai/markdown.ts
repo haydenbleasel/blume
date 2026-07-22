@@ -4,7 +4,10 @@ import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readEntryText } from "../core/sources/read.ts";
 import type { RouteManifestEntry } from "../core/types.ts";
-import { downlevelComponents } from "./component-markdown.ts";
+import {
+  downlevelComponents,
+  exampleComponentSerializers,
+} from "./component-markdown.ts";
 import { applyAgentVisibility } from "./visibility.ts";
 
 /** One route's raw-Markdown variants. */
@@ -37,6 +40,13 @@ export const buildRawMarkdown = async (
 ): Promise<Record<string, RawMarkdownEntry>> => {
   const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
 
+  // Downlevel `<Component>` to its example's source. A user `markdownComponents`
+  // entry of the same name is spread last, so it still wins.
+  const components = {
+    ...exampleComponentSerializers(project.examples ?? {}),
+    ...project.config.ai.markdownComponents,
+  };
+
   const readRoute = async (route: RouteManifestEntry): Promise<string> => {
     const page = pageById.get(route.id);
     if (page) {
@@ -50,11 +60,7 @@ export const buildRawMarkdown = async (
       const source = applyAgentVisibility(await readRoute(route));
       // The `.md` variant keeps the front-matter block in the output, but its
       // data must also be in scope for `prop={frontmatter.*}` expressions.
-      const md = downlevelComponents(
-        source,
-        project.config.ai.markdownComponents,
-        matter(source).data
-      );
+      const md = downlevelComponents(source, components, matter(source).data);
       const entry: RawMarkdownEntry =
         md === source ? { mdx: source } : { md, mdx: source };
       return [route.path, entry] as const;

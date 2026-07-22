@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join, relative } from "pathe";
 import { glob } from "tinyglobby";
 
+import type { ExampleLookup } from "../core/types.ts";
 import type { IslandClientMode } from "./islands.ts";
 import { readClientMode } from "./islands.ts";
 
@@ -146,3 +147,15 @@ export const discoverExamples = async (
 
   return { examples, warnings };
 };
+
+/**
+ * Reduce discovered examples to the `<Component path>` → source lookup the
+ * agent-facing Markdown downleveler needs (see {@link BlumeProject.examples}).
+ */
+export const exampleMarkdownLookup = (examples: ExampleSpec[]): ExampleLookup =>
+  Object.fromEntries(
+    examples.map((example) => [
+      example.path,
+      { lang: example.lang, source: example.source },
+    ])
+  );

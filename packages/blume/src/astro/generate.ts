@@ -58,7 +58,7 @@ import { buildThemeCss } from "../theme/palette.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
 import { planComponentSlots } from "./component-slots.ts";
 import type { ComponentSlotPlan } from "./component-slots.ts";
-import { discoverExamples } from "./examples.ts";
+import { discoverExamples, exampleMarkdownLookup } from "./examples.ts";
 import { discoverIslands } from "./islands.ts";
 import {
   customOgRoutes,
@@ -1367,6 +1367,9 @@ export const generateRuntime = async (
     tags: overrideTags,
     warnings: overrideWarnings,
   } = componentSlots;
+  // Expose the discovered examples for agent-facing Markdown downleveling
+  // (`<Component>` → source) before any consumer (raw `.md`, MCP, llms) runs.
+  project.examples = exampleMarkdownLookup(exampleDiscovery.examples);
 
   // Each island/example framework enables its Astro renderer. React also
   // switches on for any project `.tsx`/`.jsx` and for Ask AI; Vue/Svelte are

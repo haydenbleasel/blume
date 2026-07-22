@@ -1,6 +1,7 @@
 import { mdxToMdast } from "satteri";
 
 import { parseYouTubeId } from "../components/content/youtube.ts";
+import type { ExampleLookup } from "../core/types.ts";
 
 /**
  * Downlevel Blume's MDX components to plain Markdown for agent-facing output
@@ -335,6 +336,33 @@ const youtube: ComponentMarkdown = ({ props }) => {
       : "Watch on YouTube";
   return `[${title}](https://www.youtube.com/watch?v=${videoId}${start})`;
 };
+
+/** Fence `code` so its opening/closing run outlengths any backticks inside. */
+const fencedBlock = (lang: string, code: string): string => {
+  const trimmed = code.replace(/\n+$/u, "");
+  const runs = trimmed.match(/`+/gu);
+  const longest = runs ? Math.max(...runs.map((run) => run.length)) : 0;
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return `${fence}${lang}\n${trimmed}\n${fence}`;
+};
+
+/**
+ * Build the `<Component>` serializer for a project's discovered examples. The
+ * live preview can't survive the trip to Markdown, so the agent-facing output
+ * carries the example's source — the same code the "Code" tab shows — as a
+ * fenced block. An unknown `path` (or a missing `path` prop) declines, leaving
+ * the JSX verbatim, mirroring the "no example found" note the component renders
+ * on the page.
+ */
+export const exampleComponentSerializers = (
+  examples: ExampleLookup
+): Record<string, ComponentMarkdown> => ({
+  Component: ({ props }) => {
+    const path = typeof props.path === "string" ? props.path : undefined;
+    const example = path === undefined ? undefined : examples[path];
+    return example ? fencedBlock(example.lang, example.source) : null;
+  },
+});
 
 /**
  * The built-in serializer registry, keyed by JSX name. `Step` and `Tab` are

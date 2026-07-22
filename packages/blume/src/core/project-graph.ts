@@ -20,6 +20,7 @@ import type {
   BlumeManifest,
   ContentGraph,
   Diagnostic,
+  ExampleLookup,
   PageRecord,
   ProjectContext,
 } from "./types.ts";
@@ -74,6 +75,14 @@ export interface BlumeProject {
   droppedPages: number;
   /** The instantiated content sources, for lazy entry reads (search/AI/raw). */
   sources: ContentSource[];
+  /**
+   * Discovered `examples/` sources keyed by `<Component path>`, attached by the
+   * runtime/eject layer after {@link scanProject} (example discovery is an Astro
+   * concern, so core doesn't run it). Undefined until then; the agent-facing
+   * Markdown downleveler reads it to turn `<Component path="…" />` into the
+   * example's source. Empty when the project has no examples.
+   */
+  examples?: ExampleLookup;
 }
 
 /**
