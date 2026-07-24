@@ -1,6 +1,6 @@
 # Blume
 
-[![npm version](https://img.shields.io/npm/v/blume.svg)](https://www.npmjs.com/package/blume) [![npm downloads](https://img.shields.io/npm/dm/blume.svg)](https://www.npmjs.com/package/blume) [![license](https://img.shields.io/npm/l/blume.svg)](./LICENSE) [![node](https://img.shields.io/node/v/blume.svg)](https://nodejs.org)
+[![npm downloads](https://img.shields.io/npm/dm/blume.svg)](https://www.npmjs.com/package/blume) [![Socket Badge](https://socket.dev/api/badge/npm/package/blume)](https://socket.dev/npm/package/blume) ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/haydenbleasel/blume?utm_source=oss&utm_medium=github&utm_campaign=haydenbleasel%2Fblume&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 **Documentation for everything you build.** Fast, AI-ready, and zero-config. Free and open source, forever.
 
