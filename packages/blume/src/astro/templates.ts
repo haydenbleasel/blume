@@ -521,18 +521,25 @@ export default defineConfig({
   devToolbar: { enabled: false },
   vite: {
     plugins: [tailwindcss(), prerenderDepsPlugin(), serverAppResolvePlugin()],
-    // Mermaid (lazy-loaded client-side for diagrams) statically imports dayjs as
-    // CJS (\`dayjs/dayjs.min.js\`). In dev, an un-pre-bundled dependency is served
-    // as raw ESM, and that UMD file exposes no \`default\` export, so mermaid
-    // throws on load and diagrams render blank. Forcing mermaid through the dep
-    // optimizer bundles dayjs with correct CJS interop. In a standalone install
-    // Blume's dynamic \`import("mermaid")\` lives inside \`node_modules/blume\`,
-    // which Vite's optimizer scan doesn't crawl, so mermaid is never discovered
-    // on its own — hence the explicit include. mermaid resolves through the
-    // \`blume\` package (it isn't a direct dep of the generated project), so the
-    // nested \`blume > mermaid\` form is required. Production (Rollup) already
-    // handles the interop, so this only affects dev.
-    optimizeDeps: { include: ["blume > mermaid"] },
+    // The lazy client-side imports both land on CJS/UMD files: mermaid (for
+    // diagrams) statically imports dayjs as CJS (\`dayjs/dayjs.min.js\`), and
+    // epub-gen-memory's browser bundle is a browserified UMD. In dev, an
+    // un-pre-bundled dependency is served as raw ESM, where such a file
+    // exposes no \`default\` export — mermaid throws on load and diagrams
+    // render blank, and the EPUB export throws \`epub is not a function\`
+    // (the UMD finds no \`exports\`/\`define\` and strands its callable on
+    // \`window.epubGen\` instead). Forcing them through the dep optimizer
+    // restores the CJS interop. In a standalone install these dynamic imports
+    // live inside \`node_modules/blume\`, which Vite's optimizer scan doesn't
+    // crawl, so neither is discovered on its own — hence the explicit
+    // includes. They resolve through the \`blume\` package (they aren't direct
+    // deps of the generated project), so the nested \`blume > x\` form is
+    // required, and epub-gen-memory must name the \`/bundle\` subpath that is
+    // actually imported: optimizing the package root leaves that entry out.
+    // Production (Rollup) already handles the interop, so this only affects dev.
+    optimizeDeps: {
+      include: ["blume > mermaid", "blume > epub-gen-memory/bundle"],
+    },
     // Blume's render-time deps are forced external on both build environments so
     // native bindings resolve at runtime and isolated linkers don't bundle
     // symlinked store copies (which would surface their children as unresolvable

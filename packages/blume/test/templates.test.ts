@@ -617,10 +617,15 @@ describe("astroConfigTemplate", () => {
     );
     expect(out).toContain("prerenderDepsPlugin()");
     expect(out).toContain("serverAppResolvePlugin()");
-    // Mermaid is pre-bundled through the `blume` package so its CJS dayjs import
-    // gets ESM interop in dev; the nested form is required because mermaid isn't
-    // a direct dep of the generated project. See the optimizeDeps comment.
-    expect(out).toContain('optimizeDeps: { include: ["blume > mermaid"] }');
+    // Both lazy client-side deps are pre-bundled through the `blume` package so
+    // their CJS/UMD entries get ESM interop in dev; the nested form is required
+    // because neither is a direct dep of the generated project, and
+    // epub-gen-memory names the `/bundle` subpath it actually imports — the
+    // package root would leave that entry unoptimized. See the optimizeDeps
+    // comment.
+    expect(out).toContain(
+      'include: ["blume > mermaid", "blume > epub-gen-memory/bundle"]'
+    );
     // Blume's render-time deps are forced external on both build environments so
     // native bindings load at runtime and isolated linkers don't bundle (and
     // strand the children of) symlinked store copies.
