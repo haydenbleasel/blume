@@ -53,17 +53,24 @@ const toEntry = (rendered: RenderedPage, ref: string): SourceEntry => {
 /** All staged entries for one spec: operations first, overview last. */
 const specEntries = (
   spec: ApiSpecData,
-  operations: ApiOperationRef[]
+  operations: ApiOperationRef[],
+  reference: ReferenceSource
 ): SourceEntry[] => {
   const entries = operations.map((operation) =>
-    toEntry(operationMdx(spec, operation), `${routeToRef(operation.route)}.mdx`)
+    toEntry(
+      operationMdx(spec, operation, reference),
+      `${routeToRef(operation.route)}.mdx`
+    )
   );
   // Overview last so an operation sets the section's routePath before the index
   // page is inserted (the group's routePath is derived from its first child).
   // A root-mounted reference refs `index.mdx`, not `/index.mdx`.
   const base = routeToRef(spec.route);
   entries.push(
-    toEntry(overviewMdx(spec), base ? `${base}/index.mdx` : "index.mdx")
+    toEntry(
+      overviewMdx(spec, reference),
+      base ? `${base}/index.mdx` : "index.mdx"
+    )
   );
   return entries;
 };
@@ -149,7 +156,7 @@ export const openApiSource = (
               ]
             : []),
         ],
-        entries: specEntries(spec, operations),
+        entries: specEntries(spec, operations, reference),
         slug: reference.slug,
         spec,
       };

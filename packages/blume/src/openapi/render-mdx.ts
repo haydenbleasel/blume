@@ -1,4 +1,5 @@
 import type { ApiOperationRef, ApiSpecData } from "./model.ts";
+import type { ReferenceSource } from "./references.ts";
 
 /**
  * Lower a parsed spec into MDX for the staged content source. Each operation and
@@ -126,7 +127,11 @@ const withDescription = (description: string, component: string): string =>
 
 export const operationMdx = (
   spec: ApiSpecData,
-  operation: ApiOperationRef
+  operation: ApiOperationRef,
+  reference?: Pick<
+    ReferenceSource,
+    "includeInLlms" | "includeInSearch" | "noindex"
+  >
 ): RenderedPage => {
   const method = operation.method.toUpperCase();
   const title = operation.summary || `${method} ${operation.path}`;
@@ -142,9 +147,16 @@ export const operationMdx = (
       `<Operation source="${spec.slug}" id="${operation.key}" />`
     ),
     data: {
+      ...(reference?.includeInLlms === false ? { ai: { exclude: true } } : {}),
       ...(operation.deprecated ? { deprecated: true } : {}),
-      search: { tags: [operation.tag, method] },
-      seo: { description: operationDescription(spec, operation) },
+      search: {
+        ...(reference?.includeInSearch === false ? { exclude: true } : {}),
+        tags: [operation.tag, method],
+      },
+      seo: {
+        description: operationDescription(spec, operation),
+        ...(reference?.noindex ? { noindex: true } : {}),
+      },
       sidebar: { badge: method, label: operation.summary || operation.path },
       title,
       // Signals the two-column API layout (request panel instead of the TOC).
@@ -153,7 +165,13 @@ export const operationMdx = (
   };
 };
 
-export const overviewMdx = (spec: ApiSpecData): RenderedPage => {
+export const overviewMdx = (
+  spec: ApiSpecData,
+  reference?: Pick<
+    ReferenceSource,
+    "includeInLlms" | "includeInSearch" | "noindex"
+  >
+): RenderedPage => {
   // Tag sections: declared tags in spec order, then any tag an operation
   // references that isn't declared under `tags`. The section headings are
   // emitted as real markdown `##` (not markup inside a component) so the
@@ -205,10 +223,15 @@ export const overviewMdx = (spec: ApiSpecData): RenderedPage => {
       ...tagSections,
     ].join("\n\n"),
     data: {
+      ...(reference?.includeInLlms === false ? { ai: { exclude: true } } : {}),
+      ...(reference?.includeInSearch === false
+        ? { search: { exclude: true } }
+        : {}),
       seo: {
         description:
           clip(plainProse(spec.description), META_DESCRIPTION_MAX) ||
           `${apiName(spec)} API reference.`,
+        ...(reference?.noindex ? { noindex: true } : {}),
       },
       sidebar: { label: "Overview" },
       title: apiName(spec),

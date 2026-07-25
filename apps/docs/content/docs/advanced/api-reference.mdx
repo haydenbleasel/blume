@@ -78,6 +78,31 @@ openapi: {
 
 `spec` is shorthand for a single-entry `sources`, so you only reach for `sources` when you have more than one.
 
+### Per-source indexing
+
+Generated pages participate in search, `llms.txt`, and crawler indexing by default. A secondary or overlapping spec can opt out of any surface without hiding its pages or removing it from navigation:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", route: "/api", spec: "./public.json" },
+    {
+      label: "Platform API",
+      route: "/platform",
+      spec: "./platform.json",
+      includeInSearch: false,
+      includeInLlms: false,
+      noindex: true,
+    },
+  ],
+}
+```
+
+- `includeInSearch: false` keeps the source's overview and operations out of site search.
+- `includeInLlms: false` keeps them out of both `llms.txt` files.
+- `noindex: true` adds crawler noindex metadata and removes the pages from the sitemap.
+
 ## Authorization
 
 Operations that declare [security requirements](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) render an **Authorization** section above their parameters, and the generated code samples send a placeholder credential (`Authorization: Bearer YOUR_TOKEN`, an API-key header, or a query key — whatever the scheme calls for). There's nothing to configure: Blume reads `security` from the spec, so the reference always matches what the API actually enforces.

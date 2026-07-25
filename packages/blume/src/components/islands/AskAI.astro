@@ -9,11 +9,12 @@ interface Suggestion {
 }
 
 interface Props {
+  endpoint?: string;
   strings?: UIStrings["ask"];
   suggestions?: Suggestion[];
 }
 
-const { strings, suggestions = [] } = Astro.props;
+const { endpoint, strings, suggestions = [] } = Astro.props;
 
 // Icons resolve to inline SVG here (server-only module), so the client island
 // gets ready-to-render markup rather than a name it can't resolve. Bare Lucide
@@ -43,7 +44,13 @@ const icons = {
 };
 ---
 
-<AskAI client:load icons={icons} strings={strings} suggestions={items} />
+<AskAI
+  client:load
+  endpoint={endpoint}
+  icons={icons}
+  strings={strings}
+  suggestions={items}
+/>
 
 <style is:global>
   :root {

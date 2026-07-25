@@ -112,7 +112,7 @@ const askFiles = async (
   genDir: string
 ): Promise<{ content: string; path: string }[]> => {
   const { ask } = project.config.ai;
-  if (!ask?.enabled) {
+  if (!(ask?.enabled && !ask.endpoint)) {
     return [];
   }
   const grounded = ask.provider !== "inkeep";

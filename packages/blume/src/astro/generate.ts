@@ -1085,7 +1085,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       analytics: config.analytics ?? null,
       appleIcon: resolveAppleIcon(project),
       ask: config.ai.ask?.enabled
-        ? { suggestions: config.ai.ask.suggestions }
+        ? {
+            endpoint: config.ai.ask.endpoint ?? null,
+            suggestions: config.ai.ask.suggestions,
+          }
         : null,
       banner: resolveBanner(config),
       basePath: config.basePath,
@@ -1279,7 +1282,7 @@ const writeAskFiles = async (
   write: (path: string, content: string) => Promise<boolean>
 ): Promise<void> => {
   const { ask } = project.config.ai;
-  if (!ask?.enabled) {
+  if (!(ask?.enabled && !ask.endpoint)) {
     return;
   }
   const grounded = ask.provider !== "inkeep";

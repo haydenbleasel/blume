@@ -209,6 +209,27 @@ describe("references", () => {
     });
   });
 
+  it("carries per-source search, LLM, and crawler controls", () => {
+    const config = blumeConfigSchema.parse({
+      openapi: {
+        enabled: true,
+        sources: [
+          {
+            includeInLlms: false,
+            includeInSearch: false,
+            noindex: true,
+            spec: "platform.json",
+          },
+        ],
+      },
+    });
+    expect(resolveReferences(config)[0]).toMatchObject({
+      includeInLlms: false,
+      includeInSearch: false,
+      noindex: true,
+    });
+  });
+
   it("forwards scalar options into the generated page, winning over theme", async () => {
     const config = blumeConfigSchema.parse({
       openapi: {
@@ -672,6 +693,26 @@ describe("render-mdx", () => {
     expect(page.body).toBe('<Operation source="api" id="addpet" />');
   });
 
+  it("applies a reference source's indexing controls to every generated page", () => {
+    const { operations } = extractOperations(SPEC_3_1, "/api");
+    const addPet = operations.find((op) => op.key === "addpet");
+    if (!addPet) {
+      throw new Error("addpet operation missing");
+    }
+    const reference = {
+      includeInLlms: false,
+      includeInSearch: false,
+      noindex: true,
+    };
+    const operation = operationMdx(specData(), addPet, reference);
+    const overview = overviewMdx(specData(), reference);
+    for (const page of [operation, overview]) {
+      expect(page.data.ai).toStrictEqual({ exclude: true });
+      expect(page.data.search).toMatchObject({ exclude: true });
+      expect(page.data.seo).toMatchObject({ noindex: true });
+    }
+  });
+
   it("embeds an operation description as MDX-safe markdown in the body", () => {
     const op = {
       deprecated: false,
@@ -1030,9 +1071,16 @@ describe("render-mdx", () => {
 });
 
 describe("source.openApiSource", () => {
+  const indexedReference = {
+    includeInLlms: true,
+    includeInSearch: true,
+    noindex: false,
+  } as const;
+
   it("emits one entry per operation plus an overview, and exposes parsed data", async () => {
     const dir = await tempSpec(SPEC_3_1);
     const reference = {
+      ...indexedReference,
       basePath: "",
       display: { codeSamples: ["curl"], expandSchemas: false },
       kind: "openapi" as const,
@@ -1062,6 +1110,7 @@ describe("source.openApiSource", () => {
   it("serializes operation routes under basePath while entries stay base-less", async () => {
     const dir = await tempSpec(SPEC_3_1);
     const reference = {
+      ...indexedReference,
       basePath: "/docs",
       display: { codeSamples: [], expandSchemas: false },
       kind: "openapi" as const,
@@ -1090,6 +1139,7 @@ describe("source.openApiSource", () => {
       paths: { "/pets": { $ref: "#/components/pathItems/pets" } },
     });
     const reference = {
+      ...indexedReference,
       basePath: "",
       display: { codeSamples: [], expandSchemas: false },
       kind: "openapi" as const,
@@ -1116,6 +1166,7 @@ describe("source.openApiSource", () => {
       paths: {},
     });
     const reference = {
+      ...indexedReference,
       basePath: "",
       display: { codeSamples: [], expandSchemas: false },
       kind: "openapi" as const,
@@ -1142,6 +1193,7 @@ describe("source.openApiSource", () => {
     const dir = await mkdtemp(join(tmpdir(), "blume-openapi-src-"));
     await writeFile(join(dir, "README.md"), "# Not a spec\n");
     const reference = {
+      ...indexedReference,
       basePath: "",
       display: { codeSamples: [], expandSchemas: false },
       kind: "openapi" as const,
@@ -1164,6 +1216,7 @@ describe("source.openApiSource", () => {
   it("surfaces recorded route collisions as warning diagnostics", async () => {
     const dir = await tempSpec(SPEC_3_1);
     const reference = {
+      ...indexedReference,
       basePath: "",
       collisions: [
         "Two API reference sources resolve to /api; keeping the first.",
@@ -1186,6 +1239,7 @@ describe("source.openApiSource", () => {
   });
 
   const missingReference = {
+    ...indexedReference,
     basePath: "",
     display: { codeSamples: [], expandSchemas: false },
     kind: "openapi" as const,
@@ -1220,6 +1274,7 @@ describe("source.openApiSource", () => {
     const original = globalThis.fetch;
     const cacheDir = await mkdtemp(join(tmpdir(), "blume-openapi-src-"));
     const reference = {
+      ...indexedReference,
       basePath: "",
       display: { codeSamples: [], expandSchemas: false },
       kind: "openapi" as const,

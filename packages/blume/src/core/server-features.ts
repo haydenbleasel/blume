@@ -7,7 +7,7 @@ import type { ResolvedConfig } from "./schema.ts";
  */
 export const serverFeatures = (config: ResolvedConfig): string[] => {
   const features: string[] = [];
-  if (config.ai.ask?.enabled) {
+  if (config.ai.ask?.enabled && !config.ai.ask.endpoint) {
     features.push("Ask AI");
   }
   // The hosted MCP server is a live JSON-RPC endpoint, so it needs a runtime.

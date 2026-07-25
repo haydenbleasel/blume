@@ -128,9 +128,33 @@ The page the reader is currently on is added to the context first and used to sc
 
 Grounding is on for every backend except **[Inkeep](#backends)**, which runs its own retrieval over the content you've indexed in its dashboard.
 
+### External endpoint
+
+Already have an API backend for AI? Point the panel at it and keep the docs build static:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    endpoint: "https://api.example.com/v1/docs/ask",
+  },
+}
+```
+
+Blume sends the same `POST` body as its built-in route:
+
+```json
+{
+  "messages": [{ "role": "user", "content": "How do I deploy?" }],
+  "page": { "path": "/deployment" }
+}
+```
+
+Return a successful response whose body is a plain UTF-8 text stream. If the endpoint is on another origin, allow the docs origin with CORS. With `endpoint` set, Blume generates the chat UI but no server route, grounding snapshot, provider dependency, or provider-secret warning; your backend owns retrieval, authentication, rate limiting, model access, and citations.
+
 ### Server output required
 
-Ask AI is a server route (`POST /api/ask`), so it can't run on a static build. Switch to server output and pick an adapter:
+Blume's built-in Ask AI backend is a server route (`POST /api/ask`), so it can't run on a static build. Switch to server output and pick an adapter:
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -139,7 +163,7 @@ deployment: {
 }
 ```
 
-A static build with Ask AI enabled fails fast with a message telling you to set `deployment.output` to `server`. See [Deployment](/docs/deployment) for the adapters.
+A static build with Ask AI enabled and no external `endpoint` fails fast with a message telling you to set `deployment.output` to `server`. See [Deployment](/docs/deployment) for the adapters.
 
 ### Backends
 

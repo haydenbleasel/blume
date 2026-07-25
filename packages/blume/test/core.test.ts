@@ -1221,8 +1221,11 @@ describe("api reference (scalar)", () => {
           codeSamples: ["curl", "js", "python"],
           expandSchemas: false,
         },
+        includeInLlms: true,
+        includeInSearch: true,
         kind: "openapi",
         label: "API Reference",
+        noindex: false,
         renderer: "blume",
         route: "/reference",
         // toStrictEqual requires the `scalar`/`theme` keys present and

@@ -25,7 +25,12 @@ const pageUrl = (route: string, site?: string, base = ""): string => {
 const eligiblePages = (project: BlumeProject): PageRecord[] =>
   project.graph.pages.filter(
     (page) =>
-      !(page.meta.draft || page.meta.sidebar.hidden || page.meta.seo.noindex) &&
+      !(
+        page.meta.ai.exclude ||
+        page.meta.draft ||
+        page.meta.sidebar.hidden ||
+        page.meta.seo.noindex
+      ) &&
       (project.config.ai.llmsTxt.openapi || page.source.name !== "openapi")
   );
 

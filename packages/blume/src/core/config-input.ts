@@ -522,6 +522,12 @@ export interface AskConfig {
   baseUrl?: string;
   /** Turn Ask AI on. Defaults to `false`. */
   enabled?: boolean;
+  /**
+   * Existing Ask AI endpoint to call instead of generating one. This keeps a
+   * Blume site static while an API backend owns retrieval, model access, rate
+   * limiting, and streaming. Accepts an absolute URL or root-relative path.
+   */
+  endpoint?: string;
   /** Model id to use. Defaults to `openai/gpt-5.5`. */
   model?: string;
   /** Which backend routes the request. Defaults to `gateway`. */

@@ -38,6 +38,12 @@ export interface ReferenceSource {
    */
   basePath: string;
   label: string;
+  /** Whether generated pages are included in llms.txt/llms-full.txt. */
+  includeInLlms: boolean;
+  /** Whether generated pages are included in site search. */
+  includeInSearch: boolean;
+  /** Whether generated pages emit noindex metadata and stay out of the sitemap. */
+  noindex: boolean;
   /** Local path or `http(s)` URL, verbatim from config. */
   spec: string;
   /** Per-block Scalar theme name override, if any (Scalar renderer only). */
@@ -78,10 +84,22 @@ type Block = ResolvedConfig["openapi"] | ResolvedConfig["asyncapi"];
 /** A spec is a single source (`spec` shorthand prepended to any `sources`). */
 const sourcesOf = (
   block: Block
-): { label?: string; route?: string; spec: string }[] => {
+): {
+  includeInLlms: boolean;
+  includeInSearch: boolean;
+  label?: string;
+  noindex: boolean;
+  route?: string;
+  spec: string;
+}[] => {
   const sources = [...block.sources];
   if (block.spec) {
-    sources.unshift({ spec: block.spec });
+    sources.unshift({
+      includeInLlms: true,
+      includeInSearch: true,
+      noindex: false,
+      spec: block.spec,
+    });
   }
   return sources;
 };
@@ -118,8 +136,11 @@ const referencesFor = (
     return {
       basePath,
       display,
+      includeInLlms: source.includeInLlms,
+      includeInSearch: source.includeInSearch,
       kind,
       label,
+      noindex: source.noindex,
       renderer,
       route,
       scalar: block.scalar,

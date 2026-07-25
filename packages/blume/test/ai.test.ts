@@ -975,6 +975,19 @@ describe("ai.ask schema", () => {
       })
     ).not.toThrow();
   });
+
+  it("accepts an external endpoint without provider configuration", () => {
+    const config = blumeConfigSchema.parse({
+      ai: {
+        ask: {
+          enabled: true,
+          endpoint: "https://api.example.com/v1/docs/ask",
+          provider: "openai-compatible",
+        },
+      },
+    });
+    expect(config.ai.ask?.endpoint).toBe("https://api.example.com/v1/docs/ask");
+  });
 });
 
 describe("askEndpointTemplate", () => {

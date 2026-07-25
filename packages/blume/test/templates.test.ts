@@ -571,6 +571,7 @@ describe("askComponentTemplate", () => {
       'import AskAI from "blume/components/islands/AskAI.astro"'
     );
     expect(out).toContain("<AskAI");
+    expect(out).toContain("data.config.ask?.endpoint ?? undefined");
     expect(out).toContain("data.config.ask?.suggestions ?? []");
   });
 

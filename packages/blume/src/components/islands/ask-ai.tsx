@@ -65,7 +65,7 @@ const nextId = (): number => {
 
 // The endpoint and page path both honor the deployment `base` so grounding works
 // under a non-root base path (the server matches base-less document routes).
-const ASK_ENDPOINT = joinBase(import.meta.env.BASE_URL, "api/ask");
+const DEFAULT_ASK_ENDPOINT = joinBase(import.meta.env.BASE_URL, "api/ask");
 
 /** The current route with the deployment base stripped, for page-context lookup. */
 const currentPath = (): string =>
@@ -133,10 +133,12 @@ const ANSWER_CLASS =
   "prose prose-sm max-w-none text-foreground [&_a]:inline-flex [&_a]:items-center [&_a]:gap-1 [&_a]:rounded-full [&_a]:bg-muted [&_a]:px-2 [&_a]:py-1 [&_a]:align-middle [&_a]:font-medium [&_a]:text-[0.7rem] [&_a]:leading-none [&_a]:text-muted-foreground! [&_a]:no-underline! [&_a:hover]:text-foreground!";
 
 const AskAI = ({
+  endpoint = DEFAULT_ASK_ENDPOINT,
   icons = EMPTY_ICONS,
   strings,
   suggestions = EMPTY_SUGGESTIONS,
 }: {
+  endpoint?: string;
   icons?: AskIcons;
   strings?: UIStrings["ask"];
   suggestions?: Suggestion[];
@@ -268,7 +270,7 @@ const AskAI = ({
     abortRef.current = controller;
 
     try {
-      const response = await fetch(ASK_ENDPOINT, {
+      const response = await fetch(endpoint, {
         body: JSON.stringify({
           messages: history.map((m) => ({ content: m.content, role: m.role })),
           page: { path: currentPath() },

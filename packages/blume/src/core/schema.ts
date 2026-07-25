@@ -78,6 +78,11 @@ const searchMetaSchema = z.strictObject({
   tags: z.array(z.string()).optional(),
 });
 
+const aiMetaSchema = z.strictObject({
+  /** Exclude this page from llms.txt and llms-full.txt. */
+  exclude: z.boolean().default(false),
+});
+
 const changelogMetaSchema = z.strictObject({
   category: z.string().optional(),
   date: dateSchema.optional(),
@@ -105,6 +110,7 @@ const authorSchema = z.union([
 
 /** Frontmatter accepted on any content page. */
 const pageMetaBaseSchema = z.strictObject({
+  ai: aiMetaSchema.default({}),
   /** Post author(s) for blog/changelog content; preserved, not yet rendered. */
   authors: z.union([authorSchema, z.array(authorSchema)]).optional(),
   changelog: changelogMetaSchema.optional(),
@@ -587,6 +593,10 @@ const aiConfigSchema = z.strictObject({
       // oxlint-disable-next-line react-doctor/zod-v4-prefer-top-level-string-formats
       baseUrl: z.string().url().optional(),
       enabled: z.boolean().default(false),
+      // Optional external endpoint for projects that keep their docs static
+      // and host Ask AI in an existing backend. Absolute URLs and root-relative
+      // paths are both valid; the built-in request/stream contract is unchanged.
+      endpoint: z.string().min(1).optional(),
       model: z.string().default("openai/gpt-5.5"),
       provider: z.enum(askAiProviders).default("gateway"),
       // Empty-state prompts shown before the first question. Each renders as a
@@ -603,7 +613,10 @@ const aiConfigSchema = z.strictObject({
     .superRefine((value, ctx) => {
       // A generic OpenAI-compatible backend has no preset URL, so the user
       // must supply one; the named providers fall back to their preset.
-      if (value.provider === "openai-compatible" && !value.baseUrl) {
+      if (
+        value.provider === "openai-compatible" &&
+        !(value.baseUrl || value.endpoint)
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message:
@@ -1118,15 +1131,21 @@ const reactConfigSchema = z.strictObject({
  * `http(s)` URL (OpenAPI for the Blume renderer; OpenAPI or AsyncAPI for Scalar).
  */
 const openapiSourceSchema = z.strictObject({
+  /** Include generated pages from this spec in llms.txt/llms-full.txt. */
+  includeInLlms: z.boolean().default(true),
+  /** Include generated pages from this spec in site search. */
+  includeInSearch: z.boolean().default(true),
   /** Nav/section label for this source. */
   label: z.string().optional(),
+  /** Emit noindex metadata and omit generated pages from the sitemap. */
+  noindex: z.boolean().default(false),
   /** Per-source route; defaults to the block's `route` (or a derived path). */
   route: z.string().optional(),
   /** Local path or `http(s)` URL to the spec. */
   spec: z.string(),
 });
 
-export type OpenApiSource = z.infer<typeof openapiSourceSchema>;
+export type OpenApiSource = z.input<typeof openapiSourceSchema>;
 
 /**
  * Arbitrary Scalar API-reference options forwarded verbatim to the generated

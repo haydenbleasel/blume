@@ -95,6 +95,7 @@ export interface BlumeDataConfig {
   appleIcon: BlumeFavicon | null;
   /** Ask AI empty-state suggestions, or `null` when Ask AI is off. */
   ask: {
+    endpoint: string | null;
     suggestions: NonNullable<ResolvedConfig["ai"]["ask"]>["suggestions"];
   } | null;
   banner: BlumeBanner | null;

@@ -24,7 +24,7 @@ export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
     });
   };
 
-  if (config.ai.ask?.enabled) {
+  if (config.ai.ask?.enabled && !config.ai.ask.endpoint) {
     const backend = resolveAskBackend(config.ai.ask);
     if (backend.kind === "gateway") {
       requireSecret(

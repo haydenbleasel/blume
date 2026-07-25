@@ -139,7 +139,12 @@ export interface UseAskAI {
   reset: () => void;
 }
 
-const ASK_ENDPOINT = joinBase(import.meta.env.BASE_URL, "api/ask");
+const DEFAULT_ASK_ENDPOINT = joinBase(import.meta.env.BASE_URL, "api/ask");
+
+export interface UseAskAIOptions {
+  /** Existing Ask AI endpoint; defaults to Blume's generated `/api/ask`. */
+  endpoint?: string;
+}
 
 /** Shown as the assistant's answer when the request fails or throws. */
 const ASK_ERROR = "Something went wrong answering that. Please try again.";
@@ -152,7 +157,8 @@ const currentPath = (): string =>
  * Stream answers from the Ask AI endpoint. Mirrors the built-in Ask AI island so
  * a custom chat UI shares the same grounded, page-aware backend.
  */
-export const useAskAI = (): UseAskAI => {
+export const useAskAI = (options: UseAskAIOptions = {}): UseAskAI => {
+  const endpoint = options.endpoint ?? DEFAULT_ASK_ENDPOINT;
   const [messages, setMessages] = useState<AskMessage[]>([]);
   const [loading, setLoading] = useState(false);
   // The stream writes into the conversation via state updates, so `reset()`
@@ -186,7 +192,7 @@ export const useAskAI = (): UseAskAI => {
       setMessages([...history, assistant]);
       setLoading(true);
       try {
-        const response = await fetch(ASK_ENDPOINT, {
+        const response = await fetch(endpoint, {
           body: JSON.stringify({
             messages: history,
             page: { path: currentPath() },
@@ -239,7 +245,7 @@ export const useAskAI = (): UseAskAI => {
         }
       }
     },
-    [loading, messages]
+    [endpoint, loading, messages]
   );
 
   // Retained for the compiler-off opt-out path (`react: { compiler: false }`):

@@ -19,6 +19,18 @@ describe("serverFeatures", () => {
     const config = blumeConfigSchema.parse({ ai: { ask: { enabled: false } } });
     expect(serverFeatures(config)).toStrictEqual([]);
   });
+
+  it("keeps Ask AI static when an external endpoint is configured", () => {
+    const config = blumeConfigSchema.parse({
+      ai: {
+        ask: {
+          enabled: true,
+          endpoint: "https://api.example.com/v1/docs/ask",
+        },
+      },
+    });
+    expect(serverFeatures(config)).toStrictEqual([]);
+  });
 });
 
 describe("defineComponents", () => {
