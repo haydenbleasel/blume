@@ -157,10 +157,15 @@ export const initCommand = defineCommand({
     const sink = interactive ? clack.log : logger;
     const { createdPackage } = await applyPlan(buildPlan(root, answers), sink);
 
-    // Keep Blume's generated runtime (`.blume/`) and build output (`dist/`) out
-    // of version control. Idempotent: creates `.gitignore` when absent and skips
-    // entries already present (trailing-slash agnostic).
-    const ignored = await ensureGitignore(root, [".blume/", "dist/"]);
+    // Keep installed dependencies, Blume's generated runtime (`.blume/`), and
+    // build output (`dist/`) out of version control. Idempotent: creates
+    // `.gitignore` when absent and skips entries already present
+    // (trailing-slash agnostic).
+    const ignored = await ensureGitignore(root, [
+      "node_modules/",
+      ".blume/",
+      "dist/",
+    ]);
     if (ignored.length > 0) {
       sink.success(`Added ${ignored.join(", ")} to .gitignore`);
     }
