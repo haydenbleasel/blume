@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+import { afterAll, describe, expect, it, mock } from "bun:test";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,8 +9,16 @@ import { pathToFileURL } from "node:url";
 import { buildSearchIndex } from "../src/search/build.ts";
 
 describe("Pagefind build", () => {
+  const buildDirs: string[] = [];
+  afterAll(async () => {
+    await Promise.all(
+      buildDirs.map((dir) => rm(dir, { force: true, recursive: true }))
+    );
+  });
+
   it("skips a rendered page marked as non-indexable", async () => {
     const output = await mkdtemp(path.join(tmpdir(), "blume-pagefind-build-"));
+    buildDirs.push(output);
     await Promise.all([
       mkdir(path.join(output, "included")),
       mkdir(path.join(output, "excluded")),
@@ -57,5 +65,17 @@ describe("Pagefind build", () => {
       server.close();
       await once(server, "close");
     }
+  });
+
+  // Declared after the behavioral test: `buildSearchIndex` imports "pagefind"
+  // dynamically per call, so the module mock only affects calls made after it
+  // is installed.
+  it("throws when Pagefind fails to create an index", async () => {
+    mock.module("pagefind", () => ({
+      createIndex: () => Promise.resolve({ index: null }),
+    }));
+    await expect(buildSearchIndex("/nowhere")).rejects.toThrow(
+      "Failed to create Pagefind index."
+    );
   });
 });

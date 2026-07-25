@@ -1172,6 +1172,28 @@ describe("agent-readability.json", () => {
     });
   });
 
+  it("absolutizes a root-relative Ask AI endpoint against the site, not the base", () => {
+    const manifest = buildAgentReadability(
+      makeProject([], {
+        ai: { ask: { enabled: true, endpoint: "/api/docs/ask" } },
+        deployment: { base: "/docs", site: "https://example.com" },
+      })
+    );
+    expect(manifest?.artifacts).toMatchObject({
+      askApi: "https://example.com/api/docs/ask",
+    });
+
+    // Without a site there is no origin to absolutize against; the endpoint
+    // still bypasses the base, which only applies to Blume-served artifacts.
+    const relative = buildAgentReadability(
+      makeProject([], {
+        ai: { ask: { enabled: true, endpoint: "/api/docs/ask" } },
+        deployment: { base: "/docs" },
+      })
+    );
+    expect(relative?.artifacts).toMatchObject({ askApi: "/api/docs/ask" });
+  });
+
   it("uses root-relative URLs and omits the sitemap without a site", () => {
     const manifest = buildAgentReadability(
       makeProject([], { ai: { llmsTxt: true }, deployment: {} })

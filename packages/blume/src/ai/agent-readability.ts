@@ -28,6 +28,24 @@ const usagePolicy = (
 };
 
 /**
+ * The advertised Ask AI URL. An external endpoint is not served under
+ * `deployment.base`, so a root-relative one absolutizes against the site
+ * origin alone; the built-in route gets site and base via `abs`.
+ */
+const askApiUrl = (
+  endpoint: string | undefined,
+  site: string | null,
+  abs: (path: string) => string
+): string => {
+  if (!endpoint) {
+    return abs("/api/ask");
+  }
+  return site && endpoint.startsWith("/")
+    ? `${site.replace(/\/+$/u, "")}${endpoint}`
+    : endpoint;
+};
+
+/**
  * Build `agent-readability.json`: a root manifest that indexes the project's
  * agent-facing surface — llms.txt, the raw-Markdown mirrors, the MCP server,
  * Ask AI, sitemap, and feeds — so agents can discover and cite the docs without
@@ -69,7 +87,7 @@ export const buildAgentReadability = (
     };
   }
   if (config.ai.ask?.enabled) {
-    artifacts.askApi = config.ai.ask.endpoint ?? abs("/api/ask");
+    artifacts.askApi = askApiUrl(config.ai.ask.endpoint, site, abs);
   }
   if (site && config.seo.sitemap) {
     artifacts.sitemap = abs("/sitemap.xml");

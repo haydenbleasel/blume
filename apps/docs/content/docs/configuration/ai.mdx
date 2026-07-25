@@ -33,6 +33,18 @@ ai: {
 }
 ```
 
+To keep an individual page out of both files, set `ai.exclude` in its frontmatter:
+
+```mdx
+---
+title: Internal notes
+ai:
+  exclude: true
+---
+```
+
+The page still renders, stays in search, and keeps its place in the sitemap — only the `llms.txt` files skip it.
+
 To take full control of either file, add your own `llms.txt` or `llms-full.txt` to your `public/` folder. Like a custom favicon, it's picked up automatically and ships in place of the generated file — override one and Blume still generates the other.
 
 ## Raw Markdown

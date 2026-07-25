@@ -103,6 +103,8 @@ openapi: {
 - `includeInLlms: false` keeps them out of both `llms.txt` files.
 - `noindex: true` adds crawler noindex metadata and removes the pages from the sitemap.
 
+With the [Scalar renderer](#the-scalar-renderer), only `noindex` applies — a Scalar-rendered reference already sits outside Blume's search and `llms.txt`, so the two `include*` settings have nothing to act on there.
+
 ## Authorization
 
 Operations that declare [security requirements](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) render an **Authorization** section above their parameters, and the generated code samples send a placeholder credential (`Authorization: Bearer YOUR_TOKEN`, an API-key header, or a query key — whatever the scheme calls for). There's nothing to configure: Blume reads `security` from the spec, so the reference always matches what the API actually enforces.
