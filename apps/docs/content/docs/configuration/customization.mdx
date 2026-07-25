@@ -168,7 +168,9 @@ export default defineConfig({
 
 Blume keeps its built-in integrations in their existing order, then appends your entries in declaration order. It does not sort or deduplicate them, so two integrations with the same `name` both run. Blume validates that `integrations` is an array, while Astro validates each entry and reports invalid integrations.
 
-The same integrations run in `blume dev` and `blume build`. Editing `blume.config.ts` during `blume dev` regenerates the hidden Astro config and triggers a config restart; if you don't see an edited integration take effect, restart `blume dev`. If you eject, the owned `astro.config.mjs` keeps a relative bridge to `blume.config.ts`, so the configured integrations continue to run; you can later move them directly into the Astro config as part of taking full ownership.
+Because Blume loads your integrations by re-importing `blume.config.ts` from the generated Astro config rather than copying the instances, the config module evaluates twice per run — once when Blume reads your config and once when Astro loads it. Keep integration factories side-effect free (return the integration; don't write files or open connections at construction) so the second evaluation is harmless.
+
+The same integrations run in `blume dev` and `blume build`. Editing `blume.config.ts` during `blume dev` regenerates the hidden Astro config and triggers a config restart; if you don't see an edited integration take effect, restart `blume dev`. Blume only tracks the contents of `blume.config.ts`, so editing a separate file it imports won't trigger that regeneration on its own — restart `blume dev` after such edits. If you eject, the owned `astro.config.mjs` keeps a relative bridge to `blume.config.ts`, so the configured integrations continue to run; you can later move them directly into the Astro config as part of taking full ownership.
 
 ## Eject
 
