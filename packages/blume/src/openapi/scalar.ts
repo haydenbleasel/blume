@@ -167,6 +167,7 @@ export const buildReferenceFiles = async (options: {
           ...ref.scalar,
         },
         dataImport: `${"../".repeat(depth + 1)}generated/data.json`,
+        noindex: ref.noindex,
         route: ref.route,
         title: ref.label,
       }),

@@ -359,7 +359,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
 ---
 
 <!doctype html>
-<html dir={dir} lang={locale}>
+<html data-pagefind-ignore={indexable ? undefined : "all"} dir={dir} lang={locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

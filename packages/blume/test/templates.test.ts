@@ -1324,6 +1324,18 @@ describe("scalarReferenceTemplate", () => {
     expect(out).toContain('import data from "../generated/data.json"');
     expect(out).toContain('route={"/reference"}');
     expect(out).toContain('"url": "https://api/spec.json"');
+    expect(out).toContain("noindex={false}");
+  });
+
+  it("passes crawler exclusion to the reference layout", () => {
+    const out = scalarReferenceTemplate({
+      configuration: { url: "https://api/spec.json" },
+      dataImport: "../generated/data.json",
+      noindex: true,
+      route: "/reference",
+      title: "API",
+    });
+    expect(out).toContain("noindex={true}");
   });
 
   it("forwards the localized UI dictionary to the layout", () => {

@@ -1247,6 +1247,7 @@ export async function GET({ props }: { props: { title: string } }) {
 export const scalarReferenceTemplate = (options: {
   configuration: Record<string, unknown>;
   dataImport: string;
+  noindex?: boolean;
   route: string;
   title: string;
 }): string =>
@@ -1281,6 +1282,7 @@ const htmlLang = i18n ? i18n.defaultLocale : "en";
   favicon={data.config.favicon}
   appleIcon={data.config.appleIcon}
   navigation={data.navigation}
+  noindex={${options.noindex === true}}
   pageTitle={${JSON.stringify(options.title)}}
   route={${JSON.stringify(options.route)}}
   searchEnabled={data.config.search.enabled}

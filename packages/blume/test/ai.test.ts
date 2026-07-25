@@ -338,6 +338,19 @@ describe("buildLlmsFiles — ai.llmsTxt.openapi", () => {
     expect(full).toContain("Body A.");
     expect(full).not.toContain("API operation body.");
   });
+
+  it("keeps noindex API references in LLM files unless explicitly excluded", async () => {
+    const included = apiPage();
+    included.meta.seo.noindex = true;
+    const { full, index } = await buildLlmsFiles(makeProject([included]));
+    expect(index).toContain("Get Pet");
+    expect(full).toContain("API operation body.");
+
+    included.meta.ai.exclude = true;
+    const excluded = await buildLlmsFiles(makeProject([included]));
+    expect(excluded.index).not.toContain("Get Pet");
+    expect(excluded.full).not.toContain("API operation body.");
+  });
 });
 
 describe("ai.llmsTxt schema", () => {
@@ -987,6 +1000,28 @@ describe("ai.ask schema", () => {
       },
     });
     expect(config.ai.ask?.endpoint).toBe("https://api.example.com/v1/docs/ask");
+  });
+
+  it("accepts root-relative endpoints and rejects malformed values", () => {
+    const parsed = blumeConfigSchema.parse({
+      ai: { ask: { enabled: true, endpoint: "  /api/docs/ask  " } },
+    });
+    expect(parsed.ai.ask?.endpoint).toBe("/api/docs/ask");
+
+    for (const endpoint of [
+      " ",
+      "api/docs/ask",
+      "//example.com/ask",
+      "ftp://example.com/ask",
+    ]) {
+      expect(() =>
+        blumeConfigSchema.parse({
+          ai: { ask: { enabled: true, endpoint } },
+        })
+      ).toThrow(
+        "ai.ask.endpoint must be an HTTP(S) URL or a root-relative path."
+      );
+    }
   });
 });
 

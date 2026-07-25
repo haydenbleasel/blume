@@ -581,14 +581,36 @@ const mcpConfigSchema = z.strictObject({
   route: z.string().default("/mcp").transform(normalizeRoute),
 });
 
+const askEndpointSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(
+    (value) => {
+      if (value.startsWith("/") && !value.startsWith("//")) {
+        return true;
+      }
+      try {
+        const url = new URL(value);
+        return url.protocol === "http:" || url.protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    {
+      message:
+        "ai.ask.endpoint must be an HTTP(S) URL or a root-relative path.",
+    }
+  );
+
 const aiConfigSchema = z.strictObject({
   ask: z
     .strictObject({
       // Name of the env var holding the provider's API key; each provider has
       // a sensible default, so this only needs setting to override it.
       apiKeyEnv: z.string().optional(),
-      // Base URL of the backend. Required for `openai-compatible`; for the
-      // named providers it overrides the built-in preset.
+      // Base URL of the backend. Required for `openai-compatible` only when no
+      // external endpoint is supplied; for named providers it overrides the preset.
       // blume bundles Zod 3; top-level `z.url()` is undefined at runtime.
       // oxlint-disable-next-line react-doctor/zod-v4-prefer-top-level-string-formats
       baseUrl: z.string().url().optional(),
@@ -596,7 +618,7 @@ const aiConfigSchema = z.strictObject({
       // Optional external endpoint for projects that keep their docs static
       // and host Ask AI in an existing backend. Absolute URLs and root-relative
       // paths are both valid; the built-in request/stream contract is unchanged.
-      endpoint: z.string().min(1).optional(),
+      endpoint: askEndpointSchema.optional(),
       model: z.string().default("openai/gpt-5.5"),
       provider: z.enum(askAiProviders).default("gateway"),
       // Empty-state prompts shown before the first question. Each renders as a

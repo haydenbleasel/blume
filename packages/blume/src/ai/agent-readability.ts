@@ -69,7 +69,7 @@ export const buildAgentReadability = (
     };
   }
   if (config.ai.ask?.enabled) {
-    artifacts.askApi = abs("/api/ask");
+    artifacts.askApi = config.ai.ask.endpoint ?? abs("/api/ask");
   }
   if (site && config.seo.sitemap) {
     artifacts.sitemap = abs("/sitemap.xml");

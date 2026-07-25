@@ -53,6 +53,8 @@ interface Props {
   fontCssVars?: string[];
   searchEnabled: boolean;
   pageTitle: string;
+  /** Keep the reference route out of crawler indexes. */
+  noindex?: boolean;
   /** Active locale code for `<html lang>` (defaults to `en`). */
   locale?: string;
   /** Text direction for `<html dir>` (defaults to `ltr`). */
@@ -74,6 +76,7 @@ const {
   fontCssVars,
   searchEnabled,
   pageTitle,
+  noindex = false,
   locale = "en",
   dir = "ltr",
   ui,
@@ -89,6 +92,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {noindex && <meta name="robots" content="noindex" />}
     <title>{pageTitle}</title>
     <Favicon favicon={favicon} appleIcon={appleIcon} />
     <Fonts cssVars={fontCssVars ?? []} />

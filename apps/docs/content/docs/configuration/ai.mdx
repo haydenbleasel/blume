@@ -150,7 +150,7 @@ Blume sends the same `POST` body as its built-in route:
 }
 ```
 
-Return a successful response whose body is a plain UTF-8 text stream. If the endpoint is on another origin, allow the docs origin with CORS. With `endpoint` set, Blume generates the chat UI but no server route, grounding snapshot, provider dependency, or provider-secret warning; your backend owns retrieval, authentication, rate limiting, model access, and citations.
+Return a successful response whose body is a plain UTF-8 text stream. If the endpoint is on another origin, allow the docs origin with CORS: accept `OPTIONS` and `POST`, permit the `content-type` request header, and return the CORS headers on both the preflight and streamed response. With `endpoint` set, Blume generates the chat UI but no server route, grounding snapshot, provider dependency, or provider-secret warning; your backend owns retrieval, authentication, rate limiting, model access, and citations.
 
 ### Server output required
 

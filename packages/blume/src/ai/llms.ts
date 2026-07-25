@@ -19,9 +19,9 @@ const pageUrl = (route: string, site?: string, base = ""): string => {
   return encodeURI(site ? `${site.replace(/\/$/u, "")}${path}` : path);
 };
 
-// Drafts, hidden, and `noindex` pages are excluded, matching the sitemap.
-// Generated API reference pages are excluded when `ai.llmsTxt.openapi` is off
-// (they arrive through the internal staged "openapi" source).
+// Drafts, hidden, and ordinary `noindex` pages are excluded. Generated API
+// references keep crawler visibility (`noindex`) separate from LLM visibility
+// (`ai.exclude`), and are excluded wholesale when `ai.llmsTxt.openapi` is off.
 const eligiblePages = (project: BlumeProject): PageRecord[] =>
   project.graph.pages.filter(
     (page) =>
@@ -29,7 +29,7 @@ const eligiblePages = (project: BlumeProject): PageRecord[] =>
         page.meta.ai.exclude ||
         page.meta.draft ||
         page.meta.sidebar.hidden ||
-        page.meta.seo.noindex
+        (page.meta.seo.noindex && page.source.name !== "openapi")
       ) &&
       (project.config.ai.llmsTxt.openapi || page.source.name !== "openapi")
   );

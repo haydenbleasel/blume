@@ -1155,6 +1155,23 @@ describe("agent-readability.json", () => {
     expect(off?.contentUsage).toBeUndefined();
   });
 
+  it("advertises an external Ask AI endpoint without rewriting it under the docs base", () => {
+    const manifest = buildAgentReadability(
+      makeProject([], {
+        ai: {
+          ask: {
+            enabled: true,
+            endpoint: "https://api.example.com/v1/docs/ask",
+          },
+        },
+        deployment: { base: "/docs" },
+      })
+    );
+    expect(manifest?.artifacts).toMatchObject({
+      askApi: "https://api.example.com/v1/docs/ask",
+    });
+  });
+
   it("uses root-relative URLs and omits the sitemap without a site", () => {
     const manifest = buildAgentReadability(
       makeProject([], { ai: { llmsTxt: true }, deployment: {} })
