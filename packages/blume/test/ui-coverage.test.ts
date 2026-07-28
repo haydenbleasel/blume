@@ -445,6 +445,13 @@ describe("layout chrome sources", () => {
     );
   });
 
+  it("uses the sidebar row radius for the full-width NavTree back button", async () => {
+    const source = await layoutSource("NavTree.astro");
+    expect(source).toMatch(
+      /class="[^"]*w-full[^"]*rounded-\[0\.65rem\][^"]*"[\s\S]*?data-nav-back=\{panel\.parentId\}/u
+    );
+  });
+
   it("rotates a collapsible disclosure's indicator from its own details only", async () => {
     // `group-open:` matches any descendant of an open `.group`, and each of
     // these disclosures nests inside others of the same kind (sidebar groups,
