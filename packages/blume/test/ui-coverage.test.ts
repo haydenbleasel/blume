@@ -452,6 +452,17 @@ describe("layout chrome sources", () => {
     );
   });
 
+  it("never pairs the generic rounded utility with a muted row background", async () => {
+    // Every hoverable/active sidebar row shares the 0.65rem navigation radius;
+    // a bare `rounded` next to `bg-muted` renders a mismatched 4px corner.
+    const source = await layoutSource("NavTree.astro");
+    for (const match of source.matchAll(/class="[^"]*"/gu)) {
+      if (/(?:^|[\s"])rounded(?:$|[\s"])/u.test(match[0])) {
+        expect(match[0]).not.toContain("bg-muted");
+      }
+    }
+  });
+
   it("rotates a collapsible disclosure's indicator from its own details only", async () => {
     // `group-open:` matches any descendant of an open `.group`, and each of
     // these disclosures nests inside others of the same kind (sidebar groups,

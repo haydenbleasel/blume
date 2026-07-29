@@ -2,4 +2,4 @@
 "blume": patch
 ---
 
-Match the full-width navigation back row radius to the other sidebar navigation buttons.
+Match every hoverable sidebar navigation row — the back rows, routed panel header, and flat group header — to the shared 0.65rem navigation radius.

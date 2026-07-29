@@ -137,7 +137,7 @@ const initialId =
             <div class="mb-3 flex items-center gap-0.5">
               <button
                 aria-label={n.back}
-                class="-ml-1 flex shrink-0 items-center justify-center self-stretch rounded px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                class="-ml-1 flex shrink-0 items-center justify-center self-stretch rounded-[0.65rem] px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 data-nav-back={panel.parentId}
                 type="button"
               >
@@ -145,7 +145,7 @@ const initialId =
               </button>
               <a
                 aria-current={panel.route === currentRoute ? "page" : undefined}
-                class="flex-1 truncate rounded px-1 py-1 font-semibold text-foreground text-sm transition-colors hover:bg-muted"
+                class="flex-1 truncate rounded-[0.65rem] px-1 py-1 font-semibold text-foreground text-sm transition-colors hover:bg-muted"
                 href={withBase(panel.route)}
               >
                 {panel.label}
@@ -317,7 +317,7 @@ const initialId =
               {item.route ? (
                 <a
                   aria-current={item.route === currentRoute ? "page" : undefined}
-                  class="-ml-1 flex flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-foreground transition-colors hover:bg-muted aria-[current=page]:bg-muted"
+                  class="-ml-1 flex flex-1 items-center gap-1.5 rounded-[0.65rem] px-1 py-0.5 text-foreground transition-colors hover:bg-muted aria-[current=page]:bg-muted"
                   href={withBase(item.route)}
                 >
                   {item.icon && (
