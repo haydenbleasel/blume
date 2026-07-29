@@ -1,5 +1,13 @@
 # blume
 
+## 1.2.1
+
+### Patch Changes
+
+- a015b0a: Match CJK and Thai content in the default Orama search provider. With `i18n.defaultLocale` set to a language written without spaces (Japanese, Chinese, Korean, Thai), the search index now uses a word-segmenting tokenizer built on `Intl.Segmenter` — previously every query in those scripts silently returned zero results because the default tokenizer collapsed the text to no tokens. The fix covers the search dialog, the MCP server's `search_docs` tool, and Ask AI grounding, and keeps Latin terms matching case-insensitively on mixed-language sites.
+- 454e67f: Match every hoverable sidebar navigation row — the back rows, routed panel header, and flat group header — to the shared 0.65rem navigation radius.
+- 17d520b: Style the desktop sidebar scrollbar with a thin, theme-colored thumb and a transparent track. The mobile drawer and the page scrollbar keep their platform defaults. Requires Tailwind CSS 4.3 or later, which is now the declared minimum.
+
 ## 1.2.0
 
 ### Minor Changes
