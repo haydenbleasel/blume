@@ -34,7 +34,7 @@
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "shiki": "^4.2.0",
-        "tailwindcss": "^4",
+        "tailwindcss": "^4.3.0",
         "takumi-js": "^2.2.1",
         "turbo": "^2.3.0",
         "typescript": "^6.0.3",
@@ -54,7 +54,7 @@
     },
     "packages/blume": {
       "name": "blume",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "bin": {
         "blume": "bin/blume.mjs",
       },
@@ -102,7 +102,7 @@
         "satteri": "^0.9.5",
         "shiki": "^4.2.0",
         "simple-icons": "^13.0.0",
-        "tailwindcss": "^4",
+        "tailwindcss": "^4.3.0",
         "takumi-js": "^2.2.1",
         "tinyglobby": "^0.2.10",
         "twoslash": "^0.3.9",
