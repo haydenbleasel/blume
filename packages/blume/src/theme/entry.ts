@@ -540,6 +540,10 @@ pre.blume-source {
 
 pre.blume-source > code {
   flex: 1;
+  /* The pane's measured height is authoritative (it can exceed the prose
+     24rem cap), so undo the generic prose max-height: the code must fill
+     whatever height the tab was given. */
+  max-height: none;
   min-height: 0;
   overflow: auto;
 }
@@ -719,6 +723,13 @@ pre:has(.line.focused):hover .line:not(.focused) {
   #blume-content > nav,
   #blume-content > details {
     display: none !important;
+  }
+
+  /* Paper can't scroll: uncap the code scroller so long blocks print in
+     full, same as tab panels are force-expanded below. */
+  .prose :where(pre:not(.twoslash, .twoslash pre, blume-panel-tabs *) > code) {
+    max-height: none;
+    overflow: visible;
   }
 
   #blume-content {

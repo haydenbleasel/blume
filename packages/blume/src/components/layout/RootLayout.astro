@@ -761,6 +761,16 @@ const bannerKey = banner?.dismissible ? banner.key : null;
           );
         }
         pre.classList.add("group", "relative");
+        // The code element is the scroll container (see the theme entry), but
+        // Shiki's tab stop lands on the pre, which no longer scrolls. Move the
+        // stop to the code so keyboard users can actually scroll the block
+        // (WCAG 2.1.1 — the same rule the table wrapper handles). Twoslash and
+        // API-panel blocks keep the pre as their scroller, so theirs stays.
+        const scroller = pre.querySelector("code");
+        if (scroller && !pre.matches(".twoslash, blume-panel-tabs *")) {
+          scroller.setAttribute("tabindex", "0");
+          pre.removeAttribute("tabindex");
+        }
         const button = document.createElement("button");
         button.type = "button";
         // The language-label bar (prose) vs flush code (tabs) need a different
