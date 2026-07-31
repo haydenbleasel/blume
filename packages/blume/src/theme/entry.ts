@@ -457,18 +457,22 @@ blume-diff {
      so the header bar and copy button never drift with the scroll. */
   max-height: 24rem;
   overflow: auto;
-  padding: 0 1.25rem;
-  /* The scroller is only as tall as the code, so an overlay scrollbar would
-     draw on top of the last line; hide it (wheel/trackpad/keyboard scrolling
-     still works). */
-  scrollbar-width: none;
+  /* The small bottom inset keeps the horizontal thumb off the last line's
+     descenders now that scrollbars are visible. */
+  padding: 0 1.25rem 0.375rem;
+  /* Thin theme-colored scrollbars, matching the sidebar treatment, so a
+     height-capped block reads as scrollable instead of simply ending. */
+  scrollbar-color: var(--blume-border) transparent;
+  scrollbar-width: thin;
 }
 
-.prose
-  :where(
-    pre:not(.twoslash, .twoslash pre, blume-panel-tabs *) > code
-  )::-webkit-scrollbar {
-  display: none;
+/* The dark border token is too close to the page background to read as a
+   scrollbar thumb; derive a brighter one from the muted foreground instead. */
+:root[data-theme="dark"]
+  .prose
+  :where(pre:not(.twoslash, .twoslash pre, blume-panel-tabs *) > code) {
+  scrollbar-color: color-mix(in oklab, var(--blume-muted-foreground) 55%, transparent)
+    transparent;
 }
 
 /* Word wrap (markdown.code.wrap): long lines wrap instead of scrolling. The
