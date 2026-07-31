@@ -452,7 +452,11 @@ blume-diff {
    even though its chrome wrapper is not-prose. */
 .prose :where(pre:not(.twoslash, .twoslash pre, blume-panel-tabs *) > code) {
   display: block;
-  overflow-x: auto;
+  /* Tall blocks scroll vertically in place instead of taking the page. Both
+     axes live on the code element for the same reason: the pre stays static
+     so the header bar and copy button never drift with the scroll. */
+  max-height: 24rem;
+  overflow: auto;
   padding: 0 1.25rem;
   /* The scroller is only as tall as the code, so an overlay scrollbar would
      draw on top of the last line; hide it (wheel/trackpad/keyboard scrolling

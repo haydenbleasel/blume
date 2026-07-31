@@ -707,11 +707,15 @@ const bannerKey = banner?.dismissible ? banner.key : null;
         });
       }
 
-      const svg = (name: string) =>
-        `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
+      const svg = (name: string, cls = "") =>
+        `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${cls ? ` class="${cls}"` : ""}>${icons[name]}</svg>`;
 
+      // Ghost icon button in the style of Lina's code block: frosted over the
+      // code, with the check icon scale-swapping in over the copy icon after
+      // a copy.
       const buttonClass =
-        "absolute right-3 inline-flex size-7 items-center justify-center rounded-full bg-transparent text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:opacity-100";
+        "absolute right-3 z-[2] inline-flex size-[1.875rem] select-none items-center justify-center rounded-md text-muted-foreground bg-background [&_svg]:pointer-events-none [&_svg]:shrink-0";
+      const idleClasses = ["hover:bg-muted", "hover:text-foreground"];
 
       // Localized copy-button label, stamped on <body> by the layout markup
       // (the Search.astro data-attribute channel) since this bundled script
@@ -764,10 +768,25 @@ const bannerKey = banner?.dismissible ? banner.key : null;
         const topClass = pre.closest("blume-tabs, .not-prose")
           ? "top-2.5"
           : "top-2";
-        button.className = `${buttonClass} ${topClass}`;
+        button.className = `${buttonClass} ${idleClasses.join(" ")} ${topClass}`;
         button.setAttribute("data-blume-copy", "");
         button.setAttribute("aria-label", copyCodeLabel);
-        button.innerHTML = svg("copy");
+        button.innerHTML =
+          svg(
+            "check",
+            "scale-0 text-green-600 transition-transform dark:text-green-500"
+          ) + svg("copy", "absolute transition-transform");
+        const [checkIcon, copyIcon] = button.querySelectorAll("svg");
+        // While checked the button stays visible (even without hover) and its
+        // hover tint goes green, mirroring the copied state in Lina.
+        const setChecked = (checked: boolean) => {
+          checkIcon?.classList.toggle("scale-0", !checked);
+          copyIcon?.classList.toggle("scale-0", checked);
+          for (const cls of idleClasses) {
+            button.classList.toggle(cls, !checked);
+          }
+        };
+        let resetTimeout: number | undefined;
         button.addEventListener("click", async () => {
           const code = pre.querySelector("code");
           let text = code?.textContent ?? "";
@@ -788,10 +807,11 @@ const bannerKey = banner?.dismissible ? banner.key : null;
           } catch {
             return;
           }
-          button.innerHTML = svg("check");
-          setTimeout(() => {
-            button.innerHTML = svg("copy");
-          }, 1500);
+          if (resetTimeout) {
+            window.clearTimeout(resetTimeout);
+          }
+          setChecked(true);
+          resetTimeout = window.setTimeout(() => setChecked(false), 1500);
         });
         pre.appendChild(button);
       }
