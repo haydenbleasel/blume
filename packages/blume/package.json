@@ -98,7 +98,7 @@
     "gray-matter": "^4.0.3",
     "jiti": "^2.4.0",
     "js-yaml": "^4.1.0",
-    "katex": "^0.17.0",
+    "katex": "^0.18.1",
     "marked": "^18.0.5",
     "mermaid": "^11.15.0",
     "node-html-parser": "^9.0.0",
