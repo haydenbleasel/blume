@@ -461,7 +461,9 @@ blume-diff {
      descenders now that scrollbars are visible. */
   padding: 0 1.25rem 0.375rem;
   /* Thin theme-colored scrollbars, matching the sidebar treatment, so a
-     height-capped block reads as scrollable instead of simply ending. */
+     height-capped block reads as scrollable instead of simply ending.
+     Safari before 18.2 supports neither property and falls back to the
+     platform-default scrollbar — acceptable, since macOS overlays it. */
   scrollbar-color: var(--blume-border) transparent;
   scrollbar-width: thin;
 }
