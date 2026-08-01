@@ -392,7 +392,10 @@ const AskAI = ({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col overflow-y-auto" ref={scrollRef}>
+      <div
+        className="flex flex-1 flex-col scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent overflow-y-auto"
+        ref={scrollRef}
+      >
         {hasMessages ? (
           <div className="flex flex-col gap-4 p-4">
             {messages.map((message) =>
