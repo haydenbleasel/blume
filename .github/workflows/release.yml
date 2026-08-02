@@ -21,12 +21,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Prepare repository
         run: git fetch --unshallow --tags
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -38,7 +38,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         name: Install Bun
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         name: Setup Bun cache
         with:
           path: ~/.bun/install/cache
