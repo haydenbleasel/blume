@@ -1,5 +1,0 @@
----
-"blume": minor
----
-
-Built-in image optimization for local images. A relative image reference (`![alt](./diagram.png)`) next to your content is now optimized at build time end-to-end — compressed, converted to WebP, and stamped with intrinsic `width`/`height` so the layout doesn't shift while it loads. sharp now ships as a Blume dependency, so the Astro image service works out of the box under every installer (it was previously unresolvable from the generated runtime under isolated linkers, failing the build with "Could not find Sharp"). Agent-facing surfaces (`/<route>.md`, `/<route>.mdx`, llms-full.txt, MCP) rewrite relative references to a new `/blume-assets/content/…` endpoint serving the original files, so image links in raw Markdown resolve instead of 404ing; the same endpoint serves remote-source assets materialized under `.blume/public/blume-assets`, which builds previously never shipped. A new `image` config (`domains`, `remotePatterns`) authorizes remote hosts for optimization, mapping directly onto Astro's `image` config.
