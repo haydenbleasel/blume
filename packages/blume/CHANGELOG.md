@@ -1,5 +1,14 @@
 # blume
 
+## 1.3.1
+
+### Patch Changes
+
+- 4d7dc87: Negotiate `Accept: text/markdown` on the homepage even when it's a landing page. A user-authored home page has no Markdown source, so agent requests for a markdown homepage previously fell through to HTML; the homepage's mirror now falls back to the `llms.txt` index — the machine-readable map of the site — served at `/index.md` and wired into the dev server, the Vercel routing config, and the homepage `Link` header's `rel="alternate"` entry.
+- ff31ab5: Remove a polynomial-backtracking regex from the font-name slugifier's dash trim
+- 02eb6c7: Fix the homepage `Link` header and `Vary: Accept` never being sent on Vercel deploys. The injected header routes sat after `handle: "filesystem"` in the Build Output config — the miss phase, which prerendered static responses never reach — so agent-readiness checkers saw no `Link` header on `GET /`. Both header routes now ride in the main phase, ahead of static-file matching.
+- de62812: Stamp an `x-markdown-tokens` header (estimated token count, ~4 characters per token) on Markdown responses, following the Cloudflare Markdown for Agents convention: the raw-Markdown endpoints send it on dev and server-rendered responses, and the Vercel routing config carries it on the negotiated homepage.
+
 ## 1.3.0
 
 ### Minor Changes
