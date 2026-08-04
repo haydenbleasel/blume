@@ -1,4 +1,5 @@
 ---
+import { isImageIcon, isInlineSvg } from "../theme/icon-kind.ts";
 import { resolveIcon } from "../theme/icons.ts";
 import { withBase } from "./islands/base-path.ts";
 
@@ -27,13 +28,7 @@ const customIcon =
     ? rawIcon
     : null;
 const iconName = typeof rawIcon === "string" ? rawIcon : null;
-const rawSvg =
-  iconName && /^\s*<svg[\s\S]*<\/svg>\s*$/u.test(iconName)
-    ? iconName.trim()
-    : null;
-const isImageIcon = (value: string): boolean =>
-  /^(?:https?:\/\/|data:image\/|\/|\.{1,2}\/)/u.test(value) ||
-  /\.(?:avif|gif|jpe?g|png|svg|webp)$/iu.test(value);
+const rawSvg = iconName && isInlineSvg(iconName) ? iconName.trim() : null;
 const imageSrc = iconName && !rawSvg && isImageIcon(iconName) ? iconName : null;
 const resolvedIcon =
   iconName && !(imageSrc || rawSvg) ? resolveIcon(iconName) : null;

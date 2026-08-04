@@ -1,3 +1,4 @@
+import { isAssetIcon } from "../theme/icon-kind.ts";
 import { hasIcon } from "../theme/icons.ts";
 import type { Diagnostic, NavNode, Navigation, PageRecord } from "./types.ts";
 
@@ -8,12 +9,8 @@ import type { Diagnostic, NavNode, Navigation, PageRecord } from "./types.ts";
  * covers every source (config, folder meta, frontmatter) at once.
  */
 
-const IMAGE_ICON =
-  /^(?:https?:\/\/|data:image\/|\/|\.{1,2}\/)|\.(?:avif|gif|jpe?g|png|svg|webp)$/iu;
-
-/** Whether an icon string is an asset (image/URL/inline SVG), not a set name. */
-const isAssetIcon = (value: string): boolean =>
-  value.startsWith("<") || IMAGE_ICON.test(value);
+const ICON_SHAPE_HINT =
+  "Use a built-in icon name, an image path/URL, or inline SVG markup.";
 
 /** Flatten a sidebar tree to every node, descending into groups. */
 const flattenNodes = (nodes: NavNode[]): NavNode[] =>
@@ -78,15 +75,11 @@ const unknownIconDiagnostics = (
 
 /** Warn about icon names that aren't in Blume's set (skipping image/SVG icons). */
 export const validateNavIcons = (navigation: Navigation): Diagnostic[] =>
-  unknownIconDiagnostics(
-    collectIcons(navigation),
-    "Use a built-in icon name, an image path/URL, or inline SVG markup."
-  );
+  unknownIconDiagnostics(collectIcons(navigation), ICON_SHAPE_HINT);
 
 /**
  * Warn about unknown icons on curated `search.popular` links. Same accepted
- * shapes as nav icons (built-in name, image path/URL, or inline SVG) — the
- * search dialog resolves them to markup on the server before the island runs.
+ * input shapes as nav icons — resolved to markup on the server for the island.
  */
 export const validateSearchPopularIcons = (
   popular: { icon?: string; label: string }[]
@@ -96,10 +89,7 @@ export const validateSearchPopularIcons = (
       ? [{ icon: link.icon, where: `popular link "${link.label}"` }]
       : []
   );
-  return unknownIconDiagnostics(
-    icons,
-    "Use a built-in icon name, an image path/URL, or inline SVG markup."
-  );
+  return unknownIconDiagnostics(icons, ICON_SHAPE_HINT);
 };
 
 /** Whether an internal path resolves to a page or a section that has pages. */

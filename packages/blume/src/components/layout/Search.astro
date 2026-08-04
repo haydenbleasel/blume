@@ -4,7 +4,6 @@ import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { Navigation } from "../../core/types.ts";
 import { resolvePopularIconMarkup } from "../../search/popular-icon.ts";
 import Icon from "../Icon.astro";
-import { withBase } from "../islands/base-path.ts";
 import { flattenPages } from "./nav-utils.ts";
 
 // The provider-specific loader is generated per project into `blume:search-client`
@@ -29,15 +28,15 @@ const { askEnabled = false, navigation, popularPages, strings, locale } =
 // default, matching the pattern PageActions uses for its own dictionary.
 const s = { ...EN_UI.search, ...strings };
 
-// Icons resolve to markup here (`theme/icons.ts` is a server-only module —
-// far too large to ship to the browser), so the island gets ready-to-render
-// HTML rather than a name it can't resolve. Built-in names, image paths/URLs,
-// and inline SVG all work — same shapes as nav `Icon`. Unknown names fall
-// through to the island's own file glyph.
+// Resolve popular icons to markup here (icon set is server-only). Unknown
+// names fall through to the island's file glyph.
 const popular =
   popularPages && popularPages.length > 0
     ? popularPages.map((page) => ({
-        icon: resolvePopularIconMarkup(page.icon, withBase),
+        icon: resolvePopularIconMarkup(
+          page.icon,
+          import.meta.env.BASE_URL ?? "/"
+        ),
         label: page.label,
         route: page.route,
       }))
