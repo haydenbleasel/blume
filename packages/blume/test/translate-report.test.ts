@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 
 import type { TranslatableMeta } from "../src/translate/meta.ts";
 import {
-  activeLine,
   checkLines,
   checkReportJson,
   checkSummaryLine,
@@ -12,6 +11,7 @@ import {
   itemEndLine,
   itemLabel,
   SPINNER_FRAMES,
+  spinnerLine,
   translateHeaderLine,
   translateReportJson,
   translateSummaryLine,
@@ -101,12 +101,21 @@ describe("labels and lines", () => {
     );
   });
 
-  it("cycles spinner frames on the active line", () => {
-    expect(strip(activeLine(page(), 0))).toBe(
-      `  ${SPINNER_FRAMES[0]} docs/guides/install.mdx → fr`
+  it("cycles spinner frames and counts extra in-flight lanes", () => {
+    expect(strip(spinnerLine([page()], 0, 3, 0))).toBe(
+      `  ${SPINNER_FRAMES[0]} docs/guides/install.mdx → fr 0/3`
     );
-    expect(strip(activeLine(page(), SPINNER_FRAMES.length + 2))).toContain(
-      SPINNER_FRAMES[2] as string
+    expect(
+      strip(
+        spinnerLine(
+          [page(), page({ locale: "de" }), meta(["guides"])],
+          5,
+          132,
+          SPINNER_FRAMES.length + 2
+        )
+      )
+    ).toBe(
+      `  ${SPINNER_FRAMES[2]} docs/guides/install.mdx → fr (+2 more) 5/132`
     );
   });
 
@@ -316,7 +325,12 @@ describe("createProgressRenderer", () => {
       write: (chunk) => writes.push(chunk),
     });
 
-    renderer.onProgress({ item: page(), kind: "item-start" });
+    renderer.onProgress({
+      index: 0,
+      item: page(),
+      kind: "item-start",
+      total: 1,
+    });
     expect(writes[0]).toStartWith("\r[K");
     expect(strip(writes[0] as string)).toContain(
       `${SPINNER_FRAMES[0]} docs/guides/install.mdx → fr`
@@ -324,13 +338,51 @@ describe("createProgressRenderer", () => {
 
     time = 250;
     renderer.onProgress({
+      index: 0,
       kind: "item-end",
       result: resultOf(page(), { costUsd: 0.03 }),
+      total: 1,
     });
     const last = writes.at(-1) as string;
     expect(last).toStartWith("\r[K");
     expect(last).toEndWith("\n");
     expect(strip(last)).toContain("✔ docs/guides/install.mdx → fr");
+    renderer.stop();
+  });
+
+  it("keeps painting the surviving lanes of a concurrent run", () => {
+    const writes: string[] = [];
+    const renderer = createProgressRenderer({
+      isTTY: true,
+      now: () => 0,
+      write: (chunk) => writes.push(chunk),
+    });
+    renderer.onProgress({
+      index: 0,
+      item: page(),
+      kind: "item-start",
+      total: 3,
+    });
+    renderer.onProgress({
+      index: 1,
+      item: page({ locale: "de" }),
+      kind: "item-start",
+      total: 3,
+    });
+    expect(strip(writes.at(-1) as string)).toContain("(+1 more) 0/3");
+
+    // The first lane finishes: its permanent line prints, then the spinner
+    // repaints with the remaining lane and the bumped done count.
+    renderer.onProgress({
+      index: 0,
+      kind: "item-end",
+      result: resultOf(page()),
+      total: 3,
+    });
+    expect(strip(writes.at(-2) as string)).toContain("✔");
+    const repaint = strip(writes.at(-1) as string);
+    expect(repaint).toContain("docs/guides/install.mdx → de 1/3");
+    expect(repaint).not.toContain("more");
     renderer.stop();
   });
 
@@ -340,9 +392,19 @@ describe("createProgressRenderer", () => {
       isTTY: false,
       write: (chunk) => writes.push(chunk),
     });
-    renderer.onProgress({ item: page(), kind: "item-start" });
+    renderer.onProgress({
+      index: 0,
+      item: page(),
+      kind: "item-start",
+      total: 1,
+    });
     expect(writes).toEqual([]);
-    renderer.onProgress({ kind: "item-end", result: resultOf(page()) });
+    renderer.onProgress({
+      index: 0,
+      kind: "item-end",
+      result: resultOf(page()),
+      total: 1,
+    });
     expect(writes).toHaveLength(1);
     expect(writes[0]).not.toContain("\r");
     expect(strip(writes[0] as string)).toBe(
@@ -357,8 +419,18 @@ describe("createProgressRenderer", () => {
       isTTY: true,
       write: (chunk) => writes.push(chunk),
     });
-    renderer.onProgress({ item: page(), kind: "item-start" });
-    renderer.onProgress({ kind: "item-end", result: resultOf(page()) });
+    renderer.onProgress({
+      index: 0,
+      item: page(),
+      kind: "item-start",
+      total: 1,
+    });
+    renderer.onProgress({
+      index: 0,
+      kind: "item-end",
+      result: resultOf(page()),
+      total: 1,
+    });
     expect(writes.length).toBeGreaterThanOrEqual(2);
     renderer.stop();
   });
@@ -370,7 +442,12 @@ describe("createProgressRenderer", () => {
       now: () => 0,
       write: (chunk) => writes.push(chunk),
     });
-    renderer.onProgress({ item: page(), kind: "item-start" });
+    renderer.onProgress({
+      index: 0,
+      item: page(),
+      kind: "item-start",
+      total: 1,
+    });
     renderer.stop();
     const count = writes.length;
     // A stopped renderer paints nothing further.

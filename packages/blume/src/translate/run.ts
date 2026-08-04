@@ -52,9 +52,17 @@ export type TranslateProgress =
 
 export interface TranslateRunOptions {
   agent: AgentKind;
+  /** Parallel agent sessions. Defaults to 1 (serial). */
+  concurrency?: number;
   /** Mutated in place: every validated write stamps its entry immediately. */
   ledger: TranslationLedger;
   onProgress?: (event: TranslateProgress) => void;
+  /**
+   * Called after each finished item to flush the ledger to disk, so an
+   * interrupted run keeps everything already translated. Calls are serialized
+   * here — concurrent workers finishing together never race the same file.
+   */
+  persistLedger?: () => Promise<unknown>;
   project: BlumeProject;
   /** The spawn function — injectable so tests never launch a real agent. */
   run?: HeadlessRunner;
@@ -251,9 +259,12 @@ const itemDiagnostic = (result: TranslateItemResult): Diagnostic => {
 };
 
 /**
- * Run every work item through the agent, serially: each item is a full agent
- * session, and a serial run keeps progress output ordered and cost attribution
- * obvious. A failed item never writes or stamps; the loop continues.
+ * Run every work item through the agent, `concurrency` at a time: each worker
+ * is a serial lane pulling the next unclaimed item, so results stay indexed
+ * by item and progress events interleave but never duplicate. A failed item
+ * never writes or stamps; its lane continues. After every finished item the
+ * ledger is flushed via `persistLedger` (serialized across lanes), so an
+ * interrupted run resumes from what already landed instead of from scratch.
  */
 export const runTranslate = async (
   options: TranslateRunOptions
@@ -278,30 +289,58 @@ export const runTranslate = async (
   };
 
   const { items } = options.workList;
-  const results: TranslateItemResult[] = [];
+  const results: TranslateItemResult[] = Array.from({ length: items.length });
+  const concurrency = Math.max(
+    1,
+    Math.min(options.concurrency ?? 1, items.length || 1)
+  );
+
+  // The persist chain: whichever lane finishes next appends its flush after
+  // the previous one, so two lanes never write the ledger file concurrently.
+  let persisting: Promise<unknown> = Promise.resolve();
+  const persist = (): Promise<unknown> => {
+    // The chain is the mutex: appending with .then() serializes flushes.
+    // oxlint-disable-next-line promise/prefer-await-to-then
+    persisting = persisting.then(() => options.persistLedger?.());
+    return persisting;
+  };
+
+  let nextIndex = 0;
+  const worker = async (): Promise<void> => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const item = items[index] as WorkItem;
+      options.onProgress?.({
+        index,
+        item,
+        kind: "item-start",
+        total: items.length,
+      });
+      // oxlint-disable-next-line no-await-in-loop -- each worker is a serial lane
+      const result = await (item.kind === "page"
+        ? runPageItem(item, index, context, options.ledger)
+        : runMetaItem(item, index, context, options.ledger));
+      results[index] = result;
+      // Flush this item's stamps before claiming the next one, so a kill
+      // loses at most the in-flight items.
+      // oxlint-disable-next-line no-await-in-loop
+      await persist();
+      options.onProgress?.({
+        index,
+        kind: "item-end",
+        result,
+        total: items.length,
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
   const diagnostics: Diagnostic[] = [];
-  for (const [index, item] of items.entries()) {
-    options.onProgress?.({
-      index,
-      item,
-      kind: "item-start",
-      total: items.length,
-    });
-    // Sequential by design — see the function comment.
-    // oxlint-disable-next-line no-await-in-loop
-    const result = await (item.kind === "page"
-      ? runPageItem(item, index, context, options.ledger)
-      : runMetaItem(item, index, context, options.ledger));
-    results.push(result);
+  for (const result of results) {
     if (result.status !== "translated") {
       diagnostics.push(itemDiagnostic(result));
     }
-    options.onProgress?.({
-      index,
-      kind: "item-end",
-      result,
-      total: items.length,
-    });
   }
 
   const counts: Record<TranslateItemStatus, number> = {

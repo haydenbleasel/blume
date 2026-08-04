@@ -149,7 +149,14 @@ describe("blume translate", () => {
 
     // 2. The translate run writes the missing file, stamps it, and adopts the
     //    hand-authored translation without touching it.
-    const translate = await run(root, bin, "--claude", "--json");
+    const translate = await run(
+      root,
+      bin,
+      "--claude",
+      "--json",
+      "--concurrency",
+      "2"
+    );
     expect(translate.exitCode).toBe(0);
     expect(
       await readFile(join(root, "docs/fr/guides/install.mdx"), "utf-8")
@@ -190,7 +197,7 @@ describe("blume translate", () => {
     const drifted = await run(root, bin, "--check");
     expect(drifted.exitCode).toBe(1);
     expect(drifted.stderr).toContain("stale");
-  });
+  }, 60_000);
 
   it("exits 1 and keeps the successes when a translation fails validation", async () => {
     const root = await fixture({
@@ -219,7 +226,7 @@ describe("blume translate", () => {
     const report = JSON.parse(failed.stdout);
     expect(report.translate.counts.failed).toBe(2);
     expect(report.summary.error).toBe(2);
-  });
+  }, 60_000);
 
   it("rejects bad flag combinations and values", async () => {
     const root = await fixture();
@@ -241,6 +248,14 @@ describe("blume translate", () => {
     expect(timeout.exitCode).toBe(1);
     expect(timeout.stderr).toContain("Invalid --timeout");
 
+    const concurrency = await run(root, bin, "--claude", "--concurrency", "0");
+    expect(concurrency.exitCode).toBe(1);
+    expect(concurrency.stderr).toContain("Invalid --concurrency");
+
+    const tooMany = await run(root, bin, "--claude", "--concurrency", "99");
+    expect(tooMany.exitCode).toBe(1);
+    expect(tooMany.stderr).toContain("Invalid --concurrency");
+
     const unknown = await run(root, bin, "--claude", "--locale", "xx");
     expect(unknown.exitCode).toBe(1);
     expect(unknown.stderr).toContain('Unknown --locale "xx"');
@@ -253,7 +268,7 @@ describe("blume translate", () => {
     const cased = await run(root, bin, "--check", "--locale", "FR");
     expect(cased.exitCode).toBe(1);
     expect(cased.stderr).toContain("→ fr");
-  });
+  }, 60_000);
 
   it("errors clearly when i18n is not configured", async () => {
     const root = await fixture({

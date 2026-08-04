@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { dirname, join } from "pathe";
 
@@ -167,6 +168,59 @@ describe("runTranslate pages", () => {
       "item-start",
       "item-end",
     ]);
+  });
+
+  it("runs lanes concurrently, keeps results ordered, and persists after each item", async () => {
+    const root = await scratch();
+    const items = await Promise.all(
+      ["a", "b", "c", "d"].map((name) => pageItem(root, name))
+    );
+    const ledger = emptyLedger();
+    let inFlight = 0;
+    let peak = 0;
+    const run = async (): Promise<HeadlessResult> => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      // Hold the lane long enough for the others to start.
+      await delay(25);
+      inFlight -= 1;
+      return {
+        code: 0,
+        stderr: "",
+        stdout: JSON.stringify({ is_error: false, result: TRANSLATED }),
+        timedOut: false,
+      };
+    };
+    let persists = 0;
+    const events: TranslateProgress[] = [];
+
+    const result = await runTranslate({
+      agent: "claude",
+      concurrency: 4,
+      ledger,
+      onProgress: (event) => events.push(event),
+      persistLedger: () => {
+        persists += 1;
+        return Promise.resolve();
+      },
+      project: project(root),
+      run,
+      workList: workListOf(items),
+    });
+
+    expect(peak).toBeGreaterThan(1);
+    expect(result.counts.translated).toBe(4);
+    // Results stay indexed by work item, regardless of completion order.
+    expect(
+      result.results.map((r) => (r.item as PageWorkItem).sourceRel)
+    ).toEqual(items.map((item) => item.sourceRel));
+    // The ledger was flushed once per finished item, and every item stamped.
+    expect(persists).toBe(4);
+    for (const item of items) {
+      expect(ledger.files[item.sourceRel]).toEqual({ fr: hashSource(SOURCE) });
+    }
+    expect(events.filter((e) => e.kind === "item-start")).toHaveLength(4);
+    expect(events.filter((e) => e.kind === "item-end")).toHaveLength(4);
   });
 
   it("continues after a validation failure without writing or stamping", async () => {

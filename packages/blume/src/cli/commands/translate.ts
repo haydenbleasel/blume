@@ -32,10 +32,15 @@ import { flushStdout, logger } from "../log.ts";
 /** Wall-clock ceiling per file, in seconds. */
 const DEFAULT_TIMEOUT_S = DEFAULT_TRANSLATE_TIMEOUT_MS / 1000;
 
+/** Parallel agent sessions per run; each one is a full agent process. */
+const DEFAULT_CONCURRENCY = 4;
+const MAX_CONCURRENCY = 16;
+
 interface TranslateFlags {
   check?: boolean;
   claude?: boolean;
   codex?: boolean;
+  concurrency?: string;
   force?: boolean;
   json?: boolean;
   locale?: string;
@@ -45,7 +50,7 @@ interface TranslateFlags {
 /** Validate the flag surface, exiting with a message on the first offense. */
 const parseFlags = (
   args: TranslateFlags
-): { agent: AgentKind | undefined; timeoutS: number } => {
+): { agent: AgentKind | undefined; concurrency: number; timeoutS: number } => {
   const agents = (Object.keys(AGENTS) as AgentKind[]).filter(
     (kind) => args[kind]
   );
@@ -71,7 +76,21 @@ const parseFlags = (
     logger.error(`Invalid --timeout "${args.timeout}" (whole seconds).`);
     process.exit(1);
   }
-  return { agent: agents[0], timeoutS };
+  const concurrency =
+    args.concurrency === undefined
+      ? DEFAULT_CONCURRENCY
+      : Number(args.concurrency);
+  if (
+    !Number.isInteger(concurrency) ||
+    concurrency < 1 ||
+    concurrency > MAX_CONCURRENCY
+  ) {
+    logger.error(
+      `Invalid --concurrency "${args.concurrency}" (use 1..${MAX_CONCURRENCY}).`
+    );
+    process.exit(1);
+  }
+  return { agent: agents[0], concurrency, timeoutS };
 };
 
 /**
@@ -132,6 +151,10 @@ export const translateCommand = defineCommand({
       description: "Translate with Codex.",
       type: "boolean",
     },
+    concurrency: {
+      description: `Parallel agent sessions. Defaults to ${DEFAULT_CONCURRENCY}, max ${MAX_CONCURRENCY}.`,
+      type: "string",
+    },
     force: {
       description:
         "Retranslate everything, up-to-date and hand-authored files included.",
@@ -158,7 +181,7 @@ export const translateCommand = defineCommand({
   },
   async run({ args }) {
     const root = process.cwd();
-    const { agent, timeoutS } = parseFlags(args);
+    const { agent, concurrency, timeoutS } = parseFlags(args);
 
     try {
       // `scanProject`, not `prepareProject`: translation reads the content
@@ -208,27 +231,35 @@ export const translateCommand = defineCommand({
       process.stderr.write(
         `${translateHeaderLine(workList.items.length, workList.targetLocales.length, kind)}\n\n`
       );
+
+      // Adopt pre-existing hand-authored translations (stamp, never rewrite)
+      // and persist BEFORE the agents run, so adoption survives an interrupt.
+      for (const entry of workList.untracked) {
+        stampLedger(ledger, entry.sourceRel, entry.locale, entry.hash);
+      }
+      await writeLedger(root, ledger);
+
       const renderer = createProgressRenderer({
         isTTY: process.stderr.isTTY === true,
         write: (chunk) => process.stderr.write(chunk),
       });
       const result = await runTranslate({
         agent: kind,
+        concurrency,
         ledger,
         onProgress: (event) => renderer.onProgress(event),
+        // Flush after every finished item, so stopping a long run mid-way
+        // keeps everything already translated out of the next work list.
+        persistLedger: () => writeLedger(root, ledger),
         project,
         timeoutMs: timeoutS * 1000,
         workList,
       });
       renderer.stop();
 
-      // Adopt pre-existing hand-authored translations (stamp, never rewrite),
-      // then prune entries whose source or locale no longer exists. Pruning
-      // spans ALL non-default locales — a `--locale fr` run must not drop the
-      // other locales' stamps.
-      for (const entry of workList.untracked) {
-        stampLedger(ledger, entry.sourceRel, entry.locale, entry.hash);
-      }
+      // Prune entries whose source or locale no longer exists. Pruning spans
+      // ALL non-default locales — a `--locale fr` run must not drop the other
+      // locales' stamps.
       const knownLocales = new Set(
         localeCodes(i18n).filter((code) => code !== i18n.defaultLocale)
       );

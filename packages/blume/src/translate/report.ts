@@ -84,9 +84,20 @@ export const itemLabel = (item: WorkItem): string =>
     ? `${item.sourceRel} → ${item.locale}`
     : `meta title${item.entries.length === 1 ? "" : "s"} (${item.entries.length}) → ${item.locale}`;
 
-/** The in-flight spinner line a TTY rewrites in place. */
-export const activeLine = (item: WorkItem, frame: number): string =>
-  `  ${COLORS.cyan}${SPINNER_FRAMES[frame % SPINNER_FRAMES.length]}${COLORS.reset} ${itemLabel(item)}`;
+/**
+ * The in-flight spinner line a TTY rewrites in place: the oldest active
+ * item's label, how many more lanes are running, and the run's progress.
+ */
+export const spinnerLine = (
+  active: WorkItem[],
+  done: number,
+  total: number,
+  frame: number
+): string => {
+  const first = active[0] as WorkItem;
+  const more = active.length > 1 ? ` (+${active.length - 1} more)` : "";
+  return `  ${COLORS.cyan}${SPINNER_FRAMES[frame % SPINNER_FRAMES.length]}${COLORS.reset} ${itemLabel(first)}${more} ${COLORS.dim}${done}/${total}${COLORS.reset}`;
+};
 
 /** The permanent line printed when an item finishes. */
 export const itemEndLine = (result: TranslateItemResult): string => {
@@ -266,16 +277,23 @@ export const translateReportJson = (
 export interface ProgressRenderer {
   onProgress: (
     event:
-      | { kind: "item-end"; result: TranslateItemResult }
-      | { kind: "item-start"; item: WorkItem }
+      | {
+          kind: "item-end";
+          index: number;
+          result: TranslateItemResult;
+          total: number;
+        }
+      | { kind: "item-start"; index: number; item: WorkItem; total: number }
   ) => void;
   stop: () => void;
 }
 
 /**
- * Live progress: on a TTY the active item renders as a spinner line rewritten
- * in place (`\r\x1B[K`), replaced by its permanent line on completion; off-TTY
- * (CI) there is no interval and only the permanent per-item lines print.
+ * Live progress: on a TTY the in-flight items render as one spinner line
+ * rewritten in place (`\r\x1B[K`) — a concurrent run shows the oldest active
+ * item plus a `(+n more)` count — and each completion prints its permanent
+ * line above it; off-TTY (CI) there is no interval and only the permanent
+ * per-item lines print.
  */
 export const createProgressRenderer = (options: {
   isTTY: boolean;
@@ -284,13 +302,17 @@ export const createProgressRenderer = (options: {
 }): ProgressRenderer => {
   const now = options.now ?? (() => performance.now());
   let timer: ReturnType<typeof setInterval> | undefined;
-  let active: WorkItem | undefined;
+  const active = new Map<number, WorkItem>();
+  let done = 0;
+  let total = 0;
   let startedAt = 0;
 
   const paint = (): void => {
-    if (active) {
+    if (active.size > 0) {
       const frame = Math.floor((now() - startedAt) / SPINNER_INTERVAL_MS);
-      options.write(`${REWRITE}${activeLine(active, frame)}`);
+      options.write(
+        `${REWRITE}${spinnerLine([...active.values()], done, total, frame)}`
+      );
     }
   };
   const clearTimer = (): void => {
@@ -302,25 +324,37 @@ export const createProgressRenderer = (options: {
 
   return {
     onProgress(event) {
+      ({ total } = event);
       if (event.kind === "item-start") {
+        active.set(event.index, event.item);
         if (!options.isTTY) {
           return;
         }
-        active = event.item;
-        startedAt = now();
+        if (!timer) {
+          startedAt = now();
+          timer = setInterval(paint, SPINNER_INTERVAL_MS);
+          timer.unref?.();
+        }
         paint();
-        timer = setInterval(paint, SPINNER_INTERVAL_MS);
-        timer.unref?.();
         return;
       }
-      clearTimer();
-      active = undefined;
+      active.delete(event.index);
+      done += 1;
       const line = itemEndLine(event.result);
-      options.write(options.isTTY ? `${REWRITE}${line}\n` : `${line}\n`);
+      if (!options.isTTY) {
+        options.write(`${line}\n`);
+        return;
+      }
+      options.write(`${REWRITE}${line}\n`);
+      if (active.size > 0) {
+        paint();
+      } else {
+        clearTimer();
+      }
     },
     stop() {
       clearTimer();
-      active = undefined;
+      active.clear();
     },
   };
 };

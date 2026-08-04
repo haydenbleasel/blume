@@ -25,6 +25,8 @@ Blume owns the pipeline; the agent only translates text. For each file that need
 
 Every validated write is recorded in `blume.translations.json` at the project root: for each source file and locale, a hash of the source at the moment it was translated. **Commit this file.** It's how a rerun knows the difference between "already translated" and "translated, but the source changed since" — and it's what makes the CI gate possible.
 
+The ledger is flushed after every finished file, so stopping a long run (Ctrl+C) loses at most the translations that were in flight — the next run picks up where you left off. Files run 4 at a time by default; raise it with `--concurrency` if your machine and the agent's rate limits allow.
+
 Reruns are incremental: a source that hasn't changed since its last translation is skipped, so running `blume translate` after editing one page translates one page per locale.
 
 ## What gets translated
@@ -68,6 +70,7 @@ The JSON report carries the same `diagnostics` + `summary` shape as `blume valid
 
 - `--claude` / `--codex` — which agent CLI translates. Exactly one is required (except with `--check`).
 - `--check` — report drift and exit non-zero, without writing anything.
+- `--concurrency <n>` — parallel agent sessions. Defaults to `4`, max `16`.
 - `--locale <codes>` — comma-separated target locales (defaults to every non-default locale).
 - `--force` — retranslate everything, up-to-date and hand-authored files included.
 - `--timeout <seconds>` — agent time limit per file. Defaults to `180`.
