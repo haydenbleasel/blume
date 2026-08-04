@@ -73,5 +73,5 @@ The JSON report carries the same `diagnostics` + `summary` shape as `blume valid
 - `--concurrency <n>` — parallel agent sessions. Defaults to `4`, max `16`.
 - `--locale <codes>` — comma-separated target locales (defaults to every non-default locale).
 - `--force` — retranslate everything, up-to-date and hand-authored files included.
-- `--timeout <seconds>` — agent time limit per file. Defaults to `180`.
+- `--timeout <seconds>` — agent time limit per file. Defaults to `600`; the ceiling exists to catch hung agents, so large pages have room to finish.
 - `--json` — emit the report as JSON on stdout, in both modes.

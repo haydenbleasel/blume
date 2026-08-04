@@ -33,7 +33,7 @@ describe("translateAgentArgs", () => {
     ]);
   });
 
-  it("defaults the per-file timeout to three minutes", () => {
-    expect(DEFAULT_TRANSLATE_TIMEOUT_MS).toBe(180_000);
+  it("defaults the per-file timeout to ten minutes", () => {
+    expect(DEFAULT_TRANSLATE_TIMEOUT_MS).toBe(600_000);
   });
 });

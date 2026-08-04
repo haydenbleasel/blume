@@ -9,8 +9,13 @@ import { DISALLOWED_TOOLS } from "../eval/agents.ts";
  * agent can neither read the repo nor write files (Blume owns every write).
  */
 
-/** Wall-clock ceiling per file — the eval reader's precedent. */
-export const DEFAULT_TRANSLATE_TIMEOUT_MS = 180_000;
+/**
+ * Wall-clock ceiling per file. Generous by design: translating a large page
+ * means regenerating the whole file token by token, and a 20KB+ reference
+ * page comfortably exceeds the eval reader's 3-minute precedent. The ceiling
+ * exists to catch hung agents, not to police slow-but-progressing ones.
+ */
+export const DEFAULT_TRANSLATE_TIMEOUT_MS = 600_000;
 
 const claudeArgs = (): string[] => [
   "-p",
