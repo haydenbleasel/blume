@@ -4,6 +4,7 @@ import { validateNavIcons, validateNavStructure } from "./nav-diagnostics.ts";
 import { buildNavigation } from "./navigation.ts";
 import type {
   FolderMeta,
+  LocalizableLabel,
   ResolvedConfig,
   ResolvedI18nConfig,
 } from "./schema.ts";
@@ -11,6 +12,7 @@ import type {
   ContentGraph,
   Diagnostic,
   Navigation,
+  NavTab,
   PageRecord,
 } from "./types.ts";
 
@@ -79,6 +81,42 @@ const localePagesFor = (
   return [...real, ...filled];
 };
 
+/**
+ * Resolve a possibly-per-locale header label to the string a locale renders:
+ * the active locale's entry, else the default locale's, else the map's first
+ * entry (which is also what a single-locale site gets).
+ */
+const resolveLabel = (
+  label: LocalizableLabel,
+  locale: string,
+  defaultLocale?: string
+): string => {
+  if (typeof label === "string") {
+    return label;
+  }
+  return (
+    label[locale] ??
+    (defaultLocale === undefined ? undefined : label[defaultLocale]) ??
+    Object.values(label)[0] ??
+    ""
+  );
+};
+
+/** Resolve every localizable label in the configured tabs for one locale. */
+const resolveTabLabels = (
+  tabs: BuildContentGraphOptions["navigation"]["tabs"],
+  locale: string,
+  defaultLocale?: string
+): NavTab[] =>
+  (tabs ?? []).map((tab) => ({
+    ...tab,
+    items: tab.items?.map((item) => ({
+      ...item,
+      label: resolveLabel(item.label, locale, defaultLocale),
+    })),
+    label: resolveLabel(tab.label, locale, defaultLocale),
+  }));
+
 /** Build one locale's navigation tree from its own pages and folder meta. */
 const buildLocaleNavigation = (
   code: string,
@@ -95,7 +133,11 @@ const buildLocaleNavigation = (
   // selector's items intentionally target specific locales.
   const localizePath = (path: string): string =>
     path.startsWith("/") ? localizeRoute(path, code, i18n) : path;
-  const tabs = options.navigation.tabs?.map((tab) => ({
+  const tabs = resolveTabLabels(
+    options.navigation.tabs,
+    code,
+    i18n.defaultLocale
+  ).map((tab) => ({
     ...tab,
     ...(tab.href ? { href: localizePath(tab.href) } : {}),
     items: tab.items?.map((item) => ({
@@ -220,7 +262,9 @@ export const buildContentGraph = (
           selectors: options.navigation.selectors,
           sharedFolderMeta: options.sharedFolderMeta,
           sidebar: options.navigation.sidebar.items,
-          tabs: options.navigation.tabs,
+          // No locale to prefer: a per-locale label map resolves to its first
+          // entry on a single-locale site.
+          tabs: resolveTabLabels(options.navigation.tabs, ""),
         }),
         navigationByLocale: {} as Record<string, Navigation>,
       };

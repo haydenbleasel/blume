@@ -28,6 +28,8 @@ const uiStringsObject = z.object({
       exportEpub: z.string().default("Export to EPUB"),
       exportPdf: z.string().default("Export to PDF"),
       generating: z.string().default("Generating…"),
+      // `{name}` is replaced with the provider's brand name at render time.
+      openIn: z.string().default("Open in {name}"),
       openInChat: z.string().default("Open in chat"),
       scrollToTop: z.string().default("Scroll to top"),
     })

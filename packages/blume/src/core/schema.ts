@@ -359,6 +359,25 @@ const contentConfigSchema = z.strictObject({
   sources: z.array(contentSourceSchema).optional(),
 });
 
+/**
+ * A header label that may localize: a plain string, or a map of locale code to
+ * label (`{ en: "Docs", ja: "ドキュメント" }`). Resolved when each locale's
+ * navigation is built — the active locale's entry wins, then the default
+ * locale's, then the map's first entry — so a single-locale site can keep
+ * plain strings and an i18n site can translate its header without forking the
+ * config.
+ */
+const localizableLabelSchema = z.union([
+  z.string(),
+  z
+    .record(z.string(), z.string())
+    .refine((value) => Object.keys(value).length > 0, {
+      message: "Provide at least one locale's label.",
+    }),
+]);
+
+export type LocalizableLabel = z.infer<typeof localizableLabelSchema>;
+
 const navTabSchema = z.strictObject({
   // Rejected empty rather than accepted: an empty `href` would render a link to
   // nowhere, and it can't mean "resolve it for me" either — that's what
@@ -370,13 +389,13 @@ const navTabSchema = z.strictObject({
       z.strictObject({
         description: z.string().optional(),
         icon: iconName.optional(),
-        label: z.string(),
+        label: localizableLabelSchema,
         path: z.string(),
         tag: z.string().optional(),
       })
     )
     .optional(),
-  label: z.string(),
+  label: localizableLabelSchema,
   path: z.string(),
 });
 

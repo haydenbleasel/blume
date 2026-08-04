@@ -275,14 +275,21 @@ export interface ContentConfig {
 // Navigation
 // ---------------------------------------------------------------------------
 
+/**
+ * A header label, optionally per locale: a plain string, or a map of locale
+ * code to label (`{ en: "Docs", ja: "ドキュメント" }`). The active locale's
+ * entry wins, then the default locale's, then the map's first entry.
+ */
+export type LocalizableLabel = string | Record<string, string>;
+
 /** A single item inside a header tab's dropdown. */
 export interface NavTabItem {
   /** Secondary line under the label. */
   description?: string;
   /** Lucide icon name shown beside the label. */
   icon?: string;
-  /** Item label. */
-  label: string;
+  /** Item label, optionally per locale. */
+  label: LocalizableLabel;
   /** Route the item links to. */
   path: string;
   /** Short tag/pill (e.g. `New`, `Beta`). */
@@ -304,8 +311,8 @@ export interface NavTab {
   icon?: string;
   /** Dropdown items; omit for a plain link tab. */
   items?: NavTabItem[];
-  /** Tab label. */
-  label: string;
+  /** Tab label, optionally per locale. */
+  label: LocalizableLabel;
   /** Route the tab links to. */
   path: string;
 }

@@ -64,6 +64,7 @@ The JSON report carries the same `diagnostics` + `summary` shape as `blume valid
 
 - Meta title translation is `dir`-parser only — the `dot` parser has no per-locale `meta.ts` mechanism. A `meta.ts` that default-exports a function is skipped with a warning; author that locale's copy by hand.
 - Remote and CMS-backed sources are skipped: there is no local file to write the translation to.
+- Header tab labels live in `blume.config.ts`, not content — localize them there with [per-locale label maps](/docs/content/navigation#tabs).
 - Translation quality is the agent's. Review the output like any other contribution — the ledger only guarantees freshness, not fluency.
 
 ## Flags

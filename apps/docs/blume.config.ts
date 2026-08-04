@@ -53,9 +53,27 @@ export default defineConfig({
   logo: "/logo.svg",
   navigation: {
     tabs: [
-      { label: "Docs", path: "/docs" },
+      {
+        label: {
+          de: "Doku",
+          en: "Docs",
+          hi: "दस्तावेज़",
+          ja: "ドキュメント",
+          pt: "Documentação",
+        },
+        path: "/docs",
+      },
       { label: "CLI", path: "/cli" },
-      { label: "Changelog", path: "/changelog" },
+      {
+        label: {
+          de: "Änderungen",
+          en: "Changelog",
+          hi: "चेंजलॉग",
+          ja: "変更履歴",
+          pt: "Alterações",
+        },
+        path: "/changelog",
+      },
     ],
   },
   seo: {

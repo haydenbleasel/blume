@@ -83,6 +83,8 @@ i18n: {
 
 Each language gets its own sidebar, built from that locale's files — so translations can diverge in structure, ordering, or labels. Folder [`meta.ts`](/docs/content/meta) files resolve per locale, too: under the default `dir` parser, put a `meta.ts` under `fr/guides/` to order the French group independently. Under the `dot` parser translations sit next to the originals, so a folder's `meta.ts` applies to every locale. Everything else about [navigation](/docs/content/navigation) works the same, per language.
 
+Header tabs are configured, not derived from content, so their labels localize in `blume.config.ts`: a tab `label` accepts a per-locale map (`{ en: "Docs", fr: "Documentation" }`) alongside the plain-string form, falling back to the default locale's entry for locales you haven't filled in. See [Tabs](/docs/content/navigation#tabs).
+
 ## Fallbacks
 
 When a page isn't translated yet, Blume renders the fallback locale's content at the localized URL — so the link works, the page is fully pre-rendered, and search engines aren't sent to a dead end. The fallback defaults to your `defaultLocale`:
