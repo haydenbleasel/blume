@@ -1,14 +1,14 @@
 ---
 title: Internationalisierung
 description: >-
-  Stelle deine Dokumentation in mehreren Sprachen bereit – mit locale-bewusstem Routing, sprachspezifischer Navigation, übersetzter Oberfläche und SEO – alles konventionsbasiert.
+  Stellen Sie Ihre Dokumentation in mehreren Sprachen bereit – mit locale-bewusstem Routing, sprachspezifischer Navigation, übersetzter Benutzeroberfläche und SEO – alles konventionsbasiert.
 ---
 
-Blume stellt ein Projekt in vielen Sprachen bereit. Lege übersetzte Dateien an der richtigen Stelle ab, und Blume kümmert sich um Routing, den Sprachumschalter, die Navigation pro Locale und SEO – es gibt keine separate Routing-Ebene zu pflegen. Das Ganze ist opt-in: Ohne einen `i18n`-Block bleibt deine Website einsprachig, genau wie zuvor.
+Blume stellt ein Projekt in vielen Sprachen bereit. Legen Sie übersetzte Dateien an der richtigen Stelle ab, und Blume verdrahtet Routing, den Sprachumschalter, die Navigation pro Locale und SEO für Sie – es gibt keine separate Routing-Ebene zu pflegen. Es ist optional: Ohne einen `i18n`-Block bleibt Ihre Website genau wie zuvor einsprachig.
 
 ## Aktivieren
 
-Füge einen `i18n`-Block hinzu, der deine Locales auflistet und angibt, welches die Standardsprache ist:
+Fügen Sie einen `i18n`-Block hinzu, der Ihre Locales auflistet und angibt, welche die Standard-Locale ist:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -21,11 +21,11 @@ i18n: {
 }
 ```
 
-Jedes Locale hat einen `code` (wird in URLs verwendet), ein `label` (wird im Sprachumschalter angezeigt) und ein optionales `dir` für rechtsläufige Schriften (standardmäßig `"ltr"`).
+Jede Locale hat einen `code` (wird in URLs verwendet), ein `label` (wird im Sprachumschalter angezeigt) und ein optionales `dir` für Rechts-nach-links-Schriften (standardmäßig `"ltr"`).
 
 ## Übersetzte Inhalte organisieren
 
-Das Standard-Locale liegt im Wurzelverzeichnis deiner Inhalte. Jedes weitere Locale ist ein Ordner der obersten Ebene, benannt nach seinem `code`, der die Standardstruktur spiegelt:
+Die Standard-Locale liegt im Stammverzeichnis Ihrer Inhalte. Jede weitere Locale ist ein Ordner der obersten Ebene, benannt nach ihrem `code`, der die Standardstruktur spiegelt:
 
 ```txt
 docs/
@@ -44,11 +44,11 @@ docs/
 | `docs/guides/quickstart.mdx`    | `/guides/quickstart`    |
 | `docs/fr/guides/quickstart.mdx` | `/fr/guides/quickstart` |
 
-Du übersetzt nur die Dateien, die du möchtest – alles Übrige greift automatisch auf einen Fallback zurück (siehe [Fallbacks](#fallbacks)).
+Sie übersetzen nur die Dateien, die Sie möchten – alles andere greift automatisch auf einen Fallback zurück (siehe [Fallbacks](#fallbacks)).
 
 ### Dateinamen-Suffixe
 
-Du möchtest die Übersetzungen lieber direkt neben dem Original behalten? Setze `parser: "dot"` und benenne die Dateien mit einem Locale-Suffix, statt Ordner zu verwenden:
+Sie möchten Übersetzungen lieber neben dem Original behalten? Setzen Sie `parser: "dot"` und benennen Sie Dateien mit einem Locale-Suffix, statt Ordner zu verwenden:
 
 ```txt
 docs/
@@ -56,22 +56,22 @@ docs/
   guides/quickstart.fr.mdx  ->  /fr/guides/quickstart   (French)
 ```
 
-Gut geeignet für lückenhafte Übersetzungen – lege die wenigen bereits übersetzten Seiten direkt daneben, ohne den gesamten Baum spiegeln zu müssen.
+Gut geeignet für spärliche Übersetzungen – legen Sie die wenigen übersetzten Seiten daneben ab, ohne den gesamten Baum zu spiegeln.
 
-### Gemeinsam genutzte Dateien
+### Gemeinsame Dateien
 
-Für Inhalte, die in jeder Sprache gleich sind – ein Changelog, eine Statusseite – füge einen `$`-Marker hinzu, damit eine Datei alle Locales bedient, ohne Duplikate:
+Für Inhalte, die in jeder Sprache gleich sind – ein Changelog, eine Statusseite – fügen Sie einen `$`-Marker hinzu, damit eine Datei alle Locales ohne Duplikate bedient:
 
 ```txt
 docs/changelog.$.mdx   ->  /changelog and /fr/changelog (same content)
 docs/guides/meta.$.ts   (folder meta applied to every locale)
 ```
 
-Eine locale-spezifische `meta.ts` überschreibt die gemeinsam genutzte für diese Sprache weiterhin.
+Eine locale-spezifische `meta.ts` überschreibt die gemeinsame für diese Sprache weiterhin.
 
-## URLs des Standard-Locales
+## URLs der Standard-Locale
 
-Standardmäßig hat das Standard-Locale kein URL-Präfix (`/`, `/guides/quickstart`), während andere Locales ein Präfix erhalten (`/fr/…`). So bleiben die URLs deiner Hauptsprache sauber. Um jedes Locale mit einem Präfix zu versehen, einschließlich des Standards:
+Standardmäßig hat die Standard-Locale kein URL-Präfix (`/`, `/guides/quickstart`), während andere Locales ein Präfix erhalten (`/fr/…`). So bleiben die URLs Ihrer Hauptsprache sauber. Um jeder Locale ein Präfix zu geben, einschließlich der Standard-Locale:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -82,11 +82,13 @@ i18n: {
 
 ## Navigation pro Locale
 
-Jede Sprache erhält ihre eigene Seitenleiste, aufgebaut aus den Dateien dieses Locales – Übersetzungen können also in Struktur, Reihenfolge oder Bezeichnungen abweichen. Auch [`meta.ts`](/docs/content/meta)-Dateien in Ordnern werden pro Locale aufgelöst: Mit dem standardmäßigen `dir`-Parser legst du eine `meta.ts` unter `fr/guides/` ab, um die französische Gruppe unabhängig zu sortieren. Mit dem `dot`-Parser liegen die Übersetzungen neben den Originalen, sodass die `meta.ts` eines Ordners für jedes Locale gilt. Alles andere an der [Navigation](/docs/content/navigation) funktioniert genauso, pro Sprache.
+Jede Sprache erhält ihre eigene Seitenleiste, aufgebaut aus den Dateien dieser Locale – so können Übersetzungen in Struktur, Reihenfolge oder Beschriftungen abweichen. Auch [`meta.ts`](/docs/content/meta)-Dateien von Ordnern werden pro Locale aufgelöst: Legen Sie unter dem Standard-Parser `dir` eine `meta.ts` in `fr/guides/` ab, um die französische Gruppe unabhängig zu sortieren. Unter dem `dot`-Parser liegen Übersetzungen neben den Originalen, sodass die `meta.ts` eines Ordners für jede Locale gilt. Alles andere zur [Navigation](/docs/content/navigation) funktioniert genauso, pro Sprache.
+
+Header-Tabs werden konfiguriert und nicht aus dem Inhalt abgeleitet, daher werden ihre Beschriftungen in `blume.config.ts` lokalisiert: Ein Tab-`label` akzeptiert neben der einfachen String-Form auch eine Zuordnung pro Locale (`{ en: "Docs", fr: "Documentation" }`) und greift für Locales, die Sie nicht ausgefüllt haben, auf den Eintrag der Standard-Locale zurück. Siehe [Tabs](/docs/content/navigation#tabs).
 
 ## Fallbacks
 
-Wenn eine Seite noch nicht übersetzt ist, rendert Blume den Inhalt des Fallback-Locales unter der lokalisierten URL – der Link funktioniert also, die Seite wird vollständig vorgerendert, und Suchmaschinen landen nicht in einer Sackgasse. Der Fallback ist standardmäßig dein `defaultLocale`:
+Wenn eine Seite noch nicht übersetzt ist, rendert Blume den Inhalt der Fallback-Locale unter der lokalisierten URL – so funktioniert der Link, die Seite wird vollständig vorgerendert, und Suchmaschinen landen nicht in einer Sackgasse. Der Fallback ist standardmäßig Ihre `defaultLocale`:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -95,33 +97,33 @@ i18n: {
 }
 ```
 
-Fallback-Seiten werden vom Suchindex ausgeschlossen und im `hreflang` nicht als echte Übersetzungen ausgewiesen, sodass nicht übersetzte Inhalte nicht um das Ranking konkurrieren. Sie erscheinen weiterhin in der Seitenleiste des jeweiligen Locales, sodass die Navigation vollständig bleibt – Leserinnen und Leser erreichen jede Seite in jeder Sprache.
+Fallback-Seiten werden vom Suchindex ausgeschlossen und in `hreflang` nicht als echte Übersetzungen ausgewiesen, sodass unübersetzte Inhalte nicht um das Ranking konkurrieren. Sie erscheinen weiterhin in der Seitenleiste dieser Locale, sodass die Navigation vollständig bleibt – eine Leserin oder ein Leser erreicht jede Seite in jeder Sprache.
 
 :::tip
-Beginne damit, deine wichtigsten Seiten zu übersetzen – die Startseite, den Schnellstart und die wichtigsten Guides – und lass den Rest auf den Fallback zurückgreifen. Du kannst Übersetzungen mit der Zeit ergänzen, ohne Links zu zerstören.
+Beginnen Sie damit, Ihre wichtigsten Seiten zu übersetzen – die Startseite, den Schnellstart und die wichtigsten Anleitungen – und lassen Sie den Rest auf den Fallback zurückgreifen. Sie können Übersetzungen mit der Zeit ergänzen, ohne Links zu beschädigen.
 :::
 
-## Mit einem Agenten übersetzen
+## Übersetzen mit einem Agenten
 
-Du musst die Locales nicht von Hand füllen. [`blume translate`](/docs/reference/translate) findet jede Seite, die in einem Locale fehlt oder veraltet ist, und übersetzt sie mit einer lokalen Agenten-CLI ([Claude Code](https://claude.com/claude-code) oder [Codex](https://developers.openai.com/codex/cli)):
+Sie müssen die Locales nicht von Hand ausfüllen. [`blume translate`](/docs/reference/translate) findet jede Seite, die in einer Locale fehlt oder veraltet ist, und übersetzt sie mit einer lokalen Agenten-CLI ([Claude Code](https://claude.com/claude-code) oder [Codex](https://developers.openai.com/codex/cli)):
 
 ```bash
 blume translate --claude
 ```
 
-Blume validiert die Struktur jedes Ergebnisses – Frontmatter, Code-Fences, Links – und schreibt die Dateien selbst; der Agent übersetzt nur Text. Ein eingecheckter Ledger (`blume.translations.json`) verfolgt, aus welcher Quellrevision jede Übersetzung stammt, sodass erneute Läufe nur das anfassen, was sich geändert hat, und von Hand geschriebene Übersetzungen unverändert übernommen und nie überschrieben werden. In der CI schlägt `blume translate --check` fehl, wenn eine Quellseite ihren Übersetzungen vorausgeeilt ist.
+Blume validiert die Struktur jedes Ergebnisses – Frontmatter, Code-Fences, Links – und schreibt die Dateien selbst; der Agent übersetzt nur Text. Ein eingecheckter Ledger (`blume.translations.json`) verfolgt, aus welcher Quellrevision jede Übersetzung stammt, sodass erneute Läufe nur ändern, was sich geändert hat, und von Hand geschriebene Übersetzungen unverändert übernommen und nie überschrieben werden. In der CI schlägt `blume translate --check` fehl, wenn eine Quellseite ihren Übersetzungen vorausgeeilt ist.
 
 ## Der Sprachumschalter
 
-Wenn i18n aktiviert ist, erscheint automatisch ein Sprachumschalter im Header, generiert aus deinen `locales`. Für jede Seite verlinkt er die passende Übersetzung in jeder Sprache; fehlt eine Übersetzung, verlinkt er die Fallback-Seite und kennzeichnet sie als nicht übersetzt. Es gibt nichts zu konfigurieren.
+Wenn i18n aktiviert ist, erscheint automatisch ein Sprachumschalter im Header, generiert aus Ihren `locales`. Für jede Seite verlinkt er die passende Übersetzung in jeder Sprache; wo eine Übersetzung fehlt, verlinkt er die Fallback-Seite und kennzeichnet sie als nicht übersetzt. Es gibt nichts zu konfigurieren.
 
-## Übersetzte Oberfläche
+## Übersetzte Benutzeroberfläche
 
-Blume liefert integrierte Übersetzungen für seine eigene Oberfläche mit – „Auf dieser Seite“, „Suche“, „Auf GitHub bearbeiten“ und den Rest – sodass ein Locale mit einem mitgelieferten Paket die Oberfläche von Haus aus übersetzt bekommt. **Du übersetzt nur deine Inhalte.**
+Blume liefert integrierte Übersetzungen für seine eigene Oberfläche mit – „Auf dieser Seite“, „Suchen“, „Auf GitHub bearbeiten“ und den Rest – sodass eine Locale mit integriertem Paket von Haus aus eine übersetzte Oberfläche erhält. **Sie übersetzen nur Ihre Inhalte.**
 
-Pakete gibt es für über 30 Sprachen – Arabisch, Bengalisch, Bulgarisch, Katalanisch, Chinesisch (vereinfacht und traditionell), Kroatisch, Tschechisch, Dänisch, Niederländisch, Finnisch, Französisch, Deutsch, Griechisch, Hebräisch, Hindi, Ungarisch, Indonesisch, Italienisch, Japanisch, Koreanisch, Norwegisch, Persisch, Polnisch, Portugiesisch (und brasilianisches Portugiesisch), Rumänisch, Russisch, Serbisch, Slowakisch, Spanisch, Schwedisch, Thailändisch, Türkisch, Ukrainisch und Vietnamesisch. Sie werden von der Community gepflegt – eröffne einen PR, um ein Locale hinzuzufügen oder eine Übersetzung zu verbessern.
+Pakete gibt es für über 30 Sprachen – Arabisch, Bengalisch, Bulgarisch, Katalanisch, Chinesisch (vereinfacht und traditionell), Kroatisch, Tschechisch, Dänisch, Niederländisch, Finnisch, Französisch, Deutsch, Griechisch, Hebräisch, Hindi, Ungarisch, Indonesisch, Italienisch, Japanisch, Koreanisch, Norwegisch, Persisch, Polnisch, Portugiesisch (und brasilianisches Portugiesisch), Rumänisch, Russisch, Serbisch, Slowakisch, Spanisch, Schwedisch, Thailändisch, Türkisch, Ukrainisch und Vietnamesisch. Sie werden von der Community gepflegt – öffnen Sie einen PR, um eine Locale hinzuzufügen oder eine Übersetzung zu verbessern.
 
-Fehlende oder nicht mitgelieferte Strings greifen auf das Standard-Locale zurück, dann auf Englisch. Um einen String zu überschreiben oder eine eigene Sprache bereitzustellen, setze `i18n.ui`, gruppiert nach Locale:
+Fehlende oder nicht mitgelieferte Strings greifen auf die Standard-Locale zurück, dann auf Englisch. Um einen String zu überschreiben oder Ihre eigene Sprache bereitzustellen, setzen Sie `i18n.ui`, aufgeschlüsselt nach Locale:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -137,27 +139,27 @@ i18n: {
 
 ## SEO
 
-Lokalisiertes SEO wird für dich erledigt – es sind keine Metadaten pro Seite zu schreiben:
+Lokalisiertes SEO wird für Sie erledigt – keine Metadaten pro Seite zu schreiben:
 
-- `<html lang>` und `dir` werden aus dem aktiven Locale gesetzt.
-- `hreflang`-Alternates verlinken jede echte Übersetzung einer Seite, plus ein `x-default`, das auf das Standard-Locale zeigt.
-- Kanonische URLs sind locale-korrekt, und JSON-LD führt `inLanguage` mit.
+- `<html lang>` und `dir` werden anhand der aktiven Locale gesetzt.
+- `hreflang`-Alternates verlinken jede echte Übersetzung einer Seite, plus ein `x-default`, das auf die Standard-Locale zeigt.
+- Kanonische URLs sind locale-korrekt, und JSON-LD führt `inLanguage`.
 
-Setze [`deployment.site`](/docs/deployment), damit diese als absolute URLs ausgegeben werden können.
+Setzen Sie [`deployment.site`](/docs/deployment), damit diese als absolute URLs ausgegeben werden können.
 
 ## Suche
 
-Die Suche ist auf die aktive Sprache beschränkt: Auf einer `/fr/…`-Seite liefert der Dialog französische Ergebnisse, mit einem Umschalter **Alle Sprachen**, um in allen Locales zugleich zu suchen. Die Standardindizes (Orama) und FlexSearch filtern im Browser; gehostete Anbieter führen eine `locale`-Facette an jedem Datensatz.
+Die Suche ist auf die aktive Sprache beschränkt: Auf einer `/fr/…`-Seite liefert der Dialog französische Ergebnisse, mit einem Umschalter **Alle Sprachen**, um auf einmal über alle Locales zu suchen. Der Standardindex (Orama) und der FlexSearch-Index filtern im Browser; gehostete Anbieter führen eine `locale`-Facette auf jedem Datensatz.
 
-## Rechtsläufig
+## Rechts-nach-links
 
-Setze `dir: "rtl"` an einem Locale, und Blume spiegelt die gesamte Oberfläche – die Seitenleiste, den Header, das Inhaltsverzeichnis, die Seitennavigation, die Suche und die Menüs – und setzt `<html dir>` passend dazu. Zwei Dinge bleiben bewusst linksläufig: **Codeblöcke** (Code liest sich in jeder Sprache LTR) und **Fallback-Inhalte** – eine nicht übersetzte Seite behält die Leserichtung der Sprache, in der sie tatsächlich verfasst ist, sodass Englisch unter einem RTL-Locale weiterhin korrekt lesbar bleibt, während die umgebende Oberfläche gespiegelt wird.
+Setzen Sie `dir: "rtl"` auf einer Locale, und Blume spiegelt die gesamte Oberfläche – die Seitenleiste, den Header, das Inhaltsverzeichnis, die Seitennavigation, die Suche und die Menüs – und setzt `<html dir>` entsprechend. Zwei Dinge bleiben bewusst von links nach rechts: **Code-Blöcke** (Code liest sich in jeder Sprache LTR) und **Fallback-Inhalte** – eine unübersetzte Seite behält die Richtung der Sprache, in der sie tatsächlich geschrieben ist, sodass unter einer RTL-Locale angezeigtes Englisch weiterhin korrekt lesbar ist, während die umgebende Oberfläche gespiegelt wird.
 
 ## Wie geht es weiter
 
 <CardGroup cols={2}>
   <Card title="Navigation" href="/docs/content/navigation" icon="menu">
-    Gestalte Seitenleiste, Reihenfolge und Tabs für jedes Locale.
+    Gestalten Sie Seitenleiste, Reihenfolge und Tabs für jede Locale.
   </Card>
   <Card title="SEO" href="/docs/configuration/seo" icon="rocket">
     Sitemaps, Open Graph und strukturierte Daten.

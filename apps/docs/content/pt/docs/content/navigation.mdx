@@ -1,20 +1,20 @@
 ---
 title: Navegação
 description: >-
-  O Blume constrói a barra lateral a partir dos seus arquivos e depois permite refiná-la com frontmatter, meta de pasta ou configuração — as trilhas de navegação e os sumários acompanham.
+  O Blume monta a barra lateral a partir dos seus arquivos e depois permite refiná-la com frontmatter, meta de pasta ou configuração — trilhas de navegação e sumários acompanham automaticamente.
 ---
 
-O Blume constrói sua barra lateral a partir do sistema de arquivos e depois permite refiná-la tanto — ou tão pouco — quanto você quiser: página por página, pasta por pasta, ou com uma configuração explícita. Trilhas de navegação, links de anterior/próximo e o sumário da página decorrem todos do mesmo modelo, sem nada para conectar.
+O Blume monta sua barra lateral a partir do sistema de arquivos e depois permite refiná-la tanto — ou tão pouco — quanto você quiser: página por página, pasta por pasta ou com uma configuração explícita. Trilhas de navegação, links de anterior/próximo e o sumário da página derivam todos do mesmo modelo, sem nada para conectar manualmente.
 
 ## A barra lateral gerada
 
-Por padrão, a barra lateral espelha sua árvore de conteúdo:
+Por padrão, a barra lateral espelha a sua árvore de conteúdo:
 
 - pastas viram **grupos**, arquivos viram **páginas**
 - o rótulo de uma página é o `title` do seu frontmatter; o rótulo de um grupo é o nome humanizado da pasta
 - os itens são ordenados por [prefixo numérico](/docs/content) e depois alfabeticamente, e a página `index` de uma pasta vem primeiro
 
-Isso é suficiente para muitos sites — tudo abaixo é opcional.
+Isso já basta para muitos sites — tudo abaixo é opcional.
 
 ## Rótulo, ícone e selo da página
 
@@ -32,7 +32,7 @@ Veja [Frontmatter](/docs/reference/frontmatter) para o esquema completo da pági
 
 ## Grupos de pastas
 
-Cada pasta se torna um grupo da barra lateral. Coloque um [`meta.ts`](/docs/content/meta) junto às suas páginas para definir o título, o ícone, a ordem do grupo e a ordem dos seus filhos:
+Cada pasta vira um grupo na barra lateral. Coloque um [`meta.ts`](/docs/content/meta) junto às suas páginas para definir o título, o ícone, a ordem do grupo e a ordem dos seus filhos:
 
 ```ts meta.ts
 import { defineMeta } from "blume";
@@ -44,9 +44,9 @@ export default defineMeta({
 });
 ```
 
-Veja [Meta de pasta](/docs/content/meta) para todos os campos e para computar o meta em tempo de varredura.
+Veja [Meta de pasta](/docs/content/meta) para todos os campos e para computar meta no momento da varredura.
 
-O `meta.title` de uma pasta e o `title` do frontmatter da sua própria página `index` são resolvidos de forma independente — traduzir um sob i18n e esquecer o outro renderiza uma barra lateral correta com um `<title>`/título desatualizado na própria página inicial. O Blume relata um aviso `BLUME_NAV_INDEX_TITLE_MISMATCH` quando eles divergem. Páginas não traduzidas preenchidas a partir da localidade de fallback estão isentas — seu título pertence à localidade de fallback, e a correção é traduzir a página, não editar seu frontmatter.
+O `meta.title` de uma pasta e o `title` do frontmatter da sua própria página `index` são resolvidos de forma independente — traduzir um sob i18n e esquecer o outro renderiza uma barra lateral correta, mas com um `<title>`/título desatualizado na própria página de destino. O Blume emite um aviso `BLUME_NAV_INDEX_TITLE_MISMATCH` quando eles divergem. Páginas não traduzidas preenchidas a partir do idioma de fallback são isentas — o título delas pertence ao idioma de fallback, e a correção é traduzir a página, não editar o frontmatter dela.
 
 Para agrupar páginas _sem_ adicionar um segmento de URL, use um nome de pasta entre parênteses — veja [Páginas](/docs/content#group-folders).
 
@@ -62,15 +62,15 @@ navigation: {
 }
 ```
 
-- **`flat`** (padrão) — um cabeçalho não recolhível com suas páginas listadas abaixo. Páginas que não estão em nenhum grupo são sempre listadas primeiro, acima das seções de grupo, para que não sejam confundidas com filhas de um grupo.
-- **`group`** — uma divulgação `<details>` recolhível por grupo. Os grupos começam recolhidos por padrão; um grupo que contém a página atual sempre começa aberto, de modo que apenas a seção em que você está fica expandida. Defina `collapsed: false` no [meta de pasta](/docs/content/meta) para forçar um grupo a ficar aberto independentemente disso.
-- **`page`** — cada grupo é uma única linha que, ao ser clicada, desliza a barra lateral para um subpainel que mostra apenas os itens daquele grupo, com uma seta de voltar no topo. O painel reconhece a rota, então chegar diretamente a uma página dentro do grupo o abre imediatamente nela.
+- **`flat`** (padrão) — um cabeçalho não recolhível com suas páginas listadas abaixo. Páginas que não pertencem a nenhum grupo sempre aparecem primeiro, acima das seções de grupo, para que não sejam confundidas com filhos de um grupo.
+- **`group`** — um bloco recolhível `<details>` por grupo. Os grupos começam recolhidos por padrão; um grupo que contém a página atual sempre começa aberto, de modo que apenas a seção em que você está fica expandida. Defina `collapsed: false` no [meta de pasta](/docs/content/meta) para forçar um grupo a ficar aberto independentemente disso.
+- **`page`** — cada grupo é uma única linha que, ao ser clicada, desliza a barra lateral para um subpainel mostrando apenas os itens daquele grupo, com uma seta de voltar no topo. O painel reconhece a rota, então cair diretamente em uma página dentro do grupo abre direto nela.
 
 :::tip
-O modo `page` mantém seções profundas organizadas — recorra a ele quando os grupos tiverem muitos filhos e você preferir navegar dentro deles a rolar além deles.
+O modo `page` mantém seções profundas organizadas — use-o quando os grupos tiverem muitos filhos e você preferir navegar dentro deles a rolar por eles.
 :::
 
-Um grupo em uma [barra lateral explícita](#explicit-sidebar) pode sobrepor o modo global com seu próprio `display`.
+Um grupo em uma [barra lateral explícita](#explicit-sidebar) pode substituir o modo global com seu próprio `display`.
 
 ## Ordenação
 
@@ -78,7 +78,7 @@ Quando a barra lateral é gerada, a ordem é resolvida da maior prioridade para 
 
 <Steps>
   <Step title="Barra lateral da configuração">
-    Uma `navigation.sidebar` explícita substitui a árvore gerada por completo.
+    Um `navigation.sidebar` explícito substitui inteiramente a árvore gerada.
   </Step>
   <Step title="Meta de pasta">
     O array `pages` em `meta.ts` ordena um grupo.
@@ -90,11 +90,11 @@ Quando a barra lateral é gerada, a ordem é resolvida da maior prioridade para 
   </Step>
 </Steps>
 
-Dois irmãos que acabem com a mesma ordem explícita ou numérica recorrem à ordem alfabética entre si — o Blume relata um aviso `BLUME_DUPLICATE_SIDEBAR_ORDER` para que o empate não passe despercebido.
+Dois irmãos que acabam com a mesma ordem explícita ou numérica recorrem à ordem alfabética entre si — o Blume emite um aviso `BLUME_DUPLICATE_SIDEBAR_ORDER` para que o empate não passe despercebido.
 
 ## Páginas ocultas
 
-Oculte uma página da barra lateral — e da paginação anterior/próxima — mantendo-a compilada e acessível pela sua URL:
+Oculte uma página da barra lateral — e da paginação de anterior/próximo — mantendo-a construída e acessível pela sua URL:
 
 ```yaml
 sidebar:
@@ -103,7 +103,7 @@ sidebar:
 
 ## Abas
 
-Renderize seções de nível superior como abas no cabeçalho, útil para dividir um site grande em áreas distintas — digamos, adaptadores, uma API e guias de IA. Uma aba é destacada quando a rota atual está sob seu `path`:
+Renderize seções de nível superior como abas no cabeçalho, útil para dividir um site grande em áreas distintas — digamos, adaptadores, uma API e guias de IA. Uma aba fica destacada quando a rota atual está sob o seu `path`:
 
 ```ts blume.config.ts lineNumbers
 navigation: {
@@ -115,7 +115,7 @@ navigation: {
 }
 ```
 
-Uma [referência OpenAPI ou AsyncAPI](/docs/advanced/api-reference) habilitada é montada em sua rota, mas não adiciona uma aba por conta própria — aponte uma aba para essa rota para exibi-la no cabeçalho (e, no caso do renderizador nativo, para delimitar sua barra lateral de operações), com o rótulo que você quiser:
+Uma [referência OpenAPI ou AsyncAPI](/docs/advanced/api-reference) habilitada é montada na sua rota, mas não adiciona uma aba por conta própria — aponte uma aba para essa rota para exibi-la no cabeçalho (e, para o renderizador nativo, para delimitar a barra lateral de operações), com o rótulo que você quiser:
 
 ```ts blume.config.ts
 navigation: {
@@ -125,7 +125,7 @@ navigation: {
 }
 ```
 
-O `path` de uma aba é o prefixo da sua seção e também serve como destino do link. Uma seção cujo `path` não é uma página por si só — uma pasta sem `index.mdx` — apontaria para um 404, então a aba recorre à primeira página da seção. Defina `href` quando quiser que ela leve a outro lugar:
+O `path` de uma aba é o prefixo da sua seção, e ele também serve como destino do link. Uma seção cujo `path` não é uma página própria — uma pasta sem `index.mdx` — apontaria para um 404, então a aba recorre à primeira página da seção. Defina `href` quando quiser que ela leve a outro lugar:
 
 ```ts blume.config.ts
 navigation: {
@@ -135,15 +135,26 @@ navigation: {
 }
 ```
 
-Isso importa para rotas que não fazem parte da árvore de conteúdo, já que o fallback não consegue enxergá-las: o índice do [changelog](/docs/advanced/changelog) gerado, ou uma [página personalizada](/docs/advanced/custom-pages) que você adicionou em `pages/`. Sem `href`, uma aba `/changelog` leva à entrada mais recente em vez do índice. Abas que não definem `href` não são afetadas.
+Isso importa para rotas que não fazem parte da árvore de conteúdo, já que o fallback não as enxerga: o índice de [changelog](/docs/advanced/changelog) gerado, ou uma [página personalizada](/docs/advanced/custom-pages) que você adicionou sob `pages/`. Sem `href`, uma aba `/changelog` cai na entrada mais recente em vez do índice. Abas que não definem `href` não são afetadas.
+
+Em um site com [i18n](/docs/content/i18n), o `label` de uma aba (e o de um item de dropdown) pode ser um mapa por idioma em vez de uma string — a entrada do idioma ativo prevalece, depois a do idioma padrão:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: { en: "Docs", fr: "Documentation" }, path: "/docs" },
+    { label: "CLI", path: "/cli" }, // a plain string renders as-is everywhere
+  ],
+}
+```
 
 As abas também **delimitam a barra lateral**: quando a rota atual está sob o `path` de uma aba, a barra lateral mostra apenas as páginas daquela seção — então `/adapters/*` lista os adaptadores e nada mais. A pasta no `path` de uma aba se torna a seção, então isso não requer nenhuma configuração além das próprias abas; estruture seu conteúdo em uma pasta por aba e aponte cada aba para ela.
 
-Em uma rota que não está sob nenhuma aba (ou sob uma aba cujo `path` é `/`), a barra lateral mostra as páginas que _não_ pertencem a uma aba — a pasta de cada aba fica oculta nela, já que aquela seção já tem sua própria aba no cabeçalho. Assim, uma página inicial raiz lista suas páginas soltas de nível superior enquanto o conteúdo seccionado permanece atrás de sua aba, espelhando as pastas raiz do Fumadocs. Se uma rota não tiver páginas próprias para mostrar dessa forma, a árvore completa é exibida em vez disso, de modo que a barra lateral nunca fica em branco.
+Em uma rota que não está sob nenhuma aba (ou sob uma aba cujo `path` é `/`), a barra lateral mostra as páginas que _não_ pertencem a uma aba — a pasta de cada aba fica oculta dela, já que aquela seção já tem sua própria aba no cabeçalho. Assim, uma página inicial na raiz lista suas páginas soltas de nível superior enquanto o conteúdo seccionado permanece atrás da sua aba, espelhando as pastas raiz do Fumadocs. Se uma rota não tiver páginas próprias para mostrar dessa forma, a árvore completa é exibida em vez disso, de modo que a barra lateral nunca fica em branco.
 
 ## Seletores
 
-Para alternar entre partições inteiras de um site — um produto, uma versão ou qualquer conjunto agrupado de destinos — adicione um `selector`. Cada um é renderizado como um menu suspenso no cabeçalho, mostrando a opção cujo `path` corresponde à rota atual:
+Para alternar entre partições inteiras de um site — um produto, uma versão ou qualquer conjunto agrupado de destinos — adicione um `selector`. Cada um é renderizado como um dropdown no cabeçalho, mostrando a opção cujo `path` corresponde à rota atual:
 
 ```ts blume.config.ts lineNumbers
 navigation: {
@@ -160,7 +171,7 @@ navigation: {
 }
 ```
 
-Cada item recebe um `label`, um `path` e, opcionalmente, `icon`, `description` e `tag`. `kind` (`dropdown`, `product`, `version` ou `language`) é uma dica sobre como o seletor é usado; todos renderizam o mesmo menu suspenso.
+Cada item recebe um `label`, um `path` e, opcionalmente, `icon`, `description` e `tag`. `kind` (`dropdown`, `product`, `version` ou `language`) é uma indicação de como o seletor é usado; todos renderizam o mesmo dropdown.
 
 ## Links em destaque
 
@@ -175,11 +186,11 @@ navigation: {
 }
 ```
 
-Cada link recebe um `label`, um `href` e um `icon` opcional (o nome de um [ícone integrado](/docs/content/components#icon), caminho/URL de imagem ou SVG inline — igual a qualquer outro lugar). Um `href` pode apontar para qualquer lugar: uma URL externa abre em uma nova aba, enquanto uma rota interna (`/contact`) é validada contra suas páginas em tempo de compilação, avisando você se nada corresponder.
+Cada link recebe um `label`, um `href` e um `icon` opcional (um nome de [ícone integrado](/docs/content/components#icon), caminho/URL de imagem ou SVG inline — o mesmo que em qualquer outro lugar). Um `href` pode apontar para qualquer lugar: uma URL externa abre em uma nova aba, enquanto uma rota interna (`/contact`) é validada contra as suas páginas no momento da build, avisando você se nada corresponder.
 
 ## Barra lateral explícita
 
-Para controle total, liste itens explícitos em `navigation.sidebar` — um array simples é um atalho para `sidebar.items`, e a forma de objeto os combina com um [`display`](#display-modes) global. Quando os itens são definidos, o Blume os usa literalmente e ignora a geração pelo sistema de arquivos:
+Para controle total, liste itens explícitos em `navigation.sidebar` — um array simples é um atalho para `sidebar.items`, e a forma de objeto os combina com um [`display`](#display-modes) global. Quando os itens são definidos, o Blume os usa literalmente e pula a geração pelo sistema de arquivos:
 
 ```ts blume.config.ts lineNumbers
 navigation: {
@@ -195,11 +206,11 @@ navigation: {
 }
 ```
 
-Cada item é uma rota de página (uma string), um grupo (`label` + `items`) ou um link (`label` + `href`). Grupos podem ser aninhados, sobrepor o [modo `display`](#display-modes) global e começar `collapsed`.
+Cada item é uma rota de página (uma string), um grupo (`label` + `items`) ou um link (`label` + `href`). Grupos podem ser aninhados, substituir o [modo `display`](#display-modes) global e começar `collapsed`.
 
 ## Link do repositório
 
-Quando você define [`github`](/docs/configuration) na sua configuração, o Blume mostra um ícone do GitHub no cabeçalho — ao lado do alternador de tema — que leva ao seu repositório. Ele fica ativo por padrão; oculte-o com `navigation.repo`:
+Quando você define [`github`](/docs/configuration) na sua configuração, o Blume mostra um ícone do GitHub no cabeçalho — ao lado do alternador de tema — que leva ao seu repositório. Ele vem ativado por padrão; oculte-o com `navigation.repo`:
 
 ```ts blume.config.ts lineNumbers
 navigation: {
@@ -207,27 +218,27 @@ navigation: {
 }
 ```
 
-O link só aparece quando `github` está configurado, então projetos sem um repositório não são afetados de nenhuma forma.
+O link só aparece quando `github` está configurado, então projetos sem repositório não são afetados de nenhuma forma.
 
 ## Trilhas de navegação e paginação
 
 Elas vêm de graça a partir da árvore da barra lateral — sem configuração:
 
 - **Trilhas de navegação** mostram o grupo pai da página atual acima do título.
-- **Links de anterior e próximo** ao pé de cada página seguem a ordem da barra lateral, pulando páginas ocultas.
+- **Links de anterior e próximo** no rodapé de cada página seguem a ordem da barra lateral, pulando páginas ocultas.
 
 ## Nesta página
 
-Um sumário na coluna lateral direita é gerado automaticamente a partir dos títulos `##` e `###` de cada página, para que páginas longas continuem fáceis de percorrer. Em telas mais estreitas, onde a coluna direita fica oculta, ele se recolhe em um menu suspenso “Nesta página” acima do conteúdo.
+Um sumário na coluna direita é gerado automaticamente a partir dos títulos `##` e `###` de cada página, para que páginas longas continuem fáceis de escanear. Em telas mais estreitas, onde a coluna direita fica oculta, ele se recolhe em um dropdown “Nesta página” acima do conteúdo.
 
 ## Ações da página
 
-Abaixo do sumário, cada página exibe um conjunto de ações rápidas:
+Abaixo do sumário, toda página exibe um conjunto de ações rápidas:
 
-- **Editar no GitHub** — leva direto ao arquivo de origem. Aparece assim que você define [`github`](/docs/configuration) na sua configuração.
+- **Editar no GitHub** — leva direto ao arquivo-fonte. Aparece assim que você define [`github`](/docs/configuration) na sua configuração.
 - **Voltar ao topo** — retorna suavemente ao topo de páginas longas.
 - **Enviar feedback** — abre uma issue do GitHub pré-preenchida com uma reação e uma nota opcionais (também requer `github`).
 
 Outras entregam a página a ferramentas de IA — **Copiar como Markdown** e **Abrir no chat** — abordadas em [IA](/docs/configuration/ai#copy-as-markdown).
 
-Com [`export`](/docs/configuration/export) ativado, uma ação **Exportar** também permite que os leitores baixem a página como PDF ou EPUB.
+Com [`export`](/docs/configuration/export) ativado, uma ação de **Exportar** também permite que os leitores baixem a página como PDF ou EPUB.

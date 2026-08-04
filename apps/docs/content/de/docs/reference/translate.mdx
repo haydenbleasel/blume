@@ -1,10 +1,10 @@
 ---
 title: Übersetzen
 description: >-
-  blume translate füllt deine Sprachversionen mit einem KI-Agenten — es findet die Seiten, die in der jeweiligen Sprache fehlen oder veraltet sind, übersetzt sie mit der Agent-CLI, die du bereits hast, und gibt CI eine Prüfung, die fehlschlägt, wenn Übersetzungen auseinanderlaufen.
+  blume translate füllt Ihre Locales mit einem KI-Agenten – es findet die Seiten, die in jeder Sprache fehlen oder veraltet sind, übersetzt sie mit der Agent-CLI, die Sie bereits haben, und gibt CI eine Schranke, die fehlschlägt, wenn Übersetzungen abdriften.
 ---
 
-Sobald [i18n](/docs/content/i18n) aktiviert ist, veraltet jede Änderung an einer Quellseite stillschweigend deren Übersetzungen. `blume translate` schließt diesen Kreis: Es ermittelt genau, welche Seiten in welcher Sprache fehlen oder veraltet sind, übersetzt sie headless mit einer lokalen Agent-CLI und hält in einem eingecheckten Ledger fest, was es getan hat — damit der nächste Lauf und CI wissen, was aktuell ist.
+Sobald [i18n](/docs/content/i18n) aktiviert ist, veraltet jede Änderung an einer Quellseite stillschweigend deren Übersetzungen. `blume translate` schließt diesen Kreis: Es berechnet exakt, welche Seiten in jeder Locale fehlen oder veraltet sind, übersetzt sie headless mit einer lokalen Agent-CLI und hält in einem eingecheckten Ledger fest, was es getan hat, damit der nächste Lauf – und CI – weiß, was aktuell ist.
 
 ```bash
 blume translate --claude
@@ -20,35 +20,35 @@ blume translate  3 item(s) · 2 locale(s) · Claude Code
   Translated 3 files into 2 locales · 1 adopted · 14 already up to date · 51.1s · $0.22
 ```
 
-## So funktioniert es
+## Funktionsweise
 
-Blume steuert die Pipeline; der Agent übersetzt nur Text. Für jede Datei, die Arbeit erfordert, baut Blume einen Übersetzungs-Prompt, führt die Agent-CLI headless aus — mit deaktivierten Datei-, Shell- und Web-Tools —, validiert die Struktur der Antwort und schreibt die Zieldatei selbst: [Claude Code](https://claude.com/claude-code) mit `--claude` oder [Codex](https://developers.openai.com/codex/cli) mit `--codex`. Blume hält keine API-Schlüssel und ruft selbst kein Modell auf.
+Blume besitzt die Pipeline; der Agent übersetzt nur Text. Für jede Datei, die Arbeit erfordert, baut Blume einen Übersetzungs-Prompt, führt die Agent-CLI headless mit deaktivierten Datei-, Shell- und Web-Tools aus, validiert die Struktur der Antwort und schreibt die Zieldatei selbst – [Claude Code](https://claude.com/claude-code) mit `--claude` oder [Codex](https://developers.openai.com/codex/cli) mit `--codex`. Blume hält keine API-Schlüssel und ruft selbst kein Modell auf.
 
-Jeder validierte Schreibvorgang wird in `blume.translations.json` im Projektstammverzeichnis festgehalten: für jede Quelldatei und Sprache ein Hash der Quelle zum Zeitpunkt der Übersetzung. **Checke diese Datei ein.** So erkennt ein erneuter Lauf den Unterschied zwischen „bereits übersetzt" und „übersetzt, aber die Quelle hat sich seitdem geändert" — und genau das macht die CI-Prüfung möglich.
+Jeder validierte Schreibvorgang wird in `blume.translations.json` im Projektstammverzeichnis festgehalten: für jede Quelldatei und Locale ein Hash der Quelle zum Zeitpunkt der Übersetzung. **Committen Sie diese Datei.** So erkennt ein erneuter Lauf den Unterschied zwischen „bereits übersetzt" und „übersetzt, aber die Quelle hat sich seitdem geändert" – und genau das macht die CI-Schranke möglich.
 
-Das Ledger wird nach jeder fertigen Datei geschrieben, sodass beim Abbruch eines langen Laufs (Strg+C) höchstens die gerade laufenden Übersetzungen verloren gehen — der nächste Lauf macht dort weiter, wo du aufgehört hast. Standardmäßig laufen 4 Dateien gleichzeitig; erhöhe den Wert mit `--concurrency`, wenn deine Maschine und die Rate Limits des Agenten es zulassen.
+Das Ledger wird nach jeder fertiggestellten Datei geschrieben, sodass beim Abbrechen eines langen Laufs (Strg+C) höchstens die gerade laufenden Übersetzungen verloren gehen – der nächste Lauf macht dort weiter, wo Sie aufgehört haben. Standardmäßig laufen 4 Dateien gleichzeitig; erhöhen Sie den Wert mit `--concurrency`, wenn Ihre Maschine und die Rate Limits des Agenten es zulassen.
 
-Erneute Läufe sind inkrementell: Eine Quelle, die sich seit ihrer letzten Übersetzung nicht geändert hat, wird übersprungen — `blume translate` nach dem Bearbeiten einer Seite übersetzt also eine Seite pro Sprache.
+Erneute Läufe sind inkrementell: Eine Quelle, die sich seit ihrer letzten Übersetzung nicht geändert hat, wird übersprungen – wenn Sie also `blume translate` nach der Bearbeitung einer Seite ausführen, wird eine Seite pro Locale übersetzt.
 
 ## Was übersetzt wird
 
-- **Seiten** — `.md`/`.mdx`-Dateien in der Standardsprache. Der Agent übersetzt die Prosa und nur die für Menschen sichtbaren Frontmatter-Werte (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Die Ziele richten sich nach deinem Parser: `fr/guides/install.mdx` bei `dir`, `guides/install.fr.mdx` bei `dot`.
-- **Navigationstitel von Ordnern** — beim `dir`-Parser werden die benötigten [`meta.ts`](/docs/content/meta)-Titel jeder Sprache in einem gebündelten Aufruf übersetzt, und die generierte sprachspezifische `meta.ts` übernimmt jeden anderen Schlüssel (`order`, `pages`, `icon`, `collapsed`) wortwörtlich, damit die Seitenleiste der Sprache ihre Reihenfolge behält.
+- **Seiten** – `.md`/`.mdx`-Dateien in der Standard-Locale. Der Agent übersetzt die Prosa und nur die für Menschen sichtbaren Frontmatter-Werte (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Die Ziele richten sich nach Ihrem Parser: `fr/guides/install.mdx` bei `dir`, `guides/install.fr.mdx` bei `dot`.
+- **Navigationstitel von Ordnern** – beim `dir`-Parser werden die benötigten [`meta.ts`](/docs/content/meta)-Titel jeder Locale in einem gebündelten Aufruf übersetzt, und die generierte `meta.ts` pro Locale übernimmt jeden anderen Schlüssel (`order`, `pages`, `icon`, `collapsed`) wortwörtlich, damit die Sidebar der Locale ihre Reihenfolge behält.
 
-Von Hand geschriebene Übersetzungen werden **übernommen, nie überschrieben**: Eine Übersetzung, die existiert, aber keinen Ledger-Eintrag hat, wird als aktuell markiert und unangetastet gelassen. Nur `--force` übersetzt sie neu.
+Übersetzungen, die Sie von Hand geschrieben haben, werden **übernommen, niemals überschrieben**: Eine Übersetzung, die existiert, aber keinen Ledger-Eintrag hat, wird als aktuell gestempelt und unangetastet gelassen. Nur `--force` übersetzt sie erneut.
 
 ## Validierung
 
-Dem Agenten wird die Struktur niemals anvertraut. Vor dem Schreiben prüft Blume jede Antwort und baut die Datei aus der Quelle neu auf:
+Dem Agenten wird bei der Struktur nie vertraut. Vor dem Schreiben prüft Blume jede Antwort und baut die Datei aus der Quelle neu auf:
 
-- Das Frontmatter wird aus den Daten der Quelldatei rekonstruiert, wobei nur die sechs übersetzbaren Werte überlagert werden — vom Agenten erfundene Schlüssel werden verworfen, von ihm gelöschte Schlüssel wiederhergestellt, und `slug`, `icon`, `order` sowie Datumsangaben stammen konstruktionsbedingt wortwörtlich aus der Quelle.
+- Das Frontmatter wird aus den Daten der Quelldatei rekonstruiert, wobei nur die sechs übersetzbaren Werte überlagert werden – vom Agenten erfundene Schlüssel werden verworfen, von ihm gelöschte Schlüssel werden wiederhergestellt, und `slug`, `icon`, `order` sowie Datumsangaben stammen konstruktionsbedingt wortwörtlich aus der Quelle.
 - Die Anzahl der Code-Fences muss mit der Quelle übereinstimmen, der Textkörper darf nicht leer sein, und das Frontmatter muss parsebar sein.
 
-Eine Antwort, die die Validierung nicht besteht, schreibt nichts — das Element wird als fehlgeschlagen gemeldet und der Lauf geht weiter. Alles Erfolgreiche bleibt im Ledger vermerkt, sodass ein erneuter Lauf nur die Fehlschläge wiederholt.
+Eine Antwort, die die Validierung nicht besteht, schreibt nichts – das Element wird als fehlgeschlagen gemeldet und der Lauf fährt fort. Alles Erfolgreiche bleibt im Ledger gestempelt, sodass ein erneuter Lauf nur die Fehlschläge wiederholt.
 
 ## CI zum Fehlschlagen bringen
 
-`blume translate --check` ist die schreibgeschützte Prüfung: Sie meldet jedes fehlende und veraltete Paar und beendet sich mit einem Exit-Code ungleich null, wenn es Abweichungen gibt — ohne einen Agenten auszuführen oder etwas zu schreiben.
+`blume translate --check` ist die schreibgeschützte Schranke: Sie meldet jedes fehlende und veraltete Paar und beendet sich mit einem Exit-Code ungleich null, wenn es Abweichungen gibt – ohne einen Agenten auszuführen oder irgendetwas zu schreiben.
 
 ```bash
 blume translate --check           # exit 1 when translations are missing or stale
@@ -59,20 +59,21 @@ blume translate --check --json    # machine-readable drift report on stdout
 - run: npx blume translate --check
 ```
 
-Der JSON-Bericht hat dieselbe `diagnostics`- + `summary`-Struktur wie `blume validate --json`, `blume audit --json` und `blume eval --json`, wobei die Abweichungen pro Sprache gruppiert sind. Von Hand verfasste (nicht erfasste) Übersetzungen lassen die Prüfung nie fehlschlagen.
+Der JSON-Bericht trägt dieselbe `diagnostics`- + `summary`-Struktur wie `blume validate --json`, `blume audit --json` und `blume eval --json`, wobei die Abweichungen pro Locale gruppiert sind. Von Hand verfasste (nicht erfasste) Übersetzungen lassen die Schranke nie fehlschlagen.
 
 ## Einschränkungen
 
-- Die Übersetzung von Meta-Titeln funktioniert nur mit dem `dir`-Parser — der `dot`-Parser hat keinen Mechanismus für sprachspezifische `meta.ts`-Dateien. Eine `meta.ts`, die per Default eine Funktion exportiert, wird mit einer Warnung übersprungen; verfasse die Kopie für diese Sprache von Hand.
-- Externe und CMS-gestützte Quellen werden übersprungen: Es gibt keine lokale Datei, in die die Übersetzung geschrieben werden könnte.
-- Die Übersetzungsqualität liegt beim Agenten. Prüfe die Ausgabe wie jeden anderen Beitrag — das Ledger garantiert nur Aktualität, nicht sprachliche Qualität.
+- Die Übersetzung von Meta-Titeln gibt es nur beim `dir`-Parser – der `dot`-Parser hat keinen Mechanismus für `meta.ts` pro Locale. Eine `meta.ts`, die per Default eine Funktion exportiert, wird mit einer Warnung übersprungen; verfassen Sie die Kopie für diese Locale von Hand.
+- Remote- und CMS-gestützte Quellen werden übersprungen: Es gibt keine lokale Datei, in die die Übersetzung geschrieben werden könnte.
+- Die Beschriftungen der Header-Tabs liegen in `blume.config.ts`, nicht im Content – lokalisieren Sie sie dort mit [Label-Maps pro Locale](/docs/content/navigation#tabs).
+- Die Übersetzungsqualität ist die des Agenten. Prüfen Sie die Ausgabe wie jeden anderen Beitrag – das Ledger garantiert nur Aktualität, nicht Sprachfluss.
 
 ## Flags
 
-- `--claude` / `--codex` — welche Agent-CLI übersetzt. Genau eines davon ist erforderlich (außer bei `--check`).
-- `--check` — Abweichungen melden und mit einem Exit-Code ungleich null beenden, ohne etwas zu schreiben.
-- `--concurrency <n>` — parallele Agent-Sitzungen. Standardwert `4`, Maximum `16`.
-- `--locale <codes>` — kommagetrennte Zielsprachen (standardmäßig alle Sprachen außer der Standardsprache).
-- `--force` — alles neu übersetzen, einschließlich aktueller und von Hand verfasster Dateien.
-- `--timeout <seconds>` — Zeitlimit des Agenten pro Datei. Standardwert `600`; die Obergrenze existiert, um hängende Agenten abzufangen, damit große Seiten genug Zeit zum Abschließen haben.
-- `--json` — den Bericht in beiden Modi als JSON auf stdout ausgeben.
+- `--claude` / `--codex` – welche Agent-CLI übersetzt. Genau eines ist erforderlich (außer bei `--check`).
+- `--check` – Abweichungen melden und mit einem Exit-Code ungleich null beenden, ohne etwas zu schreiben.
+- `--concurrency <n>` – parallele Agent-Sitzungen. Standardwert `4`, Maximum `16`.
+- `--locale <codes>` – kommagetrennte Ziel-Locales (standardmäßig jede Locale außer der Standard-Locale).
+- `--force` – alles neu übersetzen, einschließlich aktueller und von Hand verfasster Dateien.
+- `--timeout <seconds>` – Zeitlimit des Agenten pro Datei. Standardwert `600`; die Obergrenze existiert, um hängende Agenten abzufangen, sodass große Seiten genug Zeit zum Fertigwerden haben.
+- `--json` – den Bericht als JSON auf stdout ausgeben, in beiden Modi.
