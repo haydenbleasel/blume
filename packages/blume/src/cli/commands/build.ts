@@ -435,6 +435,13 @@ export const isolatedOutputDir = (
  * bundle to the project root — a Vercel server build's static output stays at
  * `<runtime>/.vercel/output/static`, where `deployStaticDir` would instead
  * point at the project-root copy (a previous real build's assets, or nothing).
+ *
+ * Node and Cloudflare server builds both keep Astro's `dist/client` +
+ * `dist/server` split, so their client assets live one level down: the Node
+ * standalone server's static handler reads only `build.client`, and
+ * `@astrojs/cloudflare` sets `preserveBuildClientDir: true` and points the
+ * ASSETS binding in its generated `dist/server/wrangler.json` at `../client`.
+ * A Cloudflare *static* build has no such split and ships the `outDir` root.
  */
 export const isolatedStaticDir = (
   config: ResolvedConfig,
@@ -445,7 +452,7 @@ export const isolatedStaticDir = (
   if (output === "server" && adapter === "vercel") {
     return join(outputDir, "static");
   }
-  if (output === "server" && adapter === "node") {
+  if (output === "server" && (adapter === "node" || adapter === "cloudflare")) {
     return join(outputDir, "client");
   }
   return outputDir;

@@ -1,0 +1,5 @@
+---
+"blume": patch
+---
+
+Write a Cloudflare server build's artifacts where the Worker can actually serve them. `@astrojs/cloudflare` declares `preserveBuildClientDir: true`, so it keeps Astro's `dist/client` + `dist/server` split and points the ASSETS binding in the `dist/server/wrangler.json` it generates at `../client` — the deployed Worker serves `dist/client` and nothing above it. Blume still treated `dist/` as the served root, so `robots.txt`, `sitemap.xml`, `llms.txt`, `llms-full.txt`, `agent-readability.json`, `.well-known/api-catalog`, the Pagefind index, `_redirects`, and `_headers` all landed one directory too high and 404'd in production, and `blume audit` crawled `dist/` and read `client/` as a route segment, reporting ~118 phantom broken links. `deployStaticDir` and its isolated-build mirror `isolatedStaticDir` now resolve to `dist/client` for a Cloudflare server build, matching the existing Node standalone handling. Cloudflare static builds are unaffected — they have no client/server split, so the `outDir` root is still what ships.
