@@ -100,6 +100,16 @@ Fallback pages are excluded from the search index and aren't advertised as real 
 Start by translating your most important pages — the homepage, quickstart, and top guides — and let the rest fall back. You can fill in translations over time without breaking any links.
 :::
 
+## Translating with an agent
+
+You don't have to fill in the locales by hand. [`blume translate`](/docs/reference/translate) finds every page that's missing or outdated in each locale and translates it with a local agent CLI ([Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex/cli)):
+
+```bash
+blume translate --claude
+```
+
+Blume validates each result's structure — frontmatter, code fences, links — and writes the files itself; the agent only translates text. A committed ledger (`blume.translations.json`) tracks which source revision each translation came from, so reruns only touch what changed, and translations you wrote by hand are adopted as-is, never overwritten. In CI, `blume translate --check` fails when a source page has drifted ahead of its translations.
+
 ## The language switcher
 
 When i18n is on, a language switcher appears in the header automatically, generated from your `locales`. For each page it links the matching translation in every language; where a translation is missing it links the fallback page and marks it as not translated. There's nothing to configure.

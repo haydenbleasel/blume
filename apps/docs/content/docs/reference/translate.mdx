@@ -1,0 +1,74 @@
+---
+title: Translate
+description: blume translate fills in your locales with an AI agent — it finds the pages that are missing or outdated in each language, translates them with the agent CLI you already have, and gives CI a gate that fails when translations drift.
+---
+
+Once [i18n](/docs/content/i18n) is on, every edit to a source page quietly outdates its translations. `blume translate` closes that loop: it computes exactly which pages are missing or stale in each locale, translates them headlessly with a local agent CLI, and records what it did in a committed ledger so the next run — and CI — knows what's current.
+
+```bash
+blume translate --claude
+```
+
+```
+blume translate  3 item(s) · 2 locale(s) · Claude Code
+
+  ✔ docs/guides/install.mdx → fr 24.2s $0.11
+  ✔ docs/guides/install.mdx → de 22.8s $0.10
+  ✔ meta titles (2) → de 4.1s $0.01
+
+  Translated 3 files into 2 locales · 1 adopted · 14 already up to date · 51.1s · $0.22
+```
+
+## How it works
+
+Blume owns the pipeline; the agent only translates text. For each file that needs work, Blume builds a translation prompt, runs the agent CLI headlessly with its file, shell, and web tools disabled, validates the reply's structure, and writes the target file itself — [Claude Code](https://claude.com/claude-code) with `--claude`, or [Codex](https://developers.openai.com/codex/cli) with `--codex`. Blume holds no API keys and calls no model itself.
+
+Every validated write is recorded in `blume.translations.json` at the project root: for each source file and locale, a hash of the source at the moment it was translated. **Commit this file.** It's how a rerun knows the difference between "already translated" and "translated, but the source changed since" — and it's what makes the CI gate possible.
+
+Reruns are incremental: a source that hasn't changed since its last translation is skipped, so running `blume translate` after editing one page translates one page per locale.
+
+## What gets translated
+
+- **Pages** — `.md`/`.mdx` files in the default locale. The agent translates the prose and only the human-visible frontmatter values (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Targets follow your parser: `fr/guides/install.mdx` under `dir`, `guides/install.fr.mdx` under `dot`.
+- **Folder navigation titles** — under the `dir` parser, each locale's needed [`meta.ts`](/docs/content/meta) titles are translated in one batched call, and the generated per-locale `meta.ts` copies every other key (`order`, `pages`, `icon`, `collapsed`) verbatim so the locale's sidebar keeps its ordering.
+
+Translations you wrote by hand are **adopted, never overwritten**: a translation that exists but has no ledger entry is stamped as current and left alone. Only `--force` retranslates it.
+
+## Validation
+
+The agent is never trusted with structure. Before writing, Blume checks each reply and rebuilds the file from the source:
+
+- The frontmatter is reconstructed from the source file's data, with only the six translatable values overlaid — keys the agent invented are dropped, keys it deleted are restored, and `slug`, `icon`, `order`, and dates are source-verbatim by construction.
+- The number of code fences must match the source, the body must be non-empty, and the frontmatter must parse.
+
+A reply that fails validation writes nothing — the item is reported as failed and the run moves on. Everything that succeeded stays stamped in the ledger, so a rerun retries only the failures.
+
+## Failing CI
+
+`blume translate --check` is the read-only gate: it reports every missing and stale pair and exits non-zero when there's drift, without running an agent or writing anything.
+
+```bash
+blume translate --check           # exit 1 when translations are missing or stale
+blume translate --check --json    # machine-readable drift report on stdout
+```
+
+```yaml .github/workflows/translations.yml
+- run: npx blume translate --check
+```
+
+The JSON report carries the same `diagnostics` + `summary` shape as `blume validate --json`, `blume audit --json`, and `blume eval --json`, with the drift grouped per locale. Hand-authored (untracked) translations never fail the gate.
+
+## Limitations
+
+- Meta title translation is `dir`-parser only — the `dot` parser has no per-locale `meta.ts` mechanism. A `meta.ts` that default-exports a function is skipped with a warning; author that locale's copy by hand.
+- Remote and CMS-backed sources are skipped: there is no local file to write the translation to.
+- Translation quality is the agent's. Review the output like any other contribution — the ledger only guarantees freshness, not fluency.
+
+## Flags
+
+- `--claude` / `--codex` — which agent CLI translates. Exactly one is required (except with `--check`).
+- `--check` — report drift and exit non-zero, without writing anything.
+- `--locale <codes>` — comma-separated target locales (defaults to every non-default locale).
+- `--force` — retranslate everything, up-to-date and hand-authored files included.
+- `--timeout <seconds>` — agent time limit per file. Defaults to `180`.
+- `--json` — emit the report as JSON on stdout, in both modes.

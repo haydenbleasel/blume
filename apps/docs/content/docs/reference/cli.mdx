@@ -23,6 +23,7 @@ blume <command> [options]
 | `blume validate` | Validate links across your content. |
 | `blume audit` | Audit the built site for SEO and health issues. |
 | `blume eval` | Test the docs: an agent answers your questions using only the documentation. |
+| `blume translate` | Translate docs into the configured locales with a local agent CLI. |
 
 ## Common flags
 
@@ -62,6 +63,9 @@ blume <command> [options]
 - `blume eval` — run the questions in `evals.yaml` through an agent that reads only your docs; see [Evals](/docs/reference/eval).
 - `blume eval init` — have the agent draft a starter `evals.yaml` from your docs.
 - `blume eval --agent claude|codex --threshold <0..1> --timeout <seconds> --json --fix --verbose` — see [Evals](/docs/reference/eval) for each flag.
+- `blume translate --claude` / `--codex` — translate missing and outdated pages into your configured locales; see [Translate](/docs/reference/translate).
+- `blume translate --check` — report translation drift and exit non-zero (the CI gate), without running an agent.
+- `blume translate --locale <codes> --force --timeout <seconds> --json` — see [Translate](/docs/reference/translate) for each flag.
 
 ## Verifying while the dev server runs
 

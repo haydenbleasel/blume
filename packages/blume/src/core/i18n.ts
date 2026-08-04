@@ -149,6 +149,37 @@ export const localePlacement = (
 };
 
 /**
+ * The inverse of {@link localePlacement}: where a default-locale file's
+ * translation into `locale` lives, by parser:
+ * - `dir`: a leading locale directory (`guides/x.mdx` → `fr/guides/x.mdx`)
+ * - `dot`: a filename suffix (`guides/x.mdx` → `guides/x.fr.mdx`)
+ *
+ * Under `dot`, a source authored with an explicit default-locale suffix
+ * (`x.en.mdx`) swaps it for the target's (`x.fr.mdx`) — same case-insensitive
+ * last-dot-inside-filename logic as `localePlacement`, so both spellings of a
+ * default-locale file resolve to one canonical target.
+ */
+export const localeTargetPath = (
+  rel: string,
+  ext: string,
+  locale: string,
+  i18n: ResolvedI18nConfig
+): string => {
+  if (i18n.parser === "dot") {
+    let base = rel.slice(0, rel.length - ext.length);
+    const lastDot = base.lastIndexOf(".");
+    if (lastDot > base.lastIndexOf("/")) {
+      const suffix = base.slice(lastDot + 1).toLowerCase();
+      if (i18n.locales.some((entry) => entry.code.toLowerCase() === suffix)) {
+        base = base.slice(0, lastDot);
+      }
+    }
+    return `${base}.${locale}${ext}`;
+  }
+  return `${locale}/${rel}`;
+};
+
+/**
  * Warn about top-level content folders that look like a locale (a code Blume
  * recognizes) but aren't declared in `i18n.locales`. Without this they're
  * silently treated as default-locale content under a `/<code>/…` route, which

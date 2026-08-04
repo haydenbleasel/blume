@@ -15,6 +15,7 @@ import {
   localeDir,
   localePlacement,
   localePrefix,
+  localeTargetPath,
   localizeRoute,
   resolveFallbackLocale,
 } from "../src/core/i18n.ts";
@@ -685,6 +686,50 @@ describe("dot parser and shared files", () => {
       locales: ["pt-BR"],
       navPath: "intro.mdx",
     });
+  });
+
+  it("resolves translation targets under the dir parser", () => {
+    const i18n = i18nOf();
+    expect(localeTargetPath("guides/x.mdx", ".mdx", "fr", i18n)).toBe(
+      "fr/guides/x.mdx"
+    );
+    expect(localeTargetPath("index.md", ".md", "fr", i18n)).toBe("fr/index.md");
+  });
+
+  it("resolves translation targets under the dot parser", () => {
+    const i18n = i18nOf({ parser: "dot" });
+    expect(localeTargetPath("guides/x.mdx", ".mdx", "fr", i18n)).toBe(
+      "guides/x.fr.mdx"
+    );
+    // Symmetric authoring: an explicit default-locale suffix is swapped, not
+    // stacked (`x.en.mdx` → `x.fr.mdx`, never `x.en.fr.mdx`).
+    expect(localeTargetPath("guides/x.en.mdx", ".mdx", "fr", i18n)).toBe(
+      "guides/x.fr.mdx"
+    );
+    // A non-locale dotted name keeps its suffix.
+    expect(localeTargetPath("intro.v2.mdx", ".mdx", "fr", i18n)).toBe(
+      "intro.v2.fr.mdx"
+    );
+    // A dot in a directory name is not a locale suffix.
+    expect(localeTargetPath("v2.5/intro.mdx", ".mdx", "fr", i18n)).toBe(
+      "v2.5/intro.fr.mdx"
+    );
+  });
+
+  it("matches an existing dot suffix case-insensitively when retargeting", () => {
+    const i18n = i18nOf({
+      locales: [
+        { code: "en", label: "English" },
+        { code: "pt-BR", label: "Português" },
+      ],
+      parser: "dot",
+    });
+    expect(localeTargetPath("intro.EN.mdx", ".mdx", "pt-BR", i18n)).toBe(
+      "intro.pt-BR.mdx"
+    );
+    expect(localeTargetPath("intro.mdx", ".mdx", "pt-BR", i18n)).toBe(
+      "intro.pt-BR.mdx"
+    );
   });
 
   it("hoists a dir-parser locale directory in front of the source prefix", async () => {

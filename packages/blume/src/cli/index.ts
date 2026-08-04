@@ -13,6 +13,7 @@ import { initCommand } from "./commands/init.ts";
 import { mcpStdioCommand } from "./commands/mcp-stdio.ts";
 import { previewCommand } from "./commands/preview.ts";
 import { syncCommand } from "./commands/sync.ts";
+import { translateCommand } from "./commands/translate.ts";
 import { validateCommand } from "./commands/validate.ts";
 import { loadEnvFiles } from "./env.ts";
 import { reportInternalError } from "./internal-error.ts";
@@ -36,6 +37,7 @@ const main = defineCommand({
     "mcp-stdio": mcpStdioCommand,
     preview: previewCommand,
     sync: syncCommand,
+    translate: translateCommand,
     validate: validateCommand,
   },
 });

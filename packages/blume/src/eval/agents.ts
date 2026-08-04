@@ -25,7 +25,7 @@ const MCP_SERVER_NAME = "docs";
  * sandbox: the reader must not read the repo, run commands, or search the
  * web — it sees the documentation the way a stranger does, through MCP.
  */
-const DISALLOWED_TOOLS = [
+export const DISALLOWED_TOOLS = [
   "Bash",
   "Read",
   "Glob",
