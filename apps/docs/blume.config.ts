@@ -39,6 +39,16 @@ export default defineConfig({
     owner: "haydenbleasel",
     repo: "blume",
   },
+  i18n: {
+    defaultLocale: "en",
+    locales: [
+      { code: "en", label: "English" },
+      { code: "de", label: "Deutsch" },
+      { code: "hi", label: "हिन्दी" },
+      { code: "ja", label: "日本語" },
+      { code: "pt", label: "Português" },
+    ],
+  },
   lastModified: true,
   logo: "/logo.svg",
   navigation: {
