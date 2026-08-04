@@ -1,0 +1,78 @@
+---
+title: Traduzir
+description: >-
+  O blume translate preenche seus locales com um agente de IA — ele encontra as páginas que estão ausentes ou desatualizadas em cada idioma, traduz com a CLI de agente que você já tem e dá à CI um portão que falha quando as traduções ficam defasadas.
+---
+
+Assim que o [i18n](/docs/content/i18n) está ativado, cada edição em uma página de origem silenciosamente desatualiza suas traduções. O `blume translate` fecha esse ciclo: ele calcula exatamente quais páginas estão ausentes ou defasadas em cada locale, traduz de forma headless com uma CLI de agente local e registra o que fez em um livro-razão versionado, para que a próxima execução — e a CI — saibam o que está atualizado.
+
+```bash
+blume translate --claude
+```
+
+```
+blume translate  3 item(s) · 2 locale(s) · Claude Code
+
+  ✔ docs/guides/install.mdx → fr 24.2s $0.11
+  ✔ docs/guides/install.mdx → de 22.8s $0.10
+  ✔ meta titles (2) → de 4.1s $0.01
+
+  Translated 3 files into 2 locales · 1 adopted · 14 already up to date · 51.1s · $0.22
+```
+
+## Como funciona
+
+O Blume é dono do pipeline; o agente apenas traduz texto. Para cada arquivo que precisa de trabalho, o Blume monta um prompt de tradução, executa a CLI do agente de forma headless com suas ferramentas de arquivo, shell e web desativadas, valida a estrutura da resposta e escreve ele mesmo o arquivo de destino — [Claude Code](https://claude.com/claude-code) com `--claude`, ou [Codex](https://developers.openai.com/codex/cli) com `--codex`. O Blume não guarda nenhuma chave de API e não chama nenhum modelo por conta própria.
+
+Cada escrita validada é registrada em `blume.translations.json` na raiz do projeto: para cada arquivo de origem e locale, um hash da origem no momento em que foi traduzida. **Faça commit desse arquivo.** É assim que uma nova execução distingue entre "já traduzido" e "traduzido, mas a origem mudou desde então" — e é o que torna possível o portão de CI.
+
+O livro-razão é gravado após cada arquivo concluído, então interromper uma execução longa (Ctrl+C) perde no máximo as traduções que estavam em andamento — a próxima execução retoma de onde você parou. Os arquivos são processados 4 por vez por padrão; aumente esse número com `--concurrency` se sua máquina e os limites de taxa do agente permitirem.
+
+As reexecuções são incrementais: uma origem que não mudou desde sua última tradução é ignorada, então executar `blume translate` depois de editar uma página traduz uma página por locale.
+
+## O que é traduzido
+
+- **Páginas** — arquivos `.md`/`.mdx` no locale padrão. O agente traduz a prosa e apenas os valores de frontmatter visíveis para humanos (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Os destinos seguem seu parser: `fr/guides/install.mdx` com `dir`, `guides/install.fr.mdx` com `dot`.
+- **Títulos de navegação de pastas** — com o parser `dir`, os títulos de [`meta.ts`](/docs/content/meta) necessários para cada locale são traduzidos em uma única chamada em lote, e o `meta.ts` gerado por locale copia todas as outras chaves (`order`, `pages`, `icon`, `collapsed`) literalmente, para que a barra lateral do locale mantenha sua ordenação.
+
+Traduções que você escreveu à mão são **adotadas, nunca sobrescritas**: uma tradução que existe mas não tem entrada no livro-razão é marcada como atual e deixada intacta. Somente `--force` a retraduz.
+
+## Validação
+
+Nunca se confia a estrutura ao agente. Antes de escrever, o Blume verifica cada resposta e reconstrói o arquivo a partir da origem:
+
+- O frontmatter é reconstruído a partir dos dados do arquivo de origem, com apenas os seis valores traduzíveis sobrepostos — chaves que o agente inventou são descartadas, chaves que ele apagou são restauradas, e `slug`, `icon`, `order` e datas são idênticos à origem por construção.
+- O número de blocos de código deve corresponder ao da origem, o corpo deve ser não vazio e o frontmatter deve ser interpretável.
+
+Uma resposta que falha na validação não escreve nada — o item é reportado como falho e a execução segue em frente. Tudo o que teve sucesso permanece marcado no livro-razão, então uma nova execução tenta novamente apenas as falhas.
+
+## Falhando a CI
+
+O `blume translate --check` é o portão somente leitura: ele reporta cada par ausente e defasado e sai com código diferente de zero quando há defasagem, sem executar um agente nem escrever nada.
+
+```bash
+blume translate --check           # exit 1 when translations are missing or stale
+blume translate --check --json    # machine-readable drift report on stdout
+```
+
+```yaml .github/workflows/translations.yml
+- run: npx blume translate --check
+```
+
+O relatório JSON traz o mesmo formato de `diagnostics` + `summary` que `blume validate --json`, `blume audit --json` e `blume eval --json`, com a defasagem agrupada por locale. Traduções escritas à mão (não rastreadas) nunca fazem o portão falhar.
+
+## Limitações
+
+- A tradução de títulos de meta é exclusiva do parser `dir` — o parser `dot` não tem um mecanismo de `meta.ts` por locale. Um `meta.ts` que exporta uma função como default é ignorado com um aviso; escreva a versão daquele locale à mão.
+- Origens remotas e vindas de CMS são ignoradas: não há arquivo local onde escrever a tradução.
+- A qualidade da tradução é do agente. Revise a saída como qualquer outra contribuição — o livro-razão só garante atualidade, não fluência.
+
+## Flags
+
+- `--claude` / `--codex` — qual CLI de agente traduz. Exatamente uma é obrigatória (exceto com `--check`).
+- `--check` — reporta a defasagem e sai com código diferente de zero, sem escrever nada.
+- `--concurrency <n>` — sessões de agente em paralelo. O padrão é `4`, máximo `16`.
+- `--locale <codes>` — locales de destino separados por vírgula (o padrão é todos os locales não padrão).
+- `--force` — retraduz tudo, incluindo arquivos atualizados e escritos à mão.
+- `--timeout <seconds>` — limite de tempo do agente por arquivo. O padrão é `600`; o teto existe para detectar agentes travados, então páginas grandes têm espaço para terminar.
+- `--json` — emite o relatório como JSON na saída padrão, em ambos os modos.

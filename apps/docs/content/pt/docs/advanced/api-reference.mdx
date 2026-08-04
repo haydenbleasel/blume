@@ -1,0 +1,168 @@
+---
+title: OpenAPI / AsyncAPI
+description: >-
+  Adicione uma especificação OpenAPI e obtenha uma referência de API nativa — uma página real por operação, na sua barra lateral e na busca.
+---
+
+Aponte o Blume para uma especificação OpenAPI e ele gera uma referência de API nativa: uma **página real por operação**, agrupada por tag em uma barra lateral delimitada por aba, com tabelas de esquema, exemplos de requisição/resposta e amostras de código geradas. Como cada operação é uma página Blume genuína, ela ganha sua própria URL, aparece na **busca do site** e no `llms.txt`, e recebe uma imagem Open Graph — igual a qualquer documento escrito à mão. A configuração abaixo aponta o Blume para a especificação pública do Petstore como exemplo.
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "https://petstore3.swagger.io/api/v3/openapi.json",
+}
+```
+
+Isso monta a referência em `/reference` (uma página de visão geral) com cada operação em `/reference/<tag>/<operation>`. O `spec` é uma URL `http(s)` ou um caminho para um arquivo local no seu projeto. O Blume o analisa com o [parser OpenAPI do Scalar](https://github.com/scalar/scalar) — especificações Swagger 2.0 e OpenAPI 3.0 são atualizadas para 3.1 automaticamente.
+
+A referência não adiciona uma aba de cabeçalho por conta própria. Para exibi-la, aponte uma [aba de navegação](/docs/content/navigation#tabs) para sua rota — isso também delimita a barra lateral de operações para o renderizador nativo:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [{ label: "API", path: "/reference" }],
+}
+```
+
+:::note
+As operações são indexadas para busca pelo seu **resumo e tag**. As tabelas de esquema renderizadas e as amostras de código não são indexadas em texto completo; a busca corresponde ao título e à seção de uma operação e, em seguida, cria um link para sua própria página.
+:::
+
+## Uma especificação local
+
+Um caminho relativo é resolvido a partir da raiz do seu projeto e lido em tempo de build. Tanto JSON quanto YAML funcionam:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+}
+```
+
+## Rota
+
+`route` controla onde a referência é montada — a página de visão geral e o prefixo para cada rota de operação (e a rota para a qual você aponta uma aba de navegação):
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  route: "/api",   // overview at /api, operations at /api/<tag>/<operation>
+  spec: "./openapi.yaml",
+}
+```
+
+## Amostras de código e esquemas
+
+`codeSamples` escolhe quais linguagens são renderizadas por operação (nativas: `curl`, `js`, `python`); `expandSchemas` inicia as linhas de esquema aninhadas expandidas em vez de recolhidas:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+  codeSamples: ["curl", "js"],
+  expandSchemas: true,
+}
+```
+
+## Múltiplas especificações
+
+Use `sources` para publicar mais de uma especificação. Cada fonte recebe sua própria rota de visão geral, páginas de operação e aba de cabeçalho. Dê a cada uma um `label` (usado para a aba e para derivar sua rota), ou defina uma `route` explícita:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", spec: "./public.json" },   // → /reference/public-api
+    { label: "Admin API", route: "/admin", spec: "./admin.json" },
+  ],
+}
+```
+
+`spec` é um atalho para um `sources` de entrada única, então você só recorre a `sources` quando tem mais de uma.
+
+### Indexação por fonte
+
+As páginas geradas participam da busca, do `llms.txt` e da indexação por rastreadores por padrão. Uma especificação secundária ou sobreposta pode optar por sair de qualquer superfície sem ocultar suas páginas ou removê-la da navegação:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", route: "/api", spec: "./public.json" },
+    {
+      label: "Platform API",
+      route: "/platform",
+      spec: "./platform.json",
+      includeInSearch: false,
+      includeInLlms: false,
+      noindex: true,
+    },
+  ],
+}
+```
+
+- `includeInSearch: false` mantém a visão geral e as operações da fonte fora da busca do site.
+- `includeInLlms: false` as mantém fora de ambos os arquivos `llms.txt`.
+- `noindex: true` adiciona metadados noindex para rastreadores e remove as páginas do sitemap.
+
+Com o [renderizador Scalar](#the-scalar-renderer), apenas `noindex` se aplica — uma referência renderizada pelo Scalar já fica fora da busca e do `llms.txt` do Blume, então as duas configurações `include*` não têm sobre o que atuar ali.
+
+## Autorização
+
+Operações que declaram [requisitos de segurança](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) renderizam uma seção **Authorization** acima de seus parâmetros, e as amostras de código geradas enviam uma credencial de espaço reservado (`Authorization: Bearer YOUR_TOKEN`, um cabeçalho de chave de API ou uma chave de consulta — o que o esquema exigir). Não há nada para configurar: o Blume lê `security` da especificação, então a referência sempre corresponde ao que a API realmente aplica.
+
+A semântica do OpenAPI é mantida conforme escrita:
+
+- O `security` próprio de uma operação sobrescreve o padrão da raiz do documento; `security: []` a marca como **pública** e não renderiza nenhuma seção de Autorização.
+- Múltiplas entradas de requisito são alternativas — renderizadas como grupos "ou"; todos os esquemas dentro de uma entrada são exigidos em conjunto. A primeira alternativa alimenta as amostras de código.
+- Uma entrada `{}` vazia significa que a autenticação é **opcional** para aquela operação, e a seção informa isso.
+- Os escopos OAuth2 são listados por esquema; as `description`s de esquema de `components.securitySchemes` são renderizadas inline.
+
+## O renderizador Scalar
+
+O renderizador nativo é o padrão. Se você preferir incorporar a referência de API autocontida do [Scalar](https://scalar.com) — com sua própria barra lateral, busca, tema e playground "Try it" em uma única rota — defina `renderer: "scalar"`:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  renderer: "scalar",
+  spec: "./openapi.yaml",
+  theme: "purple",   // a Scalar theme name (Scalar renderer only)
+}
+```
+
+Uma referência renderizada pelo Scalar é uma incorporação autocontida em sua própria rota — ela não se integra à barra lateral, à busca ou ao `llms.txt` do Blume. Seu playground "Try it" chama sua **API de destino diretamente do navegador** (o Blume não faz proxy), então a API precisa permitir requisições de origem cruzada a partir do site de documentação (`Access-Control-Allow-Origin`). `theme` e o playground se aplicam apenas ao renderizador Scalar.
+
+### Passando opções do Scalar
+
+`theme` é um atalho para a opção que a maioria das pessoas usa, mas o Scalar suporta muitas outras. Um objeto `scalar` encaminha qualquer [configuração do Scalar](https://github.com/scalar/scalar/blob/main/documentation/configuration.md) diretamente para a referência incorporada — o Blume não restringe as chaves, então tudo o que o Scalar aceita passa adiante:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  renderer: "scalar",
+  spec: "./openapi.yaml",
+  scalar: {
+    localization: { locale: "es" },   // translate Scalar's own UI
+    agent: { disabled: true },         // disable the Scalar Agent
+    hideTestRequestButton: true,
+    orderSchemaPropertiesBy: "preserve",
+  },
+}
+```
+
+O [`i18n`](/docs/content/i18n) do próprio Blume traduz a interface da documentação, mas o Scalar tem um sistema de localização separado — defina `scalar.localization.locale` para traduzir também a referência incorporada. As opções no objeto `scalar` prevalecem sobre a configuração derivada do Blume, então tudo que for definido aqui (incluindo `theme`, `customCss` ou o `content`/`url` da especificação) sobrescreve os padrões do Blume. O mesmo bloco `scalar` funciona na referência `asyncapi`.
+
+## AsyncAPI
+
+APIs orientadas a eventos usam um bloco irmão `asyncapi` com o mesmo formato. O AsyncAPI é renderizado pelo Scalar (o renderizador nativo é somente para OpenAPI por enquanto); apenas a rota padrão difere (`/events`):
+
+```ts blume.config.ts lineNumbers
+asyncapi: {
+  enabled: true,
+  spec: "./asyncapi.yaml",
+}
+```
+
+:::warning
+O suporte do Scalar a AsyncAPI ainda está em desenvolvimento — ele renderiza canais, operações, mensagens e uma seção de Modelos, mas ainda **não há playground interativo** para eventos. Isso melhora com o tempo no projeto original.
+:::

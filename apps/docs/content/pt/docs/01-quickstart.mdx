@@ -1,0 +1,96 @@
+---
+title: Início rápido
+description: >-
+  Instale o Blume, crie a estrutura de um novo projeto e publique a sua primeira página de documentação em minutos — depois faça-a crescer até um site completo ao seu próprio ritmo.
+sidebar:
+  label: Início rápido
+  order: 1
+---
+
+Passe de uma pasta vazia a um site de documentação em funcionamento com apenas alguns comandos. O Blume precisa de **Node.js 22.12 ou superior** e de uma pasta `docs/` com pelo menos um ficheiro `.md` ou `.mdx` — não há mais nada para configurar.
+
+## Instalar e executar
+
+<Steps>
+  <Step title="Install Blume">
+    Adicione o pacote a um projeto novo ou já existente.
+
+    ```package-install
+    npm i blume
+    ```
+
+  </Step>
+  <Step title="Scaffold a project">
+    O `blume init` faz algumas perguntas — onde criar o projeto, qual o nome do
+    seu site de documentação, que modelo usar e onde reside o seu conteúdo — e
+    depois gera a estrutura mínima: uma pasta de conteúdo e um ficheiro de
+    configuração. Passe `--yes` para saltar as perguntas e aceitar as predefinições.
+
+    ```bash
+    blume init
+    ```
+
+    ```txt
+    docs/
+      index.mdx
+    blume.config.ts
+    ```
+
+  </Step>
+  <Step title="Start the dev server">
+    O Blume gera o runtime e serve a sua documentação com recarregamento automático.
+
+    ```bash
+    blume dev
+    ```
+
+  </Step>
+  <Step title="Build for production">
+    O HTML estático é escrito em `dist/`, com um índice de pesquisa local construído sobre ele.
+
+    ```bash
+    blume build
+    ```
+
+  </Step>
+</Steps>
+
+:::tip
+O Blume funciona com qualquer gestor de pacotes e nunca exige que configure o Astro ou o Tailwind por si próprio.
+:::
+
+## Escrever a sua primeira página
+
+Cada página é Markdown ou MDX com um pouco de frontmatter — o `title` e a `description` são apresentados automaticamente como o cabeçalho e a introdução da página. Coloque isto em `docs/index.mdx`:
+
+```mdx docs/index.mdx lineNumbers
+---
+title: Introduction
+description: Welcome to my docs.
+---
+
+Welcome! Use **Markdown** and built-in components — no imports required:
+
+:::note
+Blume ships callouts, cards, tabs, steps, and more.
+:::
+```
+
+Guarde o ficheiro e o servidor de desenvolvimento recarrega de imediato. A navegação, a pesquisa e os metadados das páginas são inferidos a partir dos seus ficheiros à medida que os adiciona — continue a escrever, que o site acompanha.
+
+## Próximos passos
+
+<CardGroup cols={2}>
+  <Card title="Configuration" href="/docs/configuration" icon="file">
+    Ajuste o título, o tema, a pesquisa e a implementação.
+  </Card>
+  <Card title="Components" href="/docs/content/components" icon="folder">
+    Explore a biblioteca de componentes integrada.
+  </Card>
+  <Card title="AI" href="/docs/configuration/ai" icon="lightbulb">
+    Publique um `llms.txt` e um assistente Ask AI.
+  </Card>
+  <Card title="Deployment" href="/docs/deployment" icon="rocket">
+    Entre em produção em qualquer alojamento estático.
+  </Card>
+</CardGroup>

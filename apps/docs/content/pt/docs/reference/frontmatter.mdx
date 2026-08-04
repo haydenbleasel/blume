@@ -1,0 +1,116 @@
+---
+title: Frontmatter
+description: >-
+  Todos os campos de frontmatter que uma página aceita, todos opcionais — título, descrição, barra lateral, SEO, pesquisa e os demais, com o que cada um controla.
+---
+
+Todas as páginas aceitam o frontmatter a seguir. Todos os campos são opcionais.
+
+<TypeTable
+  type={{
+    title: { type: "string", description: "Título da página." },
+    description: { type: "string", description: "Resumo da página." },
+    type: {
+      type: "string",
+      default: "doc",
+      description: "Tipo de conteúdo. blog/changelog alimentam os feeds.",
+    },
+    date: {
+      type: "string",
+      description:
+        "Data de publicação para os feeds de blog/changelog (ISO ou data YAML).",
+    },
+    authors: {
+      type: "string | string[] | object[]",
+      description:
+        "Autor(es) do post para conteúdo de blog/changelog — um nome, ou objetos com um nome mais avatar/url opcionais e quaisquer campos extras. Preservado como está.",
+    },
+    slug: { type: "string", description: "Substitui o slug gerado." },
+    draft: {
+      type: "boolean",
+      default: "false",
+      description: "Exclui das builds de produção.",
+    },
+    lastModified: {
+      type: "string",
+      description:
+        'Fixa a data de "última atualização" da página (ISO ou data YAML); substitui a data derivada do git.',
+    },
+  }}
+/>
+
+## Barra lateral
+
+```yaml lineNumbers
+sidebar:
+  label: Install
+  order: 2
+  icon: download
+  badge: New
+  hidden: false
+```
+
+## SEO
+
+```yaml lineNumbers
+seo:
+  title: Install Blume
+  description: Install Blume and scaffold your first project.
+  image: /og/install.png
+  canonical: https://acme.com/install
+  noindex: false
+```
+
+## Pesquisa
+
+```yaml lineNumbers
+search:
+  exclude: false
+  tags: [api]
+```
+
+## Changelog
+
+As entradas de changelog (`type: changelog`) aceitam um objeto `changelog` opcional para metadados mais ricos de feed e exibição:
+
+```yaml lineNumbers
+type: changelog
+changelog:
+  version: 1.2.0
+  date: 2026-06-20
+  category: Features
+```
+
+`date` pode ficar aqui ou no nível superior — ambos alimentam o [feed RSS do changelog](/docs/content#feeds). Consulte [Changelog](/docs/advanced/changelog) para a página de linha do tempo gerada e o feed.
+
+## Chaves personalizadas
+
+Qualquer chave fora desta referência faz a build falhar, então erros de digitação são detectados cedo. Projetos que carregam seus próprios metadados podem incluir chaves extras via [`frontmatter.extend`](/docs/configuration#frontmatter) em `blume.config.ts`, cada uma validada por um schema fornecido pelo projeto:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { z } from "zod";
+
+export default defineConfig({
+  frontmatter: {
+    extend: {
+      owner: z.string(),
+      reviewedAt: z.coerce.date().optional(),
+    },
+  },
+});
+```
+
+```yaml page.mdx
+---
+title: Install
+owner: "@sam"
+reviewedAt: 2026-06-20
+---
+```
+
+Os schemas são aceitos pela interface [Standard Schema](https://standardschema.dev), então Zod (qualquer que seja a versão instalada pelo seu projeto), Valibot e ArkType funcionam. Toda chave declarada é validada em cada página — inclusive as ausentes — de modo que um schema obrigatório impõe a chave em todo o site; marque-a como `.optional()` para validar apenas onde estiver presente. Todas as demais chaves permanecem estritamente validadas, e os campos integrados não podem ser redeclarados.
+
+Uma página que falha na validação faz `blume build` falhar com um diagnóstico nomeando o arquivo e a chave. Com [`--no-strict`](/docs/reference/cli#common-flags), a build é bem-sucedida mesmo assim e as páginas com falha são removidas da saída — o resumo da build informa quantas.
+
+Os schemas são exportados de `blume/schema` para ferramentas de edição e migração.

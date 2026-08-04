@@ -1,0 +1,132 @@
+---
+title: Páginas
+description: >-
+  Como os ficheiros na sua pasta de conteúdo se tornam páginas, e como organizá-los e nomeá-los para que o encaminhamento e a navegação sejam inferidos automaticamente.
+---
+
+A sua documentação é apenas uma pasta de ficheiros Markdown e MDX. O Blume transforma cada ficheiro numa página — encaminhamento, navegação e metadados são inferidos a partir do sistema de ficheiros, pelo que não existe nenhum manifesto para manter sincronizado.
+
+O conteúdo fica na sua **raiz de conteúdo** (`docs/` por predefinição; altere-a com `content.root` em [`blume.config.ts`](/docs/configuration)).
+
+## Markdown e MDX
+
+O Blume compõe dois tipos de ficheiro:
+
+- **`.md`** — Markdown para prosa simples: GFM, frontmatter, pontuação inteligente e sobrescrito/subscrito.
+- **`.mdx`** — tudo o que o `.md` tem, mais [componentes](/docs/content/components) e as [diretivas, instalações de pacotes e matemática](/docs/content/syntax) exclusivas do MDX.
+
+Opte pelo `.md` quando uma página for apenas prosa, e pelo `.mdx` quando precisar de componentes ou diretivas. Mudar é tão simples como renomear o ficheiro.
+
+## Ficheiros e rotas
+
+Cada ficheiro corresponde a uma rota pelo seu caminho na raiz de conteúdo:
+
+| Ficheiro                  | Rota              |
+| ------------------------- | ----------------- |
+| `docs/index.mdx`          | `/`               |
+| `docs/quickstart.mdx`     | `/quickstart`     |
+| `docs/guides/theming.mdx` | `/guides/theming` |
+| `docs/guides/index.mdx`   | `/guides`         |
+
+Pastas aninhadas tornam-se rotas aninhadas, e um `index.mdx` dentro de uma pasta torna-se a página dessa mesma pasta.
+
+## Ordenação com prefixos numéricos
+
+Prefixe um ficheiro ou pasta com um número para controlar a sua ordem na barra lateral. O prefixo é removido do URL, pelo que pode reordenar páginas sem quebrar ligações:
+
+```txt
+01-introduction.mdx  ->  /introduction
+02-installation.mdx  ->  /installation
+```
+
+A ordenação tem várias camadas — consulte [Navegação](/docs/content/navigation) para as regras de precedência completas.
+
+## Pastas de agrupamento
+
+Envolva o nome de uma pasta em parênteses para agrupar as suas páginas na barra lateral **sem** adicionar um segmento ao URL:
+
+```txt
+docs/(internal)/security.mdx  ->  /security
+```
+
+As páginas partilham um grupo “Internal” na barra lateral, mas mantêm URLs planos e sem parênteses.
+
+## Rascunhos
+
+Marque uma página como rascunho para a manter fora das compilações de produção, podendo ainda pré-visualizá-la em `blume dev`:
+
+```yaml lineNumbers
+---
+title: Work in progress
+draft: true
+---
+```
+
+O `blume build` ignora rascunhos; o `blume dev` compõe-nos para que possa trabalhar abertamente.
+
+## Tipos de conteúdo
+
+Cada página tem um **tipo**, definido com o campo de frontmatter `type` (predefinição `doc`). Os tipos permitem ao Blume tratar grupos de páginas de forma diferente — e, mais importante ainda, as páginas `blog` e `changelog` são reunidas em [feeds](#feeds).
+
+```yaml lineNumbers
+---
+title: v1.2.0
+type: changelog
+date: 2026-06-20
+changelog:
+  version: 1.2.0
+  category: Features
+---
+```
+
+O tipo é independente do local onde o ficheiro se encontra, mas, por convenção, as publicações de blogue ficam em `blog/` e as entradas do registo de alterações em `changelog/`. Ambos recebem automaticamente um feed RSS, e as entradas do registo de alterações são também reunidas numa [cronologia `/changelog`](/docs/advanced/changelog) gerada. Consulte [Blogue](/docs/advanced/blog) e [Registo de alterações](/docs/advanced/changelog) para escrever cada um deles.
+
+## Feeds
+
+O Blume gera automaticamente um feed RSS para cada tipo de conteúdo listado em [`rss.types`](/docs/configuration/seo#rss-feeds) — `blog` e `changelog` por predefinição — desde que tenha pelo menos uma página. Os feeds são servidos em `/<type>/rss.xml`:
+
+| Tipo        | Feed                 |
+| ----------- | -------------------- |
+| `blog`      | `/blog/rss.xml`      |
+| `changelog` | `/changelog/rss.xml` |
+
+Atribua a cada entrada uma `date` para que os itens sejam ordenados do mais recente para o mais antigo e incluam uma `pubDate`. Uma data YAML sem aspas serve — o Blume normaliza-a:
+
+```yaml lineNumbers
+---
+title: Introducing Blume
+type: blog
+date: 2026-06-22
+description: Why we built a markdown-first docs framework.
+---
+```
+
+Os feeds precisam de um URL absoluto do site, por isso defina [`deployment.site`](/docs/deployment). O Blume adiciona etiquetas `<link rel="alternate">` a todas as páginas para que navegadores e leitores de feeds as descubram automaticamente. Consulte [Blogue](/docs/advanced/blog) e [Registo de alterações](/docs/advanced/changelog) para escrever cada tipo de conteúdo.
+
+## Nesta página
+
+Cada página recebe um índice automático, construído a partir dos seus cabeçalhos. Em ecrãs largos, fica numa barra lateral fixa ao lado do seu conteúdo; em ecrãs mais estreitos, recolhe-se num painel **Nesta página** acima da página. À medida que desloca a página, a entrada da secção que está a ler é destacada, para que saiba sempre onde se encontra numa página longa.
+
+O Blume converte cada cabeçalho num slug para criar uma âncora, pelo que cada entrada liga diretamente à sua secção — e pode criar ligações diretas para qualquer cabeçalho acrescentando o respetivo slug ao URL (`.../my-page#getting-started`).
+
+O índice lista os seus cabeçalhos `##` e `###` (H2 e H3). Uma página sem cabeçalhos desse nível simplesmente não tem índice.
+
+## Para onde ir a seguir
+
+<CardGroup cols={2}>
+  <Card title="Frontmatter" href="/docs/reference/frontmatter" icon="file">
+    Metadados da página: título, descrição, barra lateral, SEO e pesquisa.
+  </Card>
+  <Card title="Sintaxe" href="/docs/content/syntax" icon="book-open">
+    Todas as funcionalidades de Markdown e MDX que pode escrever.
+  </Card>
+  <Card title="Componentes" href="/docs/content/components" icon="folder">
+    Os componentes JSX disponíveis em qualquer página MDX.
+  </Card>
+  <Card title="Navegação" href="/docs/content/navigation" icon="menu">
+    Molde a barra lateral, a ordenação e os separadores.
+  </Card>
+  <Card title="Meta de pasta" href="/docs/content/meta" icon="panel-left">
+    Configure um grupo da barra lateral com um ficheiro `meta.ts`.
+  </Card>
+</CardGroup>

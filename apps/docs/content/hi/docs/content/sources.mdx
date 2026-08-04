@@ -1,0 +1,197 @@
+---
+title: कंटेंट स्रोत
+description: >-
+  लोकल फ़ाइलों, किसी रिमोट रिपॉज़िटरी, या किसी भी कस्टम बैकएंड से डॉक्स लाएँ — और कई स्रोतों को एक ऐसी स्टैटिक-फ़र्स्ट साइट में मिलाएँ जो बिल्ड टाइम पर पढ़ी जाती है।
+---
+
+डिफ़ॉल्ट रूप से Blume `.md`/`.mdx` फ़ाइलों का एक फ़ोल्डर पढ़ता है। **कंटेंट स्रोत** आपको कहीं और से पेज लाने देते हैं — किसी रिमोट रिपॉज़िटरी, किसी CMS, या किसी भी कस्टम बैकएंड से — और कई स्रोतों को एक ही साइट में मिलाने देते हैं। स्रोत बिल्ड टाइम पर पढ़े जाते हैं; Blume स्टैटिक-फ़र्स्ट ही रहता है।
+
+## डिफ़ॉल्ट
+
+बिना किसी कॉन्फ़िगरेशन के, Blume आपके कंटेंट रूट (डिफ़ॉल्ट रूप से `docs`) को एक निहित फ़ाइलसिस्टम स्रोत के रूप में स्कैन करता है। टॉप-लेवल `content.root`/`include`/`exclude` विकल्प पहले की तरह ही काम करते हैं — कुछ भी बदलने की ज़रूरत नहीं।
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: { root: "docs" },
+});
+```
+
+## कई स्रोत
+
+स्रोतों को जोड़ने के लिए एक `content.sources` ऐरे जोड़ें। हर एंट्री एक वैकल्पिक `prefix` से नेमस्पेस की जाती है, इसलिए उसके रूट `/<prefix>/…` के अंदर नेस्ट होते हैं। जब `sources` मौजूद होता है, तो यह निहित डिफ़ॉल्ट की जगह ले लेता है, इसलिए अपने लोकल डॉक्स के लिए एक `filesystem` एंट्री शामिल करें।
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      // Local docs at the site root
+      { type: "filesystem", root: "docs" },
+
+      // Remote MDX from a GitHub repo, mounted under /sdk
+      {
+        type: "mdx-remote",
+        prefix: "sdk",
+        github: { owner: "acme", repo: "sdk", ref: "main", path: "docs" },
+      },
+    ],
+  },
+});
+```
+
+अगर दो स्रोत एक ही रूट पर पहुँचते हैं, तो Blume एक `BLUME_DUPLICATE_ROUTE` बिल्ड एरर रिपोर्ट करता है — हर स्रोत को एक अलग `prefix` दें।
+
+## रिमोट MDX
+
+बिल्ट-इन `mdx-remote` स्रोत HTTP पर रॉ `.md`/`.mdx` फ़ेच करता है। फ़ाइलों की सूची या तो किसी GitHub रिपॉज़िटरी सबट्री (`github`) से बनाएँ या किसी रॉ बेस URL के सापेक्ष स्पष्ट रूप से (`url` + `files`):
+
+```ts blume.config.ts
+{
+  type: "mdx-remote",
+  prefix: "sdk",
+  url: "https://raw.githubusercontent.com/acme/sdk/main/docs",
+  files: ["intro.mdx", "guide.mdx"],
+}
+```
+
+किसी प्राइवेट रिपॉज़िटरी का टोकन `GITHUB_TOKEN` एनवायरनमेंट वेरिएबल से पढ़ा जाता है — यह कभी भी आपके कॉन्फ़िग या जेनरेट किए गए आउटपुट में इनलाइन नहीं किया जाता, और यह केवल GitHub के अपने होस्ट (`api.github.com`, `raw.githubusercontent.com`) पर ही भेजा जाता है, किसी कस्टम `url` बेस पर कभी नहीं।
+
+रिमोट पेज पूरी MDX-प्लस-कंपोनेंट सटीकता के साथ रेंडर होते हैं: उनकी बॉडी एक छिपी हुई स्टेजिंग डायरेक्टरी में मटीरियलाइज़ की जाती है और आपके लोकल डॉक्स के साथ Astro के ज़रिए रेंडर की जाती है, इसलिए कॉलआउट, टैब और हर दूसरा Blume कंपोनेंट काम करता रहता है।
+
+### कैशिंग और ऑफ़लाइन बिल्ड
+
+हर रिमोट स्रोत `.blume/cache/<source>/` के अंतर्गत एक स्नैपशॉट रखता है। अगर कोई फ़ेच विफल हो जाता है — कोई नेटवर्क गड़बड़ी या CMS आउटेज — तो Blume बिल्ड को विफल करने के बजाय चेतावनी के साथ आखिरी ज्ञात-अच्छा स्नैपशॉट परोसता है। कैश `.blume/` के अंदर रहता है और फिर से जेनरेट होता है, कभी कमिट नहीं किया जाता।
+
+डेव में, रिमोट कंटेंट एक बार फ़ेच किया जाता है और सेशन के लिए फ़्रीज़ कर दिया जाता है; इसे रीफ़्रेश करने के लिए डेव सर्वर को पुनः आरंभ करें। लोकल फ़ाइलसिस्टम स्रोत हमेशा की तरह हॉट-रीलोड होते हैं। इसके बजाय किसी रिमोट स्रोत में बदलावों के लिए पोल करने के लिए, उस पर `pollInterval` (सेकंड में) सेट करें — डेव सर्वर उस अंतराल पर फिर से फ़ेच करता है और तभी रीलोड करता है जब कंटेंट वास्तव में बदलता है। काम करते समय API पर बार-बार अनुरोध भेजने से बचने के लिए इसे अनसेट छोड़ दें।
+
+## GitHub रिलीज़
+
+बिल्ट-इन `github-releases` स्रोत किसी रिपॉज़िटरी की रिलीज़ को एक चेंजलॉग में बदल देता है: हर रिलीज़ एक `type: changelog` एंट्री बन जाती है, इसलिए आपके रिलीज़ नोट्स _ही_ आपका चेंजलॉग हैं — दो बार लिखने की ज़रूरत नहीं। जेनरेट की गई [चेंजलॉग टाइमलाइन](/docs/advanced/changelog) के साथ मिलकर, एक GitHub रिलीज़ प्रकाशित करना एक चेंजलॉग एंट्री भेज देता है।
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "content" },
+      {
+        type: "github-releases",
+        prefix: "changelog",
+        owner: "acme",
+        repo: "sdk",
+        // prereleases: false,  // include prereleases (default off)
+        // drafts: false,       // include drafts (needs a write token)
+        // limit: 100,          // cap releases, newest-first
+      },
+    ],
+  },
+});
+```
+
+हर रिलीज़ अपने आप चेंजलॉग फ़ील्ड्स से मैप हो जाती है: उसका नाम (या टैग) शीर्षक बन जाता है, उसकी प्रकाशन तिथि टाइमलाइन क्रम तय करती है, टैग `changelog.version` बन जाता है, और प्रीरिलीज़ को `Prerelease` टैग किया जाता है (बाकी को `Release`)। नोट्स एंट्री की बॉडी के रूप में रेंडर होते हैं। स्रोत को एक `prefix` दें ताकि उसके रिलीज़ पेज `/changelog/v1-2-0` जैसे रूट के अंदर नेस्ट हों।
+
+एक प्राइवेट रिपॉज़िटरी `GITHUB_TOKEN` एनवायरनमेंट वेरिएबल से प्रमाणित होती है — वही टोकन जो अन्य GitHub फ़ीचर इस्तेमाल करते हैं, कभी भी आपके कॉन्फ़िग में इनलाइन नहीं किया जाता। हर रिमोट स्रोत की तरह यह भी `.blume/cache/<source>/` के अंतर्गत कैश होता है और API अनुपलब्ध होने पर ऑफ़लाइन परोसा जाता है। चूँकि चेंजलॉग पूरक होता है, इसलिए बिना कैश के फ़ेच विफलता (मान लीजिए बिना टोकन वाला कोई CI बिल्ड) बिल्ड को विफल करने के बजाय चेतावनी के साथ एक खाली चेंजलॉग तक सीमित हो जाती है — इसे भरने के लिए अपने CI और डिप्लॉय एनवायरनमेंट में `GITHUB_TOKEN` सेट करें।
+
+## Sanity
+
+बिल्ट-इन `sanity` स्रोत एक GROQ क्वेरी चलाता है और हर डॉक्युमेंट के फ़ील्ड्स को फ़्रंटमैटर से तथा उसकी Portable Text बॉडी को Markdown से मैप करता है। `@sanity/client` पैकेज एक वैकल्पिक पीयर डिपेंडेंसी है — इसे तभी इंस्टॉल करें जब आप इस स्रोत का उपयोग करें।
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "sanity",
+        prefix: "guides",
+        projectId: "abc123",
+        dataset: "production",
+        query: `*[_type == "guide"]`,
+        // Field paths default to title / slug.current / body / _updatedAt
+        fields: { slug: "slug.current", body: "content" },
+      },
+    ],
+  },
+});
+```
+
+किसी प्राइवेट डेटासेट के लिए रीड टोकन `SANITY_TOKEN` एनवायरनमेंट वेरिएबल से आता है। कस्टम Portable Text ब्लॉक टाइप एडैप्टर के `serializers` विकल्प के ज़रिए Blume कंपोनेंट्स से मैप होते हैं, जो तब उपलब्ध होता है जब आप [कस्टम स्रोत](#custom-sources) के माध्यम से सीधे `sanitySource` बनाते हैं।
+
+## Notion
+
+बिल्ट-इन `notion` स्रोत किसी Notion डेटाबेस को एक कलेक्शन में बदल देता है: हर पंक्ति एक पेज बन जाती है, उसकी प्रॉपर्टीज़ फ़्रंटमैटर बन जाती हैं, और उसका ब्लॉक ट्री MDX बन जाता है। कॉलआउट, टॉगल, कॉलम और कोड ब्लॉक संबंधित Blume कंपोनेंट्स से मैप होते हैं। `@notionhq/client` एक वैकल्पिक पीयर डिपेंडेंसी है।
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "notion",
+        prefix: "handbook",
+        database: process.env.NOTION_DB_ID,
+        // Property names default to the title-typed prop / Description / Slug / Order
+        // Set publishedValue to treat Status as a publish gate (opt-in)
+        publishedValue: "Published",
+      },
+    ],
+  },
+});
+```
+
+इंटीग्रेशन टोकन `NOTION_TOKEN` एनवायरनमेंट वेरिएबल से आता है (डेटाबेस को अपने इंटीग्रेशन के साथ शेयर करें)। डिफ़ॉल्ट रूप से हर पेज इंपोर्ट होता है; `Status` प्रॉपर्टी को एक पब्लिश गेट बनाने के लिए `publishedValue` सेट करें — तब कोई भी दूसरा मान `draft: true` से मैप होता है, जिसे प्रोडक्शन बिल्ड हटा देते हैं। **Notion इमेज URL साइन किए हुए होते हैं और समाप्त हो जाते हैं**, इसलिए एडैप्टर उन्हें बिल्ड टाइम पर साइट की एसेट्स में डाउनलोड कर लेता है और रेफ़रेंस दोबारा लिख देता है — कोई CMS इमेज कभी किसी स्टैटिक बिल्ड को खराब नहीं करती।
+
+## प्रीव्यू और सिंक
+
+दो फ़्लैग यह नियंत्रित करते हैं कि रिमोट कंटेंट कैसे फ़ेच किया जाता है और क्या-क्या शामिल होता है:
+
+- **`--preview`** — `blume dev` या `blume build` पर यह ड्राफ़्ट रेंडर करता है और अप्रकाशित CMS कंटेंट खींचता है — Sanity अपने `previewDrafts` परिप्रेक्ष्य पर स्विच कर जाता है, और Notion `Status` के आधार पर फ़िल्टर करना बंद कर देता है। इस फ़्लैग के बिना प्रोडक्शन बिल्ड हमेशा की तरह ड्राफ़्ट को बाहर रखते हैं, इसलिए प्रीव्यू बिल्ड अप्रकाशित काम को शिप होने से पहले समीक्षा करने का एक सुरक्षित तरीका है।
+- **`blume sync`** हर रिमोट स्रोत को फिर से फ़ेच करता है और रनटाइम को दोबारा जेनरेट करता है। डेव कैश-फ़र्स्ट है — कोई रिमोट स्रोत एक बार फ़ेच किया जाता है और पुनः आरंभ पर `.blume/cache` से परोसा जाता है (तेज़ और ऑफ़लाइन-सहिष्णु), इसलिए `blume sync` वह तरीका है जिससे आप डेव सर्वर को पुनः आरंभ किए बिना नवीनतम CMS कंटेंट खींचते हैं (चल रहा सर्वर हॉट-रीलोड करता है)। पहले कैश हटाने के लिए `--force` जोड़ें, या अपने आप रीफ़्रेश करने के लिए किसी स्रोत पर `pollInterval` सेट करें।
+
+```sh
+blume dev --preview      # author workflow: see drafts live
+blume build --preview    # render a full preview build
+blume sync               # refresh remote content now
+blume sync --force       # ...ignoring any cached snapshot
+```
+
+## कस्टम स्रोत
+
+`ContentSource` इंटरफ़ेस को लागू करने वाला कोई भी ऑब्जेक्ट सीधे पास किया जा सकता है, और इसी तरह कस्टम सीरियलाइज़र वाला कोई एडैप्टर — या कोई भी ऐसा बैकएंड जो बिल्ट-इन नहीं है — बिना अपने SDK को कोर इंस्टॉल तक पहुँचाए जुड़ जाता है:
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+import { sanitySource } from "blume/sources/sanity.ts";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "custom",
+        source: sanitySource({
+          name: "guides",
+          prefix: "guides",
+          projectId: "abc123",
+          dataset: "production",
+          query: `*[_type == "guide"]`,
+          // Map custom Portable Text blocks to Blume components
+          serializers: {
+            callout: (block) => `<Callout>${block.text}</Callout>`,
+          },
+        }),
+      },
+    ],
+  },
+});
+```
+
+एक स्रोत अपने नेटिव आकार (Portable Text, Notion ब्लॉक, रिमोट HTML) को Markdown/MDX टेक्स्ट में नॉर्मलाइज़ कर देता है, इसलिए पेज चाहे कहीं से भी आए, वही कंपोनेंट और मार्कडाउन फ़ीचर लागू होते हैं।

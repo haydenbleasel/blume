@@ -1,0 +1,96 @@
+---
+title: Schnellstart
+description: >-
+  Installiere Blume, erstelle ein neues Projekt und veröffentliche deine erste Dokumentationsseite in wenigen Minuten – und baue sie in deinem eigenen Tempo zu einer vollständigen Website aus.
+sidebar:
+  label: Schnellstart
+  order: 1
+---
+
+Von einem leeren Ordner zu einer laufenden Doku-Website in wenigen Befehlen. Blume benötigt **Node.js 22.12 oder neuer** und einen `docs/`-Ordner mit mindestens einer `.md`- oder `.mdx`-Datei – mehr ist nicht einzurichten.
+
+## Installieren und ausführen
+
+<Steps>
+  <Step title="Blume installieren">
+    Füge das Paket zu einem neuen oder bestehenden Projekt hinzu.
+
+    ```package-install
+    npm i blume
+    ```
+
+  </Step>
+  <Step title="Ein Projekt erstellen">
+    `blume init` stellt ein paar Fragen – wo das Projekt erstellt werden soll, wie deine
+    Doku-Website heißt, welches Template verwendet wird und wo deine Inhalte liegen – und
+    erzeugt dann das Nötigste: einen Inhaltsordner und eine Konfigurationsdatei. Übergib
+    `--yes`, um die Abfragen zu überspringen und die Standardwerte zu übernehmen.
+
+    ```bash
+    blume init
+    ```
+
+    ```txt
+    docs/
+      index.mdx
+    blume.config.ts
+    ```
+
+  </Step>
+  <Step title="Den Entwicklungsserver starten">
+    Blume generiert die Laufzeitumgebung und stellt deine Doku mit Hot Reload bereit.
+
+    ```bash
+    blume dev
+    ```
+
+  </Step>
+  <Step title="Für die Produktion bauen">
+    Statisches HTML wird nach `dist/` geschrieben, mit einem darauf aufgebauten lokalen Suchindex.
+
+    ```bash
+    blume build
+    ```
+
+  </Step>
+</Steps>
+
+:::tip
+Blume funktioniert mit jedem Paketmanager und verlangt nie, dass du Astro oder Tailwind selbst einrichtest.
+:::
+
+## Schreibe deine erste Seite
+
+Jede Seite ist Markdown oder MDX mit ein wenig Frontmatter – `title` und `description` werden automatisch als Seitenüberschrift und Einleitung gerendert. Füge dies in `docs/index.mdx` ein:
+
+```mdx docs/index.mdx lineNumbers
+---
+title: Introduction
+description: Welcome to my docs.
+---
+
+Welcome! Use **Markdown** and built-in components — no imports required:
+
+:::note
+Blume ships callouts, cards, tabs, steps, and more.
+:::
+```
+
+Speichere sie, und der Entwicklungsserver lädt sofort neu. Navigation, Suche und Seiten-Metadaten werden aus deinen Dateien abgeleitet, sobald du sie hinzufügst – schreib einfach weiter, und die Website zieht mit.
+
+## Nächste Schritte
+
+<CardGroup cols={2}>
+  <Card title="Konfiguration" href="/docs/configuration" icon="file">
+    Passe Titel, Theme, Suche und Deployment an.
+  </Card>
+  <Card title="Komponenten" href="/docs/content/components" icon="folder">
+    Entdecke die integrierte Komponentenbibliothek.
+  </Card>
+  <Card title="KI" href="/docs/configuration/ai" icon="lightbulb">
+    Liefere `llms.txt` und einen Ask-AI-Assistenten aus.
+  </Card>
+  <Card title="Deployment" href="/docs/deployment" icon="rocket">
+    Geh auf jedem statischen Host live.
+  </Card>
+</CardGroup>

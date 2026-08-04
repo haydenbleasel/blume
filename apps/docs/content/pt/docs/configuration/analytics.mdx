@@ -1,0 +1,83 @@
+---
+title: Analytics
+description: >-
+  Análises web de origem própria — Vercel Web Analytics, PostHog ou qualquer script personalizado — configuradas a partir do blume.config.ts.
+---
+
+O Blume injeta as análises por si a partir de um único bloco `analytics` no `blume.config.ts`. O Vercel Web Analytics e o PostHog são suportados de forma nativa, e uma válvula de escape `scripts` cobre todos os outros fornecedores — Plausible, Fathom, Google Analytics, Umami e os restantes.
+
+As análises são carregadas **apenas em builds de produção**. Os scripts são emitidos pelo `blume build`, nunca pelo `blume dev`, por isso o tráfego local nunca chega aos seus painéis e não precisa de um projeto de "desenvolvimento" separado.
+
+:::note
+As análises são opcionais. Sem um bloco `analytics`, o Blume não injeta nada.
+:::
+
+## Vercel Web Analytics
+
+Defina `vercel: true` para adicionar o [Vercel Web Analytics](https://vercel.com/docs/analytics). O Blume injeta o script nativo da Vercel, que é servido a partir do seu próprio domínio assim que o Web Analytics estiver ativado para o projeto no painel da Vercel.
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  vercel: true,
+}
+```
+
+Não são necessárias chaves — o script reporta para o projeto sob o qual está implementado. Isto só recolhe dados em implementações na Vercel, onde existe o endpoint `/_vercel/insights`.
+
+## PostHog
+
+Forneça a sua **chave de API do projeto** para adicionar o [PostHog](https://posthog.com). O host assume por predefinição o PostHog Cloud US; defina `host` para o EU Cloud (`https://eu.i.posthog.com`) ou para uma instância auto-alojada.
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  posthog: {
+    key: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    host: "https://us.i.posthog.com", // optional, this is the default
+  },
+}
+```
+
+A chave de API do projeto pode ser enviada para o browser em segurança — é uma chave pública, apenas de escrita.
+
+## Scripts personalizados
+
+Use `scripts` para carregar qualquer outro fornecedor de análises. Cada entrada gera uma etiqueta `<script>` e tem de definir **exatamente um** de `src` (externo) ou `content` (inline).
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  scripts: [
+    // Plausible
+    {
+      src: "https://plausible.io/js/script.js",
+      strategy: "defer",
+      attributes: { "data-domain": "example.com" },
+    },
+    // Fathom
+    {
+      src: "https://cdn.usefathom.com/script.js",
+      strategy: "defer",
+      attributes: { "data-site": "ABCDEFG" },
+    },
+    // An inline snippet
+    {
+      content: "console.log('analytics ready')",
+    },
+  ],
+}
+```
+
+`attributes` é um mapa de atributos HTML adicionais (`data-*`, `id`, …) aplicados à etiqueta, e `strategy` adiciona `async` ou `defer` a scripts externos.
+
+## Opções
+
+| Opção | Predefinição | Descrição |
+| --- | --- | --- |
+| `vercel` | `false` | Adiciona o Vercel Web Analytics (apenas em implementações na Vercel). |
+| `posthog.key` | — | Chave de API do projeto PostHog. Ativa o PostHog quando definida. |
+| `posthog.host` | `https://us.i.posthog.com` | Host de ingestão do PostHog (EU Cloud ou auto-alojado). |
+| `scripts[].src` | — | URL do script externo. Mutuamente exclusivo com `content`. |
+| `scripts[].content` | — | Corpo do script inline. Mutuamente exclusivo com `src`. |
+| `scripts[].strategy` | — | `async` ou `defer` para um script externo. |
+| `scripts[].attributes` | — | Atributos HTML adicionais aplicados à etiqueta `<script>`. |
+
+Os três podem ser combinados — ative a Vercel, o PostHog e scripts personalizados em conjunto. Para implementar o seu site já construído, consulte [Implementação](/docs/deployment).

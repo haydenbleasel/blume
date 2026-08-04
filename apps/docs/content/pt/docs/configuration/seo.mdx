@@ -1,0 +1,340 @@
+---
+title: SEO
+description: >-
+  Metadados, imagens Open Graph, feeds RSS e JSON-LD — a camada de descoberta do Blume, agrupada sob uma única configuração seo.
+sidebar:
+  label: SEO
+---
+
+O Blume cuida da camada de descoberta por você: metadados de página, imagens de compartilhamento social, feeds e dados estruturados. Os recursos configuráveis ficam sob a chave `seo` em `blume.config.ts`; os metadados são gerados a partir do seu conteúdo.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
+  structuredData: true,
+  x: { handle: "@acme" },
+}
+```
+
+A maior parte disso fica mais precisa com uma URL de site absoluta — defina [`deployment.site`](/docs/deployment) para que feeds, imagens OG, canônicos, o sitemap e o JSON-LD possam emitir URLs completas.
+
+## Metadados
+
+Cada página renderiza as tags `<head>` padrão a partir da sua configuração e do frontmatter:
+
+- `<title>` — o título da página mais o `title` do seu site.
+- `<meta name="description">` e `og:description` — a `description` da página, recorrendo à `description` do site.
+- `og:title` e `og:site_name` — o título da página e o `title` do seu site.
+- `<link rel="canonical">` e `og:url` — a URL absoluta da página (quando `deployment.site` está definido).
+- `og:type` — `article` em posts de blog e entradas de changelog, `website` nos demais casos. Páginas de artigo também emitem `article:published_time` e `article:modified_time` a partir da `date` da página e do carimbo de última modificação.
+- `og:image` — a [imagem OG](#imagens-open-graph) da página. Um card gerado também declara seus `og:image:width`, `og:image:height`, `og:image:type` e `og:image:alt`, para que um rastreador possa dispor o card sem precisar buscá-lo antes; uma `seo.image` fornecida por você não declara nenhum desses, já que seu tamanho e formato são desconhecidos.
+- `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image` — o card do X. Páginas com imagem recebem a variante ampla `summary_large_image`; páginas sem imagem ainda recebem o card compacto `summary` em vez de serem exibidas como um link simples.
+
+### Atribuição no X
+
+O X lê todo o restante do card a partir das tags `og:*`, então os únicos valores que ele não consegue inferir são as contas a creditar. Defina-as em `seo.x` e o Blume emite `twitter:site` (a conta do seu site) e `twitter:creator` (a da pessoa autora). O `@` é opcional — tanto `acme` quanto `@acme` funcionam.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  x: { handle: "@acme", creator: "@jane" },
+}
+```
+
+Uma página pode reivindicar sua própria autoria, que é o que você quer para um post convidado:
+
+```yaml lineNumbers
+---
+title: How we shipped it
+seo:
+  x:
+    creator: "@guestauthor"
+---
+```
+
+Sobrescreva qualquer uma das outras tags por página com o frontmatter `seo`:
+
+```yaml lineNumbers
+---
+title: Pricing
+description: Plans and pricing for every team size.
+seo:
+  title: Pricing — Acme
+  canonical: https://acme.com/pricing
+  noindex: false
+---
+```
+
+<TypeTable
+  type={{
+    "seo.title": {
+      type: "string",
+      description: "Sobrescreve o <title> e o og:title desta página.",
+    },
+    "seo.description": {
+      type: "string",
+      description: "Sobrescreve a meta description e a og:description.",
+    },
+    "seo.image": {
+      type: "string",
+      description: "Imagem social personalizada (veja Open Graph).",
+    },
+    "seo.canonical": {
+      type: "string",
+      description: "Sobrescreve a URL canônica.",
+    },
+    "seo.noindex": {
+      type: "boolean",
+      description: "Emite robots noindex e ignora os dados estruturados.",
+    },
+    "seo.x.creator": {
+      type: "string",
+      description:
+        "Credita esta página a uma conta do X (twitter:creator), sobrescrevendo o seo.x.creator da sua configuração.",
+    },
+  }}
+/>
+
+## Imagens Open Graph
+
+O Blume pode renderizar um card social de 1200×630 para cada página no momento do build — sem navegador headless, graças ao [Takumi](https://takumi.kane.tw), então os builds continuam rápidos. Ativado por padrão assim que [`deployment.site`](/docs/deployment) é definido ou detectado automaticamente (a URL de `og:image` precisa ser absoluta para ser útil aos rastreadores), e desativado caso contrário. Defina `enabled` para sobrescrever esse comportamento em qualquer direção:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true }, // or false to opt out even with a site set
+}
+```
+
+### Aplique sua marca ao card gerado
+
+Defina um SVG local e uma paleta de cores para alinhar o card gerado à sua marca. O logotipo pode ficar em `public/` ou na raiz do projeto. Omita qualquer valor da paleta para manter o padrão dele.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    logo: "/logo/og.svg",
+    palette: {
+      accent: "#ff5410",
+      background: "#1d1d1d",
+      foreground: "#fff6f2",
+      muted: "#a6a19f",
+      border: "#323232",
+    },
+  },
+}
+```
+
+Por padrão, cada card é derivado do seu conteúdo e tema — o **título da página** como manchete, o **título do site** como sobretítulo e o **accent** do seu tema para a marca. As imagens são servidas em `/og/<slug>.png`, espelhando cada rota, e são pré-renderizadas como arquivos estáticos mesmo em modo servidor:
+
+| Rota da página      | URL da imagem              |
+| ------------------- | -------------------------- |
+| `/`                 | `/og/index.png`            |
+| `/quickstart`       | `/og/quickstart.png`       |
+| `/configuration/ai` | `/og/configuration/ai.png` |
+
+Sobrescreva o card gerado de qualquer página com `seo.image` — um arquivo em `public/` ou uma URL externa. Ele tem precedência sobre o card gerado e funciona mesmo quando `og` está desativado, então você pode misturar imagens personalizadas com geradas:
+
+```yaml lineNumbers
+---
+title: Pricing
+seo:
+  image: /og/pricing-custom.png
+---
+```
+
+:::note
+Cada cor da paleta aceita qualquer cor CSS — hex, `oklch(…)`, `rgb(…)` e assim por diante. O accent também aceita uma predefinição nomeada (`blue`, `teal`, …), correspondendo a [`theme.accent`](/docs/configuration/theming#accent). Uma cor que o renderizador não consegue interpretar quebra o build em vez de entregar silenciosamente um card com a cor padrão.
+:::
+
+Emojis em um título de página ou de site são renderizados como glifos [Twemoji](https://github.com/jdecked/twemoji), buscados em uma CDN enquanto o card é renderizado — então um build cujos títulos contêm emojis precisa de acesso à rede. Cada glifo é buscado uma vez por build, independentemente de quantas páginas o usam.
+
+### Exiba, oculte ou sobrescreva camadas do card
+
+Além da manchete, o card carrega três camadas opcionais: a **marca** no canto superior esquerdo (seu logotipo, ou um bloco na cor accent com a inicial do título do site), o **subtítulo** abaixo da manchete (a `description` do seu site) e um **rodapé** com o slug do seu repositório (a partir de `github`) e a URL do site — o host do site de deployment mais [`deployment.base`](/docs/deployment#subpath-deploys), de modo que um site de projeto no GitHub Pages exibe `user.github.io/repo`. Sobrescreva qualquer uma delas com um texto seu, ou oculte uma com `false`:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    site: "docs.acme.com", // footer URL text, or false to hide it
+    description: false, // hide the subtitle; a string overrides it
+    logo: false, // no brand mark at all — not even the initial tile
+  },
+}
+```
+
+### Fontes do card
+
+Por padrão, o card é renderizado com a fonte integrada do Takumi, que cobre apenas glifos latinos — um título em outro sistema de escrita (japonês, chinês, coreano, árabe, …) apareceria como tofu, caixas vazias.
+
+**Defina [`theme.fonts`](/docs/configuration/theming#fonts) e o card acompanha.** Quando sua configuração escolhe suas próprias fontes, os cards gerados automaticamente renderizam a manchete na sua fonte de display e a descrição e o rodapé na sua fonte de texto, para que os links compartilhados combinem com o site — incluindo cobertura não latina, sem nada a configurar aqui. (Famílias de provedores que não sejam o Google são ignoradas — o renderizador de cards só consegue buscar no Google Fonts — mas arquivos de fonte locais funcionam.)
+
+Para usar fontes diferentes nos cards e no site, ou para adicionar cobertura de sistemas de escrita sem mexer no tema, defina `og.fonts` explicitamente — ele sempre prevalece sobre as fontes derivadas do tema:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    fonts: [
+      "Noto Sans JP",
+      { name: "Inter", weight: [400, 700] },
+      { name: "Berkeley Mono", src: "./fonts/BerkeleyMono-Regular.woff2" },
+    ],
+  },
+}
+```
+
+Cada entrada é o nome de uma família do Google Fonts, um objeto fixando seu `weight` (um número, uma lista ou um intervalo variável como `"100..900"`) e `style` (`"normal"`, `"italic"` ou ambos), ou um arquivo de fonte local — `src` é resolvido a partir da raiz do projeto, com `weight` e `style` opcionais para quando os metadados do próprio arquivo não devem decidir.
+
+As famílias do Google são buscadas no build — então um build que as utiliza precisa de acesso à rede — e o renderizador baixa apenas os subconjuntos de glifos que cada título realmente usa. O fallback é por glifo, então adicionar uma família afeta apenas os glifos que as outras fontes não conseguem desenhar.
+
+Um `og.fonts: []` explícito desativa tudo: os cards mantêm a fonte integrada mesmo quando `theme.fonts` está definido.
+
+### Títulos de página personalizados
+
+Uma [página `.astro`](/docs/advanced/custom-pages) personalizada não tem frontmatter a ler, então o card gerado é intitulado humanizando o último segmento de URL da sua rota — `/getting-started` vira "Getting Started", mas `/cli` vira "Cli". Nomeie esses cards explicitamente com `og.titles`, indexados por rota (`"/"` corresponde à página inicial, cujo card, de outro modo, carrega o título do site):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    titles: {
+      "/cli": "CLI",
+    },
+  },
+}
+```
+
+As entradas se aplicam apenas a páginas personalizadas — o card de uma página de conteúdo sempre tira sua manchete do título da página, então renomeie essas no frontmatter.
+
+`seo.image` é frontmatter, então cobre apenas conteúdo em Markdown e MDX. Para dar a uma [página `.astro`](/docs/advanced/custom-pages) personalizada sua própria imagem social — uma home de marketing ou landing page, e a maneira de dar apenas à página inicial uma imagem de compartilhamento sob medida — passe a prop `ogImage` para o `PageLayout`.
+
+## Feeds RSS
+
+O Blume cria um feed RSS para cada tipo de conteúdo em `rss.types` — `blog` e `changelog` por padrão — que tenha páginas, servido em `/<type>/rss.xml`. Veja [Feeds](/docs/content#feeds) para escrever posts de blog e entradas de changelog com datas.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+| Opção | Padrão | Descrição |
+| --- | --- | --- |
+| `enabled` | `true` | Gera os feeds. |
+| `types` | `["blog", "changelog"]` | Tipos de conteúdo que recebem um feed cada. |
+| `limit` | `50` | Máximo de itens por feed, dos mais novos aos mais antigos. |
+
+O Blume injeta tags `<link rel="alternate">` para que navegadores e leitores de feed descubram os feeds automaticamente.
+
+## Dados estruturados
+
+O Blume emite JSON-LD do [schema.org](https://schema.org) no `<head>` de cada página para que os mecanismos de busca entendam seu conteúdo. Ativado por padrão:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  structuredData: true,
+}
+```
+
+Cada página inclui:
+
+- um nó **WebSite** para a identidade do site,
+- a página como um **artigo** — `BlogPosting` para posts de blog, `TechArticle` para changelog e docs — com sua descrição e data de publicação,
+- uma **BreadcrumbList** construída a partir da trilha de navegação.
+
+As URLs são absolutas quando `deployment.site` está definido. Páginas marcadas com `seo.noindex` são ignoradas.
+
+## Sitemap
+
+O Blume escreve um `sitemap.xml` com todas as páginas indexáveis no momento do build. Ele precisa de um [`deployment.site`](/docs/deployment) absoluto e lista todas as páginas, exceto rascunhos, ocultas e páginas com `noindex`. Ativado por padrão:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  sitemap: true,
+}
+```
+
+Publique seu próprio `public/sitemap.xml` para assumir o controle — o Blume nunca sobrescreve um arquivo que você coloca em `public/`.
+
+## Robots
+
+O Blume escreve um `robots.txt` que permite todos os rastreadores, declara seus [sinais de conteúdo](#sinais-de-conteudo) e adiciona uma linha `Sitemap:` apontando para o sitemap quando há um disponível. Ativado por padrão:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  robots: true,
+}
+```
+
+```txt robots.txt
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+Allow: /
+
+Sitemap: https://docs.example.com/sitemap.xml
+```
+
+### Sinais de conteúdo
+
+A linha `Content-Signal` — a convenção emergente de uso de conteúdo — declara como os rastreadores de IA podem reutilizar sua documentação. O Blume a emite **ativada por padrão, com todos os sinais definidos como `yes`**, em linha com sua postura de que a documentação está aberta tanto a pessoas quanto a agentes:
+
+- `search` — indexação de busca tradicional e por IA
+- `aiInput` — grounding / RAG no momento da resposta
+- `aiTrain` — treinamento de modelos
+
+Restrinja qualquer sinal definindo-o como `false`; os que você deixar de fora permanecem como `yes`:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  contentSignals: {
+    aiTrain: false, // opt out of training, keep search + grounding
+  },
+}
+```
+
+```txt robots.txt
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /
+```
+
+Defina `contentSignals: false` para remover a declaração por completo:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  contentSignals: false,
+}
+```
+
+<TypeTable
+  type={{
+    "seo.contentSignals": {
+      type: "boolean | object",
+      description:
+        "Declaração Content-Signal. true ou omitido emite todos os sinais como yes; false remove a linha; um objeto define os sinais individualmente.",
+    },
+    "contentSignals.search": {
+      type: "boolean",
+      description:
+        "Permite o uso para indexação de busca (search). Padrão: true.",
+    },
+    "contentSignals.aiInput": {
+      type: "boolean",
+      description:
+        "Permite o uso para grounding / RAG de IA no momento da resposta (ai-input). Padrão: true.",
+    },
+    "contentSignals.aiTrain": {
+      type: "boolean",
+      description:
+        "Permite o uso para treinamento de modelos de IA (ai-train). Padrão: true.",
+    },
+  }}
+/>
+
+Os sinais de conteúdo expressam uma preferência, não controle de acesso: eles informam aos rastreadores bem-comportados como você gostaria que seu conteúdo fosse usado, e cabe ao rastreador respeitá-los.
+
+Publique seu próprio `public/robots.txt` para assumir o controle.

@@ -1,0 +1,96 @@
+---
+title: क्विकस्टार्ट
+description: >-
+  Blume इंस्टॉल करें, एक नया प्रोजेक्ट स्कैफ़ोल्ड करें, और मिनटों में अपना पहला डॉक्यूमेंटेशन पेज शिप करें — फिर अपनी गति से इसे एक पूरी साइट में विकसित करें।
+sidebar:
+  label: क्विकस्टार्ट
+  order: 1
+---
+
+कुछ ही कमांड में एक खाली फ़ोल्डर से चलती हुई डॉक्स साइट तक पहुँचें। Blume को **Node.js 22.12 या नया** और कम से कम एक `.md` या `.mdx` फ़ाइल वाले `docs/` फ़ोल्डर की आवश्यकता होती है — सेट अप करने के लिए और कुछ नहीं है।
+
+## इंस्टॉल करें और चलाएँ
+
+<Steps>
+  <Step title="Blume इंस्टॉल करें">
+    पैकेज को किसी नए या मौजूदा प्रोजेक्ट में जोड़ें।
+
+    ```package-install
+    npm i blume
+    ```
+
+  </Step>
+  <Step title="प्रोजेक्ट स्कैफ़ोल्ड करें">
+    `blume init` कुछ सवाल पूछता है — प्रोजेक्ट कहाँ बनाना है, आपकी
+    डॉक्स साइट का नाम क्या है, कौन सा टेम्पलेट, और आपका कंटेंट कहाँ रहता है — फिर
+    न्यूनतम सतह स्कैफ़ोल्ड करता है: एक कंटेंट फ़ोल्डर और एक कॉन्फ़िग फ़ाइल। प्रॉम्प्ट छोड़ने
+    और डिफ़ॉल्ट अपनाने के लिए `--yes` पास करें।
+
+    ```bash
+    blume init
+    ```
+
+    ```txt
+    docs/
+      index.mdx
+    blume.config.ts
+    ```
+
+  </Step>
+  <Step title="डेव सर्वर शुरू करें">
+    Blume रनटाइम जनरेट करता है और आपके डॉक्स को हॉट रीलोड के साथ सर्व करता है।
+
+    ```bash
+    blume dev
+    ```
+
+  </Step>
+  <Step title="प्रोडक्शन के लिए बिल्ड करें">
+    स्टैटिक HTML `dist/` में लिखा जाता है, और उसके ऊपर एक लोकल सर्च इंडेक्स बनाया जाता है।
+
+    ```bash
+    blume build
+    ```
+
+  </Step>
+</Steps>
+
+:::tip
+Blume किसी भी पैकेज मैनेजर के साथ काम करता है और आपसे कभी Astro या Tailwind खुद सेट अप करने की अपेक्षा नहीं करता।
+:::
+
+## अपना पहला पेज लिखें
+
+हर पेज थोड़े फ़्रंटमैटर के साथ Markdown या MDX होता है — `title` और `description` स्वतः पेज हेडिंग और परिचय के रूप में रेंडर होते हैं। इसे `docs/index.mdx` में डालें:
+
+```mdx docs/index.mdx lineNumbers
+---
+title: Introduction
+description: Welcome to my docs.
+---
+
+Welcome! Use **Markdown** and built-in components — no imports required:
+
+:::note
+Blume ships callouts, cards, tabs, steps, and more.
+:::
+```
+
+इसे सेव करें, और डेव सर्वर तुरंत रीलोड हो जाता है। जैसे-जैसे आप फ़ाइलें जोड़ते हैं, नेविगेशन, सर्च, और पेज मेटाडेटा उनसे अनुमानित होते जाते हैं — लिखते रहें, और साइट साथ चलती रहेगी।
+
+## अगले कदम
+
+<CardGroup cols={2}>
+  <Card title="कॉन्फ़िगरेशन" href="/docs/configuration" icon="file">
+    टाइटल, थीम, सर्च, और डिप्लॉयमेंट को ट्यून करें।
+  </Card>
+  <Card title="कंपोनेंट्स" href="/docs/content/components" icon="folder">
+    बिल्ट-इन कंपोनेंट लाइब्रेरी को एक्सप्लोर करें।
+  </Card>
+  <Card title="AI" href="/docs/configuration/ai" icon="lightbulb">
+    `llms.txt` और एक Ask AI असिस्टेंट शिप करें।
+  </Card>
+  <Card title="डिप्लॉयमेंट" href="/docs/deployment" icon="rocket">
+    किसी भी स्टैटिक होस्ट पर लाइव जाएँ।
+  </Card>
+</CardGroup>

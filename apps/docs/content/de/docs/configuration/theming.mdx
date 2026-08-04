@@ -1,0 +1,249 @@
+---
+title: Theming
+description: >-
+  Passe das Erscheinungsbild mit einer Handvoll Konfigurations-Tokens an, überschreibe jede CSS-Variable in theme.css oder greife für eigene Komponenten auf Tailwind-Utilities zurück.
+---
+
+Blumes Theme ist Token-gesteuert und funktioniert von Haus aus im hellen und dunklen Modus. Nutze so wenig oder so viel davon, wie du brauchst: ein paar Konfigurations-Tokens für die gängigen Fälle, eine `theme.css`, um beliebige Design-Tokens zu überschreiben, oder Tailwind-Utilities für eigene Komponenten.
+
+## Konfigurations-Tokens
+
+Die alltäglichen Stellschrauben findest du unter `theme` in deiner Konfiguration:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: "teal",   // a named preset or any CSS color
+  radius: "md",     // none | sm | md | lg
+  mode: "system",   // system | light | dark
+  fonts: {          // self-hosted Google Fonts
+    display: "inter-tight",
+    body: "inter",
+    mono: "ibm-plex-mono",
+  },
+}
+```
+
+### Akzentfarbe
+
+Die Akzentfarbe färbt interaktive und hervorgehobene Elemente ein — Schrittmarkierungen, aktive Tabs, Badges, Karten-Hover und mehr. Verwende eine benannte Voreinstellung oder eine beliebige CSS-Farbe:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: "#ff0066", // hex, oklch(), rgb()… anything CSS understands
+}
+```
+
+Benannte Voreinstellungen: `blue` (Standard), `green`, `orange`, `pink`, `purple`, `red` und `teal`.
+
+Ein String gilt für beide Farbmodi; übergib ein Objekt für [eine unterschiedliche Akzentfarbe je Modus](#dark-mode-colors).
+
+### Eckenradius
+
+`radius` legt die Eckenrundung fest, die Karten, Codeblöcke, Callouts und Eingabefelder gemeinsam nutzen — `none`, `sm`, `md` (Standard) oder `lg`.
+
+### Farbmodus
+
+`mode` legt das anfängliche Farbschema fest:
+
+- **`system`** (Standard) — folgt der Betriebssystem-Einstellung der Leserin oder des Lesers
+- **`light`** / **`dark`** — verwendet standardmäßig ein bestimmtes Schema
+
+Ein Umschalter im Header erlaubt Lesenden jederzeit den Wechsel, und ihre Wahl wird über Besuche hinweg gespeichert. Der dunkle Modus wird über ein Attribut `data-theme="dark"` am `<html>`-Element angewendet.
+
+### Schriften
+
+`fonts` legt die Schriftarten für drei Rollen fest:
+
+- **`display`** — Überschriften (`h1`–`h6`)
+- **`body`** — Fließtext, UI und Prosa
+- **`mono`** — Codeblöcke und Inline-Code
+
+Für jede Rolle ist standardmäßig eine kuratierte Google-Schrift hinterlegt, damit Blume von Anfang an durchdacht aussieht:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: "inter-tight",   // default
+    body: "inter",            // default
+    mono: "ibm-plex-mono",    // default
+  },
+}
+```
+
+Lege nur die Rollen fest, die du ändern möchtest — der Rest behält seine Standardwerte:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: { display: "geist" }, // body + mono stay Inter / IBM Plex Mono
+}
+```
+
+Schriften werden **selbst gehostet**: Blume lädt sie zur Build-Zeit herunter und liefert sie von deiner eigenen Website aus, sodass es keine Laufzeitanfrage an Google und kein Layout-Shift gibt (Astro erzeugt automatisch Fallback-Schriften mit passenden Metriken).
+
+Ein einfacher String ist ein Google-Fonts-Slug aus der folgenden kuratierten Auswahl:
+
+| Kategorie | Slugs |
+| --- | --- |
+| Sans | `dm-sans` `figtree` `geist` `ibm-plex-sans` `inter` `inter-tight` `manrope` `open-sans` `plus-jakarta-sans` `roboto` `source-sans-3` `space-grotesk` `work-sans` |
+| Serif | `ibm-plex-serif` `lora` `merriweather` `playfair-display` `source-serif-4` |
+| Mono | `fira-code` `geist-mono` `ibm-plex-mono` `jetbrains-mono` `roboto-mono` `source-code-pro` `space-mono` |
+
+#### Beliebige Schriftfamilie eines Anbieters
+
+Du brauchst eine Familie, die nicht in der kuratierten Auswahl enthalten ist — etwa eine, die ein nicht-lateinisches Schriftsystem abdeckt? Übergib ein Objekt mit dem exakten Namen der Familie. Sie wird genauso selbst gehostet und optimiert:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: { name: "Noto Sans JP", weights: [400, 700] },
+    body: { name: "Noto Sans JP", weights: [400, 500, 700] },
+  },
+}
+```
+
+- **`name`** — der Familienname exakt so, wie der Anbieter ihn führt.
+- **`provider`** — woher die Familie stammt: `google` (Standard), `fontsource`, `bunny` oder `fontshare`.
+- **`weights`** — die zu ladenden Schriftschnitte, als Zahlen oder als variabler Bereich wie `"100..900"`. Standard ist `[400, 500, 600, 700]`.
+- **`fallback`** — der System-Stack, der während des Ladens der Schrift und für fehlende Glyphen angezeigt wird: `sans`, `serif` oder `mono`. Standard ist `mono` für die Mono-Rolle und andernfalls `sans`.
+
+#### Lokale Schriftdateien
+
+Für eine Schrift, die dir gehört (oder die kein Anbieter ausliefert), verweist du eine Rolle auf Schriftdateien in deinem Projekt. Jede Variante wird zu einer `@font-face`:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: {
+      name: "Berkeley Mono",
+      variants: [
+        { src: "./fonts/BerkeleyMono-Regular.woff2", weight: 400 },
+        { src: "./fonts/BerkeleyMono-Bold.woff2", weight: 700 },
+      ],
+    },
+  },
+}
+```
+
+Pfade werden relativ zum Projektstammverzeichnis aufgelöst. `weight` und `style` (`normal`, `italic`, `oblique`) sind optional — wenn sie fehlen, liest Astro sie aus der Schriftdatei.
+
+:::note
+Wenn du `theme.fonts` explizit setzt, gestalten deine Display- und Body-Schriften automatisch auch die generierten [Open-Graph-Karten](/docs/configuration/seo#card-fonts), sodass geteilte Links zur Website passen. Familien von Anbietern außerhalb von Google werden dort übersprungen (der Karten-Renderer kann nur von Google Fonts laden); lokale Dateien funktionieren überall.
+:::
+
+Du möchtest zum System-Stack zurückkehren? Überschreibe die `--blume-font-*`-Tokens direkt in [`theme.css`](#themecss).
+
+### Farben im dunklen Modus
+
+`accent` und `background` folgen einer Regel: Ein String gilt für beide Farbmodi, und ein Objekt `{ light, dark }` legt jeden Modus einzeln fest:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: { light: "blue", dark: "teal" },
+  background: {
+    light: "#ffffff",
+    dark: "#0a0a0a",
+  },
+}
+```
+
+Jede Farbe akzeptiert eine benannte Voreinstellung oder eine beliebige CSS-Farbe. Bei `background` (und `backgroundImage`) kann jeder Schlüssel weggelassen werden, um nur einen Modus zu überschreiben — `background: { dark: "#0a0a0a" }` behält den standardmäßigen hellen Hintergrund bei.
+
+### Aktionsfarbe
+
+`action` ist eine sekundäre Akzentfarbe für primäre Handlungsaufforderungen und die `action`-Tailwind-Utilities (`bg-action`, `text-action`). Standardmäßig entspricht sie deiner `accent`-Farbe:
+
+```ts blume.config.ts
+theme: {
+  action: "#ff0066",
+}
+```
+
+### Hintergrundbild
+
+Lege mit `backgroundImage` ein Hintergrundbild hinter deinen Inhalt — eine URL oder ein Pfad unterhalb von `public/`. Wie bei den Farben gilt ein String für beide Modi, und ein Objekt `{ light, dark }` legt das Bild je Modus fest:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  backgroundImage: {
+    light: "/bg-light.svg",
+    dark: "/bg-dark.svg",
+  },
+}
+```
+
+## theme.css
+
+Lege eine `theme.css` im Stammverzeichnis deines Projekts ab, um beliebige Design-Tokens zu überschreiben. Sie ist die letzte Ebene der Kaskade und setzt sich damit gegenüber den Standardwerten und den Konfigurations-Tokens durch:
+
+```css theme.css lineNumbers
+:root {
+  --blume-accent: oklch(0.68 0.14 180);
+  --blume-radius: 0.5rem;
+}
+
+:root[data-theme="dark"] {
+  --blume-background: oklch(0.16 0 0);
+}
+```
+
+Setze ein Token unter `:root` für den hellen Modus und unter `:root[data-theme="dark"]` für den dunklen Modus. Farb-Tokens haben eigene integrierte Dunkelwerte, die mit der höheren Spezifität des Dunkel-Selektors deklariert sind — eine Überschreibung von `--blume-accent`, `--blume-background` und Konsorten allein unter `:root` gilt daher nur für den hellen Modus. Deklariere zusätzlich den Dunkel-Block, wenn sich beide Modi ändern sollen.
+
+### Design-Tokens
+
+| Token                       | Steuert                                       |
+| --------------------------- | --------------------------------------------- |
+| `--blume-background`        | Seitenhintergrund                             |
+| `--blume-foreground`        | Fließtext                                     |
+| `--blume-muted`             | Dezente Flächen — Callouts, Tabellenköpfe     |
+| `--blume-muted-foreground`  | Sekundärer Text                               |
+| `--blume-border`            | Rahmen und Trennlinien                        |
+| `--blume-accent`            | Akzentfarbe                                   |
+| `--blume-accent-foreground` | Text und Icons auf einem Akzenthintergrund    |
+| `--blume-action`            | Sekundäre Akzentfarbe (Standard: Akzentfarbe) |
+| `--blume-code-background`   | Fläche des Codeblocks                         |
+| `--blume-radius`            | Eckenradius                                   |
+| `--blume-font-display`      | Überschriftenschrift                          |
+| `--blume-font-body`         | Body-/UI-Schrift                              |
+| `--blume-font-mono`         | Code-Schrift                                  |
+
+Setze ein `--blume-font-*`-Token auf einen beliebigen Font-Stack, um eine Schrift außerhalb der kuratierten Liste zu verwenden oder auf den System-Stack zurückzufallen:
+
+```css theme.css lineNumbers
+:root {
+  --blume-font-body: ui-sans-serif, system-ui, sans-serif;
+}
+```
+
+## Tailwind-Utilities
+
+Blumes Theme ist intern mit Tailwind v4 gebaut, und die `.astro`-, `.tsx`- und `.jsx`-Dateien deines Projekts werden ebenfalls gescannt — du kannst eigene Komponenten und Seiten also mit Utility-Klassen gestalten, ganz ohne Tailwind-Setup. Jedes Token ist als Utility verfügbar, sodass deine Komponenten dem Theme automatisch folgen:
+
+| Token                       | Utilities                  |
+| --------------------------- | -------------------------- |
+| `--blume-background`        | `bg-background`            |
+| `--blume-foreground`        | `text-foreground`          |
+| `--blume-muted`             | `bg-muted`                 |
+| `--blume-muted-foreground`  | `text-muted-foreground`    |
+| `--blume-border`            | `border-border`            |
+| `--blume-accent`            | `bg-accent`, `text-accent` |
+| `--blume-accent-foreground` | `text-accent-foreground`   |
+| `--blume-action`            | `bg-action`, `text-action` |
+| `--blume-radius`            | `rounded-blume`            |
+| `--blume-font-display`      | `font-display`             |
+| `--blume-font-body`         | `font-sans`                |
+| `--blume-font-mono`         | `font-mono`                |
+
+## Reihenfolge der Kaskade
+
+Styles werden in drei Ebenen aufgelöst, von denen jede die vorherige überschreibt:
+
+<Steps>
+  <Step title="Basis">
+    Blumes Reset, Standard-Tokens und Komponenten-Styles.
+  </Step>
+  <Step title="Konfigurations-Tokens">
+    `--blume-accent`, `--blume-radius` und die `--blume-font-*`-Tokens aus
+    `theme`.
+  </Step>
+  <Step title="theme.css">Deine Token-Überschreibungen — das letzte Wort.</Step>
+</Steps>

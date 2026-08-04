@@ -1,0 +1,106 @@
+---
+title: ब्लॉग
+description: >-
+  पोस्ट को कंटेंट के रूप में प्रकाशित करें, मुफ़्त में RSS फ़ीड और आर्टिकल स्ट्रक्चर्ड डेटा पाएँ, और एक कस्टम इंडेक्स पेज बनाएँ।
+---
+
+Blume में ब्लॉग बस एक टाइप वाला कंटेंट है। किसी पेज को `type: blog` से चिह्नित करें और Blume उसे अपने आप एक RSS फ़ीड तथा अधिक समृद्ध आर्टिकल मेटाडेटा दे देता है। [changelog](/docs/advanced/changelog) के विपरीत, यहाँ कोई जनरेट किया हुआ इंडेक्स पेज नहीं होता — लैंडिंग पेज आप स्वयं तैयार करते हैं, जिससे डिज़ाइन पूरी तरह आपके हाथों में रहता है।
+
+## एक पोस्ट लिखें
+
+पोस्ट एक सामान्य `.md` या `.mdx` पेज होता है जिसके फ़्रंटमैटर में `type: blog` होता है। परंपरा के अनुसार पोस्ट `blog/` के अंतर्गत रहते हैं, लेकिन जो मायने रखता है वह टाइप है — फ़ोल्डर नहीं:
+
+```mdx blog/introducing-blume.mdx lineNumbers
+---
+title: Introducing Blume
+type: blog
+date: 2026-06-22
+description: Why we built a markdown-first docs framework.
+---
+
+Documentation should be fast, AI-ready, and zero-config — down to not needing a starter template at all. Here's the thinking behind Blume.
+```
+
+हर पोस्ट को एक `date` दें ताकि फ़ीड आइटम नए से पुराने क्रम में लगें और उनमें `pubDate` शामिल हो, तथा एक `description` भी दें — इसका उपयोग फ़ीड सारांश और SEO दोनों के लिए होता है।
+
+## RSS फ़ीड
+
+Blume **`/blog/rss.xml`** पर एक ब्लॉग फ़ीड बनाता है, जो `date` के अनुसार नए से पुराने क्रम में सजा होता है। फ़ीड को एक पूर्ण (absolute) साइट URL चाहिए, इसलिए [`deployment.site`](/docs/deployment) सेट करें; इसके बाद Blume हर पेज पर एक `<link rel="alternate">` टैग जोड़ देता है ताकि रीडर उसे अपने आप खोज लें।
+
+फ़ीड डिफ़ॉल्ट रूप से चालू रहती है। इसे [`seo.rss`](/docs/configuration/seo#rss-feeds) के अंतर्गत समायोजित करें:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+फ़ीड छोड़ने के लिए `rss.types` से `"blog"` हटा दें।
+
+## स्ट्रक्चर्ड डेटा
+
+जब [स्ट्रक्चर्ड डेटा](/docs/configuration/seo#structured-data) चालू होता है, तो हर पोस्ट को उसके विवरण और प्रकाशन तिथि के साथ एक schema.org **`BlogPosting`** के रूप में निर्गत किया जाता है — यही वह समृद्ध आर्टिकल टाइप है जिसकी सर्च इंजन ब्लॉग कंटेंट के लिए अपेक्षा करते हैं।
+
+## इंडेक्स बनाना
+
+Blume `/blog` लैंडिंग पेज जनरेट नहीं करता, इसलिए आप उसे स्वयं बनाते हैं। सबसे सरल विकल्प एक ऐसा कंटेंट पेज है जो हर पोस्ट से हाथ से लिंक करता हो:
+
+```mdx blog/index.mdx lineNumbers
+---
+title: Blog
+description: News and writing from the team.
+---
+
+<CardGroup cols={2}>
+  <Card title="Introducing Blume" href="/blog/introducing-blume">
+    Why we built a markdown-first docs framework.
+  </Card>
+</CardGroup>
+```
+
+इसके बजाय पोस्ट को अपने आप सूचीबद्ध करने के लिए, `pages/blog/index.astro` पर एक [कस्टम पेज](/docs/advanced/custom-pages) जोड़ें जो Astro के `docs` कंटेंट कलेक्शन से पढ़ता है और हर एंट्री को `blume:data` से मिले उसके रूट के साथ जोड़ता है:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import { getCollection } from "astro:content";
+import data from "blume:data";
+
+const routeById = new Map(data.routes.map((route) => [route.id, route.path]));
+
+const posts = (await getCollection("docs"))
+  .filter((entry) => entry.data.type === "blog" && !entry.data.draft)
+  .map((entry) => ({
+    date: entry.data.date,
+    description: entry.data.description,
+    href: routeById.get(entry.id),
+    title: entry.data.title,
+  }))
+  .toSorted((a, b) => Number(new Date(b.date)) - Number(new Date(a.date)));
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={post.href}>{post.title}</a>
+        <p>{post.description}</p>
+      </li>
+    ))
+  }
+</ul>
+```
+
+इसे पूरे साइट लेआउट में लपेटने के लिए [कस्टम पेज](/docs/advanced/custom-pages#using-the-site-layout) देखें।
+
+<CardGroup cols={2}>
+  <Card title="कस्टम पेज" href="/docs/advanced/custom-pages" icon="folder">
+    ब्लॉग इंडेक्स माउंट करें और blume:data से पढ़ें।
+  </Card>
+  <Card title="SEO" href="/docs/configuration/seo" icon="file">
+    फ़ीड, Open Graph इमेज, और स्ट्रक्चर्ड डेटा।
+  </Card>
+</CardGroup>

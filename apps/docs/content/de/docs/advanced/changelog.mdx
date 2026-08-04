@@ -1,0 +1,136 @@
+---
+title: Changelog
+description: >-
+  Verfassen Sie Release Notes als gewöhnliche Inhaltsdateien oder beziehen Sie sie aus GitHub Releases – Blume erstellt daraus automatisch eine Timeline-Seite und einen RSS-Feed.
+---
+
+Blume bringt ein Changelog von Haus aus mit. Schreiben Sie jedes Release als normale Inhaltsdatei, kennzeichnen Sie es mit `type: changelog`, und Blume sammelt jeden Eintrag in einer generierten Timeline-Seite und einem RSS-Feed – kein Layout zu bauen, keine Liste zu pflegen. Oder verzichten Sie ganz auf die Dateien und [beziehen Sie Ihr Changelog aus GitHub Releases](#from-github-releases).
+
+## Einen Eintrag schreiben
+
+Ein Changelog-Eintrag ist eine gewöhnliche `.md`- oder `.mdx`-Seite mit `type: changelog` im Frontmatter. Üblicherweise liegen sie unter `changelog/`, aber entscheidend ist der Typ – nicht der Ordner:
+
+```mdx changelog/v1-2-0.mdx lineNumbers
+---
+title: v1.2.0
+type: changelog
+date: 2026-06-20
+changelog:
+  version: 1.2.0
+  category: Features
+---
+
+A big batch of components landed this release — columns, frames, trees, and tooltips, plus code groups that render as proper language tabs.
+
+- New `Accordion`, `Expandable`, and `Tooltip` components
+- `CodeGroup` tabs with flush code blocks
+```
+
+Geben Sie jedem Eintrag ein `date`, damit Timeline und Feed die neuesten zuerst sortieren. Ein YAML-Datum ohne Anführungszeichen ist in Ordnung – Blume normalisiert es.
+
+### Das `changelog`-Objekt
+
+Das optionale `changelog`-Objekt ergänzt reichhaltigere Metadaten für Timeline und Feed:
+
+<TypeTable
+  type={{
+    "changelog.version": {
+      type: "string",
+      description:
+        "Release-Version. Fällt auf ein Label mit v-Präfix zurück, wenn kein Titel vorhanden ist.",
+    },
+    "changelog.category": {
+      type: "string",
+      description:
+        "Wird als Tag neben dem Eintrag angezeigt, z. B. Release, Features, Fixes.",
+    },
+    "changelog.date": {
+      type: "string",
+      description:
+        "Veröffentlichungsdatum. Kann hier oder auf oberster Ebene stehen – beides speist Timeline und RSS-Feed.",
+    },
+  }}
+/>
+
+## Die Timeline-Seite
+
+Sobald Sie mindestens einen Eintrag mit `type: changelog` haben, generiert Blume automatisch eine **`/changelog`**-Seite. Sie wird als fokussierte Timeline über die volle Breite gerendert – ohne Seitenleiste oder Inhaltsverzeichnis – mit den neuesten Einträgen zuerst und zeigt Datum, Label und `category`-Tag in einer linken Spalte neben dem Inhalt:
+
+- Der **Titel** des Eintrags wird zu seinem Label – oder `v{version}`, wenn kein Titel vorhanden ist. Er verlinkt auf die eigene Seite des Eintrags, sodass ein Release zugleich eine Zeile in der Timeline und ein teilbarer Permalink ist.
+- Die `category` wird als Tag neben dem Datum gerendert.
+- Entwürfe und Einträge mit `sidebar.hidden` werden übersprungen.
+
+Die Seite erscheint nur, wenn die Route `/changelog` nicht bereits belegt ist. Um sie durch Ihr eigenes Design zu ersetzen, fügen Sie unter `pages/changelog.astro` eine [benutzerdefinierte Seite](/docs/advanced/custom-pages) hinzu – sie übernimmt, und Blume generiert die Standard-Timeline nicht mehr.
+
+Da diese Seite generiert und nicht verfasst wird, ist sie nicht Teil des Inhaltsbaums – ein Header-[Tab](/docs/content/navigation#tabs), der auf `/changelog` zeigt, löst daher zum neuesten Eintrag auf. Geben Sie dem Tab ein `href`, um auf der Übersichtsseite selbst zu landen:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "Changelog", path: "/changelog", href: "/changelog" },
+  ],
+}
+```
+
+### Nach Major-Version gruppiert
+
+Wenn Ihre Versionen [Semver](https://semver.org) folgen und mehr als eine Major-Version umfassen, paginiert Blume die Timeline nach Major-Version. Es wird nur die neueste Major-Reihe angezeigt, mit einer Schaltfläche **Show N.x releases** am unteren Rand, die die nächstältere Major-Version mit je einem Klick einblendet:
+
+- Die Erkennung erfolgt automatisch – ohne Konfiguration. Sie greift nur, wenn jedes aufgeführte Release als `major.minor.patch` geparst wird und es mehr als eine Major-Version gibt; andernfalls bleibt die Timeline flach.
+- Sie kommt mit den Scoped Tags zurecht, die Monorepos veröffentlichen, sodass `pkg@2.0.0` unter `2.x` und `pkg@1.4.0` unter `1.x` gruppiert wird.
+- Es handelt sich um Progressive Enhancement: Jedes Release steht weiterhin im HTML der Seite (sowie im RSS-Feed und im Suchindex), sodass Leser ohne JavaScript – und Crawler – die vollständige Historie sehen. Die Schaltfläche klappt ältere Major-Versionen erst ein, sobald die Seite hydratisiert.
+
+## Aus GitHub Releases
+
+Statt Einträge von Hand zu verfassen, richten Sie die eingebaute [`github-releases`-Quelle](/docs/content/sources#github-releases) auf ein Repository, und jedes Release wird zu einem Eintrag mit `type: changelog` – dieselbe Timeline und derselbe Feed, direkt gespeist aus den Releases, die Sie ohnehin veröffentlichen. Blumes eigenes [Changelog](/changelog) ist so aufgebaut:
+
+```ts blume.config.ts
+content: {
+  sources: [
+    { type: "filesystem", root: "content" },
+    {
+      type: "github-releases",
+      prefix: "changelog",
+      owner: "acme",
+      repo: "sdk",
+    },
+  ],
+}
+```
+
+Der Name des Releases wird zum Titel, sein Tag zu `changelog.version`, und sein Veröffentlichungsdatum sortiert die Timeline. Jede Release-Seite erhält außerdem eine eindeutige Meta-Description, die aus ihren Notes zusammengefasst wird – Markdown entfernt, Abschnittsüberschriften und Changeset-Commit-Hash-Präfixe verworfen, gekürzt auf die Länge des Such-Snippets, die [`blume audit`](/docs/reference/cli#auditing-the-built-site) prüft – statt auf die Site-Beschreibung zurückzufallen. Ein privates Repository authentifiziert sich über die Umgebungsvariable `GITHUB_TOKEN`. Alle Optionen finden Sie unter [Content sources](/docs/content/sources#github-releases).
+
+## Der RSS-Feed
+
+Blume erstellt außerdem einen Changelog-Feed unter **`/changelog/rss.xml`**, sortiert nach `date` mit den neuesten zuerst. Feeds benötigen eine absolute Site-URL, setzen Sie also [`deployment.site`](/docs/deployment); Blume fügt dann auf jeder Seite ein `<link rel="alternate">`-Tag ein, damit Leser den Feed automatisch entdecken.
+
+Der Feed ist standardmäßig aktiviert. Feinjustieren können Sie ihn unter [`seo.rss`](/docs/configuration/seo#rss-feeds):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+Entfernen Sie `"changelog"` aus `rss.types`, um den Feed wegzulassen und die Timeline beizubehalten.
+
+## Strukturierte Daten
+
+Wenn [strukturierte Daten](/docs/configuration/seo#structured-data) aktiviert sind, wird jeder Changelog-Eintrag als schema.org-**`TechArticle`** mit Beschreibung und Veröffentlichungsdatum ausgegeben, sodass Suchmaschinen Releases als datierte Artikel indexieren können.
+
+<CardGroup cols={2}>
+  <Card
+    title="Frontmatter"
+    href="/docs/reference/frontmatter#changelog"
+    icon="file"
+  >
+    Das vollständige Frontmatter-Schema für das Changelog.
+  </Card>
+  <Card title="Custom Pages" href="/docs/advanced/custom-pages" icon="folder">
+    Ersetzen Sie die generierte Timeline durch Ihr eigenes Layout.
+  </Card>
+</CardGroup>

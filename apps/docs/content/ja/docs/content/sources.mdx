@@ -1,0 +1,197 @@
+---
+title: コンテンツソース
+description: >-
+  ローカルファイル、リモートリポジトリ、または任意のカスタムバックエンドからドキュメントを取得し、複数のソースをビルド時に読み込む1つのスタティックファーストなサイトに統合できます。
+---
+
+Blume はデフォルトで `.md`/`.mdx` ファイルのフォルダーを読み込みます。**コンテンツソース**を使うと、リモートリポジトリ、CMS、任意のカスタムバックエンドなど、別の場所からページを取得し、複数のソースを1つのサイトに統合できます。ソースはビルド時に読み込まれ、Blume はスタティックファーストのままです。
+
+## デフォルトの動作
+
+設定を行わない場合、Blume はコンテンツルート（デフォルトでは `docs`）を1つの暗黙的なファイルシステムソースとしてスキャンします。トップレベルの `content.root`/`include`/`exclude` オプションはこれまでどおり動作するため、変更は不要です。
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: { root: "docs" },
+});
+```
+
+## 複数のソース
+
+ソースを組み合わせるには `content.sources` 配列を追加します。各エントリは任意の `prefix` によって名前空間が分けられ、そのルートは `/<prefix>/…` の下にネストされます。`sources` が存在する場合は暗黙のデフォルトが置き換えられるため、ローカルドキュメント用に `filesystem` エントリを含めてください。
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      // Local docs at the site root
+      { type: "filesystem", root: "docs" },
+
+      // Remote MDX from a GitHub repo, mounted under /sdk
+      {
+        type: "mdx-remote",
+        prefix: "sdk",
+        github: { owner: "acme", repo: "sdk", ref: "main", path: "docs" },
+      },
+    ],
+  },
+});
+```
+
+2つのソースが同じルートに解決される場合、Blume は `BLUME_DUPLICATE_ROUTE` ビルドエラーを報告します。各ソースには異なる `prefix` を指定してください。
+
+## リモート MDX
+
+組み込みの `mdx-remote` ソースは、生の `.md`/`.mdx` を HTTP 経由で取得します。ファイルの列挙は、GitHub リポジトリのサブツリー（`github`）から行うか、raw ベース URL に対して明示的に指定（`url` + `files`）します。
+
+```ts blume.config.ts
+{
+  type: "mdx-remote",
+  prefix: "sdk",
+  url: "https://raw.githubusercontent.com/acme/sdk/main/docs",
+  files: ["intro.mdx", "guide.mdx"],
+}
+```
+
+プライベートリポジトリのトークンは `GITHUB_TOKEN` 環境変数から読み込まれます。設定ファイルや生成された出力にインライン展開されることはなく、送信先は GitHub 自身のホスト（`api.github.com`、`raw.githubusercontent.com`）のみで、カスタムの `url` ベースに送信されることはありません。
+
+リモートページは MDX とコンポーネントの機能をすべて備えた形でレンダリングされます。その本文は隠しステージングディレクトリに実体化され、ローカルドキュメントと並んで Astro を通してレンダリングされるため、コールアウト、タブ、その他すべての Blume コンポーネントが引き続き動作します。
+
+### キャッシュとオフラインビルド
+
+各リモートソースは `.blume/cache/<source>/` 配下にスナップショットを保持します。ネットワークの一時的な不調や CMS の障害などで取得に失敗した場合、Blume はビルドを失敗させる代わりに、警告を出しつつ最後に取得できた正常なスナップショットを提供します。キャッシュは `.blume/` 内に置かれ、再生成されるものであり、コミットすることはありません。
+
+開発環境では、リモートコンテンツは一度だけ取得され、そのセッション中は固定されます。更新するには開発サーバーを再起動してください。ローカルのファイルシステムソースは通常どおりホットリロードされます。代わりにリモートソースの変更をポーリングするには、そのソースに `pollInterval`（秒）を設定します。開発サーバーはその間隔で再取得を行い、コンテンツが実際に変更された場合にのみリロードします。作業中に API へアクセスしないようにするには、未設定のままにしてください。
+
+## GitHub Releases
+
+組み込みの `github-releases` ソースは、リポジトリのリリースを変更履歴（changelog）に変換します。各リリースは `type: changelog` のエントリになるため、リリースノートが*そのまま*変更履歴になり、二重に書く必要はありません。生成される[変更履歴タイムライン](/docs/advanced/changelog)と組み合わせれば、GitHub リリースを公開するだけで変更履歴エントリが出荷されます。
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "content" },
+      {
+        type: "github-releases",
+        prefix: "changelog",
+        owner: "acme",
+        repo: "sdk",
+        // prereleases: false,  // include prereleases (default off)
+        // drafts: false,       // include drafts (needs a write token)
+        // limit: 100,          // cap releases, newest-first
+      },
+    ],
+  },
+});
+```
+
+各リリースは変更履歴のフィールドへ自動的にマッピングされます。名前（またはタグ）がタイトルになり、公開日がタイムラインの並び順を決定し、タグが `changelog.version` になり、プレリリースには `Prerelease`（それ以外には `Release`）のタグが付きます。リリースノートはエントリの本文としてレンダリングされます。リリースページを `/changelog/v1-2-0` のようなルートにネストさせるには、ソースに `prefix` を指定してください。
+
+プライベートリポジトリの認証には `GITHUB_TOKEN` 環境変数を使用します。これは他の GitHub 機能が使うものと同じトークンで、設定ファイルにインライン展開されることはありません。他のすべてのリモートソースと同様に `.blume/cache/<source>/` にキャッシュされ、API に到達できない場合はオフラインで提供されます。変更履歴は補助的なものであるため、キャッシュがない状態で取得に失敗した場合（トークンのない CI ビルドなど）は、ビルドを失敗させるのではなく、警告を出して空の変更履歴に縮退します。内容を反映させるには、CI やデプロイ環境で `GITHUB_TOKEN` を設定してください。
+
+## Sanity
+
+組み込みの `sanity` ソースは GROQ クエリを実行し、各ドキュメントのフィールドをフロントマターに、Portable Text の本文を Markdown にマッピングします。`@sanity/client` パッケージは任意の peer dependency です。このソースを使う場合にのみインストールしてください。
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "sanity",
+        prefix: "guides",
+        projectId: "abc123",
+        dataset: "production",
+        query: `*[_type == "guide"]`,
+        // Field paths default to title / slug.current / body / _updatedAt
+        fields: { slug: "slug.current", body: "content" },
+      },
+    ],
+  },
+});
+```
+
+プライベートデータセット用の読み取りトークンは `SANITY_TOKEN` 環境変数から取得されます。カスタムの Portable Text ブロックタイプは、アダプターの `serializers` オプションを通じて Blume コンポーネントにマッピングできます。このオプションは[カスタムソース](#custom-sources)として `sanitySource` を直接構築する場合に利用できます。
+
+## Notion
+
+組み込みの `notion` ソースは、Notion のデータベースをコレクションに変換します。各行がページになり、そのプロパティがフロントマターに、ブロックツリーが MDX になります。コールアウト、トグル、カラム、コードブロックは対応する Blume コンポーネントにマッピングされます。`@notionhq/client` は任意の peer dependency です。
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "notion",
+        prefix: "handbook",
+        database: process.env.NOTION_DB_ID,
+        // Property names default to the title-typed prop / Description / Slug / Order
+        // Set publishedValue to treat Status as a publish gate (opt-in)
+        publishedValue: "Published",
+      },
+    ],
+  },
+});
+```
+
+インテグレーショントークンは `NOTION_TOKEN` 環境変数から取得されます（データベースをインテグレーションと共有してください）。デフォルトではすべてのページがインポートされます。`Status` プロパティを公開ゲートとして扱うには `publishedValue` を設定してください。その場合、それ以外の値は `draft: true` にマッピングされ、本番ビルドでは除外されます。**Notion の画像 URL は署名付きで有効期限がある**ため、アダプターはビルド時にそれらをダウンロードしてサイトのアセットに取り込み、参照を書き換えます。CMS の画像が静的ビルドを壊すことはありません。
+
+## プレビューと同期
+
+リモートコンテンツの取得方法と対象範囲は、2つのフラグで制御します。
+
+- **`--preview`** を `blume dev` または `blume build` に付けると、下書きがレンダリングされ、未公開の CMS コンテンツが取得されます。Sanity は `previewDrafts` パースペクティブに切り替わり、Notion は `Status` によるフィルタリングを停止します。フラグなしの本番ビルドはこれまでどおり下書きを除外するため、プレビュービルドは出荷前に未公開の作業を安全に確認する手段になります。
+- **`blume sync`** はすべてのリモートソースを再取得し、ランタイムを再生成します。開発環境はキャッシュ優先で、リモートソースは一度取得されると再起動時には `.blume/cache` から提供されます（高速でオフラインにも強い）。そのため、開発サーバーを再起動せずに最新の CMS コンテンツを取得する手段が `blume sync` です（起動中のサーバーはホットリロードします）。先にキャッシュを破棄するには `--force` を追加するか、ソースに `pollInterval` を設定して自動更新してください。
+
+```sh
+blume dev --preview      # author workflow: see drafts live
+blume build --preview    # render a full preview build
+blume sync               # refresh remote content now
+blume sync --force       # ...ignoring any cached snapshot
+```
+
+## カスタムソース
+
+`ContentSource` インターフェースを実装したオブジェクトはそのまま渡せます。これにより、カスタムシリアライザーを備えたアダプターや、組み込みでない任意のバックエンドを、その SDK をコアのインストールに持ち込むことなく組み込めます。
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+import { sanitySource } from "blume/sources/sanity.ts";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "custom",
+        source: sanitySource({
+          name: "guides",
+          prefix: "guides",
+          projectId: "abc123",
+          dataset: "production",
+          query: `*[_type == "guide"]`,
+          // Map custom Portable Text blocks to Blume components
+          serializers: {
+            callout: (block) => `<Callout>${block.text}</Callout>`,
+          },
+        }),
+      },
+    ],
+  },
+});
+```
+
+ソースは自身のネイティブな形式（Portable Text、Notion ブロック、リモート HTML）を Markdown/MDX テキストに正規化するため、ページがどこから来たものであっても、同じコンポーネントと Markdown の機能が適用されます。

@@ -1,0 +1,29 @@
+---
+title: Skills
+description: >-
+  As skills de agente que o Blume oferece — playbooks que ensinam um agente de programação como Claude Code, Codex ou Cursor a construir e manter um site de documentação Blume.
+---
+
+O Blume oferece [agent skills](https://docs.claude.com/en/docs/claude-code/skills) — playbooks que ensinam um agente de programação (Claude Code, Codex, Cursor) a executar uma tarefa no formato Blume sem que você precise explicá-la. Elas ficam no GitHub, na pasta `skills/` do repositório, e vêm incluídas no pacote instalado em `skills/`, de modo que qualquer agente pode ser apontado diretamente para um `SKILL.md`.
+
+## Blume
+
+A skill principal. Ela ensina ao agente o que é o Blume e como estruturar, escrever e configurar um site — navegação derivada do sistema de arquivos, o schema de configuração, componentes de conteúdo — e o direciona para a documentação completa incluída no pacote instalado (o diretório `docs/` dentro de `blume`, resolvido a partir de onde quer que seu gerenciador de pacotes o instale — em um monorepo pnpm, isso é o `node_modules` do workspace dependente, não a raiz do repositório). Instale-a em qualquer projeto em que um agente ajude você a construir sua documentação:
+
+```bash
+npx skills add haydenbleasel/blume
+```
+
+## Documentação que se atualiza sozinha
+
+A `blume-update-docs` mantém sua documentação em sincronia com o produto que ela documenta. A cada execução — normalmente a partir de um agendamento que você configura no seu executor de agentes — ela audita PRs mesclados recentemente, changelogs, schemas de configuração e a ajuda da CLI em relação ao conteúdo da documentação, atualiza apenas as páginas que estão factualmente desatualizadas (trabalhos por trás de feature flags são ignorados), verifica com `blume build` e abre ou atualiza um pull request `blume/*`. Se nada divergiu, ela reporta uma execução limpa sem alterações em vez de abrir um PR ruidoso.
+
+```bash
+npx skills add haydenbleasel/blume --skill blume-update-docs
+```
+
+O Blume não hospeda a automação — conecte a skill a uma tarefa agendada no Claude Code, a uma automação do Codex ou do Cursor, ou a um cron simples, com permissão para ler o histórico do repositório e abrir PRs. Um prompt semanal típico:
+
+```text
+Use the blume-update-docs skill. Review the PRs merged within the last 7 days and compare them to the docs content. Ignore work behind feature flags. If docs need updates, make them, verify the docs build, and open a blume/* PR. If not, report what you checked and do not open a PR.
+```

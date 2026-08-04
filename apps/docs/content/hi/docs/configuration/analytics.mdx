@@ -1,0 +1,83 @@
+---
+title: एनालिटिक्स
+description: >-
+  फ़र्स्ट-पार्टी वेब एनालिटिक्स — Vercel Web Analytics, PostHog, या कोई भी कस्टम स्क्रिप्ट — blume.config.ts से जुड़ी हुई।
+---
+
+Blume आपके लिए `blume.config.ts` में एक ही `analytics` ब्लॉक से एनालिटिक्स इंजेक्ट करता है। Vercel Web Analytics और PostHog फ़र्स्ट-क्लास हैं, और एक `scripts` एस्केप हैच बाक़ी हर प्रोवाइडर को कवर करता है — Plausible, Fathom, Google Analytics, Umami, और अन्य।
+
+एनालिटिक्स **केवल प्रोडक्शन बिल्ड** में लोड होता है। स्क्रिप्ट्स `blume build` द्वारा उत्सर्जित की जाती हैं, कभी भी `blume dev` द्वारा नहीं, इसलिए लोकल ट्रैफ़िक कभी आपके डैशबोर्ड तक नहीं पहुँचता और आपको अलग "डेवलपमेंट" प्रोजेक्ट की ज़रूरत नहीं पड़ती।
+
+:::note
+एनालिटिक्स ऑप्ट-इन है। `analytics` ब्लॉक न होने पर Blume कुछ भी इंजेक्ट नहीं करता।
+:::
+
+## Vercel Web Analytics
+
+[Vercel Web Analytics](https://vercel.com/docs/analytics) जोड़ने के लिए `vercel: true` सेट करें। Blume, Vercel की फ़र्स्ट-पार्टी स्क्रिप्ट इंजेक्ट करता है, जो Vercel डैशबोर्ड में प्रोजेक्ट के लिए Web Analytics सक्षम होने के बाद आपके अपने डोमेन से सर्व की जाती है।
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  vercel: true,
+}
+```
+
+किसी की-ज़रूरत नहीं है — स्क्रिप्ट उसी प्रोजेक्ट को रिपोर्ट करती है जिसके तहत वह डिप्लॉय हुई है। यह केवल Vercel डिप्लॉयमेंट्स पर डेटा एकत्र करती है, जहाँ `/_vercel/insights` एंडपॉइंट मौजूद होता है।
+
+## PostHog
+
+[PostHog](https://posthog.com) जोड़ने के लिए अपनी **प्रोजेक्ट API की** दें। होस्ट डिफ़ॉल्ट रूप से PostHog Cloud US होता है; EU Cloud (`https://eu.i.posthog.com`) या सेल्फ़-होस्टेड इंस्टेंस के लिए `host` सेट करें।
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  posthog: {
+    key: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    host: "https://us.i.posthog.com", // optional, this is the default
+  },
+}
+```
+
+प्रोजेक्ट API की को ब्राउज़र तक भेजना सुरक्षित है — यह एक सार्वजनिक, राइट-ओनली की है।
+
+## कस्टम स्क्रिप्ट्स
+
+किसी भी अन्य एनालिटिक्स प्रोवाइडर को लोड करने के लिए `scripts` का उपयोग करें। हर एंट्री एक `<script>` टैग रेंडर करती है और उसमें `src` (बाहरी) या `content` (इनलाइन) में से **ठीक एक** सेट होना चाहिए।
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  scripts: [
+    // Plausible
+    {
+      src: "https://plausible.io/js/script.js",
+      strategy: "defer",
+      attributes: { "data-domain": "example.com" },
+    },
+    // Fathom
+    {
+      src: "https://cdn.usefathom.com/script.js",
+      strategy: "defer",
+      attributes: { "data-site": "ABCDEFG" },
+    },
+    // An inline snippet
+    {
+      content: "console.log('analytics ready')",
+    },
+  ],
+}
+```
+
+`attributes` अतिरिक्त HTML एट्रिब्यूट्स (`data-*`, `id`, …) का मैप है जो टैग पर स्प्रेड किए जाते हैं, और `strategy` बाहरी स्क्रिप्ट्स में `async` या `defer` जोड़ता है।
+
+## विकल्प
+
+| विकल्प | डिफ़ॉल्ट | विवरण |
+| --- | --- | --- |
+| `vercel` | `false` | Vercel Web Analytics जोड़ें (केवल Vercel डिप्लॉयमेंट्स)। |
+| `posthog.key` | — | PostHog प्रोजेक्ट API की। सेट होने पर PostHog सक्षम करती है। |
+| `posthog.host` | `https://us.i.posthog.com` | PostHog इंजेशन होस्ट (EU Cloud या सेल्फ़-होस्टेड)। |
+| `scripts[].src` | — | बाहरी स्क्रिप्ट URL. `content` के साथ परस्पर अनन्य। |
+| `scripts[].content` | — | इनलाइन स्क्रिप्ट बॉडी। `src` के साथ परस्पर अनन्य। |
+| `scripts[].strategy` | — | बाहरी स्क्रिप्ट के लिए `async` या `defer`. |
+| `scripts[].attributes` | — | `<script>` टैग पर स्प्रेड किए जाने वाले अतिरिक्त HTML एट्रिब्यूट्स। |
+
+तीनों को मिलाकर इस्तेमाल किया जा सकता है — Vercel, PostHog, और कस्टम स्क्रिप्ट्स एक साथ सक्षम करें। अपनी बिल्ट साइट को डिप्लॉय करने के लिए, [Deployment](/docs/deployment) देखें।

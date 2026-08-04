@@ -1,0 +1,381 @@
+---
+title: Ficheiro de configuração
+description: >-
+  Todas as opções em blume.config.ts, desde os metadados do site e as fontes de conteúdo até às ligações que conduzem a cada guia de configuração de funcionalidade.
+sidebar:
+  label: blume.config.ts
+---
+
+O Blume lê o `blume.config.ts` a partir da raiz do teu projeto. Envolve a tua configuração em `defineConfig` para obteres preenchimento automático e verificação de tipos — todos os campos são opcionais, com um valor predefinido sensato.
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  title: "My Docs",
+  description: "Documentation for my project.",
+});
+```
+
+## Um exemplo completo
+
+Um exemplo mais abrangente que aborda as opções mais comuns (consulta o guia de cada funcionalidade para as restantes):
+
+```ts blume.config.ts lineNumbers
+import sitemap from "@astrojs/sitemap";
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  // Site
+  title: "My Docs",
+  description: "Documentation for my project.",
+  logo: "/logo.svg",
+
+  // Astro integrations — installed and versioned by this site
+  integrations: [sitemap()],
+
+  // Content
+  content: {
+    root: "docs",
+  },
+
+  // Theme — see the Theming guide
+  theme: {
+    accent: "teal",
+    radius: "md",
+    mode: "system",
+  },
+
+  // Search — see the Search guide
+  search: {
+    provider: "orama",
+  },
+
+  // Markdown features
+  markdown: {
+    imageZoom: true,
+    code: {
+      icons: true, // language icon in the code-block header
+      wrap: false, // wrap long lines instead of scrolling
+    },
+    codeBlocks: {
+      theme: {
+        light: "github-light", // bundled name or custom Shiki theme object
+        dark: "github-dark",
+      },
+    },
+  },
+
+  // AI — see the AI guide
+  ai: {
+    llmsTxt: true,
+    // MCP server (needs server output)
+    mcp: {
+      enabled: false,
+      route: "/mcp",
+    },
+  },
+
+  // SEO — OG images, feeds, sitemap, structured data; see the SEO guide
+  seo: {
+    og: { enabled: true },
+    rss: { enabled: true, types: ["blog", "changelog"] },
+    sitemap: true,
+    robots: true,
+    structuredData: true,
+  },
+
+  // Deployment — see the Deployment guide
+  deployment: {
+    output: "static",
+    site: "https://docs.example.com",
+  },
+});
+```
+
+## Site
+
+| Opção | Predefinição | Descrição |
+| --- | --- | --- |
+| `title` | `"Documentation"` | Nome do site — apresentado no cabeçalho, nos títulos das páginas e nos cartões OG. |
+| `description` | — | Meta descrição predefinida, usada para SEO e OG. |
+| `logo` | — | Marca gráfica e/ou logótipo textual apresentado no cabeçalho. |
+| `banner` | — | Barra de anúncios para todo o site, acima do cabeçalho. |
+
+### Logótipo
+
+Aponta o `logo` para um SVG e o Blume incorpora-o em linha, para que um logótipo com `currentColor` acompanhe automaticamente o tema claro e escuro:
+
+```ts blume.config.ts
+logo: "/logo.svg",
+```
+
+O SVG pode estar na raiz do teu projeto ou em `public/`. A marca é composta por um símbolo (`image`) mais um logótipo textual (`text`); a forma de objeto permite-te defini-los de forma independente:
+
+```ts blume.config.ts lineNumbers
+logo: {
+  image: "/logo.svg", // string, or { light, dark, alt } for themed raster art
+  text: "Acme",       // wordmark beside the mark
+  href: "/",          // overrides the brand link (defaults to "/")
+},
+```
+
+`image` aceita o mesmo valor que a forma abreviada — um único caminho, ou `{ light, dark, alt }` para artes separadas para claro/escuro (as imagens raster têm de estar em `public/`).
+
+`text` controla o logótipo textual independentemente do símbolo:
+
+- **Omite `text`** e a marca usa o `title` do teu site (a predefinição).
+- **Define `text: ""`** para mostrar apenas o símbolo — útil quando a imagem do logótipo já inclui o logótipo textual.
+- **Define `text` sem `image`** para um logótipo apenas de texto.
+
+### Favicon
+
+Não existe uma opção de favicon — o Blume deteta um automaticamente pelo nome do ficheiro, tal como o Next.js faz. Coloca um ficheiro `icon` ou `favicon` (`.svg`, `.png` ou `.ico`) na raiz do teu projeto ou no diretório `public/` e ele passa a ser o ícone do separador do browser:
+
+```
+my-docs/
+├─ blume.config.ts
+├─ icon.png          ← picked up automatically
+└─ docs/
+```
+
+O SVG prevalece sobre o PNG, que prevalece sobre o ICO quando existem vários, e um ficheiro em `public/` é preferido a um na raiz. Se o Blume não encontrar nenhum ícone, recorre à sua própria marca.
+
+### Ícone Apple touch
+
+O ícone que o iOS usa quando alguém adiciona o teu site ao ecrã principal é detetado da mesma forma. Coloca um ficheiro `apple-icon` (`.png`, `.jpg` ou `.jpeg`) — ou um `apple-touch-icon.png`, o nome que a maioria dos geradores de favicons produz — na raiz do teu projeto ou no diretório `public/` e o Blume trata de configurar `<link rel="apple-touch-icon">` por ti. Não há predefinição; se não for encontrado nenhum ficheiro, não é emitida nenhuma tag.
+
+```
+my-docs/
+├─ blume.config.ts
+├─ apple-icon.png     ← picked up automatically
+└─ docs/
+```
+
+Coloca o ficheiro em `public/` em vez de na raiz do projeto: o iOS ignora o URI de dados incorporado que o Blume usa para um ícone ao nível da raiz, pelo que só um ficheiro em `public/` (servido em `/apple-icon.png`) chega de forma fiável ao ecrã principal.
+
+### Faixa
+
+Mostra uma barra de anúncios para todo o site acima do cabeçalho. Passa uma string, ou um objeto com uma ligação e um botão para dispensar:
+
+```ts blume.config.ts
+banner: "Docs are in beta — expect changes.",
+```
+
+```ts blume.config.ts lineNumbers
+banner: {
+  content: "Blume v1 is here!",
+  link: { text: "Read more", href: "/blog/v1" },
+  dismissible: true,
+  id: "v1",
+},
+```
+
+Quando `dismissible` está ativo, a barra mostra um botão de fechar e permanece oculta para esse visitante a partir daí. A chave de dispensa assume por predefinição o texto do conteúdo, pelo que editar a mensagem faz a faixa reaparecer; define um `id` estável para a manter dispensada entre edições.
+
+## Conteúdo
+
+Onde vive o teu conteúdo e como o Blume o descobre. Consulta [Páginas](/docs/content) para saberes como os ficheiros se tornam rotas.
+
+```ts blume.config.ts lineNumbers
+content: {
+  root: "docs",
+}
+```
+
+| Opção | Predefinição | Descrição |
+| --- | --- | --- |
+| `root` | `"docs"` | Pasta que o Blume analisa em busca de conteúdo. |
+| `include` | `["**/*.{md,mdx}"]` | Globs que correspondem a ficheiros de conteúdo. |
+| `exclude` | `["**/_*", "**/.*"]` | Globs a ignorar (ficheiros com underscore e com ponto). |
+| `pages` | `"pages"` | Pasta para páginas `.astro` personalizadas. |
+| `defaultType` | `"doc"` | `type` de página usado quando o frontmatter o omite. |
+
+Os recursos estáticos vivem em `public/` — um ficheiro em `public/logo.png` é servido em `/logo.png`, pelo que uma referência como `![](/images/create.png)` é resolvida a partir de `public/images/create.png`. As imagens referenciadas por **caminho relativo** (`![](./diagram.png)`) vivem antes junto ao teu conteúdo e são [otimizadas no momento da compilação](/docs/content/syntax#links-and-images).
+
+## Imagens
+
+As imagens locais referenciadas por caminho relativo são otimizadas automaticamente no momento da compilação — comprimidas, convertidas para WebP e com atributos `width`/`height` intrínsecos, para que o layout não se desloque enquanto carregam. Não há nada a configurar; consulta [Ligações e imagens](/docs/content/syntax#links-and-images) para orientações de escrita.
+
+As imagens remotas são servidas sem alterações por predefinição. Para que o Blume também as descarregue e otimize no momento da compilação, autoriza os seus hosts:
+
+```ts blume.config.ts lineNumbers
+image: {
+  domains: ["cdn.example.com"],
+  remotePatterns: [{ protocol: "https", hostname: "**.example.com" }],
+}
+```
+
+| Opção | Predefinição | Descrição |
+| --- | --- | --- |
+| `domains` | `[]` | Nomes de host cujas imagens remotas podem ser otimizadas. |
+| `remotePatterns` | `[]` | Autorização baseada em padrões (`protocol`, `hostname`, `port`, `pathname`); os nomes de host aceitam os wildcards `*.` (um nível) e `**.` (qualquer profundidade). |
+
+## Frontmatter
+
+O frontmatter das páginas é validado de forma estrita — uma chave desconhecida faz falhar a compilação, pelo que os erros de escrita são detetados cedo. Para incluíres metadados específicos do projeto (um responsável, uma data de revisão), declara as chaves adicionais em `frontmatter.extend`, cada uma mapeada para um schema que forneces:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { z } from "zod";
+
+export default defineConfig({
+  frontmatter: {
+    extend: {
+      owner: z.string(),
+      reviewedAt: z.coerce.date().optional(),
+    },
+  },
+});
+```
+
+Funciona com qualquer biblioteca [Standard Schema](https://standardschema.dev) — Zod (qualquer que seja a versão que o teu projeto instale), Valibot, ArkType. As chaves fora da extensão continuam validadas de forma estrita, pelo que a deteção de erros de escrita mantém-se inalterada. Consulta [Chaves personalizadas](/docs/reference/frontmatter#custom-keys) para a semântica de validação.
+
+## GitHub
+
+Aponta o Blume para o teu repositório com `github`. É o que alimenta a [ligação para o repositório](/docs/content/navigation#repository-link) no cabeçalho e as [ações de página](/docs/content/navigation#page-actions) **Editar no GitHub** e **Enviar feedback**:
+
+```ts blume.config.ts lineNumbers
+github: {
+  owner: "acme",
+  repo: "docs",
+}
+```
+
+| Opção | Predefinição | Descrição |
+| --- | --- | --- |
+| `owner` | — | Conta ou organização do GitHub proprietária do repositório. |
+| `repo` | — | Nome do repositório. |
+| `branch` | `"main"` | Branch para onde apontam as ligações de edição. |
+| `dir` | — | Caminho da raiz do repositório até à raiz do projeto (para monorepos). |
+
+## Última modificação
+
+Mostra uma linha "Última atualização em …" no fundo de cada página. Desativado por predefinição; define `lastModified` como `true` para derivar a data de cada página a partir do respetivo histórico do git:
+
+```ts blume.config.ts
+lastModified: true,
+```
+
+| Valor | Descrição |
+| --- | --- |
+| `false` | Desativado (predefinição). |
+| `true` | Lê a data a partir do histórico do git (datas dos commits). |
+| `{ type: "git" }` | O mesmo que `true`, escrito explicitamente. |
+| `{ type: "frontmatter" }` | Nunca executa o git — usa apenas o campo `lastModified` do frontmatter. |
+
+A fonte git lê o commit mais recente que tocou em cada ficheiro, pelo que funciona em qualquer repositório git — incluindo monorepos — e precisa do histórico do repositório no momento da compilação (evita um checkout superficial com `--depth 1` no CI). O `lastModified` do frontmatter da própria página prevalece sempre, o que é útil para fixar uma data ou para ficheiros que ainda não foram commitados:
+
+```mdx page.mdx
+---
+title: My page
+lastModified: 2026-06-20
+---
+```
+
+Quando ativada, a data é também emitida como `dateModified` de schema.org nos dados estruturados da página.
+
+## Formato de data
+
+Tanto a marca de "Última atualização" como a cronologia do [changelog](/docs/advanced/changelog) apresentam as suas datas através do mesmo `dateFormat`, para que se leiam de igual forma. As datas são sempre apresentadas na localização do site; o `dateFormat` controla o _formato_. Por predefinição usa a forma longa (`July 21, 2026`, `2026年7月21日`):
+
+```ts blume.config.ts
+dateFormat: { dateStyle: "long" },
+```
+
+`dateFormat` é passado diretamente para as opções de [`Intl.DateTimeFormat`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat). Usa uma predefinição `dateStyle` para escolher um comprimento:
+
+```ts blume.config.ts
+dateFormat: { dateStyle: "medium" },
+```
+
+Ou os campos de componentes individuais para um estilo numérico próprio como `2026/07/21`:
+
+```ts blume.config.ts
+dateFormat: { year: "numeric", month: "2-digit", day: "2-digit" },
+```
+
+| Opção | Descrição |
+| --- | --- |
+| `dateStyle` | Comprimento predefinido: `"full"`, `"long"`, `"medium"` ou `"short"`. Não pode ser combinado com os campos de componentes. |
+| `weekday`, `era`, `year`, `month`, `day` | Componentes individuais, p. ex. `year: "numeric"`, `month: "2-digit"`. |
+| `timeZone` | Fuso horário IANA. Por predefinição é `UTC`, para que uma data se leia da mesma forma independentemente de onde o site é compilado. |
+| `calendar`, `numberingSystem` | Sistema de calendário (p. ex. `"japanese"`) e sistema de numeração (p. ex. `"arab"`). |
+
+## SEO
+
+Imagens Open Graph, feeds RSS e dados estruturados JSON-LD, agrupados em `seo`. Consulta o [guia de SEO](/docs/configuration/seo) para metadados, substituições no frontmatter e a referência completa.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
+  structuredData: true,
+}
+```
+
+| Opção | Predefinição | Descrição |
+| --- | --- | --- |
+| `og.enabled` | automático | Imagens Open Graph por página — ativas quando um URL do site está definido. |
+| `rss.enabled` | `true` | Cria feeds para conteúdos de blogue e de changelog. |
+| `rss.types` | `["blog", "changelog"]` | Tipos de conteúdo que recebem cada um um feed. |
+| `rss.limit` | `50` | Número máximo de itens por feed. |
+| `sitemap` | `true` | Gera o sitemap.xml (precisa de deployment.site). |
+| `robots` | `true` | Gera o robots.txt com uma ligação para o Sitemap. |
+| `structuredData` | `true` | Emite JSON-LD de schema.org no head de cada página. |
+
+Estes funcionam melhor com um [`deployment.site`](/docs/deployment) absoluto, para URLs completos.
+
+## Índice da página
+
+O esquema "nesta página" está ativo por predefinição e lista os cabeçalhos `H2`–`H3`. Desativa-o, ou altera o intervalo de cabeçalhos, com `toc`:
+
+```ts blume.config.ts
+export default defineConfig({
+  toc: false, // hide it everywhere
+});
+```
+
+Ou, em alternativa, restringe o intervalo de cabeçalhos:
+
+```ts blume.config.ts
+export default defineConfig({
+  toc: { minHeadingLevel: 2, maxHeadingLevel: 4 },
+});
+```
+
+## Opções de funcionalidades
+
+Cada uma delas tem o seu próprio guia. O campo de configuração é o ponto de entrada:
+
+| Campo | O que configura | Guia |
+| --- | --- | --- |
+| `theme` | Cor de destaque, raio dos cantos, tipos de letra, modo claro/escuro | [Temas](/docs/configuration/theming) |
+| `navigation` | Barra lateral explícita e separadores do cabeçalho | [Navegação](/docs/content/navigation) |
+| `search` | Fornecedor (Orama, Pagefind, Algolia, entre outros) e indexação | [Pesquisa](/docs/configuration/search) |
+| `markdown` | Opções de renderização de Markdown — blocos de código, âncoras de cabeçalhos, zoom em imagens | [Sintaxe](/docs/content/syntax) |
+| `ai` | `llms.txt`, Ask AI e o servidor MCP alojado para agentes de programação | [IA](/docs/configuration/ai) |
+| `analytics` | Vercel, PostHog e scripts personalizados | [Análises](/docs/configuration/analytics) |
+| `seo` | Metadados, imagens OG, feeds, dados estruturados | [SEO](/docs/configuration/seo) |
+| `deployment` | Modo de saída, adaptador e URL do site | [Implementação](/docs/deployment) |
+| `redirects` | Redirecionamentos permanentes e temporários | [Implementação](/docs/deployment#redirects) |
+| `integrations` | Integrações do Astro acrescentadas depois das integradas do Blume | [Personalização](/docs/configuration/customization#astro-integrations) |
+
+## Precedência
+
+As definições são resolvidas da prioridade mais baixa para a mais alta, para que só tenhas de substituir o que precisas:
+
+<Steps>
+  <Step title="Predefinições do Blume">
+    Um valor predefinido sensato para cada campo.
+  </Step>
+  <Step title="blume.config.ts">A configuração de todo o teu projeto.</Step>
+  <Step title="Meta da pasta">
+    [`meta.ts`](/docs/content/meta) para o título e a ordenação de uma secção.
+  </Step>
+  <Step title="Frontmatter da página">
+    As substituições por página prevalecem.
+  </Step>
+</Steps>

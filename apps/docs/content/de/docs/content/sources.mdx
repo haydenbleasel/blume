@@ -1,0 +1,197 @@
+---
+title: Inhaltsquellen
+description: >-
+  Beziehe Dokumentation aus lokalen Dateien, einem entfernten Repository oder einem beliebigen eigenen Backend – und kombiniere mehrere Quellen zu einer static-first-Website, die zur Build-Zeit gelesen wird.
+---
+
+Standardmäßig liest Blume einen Ordner mit `.md`/`.mdx`-Dateien. **Inhaltsquellen** ermöglichen es dir, Seiten von woanders zu beziehen – aus einem entfernten Repository, einem CMS oder einem beliebigen eigenen Backend – und mehrere Quellen zu einer einzigen Website zu kombinieren. Quellen werden zur Build-Zeit gelesen; Blume bleibt static-first.
+
+## Die Voreinstellung
+
+Ohne Konfiguration durchsucht Blume dein Inhaltsverzeichnis (standardmäßig `docs`) als eine implizite Dateisystemquelle. Die Optionen `content.root`/`include`/`exclude` auf oberster Ebene funktionieren weiterhin genau wie zuvor – es muss nichts geändert werden.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: { root: "docs" },
+});
+```
+
+## Mehrere Quellen
+
+Füge ein `content.sources`-Array hinzu, um Quellen zusammenzustellen. Jeder Eintrag erhält über ein optionales `prefix` einen eigenen Namensraum, sodass seine Routen unter `/<prefix>/…` liegen. Wenn `sources` vorhanden ist, ersetzt es die implizite Voreinstellung – nimm daher einen `filesystem`-Eintrag für deine lokale Dokumentation auf.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      // Local docs at the site root
+      { type: "filesystem", root: "docs" },
+
+      // Remote MDX from a GitHub repo, mounted under /sdk
+      {
+        type: "mdx-remote",
+        prefix: "sdk",
+        github: { owner: "acme", repo: "sdk", ref: "main", path: "docs" },
+      },
+    ],
+  },
+});
+```
+
+Wenn zwei Quellen dieselbe Route auflösen, meldet Blume den Build-Fehler `BLUME_DUPLICATE_ROUTE` – gib jeder Quelle ein eigenes `prefix`.
+
+## Entferntes MDX
+
+Die eingebaute Quelle `mdx-remote` lädt rohe `.md`/`.mdx`-Dateien über HTTP. Zähle die Dateien entweder über einen Teilbaum eines GitHub-Repositorys (`github`) oder explizit gegenüber einer Raw-Basis-URL (`url` + `files`) auf:
+
+```ts blume.config.ts
+{
+  type: "mdx-remote",
+  prefix: "sdk",
+  url: "https://raw.githubusercontent.com/acme/sdk/main/docs",
+  files: ["intro.mdx", "guide.mdx"],
+}
+```
+
+Das Token eines privaten Repositorys wird aus der Umgebungsvariable `GITHUB_TOKEN` gelesen – es wird niemals in deine Konfiguration oder die generierte Ausgabe eingebettet und ausschließlich an GitHubs eigene Hosts (`api.github.com`, `raw.githubusercontent.com`) gesendet, niemals an eine eigene `url`-Basis.
+
+Entfernte Seiten werden mit voller MDX-plus-Komponenten-Treue gerendert: Ihre Inhalte werden in einem versteckten Staging-Verzeichnis materialisiert und zusammen mit deiner lokalen Dokumentation über Astro gerendert, sodass Callouts, Tabs und alle anderen Blume-Komponenten weiterhin funktionieren.
+
+### Caching und Offline-Builds
+
+Jede entfernte Quelle hält einen Snapshot unter `.blume/cache/<source>/` vor. Wenn ein Abruf fehlschlägt – eine Netzwerkstörung oder ein CMS-Ausfall –, liefert Blume den letzten funktionierenden Snapshot mit einer Warnung aus, anstatt den Build fehlschlagen zu lassen. Der Cache liegt innerhalb von `.blume/` und wird neu erzeugt, niemals eingecheckt.
+
+In der Entwicklung werden entfernte Inhalte einmal abgerufen und für die Sitzung eingefroren; starte den Dev-Server neu, um sie zu aktualisieren. Lokale Dateisystemquellen laden wie gewohnt per Hot-Reload neu. Um eine entfernte Quelle stattdessen auf Änderungen abzufragen, setze bei ihr `pollInterval` (in Sekunden) – der Dev-Server ruft in diesem Intervall erneut ab und lädt nur dann neu, wenn sich der Inhalt tatsächlich geändert hat. Lass die Option ungesetzt, um die API während der Arbeit nicht zu belasten.
+
+## GitHub Releases
+
+Die eingebaute Quelle `github-releases` verwandelt die Releases eines Repositorys in ein Changelog: Jedes Release wird zu einem Eintrag mit `type: changelog`, sodass deine Release Notes _dein_ Changelog sind – nichts muss doppelt geschrieben werden. In Kombination mit der generierten [Changelog-Timeline](/docs/advanced/changelog) liefert die Veröffentlichung eines GitHub-Releases direkt einen Changelog-Eintrag.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "content" },
+      {
+        type: "github-releases",
+        prefix: "changelog",
+        owner: "acme",
+        repo: "sdk",
+        // prereleases: false,  // include prereleases (default off)
+        // drafts: false,       // include drafts (needs a write token)
+        // limit: 100,          // cap releases, newest-first
+      },
+    ],
+  },
+});
+```
+
+Jedes Release wird automatisch auf die Changelog-Felder abgebildet: Sein Name (oder Tag) wird zum Titel, sein Veröffentlichungsdatum bestimmt die Reihenfolge in der Timeline, der Tag wird zu `changelog.version`, und Prereleases werden mit `Prerelease` gekennzeichnet (alle anderen mit `Release`). Die Notes werden als Inhalt des Eintrags gerendert. Gib der Quelle ein `prefix`, damit ihre Release-Seiten unter einer Route wie `/changelog/v1-2-0` liegen.
+
+Ein privates Repository authentifiziert sich über die Umgebungsvariable `GITHUB_TOKEN` – dasselbe Token, das auch die anderen GitHub-Funktionen verwenden, und es wird niemals in deine Konfiguration eingebettet. Wie jede entfernte Quelle wird sie unter `.blume/cache/<source>/` zwischengespeichert und offline ausgeliefert, falls die API nicht erreichbar ist. Da ein Changelog ergänzend ist, führt ein fehlgeschlagener Abruf ohne Cache (etwa ein CI-Build ohne Token) zu einem leeren Changelog mit einer Warnung, statt den Build fehlschlagen zu lassen – setze `GITHUB_TOKEN` in deinen CI- und Deploy-Umgebungen, um es zu befüllen.
+
+## Sanity
+
+Die eingebaute Quelle `sanity` führt eine GROQ-Abfrage aus und bildet die Felder jedes Dokuments auf Frontmatter sowie seinen Portable-Text-Inhalt auf Markdown ab. Das Paket `@sanity/client` ist eine optionale Peer-Abhängigkeit – installiere es nur, wenn du diese Quelle verwendest.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "sanity",
+        prefix: "guides",
+        projectId: "abc123",
+        dataset: "production",
+        query: `*[_type == "guide"]`,
+        // Field paths default to title / slug.current / body / _updatedAt
+        fields: { slug: "slug.current", body: "content" },
+      },
+    ],
+  },
+});
+```
+
+Ein Lesetoken für ein privates Dataset stammt aus der Umgebungsvariable `SANITY_TOKEN`. Eigene Portable-Text-Blocktypen werden über die Option `serializers` des Adapters auf Blume-Komponenten abgebildet; sie steht zur Verfügung, wenn du `sanitySource` direkt über eine [eigene Quelle](#custom-sources) konstruierst.
+
+## Notion
+
+Die eingebaute Quelle `notion` verwandelt eine Notion-Datenbank in eine Sammlung: Jede Zeile wird zu einer Seite, ihre Eigenschaften werden zu Frontmatter und ihr Blockbaum wird zu MDX. Callouts, Toggles, Spalten und Codeblöcke werden auf die passenden Blume-Komponenten abgebildet. `@notionhq/client` ist eine optionale Peer-Abhängigkeit.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "notion",
+        prefix: "handbook",
+        database: process.env.NOTION_DB_ID,
+        // Property names default to the title-typed prop / Description / Slug / Order
+        // Set publishedValue to treat Status as a publish gate (opt-in)
+        publishedValue: "Published",
+      },
+    ],
+  },
+});
+```
+
+Das Integrationstoken stammt aus der Umgebungsvariable `NOTION_TOKEN` (teile die Datenbank mit deiner Integration). Standardmäßig wird jede Seite importiert; setze `publishedValue`, um die Eigenschaft `Status` zu einer Veröffentlichungssperre zu machen – jeder andere Wert wird dann auf `draft: true` abgebildet, was Produktions-Builds verwerfen. **Notion-Bild-URLs sind signiert und laufen ab**, daher lädt der Adapter sie zur Build-Zeit in die Assets der Website herunter und schreibt die Verweise um – so verdirbt ein CMS-Bild niemals einen statischen Build.
+
+## Preview und Sync
+
+Zwei Flags steuern, wie entfernte Inhalte abgerufen werden und was enthalten ist:
+
+- **`--preview`** bei `blume dev` oder `blume build` rendert Entwürfe und lädt unveröffentlichte CMS-Inhalte – Sanity wechselt in seine `previewDrafts`-Perspektive, und Notion filtert nicht mehr nach `Status`. Produktions-Builds ohne das Flag schließen Entwürfe wie gewohnt aus, sodass ein Preview-Build eine sichere Möglichkeit ist, unveröffentlichte Arbeit vor der Auslieferung zu prüfen.
+- **`blume sync`** ruft jede entfernte Quelle erneut ab und generiert die Runtime neu. Die Entwicklung ist cache-first – eine entfernte Quelle wird einmal abgerufen und beim Neustart aus `.blume/cache` ausgeliefert (schnell und offline-tolerant), daher ist `blume sync` der Weg, die neuesten CMS-Inhalte zu holen, ohne den Dev-Server neu zu starten (ein laufender Server lädt per Hot-Reload neu). Ergänze `--force`, um zuerst den Cache zu verwerfen, oder setze `pollInterval` an einer Quelle, um automatisch zu aktualisieren.
+
+```sh
+blume dev --preview      # author workflow: see drafts live
+blume build --preview    # render a full preview build
+blume sync               # refresh remote content now
+blume sync --force       # ...ignoring any cached snapshot
+```
+
+## Eigene Quellen
+
+Jedes Objekt, das die `ContentSource`-Schnittstelle implementiert, kann direkt übergeben werden. So lässt sich ein Adapter mit eigenen Serializern – oder ein beliebiges nicht eingebautes Backend – einbinden, ohne dass dessen SDK die Kerninstallation berührt:
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+import { sanitySource } from "blume/sources/sanity.ts";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "custom",
+        source: sanitySource({
+          name: "guides",
+          prefix: "guides",
+          projectId: "abc123",
+          dataset: "production",
+          query: `*[_type == "guide"]`,
+          // Map custom Portable Text blocks to Blume components
+          serializers: {
+            callout: (block) => `<Callout>${block.text}</Callout>`,
+          },
+        }),
+      },
+    ],
+  },
+});
+```
+
+Eine Quelle normalisiert ihre native Form (Portable Text, Notion-Blöcke, entferntes HTML) zu Markdown-/MDX-Text, sodass dieselben Komponenten und Markdown-Funktionen gelten, ganz gleich, woher eine Seite stammt.

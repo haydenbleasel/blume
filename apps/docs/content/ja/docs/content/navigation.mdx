@@ -1,0 +1,233 @@
+---
+title: ナビゲーション
+description: >-
+  Blume はファイルからサイドバーを構築し、フロントマター、フォルダーの meta、または設定で調整できるようにします — パンくずリストとアウトラインもそれに追従します。
+---
+
+Blume はファイルシステムからサイドバーを構築し、その後は好きなだけ — あるいは最小限に — 調整できるようにします: ページ単位、フォルダー単位、あるいは 1 つの明示的な設定で。パンくずリスト、前へ/次へのリンク、ページ内アウトラインはすべて同じモデルから導かれ、配線は一切不要です。
+
+## 生成されるサイドバー
+
+デフォルトでは、サイドバーはコンテンツツリーを反映します:
+
+- フォルダーは**グループ**に、ファイルは**ページ**になります
+- ページのラベルはフロントマターの `title`、グループのラベルは人間可読化されたフォルダー名です
+- 項目は[数値プレフィックス](/docs/content)順、次にアルファベット順に並び、フォルダーの `index` ページが最初に来ます
+
+多くのサイトではこれで十分です — 以下はすべてオプトインです。
+
+## ページのラベル、アイコン、バッジ
+
+個々のページがサイドバーにどう表示されるかは、フロントマターの `sidebar` の下で調整します:
+
+```yaml lineNumbers
+sidebar:
+  label: Quickstart # override the title in the sidebar
+  icon: rocket # an icon from Blume's built-in set
+  badge: New # a small label beside the entry
+  order: 1 # sort position within its group
+```
+
+ページスキーマの全体については[フロントマター](/docs/reference/frontmatter)を参照してください。
+
+## フォルダーグループ
+
+各フォルダーはサイドバーのグループになります。ページと並べて [`meta.ts`](/docs/content/meta) を置くと、グループのタイトル、アイコン、順序、および子要素の順序を設定できます:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Guides",
+  icon: "book-open",
+  pages: ["configuration", "theming", "deployment"],
+});
+```
+
+すべてのフィールドとスキャン時の meta の算出については[フォルダー meta](/docs/content/meta) を参照してください。
+
+フォルダーの `meta.title` とその `index` ページ自身のフロントマターの `title` は独立して解決されます — i18n で一方だけを翻訳してもう一方を忘れると、サイドバーは正しく表示される一方で、ランディングページ自体の `<title>` や見出しが古いままになります。両者が食い違う場合、Blume は `BLUME_NAV_INDEX_TITLE_MISMATCH` 警告を報告します。フォールバックロケールから埋められた未翻訳ページは対象外です — そのタイトルはフォールバックロケールに属するものであり、修正方法はページを翻訳することであって、フロントマターを編集することではありません。
+
+URL セグメントを追加*せずに*ページをグループ化するには、括弧付きのフォルダー名を使います — [ページ](/docs/content#group-folders)を参照してください。
+
+## 表示モード
+
+`navigation.sidebar.display` は、すべてのサイドバーグループの描画方法を設定します:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  sidebar: {
+    display: "flat", // "flat" | "group" | "page"
+  },
+}
+```
+
+- **`flat`**（デフォルト） — 折りたためないヘッダーと、その下に並ぶページ。どのグループにも属さないページは常に最初、グループセクションより上に並ぶため、グループの子要素と誤解されることはありません。
+- **`group`** — グループごとに折りたたみ可能な `<details>` 開閉要素。グループはデフォルトで閉じた状態から始まりますが、現在のページを含むグループは常に開いた状態で始まるため、今いるセクションだけが展開されます。[フォルダー meta](/docs/content/meta) で `collapsed: false` を設定すると、状況に関わらずグループを開いた状態に固定できます。
+- **`page`** — 各グループが 1 行になり、クリックするとサイドバーがサブパネルにスライドして、そのグループの項目だけを表示し、上部に戻る矢印が付きます。パネルはルートを認識するため、グループ内のページに直接アクセスした場合はそのページが開いた状態になります。
+
+:::tip
+`page` モードは深いセクションをすっきりと保ちます — グループに子要素が多く、スクロールして通り過ぎるよりも掘り下げたい場合に使ってください。
+:::
+
+[明示的なサイドバー](#explicit-sidebar)内のグループは、自身の `display` でグローバルなモードを上書きできます。
+
+## 順序
+
+サイドバーが生成される際、順序は優先度の高いものから解決されます:
+
+<Steps>
+  <Step title="設定のサイドバー">
+    明示的な `navigation.sidebar` は、生成されたツリーを完全に置き換えます。
+  </Step>
+  <Step title="フォルダー meta">
+    `meta.ts` の `pages` 配列がグループの順序を決めます。
+  </Step>
+  <Step title="フロントマター">ページの `sidebar.order`。</Step>
+  <Step title="ファイルシステム">
+    `index`
+    ページが最初、次に数値プレフィックス、その後ラベルのアルファベット順。
+  </Step>
+</Steps>
+
+同じ明示的順序または数値順序になった 2 つの兄弟要素は、その間ではアルファベット順にフォールバックします — Blume は `BLUME_DUPLICATE_SIDEBAR_ORDER` 警告を報告するため、この同順が見過ごされることはありません。
+
+## 非表示ページ
+
+ページをサイドバーから — そして前へ/次へのページネーションからも — 隠しつつ、ビルドは行い URL でアクセスできる状態に保ちます:
+
+```yaml
+sidebar:
+  hidden: true
+```
+
+## タブ
+
+トップレベルのセクションをヘッダーのタブとして描画します。大規模なサイトを別々の領域に分割するのに便利です — 例えばアダプター、API、AI ガイドなど。現在のルートがタブの `path` の配下にある場合、そのタブがハイライトされます:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  tabs: [
+    { label: "Adapters", path: "/adapters", icon: "plug" },
+    { label: "API", path: "/api", icon: "rocket" },
+    { label: "AI", path: "/ai", icon: "sparkles" },
+  ],
+}
+```
+
+有効化された [OpenAPI または AsyncAPI リファレンス](/docs/advanced/api-reference)は自身のルートにマウントされますが、それ自体ではタブを追加しません — そのルートにタブを向けることで、好きなラベルでヘッダーに表示できます（さらにネイティブレンダラーの場合は、その操作サイドバーのスコープを限定できます）:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "API", path: "/reference" },
+  ],
+}
+```
+
+タブの `path` はそのセクションのプレフィックスであり、同時にリンク先も兼ねます。`path` が自身のページを持たないセクション — `index.mdx` のないフォルダー — は 404 にリンクしてしまうため、タブは代わりにそのセクションの最初のページへフォールバックします。別の場所に着地させたい場合は `href` を設定してください:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "Changelog", path: "/changelog", href: "/changelog" },
+  ],
+}
+```
+
+これはコンテンツツリーに含まれないルートで重要になります。フォールバックはそれらを認識できないためです: 生成された[変更履歴](/docs/advanced/changelog)のインデックスや、`pages/` の下に追加した[カスタムページ](/docs/advanced/custom-pages)などです。`href` がないと、`/changelog` タブはインデックスではなく最新のエントリーに着地します。`href` を設定していないタブは影響を受けません。
+
+タブは**サイドバーのスコープも限定します**: 現在のルートがタブの `path` の配下にある場合、サイドバーはそのセクションのページだけを表示します — つまり `/adapters/*` ではアダプターだけが並び、他は表示されません。タブの `path` にあるフォルダーがそのセクションになるため、タブ自体以外に追加の設定は不要です。コンテンツをタブごとのフォルダーに整理し、各タブをそこに向けてください。
+
+どのタブにも属さないルート（または `path` が `/` のタブ）では、サイドバーはタブに属さ*ない*ページを表示します — 各タブのフォルダーはそこから隠されます。そのセクションはすでにヘッダーに独自のタブを持っているからです。したがってルートのランディングページでは、トップレベルの単独ページが並び、セクション化されたコンテンツはタブの背後に留まります。これは Fumadocs のルートフォルダーと同じ考え方です。この方法で表示するページがルートに存在しない場合は、代わりにツリー全体が表示されるため、サイドバーが空になることはありません。
+
+## セレクター
+
+サイト全体のパーティションを切り替える場合 — 製品、バージョン、あるいは任意のグループ化された遷移先の集合 — には `selector` を追加します。それぞれヘッダーにドロップダウンとして描画され、現在のルートに一致する `path` を持つオプションを表示します:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  selectors: [
+    {
+      kind: "version",
+      label: "Version",
+      items: [
+        { label: "v2 (latest)", path: "/v2", icon: "rocket" },
+        { label: "v1", path: "/v1" },
+      ],
+    },
+  ],
+}
+```
+
+各項目は `label`、`path`、およびオプションの `icon`、`description`、`tag` を取ります。`kind`（`dropdown`、`product`、`version`、`language`）はそのセレクターの用途を示すヒントであり、いずれも同じドロップダウンとして描画されます。
+
+## 注目リンク
+
+サイドバーの最上部、すべてのセクションより上にリンクを固定します — ブログ、変更履歴、常に 1 クリックで届くべき問い合わせやサポートのページなど。生成されるツリーとは異なり、注目リンクは**タブによってスコープされません**: あらゆるルート、あらゆるブレークポイントで表示されます。
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  featured: [
+    { label: "Blog", href: "https://example.com/blog", icon: "newspaper" },
+    { label: "Contact", href: "/contact", icon: "headphones" },
+  ],
+}
+```
+
+各リンクは `label`、`href`、およびオプションの `icon`（[組み込みアイコン](/docs/content/components#icon)名、画像パス/URL、またはインライン SVG — 他の場所と同じです）を取ります。`href` はどこを指しても構いません: 外部 URL は新しいタブで開き、内部ルート（`/contact`）はビルド時にページと突き合わせて検証され、一致するものがなければ警告されます。
+
+## 明示的なサイドバー
+
+完全に制御したい場合は、`navigation.sidebar` に明示的な項目を列挙します — 素の配列は `sidebar.items` の省略記法であり、オブジェクト形式ではそれらをグローバルな [`display`](#display-modes) と組み合わせられます。items が設定されると、Blume はそれをそのまま使用し、ファイルシステムからの生成をスキップします:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  sidebar: [
+    "/", // a page, referenced by route
+    {
+      label: "Guides", // a group
+      collapsed: false,
+      items: ["/configuration", "/configuration/theming"],
+    },
+    { label: "GitHub", href: "https://github.com/owner/repo" }, // an external link
+  ],
+}
+```
+
+各項目はページのルート（文字列）、グループ（`label` + `items`）、またはリンク（`label` + `href`）です。グループは入れ子にでき、グローバルな [`display` モード](#display-modes)を上書きでき、`collapsed` の状態で始められます。
+
+## リポジトリリンク
+
+設定で [`github`](/docs/configuration) を指定すると、Blume はヘッダーの — テーマ切り替えの隣に — リポジトリへリンクする GitHub アイコンを表示します。デフォルトで有効で、`navigation.repo` で非表示にできます:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  repo: false, // hide the header GitHub link (default: true)
+}
+```
+
+このリンクは `github` が設定されている場合にのみ表示されるため、リポジトリのないプロジェクトはいずれにせよ影響を受けません。
+
+## パンくずリストとページネーション
+
+これらはサイドバーツリーから自動的に得られます — 設定は不要です:
+
+- **パンくずリスト**は、タイトルの上に現在のページの親グループを表示します。
+- 各ページ末尾の**前へと次へ**のリンクはサイドバーの順序に従い、非表示ページはスキップします。
+
+## このページの内容
+
+右レールのアウトラインは各ページの `##` と `###` の見出しから自動生成されるため、長いページも見通しよく保たれます。右レールが隠れる狭い画面では、コンテンツの上にある「このページの内容」ドロップダウンに折りたたまれます。
+
+## ページアクション
+
+目次の下には、すべてのページで一連のクイックアクションが表示されます:
+
+- **GitHub で編集** — ソースファイルへ直接リンクします。設定で [`github`](/docs/configuration) を指定すると表示されます。
+- **トップへスクロール** — 長いページのトップへスムーズに戻ります。
+- **フィードバックを送る** — 任意のリアクションとメモを添えて、内容が事前入力された GitHub issue を開きます（これも `github` が必要です）。
+
+その他のアクションはページを AI ツールに引き渡します — **Markdown としてコピー**と**チャットで開く** — これらは [AI](/docs/configuration/ai#copy-as-markdown) で解説しています。
+
+[`export`](/docs/configuration/export) を有効にすると、**エクスポート**アクションによって読者がページを PDF または EPUB としてダウンロードすることもできます。

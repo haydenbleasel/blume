@@ -1,0 +1,195 @@
+---
+title: Anpassung
+description: >-
+  Überschreibe Komponenten, füge interaktive Islands hinzu, binde eigene Seiten ein, installiere Registry-Komponenten oder ejecte vollständig, wenn du volle Kontrolle brauchst.
+---
+
+## Komponenten-Overrides
+
+Füge eine `components.ts` (oder `components.tsx`) im Stammverzeichnis deines Projekts hinzu und exportiere `defineComponents`. Die `mdx`-Map **ersetzt** entweder eine eingebaute Komponente oder **fügt** eine neue hinzu — verfügbar in jeder `.mdx`-Seite ohne Import.
+
+```ts components.ts lineNumbers
+import { defineComponents } from "blume";
+import Callout from "./components/Callout.astro";
+import Pricing from "./components/Pricing.astro";
+
+export default defineComponents({
+  mdx: {
+    Callout, // replace the built-in Callout
+    Pricing, // add a new <Pricing /> component
+  },
+});
+```
+
+Die Schlüssel sind die Namen, die du in MDX schreibst (`<Callout>`, `<Pricing>`). Verwende den Dateinamen mit `.tsx`, wenn du React-Komponenten importierst.
+
+### Referenzformen
+
+Jedes Override — in `mdx`, `layout` oder `islands` — akzeptiert drei Formen:
+
+```ts components.ts
+import { defineComponents } from "blume";
+import Callout from "./components/Callout.astro";
+
+export default defineComponents({
+  mdx: {
+    Callout, // 1. an imported component
+    Note: "./components/Note.astro", // 2. a path string (resolved from the project root)
+    Chart: { component: "./components/Chart.tsx", client: "load" }, // 3. a descriptor
+  },
+});
+```
+
+Die **Descriptor**-Form ergänzt einen Hydration-Modus, damit eine interaktive React-/Vue-/Svelte-Komponente ihr JavaScript ausliefert und auf dem Client zum Leben erwacht. Ohne einen `client`-Modus wird eine Framework-Komponente als statisches HTML gerendert — Blume gibt eine Build-Warnung aus, wenn es so einen Fall entdeckt, da das meist ein Versehen ist.
+
+| `client` | Hydratisiert |
+| --- | --- |
+| `"load"` | Sofort beim Laden der Seite |
+| `"idle"` | Wenn der Main Thread im Leerlauf ist |
+| `"visible"` | Wenn sie in den sichtbaren Bereich gescrollt wird |
+| `"media"` | Wenn eine `media`-Query zutrifft (ergänze `media: "(min-width: 40rem)"`) |
+| `"only"` | Nur auf dem Client, niemals serverseitig gerendert |
+
+Für interaktive Komponenten, die du auf vielen Seiten einsetzt, ist die [`islands`-Gruppe](/docs/content/islands#registering-islands-in-componentsts) eine Kurzschreibweise für die Descriptor-Form mit `client: "visible"`.
+
+### Ein Override typisieren
+
+Wenn du eine eingebaute Komponente ersetzt, importiere ihren Prop-Typ aus `blume/components`, damit deine Komponente dem Vertrag entspricht — die Typen werden aus den Komponenten selbst abgeleitet, laufen also nie auseinander:
+
+```tsx components/Callout.tsx
+import type { CalloutProps } from "blume/components";
+
+export default function Callout(props: CalloutProps) {
+  // …your own callout, same props as the built-in
+}
+```
+
+Prop-Typen werden für die Content-Komponenten exportiert (`CalloutProps`, `CardProps`, `TabsProps`, `StepsProps`, `BadgeProps` und weitere).
+
+## Layout-Slots
+
+Die `layout`-Map ersetzt einen Teil von Blumes Rahmen durch deine eigene Komponente. Jedes Override erhält dieselben Props wie die eingebaute Komponente, die es ersetzt, sodass du die Standardvariante umhüllen oder bei null anfangen kannst.
+
+```ts components.ts
+import { defineComponents } from "blume";
+import Footer from "./components/Footer.astro";
+import Logo from "./components/Logo.astro";
+
+export default defineComponents({
+  layout: {
+    Logo, // brand mark + title in the header
+    Footer, // site-wide footer (no built-in — renders only when set)
+  },
+});
+```
+
+Verdrahtete Slots:
+
+| Slot | Ersetzt | Props |
+| --- | --- | --- |
+| `Layout` | Die gesamte Seitenhülle (`RootLayout`) | Alles, was das eingebaute Layout erhält, plus die `layout`-Map |
+| `Header` | Die obere Navigationsleiste | `site`, `logo`, `navigation`, `route`, `searchEnabled`, … |
+| `Logo` | Der Marken-Link (Bildmarke + Titel) im Header | `site`, `logo` |
+| `Search` | Der Suchauslöser im Header + Modal | `navigation`, `strings`, `locale`, `askEnabled` |
+| `Sidebar` | Der primäre Navigationsbaum | `items`, `currentRoute` |
+| `MobileNav` | Die Navigation in der mobilen Schublade (standardmäßig `Sidebar`) | `items`, `currentRoute` |
+| `Breadcrumbs` | Der Breadcrumb-Pfad | `crumbs` |
+| `TableOfContents` | Die Gliederung „Auf dieser Seite“ | `headings`, `title`, `variant` |
+| `Pagination` | Die Zurück-/Weiter-Links im Fußbereich | `prev`, `next`, `strings` |
+| `PageHeader` | Ein Einfügepunkt über dem Artikel (keine eingebaute Komponente) | `page`, `headings`, `route` |
+| `PageFooter` | Ein Einfügepunkt unter dem Artikel (keine eingebaute Komponente) | `page`, `headings`, `route` |
+| `Footer` | Ein seitenweiter Footer nach dem Content-Grid (keine eingebaute Komponente) | `site`, `navigation`, `ui` |
+
+`PageHeader`, `PageFooter` und `Footer` haben keine eingebaute Komponente — sie rendern nichts, bis du sie setzt, was sie zu praktischen Einfügepunkten für ein Werbebanner, einen „Zuletzt aktualisiert“-Hinweis oder einen Marketing-Footer macht.
+
+Layout-Slots akzeptieren dieselben [drei Referenzformen](#reference-form) wie MDX-Overrides, sodass ein Slot ein Pfad-String oder ein hydratisierter Descriptor (`{ component, client }`) sein kann, wenn du einen interaktiven Header oder Footer möchtest.
+
+## Interaktive Islands
+
+Für interaktive UI (React, Vue oder Svelte) legst du eine Komponente in einen `islands/`-Ordner und verwendest sie in jeder MDX-Seite — Blume hydratisiert sie für dich, ohne Wrapper oder Registrierung:
+
+```tsx islands/Counter.tsx lineNumbers
+import { useState } from "react";
+
+export default function Counter() {
+  const [n, setN] = useState(0);
+  return <button onClick={() => setN(n + 1)}>Clicked {n}</button>;
+}
+```
+
+```mdx page.mdx
+Use it anywhere: <Counter />
+```
+
+Siehe [Islands](/docs/content/islands) für Hydration-Strategien und Framework-Setup.
+
+## Eigene Seiten
+
+Füge `.astro`-Dateien in deinem `pages/`-Ordner hinzu, um vollständig eigene Routen neben deiner Dokumentation einzubinden — eine Landingpage, eine Preisseite oder einen handgebauten Index. Sie behalten ihren Ort, sodass relative Importe und `getStaticPaths` wie gewohnt funktionieren, und sie können deine Konfiguration, Navigation und Routen aus dem Modul `blume:data` lesen.
+
+Siehe [Eigene Seiten](/docs/advanced/custom-pages) für die vollständige Anleitung.
+
+## Registry
+
+`blume add` kopiert eine von Blume gepflegte Komponente als **Quellcode** in dein Projekt — sie gehört dir und du kannst sie frei bearbeiten. Führe den Befehl ohne Argumente aus, um aufzulisten, was verfügbar ist:
+
+```bash
+blume add
+```
+
+Installiere einen Layout-Slot (Header, Sidebar, Breadcrumbs, Inhaltsverzeichnis, Pagination oder Feedback) oder eine beliebige Content-Komponente (Callout, Card, Tabs, Steps, Accordion und weitere):
+
+```bash
+blume add callout
+blume add pagination
+```
+
+Die Kopie importiert den Rest des Frameworks aus `blume/*`, sodass sie exakt wie die eingebaute Komponente rendert, bis du sie änderst. `blume add` gibt das `defineComponents`-Snippet aus, um sie zu registrieren — Content-Komponenten unter `mdx`, Layout-Teile unter `layout`.
+
+## Astro-Integrationen
+
+Füge eine beliebige Astro-Integration über das Array `integrations` auf oberster Ebene in `blume.config.ts` hinzu. Installiere die Integration zuerst in deiner Site; Blume fügt sie nicht zu den Abhängigkeiten der generierten Runtime hinzu und verwaltet auch nicht ihre Astro-Kompatibilität.
+
+```bash
+npm install @astrojs/sitemap
+```
+
+```ts blume.config.ts lineNumbers
+import sitemap from "@astrojs/sitemap";
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  integrations: [
+    sitemap({
+      filter: (page) => !page.includes("/drafts/"),
+    }),
+  ],
+});
+```
+
+Blume behält seine eingebauten Integrationen in ihrer bestehenden Reihenfolge und hängt anschließend deine Einträge in Deklarationsreihenfolge an. Sie werden weder sortiert noch dedupliziert, sodass zwei Integrationen mit demselben `name` beide laufen. Blume validiert, dass `integrations` ein Array ist, während Astro jeden Eintrag validiert und ungültige Integrationen meldet.
+
+Da Blume deine Integrationen lädt, indem es `blume.config.ts` aus der generierten Astro-Konfiguration erneut importiert, statt die Instanzen zu kopieren, wird das Konfigurationsmodul pro Lauf zweimal ausgewertet — einmal, wenn Blume deine Konfiguration liest, und einmal, wenn Astro sie lädt. Halte Integrations-Factories frei von Seiteneffekten (gib die Integration zurück; schreibe keine Dateien und öffne keine Verbindungen bei der Konstruktion), damit die zweite Auswertung harmlos bleibt.
+
+Dieselben Integrationen laufen in `blume dev` und `blume build`. Wenn du `blume.config.ts` während `blume dev` bearbeitest, wird die versteckte Astro-Konfiguration neu generiert und ein Konfigurationsneustart ausgelöst; falls eine bearbeitete Integration keine Wirkung zeigt, starte `blume dev` neu. Blume kann nicht erkennen, welche Konfigurationsänderungen Integrationen betreffen, daher löst jede Änderung an `blume.config.ts` — selbst an einem nicht zusammenhängenden Feld — einen Neustart des Dev-Servers aus statt einer Hot-Anwendung, sobald `integrations` nicht leer ist. Blume verfolgt nur den Inhalt von `blume.config.ts`, sodass das Bearbeiten einer separaten Datei, die davon importiert wird, diese Neugenerierung nicht von selbst auslöst — starte `blume dev` nach solchen Änderungen neu. Wenn du ejectest, behält die dir gehörende `astro.config.mjs` eine relative Brücke zu `blume.config.ts`, sodass die konfigurierten Integrationen weiterhin laufen; du kannst sie später direkt in die Astro-Konfiguration verschieben, als Teil der vollständigen Übernahme.
+
+## Eject
+
+Wenn du volle Kontrolle möchtest, ejecte die generierte Runtime in ein eigenständiges Astro-Projekt:
+
+```bash
+blume eject --yes
+```
+
+Eject ist ein einseitiger Schritt: Die versteckte `.blume/`-Runtime wird zu einer normalen Astro-App, die dir gehört und die du direkt verändern kannst. Das Paket `blume` bleibt importierbar, sodass du seine Komponenten, sein Theme und seine Markdown-Prozessoren behältst.
+
+### Was Eject zurücklässt
+
+Nach dem Eject führt dein `build`-Skript einfach `astro build` aus — die Site selbst wird gleich gebaut, aber die Artefakte, die `blume build` obendrauf gelegt hat, werden nicht mehr erzeugt. Der Eject-Befehl warnt vor denen, die deine Konfiguration tatsächlich nutzt. Um sie zu behalten:
+
+- **Pagefind-Suchindex** — mit `search.provider: "pagefind"` lädt die Such-UI den Index von der gebauten Site, sodass die Suche in Produktion nicht funktioniert, bis du selbst indexierst. Installiere `pagefind` als devDependency und indexiere nach jedem Build: `"build": "astro build && pagefind --site dist"`.
+- **Synchronisierung der gehosteten Suche** — der Index eines gehosteten Anbieters wird beim Build nicht mehr hochgeladen; lade deine Suchdatensätze nach jedem Build erneut über die API oder CLI des Anbieters hoch.
+- **sitemap.xml** — erstelle sie neu mit der Standard-Integration [@astrojs/sitemap](https://docs.astro.build/en/guides/integrations-guide/sitemap/).
+- **robots.txt** — liefere deine eigene als `public/robots.txt` aus.
+- **llms.txt / llms-full.txt und agent-readability.json** — schreibe sie von Hand (oder generiere sie in einem eigenen Build-Schritt) und liefere sie aus `public/` aus.
+- **Plattform-Weiterleitungsdateien** — `_redirects` und `vercel.json` werden für statische Builds nicht mehr ausgegeben. Deine Weiterleitungen funktionieren weiterhin als von Astro generierte Meta-Refresh-Seiten, oder du kannst sie in die Konfiguration deines Hosters übernehmen.

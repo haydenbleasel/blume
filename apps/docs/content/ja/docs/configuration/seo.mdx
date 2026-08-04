@@ -1,0 +1,339 @@
+---
+title: SEO
+description: メタデータ、Open Graph 画像、RSS フィード、JSON-LD — Blume の発見性レイヤーを 1 つの seo 設定にまとめました。
+sidebar:
+  label: SEO
+---
+
+Blume は発見性レイヤーを代わりに処理します。ページのメタデータ、ソーシャル共有画像、フィード、構造化データです。設定可能な機能は `blume.config.ts` の `seo` キーの下にあり、メタデータはコンテンツによって駆動されます。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
+  structuredData: true,
+  x: { handle: "@acme" },
+}
+```
+
+これらの多くは絶対サイト URL があるとより効果的です。[`deployment.site`](/docs/deployment) を設定すると、フィード、OG 画像、canonical、サイトマップ、JSON-LD が完全な URL を出力できるようになります。
+
+## メタデータ
+
+すべてのページは、設定とフロントマターから標準的な `<head>` タグをレンダリングします。
+
+- `<title>` — ページタイトルとサイトの `title`。
+- `<meta name="description">` と `og:description` — ページの `description`。未設定の場合はサイトの `description` にフォールバックします。
+- `og:title` と `og:site_name` — ページタイトルとサイトの `title`。
+- `<link rel="canonical">` と `og:url` — ページの絶対 URL（`deployment.site` が設定されている場合）。
+- `og:type` — ブログ記事と変更履歴エントリーでは `article`、それ以外では `website`。記事ページはページの `date` と最終更新タイムスタンプから `article:published_time` と `article:modified_time` も出力します。
+- `og:image` — そのページの [OG 画像](#open-graph-images)。生成されたカードは `og:image:width`、`og:image:height`、`og:image:type`、`og:image:alt` も宣言するため、クローラーは先に取得しなくてもカードをレイアウトできます。自分で指定した `seo.image` は、サイズと形式が不明なためこれらを一切宣言しません。
+- `twitter:card`、`twitter:title`、`twitter:description`、`twitter:image` — X のカード。画像のあるページはワイドな `summary_large_image` バリアントになり、画像のないページも素のリンクとして表示されるのではなくコンパクトな `summary` カードになります。
+
+### X のアトリビューション
+
+X はカードのその他の情報をすべて `og:*` タグから読み取るため、推測できない値はクレジットするアカウントだけです。`seo.x` の下に設定すると、Blume は `twitter:site`（サイトのアカウント）と `twitter:creator`（著者のアカウント）を出力します。`@` は省略可能で、`acme` と `@acme` のどちらでも動作します。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  x: { handle: "@acme", creator: "@jane" },
+}
+```
+
+ページ単位で独自の著者を指定できます。ゲスト投稿にはこれが適しています。
+
+```yaml lineNumbers
+---
+title: How we shipped it
+seo:
+  x:
+    creator: "@guestauthor"
+---
+```
+
+その他のタグは `seo` フロントマターでページごとに上書きできます。
+
+```yaml lineNumbers
+---
+title: Pricing
+description: Plans and pricing for every team size.
+seo:
+  title: Pricing — Acme
+  canonical: https://acme.com/pricing
+  noindex: false
+---
+```
+
+<TypeTable
+  type={{
+    "seo.title": {
+      type: "string",
+      description: "このページの <title> と og:title を上書きします。",
+    },
+    "seo.description": {
+      type: "string",
+      description: "meta と og:description を上書きします。",
+    },
+    "seo.image": {
+      type: "string",
+      description: "カスタムのソーシャル画像（Open Graph を参照）。",
+    },
+    "seo.canonical": {
+      type: "string",
+      description: "canonical URL を上書きします。",
+    },
+    "seo.noindex": {
+      type: "boolean",
+      description: "robots noindex を出力し、構造化データをスキップします。",
+    },
+    "seo.x.creator": {
+      type: "string",
+      description:
+        "このページを特定の X アカウント（twitter:creator）にクレジットし、設定の seo.x.creator を上書きします。",
+    },
+  }}
+/>
+
+## Open Graph 画像
+
+Blume はビルド時にすべてのページ用の 1200×630 のソーシャルカードをレンダリングできます。[Takumi](https://takumi.kane.tw) のおかげでヘッドレスブラウザは不要で、ビルドは高速なままです。[`deployment.site`](/docs/deployment) が設定されるか自動検出されるとデフォルトで有効になり（`og:image` の URL がクローラーにとって有用であるためには絶対 URL である必要があります）、それ以外では無効です。`enabled` を設定すればどちらにも上書きできます。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true }, // or false to opt out even with a site set
+}
+```
+
+### 生成カードのブランディング
+
+ローカルの SVG とカラーパレットを設定して、生成カードをブランドに合わせましょう。ロゴは `public/` またはプロジェクトのルートに配置できます。パレットの値を省略すると、その項目はデフォルトのままになります。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    logo: "/logo/og.svg",
+    palette: {
+      accent: "#ff5410",
+      background: "#1d1d1d",
+      foreground: "#fff6f2",
+      muted: "#a6a19f",
+      border: "#323232",
+    },
+  },
+}
+```
+
+デフォルトでは、各カードはコンテンツとテーマから導出されます。**ページタイトル**が見出し、**サイトタイトル**がアイブロウ、テーマの**アクセント**がマークになります。画像は各ルートを反映した `/og/<slug>.png` で配信され、サーバーモードでも静的ファイルとしてプリレンダリングされます。
+
+| ページのルート      | 画像 URL                   |
+| ------------------- | -------------------------- |
+| `/`                 | `/og/index.png`            |
+| `/quickstart`       | `/og/quickstart.png`       |
+| `/configuration/ai` | `/og/configuration/ai.png` |
+
+任意のページで生成カードを上書きするには `seo.image` を使います。`public/` 内のファイルか外部 URL を指定できます。これは生成カードより優先され、`og` が無効でも機能するため、カスタム画像と生成画像を混在させられます。
+
+```yaml lineNumbers
+---
+title: Pricing
+seo:
+  image: /og/pricing-custom.png
+---
+```
+
+:::note
+パレットの各色は任意の CSS カラーを受け付けます。16 進数、`oklch(…)`、`rgb(…)` などです。アクセントは [`theme.accent`](/docs/configuration/theming#accent) と同じく、名前付きプリセット（`blue`、`teal`、…）も受け付けます。レンダラーが解析できない色は、デフォルト色のカードを黙って出荷するのではなくビルドを失敗させます。
+:::
+
+ページタイトルやサイトタイトルに含まれる絵文字は、カードのレンダリング中に CDN から取得される [Twemoji](https://github.com/jdecked/twemoji) のグリフとして表示されます。そのため、タイトルに絵文字を含むビルドにはネットワークアクセスが必要です。各グリフは、いくつのページで使われていてもビルドごとに 1 回だけ取得されます。
+
+### カードのレイヤーを表示・非表示・上書きする
+
+見出しに加えて、カードには 3 つのオプションレイヤーがあります。左上の**ブランドマーク**（ロゴ、またはサイトタイトルの頭文字を入れたアクセントタイル）、見出しの下の**サブタイトル**（サイトの `description`）、そしてリポジトリのスラッグ（`github` から）とサイトの URL を含む**フッター**です。フッターの URL はデプロイサイトのホストに [`deployment.base`](/docs/deployment#subpath-deploys) を加えたもので、GitHub Pages のプロジェクトサイトなら `user.github.io/repo` と表示されます。いずれも独自の文字列で上書きするか、`false` で非表示にできます。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    site: "docs.acme.com", // footer URL text, or false to hide it
+    description: false, // hide the subtitle; a string overrides it
+    logo: false, // no brand mark at all — not even the initial tile
+  },
+}
+```
+
+### カードのフォント
+
+デフォルトでは、カードは Takumi の組み込みフォントでレンダリングされます。このフォントはラテン文字のグリフのみをカバーしているため、他の文字体系（日本語、中国語、韓国語、アラビア語など）のタイトルは豆腐（空の四角）として表示されてしまいます。
+
+**[`theme.fonts`](/docs/configuration/theming#fonts) を設定すればカードもそれに従います。** 設定で独自のフォントを選択すると、生成カードは自動的に見出しをディスプレイフォントで、説明とフッターをボディフォントでレンダリングするため、共有リンクがサイトと一致します。非ラテン文字のカバレッジも含めて、ここで設定するものは何もありません。（Google 以外のプロバイダーのファミリーはスキップされます — カードレンダラーは Google Fonts からしか取得できません — が、ローカルのフォントファイルは動作します。）
+
+サイトとは異なるフォントをカードに使いたい場合や、テーマに手を加えずに文字体系のカバレッジを追加したい場合は、`og.fonts` を明示的に設定してください。これは常にテーマ由来のフォントより優先されます。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    fonts: [
+      "Noto Sans JP",
+      { name: "Inter", weight: [400, 700] },
+      { name: "Berkeley Mono", src: "./fonts/BerkeleyMono-Regular.woff2" },
+    ],
+  },
+}
+```
+
+各エントリーは、Google Fonts のファミリー名、`weight`（数値、リスト、あるいは `"100..900"` のような可変範囲）と `style`（`"normal"`、`"italic"`、またはその両方）を固定するオブジェクト、またはローカルのフォントファイルです。`src` はプロジェクトルートからの相対で解決され、ファイル自身のメタデータに任せたくない場合は `weight` と `style` を任意で指定できます。
+
+Google のファミリーはビルド時に取得されるため、それらを使うビルドにはネットワークアクセスが必要です。レンダラーは各タイトルが実際に使うグリフのサブセットのみを取得します。フォールバックはグリフ単位なので、ファミリーを追加しても影響するのは他のフォントで描画できないグリフだけです。
+
+`og.fonts: []` を明示すると完全にオプトアウトになります。`theme.fonts` が設定されていても、カードは組み込みフォントのままです。
+
+### カスタムページのタイトル
+
+カスタムの [`.astro` ページ](/docs/advanced/custom-pages)には読み取るフロントマターがないため、生成カードのタイトルはルートの最後の URL セグメントを人間可読化したものになります。`/getting-started` は "Getting Started" になりますが、`/cli` は "Cli" になります。そうしたカードには `og.titles` でルートをキーにして明示的に名前を付けてください（`"/"` はホームを指し、そのカードは指定しない場合サイトタイトルを表示します）。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    titles: {
+      "/cli": "CLI",
+    },
+  },
+}
+```
+
+エントリーはカスタムページにのみ適用されます。コンテンツページのカードは常にページタイトルから見出しを取るため、そちらはフロントマターで改題してください。
+
+`seo.image` はフロントマターなので、Markdown と MDX のコンテンツにしか適用されません。カスタムの [`.astro` ページ](/docs/advanced/custom-pages)（マーケティング用のホームやランディングページなど）に独自のソーシャル画像を設定する場合、そしてホームページだけに専用の共有画像を設定する方法としては、`PageLayout` に `ogImage` プロップを渡してください。
+
+## RSS フィード
+
+Blume は `rss.types` に指定された各コンテンツタイプ（デフォルトでは `blog` と `changelog`）のうち、ページが存在するものについて RSS フィードをビルドし、`/<type>/rss.xml` で配信します。日付付きのブログ記事や変更履歴エントリーの書き方については [フィード](/docs/content#feeds) を参照してください。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+| オプション | デフォルト | 説明 |
+| --- | --- | --- |
+| `enabled` | `true` | フィードを生成します。 |
+| `types` | `["blog", "changelog"]` | それぞれフィードを持つコンテンツタイプ。 |
+| `limit` | `50` | フィードあたりの最大項目数（新しい順）。 |
+
+Blume は `<link rel="alternate">` タグを挿入するので、ブラウザやフィードリーダーが自動的にフィードを検出します。
+
+## 構造化データ
+
+Blume はすべてのページの `<head>` に [schema.org](https://schema.org) の JSON-LD を出力し、検索エンジンがコンテンツを理解できるようにします。デフォルトで有効です。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  structuredData: true,
+}
+```
+
+各ページには次のものが含まれます。
+
+- サイトのアイデンティティを表す **WebSite** ノード、
+- **article** としてのページ — ブログ記事は `BlogPosting`、変更履歴とドキュメントは `TechArticle` — その説明と公開日を伴います、
+- ナビゲーションの経路から構築された **BreadcrumbList**。
+
+`deployment.site` が設定されている場合、URL は絶対 URL になります。`seo.noindex` が指定されたページはスキップされます。
+
+## サイトマップ
+
+Blume はビルド時に、インデックス可能なすべてのページを含む `sitemap.xml` を書き出します。絶対 URL の [`deployment.site`](/docs/deployment) が必要で、下書き、非表示、`noindex` のページを除くすべてのページを一覧します。デフォルトで有効です。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  sitemap: true,
+}
+```
+
+独自の `public/sitemap.xml` を配置すれば、それが使われます。Blume が `public/` に置いたファイルを上書きすることはありません。
+
+## Robots
+
+Blume は、すべてのクローラーを許可し、[コンテンツシグナル](#content-signals)を宣言し、サイトマップが利用可能な場合はそれを指す `Sitemap:` 行を追加した `robots.txt` を書き出します。デフォルトで有効です。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  robots: true,
+}
+```
+
+```txt robots.txt
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+Allow: /
+
+Sitemap: https://docs.example.com/sitemap.xml
+```
+
+### コンテンツシグナル
+
+`Content-Signal` 行 — 普及しつつあるコンテンツ利用の慣習 — は、AI クローラーがドキュメントをどのように再利用してよいかを宣言します。Blume は**デフォルトで有効にし、すべてのシグナルを `yes`** にして出力します。これは、ドキュメントは人間にもエージェントにも等しく開かれているという Blume の立場に沿ったものです。
+
+- `search` — 従来型および AI による検索インデックス
+- `aiInput` — 回答時のグラウンディング / RAG
+- `aiTrain` — モデルの学習
+
+いずれかのシグナルを制限するには `false` を設定します。指定しなかったものは `yes` のままです。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  contentSignals: {
+    aiTrain: false, // opt out of training, keep search + grounding
+  },
+}
+```
+
+```txt robots.txt
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /
+```
+
+宣言を完全に削除するには `contentSignals: false` を設定します。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  contentSignals: false,
+}
+```
+
+<TypeTable
+  type={{
+    "seo.contentSignals": {
+      type: "boolean | object",
+      description:
+        "Content-Signal の宣言。true または省略ですべてのシグナルを yes として出力し、false で行を削除し、オブジェクトでシグナルを個別に設定します。",
+    },
+    "contentSignals.search": {
+      type: "boolean",
+      description:
+        "検索インデックス（search）への利用を許可します。デフォルトは true。",
+    },
+    "contentSignals.aiInput": {
+      type: "boolean",
+      description:
+        "回答時の AI グラウンディング / RAG（ai-input）への利用を許可します。デフォルトは true。",
+    },
+    "contentSignals.aiTrain": {
+      type: "boolean",
+      description:
+        "AI モデルの学習（ai-train）への利用を許可します。デフォルトは true。",
+    },
+  }}
+/>
+
+コンテンツシグナルは意向を表明するものであり、アクセス制御ではありません。行儀の良いクローラーにコンテンツをどう扱ってほしいかを伝えるものであり、それを尊重するかどうかはクローラー側に委ねられます。
+
+独自の `public/robots.txt` を配置すれば、それが使われます。

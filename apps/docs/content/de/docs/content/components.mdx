@@ -1,0 +1,711 @@
+---
+title: Komponenten
+description: >-
+  Karten, Schritte, Tabs, Akkordeons, Badges, Codegruppen, Rahmen, Bäume, Typtabellen, Live-Vorschauen und Diffs – die integrierten Komponenten, nutzbar auf jeder MDX-Seite.
+---
+
+Blume liefert einen barrierefreien, themenfähigen Komponentensatz, der auf jeder `.mdx`-Seite **ohne Imports** verfügbar ist. Jede Komponente wird unten mit einer Live-Vorschau und ihrem Quellcode gezeigt. Die Komponenten sind Vanilla und React-frei; React wird nur aktiviert, wenn du deine eigene Island hinzufügst.
+
+## Card and CardGroup
+
+Karten verlinken mit Icon, Titel und kurzem Text auf ein Ziel. Gruppiere sie mit `CardGroup` zu einem responsiven Raster. Setze sie auf Landingpages, in Abschnittsübersichten und bei „nächsten Schritten“ ein – überall dort, wo du die Leserschaft weiterführst.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
+    Installiere Blume und veröffentliche deine erste Seite.
+  </Card>
+  <Card title="Components" href="/docs/content/components" icon="folder">
+    Durchstöbere die Komponentenbibliothek.
+  </Card>
+</CardGroup>
+
+```astro lineNumbers
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
+    Install Blume and ship your first page.
+  </Card>
+  <Card title="Components" href="/docs/content/components" icon="folder">
+    Browse the component library.
+  </Card>
+</CardGroup>
+```
+
+`Card` nimmt `title`, ein optionales `href` (weglassen für eine nicht klickbare Karte) und ein `icon` aus Blumes integriertem Icon-Set entgegen. `CardGroup` nimmt `cols` entgegen (Standard `2`).
+
+## Steps
+
+Eine nummerierte vertikale Abfolge für geordnete Anleitungen – Installationen, Einrichtungsabläufe und Tutorials, bei denen die Reihenfolge zählt. Jeder `Step` nimmt einen `title` entgegen.
+
+<Steps>
+  <Step title="Install Blume">Füge das Paket zu deinem Projekt hinzu.</Step>
+  <Step title="Write a page">
+    Lege eine `.mdx`-Datei in deinen Inhaltsordner.
+  </Step>
+  <Step title="Ship it">Führe `blume build` aus und deploye `dist/`.</Step>
+</Steps>
+
+```astro lineNumbers
+<Steps>
+  <Step title="Install Blume">Add the package to your project.</Step>
+  <Step title="Write a page">
+    Drop an `.mdx` file into your content folder.
+  </Step>
+  <Step title="Ship it">Run `blume build` and deploy `dist/`.</Step>
+</Steps>
+```
+
+## Tabs
+
+Wechsle an Ort und Stelle zwischen gleichwertigen Inhalten – Sprachvarianten, betriebssystemspezifischen Befehlen oder alternativen Vorgehensweisen – ohne alles untereinander auf der Seite zu stapeln. Jeder `Tab` nimmt einen `title` entgegen.
+
+<Tabs>
+  <Tab title="macOS">Nutze Homebrew, um die Toolchain zu installieren.</Tab>
+  <Tab title="Windows">Nutze winget, um die Toolchain zu installieren.</Tab>
+</Tabs>
+
+```astro lineNumbers
+<Tabs>
+  <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
+  <Tab title="Windows">Use winget to install the toolchain.</Tab>
+</Tabs>
+```
+
+Füge `inline` hinzu, um randlos zu rendern – eine Tab-Leiste auf einer Linie über die volle Breite, mit dem Inhalt, der darunter als Fließtext folgt – statt der umrandeten Box. Füge `param` hinzu, um den aktiven Tab statt mit dem Hash mit einem URL-Query-Parameter zu synchronisieren; das macht die Auswahl teilbar: Ein Link, der auf `?install=windows` endet, öffnet den Windows-Tab. Jede Gruppe synchronisiert sich mit ihrem eigenen `param`, sodass du mehrere unabhängige, direkt verlinkbare Gruppen auf einer Seite verwenden kannst.
+
+<Tabs inline param="install">
+  <Tab title="macOS">Nutze Homebrew, um die Toolchain zu installieren.</Tab>
+  <Tab title="Windows">Nutze winget, um die Toolchain zu installieren.</Tab>
+</Tabs>
+
+```astro lineNumbers
+<Tabs inline param="install">
+  <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
+  <Tab title="Windows">Use winget to install the toolchain.</Tab>
+</Tabs>
+```
+
+## Badge
+
+Ein kleines Inline-Label für Status oder Metadaten – Versionskennzeichen, „new“- oder „beta“-Markierungen, Stabilitätsstufen. Die `variant` stimmt die Farbe auf die Bedeutung ab.
+
+### Default
+
+Neutrale Metadaten ohne besondere Betonung.
+
+<Badge>Stabil</Badge>
+
+```astro
+<Badge>Stable</Badge>
+```
+
+### Accent
+
+Zieht mit deiner Theme-Akzentfarbe den Blick auf sich – gut für „neu“- oder Hervorhebungs-Markierungen.
+
+<Badge variant="accent">Neu</Badge>
+
+```astro
+<Badge variant="accent">New</Badge>
+```
+
+### Success
+
+Ein positiver oder bestandener Zustand.
+
+<Badge variant="success">Bestanden</Badge>
+
+```astro
+<Badge variant="success">Passing</Badge>
+```
+
+### Warning
+
+Etwas, das mit Vorsicht zu verwenden ist, etwa ein experimentelles Feature.
+
+<Badge variant="warning">Beta</Badge>
+
+```astro
+<Badge variant="warning">Beta</Badge>
+```
+
+### Danger
+
+Ein negativer oder brechender Zustand, etwa eine Veraltung.
+
+<Badge variant="danger">Veraltet</Badge>
+
+```astro
+<Badge variant="danger">Deprecated</Badge>
+```
+
+## Icon
+
+Rendere ein Icon anhand seines Namens – dieselbe `icon`-Prop treibt Karten, Schritte, Tabs und Sidebar-Einträge an. Die Namen stammen von [Lucide](https://lucide.dev/icons), in Kleinschreibung und Kebab-Case (`rocket`, `gauge`, `book-open`).
+
+<Icon icon="rocket" size={20} />
+
+```astro
+<Icon icon="rocket" size={20} />
+```
+
+Blume unterstützt ausschließlich Lucide – ein reiner Name wird gegen Lucide aufgelöst, und du kannst einem Namen zur Symmetrie mit anderen Icon-Eingaben `lucide:` voranstellen (`lucide:rocket`). `size` legt die Pixelgröße fest (Standard `16`) und `color` färbt es ein (jede CSS-Farbe; Standard ist `currentColor`). Übergib anstelle eines Namens einen rohen `<svg>`-String, eine Bild-URL oder einen lokalen Bildpfad, um eigene Grafiken zu rendern, und ergänze ein `label`, um es assistiven Technologien zugänglich zu machen – ohne ein solches gilt das Icon als dekorativ.
+
+Icons werden zur Build-Zeit aufgelöst und als SVG ohne JavaScript eingebettet – zur Laufzeit wird nichts nachgeladen.
+
+## File tree
+
+Veranschauliche ein Projekt- oder Ordnerlayout. Umschließe eine gewöhnliche Markdown-Liste, und Blume stylt sie als Baum – praktisch, um Strukturen in Einrichtungs- und Konfigurationsanleitungen zu erklären.
+
+<FileTree>
+
+- docs/
+  - index.mdx
+  - guides/
+    - configuration.mdx
+- blume.config.ts
+
+</FileTree>
+
+```astro lineNumbers
+<FileTree>
+
+- docs/
+  - index.mdx
+  - guides/
+    - configuration.mdx
+- blume.config.ts
+
+</FileTree>
+```
+
+## Accordion
+
+Staple zusammengehörige Aufklappbereiche in einem einzigen umrandeten Container mit Trennlinien dazwischen – FAQs, optionale Schritte oder lange Beispiele. Jedes Kind ist ein `AccordionItem` (`title`, optional `icon`, `description`, `defaultOpen`). Für einen einzelnen eigenständigen Aufklappbereich verwende [Expandable](#expandable).
+
+<Accordion>
+  <AccordionItem title="Does it support MDX?">
+    Ja – jede Seite kann `.md` oder `.mdx` sein.
+  </AccordionItem>
+  <AccordionItem title="Is the theme customizable?">
+    Ja, über Tailwind-v4-Tokens und dein eigenes `theme.css`.
+  </AccordionItem>
+</Accordion>
+
+```astro lineNumbers
+<Accordion>
+  <AccordionItem title="Does it support MDX?">
+    Yes — every page can be `.md` or `.mdx`.
+  </AccordionItem>
+  <AccordionItem title="Is the theme customizable?">
+    Yes, via Tailwind v4 tokens and your own `theme.css`.
+  </AccordionItem>
+</Accordion>
+```
+
+## Expandable
+
+Ein leichtgewichtiger Inline-Aufklappbereich für verschachtelte Details – etwa die Unterattribute eines Feldes oder eine optionale Randbemerkung. `title` beschriftet den Umschalter (Standard „Show more“); setze `defaultOpen`, damit er aufgeklappt startet.
+
+<Expandable title="Show advanced options">
+  Diese Einstellungen sind optional und müssen selten geändert werden.
+</Expandable>
+
+```astro
+<Expandable title="Show advanced options">
+  These settings are optional and rarely need changing.
+</Expandable>
+```
+
+## Columns
+
+Ordne Karten oder Blöcke in einem responsiven Raster aus gleich breiten Spalten an, das auf Mobilgeräten umbricht. `Columns` nimmt `cols` entgegen; umschließe jede Zelle mit einem `Column`.
+
+<Columns cols={2}>
+  <Column>
+    <Card title="Fast" icon="rocket">
+      Gebaut auf Astro und Vite.
+    </Card>
+  </Column>
+  <Column>
+    <Card title="Themeable" icon="sun">
+      Tailwind-v4-Design-Tokens.
+    </Card>
+  </Column>
+</Columns>
+
+```astro lineNumbers
+<Columns cols={2}>
+  <Column>
+    <Card title="Fast" icon="rocket">
+      Built on Astro and Vite.
+    </Card>
+  </Column>
+  <Column>
+    <Card title="Themeable" icon="sun">
+      Tailwind v4 design tokens.
+    </Card>
+  </Column>
+</Columns>
+```
+
+## CodeGroup
+
+Fasse mehrere Codeblöcke zu einem einzigen Tab-Umschalter zusammen – ein Tab pro Sprache oder Datei. Die Tab-Beschriftung ist der Titel des jeweiligen Blocks (der Text nach der Sprache). Füge `dropdown` hinzu, um statt über eine Tab-Leiste über ein Menü zu wechseln.
+
+<CodeGroup>
+
+```ts TypeScript
+export const greet = (name: string) => `Hello, ${name}`;
+```
+
+```python Python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+```rust Rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}")
+}
+```
+
+</CodeGroup>
+
+````astro
+<CodeGroup>
+
+```ts TypeScript
+export const greet = (name: string) => `Hello, ${name}`;
+```
+
+```python Python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+```rust Rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}")
+}
+```
+
+</CodeGroup>
+````
+
+## Frame
+
+Umschließe ein Bild oder eine beliebige Grafik mit einem zentrierten, umrandeten Rahmen samt optionaler `caption` (wird als Markdown gerendert) und `hint`.
+
+<Frame
+  caption="A **framed** illustration."
+  hint="Frames center and caption visuals."
+>
+  <svg
+    width="160"
+    height="72"
+    viewBox="0 0 160 72"
+    role="img"
+    aria-label="Sample frame"
+  >
+    <rect width="160" height="72" rx="8" fill="#3b82f6" />
+  </svg>
+</Frame>
+
+```astro lineNumbers
+<Frame
+  caption="A **framed** illustration."
+  hint="Frames center and caption visuals."
+>
+  <img src="/screenshot.png" alt="Product screenshot" />
+</Frame>
+```
+
+## YouTube
+
+Bette ein YouTube-Video in einen responsiven, datenschutzfreundlichen (`youtube-nocookie.com`) 16:9-Rahmen ein, der kein Client-JavaScript ausliefert. Übergib eine Video-`id` oder eine vollständige `url` sowie optional einen `title` (für Barrierefreiheit) und eine `start`-Zeit in Sekunden.
+
+<YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />
+
+```astro lineNumbers
+<YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />
+<YouTube url="https://youtu.be/aqz-KE-bpKQ" start={30} />
+```
+
+## Color
+
+Zeige Farbfelder mit kopierbaren Hex-Werten – nützlich, um eine Palette oder Markenfarben zu dokumentieren. Verwende `variant="compact"` für eine Liste von Farbfeldern oder `variant="table"` mit `Color.Row`, um sie zu gruppieren. Jedes `Color.Item` nimmt einen `name` und einen `value` entgegen (einen Hex-String oder `{ light, dark }` für themenabhängige Farben).
+
+<Color variant="compact">
+  <Color.Item name="blue-500" value="#3B82F6" />
+  <Color.Item name="green-500" value="#16A34A" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+
+```astro lineNumbers
+<Color variant="compact">
+  <Color.Item name="blue-500" value="#3B82F6" />
+  <Color.Item name="green-500" value="#16A34A" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+```
+
+## Tree
+
+Rendere eine hierarchische Datei-/Ordnerstruktur mit ausklappbaren Ordnern. (Für eine schnelle, listenbasierte Variante siehe [File tree](#file-tree); `Tree` bietet Kontrolle pro Ordner.) Verwende `Tree.Folder` (`name`, optional `defaultOpen`, `openable`) und `Tree.File` (`name`).
+
+<Tree>
+  <Tree.Folder name="src" defaultOpen>
+    <Tree.File name="index.ts" />
+    <Tree.Folder name="components">
+      <Tree.File name="Button.tsx" />
+    </Tree.Folder>
+  </Tree.Folder>
+  <Tree.File name="blume.config.ts" />
+</Tree>
+
+```astro lineNumbers
+<Tree>
+  <Tree.Folder name="src" defaultOpen>
+    <Tree.File name="index.ts" />
+    <Tree.Folder name="components">
+      <Tree.File name="Button.tsx" />
+    </Tree.Folder>
+  </Tree.Folder>
+  <Tree.File name="blume.config.ts" />
+</Tree>
+```
+
+## Panel
+
+Ein betitelter Container für ergänzende, beiseitegestellte Inhalte. `title` ist optional.
+
+<Panel title="Good to know">
+  Panels nehmen ergänzende Details auf, ohne den Lesefluss zu unterbrechen.
+</Panel>
+
+```astro
+<Panel title="Good to know">
+  Panels hold supporting detail without interrupting the main flow.
+</Panel>
+```
+
+## Tooltip
+
+Zeige beim Überfahren eines Inline-Begriffs eine Definition oder einen Hinweis. `tip` ist der Hover-Text; ergänze optional eine `headline` sowie ein `cta` + `href` für einen weiterführenden Link.
+
+Fahre über den Begriff <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/docs/quickstart">API</Tooltip>, um mehr zu erfahren.
+
+```astro
+Hover the <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/docs/quickstart">API</Tooltip> term.
+```
+
+## Tile
+
+Eine klickbare Vorschau, die mit einer Grafik – einem Icon oder Bild – über Titel und Beschreibung eröffnet. Gut für Galerien und Showcases. Nimmt `title`, `description` und `href` entgegen; das Kind ist die Grafik.
+
+<Tile
+  title="Quickstart"
+  description="Ship your first page in minutes."
+  href="/docs/quickstart"
+>
+  <Icon icon="rocket" size={28} />
+</Tile>
+
+```astro
+<Tile
+  title="Quickstart"
+  description="Ship your first page in minutes."
+  href="/docs/quickstart"
+>
+  <Icon icon="rocket" size={28} />
+</Tile>
+```
+
+## Prompt
+
+Eine einzelne Zeile mit einer Beschriftung und einem Kopier-Button. Die `description` (Markdown) ist die sichtbare Beschriftung; der Body ist der Prompt selbst – ausgeblendet und beim Drücken des Buttons **Copy prompt** in die Zwischenablage kopiert. `actions` steuert die Buttons (z. B. `["copy", "cursor"]`).
+
+<Prompt
+  description="Ask the model to **document** an endpoint."
+  actions={["copy"]}
+>
+  Schreibe eine Referenzdokumentation für den Endpunkt POST /v1/pets.
+</Prompt>
+
+```astro
+<Prompt
+  description="Ask the model to **document** an endpoint."
+  actions={["copy"]}
+>
+  Write reference docs for the POST /v1/pets endpoint.
+</Prompt>
+```
+
+## Visibility
+
+Zeige oder verbirg Inhalte je nach Zielgruppe. `for="web"` rendert nur auf der Website; `for="agents"` zielt auf das an Agenten gerichtete Markdown, das KI-Agenten lesen (`llms-full.txt` und die `.md`-Spiegelung jeder Seite).
+
+<Visibility for="web">
+  Dieser Hinweis erscheint auf der Website, wird aber im an Agenten gerichteten
+  Markdown weggelassen.
+</Visibility>
+
+```astro
+<Visibility for="web">Shown on the site only.</Visibility>
+<Visibility for="agents">Shown only in the generated Markdown.</Visibility>
+```
+
+## Type tables
+
+Tabellen zur Dokumentation der Eigenschaften eines Objekts – seiner Props, Typen und Standardwerte. Schreibe die Zeilen mit `TypeTable` von Hand oder erzeuge sie direkt aus einem TypeScript-Interface oder Typ-Alias mit `AutoTypeTable`.
+
+### Type table
+
+Ein **Prop / Type**-Raster, in dem sich jede Zeile ausklappen lässt, um ihre Beschreibung und Details zu zeigen. Übergib eine `type`-Map mit den Eigenschaftsnamen als Schlüssel; jeder Eintrag nimmt einen `type` entgegen, dazu optional eine `description`, ein `default`, ein `required`-Flag, `typeDescription` und `typeDescriptionLink`. Optionale Props (`required` nicht gesetzt) zeigen ein `?` nach dem Namen.
+
+<TypeTable
+  type={{
+    label: {
+      type: "string",
+      required: true,
+      description: "The button's visible label.",
+    },
+    variant: {
+      type: '"primary" | "ghost"',
+      default: '"primary"',
+      description: "Visual style.",
+    },
+    disabled: { type: "boolean" },
+  }}
+/>
+
+```astro lineNumbers
+<TypeTable
+  type={{
+    label: {
+      type: "string",
+      required: true,
+      description: "The button's visible label.",
+    },
+    variant: {
+      type: '"primary" | "ghost"',
+      default: '"primary"',
+      description: "Visual style.",
+    },
+    disabled: { type: "boolean" },
+  }}
+/>
+```
+
+### Auto type table
+
+Erzeuge eine Typtabelle aus einem TypeScript-Typ, damit die Dokumentation mit dem Quellcode synchron bleibt. Richte `AutoTypeTable` mit `path` (relativ zum Projektstammverzeichnis aufgelöst) und einem Typ-`name` auf eine Datei aus. Beschreibungen stammen aus JSDoc-Kommentaren, Standardwerte aus `@default`-Tags, und optionale Eigenschaften (`?`) werden entsprechend markiert.
+
+```astro
+<AutoTypeTable path="./src/button.ts" name="ButtonProps" />
+```
+
+Du kannst den Typ statt eines `path` auch inline über `type` übergeben – praktisch für kleine Beispiele:
+
+<AutoTypeTable
+  name="ButtonProps"
+  type={`
+export interface ButtonProps {
+  /** The button's visible label. */
+  label: string;
+  /**
+   * Visual style.
+   * @default "primary"
+   */
+  variant?: "primary" | "ghost";
+  /** Disable interaction. */
+  disabled?: boolean;
+}
+`}
+/>
+
+```astro lineNumbers
+<AutoTypeTable
+  name="ButtonProps"
+  type={`
+export interface ButtonProps {
+  /** The button's visible label. */
+  label: string;
+  /**
+   * Visual style.
+   * @default "primary"
+   */
+  variant?: "primary" | "ghost";
+  /** Disable interaction. */
+  disabled?: boolean;
+}
+`}
+/>
+```
+
+## GitHub info
+
+Eine Karte, die auf ein GitHub-Repository verlinkt und dessen aktuelle Stern- und Fork-Zahlen anzeigt. Die Zahlen werden zur Build-Zeit abgerufen – kein Client-JavaScript – und die Karte wird auch dann gerendert, wenn die API nicht erreichbar ist. Übergib `owner` und `repo` oder lass beides weg, um das Repository aus deiner `blume.config` zu verwenden. Setze eine Umgebungsvariable `GITHUB_TOKEN`, um das API-Ratenlimit anzuheben.
+
+<GithubInfo owner="haydenbleasel" repo="blume" />
+
+```astro lineNumbers
+<!-- Uses the repo from blume.config -->
+<GithubInfo />
+
+<!-- Or point it at any repository -->
+<GithubInfo owner="haydenbleasel" repo="blume" />
+```
+
+## Component
+
+`Component` rendert eine Beispieldatei aus dem Verzeichnis `examples/` deines Projekts als Live-Vorschau neben ihrem hervorgehobenen Quellcode, in Tabs. Richte es mit `path` auf eine Datei aus – ihr Ort unterhalb von `examples/`, ohne Erweiterung (aus `examples/counter.tsx` wird also `path="counter"`). React-, Vue-, Svelte- und Astro-Beispiele werden alle unterstützt; Framework-Beispiele hydrieren, Astro-Beispiele werden statisch gerendert. So bleiben Vorschau und Code aus einer einzigen Datei synchron.
+
+Die Vorschau rendert in einem isolierten Rahmen, den die Doku-Styles nie erreichen – keine Fließtext-Abstände, Typografie oder Theme-Elemente sickern in deine Komponente. Der Rahmen erhält Tailwind (Preflight + Utilities, die aus deinen Beispieldateien und allem, was sie importieren, gescannt werden), Blumes Design-Tokens, sodass Klassen wie `bg-background` standardmäßig der Website-Palette folgen, und er folgt der Hell-/Dunkel-Umschaltung der Website in Echtzeit. Der Bereich passt seine Größe an das gerenderte Beispiel an – und verfolgt das weiter, falls das Beispiel nach dem Laden wächst oder schrumpft – wobei die Tabs „Preview“ und „Code“ dieselbe Höhe teilen, sodass das Umschalten die Seite nie verschiebt.
+
+Um Vorschauen mit deinem eigenen Designsystem zu gestalten – etwa mit shadcn-Variablen – richte `examples.css` auf ein Stylesheet aus. Es wird nach Blumes Standardwerten in jeden Vorschaurahmen eingefügt, sodass deine Tokens gewinnen. Verwende darin kein `@import "tailwindcss"`; der Rahmen stellt Tailwind bereits bereit. Sowohl `.dark` als auch `[data-theme="dark"]` funktionieren für Dark-Mode-Overrides:
+
+```ts
+// blume.config.ts
+export default defineConfig({
+  examples: { css: "examples/theme.css" },
+});
+```
+
+```css
+/* examples/theme.css */
+:root {
+  --primary: oklch(0.6 0.2 260);
+}
+
+.dark {
+  --primary: oklch(0.75 0.15 260);
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+}
+```
+
+Auch das Verzeichnis ist konfigurierbar – setze `source` (oder nutze die Kurzschreibweise als String, `examples: "..."`), wenn deine Beispiele anderswo liegen (z. B. in einem Registry-Layout). `path` ist immer relativ dazu:
+
+```ts
+// blume.config.ts
+export default defineConfig({
+  examples: "registry/files-sdk",
+});
+```
+
+```astro
+<!-- registry/files-sdk/file-list/basic.tsx -->
+<Component path="file-list/basic" />
+```
+
+`examples` kann auch ein Glob sein (alles mit `*`, `?`, `[]`, `{}` oder `!`). Es werden nur passende Dateien erfasst, und `path` ist relativ zum statischen Präfix des Globs (dem Teil vor dem ersten Platzhalter). Das ist für eine Registry gedacht, die den Quellcode jeder Komponente neben ihrem Beispiel ablegt – richte es nur auf die Beispiele aus, damit die Quelldateien, die keinen Default-Export für eine Vorschau haben, nicht mit eingesammelt werden:
+
+```ts
+// blume.config.ts
+export default defineConfig({
+  // registry/files-sdk/file-list/file-list.tsx — source, left out
+  // registry/files-sdk/file-list/examples/basic.tsx — discovered
+  examples: "registry/files-sdk/**/examples/*",
+});
+```
+
+```astro
+<!-- keyed relative to registry/files-sdk -->
+<Component path="file-list/examples/basic" />
+```
+
+<Component path="counter" />
+
+```astro
+<!-- examples/counter.tsx -->
+<Component path="counter" />
+```
+
+Ein Astro-Beispiel rendert live und ohne Client-JavaScript:
+
+<Component path="card" />
+
+## CodeBlock
+
+`CodeBlock` hebt einen Code-String mit demselben Shiki-Theme und denselben Transformern hervor wie deine eingezäunten Codeblöcke – einschließlich des Hell-/Dunkel-Wechsels – für Stellen, an die kein Code-Fence passt, etwa eine Landingpage oder eine eigene Komponente. Übergib `code` und ein `lang`:
+
+<CodeBlock
+  lang="ts"
+  code={`export const greet = (name: string): string =>
+  \`Hello, \${name}!\`;`}
+/>
+
+```astro
+---
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+---
+
+<CodeBlock lang="ts" code={source} />
+```
+
+Um selbst zu einem HTML-String hervorzuheben (z. B. innerhalb deiner eigenen Komponente), importiere den zugrunde liegenden Helfer aus `blume/markdown`:
+
+```ts
+import { highlightCode } from "blume/markdown";
+
+const html = await highlightCode(source, "ts");
+```
+
+## Diff
+
+`Diff` rendert einen Diff im Git-Stil, hervorgehoben mit demselben Shiki-Theme wie deine Codeblöcke und vollständig zur Build-Zeit erzeugt – kein Client-JavaScript. Übergib zwei Inline-Strings (`old` / `new`), zwei Dateipfade (`before` / `after`) oder einen Unified Patch (einen Inline-`patch`-String oder eine `src`-Datei).
+
+<Diff
+  lang="ts"
+  old={`export function greet(name) {
+  return "Hi, " + name;
+}`}
+  new={`export function greet(name: string): string {
+  return "Hi, " + name + "!";
+}`}
+/>
+
+```astro
+<Diff
+  lang="ts"
+  old={`export function greet(name) {
+  return "Hi, " + name;
+}`}
+  new={`export function greet(name: string): string {
+  return "Hi, " + name + "!";
+}`}
+/>
+```
+
+Vergleiche zwei Dateien in deinem Projekt, relativ zu dessen Stammverzeichnis:
+
+<Diff before="diffs/button-before.ts" after="diffs/button-after.ts" />
+
+```astro
+<Diff before="diffs/button-before.ts" after="diffs/button-after.ts" />
+```
+
+Oder rendere einen Unified Patch – entweder aus einer Datei mit `src` oder inline mit `patch`:
+
+<Diff src="diffs/greet.patch" />
+
+```astro
+<Diff src="diffs/greet.patch" />
+```
+
+```astro
+<Diff
+  patch={`--- a/greet.ts
++++ b/greet.ts
+@@ -1,3 +1,4 @@
+-export function greet(name) {
+-  return "Hi, " + name;
++export function greet(name: string): string {
++  const greeting = "Hi, " + name + "!";
++  return greeting;
+ }`}
+/>
+```

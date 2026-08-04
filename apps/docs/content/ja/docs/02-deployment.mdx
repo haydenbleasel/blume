@@ -1,0 +1,146 @@
+---
+title: デプロイ
+description: 設定不要で静的ドキュメントを任意のホストにデプロイできます。動的な挙動が必要な場合は、アダプターを使ってサーバーサイドレンダリングに切り替えられます。
+sidebar:
+  label: デプロイ
+  order: 2
+---
+
+## どこにでもデプロイ（静的）
+
+`blume build` はドキュメントを素の HTML、CSS、そしてローカル検索インデックスとして `dist/` にコンパイルします。実行するサーバーはありません — 任意の静的ホストにそのフォルダを向けるだけです。
+
+| 設定             | 値            |
+| ---------------- | ------------- |
+| ビルドコマンド   | `blume build` |
+| 出力ディレクトリ | `dist`        |
+| Node バージョン  | 22.12 以降    |
+
+これらの設定は Vercel、Netlify、Cloudflare Pages、GitHub Pages、Amazon S3 + CloudFront、その他あらゆるバケットや CDN で動作します。ホストがビルドを実行できるよう、`blume` が依存関係に含まれていることを確認してください。
+
+静的ビルドには次のものが含まれます:
+
+- すべてのドキュメントページとカスタムページ（静的 HTML として）
+- ローカル検索インデックス（デフォルトは Orama、Pagefind はオプトイン）
+- `deployment.site` が設定されている場合の [`sitemap.xml`](/docs/configuration/seo#sitemap) と [`robots.txt`](/docs/configuration/seo#robots)
+- AI ツール向けの `llms.txt` と `llms-full.txt`
+- リダイレクトページ
+- `seo.og.enabled` が有効な場合、事前レンダリングされた [Open Graph 画像](/docs/configuration/seo#open-graph-images)
+
+### サイト URL を設定する
+
+サイトマップ、canonical タグ、RSS、Open Graph 画像には絶対オリジンが必要です。**Vercel**、**Netlify**、**Cloudflare Pages** では、Blume がビルド時にプラットフォームの環境から自動検出します — 設定は不要です。
+
+検出された値を上書きする場合、またはそれを公開していないホスト（GitHub Pages、S3、カスタム CDN）で指定する場合は `deployment.site` を設定します:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  site: "https://docs.example.com",
+}
+```
+
+自動検出の際、Blume はデプロイごとのプレビュー URL よりも安定した本番ドメインを優先するため、canonical オリジンはデプロイをまたいで変わりません。
+
+`blume dev` の実行中、サイト URL が未設定の場合はローカル開発サーバー（例: `http://localhost:4321`）にフォールバックするため、サイト URL に依存する機能 — Open Graph 画像、canonical、サイトマップ — がそのまま動作します。ビルドではこのフォールバックは使われないため、本番の出力が localhost を指すことはありません。
+
+## ローカルでプレビューする
+
+公開する前に、静的ホストが配信するのとまったく同じ形で本番ビルドをプレビューしましょう:
+
+```bash
+blume build
+blume preview
+```
+
+## サブパスへのデプロイ
+
+`example.com/docs` のようなパス配下でドキュメントを配信しますか？ `deployment.base` を設定してください — GitHub Pages のプロジェクトサイトでよくあるケースです。ルートを含むサイト全体がそのベース配下に移動し、内部リンクとアセットもベースを含むように書き換えられます。
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  base: "/docs",
+}
+```
+
+## ドキュメントをパス配下にマウントする
+
+`basePath` は生成されるすべてのルートをあるセグメント配下（`/docs/getting-started`）にマウントしますが、サイドバーはそのままです — トップレベルはラッパーグループではなく、あなたのセクションのままです。ドキュメントは `/docs/*` に置きつつ、サイトのルートは自分のものとして残したい場合に使います（Docusaurus の `routeBasePath` や Fumadocs の `baseUrl` のようなものです）。
+
+```ts blume.config.ts lineNumbers
+basePath: "/docs",
+```
+
+リンクはルートにマウントされている前提（`/getting-started`）で書いてください。Blume がリンクを書き換え、リダイレクト、サイトマップ、canonical URL、Open Graph 画像、`llms.txt`、検索インデックスも合わせて処理します。公開アセット（画像や `public/` 配下のファイル）はサイトのルートに残ります。
+
+これは上記 2 つのパスとは別の概念です:
+
+- ソースごとの [`prefix`](/docs/content/sources#multiple-sources) は**単一**のソースに名前空間を与え、サイドバーグループを**追加します**。
+- `deployment.base` は**アプリ全体**が配信されるホスト側のサブディレクトリです。両者は組み合わせられます — 両方を設定すると、ページは `{deployment.base}/{basePath}/page` に配置されます。
+
+## サーバーレンダリング
+
+静的出力でほとんどのドキュメントは事足ります。リクエスト時の機能 — 特に [Ask AI](/docs/configuration/ai) エンドポイント — が必要な場合はサーバー出力に切り替えます:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  output: "server",
+  adapter: "vercel",
+}
+```
+
+`vercel` と `node` のアダプターは Blume に同梱されています — 選ぶだけで動きます。`netlify` と `cloudflare` のアダプターはプロジェクトへのインストールが必要です（例: `bun add -d @astrojs/netlify`）。パッケージが見つからない場合、CLI が警告します:
+
+| アダプター | パッケージ | 用途 |
+| --- | --- | --- |
+| `vercel` | `@astrojs/vercel` | Vercel — 最も洗練された選択肢 |
+| `netlify` | `@astrojs/netlify` | Netlify Functions |
+| `node` | `@astrojs/node` | セルフホストの Node サーバー、コンテナ |
+| `cloudflare` | `@astrojs/cloudflare` | Cloudflare Workers と Pages |
+
+**Vercel**、**Netlify**、**Cloudflare Pages** では、サーバー出力時に Blume が対応するアダプターを自動選択します — `output: "server"` を設定してデプロイするだけです（Netlify と Cloudflare ではアダプターのパッケージもインストールしてください）。検出された値を上書きする場合や、`node` でセルフホストする場合は `adapter` を明示的に設定します。
+
+サーバービルドには静的ビルドのすべてに加えて、追加した Astro のエンドポイントやミドルウェアが含まれます。`node` アダプターは直接実行できるスタンドアロンのサーバーを生成します。
+
+Vercel では、サーバービルドによって [`Accept: text/markdown` のコンテンツネゴシエーション](/docs/configuration/ai#content-negotiation) も有効になります。Blume はデプロイのルーティング設定にヘッダー条件付きのリライトを挿入するため、そのヘッダー付きで任意のコンテンツページをリクエストしたエージェントは、同じ URL で生の Markdown 版を受け取れます。
+
+:::note
+サーバー機能にはそれぞれ独自の設定があります — 例えば Ask AI にはモデルの API キーが必要です。セットアップについては [AI ガイド](/docs/configuration/ai) を参照してください。
+:::
+
+## リダイレクト
+
+`blume.config.ts` で古い URL を新しい URL にマッピングします:
+
+```ts blume.config.ts
+redirects: [{ from: "/old", to: "/new", status: 301 }];
+```
+
+`status` は `301`、`302`、`307`、`308` を受け付けます（デフォルトは `301`）。サーバービルドではリダイレクトをリクエスト時に処理します。静的ビルドではリダイレクトページ**に加えて**プラットフォーム用のファイルも出力するため、ホストが本物の HTTP リダイレクトを返せます: `_redirects`（Netlify、Cloudflare Pages）、`vercel.json`（Vercel）、そして `blume-redirects.json` — その他の環境（nginx/Apache のルール、エッジワーカーなど）向けの構造化マニフェストです。`public/` に配置した `_redirects` や `vercel.json` はそのまま維持されます。
+
+:::note
+`from` は完全一致のパスとして照合されます — ワイルドカードやパターンマッチ（例: `/blog/:slug` や `/old/*`）はサポートされていません。パターンベースのルールが必要な場合は、`vercel.json`（ワイルドカードの `source` パターンをサポート）のようなインフラ側のファイルや、ホストのリダイレクト設定で対応してください。`public/` に配置した `vercel.json` はそのまま保持されます。
+:::
+
+:::note
+`from` と `to` はどちらもルートにマウントされている前提で書いてください — [`deployment.base`](#subpath-deploys) でも [`basePath`](#mount-the-docs-under-a-path) でも、Blume が両側を書き換えるため、リダイレクト先はベース配下に収まります。`to` に手動でベースを書き込んでいる場合は、二重にならずそのまま維持されます。
+:::
+
+## コンテンツタイプ
+
+静的ビルドでは `_headers` ファイルも出力され、生の AI 対応エンドポイント — `/<route>.md`、`/<route>.mdx`、および `.txt` ファイル（`llms.txt`、`llms-full.txt`）— に `charset=utf-8` を固定します。これらのレスポンスは妥当な UTF-8 ですが、多くの静的ホストは charset **なし**の `text/markdown` / `text/plain` として配信し、ブラウザは Windows-1252 にフォールバックします — その結果、非 ASCII のドキュメント（日本語、アクセント付きラテン文字など）は生の URL を直接開いたときに文字化けします。HTML ページは `<meta charset>` を持つため影響を受けません。Netlify と Cloudflare（Pages/Workers の静的アセット）は `_headers` を読み取ります。読み取らないホスト（Vercel、S3）はこのファイルを無害に無視します。`public/` に配置した `_headers` はそのまま維持されます。
+
+## 環境変数
+
+機能が実行時のシークレットを必要とする場合、それが欠けていると Blume は `blume dev`/`build` の時点で警告します — 最初のリクエスト時ではなく、早い段階で問題が表面化します:
+
+| 機能 | 変数 |
+| --- | --- |
+| Ask AI（AI Gateway） | `AI_GATEWAY_API_KEY`（または Vercel OIDC） |
+| Ask AI（その他のプロバイダー） | プロバイダーのデフォルトのキー環境変数（`OPENROUTER_API_KEY`、`LLMGATEWAY_API_KEY`、`INKEEP_API_KEY`）、または設定した `apiKeyEnv` |
+| Mixedbread 検索 | `MIXEDBREAD_API_KEY` |
+
+ローカル開発では `.env.local` に、本番ではホストの環境に設定してください。検索インデックスの同期（Algolia、Orama Cloud、Typesense）に必要なビルド時のシークレットについては、同期ステップで個別に警告されます。
+
+## ビルドサマリー
+
+ビルドのたびにサマリーが出力されます — 出力モード、アダプター、解決されたサイト URL、検索プロバイダー、リダイレクト数、サイトマップと `llms.txt` の状態、有効になっているサーバー機能 — デプロイ前に、何が反映されたのか（自動検出されたものも含めて）を確認できます。

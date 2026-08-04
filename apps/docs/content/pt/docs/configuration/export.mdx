@@ -1,0 +1,50 @@
+---
+title: Exportar
+description: >-
+  Permita que os leitores baixem qualquer página como PDF ou EPUB — renderizado no lado do cliente, para que suas builds estáticas continuem estáticas e não precisem de infraestrutura de servidor.
+---
+
+O Blume pode adicionar uma ação de **Exportar** às [ações de página](/docs/content/navigation#page-actions) abaixo do sumário, permitindo que os leitores salvem a página em que estão como **PDF** ou **EPUB**. Ela vem desativada por padrão e é totalmente do lado do cliente — sem servidor, e as builds [estáticas](/docs/deployment) continuam estáticas.
+
+## Ativar
+
+Ative os dois formatos com uma única opção:
+
+```ts blume.config.ts
+export: true,
+```
+
+Para oferecer apenas um formato, passe um objeto:
+
+```ts blume.config.ts
+export: {
+  pdf: true,
+  epub: false,
+},
+```
+
+Qualquer formato que você omitir (ou definir como `false`) fica de fora do menu. Com ambos desativados — o padrão — a ação **Exportar** não aparece de forma alguma.
+
+## PDF
+
+**Exportar para PDF** abre a caixa de diálogo de impressão do navegador com uma folha de estilo de impressão que remove os elementos da interface do site — cabeçalho, barras laterais, navegação — deixando apenas o artigo. Escolha **Salvar como PDF** para concluir.
+
+Como imprime a página ao vivo e totalmente estilizada, o resultado mantém o texto nítido e selecionável, fontes reais e código com realce de sintaxe. Não requer dependências e funciona da mesma forma em desenvolvimento, em produção e em hospedagens estáticas.
+
+:::note
+A exportação para PDF passa pela caixa de diálogo de impressão nativa do navegador, portanto o texto exato de "Salvar como PDF" e as opções dependem do navegador. Ative **Gráficos de plano de fundo** na caixa de diálogo para manter os fundos dos blocos de código e dos destaques.
+:::
+
+## EPUB
+
+**Exportar para EPUB** gera um `.epub` autocontido da página atual no navegador e o baixa — pronto para o Apple Books, o Calibre ou qualquer leitor de e-books. O gerador só é carregado quando um leitor clica em Exportar, então ele nunca pesa no restante do seu site.
+
+Para manter o arquivo legível em um dispositivo sem folha de estilo ou JavaScript próprios, o Blume reescreve a página em HTML limpo e independente: o código com realce de sintaxe vira monoespaçado simples, ícones decorativos e botões de copiar são removidos, e uma folha de estilo integrada para leitores de e-books cuida do espaçamento, dos blocos de código e das tabelas.
+
+## O que é exportado
+
+Ambos os formatos exportam a **única página** que o leitor está visualizando — não o site inteiro — o que condiz com o lugar onde a ação fica, abaixo do sumário daquela página.
+
+:::note
+Em um EPUB não há JavaScript para alternar abas, então o conteúdo em abas — como os blocos [package-install](/docs/content/syntax) e os grupos de código — é expandido para mostrar todos os painéis de uma vez. Embeds renderizados no cliente, como diagramas Mermaid, não são incluídos.
+:::

@@ -1,0 +1,106 @@
+---
+title: Blog
+description: >-
+  Veröffentliche Beiträge als Inhalte, erhalte kostenlos einen RSS-Feed und strukturierte Artikeldaten und erstelle eine eigene Übersichtsseite.
+---
+
+Ein Blog ist in Blume einfach Inhalt mit einem Typ. Markiere eine Seite mit `type: blog` und Blume stattet sie automatisch mit einem RSS-Feed und umfangreicheren Artikel-Metadaten aus. Anders als beim [Changelog](/docs/advanced/changelog) wird keine Übersichtsseite generiert – die Landingpage stellst du selbst zusammen, wodurch das Design vollständig in deiner Hand bleibt.
+
+## Einen Beitrag schreiben
+
+Ein Beitrag ist eine ganz normale `.md`- oder `.mdx`-Seite mit `type: blog` im Frontmatter. Üblicherweise liegen Beiträge unter `blog/`, entscheidend ist aber der Typ – nicht der Ordner:
+
+```mdx blog/introducing-blume.mdx lineNumbers
+---
+title: Introducing Blume
+type: blog
+date: 2026-06-22
+description: Why we built a markdown-first docs framework.
+---
+
+Documentation should be fast, AI-ready, and zero-config — down to not needing a starter template at all. Here's the thinking behind Blume.
+```
+
+Gib jedem Beitrag ein `date`, damit Feed-Einträge neueste zuerst sortiert werden und ein `pubDate` erhalten, sowie eine `description` – sie wird sowohl für die Feed-Zusammenfassung als auch für SEO verwendet.
+
+## Der RSS-Feed
+
+Blume erzeugt einen Blog-Feed unter **`/blog/rss.xml`**, sortiert nach `date` mit den neuesten Einträgen zuerst. Feeds benötigen eine absolute Site-URL, setze daher [`deployment.site`](/docs/deployment); Blume fügt dann auf jeder Seite ein `<link rel="alternate">`-Tag ein, damit Leser den Feed automatisch finden.
+
+Der Feed ist standardmäßig aktiviert. Feinjustieren kannst du ihn unter [`seo.rss`](/docs/configuration/seo#rss-feeds):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+Entferne `"blog"` aus `rss.types`, um den Feed zu überspringen.
+
+## Strukturierte Daten
+
+Wenn [strukturierte Daten](/docs/configuration/seo#structured-data) aktiviert sind, wird jeder Beitrag als schema.org-**`BlogPosting`** mit seiner Beschreibung und seinem Veröffentlichungsdatum ausgegeben – dem umfangreicheren Artikeltyp, den Suchmaschinen bei Blog-Inhalten erwarten.
+
+## Eine Übersichtsseite erstellen
+
+Blume generiert keine `/blog`-Landingpage, du erstellst sie also selbst. Die einfachste Möglichkeit ist eine Inhaltsseite, die jeden Beitrag von Hand verlinkt:
+
+```mdx blog/index.mdx lineNumbers
+---
+title: Blog
+description: News and writing from the team.
+---
+
+<CardGroup cols={2}>
+  <Card title="Introducing Blume" href="/blog/introducing-blume">
+    Why we built a markdown-first docs framework.
+  </Card>
+</CardGroup>
+```
+
+Um Beiträge stattdessen automatisch aufzulisten, füge unter `pages/blog/index.astro` eine [eigene Seite](/docs/advanced/custom-pages) hinzu, die aus Astros `docs`-Content-Collection liest und jeden Eintrag mit seiner Route aus `blume:data` verknüpft:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import { getCollection } from "astro:content";
+import data from "blume:data";
+
+const routeById = new Map(data.routes.map((route) => [route.id, route.path]));
+
+const posts = (await getCollection("docs"))
+  .filter((entry) => entry.data.type === "blog" && !entry.data.draft)
+  .map((entry) => ({
+    date: entry.data.date,
+    description: entry.data.description,
+    href: routeById.get(entry.id),
+    title: entry.data.title,
+  }))
+  .toSorted((a, b) => Number(new Date(b.date)) - Number(new Date(a.date)));
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={post.href}>{post.title}</a>
+        <p>{post.description}</p>
+      </li>
+    ))
+  }
+</ul>
+```
+
+Wie du das in das vollständige Site-Layout einbettest, erfährst du unter [Eigene Seiten](/docs/advanced/custom-pages#using-the-site-layout).
+
+<CardGroup cols={2}>
+  <Card title="Eigene Seiten" href="/docs/advanced/custom-pages" icon="folder">
+    Binde die Blog-Übersicht ein und lies aus blume:data.
+  </Card>
+  <Card title="SEO" href="/docs/configuration/seo" icon="file">
+    Feeds, Open-Graph-Bilder und strukturierte Daten.
+  </Card>
+</CardGroup>

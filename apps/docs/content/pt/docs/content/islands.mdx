@@ -1,0 +1,153 @@
+---
+title: Ilhas
+description: >-
+  Coloque um componente interativo em islands/ e use-o em qualquer página MDX — hidratado automaticamente, sem importação por página.
+---
+
+O Blume renderiza sua documentação como HTML estático com **zero JavaScript** por padrão. Quando você precisa de algo interativo — uma demonstração ao vivo, um gráfico, um playground — você adiciona uma **ilha**: um componente de framework que envia JS apenas para si mesmo, apenas nas páginas que o utilizam.
+
+## A convenção `islands/`
+
+Coloque um componente em uma pasta `islands/` na raiz do seu projeto. O nome do arquivo se torna um componente que você pode usar em **qualquer** página `.mdx`, sem importação:
+
+```tsx islands/Counter.tsx lineNumbers
+import { useState } from "react";
+
+export default function Counter() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>Clicked {count}</button>;
+}
+```
+
+```mdx page.mdx
+Here's a live counter: <Counter />
+```
+
+O nome do arquivo é o nome do componente, então ele **deve ser um identificador em PascalCase** — apenas letras, dígitos e sublinhados (`Counter.tsx` → `<Counter />`). Nomes de arquivo em minúsculas, nomes com traços/pontos/espaços (como `Time-Picker.tsx`) e duas ilhas que resolvem para o mesmo nome são ignorados com um aviso de compilação.
+
+:::note
+Ilhas são para UI **interativa**. Para um componente estático que você reutiliza entre páginas (um destaque estilizado, uma tabela de preços), use uma [substituição MDX](/docs/configuration/customization) em vez disso — ela não envia nenhum JavaScript.
+:::
+
+## Registrando ilhas em `components.ts`
+
+Se você preferir manter as ilhas junto ao restante dos seus componentes — ou dar a elas um nome diferente do arquivo — registre-as com `defineComponents`. O grupo `islands` é exatamente como a pasta `islands/`: cada entrada está disponível em todas as páginas MDX e é hidratada (com padrão `client: "visible"`).
+
+```ts components.ts
+import { defineComponents } from "blume";
+import Counter from "./widgets/Counter.tsx";
+
+export default defineComponents({
+  islands: {
+    Counter, // <Counter /> in any MDX page, hydrated
+  },
+});
+```
+
+Referencie o componente por importação ou por uma string de caminho, e defina um modo de hidratação por ilha com a forma de descritor:
+
+```ts components.ts
+export default defineComponents({
+  islands: {
+    Chart: { component: "./widgets/Chart.tsx", client: "only" },
+  },
+});
+```
+
+## Hidratação
+
+Por padrão, uma ilha usa `client:visible`: ela é hidratada quando o leitor a rola até o campo de visão, então uma página cheia de ilhas ainda carrega instantaneamente. Opte por uma estratégia diferente com um `export const client` no arquivo da ilha:
+
+```tsx islands/Chart.tsx lineNumbers
+// Skip server rendering entirely — for components that touch the DOM/window.
+export const client = "only";
+
+export default function Chart() {
+  /* ... */
+}
+```
+
+| Valor de `client` | Hidrata | Use para |
+| --- | --- | --- |
+| `"visible"` _(padrão)_ | Quando rolado até o campo de visão | A maioria das ilhas |
+| `"load"` | Imediatamente ao carregar a página | UI acima da dobra, que deve ser instantânea |
+| `"idle"` | Quando a thread principal está ociosa | Interatividade não urgente |
+| `"only"` | Apenas no cliente, nunca renderizado no servidor | Bibliotecas que precisam de `window`/`document` (gráficos, editores) |
+
+## Frameworks
+
+**O React funciona de imediato** — o Blume o ativa automaticamente assim que seu projeto contém uma ilha `.tsx`/`.jsx`.
+
+O [React Compiler](https://react.dev/learn/react-compiler) está ativado por padrão sempre que o React está habilitado, então suas ilhas são memoizadas automaticamente — sem necessidade de `useMemo`/`useCallback` escritos à mão. Ele vem com o Blume; não há nada para instalar. Desative em `blume.config.ts`:
+
+```ts blume.config.ts
+export default defineConfig({
+  react: { compiler: false },
+});
+```
+
+**Vue e Svelte** também são suportados; instale a integração Astro correspondente e o Blume configura o renderizador quando encontra uma ilha `.vue` ou `.svelte`:
+
+```bash
+# Vue
+npm install @astrojs/vue vue
+
+# Svelte
+npm install @astrojs/svelte svelte
+```
+
+```vue islands/Toggle.vue lineNumbers
+<script setup>
+import { ref } from "vue";
+const on = ref(false);
+</script>
+
+<template>
+  <button @click="on = !on">{{ on ? "On" : "Off" }}</button>
+</template>
+```
+
+As props que você passa no MDX (`<Counter start={5} />`) são encaminhadas ao componente, e os filhos (`<Counter>label</Counter>`) chegam como o slot padrão.
+
+:::tip
+As ilhas são hidratadas no cliente, então qualquer coisa que você passe como prop deve ser serializável — strings, números, objetos simples, não funções.
+:::
+
+## Hooks
+
+As ilhas são hidratadas por conta própria, então não há contexto do React para conduzir os dados do projeto. Em vez disso, `blume/hooks` lê um pequeno snapshot que o layout serializa na página — sem props para repassar:
+
+```tsx islands/PageInfo.tsx lineNumbers
+import { useBlume, usePage } from "blume/hooks";
+
+export default function PageInfo() {
+  const blume = useBlume();
+  const page = usePage();
+  if (!(blume && page)) {
+    return null;
+  }
+  return (
+    <p>
+      You're reading <strong>{page.title}</strong> on {blume.config.title}.
+    </p>
+  );
+}
+```
+
+| Hook | Retorna |
+| --- | --- |
+| `useBlume()` | `{ config, navigation }` do site, ou `null` antes da montagem |
+| `usePage()` | `{ route, title }` da página atual, ou `null` antes da montagem |
+| `useSearch()` | `{ search, results, loading }` — consulta o provedor de busca configurado |
+| `useAskAI()` | `{ ask, messages, loading, reset }` — transmite a partir do endpoint Ask AI |
+
+`useBlume()` e `usePage()` retornam `null` até que a ilha seja montada (para que servidor e cliente renderizem o mesmo primeiro quadro) — proteja-se contra isso. O snapshot é emitido apenas em páginas que enviam React, então um site totalmente estático não paga nada.
+
+Em [páginas personalizadas](/docs/advanced/custom-pages) construídas com `PageLayout`, passe `clientData` para que as ilhas ali possam lê-lo:
+
+```astro
+<PageLayout
+  clientData={{ config: data.config, navigation: data.navigation, page: { route: "/", title: "Home" } }}
+  {/* …other props… */}
+/>
+```

@@ -1,0 +1,93 @@
+---
+title: クイックスタート
+description: >-
+  Blume をインストールし、新しいプロジェクトを作成して、数分で最初のドキュメントページを公開しましょう。その後は自分のペースで本格的なサイトへと育てていけます。
+sidebar:
+  label: クイックスタート
+  order: 1
+---
+
+空のフォルダから、いくつかのコマンドだけで動作するドキュメントサイトまで到達できます。Blume に必要なのは **Node.js 22.12 以降**と、`.md` または `.mdx` ファイルを 1 つ以上含む `docs/` フォルダだけです。それ以外に用意するものはありません。
+
+## インストールと実行
+
+<Steps>
+  <Step title="Blume をインストールする">
+    新規または既存のプロジェクトにパッケージを追加します。
+
+    ```package-install
+    npm i blume
+    ```
+
+  </Step>
+  <Step title="プロジェクトを作成する">
+    `blume init` はいくつかの質問をします — プロジェクトを作成する場所、ドキュメントサイトの名前、使用するテンプレート、コンテンツの配置場所 — そのうえで最小限の構成、つまりコンテンツフォルダと設定ファイルを生成します。プロンプトをスキップしてデフォルト値を使うには `--yes` を渡してください。
+
+    ```bash
+    blume init
+    ```
+
+    ```txt
+    docs/
+      index.mdx
+    blume.config.ts
+    ```
+
+  </Step>
+  <Step title="開発サーバーを起動する">
+    Blume がランタイムを生成し、ホットリロード付きでドキュメントを配信します。
+
+    ```bash
+    blume dev
+    ```
+
+  </Step>
+  <Step title="本番向けにビルドする">
+    静的 HTML が `dist/` に出力され、それを対象としたローカル検索インデックスが構築されます。
+
+    ```bash
+    blume build
+    ```
+
+  </Step>
+</Steps>
+
+:::tip
+Blume はあらゆるパッケージマネージャーで動作し、Astro や Tailwind を自分でセットアップする必要は一切ありません。
+:::
+
+## 最初のページを書く
+
+すべてのページは、少しのフロントマターを添えた Markdown または MDX です。`title` と `description` は自動的にページの見出しとイントロとして表示されます。次の内容を `docs/index.mdx` に貼り付けてみましょう。
+
+```mdx docs/index.mdx lineNumbers
+---
+title: Introduction
+description: Welcome to my docs.
+---
+
+Welcome! Use **Markdown** and built-in components — no imports required:
+
+:::note
+Blume ships callouts, cards, tabs, steps, and more.
+:::
+```
+
+保存すれば、開発サーバーが即座にリロードします。ナビゲーション、検索、ページメタデータは、ファイルを追加するたびにそれらから推論されます。書き続けるだけで、サイトがついてきます。
+
+## 次のステップ
+
+<CardGroup cols={2}>
+  <Card title="設定" href="/docs/configuration" icon="file">
+    タイトル、テーマ、検索、デプロイを調整します。
+  </Card>
+  <Card title="コンポーネント" href="/docs/content/components" icon="folder">
+    組み込みのコンポーネントライブラリを見てみましょう。
+  </Card>
+  <Card title="AI" href="/docs/configuration/ai" icon="lightbulb">
+    `llms.txt` と Ask AI アシスタントを提供します。
+  </Card>
+  <Card title="デプロイ" href="/docs/deployment" icon="rocket">
+    任意の静的ホスティングで公開しましょう。
+  </Card>
+</CardGroup>

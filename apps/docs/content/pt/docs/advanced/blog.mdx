@@ -1,0 +1,110 @@
+---
+title: Blog
+description: >-
+  Publique posts como conteúdo, obtenha um feed RSS e dados estruturados de artigo gratuitamente, e crie uma página de índice personalizada.
+---
+
+Um blog no Blume é apenas conteúdo com um tipo. Marque uma página com `type: blog` e o Blume lhe dá automaticamente um feed RSS e metadados de artigo mais ricos. Diferentemente do [changelog](/docs/advanced/changelog), não há página de índice gerada — você compõe a página inicial por conta própria, o que mantém o design inteiramente em suas mãos.
+
+## Escreva um post
+
+Um post é uma página `.md` ou `.mdx` comum com `type: blog` em seu frontmatter. Por convenção, os posts ficam em `blog/`, mas o que importa é o tipo — não a pasta:
+
+```mdx blog/introducing-blume.mdx lineNumbers
+---
+title: Introducing Blume
+type: blog
+date: 2026-06-22
+description: Why we built a markdown-first docs framework.
+---
+
+Documentation should be fast, AI-ready, and zero-config — down to not needing a starter template at all. Here's the thinking behind Blume.
+```
+
+Dê a cada post uma `date` para que os itens do feed sejam ordenados do mais recente para o mais antigo e carreguem uma `pubDate`, e uma `description` — ela é usada tanto no resumo do feed quanto no SEO.
+
+## O feed RSS
+
+O Blume cria um feed do blog em **`/blog/rss.xml`**, ordenado do mais recente para o mais antigo por `date`. Feeds precisam de uma URL absoluta do site, então defina [`deployment.site`](/docs/deployment); o Blume então injeta uma tag `<link rel="alternate">` em todas as páginas para que os leitores a descubram automaticamente.
+
+O feed está ativado por padrão. Ajuste-o em [`seo.rss`](/docs/configuration/seo#rss-feeds):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+Remova `"blog"` de `rss.types` para dispensar o feed.
+
+## Dados estruturados
+
+Quando os [dados estruturados](/docs/configuration/seo#structured-data) estão ativados, cada post é emitido como um **`BlogPosting`** do schema.org com sua descrição e data de publicação — o tipo de artigo mais rico que os mecanismos de busca esperam para conteúdo de blog.
+
+## Criando um índice
+
+O Blume não gera uma página inicial `/blog`, então você a constrói. A opção mais simples é uma página de conteúdo que liga a cada post manualmente:
+
+```mdx blog/index.mdx lineNumbers
+---
+title: Blog
+description: News and writing from the team.
+---
+
+<CardGroup cols={2}>
+  <Card title="Introducing Blume" href="/blog/introducing-blume">
+    Why we built a markdown-first docs framework.
+  </Card>
+</CardGroup>
+```
+
+Para listar os posts automaticamente, adicione uma [página personalizada](/docs/advanced/custom-pages) em `pages/blog/index.astro` que leia da coleção de conteúdo `docs` do Astro e associe cada entrada à sua rota vinda de `blume:data`:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import { getCollection } from "astro:content";
+import data from "blume:data";
+
+const routeById = new Map(data.routes.map((route) => [route.id, route.path]));
+
+const posts = (await getCollection("docs"))
+  .filter((entry) => entry.data.type === "blog" && !entry.data.draft)
+  .map((entry) => ({
+    date: entry.data.date,
+    description: entry.data.description,
+    href: routeById.get(entry.id),
+    title: entry.data.title,
+  }))
+  .toSorted((a, b) => Number(new Date(b.date)) - Number(new Date(a.date)));
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={post.href}>{post.title}</a>
+        <p>{post.description}</p>
+      </li>
+    ))
+  }
+</ul>
+```
+
+Veja [Páginas Personalizadas](/docs/advanced/custom-pages#using-the-site-layout) para envolver isso no layout completo do site.
+
+<CardGroup cols={2}>
+  <Card
+    title="Páginas Personalizadas"
+    href="/docs/advanced/custom-pages"
+    icon="folder"
+  >
+    Monte o índice do blog e leia de blume:data.
+  </Card>
+  <Card title="SEO" href="/docs/configuration/seo" icon="file">
+    Feeds, imagens Open Graph e dados estruturados.
+  </Card>
+</CardGroup>

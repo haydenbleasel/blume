@@ -1,0 +1,81 @@
+---
+title: Meta de pasta
+description: >-
+  Configure um grupo da barra lateral com um arquivo meta.ts junto às suas páginas — defina o título, o ícone e a ordem do grupo, além da ordem das páginas aninhadas dentro dele.
+---
+
+Toda pasta na sua árvore de conteúdo se torna um grupo da barra lateral. Coloque um `meta.ts` junto às suas páginas para controlar a aparência desse grupo e a ordenação de seus filhos. É totalmente opcional: sem ele, o rótulo do grupo é o nome da pasta humanizado e suas páginas são ordenadas por [índice, prefixo numérico e, então, alfabeticamente](/docs/content/navigation#ordering).
+
+## Definindo o meta
+
+Exporte um objeto `defineMeta` para obter uma configuração totalmente tipada. Coloque o arquivo na raiz da pasta que ele configura — `guides/meta.ts` configura o grupo **Guias**:
+
+```ts meta.ts lineNumbers
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Guides",
+  icon: "book-open",
+  order: 2,
+  collapsed: false,
+  pages: ["configuration", "theming", "deployment"],
+});
+```
+
+Todos os campos são opcionais — defina apenas o que você quiser sobrescrever.
+
+## Campos
+
+| Campo | Tipo | Descrição |
+| --- | --- | --- |
+| `title` | `string` | O rótulo do grupo. O padrão é o nome da pasta humanizado. |
+| `icon` | `string` | Ícone exibido ao lado do rótulo. |
+| `order` | `number` | Posição entre grupos e páginas irmãos. Números menores vêm primeiro. |
+| `collapsed` | `boolean` | Sob o [modo de exibição `group`](/docs/content/navigation#display-modes), define se o grupo começa recolhido. |
+| `pages` | `string[]` | Ordem explícita dos filhos do grupo, por slug. |
+
+O array `pages` lista os filhos por slug — o nome da pasta ou do arquivo com o prefixo numérico e quaisquer parênteses removidos (portanto `01-quickstart.mdx` é `"quickstart"`). Os filhos que você deixar de fora ainda aparecem, depois dos listados.
+
+Como os grupos são renderizados — cabeçalhos planos, blocos recolhíveis ou painéis de navegação em profundidade — é uma configuração de toda a barra lateral, não por pasta: veja [modos de exibição](/docs/content/navigation#display-modes).
+
+## Meta computado
+
+Como `meta.ts` é um módulo de verdade, você pode computar o meta — passe uma função (síncrona ou `async`) em vez de um objeto para construí-lo no momento da varredura. Prático para ordenar páginas a partir de uma fonte externa:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta(async () => ({
+  title: "Guides",
+  pages: await orderFromCms(),
+}));
+```
+
+## Ordenação dentro de um grupo
+
+O array `pages` define a ordem dos filhos de um grupo. Tudo que ele omitir recorre ao `sidebar.order` do frontmatter de cada página e, em seguida, ao sistema de arquivos (uma página `index` primeiro, depois os prefixos numéricos e então a ordem alfabética). Para a precedência completa da barra lateral — incluindo uma barra lateral explícita na configuração — veja [Navegação › Ordenação](/docs/content/navigation#ordering).
+
+Para agrupar páginas _sem_ adicionar um segmento de URL, você não precisa de um `meta.ts`: use um nome de pasta entre parênteses — veja [Páginas › Pastas de grupo](/docs/content#group-folders).
+
+## Internacionalização
+
+Sob o [i18n](/docs/content/i18n), o meta de pasta é resolvido por locale: coloque um `meta.ts` em `fr/guides/` para ordenar o grupo em francês de forma independente.
+
+Para um meta de pasta idêntico em todos os idiomas, adicione um marcador `$` para que um único arquivo sirva a todos os locales sem duplicação:
+
+```txt
+docs/guides/meta.$.ts   (folder meta applied to every locale)
+```
+
+Um `meta.ts` específico de locale ainda sobrescreve o `meta.$.ts` compartilhado para aquele idioma.
+
+## Para onde ir agora
+
+<CardGroup cols={2}>
+  <Card title="Navegação" href="/docs/content/navigation" icon="menu">
+    Como a barra lateral, as trilhas de navegação e as abas são construídas.
+  </Card>
+  <Card title="Frontmatter" href="/docs/reference/frontmatter" icon="file">
+    Metadados por página, incluindo as sobrescritas de `sidebar`.
+  </Card>
+</CardGroup>

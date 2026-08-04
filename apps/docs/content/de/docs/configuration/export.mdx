@@ -1,0 +1,50 @@
+---
+title: Export
+description: >-
+  Lassen Sie Leser jede Seite als PDF oder EPUB herunterladen — clientseitig gerendert, damit Ihre statischen Builds statisch bleiben und keine Serverinfrastruktur benötigen.
+---
+
+Blume kann eine **Export**-Aktion zu den [Seitenaktionen](/docs/content/navigation#page-actions) unterhalb des Inhaltsverzeichnisses hinzufügen, sodass Leser die Seite, auf der sie sich befinden, als **PDF** oder **EPUB** speichern können. Die Funktion ist standardmäßig deaktiviert und läuft vollständig clientseitig — kein Server, und [statische](/docs/deployment) Builds bleiben statisch.
+
+## Aktivieren
+
+Schalten Sie beide Formate mit einem einzigen Schalter ein:
+
+```ts blume.config.ts
+export: true,
+```
+
+Um nur ein Format anzubieten, übergeben Sie stattdessen ein Objekt:
+
+```ts blume.config.ts
+export: {
+  pdf: true,
+  epub: false,
+},
+```
+
+Jedes Format, das Sie weglassen (oder auf `false` setzen), wird aus dem Menü ausgeschlossen. Sind beide deaktiviert — die Standardeinstellung —, erscheint die **Export**-Aktion überhaupt nicht.
+
+## PDF
+
+**Als PDF exportieren** öffnet den Druckdialog Ihres Browsers mit einem Druck-Stylesheet, das die Website-Umgebung — Kopfzeile, Seitenleisten, Navigation — entfernt und nur den Artikel übrig lässt. Wählen Sie **Als PDF speichern**, um den Vorgang abzuschließen.
+
+Da die live dargestellte, vollständig gestaltete Seite gedruckt wird, behält das Ergebnis gestochen scharfen, markierbaren Text, echte Schriftarten und syntaxhervorgehobenen Code. Es sind keine Abhängigkeiten erforderlich, und es funktioniert in der Entwicklung, in der Produktion und auf statischen Hosts gleichermaßen.
+
+:::note
+Der PDF-Export läuft über den nativen Druckdialog des Browsers, daher hängen die genaue Formulierung „Als PDF speichern" und die Optionen vom Browser ab. Aktivieren Sie im Dialog **Hintergrundgrafiken**, damit die Hintergründe von Codeblöcken und Hinweisen erhalten bleiben.
+:::
+
+## EPUB
+
+**Als EPUB exportieren** erzeugt im Browser eine eigenständige `.epub`-Datei der aktuellen Seite und lädt sie herunter — bereit für Apple Books, Calibre oder jeden E-Reader. Der Generator wird erst geladen, wenn ein Leser auf Export klickt, sodass er den Rest Ihrer Website nie belastet.
+
+Damit die Datei auf einem Gerät ohne eigenes Stylesheet oder JavaScript lesbar bleibt, schreibt Blume die Seite in sauberes, eigenständiges HTML um: syntaxhervorgehobener Code wird zu einfacher Monospace-Schrift, dekorative Symbole und Kopieren-Schaltflächen entfallen, und ein integriertes E-Reader-Stylesheet kümmert sich um Abstände, Codeblöcke und Tabellen.
+
+## Was exportiert wird
+
+Beide Formate exportieren die **einzelne Seite**, die ein Leser gerade betrachtet — nicht die gesamte Website —, was dazu passt, wo die Aktion angesiedelt ist: unterhalb des Inhaltsverzeichnisses dieser Seite.
+
+:::note
+In einem EPUB gibt es kein JavaScript, um Tabs zu wechseln, daher werden Inhalte mit Tabs — wie [package-install](/docs/content/syntax)-Blöcke und Codegruppen — so erweitert, dass alle Panels gleichzeitig angezeigt werden. Clientseitig gerenderte Einbettungen wie Mermaid-Diagramme sind nicht enthalten.
+:::

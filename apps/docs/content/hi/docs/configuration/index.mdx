@@ -1,0 +1,377 @@
+---
+title: कॉन्फ़िगरेशन फ़ाइल
+description: >-
+  blume.config.ts का हर विकल्प — साइट मेटाडेटा और कंटेंट स्रोतों से लेकर उन लिंक्स तक जो हर अलग-अलग फ़ीचर कॉन्फ़िगरेशन गाइड तक ले जाते हैं।
+sidebar:
+  label: blume.config.ts
+---
+
+Blume आपके प्रोजेक्ट रूट से `blume.config.ts` पढ़ता है। ऑटोकम्पलीट और टाइप-चेकिंग के लिए अपने कॉन्फ़िग को `defineConfig` में लपेटें — हर फ़ील्ड वैकल्पिक है, और उसका एक समझदार डिफ़ॉल्ट होता है।
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  title: "My Docs",
+  description: "Documentation for my project.",
+});
+```
+
+## एक सम्पूर्ण उदाहरण
+
+सबसे आम विकल्पों को छूता हुआ एक व्यापक उदाहरण (बाकी के लिए हर फ़ीचर की गाइड देखें):
+
+```ts blume.config.ts lineNumbers
+import sitemap from "@astrojs/sitemap";
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  // Site
+  title: "My Docs",
+  description: "Documentation for my project.",
+  logo: "/logo.svg",
+
+  // Astro integrations — installed and versioned by this site
+  integrations: [sitemap()],
+
+  // Content
+  content: {
+    root: "docs",
+  },
+
+  // Theme — see the Theming guide
+  theme: {
+    accent: "teal",
+    radius: "md",
+    mode: "system",
+  },
+
+  // Search — see the Search guide
+  search: {
+    provider: "orama",
+  },
+
+  // Markdown features
+  markdown: {
+    imageZoom: true,
+    code: {
+      icons: true, // language icon in the code-block header
+      wrap: false, // wrap long lines instead of scrolling
+    },
+    codeBlocks: {
+      theme: {
+        light: "github-light", // bundled name or custom Shiki theme object
+        dark: "github-dark",
+      },
+    },
+  },
+
+  // AI — see the AI guide
+  ai: {
+    llmsTxt: true,
+    // MCP server (needs server output)
+    mcp: {
+      enabled: false,
+      route: "/mcp",
+    },
+  },
+
+  // SEO — OG images, feeds, sitemap, structured data; see the SEO guide
+  seo: {
+    og: { enabled: true },
+    rss: { enabled: true, types: ["blog", "changelog"] },
+    sitemap: true,
+    robots: true,
+    structuredData: true,
+  },
+
+  // Deployment — see the Deployment guide
+  deployment: {
+    output: "static",
+    site: "https://docs.example.com",
+  },
+});
+```
+
+## साइट
+
+| विकल्प | डिफ़ॉल्ट | विवरण |
+| --- | --- | --- |
+| `title` | `"Documentation"` | साइट का नाम — हेडर, पेज शीर्षकों और OG कार्ड्स में दिखता है। |
+| `description` | — | डिफ़ॉल्ट मेटा विवरण, जो SEO और OG के लिए उपयोग होता है। |
+| `logo` | — | हेडर में दिखने वाला ब्रांड चिह्न और/या वर्डमार्क। |
+| `banner` | — | हेडर के ऊपर साइट-व्यापी घोषणा पट्टी। |
+
+### लोगो
+
+`logo` को किसी SVG की ओर इंगित करें और Blume उसे इनलाइन कर देता है, जिससे `currentColor` वाला लोगो अपने आप लाइट और डार्क थीम का अनुसरण करता है:
+
+```ts blume.config.ts
+logo: "/logo.svg",
+```
+
+SVG आपके प्रोजेक्ट रूट में या `public/` में रह सकता है। ब्रांड एक चिह्न (`image`) और एक वर्डमार्क (`text`) से बनता है; ऑब्जेक्ट रूप आपको इन्हें अलग-अलग सेट करने देता है:
+
+```ts blume.config.ts lineNumbers
+logo: {
+  image: "/logo.svg", // string, or { light, dark, alt } for themed raster art
+  text: "Acme",       // wordmark beside the mark
+  href: "/",          // overrides the brand link (defaults to "/")
+},
+```
+
+`image` वही मान लेता है जो शॉर्टहैंड लेता है — एक अकेला पाथ, या अलग-अलग लाइट/डार्क आर्टवर्क के लिए `{ light, dark, alt }` (रास्टर इमेज `public/` में ही होनी चाहिए)।
+
+`text` वर्डमार्क को चिह्न से स्वतंत्र रूप से नियंत्रित करता है:
+
+- **`text` को छोड़ दें** और ब्रांड आपकी साइट के `title` का उपयोग करेगा (डिफ़ॉल्ट)।
+- **`text: ""` सेट करें** ताकि केवल चिह्न दिखे — तब उपयोगी जब लोगो इमेज में पहले से ही वर्डमार्क शामिल हो।
+- **`image` के बिना `text` सेट करें** केवल-टेक्स्ट वाले लोगो के लिए।
+
+### फ़ेविकॉन
+
+कोई फ़ेविकॉन विकल्प नहीं है — Blume उसे फ़ाइलनाम से अपने आप पहचान लेता है, ठीक वैसे ही जैसे Next.js करता है। अपने प्रोजेक्ट रूट या `public/` डायरेक्टरी में एक `icon` या `favicon` फ़ाइल (`.svg`, `.png`, या `.ico`) रखें और वह ब्राउज़र टैब का आइकॉन बन जाती है:
+
+```
+my-docs/
+├─ blume.config.ts
+├─ icon.png          ← picked up automatically
+└─ docs/
+```
+
+जब कई मौजूद हों, तो SVG की प्राथमिकता PNG से ऊपर और PNG की ICO से ऊपर होती है, और `public/` की फ़ाइल को रूट वाली फ़ाइल पर वरीयता मिलती है। अगर Blume को कोई आइकॉन नहीं मिलता, तो वह अपने ही चिह्न पर लौट आता है।
+
+### Apple टच आइकॉन
+
+जब कोई आपकी साइट को अपनी होम स्क्रीन पर जोड़ता है तो iOS जिस आइकॉन का उपयोग करता है, उसे भी इसी तरह पहचाना जाता है। अपने प्रोजेक्ट रूट या `public/` डायरेक्टरी में एक `apple-icon` फ़ाइल (`.png`, `.jpg`, या `.jpeg`) — या `apple-touch-icon.png`, वह नाम जो ज़्यादातर फ़ेविकॉन जेनरेटर बनाते हैं — रखें और Blume आपके लिए `<link rel="apple-touch-icon">` जोड़ देता है। कोई डिफ़ॉल्ट नहीं है; अगर कोई फ़ाइल नहीं मिलती, तो कोई टैग नहीं निकाला जाता।
+
+```
+my-docs/
+├─ blume.config.ts
+├─ apple-icon.png     ← picked up automatically
+└─ docs/
+```
+
+फ़ाइल को प्रोजेक्ट रूट के बजाय `public/` में रखें: रूट-स्तर के आइकॉन के लिए Blume जिस इनलाइन डेटा URI का उपयोग करता है, iOS उसे अनदेखा कर देता है, इसलिए केवल `public/` की फ़ाइल (जो `/apple-icon.png` पर सर्व होती है) ही भरोसेमंद तरीके से होम स्क्रीन तक पहुँचती है।
+
+### बैनर
+
+हेडर के ऊपर साइट-व्यापी घोषणा पट्टी दिखाएँ। एक स्ट्रिंग पास करें, या एक लिंक और डिसमिस बटन वाला ऑब्जेक्ट:
+
+```ts blume.config.ts
+banner: "Docs are in beta — expect changes.",
+```
+
+```ts blume.config.ts lineNumbers
+banner: {
+  content: "Blume v1 is here!",
+  link: { text: "Read more", href: "/blog/v1" },
+  dismissible: true,
+  id: "v1",
+},
+```
+
+जब `dismissible` चालू होता है, तो पट्टी एक क्लोज़ बटन दिखाती है और उसके बाद उस विज़िटर के लिए छिपी रहती है। डिसमिस की कुंजी डिफ़ॉल्ट रूप से कंटेंट टेक्स्ट होती है, इसलिए संदेश संपादित करने पर बैनर वापस आ जाता है; संपादनों के बाद भी उसे डिसमिस बनाए रखने के लिए एक स्थिर `id` सेट करें।
+
+## कंटेंट
+
+आपका कंटेंट कहाँ रहता है और Blume उसे कैसे खोजता है। फ़ाइलें रूट्स कैसे बनती हैं, इसके लिए [पेज](/docs/content) देखें।
+
+```ts blume.config.ts lineNumbers
+content: {
+  root: "docs",
+}
+```
+
+| विकल्प | डिफ़ॉल्ट | विवरण |
+| --- | --- | --- |
+| `root` | `"docs"` | वह फ़ोल्डर जिसे Blume कंटेंट के लिए स्कैन करता है। |
+| `include` | `["**/*.{md,mdx}"]` | वे ग्लोब्स जो कंटेंट फ़ाइलों से मेल खाते हैं। |
+| `exclude` | `["**/_*", "**/.*"]` | नज़रअंदाज़ करने के लिए ग्लोब्स (अंडरस्कोर- और डॉट-फ़ाइलें)। |
+| `pages` | `"pages"` | कस्टम `.astro` पेजों के लिए फ़ोल्डर। |
+| `defaultType` | `"doc"` | जब फ़्रंटमैटर में `type` न हो तो उपयोग किया जाने वाला पेज `type`। |
+
+स्टैटिक एसेट्स `public/` में रहती हैं — `public/logo.png` पर मौजूद फ़ाइल `/logo.png` पर सर्व होती है, इसलिए `![](/images/create.png)` जैसा संदर्भ `public/images/create.png` के सापेक्ष हल होता है। **सापेक्ष पाथ** से संदर्भित इमेज (`![](./diagram.png)`) इसके बजाय आपके कंटेंट के बगल में रहती हैं, और [बिल्ड समय पर ऑप्टिमाइज़](/docs/content/syntax#links-and-images) की जाती हैं।
+
+## इमेज
+
+सापेक्ष पाथ से संदर्भित लोकल इमेज बिल्ड समय पर अपने आप ऑप्टिमाइज़ हो जाती हैं — कंप्रेस की जाती हैं, WebP में बदली जाती हैं, और उन्हें अंतर्निहित `width`/`height` एट्रिब्यूट्स दिए जाते हैं ताकि लोड होते समय लेआउट न खिसके। कॉन्फ़िगर करने को कुछ नहीं है; लेखन संबंधी मार्गदर्शन के लिए [लिंक और इमेज](/docs/content/syntax#links-and-images) देखें।
+
+रिमोट इमेज डिफ़ॉल्ट रूप से बिना छेड़े सर्व की जाती हैं। Blume उन्हें भी बिल्ड समय पर डाउनलोड और ऑप्टिमाइज़ करे, इसके लिए उनके होस्ट्स को अधिकृत करें:
+
+```ts blume.config.ts lineNumbers
+image: {
+  domains: ["cdn.example.com"],
+  remotePatterns: [{ protocol: "https", hostname: "**.example.com" }],
+}
+```
+
+| विकल्प | डिफ़ॉल्ट | विवरण |
+| --- | --- | --- |
+| `domains` | `[]` | वे होस्टनेम जिनकी रिमोट इमेज ऑप्टिमाइज़ की जा सकती हैं। |
+| `remotePatterns` | `[]` | पैटर्न-आधारित प्राधिकरण (`protocol`, `hostname`, `port`, `pathname`); होस्टनेम `*.` (एक स्तर) और `**.` (किसी भी गहराई) वाइल्डकार्ड स्वीकार करते हैं। |
+
+## फ़्रंटमैटर
+
+पेज फ़्रंटमैटर की सख़्ती से जाँच होती है — कोई अनजान कुंजी बिल्ड को विफल कर देती है, इसलिए टाइपो जल्दी पकड़ में आ जाते हैं। प्रोजेक्ट-विशिष्ट मेटाडेटा (एक ओनर, एक समीक्षा तिथि) रखने के लिए, अतिरिक्त कुंजियों को `frontmatter.extend` के अंतर्गत घोषित करें, हर एक को आपके द्वारा दिए गए स्कीमा से मैप करके:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { z } from "zod";
+
+export default defineConfig({
+  frontmatter: {
+    extend: {
+      owner: z.string(),
+      reviewedAt: z.coerce.date().optional(),
+    },
+  },
+});
+```
+
+कोई भी [Standard Schema](https://standardschema.dev) लाइब्रेरी काम करती है — Zod (आपका प्रोजेक्ट जो भी संस्करण इंस्टॉल करे), Valibot, ArkType। एक्सटेंशन से बाहर की कुंजियाँ सख़्ती से जाँची जाती रहती हैं, इसलिए टाइपो पकड़ने में कोई बदलाव नहीं आता। जाँच के अर्थ-नियमों के लिए [कस्टम कुंजियाँ](/docs/reference/frontmatter#custom-keys) देखें।
+
+## GitHub
+
+`github` के ज़रिए Blume को अपनी रिपॉज़िटरी की ओर इंगित करें। यह हेडर के [रिपॉज़िटरी लिंक](/docs/content/navigation#repository-link) और **Edit on GitHub** तथा **Give feedback** [पेज एक्शन](/docs/content/navigation#page-actions) को संचालित करता है:
+
+```ts blume.config.ts lineNumbers
+github: {
+  owner: "acme",
+  repo: "docs",
+}
+```
+
+| विकल्प   | डिफ़ॉल्ट | विवरण                                                  |
+| -------- | -------- | ------------------------------------------------------ |
+| `owner`  | —        | वह GitHub अकाउंट या संगठन जिसके पास रिपॉज़िटरी है।     |
+| `repo`   | —        | रिपॉज़िटरी का नाम।                                     |
+| `branch` | `"main"` | वह ब्रांच जिस पर एडिट लिंक इंगित करते हैं।             |
+| `dir`    | —        | रिपो रूट से प्रोजेक्ट रूट तक का पाथ (मोनोरिपो के लिए)। |
+
+## अंतिम बार संशोधित
+
+हर पेज के नीचे "Last updated on …" पंक्ति दिखाएँ। डिफ़ॉल्ट रूप से बंद; हर पेज की तिथि उसके git इतिहास से निकालने के लिए `lastModified` को `true` सेट करें:
+
+```ts blume.config.ts
+lastModified: true,
+```
+
+| मान | विवरण |
+| --- | --- |
+| `false` | अक्षम (डिफ़ॉल्ट)। |
+| `true` | तिथि git इतिहास (कमिट तिथियों) से पढ़ें। |
+| `{ type: "git" }` | `true` जैसा ही, स्पष्ट रूप से लिखा हुआ। |
+| `{ type: "frontmatter" }` | git कभी न चलाएँ — केवल `lastModified` फ़्रंटमैटर फ़ील्ड का उपयोग करें। |
+
+git स्रोत हर फ़ाइल को छूने वाला सबसे हालिया कमिट पढ़ता है, इसलिए यह किसी भी git रिपॉज़िटरी में काम करता है — मोनोरिपो सहित — और बिल्ड समय पर रिपो का इतिहास चाहिए (CI में उथला `--depth 1` चेकआउट न करें)। पेज का अपना `lastModified` फ़्रंटमैटर हमेशा जीतता है, जो किसी तिथि को पिन करने या अभी तक कमिट न हुई फ़ाइलों के लिए उपयोगी है:
+
+```mdx page.mdx
+---
+title: My page
+lastModified: 2026-06-20
+---
+```
+
+सक्षम होने पर, तिथि पेज के स्ट्रक्चर्ड डेटा में schema.org `dateModified` के रूप में भी उत्सर्जित होती है।
+
+## तिथि प्रारूप
+
+"Last updated" स्टैम्प और [चेंजलॉग](/docs/advanced/changelog) टाइमलाइन दोनों अपनी तिथियाँ एक ही `dateFormat` के ज़रिए रेंडर करते हैं, ताकि वे एक जैसी पढ़ी जाएँ। तिथियाँ हमेशा साइट की लोकेल में रेंडर होती हैं; `dateFormat` उनका _स्वरूप_ नियंत्रित करता है। यह डिफ़ॉल्ट रूप से लंबे रूप में होता है (`July 21, 2026`, `2026年7月21日`):
+
+```ts blume.config.ts
+dateFormat: { dateStyle: "long" },
+```
+
+`dateFormat` [`Intl.DateTimeFormat`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat) विकल्पों के लिए एक पास-थ्रू है। किसी लंबाई के लिए `dateStyle` प्रीसेट का उपयोग करें:
+
+```ts blume.config.ts
+dateFormat: { dateStyle: "medium" },
+```
+
+या `2026/07/21` जैसी संख्यात्मक शैली के लिए अलग-अलग घटक फ़ील्ड्स:
+
+```ts blume.config.ts
+dateFormat: { year: "numeric", month: "2-digit", day: "2-digit" },
+```
+
+| विकल्प | विवरण |
+| --- | --- |
+| `dateStyle` | प्रीसेट लंबाई: `"full"`, `"long"`, `"medium"`, या `"short"`। घटक फ़ील्ड्स के साथ नहीं जोड़ा जा सकता। |
+| `weekday`, `era`, `year`, `month`, `day` | अलग-अलग घटक, जैसे `year: "numeric"`, `month: "2-digit"`। |
+| `timeZone` | IANA टाइम ज़ोन। डिफ़ॉल्ट `UTC` है, ताकि साइट कहीं भी बिल्ड हो, तिथि एक जैसी पढ़ी जाए। |
+| `calendar`, `numberingSystem` | कैलेंडर प्रणाली (जैसे `"japanese"`) और अंक प्रणाली (जैसे `"arab"`)। |
+
+## SEO
+
+Open Graph इमेज, RSS फ़ीड्स, और JSON-LD स्ट्रक्चर्ड डेटा, `seo` के अंतर्गत समूहित। मेटाडेटा, फ़्रंटमैटर ओवरराइड्स, और पूरे संदर्भ के लिए [SEO गाइड](/docs/configuration/seo) देखें।
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
+  structuredData: true,
+}
+```
+
+| विकल्प | डिफ़ॉल्ट | विवरण |
+| --- | --- | --- |
+| `og.enabled` | ऑटो | प्रति-पेज Open Graph इमेज — साइट URL सेट होने पर चालू। |
+| `rss.enabled` | `true` | ब्लॉग और चेंजलॉग कंटेंट के लिए फ़ीड्स बनाएँ। |
+| `rss.types` | `["blog", "changelog"]` | वे कंटेंट प्रकार जिन्हें अपनी-अपनी फ़ीड मिलती है। |
+| `rss.limit` | `50` | प्रति फ़ीड अधिकतम आइटम। |
+| `sitemap` | `true` | sitemap.xml बनाएँ (deployment.site चाहिए)। |
+| `robots` | `true` | Sitemap लिंक के साथ robots.txt बनाएँ। |
+| `structuredData` | `true` | हर पेज के हेड में schema.org JSON-LD उत्सर्जित करें। |
+
+ये पूर्ण URL के लिए एक निरपेक्ष [`deployment.site`](/docs/deployment) के साथ सबसे अच्छा काम करते हैं।
+
+## विषय-सूची
+
+इस-पेज-पर वाली रूपरेखा डिफ़ॉल्ट रूप से चालू रहती है और `H2`–`H3` शीर्षकों को सूचीबद्ध करती है। `toc` के साथ इसे बंद करें, या शीर्षक-सीमा बदलें:
+
+```ts blume.config.ts
+export default defineConfig({
+  toc: false, // hide it everywhere
+});
+```
+
+या इसके बजाय शीर्षक-सीमा को संकीर्ण करें:
+
+```ts blume.config.ts
+export default defineConfig({
+  toc: { minHeadingLevel: 2, maxHeadingLevel: 4 },
+});
+```
+
+## फ़ीचर विकल्प
+
+इनमें से हर एक की अपनी गाइड है। कॉन्फ़िग फ़ील्ड प्रवेश-बिंदु है:
+
+| फ़ील्ड | यह क्या कॉन्फ़िगर करता है | गाइड |
+| --- | --- | --- |
+| `theme` | एक्सेंट रंग, कोने की त्रिज्या, फ़ॉन्ट्स, लाइट/डार्क मोड | [थीमिंग](/docs/configuration/theming) |
+| `navigation` | स्पष्ट साइडबार और हेडर टैब्स | [नेविगेशन](/docs/content/navigation) |
+| `search` | प्रोवाइडर (Orama, Pagefind, Algolia, और अन्य) और इंडेक्सिंग | [खोज](/docs/configuration/search) |
+| `markdown` | मार्कडाउन रेंडरिंग विकल्प — कोड ब्लॉक्स, हेडिंग एंकर, इमेज ज़ूम | [सिंटैक्स](/docs/content/syntax) |
+| `ai` | `llms.txt`, Ask AI, और कोडिंग एजेंट्स के लिए होस्टेड MCP सर्वर | [AI](/docs/configuration/ai) |
+| `analytics` | Vercel, PostHog, और कस्टम स्क्रिप्ट्स | [एनालिटिक्स](/docs/configuration/analytics) |
+| `seo` | मेटाडेटा, OG इमेज, फ़ीड्स, स्ट्रक्चर्ड डेटा | [SEO](/docs/configuration/seo) |
+| `deployment` | आउटपुट मोड, अडैप्टर, और साइट URL | [डिप्लॉयमेंट](/docs/deployment) |
+| `redirects` | स्थायी और अस्थायी रीडायरेक्ट्स | [डिप्लॉयमेंट](/docs/deployment#redirects) |
+| `integrations` | Blume के अंतर्निर्मित इंटीग्रेशन के बाद जोड़े गए Astro इंटीग्रेशन | [कस्टमाइज़ेशन](/docs/configuration/customization#astro-integrations) |
+
+## प्राथमिकता
+
+सेटिंग्स सबसे कम से सबसे अधिक प्राथमिकता के क्रम में हल होती हैं, इसलिए आपको केवल वही ओवरराइड करना पड़ता है जिसकी ज़रूरत हो:
+
+<Steps>
+  <Step title="Blume डिफ़ॉल्ट्स">हर फ़ील्ड के लिए एक समझदार डिफ़ॉल्ट।</Step>
+  <Step title="blume.config.ts">आपका प्रोजेक्ट-व्यापी कॉन्फ़िगरेशन।</Step>
+  <Step title="फ़ोल्डर मेटा">
+    किसी सेक्शन के शीर्षक और क्रम के लिए [`meta.ts`](/docs/content/meta)।
+  </Step>
+  <Step title="पेज फ़्रंटमैटर">प्रति-पेज ओवरराइड्स जीतते हैं।</Step>
+</Steps>

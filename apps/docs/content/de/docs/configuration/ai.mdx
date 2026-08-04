@@ -1,0 +1,446 @@
+---
+title: KI
+description: >-
+  Machen Sie Ihre Dokumentation maschinenlesbar mit llms.txt, ergänzen Sie einen optionalen "Ask AI"-Assistenten direkt auf der Seite und stellen Sie einen gehosteten MCP-Server für Coding-Agents bereit.
+---
+
+Blume bietet einige KI-Funktionen: maschinenlesbare Dokumentation für externe Werkzeuge (`llms.txt`, standardmäßig aktiviert), einen **Ask AI**-Assistenten direkt auf der Seite und einen gehosteten **MCP-Server** für Coding-Agents. Ask AI und MCP sind optional zuschaltbar, und statische Dokumentation bleibt vollständig statisch, bis Sie eine Funktion aktivieren.
+
+## llms.txt
+
+Blume erzeugt maschinenlesbare Versionen Ihrer Dokumentation, die Coding-Agents und Chat-Assistenten verarbeiten können. Dies ist standardmäßig aktiviert; setzen Sie `llmsTxt: false`, um es abzuschalten:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  llmsTxt: false,
+}
+```
+
+Solange die Funktion aktiviert ist, schreibt `blume build` zwei Dateien in das Stammverzeichnis Ihrer Website:
+
+- **`/llms.txt`** — ein kompakter Index: Titel und Beschreibung Ihrer Website, gefolgt von einer verlinkten Liste aller Seiten mit ihrer Zusammenfassung, gegliedert in Abschnitte, die Ihre Seitenleiste widerspiegeln — Ordner und Gruppen werden zu Überschriften, sodass ein Agent die Struktur der Dokumentation sieht und nicht einen einzigen flachen Block.
+- **`/llms-full.txt`** — der gesamte Korpus: der vollständige Markdown-Text jeder Seite samt ihrer Quell-URL, in einer einzigen Datei.
+
+Entwurfsseiten werden ausgeschlossen. Setzen Sie [`deployment.site`](/docs/deployment), damit die Links und Quell-URLs auf absolute Adressen aufgelöst werden.
+
+`llmsTxt` akzeptiert außerdem eine Objektform mit Stellschrauben dafür, was die Dateien enthalten. Wenn Ihre [API-Referenz](/docs/advanced/api-reference) eine Platzhalter- oder Beispielspezifikation dokumentiert, setzen Sie `openapi: false`, um die daraus generierten Seiten aus beiden Dateien herauszuhalten:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  llmsTxt: {
+    enabled: true, // default
+    openapi: false, // exclude generated API reference pages
+  },
+}
+```
+
+Um eine einzelne Seite aus beiden Dateien herauszuhalten, setzen Sie `ai.exclude` in deren Frontmatter:
+
+```mdx
+---
+title: Internal notes
+ai:
+  exclude: true
+---
+```
+
+Die Seite wird weiterhin gerendert, bleibt in der Suche und behält ihren Platz in der Sitemap — nur die `llms.txt`-Dateien überspringen sie.
+
+Um die volle Kontrolle über eine der beiden Dateien zu übernehmen, legen Sie Ihre eigene `llms.txt` oder `llms-full.txt` in Ihrem `public/`-Ordner ab. Wie ein eigenes Favicon wird sie automatisch übernommen und anstelle der generierten Datei ausgeliefert — überschreiben Sie eine, generiert Blume die andere trotzdem.
+
+## Rohes Markdown
+
+Hängen Sie `.md` oder `.mdx` an die URL einer beliebigen Seite an, um deren rohe Markdown-Quelle abzurufen — perfekt für LLMs, Coding-Agents und "Als Markdown kopieren"-Workflows. Das steht für jede Seite zur Verfügung, in der Entwicklung wie in der Produktion, ohne jede Konfiguration.
+
+| URL               | Liefert                                        |
+| ----------------- | ---------------------------------------------- |
+| `/quickstart`     | Die gerenderte Seite                           |
+| `/quickstart.md`  | Reines Markdown, mit umgewandelten Komponenten |
+| `/quickstart.mdx` | Die rohe MDX-Quelle, exakt wie geschrieben     |
+
+Verschachtelte Routen funktionieren genauso (`/content/syntax.md`), und die Startseite wird unter `/index.md` ausgeliefert.
+
+Die `.md`-Variante _reduziert_ Komponenten auf reines Markdown für Konsumenten, die kein JSX interpretieren können: `<TypeTable>` wird zu einer Markdown-Tabelle, `<Callout>` zu einem beschrifteten Blockzitat, `<Steps>` zu einer nummerierten Liste, `<Tabs>` zu fett beschrifteten Abschnitten und `<YouTube>` zu einem Link. Props werden mit dem `frontmatter` der Seite im Gültigkeitsbereich ausgewertet, sodass ein Prop wie `title={frontmatter.status}` denselben Wert ergibt, den die gerenderte Seite anzeigt. Alles, was sich nicht originalgetreu umwandeln lässt — eine eigene Komponente oder ein aus einem Import berechnetes Prop — bleibt unverändert, und Komponenten-Markup innerhalb von Code-Blöcken wird nie angetastet. Dieselbe Umwandlung gilt für `llms-full.txt` und das `get_page`-Tool des MCP-Servers, sodass jede an Agents gerichtete Oberfläche sauberes Markdown liefert. Wenn Sie die untransformierte Quelle möchten, verwenden Sie die `.mdx`-Variante.
+
+### Content Negotiation
+
+Agents müssen die `.md`-Konvention nicht kennen: Wird die eigentliche URL einer Seite mit einem [`Accept: text/markdown`](https://acceptmarkdown.com)-Header angefragt, wird die Markdown-Variante unter derselben Adresse ausgeliefert, mit `Vary: Accept`, damit Caches die beiden auseinanderhalten. Der Entwicklungsserver berücksichtigt den Header von Haus aus, und ein [Vercel-Server-Build](/docs/deployment#server-rendering) verdrahtet dieselbe Aushandlung automatisch in die Routing-Regeln des Deployments — ganz ohne Konfiguration. Die Startseite handelt immer aus, selbst wenn sie eine eigene Landing Page statt einer Inhaltsseite ist: Ihr Markdown-Spiegel fällt auf den [`llms.txt`](#llmstxt)-Index zurück, sodass ein Agent, der beim Website-Stamm nach Markdown fragt, die maschinenlesbare Karte der Website erhält. Markdown-Antworten tragen außerdem einen `x-markdown-tokens`-Header — eine geschätzte Token-Anzahl (~4 Zeichen pro Token), gemäß der Konvention von [Cloudflares Markdown for Agents](https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/) — auf jeder Oberfläche, auf der Blume die Antwort-Header kontrolliert: dem Entwicklungsserver, serverseitig gerenderten Antworten und der ausgehandelten Startseite auf Vercel. Andere Deploy-Ziele liefern vorgerenderte Seiten aus einer statischen Schicht ohne Hook zur Anfragezeit aus, sodass Agents dort die `.md`-URL direkt abrufen; das [Agent-Readability-Manifest](#agent-readability) weist `contentNegotiation` nur auf Deployments aus, die den Header berücksichtigen.
+
+### Eigene Komponenten-Serializer
+
+Geben Sie Ihren eigenen Komponenten mit `ai.markdownComponents` eine Markdown-Form — eine Zuordnung von JSX-Name zu Serializer. Jeder Serializer erhält die `props` der Komponente (statisch aus den MDX-Attributen ausgewertet, mit dem `frontmatter` der Seite im Gültigkeitsbereich), ihre `children` (bereits auf Markdown reduziert) und die `frontmatter`-Daten der Seite und gibt den Ersatz zurück — oder `null`, um das JSX unverändert zu lassen:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import type { ComponentMarkdown } from "blume";
+
+const chart: ComponentMarkdown = ({ props }) =>
+  `![${props.title}](/charts/${props.slug}.png)`;
+
+export default defineConfig({
+  ai: {
+    markdownComponents: {
+      Chart: chart,
+    },
+  },
+});
+```
+
+Für Container-Komponenten extrahiert `childComponents("Name")` direkte Kinder anhand des Tags — genauso, wie der eingebaute `<Steps>`-Serializer seine `<Step>`-Elemente sammelt. Ein gleichnamiger Eintrag ersetzt einen eingebauten Serializer, sodass Sie umgestalten können, wie `<Callout>` heruntergestuft wird — oder `null` zurückgeben, um eine Komponente vollständig auszunehmen.
+
+Serializer leben in `blume.config.ts`, nicht in `components.tsx`: Die Konfigurationsdatei wird zur Build-Zeit ausgeführt, während die Komponentendatei nur statisch analysiert wird (sie darf `.astro`-Dateien importieren, die außerhalb des Website-Builds nicht laufen können). Ihre Komponenten selbst bleiben genau wie zuvor in `components.tsx` registriert — `markdownComponents` ergänzt lediglich deren an Agents gerichtete Markdown-Form.
+
+## Als Markdown kopieren
+
+Jede Seite verfügt über eine Aktion **Als Markdown kopieren** — bei den [Seitenaktionen](/docs/content/navigation#page-actions) unterhalb des Inhaltsverzeichnisses —, die das rohe Markdown der Seite in die Zwischenablage kopiert. Es ist dieselbe Quelle, die unter der [`.md`-URL](#raw-markdown) oben ausgeliefert wird, bereit zum Einfügen in ein LLM, ein Issue oder Ihre Notizen. Sie ist auf jeder Seite verfügbar, in der Entwicklung wie in der Produktion, ohne jede Konfiguration.
+
+## Im Chat öffnen
+
+Die Aktion **Im Chat öffnen** öffnet die aktuelle Seite in einem KI-Assistenten — v0, ChatGPT, Claude, T3 Chat, Scira oder Cursor — vorbefüllt mit einem Prompt, der ihn auf das rohe Markdown der Seite verweist, sodass er Fragen zu dem beantworten kann, was Sie gerade lesen:
+
+> Read `https://your-site/this-page.md` so I can ask you questions about this page.
+
+Wie "Als Markdown kopieren" erfordert dies keine Einrichtung. Der Assistent ruft die Seite über ihre öffentliche URL ab, es funktioniert also, sobald die Seite bereitgestellt ist.
+
+Um einen kopierfertigen Prompt direkt in Ihre Inhalte einzubetten — statt einer seitenweiten Aktion —, verwenden Sie die [Prompt-Komponente](/docs/content/components#prompt), die eine beschriftete Zeile mit einer Schaltfläche **Prompt kopieren** und einem optionalen Link zum Öffnen in Cursor rendert.
+
+## Ask AI
+
+Fügen Sie einen Assistenten hinzu, der Leserfragen in einem Chat-Panel auf der Seite beantwortet, gestützt auf einen streamenden Server-Endpunkt und das [AI SDK](https://ai-sdk.dev):
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    provider: "gateway", // default
+    model: "openai/gpt-5.5",
+  },
+}
+```
+
+### Vorgeschlagene Fragen
+
+Befüllen Sie den leeren Zustand mit einigen Einstiegs-Prompts. Jeder wird als anklickbarer Vorschlag gerendert — ein Klick sendet ihn ab — mit einem optionalen [Lucide-Icon](/docs/content/components#icon) neben der Beschriftung:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    suggestions: [
+      { label: "What is Blume?", icon: "rocket" },
+      { label: "How do I write a docs page?", icon: "file-text" },
+      { label: "How do I configure the theme?", icon: "settings" },
+    ],
+  },
+}
+```
+
+`label` ist die Frage, die gestellt wird; `icon` ist optional. Lassen Sie `suggestions` ungesetzt (oder leer), öffnet sich das Panel mit einem schlichten Eingabefeld.
+
+### Fundierung
+
+Ask AI ist **in Ihrer Dokumentation fundiert**. Für jede Frage ruft es die relevantesten Seiten ab — über denselben lexikalischen [Orama](/docs/configuration/search)-Index, der auch die Suche auf der Seite antreibt — und fügt sie in den System-Prompt des Modells ein, sodass Antworten aus Ihren Inhalten stammen statt aus dem Eigenwissen des Modells. Dem Assistenten wird aufgetragen, nur aus den abgerufenen Seiten zu antworten, zu sagen, wenn etwas nicht abgedeckt ist, und die Seiten zu zitieren, aus denen er geschöpft hat.
+
+Die Seite, auf der sich der Leser gerade befindet, wird dem Kontext zuerst hinzugefügt und dient dazu, den Abruf auf die Sprache dieser Seite einzugrenzen, sodass Antworten dort relevant bleiben, wo der Leser sich in der Dokumentation befindet. Der Abruf läuft zur Anfragezeit aus einem in den Build eingebackenen Snapshot, funktioniert also unabhängig von Ihrem [Such](/docs/configuration/search)-Anbieter — selbst wenn die Suche auf `none` gesetzt ist — und benötigt keine Konfiguration.
+
+Die Fundierung ist für jedes Backend aktiv außer **[Inkeep](#backends)**, das seinen eigenen Abruf über die in seinem Dashboard indizierten Inhalte durchführt.
+
+### Externer Endpunkt
+
+Sie haben bereits ein API-Backend für KI? Richten Sie das Panel darauf aus und halten Sie den Dokumentations-Build statisch:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    endpoint: "https://api.example.com/v1/docs/ask",
+  },
+}
+```
+
+Blume sendet denselben `POST`-Body wie seine eingebaute Route:
+
+```json
+{
+  "messages": [{ "role": "user", "content": "How do I deploy?" }],
+  "page": { "path": "/deployment" }
+}
+```
+
+Geben Sie eine erfolgreiche Antwort zurück, deren Body ein reiner UTF-8-Textstream ist. Liegt der Endpunkt auf einem anderen Origin, erlauben Sie den Dokumentations-Origin per CORS: Akzeptieren Sie `OPTIONS` und `POST`, lassen Sie den `content-type`-Request-Header zu und geben Sie die CORS-Header sowohl beim Preflight als auch bei der gestreamten Antwort zurück. Mit gesetztem `endpoint` erzeugt Blume die Chat-Oberfläche, aber keine Server-Route, keinen Fundierungs-Snapshot, keine Anbieter-Abhängigkeit und keine Warnung zu Anbieter-Geheimnissen; Ihr Backend verantwortet Abruf, Authentifizierung, Ratenbegrenzung, Modellzugriff und Zitate.
+
+### Server-Ausgabe erforderlich
+
+Blumes eingebautes Ask-AI-Backend ist eine Server-Route (`POST /api/ask`) und kann daher nicht auf einem statischen Build laufen. Wechseln Sie zur Server-Ausgabe und wählen Sie einen Adapter:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  output: "server",
+  adapter: "vercel",
+}
+```
+
+Ein statischer Build mit aktiviertem Ask AI und ohne externen `endpoint` schlägt sofort fehl, mit einer Meldung, die Sie auffordert, `deployment.output` auf `server` zu setzen. Siehe [Deployment](/docs/deployment) für die Adapter.
+
+### Backends
+
+Standardmäßig läuft Ask AI über das **Vercel AI Gateway**: `model` ist eine `provider/model`-Zeichenkette, Sie wechseln Modelle also durch deren Änderung (`openai/gpt-5.5`, `anthropic/claude-sonnet-4-5` und so weiter), ohne ein Anbieter-SDK installieren zu müssen. Das Gateway liest `AI_GATEWAY_API_KEY` aus Ihrer Umgebung und wird bei einem Deployment auf Vercel automatisch verdrahtet.
+
+Setzen Sie `provider`, um Ask AI anderswohin zu leiten. Jedes Backend liest seinen API-Schlüssel aus einer Umgebungsvariablen, und das passende Anbieter-SDK wird beim Build automatisch zur Laufzeitumgebung Ihres Projekts hinzugefügt — nur dasjenige, das Sie verwenden:
+
+| `provider` | `model` | Umgebungsvariable für den API-Schlüssel |
+| --- | --- | --- |
+| `gateway` (Standard) | eine `provider/model`-Zeichenkette über das AI Gateway | `AI_GATEWAY_API_KEY` |
+| `openrouter` | ein beliebiges [OpenRouter](https://openrouter.ai)-Modell | `OPENROUTER_API_KEY` |
+| `llmgateway` | ein beliebiges [LLMGateway](https://llmgateway.io)-Modell | `LLMGATEWAY_API_KEY` |
+| `inkeep` | ein [Inkeep](https://inkeep.com)-QA-Modell | `INKEEP_API_KEY` |
+| `openai-compatible` | was auch immer Ihr Endpunkt ausliefert | mit `apiKeyEnv` gesetzt |
+
+Um zum Beispiel OpenRouter zu verwenden:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    provider: "openrouter",
+    model: "anthropic/claude-sonnet-4-5",
+  },
+}
+```
+
+Jeder OpenAI-kompatible Endpunkt funktioniert über `openai-compatible` — geben Sie die `baseUrl` und die Umgebungsvariable an, die seinen Schlüssel enthält:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    provider: "openai-compatible",
+    baseUrl: "https://my-gateway.example.com/v1",
+    apiKeyEnv: "MY_GATEWAY_API_KEY",
+    model: "gpt-4o",
+  },
+}
+```
+
+Setzen Sie `apiKeyEnv` (und, bei den benannten Anbietern, `baseUrl`) bei jedem Backend, um auf eine andere Umgebungsvariable oder einen Proxy zu verweisen.
+
+:::note
+**Inkeep** antwortet aus den Inhalten, die Sie im Inkeep-Dashboard indiziert haben — es führt seinen eigenen Abruf durch —, weshalb Blume es unfundiert lässt. Jedes andere Backend ist in den Seiten dieser Website [fundiert](#grounding).
+:::
+
+Schlüssel werden mit `process.env` gelesen, was die Adapter Node, Vercel und Netlify abdeckt. Auf Cloudflare stellen Sie den Schlüssel über das [Runtime-Binding](https://docs.astro.build/en/guides/integrations-guide/cloudflare/#environment-variables-and-secrets) der Plattform bereit. Das Aktivieren von Ask AI schaltet außerdem React für die Insel auf der Seite ein — siehe [Anpassung](/docs/configuration/customization#interactive-islands).
+
+### Ratenbegrenzung
+
+Der Endpunkt `POST /api/ask` ist **nicht authentifiziert** — er muss es sein, damit der Assistent auf der Seite ihn aufrufen kann. Blume validiert jede Anfrage — weist fehlerhafte Bodys ab, begrenzt sie auf 1–40 Nachrichten und akzeptiert nur die Rollen `user`/`assistant`, sodass ein Aufrufer keinen eigenen System-Prompt einschleusen und die Route nicht als allgemeinen LLM-Proxy zweckentfremden kann —, um zu begrenzen, wie viel ein einzelner Aufruf gegen Ihr Modell verbrauchen kann; es kann jedoch niemanden davon abhalten, den Endpunkt wiederholt aufzurufen. Falls Kostenmissbrauch ein Anliegen ist, stellen Sie der Route eine Ratenbegrenzung voran — die Edge-Ratenbegrenzung Ihres Hosters (z. B. die von Vercel), eine Middleware oder die Ausgabelimits pro Schlüssel Ihres Modellanbieters.
+
+## MCP-Server
+
+Hosten Sie einen [Model-Context-Protocol](https://modelcontextprotocol.io)-Server, damit Coding-Agents (Claude Code, Cursor, VS Code, claude.ai-Connectors) Ihre Dokumentation direkt durchsuchen und lesen können — ohne Scraping:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  mcp: {
+    enabled: true,
+    route: "/mcp", // where the server is mounted
+  },
+}
+```
+
+| Option | Standard | Beschreibung |
+| --- | --- | --- |
+| `enabled` | `false` | Den MCP-Server erzeugen und hosten. |
+| `route` | `/mcp` | Pfad, unter dem der Streamable-HTTP-Endpunkt hängt. |
+| `name` | Titel | Clients angezeigter Servername (Standard: Titel). |
+| `instructions` | — | Optionaler System-Hinweis für verbindende Agents. |
+
+Der Server stellt schreibgeschützte Tools bereit — `search_docs`, `get_page`, `list_pages` und `get_navigation` — und veröffentlicht Discovery-Dokumente unter `/.well-known/mcp.json` und `/.well-known/mcp/server-card.json`. Die Server Card folgt dem Server-Card-Erweiterungsschema [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) (Reverse-DNS-`name`, `remotes`-Transport-Endpunkte), mit initialize-förmigen Kompatibilitätsfeldern (`serverInfo`, `capabilities`, `transports`) für Scanner, die gegen die frühere Revision des Vorschlags gebaut wurden. Das Menü **Mit MCP verbinden** jeder Seite bietet eine Kopieren-und-loslegen-Installation für Claude Code, Cursor, VS Code und Codex (angezeigt, sobald [`deployment.site`](/docs/deployment) gesetzt ist).
+
+`search_docs` betreibt seinen eigenen Volltextindex und funktioniert damit unabhängig von Ihrem [Such](/docs/configuration/search)-Anbieter — und sogar, wenn die Suche auf `none` gesetzt ist. Der MCP-Server ist eine von der Suche auf der Seite getrennte Funktion.
+
+### Server-Ausgabe erforderlich
+
+Der MCP-Server ist ein aktiver Endpunkt (`/mcp`) und kann daher nicht auf einem statischen Build laufen. Wechseln Sie zur Server-Ausgabe und wählen Sie einen Adapter:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  output: "server",
+  adapter: "node", // or "vercel" | "netlify" | "cloudflare"
+  site: "https://docs.example.com",
+}
+```
+
+Ein statischer Build mit `ai.mcp.enabled` schlägt sofort fehl, mit einer Meldung, die Sie auffordert, `deployment.output` auf `server` zu setzen. Siehe [Deployment](/docs/deployment) für die Adapter. Nach dem Deployment verbinden Sie sich aus Claude Code heraus mit:
+
+```bash
+claude mcp add --transport http my-docs https://docs.example.com/mcp
+```
+
+## Agent-Lesbarkeit
+
+Blume schreibt ein Manifest **`/agent-readability.json`** in den Stamm Ihrer Website, das die in dieser Seite beschriebene, an Agents gerichtete Oberfläche indexiert — sodass ein Agent sie mit einem einzigen Abruf entdecken kann, statt Konventionen zu erraten oder HTML zu scrapen. Wie `llms.txt` ist es standardmäßig aktiviert:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  agentReadability: true,
+}
+```
+
+Das Manifest listet nur auf, was Sie aktiviert haben — das Spiegelmuster für [rohes Markdown](#raw-markdown), [`llms.txt`](#llmstxt) und `llms-full.txt`, den [MCP-Server](#mcp-server) und sein Discovery-Dokument, den [Ask AI](#ask-ai)-Endpunkt, die [Sitemap](/docs/configuration/seo#sitemap) und [RSS-Feeds](/docs/configuration/seo#rss-feeds) — neben Ihrem Website-Namen, der Beschreibung, dem Quell-Repository und der [Content-Signal](/docs/configuration/seo#content-signals)-Nutzungsrichtlinie. URLs sind absolut, wenn [`deployment.site`](/docs/deployment) gesetzt ist, andernfalls stammrelativ:
+
+```json agent-readability.json
+{
+  "artifacts": {
+    "markdown": {
+      "contentNegotiation": "text/markdown",
+      "pattern": "https://docs.example.com/{route}.md"
+    },
+    "llmsFullTxt": "https://docs.example.com/llms-full.txt",
+    "llmsTxt": "https://docs.example.com/llms.txt",
+    "mcp": {
+      "discovery": "https://docs.example.com/.well-known/mcp.json",
+      "url": "https://docs.example.com/mcp"
+    }
+  },
+  "description": "Docs for the Acme API.",
+  "generator": "blume@1.0.0",
+  "name": "Acme Docs",
+  "site": "https://docs.example.com",
+  "contentUsage": { "search": true, "ai-input": true, "ai-train": true },
+  "repository": "https://github.com/acme/docs"
+}
+```
+
+Das Feld `contentNegotiation` erscheint nur, wenn die bereitgestellte Website den Header `Accept: text/markdown` tatsächlich berücksichtigt — siehe [Content Negotiation](#content-negotiation); bei jedem anderen Deployment weist das Manifest nur das `.md`-Spiegelmuster aus.
+
+Setzen Sie `seo.agentReadability` auf `false`, um es zu überspringen, oder liefern Sie Ihre eigene `public/agent-readability.json` aus, um zu übernehmen — Blume überschreibt niemals eine Datei, die Sie in `public/` ablegen.
+
+### Discovery-Link-Header
+
+Agents, die eine Website sondieren, wissen nicht, dass sie nach dem Manifest suchen sollen — deshalb weist Blume es zusätzlich in einem `Link`-Antwort-Header nach [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288) auf der Startseite aus, unter Verwendung IANA-registrierter Beziehungstypen:
+
+```http
+Link: </agent-readability.json>; rel="describedby"; type="application/json",
+  </llms.txt>; rel="describedby"; type="text/plain",
+  </index.md>; rel="alternate"; type="text/markdown"
+```
+
+Jeder Eintrag erscheint nur, wenn die zugehörige Funktion aktiv ist. Der `alternate`-Link verweist auf den Markdown-Spiegel der Startseite — das [rohe Markdown](#raw-markdown) der Seite selbst, wenn die Startroute eine Inhaltsseite ist, oder den synthetisierten `llms.txt`-Fallback, wenn sie eine Landing Page ist. Websites, die APIs veröffentlichen, erhalten zusätzlich einen `rel="api-catalog"`-Eintrag, der auf den [generierten API-Katalog](#api-catalog) verweist. Der Header wird auf jeder von Blume kontrollierten Oberfläche mitgeliefert: dem Entwicklungsserver (prüfen Sie ihn mit `curl -I localhost:4321`), statischen Builds über die erzeugte `_headers`-Datei (Netlify und Cloudflare) und Vercel-Server-Builds über die Routing-Regeln des Deployments. Hoster, die `_headers` bei statischer Ausgabe ignorieren (GitHub Pages, S3), können überhaupt keine eigenen Antwort-Header senden — dort finden Agents alles weiterhin über `llms.txt` und `agent-readability.json` im Stamm der Website.
+
+### API-Katalog
+
+Wenn die Website APIs veröffentlicht, generiert Blume einen API-Katalog nach [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) unter `/.well-known/api-catalog` — ein [Linkset](https://www.rfc-editor.org/rfc/rfc9264), das Agents ermöglicht, Ihre APIs allein von der Domain aus aufzuzählen, ausgeliefert mit seinem registrierten Medientyp `application/linkset+json` auf jeder Build-Oberfläche. Es gibt nichts zu konfigurieren: Der Katalog wird aus dem abgeleitet, was ohnehin in `blume.config.ts` steht. Jede [OpenAPI- oder AsyncAPI-Referenz](/docs/advanced/api-reference) wird zu einem Eintrag, verankert an ihrer gerenderten Dokumentationsroute, wobei `service-doc` auf diese Dokumentation zeigt und `service-desc` auf die Spezifikation, sofern sie unter einer abrufbaren URL liegt; der [MCP-Server](#mcp-server) wird zu einem Eintrag mit seinem Discovery-Dokument als Dienstbeschreibung:
+
+```json .well-known/api-catalog
+{
+  "linkset": [
+    {
+      "anchor": "https://docs.example.com/reference",
+      "service-doc": [
+        { "href": "https://docs.example.com/reference", "type": "text/html" }
+      ],
+      "service-desc": [{ "href": "https://api.example.com/openapi.json" }]
+    },
+    {
+      "anchor": "https://docs.example.com/mcp",
+      "service-desc": [
+        {
+          "href": "https://docs.example.com/.well-known/mcp.json",
+          "type": "application/json"
+        }
+      ],
+      "service-doc": [
+        { "href": "https://docs.example.com/", "type": "text/html" }
+      ]
+    }
+  ]
+}
+```
+
+Eine Website ohne API-Referenzen und ohne MCP-Server erzeugt keinen Katalog — es stünde nichts darin. Wie überall gewinnt eine Datei `public/.well-known/api-catalog`, die Sie selbst ausliefern, gegenüber der generierten.
+
+### WebMCP
+
+[WebMCP](https://webmachinelearning.github.io/webmcp/) ist eine aufkommende Browser-API, mit der eine Seite Tools direkt bei einem agentischen Browser registrieren kann — ohne separate Serververbindung. Jede Blume-Seite registriert die schreibgeschützte Oberfläche der Dokumentation im Modellkontext der Seite: `search_docs` (Website-Suche), `get_page` (das [rohe Markdown](#raw-markdown) einer Seite) und `list_pages` (den [`llms.txt`](#llmstxt)-Index). Das Skript ist winzig, lädt keinerlei Suchmaschinerie, bis ein Tool tatsächlich aufgerufen wird, und tut in jedem Browser ohne die API stillschweigend nichts — was heute auf alle außerhalb der [Early Preview von Chrome](https://developer.chrome.com/blog/webmcp-epp) zutrifft. Es registriert sich an derjenigen Oberfläche, die die im Fluss befindliche Spezifikation bereitstellt (`navigator.modelContext` oder `document.modelContext`), über `provideContext` oder das tool-weise `registerTool`.
+
+Es ist standardmäßig aktiviert; setzen Sie `webmcp: false`, um es abzuwählen:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  webmcp: false,
+}
+```
+
+### Skills-Discovery
+
+Wenn Ihr Projekt [Agent Skills](https://agentskills.io) mitliefert — [das Blume-Repo selbst tut das](#agent-skill) —, richten Sie `ai.skills` auf das Verzeichnis aus, das sie enthält, und der Build veröffentlicht sie zur Discovery gemäß dem [Agent Skills Discovery RFC](https://github.com/cloudflare/agent-skills-discovery-rfc):
+
+```ts blume.config.ts lineNumbers
+ai: {
+  skills: "./skills",
+}
+```
+
+Der Pfad wird relativ zu Ihrem Projektstamm aufgelöst, und jedes Unterverzeichnis mit einer `SKILL.md` wird zu einem veröffentlichten Skill. Ein Skill, der aus einer einzelnen `SKILL.md` besteht, wird wortgetreu nach `/.well-known/agent-skills/<name>/SKILL.md` kopiert (`type: "skill-md"`); ein Skill mit unterstützenden Ressourcen (`scripts/`, `references/`, `assets/`) wird in ein deterministisches `.tar.gz` gebündelt (`type: "archive"`), damit seine relativen Verweise nach dem Entpacken aufgelöst werden, unter Beibehaltung der Ausführungs-Bits von Skripten. Der Discovery-Index unter `/.well-known/agent-skills/index.json` trägt das `$schema` der Version v0.2.0 und pro Skill dessen Namen, Typ, Beschreibung (aus dem Frontmatter der `SKILL.md`), Artefakt-URL sowie den SHA-256-Digest, gegen den Clients Downloads verifizieren.
+
+Skills mit fehlendem oder spezifikationswidrigem `name`/`description` werden mit einer Build-Warnung übersprungen, statt fehlerhaft veröffentlicht zu werden, und eine `public/.well-known/agent-skills/index.json`, die Sie selbst ausliefern, übernimmt die gesamte Oberfläche.
+
+### DNS-basierte Discovery (DNS-AID)
+
+[DNS for AI Discovery](https://datatracker.ietf.org/doc/draft-mozleywilliams-dnsop-dnsaid/) ist ein aufkommender IETF-Entwurf, mit dem Agents die KI-Oberfläche einer Website entdecken können, bevor sie eine einzige HTTP-Anfrage stellen, indem sie ServiceMode-[SVCB/HTTPS-Einträge](https://www.rfc-editor.org/rfc/rfc9460) an einem wohlbekannten DNS-Einstiegspunkt abfragen. DNS-Einträge liegen in Ihrer Zone, nicht im Build, weshalb dies die eine Discovery-Oberfläche ist, die Blume nicht für Sie veröffentlichen kann — legen Sie stattdessen einen Eintrag bei Ihrem DNS-Anbieter an:
+
+```txt
+_index._agents.docs.example.com. 3600 IN HTTPS 1 docs.example.com. alpn=h2
+```
+
+Verwenden Sie den Eintragstyp `HTTPS`, wenn Ihr Anbieter ihn anbietet (Vercel DNS tut das; den reinen `SVCB`-Typ unterstützt es nicht), andernfalls einen ServiceMode-`SVCB`-Eintrag mit den Parametern `alpn` und `port`. Der Entwurf empfiehlt außerdem, die Zone mit DNSSEC zu signieren, damit validierende Resolver authentifizierte Antworten zurückgeben — Anbieter wie Cloudflare aktivieren das mit einem Klick, während manche (darunter Vercel DNS) es überhaupt nicht unterstützen.
+
+`blume audit --url <origin>` prüft das für Sie: Wenn [`deployment.site`](/docs/deployment) gesetzt ist, fragt die Netzwerkstufe den Einstiegspunkt über DNS-over-HTTPS ab und meldet den exakt zu veröffentlichenden Eintrag, falls keiner existiert, sowie ob die Antworten DNSSEC-authentifiziert sind. Setzen Sie `BLUME_DOH_URL`, um die Abfrage auf Ihren eigenen Resolver zu richten, falls Ihr Netzwerk die öffentlichen (Google, Cloudflare) blockiert.
+
+### Web Bot Auth
+
+[Web Bot Auth](https://datatracker.ietf.org/wg/webbotauth/about/) wirkt in die andere Richtung: Es geht nicht darum, dass Agents Ihre Dokumentation lesen, sondern darum, dass **die Agents Ihrer Organisation sich ausweisen**, wenn sie anderswo Anfragen stellen. Ihre Agents signieren ihre Anfragen mit [HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421), und empfangende Websites verifizieren sie gegen ein auf Ihrer Domain veröffentlichtes Verzeichnis öffentlicher Schlüssel. Wenn Ihre Organisation Agents betreibt und Ihre Blume-Website unter der Domain liegt, als die sie sich ausweisen, veröffentlichen Sie deren öffentliche Schlüssel:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  webBotAuth: {
+    keys: [{ kty: "OKP", crv: "Ed25519", x: "JrQLj5P_89iXES9-vFgrIy29c…" }],
+  },
+}
+```
+
+Blume liefert das JWKS dann unter `/.well-known/http-message-signatures-directory` mit seinem registrierten Medientyp auf jeder Build-Oberfläche aus. Das Verzeichnis ist per Definition öffentlich, weshalb die Konfiguration nur öffentliche Schlüssel zulässt — ein JWK, das privates Material enthält (`d`, `p`, `q`, …), scheitert an der Validierung mit einem Fehler, statt eine geleakte Zugangsberechtigung auszuliefern. Erzeugen Sie ein Ed25519-Paar mit:
+
+```bash
+node -e 'const { generateKeyPairSync } = require("node:crypto"); const { publicKey, privateKey } = generateKeyPairSync("ed25519"); console.log("public: ", JSON.stringify(publicKey.export({ format: "jwk" }))); console.log("private:", JSON.stringify(privateKey.export({ format: "jwk" })))'
+```
+
+Der öffentliche JWK kommt in die obige Konfiguration; der private dorthin, wo Ihr signierender Agent läuft (ein Secret Manager, niemals das Repo). Wenn Ihre Organisation keine Agents betreibt, überspringen Sie dies — ein leeres Verzeichnis weist nichts aus, das der Verifikation wert wäre.
+
+Da `blume.config.ts` zur Build-Zeit ausgeführt wird, muss der Schlüssel nicht fest einprogrammiert sein — laden Sie ihn aus einer Build-Zeit-Umgebungsvariablen, um die Konfiguration frei von Schlüssel-Blobs zu halten und ohne Commit zu rotieren:
+
+```ts blume.config.ts lineNumbers
+const webBotAuthKey = process.env.WEB_BOT_AUTH_PUBLIC_JWK;
+
+export default defineConfig({
+  ai: {
+    webBotAuth: {
+      keys: webBotAuthKey ? [JSON.parse(webBotAuthKey)] : [],
+    },
+  },
+});
+```
+
+Umgebungen ohne die Variable veröffentlichen kein Verzeichnis, und ein so geladener Schlüssel wird genauso validiert wie ein inline angegebener — einschließlich der Prüfung auf privates Material. (Der öffentliche Schlüssel ist kein Geheimnis, ihn inline zu committen ist also genauso in Ordnung; die Umgebungsvariable ist eine Frage der Ergonomie, keine der Sicherheit.)
+
+## Agent Skill
+
+Bauen Sie eine Blume-Website mit Hilfe eines Coding-Agents? Installieren Sie den Blume-[Agent Skill](https://docs.claude.com/en/docs/claude-code/skills), damit er weiß, wie Blume funktioniert, ohne dass Sie es ihm erklären:
+
+```bash
+npx skills add haydenbleasel/blume
+```
+
+Der Skill vermittelt dem Agent, was Blume ist und wie man eine Website aufsetzt, schreibt und konfiguriert, und verweist ihn auf die vollständige, im installierten Paket mitgelieferte Dokumentation (das Verzeichnis `docs/` innerhalb von `blume`, wo auch immer Ihr Paketmanager es installiert).
+
+Er ist einer der [von Blume mitgelieferten Agent Skills](/docs/advanced/skills), neben einem Skill, der die Dokumentation aus einem geplanten Agent-Lauf heraus mit Ihrem Produkt synchron hält.

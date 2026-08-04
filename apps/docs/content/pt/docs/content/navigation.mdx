@@ -1,0 +1,233 @@
+---
+title: Navegação
+description: >-
+  O Blume constrói a barra lateral a partir dos seus arquivos e depois permite refiná-la com frontmatter, meta de pasta ou configuração — as trilhas de navegação e os sumários acompanham.
+---
+
+O Blume constrói sua barra lateral a partir do sistema de arquivos e depois permite refiná-la tanto — ou tão pouco — quanto você quiser: página por página, pasta por pasta, ou com uma configuração explícita. Trilhas de navegação, links de anterior/próximo e o sumário da página decorrem todos do mesmo modelo, sem nada para conectar.
+
+## A barra lateral gerada
+
+Por padrão, a barra lateral espelha sua árvore de conteúdo:
+
+- pastas viram **grupos**, arquivos viram **páginas**
+- o rótulo de uma página é o `title` do seu frontmatter; o rótulo de um grupo é o nome humanizado da pasta
+- os itens são ordenados por [prefixo numérico](/docs/content) e depois alfabeticamente, e a página `index` de uma pasta vem primeiro
+
+Isso é suficiente para muitos sites — tudo abaixo é opcional.
+
+## Rótulo, ícone e selo da página
+
+Ajuste como uma única página aparece na barra lateral a partir do seu frontmatter, sob `sidebar`:
+
+```yaml lineNumbers
+sidebar:
+  label: Quickstart # override the title in the sidebar
+  icon: rocket # an icon from Blume's built-in set
+  badge: New # a small label beside the entry
+  order: 1 # sort position within its group
+```
+
+Veja [Frontmatter](/docs/reference/frontmatter) para o esquema completo da página.
+
+## Grupos de pastas
+
+Cada pasta se torna um grupo da barra lateral. Coloque um [`meta.ts`](/docs/content/meta) junto às suas páginas para definir o título, o ícone, a ordem do grupo e a ordem dos seus filhos:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Guides",
+  icon: "book-open",
+  pages: ["configuration", "theming", "deployment"],
+});
+```
+
+Veja [Meta de pasta](/docs/content/meta) para todos os campos e para computar o meta em tempo de varredura.
+
+O `meta.title` de uma pasta e o `title` do frontmatter da sua própria página `index` são resolvidos de forma independente — traduzir um sob i18n e esquecer o outro renderiza uma barra lateral correta com um `<title>`/título desatualizado na própria página inicial. O Blume relata um aviso `BLUME_NAV_INDEX_TITLE_MISMATCH` quando eles divergem. Páginas não traduzidas preenchidas a partir da localidade de fallback estão isentas — seu título pertence à localidade de fallback, e a correção é traduzir a página, não editar seu frontmatter.
+
+Para agrupar páginas _sem_ adicionar um segmento de URL, use um nome de pasta entre parênteses — veja [Páginas](/docs/content#group-folders).
+
+## Modos de exibição
+
+`navigation.sidebar.display` define como cada grupo da barra lateral é renderizado:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  sidebar: {
+    display: "flat", // "flat" | "group" | "page"
+  },
+}
+```
+
+- **`flat`** (padrão) — um cabeçalho não recolhível com suas páginas listadas abaixo. Páginas que não estão em nenhum grupo são sempre listadas primeiro, acima das seções de grupo, para que não sejam confundidas com filhas de um grupo.
+- **`group`** — uma divulgação `<details>` recolhível por grupo. Os grupos começam recolhidos por padrão; um grupo que contém a página atual sempre começa aberto, de modo que apenas a seção em que você está fica expandida. Defina `collapsed: false` no [meta de pasta](/docs/content/meta) para forçar um grupo a ficar aberto independentemente disso.
+- **`page`** — cada grupo é uma única linha que, ao ser clicada, desliza a barra lateral para um subpainel que mostra apenas os itens daquele grupo, com uma seta de voltar no topo. O painel reconhece a rota, então chegar diretamente a uma página dentro do grupo o abre imediatamente nela.
+
+:::tip
+O modo `page` mantém seções profundas organizadas — recorra a ele quando os grupos tiverem muitos filhos e você preferir navegar dentro deles a rolar além deles.
+:::
+
+Um grupo em uma [barra lateral explícita](#explicit-sidebar) pode sobrepor o modo global com seu próprio `display`.
+
+## Ordenação
+
+Quando a barra lateral é gerada, a ordem é resolvida da maior prioridade para a menor:
+
+<Steps>
+  <Step title="Barra lateral da configuração">
+    Uma `navigation.sidebar` explícita substitui a árvore gerada por completo.
+  </Step>
+  <Step title="Meta de pasta">
+    O array `pages` em `meta.ts` ordena um grupo.
+  </Step>
+  <Step title="Frontmatter">`sidebar.order` em uma página.</Step>
+  <Step title="Sistema de arquivos">
+    Uma página `index` primeiro, depois prefixos numéricos, depois em ordem
+    alfabética por rótulo.
+  </Step>
+</Steps>
+
+Dois irmãos que acabem com a mesma ordem explícita ou numérica recorrem à ordem alfabética entre si — o Blume relata um aviso `BLUME_DUPLICATE_SIDEBAR_ORDER` para que o empate não passe despercebido.
+
+## Páginas ocultas
+
+Oculte uma página da barra lateral — e da paginação anterior/próxima — mantendo-a compilada e acessível pela sua URL:
+
+```yaml
+sidebar:
+  hidden: true
+```
+
+## Abas
+
+Renderize seções de nível superior como abas no cabeçalho, útil para dividir um site grande em áreas distintas — digamos, adaptadores, uma API e guias de IA. Uma aba é destacada quando a rota atual está sob seu `path`:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  tabs: [
+    { label: "Adapters", path: "/adapters", icon: "plug" },
+    { label: "API", path: "/api", icon: "rocket" },
+    { label: "AI", path: "/ai", icon: "sparkles" },
+  ],
+}
+```
+
+Uma [referência OpenAPI ou AsyncAPI](/docs/advanced/api-reference) habilitada é montada em sua rota, mas não adiciona uma aba por conta própria — aponte uma aba para essa rota para exibi-la no cabeçalho (e, no caso do renderizador nativo, para delimitar sua barra lateral de operações), com o rótulo que você quiser:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "API", path: "/reference" },
+  ],
+}
+```
+
+O `path` de uma aba é o prefixo da sua seção e também serve como destino do link. Uma seção cujo `path` não é uma página por si só — uma pasta sem `index.mdx` — apontaria para um 404, então a aba recorre à primeira página da seção. Defina `href` quando quiser que ela leve a outro lugar:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "Changelog", path: "/changelog", href: "/changelog" },
+  ],
+}
+```
+
+Isso importa para rotas que não fazem parte da árvore de conteúdo, já que o fallback não consegue enxergá-las: o índice do [changelog](/docs/advanced/changelog) gerado, ou uma [página personalizada](/docs/advanced/custom-pages) que você adicionou em `pages/`. Sem `href`, uma aba `/changelog` leva à entrada mais recente em vez do índice. Abas que não definem `href` não são afetadas.
+
+As abas também **delimitam a barra lateral**: quando a rota atual está sob o `path` de uma aba, a barra lateral mostra apenas as páginas daquela seção — então `/adapters/*` lista os adaptadores e nada mais. A pasta no `path` de uma aba se torna a seção, então isso não requer nenhuma configuração além das próprias abas; estruture seu conteúdo em uma pasta por aba e aponte cada aba para ela.
+
+Em uma rota que não está sob nenhuma aba (ou sob uma aba cujo `path` é `/`), a barra lateral mostra as páginas que _não_ pertencem a uma aba — a pasta de cada aba fica oculta nela, já que aquela seção já tem sua própria aba no cabeçalho. Assim, uma página inicial raiz lista suas páginas soltas de nível superior enquanto o conteúdo seccionado permanece atrás de sua aba, espelhando as pastas raiz do Fumadocs. Se uma rota não tiver páginas próprias para mostrar dessa forma, a árvore completa é exibida em vez disso, de modo que a barra lateral nunca fica em branco.
+
+## Seletores
+
+Para alternar entre partições inteiras de um site — um produto, uma versão ou qualquer conjunto agrupado de destinos — adicione um `selector`. Cada um é renderizado como um menu suspenso no cabeçalho, mostrando a opção cujo `path` corresponde à rota atual:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  selectors: [
+    {
+      kind: "version",
+      label: "Version",
+      items: [
+        { label: "v2 (latest)", path: "/v2", icon: "rocket" },
+        { label: "v1", path: "/v1" },
+      ],
+    },
+  ],
+}
+```
+
+Cada item recebe um `label`, um `path` e, opcionalmente, `icon`, `description` e `tag`. `kind` (`dropdown`, `product`, `version` ou `language`) é uma dica sobre como o seletor é usado; todos renderizam o mesmo menu suspenso.
+
+## Links em destaque
+
+Fixe links no topo da barra lateral, acima de todas as seções — um blog, um changelog, uma página de contato ou suporte que deva estar sempre a um clique de distância. Diferentemente da árvore gerada, os links em destaque **não são delimitados por aba**: eles aparecem em todas as rotas, em todos os breakpoints.
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  featured: [
+    { label: "Blog", href: "https://example.com/blog", icon: "newspaper" },
+    { label: "Contact", href: "/contact", icon: "headphones" },
+  ],
+}
+```
+
+Cada link recebe um `label`, um `href` e um `icon` opcional (o nome de um [ícone integrado](/docs/content/components#icon), caminho/URL de imagem ou SVG inline — igual a qualquer outro lugar). Um `href` pode apontar para qualquer lugar: uma URL externa abre em uma nova aba, enquanto uma rota interna (`/contact`) é validada contra suas páginas em tempo de compilação, avisando você se nada corresponder.
+
+## Barra lateral explícita
+
+Para controle total, liste itens explícitos em `navigation.sidebar` — um array simples é um atalho para `sidebar.items`, e a forma de objeto os combina com um [`display`](#display-modes) global. Quando os itens são definidos, o Blume os usa literalmente e ignora a geração pelo sistema de arquivos:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  sidebar: [
+    "/", // a page, referenced by route
+    {
+      label: "Guides", // a group
+      collapsed: false,
+      items: ["/configuration", "/configuration/theming"],
+    },
+    { label: "GitHub", href: "https://github.com/owner/repo" }, // an external link
+  ],
+}
+```
+
+Cada item é uma rota de página (uma string), um grupo (`label` + `items`) ou um link (`label` + `href`). Grupos podem ser aninhados, sobrepor o [modo `display`](#display-modes) global e começar `collapsed`.
+
+## Link do repositório
+
+Quando você define [`github`](/docs/configuration) na sua configuração, o Blume mostra um ícone do GitHub no cabeçalho — ao lado do alternador de tema — que leva ao seu repositório. Ele fica ativo por padrão; oculte-o com `navigation.repo`:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  repo: false, // hide the header GitHub link (default: true)
+}
+```
+
+O link só aparece quando `github` está configurado, então projetos sem um repositório não são afetados de nenhuma forma.
+
+## Trilhas de navegação e paginação
+
+Elas vêm de graça a partir da árvore da barra lateral — sem configuração:
+
+- **Trilhas de navegação** mostram o grupo pai da página atual acima do título.
+- **Links de anterior e próximo** ao pé de cada página seguem a ordem da barra lateral, pulando páginas ocultas.
+
+## Nesta página
+
+Um sumário na coluna lateral direita é gerado automaticamente a partir dos títulos `##` e `###` de cada página, para que páginas longas continuem fáceis de percorrer. Em telas mais estreitas, onde a coluna direita fica oculta, ele se recolhe em um menu suspenso “Nesta página” acima do conteúdo.
+
+## Ações da página
+
+Abaixo do sumário, cada página exibe um conjunto de ações rápidas:
+
+- **Editar no GitHub** — leva direto ao arquivo de origem. Aparece assim que você define [`github`](/docs/configuration) na sua configuração.
+- **Voltar ao topo** — retorna suavemente ao topo de páginas longas.
+- **Enviar feedback** — abre uma issue do GitHub pré-preenchida com uma reação e uma nota opcionais (também requer `github`).
+
+Outras entregam a página a ferramentas de IA — **Copiar como Markdown** e **Abrir no chat** — abordadas em [IA](/docs/configuration/ai#copy-as-markdown).
+
+Com [`export`](/docs/configuration/export) ativado, uma ação **Exportar** também permite que os leitores baixem a página como PDF ou EPUB.

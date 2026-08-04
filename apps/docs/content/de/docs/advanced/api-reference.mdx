@@ -1,0 +1,168 @@
+---
+title: OpenAPI / AsyncAPI
+description: >-
+  Binde eine OpenAPI-Spezifikation ein und erhalte eine native API-Referenz – eine echte Seite pro Operation, in deiner Seitenleiste und Suche.
+---
+
+Richte Blume auf eine OpenAPI-Spezifikation aus, und es generiert eine native API-Referenz: eine **echte Seite pro Operation**, nach Tag gruppiert in einer tab-bezogenen Seitenleiste, mit Schema-Tabellen, Request-/Response-Beispielen und generierten Codebeispielen. Da jede Operation eine echte Blume-Seite ist, erhält sie eine eigene URL, erscheint in der **Website-Suche** und in `llms.txt` und bekommt ein Open-Graph-Bild – genau wie jedes handgeschriebene Dokument. Die folgende Konfiguration richtet Blume beispielhaft auf die öffentliche Petstore-Spezifikation aus.
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "https://petstore3.swagger.io/api/v3/openapi.json",
+}
+```
+
+Damit wird die Referenz unter `/reference` eingebunden (eine Übersichtsseite), wobei jede Operation unter `/reference/<tag>/<operation>` liegt. Die `spec` ist entweder eine `http(s)`-URL oder ein Pfad zu einer lokalen Datei in deinem Projekt. Blume parst sie mit [Scalars OpenAPI-Parser](https://github.com/scalar/scalar) – Swagger-2.0- und OpenAPI-3.0-Spezifikationen werden automatisch auf 3.1 aktualisiert.
+
+Die Referenz fügt nicht von sich aus einen Header-Tab hinzu. Um sie sichtbar zu machen, richte einen [Navigations-Tab](/docs/content/navigation#tabs) auf ihre Route aus – dadurch wird auch die Operations-Seitenleiste für den nativen Renderer eingegrenzt:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [{ label: "API", path: "/reference" }],
+}
+```
+
+:::note
+Operationen werden für die Suche anhand ihrer **Zusammenfassung und ihres Tags** indexiert. Die gerenderten Schema-Tabellen und Codebeispiele werden nicht per Volltext indexiert; die Suche findet Titel und Abschnitt einer Operation und verlinkt dann auf deren eigene Seite.
+:::
+
+## Eine lokale Spezifikation
+
+Ein relativer Pfad wird ausgehend vom Projektstammverzeichnis aufgelöst und zur Build-Zeit gelesen. Sowohl JSON als auch YAML funktionieren:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+}
+```
+
+## Route
+
+`route` bestimmt, wo die Referenz eingebunden wird – die Übersichtsseite und das Präfix für jede Operations-Route (und die Route, auf die du einen Navigations-Tab ausrichtest):
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  route: "/api",   // overview at /api, operations at /api/<tag>/<operation>
+  spec: "./openapi.yaml",
+}
+```
+
+## Codebeispiele und Schemata
+
+`codeSamples` bestimmt, welche Sprachen pro Operation gerendert werden (eingebaut: `curl`, `js`, `python`); `expandSchemas` zeigt verschachtelte Schema-Zeilen von Anfang an ausgeklappt statt eingeklappt:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+  codeSamples: ["curl", "js"],
+  expandSchemas: true,
+}
+```
+
+## Mehrere Spezifikationen
+
+Verwende `sources`, um mehr als eine Spezifikation zu veröffentlichen. Jede Quelle erhält ihre eigene Übersichtsroute, Operationsseiten und einen Header-Tab. Gib jeder ein `label` (wird für den Tab und zur Ableitung ihrer Route verwendet) oder setze eine explizite `route`:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", spec: "./public.json" },   // → /reference/public-api
+    { label: "Admin API", route: "/admin", spec: "./admin.json" },
+  ],
+}
+```
+
+`spec` ist eine Kurzform für ein `sources` mit einem einzigen Eintrag, du greifst also nur dann zu `sources`, wenn du mehr als eine hast.
+
+### Indexierung pro Quelle
+
+Generierte Seiten nehmen standardmäßig an der Suche, an `llms.txt` und an der Crawler-Indexierung teil. Eine sekundäre oder überlappende Spezifikation kann sich von jeder dieser Oberflächen abmelden, ohne ihre Seiten zu verstecken oder sie aus der Navigation zu entfernen:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", route: "/api", spec: "./public.json" },
+    {
+      label: "Platform API",
+      route: "/platform",
+      spec: "./platform.json",
+      includeInSearch: false,
+      includeInLlms: false,
+      noindex: true,
+    },
+  ],
+}
+```
+
+- `includeInSearch: false` hält die Übersicht und die Operationen der Quelle aus der Website-Suche heraus.
+- `includeInLlms: false` hält sie aus beiden `llms.txt`-Dateien heraus.
+- `noindex: true` fügt Crawler-Noindex-Metadaten hinzu und entfernt die Seiten aus der Sitemap.
+
+Beim [Scalar-Renderer](#the-scalar-renderer) gilt nur `noindex` – eine von Scalar gerenderte Referenz liegt ohnehin außerhalb von Blumes Suche und `llms.txt`, sodass die beiden `include*`-Einstellungen dort nichts bewirken können.
+
+## Autorisierung
+
+Operationen, die [Sicherheitsanforderungen](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) deklarieren, rendern oberhalb ihrer Parameter einen Abschnitt **Authorization**, und die generierten Codebeispiele senden eine Platzhalter-Anmeldeinformation (`Authorization: Bearer YOUR_TOKEN`, einen API-Key-Header oder einen Query-Key – je nachdem, was das Schema verlangt). Es gibt nichts zu konfigurieren: Blume liest `security` aus der Spezifikation, sodass die Referenz immer dem entspricht, was die API tatsächlich durchsetzt.
+
+Die OpenAPI-Semantik wird unverändert übernommen:
+
+- Die eigene `security` einer Operation überschreibt die Standardeinstellung auf Dokumentebene; `security: []` markiert sie als **öffentlich** und rendert keinen Authorization-Abschnitt.
+- Mehrere Anforderungseinträge sind Alternativen – gerendert als „oder“-Gruppen; alle Schemata innerhalb eines Eintrags sind gemeinsam erforderlich. Die erste Alternative fließt in die Codebeispiele ein.
+- Ein leerer `{}`-Eintrag bedeutet, dass die Authentifizierung für diese Operation **optional** ist, und der Abschnitt weist darauf hin.
+- OAuth2-Scopes werden pro Schema aufgelistet; `description`s der Schemata aus `components.securitySchemes` werden inline gerendert.
+
+## Der Scalar-Renderer
+
+Der native Renderer ist die Standardeinstellung. Wenn du stattdessen lieber die eigenständige API-Referenz von [Scalar](https://scalar.com) einbetten möchtest – mit eigener Seitenleiste, Suche, eigenem Theme und „Try it“-Playground auf einer einzigen Route – setze `renderer: "scalar"`:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  renderer: "scalar",
+  spec: "./openapi.yaml",
+  theme: "purple",   // a Scalar theme name (Scalar renderer only)
+}
+```
+
+Eine von Scalar gerenderte Referenz ist ein eigenständiges Embed auf einer eigenen Route – sie fügt sich nicht in Blumes Seitenleiste, Suche oder `llms.txt` ein. Ihr „Try it“-Playground ruft deine **Ziel-API direkt aus dem Browser** auf (Blume verwendet keinen Proxy), daher muss die API Cross-Origin-Anfragen von der Doku-Website zulassen (`Access-Control-Allow-Origin`). `theme` und der Playground gelten nur für den Scalar-Renderer.
+
+### Scalar-Optionen übergeben
+
+`theme` ist eine Kurzform für die Option, zu der die meisten greifen, aber Scalar unterstützt noch viele weitere. Ein `scalar`-Objekt leitet jede beliebige [Scalar-Konfiguration](https://github.com/scalar/scalar/blob/main/documentation/configuration.md) direkt an die eingebettete Referenz weiter – Blume schränkt die Schlüssel nicht ein, sodass alles durchgereicht wird, was Scalar akzeptiert:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  renderer: "scalar",
+  spec: "./openapi.yaml",
+  scalar: {
+    localization: { locale: "es" },   // translate Scalar's own UI
+    agent: { disabled: true },         // disable the Scalar Agent
+    hideTestRequestButton: true,
+    orderSchemaPropertiesBy: "preserve",
+  },
+}
+```
+
+Blumes eigenes [`i18n`](/docs/content/i18n) übersetzt die Doku-Oberfläche, aber Scalar hat ein separates Lokalisierungssystem – setze `scalar.localization.locale`, um auch die eingebettete Referenz zu übersetzen. Optionen im `scalar`-Objekt haben Vorrang vor der von Blume abgeleiteten Konfiguration, sodass alles, was hier gesetzt wird (einschließlich `theme`, `customCss` oder der Spezifikations-`content`/`url`), Blumes Standardwerte überschreibt. Derselbe `scalar`-Block funktioniert auch bei der `asyncapi`-Referenz.
+
+## AsyncAPI
+
+Ereignisgesteuerte APIs verwenden einen gleichrangigen `asyncapi`-Block mit derselben Struktur. AsyncAPI wird von Scalar gerendert (der native Renderer unterstützt vorerst nur OpenAPI); nur die Standardroute unterscheidet sich (`/events`):
+
+```ts blume.config.ts lineNumbers
+asyncapi: {
+  enabled: true,
+  spec: "./asyncapi.yaml",
+}
+```
+
+:::warning
+Scalars AsyncAPI-Unterstützung befindet sich noch in Arbeit – sie rendert Channels, Operationen, Messages und einen Models-Abschnitt, aber es gibt noch **keinen interaktiven Playground** für Events. Sie wird im Upstream nach und nach verbessert.
+:::

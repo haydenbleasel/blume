@@ -1,0 +1,165 @@
+---
+title: Internacionalização
+description: >-
+  Disponibilize sua documentação em vários idiomas com roteamento sensível ao idioma, navegação por idioma, interface traduzida e SEO — tudo baseado em convenções.
+---
+
+O Blume serve um projeto em muitos idiomas. Coloque os arquivos traduzidos no lugar certo e o Blume configura o roteamento, o seletor de idioma, a navegação por idioma e o SEO para você — não há uma camada de roteamento separada para manter. É opcional: sem um bloco `i18n`, seu site continua em um único idioma exatamente como antes.
+
+## Como ativar
+
+Adicione um bloco `i18n` listando seus idiomas e qual deles é o padrão:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  defaultLocale: "en",
+  locales: [
+    { code: "en", label: "English" },
+    { code: "fr", label: "Français" },
+    { code: "ar", label: "العربية", dir: "rtl" },
+  ],
+}
+```
+
+Cada idioma tem um `code` (usado nas URLs), um `label` (exibido no seletor de idioma) e um `dir` opcional para escritas da direita para a esquerda (`"ltr"` por padrão).
+
+## Organize o conteúdo traduzido
+
+O idioma padrão fica na raiz do seu conteúdo. Todos os outros idiomas ficam em uma pasta de nível superior nomeada pelo seu `code`, espelhando a estrutura padrão:
+
+```txt
+docs/
+  index.mdx               ->  /
+  guides/quickstart.mdx   ->  /guides/quickstart
+  fr/
+    index.mdx             ->  /fr
+    guides/quickstart.mdx ->  /fr/guides/quickstart
+  ar/
+    index.mdx             ->  /ar
+```
+
+| Arquivo                         | Rota                    |
+| ------------------------------- | ----------------------- |
+| `docs/index.mdx`                | `/`                     |
+| `docs/guides/quickstart.mdx`    | `/guides/quickstart`    |
+| `docs/fr/guides/quickstart.mdx` | `/fr/guides/quickstart` |
+
+Você traduz apenas os arquivos que quiser — todo o restante recorre automaticamente ao conteúdo original (veja [Fallbacks](#fallbacks)).
+
+### Sufixos no nome do arquivo
+
+Prefere manter as traduções junto do original? Defina `parser: "dot"` e nomeie os arquivos com um sufixo de idioma em vez de usar pastas:
+
+```txt
+docs/
+  guides/quickstart.mdx     ->  /guides/quickstart      (default)
+  guides/quickstart.fr.mdx  ->  /fr/guides/quickstart   (French)
+```
+
+Bom para traduções esparsas — mantenha as poucas páginas traduzidas ao lado das originais sem espelhar a árvore inteira.
+
+### Arquivos compartilhados
+
+Para conteúdo que é igual em todos os idiomas — um changelog, uma página de status — adicione um marcador `$` para que um único arquivo sirva a todos os idiomas sem duplicação:
+
+```txt
+docs/changelog.$.mdx   ->  /changelog and /fr/changelog (same content)
+docs/guides/meta.$.ts   (folder meta applied to every locale)
+```
+
+Um `meta.ts` específico de um idioma ainda substitui o compartilhado para aquele idioma.
+
+## URLs do idioma padrão
+
+Por padrão, o idioma padrão não tem prefixo na URL (`/`, `/guides/quickstart`), enquanto os outros idiomas são prefixados (`/fr/…`). Isso mantém limpas as URLs do seu idioma principal. Para prefixar todos os idiomas, incluindo o padrão:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  // …
+  hideDefaultLocalePrefix: false, // /en/…, /fr/…
+}
+```
+
+## Navegação por idioma
+
+Cada idioma tem sua própria barra lateral, construída a partir dos arquivos daquele idioma — então as traduções podem divergir em estrutura, ordenação ou rótulos. Os arquivos [`meta.ts`](/docs/content/meta) de pasta também são resolvidos por idioma: com o parser `dir` padrão, coloque um `meta.ts` em `fr/guides/` para ordenar o grupo em francês de forma independente. Com o parser `dot`, as traduções ficam ao lado das originais, então o `meta.ts` de uma pasta se aplica a todos os idiomas. Todo o restante da [navegação](/docs/content/navigation) funciona da mesma forma, por idioma.
+
+## Fallbacks
+
+Quando uma página ainda não foi traduzida, o Blume renderiza o conteúdo do idioma de fallback na URL localizada — assim o link funciona, a página é totalmente pré-renderizada e os mecanismos de busca não são levados a um beco sem saída. O fallback usa por padrão o seu `defaultLocale`:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  // …
+  fallbackLocale: "en", // default; set to null to 404 instead
+}
+```
+
+As páginas de fallback são excluídas do índice de busca e não são anunciadas como traduções reais no `hreflang`, de modo que o conteúdo não traduzido não concorre por posicionamento. Elas ainda aparecem na barra lateral daquele idioma, então a navegação permanece completa — um leitor consegue chegar a qualquer página em qualquer idioma.
+
+:::tip
+Comece traduzindo suas páginas mais importantes — a página inicial, o guia de início rápido e os principais guias — e deixe o restante recorrer ao fallback. Você pode preencher as traduções ao longo do tempo sem quebrar nenhum link.
+:::
+
+## Traduzindo com um agente
+
+Você não precisa preencher os idiomas manualmente. O [`blume translate`](/docs/reference/translate) encontra todas as páginas que estão faltando ou desatualizadas em cada idioma e as traduz com uma CLI de agente local ([Claude Code](https://claude.com/claude-code) ou [Codex](https://developers.openai.com/codex/cli)):
+
+```bash
+blume translate --claude
+```
+
+O Blume valida a estrutura de cada resultado — frontmatter, blocos de código, links — e escreve os arquivos ele mesmo; o agente apenas traduz o texto. Um registro versionado (`blume.translations.json`) rastreia de qual revisão de origem veio cada tradução, então as reexecuções tocam apenas no que mudou, e as traduções que você escreveu à mão são adotadas como estão, nunca sobrescritas. Em CI, o `blume translate --check` falha quando uma página de origem avançou além de suas traduções.
+
+## O seletor de idioma
+
+Quando o i18n está ativado, um seletor de idioma aparece automaticamente no cabeçalho, gerado a partir dos seus `locales`. Para cada página, ele aponta para a tradução correspondente em cada idioma; onde uma tradução está faltando, ele aponta para a página de fallback e a marca como não traduzida. Não há nada para configurar.
+
+## Interface traduzida
+
+O Blume já vem com traduções embutidas para os elementos da própria interface — “Nesta página”, “Buscar”, “Editar no GitHub” e o restante — então um idioma com um pacote embutido recebe a interface traduzida imediatamente. **Você traduz apenas o seu conteúdo.**
+
+Há pacotes para mais de 30 idiomas — árabe, bengali, búlgaro, catalão, chinês (simplificado e tradicional), croata, tcheco, dinamarquês, holandês, finlandês, francês, alemão, grego, hebraico, híndi, húngaro, indonésio, italiano, japonês, coreano, norueguês, persa, polonês, português (e português brasileiro), romeno, russo, sérvio, eslovaco, espanhol, sueco, tailandês, turco, ucraniano e vietnamita. Eles são mantidos pela comunidade — abra um PR para adicionar um idioma ou aprimorar uma tradução.
+
+Strings ausentes ou não incluídas recorrem ao idioma padrão e depois ao inglês. Para substituir uma string ou fornecer seu próprio idioma, defina `i18n.ui`, indexado por idioma:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  // …
+  ui: {
+    fr: {
+      search: { button: "Rechercher", placeholder: "Rechercher…" },
+      page: { previous: "Précédent", next: "Suivant" },
+    },
+  },
+}
+```
+
+## SEO
+
+O SEO localizado é tratado para você — sem metadados por página para escrever:
+
+- `<html lang>` e `dir` são definidos a partir do idioma ativo.
+- As alternativas `hreflang` apontam para todas as traduções reais de uma página, além de um `x-default` apontando para o idioma padrão.
+- As URLs canônicas são corretas por idioma, e o JSON-LD carrega `inLanguage`.
+
+Defina [`deployment.site`](/docs/deployment) para que essas possam ser emitidas como URLs absolutas.
+
+## Busca
+
+A busca é restrita ao idioma ativo: em uma página `/fr/…`, o diálogo retorna resultados em francês, com um botão **Todos os idiomas** para buscar em todos os idiomas de uma vez. Os índices padrão (Orama) e FlexSearch filtram no navegador; provedores hospedados carregam uma faceta `locale` em cada registro.
+
+## Da direita para a esquerda
+
+Defina `dir: "rtl"` em um idioma e o Blume espelha toda a interface — a barra lateral, o cabeçalho, o índice da página, a paginação, a busca e os menus — e define `<html dir>` de acordo. Duas coisas permanecem deliberadamente da esquerda para a direita: **blocos de código** (código se lê da esquerda para a direita em qualquer idioma) e **conteúdo de fallback** — uma página não traduzida mantém a direção do idioma em que está realmente escrita, então o inglês exibido em um idioma RTL continua legível enquanto os elementos da interface ao redor são espelhados.
+
+## Para onde ir agora
+
+<CardGroup cols={2}>
+  <Card title="Navegação" href="/docs/content/navigation" icon="menu">
+    Molde a barra lateral, a ordenação e as abas de cada idioma.
+  </Card>
+  <Card title="SEO" href="/docs/configuration/seo" icon="rocket">
+    Sitemaps, Open Graph e dados estruturados.
+  </Card>
+</CardGroup>

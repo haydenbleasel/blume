@@ -1,0 +1,251 @@
+---
+title: テーマ設定
+description: >-
+  いくつかの設定トークンで見た目を調整したり、theme.css で任意の CSS 変数を上書きしたり、カスタムコンポーネント向けに Tailwind ユーティリティまで踏み込んだりできます。
+---
+
+Blume のテーマはトークン駆動で、ライトモードとダークモードにそのまま対応しています。必要な分だけ手を伸ばせます。よくあるケースにはいくつかの設定トークン、任意のデザイントークンを上書きするなら `theme.css`、カスタムコンポーネントには Tailwind ユーティリティを使えます。
+
+## 設定トークン
+
+日常的に使うつまみは、設定ファイルの `theme` の下にあります:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: "teal",   // a named preset or any CSS color
+  radius: "md",     // none | sm | md | lg
+  mode: "system",   // system | light | dark
+  fonts: {          // self-hosted Google Fonts
+    display: "inter-tight",
+    body: "inter",
+    mono: "ibm-plex-mono",
+  },
+}
+```
+
+### アクセント
+
+アクセントカラーは、インタラクティブな要素や強調される要素に色味を加えます。ステップのマーカー、アクティブなタブ、バッジ、カードのホバーなどです。名前付きプリセット、または任意の CSS カラーを使えます:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: "#ff0066", // hex, oklch(), rgb()… anything CSS understands
+}
+```
+
+名前付きプリセット: `blue`（デフォルト）、`green`、`orange`、`pink`、`purple`、`red`、`teal`。
+
+文字列を指定すると両方のカラーモードに適用されます。[モードごとに異なるアクセント](#dark-mode-colors)を設定したい場合はオブジェクトを渡してください。
+
+### 角丸
+
+`radius` は、カード、コードブロック、コールアウト、入力欄で共通して使われる角の丸みを設定します。`none`、`sm`、`md`（デフォルト）、`lg` のいずれかです。
+
+### カラーモード
+
+`mode` は初期のカラースキームを設定します:
+
+- **`system`**（デフォルト） — 読者の OS の設定に従う
+- **`light`** / **`dark`** — いずれかのスキームをデフォルトにする
+
+ヘッダーのトグルで読者はいつでも切り替えられ、その選択は再訪時にも記憶されます。ダークモードは `<html>` 要素の `data-theme="dark"` 属性によって適用されます。
+
+### フォント
+
+`fonts` は 3 つの役割ごとに書体を設定します:
+
+- **`display`** — 見出し（`h1`〜`h6`）
+- **`body`** — 本文、UI、散文
+- **`mono`** — コードブロックとインラインコード
+
+それぞれ厳選された Google Font がデフォルトになっているので、Blume は最初から意図のある見た目になります:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: "inter-tight",   // default
+    body: "inter",            // default
+    mono: "ibm-plex-mono",    // default
+  },
+}
+```
+
+変更したい役割だけを設定してください。残りはデフォルトのままです:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: { display: "geist" }, // body + mono stay Inter / IBM Plex Mono
+}
+```
+
+フォントは**セルフホスト**されます。Blume がビルド時にダウンロードして自分のサイトから配信するため、実行時に Google へのリクエストは発生せず、レイアウトシフトもありません（Astro がフォールバックのメトリクスに合わせた書体を自動生成します）。
+
+素の文字列は、以下の厳選セットに含まれる Google Fonts のスラッグです:
+
+| カテゴリ | スラッグ |
+| --- | --- |
+| サンセリフ | `dm-sans` `figtree` `geist` `ibm-plex-sans` `inter` `inter-tight` `manrope` `open-sans` `plus-jakarta-sans` `roboto` `source-sans-3` `space-grotesk` `work-sans` |
+| セリフ | `ibm-plex-serif` `lora` `merriweather` `playfair-display` `source-serif-4` |
+| 等幅 | `fira-code` `geist-mono` `ibm-plex-mono` `jetbrains-mono` `roboto-mono` `source-code-pro` `space-mono` |
+
+#### 任意のプロバイダーのファミリー
+
+厳選セットに含まれていないファミリー（たとえば非ラテン文字をカバーするもの）が必要ですか？ファミリーの正確な名前を指定したオブジェクトを渡してください。同じようにセルフホストされ、最適化されます:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: { name: "Noto Sans JP", weights: [400, 700] },
+    body: { name: "Noto Sans JP", weights: [400, 500, 700] },
+  },
+}
+```
+
+- **`name`** — プロバイダーが表記しているとおりの正確なファミリー名。
+- **`provider`** — ファミリーの提供元: `google`（デフォルト）、`fontsource`、`bunny`、`fontshare`。
+- **`weights`** — 読み込むウェイト。数値、または `"100..900"` のような可変フォントの範囲で指定します。デフォルトは `[400, 500, 600, 700]`。
+- **`fallback`** — フォントの読み込み中や欠けているグリフに使われるシステムスタック: `sans`、`serif`、`mono`。mono の役割では `mono`、それ以外では `sans` がデフォルトです。
+
+#### ローカルのフォントファイル
+
+自分が所有しているフォント（あるいはどのプロバイダーも配信していないフォント）は、プロジェクト内のフォントファイルを役割に指定します。各バリアントが 1 つの `@font-face` になります:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: {
+      name: "Berkeley Mono",
+      variants: [
+        { src: "./fonts/BerkeleyMono-Regular.woff2", weight: 400 },
+        { src: "./fonts/BerkeleyMono-Bold.woff2", weight: 700 },
+      ],
+    },
+  },
+}
+```
+
+パスはプロジェクトルートからの相対で解決されます。`weight` と `style`（`normal`、`italic`、`oblique`）は省略可能です。省略した場合、Astro がフォントファイルから読み取ります。
+
+:::note
+`theme.fonts` を明示的に設定すると、display と body のフォントは生成される [Open Graph カード](/docs/configuration/seo#card-fonts)にも自動的に適用されるため、共有されたリンクがサイトと揃います。Google 以外のプロバイダーのファミリーはそこではスキップされます（カードのレンダラーは Google Fonts からしか取得できません）。ローカルファイルはどこでも動作します。
+:::
+
+システムスタックに戻したいですか？[`theme.css`](#themecss) で `--blume-font-*` トークンを直接上書きしてください。
+
+### ダークモードの色
+
+`accent` と `background` は 1 つのルールに従います。文字列は両方のカラーモードに適用され、`{ light, dark }` オブジェクトは各モードを個別に設定します:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: { light: "blue", dark: "teal" },
+  background: {
+    light: "#ffffff",
+    dark: "#0a0a0a",
+  },
+}
+```
+
+いずれの色も、名前付きプリセットまたは任意の CSS カラーを受け取ります。`background`（および `backgroundImage`）ではどちらのキーも省略でき、片方のモードだけを上書きできます。`background: { dark: "#0a0a0a" }` はライトモードの背景をデフォルトのままにします。
+
+### アクションカラー
+
+`action` は、主要なコールトゥアクションと `action` 系の Tailwind ユーティリティ（`bg-action`、`text-action`）に使われる二次的なアクセントです。デフォルトは `accent` と同じです:
+
+```ts blume.config.ts
+theme: {
+  action: "#ff0066",
+}
+```
+
+### 背景画像
+
+`backgroundImage` でコンテンツの背後に背景画像を設定できます。URL か `public/` 配下のパスを指定します。色と同じく、文字列は両方のモードに適用され、`{ light, dark }` オブジェクトは各モードの画像を設定します:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  backgroundImage: {
+    light: "/bg-light.svg",
+    dark: "/bg-dark.svg",
+  },
+}
+```
+
+## theme.css
+
+プロジェクトルートに `theme.css` を置くと、任意のデザイントークンを上書きできます。カスケードの最後のレイヤーなので、デフォルトや設定トークンよりも優先されます:
+
+```css theme.css lineNumbers
+:root {
+  --blume-accent: oklch(0.68 0.14 180);
+  --blume-radius: 0.5rem;
+}
+
+:root[data-theme="dark"] {
+  --blume-background: oklch(0.16 0 0);
+}
+```
+
+ライトモード用のトークンは `:root` の下に、ダークモード用は `:root[data-theme="dark"]` の下に設定します。カラートークンにはダークセレクタのより高い詳細度で宣言された組み込みのダーク値があるため、`:root` だけで `--blume-accent`、`--blume-background` などを上書きしてもライトモードにしか適用されません。両方のモードを変えたい場合はダーク用のブロックも宣言してください。
+
+### デザイントークン
+
+| トークン                    | 制御する対象                                |
+| --------------------------- | ------------------------------------------- |
+| `--blume-background`        | ページの背景                                |
+| `--blume-foreground`        | 本文テキスト                                |
+| `--blume-muted`             | 控えめな面 — コールアウト、テーブルヘッダー |
+| `--blume-muted-foreground`  | 補助的なテキスト                            |
+| `--blume-border`            | ボーダーと区切り線                          |
+| `--blume-accent`            | アクセントカラー                            |
+| `--blume-accent-foreground` | アクセント背景の上のテキストとアイコン      |
+| `--blume-action`            | 二次的なアクセント（デフォルトは accent）   |
+| `--blume-code-background`   | コードブロックの面                          |
+| `--blume-radius`            | 角の丸み                                    |
+| `--blume-font-display`      | 見出しのフォント                            |
+| `--blume-font-body`         | 本文 / UI のフォント                        |
+| `--blume-font-mono`         | コードのフォント                            |
+
+厳選リスト外のフォントを使う、あるいはシステムスタックにフォールバックするには、`--blume-font-*` トークンに任意のフォントスタックを設定します:
+
+```css theme.css lineNumbers
+:root {
+  --blume-font-body: ui-sans-serif, system-ui, sans-serif;
+}
+```
+
+## Tailwind ユーティリティ
+
+Blume のテーマは内部的に Tailwind v4 で構築されており、プロジェクトの `.astro`、`.tsx`、`.jsx` ファイルもスキャンされます。そのため、Tailwind のセットアップなしで、カスタムコンポーネントやページをユーティリティクラスでスタイリングできます。すべてのトークンがユーティリティとして公開されているので、コンポーネントは自動的にテーマに追従します:
+
+| トークン                    | ユーティリティ             |
+| --------------------------- | -------------------------- |
+| `--blume-background`        | `bg-background`            |
+| `--blume-foreground`        | `text-foreground`          |
+| `--blume-muted`             | `bg-muted`                 |
+| `--blume-muted-foreground`  | `text-muted-foreground`    |
+| `--blume-border`            | `border-border`            |
+| `--blume-accent`            | `bg-accent`, `text-accent` |
+| `--blume-accent-foreground` | `text-accent-foreground`   |
+| `--blume-action`            | `bg-action`, `text-action` |
+| `--blume-radius`            | `rounded-blume`            |
+| `--blume-font-display`      | `font-display`             |
+| `--blume-font-body`         | `font-sans`                |
+| `--blume-font-mono`         | `font-mono`                |
+
+## カスケードの順序
+
+スタイルは 3 つのレイヤーで解決され、後のレイヤーが前のレイヤーを上書きします:
+
+<Steps>
+  <Step title="ベース">
+    Blume のリセット、デフォルトのトークン、コンポーネントのスタイル。
+  </Step>
+  <Step title="設定トークン">
+    `theme` から来る `--blume-accent`、`--blume-radius`、`--blume-font-*`
+    トークン。
+  </Step>
+  <Step title="theme.css">
+    あなたによるトークンの上書き — 最終的な決定権を持ちます。
+  </Step>
+</Steps>

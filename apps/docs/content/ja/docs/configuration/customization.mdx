@@ -1,0 +1,195 @@
+---
+title: カスタマイズ
+description: >-
+  コンポーネントの上書き、インタラクティブなアイランドの追加、カスタムページのマウント、レジストリコンポーネントのインストール、または完全な制御が必要な場合の完全なイジェクト。
+---
+
+## コンポーネントの上書き
+
+プロジェクトルートに `components.ts`（または `components.tsx`）を追加し、`defineComponents` をエクスポートします。`mdx` マップは組み込みコンポーネントを**置き換える**か、新しいコンポーネントを**追加**します — インポートなしですべての `.mdx` ページで利用できます。
+
+```ts components.ts lineNumbers
+import { defineComponents } from "blume";
+import Callout from "./components/Callout.astro";
+import Pricing from "./components/Pricing.astro";
+
+export default defineComponents({
+  mdx: {
+    Callout, // replace the built-in Callout
+    Pricing, // add a new <Pricing /> component
+  },
+});
+```
+
+キーは MDX 内で記述する名前です（`<Callout>`、`<Pricing>`）。React コンポーネントをインポートする場合は `.tsx` のファイル名を使用してください。
+
+### 参照の形式
+
+`mdx`、`layout`、`islands` のいずれにおいても、すべての上書きは 3 つの形式を受け付けます。
+
+```ts components.ts
+import { defineComponents } from "blume";
+import Callout from "./components/Callout.astro";
+
+export default defineComponents({
+  mdx: {
+    Callout, // 1. an imported component
+    Note: "./components/Note.astro", // 2. a path string (resolved from the project root)
+    Chart: { component: "./components/Chart.tsx", client: "load" }, // 3. a descriptor
+  },
+});
+```
+
+**ディスクリプタ**形式ではハイドレーションモードを追加できるため、インタラクティブな React／Vue／Svelte コンポーネントが JavaScript を配信し、クライアント側で動作するようになります。`client` モードがない場合、フレームワークコンポーネントは静的な HTML としてレンダリングされます。これは通常ミスであるため、Blume はそうしたケースを検出するとビルド警告を出力します。
+
+| `client` | ハイドレーションのタイミング |
+| --- | --- |
+| `"load"` | ページ読み込み時に即座に |
+| `"idle"` | メインスレッドがアイドル状態になったとき |
+| `"visible"` | スクロールして表示領域に入ったとき |
+| `"media"` | `media` クエリが一致したとき（`media: "(min-width: 40rem)"` を追加します） |
+| `"only"` | クライアントのみ、サーバーレンダリングは行われません |
+
+多くのページで使用するインタラクティブなコンポーネントについては、[`islands` グループ](/docs/content/islands#registering-islands-in-componentsts) が `client: "visible"` を指定したディスクリプタ形式の省略記法になります。
+
+### 上書きの型付け
+
+組み込みコンポーネントを置き換える際は、`blume/components` からそのプロップ型をインポートして、コンポーネントが契約に適合するようにしてください。型はコンポーネント自体から導出されるため、乖離することはありません。
+
+```tsx components/Callout.tsx
+import type { CalloutProps } from "blume/components";
+
+export default function Callout(props: CalloutProps) {
+  // …your own callout, same props as the built-in
+}
+```
+
+プロップ型はコンテンツコンポーネント向けにエクスポートされています（`CalloutProps`、`CardProps`、`TabsProps`、`StepsProps`、`BadgeProps` など）。
+
+## レイアウトスロット
+
+`layout` マップは Blume のクロム（外枠 UI）の一部を独自のコンポーネントに置き換えます。各上書きは置き換え対象の組み込みコンポーネントと同じプロップを受け取るため、デフォルトをラップすることも、ゼロから作ることもできます。
+
+```ts components.ts
+import { defineComponents } from "blume";
+import Footer from "./components/Footer.astro";
+import Logo from "./components/Logo.astro";
+
+export default defineComponents({
+  layout: {
+    Logo, // brand mark + title in the header
+    Footer, // site-wide footer (no built-in — renders only when set)
+  },
+});
+```
+
+配線済みのスロット:
+
+| スロット | 置き換え対象 | プロップ |
+| --- | --- | --- |
+| `Layout` | ページシェル全体（`RootLayout`） | 組み込みレイアウトが受け取るすべて、加えて `layout` マップ |
+| `Header` | 上部のナビゲーションバー | `site`、`logo`、`navigation`、`route`、`searchEnabled` など |
+| `Logo` | ヘッダー内のブランドリンク（マーク＋タイトル） | `site`、`logo` |
+| `Search` | ヘッダーの検索トリガー＋モーダル | `navigation`、`strings`、`locale`、`askEnabled` |
+| `Sidebar` | 主要なナビゲーションツリー | `items`、`currentRoute` |
+| `MobileNav` | モバイルドロワー内のナビゲーション（デフォルトは `Sidebar`） | `items`、`currentRoute` |
+| `Breadcrumbs` | パンくずリスト | `crumbs` |
+| `TableOfContents` | このページの目次 | `headings`、`title`、`variant` |
+| `Pagination` | 前後のページへのフッターリンク | `prev`、`next`、`strings` |
+| `PageHeader` | 記事の上部への挿入ポイント（組み込みなし） | `page`、`headings`、`route` |
+| `PageFooter` | 記事の下部への挿入ポイント（組み込みなし） | `page`、`headings`、`route` |
+| `Footer` | コンテンツグリッドの後に配置されるサイト全体のフッター（組み込みなし） | `site`、`navigation`、`ui` |
+
+`PageHeader`、`PageFooter`、`Footer` には組み込みコンポーネントがありません。設定するまで何もレンダリングされないため、プロモーションバナー、「最終更新日」の注記、マーケティング用フッターなどの便利な挿入ポイントになります。
+
+レイアウトスロットは MDX の上書きと同じ[3 つの参照形式](#reference-form)を受け付けます。そのため、インタラクティブなヘッダーやフッターが必要な場合は、スロットにパス文字列やハイドレーション付きのディスクリプタ（`{ component, client }`）を指定できます。
+
+## インタラクティブなアイランド
+
+インタラクティブな UI（React、Vue、Svelte）については、コンポーネントを `islands/` フォルダーに配置すれば、任意の MDX ページで使用できます。Blume が自動的にハイドレートするため、ラッパーや登録は不要です。
+
+```tsx islands/Counter.tsx lineNumbers
+import { useState } from "react";
+
+export default function Counter() {
+  const [n, setN] = useState(0);
+  return <button onClick={() => setN(n + 1)}>Clicked {n}</button>;
+}
+```
+
+```mdx page.mdx
+Use it anywhere: <Counter />
+```
+
+ハイドレーション戦略とフレームワークのセットアップについては [アイランド](/docs/content/islands) を参照してください。
+
+## カスタムページ
+
+`pages/` フォルダー配下に `.astro` ファイルを追加すると、ドキュメントと並んで完全なカスタムルートをマウントできます — ランディングページ、価格ページ、手作りのインデックスなどです。これらは配置場所を維持するため、相対インポートや `getStaticPaths` は通常どおり機能し、`blume:data` モジュールから設定、ナビゲーション、ルートを読み取ることができます。
+
+完全なガイドは [カスタムページ](/docs/advanced/custom-pages) を参照してください。
+
+## レジストリ
+
+`blume add` は Blume がメンテナンスするコンポーネントを**ソース**としてプロジェクトにコピーします — そのコードはあなたのものであり、自由に編集できます。引数なしで実行すると、利用可能なものが一覧表示されます。
+
+```bash
+blume add
+```
+
+レイアウトスロット（ヘッダー、サイドバー、パンくずリスト、目次、ページネーション、フィードバック）や任意のコンテンツコンポーネント（コールアウト、カード、タブ、ステップ、アコーディオンなど）をインストールできます。
+
+```bash
+blume add callout
+blume add pagination
+```
+
+コピーされたコンポーネントはフレームワークの残りの部分を `blume/*` からインポートするため、変更を加えるまでは組み込みのものとまったく同じようにレンダリングされます。`blume add` は登録用の `defineComponents` スニペットを出力します — コンテンツコンポーネントは `mdx` 配下、レイアウト部品は `layout` 配下です。
+
+## Astro インテグレーション
+
+`blume.config.ts` のトップレベルの `integrations` 配列から、任意の Astro インテグレーションを追加できます。まずサイトにインテグレーションをインストールしてください。Blume は生成されるランタイムの依存関係にそれを追加せず、Astro との互換性も管理しません。
+
+```bash
+npm install @astrojs/sitemap
+```
+
+```ts blume.config.ts lineNumbers
+import sitemap from "@astrojs/sitemap";
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  integrations: [
+    sitemap({
+      filter: (page) => !page.includes("/drafts/"),
+    }),
+  ],
+});
+```
+
+Blume は組み込みのインテグレーションを既存の順序のまま保持し、その後に宣言順であなたのエントリを追加します。並べ替えや重複排除は行わないため、同じ `name` を持つ 2 つのインテグレーションは両方とも実行されます。Blume は `integrations` が配列であることを検証し、各エントリの検証と無効なインテグレーションの報告は Astro が行います。
+
+Blume はインスタンスをコピーするのではなく、生成された Astro 設定から `blume.config.ts` を再インポートすることでインテグレーションを読み込むため、設定モジュールは 1 回の実行につき 2 回評価されます — Blume が設定を読み込むときと、Astro がそれを読み込むときです。2 回目の評価が無害であるように、インテグレーションのファクトリは副作用のない状態に保ってください（インテグレーションを返すだけにし、構築時にファイルを書き込んだり接続を開いたりしないこと）。
+
+同じインテグレーションが `blume dev` と `blume build` の両方で実行されます。`blume dev` の実行中に `blume.config.ts` を編集すると、隠れた Astro 設定が再生成され、設定の再起動がトリガーされます。編集したインテグレーションが反映されない場合は、`blume dev` を再起動してください。Blume はどの設定編集がインテグレーションに影響するかを判別できないため、`integrations` が空でなくなると、`blume.config.ts` へのすべての編集は — 無関係なフィールドへの編集であっても — ホットに適用されるのではなく開発サーバーを再起動します。Blume は `blume.config.ts` の内容のみを追跡するため、そこからインポートされる別ファイルを編集しても、それだけでは再生成はトリガーされません。そのような編集の後は `blume dev` を再起動してください。イジェクトした場合、所有することになる `astro.config.mjs` が `blume.config.ts` への相対的なブリッジを保持するため、設定されたインテグレーションは引き続き実行されます。完全な所有権を引き受ける一環として、後から Astro 設定へ直接移動することもできます。
+
+## イジェクト
+
+完全な制御が必要な場合は、生成されたランタイムを独立した Astro プロジェクトへイジェクトできます。
+
+```bash
+blume eject --yes
+```
+
+イジェクトは一方向のステップです。隠れた `.blume/` ランタイムが、あなたが所有し直接変更できる通常の Astro アプリになります。`blume` パッケージは引き続きインポート可能なので、そのコンポーネント、テーマ、Markdown プロセッサはそのまま使えます。
+
+### イジェクトで失われるもの
+
+イジェクト後、`build` スクリプトは素の `astro build` を実行します — サイト自体のビルド結果は同じですが、`blume build` が上に重ねていた成果物はもう生成されません。eject コマンドは、実際に設定で使用されているものについて警告します。それらを維持するには:
+
+- **Pagefind 検索インデックス** — `search.provider: "pagefind"` を使用している場合、検索 UI はビルド済みサイトからインデックスを読み込むため、自分でインデックスを作成するまで本番環境で検索が機能しなくなります。`pagefind` を devDependency としてインストールし、各ビルドの後にインデックスを作成してください: `"build": "astro build && pagefind --site dist"`。
+- **ホスト型検索の同期** — ホスト型プロバイダーのインデックスはビルド時にプッシュされなくなります。各ビルドの後に、プロバイダーの API または CLI で検索レコードを再アップロードしてください。
+- **sitemap.xml** — 標準の [@astrojs/sitemap](https://docs.astro.build/en/guides/integrations-guide/sitemap/) インテグレーションで再作成してください。
+- **robots.txt** — 独自のものを `public/robots.txt` として配置してください。
+- **llms.txt / llms-full.txt および agent-readability.json** — 手動で作成するか（もしくは独自のビルドステップで生成し）、`public/` から配信してください。
+- **プラットフォームのリダイレクトファイル** — 静的ビルドで `_redirects` と `vercel.json` が出力されなくなります。リダイレクト自体は Astro が生成する meta-refresh ページとして引き続き機能しますが、ホスティング先の設定に移すこともできます。

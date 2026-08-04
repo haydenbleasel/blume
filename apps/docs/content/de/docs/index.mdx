@@ -1,0 +1,75 @@
+---
+title: Einführung
+description: >-
+  Blume ist ein quelloffenes, Markdown-zuerst-Dokumentationsframework auf Basis von Astro und Vite — schnell, KI-fähig und ohne Konfiguration bis hinunter zum Template.
+sidebar:
+  label: Einführung
+  order: 0
+---
+
+Legen Sie Markdown oder MDX in einen Ordner, führen Sie `blume dev` aus und erhalten Sie eine produktionsreife Dokumentations-Website — Navigation, Suche, Theming, Open-Graph-Bilder und eine umfangreiche Komponentenbibliothek — ohne App-Boilerplate, die geschrieben oder gepflegt werden muss.
+
+<CardGroup cols={2}>
+  <Card title="Schnellstart" href="/docs/quickstart" icon="rocket">
+    Installieren Sie Blume und veröffentlichen Sie Ihre erste Seite in wenigen
+    Minuten.
+  </Card>
+  <Card title="Konfiguration" href="/docs/configuration" icon="file">
+    Passen Sie Titel, Theme, Suche und Deployment an.
+  </Card>
+</CardGroup>
+
+## Warum es Blume gibt
+
+Dokumentation sollte schnell, KI-fähig und konfigurationsfrei sein — bis dahin, dass gar kein Starter-Template nötig ist. Manche Dokumentationswerkzeuge übergeben Ihnen eine komplette Codebasis zur Pflege, bevor Sie überhaupt ein Wort geschrieben haben. Andere bauen das Template um Ihre Inhalte herum, binden Sie aber an ihren gehosteten Dienst.
+
+Blume vereint das Beste aus beiden Welten. Das Framework ist das Template, sodass Sie nur Ihre Inhalte anfassen. Wenn Sie anpassen möchten, können Sie zunächst die eingebauten Komponenten ersetzen, die einzelne Konfigurationsdatei ändern oder sogar ejecten, wenn Sie die Astro-Website direkt haben möchten. Die [FAQ](/docs/faq) erläutert, wie sich das im Vergleich zu Mintlify, Fumadocs und den übrigen verhält.
+
+## Was Blume anders macht
+
+### Standardmäßig schnell
+
+Blume baut auf Astro und Vite auf und rendert standardmäßig statisches HTML — schnell, cachebar und günstig zu hosten. Das Kern-Theme liefert kein Client-Framework-JS aus, sodass Seiten von Haus aus bei den Core Web Vitals gut abschneiden. Dev-Start und Hot Reload fühlen sich Vite-nativ an, und Sie aktivieren Server-Funktionen nur dann, wenn Sie sie brauchen.
+
+### Sofort KI-fähig
+
+Jede Blume-Website spricht fließend Maschine. Sie gibt [`llms.txt` und `llms-full.txt`](/docs/configuration/ai) aus, liefert das rohe Markdown jeder Seite, indem Sie `.md` an deren URL anhängen, und bietet Lesern auf jeder Seite die Aktionen **Copy as Markdown** und **Open in chat**. Ergänzen Sie einen optionalen **Ask AI**-Assistenten auf der Seite oder hosten Sie einen [**MCP-Server**](/docs/configuration/ai#mcp-server), damit Coding-Agenten wie Claude Code und Cursor Ihre Dokumentation direkt durchsuchen und lesen können — kein Scraping, kein gehosteter Dienst. Ihr Markdown ist die maßgebliche Quelle für Menschen wie für Modelle.
+
+### Keine Konfiguration — nicht einmal das Template
+
+Ein Ordner mit Dokumentation ist ein vollständiges Projekt. Es gibt keinen Starter zum Klonen, kein Astro oder Tailwind einzurichten und kein Template zu pflegen. Die Navigation wird aus Ihren Dateien abgeleitet, die [Suche](/docs/configuration/search) funktioniert in Dev und Produktion ohne gehosteten Dienst, und Theming besteht aus einer Handvoll Tokens. Alles hat einen sinnvollen Standardwert; Konfiguration ist etwas, worauf Sie zurückgreifen, nicht etwas, womit Sie anfangen.
+
+### Typsicher bis ins Mark
+
+Ihre [`blume.config.ts`](/docs/configuration) und jede [`meta.ts`](/docs/content/meta) sind echtes TypeScript — validiert durch ein Schema und geschrieben mit `defineConfig` und `defineMeta`. Ihr Editor vervollständigt jede Option automatisch und erkennt Tippfehler, ungültige Werte und fehlende Felder schon während des Tippens, lange vor einem Build. Konfiguration ist Code, den Sie refaktorieren, berechnen und dem Sie vertrauen können — kein lose typisiertes YAML.
+
+## Alles inklusive
+
+- **Komponenten** — Callouts, Cards, Steps, Tabs, Accordions, Badges, Dateibäume und Parametertabellen, in MDX nutzbar [ohne Imports](/docs/content/components).
+- **Lokale Suche** — Orama funktioniert in Dev und Produktion; Pagefind ist für große Websites nur ein Flag entfernt. Kein gehosteter Index.
+- **KI** — [`llms.txt`, rohe Markdown-URLs, Copy as Markdown, Open in chat, ein Ask-AI-Assistent und ein gehosteter MCP-Server](/docs/configuration/ai).
+- **Navigation** — aus Dateien abgeleitet, verfeinert mit `meta.ts` oder Konfiguration.
+- **SEO** — Metadaten, Open-Graph-Bilder, RSS-Feeds und JSON-LD, [eingebaut](/docs/configuration/seo).
+- **Anpassung** — Komponenten-Overrides, React-Islands, eigene Seiten, Theme-Tokens und eine Registry für Quellkomponenten über `blume add`.
+- **Eject** — `blume eject` erzeugt ein eigenständiges Astro-Projekt, das weiterhin das `blume`-Paket verwendet.
+
+## Wie es funktioniert
+
+Die Blume-CLI findet Ihre Inhalte, baut einen Content-Graphen auf und generiert ein verstecktes Astro-Projekt unter `.blume/`, das sie für Dev und Build steuert. Die generierte Laufzeitumgebung ist ein Implementierungsdetail — Sie schreiben Markdown, Blume erledigt den Rest — bis Sie sich entscheiden zu ejecten und sie selbst zu übernehmen.
+
+## Nächste Schritte
+
+<CardGroup cols={2}>
+  <Card title="Konfiguration" href="/docs/configuration" icon="file">
+    Passen Sie Titel, Theme, Suche und Deployment an.
+  </Card>
+  <Card title="Komponenten" href="/docs/content/components" icon="folder">
+    Entdecken Sie die eingebaute Komponentenbibliothek.
+  </Card>
+  <Card title="KI" href="/docs/configuration/ai" icon="lightbulb">
+    Liefern Sie `llms.txt` und einen Ask-AI-Assistenten aus.
+  </Card>
+  <Card title="CLI" href="/docs/reference/cli" icon="rocket">
+    Jeder `blume`-Befehl und jedes Flag.
+  </Card>
+</CardGroup>

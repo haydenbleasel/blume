@@ -1,0 +1,711 @@
+---
+title: घटक
+description: >-
+  कार्ड, स्टेप्स, टैब, अकॉर्डियन, बैज, कोड ग्रुप, फ़्रेम, ट्री, टाइप टेबल, लाइव प्रीव्यू और डिफ़ — अंतर्निहित घटक, जो किसी भी MDX पेज में उपयोग किए जा सकते हैं।
+---
+
+Blume एक सुलभ, थीम-योग्य घटक सेट के साथ आता है जो किसी भी `.mdx` पेज में **बिना किसी import के** उपलब्ध है। हर एक को नीचे एक लाइव प्रीव्यू और उसके सोर्स के साथ दिखाया गया है। घटक वनीला हैं और React-मुक्त हैं; React तभी सक्रिय होता है जब आप अपना स्वयं का आइलैंड जोड़ते हैं।
+
+## Card और CardGroup
+
+कार्ड किसी गंतव्य से एक आइकन, शीर्षक और छोटे विवरण के साथ लिंक करते हैं। उत्तरदायी ग्रिड के लिए उन्हें `CardGroup` से समूहबद्ध करें। इनका उपयोग लैंडिंग पेजों, सेक्शन इंडेक्स और “अगले कदम” पर करें — जहाँ भी आप पाठक को आगे की ओर मार्गदर्शित कर रहे हों।
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
+    Blume इंस्टॉल करें और अपना पहला पेज प्रकाशित करें।
+  </Card>
+  <Card title="Components" href="/docs/content/components" icon="folder">
+    घटक लाइब्रेरी ब्राउज़ करें।
+  </Card>
+</CardGroup>
+
+```astro lineNumbers
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
+    Install Blume and ship your first page.
+  </Card>
+  <Card title="Components" href="/docs/content/components" icon="folder">
+    Browse the component library.
+  </Card>
+</CardGroup>
+```
+
+`Card` में `title`, एक वैकल्पिक `href` (क्लिक न किए जा सकने वाले कार्ड के लिए इसे छोड़ दें), और Blume के अंतर्निहित आइकन सेट से एक `icon` लिया जाता है। `CardGroup` में `cols` लिया जाता है (डिफ़ॉल्ट `2`)।
+
+## Steps
+
+क्रमबद्ध निर्देशों के लिए एक क्रमांकित ऊर्ध्वाधर अनुक्रम — इंस्टॉल, सेटअप प्रवाह और ऐसे ट्यूटोरियल जहाँ क्रम मायने रखता है। हर `Step` में एक `title` लिया जाता है।
+
+<Steps>
+  <Step title="Install Blume">पैकेज को अपने प्रोजेक्ट में जोड़ें।</Step>
+  <Step title="Write a page">
+    अपने कंटेंट फ़ोल्डर में एक `.mdx` फ़ाइल रखें।
+  </Step>
+  <Step title="Ship it">`blume build` चलाएँ और `dist/` डिप्लॉय करें।</Step>
+</Steps>
+
+```astro lineNumbers
+<Steps>
+  <Step title="Install Blume">Add the package to your project.</Step>
+  <Step title="Write a page">
+    Drop an `.mdx` file into your content folder.
+  </Step>
+  <Step title="Ship it">Run `blume build` and deploy `dist/`.</Step>
+</Steps>
+```
+
+## Tabs
+
+समतुल्य सामग्री के बीच वहीं पर स्विच करें — भाषा के प्रकार, OS-विशिष्ट कमांड, या वैकल्पिक तरीके — बिना सब कुछ पेज पर ढेर किए। हर `Tab` में एक `title` लिया जाता है।
+
+<Tabs>
+  <Tab title="macOS">टूलचेन इंस्टॉल करने के लिए Homebrew का उपयोग करें।</Tab>
+  <Tab title="Windows">टूलचेन इंस्टॉल करने के लिए winget का उपयोग करें।</Tab>
+</Tabs>
+
+```astro lineNumbers
+<Tabs>
+  <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
+  <Tab title="Windows">Use winget to install the toolchain.</Tab>
+</Tabs>
+```
+
+बॉर्डर वाले बॉक्स के बजाय बिना बॉर्डर के रेंडर करने के लिए `inline` जोड़ें — पूरी चौड़ाई की एक रेखा पर टैब पट्टी, जिसके नीचे सामग्री गद्य की तरह प्रवाहित होती है। हैश के बजाय सक्रिय टैब को किसी URL क्वेरी पैरामीटर से सिंक करने के लिए `param` जोड़ें, जिससे चयन साझा करने योग्य बन जाता है: `?install=windows` पर समाप्त होने वाला लिंक Windows टैब पर खुलता है। हर समूह अपने स्वयं के `param` से सिंक होता है, इसलिए आप एक ही पेज पर कई स्वतंत्र, डीप-लिंक करने योग्य समूह उपयोग कर सकते हैं।
+
+<Tabs inline param="install">
+  <Tab title="macOS">टूलचेन इंस्टॉल करने के लिए Homebrew का उपयोग करें।</Tab>
+  <Tab title="Windows">टूलचेन इंस्टॉल करने के लिए winget का उपयोग करें।</Tab>
+</Tabs>
+
+```astro lineNumbers
+<Tabs inline param="install">
+  <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
+  <Tab title="Windows">Use winget to install the toolchain.</Tab>
+</Tabs>
+```
+
+## Badge
+
+स्थिति या मेटाडेटा के लिए एक छोटा इनलाइन लेबल — संस्करण टैग, “new” या “beta” चिह्न, स्थिरता स्तर। `variant` रंग को अर्थ के अनुसार समायोजित करता है।
+
+### डिफ़ॉल्ट
+
+बिना किसी विशेष ज़ोर वाला तटस्थ मेटाडेटा।
+
+<Badge>स्थिर</Badge>
+
+```astro
+<Badge>Stable</Badge>
+```
+
+### एक्सेंट
+
+आपके थीम एक्सेंट का उपयोग करके ध्यान खींचता है — “new” या फ़ीचर्ड चिह्नों के लिए उपयुक्त।
+
+<Badge variant="accent">नया</Badge>
+
+```astro
+<Badge variant="accent">New</Badge>
+```
+
+### सफलता
+
+एक सकारात्मक या उत्तीर्ण स्थिति।
+
+<Badge variant="success">उत्तीर्ण</Badge>
+
+```astro
+<Badge variant="success">Passing</Badge>
+```
+
+### चेतावनी
+
+कुछ ऐसा जिसे सावधानी से उपयोग करना चाहिए, जैसे कोई प्रायोगिक सुविधा।
+
+<Badge variant="warning">बीटा</Badge>
+
+```astro
+<Badge variant="warning">Beta</Badge>
+```
+
+### खतरा
+
+एक नकारात्मक या ब्रेकिंग स्थिति, जैसे कोई अप्रचलन।
+
+<Badge variant="danger">अप्रचलित</Badge>
+
+```astro
+<Badge variant="danger">Deprecated</Badge>
+```
+
+## Icon
+
+नाम से एक आइकन रेंडर करें — यही `icon` प्रॉप कार्ड, स्टेप्स, टैब और साइडबार प्रविष्टियों को संचालित करता है। नाम [Lucide](https://lucide.dev/icons) से आते हैं, छोटे अक्षरों और केबाब-केस में (`rocket`, `gauge`, `book-open`)।
+
+<Icon icon="rocket" size={20} />
+
+```astro
+<Icon icon="rocket" size={20} />
+```
+
+Blume केवल Lucide का समर्थन करता है — एक सादा नाम Lucide के विरुद्ध हल होता है, और अन्य आइकन इनपुट के साथ समरूपता के लिए आप नाम से पहले `lucide:` लगा सकते हैं (`lucide:rocket`)। `size` पिक्सेल आकार सेट करता है (डिफ़ॉल्ट `16`) और `color` उसे रंग देता है (कोई भी CSS रंग; डिफ़ॉल्ट `currentColor`)। अपनी स्वयं की कलाकृति रेंडर करने के लिए नाम के स्थान पर एक कच्चा `<svg>` स्ट्रिंग, एक इमेज URL, या एक स्थानीय इमेज पथ पास करें, और सहायक तकनीक के सामने उसे प्रकट करने के लिए एक `label` जोड़ें — इसके बिना आइकन केवल सजावटी होता है।
+
+आइकन बिल्ड समय पर हल होते हैं और शून्य-JS SVG के रूप में इनलाइन होते हैं — रनटाइम पर कुछ भी फ़ेच नहीं किया जाता।
+
+## फ़ाइल ट्री
+
+किसी प्रोजेक्ट या फ़ोल्डर की संरचना दर्शाएँ। एक सामान्य Markdown सूची को लपेटें और Blume उसे ट्री के रूप में स्टाइल करता है — सेटअप और कॉन्फ़िग गाइड में संरचना समझाने के लिए उपयोगी।
+
+<FileTree>
+
+- docs/
+  - index.mdx
+  - guides/
+    - configuration.mdx
+- blume.config.ts
+
+</FileTree>
+
+```astro lineNumbers
+<FileTree>
+
+- docs/
+  - index.mdx
+  - guides/
+    - configuration.mdx
+- blume.config.ts
+
+</FileTree>
+```
+
+## Accordion
+
+संबंधित संकुचन योग्य आइटमों को एक ही बॉर्डर वाले कंटेनर में विभाजकों के साथ रखें — FAQ, वैकल्पिक चरण, या लंबे उदाहरण। हर चाइल्ड एक `AccordionItem` होता है (`title`, वैकल्पिक `icon`, `description`, `defaultOpen`)। किसी एकल स्वतंत्र प्रकटीकरण के लिए [Expandable](#expandable) का उपयोग करें।
+
+<Accordion>
+  <AccordionItem title="Does it support MDX?">
+    हाँ — हर पेज `.md` या `.mdx` हो सकता है।
+  </AccordionItem>
+  <AccordionItem title="Is the theme customizable?">
+    हाँ, Tailwind v4 टोकन और आपकी अपनी `theme.css` के माध्यम से।
+  </AccordionItem>
+</Accordion>
+
+```astro lineNumbers
+<Accordion>
+  <AccordionItem title="Does it support MDX?">
+    Yes — every page can be `.md` or `.mdx`.
+  </AccordionItem>
+  <AccordionItem title="Is the theme customizable?">
+    Yes, via Tailwind v4 tokens and your own `theme.css`.
+  </AccordionItem>
+</Accordion>
+```
+
+## Expandable
+
+नेस्टेड विवरण के लिए एक हल्का इनलाइन प्रकटीकरण — किसी फ़ील्ड की उप-प्रॉपर्टीज़ या एक वैकल्पिक टिप्पणी का विस्तार। `title` टॉगल को लेबल करता है (डिफ़ॉल्ट “Show more”); विस्तारित अवस्था में शुरू करने के लिए `defaultOpen` सेट करें।
+
+<Expandable title="Show advanced options">
+  ये सेटिंग्स वैकल्पिक हैं और इन्हें शायद ही कभी बदलने की आवश्यकता होती है।
+</Expandable>
+
+```astro
+<Expandable title="Show advanced options">
+  These settings are optional and rarely need changing.
+</Expandable>
+```
+
+## Columns
+
+कार्ड या ब्लॉक को समान चौड़ाई वाले कॉलमों के उत्तरदायी ग्रिड में व्यवस्थित करें जो मोबाइल पर पुनः प्रवाहित होता है। `Columns` में `cols` लिया जाता है; हर सेल को एक `Column` में लपेटें।
+
+<Columns cols={2}>
+  <Column>
+    <Card title="Fast" icon="rocket">
+      Astro और Vite पर बनाया गया।
+    </Card>
+  </Column>
+  <Column>
+    <Card title="Themeable" icon="sun">
+      Tailwind v4 डिज़ाइन टोकन।
+    </Card>
+  </Column>
+</Columns>
+
+```astro lineNumbers
+<Columns cols={2}>
+  <Column>
+    <Card title="Fast" icon="rocket">
+      Built on Astro and Vite.
+    </Card>
+  </Column>
+  <Column>
+    <Card title="Themeable" icon="sun">
+      Tailwind v4 design tokens.
+    </Card>
+  </Column>
+</Columns>
+```
+
+## CodeGroup
+
+कई कोड ब्लॉक को एक टैब्ड स्विचर में समूहबद्ध करें — प्रति भाषा या फ़ाइल एक टैब। टैब लेबल हर ब्लॉक का शीर्षक होता है (भाषा के बाद वाला टेक्स्ट)। टैब बार के बजाय मेन्यू से स्विच करने के लिए `dropdown` जोड़ें।
+
+<CodeGroup>
+
+```ts TypeScript
+export const greet = (name: string) => `Hello, ${name}`;
+```
+
+```python Python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+```rust Rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}")
+}
+```
+
+</CodeGroup>
+
+````astro
+<CodeGroup>
+
+```ts TypeScript
+export const greet = (name: string) => `Hello, ${name}`;
+```
+
+```python Python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+```rust Rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}")
+}
+```
+
+</CodeGroup>
+````
+
+## Frame
+
+किसी इमेज या किसी भी दृश्य को एक केंद्रित, बॉर्डर वाले फ़्रेम में लपेटें, जिसमें वैकल्पिक `caption` (Markdown के रूप में रेंडर) और `hint` हो।
+
+<Frame
+  caption="A **framed** illustration."
+  hint="Frames center and caption visuals."
+>
+  <svg
+    width="160"
+    height="72"
+    viewBox="0 0 160 72"
+    role="img"
+    aria-label="Sample frame"
+  >
+    <rect width="160" height="72" rx="8" fill="#3b82f6" />
+  </svg>
+</Frame>
+
+```astro lineNumbers
+<Frame
+  caption="A **framed** illustration."
+  hint="Frames center and caption visuals."
+>
+  <img src="/screenshot.png" alt="Product screenshot" />
+</Frame>
+```
+
+## YouTube
+
+किसी YouTube वीडियो को एक उत्तरदायी, गोपनीयता-अनुकूल (`youtube-nocookie.com`) 16:9 फ़्रेम में एम्बेड करें जो कोई क्लाइंट JavaScript नहीं भेजता। एक वीडियो `id` या पूरा `url` पास करें, साथ ही एक वैकल्पिक `title` (सुलभता के लिए) और सेकंडों में `start` समय।
+
+<YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />
+
+```astro lineNumbers
+<YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />
+<YouTube url="https://youtu.be/aqz-KE-bpKQ" start={30} />
+```
+
+## Color
+
+कॉपी करने योग्य हेक्स मानों के साथ रंग स्वैच दिखाएँ — किसी पैलेट या ब्रांड रंगों को प्रलेखित करने के लिए उपयोगी। स्वैच सूची के लिए `variant="compact"` का उपयोग करें, या उन्हें समूहबद्ध करने के लिए `Color.Row` के साथ `variant="table"` का। हर `Color.Item` में एक `name` और एक `value` लिया जाता है (एक हेक्स स्ट्रिंग, या थीम-सजग रंगों के लिए `{ light, dark }`)।
+
+<Color variant="compact">
+  <Color.Item name="blue-500" value="#3B82F6" />
+  <Color.Item name="green-500" value="#16A34A" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+
+```astro lineNumbers
+<Color variant="compact">
+  <Color.Item name="blue-500" value="#3B82F6" />
+  <Color.Item name="green-500" value="#16A34A" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+```
+
+## Tree
+
+विस्तारित की जा सकने वाली फ़ोल्डरों के साथ एक श्रेणीबद्ध फ़ाइल/फ़ोल्डर संरचना रेंडर करें। (त्वरित, सूची-आधारित संस्करण के लिए [फ़ाइल ट्री](#file-tree) देखें; `Tree` प्रति-फ़ोल्डर नियंत्रण देता है।) `Tree.Folder` (`name`, वैकल्पिक `defaultOpen`, `openable`) और `Tree.File` (`name`) का उपयोग करें।
+
+<Tree>
+  <Tree.Folder name="src" defaultOpen>
+    <Tree.File name="index.ts" />
+    <Tree.Folder name="components">
+      <Tree.File name="Button.tsx" />
+    </Tree.Folder>
+  </Tree.Folder>
+  <Tree.File name="blume.config.ts" />
+</Tree>
+
+```astro lineNumbers
+<Tree>
+  <Tree.Folder name="src" defaultOpen>
+    <Tree.File name="index.ts" />
+    <Tree.Folder name="components">
+      <Tree.File name="Button.tsx" />
+    </Tree.Folder>
+  </Tree.Folder>
+  <Tree.File name="blume.config.ts" />
+</Tree>
+```
+
+## Panel
+
+पूरक, अलग रखी गई सामग्री के लिए एक शीर्षक वाला कंटेनर। `title` वैकल्पिक है।
+
+<Panel title="Good to know">
+  पैनल मुख्य प्रवाह को बाधित किए बिना सहायक विवरण रखते हैं।
+</Panel>
+
+```astro
+<Panel title="Good to know">
+  Panels hold supporting detail without interrupting the main flow.
+</Panel>
+```
+
+## Tooltip
+
+किसी इनलाइन शब्द के लिए होवर पर परिभाषा या संकेत प्रकट करें। `tip` होवर टेक्स्ट है; एक वैकल्पिक `headline` और आगे के लिंक हेतु `cta` + `href` जोड़ें।
+
+अधिक जानने के लिए <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/docs/quickstart">API</Tooltip> शब्द पर होवर करें।
+
+```astro
+Hover the <Tooltip tip="A set of protocols software uses to communicate." headline="API" cta="Read the guide" href="/docs/quickstart">API</Tooltip> term.
+```
+
+## Tile
+
+एक क्लिक करने योग्य प्रीव्यू जो शीर्षक और विवरण के ऊपर एक दृश्य — आइकन या इमेज — के साथ शुरू होता है। गैलरी और शोकेस के लिए उपयुक्त। इसमें `title`, `description` और `href` लिए जाते हैं; चाइल्ड दृश्य होता है।
+
+<Tile
+  title="Quickstart"
+  description="Ship your first page in minutes."
+  href="/docs/quickstart"
+>
+  <Icon icon="rocket" size={28} />
+</Tile>
+
+```astro
+<Tile
+  title="Quickstart"
+  description="Ship your first page in minutes."
+  href="/docs/quickstart"
+>
+  <Icon icon="rocket" size={28} />
+</Tile>
+```
+
+## Prompt
+
+एक लेबल और कॉपी बटन वाली एकल पंक्ति। `description` (Markdown) दृश्यमान लेबल है; बॉडी स्वयं प्रॉम्प्ट है — छिपी हुई, और **Copy prompt** बटन दबाने पर क्लिपबोर्ड में कॉपी हो जाती है। `actions` बटनों को नियंत्रित करता है (उदा. `["copy", "cursor"]`)।
+
+<Prompt
+  description="Ask the model to **document** an endpoint."
+  actions={["copy"]}
+>
+  POST /v1/pets एंडपॉइंट के लिए संदर्भ दस्तावेज़ लिखें।
+</Prompt>
+
+```astro
+<Prompt
+  description="Ask the model to **document** an endpoint."
+  actions={["copy"]}
+>
+  Write reference docs for the POST /v1/pets endpoint.
+</Prompt>
+```
+
+## Visibility
+
+दर्शकों के अनुसार सामग्री दिखाएँ या छिपाएँ। `for="web"` केवल साइट पर रेंडर होता है; `for="agents"` उस एजेंट-उन्मुख Markdown को लक्षित करता है जिसे AI एजेंट पढ़ते हैं (`llms-full.txt` और हर पेज का `.md` मिरर)।
+
+<Visibility for="web">
+  यह टिप्पणी वेबसाइट पर दिखाई देती है लेकिन एजेंट-उन्मुख Markdown से छोड़ दी
+  जाती है।
+</Visibility>
+
+```astro
+<Visibility for="web">Shown on the site only.</Visibility>
+<Visibility for="agents">Shown only in the generated Markdown.</Visibility>
+```
+
+## टाइप टेबल
+
+किसी ऑब्जेक्ट की प्रॉपर्टीज़ — उसके प्रॉप्स, टाइप और डिफ़ॉल्ट — को प्रलेखित करने के लिए टेबल। पंक्तियाँ `TypeTable` के साथ हाथ से लिखें, या `AutoTypeTable` के साथ सीधे किसी TypeScript इंटरफ़ेस या टाइप एलियास से उत्पन्न करें।
+
+### टाइप टेबल
+
+एक **Prop / Type** ग्रिड जहाँ हर पंक्ति विस्तारित होकर अपना विवरण और ब्योरा प्रकट करती है। प्रॉपर्टी नाम से कुंजीबद्ध एक `type` मैप पास करें; हर प्रविष्टि में एक `type`, साथ ही वैकल्पिक `description`, `default`, `required` फ़्लैग, `typeDescription` और `typeDescriptionLink` लिया जाता है। वैकल्पिक प्रॉप्स (`required` सेट न होने पर) नाम के बाद `?` दिखाते हैं।
+
+<TypeTable
+  type={{
+    label: {
+      type: "string",
+      required: true,
+      description: "The button's visible label.",
+    },
+    variant: {
+      type: '"primary" | "ghost"',
+      default: '"primary"',
+      description: "Visual style.",
+    },
+    disabled: { type: "boolean" },
+  }}
+/>
+
+```astro lineNumbers
+<TypeTable
+  type={{
+    label: {
+      type: "string",
+      required: true,
+      description: "The button's visible label.",
+    },
+    variant: {
+      type: '"primary" | "ghost"',
+      default: '"primary"',
+      description: "Visual style.",
+    },
+    disabled: { type: "boolean" },
+  }}
+/>
+```
+
+### ऑटो टाइप टेबल
+
+किसी TypeScript टाइप से टाइप टेबल उत्पन्न करें ताकि दस्तावेज़ सोर्स के साथ समकालिक बने रहें। `AutoTypeTable` को `path` (आपके प्रोजेक्ट रूट से हल किया गया) और एक टाइप `name` के साथ किसी फ़ाइल की ओर इंगित करें। विवरण JSDoc टिप्पणियों से आते हैं, डिफ़ॉल्ट `@default` टैग से, और वैकल्पिक प्रॉपर्टीज़ (`?`) को तदनुसार चिह्नित किया जाता है।
+
+```astro
+<AutoTypeTable path="./src/button.ts" name="ButtonProps" />
+```
+
+आप `path` के बजाय `type` के साथ टाइप को इनलाइन भी पास कर सकते हैं — छोटे उदाहरणों के लिए सुविधाजनक:
+
+<AutoTypeTable
+  name="ButtonProps"
+  type={`
+export interface ButtonProps {
+  /** The button's visible label. */
+  label: string;
+  /**
+   * Visual style.
+   * @default "primary"
+   */
+  variant?: "primary" | "ghost";
+  /** Disable interaction. */
+  disabled?: boolean;
+}
+`}
+/>
+
+```astro lineNumbers
+<AutoTypeTable
+  name="ButtonProps"
+  type={`
+export interface ButtonProps {
+  /** The button's visible label. */
+  label: string;
+  /**
+   * Visual style.
+   * @default "primary"
+   */
+  variant?: "primary" | "ghost";
+  /** Disable interaction. */
+  disabled?: boolean;
+}
+`}
+/>
+```
+
+## GitHub जानकारी
+
+एक कार्ड जो किसी GitHub रिपॉज़िटरी से उसके लाइव स्टार और फ़ोर्क काउंट के साथ लिंक करता है। काउंट बिल्ड समय पर फ़ेच किए जाते हैं — कोई क्लाइंट JavaScript नहीं — और API अनुपलब्ध होने पर भी कार्ड रेंडर होता है। `owner` और `repo` पास करें, या अपने `blume.config` की रिपॉज़िटरी उपयोग करने के लिए उन्हें छोड़ दें। API दर सीमा हटाने के लिए एक `GITHUB_TOKEN` एनवायरनमेंट वेरिएबल सेट करें।
+
+<GithubInfo owner="haydenbleasel" repo="blume" />
+
+```astro lineNumbers
+<!-- Uses the repo from blume.config -->
+<GithubInfo />
+
+<!-- Or point it at any repository -->
+<GithubInfo owner="haydenbleasel" repo="blume" />
+```
+
+## Component
+
+`Component` आपके प्रोजेक्ट की `examples/` डायरेक्टरी से एक उदाहरण फ़ाइल को उसके हाइलाइट किए गए सोर्स के साथ-साथ लाइव प्रीव्यू के रूप में टैब में रेंडर करता है। इसे `path` के साथ किसी फ़ाइल की ओर इंगित करें — `examples/` के अंतर्गत उसका स्थान, बिना एक्सटेंशन के (इसलिए `examples/counter.tsx` के लिए `path="counter"`)। React, Vue, Svelte और Astro उदाहरण सभी समर्थित हैं; फ़्रेमवर्क उदाहरण हाइड्रेट होते हैं, Astro वाले स्थैतिक रूप से रेंडर होते हैं। यह एक ही फ़ाइल से प्रीव्यू और कोड को समकालिक रखता है।
+
+प्रीव्यू एक पृथक फ़्रेम में रेंडर होता है जहाँ दस्तावेज़ की स्टाइल कभी नहीं पहुँचती — कोई गद्य मार्जिन, टाइपोग्राफ़ी, या थीम क्रोम आपके घटक में नहीं रिसता। फ़्रेम को Tailwind मिलता है (प्रीफ़्लाइट + आपकी उदाहरण फ़ाइलों और उनके द्वारा इम्पोर्ट की गई हर चीज़ से स्कैन की गई यूटिलिटीज़), Blume के डिज़ाइन टोकन मिलते हैं ताकि `bg-background` जैसी क्लासेज़ डिफ़ॉल्ट रूप से साइट पैलेट का अनुसरण करें, और यह साइट के लाइट/डार्क टॉगल का लाइव अनुसरण करता है। पेन स्वयं को रेंडर किए गए उदाहरण के अनुसार आकार देता है — और लोड होने के बाद उदाहरण के बढ़ने या घटने पर भी उसे ट्रैक करता रहता है — जिसमें Preview और Code टैब एक ही ऊँचाई साझा करते हैं, इसलिए उन्हें बदलने पर पेज कभी नहीं खिसकता।
+
+प्रीव्यू को अपने स्वयं के डिज़ाइन सिस्टम — मान लीजिए, shadcn वेरिएबल्स — से स्टाइल करने के लिए, `examples.css` को किसी स्टाइलशीट की ओर इंगित करें। इसे Blume के डिफ़ॉल्ट के बाद हर प्रीव्यू फ़्रेम में इंजेक्ट किया जाता है, इसलिए आपके टोकन जीतते हैं। इसमें `@import "tailwindcss"` न करें; फ़्रेम पहले से ही Tailwind प्रदान करता है। डार्क-मोड ओवरराइड के लिए `.dark` और `[data-theme="dark"]` दोनों काम करते हैं:
+
+```ts
+// blume.config.ts
+export default defineConfig({
+  examples: { css: "examples/theme.css" },
+});
+```
+
+```css
+/* examples/theme.css */
+:root {
+  --primary: oklch(0.6 0.2 260);
+}
+
+.dark {
+  --primary: oklch(0.75 0.15 260);
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+}
+```
+
+डायरेक्टरी भी कॉन्फ़िगर करने योग्य है — जब आपके उदाहरण कहीं और रहते हों (उदा. रजिस्ट्री लेआउट) तो `source` सेट करें (या स्ट्रिंग शॉर्टहैंड, `examples: "..."` का उपयोग करें)। `path` हमेशा उसके सापेक्ष होता है:
+
+```ts
+// blume.config.ts
+export default defineConfig({
+  examples: "registry/files-sdk",
+});
+```
+
+```astro
+<!-- registry/files-sdk/file-list/basic.tsx -->
+<Component path="file-list/basic" />
+```
+
+`examples` एक ग्लोब भी हो सकता है (कुछ भी जिसमें `*`, `?`, `[]`, `{}`, या `!` हो)। केवल मेल खाने वाली फ़ाइलें खोजी जाती हैं, और `path` ग्लोब के स्थैतिक उपसर्ग (पहले वाइल्डकार्ड से पहले वाला भाग) के सापेक्ष होता है। यह ऐसी रजिस्ट्री के लिए है जो हर घटक के सोर्स को उसके उदाहरण के साथ रखती है — केवल उदाहरणों की ओर इंगित करें ताकि सोर्स, जिनमें प्रीव्यू के लिए कोई डिफ़ॉल्ट एक्सपोर्ट नहीं होता, शामिल न हो जाएँ:
+
+```ts
+// blume.config.ts
+export default defineConfig({
+  // registry/files-sdk/file-list/file-list.tsx — source, left out
+  // registry/files-sdk/file-list/examples/basic.tsx — discovered
+  examples: "registry/files-sdk/**/examples/*",
+});
+```
+
+```astro
+<!-- keyed relative to registry/files-sdk -->
+<Component path="file-list/examples/basic" />
+```
+
+<Component path="counter" />
+
+```astro
+<!-- examples/counter.tsx -->
+<Component path="counter" />
+```
+
+एक Astro उदाहरण बिना किसी क्लाइंट JavaScript के लाइव रेंडर होता है:
+
+<Component path="card" />
+
+## CodeBlock
+
+`CodeBlock` किसी कोड स्ट्रिंग को उन्हीं Shiki थीम और ट्रांसफ़ॉर्मर्स के साथ हाइलाइट करता है जो आपके फ़ेंस किए गए कोड के लिए उपयोग होते हैं — लाइट/डार्क स्वैप सहित — उन जगहों के लिए जहाँ फ़ेंस नहीं जा सकता, जैसे कोई लैंडिंग पेज या कस्टम घटक। `code` और एक `lang` पास करें:
+
+<CodeBlock
+  lang="ts"
+  code={`export const greet = (name: string): string =>
+  \`Hello, \${name}!\`;`}
+/>
+
+```astro
+---
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+---
+
+<CodeBlock lang="ts" code={source} />
+```
+
+स्वयं HTML स्ट्रिंग में हाइलाइट करने के लिए (उदा. अपने स्वयं के घटक के भीतर), `blume/markdown` से अंतर्निहित हेल्पर इम्पोर्ट करें:
+
+```ts
+import { highlightCode } from "blume/markdown";
+
+const html = await highlightCode(source, "ts");
+```
+
+## Diff
+
+`Diff` एक git-शैली का डिफ़ रेंडर करता है, जो आपके कोड ब्लॉक की तरह उसी Shiki थीम से हाइलाइट होता है और पूरी तरह बिल्ड समय पर तैयार होता है — कोई क्लाइंट JavaScript नहीं। इसे दो इनलाइन स्ट्रिंग (`old` / `new`), दो फ़ाइल पथ (`before` / `after`), या एक यूनिफ़ाइड पैच (एक इनलाइन `patch` स्ट्रिंग या एक `src` फ़ाइल) दें।
+
+<Diff
+  lang="ts"
+  old={`export function greet(name) {
+  return "Hi, " + name;
+}`}
+  new={`export function greet(name: string): string {
+  return "Hi, " + name + "!";
+}`}
+/>
+
+```astro
+<Diff
+  lang="ts"
+  old={`export function greet(name) {
+  return "Hi, " + name;
+}`}
+  new={`export function greet(name: string): string {
+  return "Hi, " + name + "!";
+}`}
+/>
+```
+
+अपने प्रोजेक्ट की दो फ़ाइलों का डिफ़ लें, उसके रूट के सापेक्ष:
+
+<Diff before="diffs/button-before.ts" after="diffs/button-after.ts" />
+
+```astro
+<Diff before="diffs/button-before.ts" after="diffs/button-after.ts" />
+```
+
+या एक यूनिफ़ाइड पैच रेंडर करें — या तो `src` के साथ किसी फ़ाइल से, या `patch` के साथ इनलाइन:
+
+<Diff src="diffs/greet.patch" />
+
+```astro
+<Diff src="diffs/greet.patch" />
+```
+
+```astro
+<Diff
+  patch={`--- a/greet.ts
++++ b/greet.ts
+@@ -1,3 +1,4 @@
+-export function greet(name) {
+-  return "Hi, " + name;
++export function greet(name: string): string {
++  const greeting = "Hi, " + name + "!";
++  return greeting;
+ }`}
+/>
+```

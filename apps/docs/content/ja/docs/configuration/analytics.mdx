@@ -1,0 +1,83 @@
+---
+title: アナリティクス
+description: >-
+  ファーストパーティのウェブアナリティクス — Vercel Web Analytics、PostHog、または任意のカスタムスクリプト — を blume.config.ts から設定できます。
+---
+
+Blume は `blume.config.ts` の単一の `analytics` ブロックからアナリティクスを注入します。Vercel Web Analytics と PostHog はファーストクラスでサポートされ、`scripts` というエスケープハッチによって他のあらゆるプロバイダー（Plausible、Fathom、Google Analytics、Umami など）に対応できます。
+
+アナリティクスが読み込まれるのは**本番ビルドのみ**です。スクリプトは `blume build` によって出力され、`blume dev` では決して出力されません。そのため、ローカルのトラフィックがダッシュボードに届くことはなく、別途「開発用」プロジェクトを用意する必要もありません。
+
+:::note
+アナリティクスはオプトインです。`analytics` ブロックがない場合、Blume は何も注入しません。
+:::
+
+## Vercel Web Analytics
+
+[Vercel Web Analytics](https://vercel.com/docs/analytics) を追加するには `vercel: true` を設定します。Blume は Vercel のファーストパーティスクリプトを注入します。このスクリプトは、Vercel ダッシュボードでプロジェクトの Web Analytics を有効にすると、あなた自身のドメインから配信されます。
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  vercel: true,
+}
+```
+
+キーは不要です — スクリプトはデプロイ先のプロジェクトにレポートします。これは `/_vercel/insights` エンドポイントが存在する Vercel のデプロイでのみデータを収集します。
+
+## PostHog
+
+[PostHog](https://posthog.com) を追加するには、**プロジェクト API キー**を指定します。ホストのデフォルトは PostHog Cloud US です。EU Cloud（`https://eu.i.posthog.com`）やセルフホストのインスタンスを使う場合は `host` を設定してください。
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  posthog: {
+    key: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    host: "https://us.i.posthog.com", // optional, this is the default
+  },
+}
+```
+
+プロジェクト API キーはブラウザに配信しても安全です — これは公開用の書き込み専用キーです。
+
+## カスタムスクリプト
+
+他のアナリティクスプロバイダーを読み込むには `scripts` を使用します。各エントリは 1 つの `<script>` タグをレンダリングし、`src`（外部）または `content`（インライン）の**どちらか一方だけ**を設定する必要があります。
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  scripts: [
+    // Plausible
+    {
+      src: "https://plausible.io/js/script.js",
+      strategy: "defer",
+      attributes: { "data-domain": "example.com" },
+    },
+    // Fathom
+    {
+      src: "https://cdn.usefathom.com/script.js",
+      strategy: "defer",
+      attributes: { "data-site": "ABCDEFG" },
+    },
+    // An inline snippet
+    {
+      content: "console.log('analytics ready')",
+    },
+  ],
+}
+```
+
+`attributes` はタグに展開される追加の HTML 属性（`data-*`、`id` など）のマップで、`strategy` は外部スクリプトに `async` または `defer` を追加します。
+
+## オプション
+
+| オプション | デフォルト | 説明 |
+| --- | --- | --- |
+| `vercel` | `false` | Vercel Web Analytics を追加します（Vercel のデプロイのみ）。 |
+| `posthog.key` | — | PostHog のプロジェクト API キー。設定すると PostHog が有効になります。 |
+| `posthog.host` | `https://us.i.posthog.com` | PostHog の取り込みホスト（EU Cloud またはセルフホスト）。 |
+| `scripts[].src` | — | 外部スクリプトの URL。`content` とは排他的です。 |
+| `scripts[].content` | — | インラインスクリプトの本文。`src` とは排他的です。 |
+| `scripts[].strategy` | — | 外部スクリプトに対する `async` または `defer`。 |
+| `scripts[].attributes` | — | `<script>` タグに展開される追加の HTML 属性。 |
+
+3 つすべてを組み合わせることもできます — Vercel、PostHog、カスタムスクリプトを同時に有効にできます。ビルドしたサイトのデプロイについては、[デプロイ](/docs/deployment)を参照してください。

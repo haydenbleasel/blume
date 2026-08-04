@@ -1,0 +1,117 @@
+---
+title: フロントマター
+description: >-
+  ページが受け付けるフロントマターフィールドをすべて解説します。すべて任意項目で、title、description、sidebar、SEO、search などが何を制御するのかをまとめています。
+---
+
+各ページでは以下のフロントマターを使用できます。すべてのフィールドは任意です。
+
+<TypeTable
+  type={{
+    title: { type: "string", description: "ページのタイトル。" },
+    description: { type: "string", description: "ページの概要。" },
+    type: {
+      type: "string",
+      default: "doc",
+      description:
+        "コンテンツの種類。blog / changelog はフィードを生成します。",
+    },
+    date: {
+      type: "string",
+      description:
+        "blog / changelog フィード用の公開日（ISO 形式または YAML の日付）。",
+    },
+    authors: {
+      type: "string | string[] | object[]",
+      description:
+        "blog / changelog コンテンツの投稿者。名前、または name と任意の avatar / url、その他の追加フィールドを持つオブジェクトを指定します。値はそのまま保持されます。",
+    },
+    slug: { type: "string", description: "生成されるスラッグを上書きします。" },
+    draft: {
+      type: "boolean",
+      default: "false",
+      description: "本番ビルドから除外します。",
+    },
+    lastModified: {
+      type: "string",
+      description:
+        "ページの「最終更新日」を固定します（ISO 形式または YAML の日付）。git から取得した日付を上書きします。",
+    },
+  }}
+/>
+
+## サイドバー
+
+```yaml lineNumbers
+sidebar:
+  label: Install
+  order: 2
+  icon: download
+  badge: New
+  hidden: false
+```
+
+## SEO
+
+```yaml lineNumbers
+seo:
+  title: Install Blume
+  description: Install Blume and scaffold your first project.
+  image: /og/install.png
+  canonical: https://acme.com/install
+  noindex: false
+```
+
+## 検索
+
+```yaml lineNumbers
+search:
+  exclude: false
+  tags: [api]
+```
+
+## 変更履歴
+
+変更履歴のエントリー（`type: changelog`）では、フィードや表示のメタデータをより充実させるために、任意の `changelog` オブジェクトを指定できます。
+
+```yaml lineNumbers
+type: changelog
+changelog:
+  version: 1.2.0
+  date: 2026-06-20
+  category: Features
+```
+
+`date` はここに書いてもトップレベルに書いても構いません。どちらも[変更履歴の RSS フィード](/docs/content#feeds)に反映されます。生成されるタイムラインページとフィードについては、[変更履歴](/docs/advanced/changelog)を参照してください。
+
+## カスタムキー
+
+このリファレンスに記載されていないキーはビルドを失敗させるため、タイプミスを早期に検出できます。独自のメタデータを扱うプロジェクトでは、`blume.config.ts` の [`frontmatter.extend`](/docs/configuration#frontmatter) で追加のキーを許可できます。各キーはプロジェクト側が用意したスキーマで検証されます。
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { z } from "zod";
+
+export default defineConfig({
+  frontmatter: {
+    extend: {
+      owner: z.string(),
+      reviewedAt: z.coerce.date().optional(),
+    },
+  },
+});
+```
+
+```yaml page.mdx
+---
+title: Install
+owner: "@sam"
+reviewedAt: 2026-06-20
+---
+```
+
+スキーマは [Standard Schema](https://standardschema.dev) インターフェース経由で受け付けられるため、Zod（プロジェクトがインストールしているバージョンを問わず）、Valibot、ArkType のいずれも利用できます。宣言されたキーはすべてのページで検証されます。存在しない場合も含めて検証されるため、必須スキーマにするとサイト全体でそのキーが強制されます。存在するページでのみ検証したい場合は `.optional()` を付けてください。それ以外のキーは引き続き厳密に検証され、組み込みフィールドを再宣言することはできません。
+
+検証に失敗したページがあると `blume build` は失敗し、該当するファイルとキーを示す診断メッセージが表示されます。[`--no-strict`](/docs/reference/cli#common-flags) を指定した場合はビルドが成功し、失敗したページは出力から除外されます。除外された件数はビルドのサマリーに報告されます。
+
+スキーマはエディターや移行ツール向けに `blume/schema` からエクスポートされています。

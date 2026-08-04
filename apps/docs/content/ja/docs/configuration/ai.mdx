@@ -1,0 +1,446 @@
+---
+title: AI
+description: >-
+  llms.txt でドキュメントを機械可読にし、ページ内の Ask AI アシスタント（任意）を追加し、コーディングエージェント向けにホスト型 MCP サーバーを公開します。
+---
+
+Blume にはいくつかの AI 機能があります。外部ツール向けの機械可読ドキュメント（`llms.txt`、既定で有効）、ページ内の **Ask AI** アシスタント、そしてコーディングエージェント向けのホスト型 **MCP サーバー** です。Ask AI と MCP はオプトインで、機能を有効にするまで静的ドキュメントは完全に静的なままです。
+
+## llms.txt
+
+Blume は、コーディングエージェントやチャットアシスタントが利用できる機械可読版のドキュメントを出力します。これは既定で有効です。無効にするには `llmsTxt: false` を設定します。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  llmsTxt: false,
+}
+```
+
+有効な間、`blume build` はサイトのルートに 2 つのファイルを書き出します。
+
+- **`/llms.txt`** — コンパクトな索引です。サイトのタイトルと説明に続いて、各ページの要約付きリンク一覧を、サイドバーを反映したセクションに整理して並べます。フォルダーやグループが見出しになるため、エージェントは 1 枚のフラットな塊ではなくドキュメントの構造を把握できます。
+- **`/llms-full.txt`** — コーパス全体です。各ページの完全な Markdown 本文を、ソース URL とともに 1 つのファイルにまとめます。
+
+下書きページは除外されます。リンクとソース URL が絶対アドレスに解決されるように [`deployment.site`](/docs/deployment) を設定してください。
+
+`llmsTxt` は、ファイルに含める内容を調整するつまみを備えたオブジェクト形式も受け付けます。[API リファレンス](/docs/advanced/api-reference)がプレースホルダーやサンプルの仕様をドキュメント化している場合は、`openapi: false` を設定して、生成されたページを両方のファイルから除外できます。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  llmsTxt: {
+    enabled: true, // default
+    openapi: false, // exclude generated API reference pages
+  },
+}
+```
+
+個々のページを両方のファイルから除外するには、そのページのフロントマターで `ai.exclude` を設定します。
+
+```mdx
+---
+title: Internal notes
+ai:
+  exclude: true
+---
+```
+
+そのページは引き続きレンダリングされ、検索にも残り、サイトマップ上の位置も保たれます。スキップされるのは `llms.txt` ファイルだけです。
+
+どちらかのファイルを完全に自分で制御したい場合は、独自の `llms.txt` または `llms-full.txt` を `public/` フォルダーに追加してください。カスタムファビコンと同様に自動的に検出され、生成されたファイルの代わりに配信されます。一方を上書きしても、もう一方は Blume が生成し続けます。
+
+## 生の Markdown
+
+任意のページの URL に `.md` または `.mdx` を付け加えると、その生の Markdown ソースを取得できます。LLM、コーディングエージェント、「Markdown としてコピー」ワークフローに最適です。設定不要で、開発環境でも本番環境でも、すべてのページで利用できます。
+
+| URL               | 返される内容                                |
+| ----------------- | ------------------------------------------- |
+| `/quickstart`     | レンダリングされたページ                    |
+| `/quickstart.md`  | コンポーネントを変換したプレーンな Markdown |
+| `/quickstart.mdx` | 記述されたままの生の MDX ソース             |
+
+ネストされたルートも同様に動作し（`/content/syntax.md`）、ホームページは `/index.md` で配信されます。
+
+`.md` 版は、JSX を解釈できない利用者のためにコンポーネントをプレーンな Markdown へ*ダウンレベル*します。`<TypeTable>` は Markdown のテーブルに、`<Callout>` はラベル付き引用に、`<Steps>` は順序付きリストに、`<Tabs>` は太字ラベルのセクションに、`<YouTube>` はリンクになります。props はページの `frontmatter` をスコープに入れて評価されるため、`title={frontmatter.status}` のような prop はレンダリングされたページと同じ値に解決されます。忠実に変換できないもの（カスタムコンポーネントや、import から算出される prop）はそのまま残され、フェンス付きコードブロック内のコンポーネントのマークアップには一切手を加えません。同じ変換は `llms-full.txt` と MCP サーバーの `get_page` ツールにも適用されるため、エージェントに向けたあらゆる面がきれいな Markdown として読めます。変換前のソースが必要なときは `.mdx` 版を使ってください。
+
+### コンテントネゴシエーション
+
+エージェントが `.md` の規約を知っている必要はありません。ページ自身の URL を [`Accept: text/markdown`](https://acceptmarkdown.com) ヘッダー付きでリクエストすると、同じアドレスで Markdown 版が配信され、キャッシュが両者を区別できるように `Vary: Accept` が付きます。開発サーバーは標準でこのヘッダーを尊重し、[Vercel のサーバービルド](/docs/deployment#server-rendering)ではデプロイのルーティングルールに同じネゴシエーションが自動的に組み込まれます。設定は不要です。ホームページは、コンテンツページではなくカスタムのランディングページであっても常にネゴシエーションを行います。その Markdown ミラーは [`llms.txt`](#llmstxt) の索引にフォールバックするため、サイトルートに Markdown を求めたエージェントはサイトの機械可読なマップを得られます。Markdown のレスポンスには `x-markdown-tokens` ヘッダー（トークン数の推定値。1 トークンあたり約 4 文字）も付きます。これは [Cloudflare の Markdown for Agents](https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/) の慣習に従ったもので、Blume がレスポンスヘッダーを制御できるすべての面（開発サーバー、サーバーレンダリングされたレスポンス、Vercel 上でネゴシエーションされるホームページ）に付与されます。それ以外のデプロイ先はリクエスト時のフックを持たない静的レイヤーからプリレンダリング済みページを配信するため、そこではエージェントが `.md` の URL を直接取得します。[エージェント可読性マニフェスト](#agent-readability)は、ヘッダーを尊重するデプロイでのみ `contentNegotiation` を告知します。
+
+### カスタムコンポーネントのシリアライザー
+
+`ai.markdownComponents`（JSX 名からシリアライザーへのマップ）を使うと、独自のコンポーネントに Markdown 表現を与えられます。各シリアライザーは、コンポーネントの `props`（MDX の属性から静的に評価され、ページの `frontmatter` がスコープに入ります）、`children`（すでに Markdown へダウンレベル済み）、およびページの `frontmatter` データを受け取り、置き換える内容を返します。JSX をそのまま残すには `null` を返します。
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import type { ComponentMarkdown } from "blume";
+
+const chart: ComponentMarkdown = ({ props }) =>
+  `![${props.title}](/charts/${props.slug}.png)`;
+
+export default defineConfig({
+  ai: {
+    markdownComponents: {
+      Chart: chart,
+    },
+  },
+});
+```
+
+コンテナー系のコンポーネントでは、`childComponents("Name")` がタグごとに直下の子要素を抽出します。組み込みの `<Steps>` シリアライザーが `<Step>` 項目を集めるのと同じ仕組みです。同名のエントリーは組み込みシリアライザーを置き換えるため、`<Callout>` のダウンレベルの見え方を作り替えたり、`null` を返して完全にオプトアウトしたりできます。
+
+シリアライザーは `components.tsx` ではなく `blume.config.ts` に置きます。設定ファイルはビルド時に実行されますが、コンポーネントファイルは静的に解析されるだけだからです（`.astro` ファイルを import する可能性があり、それはサイトのビルド外では実行できません）。コンポーネント自体はこれまでどおり `components.tsx` に登録したままです。`markdownComponents` は、そのエージェント向けの Markdown 表現を追加するだけです。
+
+## Copy as Markdown
+
+すべてのページには、目次の下の[ページアクション](/docs/content/navigation#page-actions)に **Copy as Markdown** アクションがあり、そのページの生の Markdown をクリップボードにコピーします。これは上記の [`.md` URL](#raw-markdown) で配信されるものと同じソースで、LLM や Issue、メモにそのまま貼り付けられます。設定不要で、開発環境でも本番環境でも、すべてのページで利用できます。
+
+## Open in chat
+
+**Open in chat** アクションは、現在のページを AI アシスタント（v0、ChatGPT、Claude、T3 Chat、Scira、Cursor）で開き、そのページの生の Markdown を指すプロンプトをあらかじめ入力しておくため、読んでいる内容について質問できます。
+
+> Read `https://your-site/this-page.md` so I can ask you questions about this page.
+
+Copy as Markdown と同様、セットアップは不要です。アシスタントは公開 URL 経由でページを取得するため、ページがデプロイされればすぐに機能します。
+
+ページ全体のアクションではなく、コンテンツ内にコピーしてすぐ使えるプロンプトを埋め込みたい場合は、[Prompt コンポーネント](/docs/content/components#prompt)を使ってください。**Copy prompt** ボタンと、任意で Cursor で開くリンクを備えたラベル付きの行をレンダリングします。
+
+## Ask AI
+
+読者の質問にページ内のチャットパネルで答えるアシスタントを追加します。ストリーミング対応のサーバーエンドポイントと [AI SDK](https://ai-sdk.dev) がバックエンドです。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    provider: "gateway", // default
+    model: "openai/gpt-5.5",
+  },
+}
+```
+
+### 質問候補
+
+空の状態にいくつかのスターター用プロンプトを用意できます。それぞれクリック可能な候補として表示され（クリックすると送信されます）、ラベルの横に任意で [Lucide アイコン](/docs/content/components#icon)を添えられます。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    suggestions: [
+      { label: "What is Blume?", icon: "rocket" },
+      { label: "How do I write a docs page?", icon: "file-text" },
+      { label: "How do I configure the theme?", icon: "settings" },
+    ],
+  },
+}
+```
+
+`label` は実際に送信される質問で、`icon` は任意です。`suggestions` を未設定（または空）のままにすると、パネルはシンプルな入力欄で開きます。
+
+### グラウンディング
+
+Ask AI は**ドキュメントにグラウンディングされています**。質問ごとに最も関連性の高いページを取得し（ページ内検索を支えるのと同じ字句ベースの [Orama](/docs/configuration/search) インデックスを使用）、モデルのシステムプロンプトに注入するため、回答はモデル自身の知識ではなくあなたのコンテンツから生成されます。アシスタントは、取得したページのみから回答すること、カバーされていない事柄はそう伝えること、参照したページを引用することを指示されています。
+
+読者が現在開いているページが最初にコンテキストへ追加され、そのページの言語に検索範囲を絞るために使われるため、回答はドキュメント内の現在地に沿った内容になります。取得処理はビルドに埋め込まれたスナップショットからリクエスト時に実行されるため、[検索](/docs/configuration/search)プロバイダーに関係なく（検索が `none` に設定されていても）動作し、設定は不要です。
+
+グラウンディングは **[Inkeep](#backends)** 以外のすべてのバックエンドで有効です。Inkeep はダッシュボードでインデックスしたコンテンツに対して独自の取得処理を行います。
+
+### 外部エンドポイント
+
+すでに AI 用の API バックエンドをお持ちですか。パネルをそこに向ければ、ドキュメントのビルドは静的なままにできます。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    endpoint: "https://api.example.com/v1/docs/ask",
+  },
+}
+```
+
+Blume は組み込みのルートと同じ `POST` ボディを送信します。
+
+```json
+{
+  "messages": [{ "role": "user", "content": "How do I deploy?" }],
+  "page": { "path": "/deployment" }
+}
+```
+
+ボディがプレーンな UTF-8 テキストストリームである成功レスポンスを返してください。エンドポイントが別オリジンにある場合は、CORS でドキュメントのオリジンを許可します。`OPTIONS` と `POST` を受け付け、`content-type` リクエストヘッダーを許可し、プリフライトとストリーミングレスポンスの両方で CORS ヘッダーを返してください。`endpoint` を設定すると、Blume はチャット UI を生成しますが、サーバールート、グラウンディング用スナップショット、プロバイダーの依存関係、プロバイダーのシークレットに関する警告は生成しません。取得処理、認証、レート制限、モデルへのアクセス、引用はあなたのバックエンドが担います。
+
+### サーバー出力が必要
+
+Blume 組み込みの Ask AI バックエンドはサーバールート（`POST /api/ask`）なので、静的ビルドでは動作しません。サーバー出力に切り替えてアダプターを選択してください。
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  output: "server",
+  adapter: "vercel",
+}
+```
+
+Ask AI が有効で外部 `endpoint` がない静的ビルドは、`deployment.output` を `server` に設定するよう促すメッセージとともに即座に失敗します。アダプターについては[デプロイ](/docs/deployment)を参照してください。
+
+### バックエンド
+
+既定では、Ask AI は **Vercel AI Gateway** を経由します。`model` は `provider/model` 形式の文字列なので、それを変更するだけでモデルを切り替えられ（`openai/gpt-5.5`、`anthropic/claude-sonnet-4-5` など）、プロバイダーの SDK をインストールする必要はありません。ゲートウェイは環境から `AI_GATEWAY_API_KEY` を読み取り、Vercel にデプロイすると自動的に設定されます。
+
+Ask AI を別の場所に向けるには `provider` を設定します。各バックエンドは環境変数から API キーを読み取り、対応するプロバイダーの SDK はビルド時にプロジェクトのランタイムへ自動的に追加されます。追加されるのは実際に使うものだけです。
+
+| `provider` | `model` | API キーの環境変数 |
+| --- | --- | --- |
+| `gateway`（既定） | AI Gateway 経由の `provider/model` 形式の文字列 | `AI_GATEWAY_API_KEY` |
+| `openrouter` | 任意の [OpenRouter](https://openrouter.ai) モデル | `OPENROUTER_API_KEY` |
+| `llmgateway` | 任意の [LLMGateway](https://llmgateway.io) モデル | `LLMGATEWAY_API_KEY` |
+| `inkeep` | [Inkeep](https://inkeep.com) の QA モデル | `INKEEP_API_KEY` |
+| `openai-compatible` | エンドポイントが提供するもの | `apiKeyEnv` で設定 |
+
+たとえば OpenRouter を使うには次のようにします。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    provider: "openrouter",
+    model: "anthropic/claude-sonnet-4-5",
+  },
+}
+```
+
+OpenAI 互換のエンドポイントはすべて `openai-compatible` で利用できます。`baseUrl` と、キーを保持する環境変数を指定してください。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    provider: "openai-compatible",
+    baseUrl: "https://my-gateway.example.com/v1",
+    apiKeyEnv: "MY_GATEWAY_API_KEY",
+    model: "gpt-4o",
+  },
+}
+```
+
+どのバックエンドでも `apiKeyEnv`（および、名前付きプロバイダーでは `baseUrl`）を設定すれば、別の環境変数やプロキシを指せます。
+
+:::note
+**Inkeep** は Inkeep のダッシュボードでインデックスしたコンテンツから回答し、独自の取得処理を行うため、Blume はグラウンディングを行いません。それ以外のバックエンドはすべて、このサイトのページに[グラウンディング](#grounding)されます。
+:::
+
+キーは `process.env` で読み取られ、Node、Vercel、Netlify の各アダプターがこれに該当します。Cloudflare では、プラットフォームの[ランタイムバインディング](https://docs.astro.build/en/guides/integrations-guide/cloudflare/#environment-variables-and-secrets)経由でキーを公開してください。Ask AI を有効にすると、ページ内アイランドのために React も有効になります。[カスタマイズ](/docs/configuration/customization#interactive-islands)を参照してください。
+
+### レート制限
+
+`POST /api/ask` エンドポイントは**認証されていません**。ページ内アシスタントが呼び出せる必要があるため、そうならざるを得ません。Blume は各リクエストを検証し（不正なボディを拒否し、メッセージ数を 1〜40 に制限し、`user`/`assistant` のロールのみを受け付けることで、呼び出し元が独自のシステムプロンプトを注入してこのルートを汎用の LLM プロキシに転用できないようにします）、1 回の呼び出しがモデルに対して消費できる量を抑えますが、誰かが繰り返しエンドポイントを呼び出すことは防げません。コストの悪用が懸念される場合は、ホスト（たとえば Vercel）のエッジのレート制限、ミドルウェア、あるいはモデルプロバイダーのキー単位の支出上限などで、このルートをレートリミッターの背後に置いてください。
+
+## MCP サーバー
+
+[Model Context Protocol](https://modelcontextprotocol.io) サーバーをホストすれば、コーディングエージェント（Claude Code、Cursor、VS Code、claude.ai のコネクター）がスクレイピングなしで直接ドキュメントを検索・閲覧できます。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  mcp: {
+    enabled: true,
+    route: "/mcp", // where the server is mounted
+  },
+}
+```
+
+| オプション | 既定値 | 説明 |
+| --- | --- | --- |
+| `enabled` | `false` | MCP サーバーを生成してホストします。 |
+| `route` | `/mcp` | Streamable-HTTP エンドポイントをマウントするパスです。 |
+| `name` | title | クライアントに表示されるサーバー名（既定はタイトル）。 |
+| `instructions` | — | 接続するエージェントに渡す任意のシステムヒント。 |
+
+サーバーは読み取り専用のツール（`search_docs`、`get_page`、`list_pages`、`get_navigation`）を公開し、`/.well-known/mcp.json` と `/.well-known/mcp/server-card.json` にディスカバリー文書を公開します。サーバーカードは [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) の Server Card 拡張スキーマ（逆引き DNS 形式の `name`、`remotes` トランスポートエンドポイント）に従い、提案の以前の版に合わせて作られたスキャナー向けに initialize 形式の互換フィールド（`serverInfo`、`capabilities`、`transports`）も備えています。各ページの **Connect to MCP** メニューでは、Claude Code、Cursor、VS Code、Codex 向けにコピーしてすぐ使えるインストール手順を提供します（[`deployment.site`](/docs/deployment) を設定すると表示されます）。
+
+`search_docs` は独自の全文インデックスで動作するため、[検索](/docs/configuration/search)プロバイダーに関係なく（検索が `none` に設定されていても）機能します。MCP サーバーはページ内検索とは別の機能です。
+
+### サーバー出力が必要
+
+MCP サーバーはライブのエンドポイント（`/mcp`）なので、静的ビルドでは動作しません。サーバー出力に切り替えてアダプターを選択してください。
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  output: "server",
+  adapter: "node", // or "vercel" | "netlify" | "cloudflare"
+  site: "https://docs.example.com",
+}
+```
+
+`ai.mcp.enabled` が設定された静的ビルドは、`deployment.output` を `server` に設定するよう促すメッセージとともに即座に失敗します。アダプターについては[デプロイ](/docs/deployment)を参照してください。デプロイ後は、次のコマンドで Claude Code から接続できます。
+
+```bash
+claude mcp add --transport http my-docs https://docs.example.com/mcp
+```
+
+## エージェント可読性
+
+Blume はサイトのルートに **`/agent-readability.json`** マニフェストを書き出し、このページで説明したエージェント向けの機能を索引化します。これにより、エージェントは規約を推測したり HTML をスクレイピングしたりせずに、1 回の取得で発見できます。`llms.txt` と同様、既定で有効です。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  agentReadability: true,
+}
+```
+
+マニフェストには有効にしたものだけが列挙されます。[生の Markdown](#raw-markdown) ミラーのパターン、[`llms.txt`](#llmstxt) と `llms-full.txt`、[MCP サーバー](#mcp-server)とそのディスカバリー文書、[Ask AI](#ask-ai) のエンドポイント、[サイトマップ](/docs/configuration/seo#sitemap)、[RSS フィード](/docs/configuration/seo#rss-feeds)に加えて、サイト名、説明、ソースリポジトリ、[コンテントシグナル](/docs/configuration/seo#content-signals)の利用ポリシーが含まれます。URL は [`deployment.site`](/docs/deployment) が設定されていれば絶対 URL に、そうでなければルート相対になります。
+
+```json agent-readability.json
+{
+  "artifacts": {
+    "markdown": {
+      "contentNegotiation": "text/markdown",
+      "pattern": "https://docs.example.com/{route}.md"
+    },
+    "llmsFullTxt": "https://docs.example.com/llms-full.txt",
+    "llmsTxt": "https://docs.example.com/llms.txt",
+    "mcp": {
+      "discovery": "https://docs.example.com/.well-known/mcp.json",
+      "url": "https://docs.example.com/mcp"
+    }
+  },
+  "description": "Docs for the Acme API.",
+  "generator": "blume@1.0.0",
+  "name": "Acme Docs",
+  "site": "https://docs.example.com",
+  "contentUsage": { "search": true, "ai-input": true, "ai-train": true },
+  "repository": "https://github.com/acme/docs"
+}
+```
+
+`contentNegotiation` フィールドは、デプロイされたサイトが実際に `Accept: text/markdown` ヘッダーを尊重する場合にのみ現れます（[コンテントネゴシエーション](#content-negotiation)を参照）。それ以外のデプロイでは、マニフェストは `.md` ミラーのパターンのみを告知します。
+
+`seo.agentReadability` を `false` にすると生成をスキップできます。独自の `public/agent-readability.json` を用意して置き換えることも可能です。Blume が `public/` に置いたファイルを上書きすることはありません。
+
+### ディスカバリー用 Link ヘッダー
+
+サイトを探索するエージェントは、マニフェストを探すべきだと知りません。そこで Blume は、IANA 登録済みのリレーションタイプを用いて、ホームページの [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288) `Link` レスポンスヘッダーでもマニフェストを告知します。
+
+```http
+Link: </agent-readability.json>; rel="describedby"; type="application/json",
+  </llms.txt>; rel="describedby"; type="text/plain",
+  </index.md>; rel="alternate"; type="text/markdown"
+```
+
+各エントリーは、その機能が有効な場合にのみ現れます。`alternate` リンクはホームページの Markdown ミラーを指します。ホームのルートがコンテンツページであればそのページ自身の[生の Markdown](#raw-markdown)、ランディングページであれば合成された `llms.txt` フォールバックです。API を公開しているサイトには、[生成された API カタログ](#api-catalog)を指す `rel="api-catalog"` エントリーも追加されます。このヘッダーは、Blume が制御するすべての面に付与されます。開発サーバー（`curl -I localhost:4321` で確認できます）、出力される `_headers` ファイル経由の静的ビルド（Netlify と Cloudflare）、そしてデプロイのルーティングルール経由の Vercel サーバービルドです。静的出力で `_headers` を無視するホスト（GitHub Pages、S3）はカスタムのレスポンスヘッダーをまったく送信できませんが、そこでもエージェントはサイトルートの `llms.txt` と `agent-readability.json` からすべてを見つけられます。
+
+### API カタログ
+
+サイトが API を公開している場合、Blume は `/.well-known/api-catalog` に [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) の API カタログを生成します。これは[リンクセット](https://www.rfc-editor.org/rfc/rfc9264)で、エージェントがドメインだけから API を列挙できるようにするもので、登録済みの `application/linkset+json` メディアタイプで、あらゆるビルド面において配信されます。設定は不要で、カタログは `blume.config.ts` にすでにある情報から導出されます。各 [OpenAPI または AsyncAPI リファレンス](/docs/advanced/api-reference)は、レンダリングされたドキュメントのルートをアンカーとするエントリーになり、`service-doc` がそのドキュメントを、`service-desc` が仕様（取得可能な URL にある場合）を指します。[MCP サーバー](#mcp-server)は、ディスカバリー文書をサービス記述とするエントリーになります。
+
+```json .well-known/api-catalog
+{
+  "linkset": [
+    {
+      "anchor": "https://docs.example.com/reference",
+      "service-doc": [
+        { "href": "https://docs.example.com/reference", "type": "text/html" }
+      ],
+      "service-desc": [{ "href": "https://api.example.com/openapi.json" }]
+    },
+    {
+      "anchor": "https://docs.example.com/mcp",
+      "service-desc": [
+        {
+          "href": "https://docs.example.com/.well-known/mcp.json",
+          "type": "application/json"
+        }
+      ],
+      "service-doc": [
+        { "href": "https://docs.example.com/", "type": "text/html" }
+      ]
+    }
+  ]
+}
+```
+
+API リファレンスも MCP サーバーもないサイトではカタログは出力されません。中身が何もないからです。他と同じく、自分で用意した `public/.well-known/api-catalog` ファイルは生成されたものより優先されます。
+
+### WebMCP
+
+[WebMCP](https://webmachinelearning.github.io/webmcp/) は、ページがエージェント型ブラウザーに直接ツールを登録できるようにする新しいブラウザー API で、別途サーバー接続を必要としません。Blume のすべてのページは、ドキュメントの読み取り専用の機能をページのモデルコンテキストに登録します。`search_docs`（サイト検索）、`get_page`（ページの[生の Markdown](#raw-markdown)）、`list_pages`（[`llms.txt`](#llmstxt) の索引）です。スクリプトは非常に小さく、ツールが実際に呼び出されるまで検索の仕組みを読み込まず、この API がないブラウザーでは何もしません。現時点では [Chrome の早期プレビュー](https://developer.chrome.com/blog/webmcp-epp)以外のすべてのブラウザーが該当します。登録は、流動的な仕様が公開しているいずれかの面（`navigator.modelContext` または `document.modelContext`）に対して、`provideContext` またはツールごとの `registerTool` 経由で行われます。
+
+既定で有効です。オプトアウトするには `webmcp: false` を設定します。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  webmcp: false,
+}
+```
+
+### スキルのディスカバリー
+
+プロジェクトが[エージェントスキル](https://agentskills.io)を同梱している場合（[Blume のリポジトリ自体もそうです](#agent-skill)）、それらを格納しているディレクトリを `ai.skills` に指定すると、ビルドが [Agent Skills Discovery RFC](https://github.com/cloudflare/agent-skills-discovery-rfc) に従ってディスカバリー用に公開します。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  skills: "./skills",
+}
+```
+
+パスはプロジェクトルートからの相対で解決され、`SKILL.md` を含む各サブディレクトリが公開されるスキルになります。`SKILL.md` 単体のスキルは `/.well-known/agent-skills/<name>/SKILL.md` にそのままコピーされます（`type: "skill-md"`）。補助リソース（`scripts/`、`references/`、`assets/`）を伴うスキルは決定的な `.tar.gz` にまとめられ（`type: "archive"`）、展開後に相対参照が解決されるようにし、スクリプトの実行ビットも保持されます。`/.well-known/agent-skills/index.json` のディスカバリー索引には v0.2.0 の `$schema` と、スキルごとの名前、タイプ、説明（`SKILL.md` のフロントマターから）、成果物の URL、クライアントがダウンロードを検証するための SHA-256 ダイジェストが含まれます。
+
+`name`/`description` が欠けていたり仕様に反していたりするスキルは、壊れた状態で公開する代わりにビルド警告を出してスキップされます。また、自分で用意した `public/.well-known/agent-skills/index.json` があれば、この面全体を置き換えます。
+
+### DNS ベースのディスカバリー（DNS-AID）
+
+[DNS for AI Discovery](https://datatracker.ietf.org/doc/draft-mozleywilliams-dnsop-dnsaid/) は策定中の IETF ドラフトで、well-known な DNS のエントリーポイントにある ServiceMode の [SVCB/HTTPS レコード](https://www.rfc-editor.org/rfc/rfc9460)を照会することで、エージェントが HTTP リクエストを 1 度も送らずにサイトの AI 関連機能を発見できるようにします。DNS レコードはビルドではなくあなたのゾーンにあるため、これは Blume が代わりに公開できない唯一のディスカバリー面です。DNS プロバイダー側でレコードを追加してください。
+
+```txt
+_index._agents.docs.example.com. 3600 IN HTTPS 1 docs.example.com. alpn=h2
+```
+
+プロバイダーが提供していれば `HTTPS` レコードタイプを使い（Vercel DNS は対応していますが、素の `SVCB` タイプには対応していません）、そうでなければ `alpn` と `port` パラメーターを持つ ServiceMode の `SVCB` レコードを使ってください。ドラフトは、検証を行うリゾルバーが認証済みの応答を返せるように、DNSSEC でゾーンに署名することも推奨しています。Cloudflare のようなプロバイダーはワンクリックで有効化できますが、まったく対応していないところ（Vercel DNS を含む）もあります。
+
+`blume audit --url <origin>` がこれを代わりに確認します。[`deployment.site`](/docs/deployment) が設定されている場合、ネットワーク層が DNS-over-HTTPS 経由でエントリーポイントを照会し、レコードが存在しなければ公開すべき正確なレコードを、加えて応答が DNSSEC で認証されているかどうかを報告します。ネットワークがパブリックなリゾルバー（Google、Cloudflare）をブロックしている場合は、`BLUME_DOH_URL` を設定して独自のリゾルバーを参照させてください。
+
+### Web Bot Auth
+
+[Web Bot Auth](https://datatracker.ietf.org/wg/webbotauth/about/) は逆方向に働きます。エージェントがあなたのドキュメントを読むためのものではなく、**あなたの組織のエージェントが**他所へリクエストを送るときに**自らを識別する**ためのものです。エージェントは [HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421) でリクエストに署名し、受信側のサイトはあなたのドメインで公開された公開鍵ディレクトリに照らして検証します。組織がエージェントを運用していて、Blume のサイトがそのエージェントが名乗るドメインにあるなら、公開鍵を公開してください。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  webBotAuth: {
+    keys: [{ kty: "OKP", crv: "Ed25519", x: "JrQLj5P_89iXES9-vFgrIy29c…" }],
+  },
+}
+```
+
+すると Blume は、あらゆるビルド面で `/.well-known/http-message-signatures-directory` に登録済みのメディアタイプで JWKS を配信します。このディレクトリは定義上公開されるものなので、設定は公開鍵しか受け付けません。秘密情報（`d`、`p`、`q` など）を含む JWK は、漏洩した資格情報を配信する代わりにエラーで検証に失敗します。Ed25519 の鍵ペアは次のように生成します。
+
+```bash
+node -e 'const { generateKeyPairSync } = require("node:crypto"); const { publicKey, privateKey } = generateKeyPairSync("ed25519"); console.log("public: ", JSON.stringify(publicKey.export({ format: "jwk" }))); console.log("private:", JSON.stringify(privateKey.export({ format: "jwk" })))'
+```
+
+公開 JWK は上記の設定に入れ、秘密鍵は署名を行うエージェントが動作する場所（シークレットマネージャー。リポジトリには決して置かないでください）に配置します。組織がエージェントを運用していない場合は、これをスキップしてください。空のディレクトリは、検証する価値のあるものを何も告知しません。
+
+`blume.config.ts` はビルド時に実行されるため、鍵をハードコードする必要はありません。ビルド時の環境変数から読み込めば、設定ファイルに鍵の塊を含めずに済み、コミットなしでローテーションできます。
+
+```ts blume.config.ts lineNumbers
+const webBotAuthKey = process.env.WEB_BOT_AUTH_PUBLIC_JWK;
+
+export default defineConfig({
+  ai: {
+    webBotAuth: {
+      keys: webBotAuthKey ? [JSON.parse(webBotAuthKey)] : [],
+    },
+  },
+});
+```
+
+この変数がない環境ではディレクトリは公開されず、この方法で読み込まれた鍵もインラインの鍵とまったく同じように検証されます（秘密情報のチェックを含みます）。（公開鍵は秘密ではないので、インラインでコミットしても同じく問題ありません。環境変数は使い勝手の選択であって、セキュリティ上の選択ではありません。）
+
+## エージェントスキル
+
+コーディングエージェントの助けを借りて Blume サイトを構築していますか。Blume の[エージェントスキル](https://docs.claude.com/en/docs/claude-code/skills)をインストールすれば、あなたが説明しなくてもエージェントが Blume の仕組みを理解できます。
+
+```bash
+npx skills add haydenbleasel/blume
+```
+
+このスキルは、Blume とは何か、サイトのスキャフォールド・執筆・設定をどう行うかをエージェントに教え、インストール済みパッケージに同梱された完全なドキュメント（パッケージマネージャーがインストールした場所にある `blume` 内の `docs/` ディレクトリ）を参照させます。
+
+これは [Blume が同梱するエージェントスキル](/docs/advanced/skills)の 1 つで、スケジュール実行されるエージェントによってドキュメントを製品と同期させ続けるスキルも併せて提供されています。

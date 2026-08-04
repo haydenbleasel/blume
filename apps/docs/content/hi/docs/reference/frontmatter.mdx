@@ -1,0 +1,117 @@
+---
+title: फ्रंटमैटर
+description: >-
+  हर वह फ्रंटमैटर फ़ील्ड जो कोई पृष्ठ स्वीकार करता है, सभी वैकल्पिक — title, description, sidebar, SEO, search, और बाक़ी सब, साथ में यह कि हर एक क्या नियंत्रित करता है।
+---
+
+हर पृष्ठ निम्नलिखित फ्रंटमैटर स्वीकार करता है। सभी फ़ील्ड वैकल्पिक हैं।
+
+<TypeTable
+  type={{
+    title: { type: "string", description: "पृष्ठ का शीर्षक।" },
+    description: { type: "string", description: "पृष्ठ का सारांश।" },
+    type: {
+      type: "string",
+      default: "doc",
+      description:
+        "सामग्री का प्रकार। blog/changelog फ़ीड्स को संचालित करते हैं।",
+    },
+    date: {
+      type: "string",
+      description:
+        "blog/changelog फ़ीड्स के लिए प्रकाशन तिथि (ISO या YAML तिथि)।",
+    },
+    authors: {
+      type: "string | string[] | object[]",
+      description:
+        "blog/changelog सामग्री के लिए पोस्ट के लेखक — एक नाम, या ऐसे ऑब्जेक्ट जिनमें नाम के साथ वैकल्पिक avatar/url और कोई भी अतिरिक्त फ़ील्ड हों। ज्यों का त्यों सुरक्षित रखा जाता है।",
+    },
+    slug: { type: "string", description: "जनरेट किए गए slug को ओवरराइड करें।" },
+    draft: {
+      type: "boolean",
+      default: "false",
+      description: "प्रोडक्शन बिल्ड से बाहर रखें।",
+    },
+    lastModified: {
+      type: "string",
+      description:
+        'पृष्ठ की "अंतिम अपडेट" तिथि निश्चित करें (ISO या YAML तिथि); यह git से प्राप्त तिथि को ओवरराइड करती है।',
+    },
+  }}
+/>
+
+## साइडबार
+
+```yaml lineNumbers
+sidebar:
+  label: Install
+  order: 2
+  icon: download
+  badge: New
+  hidden: false
+```
+
+## SEO
+
+```yaml lineNumbers
+seo:
+  title: Install Blume
+  description: Install Blume and scaffold your first project.
+  image: /og/install.png
+  canonical: https://acme.com/install
+  noindex: false
+```
+
+## खोज
+
+```yaml lineNumbers
+search:
+  exclude: false
+  tags: [api]
+```
+
+## चेंजलॉग
+
+चेंजलॉग प्रविष्टियाँ (`type: changelog`) समृद्ध फ़ीड और डिस्प्ले मेटाडेटा के लिए एक वैकल्पिक `changelog` ऑब्जेक्ट स्वीकार करती हैं:
+
+```yaml lineNumbers
+type: changelog
+changelog:
+  version: 1.2.0
+  date: 2026-06-20
+  category: Features
+```
+
+`date` यहाँ रह सकती है या शीर्ष स्तर पर — दोनों ही [चेंजलॉग RSS फ़ीड](/docs/content#feeds) को संचालित करती हैं। जनरेट किए गए टाइमलाइन पृष्ठ और फ़ीड के लिए [चेंजलॉग](/docs/advanced/changelog) देखें।
+
+## कस्टम कुंजियाँ
+
+इस संदर्भ से बाहर की कोई भी कुंजी बिल्ड को विफल कर देती है, जिससे टाइपो जल्दी पकड़ में आ जाते हैं। जो प्रोजेक्ट अपना स्वयं का मेटाडेटा रखते हैं, वे `blume.config.ts` में [`frontmatter.extend`](/docs/configuration#frontmatter) के माध्यम से अतिरिक्त कुंजियाँ शामिल कर सकते हैं, जिनमें से प्रत्येक को प्रोजेक्ट द्वारा उपलब्ध कराए गए स्कीमा से मान्य किया जाता है:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { z } from "zod";
+
+export default defineConfig({
+  frontmatter: {
+    extend: {
+      owner: z.string(),
+      reviewedAt: z.coerce.date().optional(),
+    },
+  },
+});
+```
+
+```yaml page.mdx
+---
+title: Install
+owner: "@sam"
+reviewedAt: 2026-06-20
+---
+```
+
+स्कीमा [Standard Schema](https://standardschema.dev) इंटरफ़ेस के ज़रिए स्वीकार किए जाते हैं, इसलिए Zod (आपका प्रोजेक्ट जो भी संस्करण इंस्टॉल करता है), Valibot, और ArkType सभी काम करते हैं। घोषित की गई हर कुंजी हर पृष्ठ पर मान्य की जाती है — अनुपस्थित कुंजियाँ भी शामिल — इसलिए एक आवश्यक स्कीमा उस कुंजी को पूरी साइट पर लागू करता है; इसे केवल वहीं मान्य करने के लिए जहाँ यह मौजूद है, इसे `.optional()` चिह्नित करें। अन्य सभी कुंजियाँ सख़्ती से मान्य की जाती रहती हैं, और अंतर्निहित फ़ील्ड्स को पुनः घोषित नहीं किया जा सकता।
+
+जो पृष्ठ मान्यता में विफल होता है, वह `blume build` को एक ऐसे डायग्नोस्टिक के साथ विफल कर देता है जो फ़ाइल और कुंजी का नाम बताता है। [`--no-strict`](/docs/reference/cli#common-flags) के साथ, बिल्ड फिर भी सफल होता है और विफल पृष्ठ आउटपुट से हटा दिए जाते हैं — बिल्ड सारांश बताता है कि कितने।
+
+एडिटर और माइग्रेशन टूलिंग के लिए स्कीमा `blume/schema` से एक्सपोर्ट किए जाते हैं।

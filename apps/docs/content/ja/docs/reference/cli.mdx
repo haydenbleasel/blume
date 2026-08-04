@@ -1,0 +1,196 @@
+---
+title: CLI
+description: >-
+  Blume のすべてのコマンドとフラグを一箇所で解説します — init、dev、build、preview、add、sync、eject と、それぞれが受け付けるオプション。
+---
+
+```bash
+blume <command> [options]
+```
+
+## コマンド
+
+| コマンド | 説明 |
+| --- | --- |
+| `blume init [dir]` | プロジェクトをスキャフォールドします（デフォルトは対話形式）。 |
+| `blume dev` | ホットリロード付きの開発サーバーを起動します。 |
+| `blume build` | 静的（またはサーバー）サイトをビルドします。 |
+| `blume preview` | 直近のビルドをプレビューします。 |
+| `blume add <item>` | レジストリからソースコンポーネントをインストールします。 |
+| `blume sync` | リモートコンテンツソースを再取得して再生成します。 |
+| `blume eject` | ランタイムを独立した Astro アプリへ昇格させます。 |
+| `blume check` | `astro check` でサイトを型チェックします。 |
+| `blume doctor` | 設定とコンテンツの問題を診断します。 |
+| `blume validate` | コンテンツ全体のリンクを検証します。 |
+| `blume audit` | ビルド済みサイトの SEO と健全性の問題を監査します。 |
+| `blume eval` | ドキュメントをテストします。エージェントがドキュメントのみを使って質問に回答します。 |
+| `blume translate` | ローカルのエージェント CLI を使って、設定済みのロケールにドキュメントを翻訳します。 |
+
+## よく使うフラグ
+
+- `blume init` — ターミナルでは、いくつかの質問（プロジェクトの作成先、サイト名、テンプレート、コンテンツソース）に沿って進みます。以下の各フラグは、対応する質問にあらかじめ回答します。
+- `blume init --yes` — プロンプトをスキップし、デフォルト設定でスキャフォールドします（CI 環境や stdin がターミナルでない場合の挙動でもあります）。
+- `blume init --content-dir <dir>` — コンテンツフォルダーを指定します（デフォルトは `docs`）。
+- `blume init --template docs|api|sdk|changelog` — スターターからスキャフォールドします（プレーンなドキュメントのシードではなく、API リファレンス、SDK、changelog）。
+- `blume init --package-manager npm|pnpm|yarn|bun` — 出力される次のステップの案内をパッケージマネージャーに合わせます。
+- `blume init --eject` — スキャフォールド後、独立した Astro プロジェクトへ eject します（依存関係がまだインストールされていない場合は、`blume eject` の手順を案内する動作にフォールバックします）。
+- `blume dev --host --port <n> --open`
+- `blume dev --content-dir <dir>` — `blume.config.ts` を編集せずに別のコンテンツフォルダーをスキャンします。
+- `blume dev --debug` — トラブルシューティング用に Astro/Vite の詳細ログを出力します。
+- `blume dev --preview` / `blume build --preview` — 下書きと未公開の CMS コンテンツを含めます。
+- `blume build --no-strict` — 診断エラーがあってもビルドします。デフォルトでは `blume build` はエラー診断があると失敗します（終了コード 1）。フロントマターの検証に失敗したページは出力から除外されるためです。`--no-strict` を付けるとビルドは成功し、欠落しているページ数を報告します。`blume dev --strict` は、開発時にも同じ fail-fast の挙動を有効にします。
+- `blume build --output static|server --adapter vercel|node|netlify|cloudflare --base /docs` — `blume.config.ts` のデプロイ出力、アダプター、ベースパスを上書きします。
+- `blume build --analyze` — ビルド後にクライアント JavaScript のバンドルサイズを（大きい順に）出力します。
+- `blume build --budget-js <kb> --budget-css <kb>` — クライアントの JavaScript/CSS の合計が予算を超えた場合にビルドを失敗させ、パフォーマンス目標を CI のゲートに変えます。
+- `blume build --isolated` — `.blume/` ではなく使い捨ての `.blume-verify/` ランタイム（および独自の `dist/`）にビルドするため、実行中の `blume dev` サーバーと実際の `dist/` はそのまま保たれます。[開発サーバー実行中の検証](#verifying-while-the-dev-server-runs)を参照してください。
+- `blume preview --host --port <n>` — プレビューサーバーをバインドします。
+- `blume sync --force` — キャッシュされたスナップショットを先に破棄して、リモートソースを再取得します。
+- `blume add <item> --force` — 既に存在するファイルを上書きします。
+- `blume check --preview` — チェック時に下書きと未公開の CMS コンテンツを含めます。
+- `blume check --strict` — 型エラーに加えてコンテンツ診断でも失敗させます。
+- `blume check --isolated` — 使い捨ての `.blume-verify/` ランタイムで型チェックを行うため、実行中の `blume dev` サーバーはそのまま保たれます。[開発サーバー実行中の検証](#verifying-while-the-dev-server-runs)を参照してください。
+- `blume eject --yes` — 確認プロンプトをスキップします。
+- `blume validate --external` — 外部リンクもネットワーク経由でチェックします。
+- `blume validate --strict` — 警告でも非ゼロで終了します。
+- `blume validate --json` / `blume doctor --json` — CI やエディター連携向けに、診断結果を JSON として標準出力に出力します（`code`、`severity`、`file`、`line`/`column`、`docsUrl` を含む）。
+- `blume audit --fail-on error|warning|info` — CI のゲート。デフォルトは `error` です。`--strict` は `--fail-on warning` のエイリアスです。
+- `blume audit --url <origin>` — 実際のデプロイに対して、ステータスコード、レスポンスヘッダー、リダイレクトチェーンも調べます。
+- `blume audit --external` — 外部リンクをネットワーク経由で調べます。
+- `blume audit --only <check|category>` / `--skip <check|category>` — 対応を進める間、レポートを絞り込みます（カンマ区切り）。
+- `blume audit --list-checks` — 監査が報告できるすべてのチェックを出力します。
+- `blume audit --verbose` — 影響を受けるすべてのページを、どのリンク先が壊れているかなど各所見の詳細とともに一覧表示します。
+- `blume audit --json` — レポートを JSON として標準出力に出力します。
+- `blume audit --claude` / `--codex` — 所見を Claude Code または Codex に渡して対話的に修正します。
+- `blume eval` — `evals.yaml` の質問を、あなたのドキュメントのみを読むエージェントに通して実行します。[Evals](/docs/reference/eval) を参照してください。
+- `blume eval init` — エージェントにドキュメントから `evals.yaml` のたたき台を作成させます。
+- `blume eval --agent claude|codex --threshold <0..1> --timeout <seconds> --json --fix --verbose` — 各フラグについては [Evals](/docs/reference/eval) を参照してください。
+- `blume translate --claude` / `--codex` — 未翻訳・内容が古いページを、設定済みのロケールに翻訳します。[Translate](/docs/reference/translate) を参照してください。
+- `blume translate --check` — エージェントを実行せずに、翻訳のずれを報告して非ゼロで終了します（CI のゲート）。
+- `blume translate --locale <codes> --concurrency <n> --force --timeout <seconds> --json` — 各フラグについては [Translate](/docs/reference/translate) を参照してください。
+
+## 開発サーバー実行中の検証
+
+`blume dev` は生成された `.blume/` ランタイムをルートとするライブの Astro サーバーを提供し、変更のたびにそれを再生成します。`blume build` と `blume check` は*同じ* `.blume/` を再生成するため、開発サーバーの実行中にどちらかを実行するとランタイムが壊れてしまいます。そのため、どちらもエラーで拒否し、非ゼロで終了します:
+
+```
+A `blume dev` server is running at http://localhost:3000; building would
+corrupt its .blume runtime. Reuse that server, stop it first, or re-run with
+--isolated to build/verify against .blume-verify without touching it.
+```
+
+`--isolated` フラグはその回避手段です。生成されるランタイム全体（`build` の場合はその出力 `dist/` も）を隣接する `.blume-verify/` ディレクトリへ移すため、検証は開発サーバー — あるいは実際の `dist/` — が依存するものに一切書き込みません:
+
+```bash
+# In a second terminal, while `blume dev` is running:
+blume check --isolated   # fast: type-check the .astro/config changes
+blume build --isolated   # thorough: full production render into .blume-verify/dist
+```
+
+`check --isolated` は素早い方法です（Astro の型とテンプレートの診断のみで、`dist/` は生成しません）。`build --isolated` はより重く、実行時のレンダリングエラーも検出します。分離ビルドはデプロイ後の処理（検索インデックス、ホスティングプロバイダーとの同期、`llms.txt`、サイトマップ/robots、リダイレクト）をスキップします。検証で必要なのは、サイトがコンパイルされてレンダリングされることの確認だけであり、公開することではないためです。`--analyze` と `--budget-js`/`--budget-css` のゲートは引き続き実行され、分離された出力に対して計測されます。Blume は `.blume-verify/` を自動的に `.gitignore` に追加します。
+
+これは、開発サーバーを開いたままにしつつコーディングエージェントに変更を検証させたい場合に特に便利です。フラグなしの `blume build`/`blume check` を分離実行させたい場合 — 例えばエージェントのシェル内で — は、使用するランタイムディレクトリを `BLUME_RUNTIME_DIR` に設定します:
+
+```bash
+export BLUME_RUNTIME_DIR=.blume-verify
+```
+
+## 型チェック
+
+`blume check` はプロジェクトに対して [`astro check`](https://docs.astro.build/en/reference/cli-reference/#astro-check) を実行します。`.blume` ランタイムを再生成し、Astro のコンテンツ型を同期したうえで、TypeScript のエラーを報告します — `blume.config.ts`、カスタムの `.astro` ページ、そしてそれらがインポートするコンポーネントについて。エラーがある場合は非ゼロで終了するため、CI の `typecheck` ステップとして機能します:
+
+```json title="package.json"
+{
+  "scripts": {
+    "typecheck": "blume check"
+  }
+}
+```
+
+作成したページが `blume/*` のインポートや `blume:data` のような仮想モジュールを解決できるよう、Astro の設定を継承する `tsconfig.json` をプロジェクトルートに追加してください:
+
+```json title="tsconfig.json"
+{
+  "extends": "astro/tsconfigs/strict",
+  "include": [".blume/.astro/types.d.ts", ".blume/src/env.d.ts", "**/*"]
+}
+```
+
+プロジェクトに `tsconfig.json` がない場合、チェックされるのは生成されたランタイムのみです。
+
+## リンクの検証
+
+`blume validate` は、コンテンツ内で見つかったすべてのリンクをチェックします:
+
+- **内部ページリンク**（`/guides/intro`、`./sibling`）は実在するページに解決される必要があります。壊れているものはエラーとして報告されます。
+- **アンカーリンク**（`#section`、`/guides/intro#setup`）はリンク先ページの見出しと一致する必要があります。一致しないものは警告です。
+- **アセットリンク**（`/logo.png`）は `public/` ディレクトリに対してチェックされます。
+- **外部リンク**は `--external` を指定した場合のみチェックされます（ネットワークが必要なためデフォルトは無効）。切れたリンク（404/410/到達不能）はエラー、レート制限や一時的なレスポンス（403/429/5xx/タイムアウト）は警告です。
+
+## ビルド済みサイトの監査
+
+`blume validate` は*コンテンツ*を読み取り、`blume audit` は*ビルド済みサイト*を読み取ります。ビルド後の `dist/` 内の HTML をクロールし、SEO とサイトの健全性に関する問題 — タイトル、メタディスクリプション、canonical、Open Graph と X カード、見出し、hreflang、画像、サイトマップ、`robots.txt`、構造化データ — を報告します。
+
+Blume がサイトをビルドしているため、各所見はクローラーが見る URL だけでなく、ソースファイル**とそれを修正するフロントマターの行**を示します:
+
+```
+⚠ Meta description too long or too short   5 pages
+    /docs/configuration/export    content/docs/configuration/export.mdx:3
+    fix: Rewrite `description` in the frontmatter to fit the length range.
+```
+
+ビルド後に実行します:
+
+```bash
+blume build
+blume audit
+```
+
+所見はページごとではなくチェックごとにまとめられるため、レポートは ToDo リストのように読めます。影響を受ける各ページを詳細とともに展開するには `--verbose` を、1 カテゴリーずつ対応するには `--only`/`--skip` を使ってください。`blume audit --list-checks` は全カタログを出力します。
+
+### CI を失敗させる
+
+終了コードが契約です。デフォルトでは `blume audit` はエラーでのみ失敗します — ビルドされなかったページへのリンク、リダイレクトループ、無効なサイトマップなど、明確に壊れているものです。参考情報としての所見（説明が短い、タイトルの重複）は警告であり、ビルドを失敗させません:
+
+```bash
+blume audit                      # fails on errors
+blume audit --fail-on warning    # also fails on warnings
+```
+
+### 実際のデプロイをチェックする
+
+実サーバーでしか分からないこともあります。`dist/` に存在するページが、誤ったリライトの背後で実際には 404 になっていないか、レスポンスが圧縮されているか、そして HTML は問題なく見えるページを `X-Robots-Tag` ヘッダーが密かにインデックスから外していないか。これらのチェックを追加するには、監査をデプロイ先に向けます:
+
+```bash
+blume audit --url https://docs.example.com
+blume audit --url https://docs.example.com --external   # also probe outbound links
+```
+
+外部リンクは一律に失敗扱いにするのではなく、段階的に評価されます。404 は修正できる壊れたリンクですが、403 や 5xx は通常レート制限か相手側の障害であり、警告として報告されます。
+
+### エージェントで所見を修正する
+
+[Claude Code](https://claude.com/claude-code) や [Codex](https://developers.openai.com/codex/cli) を使っている場合、監査は所見をそのままエージェントに渡せます:
+
+```bash
+blume audit --claude   # or --codex
+```
+
+これは完全な JSON レポート — ターミナルに表示される 3 ページ分のプレビューではなく、影響を受けるすべてのページ — をファイルに書き出し、所見を順に処理させるプロンプトとともにエージェントを対話的に起動します。各所見が示すソースファイルを編集し、提案された修正を適用し、その後レポートがクリーンになるまで `blume build` と `blume audit` を再実行する、という流れです。このセッションは意図的に対話的です。編集内容はエージェント自身の権限フローを通じて確認でき、またエージェントにはコンテンツを削除して所見を修正することは決してしないよう指示されています。
+
+`--only` と `--skip` はレポートを絞り込むのと同じように引き渡しの内容も絞り込むため、1 カテゴリーずつ送ることができます。
+
+### チェックする内容としない内容
+
+チェックの対象は、汎用の SEO クローラーよりも意図的に狭くしています。そうしたクローラーが報告する内容の多くは Blume のサイトでは起こり得ず — `rel=nofollow` は決して出力されず、Vite のコンテンツハッシュ付きバンドルが欠落したりリダイレクトしたりすることもありません — それらを常にゼロとして報告しても、レポートを無視する習慣がつくだけだからです。
+
+はっきり述べておくべき制限が 2 つあります:
+
+- **構造化データ**は整形式であるか（有効な JSON、`@context` の存在、すべてのノードに `@type` があるか）が検証されます。Blume は schema.org の語彙全体や Google のリッチリザルトのルールに対する検証は行いません。
+- **Core Web Vitals** はチェックされません。これらには実際のブラウザが必要であり、実質何も計測しないフラグは、それが無いことよりも悪いためです。そのため `blume audit` は、オフラインで*見える*範囲のレイアウトシフトの原因（`width`/`height` のない画像、サイズの大きすぎるアセット）を報告し、残りは今のところ対象外としています。
+
+監査が実行しなかった項目は、黙って合格扱いにするのではなく、スキップとして報告されます:
+
+```
+⊘ network      skipped — pass --url <origin> (11 checks)
+⊘ external     skipped — pass --external (2 checks)
+```

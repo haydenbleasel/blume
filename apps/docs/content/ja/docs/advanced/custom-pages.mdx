@@ -1,0 +1,315 @@
+---
+title: カスタムページ
+description: >-
+  完全にカスタムな .astro ルートをドキュメントと並べてマウントし、サイトの設定、ナビゲーション、コンテンツを blume:data モジュールから読み取ります。
+---
+
+Blume サイトの大部分は Markdown ですが、ドキュメント*ではない* ルートが必要になることもあります — ランディングページ、料金ページ、手作りのブログやチェンジログのインデックス、あるいはインタラクティブなダッシュボードなどです。**pages** フォルダに `.astro` ファイルを置けば、Blume がそれをコンテンツと並ぶ実際のルートとしてマウントします。
+
+## ページを追加する
+
+プロジェクトルートに `pages/` フォルダを作成し、`.astro` ファイルを追加します:
+
+```astro pages/pricing.astro lineNumbers
+---
+import data from "blume:data";
+---
+
+<h1>Pricing for {data.config.title}</h1>
+```
+
+`blume dev` はこれを即座に検出し、`blume build` は静的 HTML にプリレンダリングします。フォルダ名は [`content.pages`](/docs/configuration#content) で設定できます（デフォルトは `"pages"`）。
+
+カスタムページはディスク上の元の場所を保持するため、相対インポート、コンポーネントのインポート、[`getStaticPaths`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths) はすべて、素の Astro プロジェクトとまったく同じように動作します — Blume は各ファイルをコピーするのではなく、それがある場所にマウントします。
+
+## ファイルとルート
+
+pages フォルダ配下の各ファイルのパスがそのルートになります。`index` は親フォルダに対応し、動的な `[param]` セグメントはそのまま保持されます:
+
+| ファイル                  | ルート        |
+| ------------------------- | ------------- |
+| `pages/pricing.astro`     | `/pricing`    |
+| `pages/blog/index.astro`  | `/blog`       |
+| `pages/blog/[slug].astro` | `/blog/:slug` |
+| `pages/changelog.astro`   | `/changelog`  |
+
+同じパスに生成されたルートがある場合、カスタムページが**優先されます**。たとえば `pages/changelog.astro` を追加すると、Blume の[生成されるチェンジログのタイムライン](/docs/advanced/changelog)が自作のものに置き換わります。
+
+## サイトデータの読み取り
+
+`blume:data` をインポートすると、サイトの他の部分が使っているのと同じ解決済みの設定、ナビゲーション、ルート、フィードを読み取れます:
+
+```astro pages/all-pages.astro lineNumbers
+---
+import data from "blume:data";
+---
+
+<h1>All pages</h1>
+<ul>
+  {
+    data.routes
+      .filter((route) => route.indexable)
+      .map((route) => (
+        <li>
+          <a href={route.path}>{route.title}</a>
+        </li>
+      ))
+  }
+</ul>
+```
+
+Blume プロジェクト内では、このモジュールは自動的に型付けされます。型付きヘルパー、props、あるいは独自の tsconfig のために、`import type { BlumeData } from "blume"` で型を明示的に取り込むこともできます:
+
+```ts
+import type { BlumeData, BlumeRoute } from "blume";
+
+const indexable = (data: BlumeData): BlumeRoute[] =>
+  data.routes.filter((route) => route.indexable);
+```
+
+このモジュールが公開するもの:
+
+<TypeTable
+  type={{
+    config: {
+      type: "BlumeDataConfig",
+      required: true,
+      description:
+        "解決済みのサイト設定: title、description、logo、favicon、appleIcon、banner、theme、site、repoUrl、search、i18n、mcp、ask、og、analytics、feedback、structuredData、toc、codeThemes、codeWrap、imageZoom。",
+    },
+    navigation: {
+      type: "Navigation",
+      required: true,
+      description:
+        "コンテンツから推論されたサイドバー、タブ、セレクター（デフォルトロケール）。",
+    },
+    navigationByLocale: {
+      type: "Record<string, Navigation>",
+      required: true,
+      description:
+        "ロケールコードをキーとする、ロケールごとのナビゲーションツリー。i18n が設定されていない限り空です。",
+    },
+    routes: {
+      type: "BlumeRoute[]",
+      required: true,
+      description:
+        "すべてのコンテンツページ: { id, path, title, locale, indexable, hidden, draft, fallback, editUrl, lastModified, alternates, collection, entryId }。",
+    },
+    feeds: {
+      type: "BlumeFeed[]",
+      required: true,
+      description: "生成された RSS フィード: { href, title }。",
+    },
+    fontCssVars: {
+      type: "string[]",
+      required: true,
+      description:
+        "設定されたフォントの CSS 変数名（Astro の <Font> インテグレーション）。",
+    },
+    ui: {
+      type: "UIStrings",
+      required: true,
+      description:
+        "デフォルトロケール向けの解決済み UI クローム文字列（検索、サイドバー、フッターのラベル）。",
+    },
+    uiByLocale: {
+      type: "Record<string, UIStrings>",
+      required: true,
+      description:
+        "ロケールコードをキーとする、ロケールごとの UI 文字列。i18n が設定されていない限り空です。",
+    },
+  }}
+/>
+
+`routes` はページのメタデータを持ちますが、`type` や `date` のようなフロントマターは含みません。コンテンツタイプでフィルタリングしたリスト — ブログやチェンジログのインデックス — を作るには、フロントマターを保持している Astro の `docs` コンテンツコレクションと組み合わせてください:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import { getCollection } from "astro:content";
+import data from "blume:data";
+
+// Each route's id matches its collection entry id.
+const routeById = new Map(data.routes.map((route) => [route.id, route.path]));
+
+const posts = (await getCollection("docs"))
+  .filter((entry) => entry.data.type === "blog" && !entry.data.draft)
+  .map((entry) => ({
+    description: entry.data.description,
+    href: routeById.get(entry.id),
+    title: entry.data.title,
+  }));
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={post.href}>{post.title}</a>
+        <p>{post.description}</p>
+      </li>
+    ))
+  }
+</ul>
+```
+
+## ランタイムヘルパー
+
+`blume/runtime` は一般的なデータパターンをまとめて提供するため、`blume:data` の内部に手を伸ばす必要がありません。
+
+**`getBlumeCollection(data, query?)`** はコンテンツルートを選択します — コレクション、ロケール、パスのプレフィックスでフィルタリングし、下書きと非表示ページを除外し、結果をパス順にソートします — これはまさにカスタムインデックスに必要なものです:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import data from "blume:data";
+import { getBlumeCollection } from "blume/runtime";
+
+const posts = getBlumeCollection(data, { prefix: "/blog" });
+---
+
+<ul>
+  {posts.map((post) => (
+    <li><a href={post.path}>{post.title}</a></li>
+  ))}
+</ul>
+```
+
+**`<BlumePage>`** はコンテンツエントリの本文をカスタムページ内でレンダリングし、Blume 組み込みの MDX コンポーネント（コールアウト、カード、ステップなど）があらかじめ組み込まれた状態になります — ランディングページでドキュメントを目立たせたり、実際のコンテンツを表示する独自のインデックスを構築したりするのに使えます:
+
+```astro pages/index.astro lineNumbers
+---
+import BlumePage from "blume/components/BlumePage.astro";
+import data from "blume:data";
+import { getBlumeCollection } from "blume/runtime";
+
+const [intro] = getBlumeCollection(data, { prefix: "/docs" });
+---
+
+{intro && <BlumePage id={intro.entryId} />}
+```
+
+独自のオーバーライドやアイランド（生成されたランタイム内に存在し、デフォルトではインポートされません）を追加するには `components` を、`"docs"` 以外のコレクションから読み取るには `collection` を渡します。
+
+## サイトレイアウトを使う
+
+`RootLayout` は、生成されたページが使うのと同じ 3 カラムグリッドでラップすることで、カスタムページに完全なドキュメントのクローム — ヘッダー、サイドバー、検索、目次、テーマ — を与えます。ランディングページやマーケティングページではそのグリッドが邪魔になるので、代わりに **`PageLayout`** を使いましょう: これはドキュメントのシェル、ヘッダー、テーマ、フォントに加えて、単一の全幅 `<slot />` を提供します（サイドバーなし、prose なし、目次なし）。オプションの `footer` スロットは `<main>` の後にレンダリングされます:
+
+```astro pages/index.astro lineNumbers
+---
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import data from "blume:data";
+import Footer from "./_home/Footer.astro";
+
+const { config } = data;
+---
+
+<PageLayout
+  site={{ title: config.title, description: config.description }}
+  logo={config.logo}
+  banner={config.banner}
+  analytics={config.analytics}
+  navigation={data.navigation}
+  favicon={config.favicon}
+  fontCssVars={data.fontCssVars}
+  themeMode={config.theme.mode}
+  searchEnabled={config.search.enabled}
+  siteUrl={config.site}
+  ogEnabled={config.og.enabled}
+  page={{ title: "Acme — the fastest docs", description: config.description }}
+>
+  <section class="mx-auto max-w-5xl px-6 py-24">
+    <h1>Build docs that fly</h1>
+  </section>
+  <Footer slot="footer" />
+</PageLayout>
+```
+
+カスタムページが得るヘッダーはドキュメントページのものと同じなので、そこにあるクロームも一緒についてきます: 検索、テーマ切り替え、言語スイッチャー、そして [Ask AI](/docs/configuration/ai) が設定されている場合は Ask AI のトリガーです。どれもページごとに配線する必要はありません。あるページだけ Ask トリガーを無効にし、他のすべてでは有効なままにするには `askEnabled={false}` を渡します。
+
+`siteUrl`（と `ogEnabled`）を渡すと、そのページの `canonical` と生成された `og:image` が自動的に導出されます: Blume はすべての静的カスタムページ — 最も共有されやすい URL であるホームを含む — に対して Open Graph カードをレンダリングし、`/og/<route>.png`（`/` の場合は `/og/index.png`）で配信します。ホームのカードはサイトタイトルを使い、description をアイブロウにします。より深い階層のページはパスの最後のセグメントからタイトルが付けられます。どちらも上書きするには `ogImage` または `canonical` を明示的に設定してください。`ogImage` はルート相対パス — `public/` 内のファイルで、[`deployment.site`](/docs/deployment) を基準にクローラーが必要とする絶対 URL へ解決されます — または外部 URL を受け取り、後者はそのまま通されます:
+
+```astro pages/index.astro lineNumbers
+<PageLayout
+  siteUrl={config.site}
+  ogEnabled={config.og.enabled}
+  ogImage="/opengraph-image.png"
+  page={{ title: config.title }}
+>
+  <!-- page content -->
+</PageLayout>
+```
+
+変わるのはこのページだけで、他のすべてのルートは生成されたカードのままです — つまりこれが、ホームページだけに独自の共有画像を与える方法です。
+
+`page.title` はドキュメントタイトルとしてそのまま使われます（`- siteTitle` のサフィックスは付きません）。マーケティングページは通常、自前のタイトルを設定するためです。代わりにカスタムページへ完全なドキュメントのクローム — サイドバー、目次、すべて — を与えるには、生成されたページが使うレイアウトである `RootLayout` でラップします。必要な props は `blume:data` から直接取得できます:
+
+```astro pages/pricing.astro lineNumbers
+---
+import RootLayout from "blume/components/layout/RootLayout.astro";
+import data from "blume:data";
+---
+
+<RootLayout
+  site={{ title: data.config.title, description: data.config.description }}
+  logo={data.config.logo}
+  banner={data.config.banner}
+  navigation={data.navigation}
+  page={{ title: "Pricing", route: "/pricing" }}
+  headings={[]}
+  themeMode={data.config.theme.mode}
+  searchEnabled={data.config.search.enabled}
+  indexable={true}
+>
+  <h1>Pricing</h1>
+</RootLayout>
+```
+
+:::note
+`RootLayout` は生成されるランタイムの一部であるため、その props はリリース間で変更される可能性があります。完全に自分のものとなるレイアウトが欲しい場合は、[`blume eject`](/docs/configuration/customization#eject) で `.blume/` を完全に自分が所有する標準の Astro プロジェクトに変換できます。
+:::
+
+## 404 ページ
+
+Blume はデフォルトの **not found** ページを標準で同梱しています: サイトのクローム（ヘッダー、検索、テーマ）でラップされた中央揃えの「404」メッセージで、マッチしないあらゆる URL に対して配信されます。`blume build` はこれを `404.html` に書き出し、静的ホストが自動的に配信します。また `blume dev` は不明なルートに対してこれを表示します。
+
+これを自作のものに置き換えるには、`pages/404.astro` を追加します。`pages/changelog.astro` がチェンジログを引き継ぐのと同じように、このファイルが `/404` ルートを所有します — あなたのページが優先され、デフォルトは破棄されます。他のカスタムページと同様に、`PageLayout` または `RootLayout` で構築してください:
+
+```astro pages/404.astro lineNumbers
+---
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import data from "blume:data";
+---
+
+<PageLayout
+  site={{ title: data.config.title, description: data.config.description }}
+  logo={data.config.logo}
+  navigation={data.navigation}
+  themeMode={data.config.theme.mode}
+  searchEnabled={data.config.search.enabled}
+  page={{ title: "Page not found", route: "/404" }}
+  noindex={true}
+>
+  <section class="mx-auto max-w-2xl px-6 py-24 text-center">
+    <h1>This page took a wrong turn</h1>
+    <a href="/">Back to home</a>
+  </section>
+</PageLayout>
+```
+
+デフォルトのデザインは保ちつつ文言だけを変更する場合 — 他の言語向けも含めて — は、`i18n.ui` で `notFound` の [UI 文字列](/docs/content/i18n)（`title`、`description`、`home`）を上書きしてください。
+
+## インタラクティブなページ
+
+カスタムページは通常の Astro なので、ハイドレーションディレクティブを付けて React（や任意のフレームワーク）の[アイランド](/docs/configuration/customization#interactive-islands)を組み込めます。プロジェクトに `.tsx` または `.jsx` ファイルが含まれた時点で、React は自動的に有効になります。
+
+<CardGroup cols={2}>
+  <Card
+    title="カスタマイズ"
+    href="/docs/configuration/customization"
+    icon="file"
+  >
+    コンポーネントのオーバーライド、React アイランド、レジストリ、eject。
+  </Card>
+  <Card title="ブログ" href="/docs/advanced/blog" icon="book-open">
+    記事を執筆し、カスタムのブログインデックスを構築します。
+  </Card>
+</CardGroup>

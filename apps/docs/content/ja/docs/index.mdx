@@ -1,0 +1,74 @@
+---
+title: はじめに
+description: >-
+  Blume は Astro と Vite 上に構築された、オープンソースかつ Markdown ファーストのドキュメントフレームワークです。高速で、AI に対応し、テンプレートに至るまでゼロコンフィグです。
+sidebar:
+  label: はじめに
+  order: 0
+---
+
+Markdown または MDX をフォルダに置いて `blume dev` を実行すれば、本番品質のドキュメントサイトが手に入ります。ナビゲーション、検索、テーマ設定、Open Graph 画像、充実したコンポーネントライブラリまで揃い、アプリのボイラープレートを書いたり保守したりする必要はありません。
+
+<CardGroup cols={2}>
+  <Card title="クイックスタート" href="/docs/quickstart" icon="rocket">
+    Blume をインストールして、数分で最初のページを公開しましょう。
+  </Card>
+  <Card title="設定" href="/docs/configuration" icon="file">
+    タイトル、テーマ、検索、デプロイを調整しましょう。
+  </Card>
+</CardGroup>
+
+## Blume が存在する理由
+
+ドキュメントは高速で、AI に対応し、ゼロコンフィグであるべきです。スターターテンプレートすら不要なほどに。ドキュメントツールの中には、一文字も書かないうちに保守すべきコードベース一式を渡してくるものがあります。一方、コンテンツに合わせてテンプレートを構築してくれるものもありますが、その場合はマネージドサービスに縛られてしまいます。
+
+Blume は両者の良いところを取り入れています。フレームワーク自体がテンプレートなので、あなたが触れるのはコンテンツだけです。カスタマイズしたくなったら、組み込みコンポーネントを差し替えたり、単一の設定ファイルを変更したり、Astro サイトを直接扱いたければ eject することもできます。[FAQ](/docs/faq) では、Mintlify や Fumadocs などとの比較を詳しく説明しています。
+
+## Blume の違い
+
+### デフォルトで高速
+
+Blume は Astro と Vite の上に構築され、デフォルトで静的 HTML をレンダリングします。高速で、キャッシュしやすく、ホスティングも安価です。コアテーマはクライアントフレームワークの JS を一切出力しないため、ページは最初から Core Web Vitals で高いスコアを記録します。開発サーバーの起動とホットリロードは Vite ネイティブの快適さで、サーバー機能は必要になったときだけオプトインできます。
+
+### すぐに使える AI 対応
+
+すべての Blume サイトは機械にも流暢に語りかけます。[`llms.txt` と `llms-full.txt`](/docs/configuration/ai) を出力し、URL に `.md` を付けるだけで任意のページの生の Markdown を提供し、すべてのページで **Copy as Markdown** と **Open in chat** のアクションを読者に提供します。オプションのページ内 **Ask AI** アシスタントを追加したり、[**MCP サーバー**](/docs/configuration/ai#mcp-server) をホストすれば、Claude Code や Cursor などのコーディングエージェントがドキュメントを直接検索して読み取れます。スクレイピングも、ホスト型サービスも不要です。あなたの Markdown が、人間にとってもモデルにとっても信頼できる唯一の情報源になります。
+
+### ゼロコンフィグ — テンプレートさえも
+
+ドキュメントの入ったフォルダが、そのまま完全なプロジェクトです。クローンすべきスターターも、セットアップすべき Astro や Tailwind も、保守すべきテンプレートもありません。ナビゲーションはファイルから推論され、[検索](/docs/configuration/search)はホスト型サービスなしで開発環境でも本番環境でも動作し、テーマ設定はわずかなトークンで済みます。すべてに適切なデフォルトがあります。設定は最初に取り組むものではなく、必要になったときに手を伸ばすものです。
+
+### 芯まで型安全
+
+あなたの [`blume.config.ts`](/docs/configuration) とすべての [`meta.ts`](/docs/content/meta) は本物の TypeScript です。スキーマによって検証され、`defineConfig` と `defineMeta` を使って記述します。エディタはすべてのオプションを補完し、タイプミス、不正な値、欠けているフィールドを、ビルドのはるか前、入力中に検出します。設定は、緩い型付けの YAML ではなく、リファクタリングでき、計算でき、信頼できるコードです。
+
+## すべて同梱
+
+- **コンポーネント** — コールアウト、カード、ステップ、タブ、アコーディオン、バッジ、ファイルツリー、パラメータテーブルが、MDX で[インポート不要](/docs/content/components)で使えます。
+- **ローカル検索** — Orama が開発環境でも本番環境でも動作します。大規模サイト向けには Pagefind がフラグ 1 つで利用できます。ホスト型インデックスは不要です。
+- **AI** — [`llms.txt`、生の Markdown URL、Copy as Markdown、Open in chat、Ask AI アシスタント、ホスト型 MCP サーバー](/docs/configuration/ai)。
+- **ナビゲーション** — ファイルから推論され、`meta.ts` や設定で調整できます。
+- **SEO** — メタデータ、Open Graph 画像、RSS フィード、JSON-LD を[標準搭載](/docs/configuration/seo)。
+- **カスタマイズ** — コンポーネントのオーバーライド、React アイランド、カスタムページ、テーマトークン、そして `blume add` によるソースコンポーネントレジストリ。
+- **Eject** — `blume eject` は、`blume` パッケージを引き続き利用するスタンドアロンの Astro プロジェクトを生成します。
+
+## 仕組み
+
+Blume CLI はコンテンツを検出し、コンテンツグラフを構築して、`.blume/` 配下に隠し Astro プロジェクトを生成し、それを開発とビルドで駆動します。生成されたランタイムは実装の詳細です。あなたは Markdown を書き、残りは Blume が処理します。eject して自分のものにすると決めるまでは。
+
+## 次のステップ
+
+<CardGroup cols={2}>
+  <Card title="設定" href="/docs/configuration" icon="file">
+    タイトル、テーマ、検索、デプロイを調整しましょう。
+  </Card>
+  <Card title="コンポーネント" href="/docs/content/components" icon="folder">
+    組み込みのコンポーネントライブラリを見てみましょう。
+  </Card>
+  <Card title="AI" href="/docs/configuration/ai" icon="lightbulb">
+    `llms.txt` と Ask AI アシスタントを提供しましょう。
+  </Card>
+  <Card title="CLI" href="/docs/reference/cli" icon="rocket">
+    すべての `blume` コマンドとフラグ。
+  </Card>
+</CardGroup>

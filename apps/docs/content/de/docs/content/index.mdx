@@ -1,0 +1,132 @@
+---
+title: Seiten
+description: >-
+  Wie die Dateien in deinem Content-Ordner zu Seiten werden und wie du sie organisierst und benennst, damit Routing und Navigation automatisch abgeleitet werden.
+---
+
+Deine Dokumentation ist einfach ein Ordner voller Markdown- und MDX-Dateien. Blume macht aus jeder Datei eine Seite — Routing, Navigation und Metadaten werden aus dem Dateisystem abgeleitet, es gibt also kein Manifest, das synchron gehalten werden muss.
+
+Inhalte liegen unter deinem **Content-Root** (standardmäßig `docs/`; änderbar über `content.root` in [`blume.config.ts`](/docs/configuration)).
+
+## Markdown und MDX
+
+Blume rendert zwei Arten von Dateien:
+
+- **`.md`** — Markdown für reinen Fließtext: GFM, Frontmatter, typografische Satzzeichen sowie Hoch- und Tiefstellung.
+- **`.mdx`** — alles, was `.md` bietet, plus [Komponenten](/docs/content/components) und die nur in MDX verfügbaren [Direktiven, Paketinstallationen und Mathematik](/docs/content/syntax).
+
+Greif zu `.md`, wenn eine Seite nur aus Fließtext besteht, und zu `.mdx`, wenn sie Komponenten oder Direktiven braucht. Der Wechsel ist so einfach wie das Umbenennen der Datei.
+
+## Dateien und Routen
+
+Jede Datei wird anhand ihres Pfads unterhalb des Content-Roots auf eine Route abgebildet:
+
+| Datei                     | Route             |
+| ------------------------- | ----------------- |
+| `docs/index.mdx`          | `/`               |
+| `docs/quickstart.mdx`     | `/quickstart`     |
+| `docs/guides/theming.mdx` | `/guides/theming` |
+| `docs/guides/index.mdx`   | `/guides`         |
+
+Verschachtelte Ordner werden zu verschachtelten Routen, und eine `index.mdx` in einem Ordner wird zur eigenen Seite dieses Ordners.
+
+## Sortierung mit numerischen Präfixen
+
+Stelle einer Datei oder einem Ordner eine Zahl voran, um die Reihenfolge in der Seitenleiste zu steuern. Das Präfix wird aus der URL entfernt, sodass du Seiten neu anordnen kannst, ohne Links zu zerstören:
+
+```txt
+01-introduction.mdx  ->  /introduction
+02-installation.mdx  ->  /installation
+```
+
+Die Sortierung hat mehrere Ebenen — die vollständigen Vorrangregeln findest du unter [Navigation](/docs/content/navigation).
+
+## Gruppenordner
+
+Setze einen Ordnernamen in Klammern, um dessen Seiten in der Seitenleiste zu gruppieren, **ohne** ein URL-Segment hinzuzufügen:
+
+```txt
+docs/(internal)/security.mdx  ->  /security
+```
+
+Die Seiten teilen sich eine Seitenleisten-Gruppe „Internal“, behalten aber flache URLs ohne Klammern.
+
+## Entwürfe
+
+Markiere eine Seite als Entwurf, um sie aus Produktions-Builds herauszuhalten, sie aber weiterhin in `blume dev` ansehen zu können:
+
+```yaml lineNumbers
+---
+title: Work in progress
+draft: true
+---
+```
+
+`blume build` überspringt Entwürfe; `blume dev` rendert sie, damit du offen daran arbeiten kannst.
+
+## Inhaltstypen
+
+Jede Seite hat einen **Typ**, festgelegt über das Frontmatter-Feld `type` (Standard `doc`). Typen ermöglichen es Blume, Gruppen von Seiten unterschiedlich zu behandeln — vor allem werden `blog`- und `changelog`-Seiten in [Feeds](#feeds) gesammelt.
+
+```yaml lineNumbers
+---
+title: v1.2.0
+type: changelog
+date: 2026-06-20
+changelog:
+  version: 1.2.0
+  category: Features
+---
+```
+
+Der Typ ist unabhängig davon, wo die Datei liegt, aber per Konvention gehören Blogbeiträge unter `blog/` und Changelog-Einträge unter `changelog/`. Beide erhalten automatisch einen RSS-Feed, und Changelog-Einträge werden zusätzlich in einer generierten [`/changelog`-Timeline](/docs/advanced/changelog) gesammelt. Wie du sie jeweils schreibst, erfährst du unter [Blog](/docs/advanced/blog) und [Changelog](/docs/advanced/changelog).
+
+## Feeds
+
+Blume erzeugt automatisch einen RSS-Feed für jeden Inhaltstyp, der in [`rss.types`](/docs/configuration/seo#rss-feeds) aufgeführt ist — standardmäßig `blog` und `changelog` — sofern er mindestens eine Seite enthält. Feeds werden unter `/<type>/rss.xml` ausgeliefert:
+
+| Typ         | Feed                 |
+| ----------- | -------------------- |
+| `blog`      | `/blog/rss.xml`      |
+| `changelog` | `/changelog/rss.xml` |
+
+Gib jedem Eintrag ein `date`, damit die Einträge nach Aktualität sortiert werden und ein `pubDate` tragen. Ein YAML-Datum ohne Anführungszeichen ist in Ordnung — Blume normalisiert es:
+
+```yaml lineNumbers
+---
+title: Introducing Blume
+type: blog
+date: 2026-06-22
+description: Why we built a markdown-first docs framework.
+---
+```
+
+Feeds benötigen eine absolute Website-URL, setze also [`deployment.site`](/docs/deployment). Blume fügt jeder Seite `<link rel="alternate">`-Tags hinzu, damit Browser und Feedreader sie automatisch finden. Wie du die jeweiligen Inhaltstypen schreibst, erfährst du unter [Blog](/docs/advanced/blog) und [Changelog](/docs/advanced/changelog).
+
+## Auf dieser Seite
+
+Jede Seite erhält automatisch ein Inhaltsverzeichnis, das aus ihren Überschriften erstellt wird. Auf breiten Bildschirmen sitzt es in einer haftenden Seitenleiste neben deinem Inhalt; auf schmaleren Bildschirmen klappt es in ein Panel **Auf dieser Seite** oberhalb der Seite zusammen. Beim Scrollen wird der Eintrag des Abschnitts hervorgehoben, den du gerade liest, sodass du auf einer langen Seite immer weißt, wo du dich befindest.
+
+Blume wandelt jede Überschrift in einen Anker-Slug um, sodass jeder Eintrag direkt auf seinen Abschnitt verlinkt — und du kannst auf jede Überschrift per Deeplink verweisen, indem du ihren Slug an die URL anhängst (`.../my-page#getting-started`).
+
+Das Inhaltsverzeichnis listet deine `##`- und `###`-Überschriften (H2 und H3) auf. Eine Seite ohne Überschriften auf dieser Ebene hat schlicht kein Inhaltsverzeichnis.
+
+## Wie geht es weiter
+
+<CardGroup cols={2}>
+  <Card title="Frontmatter" href="/docs/reference/frontmatter" icon="file">
+    Seiten-Metadaten: Titel, Beschreibung, Seitenleiste, SEO und Suche.
+  </Card>
+  <Card title="Syntax" href="/docs/content/syntax" icon="book-open">
+    Jede Markdown- und MDX-Funktion, die du schreiben kannst.
+  </Card>
+  <Card title="Komponenten" href="/docs/content/components" icon="folder">
+    Die JSX-Komponenten, die in jeder MDX-Seite verfügbar sind.
+  </Card>
+  <Card title="Navigation" href="/docs/content/navigation" icon="menu">
+    Gestalte Seitenleiste, Sortierung und Tabs.
+  </Card>
+  <Card title="Ordner-Meta" href="/docs/content/meta" icon="panel-left">
+    Konfiguriere eine Seitenleisten-Gruppe mit einer `meta.ts`-Datei.
+  </Card>
+</CardGroup>

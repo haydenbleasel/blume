@@ -1,0 +1,315 @@
+---
+title: कस्टम पेज
+description: >-
+  पूरी तरह कस्टम .astro रूट्स को अपने डॉक्स के साथ माउंट करें और अपनी साइट का कॉन्फ़िग, नेविगेशन तथा कंटेंट blume:data मॉड्यूल से पढ़ें।
+---
+
+एक Blume साइट का अधिकांश भाग Markdown होता है, लेकिन कभी-कभी आपको ऐसा रूट चाहिए होता है जो डॉक _न_ हो — एक लैंडिंग पेज, एक प्राइसिंग पेज, हाथ से बनाया गया ब्लॉग या चेंजलॉग इंडेक्स, या एक इंटरैक्टिव डैशबोर्ड। अपने **pages** फ़ोल्डर में एक `.astro` फ़ाइल रखें और Blume उसे आपके कंटेंट के साथ-साथ एक वास्तविक रूट के रूप में माउंट कर देता है।
+
+## पेज जोड़ें
+
+अपने प्रोजेक्ट रूट पर एक `pages/` फ़ोल्डर बनाएँ और उसमें एक `.astro` फ़ाइल जोड़ें:
+
+```astro pages/pricing.astro lineNumbers
+---
+import data from "blume:data";
+---
+
+<h1>Pricing for {data.config.title}</h1>
+```
+
+`blume dev` इसे तुरंत उठा लेता है और `blume build` इसे स्टैटिक HTML में प्रीरेंडर कर देता है। फ़ोल्डर का नाम [`content.pages`](/docs/configuration#content) से कॉन्फ़िगर किया जा सकता है (डिफ़ॉल्ट `"pages"`)।
+
+कस्टम पेज डिस्क पर अपना मूल स्थान बनाए रखते हैं, इसलिए रिलेटिव इम्पोर्ट, कंपोनेंट इम्पोर्ट और [`getStaticPaths`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths) सभी ठीक वैसे ही काम करते हैं जैसे एक सामान्य Astro प्रोजेक्ट में — Blume हर फ़ाइल को उसकी जगह पर ही माउंट करता है, उसे कॉपी नहीं करता।
+
+## फ़ाइलें और रूट्स
+
+pages फ़ोल्डर के अंतर्गत हर फ़ाइल का पाथ ही उसका रूट बन जाता है। `index` पैरेंट फ़ोल्डर से मैप होता है, और डायनैमिक `[param]` सेगमेंट संरक्षित रहते हैं:
+
+| फ़ाइल                     | रूट           |
+| ------------------------- | ------------- |
+| `pages/pricing.astro`     | `/pricing`    |
+| `pages/blog/index.astro`  | `/blog`       |
+| `pages/blog/[slug].astro` | `/blog/:slug` |
+| `pages/changelog.astro`   | `/changelog`  |
+
+एक ही पाथ पर कस्टम पेज जेनरेट किए गए रूट पर **भारी पड़ता** है। उदाहरण के लिए, `pages/changelog.astro` जोड़ने पर Blume की [जेनरेट की गई चेंजलॉग टाइमलाइन](/docs/advanced/changelog) की जगह आपका अपना पेज आ जाता है।
+
+## साइट डेटा पढ़ना
+
+वही रिज़ॉल्व किया गया कॉन्फ़िग, नेविगेशन, रूट्स और फ़ीड्स पढ़ने के लिए `blume:data` इम्पोर्ट करें जिनका उपयोग बाकी साइट करती है:
+
+```astro pages/all-pages.astro lineNumbers
+---
+import data from "blume:data";
+---
+
+<h1>All pages</h1>
+<ul>
+  {
+    data.routes
+      .filter((route) => route.indexable)
+      .map((route) => (
+        <li>
+          <a href={route.path}>{route.title}</a>
+        </li>
+      ))
+  }
+</ul>
+```
+
+Blume प्रोजेक्ट के भीतर यह मॉड्यूल स्वतः टाइप्ड होता है। आप इसका शेप स्पष्ट रूप से भी ला सकते हैं — टाइप्ड हेल्पर्स, प्रॉप्स, या अपने स्वयं के tsconfig के लिए — `import type { BlumeData } from "blume"` के साथ:
+
+```ts
+import type { BlumeData, BlumeRoute } from "blume";
+
+const indexable = (data: BlumeData): BlumeRoute[] =>
+  data.routes.filter((route) => route.indexable);
+```
+
+यह मॉड्यूल निम्नलिखित उपलब्ध कराता है:
+
+<TypeTable
+  type={{
+    config: {
+      type: "BlumeDataConfig",
+      required: true,
+      description:
+        "Resolved site settings: title, description, logo, favicon, appleIcon, banner, theme, site, repoUrl, search, i18n, mcp, ask, og, analytics, feedback, structuredData, toc, codeThemes, codeWrap, and imageZoom.",
+    },
+    navigation: {
+      type: "Navigation",
+      required: true,
+      description:
+        "The sidebar, tabs, and selectors inferred from your content (default locale).",
+    },
+    navigationByLocale: {
+      type: "Record<string, Navigation>",
+      required: true,
+      description:
+        "Per-locale navigation trees, keyed by locale code. Empty unless i18n is configured.",
+    },
+    routes: {
+      type: "BlumeRoute[]",
+      required: true,
+      description:
+        "Every content page: { id, path, title, locale, indexable, hidden, draft, fallback, editUrl, lastModified, alternates, collection, entryId }.",
+    },
+    feeds: {
+      type: "BlumeFeed[]",
+      required: true,
+      description: "Generated RSS feeds: { href, title }.",
+    },
+    fontCssVars: {
+      type: "string[]",
+      required: true,
+      description:
+        "CSS variable names for the configured fonts (Astro <Font> integration).",
+    },
+    ui: {
+      type: "UIStrings",
+      required: true,
+      description:
+        "Resolved UI chrome strings for the default locale (search, sidebar, and footer labels).",
+    },
+    uiByLocale: {
+      type: "Record<string, UIStrings>",
+      required: true,
+      description:
+        "Per-locale UI strings, keyed by locale code. Empty unless i18n is configured.",
+    },
+  }}
+/>
+
+`routes` पेज मेटाडेटा रखता है, लेकिन `type` या `date` जैसा फ़्रंटमैटर नहीं। कंटेंट टाइप के आधार पर फ़िल्टर की गई सूची बनाने के लिए — जैसे ब्लॉग या चेंजलॉग इंडेक्स — इसे Astro के `docs` कंटेंट कलेक्शन के साथ जोड़ें, जिसमें फ़्रंटमैटर होता है:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import { getCollection } from "astro:content";
+import data from "blume:data";
+
+// Each route's id matches its collection entry id.
+const routeById = new Map(data.routes.map((route) => [route.id, route.path]));
+
+const posts = (await getCollection("docs"))
+  .filter((entry) => entry.data.type === "blog" && !entry.data.draft)
+  .map((entry) => ({
+    description: entry.data.description,
+    href: routeById.get(entry.id),
+    title: entry.data.title,
+  }));
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={post.href}>{post.title}</a>
+        <p>{post.description}</p>
+      </li>
+    ))
+  }
+</ul>
+```
+
+## रनटाइम हेल्पर्स
+
+`blume/runtime` सामान्य डेटा पैटर्न को बंडल करता है ताकि आपको `blume:data` के आंतरिक हिस्सों तक पहुँचना न पड़े।
+
+**`getBlumeCollection(data, query?)`** कंटेंट रूट्स चुनता है — कलेक्शन, लोकेल, या पाथ प्रीफ़िक्स के आधार पर फ़िल्टर किए हुए, ड्राफ़्ट और छिपे हुए पेज हटाकर और परिणाम पाथ के अनुसार क्रमबद्ध — जो ठीक वही है जिसकी एक कस्टम इंडेक्स को ज़रूरत होती है:
+
+```astro pages/blog/index.astro lineNumbers
+---
+import data from "blume:data";
+import { getBlumeCollection } from "blume/runtime";
+
+const posts = getBlumeCollection(data, { prefix: "/blog" });
+---
+
+<ul>
+  {posts.map((post) => (
+    <li><a href={post.path}>{post.title}</a></li>
+  ))}
+</ul>
+```
+
+**`<BlumePage>`** किसी कंटेंट एंट्री के बॉडी को एक कस्टम पेज के भीतर रेंडर करता है, जिसमें Blume के बिल्ट-इन MDX कंपोनेंट (कॉलआउट, कार्ड, स्टेप्स…) पहले से जुड़े होते हैं — किसी लैंडिंग पेज पर किसी डॉक को प्रस्तुत करने या वास्तविक कंटेंट दिखाने वाला अनुकूलित इंडेक्स बनाने के लिए:
+
+```astro pages/index.astro lineNumbers
+---
+import BlumePage from "blume/components/BlumePage.astro";
+import data from "blume:data";
+import { getBlumeCollection } from "blume/runtime";
+
+const [intro] = getBlumeCollection(data, { prefix: "/docs" });
+---
+
+{intro && <BlumePage id={intro.entryId} />}
+```
+
+अपने स्वयं के ओवरराइड या आइलैंड्स (जो जेनरेट किए गए रनटाइम में रहते हैं और डिफ़ॉल्ट रूप से इम्पोर्ट नहीं होते) जोड़ने के लिए `components` पास करें, और `"docs"` के अलावा किसी अन्य कलेक्शन से पढ़ने के लिए `collection` पास करें।
+
+## साइट लेआउट का उपयोग
+
+`RootLayout` एक कस्टम पेज को पूरा डॉक्स क्रोम देता है — हेडर, साइडबार, सर्च, TOC और थीम — उसे उसी 3-कॉलम ग्रिड में लपेटकर जिसका उपयोग जेनरेट किए गए पेज करते हैं। लैंडिंग या मार्केटिंग पेज के लिए वह ग्रिड बाधा बनता है, इसलिए उसकी जगह **`PageLayout`** चुनें: यह डॉक्यूमेंट शेल, हेडर, थीम और फ़ॉन्ट देता है, और फिर एक अकेला पूरी चौड़ाई वाला `<slot />` (न साइडबार, न प्रोज़, न TOC)। एक वैकल्पिक `footer` स्लॉट `<main>` के बाद रेंडर होता है:
+
+```astro pages/index.astro lineNumbers
+---
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import data from "blume:data";
+import Footer from "./_home/Footer.astro";
+
+const { config } = data;
+---
+
+<PageLayout
+  site={{ title: config.title, description: config.description }}
+  logo={config.logo}
+  banner={config.banner}
+  analytics={config.analytics}
+  navigation={data.navigation}
+  favicon={config.favicon}
+  fontCssVars={data.fontCssVars}
+  themeMode={config.theme.mode}
+  searchEnabled={config.search.enabled}
+  siteUrl={config.site}
+  ogEnabled={config.og.enabled}
+  page={{ title: "Acme — the fastest docs", description: config.description }}
+>
+  <section class="mx-auto max-w-5xl px-6 py-24">
+    <h1>Build docs that fly</h1>
+  </section>
+  <Footer slot="footer" />
+</PageLayout>
+```
+
+कस्टम पेज को वही हेडर मिलता है जो डॉक्स पेजों को मिलता है, इसलिए उसमें रहने वाला क्रोम भी साथ आता है: सर्च, थीम टॉगल, भाषा स्विचर, और — जब [Ask AI](/docs/configuration/ai) कॉन्फ़िगर हो — Ask AI ट्रिगर। इनमें से किसी को भी प्रति पेज जोड़ने की ज़रूरत नहीं। किसी एक पेज पर Ask ट्रिगर बंद रखने और बाकी हर जगह चालू रखने के लिए `askEnabled={false}` पास करें।
+
+`siteUrl` (और `ogEnabled`) पास करने से पेज का `canonical` और एक जेनरेट किया गया `og:image` स्वतः प्राप्त होता है: Blume हर स्टैटिक कस्टम पेज के लिए एक Open Graph कार्ड रेंडर करता है — होम सहित, जो सबसे अधिक साझा किया जाने वाला URL है — जो `/og/<route>.png` पर सर्व होता है (`/` के लिए `/og/index.png`)। होम कार्ड साइट टाइटल का उपयोग करता है और डिस्क्रिप्शन को आइब्रो के रूप में रखता है; किसी गहरे पेज का शीर्षक उसके अंतिम पाथ सेगमेंट से बनता है। किसी को भी ओवरराइड करने के लिए `ogImage` या `canonical` स्पष्ट रूप से सेट करें। `ogImage` एक रूट-रिलेटिव पाथ लेता है — `public/` में मौजूद कोई फ़ाइल, जो [`deployment.site`](/docs/deployment) के सापेक्ष उस पूर्ण URL में रिज़ॉल्व होती है जिसकी क्रॉलर्स को ज़रूरत होती है — या एक बाहरी URL, जो बिना बदले पास हो जाता है:
+
+```astro pages/index.astro lineNumbers
+<PageLayout
+  siteUrl={config.site}
+  ogEnabled={config.og.enabled}
+  ogImage="/opengraph-image.png"
+  page={{ title: config.title }}
+>
+  <!-- page content -->
+</PageLayout>
+```
+
+केवल यही पेज बदलता है — बाकी हर रूट अपना जेनरेट किया गया कार्ड बनाए रखता है — इसलिए इसी तरह आप अकेले होम पेज को एक अनुकूलित शेयर इमेज देते हैं।
+
+`page.title` का उपयोग डॉक्यूमेंट टाइटल के रूप में ज्यों का त्यों होता है (कोई `- siteTitle` सफ़िक्स नहीं), क्योंकि मार्केटिंग पेज आमतौर पर अपना खुद का सेट करते हैं। इसके बजाय किसी कस्टम पेज को पूरा डॉक्स क्रोम देने के लिए — साइडबार, TOC और सब कुछ — उसे `RootLayout` में लपेटें, वही लेआउट जिसका उपयोग जेनरेट किए गए पेज करते हैं। आवश्यक प्रॉप्स सीधे `blume:data` से लें:
+
+```astro pages/pricing.astro lineNumbers
+---
+import RootLayout from "blume/components/layout/RootLayout.astro";
+import data from "blume:data";
+---
+
+<RootLayout
+  site={{ title: data.config.title, description: data.config.description }}
+  logo={data.config.logo}
+  banner={data.config.banner}
+  navigation={data.navigation}
+  page={{ title: "Pricing", route: "/pricing" }}
+  headings={[]}
+  themeMode={data.config.theme.mode}
+  searchEnabled={data.config.search.enabled}
+  indexable={true}
+>
+  <h1>Pricing</h1>
+</RootLayout>
+```
+
+:::note
+`RootLayout` जेनरेट किए गए रनटाइम का हिस्सा है, इसलिए इसके प्रॉप्स रिलीज़ों के बीच बदल सकते हैं। जब आप ऐसा लेआउट चाहते हैं जो पूरी तरह आपका हो, तो [`blume eject`](/docs/configuration/customization#eject) `.blume/` को एक मानक Astro प्रोजेक्ट में बदल देता है जिसके पूर्ण स्वामी आप होते हैं।
+:::
+
+## 404 पेज
+
+Blume बॉक्स से बाहर ही एक डिफ़ॉल्ट **not found** पेज देता है: साइट क्रोम (हेडर, सर्च, थीम) में लिपटा एक केंद्रित "404" संदेश, जो किसी भी अमेल URL के लिए सर्व होता है। `blume build` इसे `404.html` में लिखता है, जिसे स्टैटिक होस्ट स्वतः सर्व करते हैं, और `blume dev` इसे अज्ञात रूट्स के लिए दिखाता है।
+
+इसे अपने पेज से बदलने के लिए, एक `pages/404.astro` जोड़ें। यह `/404` रूट का स्वामी उसी तरह बनता है जैसे `pages/changelog.astro` चेंजलॉग को अपने अधीन ले लेता है — आपका पेज जीतता है और डिफ़ॉल्ट हटा दिया जाता है। इसे किसी भी अन्य कस्टम पेज की तरह बनाएँ, `PageLayout` या `RootLayout` में:
+
+```astro pages/404.astro lineNumbers
+---
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import data from "blume:data";
+---
+
+<PageLayout
+  site={{ title: data.config.title, description: data.config.description }}
+  logo={data.config.logo}
+  navigation={data.navigation}
+  themeMode={data.config.theme.mode}
+  searchEnabled={data.config.search.enabled}
+  page={{ title: "Page not found", route: "/404" }}
+  noindex={true}
+>
+  <section class="mx-auto max-w-2xl px-6 py-24 text-center">
+    <h1>This page took a wrong turn</h1>
+    <a href="/">Back to home</a>
+  </section>
+</PageLayout>
+```
+
+डिफ़ॉल्ट डिज़ाइन बनाए रखते हुए केवल उसके शब्द बदलने के लिए — अन्य भाषाओं के लिए भी — `i18n.ui` के ज़रिए `notFound` [UI स्ट्रिंग्स](/docs/content/i18n) (`title`, `description`, `home`) को ओवरराइड करें।
+
+## इंटरैक्टिव पेज
+
+कस्टम पेज सामान्य Astro हैं, इसलिए आप हाइड्रेशन डायरेक्टिव के साथ React (या किसी भी फ़्रेमवर्क) के [आइलैंड्स](/docs/configuration/customization#interactive-islands) रख सकते हैं। जैसे ही आपके प्रोजेक्ट में कोई `.tsx` या `.jsx` फ़ाइल होती है, React स्वतः चालू हो जाता है।
+
+<CardGroup cols={2}>
+  <Card
+    title="Customization"
+    href="/docs/configuration/customization"
+    icon="file"
+  >
+    कंपोनेंट ओवरराइड, React आइलैंड्स, रजिस्ट्री और eject।
+  </Card>
+  <Card title="Blog" href="/docs/advanced/blog" icon="book-open">
+    पोस्ट लिखें और एक कस्टम ब्लॉग इंडेक्स बनाएँ।
+  </Card>
+</CardGroup>

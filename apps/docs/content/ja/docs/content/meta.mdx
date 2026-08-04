@@ -1,0 +1,81 @@
+---
+title: フォルダーメタ
+description: >-
+  ページと同じ階層に meta.ts ファイルを置いてサイドバーグループを設定します — グループのタイトル、アイコン、順序、および内部にネストされたページの順序を設定できます。
+---
+
+コンテンツツリー内のすべてのフォルダーはサイドバーグループになります。ページと同じ階層に `meta.ts` を置くと、そのグループの見た目と子要素の並び順を制御できます。これは完全に任意です。ファイルがない場合、グループのラベルはフォルダー名を人間が読みやすい形にしたものになり、ページは[インデックス、数値プレフィックス、その後アルファベット順](/docs/content/navigation#ordering)で並びます。
+
+## メタの定義
+
+完全に型付けされた設定にするには `defineMeta` オブジェクトをエクスポートします。設定対象のフォルダーのルートにファイルを配置してください — `guides/meta.ts` は **Guides** グループを設定します:
+
+```ts meta.ts lineNumbers
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Guides",
+  icon: "book-open",
+  order: 2,
+  collapsed: false,
+  pages: ["configuration", "theming", "deployment"],
+});
+```
+
+すべてのフィールドは任意です — 上書きしたいものだけを設定してください。
+
+## フィールド
+
+| フィールド | 型 | 説明 |
+| --- | --- | --- |
+| `title` | `string` | グループのラベル。デフォルトはフォルダー名を人間が読みやすい形にしたもの。 |
+| `icon` | `string` | ラベルの横に表示されるアイコン。 |
+| `order` | `number` | 兄弟のグループやページの中での位置。数値が小さいほど先に並びます。 |
+| `collapsed` | `boolean` | [`group` 表示モード](/docs/content/navigation#display-modes)において、グループを折りたたんだ状態で開始するかどうか。 |
+| `pages` | `string[]` | スラッグによる、グループの子要素の明示的な順序。 |
+
+`pages` 配列は子要素をスラッグで列挙します — スラッグとは、フォルダー名またはファイル名から数値プレフィックスと括弧を取り除いたものです（つまり `01-quickstart.mdx` は `"quickstart"` になります）。省略した子要素も、列挙されたものの後に表示されます。
+
+グループの描画方法 — フラットなヘッダー、折りたたみ可能な開閉要素、ドリルインパネル — はフォルダーごとではなくサイドバー全体の設定です: [表示モード](/docs/content/navigation#display-modes)を参照してください。
+
+## 計算されたメタ
+
+`meta.ts` は実際のモジュールなので、メタを計算できます — オブジェクトの代わりに関数（同期または `async`）を渡すと、スキャン時に構築されます。外部ソースからページの順序を取得する場合に便利です:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta(async () => ({
+  title: "Guides",
+  pages: await orderFromCms(),
+}));
+```
+
+## グループ内での並び順
+
+`pages` 配列はグループの子要素の順序を設定します。そこで省略されたものは、各ページのフロントマターの `sidebar.order`、次にファイルシステム（最初に `index` ページ、次に数値プレフィックス、その後アルファベット順）にフォールバックします。明示的な設定サイドバーを含む、サイドバーの優先順位の全体については、[ナビゲーション › 並び順](/docs/content/navigation#ordering)を参照してください。
+
+URL セグメントを追加*せずに*ページをグループ化したい場合、`meta.ts` はまったく必要ありません。括弧付きのフォルダー名を使用してください — [ページ › グループフォルダー](/docs/content#group-folders)を参照してください。
+
+## 国際化
+
+[i18n](/docs/content/i18n) では、フォルダーメタはロケールごとに解決されます。`fr/guides/` の下に `meta.ts` を置くと、フランス語のグループを独立して並べ替えられます。
+
+すべての言語で同一のフォルダーメタについては、`$` マーカーを追加すると、1 つのファイルで重複なくすべてのロケールに対応できます:
+
+```txt
+docs/guides/meta.$.ts   (folder meta applied to every locale)
+```
+
+ロケール固有の `meta.ts` は、その言語について共有の `meta.$.ts` を引き続き上書きします。
+
+## 次はどこへ
+
+<CardGroup cols={2}>
+  <Card title="ナビゲーション" href="/docs/content/navigation" icon="menu">
+    サイドバー、パンくずリスト、タブがどのように構築されるか。
+  </Card>
+  <Card title="フロントマター" href="/docs/reference/frontmatter" icon="file">
+    `sidebar` の上書きを含む、ページごとのメタデータ。
+  </Card>
+</CardGroup>

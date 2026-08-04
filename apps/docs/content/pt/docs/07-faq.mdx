@@ -1,0 +1,163 @@
+---
+title: FAQ
+description: >-
+  Perguntas comuns sobre o Blume — como ele se compara a outras ferramentas de documentação e por que um formatador de Markdown pode colapsar as suas diretivas de callout.
+sidebar:
+  label: FAQ
+---
+
+Respostas para perguntas que surgem com frequência. Está a faltar alguma? [Abra uma issue](https://github.com/haydenbleasel/blume/issues) ou pergunte ao assistente na página.
+
+## Em que é que o Blume é diferente do Mintlify, do Fumadocs e de outros?
+
+A maioria das ferramentas de documentação situa-se num de dois extremos. **Plataformas geridas** como o Mintlify dão-lhe um resultado polido rapidamente, mas a construção e o alojamento são o serviço deles — escreve dentro do sistema deles e publica na infraestrutura deles. **Bibliotecas de componentes e starters** como o Fumadocs, o Nextra ou o Docusaurus são open-source e flexíveis, mas entregam-lhe uma aplicação (um projeto Next.js ou React) que tem de montar, ligar e manter antes e depois de escrever uma única palavra.
+
+O Blume segue um terceiro caminho: **a framework é o template.** Aponta-o para uma pasta de Markdown e ele gera e conduz o site inteiro — navegação, pesquisa, temas, imagens Open Graph, SEO e endpoints de IA — sem nenhuma aplicação para gerir. É totalmente open-source e auto-alojável, portanto não há serviço gerido nem dependência de fornecedor, mas também não há boilerplate para manter.
+
+|  | Blume | Mintlify | Fumadocs / Nextra / Docusaurus |
+| --- | --- | --- | --- |
+| **Modelo** | Framework de configuração zero; apenas conteúdo | Plataforma alojada | Biblioteca + aplicação que monta |
+| **Código-fonte** | Open-source (MIT) | Núcleo fechado | Open-source |
+| **Alojamento** | Em qualquer lado — estático ou uma função de servidor | A infraestrutura gerida deles | Em qualquer lado; você constrói e publica |
+| **Você mantém** | O seu Markdown | O seu Markdown + configuração da plataforma | O seu Markdown + a aplicação à volta dele |
+| **Renderização** | Astro; o tema principal não envia JS de cliente | O runtime deles | Runtime React/Next.js |
+| **Funcionalidades de IA** | `llms.txt`, Markdown em bruto, Ask AI, MCP — integrados, sem serviço alojado | Integradas (alojadas) | Traga as suas |
+
+Vale a pena destacar algumas consequências:
+
+- **O resultado é seu.** O `blume build` produz um site simples que aloja na Vercel, Netlify, Cloudflare, S3 ou na sua própria máquina. Nada envia dados para casa.
+- **Sem dependência de fornecedor, com duas saídas.** O seu conteúdo é Markdown portátil, e o `blume eject` transforma o projeto numa aplicação Astro autónoma que continua a usar o pacote `blume` quando quiser controlo total.
+- **Rápido por omissão.** O tema principal não usa React e renderiza HTML estático, por isso as páginas pontuam bem nos Core Web Vitals sem afinações. Adere às funcionalidades de servidor (Ask AI, MCP) apenas quando precisar delas.
+- **Configuração com segurança de tipos.** O `blume.config.ts` e cada `meta.ts` são TypeScript real validado por um esquema — e não YAML com tipagem frouxa.
+
+:::note
+Isto não é "melhor do que tudo" — plataformas geridas e frameworks completas são a escolha certa quando quer um produto alojado ou controlo máximo sobre a aplicação. O Blume é para equipas que querem um site de documentação de nível de produção sem terem de gerir nem a plataforma nem a canalização.
+:::
+
+Consulte [Porque existe o Blume](/docs) para a versão mais longa.
+
+## O Blume é gratuito e open-source?
+
+Sim — o Blume é licenciado sob MIT e é gratuito. Instala o pacote `blume`, mantém o seu conteúdo no seu próprio repositório e aloja a build onde quiser. Não há nível pago, nem preço por utilizador, nem conta para criar. O código-fonte está no [GitHub](https://github.com/haydenbleasel/blume).
+
+## Preciso de saber Astro, React ou Tailwind?
+
+Não. Uma pasta de Markdown é um site completo — a navegação, a pesquisa e os temas são inferidos ou definidos com um punhado de tokens. Só recorre à stack subjacente quando quiser personalizar: [ilhas interativas](/docs/content/islands) (React), [substituições de componentes](/docs/configuration/customization) ou [tokens de tema](/docs/configuration/theming) (Tailwind). Mesmo assim, o [`blume.config.ts`](/docs/configuration) é tipado, por isso o seu editor guia-o.
+
+## Posso usar componentes React e MDX?
+
+Sim. Qualquer página pode ser `.md` ou `.mdx`, e o MDX permite-lhe inserir os [componentes integrados](/docs/content/components) sem imports. Também pode adicionar as suas próprias [ilhas](/docs/content/islands) `.tsx`/`.jsx` — o Blume ativa automaticamente o React apenas nas páginas que as usam, para que o tema principal continue livre de JavaScript em todo o resto.
+
+## Onde o posso publicar?
+
+Em qualquer lado. O `blume build` gera HTML estático por omissão, que pode servir a partir de qualquer alojamento estático ou CDN — Vercel, Netlify, Cloudflare Pages, GitHub Pages, S3 ou o seu próprio servidor. As funcionalidades exclusivas de servidor (Ask AI, o servidor MCP, renderização a pedido) mudam a build para uma função de servidor através de um adaptador para a Vercel, Node, Netlify ou Cloudflare. Consulte [Publicação](/docs/deployment).
+
+## A pesquisa precisa de um serviço alojado?
+
+Não. O [Orama](/docs/configuration/search) constrói um índice local que funciona tanto em desenvolvimento como em produção, sem nada para alojar ou pagar. Para sites muito grandes, o [Pagefind](/docs/configuration/search) está à distância de uma flag. Em qualquer dos casos, o índice é distribuído como parte do seu site.
+
+## Como personalizo o aspeto?
+
+Comece pelos [tokens de tema](/docs/configuration/theming) — cor de destaque, tipos de letra, raio e um `theme.css` para tudo o resto que o Tailwind consiga exprimir. Vá mais longe [substituindo componentes integrados](/docs/configuration/customization) ou adicionando [páginas personalizadas](/docs/configuration/customization#custom-pages). Quando quiser o próprio projeto Astro, o [`blume eject`](/docs/reference/cli) entrega-lhe uma aplicação autónoma que continua a usar o pacote `blume`.
+
+## Porque é que o oxfmt / Ultracite está a colapsar as minhas diretivas?
+
+Se formatar o seu Markdown com o [Ultracite](https://www.ultracite.ai) (que corre o oxlint + [oxfmt](https://oxc.rs)) — tal como o próprio Blume faz — poderá reparar que as diretivas de contentor ficam achatadas numa única linha depois de uma passagem de formatação:
+
+```md
+:::note
+Regenerate the project with blume dev.
+:::
+```
+
+torna-se
+
+```md
+:::note Regenerate the project with blume dev. :::
+```
+
+Assim que a linha de abertura `:::note` é unida à prosa, deixa de ser uma diretiva, pelo que é renderizada como texto literal em vez de um [callout](/docs/content/syntax#callouts).
+
+### Porque acontece
+
+Isto é um bug no formatador de Markdown do oxfmt (herdado do printer de Markdown do Prettier — ver [prettier/prettier#19040](https://github.com/prettier/prettier/pull/19040)). Quando faz a quebra da prosa, trata as linhas de fence `:::` como texto vulgar e junta-as à linha adjacente, quebrando a diretiva. Afeta todos os tipos de diretiva de contentor — `:::note`, `:::tip`, `:::info`, `:::warning`, `:::danger`, `:::success`.
+
+Reportámos o problema a montante em [oxc-project/oxc#24096](https://github.com/oxc-project/oxc/issues/24096); até ser corrigido lá, o patch abaixo é a solução alternativa.
+
+### A correção
+
+Aplique um patch ao oxfmt para que preserve a quebra de linha que fica diretamente encostada a um fence `:::`. O Blume inclui a mesma correção no seu próprio repositório, e pode aplicá-la em qualquer projeto.
+
+1. Guarde o patch como `patches/oxfmt@0.61.0.patch`:
+
+   ```diff patches/oxfmt@0.61.0.patch
+   diff --git a/dist/markdown-ZuiQU4Xe.js b/dist/markdown-ZuiQU4Xe.js
+   index 566b9e6d27f36061d64b93736e238e871e1ee2b2..82d0595acc010807c2939fc4a1717dde887a8555 100644
+   --- a/dist/markdown-ZuiQU4Xe.js
+   +++ b/dist/markdown-ZuiQU4Xe.js
+   @@ -4875,7 +4875,43 @@ function lu(e, t, r) {
+    		case "sentence": return Oh(e, r);
+    		case "word": return t.parser !== "mdx" ? zh(e, t) : Uh(e);
+    		case "whitespace": {
+   -			let { next: a } = e, u = a && /^>|^(?:[*+-]|#{1,6}|\d+[).])$/.test(a.value) && !NE(e) && !(t.proseWrap === "preserve" && RE(e)) ? "never" : t.proseWrap;
+   +			let { next: a, previous: oxfmtFencePrev } = e;
+   +			// Preserve line breaks that sit directly against a `:::` container
+   +			// directive fence, so `proseWrap: "never"` keeps the opening/closing
+   +			// fence on their own lines instead of joining them into the prose (which
+   +			// breaks the directive). Ordinary prose still wraps per proseWrap.
+   +			// See prettier/prettier#19040.
+   +			let oxfmtIsFence = (w) => w != null && typeof w.value === "string" && w.value.startsWith(":::");
+   +			// A titled directive (`:::warning[Heads up]`) parses its `[title]` as a
+   +			// linkReference between two sentence nodes at the paragraph level: the
+   +			// fence word ends the sentence before the reference, and the body's
+   +			// leading newline opens the sentence after it. So when this whitespace
+   +			// starts its sentence, climb to the paragraph and check whether the two
+   +			// preceding siblings are a (link) reference and a sentence ending in a
+   +			// `:::` fence word.
+   +			let oxfmtPrevIsTitledFence = !1;
+   +			if (oxfmtFencePrev == null && e.index === 0 && e.grandparent != null && Array.isArray(e.grandparent.children)) {
+   +				let oxfmtSibs = e.grandparent.children, oxfmtSentIdx = oxfmtSibs.indexOf(e.parent);
+   +				if (oxfmtSentIdx >= 2) {
+   +					let oxfmtLink = oxfmtSibs[oxfmtSentIdx - 1], oxfmtBefore = oxfmtSibs[oxfmtSentIdx - 2];
+   +					let oxfmtLastWord = oxfmtBefore && oxfmtBefore.type === "sentence" && Array.isArray(oxfmtBefore.children) ? oxfmtBefore.children[oxfmtBefore.children.length - 1] : null;
+   +					oxfmtPrevIsTitledFence = oxfmtLink != null && (oxfmtLink.type === "linkReference" || oxfmtLink.type === "link") && oxfmtIsFence(oxfmtLastWord);
+   +				}
+   +			}
+   +			// The plain-markdown parser keeps a titled fence's `[title]` as literal
+   +			// words, so the whole directive is one sentence. For a newline
+   +			// whitespace, walk back to the start of its visual line within the
+   +			// sentence; a line led by a `:::` word is a fence whose break must stay.
+   +			if (!oxfmtPrevIsTitledFence && e.node.value.includes("\n") && e.parent != null && Array.isArray(e.parent.children)) {
+   +				let oxfmtLineFirst = null;
+   +				for (let oxfmtJ = e.index - 1; oxfmtJ >= 0; oxfmtJ--) {
+   +					let oxfmtSib = e.parent.children[oxfmtJ];
+   +					if (oxfmtSib.type === "whitespace" && typeof oxfmtSib.value === "string" && oxfmtSib.value.includes("\n")) break;
+   +					oxfmtLineFirst = oxfmtSib;
+   +				}
+   +				oxfmtPrevIsTitledFence = oxfmtIsFence(oxfmtLineFirst);
+   +			}
+   +			let u = oxfmtIsFence(oxfmtFencePrev) || oxfmtPrevIsTitledFence || oxfmtIsFence(a) ? "preserve" : a && /^>|^(?:[*+-]|#{1,6}|\d+[).])$/.test(a.value) && !NE(e) && !(t.proseWrap === "preserve" && RE(e)) ? "never" : t.proseWrap;
+    			return ou(e, n.value, u, !1, t);
+    		}
+    		case "emphasis": {
+   ```
+
+2. Registe-o no `patchedDependencies` do seu gestor de pacotes. Com o Bun ou o pnpm, adicione ao `package.json`:
+
+   ```json package.json
+   {
+     "patchedDependencies": {
+       "oxfmt@0.61.0": "patches/oxfmt@0.61.0.patch"
+     }
+   }
+   ```
+
+3. Reinstale para que o patch seja aplicado:
+
+   ```package-install
+   bun install
+   ```
+
+:::warning[Fixado a uma versão]
+O patch tem como alvo uma build específica do oxfmt — o seu diff referencia um ficheiro cujo nome tem um hash por versão (`dist/markdown-*.js`). Quando atualizar o oxfmt, regenere o patch (por exemplo, `bun patch oxfmt`) ou verifique se a correção a montante já chegou e se o patch já não é necessário.
+:::

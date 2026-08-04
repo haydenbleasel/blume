@@ -1,0 +1,167 @@
+---
+title: OpenAPI / AsyncAPI
+description: OpenAPI 仕様を投入するだけでネイティブな API リファレンスを生成 — 操作ごとに 1 つの実ページを、サイドバーと検索に。
+---
+
+Blume に OpenAPI 仕様を指定すると、ネイティブな API リファレンスを生成します。**操作ごとに 1 つの実ページ**が作られ、タブスコープのサイドバーでタグごとにグループ化され、スキーマの表、リクエスト/レスポンスの例、生成されたコードサンプルが付きます。各操作は正真正銘の Blume ページなので、独自の URL を持ち、**サイト検索**や `llms.txt` に現れ、Open Graph 画像も生成されます — 手書きのドキュメントとまったく同じです。以下の設定では、例として公開されている Petstore 仕様を Blume に指定しています。
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "https://petstore3.swagger.io/api/v3/openapi.json",
+}
+```
+
+これでリファレンスが `/reference`（概要ページ）にマウントされ、各操作は `/reference/<tag>/<operation>` に配置されます。`spec` は `http(s)` の URL か、プロジェクト内のローカルファイルへのパスのいずれかです。Blume は [Scalar の OpenAPI パーサー](https://github.com/scalar/scalar)で解析します — Swagger 2.0 および OpenAPI 3.0 の仕様は自動的に 3.1 へアップグレードされます。
+
+リファレンスはそれ自体ではヘッダータブを追加しません。表に出すには、[ナビゲーションタブ](/docs/content/navigation#tabs)をそのルートに向けてください — これによりネイティブレンダラーの操作サイドバーのスコープも設定されます。
+
+```ts blume.config.ts
+navigation: {
+  tabs: [{ label: "API", path: "/reference" }],
+}
+```
+
+:::note
+操作は**サマリーとタグ**によって検索用にインデックスされます。レンダリングされたスキーマの表やコードサンプルは全文インデックスされません。検索は操作のタイトルとセクションにマッチし、その操作自身のページへリンクします。
+:::
+
+## ローカルの仕様
+
+相対パスはプロジェクトルートを基点に解決され、ビルド時に読み込まれます。JSON と YAML のどちらも利用できます。
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+}
+```
+
+## ルート
+
+`route` はリファレンスのマウント先を制御します — 概要ページと、すべての操作ルートのプレフィックス（およびナビゲーションタブを向ける先のルート）です。
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  route: "/api",   // overview at /api, operations at /api/<tag>/<operation>
+  spec: "./openapi.yaml",
+}
+```
+
+## コードサンプルとスキーマ
+
+`codeSamples` は操作ごとにどの言語をレンダリングするかを選びます（組み込み: `curl`、`js`、`python`）。`expandSchemas` はネストしたスキーマの行を折りたたまずに展開した状態で開始します。
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+  codeSamples: ["curl", "js"],
+  expandSchemas: true,
+}
+```
+
+## 複数の仕様
+
+複数の仕様を公開するには `sources` を使います。各ソースは独自の概要ルート、操作ページ、ヘッダータブを持ちます。それぞれに `label`（タブに使われ、ルートの導出にも使われます）を与えるか、明示的に `route` を設定してください。
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", spec: "./public.json" },   // → /reference/public-api
+    { label: "Admin API", route: "/admin", spec: "./admin.json" },
+  ],
+}
+```
+
+`spec` はエントリが 1 つだけの `sources` の短縮形なので、`sources` を使うのは仕様が複数ある場合だけです。
+
+### ソースごとのインデックス
+
+生成されたページは、デフォルトで検索、`llms.txt`、クローラーのインデックスの対象になります。副次的な仕様や内容が重複する仕様は、ページを非表示にしたりナビゲーションから外したりすることなく、任意の対象から除外できます。
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", route: "/api", spec: "./public.json" },
+    {
+      label: "Platform API",
+      route: "/platform",
+      spec: "./platform.json",
+      includeInSearch: false,
+      includeInLlms: false,
+      noindex: true,
+    },
+  ],
+}
+```
+
+- `includeInSearch: false` は、そのソースの概要と操作をサイト検索から除外します。
+- `includeInLlms: false` は、両方の `llms.txt` ファイルから除外します。
+- `noindex: true` は、クローラー向けの noindex メタデータを追加し、サイトマップからページを削除します。
+
+[Scalar レンダラー](#the-scalar-renderer)では `noindex` のみが適用されます — Scalar でレンダリングされたリファレンスはもともと Blume の検索や `llms.txt` の外側にあるため、2 つの `include*` 設定はそこでは作用する対象がありません。
+
+## 認可
+
+[セキュリティ要件](https://spec.openapis.org/oas/v3.1.0#security-requirement-object)を宣言している操作は、パラメーターの上に**認可**セクションをレンダリングし、生成されたコードサンプルはプレースホルダーの資格情報（`Authorization: Bearer YOUR_TOKEN`、API キーヘッダー、クエリキーなど、スキームが要求するもの）を送信します。設定は不要です。Blume は仕様から `security` を読み取るため、リファレンスは常に API が実際に強制している内容と一致します。
+
+OpenAPI のセマンティクスはそのまま引き継がれます。
+
+- 操作自身の `security` はドキュメントのルートのデフォルトを上書きします。`security: []` はその操作を**パブリック**として示し、認可セクションはレンダリングされません。
+- 複数の要件エントリは選択肢を表し、「or」グループとしてレンダリングされます。1 つのエントリ内のすべてのスキームはまとめて必須です。最初の選択肢がコードサンプルに使われます。
+- 空の `{}` エントリは、その操作で認証が**任意**であることを意味し、セクションにもそのように表示されます。
+- OAuth2 のスコープはスキームごとに一覧表示され、`components.securitySchemes` のスキームの `description` はインラインでレンダリングされます。
+
+## Scalar レンダラー
+
+ネイティブレンダラーがデフォルトです。[Scalar](https://scalar.com) の自己完結型 API リファレンス — 独自のサイドバー、検索、テーマ、そして単一ルート上の「Try it」プレイグラウンド — を埋め込みたい場合は、`renderer: "scalar"` を設定してください。
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  renderer: "scalar",
+  spec: "./openapi.yaml",
+  theme: "purple",   // a Scalar theme name (Scalar renderer only)
+}
+```
+
+Scalar でレンダリングされたリファレンスは、独自のルート上にある自己完結型の埋め込みです — Blume のサイドバー、検索、`llms.txt` には組み込まれません。その「Try it」プレイグラウンドは**ブラウザーから対象の API を直接**呼び出す（Blume はプロキシしません）ため、API はドキュメントサイトからのクロスオリジンリクエストを許可する必要があります（`Access-Control-Allow-Origin`）。`theme` とプレイグラウンドは Scalar レンダラーにのみ適用されます。
+
+### Scalar のオプションを渡す
+
+`theme` は最も多くの人が使うオプション 1 つの短縮形ですが、Scalar はさらに多くのオプションをサポートしています。`scalar` オブジェクトは、任意の [Scalar 設定](https://github.com/scalar/scalar/blob/main/documentation/configuration.md)を埋め込みリファレンスへそのまま転送します — Blume はキーを制限しないため、Scalar が受け付けるものはすべて通過します。
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  renderer: "scalar",
+  spec: "./openapi.yaml",
+  scalar: {
+    localization: { locale: "es" },   // translate Scalar's own UI
+    agent: { disabled: true },         // disable the Scalar Agent
+    hideTestRequestButton: true,
+    orderSchemaPropertiesBy: "preserve",
+  },
+}
+```
+
+Blume 自身の [`i18n`](/docs/content/i18n) はドキュメントの外装を翻訳しますが、Scalar には別のローカライズ機構があります — 埋め込みリファレンスも翻訳するには `scalar.localization.locale` を設定してください。`scalar` オブジェクト内のオプションは Blume が導出した設定より優先されるため、ここで設定したもの（`theme`、`customCss`、仕様の `content`/`url` を含む）は Blume のデフォルトを上書きします。同じ `scalar` ブロックは `asyncapi` リファレンスでも機能します。
+
+## AsyncAPI
+
+イベント駆動 API は、同じ形をした兄弟の `asyncapi` ブロックを使います。AsyncAPI は Scalar によってレンダリングされます（ネイティブレンダラーは今のところ OpenAPI 専用です）。異なるのはデフォルトのルートだけです（`/events`）。
+
+```ts blume.config.ts lineNumbers
+asyncapi: {
+  enabled: true,
+  spec: "./asyncapi.yaml",
+}
+```
+
+:::warning
+Scalar の AsyncAPI サポートはまだ開発途上です — チャネル、操作、メッセージ、Models セクションはレンダリングされますが、イベント向けの**インタラクティブなプレイグラウンドはまだありません**。上流で徐々に改善されています。
+:::

@@ -1,0 +1,197 @@
+---
+title: Fontes de conteúdo
+description: >-
+  Traga documentação de arquivos locais, de um repositório remoto ou de qualquer backend personalizado — e combine várias fontes em um único site static-first lido em tempo de build.
+---
+
+Por padrão, o Blume lê uma pasta de arquivos `.md`/`.mdx`. As **fontes de conteúdo** permitem trazer páginas de outro lugar — um repositório remoto, um CMS ou qualquer backend personalizado — e combinar várias fontes em um único site. As fontes são lidas em tempo de build; o Blume continua static-first.
+
+## O padrão
+
+Sem nenhuma configuração, o Blume varre a raiz do seu conteúdo (`docs`, por padrão) como uma única fonte de sistema de arquivos implícita. As opções de nível superior `content.root`/`include`/`exclude` continuam funcionando exatamente como antes — nada a mudar.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: { root: "docs" },
+});
+```
+
+## Múltiplas fontes
+
+Adicione um array `content.sources` para compor fontes. Cada entrada recebe um namespace por meio de um `prefix` opcional, de modo que suas rotas fiquem aninhadas sob `/<prefix>/…`. Quando `sources` está presente, ele substitui o padrão implícito, portanto inclua uma entrada `filesystem` para a sua documentação local.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      // Local docs at the site root
+      { type: "filesystem", root: "docs" },
+
+      // Remote MDX from a GitHub repo, mounted under /sdk
+      {
+        type: "mdx-remote",
+        prefix: "sdk",
+        github: { owner: "acme", repo: "sdk", ref: "main", path: "docs" },
+      },
+    ],
+  },
+});
+```
+
+Se duas fontes resolverem para a mesma rota, o Blume reporta um erro de build `BLUME_DUPLICATE_ROUTE` — dê a cada fonte um `prefix` distinto.
+
+## MDX remoto
+
+A fonte integrada `mdx-remote` busca arquivos `.md`/`.mdx` brutos via HTTP. Enumere os arquivos a partir de uma subárvore de um repositório do GitHub (`github`) ou explicitamente contra uma URL base bruta (`url` + `files`):
+
+```ts blume.config.ts
+{
+  type: "mdx-remote",
+  prefix: "sdk",
+  url: "https://raw.githubusercontent.com/acme/sdk/main/docs",
+  files: ["intro.mdx", "guide.mdx"],
+}
+```
+
+O token de um repositório privado é lido da variável de ambiente `GITHUB_TOKEN` — ele nunca é embutido na sua configuração ou na saída gerada, e é enviado somente para os próprios hosts do GitHub (`api.github.com`, `raw.githubusercontent.com`), nunca para uma base `url` personalizada.
+
+As páginas remotas são renderizadas com fidelidade total de MDX-mais-componentes: seus corpos são materializados em um diretório de staging oculto e renderizados pelo Astro junto com a sua documentação local, de modo que callouts, abas e todos os demais componentes do Blume continuam funcionando.
+
+### Cache e builds offline
+
+Cada fonte remota mantém um snapshot em `.blume/cache/<source>/`. Se uma busca falhar — uma instabilidade de rede ou uma indisponibilidade do CMS — o Blume serve o último snapshot válido conhecido com um aviso, em vez de quebrar o build. O cache fica dentro de `.blume/` e é regenerado, nunca versionado.
+
+Em desenvolvimento, o conteúdo remoto é buscado uma vez e congelado durante a sessão; reinicie o servidor de desenvolvimento para atualizá-lo. As fontes locais do sistema de arquivos recarregam a quente normalmente. Para, em vez disso, consultar periodicamente uma fonte remota em busca de alterações, defina `pollInterval` (em segundos) nela — o servidor de desenvolvimento refaz a busca nesse intervalo e recarrega apenas quando o conteúdo realmente muda. Deixe-o sem definir para evitar chamadas à API enquanto você trabalha.
+
+## GitHub Releases
+
+A fonte integrada `github-releases` transforma as releases de um repositório em um changelog: cada release vira uma entrada `type: changelog`, de modo que suas notas de versão _são_ o seu changelog — nada a escrever duas vezes. Combinado com a [linha do tempo de changelog](/docs/advanced/changelog) gerada, publicar uma release no GitHub entrega uma entrada de changelog.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "content" },
+      {
+        type: "github-releases",
+        prefix: "changelog",
+        owner: "acme",
+        repo: "sdk",
+        // prereleases: false,  // include prereleases (default off)
+        // drafts: false,       // include drafts (needs a write token)
+        // limit: 100,          // cap releases, newest-first
+      },
+    ],
+  },
+});
+```
+
+Cada release é mapeada automaticamente para os campos do changelog: seu nome (ou tag) vira o título, sua data de publicação define a ordem da linha do tempo, a tag vira `changelog.version`, e as prereleases são marcadas como `Prerelease` (as demais como `Release`). As notas são renderizadas como o corpo da entrada. Dê à fonte um `prefix` para que suas páginas de release fiquem aninhadas sob uma rota como `/changelog/v1-2-0`.
+
+Um repositório privado se autentica com a variável de ambiente `GITHUB_TOKEN` — o mesmo token que os outros recursos do GitHub usam, nunca embutido na sua configuração. Como toda fonte remota, ela é armazenada em cache em `.blume/cache/<source>/` e servida offline se a API estiver inacessível. Como um changelog é complementar, uma falha de busca sem cache (digamos, um build de CI sem token) degrada para um changelog vazio com um aviso, em vez de quebrar o build — defina `GITHUB_TOKEN` nos seus ambientes de CI e de deploy para preenchê-lo.
+
+## Sanity
+
+A fonte integrada `sanity` executa uma consulta GROQ e mapeia os campos de cada documento para o frontmatter e seu corpo em Portable Text para Markdown. O pacote `@sanity/client` é uma dependência peer opcional — instale-o apenas se você usar esta fonte.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "sanity",
+        prefix: "guides",
+        projectId: "abc123",
+        dataset: "production",
+        query: `*[_type == "guide"]`,
+        // Field paths default to title / slug.current / body / _updatedAt
+        fields: { slug: "slug.current", body: "content" },
+      },
+    ],
+  },
+});
+```
+
+Um token de leitura para um dataset privado vem da variável de ambiente `SANITY_TOKEN`. Tipos de bloco personalizados de Portable Text são mapeados para componentes do Blume por meio da opção `serializers` do adaptador, disponível quando você constrói `sanitySource` diretamente via uma [fonte personalizada](#custom-sources).
+
+## Notion
+
+A fonte integrada `notion` transforma um banco de dados do Notion em uma coleção: cada linha vira uma página, suas propriedades viram frontmatter e sua árvore de blocos vira MDX. Callouts, toggles, colunas e blocos de código são mapeados para os componentes correspondentes do Blume. `@notionhq/client` é uma dependência peer opcional.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "notion",
+        prefix: "handbook",
+        database: process.env.NOTION_DB_ID,
+        // Property names default to the title-typed prop / Description / Slug / Order
+        // Set publishedValue to treat Status as a publish gate (opt-in)
+        publishedValue: "Published",
+      },
+    ],
+  },
+});
+```
+
+O token de integração vem da variável de ambiente `NOTION_TOKEN` (compartilhe o banco de dados com a sua integração). Por padrão, todas as páginas são importadas; defina `publishedValue` para fazer da propriedade `Status` um controle de publicação — qualquer outro valor passa então a ser mapeado para `draft: true`, que os builds de produção descartam. **As URLs de imagem do Notion são assinadas e expiram**, portanto o adaptador as baixa em tempo de build para os assets do site e reescreve as referências — uma imagem de CMS nunca apodrece um build estático.
+
+## Preview e sincronização
+
+Duas flags controlam como o conteúdo remoto é buscado e o que é incluído:
+
+- **`--preview`** em `blume dev` ou `blume build` renderiza rascunhos e traz conteúdo não publicado do CMS — o Sanity muda para sua perspectiva `previewDrafts`, e o Notion para de filtrar por `Status`. Builds de produção sem a flag excluem rascunhos normalmente, então um build de preview é uma forma segura de revisar trabalho não publicado antes de ele ir ao ar.
+- **`blume sync`** refaz a busca de todas as fontes remotas e regenera o runtime. O ambiente de desenvolvimento é cache-first — uma fonte remota é buscada uma vez e servida a partir de `.blume/cache` ao reiniciar (rápido e tolerante a offline), portanto `blume sync` é como você traz o conteúdo mais recente do CMS sem reiniciar o servidor de desenvolvimento (um servidor em execução recarrega a quente). Adicione `--force` para descartar o cache antes, ou defina `pollInterval` em uma fonte para atualizar automaticamente.
+
+```sh
+blume dev --preview      # author workflow: see drafts live
+blume build --preview    # render a full preview build
+blume sync               # refresh remote content now
+blume sync --force       # ...ignoring any cached snapshot
+```
+
+## Fontes personalizadas
+
+Qualquer objeto que implemente a interface `ContentSource` pode ser passado diretamente, e é assim que um adaptador com serializers personalizados — ou qualquer backend não integrado — se conecta sem que seu SDK toque a instalação principal:
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+import { sanitySource } from "blume/sources/sanity.ts";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "custom",
+        source: sanitySource({
+          name: "guides",
+          prefix: "guides",
+          projectId: "abc123",
+          dataset: "production",
+          query: `*[_type == "guide"]`,
+          // Map custom Portable Text blocks to Blume components
+          serializers: {
+            callout: (block) => `<Callout>${block.text}</Callout>`,
+          },
+        }),
+      },
+    ],
+  },
+});
+```
+
+Uma fonte normaliza seu formato nativo (Portable Text, blocos do Notion, HTML remoto) para texto Markdown/MDX, de modo que os mesmos componentes e recursos de markdown se aplicam, não importa de onde uma página venha.

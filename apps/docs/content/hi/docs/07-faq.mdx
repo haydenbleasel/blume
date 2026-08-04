@@ -1,0 +1,163 @@
+---
+title: सामान्य प्रश्न (FAQ)
+description: >-
+  Blume के बारे में सामान्य प्रश्न — यह अन्य डॉक्यूमेंटेशन टूल्स से कैसे भिन्न है, और Markdown फ़ॉर्मैटर आपके callout डायरेक्टिव्स को क्यों समेट सकता है।
+sidebar:
+  label: सामान्य प्रश्न
+---
+
+अक्सर पूछे जाने वाले प्रश्नों के उत्तर। कोई प्रश्न छूट गया? [कोई issue खोलें](https://github.com/haydenbleasel/blume/issues) या पेज पर मौजूद असिस्टेंट से पूछें।
+
+## Blume, Mintlify, Fumadocs और अन्य से किस तरह अलग है?
+
+अधिकांश डॉक्यूमेंटेशन टूल दो में से किसी एक छोर पर होते हैं। Mintlify जैसे **मैनेज्ड प्लेटफ़ॉर्म** आपको तेज़ी से एक परिष्कृत परिणाम देते हैं, लेकिन बिल्ड और होस्टिंग उनकी सेवा है — आप उनके सिस्टम के भीतर लिखते हैं और उनके इन्फ़्रास्ट्रक्चर पर डिप्लॉय करते हैं। Fumadocs, Nextra या Docusaurus जैसी **कंपोनेंट लाइब्रेरीज़ और स्टार्टर्स** ओपन-सोर्स और लचीले हैं, लेकिन वे आपको एक एप्लिकेशन (एक Next.js या React प्रोजेक्ट) सौंप देते हैं जिसे आपको एक शब्द लिखने से पहले और बाद में स्कैफ़ोल्ड करना, जोड़ना और मेंटेन करना पड़ता है।
+
+Blume एक तीसरा रास्ता अपनाता है: **फ़्रेमवर्क ही टेम्पलेट है।** आप इसे Markdown के एक फ़ोल्डर की ओर इंगित करते हैं और यह पूरी साइट को जनरेट और संचालित करता है — नेविगेशन, सर्च, थीमिंग, Open Graph इमेजेज़, SEO और AI एंडपॉइंट्स — बिना किसी ऐप के स्वामित्व के। यह पूरी तरह ओपन-सोर्स और सेल्फ़-होस्टेबल है, इसलिए न कोई मैनेज्ड सेवा है और न ही कोई वेंडर लॉक-इन, लेकिन साथ ही मेंटेन करने के लिए कोई बॉयलरप्लेट भी नहीं है।
+
+|  | Blume | Mintlify | Fumadocs / Nextra / Docusaurus |
+| --- | --- | --- | --- |
+| **मॉडल** | ज़ीरो-कॉन्फ़िग फ़्रेमवर्क; केवल कंटेंट | होस्टेड प्लेटफ़ॉर्म | लाइब्रेरी + वह ऐप जिसे आप स्कैफ़ोल्ड करते हैं |
+| **स्रोत** | ओपन-सोर्स (MIT) | क्लोज़्ड कोर | ओपन-सोर्स |
+| **होस्टिंग** | कहीं भी — स्टैटिक या सर्वर फ़ंक्शन | उनका मैनेज्ड इन्फ़्रास्ट्रक्चर | कहीं भी; आप बिल्ड और डिप्लॉय करते हैं |
+| **आप क्या मेंटेन करते हैं** | आपका Markdown | आपका Markdown + प्लेटफ़ॉर्म कॉन्फ़िग | आपका Markdown + उसके इर्द-गिर्द का ऐप |
+| **रेंडरिंग** | Astro; कोर थीम शून्य क्लाइंट JS भेजती है | उनका रनटाइम | React/Next.js रनटाइम |
+| **AI फ़ीचर्स** | `llms.txt`, रॉ Markdown, Ask AI, MCP — बिल्ट इन, कोई होस्टेड सेवा नहीं | बिल्ट इन (होस्टेड) | अपना खुद का लाएँ |
+
+कुछ परिणाम जिनका उल्लेख करना ज़रूरी है:
+
+- **आउटपुट आपका है।** `blume build` एक सादी साइट बनाता है जिसे आप Vercel, Netlify, Cloudflare, S3, या अपने खुद के सर्वर पर होस्ट करते हैं। कुछ भी वापस रिपोर्ट नहीं करता।
+- **कोई लॉक-इन नहीं, बाहर निकलने के दो रास्ते।** आपका कंटेंट पोर्टेबल Markdown है, और `blume eject` प्रोजेक्ट को एक स्टैंडअलोन Astro ऐप में बदल देता है जो पूरा नियंत्रण चाहने पर भी `blume` पैकेज का ही उपयोग करता है।
+- **डिफ़ॉल्ट रूप से तेज़।** कोर थीम React-मुक्त है और स्टैटिक HTML रेंडर करती है, इसलिए पेज बिना ट्यूनिंग के Core Web Vitals पर अच्छा स्कोर करते हैं। सर्वर फ़ीचर्स (Ask AI, MCP) आप तभी चुनते हैं जब आपको उनकी ज़रूरत हो।
+- **टाइप-सेफ़ कॉन्फ़िगरेशन।** `blume.config.ts` और हर `meta.ts` असली TypeScript हैं जिन्हें एक स्कीमा द्वारा वैलिडेट किया जाता है — न कि ढीले-ढाले टाइप वाला YAML।
+
+:::note
+यह "हर चीज़ से बेहतर" होने का दावा नहीं है — मैनेज्ड प्लेटफ़ॉर्म और पूर्ण फ़्रेमवर्क तब सही विकल्प हैं जब आपको एक होस्टेड प्रोडक्ट चाहिए या ऐप पर अधिकतम नियंत्रण चाहिए। Blume उन टीमों के लिए है जो प्लेटफ़ॉर्म या प्लंबिंग में से किसी का भी स्वामित्व लिए बिना एक प्रोडक्शन-ग्रेड डॉक्स साइट चाहती हैं।
+:::
+
+विस्तृत संस्करण के लिए [Blume क्यों मौजूद है](/docs) देखें।
+
+## क्या Blume मुफ़्त और ओपन-सोर्स है?
+
+हाँ — Blume MIT-लाइसेंस्ड और मुफ़्त है। आप `blume` पैकेज इंस्टॉल करते हैं, अपना कंटेंट अपनी ही रिपॉज़िटरी में रखते हैं, और बिल्ड को जहाँ चाहें होस्ट करते हैं। कोई पेड टियर नहीं, कोई प्रति-सीट मूल्य निर्धारण नहीं, और साइन अप करने के लिए कोई अकाउंट नहीं। सोर्स [GitHub](https://github.com/haydenbleasel/blume) पर मौजूद है।
+
+## क्या मुझे Astro, React या Tailwind जानना ज़रूरी है?
+
+नहीं। Markdown का एक फ़ोल्डर ही एक संपूर्ण साइट है — नेविगेशन, सर्च और थीमिंग या तो अनुमानित होते हैं या मुट्ठी भर टोकन्स से सेट किए जाते हैं। आप अंतर्निहित स्टैक तक तभी पहुँचते हैं जब आप कस्टमाइज़ करना चाहते हैं: [इंटरैक्टिव आइलैंड्स](/docs/content/islands) (React), [कंपोनेंट ओवरराइड्स](/docs/configuration/customization), या [थीम टोकन्स](/docs/configuration/theming) (Tailwind)। तब भी, [`blume.config.ts`](/docs/configuration) टाइप्ड है, इसलिए आपका एडिटर आपका मार्गदर्शन करता है।
+
+## क्या मैं React कंपोनेंट्स और MDX का उपयोग कर सकता हूँ?
+
+हाँ। कोई भी पेज `.md` या `.mdx` हो सकता है, और MDX आपको बिना किसी import के [बिल्ट-इन कंपोनेंट्स](/docs/content/components) डालने देता है। आप अपने खुद के `.tsx`/`.jsx` [आइलैंड्स](/docs/content/islands) भी जोड़ सकते हैं — Blume केवल उन्हीं पेजों के लिए React को स्वतः सक्षम करता है जो उनका उपयोग करते हैं, इसलिए कोर थीम बाकी हर जगह JavaScript-मुक्त रहती है।
+
+## मैं इसे कहाँ डिप्लॉय कर सकता हूँ?
+
+कहीं भी। `blume build` डिफ़ॉल्ट रूप से स्टैटिक HTML आउटपुट करता है, जिसे आप किसी भी स्टैटिक होस्ट या CDN से सर्व कर सकते हैं — Vercel, Netlify, Cloudflare Pages, GitHub Pages, S3, या अपना खुद का सर्वर। केवल-सर्वर फ़ीचर्स (Ask AI, MCP सर्वर, ऑन-डिमांड रेंडरिंग) Vercel, Node, Netlify या Cloudflare के लिए एक अडैप्टर के ज़रिए बिल्ड को सर्वर फ़ंक्शन में बदल देते हैं। [डिप्लॉयमेंट](/docs/deployment) देखें।
+
+## क्या सर्च के लिए किसी होस्टेड सेवा की ज़रूरत है?
+
+नहीं। [Orama](/docs/configuration/search) एक लोकल इंडेक्स बनाता है जो dev और production दोनों में काम करता है, और इसके लिए कुछ भी होस्ट या भुगतान नहीं करना पड़ता। बहुत बड़ी साइटों के लिए, [Pagefind](/docs/configuration/search) बस एक फ़्लैग की दूरी पर है। दोनों ही स्थितियों में इंडेक्स आपकी साइट के हिस्से के रूप में भेजा जाता है।
+
+## मैं लुक कैसे कस्टमाइज़ करूँ?
+
+[थीम टोकन्स](/docs/configuration/theming) से शुरू करें — एक्सेंट रंग, फ़ॉन्ट्स, रेडियस, और बाकी हर उस चीज़ के लिए एक `theme.css` जिसे Tailwind व्यक्त कर सकता है। आगे बढ़ने के लिए [बिल्ट-इन कंपोनेंट्स को ओवरराइड करें](/docs/configuration/customization) या [कस्टम पेज](/docs/configuration/customization#custom-pages) जोड़ें। जब आपको Astro प्रोजेक्ट ही चाहिए, तो [`blume eject`](/docs/reference/cli) आपको एक स्टैंडअलोन ऐप सौंप देता है जो फिर भी `blume` पैकेज का उपयोग करता है।
+
+## oxfmt / Ultracite मेरे डायरेक्टिव्स को क्यों समेट रहा है?
+
+यदि आप अपने Markdown को [Ultracite](https://www.ultracite.ai) से फ़ॉर्मैट करते हैं (जो oxlint + [oxfmt](https://oxc.rs) चलाता है) — जैसा कि Blume खुद करता है — तो आप देख सकते हैं कि फ़ॉर्मैट पास के बाद कंटेनर डायरेक्टिव्स एक ही लाइन में सिमट जाते हैं:
+
+```md
+:::note
+Regenerate the project with blume dev.
+:::
+```
+
+बन जाता है
+
+```md
+:::note Regenerate the project with blume dev. :::
+```
+
+एक बार जब शुरुआती `:::note` फ़ेंस प्रोज़ से जुड़ जाता है, तो वह डायरेक्टिव नहीं रह जाता, इसलिए वह [callout](/docs/content/syntax#callouts) के बजाय शाब्दिक टेक्स्ट के रूप में रेंडर होता है।
+
+### यह क्यों होता है
+
+यह oxfmt के Markdown फ़ॉर्मैटर में एक बग है (जो Prettier के Markdown प्रिंटर से विरासत में मिला है — देखें [prettier/prettier#19040](https://github.com/prettier/prettier/pull/19040))। जब यह प्रोज़ को रैप करता है, तो यह `:::` फ़ेंस लाइनों को सामान्य टेक्स्ट मानता है और उन्हें बगल की लाइन से जोड़ देता है, जिससे डायरेक्टिव टूट जाता है। यह हर कंटेनर डायरेक्टिव प्रकार को प्रभावित करता है — `:::note`, `:::tip`, `:::info`, `:::warning`, `:::danger`, `:::success`।
+
+हमने इसे अपस्ट्रीम [oxc-project/oxc#24096](https://github.com/oxc-project/oxc/issues/24096) में रिपोर्ट किया है; जब तक वहाँ इसे ठीक नहीं किया जाता, नीचे दिया गया पैच ही समाधान है।
+
+### समाधान
+
+oxfmt को इस तरह पैच करें कि वह उस लाइन ब्रेक को संरक्षित रखे जो सीधे किसी `:::` फ़ेंस से सटी हुई है। Blume अपनी ही रिपॉज़िटरी में यही फ़िक्स भेजता है, और आप इसे किसी भी प्रोजेक्ट में लागू कर सकते हैं।
+
+1. पैच को `patches/oxfmt@0.61.0.patch` के रूप में सेव करें:
+
+   ```diff patches/oxfmt@0.61.0.patch
+   diff --git a/dist/markdown-ZuiQU4Xe.js b/dist/markdown-ZuiQU4Xe.js
+   index 566b9e6d27f36061d64b93736e238e871e1ee2b2..82d0595acc010807c2939fc4a1717dde887a8555 100644
+   --- a/dist/markdown-ZuiQU4Xe.js
+   +++ b/dist/markdown-ZuiQU4Xe.js
+   @@ -4875,7 +4875,43 @@ function lu(e, t, r) {
+    		case "sentence": return Oh(e, r);
+    		case "word": return t.parser !== "mdx" ? zh(e, t) : Uh(e);
+    		case "whitespace": {
+   -			let { next: a } = e, u = a && /^>|^(?:[*+-]|#{1,6}|\d+[).])$/.test(a.value) && !NE(e) && !(t.proseWrap === "preserve" && RE(e)) ? "never" : t.proseWrap;
+   +			let { next: a, previous: oxfmtFencePrev } = e;
+   +			// Preserve line breaks that sit directly against a `:::` container
+   +			// directive fence, so `proseWrap: "never"` keeps the opening/closing
+   +			// fence on their own lines instead of joining them into the prose (which
+   +			// breaks the directive). Ordinary prose still wraps per proseWrap.
+   +			// See prettier/prettier#19040.
+   +			let oxfmtIsFence = (w) => w != null && typeof w.value === "string" && w.value.startsWith(":::");
+   +			// A titled directive (`:::warning[Heads up]`) parses its `[title]` as a
+   +			// linkReference between two sentence nodes at the paragraph level: the
+   +			// fence word ends the sentence before the reference, and the body's
+   +			// leading newline opens the sentence after it. So when this whitespace
+   +			// starts its sentence, climb to the paragraph and check whether the two
+   +			// preceding siblings are a (link) reference and a sentence ending in a
+   +			// `:::` fence word.
+   +			let oxfmtPrevIsTitledFence = !1;
+   +			if (oxfmtFencePrev == null && e.index === 0 && e.grandparent != null && Array.isArray(e.grandparent.children)) {
+   +				let oxfmtSibs = e.grandparent.children, oxfmtSentIdx = oxfmtSibs.indexOf(e.parent);
+   +				if (oxfmtSentIdx >= 2) {
+   +					let oxfmtLink = oxfmtSibs[oxfmtSentIdx - 1], oxfmtBefore = oxfmtSibs[oxfmtSentIdx - 2];
+   +					let oxfmtLastWord = oxfmtBefore && oxfmtBefore.type === "sentence" && Array.isArray(oxfmtBefore.children) ? oxfmtBefore.children[oxfmtBefore.children.length - 1] : null;
+   +					oxfmtPrevIsTitledFence = oxfmtLink != null && (oxfmtLink.type === "linkReference" || oxfmtLink.type === "link") && oxfmtIsFence(oxfmtLastWord);
+   +				}
+   +			}
+   +			// The plain-markdown parser keeps a titled fence's `[title]` as literal
+   +			// words, so the whole directive is one sentence. For a newline
+   +			// whitespace, walk back to the start of its visual line within the
+   +			// sentence; a line led by a `:::` word is a fence whose break must stay.
+   +			if (!oxfmtPrevIsTitledFence && e.node.value.includes("\n") && e.parent != null && Array.isArray(e.parent.children)) {
+   +				let oxfmtLineFirst = null;
+   +				for (let oxfmtJ = e.index - 1; oxfmtJ >= 0; oxfmtJ--) {
+   +					let oxfmtSib = e.parent.children[oxfmtJ];
+   +					if (oxfmtSib.type === "whitespace" && typeof oxfmtSib.value === "string" && oxfmtSib.value.includes("\n")) break;
+   +					oxfmtLineFirst = oxfmtSib;
+   +				}
+   +				oxfmtPrevIsTitledFence = oxfmtIsFence(oxfmtLineFirst);
+   +			}
+   +			let u = oxfmtIsFence(oxfmtFencePrev) || oxfmtPrevIsTitledFence || oxfmtIsFence(a) ? "preserve" : a && /^>|^(?:[*+-]|#{1,6}|\d+[).])$/.test(a.value) && !NE(e) && !(t.proseWrap === "preserve" && RE(e)) ? "never" : t.proseWrap;
+    			return ou(e, n.value, u, !1, t);
+    		}
+    		case "emphasis": {
+   ```
+
+2. इसे अपने पैकेज मैनेजर के `patchedDependencies` में रजिस्टर करें। Bun या pnpm के साथ, `package.json` में जोड़ें:
+
+   ```json package.json
+   {
+     "patchedDependencies": {
+       "oxfmt@0.61.0": "patches/oxfmt@0.61.0.patch"
+     }
+   }
+   ```
+
+3. पैच लागू होने के लिए फिर से इंस्टॉल करें:
+
+   ```package-install
+   bun install
+   ```
+
+:::warning[संस्करण-निर्धारित]
+यह पैच एक विशिष्ट oxfmt बिल्ड को लक्षित करता है — इसका diff एक ऐसी फ़ाइल का संदर्भ देता है जिसका नाम हर रिलीज़ पर हैश किया जाता है (`dist/markdown-*.js`)। जब आप oxfmt को अपग्रेड करें, तो पैच को फिर से जनरेट करें (उदाहरण के लिए `bun patch oxfmt`) या जाँचें कि क्या अपस्ट्रीम फ़िक्स आ चुका है और पैच की अब ज़रूरत नहीं है।
+:::

@@ -1,0 +1,338 @@
+---
+title: SEO
+description: >-
+  मेटाडेटा, Open Graph छवियाँ, RSS फ़ीड और JSON-LD — Blume की खोज-योग्यता परत, एक ही seo कॉन्फ़िग के अंतर्गत समूहीकृत।
+sidebar:
+  label: SEO
+---
+
+Blume आपके लिए खोज-योग्यता परत संभालता है: पेज मेटाडेटा, सोशल शेयर छवियाँ, फ़ीड और संरचित डेटा। कॉन्फ़िगर करने योग्य सुविधाएँ `blume.config.ts` में `seo` कुंजी के अंतर्गत रहती हैं; मेटाडेटा आपकी सामग्री से संचालित होता है।
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
+  structuredData: true,
+  x: { handle: "@acme" },
+}
+```
+
+इसमें से अधिकांश एक निरपेक्ष साइट URL के साथ और भी बेहतर काम करता है — [`deployment.site`](/docs/deployment) सेट करें ताकि फ़ीड, OG छवियाँ, कैनोनिकल, साइटमैप और JSON-LD पूर्ण URL उत्सर्जित कर सकें।
+
+## मेटाडेटा
+
+हर पेज आपके कॉन्फ़िग और फ्रंटमैटर से मानक `<head>` टैग रेंडर करता है:
+
+- `<title>` — पेज का शीर्षक और साथ में आपकी साइट का `title`।
+- `<meta name="description">` और `og:description` — पेज का `description`, जिसके न होने पर साइट का `description`।
+- `og:title` और `og:site_name` — पेज का शीर्षक और आपकी साइट का `title`।
+- `<link rel="canonical">` और `og:url` — पेज का निरपेक्ष URL (जब `deployment.site` सेट हो)।
+- `og:type` — ब्लॉग पोस्ट और चेंजलॉग प्रविष्टियों पर `article`, अन्यत्र `website`। लेख पेज पेज के `date` और अंतिम-संशोधन टाइमस्टैम्प से `article:published_time` और `article:modified_time` भी उत्सर्जित करते हैं।
+- `og:image` — पेज के लिए [OG छवि](#open-graph-images)। एक जनरेट किया गया कार्ड अपनी `og:image:width`, `og:image:height`, `og:image:type` और `og:image:alt` भी घोषित करता है, ताकि कोई क्रॉलर उसे पहले फ़ेच किए बिना ही कार्ड का लेआउट तय कर सके; आपके द्वारा स्वयं दी गई `seo.image` इनमें से कुछ भी घोषित नहीं करती, क्योंकि उसका आकार और फ़ॉर्मैट अज्ञात होता है।
+- `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image` — X कार्ड। जिन पेजों में छवि होती है उन्हें चौड़ा `summary_large_image` वैरिएंट मिलता है; जिनमें नहीं होती उन्हें भी सादे लिंक के रूप में रेंडर होने के बजाय संक्षिप्त `summary` कार्ड मिलता है।
+
+### X श्रेय
+
+X कार्ड की बाकी सारी जानकारी `og:*` टैग से पढ़ लेता है, इसलिए केवल वही मान हैं जिनका वह अनुमान नहीं लगा सकता — श्रेय देने वाले खाते। इन्हें `seo.x` के अंतर्गत सेट करें और Blume `twitter:site` (आपकी साइट का खाता) तथा `twitter:creator` (लेखक का) उत्सर्जित करता है। `@` वैकल्पिक है — `acme` और `@acme` दोनों काम करते हैं।
+
+```ts blume.config.ts lineNumbers
+seo: {
+  x: { handle: "@acme", creator: "@jane" },
+}
+```
+
+कोई पेज अपना स्वयं का लेखक घोषित कर सकता है, जो अतिथि पोस्ट के लिए उपयुक्त है:
+
+```yaml lineNumbers
+---
+title: How we shipped it
+seo:
+  x:
+    creator: "@guestauthor"
+---
+```
+
+बाकी किसी भी टैग को प्रति-पेज `seo` फ्रंटमैटर से ओवरराइड करें:
+
+```yaml lineNumbers
+---
+title: Pricing
+description: Plans and pricing for every team size.
+seo:
+  title: Pricing — Acme
+  canonical: https://acme.com/pricing
+  noindex: false
+---
+```
+
+<TypeTable
+  type={{
+    "seo.title": {
+      type: "string",
+      description: "Override the <title> and og:title for this page.",
+    },
+    "seo.description": {
+      type: "string",
+      description: "Override the meta + og:description.",
+    },
+    "seo.image": {
+      type: "string",
+      description: "Custom social image (see Open Graph).",
+    },
+    "seo.canonical": {
+      type: "string",
+      description: "Override the canonical URL.",
+    },
+    "seo.noindex": {
+      type: "boolean",
+      description: "Emit robots noindex and skip structured data.",
+    },
+    "seo.x.creator": {
+      type: "string",
+      description:
+        "Credit this page to an X account (twitter:creator), overriding seo.x.creator from your config.",
+    },
+  }}
+/>
+
+## Open Graph छवियाँ
+
+Blume बिल्ड समय पर हर पेज के लिए 1200×630 का सोशल कार्ड रेंडर कर सकता है — [Takumi](https://takumi.kane.tw) की बदौलत बिना हेडलेस ब्राउज़र के, इसलिए बिल्ड तेज़ बने रहते हैं। [`deployment.site`](/docs/deployment) सेट या स्वतः-पहचाना जाने पर यह डिफ़ॉल्ट रूप से चालू रहता है (`og:image` URL का निरपेक्ष होना ज़रूरी है ताकि वह क्रॉलर के काम आ सके), अन्यथा बंद। किसी भी दिशा में इसे बदलने के लिए `enabled` सेट करें:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true }, // or false to opt out even with a site set
+}
+```
+
+### जनरेट किए गए कार्ड पर ब्रांडिंग
+
+जनरेट किए गए कार्ड को अपने ब्रांड से मिलाने के लिए एक स्थानीय SVG और रंग पैलेट सेट करें। लोगो `public/` में या प्रोजेक्ट रूट में रह सकता है। किसी भी पैलेट मान को छोड़ दें तो उसका डिफ़ॉल्ट बना रहेगा।
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    logo: "/logo/og.svg",
+    palette: {
+      accent: "#ff5410",
+      background: "#1d1d1d",
+      foreground: "#fff6f2",
+      muted: "#a6a19f",
+      border: "#323232",
+    },
+  },
+}
+```
+
+डिफ़ॉल्ट रूप से, हर कार्ड आपकी सामग्री और थीम से लिया जाता है — शीर्षपंक्ति के रूप में **पेज शीर्षक**, आइब्रो के रूप में आपका **साइट शीर्षक**, और चिह्न के लिए आपकी थीम का **accent**। छवियाँ `/og/<slug>.png` पर परोसी जाती हैं, जो हर रूट का प्रतिरूप होती हैं, और सर्वर मोड में भी स्थिर फ़ाइलों के रूप में प्रीरेंडर की जाती हैं:
+
+| पेज रूट             | छवि URL                    |
+| ------------------- | -------------------------- |
+| `/`                 | `/og/index.png`            |
+| `/quickstart`       | `/og/quickstart.png`       |
+| `/configuration/ai` | `/og/configuration/ai.png` |
+
+किसी भी पेज के लिए जनरेट किए गए कार्ड को `seo.image` से ओवरराइड करें — `public/` में मौजूद कोई फ़ाइल या कोई बाहरी URL। यह जनरेट किए गए कार्ड पर वरीयता रखता है और `og` बंद होने पर भी काम करता है, इसलिए आप कस्टम छवियों को जनरेट की गई छवियों के साथ मिलाकर उपयोग कर सकते हैं:
+
+```yaml lineNumbers
+---
+title: Pricing
+seo:
+  image: /og/pricing-custom.png
+---
+```
+
+:::note
+हर पैलेट रंग कोई भी CSS रंग स्वीकार करता है — hex, `oklch(…)`, `rgb(…)`, इत्यादि। accent एक नामित प्रीसेट (`blue`, `teal`, …) भी स्वीकार करता है, जो [`theme.accent`](/docs/configuration/theming#accent) से मेल खाता है। जिस रंग को रेंडरर पार्स नहीं कर सकता, वह चुपचाप डिफ़ॉल्ट रंग वाला कार्ड भेजने के बजाय बिल्ड को विफल कर देता है।
+:::
+
+पेज शीर्षक या साइट शीर्षक में मौजूद इमोजी [Twemoji](https://github.com/jdecked/twemoji) ग्लिफ़ के रूप में रेंडर होते हैं, जो कार्ड रेंडर होते समय CDN से फ़ेच किए जाते हैं — इसलिए जिस बिल्ड के शीर्षकों में इमोजी हों उसे नेटवर्क एक्सेस चाहिए। हर ग्लिफ़ प्रति बिल्ड एक ही बार फ़ेच होता है, चाहे उसे कितने भी पेज उपयोग करें।
+
+### कार्ड परतें दिखाएँ, छिपाएँ या ओवरराइड करें
+
+शीर्षपंक्ति के अलावा कार्ड में तीन वैकल्पिक परतें होती हैं: ऊपर-बाईं ओर **ब्रांड चिह्न** (आपका लोगो, या साइट शीर्षक के पहले अक्षर वाली accent टाइल), शीर्षपंक्ति के नीचे **उपशीर्षक** (आपका साइट `description`), और आपके रेपो स्लग (`github` से) तथा साइट के URL वाला एक **फ़ुटर** — डिप्लॉयमेंट साइट का होस्ट और साथ में [`deployment.base`](/docs/deployment#subpath-deploys), जिससे किसी GitHub Pages प्रोजेक्ट साइट पर यह `user.github.io/repo` दिखता है। इनमें से किसी को भी अपनी स्ट्रिंग से ओवरराइड करें, या `false` देकर छिपाएँ:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    site: "docs.acme.com", // footer URL text, or false to hide it
+    description: false, // hide the subtitle; a string overrides it
+    logo: false, // no brand mark at all — not even the initial tile
+  },
+}
+```
+
+### कार्ड फ़ॉन्ट
+
+डिफ़ॉल्ट रूप से कार्ड Takumi के अंतर्निहित फ़ॉन्ट में रेंडर होता है, जो केवल लैटिन ग्लिफ़ को कवर करता है — किसी अन्य लिपि (जापानी, चीनी, कोरियाई, अरबी, …) में लिखा शीर्षक टोफू, यानी खाली डिब्बों के रूप में रेंडर होगा।
+
+**[`theme.fonts`](/docs/configuration/theming#fonts) सेट करें और कार्ड उसी का अनुसरण करेगा।** जब आपका कॉन्फ़िग अपने फ़ॉन्ट चुनता है, तो जनरेट किए गए कार्ड स्वतः ही शीर्षपंक्ति को आपके डिस्प्ले फ़ॉन्ट में और विवरण तथा फ़ुटर को आपके बॉडी फ़ॉन्ट में रेंडर करते हैं, जिससे साझा किए गए लिंक साइट से मेल खाते हैं — इसमें ग़ैर-लैटिन कवरेज भी शामिल है, और यहाँ कुछ भी कॉन्फ़िगर करने की ज़रूरत नहीं। (ग़ैर-Google प्रदाताओं के फ़ॉन्ट परिवार छोड़ दिए जाते हैं — कार्ड रेंडरर केवल Google Fonts से फ़ेच कर सकता है — लेकिन स्थानीय फ़ॉन्ट फ़ाइलें काम करती हैं।)
+
+कार्ड पर साइट से अलग फ़ॉन्ट उपयोग करने के लिए, या थीम को छुए बिना लिपि कवरेज जोड़ने के लिए, `og.fonts` स्पष्ट रूप से सेट करें — यह हमेशा थीम-आधारित फ़ॉन्ट पर भारी पड़ता है:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    fonts: [
+      "Noto Sans JP",
+      { name: "Inter", weight: [400, 700] },
+      { name: "Berkeley Mono", src: "./fonts/BerkeleyMono-Regular.woff2" },
+    ],
+  },
+}
+```
+
+हर प्रविष्टि या तो कोई Google Fonts परिवार नाम है, या एक ऑब्जेक्ट जो उसका `weight` (एक संख्या, एक सूची, या `"100..900"` जैसी वेरिएबल रेंज) और `style` (`"normal"`, `"italic"`, या दोनों) तय करता है, या फिर एक स्थानीय फ़ॉन्ट फ़ाइल — `src` प्रोजेक्ट रूट से हल होता है, और जब फ़ाइल का अपना मेटाडेटा निर्णायक नहीं होना चाहिए तब वैकल्पिक `weight` तथा `style` के साथ।
+
+Google परिवार बिल्ड के समय फ़ेच किए जाते हैं — इसलिए इनका उपयोग करने वाले बिल्ड को नेटवर्क एक्सेस चाहिए — और रेंडरर केवल वही ग्लिफ़ सबसेट खींचता है जो प्रत्येक शीर्षक वास्तव में उपयोग करता है। फ़ॉलबैक प्रति-ग्लिफ़ होता है, इसलिए कोई परिवार जोड़ने का असर केवल उन्हीं ग्लिफ़ पर पड़ता है जिन्हें दूसरे फ़ॉन्ट नहीं बना सकते।
+
+स्पष्ट रूप से `og.fonts: []` देने का अर्थ है पूरी तरह बाहर निकलना: `theme.fonts` सेट होने पर भी कार्ड अंतर्निहित फ़ॉन्ट ही रखते हैं।
+
+### कस्टम पेज शीर्षक
+
+किसी कस्टम [`.astro` पेज](/docs/advanced/custom-pages) के पास पढ़ने के लिए फ्रंटमैटर नहीं होता, इसलिए उसके जनरेट किए गए कार्ड का शीर्षक उसके रूट के अंतिम URL खंड को मानव-पठनीय बनाकर तय होता है — `/getting-started` बन जाता है "Getting Started", लेकिन `/cli` बन जाता है "Cli"। ऐसे कार्डों को `og.titles` से स्पष्ट रूप से नाम दें, जिसकी कुंजी रूट होती है (`"/"` होम को संबोधित करता है, जिसका कार्ड अन्यथा साइट शीर्षक धारण करता है):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    titles: {
+      "/cli": "CLI",
+    },
+  },
+}
+```
+
+प्रविष्टियाँ केवल कस्टम पेजों पर लागू होती हैं — किसी सामग्री पेज का कार्ड अपनी शीर्षपंक्ति हमेशा पेज शीर्षक से लेता है, इसलिए उनका नाम बदलने के लिए फ्रंटमैटर का उपयोग करें।
+
+`seo.image` फ्रंटमैटर है, इसलिए यह केवल Markdown और MDX सामग्री को कवर करता है। किसी कस्टम [`.astro` पेज](/docs/advanced/custom-pages) को उसकी अपनी सोशल छवि देने के लिए — जैसे कोई मार्केटिंग होम या लैंडिंग पेज, और केवल होम पेज को एक विशेष शेयर छवि देने का यही तरीका है — `PageLayout` को `ogImage` प्रॉप पास करें।
+
+## RSS फ़ीड
+
+Blume `rss.types` में मौजूद हर उस सामग्री प्रकार के लिए एक RSS फ़ीड बनाता है जिसमें पेज हों — डिफ़ॉल्ट रूप से `blog` और `changelog` — जो `/<type>/rss.xml` पर परोसी जाती है। तिथियों के साथ ब्लॉग और चेंजलॉग प्रविष्टियाँ लिखने के लिए [फ़ीड](/docs/content#feeds) देखें।
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+| विकल्प | डिफ़ॉल्ट | विवरण |
+| --- | --- | --- |
+| `enabled` | `true` | फ़ीड जनरेट करें। |
+| `types` | `["blog", "changelog"]` | वे सामग्री प्रकार जिन्हें एक-एक फ़ीड मिलती है। |
+| `limit` | `50` | प्रति फ़ीड अधिकतम आइटम, नवीनतम पहले। |
+
+Blume `<link rel="alternate">` टैग इंजेक्ट करता है ताकि ब्राउज़र और फ़ीड रीडर फ़ीड को स्वतः खोज सकें।
+
+## संरचित डेटा
+
+Blume हर पेज के `<head>` में [schema.org](https://schema.org) JSON-LD उत्सर्जित करता है ताकि सर्च इंजन आपकी सामग्री को समझ सकें। डिफ़ॉल्ट रूप से चालू:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  structuredData: true,
+}
+```
+
+हर पेज में शामिल है:
+
+- साइट पहचान के लिए एक **WebSite** नोड,
+- पेज को एक **article** के रूप में — ब्लॉग पोस्ट के लिए `BlogPosting`, चेंजलॉग और डॉक्स के लिए `TechArticle` — उसके विवरण और प्रकाशन तिथि के साथ,
+- नेविगेशन ट्रेल से बनी एक **BreadcrumbList**।
+
+जब `deployment.site` सेट होता है तो URL निरपेक्ष होते हैं। `seo.noindex` से चिह्नित पेज छोड़ दिए जाते हैं।
+
+## साइटमैप
+
+Blume बिल्ड समय पर हर इंडेक्स-योग्य पेज का `sitemap.xml` लिखता है। इसके लिए निरपेक्ष [`deployment.site`](/docs/deployment) चाहिए और यह ड्राफ़्ट, छिपे हुए तथा `noindex` पेजों को छोड़कर हर पेज सूचीबद्ध करता है। डिफ़ॉल्ट रूप से चालू:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  sitemap: true,
+}
+```
+
+नियंत्रण अपने हाथ में लेने के लिए अपना स्वयं का `public/sitemap.xml` भेजें — `public/` में रखी गई किसी फ़ाइल को Blume कभी अधिलेखित नहीं करता।
+
+## Robots
+
+Blume एक `robots.txt` लिखता है जो सभी क्रॉलर को अनुमति देता है, आपके [कंटेंट सिग्नल](#content-signals) घोषित करता है, और साइटमैप उपलब्ध होने पर उस ओर इशारा करती हुई एक `Sitemap:` पंक्ति जोड़ता है। डिफ़ॉल्ट रूप से चालू:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  robots: true,
+}
+```
+
+```txt robots.txt
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+Allow: /
+
+Sitemap: https://docs.example.com/sitemap.xml
+```
+
+### कंटेंट सिग्नल
+
+`Content-Signal` पंक्ति — उभरती हुई कंटेंट-उपयोग परिपाटी — यह घोषित करती है कि AI क्रॉलर आपके डॉक्स का पुनः उपयोग कैसे कर सकते हैं। Blume इसे **डिफ़ॉल्ट रूप से चालू रखते हुए हर सिग्नल को `yes` पर** उत्सर्जित करता है, जो उसके इस रुख से मेल खाता है कि डॉक्स मनुष्यों और एजेंटों दोनों के लिए खुले हैं:
+
+- `search` — पारंपरिक और AI सर्च इंडेक्सिंग
+- `aiInput` — उत्तर देते समय ग्राउंडिंग / RAG
+- `aiTrain` — मॉडल प्रशिक्षण
+
+किसी भी सिग्नल को `false` पर सेट करके सीमित करें; जिन्हें आप छोड़ देंगे वे `yes` ही रहेंगे:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  contentSignals: {
+    aiTrain: false, // opt out of training, keep search + grounding
+  },
+}
+```
+
+```txt robots.txt
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /
+```
+
+घोषणा को पूरी तरह हटाने के लिए `contentSignals: false` सेट करें:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  contentSignals: false,
+}
+```
+
+<TypeTable
+  type={{
+    "seo.contentSignals": {
+      type: "boolean | object",
+      description:
+        "Content-Signal declaration. true or omitted emits all signals as yes; false drops the line; an object sets signals individually.",
+    },
+    "contentSignals.search": {
+      type: "boolean",
+      description: "Allow use for search indexing (search). Default true.",
+    },
+    "contentSignals.aiInput": {
+      type: "boolean",
+      description:
+        "Allow use for AI grounding / RAG at answer time (ai-input). Default true.",
+    },
+    "contentSignals.aiTrain": {
+      type: "boolean",
+      description: "Allow use for AI model training (ai-train). Default true.",
+    },
+  }}
+/>
+
+कंटेंट सिग्नल एक प्राथमिकता व्यक्त करते हैं, एक्सेस नियंत्रण नहीं: वे सुव्यवस्थित ढंग से व्यवहार करने वाले क्रॉलर को बताते हैं कि आप अपनी सामग्री का उपयोग कैसे चाहते हैं, और उनका पालन करना क्रॉलर पर निर्भर है।
+
+नियंत्रण अपने हाथ में लेने के लिए अपना स्वयं का `public/robots.txt` भेजें।

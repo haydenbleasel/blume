@@ -1,0 +1,247 @@
+---
+title: थीमिंग
+description: >-
+  कुछ ही कॉन्फ़िग टोकन के साथ लुक ट्यून करें, theme.css में किसी भी CSS वेरिएबल को ओवरराइड करें, या कस्टम कंपोनेंट्स के लिए Tailwind यूटिलिटीज़ तक उतरें।
+---
+
+Blume की थीम टोकन-संचालित है और लाइट व डार्क मोड में बिना किसी अतिरिक्त सेटअप के काम करती है। जितनी ज़रूरत हो उतना ही इस्तेमाल करें: आम मामलों के लिए कुछ कॉन्फ़िग टोकन, किसी भी डिज़ाइन टोकन को ओवरराइड करने के लिए एक `theme.css`, या कस्टम कंपोनेंट्स के लिए Tailwind यूटिलिटीज़।
+
+## कॉन्फ़िग टोकन
+
+रोज़मर्रा के नॉब आपकी कॉन्फ़िग में `theme` के अंतर्गत रहते हैं:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: "teal",   // a named preset or any CSS color
+  radius: "md",     // none | sm | md | lg
+  mode: "system",   // system | light | dark
+  fonts: {          // self-hosted Google Fonts
+    display: "inter-tight",
+    body: "inter",
+    mono: "ibm-plex-mono",
+  },
+}
+```
+
+### एक्सेंट
+
+एक्सेंट रंग इंटरैक्टिव और हाइलाइट किए गए एलिमेंट्स को रंगत देता है — स्टेप मार्कर, सक्रिय टैब, बैज, कार्ड होवर, और भी बहुत कुछ। किसी नामित प्रीसेट या किसी भी CSS रंग का उपयोग करें:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: "#ff0066", // hex, oklch(), rgb()… anything CSS understands
+}
+```
+
+नामित प्रीसेट: `blue` (डिफ़ॉल्ट), `green`, `orange`, `pink`, `purple`, `red`, और `teal`।
+
+एक स्ट्रिंग दोनों कलर मोड पर लागू होती है; [हर मोड के लिए अलग एक्सेंट](#dark-mode-colors) देने के लिए एक ऑब्जेक्ट पास करें।
+
+### रेडियस
+
+`radius` कार्ड्स, कोड ब्लॉक्स, कॉलआउट्स और इनपुट्स द्वारा साझा किए जाने वाले कोने के गोलाकारपन को सेट करता है — `none`, `sm`, `md` (डिफ़ॉल्ट), या `lg`।
+
+### कलर मोड
+
+`mode` प्रारंभिक कलर स्कीम सेट करता है:
+
+- **`system`** (डिफ़ॉल्ट) — पाठक की OS प्राथमिकता का अनुसरण करता है
+- **`light`** / **`dark`** — किसी एक स्कीम को डिफ़ॉल्ट बनाता है
+
+हेडर में मौजूद एक टॉगल पाठकों को हमेशा स्विच करने देता है, और उनकी पसंद विज़िट्स के बीच याद रखी जाती है। डार्क मोड `<html>` एलिमेंट पर `data-theme="dark"` एट्रिब्यूट के साथ लागू किया जाता है।
+
+### फ़ॉन्ट्स
+
+`fonts` तीन भूमिकाओं के लिए टाइपफ़ेस सेट करता है:
+
+- **`display`** — शीर्षक (`h1`–`h6`)
+- **`body`** — बॉडी टेक्स्ट, UI, और प्रोज़
+- **`mono`** — कोड ब्लॉक और इनलाइन कोड
+
+प्रत्येक का डिफ़ॉल्ट एक चयनित Google Font है, इसलिए Blume शुरुआत से ही सुविचारित दिखता है:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: "inter-tight",   // default
+    body: "inter",            // default
+    mono: "ibm-plex-mono",    // default
+  },
+}
+```
+
+केवल वही भूमिकाएँ सेट करें जिन्हें आप बदलना चाहते हैं — बाकी अपने डिफ़ॉल्ट पर बनी रहती हैं:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: { display: "geist" }, // body + mono stay Inter / IBM Plex Mono
+}
+```
+
+फ़ॉन्ट्स **सेल्फ़-होस्टेड** होते हैं: Blume उन्हें बिल्ड टाइम पर डाउनलोड करता है और आपकी अपनी साइट से सर्व करता है, इसलिए Google को कोई रनटाइम रिक्वेस्ट नहीं जाती और कोई लेआउट शिफ्ट नहीं होता (Astro स्वतः फ़ॉलबैक-मेट्रिक फ़ेस जनरेट करता है)।
+
+एक सादा स्ट्रिंग नीचे दिए गए चयनित सेट में से एक Google Fonts स्लग है:
+
+| श्रेणी | स्लग |
+| --- | --- |
+| सैन्स | `dm-sans` `figtree` `geist` `ibm-plex-sans` `inter` `inter-tight` `manrope` `open-sans` `plus-jakarta-sans` `roboto` `source-sans-3` `space-grotesk` `work-sans` |
+| सेरिफ़ | `ibm-plex-serif` `lora` `merriweather` `playfair-display` `source-serif-4` |
+| मोनो | `fira-code` `geist-mono` `ibm-plex-mono` `jetbrains-mono` `roboto-mono` `source-code-pro` `space-mono` |
+
+#### किसी भी प्रोवाइडर की फ़ैमिली
+
+क्या आपको ऐसी फ़ैमिली चाहिए जो चयनित सेट में नहीं है — मान लीजिए, कोई जो ग़ैर-लैटिन लिपि को कवर करती हो? फ़ैमिली के सटीक नाम के साथ एक ऑब्जेक्ट पास करें। यह उसी तरह सेल्फ़-होस्टेड और ऑप्टिमाइज़ की जाती है:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: { name: "Noto Sans JP", weights: [400, 700] },
+    body: { name: "Noto Sans JP", weights: [400, 500, 700] },
+  },
+}
+```
+
+- **`name`** — फ़ैमिली का नाम ठीक वैसे ही जैसे प्रोवाइडर उसे सूचीबद्ध करता है।
+- **`provider`** — फ़ैमिली कहाँ से आती है: `google` (डिफ़ॉल्ट), `fontsource`, `bunny`, या `fontshare`।
+- **`weights`** — लोड किए जाने वाले वेट, संख्याओं के रूप में या `"100..900"` जैसी वेरिएबल रेंज के रूप में। डिफ़ॉल्ट `[400, 500, 600, 700]` है।
+- **`fallback`** — फ़ॉन्ट लोड होने के दौरान और अनुपलब्ध ग्लिफ़ के लिए दिखाया जाने वाला सिस्टम स्टैक: `sans`, `serif`, या `mono`। मोनो भूमिका के लिए डिफ़ॉल्ट `mono` है और अन्यथा `sans`।
+
+#### लोकल फ़ॉन्ट फ़ाइलें
+
+ऐसे फ़ॉन्ट के लिए जो आपका अपना है (या जिसे कोई प्रोवाइडर सर्व नहीं करता), किसी भूमिका को अपने प्रोजेक्ट की फ़ॉन्ट फ़ाइलों की ओर इंगित करें। हर वेरिएंट एक `@font-face` बन जाता है:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    display: {
+      name: "Berkeley Mono",
+      variants: [
+        { src: "./fonts/BerkeleyMono-Regular.woff2", weight: 400 },
+        { src: "./fonts/BerkeleyMono-Bold.woff2", weight: 700 },
+      ],
+    },
+  },
+}
+```
+
+पाथ प्रोजेक्ट रूट से रिज़ॉल्व होते हैं। `weight` और `style` (`normal`, `italic`, `oblique`) वैकल्पिक हैं — छोड़ देने पर Astro उन्हें फ़ॉन्ट फ़ाइल से पढ़ लेता है।
+
+:::note
+जब आप `theme.fonts` को स्पष्ट रूप से सेट करते हैं, तो आपके display और body फ़ॉन्ट स्वतः जनरेट किए गए [Open Graph कार्ड्स](/docs/configuration/seo#card-fonts) को भी स्टाइल करते हैं, ताकि शेयर किए गए लिंक साइट से मेल खाएँ। ग़ैर-Google प्रोवाइडर फ़ैमिलीज़ वहाँ छोड़ दी जाती हैं (कार्ड रेंडरर केवल Google Fonts से फ़ेच कर सकता है); लोकल फ़ाइलें हर जगह काम करती हैं।
+:::
+
+सिस्टम स्टैक पर वापस लौटना चाहते हैं? [`theme.css`](#themecss) में सीधे `--blume-font-*` टोकन ओवरराइड करें।
+
+### डार्क-मोड रंग
+
+`accent` और `background` एक ही नियम का पालन करते हैं: एक स्ट्रिंग दोनों कलर मोड पर लागू होती है, और एक `{ light, dark }` ऑब्जेक्ट हर मोड को अलग-अलग सेट करता है:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  accent: { light: "blue", dark: "teal" },
+  background: {
+    light: "#ffffff",
+    dark: "#0a0a0a",
+  },
+}
+```
+
+हर रंग एक नामित प्रीसेट या कोई भी CSS रंग लेता है। `background` (और `backgroundImage`) के लिए किसी भी की को छोड़कर केवल एक मोड को ओवरराइड किया जा सकता है — `background: { dark: "#0a0a0a" }` डिफ़ॉल्ट लाइट बैकग्राउंड को बनाए रखता है।
+
+### एक्शन रंग
+
+`action` प्राथमिक कॉल-टू-एक्शन और `action` Tailwind यूटिलिटीज़ (`bg-action`, `text-action`) के लिए एक द्वितीयक एक्सेंट है। यह डिफ़ॉल्ट रूप से आपके `accent` पर सेट होता है:
+
+```ts blume.config.ts
+theme: {
+  action: "#ff0066",
+}
+```
+
+### बैकग्राउंड इमेज
+
+`backgroundImage` के साथ अपने कंटेंट के पीछे एक बैकग्राउंड इमेज सेट करें — एक URL या `public/` के अंतर्गत एक पाथ। रंगों की तरह, एक स्ट्रिंग दोनों मोड पर लागू होती है और एक `{ light, dark }` ऑब्जेक्ट हर मोड की इमेज सेट करता है:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  backgroundImage: {
+    light: "/bg-light.svg",
+    dark: "/bg-dark.svg",
+  },
+}
+```
+
+## theme.css
+
+किसी भी डिज़ाइन टोकन को ओवरराइड करने के लिए अपने प्रोजेक्ट रूट में एक `theme.css` रखें। यह कैस्केड की आख़िरी लेयर है, इसलिए यह डिफ़ॉल्ट्स और कॉन्फ़िग टोकन पर भारी पड़ती है:
+
+```css theme.css lineNumbers
+:root {
+  --blume-accent: oklch(0.68 0.14 180);
+  --blume-radius: 0.5rem;
+}
+
+:root[data-theme="dark"] {
+  --blume-background: oklch(0.16 0 0);
+}
+```
+
+लाइट मोड के लिए टोकन `:root` के अंतर्गत और डार्क मोड के लिए `:root[data-theme="dark"]` के अंतर्गत सेट करें। कलर टोकन के अलग बिल्ट-इन डार्क मान डार्क सिलेक्टर की उच्चतर विशिष्टता पर घोषित होते हैं, इसलिए `--blume-accent`, `--blume-background`, और उनके साथियों का केवल `:root` में किया गया ओवरराइड सिर्फ़ लाइट मोड पर लागू होता है — जब दोनों मोड बदलने हों तो डार्क ब्लॉक भी घोषित करें।
+
+### डिज़ाइन टोकन
+
+| टोकन                        | क्या नियंत्रित करता है                     |
+| --------------------------- | ------------------------------------------ |
+| `--blume-background`        | पेज बैकग्राउंड                             |
+| `--blume-foreground`        | बॉडी टेक्स्ट                               |
+| `--blume-muted`             | हल्की सतहें — कॉलआउट, टेबल हेडर            |
+| `--blume-muted-foreground`  | द्वितीयक टेक्स्ट                           |
+| `--blume-border`            | बॉर्डर और डिवाइडर                          |
+| `--blume-accent`            | एक्सेंट रंग                                |
+| `--blume-accent-foreground` | एक्सेंट बैकग्राउंड पर टेक्स्ट और आइकन      |
+| `--blume-action`            | द्वितीयक एक्सेंट (डिफ़ॉल्ट रूप से एक्सेंट) |
+| `--blume-code-background`   | कोड ब्लॉक सतह                              |
+| `--blume-radius`            | कोने का रेडियस                             |
+| `--blume-font-display`      | शीर्षक फ़ॉन्ट                              |
+| `--blume-font-body`         | बॉडी / UI फ़ॉन्ट                           |
+| `--blume-font-mono`         | कोड फ़ॉन्ट                                 |
+
+चयनित सूची से बाहर का कोई फ़ॉन्ट इस्तेमाल करने के लिए, या सिस्टम स्टैक पर वापस लौटने के लिए, किसी `--blume-font-*` टोकन को कोई भी फ़ॉन्ट स्टैक सेट करें:
+
+```css theme.css lineNumbers
+:root {
+  --blume-font-body: ui-sans-serif, system-ui, sans-serif;
+}
+```
+
+## Tailwind यूटिलिटीज़
+
+Blume की थीम आंतरिक रूप से Tailwind v4 के साथ बनी है, और आपके प्रोजेक्ट की `.astro`, `.tsx`, और `.jsx` फ़ाइलें भी स्कैन की जाती हैं — इसलिए आप कस्टम कंपोनेंट्स और पेजों को यूटिलिटी क्लासेस से स्टाइल कर सकते हैं, किसी Tailwind सेटअप की ज़रूरत नहीं। हर टोकन एक यूटिलिटी के रूप में उपलब्ध है, इसलिए आपके कंपोनेंट स्वतः थीम के अनुरूप चलते हैं:
+
+| टोकन                        | यूटिलिटीज़                 |
+| --------------------------- | -------------------------- |
+| `--blume-background`        | `bg-background`            |
+| `--blume-foreground`        | `text-foreground`          |
+| `--blume-muted`             | `bg-muted`                 |
+| `--blume-muted-foreground`  | `text-muted-foreground`    |
+| `--blume-border`            | `border-border`            |
+| `--blume-accent`            | `bg-accent`, `text-accent` |
+| `--blume-accent-foreground` | `text-accent-foreground`   |
+| `--blume-action`            | `bg-action`, `text-action` |
+| `--blume-radius`            | `rounded-blume`            |
+| `--blume-font-display`      | `font-display`             |
+| `--blume-font-body`         | `font-sans`                |
+| `--blume-font-mono`         | `font-mono`                |
+
+## कैस्केड क्रम
+
+स्टाइल तीन लेयर में रिज़ॉल्व होते हैं, हर लेयर पिछली को ओवरराइड करती है:
+
+<Steps>
+  <Step title="बेस">Blume का रीसेट, डिफ़ॉल्ट टोकन, और कंपोनेंट स्टाइल।</Step>
+  <Step title="कॉन्फ़िग टोकन">
+    `theme` से आने वाले `--blume-accent`, `--blume-radius`, और `--blume-font-*`
+    टोकन।
+  </Step>
+  <Step title="theme.css">आपके टोकन ओवरराइड — अंतिम फ़ैसला।</Step>
+</Steps>

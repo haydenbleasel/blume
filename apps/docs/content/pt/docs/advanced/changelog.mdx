@@ -1,0 +1,136 @@
+---
+title: Changelog
+description: >-
+  Escreva as notas de lançamento como ficheiros de conteúdo normais ou obtenha-as do GitHub Releases, e o Blume constrói automaticamente uma página de cronologia e um feed RSS.
+---
+
+O Blume traz um changelog pronto a usar. Escreva cada versão como um ficheiro de conteúdo normal, marque-o com `type: changelog`, e o Blume reúne todas as entradas numa página de cronologia gerada e num feed RSS — sem layout para construir, sem lista para manter. Ou dispense os ficheiros por completo e [alimente o seu changelog a partir do GitHub Releases](#from-github-releases).
+
+## Escrever uma entrada
+
+Uma entrada de changelog é uma página `.md` ou `.mdx` normal com `type: changelog` no seu frontmatter. Por convenção ficam em `changelog/`, mas o que importa é o tipo — não a pasta:
+
+```mdx changelog/v1-2-0.mdx lineNumbers
+---
+title: v1.2.0
+type: changelog
+date: 2026-06-20
+changelog:
+  version: 1.2.0
+  category: Features
+---
+
+A big batch of components landed this release — columns, frames, trees, and tooltips, plus code groups that render as proper language tabs.
+
+- New `Accordion`, `Expandable`, and `Tooltip` components
+- `CodeGroup` tabs with flush code blocks
+```
+
+Atribua uma `date` a cada entrada para que a cronologia e o feed ordenem da mais recente para a mais antiga. Uma data YAML sem aspas serve — o Blume normaliza-a.
+
+### O objeto `changelog`
+
+O objeto opcional `changelog` acrescenta metadados mais ricos para a cronologia e o feed:
+
+<TypeTable
+  type={{
+    "changelog.version": {
+      type: "string",
+      description:
+        "Release version. Falls back to a v-prefixed label when there's no title.",
+    },
+    "changelog.category": {
+      type: "string",
+      description:
+        "Shown as a tag beside the entry, e.g. Release, Features, Fixes.",
+    },
+    "changelog.date": {
+      type: "string",
+      description:
+        "Publish date. May live here or at the top level — both feed the timeline and RSS feed.",
+    },
+  }}
+/>
+
+## A página de cronologia
+
+Assim que tiver pelo menos uma entrada `type: changelog`, o Blume gera automaticamente uma página **`/changelog`**. É apresentada como uma cronologia focada e de largura total — sem barra lateral nem índice — com cada entrada da mais recente para a mais antiga, mostrando a sua data, etiqueta e a tag `category` numa coluna à esquerda, ao lado do conteúdo:
+
+- O **título** da entrada torna-se a sua etiqueta — ou `v{version}` quando não há título. Liga à página da própria entrada, pelo que uma versão é ao mesmo tempo uma linha na cronologia e um permalink partilhável.
+- A `category` é apresentada como uma tag junto à data.
+- Os rascunhos e as entradas com `sidebar.hidden` são ignorados.
+
+A página só aparece quando nada ocupa já a rota `/changelog`. Para a substituir pelo seu próprio design, adicione uma [página personalizada](/docs/advanced/custom-pages) em `pages/changelog.astro` — assume o controlo e o Blume deixa de gerar a cronologia predefinida.
+
+Como esta página é gerada e não escrita, não faz parte da árvore de conteúdos — por isso um [separador](/docs/content/navigation#tabs) do cabeçalho que aponte para `/changelog` resolve antes para a entrada mais recente. Dê um `href` ao separador para chegar ao próprio índice:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "Changelog", path: "/changelog", href: "/changelog" },
+  ],
+}
+```
+
+### Agrupado por versão principal
+
+Quando as suas versões seguem o [semver](https://semver.org) e abrangem mais do que uma versão principal, o Blume pagina a cronologia por versão principal. Apenas a linha principal mais recente é apresentada, com um botão **Show N.x releases** no fundo que revela a versão principal imediatamente mais antiga, um clique de cada vez:
+
+- A deteção é automática — sem configuração. Só entra em ação quando todas as versões listadas correspondem a `major.minor.patch` e existe mais do que uma versão principal; caso contrário, a cronologia mantém-se plana.
+- Tolera as tags com âmbito que os monorepos publicam, pelo que `pkg@2.0.0` fica agrupado em `2.x` e `pkg@1.4.0` em `1.x`.
+- É melhoria progressiva: todas as versões continuam presentes no HTML da página (e no seu feed RSS e índice de pesquisa), pelo que os leitores sem JavaScript — e os rastreadores — veem o histórico completo. O botão só recolhe as versões principais mais antigas depois de a página hidratar.
+
+## A partir do GitHub Releases
+
+Em vez de escrever as entradas à mão, aponte a [fonte `github-releases`](/docs/content/sources#github-releases) integrada para um repositório e cada versão passa a ser uma entrada `type: changelog` — a mesma cronologia e o mesmo feed, alimentados diretamente pelas versões que já publica. O próprio [changelog](/changelog) do Blume é construído assim:
+
+```ts blume.config.ts
+content: {
+  sources: [
+    { type: "filesystem", root: "content" },
+    {
+      type: "github-releases",
+      prefix: "changelog",
+      owner: "acme",
+      repo: "sdk",
+    },
+  ],
+}
+```
+
+O nome da versão torna-se o título, a sua tag torna-se `changelog.version` e a respetiva data de publicação ordena a cronologia. Cada página de versão recebe ainda uma meta description única, resumida a partir das suas notas — sem markdown, sem títulos de secção nem prefixos de hash de commit dos changesets, cortada para o comprimento de excerto de pesquisa que o [`blume audit`](/docs/reference/cli#auditing-the-built-site) verifica — em vez de recorrer à descrição do site. Um repositório privado autentica-se com a variável de ambiente `GITHUB_TOKEN`. Consulte [Fontes de conteúdo](/docs/content/sources#github-releases) para todas as opções.
+
+## O feed RSS
+
+O Blume também constrói um feed do changelog em **`/changelog/rss.xml`**, ordenado por `date` da mais recente para a mais antiga. Os feeds precisam de um URL absoluto do site, por isso defina [`deployment.site`](/docs/deployment); o Blume injeta então uma tag `<link rel="alternate">` em todas as páginas para que os leitores o descubram automaticamente.
+
+O feed está ativo por predefinição. Ajuste-o em [`seo.rss`](/docs/configuration/seo#rss-feeds):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+Remova `"changelog"` de `rss.types` para dispensar o feed mantendo a cronologia.
+
+## Dados estruturados
+
+Quando os [dados estruturados](/docs/configuration/seo#structured-data) estão ativos, cada entrada do changelog é emitida como um **`TechArticle`** do schema.org com a sua descrição e data de publicação, para que os motores de busca possam indexar as versões como artigos datados.
+
+<CardGroup cols={2}>
+  <Card
+    title="Frontmatter"
+    href="/docs/reference/frontmatter#changelog"
+    icon="file"
+  >
+    O esquema completo do frontmatter do changelog.
+  </Card>
+  <Card title="Custom Pages" href="/docs/advanced/custom-pages" icon="folder">
+    Substitua a cronologia gerada pelo seu próprio layout.
+  </Card>
+</CardGroup>

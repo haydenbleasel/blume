@@ -1,0 +1,168 @@
+---
+title: OpenAPI / AsyncAPI
+description: >-
+  एक OpenAPI स्पेक जोड़ें और एक नेटिव API संदर्भ पाएँ — प्रति ऑपरेशन एक वास्तविक पृष्ठ, आपके साइडबार और खोज में।
+---
+
+Blume को किसी OpenAPI स्पेक पर इंगित करें और यह एक नेटिव API संदर्भ तैयार करता है: **प्रति ऑपरेशन एक वास्तविक पृष्ठ**, टैब-स्कोप वाले साइडबार में टैग के अनुसार समूहीकृत, स्कीमा तालिकाओं, अनुरोध/प्रतिक्रिया उदाहरणों और जनरेट किए गए कोड नमूनों के साथ। चूँकि प्रत्येक ऑपरेशन एक असली Blume पृष्ठ है, इसे अपना स्वयं का URL मिलता है, यह **साइट खोज** और `llms.txt` में दिखाई देता है, और इसे एक Open Graph छवि मिलती है — ठीक वैसे ही जैसे किसी भी हाथ से लिखे दस्तावेज़ को। नीचे दिया गया कॉन्फ़िग उदाहरण के तौर पर Blume को सार्वजनिक Petstore स्पेक पर इंगित करता है।
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "https://petstore3.swagger.io/api/v3/openapi.json",
+}
+```
+
+यह संदर्भ को `/reference` पर माउंट करता है (एक अवलोकन पृष्ठ) और प्रत्येक ऑपरेशन को `/reference/<tag>/<operation>` पर। `spec` या तो एक `http(s)` URL होता है या आपकी परियोजना में किसी स्थानीय फ़ाइल का पथ। Blume इसे [Scalar के OpenAPI पार्सर](https://github.com/scalar/scalar) से पार्स करता है — Swagger 2.0 और OpenAPI 3.0 स्पेक स्वचालित रूप से 3.1 में अपग्रेड कर दिए जाते हैं।
+
+यह संदर्भ स्वयं कोई हेडर टैब नहीं जोड़ता। इसे सामने लाने के लिए, किसी [नेविगेशन टैब](/docs/content/navigation#tabs) को इसके रूट पर इंगित करें — इससे नेटिव रेंडरर के लिए ऑपरेशन साइडबार का दायरा भी तय होता है:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [{ label: "API", path: "/reference" }],
+}
+```
+
+:::note
+ऑपरेशन खोज के लिए उनके **सारांश और टैग** के आधार पर अनुक्रमित किए जाते हैं। रेंडर की गई स्कीमा तालिकाएँ और कोड नमूने पूर्ण-पाठ अनुक्रमित नहीं होते; खोज किसी ऑपरेशन के शीर्षक और अनुभाग से मेल खाती है, फिर उसके अपने पृष्ठ से लिंक करती है।
+:::
+
+## एक स्थानीय स्पेक
+
+सापेक्ष पथ आपकी परियोजना के रूट से हल किया जाता है और बिल्ड के समय पढ़ा जाता है। JSON और YAML दोनों काम करते हैं:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+}
+```
+
+## रूट
+
+`route` यह नियंत्रित करता है कि संदर्भ कहाँ माउंट हो — अवलोकन पृष्ठ और प्रत्येक ऑपरेशन रूट का उपसर्ग (और वह रूट जिस पर आप नेविगेशन टैब इंगित करते हैं):
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  route: "/api",   // overview at /api, operations at /api/<tag>/<operation>
+  spec: "./openapi.yaml",
+}
+```
+
+## कोड नमूने और स्कीमा
+
+`codeSamples` चुनता है कि प्रति ऑपरेशन कौन-सी भाषाएँ रेंडर हों (अंतर्निहित: `curl`, `js`, `python`); `expandSchemas` नेस्टेड स्कीमा पंक्तियों को सिकुड़ी हुई के बजाय विस्तारित अवस्था में शुरू करता है:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+  codeSamples: ["curl", "js"],
+  expandSchemas: true,
+}
+```
+
+## एकाधिक स्पेक
+
+एक से अधिक स्पेक प्रकाशित करने के लिए `sources` का उपयोग करें। प्रत्येक स्रोत को अपना अवलोकन रूट, ऑपरेशन पृष्ठ और हेडर टैब मिलता है। प्रत्येक को एक `label` दें (टैब के लिए और उसका रूट प्राप्त करने के लिए उपयोग किया जाता है), या एक स्पष्ट `route` सेट करें:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", spec: "./public.json" },   // → /reference/public-api
+    { label: "Admin API", route: "/admin", spec: "./admin.json" },
+  ],
+}
+```
+
+`spec` एकल-प्रविष्टि वाले `sources` का संक्षिप्त रूप है, इसलिए आप `sources` तभी उपयोग करते हैं जब आपके पास एक से अधिक हों।
+
+### प्रति-स्रोत अनुक्रमण
+
+जनरेट किए गए पृष्ठ डिफ़ॉल्ट रूप से खोज, `llms.txt` और क्रॉलर अनुक्रमण में शामिल होते हैं। कोई द्वितीयक या अतिव्यापी स्पेक अपने पृष्ठों को छिपाए बिना या नेविगेशन से हटाए बिना किसी भी सतह से बाहर निकल सकता है:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [
+    { label: "Public API", route: "/api", spec: "./public.json" },
+    {
+      label: "Platform API",
+      route: "/platform",
+      spec: "./platform.json",
+      includeInSearch: false,
+      includeInLlms: false,
+      noindex: true,
+    },
+  ],
+}
+```
+
+- `includeInSearch: false` स्रोत के अवलोकन और ऑपरेशनों को साइट खोज से बाहर रखता है।
+- `includeInLlms: false` उन्हें दोनों `llms.txt` फ़ाइलों से बाहर रखता है।
+- `noindex: true` क्रॉलर noindex मेटाडेटा जोड़ता है और पृष्ठों को साइटमैप से हटा देता है।
+
+[Scalar रेंडरर](#the-scalar-renderer) के साथ केवल `noindex` लागू होता है — Scalar द्वारा रेंडर किया गया संदर्भ पहले से ही Blume की खोज और `llms.txt` के बाहर होता है, इसलिए वहाँ दोनों `include*` सेटिंग्स के लिए कुछ करने को नहीं बचता।
+
+## प्राधिकरण
+
+जो ऑपरेशन [सुरक्षा आवश्यकताएँ](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) घोषित करते हैं, वे अपने पैरामीटर के ऊपर एक **Authorization** अनुभाग रेंडर करते हैं, और जनरेट किए गए कोड नमूने एक प्लेसहोल्डर क्रेडेंशियल भेजते हैं (`Authorization: Bearer YOUR_TOKEN`, एक API-कुंजी हेडर, या एक क्वेरी कुंजी — जो भी उस योजना की माँग हो)। कॉन्फ़िगर करने के लिए कुछ नहीं है: Blume स्पेक से `security` पढ़ता है, इसलिए संदर्भ हमेशा उससे मेल खाता है जो API वास्तव में लागू करता है।
+
+OpenAPI का अर्थ-विधान जस का तस लागू होता है:
+
+- किसी ऑपरेशन का अपना `security` दस्तावेज़ के रूट डिफ़ॉल्ट को अधिरोहित करता है; `security: []` इसे **सार्वजनिक** चिह्नित करता है और कोई Authorization अनुभाग रेंडर नहीं करता।
+- एकाधिक आवश्यकता प्रविष्टियाँ विकल्प होती हैं — "or" समूहों के रूप में रेंडर की जाती हैं; एक प्रविष्टि के भीतर की हर योजना एक साथ आवश्यक होती है। पहला विकल्प कोड नमूनों को आपूर्ति करता है।
+- एक खाली `{}` प्रविष्टि का अर्थ है कि उस ऑपरेशन के लिए प्रमाणीकरण **वैकल्पिक** है, और अनुभाग ऐसा ही बताता है।
+- OAuth2 स्कोप प्रति योजना सूचीबद्ध किए जाते हैं; `components.securitySchemes` से योजना के `description` इनलाइन रेंडर होते हैं।
+
+## Scalar रेंडरर
+
+नेटिव रेंडरर डिफ़ॉल्ट है। यदि आप इसके बजाय [Scalar](https://scalar.com) का स्वयं-निहित API संदर्भ एम्बेड करना चाहते हैं — इसका अपना साइडबार, खोज, थीम और एक ही रूट पर "Try it" प्लेग्राउंड — तो `renderer: "scalar"` सेट करें:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  renderer: "scalar",
+  spec: "./openapi.yaml",
+  theme: "purple",   // a Scalar theme name (Scalar renderer only)
+}
+```
+
+Scalar द्वारा रेंडर किया गया संदर्भ अपने स्वयं के रूट पर एक स्वयं-निहित एम्बेड होता है — यह Blume के साइडबार, खोज या `llms.txt` में नहीं बुनता। इसका "Try it" प्लेग्राउंड आपके **लक्ष्य API को सीधे ब्राउज़र से** कॉल करता है (Blume प्रॉक्सी नहीं करता), इसलिए API को दस्तावेज़ साइट से क्रॉस-ऑरिजिन अनुरोधों की अनुमति देनी चाहिए (`Access-Control-Allow-Origin`)। `theme` और प्लेग्राउंड केवल Scalar रेंडरर पर लागू होते हैं।
+
+### Scalar विकल्प पास करना
+
+`theme` उस एक विकल्प का संक्षिप्त रूप है जिसे अधिकांश लोग चुनते हैं, लेकिन Scalar इससे कहीं अधिक का समर्थन करता है। एक `scalar` ऑब्जेक्ट किसी भी [Scalar कॉन्फ़िगरेशन](https://github.com/scalar/scalar/blob/main/documentation/configuration.md) को सीधे एम्बेडेड संदर्भ तक अग्रेषित करता है — Blume कुंजियों पर रोक नहीं लगाता, इसलिए जो कुछ भी Scalar स्वीकार करता है वह प्रवाहित हो जाता है:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  renderer: "scalar",
+  spec: "./openapi.yaml",
+  scalar: {
+    localization: { locale: "es" },   // translate Scalar's own UI
+    agent: { disabled: true },         // disable the Scalar Agent
+    hideTestRequestButton: true,
+    orderSchemaPropertiesBy: "preserve",
+  },
+}
+```
+
+Blume का अपना [`i18n`](/docs/content/i18n) दस्तावेज़ क्रोम का अनुवाद करता है, लेकिन Scalar की एक अलग स्थानीयकरण प्रणाली है — एम्बेडेड संदर्भ का भी अनुवाद करने के लिए `scalar.localization.locale` सेट करें। `scalar` ऑब्जेक्ट के विकल्प Blume के व्युत्पन्न कॉन्फ़िग पर भारी पड़ते हैं, इसलिए यहाँ सेट की गई कोई भी चीज़ (`theme`, `customCss`, या स्पेक `content`/`url` सहित) Blume के डिफ़ॉल्ट को अधिरोहित कर देती है। यही `scalar` ब्लॉक `asyncapi` संदर्भ पर भी काम करता है।
+
+## AsyncAPI
+
+इवेंट-चालित API समान आकार वाले एक सहोदर `asyncapi` ब्लॉक का उपयोग करते हैं। AsyncAPI को Scalar द्वारा रेंडर किया जाता है (नेटिव रेंडरर फ़िलहाल केवल OpenAPI के लिए है); केवल डिफ़ॉल्ट रूट अलग है (`/events`):
+
+```ts blume.config.ts lineNumbers
+asyncapi: {
+  enabled: true,
+  spec: "./asyncapi.yaml",
+}
+```
+
+:::warning
+Scalar का AsyncAPI समर्थन अभी भी प्रगति पर है — यह चैनल, ऑपरेशन, संदेश और एक Models अनुभाग रेंडर करता है, लेकिन इवेंट्स के लिए अभी **कोई इंटरैक्टिव प्लेग्राउंड नहीं** है। यह समय के साथ अपस्ट्रीम में बेहतर होता जाता है।
+:::

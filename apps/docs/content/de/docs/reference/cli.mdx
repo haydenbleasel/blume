@@ -1,0 +1,196 @@
+---
+title: CLI
+description: >-
+  Jeder Blume-Befehl und jedes Flag an einem Ort erklärt — init, dev, build, preview, add, sync und eject — zusammen mit den Optionen, die jeder davon akzeptiert.
+---
+
+```bash
+blume <command> [options]
+```
+
+## Befehle
+
+| Befehl | Beschreibung |
+| --- | --- |
+| `blume init [dir]` | Ein Projekt aufsetzen (standardmäßig interaktiv). |
+| `blume dev` | Den Dev-Server mit Hot Reload starten. |
+| `blume build` | Die statische Site (oder Server-Site) bauen. |
+| `blume preview` | Den letzten Build in der Vorschau ansehen. |
+| `blume add <item>` | Eine Quellkomponente aus der Registry installieren. |
+| `blume sync` | Entfernte Inhaltsquellen erneut abrufen und neu generieren. |
+| `blume eject` | Die Laufzeitumgebung in eine eigenständige Astro-App überführen. |
+| `blume check` | Die Site mit `astro check` typprüfen. |
+| `blume doctor` | Konfigurations- und Inhaltsprobleme diagnostizieren. |
+| `blume validate` | Links in deinen Inhalten validieren. |
+| `blume audit` | Die gebaute Site auf SEO- und Gesundheitsprobleme prüfen. |
+| `blume eval` | Die Dokumentation testen: Ein Agent beantwortet deine Fragen ausschließlich anhand der Dokumentation. |
+| `blume translate` | Die Dokumentation mit einer lokalen Agent-CLI in die konfigurierten Sprachen übersetzen. |
+
+## Gängige Flags
+
+- `blume init` — führt dich im Terminal durch einige Fragen (wo das Projekt erstellt werden soll, Site-Name, Vorlage, Inhaltsquellen); jedes der folgenden Flags beantwortet seine Frage vorab.
+- `blume init --yes` — die Abfragen überspringen und mit Standardwerten aufsetzen (auch das Verhalten in CI oder wenn stdin kein Terminal ist).
+- `blume init --content-dir <dir>` — den Inhaltsordner festlegen (Standard `docs`).
+- `blume init --template docs|api|sdk|changelog` — aus einer Startvorlage aufsetzen (API-Referenz, SDK oder Changelog statt des einfachen Docs-Grundgerüsts).
+- `blume init --package-manager npm|pnpm|yarn|bun` — die ausgegebenen nächsten Schritte auf deinen Paketmanager zuschneiden.
+- `blume init --eject` — aufsetzen und anschließend zu einem eigenständigen Astro-Projekt ejecten (führt dich ersatzweise durch `blume eject`, wenn die Abhängigkeiten noch nicht installiert sind).
+- `blume dev --host --port <n> --open`
+- `blume dev --content-dir <dir>` — einen anderen Inhaltsordner einlesen, ohne `blume.config.ts` zu bearbeiten.
+- `blume dev --debug` — ausführliches Astro-/Vite-Logging zur Fehlersuche.
+- `blume dev --preview` / `blume build --preview` — Entwürfe und unveröffentlichte CMS-Inhalte einbeziehen.
+- `blume build --no-strict` — trotz Diagnosefehlern bauen. Standardmäßig schlägt `blume build` bei jeder Fehlerdiagnose fehl (Exit 1), da Seiten, die die Frontmatter-Validierung nicht bestehen, aus der Ausgabe entfernt werden; mit `--no-strict` gelingt der Build und meldet, wie viele Seiten fehlen. `blume dev --strict` aktiviert dasselbe Fail-Fast-Verhalten für den Dev-Modus.
+- `blume build --output static|server --adapter vercel|node|netlify|cloudflare --base /docs` — die Deployment-Ausgabe, den Adapter und den Basispfad aus `blume.config.ts` überschreiben.
+- `blume build --analyze` — nach dem Build die Größen der Client-JavaScript-Bundles ausgeben (größte zuerst).
+- `blume build --budget-js <kb> --budget-css <kb>` — den Build fehlschlagen lassen, wenn das gesamte Client-JavaScript/CSS das Budget überschreitet, und so ein Performance-Ziel in ein CI-Gate verwandeln.
+- `blume build --isolated` — in eine wegwerfbare `.blume-verify/`-Laufzeitumgebung (mit eigenem `dist/`) statt nach `.blume/` bauen, sodass ein laufender `blume dev`-Server und dein echtes `dist/` unangetastet bleiben. Siehe [Verifizieren, während der Dev-Server läuft](#verifying-while-the-dev-server-runs).
+- `blume preview --host --port <n>` — den Vorschauserver binden.
+- `blume sync --force` — entfernte Quellen erneut abrufen und dabei zuerst den zwischengespeicherten Snapshot verwerfen.
+- `blume add <item> --force` — bereits vorhandene Dateien überschreiben.
+- `blume check --preview` — beim Prüfen Entwürfe und unveröffentlichte CMS-Inhalte einbeziehen.
+- `blume check --strict` — auch bei Inhaltsdiagnosen fehlschlagen, nicht nur bei Typfehlern.
+- `blume check --isolated` — in einer wegwerfbaren `.blume-verify/`-Laufzeitumgebung typprüfen, sodass ein laufender `blume dev`-Server unangetastet bleibt. Siehe [Verifizieren, während der Dev-Server läuft](#verifying-while-the-dev-server-runs).
+- `blume eject --yes` — die Bestätigungsabfrage überspringen.
+- `blume validate --external` — zusätzlich externe Links über das Netzwerk prüfen.
+- `blume validate --strict` — auch bei Warnungen mit einem Exit-Code ungleich null beenden.
+- `blume validate --json` / `blume doctor --json` — Diagnosen als JSON auf stdout ausgeben (mit `code`, `severity`, `file`, `line`/`column` und `docsUrl`) für CI- und Editor-Integrationen.
+- `blume audit --fail-on error|warning|info` — das CI-Gate; Standard ist `error`. `--strict` ist ein Alias für `--fail-on warning`.
+- `blume audit --url <origin>` — zusätzlich ein laufendes Deployment auf Statuscodes, Response-Header und Redirect-Ketten prüfen.
+- `blume audit --external` — ausgehende Links über das Netzwerk prüfen.
+- `blume audit --only <check|category>` / `--skip <check|category>` — den Bericht eingrenzen, während du ihn abarbeitest (kommagetrennt).
+- `blume audit --list-checks` — jede Prüfung ausgeben, die das Audit melden kann.
+- `blume audit --verbose` — jede betroffene Seite mit allen Details zum jeweiligen Befund auflisten, etwa welches Linkziel defekt ist.
+- `blume audit --json` — den Bericht als JSON auf stdout ausgeben.
+- `blume audit --claude` / `--codex` — die Befunde an Claude Code oder Codex übergeben, um sie interaktiv zu beheben.
+- `blume eval` — die Fragen in `evals.yaml` durch einen Agenten laufen lassen, der ausschließlich deine Dokumentation liest; siehe [Evals](/docs/reference/eval).
+- `blume eval init` — den Agenten eine erste `evals.yaml` aus deiner Dokumentation entwerfen lassen.
+- `blume eval --agent claude|codex --threshold <0..1> --timeout <seconds> --json --fix --verbose` — siehe [Evals](/docs/reference/eval) für die einzelnen Flags.
+- `blume translate --claude` / `--codex` — fehlende und veraltete Seiten in deine konfigurierten Sprachen übersetzen; siehe [Translate](/docs/reference/translate).
+- `blume translate --check` — Übersetzungsdrift melden und mit einem Exit-Code ungleich null beenden (das CI-Gate), ohne einen Agenten auszuführen.
+- `blume translate --locale <codes> --concurrency <n> --force --timeout <seconds> --json` — siehe [Translate](/docs/reference/translate) für die einzelnen Flags.
+
+## Verifizieren, während der Dev-Server läuft
+
+`blume dev` betreibt einen Live-Astro-Server, der in der generierten `.blume/`-Laufzeitumgebung verwurzelt ist, und regeneriert sie bei jeder Änderung. `blume build` und `blume check` regenerieren _dieselbe_ `.blume/`, sodass beide sie beschädigen würden, wenn sie bei laufendem Dev-Server ausgeführt werden — beide verweigern die Ausführung mit einem Fehler und beenden sich mit einem Exit-Code ungleich null:
+
+```
+A `blume dev` server is running at http://localhost:3000; building would
+corrupt its .blume runtime. Reuse that server, stop it first, or re-run with
+--isolated to build/verify against .blume-verify without touching it.
+```
+
+Das Flag `--isolated` ist der Notausgang. Es verlagert die gesamte generierte Laufzeitumgebung (und bei `build` auch deren Ausgabe `dist/`) in ein benachbartes Verzeichnis `.blume-verify/`, sodass die Verifizierung nie etwas schreibt, worauf der Dev-Server — oder dein echtes `dist/` — angewiesen ist:
+
+```bash
+# In a second terminal, while `blume dev` is running:
+blume check --isolated   # fast: type-check the .astro/config changes
+blume build --isolated   # thorough: full production render into .blume-verify/dist
+```
+
+`check --isolated` ist der schnelle Weg (Astro-Typ- und Template-Diagnosen, kein `dist/`); `build --isolated` ist der aufwendigere, der auch Renderfehler zur Laufzeit erkennt. Isolierte Builds überspringen die Deploy-Nachbearbeitungsschritte (Suchindex, Sync mit gehosteten Anbietern, `llms.txt`, Sitemap/robots, Weiterleitungen) — eine Verifizierung muss nur bestätigen, dass die Site kompiliert und rendert, nicht sie veröffentlichen. `--analyze` sowie die Gates `--budget-js`/`--budget-css` laufen weiterhin und werden gegen die isolierte Ausgabe gemessen. Blume fügt `.blume-verify/` automatisch zu deiner `.gitignore` hinzu.
+
+Das ist besonders nützlich, wenn ein Coding-Agent Änderungen verifizieren muss, während du den Dev-Server geöffnet lässt. Damit einfaches `blume build`/`blume check` auch ohne das Flag isoliert — zum Beispiel in der Shell eines Agenten — setze `BLUME_RUNTIME_DIR` auf das zu verwendende Laufzeitverzeichnis:
+
+```bash
+export BLUME_RUNTIME_DIR=.blume-verify
+```
+
+## Typprüfung
+
+`blume check` führt [`astro check`](https://docs.astro.build/en/reference/cli-reference/#astro-check) über dein Projekt aus. Es regeneriert die `.blume`-Laufzeitumgebung, synchronisiert die Inhaltstypen von Astro und meldet dann alle TypeScript-Fehler — in deiner `blume.config.ts`, in eigenen `.astro`-Seiten und in den Komponenten, die diese importieren. Es beendet sich mit einem Exit-Code ungleich null, wenn Fehler vorliegen, und eignet sich damit als `typecheck`-Schritt in CI:
+
+```json title="package.json"
+{
+  "scripts": {
+    "typecheck": "blume check"
+  }
+}
+```
+
+Füge deinem Projektstammverzeichnis eine `tsconfig.json` hinzu, die Astros Konfiguration erweitert, damit verfasste Seiten `blume/*`-Importe und virtuelle Module wie `blume:data` auflösen:
+
+```json title="tsconfig.json"
+{
+  "extends": "astro/tsconfigs/strict",
+  "include": [".blume/.astro/types.d.ts", ".blume/src/env.d.ts", "**/*"]
+}
+```
+
+Ohne eine `tsconfig.json` im Projekt wird nur die generierte Laufzeitumgebung geprüft.
+
+## Links validieren
+
+`blume validate` prüft jeden in deinen Inhalten gefundenen Link:
+
+- **Interne Seitenlinks** (`/guides/intro`, `./sibling`) müssen auf eine echte Seite verweisen — defekte werden als Fehler gemeldet.
+- **Ankerlinks** (`#section`, `/guides/intro#setup`) müssen einer Überschrift auf der Zielseite entsprechen — Fehlschläge sind Warnungen.
+- **Asset-Links** (`/logo.png`) werden gegen das Verzeichnis `public/` geprüft.
+- **Externe Links** werden nur mit `--external` geprüft (standardmäßig aus, da dies das Netzwerk erfordert); tote Links (404/410/nicht erreichbar) sind Fehler, während ratenbegrenzte oder vorübergehende Antworten (403/429/5xx/Timeout) Warnungen sind.
+
+## Die gebaute Site auditieren
+
+`blume validate` liest deine _Inhalte_; `blume audit` liest die _gebaute Site_. Es crawlt nach einem Build das HTML in `dist/` und meldet SEO- und Site-Gesundheitsprobleme — Titel, Meta-Beschreibungen, Canonicals, Open-Graph- und X-Cards, Überschriften, hreflang, Bilder, die Sitemap, `robots.txt` und strukturierte Daten.
+
+Da Blume die Site gebaut hat, nennt jeder Befund die Quelldatei **und die Frontmatter-Zeile**, die ihn behebt, nicht nur die URL, die ein Crawler sehen würde:
+
+```
+⚠ Meta description too long or too short   5 pages
+    /docs/configuration/export    content/docs/configuration/export.mdx:3
+    fix: Rewrite `description` in the frontmatter to fit the length range.
+```
+
+Führe es nach einem Build aus:
+
+```bash
+blume build
+blume audit
+```
+
+Befunde werden nach Prüfung gruppiert statt pro Seite aufgelistet, sodass sich der Bericht wie eine To-do-Liste liest. Verwende `--verbose`, um jede betroffene Seite mit allen Details aufzuklappen, und `--only`/`--skip`, um eine Kategorie nach der anderen abzuarbeiten. `blume audit --list-checks` gibt den vollständigen Katalog aus.
+
+### CI fehlschlagen lassen
+
+Der Exit-Code ist der Vertrag. Standardmäßig schlägt `blume audit` nur bei Fehlern fehl — Dinge, die definitiv kaputt sind, etwa ein Link auf eine nie gebaute Seite, eine Weiterleitungsschleife oder eine ungültige Sitemap. Hinweisende Befunde (eine kurze Beschreibung, ein doppelter Titel) sind Warnungen und lassen den Build nicht fehlschlagen:
+
+```bash
+blume audit                      # fails on errors
+blume audit --fail-on warning    # also fails on warnings
+```
+
+### Ein laufendes Deployment prüfen
+
+Manches kann dir nur der echte Server sagen: ob eine Seite, die in `dist/` existiert, hinter einem fehlerhaften Rewrite tatsächlich einen 404 liefert, ob Antworten komprimiert werden und ob ein `X-Robots-Tag`-Header stillschweigend eine Seite deindexiert, deren HTML völlig einwandfrei aussieht. Richte das Audit auf ein Deployment, um diese Prüfungen hinzuzufügen:
+
+```bash
+blume audit --url https://docs.example.com
+blume audit --url https://docs.example.com --external   # also probe outbound links
+```
+
+Ausgehende Links werden abgestuft bewertet statt pauschal als Fehler gewertet: Ein 404 ist ein defekter Link, den du beheben kannst, während ein 403 oder 5xx meist auf Ratenbegrenzung oder eine fremde Störung zurückgeht und als Warnung gemeldet wird.
+
+### Die Befunde mit einem Agenten beheben
+
+Wenn du [Claude Code](https://claude.com/claude-code) oder [Codex](https://developers.openai.com/codex/cli) verwendest, kann das Audit seine Befunde direkt daran übergeben:
+
+```bash
+blume audit --claude   # or --codex
+```
+
+Dabei wird der vollständige JSON-Bericht — jede betroffene Seite, nicht die Drei-Seiten-Vorschau des Terminals — in eine Datei geschrieben und der Agent interaktiv mit einem Prompt geöffnet, der ihn durch die Befunde führt: die von jedem Befund genannte Quelldatei bearbeiten, den vorgeschlagenen Fix anwenden und dann `blume build` und `blume audit` erneut ausführen, bis der Bericht sauber ist. Die Sitzung ist bewusst interaktiv: Du prüfst die Änderungen über den eigenen Berechtigungsablauf des Agenten, und dem Agenten wird gesagt, dass er einen Befund niemals durch Löschen von Inhalten beheben darf.
+
+`--only` und `--skip` grenzen die Übergabe genauso ein, wie sie den Bericht eingrenzen, sodass du eine Kategorie nach der anderen schicken kannst.
+
+### Was es prüft und was nicht
+
+Der Prüfumfang ist bewusst enger als der eines allgemeinen SEO-Crawlers. Vieles, was ein solcher Crawler meldet, kann einer Blume-Site gar nicht passieren — sie gibt nie `rel=nofollow` aus, und Vites inhaltsgehashte Bundles fehlen nie und leiten nie um — und das als dauerhafte Nullwerte zu melden, würde dir nur beibringen, den Bericht zu ignorieren.
+
+Zwei Grenzen, die es klar zu benennen gilt:
+
+- **Strukturierte Daten** werden auf Wohlgeformtheit geprüft (gültiges JSON, ein `@context`, ein `@type` an jedem Knoten). Blume validiert nicht gegen das gesamte schema.org-Vokabular oder Googles Rich-Results-Regeln.
+- **Core Web Vitals** werden nicht geprüft. Sie brauchen einen echten Browser, und ein Flag, das stillschweigend nichts misst, wäre schlimmer, als keines zu haben — daher meldet `blume audit` die Ursachen für Layout-Verschiebungen, die es offline sehen _kann_ (Bilder ohne `width`/`height`, überdimensionierte Assets), und lässt den Rest vorerst außen vor.
+
+Alles, was das Audit nicht ausgeführt hat, wird als übersprungen gemeldet, statt stillschweigend zu bestehen:
+
+```
+⊘ network      skipped — pass --url <origin> (11 checks)
+⊘ external     skipped — pass --external (2 checks)
+```

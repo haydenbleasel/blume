@@ -1,0 +1,338 @@
+---
+title: SEO
+description: >-
+  Metadaten, Open-Graph-Bilder, RSS-Feeds und JSON-LD – die Auffindbarkeitsebene von Blume, gebündelt unter einer seo-Konfiguration.
+sidebar:
+  label: SEO
+---
+
+Blume übernimmt die Auffindbarkeitsebene für dich: Seiten-Metadaten, Bilder zum Teilen in sozialen Netzwerken, Feeds und strukturierte Daten. Die konfigurierbaren Funktionen liegen unter dem Schlüssel `seo` in `blume.config.ts`; die Metadaten ergeben sich aus deinen Inhalten.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true },
+  rss: { enabled: true, types: ["blog", "changelog"] },
+  sitemap: true,
+  robots: true,
+  structuredData: true,
+  x: { handle: "@acme" },
+}
+```
+
+Das meiste davon wird mit einer absoluten Site-URL noch besser – setze [`deployment.site`](/docs/deployment), damit Feeds, OG-Bilder, Canonicals, die Sitemap und JSON-LD vollständige URLs ausgeben können.
+
+## Metadaten
+
+Jede Seite rendert die standardmäßigen `<head>`-Tags aus deiner Konfiguration und deinem Frontmatter:
+
+- `<title>` – der Seitentitel plus der `title` deiner Site.
+- `<meta name="description">` und `og:description` – die `description` der Seite, ersatzweise die `description` der Site.
+- `og:title` und `og:site_name` – der Seitentitel und der `title` deiner Site.
+- `<link rel="canonical">` und `og:url` – die absolute URL der Seite (wenn `deployment.site` gesetzt ist).
+- `og:type` – `article` bei Blogbeiträgen und Changelog-Einträgen, `website` sonst. Artikelseiten geben außerdem `article:published_time` und `article:modified_time` aus dem `date` der Seite und dem Zeitstempel der letzten Änderung aus.
+- `og:image` – das [OG-Bild](#open-graph-images) für die Seite. Eine generierte Karte deklariert zusätzlich ihre `og:image:width`, `og:image:height`, `og:image:type` und `og:image:alt`, sodass ein Crawler die Karte anordnen kann, ohne sie zuvor abzurufen; ein `seo.image`, das du selbst angibst, deklariert nichts davon, da Größe und Format unbekannt sind.
+- `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image` – die X-Karte. Seiten mit einem Bild erhalten die breite Variante `summary_large_image`; Seiten ohne Bild erhalten weiterhin die kompakte `summary`-Karte, statt als nackter Link dargestellt zu werden.
+
+### X-Zuschreibung
+
+X liest alles Übrige auf der Karte aus den `og:*`-Tags, sodass die einzigen Werte, die es nicht ableiten kann, die zu nennenden Konten sind. Setze sie unter `seo.x`, und Blume gibt `twitter:site` (das Konto deiner Site) und `twitter:creator` (das der Autorenschaft) aus. Das `@` ist optional – `acme` und `@acme` funktionieren beide.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  x: { handle: "@acme", creator: "@jane" },
+}
+```
+
+Eine Seite kann ihre eigene Autorenschaft angeben, was bei einem Gastbeitrag genau das ist, was du willst:
+
+```yaml lineNumbers
+---
+title: How we shipped it
+seo:
+  x:
+    creator: "@guestauthor"
+---
+```
+
+Überschreibe jedes der anderen Tags pro Seite mit `seo`-Frontmatter:
+
+```yaml lineNumbers
+---
+title: Pricing
+description: Plans and pricing for every team size.
+seo:
+  title: Pricing — Acme
+  canonical: https://acme.com/pricing
+  noindex: false
+---
+```
+
+<TypeTable
+  type={{
+    "seo.title": {
+      type: "string",
+      description: "Override the <title> and og:title for this page.",
+    },
+    "seo.description": {
+      type: "string",
+      description: "Override the meta + og:description.",
+    },
+    "seo.image": {
+      type: "string",
+      description: "Custom social image (see Open Graph).",
+    },
+    "seo.canonical": {
+      type: "string",
+      description: "Override the canonical URL.",
+    },
+    "seo.noindex": {
+      type: "boolean",
+      description: "Emit robots noindex and skip structured data.",
+    },
+    "seo.x.creator": {
+      type: "string",
+      description:
+        "Credit this page to an X account (twitter:creator), overriding seo.x.creator from your config.",
+    },
+  }}
+/>
+
+## Open-Graph-Bilder
+
+Blume kann für jede Seite zur Build-Zeit eine Social-Karte in 1200×630 rendern – dank [Takumi](https://takumi.kane.tw) ohne Headless-Browser, sodass Builds schnell bleiben. Standardmäßig aktiviert, sobald [`deployment.site`](/docs/deployment) gesetzt oder automatisch erkannt wurde (die `og:image`-URL muss absolut sein, um für Crawler nützlich zu sein), andernfalls deaktiviert. Setze `enabled`, um das in beide Richtungen zu überschreiben:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: { enabled: true }, // or false to opt out even with a site set
+}
+```
+
+### Die generierte Karte mit deiner Marke versehen
+
+Setze ein lokales SVG und eine Farbpalette, um die generierte Karte an deine Marke anzupassen. Das Logo kann in `public/` oder im Projektstammverzeichnis liegen. Lasse einen Palettenwert weg, um dessen Standard beizubehalten.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    logo: "/logo/og.svg",
+    palette: {
+      accent: "#ff5410",
+      background: "#1d1d1d",
+      foreground: "#fff6f2",
+      muted: "#a6a19f",
+      border: "#323232",
+    },
+  },
+}
+```
+
+Standardmäßig leitet sich jede Karte aus deinen Inhalten und deinem Theme ab – der **Seitentitel** als Überschrift, der **Titel deiner Site** als Kopfzeile und der **Akzent** deines Themes für die Marke. Bilder werden unter `/og/<slug>.png` ausgeliefert, spiegeln also jede Route, und werden selbst im Server-Modus als statische Dateien vorgerendert:
+
+| Seitenroute         | Bild-URL                   |
+| ------------------- | -------------------------- |
+| `/`                 | `/og/index.png`            |
+| `/quickstart`       | `/og/quickstart.png`       |
+| `/configuration/ai` | `/og/configuration/ai.png` |
+
+Überschreibe die generierte Karte für eine beliebige Seite mit `seo.image` – eine Datei in `public/` oder eine externe URL. Sie hat Vorrang vor der generierten Karte und funktioniert auch dann, wenn `og` deaktiviert ist, sodass du eigene Bilder mit generierten mischen kannst:
+
+```yaml lineNumbers
+---
+title: Pricing
+seo:
+  image: /og/pricing-custom.png
+---
+```
+
+:::note
+Jede Palettenfarbe akzeptiert jede CSS-Farbe – Hex, `oklch(…)`, `rgb(…)` und so weiter. Der Akzent akzeptiert außerdem eine benannte Voreinstellung (`blue`, `teal`, …), passend zu [`theme.accent`](/docs/configuration/theming#accent). Eine Farbe, die der Renderer nicht parsen kann, lässt den Build fehlschlagen, statt stillschweigend eine Karte in der Standardfarbe auszuliefern.
+:::
+
+Emojis in einem Seitentitel oder Site-Titel werden als [Twemoji](https://github.com/jdecked/twemoji)-Glyphen gerendert, die während des Renderns der Karte von einem CDN abgerufen werden – ein Build, dessen Titel Emojis enthalten, benötigt also Netzwerkzugriff. Jede Glyphe wird einmal pro Build abgerufen, egal wie viele Seiten sie verwenden.
+
+### Kartenebenen anzeigen, ausblenden oder überschreiben
+
+Über die Überschrift hinaus trägt die Karte drei optionale Ebenen: die **Markenkennzeichnung** oben links (dein Logo oder eine Akzentkachel mit dem Anfangsbuchstaben des Site-Titels), den **Untertitel** unter der Überschrift (die `description` deiner Site) und eine **Fußzeile** mit deinem Repo-Slug (aus `github`) und der URL der Site – dem Host der Deployment-Site plus [`deployment.base`](/docs/deployment#subpath-deploys), sodass eine GitHub-Pages-Projektseite als `user.github.io/repo` erscheint. Überschreibe jede davon mit einer eigenen Zeichenkette oder blende eine mit `false` aus:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    site: "docs.acme.com", // footer URL text, or false to hide it
+    description: false, // hide the subtitle; a string overrides it
+    logo: false, // no brand mark at all — not even the initial tile
+  },
+}
+```
+
+### Kartenschriften
+
+Standardmäßig wird die Karte in der integrierten Schriftart von Takumi gerendert, die nur lateinische Glyphen abdeckt – ein Titel in einer anderen Schrift (Japanisch, Chinesisch, Koreanisch, Arabisch, …) würde als Tofu erscheinen, also als leere Kästchen.
+
+**Setze [`theme.fonts`](/docs/configuration/theming#fonts), und die Karte folgt dem.** Wenn deine Konfiguration eigene Schriften wählt, rendern die generierten Karten die Überschrift automatisch in deiner Display-Schrift und die Beschreibung sowie die Fußzeile in deiner Fließtextschrift, sodass geteilte Links zur Site passen – einschließlich nicht-lateinischer Abdeckung, ohne dass hier etwas zu konfigurieren wäre. (Familien von Anbietern außer Google werden übersprungen – der Karten-Renderer kann nur von Google Fonts laden –, lokale Schriftdateien funktionieren jedoch.)
+
+Um auf Karten andere Schriften als auf der Site zu verwenden oder Schriftsystem-Abdeckung hinzuzufügen, ohne das Theme anzufassen, setze `og.fonts` explizit – es hat immer Vorrang vor den aus dem Theme abgeleiteten Schriften:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    fonts: [
+      "Noto Sans JP",
+      { name: "Inter", weight: [400, 700] },
+      { name: "Berkeley Mono", src: "./fonts/BerkeleyMono-Regular.woff2" },
+    ],
+  },
+}
+```
+
+Jeder Eintrag ist ein Google-Fonts-Familienname, ein Objekt, das dessen `weight` (eine Zahl, eine Liste oder ein variabler Bereich wie `"100..900"`) und `style` (`"normal"`, `"italic"` oder beides) festlegt, oder eine lokale Schriftdatei – `src` wird relativ zum Projektstammverzeichnis aufgelöst, mit optionalem `weight` und `style`, wenn nicht die Metadaten der Datei selbst entscheiden sollen.
+
+Google-Familien werden beim Build abgerufen – ein Build, der sie verwendet, benötigt also Netzwerkzugriff – und der Renderer lädt nur die Glyphen-Subsets, die die Titel tatsächlich verwenden. Der Fallback erfolgt pro Glyphe, sodass das Hinzufügen einer Familie nur Glyphen betrifft, die die anderen Schriften nicht darstellen können.
+
+Ein explizites `og.fonts: []` deaktiviert das Ganze: Karten behalten die integrierte Schrift, selbst wenn `theme.fonts` gesetzt ist.
+
+### Eigene Seitentitel
+
+Eine benutzerdefinierte [`.astro`-Seite](/docs/advanced/custom-pages) hat kein Frontmatter zum Auslesen, daher wird ihre generierte Karte betitelt, indem das letzte URL-Segment ihrer Route lesbar gemacht wird – aus `/getting-started` wird „Getting Started“, aus `/cli` aber „Cli“. Benenne diese Karten explizit mit `og.titles`, gekennzeichnet nach Route (`"/"` adressiert die Startseite, deren Karte sonst den Site-Titel trägt):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    titles: {
+      "/cli": "CLI",
+    },
+  },
+}
+```
+
+Einträge gelten nur für benutzerdefinierte Seiten – die Karte einer Inhaltsseite übernimmt ihre Überschrift immer aus dem Seitentitel, ändere diese also stattdessen im Frontmatter.
+
+`seo.image` ist Frontmatter und deckt daher nur Markdown- und MDX-Inhalte ab. Um einer benutzerdefinierten [`.astro`-Seite](/docs/advanced/custom-pages) ein eigenes Social-Bild zu geben – etwa einer Marketing-Startseite oder Landingpage, und das ist auch der Weg, allein der Startseite ein maßgeschneidertes Teilen-Bild zu geben – übergib die Prop `ogImage` an `PageLayout`.
+
+## RSS-Feeds
+
+Blume erstellt einen RSS-Feed für jeden Inhaltstyp in `rss.types` – standardmäßig `blog` und `changelog` –, der Seiten enthält, ausgeliefert unter `/<type>/rss.xml`. Siehe [Feeds](/docs/content#feeds) zum Verfassen von Blog- und Changelog-Einträgen mit Datumsangaben.
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+| Option | Standard | Beschreibung |
+| --- | --- | --- |
+| `enabled` | `true` | Feeds erzeugen. |
+| `types` | `["blog", "changelog"]` | Inhaltstypen, die jeweils einen Feed erhalten. |
+| `limit` | `50` | Maximale Anzahl Einträge pro Feed, neueste zuerst. |
+
+Blume fügt `<link rel="alternate">`-Tags ein, damit Browser und Feed-Reader die Feeds automatisch finden.
+
+## Strukturierte Daten
+
+Blume gibt [schema.org](https://schema.org)-JSON-LD im `<head>` jeder Seite aus, damit Suchmaschinen deine Inhalte verstehen. Standardmäßig aktiviert:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  structuredData: true,
+}
+```
+
+Jede Seite enthält:
+
+- einen **WebSite**-Knoten für die Identität der Site,
+- die Seite als **Artikel** – `BlogPosting` für Blogbeiträge, `TechArticle` für Changelog und Doku – mit ihrer Beschreibung und ihrem Veröffentlichungsdatum,
+- eine **BreadcrumbList**, aufgebaut aus dem Navigationspfad.
+
+URLs sind absolut, wenn `deployment.site` gesetzt ist. Seiten, die mit `seo.noindex` markiert sind, werden übersprungen.
+
+## Sitemap
+
+Blume schreibt zur Build-Zeit eine `sitemap.xml` mit jeder indexierbaren Seite. Sie benötigt ein absolutes [`deployment.site`](/docs/deployment) und listet jede Seite auf, außer Entwürfen, versteckten und `noindex`-Seiten. Standardmäßig aktiviert:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  sitemap: true,
+}
+```
+
+Liefere deine eigene `public/sitemap.xml` aus, um die Kontrolle zu übernehmen – Blume überschreibt niemals eine Datei, die du in `public/` ablegst.
+
+## Robots
+
+Blume schreibt eine `robots.txt`, die alle Crawler zulässt, deine [Content-Signale](#content-signals) deklariert und eine `Sitemap:`-Zeile hinzufügt, die auf die Sitemap verweist, sofern eine verfügbar ist. Standardmäßig aktiviert:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  robots: true,
+}
+```
+
+```txt robots.txt
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+Allow: /
+
+Sitemap: https://docs.example.com/sitemap.xml
+```
+
+### Content-Signale
+
+Die `Content-Signal`-Zeile – die sich etablierende Konvention zur Inhaltsnutzung – deklariert, wie KI-Crawler deine Doku weiterverwenden dürfen. Blume gibt sie **standardmäßig aus, mit jedem Signal auf `yes`**, passend zu seiner Haltung, dass Doku für Menschen und Agents gleichermaßen offen ist:
+
+- `search` – klassische und KI-gestützte Suchindexierung
+- `aiInput` – Grounding / RAG zum Antwortzeitpunkt
+- `aiTrain` – Modelltraining
+
+Schränke ein beliebiges Signal ein, indem du es auf `false` setzt; die von dir ausgelassenen bleiben auf `yes`:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  contentSignals: {
+    aiTrain: false, // opt out of training, keep search + grounding
+  },
+}
+```
+
+```txt robots.txt
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /
+```
+
+Setze `contentSignals: false`, um die Deklaration vollständig wegzulassen:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  contentSignals: false,
+}
+```
+
+<TypeTable
+  type={{
+    "seo.contentSignals": {
+      type: "boolean | object",
+      description:
+        "Content-Signal declaration. true or omitted emits all signals as yes; false drops the line; an object sets signals individually.",
+    },
+    "contentSignals.search": {
+      type: "boolean",
+      description: "Allow use for search indexing (search). Default true.",
+    },
+    "contentSignals.aiInput": {
+      type: "boolean",
+      description:
+        "Allow use for AI grounding / RAG at answer time (ai-input). Default true.",
+    },
+    "contentSignals.aiTrain": {
+      type: "boolean",
+      description: "Allow use for AI model training (ai-train). Default true.",
+    },
+  }}
+/>
+
+Content-Signale drücken eine Präferenz aus, keine Zugriffskontrolle: Sie teilen wohlerzogenen Crawlern mit, wie du deine Inhalte genutzt sehen möchtest, und es liegt am Crawler, sie zu respektieren.
+
+Liefere deine eigene `public/robots.txt` aus, um die Kontrolle zu übernehmen.

@@ -1,0 +1,107 @@
+---
+title: Avaliações
+description: >-
+  O blume eval dá à sua documentação um conjunto de testes — um agente de IA responde às perguntas dos seus usuários usando apenas a documentação, um juiz avalia as respostas e a CI falha quando a documentação não consegue responder.
+---
+
+O `blume audit` diz se os rastreadores conseguem encontrar sua documentação. O `blume eval` diz se alguém consegue de fato _usá-la_: um agente de IA lê sua documentação como um estranho leria e tenta responder a perguntas reais de usuários a partir dela. Quando a documentação não apresenta a resposta, a execução falha e aponta a página que deveria apresentá-la.
+
+```bash
+blume eval
+```
+
+```
+blume eval  3 question(s) · Claude Code
+
+  ✔ install-node-version         pass  1.00  14.2s  $0.14
+  ✖ deploy-vercel                fail  0.40  38.9s  $0.31
+      missing: the adapter is auto-detected
+  ⊘ search-providers             skipped
+
+  fix: content/docs/deployment.mdx  Docs could not answer: "How do I deploy to Vercel?" — missing: the adapter is auto-detected
+
+  2 passed · 1 failed · 1 skipped · 1m 42s · $0.45
+```
+
+## Como funciona
+
+Cada pergunta passa por duas sessões de agente, usando uma CLI de agente que você já tem instalada — [Claude Code](https://claude.com/claude-code) por padrão, ou [Codex](https://developers.openai.com/codex/cli) com `--agent codex`. O Blume não guarda nenhuma chave de API e não chama nenhum modelo por conta própria.
+
+1. **O leitor** responde à pergunta usando _apenas_ sua documentação. Ele roda em um diretório vazio, com as ferramentas de arquivo, shell e web desativadas, conectado a um [servidor MCP](/docs/configuration/ai) privado que serve sua documentação — as mesmas ferramentas `search_docs`/`get_page` que um agente real usa contra o seu site publicado. Ele não consegue ler seu repositório, então vivencia a documentação exatamente como um usuário novo: o que não está escrito não existe.
+2. **O juiz** avalia a resposta em relação aos fatos que você listou, sem nenhuma ferramenta. Paráfrase passa; um fato ausente ou contradito falha — e "a documentação não diz" também falha.
+
+O snapshot do MCP é construído diretamente a partir das suas fontes de conteúdo, então não é necessário rodar o `blume build` antes, e nada é publicado ou enviado para lugar nenhum.
+
+Uma resposta que a documentação _não_ consegue sustentar falha mesmo quando o conhecimento prévio do agente por acaso está correto — esse é justamente o ponto. Sua documentação é a única fonte que vai para produção.
+
+## Escrevendo avaliações
+
+As perguntas ficam em `evals.yaml` na raiz do projeto. Para que um agente rascunhe um arquivo inicial a partir da sua documentação existente:
+
+```bash
+blume eval init
+```
+
+Ou escreva à mão:
+
+```yaml
+questions:
+  - id: install-node-version
+    question: What is the minimum Node.js version required?
+    expected:
+      - Node 22.12 or newer
+    routes: /docs/quickstart
+  - id: deploy-vercel
+    question: How do I deploy to Vercel?
+    expected:
+      - run blume build
+      - the output directory is dist
+    routes:
+      - /docs/deployment
+  - id: search-providers
+    question: Which search providers are supported?
+    expected:
+      - pagefind is the default
+    severity: warning # a miss warns instead of failing CI
+    skip: true # temporarily excluded, reported as skipped
+```
+
+- `expected` lista os fatos que uma resposta correta deve declarar, em substância — o juiz aceita paráfrase e rejeita contradição.
+- `routes` indica a(s) página(s) que deveriam responder à pergunta. Uma falha é então ancorada ao arquivo-fonte dessa página no relatório; uma dica que não corresponde mais a uma página gera um aviso em vez de ser descartada silenciosamente.
+- `severity: warning` mantém uma pergunta no relatório sem fazer a CI falhar; `skip: true` deixa uma pergunta de fora por completo.
+
+Escreva as perguntas que seus usuários realmente fazem — as que vêm de tópicos de suporte, issues no GitHub e chamadas de onboarding. As melhores avaliações codificam uma promessa que sua documentação faz ("deploys sem configuração") como uma pergunta que quebra quando um PR quebra a promessa.
+
+## Fazendo a CI falhar
+
+O código de saída é o contrato: qualquer pergunta que falhe sai com código diferente de zero. O `--threshold` afrouxa a barreira para uma fração de aprovação quando você está saindo de um acúmulo de pendências:
+
+```bash
+blume eval                    # every question must pass
+blume eval --threshold 0.8    # at least 80% must pass
+blume eval --json             # machine-readable report on stdout
+```
+
+O relatório JSON tem o mesmo formato de `diagnostics` + `summary` que `blume validate --json` e `blume audit --json`, com os resultados por pergunta (resposta, pontuação, fatos ausentes, custo) ao lado.
+
+Como cada pergunta são duas sessões de modelo, uma execução de avaliação custa dinheiro e minutos reais — o gasto por pergunta é exibido conforme a execução acontece. Uma configuração sensata de CI roda o `blume eval` em mudanças na documentação, e não a cada push.
+
+## Corrigindo os achados
+
+Cada falha indica os fatos ausentes e a página que deveria declará-los. Para entregar o relatório inteiro ao agente em vez disso:
+
+```bash
+blume eval --fix
+```
+
+Isso grava o relatório JSON completo em um arquivo e abre o agente de forma interativa com um prompt que o conduz por cada pergunta que falhou: ler a página indicada, adicionar os fatos ausentes na voz da página e rodar o `blume eval` novamente até tudo passar. A sessão é interativa por design — você revisa as edições através do próprio fluxo de permissões do agente — e o agente é instruído a nunca excluir perguntas ou enfraquecer os fatos esperados para chegar ao verde.
+
+## Flags
+
+- `--agent claude|codex` — qual CLI de agente executa o leitor e o juiz. Padrão: `claude`.
+- `--file <path>` — o arquivo de avaliações. Padrão: `evals.yaml`.
+- `--threshold <0..1>` — fração mínima de aprovação antes de a execução sair com código diferente de zero. Padrão: `1`.
+- `--timeout <seconds>` — limite de tempo do leitor por pergunta. Padrão: `180`.
+- `--json` — emite o relatório como JSON no stdout.
+- `--fix` — após uma execução com falhas, entrega o relatório ao agente para corrigir a documentação interativamente.
+- `--verbose` — inclui a resposta completa do leitor abaixo de cada falha.

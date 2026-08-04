@@ -1,0 +1,193 @@
+---
+title: Busca
+description: >-
+  Busca do lado do cliente que funciona imediatamente, sem chaves de API, além de backends hospedados e semânticos opcionais para os quais você pode migrar conforme sua documentação cresce.
+---
+
+O Blume inclui busca local sem infraestrutura hospedada e sem chaves de API. Ela roda no navegador, funciona tanto em `blume dev` quanto em `blume build` e indexa apenas o seu conteúdo real — elementos de navegação e páginas excluídas são ignorados. Quando ela deixar de ser suficiente, você pode migrar para um backend hospedado ou semântico sem mudar a aparência ou o comportamento da busca — só muda o `search.provider` que você configura.
+
+O Blume alcança paridade com o conjunto de provedores do Fumadocs: **Orama**, **FlexSearch**, **Algolia**, **Orama Cloud**, **Typesense** e **Mixedbread** (além do **Pagefind**). Somente o SDK do provedor configurado é instalado no seu projeto, então escolher um backend nunca traz os outros junto.
+
+## Usando a busca
+
+Abra a busca com <Badge variant="accent">⌘K</Badge> (ou `Ctrl K`), ou pressione `/` quando não estiver digitando em um campo. `Esc` a fecha, e `⌘J` (ou `Ctrl J`) alterna o painel de pré-visualização de resultados.
+
+As consultas correspondem a **títulos**, **descrições** e **texto do corpo** das páginas, com as correspondências de título classificadas em primeiro lugar e as descrições acima do corpo.
+
+## Páginas populares
+
+Antes de o leitor digitar uma consulta, o diálogo de busca exibe uma lista **Popular**. Por padrão, são as seis primeiras páginas da barra lateral — o que, em sites com várias abas, muitas vezes destaca a seção errada. Em vez disso, fixe os links que você quiser:
+
+```ts blume.config.ts lineNumbers
+search: {
+  popular: [
+    { href: "/guides/getting-started", icon: "rocket", label: "Getting started" },
+    { href: "/guides/install", icon: "download", label: "Install" },
+    { href: "/concepts/overview", label: "Overview" },
+  ],
+},
+```
+
+Cada entrada recebe um `href` (rota interna ou URL externa) e um `label`, além de um `icon` opcional — o nome de um ícone integrado exibido ao lado do rótulo, com um glifo de arquivo como padrão. Omita `popular` ou deixe a lista vazia para manter o comportamento padrão baseado na barra lateral.
+
+Diferentemente dos ícones em outras partes do Blume, o `icon` aqui precisa ser um nome integrado: essas linhas são renderizadas em uma ilha cliente, então um caminho de imagem ou SVG inline não é suportado e recai para o glifo de arquivo.
+
+Escreva o `href` como se o site estivesse montado na raiz — um `basePath` é aplicado automaticamente, igual em `navigation.featured`. URLs externas passam sem alteração.
+
+<Callout type="warning">
+  Uma lista curada é um único conjunto de links compartilhado por todos os
+  idiomas. Em um site com `i18n` configurado, o comportamento padrão da barra
+  lateral segue o idioma do leitor, mas as entradas de `popular` apontam para
+  onde o `href` indicar — então fixe rotas com prefixo de idioma apenas se
+  quiser que todos os leitores sejam levados àquele idioma.
+</Callout>
+
+## O que é indexado
+
+Para cada página indexável, o Blume indexa seu título, sua descrição e o corpo reduzido a texto simples — blocos de código, imagens e marcação são removidos, para que os resultados permaneçam relevantes. O índice é construído a partir dos seus arquivos-fonte, então é idêntico em desenvolvimento e em produção.
+
+## Tags
+
+Adicione `search.tags` ao frontmatter de uma página para agrupá-la sob um filtro no diálogo de busca — os leitores podem restringir os resultados a uma tag com um clique. As tags também se tornam uma faceta nos provedores hospedados.
+
+```yaml
+search:
+  tags: [api, reference]
+```
+
+## Provedores
+
+Os provedores do lado do cliente dispensam chaves e não precisam de configuração extra. Os hospedados recebem credenciais **públicas** em `blume.config.ts` (seguras para enviar ao navegador) e leem sua chave de administração **secreta** de uma variável de ambiente no momento do build — o segredo nunca chega à configuração nem ao bundle do cliente.
+
+### Orama (padrão)
+
+O mecanismo padrão do Blume. Ele constrói um índice JSON servido em `/blume-search.json` e o consulta no navegador — instantâneo, do lado do cliente e ativo em `blume dev` enquanto você edita. Sem chaves, sem serviço.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "orama", // default
+}
+```
+
+#### Idiomas escritos sem espaços
+
+O tokenizador padrão do Orama divide o texto em limites de palavra que só existem em escritas separadas por espaços, então textos em japonês, chinês, coreano e tailandês não produziriam nenhuma correspondência. O Blume cuida disso para você: quando [`i18n.defaultLocale`](/docs/content/i18n) é um desses idiomas, o índice passa a usar um tokenizador que segmenta palavras (baseado no `Intl.Segmenter`, nativo do navegador e do Node). Basta declarar o idioma do seu site:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  defaultLocale: "ja",
+  locales: [{ code: "ja", label: "日本語" }],
+}
+```
+
+O mesmo tokenizador atende o diálogo de busca, a ferramenta `search_docs` do servidor MCP e o embasamento do Ask AI. Em um site com vários idiomas, todo o índice compartilha o tokenizador do idioma padrão — o que é seguro, porque as palavras latinas sobrevivem intactas à segmentação, então páginas em inglês (ou em qualquer idioma com espaços) permanecem pesquisáveis ao lado do idioma padrão.
+
+Japonês e chinês vão um passo além. A segmentação sozinha indexa um termo composto como suas partes — 資金決済法 como 資金, 決済 e 法 — o que permite que uma página que mencione cada parte em algum lugar seja melhor classificada do que a página que realmente trata do termo. Por isso, Han, Hiragana e Katakana são indexados como pares de caracteres sobrepostos, e as consultas sobre esses índices preferem páginas que contenham os pares de um termo juntos, afrouxando para a correspondência de qualquer par quando nenhuma página os contém todos, de modo que digitar uma frase inteira ainda retorna as páginas mais próximas. Coreano e tailandês mantêm suas palavras segmentadas.
+
+### FlexSearch
+
+Uma segunda opção do lado do cliente e sem chaves. Ela reutiliza o mesmo índice `/blume-search.json` que o Orama gera e constrói um índice de documentos do [FlexSearch](https://github.com/nextapps-de/flexsearch) no navegador. Funciona em `blume dev` e `blume build`.
+
+O FlexSearch não tem um mecanismo equivalente de segmentação, então, para sites em japonês, chinês, coreano ou tailandês, prefira o Orama (o padrão) ou o [Pagefind](#pagefind), cujo binário `pagefind_extended` segmenta esses idiomas nativamente.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "flexsearch",
+}
+```
+
+### Pagefind
+
+Para documentações muito grandes, opte pelo [Pagefind](https://pagefind.app). Ele indexa o HTML compilado e carrega o índice em fragmentos sob demanda, mantendo a carga inicial mínima por maior que o site fique.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "pagefind",
+}
+```
+
+O Pagefind só é executado durante o `blume build`, então a busca não fica disponível em `blume dev` com esse provedor.
+
+### Algolia
+
+O navegador consulta o [Algolia](https://www.algolia.com) diretamente com sua chave somente de busca. Cada `blume build` substitui o índice usando a chave de administração de `ALGOLIA_ADMIN_API_KEY` (o build emite um aviso e pula o envio se ela não estiver definida). Todo o índice é substituído a cada sincronização, então páginas que você excluir ou renomear não permanecem como resultados desatualizados.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "algolia",
+  algolia: {
+    appId: "YOUR_APP_ID",
+    indexName: "docs",
+    searchApiKey: "YOUR_SEARCH_ONLY_KEY", // public
+  },
+}
+```
+
+### Orama Cloud
+
+Orama hospedado. O navegador consulta o endpoint do seu índice com a chave de API pública; o `blume build` envia registros para o índice usando `ORAMA_PRIVATE_API_KEY`. Defina `indexId` para habilitar a sincronização.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "orama-cloud",
+  oramaCloud: {
+    endpoint: "https://cloud.orama.run/v1/indexes/your-index",
+    apiKey: "YOUR_PUBLIC_API_KEY",
+    indexId: "your-index-id", // for the build-time sync
+  },
+}
+```
+
+### Typesense
+
+[Typesense](https://typesense.org) auto-hospedado ou na nuvem. O navegador consulta a coleção com a chave somente de busca; o `blume build` recria a coleção e importa os documentos usando `TYPESENSE_ADMIN_API_KEY`. A coleção é descartada e reconstruída a cada sincronização, para que páginas excluídas ou renomeadas não permaneçam como resultados desatualizados — se você ajustar manualmente as configurações da coleção, reaplique-as após um build.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "typesense",
+  typesense: {
+    host: "xyz.a1.typesense.net",
+    collection: "docs",
+    searchApiKey: "YOUR_SEARCH_ONLY_KEY", // public
+    // port + protocol default to 443 / https
+  },
+}
+```
+
+### Mixedbread
+
+Busca semântica via [Mixedbread](https://www.mixedbread.com). As consultas passam por um endpoint `/api/search` gerado que guarda sua chave, então esse provedor **exige saída de servidor** (`deployment.output: "server"`). O endpoint lê `MIXEDBREAD_API_KEY`. Sincronize seu conteúdo com o store usando a CLI do Mixedbread no seu build, por exemplo, `mxbai vs sync <STORE_ID> ./content --ci`.
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "mixedbread",
+  mixedbread: {
+    storeId: "YOUR_STORE_ID",
+  },
+}
+```
+
+### Desativando a busca
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: "none",
+}
+```
+
+## Excluindo páginas
+
+Apenas as páginas indexáveis são pesquisadas. Uma página fica de fora do índice quando define `search.exclude` no frontmatter:
+
+```yaml
+search:
+  exclude: true
+```
+
+[Páginas ocultas](/docs/content/navigation#hidden-pages) também são excluídas por padrão. Para indexá-las mesmo assim, ative explicitamente:
+
+```ts blume.config.ts lineNumbers
+search: {
+  indexing: { includeHiddenPages: true },
+}
+```

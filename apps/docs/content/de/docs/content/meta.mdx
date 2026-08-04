@@ -1,0 +1,81 @@
+---
+title: Ordner-Meta
+description: >-
+  Konfiguriere eine Sidebar-Gruppe mit einer meta.ts-Datei neben ihren Seiten — lege Titel, Icon und Reihenfolge der Gruppe sowie die Reihenfolge der darin verschachtelten Seiten fest.
+---
+
+Jeder Ordner in deinem Content-Baum wird zu einer Sidebar-Gruppe. Lege eine `meta.ts` neben die Seiten, um zu steuern, wie diese Gruppe aussieht und wie ihre Kinder sortiert werden. Das ist völlig optional: ohne eine solche Datei ist die Bezeichnung der Gruppe der lesbar aufbereitete Ordnername, und ihre Seiten werden [nach Index, numerischem Präfix und dann alphabetisch](/docs/content/navigation#ordering) sortiert.
+
+## Meta definieren
+
+Exportiere ein `defineMeta`-Objekt für eine vollständig typisierte Konfiguration. Lege die Datei im Wurzelverzeichnis des Ordners ab, den sie konfiguriert — `guides/meta.ts` konfiguriert die Gruppe **Guides**:
+
+```ts meta.ts lineNumbers
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Guides",
+  icon: "book-open",
+  order: 2,
+  collapsed: false,
+  pages: ["configuration", "theming", "deployment"],
+});
+```
+
+Jedes Feld ist optional — setze nur das, was du überschreiben möchtest.
+
+## Felder
+
+| Feld | Typ | Beschreibung |
+| --- | --- | --- |
+| `title` | `string` | Die Bezeichnung der Gruppe. Standardmäßig der lesbar aufbereitete Ordnername. |
+| `icon` | `string` | Icon, das neben der Bezeichnung angezeigt wird. |
+| `order` | `number` | Position unter gleichrangigen Gruppen und Seiten. Niedrigere Zahlen werden zuerst einsortiert. |
+| `collapsed` | `boolean` | Legt im [Anzeigemodus `group`](/docs/content/navigation#display-modes) fest, ob die Gruppe eingeklappt startet. |
+| `pages` | `string[]` | Explizite Reihenfolge der Kinder der Gruppe, nach Slug. |
+
+Das `pages`-Array listet die Kinder nach Slug auf — dem Ordner- oder Dateinamen ohne numerisches Präfix und ohne Klammern (aus `01-quickstart.mdx` wird also `"quickstart"`). Kinder, die du weglässt, erscheinen trotzdem, und zwar nach den aufgeführten.
+
+Wie Gruppen dargestellt werden — als flache Überschriften, aufklappbare Bereiche oder Drill-in-Panels — ist eine sidebarweite Einstellung, nicht pro Ordner: siehe [Anzeigemodi](/docs/content/navigation#display-modes).
+
+## Berechnetes Meta
+
+Da `meta.ts` ein echtes Modul ist, kannst du das Meta berechnen — übergib statt eines Objekts eine Funktion (synchron oder `async`), um es beim Scan aufzubauen. Praktisch, um Seiten anhand einer externen Quelle zu sortieren:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta(async () => ({
+  title: "Guides",
+  pages: await orderFromCms(),
+}));
+```
+
+## Reihenfolge innerhalb einer Gruppe
+
+Das `pages`-Array legt die Reihenfolge der Kinder einer Gruppe fest. Alles, was es auslässt, fällt auf das `sidebar.order` im Frontmatter der jeweiligen Seite zurück und danach auf das Dateisystem (zuerst eine `index`-Seite, dann numerische Präfixe, dann alphabetisch). Die vollständige Sidebar-Rangfolge — einschließlich einer expliziten Sidebar-Konfiguration — findest du unter [Navigation › Reihenfolge](/docs/content/navigation#ordering).
+
+Um Seiten zu gruppieren, _ohne_ ein URL-Segment hinzuzufügen, brauchst du überhaupt keine `meta.ts`: verwende einen geklammerten Ordnernamen — siehe [Seiten › Gruppenordner](/docs/content#group-folders).
+
+## Internationalisierung
+
+Unter [i18n](/docs/content/i18n) wird Ordner-Meta pro Locale aufgelöst: lege eine `meta.ts` unter `fr/guides/` ab, um die französische Gruppe unabhängig zu sortieren.
+
+Für Ordner-Meta, das in jeder Sprache identisch ist, füge eine `$`-Markierung hinzu, damit eine Datei ohne Duplizierung alle Locales bedient:
+
+```txt
+docs/guides/meta.$.ts   (folder meta applied to every locale)
+```
+
+Eine locale-spezifische `meta.ts` überschreibt die gemeinsame `meta.$.ts` für diese Sprache weiterhin.
+
+## Wie geht es weiter
+
+<CardGroup cols={2}>
+  <Card title="Navigation" href="/docs/content/navigation" icon="menu">
+    Wie Sidebar, Breadcrumbs und Tabs aufgebaut werden.
+  </Card>
+  <Card title="Frontmatter" href="/docs/reference/frontmatter" icon="file">
+    Metadaten pro Seite, einschließlich der `sidebar`-Overrides.
+  </Card>
+</CardGroup>

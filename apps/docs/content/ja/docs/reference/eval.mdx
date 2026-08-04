@@ -1,0 +1,107 @@
+---
+title: 評価（Evals）
+description: >-
+  blume eval はドキュメントにテストスイートを与えます。AI エージェントがドキュメントだけを使ってユーザーの質問に答え、ジャッジがその回答を採点し、ドキュメントが答えられない場合は CI が失敗します。
+---
+
+`blume audit` は、クローラーがドキュメントを見つけられるかどうかを教えてくれます。`blume eval` は、実際にドキュメントを _使える_ かどうかを教えてくれます。AI エージェントが初めて訪れた人と同じようにドキュメントを読み、そこから実際のユーザーの質問に答えようとします。ドキュメントに答えが書かれていない場合、実行は失敗し、答えを書くべきページを指摘します。
+
+```bash
+blume eval
+```
+
+```
+blume eval  3 question(s) · Claude Code
+
+  ✔ install-node-version         pass  1.00  14.2s  $0.14
+  ✖ deploy-vercel                fail  0.40  38.9s  $0.31
+      missing: the adapter is auto-detected
+  ⊘ search-providers             skipped
+
+  fix: content/docs/deployment.mdx  Docs could not answer: "How do I deploy to Vercel?" — missing: the adapter is auto-detected
+
+  2 passed · 1 failed · 1 skipped · 1m 42s · $0.45
+```
+
+## 仕組み
+
+各質問は 2 つのエージェントセッションを通して実行され、すでにインストール済みのエージェント CLI を使用します。デフォルトでは [Claude Code](https://claude.com/claude-code)、`--agent codex` を指定すれば [Codex](https://developers.openai.com/codex/cli) です。Blume は API キーを保持せず、モデルを自ら呼び出すこともありません。
+
+1. **リーダー（reader）** は、_あなたのドキュメントだけ_ を使って質問に答えます。ファイル、シェル、ウェブの各ツールを無効化した空のディレクトリで実行され、ドキュメントを配信するプライベートな [MCP サーバー](/docs/configuration/ai) に接続します。これは、実際のエージェントが公開済みサイトに対して使うのと同じ `search_docs`/`get_page` ツールです。リポジトリを読むことはできないため、初めて訪れたユーザーとまったく同じようにドキュメントを体験します。つまり、書かれていないものは存在しません。
+2. **ジャッジ（judge）** は、あなたが列挙した事実に照らして回答を採点します。ツールは一切使いません。言い換えは合格。事実の欠落や矛盾は不合格で、「ドキュメントには書かれていません」も同様に不合格です。
+
+MCP スナップショットはコンテンツソースから直接構築されるため、事前に `blume build` を実行する必要はなく、どこにもデプロイやアップロードは行われません。
+
+ドキュメントが裏付けられない回答は、たまたまエージェントの事前知識が正しかったとしても不合格になります。それこそが狙いです。実際に届けられる唯一の情報源は、あなたのドキュメントだからです。
+
+## 評価を書く
+
+質問はプロジェクトルートの `evals.yaml` に置きます。既存のドキュメントからエージェントに雛形ファイルを作成させるには次のようにします。
+
+```bash
+blume eval init
+```
+
+あるいは手書きでも構いません。
+
+```yaml
+questions:
+  - id: install-node-version
+    question: What is the minimum Node.js version required?
+    expected:
+      - Node 22.12 or newer
+    routes: /docs/quickstart
+  - id: deploy-vercel
+    question: How do I deploy to Vercel?
+    expected:
+      - run blume build
+      - the output directory is dist
+    routes:
+      - /docs/deployment
+  - id: search-providers
+    question: Which search providers are supported?
+    expected:
+      - pagefind is the default
+    severity: warning # a miss warns instead of failing CI
+    skip: true # temporarily excluded, reported as skipped
+```
+
+- `expected` には、正しい回答が実質的に述べていなければならない事実を列挙します。ジャッジは言い換えを受け入れ、矛盾を却下します。
+- `routes` は、その質問に答えるべきページを指定します。失敗した場合、レポート内でそのページのソースファイルに紐づけられます。どのページにも一致しなくなったヒントは、黙って破棄されるのではなく警告されます。
+- `severity: warning` は、CI を失敗させることなく質問をレポートに残します。`skip: true` は質問を完全に除外します。
+
+ユーザーが実際に尋ねる質問を書きましょう。サポートスレッド、GitHub の issue、オンボーディング通話から出てきたものです。最良の評価とは、ドキュメントが掲げる約束（「設定不要のデプロイ」など）を、その約束を壊す PR が出たときに壊れる質問としてエンコードしたものです。
+
+## CI を失敗させる
+
+終了コードが契約です。失敗した質問が 1 つでもあれば、終了コードは 0 以外になります。積み上がった課題を消化している途中であれば、`--threshold` でゲートを合格割合まで緩められます。
+
+```bash
+blume eval                    # every question must pass
+blume eval --threshold 0.8    # at least 80% must pass
+blume eval --json             # machine-readable report on stdout
+```
+
+JSON レポートは、`blume validate --json` や `blume audit --json` と同じ `diagnostics` + `summary` の形式を持ち、質問ごとの結果（回答、スコア、欠落した事実、コスト）が併記されます。
+
+各質問はモデルセッション 2 回分にあたるため、評価の実行には実際の費用と時間がかかります。質問ごとの支出は実行中に表示されます。適切な CI 構成では、すべてのプッシュではなくドキュメント変更時に `blume eval` を実行します。
+
+## 検出結果を修正する
+
+各失敗には、欠落している事実と、それを述べるべきページが示されます。レポート全体をエージェントに渡すには次のようにします。
+
+```bash
+blume eval --fix
+```
+
+これは完全な JSON レポートをファイルに書き出し、失敗した質問を 1 つずつ処理するプロンプトとともにエージェントを対話的に起動します。指定されたページを読み、そのページの語り口で欠落している事実を追加し、すべて合格するまで `blume eval` を再実行する、という流れです。このセッションは意図的に対話的であり、エージェント自身の権限フローを通じて編集内容をレビューできます。また、エージェントには、合格させるために質問を削除したり expected の事実を弱めたりしないよう指示されています。
+
+## フラグ
+
+- `--agent claude|codex` — リーダーとジャッジを実行するエージェント CLI。デフォルトは `claude`。
+- `--file <path>` — 評価ファイル。デフォルトは `evals.yaml`。
+- `--threshold <0..1>` — 終了コードが 0 以外になる前に必要な最低合格割合。デフォルトは `1`。
+- `--timeout <seconds>` — 質問ごとのリーダーの制限時間。デフォルトは `180`。
+- `--json` — レポートを JSON として stdout に出力します。
+- `--fix` — 実行が失敗した後、レポートをエージェントに渡してドキュメントを対話的に修正させます。
+- `--verbose` — 各失敗の下にリーダーの完全な回答を含めます。

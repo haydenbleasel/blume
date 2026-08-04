@@ -1,0 +1,105 @@
+---
+title: ブログ
+description: 投稿をコンテンツとして公開し、RSS フィードと記事の構造化データを無料で取得して、独自のインデックスページを構築できます。
+---
+
+Blume におけるブログとは、型を持ったコンテンツにすぎません。ページに `type: blog` を指定すれば、Blume が RSS フィードとより充実した記事メタデータを自動的に付与します。[チェンジログ](/docs/advanced/changelog)とは異なり、インデックスページは生成されません。ランディングページは自分で組み立てるため、デザインを完全に手中に収められます。
+
+## 投稿を書く
+
+投稿とは、フロントマターに `type: blog` を指定した通常の `.md` または `.mdx` ページです。慣例として投稿は `blog/` 配下に置かれますが、重要なのはフォルダではなく型です。
+
+```mdx blog/introducing-blume.mdx lineNumbers
+---
+title: Introducing Blume
+type: blog
+date: 2026-06-22
+description: Why we built a markdown-first docs framework.
+---
+
+Documentation should be fast, AI-ready, and zero-config — down to not needing a starter template at all. Here's the thinking behind Blume.
+```
+
+すべての投稿に `date` を指定してください。フィードの項目が新しい順に並び、`pubDate` が付与されます。また `description` も指定してください。フィードの概要と SEO の両方に使われます。
+
+## RSS フィード
+
+Blume は **`/blog/rss.xml`** にブログフィードを生成し、`date` の新しい順に並べます。フィードには絶対サイト URL が必要なので、[`deployment.site`](/docs/deployment) を設定してください。設定すると、Blume がすべてのページに `<link rel="alternate">` タグを挿入し、リーダーが自動的にフィードを検出できるようになります。
+
+フィードはデフォルトで有効です。[`seo.rss`](/docs/configuration/seo#rss-feeds) で調整できます。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  rss: {
+    enabled: true,
+    types: ["blog", "changelog"],
+    limit: 50,
+  },
+}
+```
+
+フィードを生成したくない場合は、`rss.types` から `"blog"` を削除してください。
+
+## 構造化データ
+
+[構造化データ](/docs/configuration/seo#structured-data)が有効な場合、各投稿は説明文と公開日を伴う schema.org の **`BlogPosting`** として出力されます。これは検索エンジンがブログコンテンツに期待する、より充実した記事型です。
+
+## インデックスページを構築する
+
+Blume は `/blog` のランディングページを生成しないため、自分で構築します。最も簡単な方法は、各投稿へのリンクを手動で記述したコンテンツページです。
+
+```mdx blog/index.mdx lineNumbers
+---
+title: Blog
+description: News and writing from the team.
+---
+
+<CardGroup cols={2}>
+  <Card title="Introducing Blume" href="/blog/introducing-blume">
+    Why we built a markdown-first docs framework.
+  </Card>
+</CardGroup>
+```
+
+代わりに投稿を自動的に一覧表示するには、`pages/blog/index.astro` に[カスタムページ](/docs/advanced/custom-pages)を追加し、Astro の `docs` コンテンツコレクションから読み込んで、各エントリを `blume:data` のルートと組み合わせます。
+
+```astro pages/blog/index.astro lineNumbers
+---
+import { getCollection } from "astro:content";
+import data from "blume:data";
+
+const routeById = new Map(data.routes.map((route) => [route.id, route.path]));
+
+const posts = (await getCollection("docs"))
+  .filter((entry) => entry.data.type === "blog" && !entry.data.draft)
+  .map((entry) => ({
+    date: entry.data.date,
+    description: entry.data.description,
+    href: routeById.get(entry.id),
+    title: entry.data.title,
+  }))
+  .toSorted((a, b) => Number(new Date(b.date)) - Number(new Date(a.date)));
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={post.href}>{post.title}</a>
+        <p>{post.description}</p>
+      </li>
+    ))
+  }
+</ul>
+```
+
+これをサイト全体のレイアウトでラップする方法については、[カスタムページ](/docs/advanced/custom-pages#using-the-site-layout)を参照してください。
+
+<CardGroup cols={2}>
+  <Card title="カスタムページ" href="/docs/advanced/custom-pages" icon="folder">
+    ブログインデックスをマウントし、blume:data から読み込みます。
+  </Card>
+  <Card title="SEO" href="/docs/configuration/seo" icon="file">
+    フィード、Open Graph 画像、構造化データ。
+  </Card>
+</CardGroup>

@@ -1,0 +1,107 @@
+---
+title: Evals
+description: >-
+  blume eval verleiht deiner Dokumentation eine Testsuite – ein KI-Agent beantwortet die Fragen deiner Nutzer allein anhand der Dokumentation, ein Judge bewertet die Antworten, und die CI schlägt fehl, wenn die Dokumentation keine Antwort liefert.
+---
+
+`blume audit` sagt dir, ob Crawler deine Dokumentation finden können. `blume eval` sagt dir, ob überhaupt jemand sie _nutzen_ kann: Ein KI-Agent liest deine Dokumentation so, wie es eine fremde Person tun würde, und versucht, daraus echte Nutzerfragen zu beantworten. Wenn die Dokumentation die Antwort nicht enthält, schlägt der Lauf fehl und benennt die Seite, die sie enthalten sollte.
+
+```bash
+blume eval
+```
+
+```
+blume eval  3 question(s) · Claude Code
+
+  ✔ install-node-version         pass  1.00  14.2s  $0.14
+  ✖ deploy-vercel                fail  0.40  38.9s  $0.31
+      missing: the adapter is auto-detected
+  ⊘ search-providers             skipped
+
+  fix: content/docs/deployment.mdx  Docs could not answer: "How do I deploy to Vercel?" — missing: the adapter is auto-detected
+
+  2 passed · 1 failed · 1 skipped · 1m 42s · $0.45
+```
+
+## Funktionsweise
+
+Jede Frage durchläuft zwei Agent-Sitzungen und nutzt dabei eine Agent-CLI, die du bereits installiert hast – standardmäßig [Claude Code](https://claude.com/claude-code) oder [Codex](https://developers.openai.com/codex/cli) mit `--agent codex`. Blume hält keine API-Schlüssel vor und ruft selbst kein Modell auf.
+
+1. **Der Reader** beantwortet die Frage _ausschließlich_ anhand deiner Dokumentation. Er läuft in einem leeren Verzeichnis, seine Datei-, Shell- und Web-Tools sind deaktiviert, und er ist mit einem privaten [MCP-Server](/docs/configuration/ai) verbunden, der deine Dokumentation bereitstellt – dieselben `search_docs`/`get_page`-Tools, die ein echter Agent gegen deine veröffentlichte Website verwendet. Er kann dein Repository nicht lesen und erlebt die Dokumentation daher genau wie ein neuer Nutzer: Was nicht geschrieben steht, existiert nicht.
+2. **Der Judge** bewertet die Antwort anhand der von dir aufgeführten Fakten, ganz ohne Tools. Umschreibungen bestehen; ein fehlender oder widersprochener Fakt fällt durch – und ebenso „die Dokumentation sagt dazu nichts".
+
+Der MCP-Snapshot wird direkt aus deinen Content-Quellen erstellt, sodass du `blume build` nicht vorher ausführen musst und nichts irgendwohin deployed oder hochgeladen wird.
+
+Eine Antwort, die die Dokumentation _nicht_ stützen kann, fällt selbst dann durch, wenn das Vorwissen des Agenten zufällig richtig ist – genau darum geht es. Deine Dokumentation ist die einzige Quelle, die ausgeliefert wird.
+
+## Evals schreiben
+
+Die Fragen liegen in `evals.yaml` im Projektstammverzeichnis. Damit ein Agent aus deiner bestehenden Dokumentation eine Startdatei entwirft:
+
+```bash
+blume eval init
+```
+
+Oder schreibe sie von Hand:
+
+```yaml
+questions:
+  - id: install-node-version
+    question: What is the minimum Node.js version required?
+    expected:
+      - Node 22.12 or newer
+    routes: /docs/quickstart
+  - id: deploy-vercel
+    question: How do I deploy to Vercel?
+    expected:
+      - run blume build
+      - the output directory is dist
+    routes:
+      - /docs/deployment
+  - id: search-providers
+    question: Which search providers are supported?
+    expected:
+      - pagefind is the default
+    severity: warning # a miss warns instead of failing CI
+    skip: true # temporarily excluded, reported as skipped
+```
+
+- `expected` listet die Fakten auf, die eine korrekte Antwort inhaltlich nennen muss – der Judge akzeptiert Umschreibungen und weist Widersprüche zurück.
+- `routes` benennt die Seite(n), die die Frage beantworten sollten. Ein Fehlschlag wird im Bericht dann der Quelldatei dieser Seite zugeordnet; ein Hinweis, der zu keiner Seite mehr passt, wird gemeldet statt stillschweigend verworfen.
+- `severity: warning` behält eine Frage im Bericht, ohne die CI fehlschlagen zu lassen; `skip: true` lässt eine Frage komplett aussetzen.
+
+Schreibe Fragen, die deine Nutzer tatsächlich stellen – die aus Support-Threads, GitHub-Issues und Onboarding-Gesprächen. Die besten Evals codieren ein Versprechen deiner Dokumentation („Deployments ohne Konfiguration") als Frage, die bricht, sobald ein PR das Versprechen bricht.
+
+## CI zum Fehlschlagen bringen
+
+Der Exit-Code ist der Vertrag: Jede fehlgeschlagene Frage führt zu einem Exit-Code ungleich null. `--threshold` lockert die Schranke auf einen bestandenen Anteil, wenn du dich aus einem Rückstand herausarbeitest:
+
+```bash
+blume eval                    # every question must pass
+blume eval --threshold 0.8    # at least 80% must pass
+blume eval --json             # machine-readable report on stdout
+```
+
+Der JSON-Bericht hat dieselbe Struktur aus `diagnostics` + `summary` wie `blume validate --json` und `blume audit --json`, ergänzt um die Ergebnisse pro Frage (Antwort, Score, fehlende Fakten, Kosten).
+
+Da jede Frage zwei Modellsitzungen bedeutet, kostet ein Eval-Lauf echtes Geld und echte Minuten – die Ausgaben pro Frage werden während des Laufs ausgegeben. Ein sinnvolles CI-Setup führt `blume eval` bei Änderungen an der Dokumentation aus statt bei jedem Push.
+
+## Die Befunde beheben
+
+Jeder Fehlschlag benennt die fehlenden Fakten und die Seite, die sie nennen sollte. Um stattdessen den gesamten Bericht an den Agenten zu übergeben:
+
+```bash
+blume eval --fix
+```
+
+Dies schreibt den vollständigen JSON-Bericht in eine Datei und öffnet den Agenten interaktiv mit einem Prompt, der ihn durch jede fehlgeschlagene Frage führt: die benannte Seite lesen, die fehlenden Fakten im Stil der Seite ergänzen und `blume eval` erneut ausführen, bis alles besteht. Die Sitzung ist bewusst interaktiv – du prüfst die Änderungen über den Berechtigungsablauf des Agenten – und dem Agenten wird ausdrücklich untersagt, Fragen zu löschen oder erwartete Fakten abzuschwächen, um auf Grün zu kommen.
+
+## Flags
+
+- `--agent claude|codex` – welche Agent-CLI Reader und Judge ausführt. Standardwert: `claude`.
+- `--file <path>` – die Evals-Datei. Standardwert: `evals.yaml`.
+- `--threshold <0..1>` – der Mindestanteil bestandener Fragen, bevor der Lauf mit einem Exit-Code ungleich null endet. Standardwert: `1`.
+- `--timeout <seconds>` – Zeitlimit des Readers pro Frage. Standardwert: `180`.
+- `--json` – gibt den Bericht als JSON auf stdout aus.
+- `--fix` – übergibt den Bericht nach einem fehlgeschlagenen Lauf an den Agenten, um die Dokumentation interaktiv zu korrigieren.
+- `--verbose` – nimmt die vollständige Antwort des Readers unter jeden Fehlschlag auf.

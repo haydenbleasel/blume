@@ -1,0 +1,29 @@
+---
+title: スキル
+description: >-
+  Blume が提供するエージェントスキル — Claude Code、Codex、Cursor などのコーディングエージェントに Blume ドキュメントサイトの構築と保守を教えるプレイブックです。
+---
+
+Blume は[エージェントスキル](https://docs.claude.com/en/docs/claude-code/skills)を提供しています。これは、コーディングエージェント（Claude Code、Codex、Cursor）に対して、あなたが説明しなくても Blume 特有の作業のやり方を教えるプレイブックです。スキルは GitHub 上のリポジトリの `skills/` フォルダーに置かれ、インストール済みパッケージにも `skills/` 配下にバンドルされているため、どのエージェントにも `SKILL.md` を直接指定できます。
+
+## Blume
+
+中核となるスキルです。Blume とは何か、そしてサイトをどのようにスキャフォールド・執筆・設定するか（ファイルシステムから導出されるナビゲーション、設定スキーマ、コンテンツコンポーネント）をエージェントに教え、インストール済みパッケージにバンドルされた完全なドキュメント（`blume` 内の `docs/` ディレクトリ。パッケージマネージャーがインストールした場所から解決されます。pnpm モノレポではリポジトリのルートではなく、依存しているワークスペースの `node_modules` です）へ誘導します。エージェントがドキュメント構築を手伝うプロジェクトにインストールしてください。
+
+```bash
+npx skills add haydenbleasel/blume
+```
+
+## 自己更新するドキュメント
+
+`blume-update-docs` は、ドキュメントを、それが説明している製品と同期した状態に保ちます。実行のたびに（通常はエージェントランナーで設定したスケジュールから）、最近マージされた PR、変更履歴、設定スキーマ、CLI ヘルプをドキュメントの内容と照合し、事実として古くなったページのみを更新し（フィーチャーフラグ配下の作業は無視されます）、`blume build` で検証したうえで、`blume/*` プルリクエストを作成または更新します。ずれが何もなければ、無用な PR を作成せず、変更なしとして報告します。
+
+```bash
+npx skills add haydenbleasel/blume --skill blume-update-docs
+```
+
+Blume は自動化をホストしません。リポジトリ履歴の読み取りと PR 作成の権限を与えたうえで、Claude Code のスケジュールタスク、Codex や Cursor の自動化、あるいは単純な cron にスキルを組み込んでください。週次プロンプトの例:
+
+```text
+Use the blume-update-docs skill. Review the PRs merged within the last 7 days and compare them to the docs content. Ignore work behind feature flags. If docs need updates, make them, verify the docs build, and open a blume/* PR. If not, report what you checked and do not open a PR.
+```
