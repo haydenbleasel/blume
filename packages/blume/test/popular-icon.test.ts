@@ -20,6 +20,10 @@ describe("resolvePopularIconMarkup", () => {
     expect(resolvePopularIconMarkup(svg)).toBe(svg.trim());
   });
 
+  it("rejects non-SVG markup (falls through to the file glyph)", () => {
+    expect(resolvePopularIconMarkup('<img src="/logo.svg">')).toBeUndefined();
+  });
+
   it("renders an image path as an img, applying the deployment base", () => {
     expect(resolvePopularIconMarkup("/icons/codemap.svg", "/docs")).toBe(
       '<img src="/docs/icons/codemap.svg" width="16" height="16" alt="" aria-hidden="true" class="size-4" />'

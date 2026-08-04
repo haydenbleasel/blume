@@ -45,6 +45,15 @@ describe("validateSearchPopularIcons", () => {
       ])
     ).toEqual([]);
   });
+
+  it("warns on invalid markup that is not a complete inline SVG", () => {
+    const result = validateSearchPopularIcons([
+      { icon: '<img src="/logo.svg">', label: "Logo" },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.code).toBe("BLUME_UNKNOWN_ICON");
+    expect(result[0]?.message).toContain('<img src="/logo.svg">');
+  });
 });
 
 describe("validateNavIcons", () => {
