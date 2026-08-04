@@ -36,14 +36,14 @@ describe("validateSearchPopularIcons", () => {
     ).toEqual([]);
   });
 
-  it("warns about an asset icon, which the client island cannot render", () => {
-    const result = validateSearchPopularIcons([
-      { icon: "./rocket.svg", label: "Start" },
-      { icon: "./rocket.svg", label: "Again" },
-    ]);
-    expect(result).toHaveLength(1);
-    expect(result[0]?.code).toBe("BLUME_UNKNOWN_ICON");
-    expect(result[0]?.message).toContain("file glyph");
+  it("accepts image and inline-SVG icons (resolved server-side for the island)", () => {
+    expect(
+      validateSearchPopularIcons([
+        { icon: "./rocket.svg", label: "Start" },
+        { icon: "<svg viewBox='0 0 24 24'></svg>", label: "Mark" },
+        { icon: "/logo.svg", label: "Again" },
+      ])
+    ).toEqual([]);
   });
 });
 

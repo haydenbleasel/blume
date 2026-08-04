@@ -84,10 +84,9 @@ export const validateNavIcons = (navigation: Navigation): Diagnostic[] =>
   );
 
 /**
- * Warn about unknown icons on curated `search.popular` links. Separate from
- * {@link validateNavIcons} because these live under `search`, not the built
- * navigation — and unlike nav icons they resolve in a *client* island, so only
- * set names work (an image/SVG icon quietly falls back to the file glyph).
+ * Warn about unknown icons on curated `search.popular` links. Same accepted
+ * shapes as nav icons (built-in name, image path/URL, or inline SVG) — the
+ * search dialog resolves them to markup on the server before the island runs.
  */
 export const validateSearchPopularIcons = (
   popular: { icon?: string; label: string }[]
@@ -97,25 +96,10 @@ export const validateSearchPopularIcons = (
       ? [{ icon: link.icon, where: `popular link "${link.label}"` }]
       : []
   );
-  // Asset icons are valid in the nav, so the shared helper skips them — but
-  // here they are exactly the silent failure this validator exists to catch.
-  const diagnostics: Diagnostic[] = [];
-  const seen = new Set<string>();
-  for (const { icon, where } of icons) {
-    if (isAssetIcon(icon) && !seen.has(icon)) {
-      seen.add(icon);
-      diagnostics.push({
-        code: "BLUME_UNKNOWN_ICON",
-        message: `Icon "${icon}" (${where}) is an image or inline SVG — popular links render in the client search island, where only built-in icon names resolve, so it falls back to the file glyph.`,
-        severity: "warning",
-        suggestion: "Use a built-in icon name.",
-      });
-    }
-  }
-  return [
-    ...diagnostics,
-    ...unknownIconDiagnostics(icons, "Use a built-in icon name."),
-  ];
+  return unknownIconDiagnostics(
+    icons,
+    "Use a built-in icon name, an image path/URL, or inline SVG markup."
+  );
 };
 
 /** Whether an internal path resolves to a page or a section that has pages. */

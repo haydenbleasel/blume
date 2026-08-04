@@ -2,8 +2,9 @@
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { Navigation } from "../../core/types.ts";
-import { resolveIcon } from "../../theme/icons.ts";
+import { resolvePopularIconMarkup } from "../../search/popular-icon.ts";
 import Icon from "../Icon.astro";
+import { withBase } from "../islands/base-path.ts";
 import { flattenPages } from "./nav-utils.ts";
 
 // The provider-specific loader is generated per project into `blume:search-client`
@@ -28,23 +29,15 @@ const { askEnabled = false, navigation, popularPages, strings, locale } =
 // default, matching the pattern PageActions uses for its own dictionary.
 const s = { ...EN_UI.search, ...strings };
 
-// Icons resolve to inline SVG here (`theme/icons.ts` is a server-only module —
+// Icons resolve to markup here (`theme/icons.ts` is a server-only module —
 // far too large to ship to the browser), so the island gets ready-to-render
-// markup rather than a name it can't resolve. Same approach as AskAI.astro.
-// A name outside the set falls through to the island's own file glyph.
-const iconSvg = (name: string | undefined): string | undefined => {
-  const resolved = name ? resolveIcon(name) : null;
-  return resolved
-    ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="${resolved.viewBox}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${resolved.body}</svg>`
-    : undefined;
-};
-
-// Pages shown in the empty state, before the user has typed anything. Only
-// curated entries carry an icon; sidebar-derived rows keep the file glyph.
+// HTML rather than a name it can't resolve. Built-in names, image paths/URLs,
+// and inline SVG all work — same shapes as nav `Icon`. Unknown names fall
+// through to the island's own file glyph.
 const popular =
   popularPages && popularPages.length > 0
     ? popularPages.map((page) => ({
-        icon: iconSvg(page.icon),
+        icon: resolvePopularIconMarkup(page.icon, withBase),
         label: page.label,
         route: page.route,
       }))
@@ -626,8 +619,8 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         const href = prefixBase(import.meta.env.BASE_URL, url);
         el.href = href;
         el.className = ROW_CLASS;
-        // `icon` is server-resolved markup from the bundled icon set, not
-        // author HTML — the label still goes through `escapeHtml`.
+        // `icon` is server-resolved markup (built-in Lucide, `<img>`, or
+        // config-authored inline SVG) — the label still goes through `escapeHtml`.
         el.innerHTML = `
           <span class="mt-0.5 shrink-0 text-muted-foreground">${icon ?? svg("file")}</span>
           <span class="flex-1">
