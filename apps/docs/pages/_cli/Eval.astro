@@ -1,0 +1,77 @@
+---
+// The `blume eval` spotlight, structured like the audit section: a terminal
+// showing the real per-question report format, then three divided columns —
+// the fresh-eyes sandbox, the graded gate, and the agent fix loop.
+import { glyph, icons, inlineCode } from "../_home/shared.ts";
+import FeatureTerminal from "./FeatureTerminal.astro";
+
+const cards = [
+  {
+    body: "The reader answers in an empty directory with its file, shell, and web tools disabled — it sees your docs through the same MCP search a real agent would. What isn't written doesn't exist, even when the model happens to know it.",
+    icon: icons.chat,
+    title: "Fresh eyes, enforced",
+  },
+  {
+    body: "Every question lists the facts a correct answer must state. A judge grades each answer against them — paraphrase passes, contradiction fails, and so does “the documentation doesn't say.” `--threshold` relaxes the gate while you dig out of a backlog.",
+    icon: glyph("scale"),
+    title: "Graded against your facts",
+  },
+  {
+    body: "Each failure is anchored to the page that should answer it. Run `--fix` to hand the report to Claude Code or Codex, which adds the missing facts in the page's own voice and reruns the eval until everything passes.",
+    icon: icons.ai,
+    title: "Fix with your agent",
+  },
+];
+---
+
+<section>
+  <div class="mx-auto max-w-2xl text-center">
+    <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
+      Docs that prove they can answer.
+    </h2>
+    <p class="mx-auto mt-4 max-w-xl text-balance text-muted-foreground">
+      <code class="font-mono text-[0.925em] text-foreground">blume eval</code> gives
+      your docs a test suite — an AI agent answers your users' real questions using
+      only the documentation, a judge grades every answer, and CI fails when the
+      docs can't answer.
+    </p>
+  </div>
+
+  <div
+    class="mx-auto mt-10 max-w-6xl overflow-hidden rounded-blume border border-zinc-800 shadow-2xl shadow-foreground/10"
+  >
+    <FeatureTerminal kind="eval" />
+  </div>
+
+  <div
+    class="mx-auto mt-12 grid max-w-6xl divide-y divide-border lg:grid-cols-3 lg:divide-x lg:divide-y-0"
+  >
+    {
+      cards.map((card) => (
+        <div class="py-8 first:pt-0 last:pb-0 lg:px-8 lg:py-0 lg:first:pl-0 lg:last:pr-0">
+          <span class="inline-flex size-10 items-center justify-center rounded-blume bg-muted text-accent">
+            <svg
+              class="size-5"
+              fill="none"
+              height="20"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="20"
+              set:html={card.icon}
+            />
+          </span>
+          <h3 class="mt-5 font-medium text-foreground text-lg tracking-tight">
+            {card.title}
+          </h3>
+          <p
+            class="mt-3 text-muted-foreground text-sm leading-relaxed"
+            set:html={inlineCode(card.body)}
+          />
+        </div>
+      ))
+    }
+  </div>
+</section>

@@ -24,6 +24,14 @@ const commands = [
     name: "blume audit",
     text: "Audit the built site for SEO and health issues.",
   },
+  {
+    name: "blume eval",
+    text: "Test the docs: an agent answers your questions using only the documentation.",
+  },
+  {
+    name: "blume translate",
+    text: "Translate docs into the configured locales with a local agent CLI.",
+  },
 ];
 ---
 
@@ -33,8 +41,8 @@ const commands = [
       Every command.
     </h2>
     <p class="mx-auto mt-4 max-w-lg text-balance text-muted-foreground">
-      Eleven commands cover the whole life of a docs site. Every flag is
-      documented in the CLI reference.
+      {commands.length} commands cover the whole life of a docs site. Every flag
+      is documented in the CLI reference.
     </p>
   </div>
 

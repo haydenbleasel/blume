@@ -1,0 +1,79 @@
+---
+// The `blume translate` spotlight, structured like the audit section: a
+// terminal telling the ledger story (drift caught by `--check`, exactly the
+// drifted pages retranslated), then three divided columns — the incremental
+// ledger, structural validation, and the CI gate.
+import { glyph, icons, inlineCode } from "../_home/shared.ts";
+import FeatureTerminal from "./FeatureTerminal.astro";
+
+const cards = [
+  {
+    body: "A committed ledger stamps every translation with the source revision it came from. Edit one page and a rerun retranslates one page per locale — and translations you wrote by hand are adopted as-is, never overwritten.",
+    icon: icons.changelog,
+    title: "Only what drifted",
+  },
+  {
+    body: "The agent only translates text. Blume rebuilds each file's frontmatter from the source, keeps code blocks and fence counts intact, and writes every file itself — a reply that fails validation writes nothing at all.",
+    icon: icons.fileCode,
+    title: "Structure survives",
+  },
+  {
+    body: "`blume translate --check` is a read-only gate: it exits non-zero the moment a source page outruns its translations, so a stale locale surfaces in the pull request instead of in production.",
+    icon: glyph("shield-check"),
+    title: "Drift fails CI",
+  },
+];
+---
+
+<section>
+  <div class="mx-auto max-w-2xl text-center">
+    <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
+      Docs in every language.
+    </h2>
+    <p class="mx-auto mt-4 max-w-xl text-balance text-muted-foreground">
+      <code class="font-mono text-[0.925em] text-foreground">blume translate</code>
+      finds every page that's missing or outdated in each configured locale and
+      translates it with the agent CLI you already have — headlessly, validated,
+      and tracked in a ledger you commit. Blume holds no API keys and calls no
+      model itself.
+    </p>
+  </div>
+
+  <div
+    class="mx-auto mt-10 max-w-6xl overflow-hidden rounded-blume border border-zinc-800 shadow-2xl shadow-foreground/10"
+  >
+    <FeatureTerminal kind="translate" />
+  </div>
+
+  <div
+    class="mx-auto mt-12 grid max-w-6xl divide-y divide-border lg:grid-cols-3 lg:divide-x lg:divide-y-0"
+  >
+    {
+      cards.map((card) => (
+        <div class="py-8 first:pt-0 last:pb-0 lg:px-8 lg:py-0 lg:first:pl-0 lg:last:pr-0">
+          <span class="inline-flex size-10 items-center justify-center rounded-blume bg-muted text-accent">
+            <svg
+              class="size-5"
+              fill="none"
+              height="20"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="20"
+              set:html={card.icon}
+            />
+          </span>
+          <h3 class="mt-5 font-medium text-foreground text-lg tracking-tight">
+            {card.title}
+          </h3>
+          <p
+            class="mt-3 text-muted-foreground text-sm leading-relaxed"
+            set:html={inlineCode(card.body)}
+          />
+        </div>
+      ))
+    }
+  </div>
+</section>

@@ -187,6 +187,93 @@ const terminals: Record<
       out("  npm run dev"),
     ],
   },
+  // A real eval session: the per-question report lines (pass/fail/skip), the
+  // fix pointer anchoring the failure to a source page, and the totals.
+  eval: {
+    lines: [
+      cmd("blume eval"),
+      blank,
+      [
+        { c: "bold", t: "  blume eval  " },
+        { c: "dim", t: "3 question(s) · Claude Code" },
+      ],
+      blank,
+      [
+        { c: "ok", t: "  ✔ " },
+        { c: "out", t: "install-node-version    " },
+        { c: "ok", t: "pass" },
+        { c: "dim", t: "  1.00  14.2s  $0.14" },
+      ],
+      [
+        { c: "err", t: "  ✖ " },
+        { c: "out", t: "deploy-vercel           " },
+        { c: "err", t: "fail" },
+        { c: "dim", t: "  0.40  38.9s  $0.31" },
+      ],
+      [{ c: "dim", t: "        missing: the adapter is auto-detected" }],
+      [
+        { c: "dim", t: "  ⊘ " },
+        { c: "out", t: "search-providers        " },
+        { c: "dim", t: "skipped" },
+      ],
+      blank,
+      [
+        { c: "fix", t: "  fix: " },
+        { c: "out", t: "content/docs/deployment.mdx " },
+        {
+          c: "dim",
+          t: 'Docs could not answer: "How do I deploy to Vercel?"',
+        },
+      ],
+      blank,
+      [{ c: "out", t: "  2 passed · 1 failed · 1 skipped · 1m 42s · $0.45" }],
+    ],
+  },
+  // The ledger story in one session: an edited page fails `--check`, the
+  // translate run retranslates exactly that page per locale, nothing else.
+  translate: {
+    lines: [
+      cmd("blume translate --check"),
+      blank,
+      [
+        { c: "err", t: "  ✖ " },
+        { c: "out", t: "content/docs/quickstart.mdx → fr " },
+        { c: "dim", t: "stale" },
+      ],
+      [
+        { c: "err", t: "  ✖ " },
+        { c: "out", t: "content/docs/quickstart.mdx → ja " },
+        { c: "dim", t: "stale" },
+      ],
+      blank,
+      [{ c: "out", t: "  2 stale · 130 up to date" }],
+      blank,
+      cmd("blume translate --claude"),
+      blank,
+      [
+        { c: "bold", t: "  blume translate  " },
+        { c: "dim", t: "2 item(s) · 2 locale(s) · Claude Code" },
+      ],
+      blank,
+      [
+        { c: "ok", t: "  ✔ " },
+        { c: "out", t: "content/docs/quickstart.mdx → fr " },
+        { c: "dim", t: "24.2s $0.09" },
+      ],
+      [
+        { c: "ok", t: "  ✔ " },
+        { c: "out", t: "content/docs/quickstart.mdx → ja " },
+        { c: "dim", t: "26.8s $0.08" },
+      ],
+      blank,
+      [
+        {
+          c: "out",
+          t: "  Translated 2 files into 2 locales · 130 already up to date · 51.3s · $0.17",
+        },
+      ],
+    ],
+  },
   // The `--codex` handoff: the report header + summary, the handoff line, then
   // the Codex session it opens — the banner box, and the real `fixPrompt` text
   // echoed on Codex's prompt panel (via `prompt`, so it wraps naturally).

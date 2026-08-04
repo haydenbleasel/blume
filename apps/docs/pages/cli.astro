@@ -4,20 +4,23 @@ import data from "blume:data";
 import Audit from "./_cli/Audit.astro";
 import CommandIndex from "./_cli/CommandIndex.astro";
 import Commands from "./_cli/Commands.astro";
+import Eval from "./_cli/Eval.astro";
 import Hero from "./_cli/Hero.astro";
+import Translate from "./_cli/Translate.astro";
 import Footer from "./_home/Footer.astro";
 import InstallCta from "./_home/InstallCta.astro";
 import { installCopyScript } from "./_home/shared.ts";
 
 // The CLI landing page: the homepage's structure and styling with the story
 // retold around the command line — a hero, the sticky-terminal parallax scroll
-// (x.ai/cli-style), the `blume audit` spotlight, and the command index.
+// (x.ai/cli-style), the `blume audit`/`eval`/`translate` spotlights, and the
+// command index.
 // PageLayout supplies the document shell, header, theme, and fonts, and — with
 // siteUrl + ogEnabled — this page's canonical and generated OG card.
 const { config } = data;
 const pageTitle = `${config.title} CLI — everything your docs need, one command away`;
 const pageDescription =
-  "Every Blume project ships with a full command line — scaffolding, hot-reload dev server, production builds, link validation, and an SEO audit built in.";
+  "Every Blume project ships with a full command line — scaffolding, hot-reload dev server, production builds, link validation, SEO audits, docs evals, and agent-driven translation built in.";
 ---
 
 <PageLayout
@@ -43,6 +46,10 @@ const pageDescription =
     <Commands />
 
     <Audit />
+
+    <Eval />
+
+    <Translate />
 
     <CommandIndex />
 
