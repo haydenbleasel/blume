@@ -60,15 +60,18 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
   data-i18n-results={s.results}
   data-locale={locale || undefined}
 >
+  {/* The label and shortcut hint wait until `lg`: below it the hamburger and
+      inline tab bar share the header row, and a full-width search field would
+      press into the language switcher. */}
   <button
     aria-label={s.button}
-    class="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground sm:min-w-48"
+    class="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground lg:min-w-48"
     data-blume-search-open
     type="button"
   >
     <Icon name="search" size={16} />
-    <span class="flex-1 text-start max-sm:hidden">{s.button}</span>
-    <kbd class="font-mono text-[0.7rem] max-sm:hidden" data-blume-search-kbd
+    <span class="flex-1 text-start max-lg:hidden">{s.button}</span>
+    <kbd class="font-mono text-[0.7rem] max-lg:hidden" data-blume-search-kbd
       >⌘K</kbd
     >
   </button>

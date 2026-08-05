@@ -26,7 +26,8 @@ const menuRowClass =
         class={`${iconButton} list-none [&::-webkit-details-marker]:hidden`}
       >
         <Icon name="globe" size={16} />
-        <span class="max-sm:hidden">{current?.label ?? label}</span>
+        {/* Collapses to the globe icon below `lg`, matching the search field. */}
+        <span class="max-lg:hidden">{current?.label ?? label}</span>
         <Icon
           class="transition-transform group-open:rotate-180"
           name="chevron-down"

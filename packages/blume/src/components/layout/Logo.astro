@@ -36,7 +36,7 @@ const brandText = logo?.text ?? site.title;
     logoSvg && (
       <span
         aria-hidden="true"
-        class="inline-flex h-5 items-center [&>svg]:h-5 [&>svg]:w-auto"
+        class="inline-flex h-5 shrink-0 items-center [&>svg]:h-5 [&>svg]:w-auto"
         set:html={logoSvg}
       />
     )
@@ -47,7 +47,7 @@ const brandText = logo?.text ?? site.title;
       (logoLight === logoDark ? (
         <img
           alt={logoAlt}
-          class="h-5 w-auto"
+          class="h-5 w-auto shrink-0"
           height={logoLightDimensions?.height}
           src={withBase(logoLight)}
           width={logoLightDimensions?.width}
@@ -56,14 +56,14 @@ const brandText = logo?.text ?? site.title;
         <>
           <img
             alt={logoAlt}
-            class="h-5 w-auto dark:hidden"
+            class="h-5 w-auto shrink-0 dark:hidden"
             height={logoLightDimensions?.height}
             src={withBase(logoLight)}
             width={logoLightDimensions?.width}
           />
           <img
             alt={logoAlt}
-            class="hidden h-5 w-auto dark:block"
+            class="hidden h-5 w-auto shrink-0 dark:block"
             height={logoDarkDimensions?.height}
             src={withBase(logoDark)}
             width={logoDarkDimensions?.width}
