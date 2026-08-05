@@ -1,0 +1,52 @@
+---
+// "A command line for the whole lifecycle." — a teaser for the /cli landing
+// page: the CLI page's terminal window (via <FeatureTerminal>, `home` kind)
+// sampling the later-lifecycle commands, with a link through to the full CLI
+// story.
+import FeatureTerminal from "../_cli/FeatureTerminal.astro";
+import { glyph } from "./shared.ts";
+
+const cliHref = "/cli";
+const chevronRight = glyph("chevron-right");
+---
+
+<!-- CLI teaser: the /cli page's terminal + link through to the landing page. -->
+<section class="mx-auto w-full max-w-5xl">
+  <div class="mx-auto max-w-2xl text-center">
+    <h2 class="text-balance font-medium text-3xl tracking-tight sm:text-4xl">
+      A command line for the whole lifecycle.
+    </h2>
+    <p class="mt-4 text-balance text-muted-foreground">
+      Every Blume project ships with a full CLI — scaffold, preview, and build,
+      then validate links, audit SEO, eval your docs with an agent, and
+      translate every locale. No separate install.
+    </p>
+  </div>
+
+  <div
+    class="mx-auto mt-12 max-w-3xl overflow-hidden rounded-blume border border-zinc-800 shadow-2xl shadow-foreground/10"
+  >
+    <FeatureTerminal kind="home" />
+  </div>
+
+  <div class="mt-12 text-center">
+    <a
+      class="inline-flex items-center gap-1.5 rounded-blume border border-border px-5 py-3 font-medium text-foreground text-sm transition-colors hover:bg-muted"
+      href={cliHref}
+    >
+      Explore the CLI
+      <svg
+        class="size-4"
+        fill="none"
+        height="16"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="16"
+        set:html={chevronRight}
+      />
+    </a>
+  </div>
+</section>

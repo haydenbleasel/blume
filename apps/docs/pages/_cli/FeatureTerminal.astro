@@ -77,6 +77,23 @@ const terminals: Record<
       ok("No issues found."),
     ],
   },
+  // The homepage CLI teaser (in _home/Cli.astro): the later-lifecycle
+  // commands with their one-line success summaries.
+  home: {
+    lines: [
+      cmd("blume validate"),
+      ok("128 link(s) checked — no broken links"),
+      blank,
+      cmd("blume audit"),
+      ok("No issues found."),
+      blank,
+      cmd("blume eval"),
+      ok("12 passed · 0 failed · 0 skipped"),
+      blank,
+      cmd("blume translate --check"),
+      ok("132 translation(s) up to date"),
+    ],
+  },
   init: {
     lines: [
       cmd("npx blume init"),
