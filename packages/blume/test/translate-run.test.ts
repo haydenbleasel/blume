@@ -223,6 +223,35 @@ describe("runTranslate pages", () => {
     expect(events.filter((e) => e.kind === "item-end")).toHaveLength(4);
   });
 
+  it("sends the existing translation for a stale item, none for a missing one", async () => {
+    const root = await scratch();
+    const stale: PageWorkItem = {
+      ...(await pageItem(root, "stale")),
+      status: "stale",
+    };
+    await mkdir(dirname(stale.targetPath), { recursive: true });
+    await writeFile(stale.targetPath, TRANSLATED);
+    const fresh = await pageItem(root, "fresh");
+    const { calls, run } = claudeRunner([
+      { result: TRANSLATED },
+      { result: TRANSLATED },
+    ]);
+
+    const result = await runTranslate({
+      agent: "claude",
+      concurrency: 1,
+      ledger: emptyLedger(),
+      project: project(root),
+      run,
+      workList: workListOf([stale, fresh]),
+    });
+
+    expect(result.counts.translated).toBe(2);
+    expect(calls[0]?.options.prompt).toContain("previous translation");
+    expect(calls[0]?.options.prompt).toContain("Bienvenue.");
+    expect(calls[1]?.options.prompt).not.toContain("previous translation");
+  });
+
   it("continues after a validation failure without writing or stamping", async () => {
     const root = await scratch();
     const items = [await pageItem(root, "bad"), await pageItem(root, "good")];

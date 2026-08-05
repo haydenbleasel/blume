@@ -28,7 +28,7 @@ Cada escrita validada é registada em `blume.translations.json` na raiz do proje
 
 O livro de registo é gravado após cada ficheiro concluído, por isso interromper uma execução longa (Ctrl+C) perde, no máximo, as traduções que estavam em curso — a execução seguinte retoma de onde parou. Por omissão, os ficheiros são processados 4 de cada vez; aumente esse valor com `--concurrency` se a sua máquina e os limites de taxa do agente o permitirem.
 
-As novas execuções são incrementais: uma origem que não mudou desde a última tradução é ignorada, pelo que executar `blume translate` depois de editar uma página traduz uma página por locale.
+As novas execuções são incrementais: uma origem que não mudou desde a última tradução é ignorada, pelo que executar `blume translate` depois de editar uma página traduz uma página por locale. Quando uma página desatualizada é retraduzida, o agente vê a tradução existente e é instruído a manter o seu registo, dialeto e terminologia — uma edição de um parágrafo na origem produz um diff de tradução de um parágrafo, não uma reescrita de raiz.
 
 ## O que é traduzido
 

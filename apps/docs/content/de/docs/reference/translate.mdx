@@ -28,7 +28,7 @@ Jeder validierte Schreibvorgang wird in `blume.translations.json` im Projektstam
 
 Das Ledger wird nach jeder fertiggestellten Datei geschrieben, sodass beim Abbrechen eines langen Laufs (Strg+C) höchstens die gerade laufenden Übersetzungen verloren gehen – der nächste Lauf macht dort weiter, wo Sie aufgehört haben. Standardmäßig laufen 4 Dateien gleichzeitig; erhöhen Sie den Wert mit `--concurrency`, wenn Ihre Maschine und die Rate Limits des Agenten es zulassen.
 
-Erneute Läufe sind inkrementell: Eine Quelle, die sich seit ihrer letzten Übersetzung nicht geändert hat, wird übersprungen – wenn Sie also `blume translate` nach der Bearbeitung einer Seite ausführen, wird eine Seite pro Locale übersetzt.
+Erneute Läufe sind inkrementell: Eine Quelle, die sich seit ihrer letzten Übersetzung nicht geändert hat, wird übersprungen – wenn Sie also `blume translate` nach der Bearbeitung einer Seite ausführen, wird eine Seite pro Locale übersetzt. Wird eine veraltete Seite erneut übersetzt, bekommt der Agent die vorhandene Übersetzung gezeigt und wird angewiesen, deren Register, Dialekt und Terminologie zu übernehmen – eine Quelländerung von einem Absatz erzeugt einen Übersetzungs-Diff von einem Absatz, keine komplette Neuübersetzung.
 
 ## Was übersetzt wird
 

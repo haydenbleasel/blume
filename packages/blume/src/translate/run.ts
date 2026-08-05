@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -153,9 +154,15 @@ const runPageItem = async (
 
   const sourceText = await readFile(item.sourcePath, "utf-8");
   const target = context.targets.get(item.locale) as LocaleConfig;
+  // A hand-authored translation can live at a non-canonical name (see
+  // WorkStatus); the disk probe finds only canonical targets, and a miss just
+  // means the prompt goes out without a style precedent.
+  const previousTranslation = existsSync(item.targetPath)
+    ? await readFile(item.targetPath, "utf-8")
+    : undefined;
   const output = await invokeAgent(
     context,
-    pagePrompt(sourceText, target, context.source),
+    pagePrompt(sourceText, target, context.source, previousTranslation),
     index
   );
   if (output.isError) {

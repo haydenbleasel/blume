@@ -250,6 +250,18 @@ describe("prompts", () => {
     expect(prompt).toContain("sidebar.label");
     expect(prompt).toContain("seo.description");
     expect(prompt).toContain("Do not wrap it in a code fence");
+    expect(prompt).not.toContain("previous translation");
+    expect(prompt.endsWith(SOURCE)).toBe(true);
+  });
+
+  it("pagePrompt carries a previous translation and the style-match rule", () => {
+    const previous = "---\ntitle: Accueil\n---\n# Accueil\n\nBienvenue.\n";
+    const prompt = pagePrompt(SOURCE, FR, EN, previous);
+    expect(prompt).toContain("The previous translation begins after this line");
+    expect(prompt).toContain("Bienvenue.");
+    expect(prompt).toContain("register, formality, dialect, and terminology");
+    expect(prompt).toContain("word-for-word identical");
+    // The source stays last so the "begins after this line" markers hold.
     expect(prompt.endsWith(SOURCE)).toBe(true);
   });
 

@@ -27,7 +27,7 @@ Every validated write is recorded in `blume.translations.json` at the project ro
 
 The ledger is flushed after every finished file, so stopping a long run (Ctrl+C) loses at most the translations that were in flight — the next run picks up where you left off. Files run 4 at a time by default; raise it with `--concurrency` if your machine and the agent's rate limits allow.
 
-Reruns are incremental: a source that hasn't changed since its last translation is skipped, so running `blume translate` after editing one page translates one page per locale.
+Reruns are incremental: a source that hasn't changed since its last translation is skipped, so running `blume translate` after editing one page translates one page per locale. When a stale page is retranslated, the agent is shown the existing translation and told to match its register, dialect, and terminology — a one-paragraph source edit produces a one-paragraph translation diff, not a from-scratch rewrite.
 
 ## What gets translated
 

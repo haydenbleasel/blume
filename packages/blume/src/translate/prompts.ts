@@ -25,12 +25,17 @@ const KEY_LIST = TRANSLATABLE_KEY_PATHS.map((path) => path.join(".")).join(
 
 /**
  * The page-translation prompt. Delivered over stdin (no argv limits), so the
- * full source file rides along inline.
+ * full source file rides along inline. When the page was translated before,
+ * the previous translation rides along too: without it, every retranslation
+ * is a from-scratch rewrite in which the agent re-decides register, dialect,
+ * and terminology (du vs Sie, pt-BR vs pt-PT) and churns the whole page for
+ * a one-paragraph source edit.
  */
 export const pagePrompt = (
   sourceText: string,
   target: LocaleConfig,
-  source: LocaleConfig
+  source: LocaleConfig,
+  previousTranslation?: string
 ): string => `Translate the following documentation page from ${localeName(
   source
 )} into ${localeName(target)}.
@@ -39,9 +44,20 @@ Rules:
 - Translate the prose: headings, paragraphs, list items, table cells, admonitions, and image alt text.
 - In the YAML frontmatter, translate ONLY the values of these keys: ${KEY_LIST}. Copy every other frontmatter key and value exactly as written.
 - Never translate or alter: code blocks, inline code, import/export statements, JSX/MDX component names and their attributes, URLs, link targets, HTML tags, or frontmatter keys.
-- Preserve the document structure exactly: the same headings, the same lists and tables, and the same number of code fences.
+- Preserve the document structure exactly: the same headings, the same lists and tables, and the same number of code fences.${
+  previousTranslation === undefined
+    ? ""
+    : `
+- A translation of an earlier revision of this page is included below. Match its register, formality, dialect, and terminology exactly; re-translate only what the changed source requires and keep everything else word-for-word identical.`
+}
 - Output ONLY the complete translated file. Do not wrap it in a code fence. Do not add commentary before or after it.
-
+${
+  previousTranslation === undefined
+    ? ""
+    : `
+The previous translation begins after this line and ends at the "page source" marker.
+${previousTranslation}`
+}
 The page source begins after this line.
 ${sourceText}`;
 
