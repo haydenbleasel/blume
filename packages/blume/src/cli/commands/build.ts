@@ -38,6 +38,7 @@ import type { ProjectContext } from "../../core/types.ts";
 import {
   ADAPTER_IGNORE_DIRS,
   deployStaticDir,
+  readsHeaderFiles,
   servesClientSubdir,
   surfaceAdapterOutput,
 } from "../../deploy/adapter-output.ts";
@@ -128,15 +129,34 @@ const emitRedirectFiles = async (
 };
 
 /**
- * Emit a `_headers` file for a static build so Netlify / Cloudflare static
- * hosts serve the raw AI-ready endpoints (`*.md`, `*.mdx`, `*.txt`) with an
- * explicit `charset=utf-8`. Without it those hosts send `text/markdown` /
- * `text/plain` with no charset and browsers fall back to Windows-1252, garbling
- * any non-ASCII docs (#82). The same file also stamps the homepage
- * agent-discovery `Link` header (RFC 8288, see `ai/link-headers.ts`). A
- * `_headers` shipped in `public/` (copied into dist by Astro before this runs)
- * wins, exactly like `_redirects`. Server adapters set the Content-Type on the
- * Response directly, so this is static-only.
+ * Emit a `_headers` file so Netlify / Cloudflare serve the raw AI-ready
+ * endpoints (`*.md`, `*.mdx`, `*.txt`) with an explicit `charset=utf-8`. Without
+ * it those hosts send `text/markdown` / `text/plain` with no charset and
+ * browsers fall back to Windows-1252, garbling any non-ASCII docs (#82).
+ *
+ * The same file carries the rest of the agent-discovery surface that only a
+ * response header can express: the homepage `Link` header (RFC 8288, see
+ * `ai/link-headers.ts`), and the registered media types for the extensionless
+ * well-known files — `application/linkset+json` for the API catalog, the
+ * signatures directory, and the Agent Skills archives. A static host serves
+ * those as `octet-stream` or nothing at all without a rule.
+ *
+ * A `_headers` shipped in `public/` wins, exactly like `_redirects` — the opt-out
+ * is checked at its source rather than in `dist`, because on Cloudflare the file
+ * in `dist` is not necessarily the user's: `@astrojs/cloudflare` writes its own
+ * `_headers` (an immutable `Cache-Control` rule for `/_astro/*`) during the
+ * build, before this runs. Testing `dist` therefore read an adapter-generated
+ * file as a user opt-out and skipped silently. When both exist, the adapter's
+ * rules are preserved and ours are appended.
+ *
+ * Gated on {@link readsHeaderFiles}, not on `output === "static"`. A **Cloudflare
+ * server** build serves `dist/client` through the Worker's ASSETS binding, and
+ * Workers static assets honour `_headers` from that directory — so the file
+ * applies there too, and skipping it left every Cloudflare server build with no
+ * `Link` header and no media type on its own discovery files. The charset half
+ * of this file *is* redundant on a server build, because the runtime endpoint
+ * sets Content-Type on the Response itself; the `Link` and well-known halves are
+ * not, and one conclusion about the first was applied to all three.
  */
 const emitHeaderFiles = async (
   project: BlumeProject,
@@ -144,17 +164,23 @@ const emitHeaderFiles = async (
 ): Promise<void> => {
   const { config } = project;
   if (
-    config.deployment.output !== "static" ||
-    existsSync(join(distDir, "_headers"))
+    !readsHeaderFiles(config.deployment) ||
+    existsSync(join(project.context.root, "public", "_headers"))
   ) {
     return;
   }
+  const ours = buildNetlifyHeaders(
+    config,
+    buildHomeLinkHeader(config, markdownRoutePaths(project))
+  );
+  // An adapter may have written its own rules here already (Cloudflare adds an
+  // immutable Cache-Control for /_astro/*). Keep them and append ours: both
+  // sets are wanted, and `_headers` has no merge semantics beyond order.
+  const target = join(distDir, "_headers");
+  const existing = existsSync(target) ? await readFile(target, "utf-8") : "";
   await writeFile(
-    join(distDir, "_headers"),
-    buildNetlifyHeaders(
-      config,
-      buildHomeLinkHeader(config, markdownRoutePaths(project))
-    ),
+    target,
+    existing ? `${existing.trimEnd()}\n${ours}` : ours,
     "utf-8"
   );
   logger.success(

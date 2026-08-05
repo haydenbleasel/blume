@@ -18,6 +18,7 @@ import type { ProjectContext } from "../src/core/types.ts";
 import {
   ADAPTER_OUTPUT_PATHS,
   deployStaticDir,
+  readsHeaderFiles,
   surfaceAdapterOutput,
 } from "../src/deploy/adapter-output.ts";
 
@@ -258,5 +259,43 @@ describe("surfaceAdapterOutput", () => {
         context(root)
       )
     ).toEqual({ moved: false });
+  });
+});
+
+describe("readsHeaderFiles", () => {
+  it("is true for every static build", () => {
+    for (const adapter of ["netlify", "cloudflare", "vercel", "node"]) {
+      expect(
+        readsHeaderFiles(config({ adapter, output: "static" }).deployment)
+      ).toBe(true);
+    }
+  });
+
+  /**
+   * The regression this fixes. A Cloudflare server build serves `dist/client`
+   * through the Worker's ASSETS binding, which honours `_headers` — so skipping
+   * the file left the homepage with no agent-discovery `Link` header and the
+   * well-known files with no registered media type.
+   */
+  it("is true for a Cloudflare server build", () => {
+    expect(
+      readsHeaderFiles(
+        config({ adapter: "cloudflare", output: "server" }).deployment
+      )
+    ).toBe(true);
+  });
+
+  it("is false for a Node server build, whose static handler ignores the file", () => {
+    expect(
+      readsHeaderFiles(config({ adapter: "node", output: "server" }).deployment)
+    ).toBe(false);
+  });
+
+  it("is false for a Vercel server build, which uses the routing config", () => {
+    expect(
+      readsHeaderFiles(
+        config({ adapter: "vercel", output: "server" }).deployment
+      )
+    ).toBe(false);
   });
 });
