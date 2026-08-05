@@ -21,7 +21,7 @@ const slugify = (value: string): string =>
 const tabId = id ?? slugify(title);
 ---
 
-<!--
+{/*
   Drop the inset only when the panel is *nothing but* code fences: a fence owns
   its own frame, so a code-only panel would double-inset it. A panel holding a
   fence AND prose is real prose content and keeps the inset, matching every
@@ -39,7 +39,7 @@ const tabId = id ?? slugify(title);
   double inset. `:only-of-type` survives the single-fence case but breaks a
   code-only panel holding two fences. Excluding `template` handles both. Do
   not "simplify" this to those.
--->
+*/}
 <div
   class:list={[
     "px-4 py-3 [&:has(>pre):not(:has(>:not(pre,template)))]:p-0 [&>:first-child]:mt-0! [&>:last-child]:mb-0!",
