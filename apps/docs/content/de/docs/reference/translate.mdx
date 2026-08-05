@@ -1,7 +1,7 @@
 ---
 title: Übersetzen
 description: >-
-  blume translate füllt Ihre Locales mit einem KI-Agenten – es findet die Seiten, die in jeder Sprache fehlen oder veraltet sind, übersetzt sie mit der Agent-CLI, die Sie bereits haben, und gibt CI eine Schranke, die fehlschlägt, wenn Übersetzungen abdriften.
+  blume translate füllt deine Locales mit einem KI-Agenten – es findet die Seiten, die in jeder Sprache fehlen oder veraltet sind, übersetzt sie mit der Agent-CLI, die du bereits hast, und gibt CI eine Schranke, die fehlschlägt, wenn Übersetzungen abdriften.
 ---
 
 Sobald [i18n](/docs/content/i18n) aktiviert ist, veraltet jede Änderung an einer Quellseite stillschweigend deren Übersetzungen. `blume translate` schließt diesen Kreis: Es berechnet exakt, welche Seiten in jeder Locale fehlen oder veraltet sind, übersetzt sie headless mit einer lokalen Agent-CLI und hält in einem eingecheckten Ledger fest, was es getan hat, damit der nächste Lauf – und CI – weiß, was aktuell ist.
@@ -24,18 +24,20 @@ blume translate  3 item(s) · 2 locale(s) · Claude Code
 
 Blume besitzt die Pipeline; der Agent übersetzt nur Text. Für jede Datei, die Arbeit erfordert, baut Blume einen Übersetzungs-Prompt, führt die Agent-CLI headless mit deaktivierten Datei-, Shell- und Web-Tools aus, validiert die Struktur der Antwort und schreibt die Zieldatei selbst – [Claude Code](https://claude.com/claude-code) mit `--claude` oder [Codex](https://developers.openai.com/codex/cli) mit `--codex`. Blume hält keine API-Schlüssel und ruft selbst kein Modell auf.
 
-Jeder validierte Schreibvorgang wird in `blume.translations.json` im Projektstammverzeichnis festgehalten: für jede Quelldatei und Locale ein Hash der Quelle zum Zeitpunkt der Übersetzung. **Committen Sie diese Datei.** So erkennt ein erneuter Lauf den Unterschied zwischen „bereits übersetzt" und „übersetzt, aber die Quelle hat sich seitdem geändert" – und genau das macht die CI-Schranke möglich.
+Jeder validierte Schreibvorgang wird in `blume.translations.json` im Projektstammverzeichnis festgehalten: für jede Quelldatei und Locale ein Hash der Quelle zum Zeitpunkt der Übersetzung. **Committe diese Datei.** So erkennt ein erneuter Lauf den Unterschied zwischen „bereits übersetzt" und „übersetzt, aber die Quelle hat sich seitdem geändert" – und genau das macht die CI-Schranke möglich.
 
-Das Ledger wird nach jeder fertiggestellten Datei geschrieben, sodass beim Abbrechen eines langen Laufs (Strg+C) höchstens die gerade laufenden Übersetzungen verloren gehen – der nächste Lauf macht dort weiter, wo Sie aufgehört haben. Standardmäßig laufen 4 Dateien gleichzeitig; erhöhen Sie den Wert mit `--concurrency`, wenn Ihre Maschine und die Rate Limits des Agenten es zulassen.
+Das Ledger wird nach jeder fertiggestellten Datei geschrieben, sodass beim Abbrechen eines langen Laufs (Strg+C) höchstens die gerade laufenden Übersetzungen verloren gehen – der nächste Lauf macht dort weiter, wo du aufgehört hast. Standardmäßig laufen 4 Dateien gleichzeitig; erhöhe den Wert mit `--concurrency`, wenn deine Maschine und die Rate Limits des Agenten es zulassen.
 
-Erneute Läufe sind inkrementell: Eine Quelle, die sich seit ihrer letzten Übersetzung nicht geändert hat, wird übersprungen – wenn Sie also `blume translate` nach der Bearbeitung einer Seite ausführen, wird eine Seite pro Locale übersetzt. Wird eine veraltete Seite erneut übersetzt, bekommt der Agent die vorhandene Übersetzung gezeigt und wird angewiesen, deren Register, Dialekt und Terminologie zu übernehmen – eine Quelländerung von einem Absatz erzeugt einen Übersetzungs-Diff von einem Absatz, keine komplette Neuübersetzung.
+Erneute Läufe sind inkrementell: Eine Quelle, die sich seit ihrer letzten Übersetzung nicht geändert hat, wird übersprungen – wenn du also `blume translate` nach der Bearbeitung einer Seite ausführst, wird eine Seite pro Locale übersetzt. Wird eine veraltete Seite erneut übersetzt, bekommt der Agent die vorhandene Übersetzung gezeigt und wird angewiesen, deren Register, Dialekt und Terminologie zu übernehmen – eine Quelländerung von einem Absatz erzeugt einen Übersetzungs-Diff von einem Absatz, keine komplette Neuübersetzung.
+
+Eine Erstübersetzung hat keinen Präzedenzfall, an dem sie sich orientieren könnte – lege die Wahl deshalb vorab mit [`style` auf der Locale](/docs/content/i18n) fest (`{ code: "pt", label: "Português", style: "Brazilian Portuguese, informal você" }`). Die Vorgabe wandert in jeden Übersetzungs-Prompt mit, und wo eine vorhandene Übersetzung ihr widerspricht, gewinnt `style` – eine Neuübersetzung schiebt ältere Seiten also ebenfalls in Richtung des konfigurierten Stils.
 
 ## Was übersetzt wird
 
-- **Seiten** – `.md`/`.mdx`-Dateien in der Standard-Locale. Der Agent übersetzt die Prosa und nur die für Menschen sichtbaren Frontmatter-Werte (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Die Ziele richten sich nach Ihrem Parser: `fr/guides/install.mdx` bei `dir`, `guides/install.fr.mdx` bei `dot`.
+- **Seiten** – `.md`/`.mdx`-Dateien in der Standard-Locale. Der Agent übersetzt die Prosa und nur die für Menschen sichtbaren Frontmatter-Werte (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Die Ziele richten sich nach deinem Parser: `fr/guides/install.mdx` bei `dir`, `guides/install.fr.mdx` bei `dot`.
 - **Navigationstitel von Ordnern** – beim `dir`-Parser werden die benötigten [`meta.ts`](/docs/content/meta)-Titel jeder Locale in einem gebündelten Aufruf übersetzt, und die generierte `meta.ts` pro Locale übernimmt jeden anderen Schlüssel (`order`, `pages`, `icon`, `collapsed`) wortwörtlich, damit die Sidebar der Locale ihre Reihenfolge behält.
 
-Übersetzungen, die Sie von Hand geschrieben haben, werden **übernommen, niemals überschrieben**: Eine Übersetzung, die existiert, aber keinen Ledger-Eintrag hat, wird als aktuell gestempelt und unangetastet gelassen. Nur `--force` übersetzt sie erneut.
+Übersetzungen, die du von Hand geschrieben hast, werden **übernommen, niemals überschrieben**: Eine Übersetzung, die existiert, aber keinen Ledger-Eintrag hat, wird als aktuell gestempelt und unangetastet gelassen. Nur `--force` übersetzt sie erneut.
 
 ## Validierung
 
@@ -63,10 +65,10 @@ Der JSON-Bericht trägt dieselbe `diagnostics`- + `summary`-Struktur wie `blume 
 
 ## Einschränkungen
 
-- Die Übersetzung von Meta-Titeln gibt es nur beim `dir`-Parser – der `dot`-Parser hat keinen Mechanismus für `meta.ts` pro Locale. Eine `meta.ts`, die per Default eine Funktion exportiert, wird mit einer Warnung übersprungen; verfassen Sie die Kopie für diese Locale von Hand.
+- Die Übersetzung von Meta-Titeln gibt es nur beim `dir`-Parser – der `dot`-Parser hat keinen Mechanismus für `meta.ts` pro Locale. Eine `meta.ts`, die per Default eine Funktion exportiert, wird mit einer Warnung übersprungen; verfasse die Kopie für diese Locale von Hand.
 - Remote- und CMS-gestützte Quellen werden übersprungen: Es gibt keine lokale Datei, in die die Übersetzung geschrieben werden könnte.
-- Die Beschriftungen der Header-Tabs liegen in `blume.config.ts`, nicht im Content – lokalisieren Sie sie dort mit [Label-Maps pro Locale](/docs/content/navigation#tabs).
-- Die Übersetzungsqualität ist die des Agenten. Prüfen Sie die Ausgabe wie jeden anderen Beitrag – das Ledger garantiert nur Aktualität, nicht Sprachfluss.
+- Die Beschriftungen der Header-Tabs liegen in `blume.config.ts`, nicht im Content – lokalisiere sie dort mit [Label-Maps pro Locale](/docs/content/navigation#tabs).
+- Die Übersetzungsqualität ist die des Agenten. Prüfe die Ausgabe wie jeden anderen Beitrag – das Ledger garantiert nur Aktualität, nicht Sprachfluss.
 
 ## Flags
 

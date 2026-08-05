@@ -738,6 +738,12 @@ export interface LocaleConfigInput {
   dir?: "ltr" | "rtl";
   /** Human-readable name shown in the switcher. */
   label: string;
+  /**
+   * Freeform style guidance for `blume translate`, e.g. "Brazilian
+   * Portuguese, informal você". Pins register and dialect from the first
+   * translation and wins over an existing translation's style on reruns.
+   */
+  style?: string;
 }
 
 /**

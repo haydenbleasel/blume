@@ -876,6 +876,12 @@ const localeSchema = z.strictObject({
   /** Text direction; drives `<html dir>` and a future RTL pass. */
   dir: z.enum(["ltr", "rtl"]).default("ltr"),
   label: z.string(),
+  /**
+   * Freeform style guidance for `blume translate`, e.g. "Brazilian
+   * Portuguese, informal você". Pins register and dialect from the first
+   * translation and wins over an existing translation's style on reruns.
+   */
+  style: z.string().optional(),
 });
 
 /**

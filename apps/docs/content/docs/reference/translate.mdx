@@ -29,6 +29,8 @@ The ledger is flushed after every finished file, so stopping a long run (Ctrl+C)
 
 Reruns are incremental: a source that hasn't changed since its last translation is skipped, so running `blume translate` after editing one page translates one page per locale. When a stale page is retranslated, the agent is shown the existing translation and told to match its register, dialect, and terminology — a one-paragraph source edit produces a one-paragraph translation diff, not a from-scratch rewrite.
 
+A first translation has no precedent to match, so pin the choice up front with [`style` on the locale](/docs/content/i18n) (`{ code: "pt", label: "Português", style: "Brazilian Portuguese, informal você" }`). The guidance rides along in every translation prompt, and where an existing translation disagrees with it, `style` wins — so a retranslation also nudges older pages toward the configured style.
+
 ## What gets translated
 
 - **Pages** — `.md`/`.mdx` files in the default locale. The agent translates the prose and only the human-visible frontmatter values (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Targets follow your parser: `fr/guides/install.mdx` under `dir`, `guides/install.fr.mdx` under `dot`.

@@ -30,6 +30,8 @@ blume translate  3 item(s) · 2 locale(s) · Claude Code
 
 再実行はインクリメンタルです。前回の翻訳以降に変更されていないソースはスキップされるため、1 ページを編集したあとに `blume translate` を実行すると、ロケールごとに 1 ページだけが翻訳されます。古くなったページを再翻訳する際は、エージェントに既存の翻訳が提示され、その語調・方言・用語に合わせるよう指示されます。ソースの 1 段落の編集が生むのは 1 段落分の翻訳差分であり、ゼロからの書き直しではありません。
 
+初回の翻訳には合わせるべき前例がないため、[ロケールの `style`](/docs/content/i18n) で方針を最初に固定してください（`{ code: "pt", label: "Português", style: "Brazilian Portuguese, informal você" }`）。この指示はすべての翻訳プロンプトに同梱され、既存の翻訳と食い違う場合は `style` が優先されます。そのため、再翻訳は古いページも設定済みのスタイルへと近づけていきます。
+
 ## 翻訳される対象
 
 - **ページ** — デフォルトロケールの `.md`/`.mdx` ファイル。エージェントは本文と、人間が目にするフロントマターの値（`title`、`description`、`sidebar.label`、`sidebar.badge`、`seo.title`、`seo.description`）のみを翻訳します。出力先はパーサーに従います。`dir` では `fr/guides/install.mdx`、`dot` では `guides/install.fr.mdx` です。

@@ -261,8 +261,44 @@ describe("prompts", () => {
     expect(prompt).toContain("Bienvenue.");
     expect(prompt).toContain("register, formality, dialect, and terminology");
     expect(prompt).toContain("word-for-word identical");
+    // No configured style, so no style rule and no precedence clause.
+    expect(prompt).not.toContain("in this style");
+    expect(prompt).not.toContain("style rule wins");
     // The source stays last so the "begins after this line" markers hold.
     expect(prompt.endsWith(SOURCE)).toBe(true);
+  });
+
+  it("pagePrompt pins a configured locale style", () => {
+    const styled = { ...FR, style: "Formal vous, Canadian French" };
+    const prompt = pagePrompt(SOURCE, styled, EN);
+    expect(prompt).toContain(
+      "Write the translation in this style: Formal vous, Canadian French"
+    );
+    // No previous translation, so the precedence clause stays out.
+    expect(prompt).not.toContain("style rule wins");
+    expect(prompt.endsWith(SOURCE)).toBe(true);
+  });
+
+  it("pagePrompt makes the style rule win over the previous translation", () => {
+    const styled = { ...FR, style: "Formal vous" };
+    const previous = "---\ntitle: Accueil\n---\nSalut.\n";
+    const prompt = pagePrompt(SOURCE, styled, EN, previous);
+    expect(prompt).toContain(
+      "Write the translation in this style: Formal vous"
+    );
+    expect(prompt).toContain(
+      "Where the previous translation disagrees with the style rule above, the style rule wins."
+    );
+    expect(prompt).toContain("Salut.");
+  });
+
+  it("metaPrompt pins a configured locale style", () => {
+    const styled = { ...FR, style: "Formal vous" };
+    const prompt = metaPrompt({ guides: "Guides" }, styled, EN);
+    expect(prompt).toContain("Write the titles in this style: Formal vous");
+    expect(metaPrompt({ guides: "Guides" }, FR, EN)).not.toContain(
+      "in this style"
+    );
   });
 
   it("metaPrompt carries the titles JSON and demands same-keys JSON back", () => {

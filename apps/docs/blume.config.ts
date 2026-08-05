@@ -43,10 +43,14 @@ export default defineConfig({
     defaultLocale: "en",
     locales: [
       { code: "en", label: "English" },
-      { code: "de", label: "Deutsch" },
-      { code: "hi", label: "हिन्दी" },
-      { code: "ja", label: "日本語" },
-      { code: "pt", label: "Português" },
+      { code: "de", label: "Deutsch", style: "Informal du-form" },
+      { code: "hi", label: "हिन्दी", style: "Formal आप-form" },
+      { code: "ja", label: "日本語", style: "Polite です/ます form" },
+      {
+        code: "pt",
+        label: "Português",
+        style: "Brazilian Portuguese, informal você",
+      },
     ],
   },
   lastModified: true,
