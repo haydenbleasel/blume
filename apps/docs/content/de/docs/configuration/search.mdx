@@ -28,9 +28,7 @@ search: {
 },
 ```
 
-Jeder Eintrag benötigt ein `href` (interne Route oder externe URL) und ein `label`, dazu optional ein `icon` — ein integrierter Iconname, der neben dem Label angezeigt wird und standardmäßig ein Datei-Symbol ist. Lass `popular` weg oder leer, um den Fallback auf die Seitenleiste beizubehalten.
-
-Anders als Icons an anderen Stellen in Blume muss `icon` hier ein integrierter Name sein: Diese Zeilen werden in einer Client-Island gerendert, sodass ein Bildpfad oder Inline-SVG nicht unterstützt wird und auf das Datei-Symbol zurückfällt.
+Jeder Eintrag benötigt ein `href` (interne Route oder externe URL) und ein `label`, dazu optional ein `icon` — der Name eines [integrierten Icons](/docs/content/components#icon), ein Bildpfad bzw. eine Bild-URL oder ein Inline-SVG (dieselben _Eingaben_ wie bei Nav-Icons), standardmäßig ein Datei-Symbol. Lass `popular` weg oder leer, um den Fallback auf die Seitenleiste beizubehalten.
 
 Schreibe `href` so, als wäre die Website im Stammverzeichnis eingehängt — ein `basePath` wird für dich angewendet, genau wie bei `navigation.featured`. Externe URLs werden unverändert durchgereicht.
 

@@ -28,9 +28,7 @@ search: {
 },
 ```
 
-Cada entrada recebe um `href` (rota interna ou URL externa) e um `label`, além de um `icon` opcional — o nome de um ícone integrado exibido ao lado do rótulo, com um glifo de arquivo como padrão. Omita `popular` ou deixe a lista vazia para manter o comportamento padrão baseado na barra lateral.
-
-Diferentemente dos ícones em outras partes do Blume, o `icon` aqui precisa ser um nome integrado: essas linhas são renderizadas em uma ilha cliente, então um caminho de imagem ou SVG inline não é suportado e recai para o glifo de arquivo.
+Cada entrada recebe um `href` (rota interna ou URL externa) e um `label`, além de um `icon` opcional — o nome de um [ícone integrado](/docs/content/components#icon), um caminho ou URL de imagem, ou um SVG inline (as mesmas _entradas_ dos ícones de navegação), com um glifo de arquivo como padrão. Omita `popular` ou deixe a lista vazia para manter o comportamento padrão baseado na barra lateral.
 
 Escreva o `href` como se o site estivesse montado na raiz — um `basePath` é aplicado automaticamente, igual em `navigation.featured`. URLs externas passam sem alteração.
 
