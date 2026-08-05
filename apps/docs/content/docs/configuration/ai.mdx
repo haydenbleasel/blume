@@ -257,6 +257,8 @@ The server exposes read-only tools — `search_docs`, `get_page`, `list_pages`, 
 
 `search_docs` runs its own full-text index, so it works regardless of your [search](/docs/configuration/search) provider — and even when search is set to `none`. The MCP server is a separate feature from on-page search.
 
+`search_docs` and `list_pages` both accept an optional `contentTypes` filter, narrowing results to pages of the given frontmatter [`type`s](/docs/reference/frontmatter) — `["rfc"]`, `["blog", "changelog"]` — so an agent working against a site that mixes docs with RFCs, runbooks, or policies can scope retrieval to the kind of page it needs. Every result names its content type, and `list_pages` output shows the types in use.
+
 ### Server output required
 
 The MCP server is a live endpoint (`/mcp`), so it can't run on a static build. Switch to server output and pick an adapter:

@@ -226,12 +226,9 @@ export const createAskContext = (
       ? byRoute.get(normalizeRoute(page.path))
       : undefined;
     const db = await index();
-    const hits = await queryOramaIndex(
-      db,
-      query,
-      MAX_RESULTS,
-      current?.locale || undefined
-    );
+    const hits = await queryOramaIndex(db, query, MAX_RESULTS, {
+      locale: current?.locale || undefined,
+    });
 
     const seen = new Set<string>();
     const sections: string[] = [];

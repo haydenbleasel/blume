@@ -33,6 +33,14 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Expose-Headers": "Mcp-Session-Id",
 };
 
+/** The optional content-type filter `search_docs` and `list_pages` share. */
+const CONTENT_TYPES_SCHEMA = {
+  description:
+    'Only include pages of these content types (frontmatter `type`, e.g. `["doc", "rfc"]`). `list_pages` shows each page\'s type. Omit to include every type.',
+  items: { type: "string" },
+  type: "array",
+} as const;
+
 /** JSON Schema for each tool's input, keyed by tool name. */
 const INPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
   get_navigation: { properties: {}, type: "object" },
@@ -46,9 +54,13 @@ const INPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
     required: ["route"],
     type: "object",
   },
-  list_pages: { properties: {}, type: "object" },
+  list_pages: {
+    properties: { contentTypes: CONTENT_TYPES_SCHEMA },
+    type: "object",
+  },
   search_docs: {
     properties: {
+      contentTypes: CONTENT_TYPES_SCHEMA,
       limit: {
         description: `Maximum hits to return (default ${DEFAULT_SEARCH_LIMIT}).`,
         maximum: MAX_SEARCH_LIMIT,
@@ -73,6 +85,18 @@ const TOOL_DEFINITIONS = MCP_TOOLS.map((tool) => ({
 
 const asString = (value: unknown): string =>
   typeof value === "string" ? value : "";
+
+/**
+ * The `contentTypes` filter as a string array, or `undefined` when absent or
+ * empty — an agent sending `[]` means "no filter", not "match nothing". A bare
+ * string is accepted as a one-element list.
+ */
+const asContentTypes = (value: unknown): string[] | undefined => {
+  const list = Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [value].filter((entry): entry is string => typeof entry === "string");
+  return list.length > 0 ? list : undefined;
+};
 
 const asLimit = (value: unknown): number => {
   const num = typeof value === "number" ? value : Number(value);
@@ -181,11 +205,13 @@ export const buildServer = (
       const hits = await queryOramaIndex(
         db,
         asString(args.query),
-        asLimit(args.limit)
+        asLimit(args.limit),
+        { contentTypes: asContentTypes(args.contentTypes) }
       );
       // `route` is the key `get_page` takes (the tool descriptions promise
       // it); `url` is where the page is served.
       const results = hits.map((doc: OramaDoc) => ({
+        contentType: doc.contentType,
         excerpt: excerptFor(doc),
         route: doc.route,
         title: doc.title,
@@ -207,9 +233,15 @@ export const buildServer = (
     }
 
     if (name === "list_pages") {
+      const contentTypes = asContentTypes(args.contentTypes);
+      const routes = contentTypes
+        ? data.routes.filter((route) =>
+            contentTypes.includes(route.contentType)
+          )
+        : data.routes;
       return text(
         JSON.stringify(
-          data.routes.map((route) => ({
+          routes.map((route) => ({
             contentType: route.contentType,
             description: route.description,
             lastModified: route.lastModified,

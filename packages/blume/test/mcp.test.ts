@@ -233,6 +233,92 @@ describe("MCP tools", () => {
       "/guides/install",
     ]);
   });
+});
+
+describe("MCP content-type filtering", () => {
+  const TYPED: McpData = {
+    ...DATA,
+    documents: [
+      ...DATA.documents.map((doc) => ({ ...doc, contentType: "doc" })),
+      {
+        content: "RFC: how Blume endpoints declare request schemas.",
+        contentType: "rfc",
+        description: "RFC for request validation",
+        route: "/rfcs/schemas",
+        title: "Request schemas",
+      },
+    ],
+    routes: [
+      ...DATA.routes,
+      {
+        contentType: "rfc",
+        description: "RFC for request validation",
+        indexable: true,
+        lastModified: null,
+        route: "/rfcs/schemas",
+        title: "Request schemas",
+      },
+    ],
+  };
+  const typedHandler = createMcpFetchHandler(TYPED);
+
+  const callTyped = async (name: string, args?: Record<string, unknown>) => {
+    const response = await typedHandler(
+      new Request("https://docs.example.com/mcp", {
+        body: JSON.stringify({
+          id: 1,
+          jsonrpc: "2.0",
+          method: "tools/call",
+          params: { arguments: args, name },
+        }),
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      })
+    );
+    const body = (await response.json()) as {
+      result?: { content?: { text: string }[] };
+    };
+    return body.result?.content?.[0]?.text ?? "";
+  };
+
+  it("search_docs filters hits to the requested content types", async () => {
+    const rfcs = JSON.parse(
+      await callTyped("search_docs", { contentTypes: ["rfc"], query: "blume" })
+    ) as { contentType: string; route: string }[];
+    expect(rfcs.map((hit) => hit.route)).toEqual(["/rfcs/schemas"]);
+    // Hits name their type, so an agent can see what it got back.
+    expect(rfcs[0]?.contentType).toBe("rfc");
+
+    const docs = JSON.parse(
+      await callTyped("search_docs", { contentTypes: ["doc"], query: "blume" })
+    ) as { route: string }[];
+    expect(docs.map((hit) => hit.route).toSorted()).toEqual([
+      "/guides/config",
+      "/guides/install",
+    ]);
+  });
+
+  it("search_docs treats an empty or absent contentTypes as no filter", async () => {
+    const unfiltered = JSON.parse(
+      await callTyped("search_docs", { contentTypes: [], query: "blume" })
+    ) as unknown[];
+    expect(unfiltered.length).toBe(3);
+  });
+
+  it("list_pages filters routes by content type", async () => {
+    const rfcs = JSON.parse(
+      await callTyped("list_pages", { contentTypes: ["rfc"] })
+    ) as { route: string }[];
+    expect(rfcs.map((page) => page.route)).toEqual(["/rfcs/schemas"]);
+
+    const all = JSON.parse(
+      await callTyped("list_pages", { contentTypes: ["doc", "rfc"] })
+    ) as unknown[];
+    expect(all.length).toBe(3);
+  });
 
   it("get_navigation returns the navigation tree", async () => {
     const { text } = await callTool("get_navigation");
@@ -420,11 +506,51 @@ describe("orama index helpers", () => {
         title: "Installation",
       },
     ]);
-    const fr = await queryOramaIndex(db, "install", 5, "fr");
+    const fr = await queryOramaIndex(db, "install", 5, { locale: "fr" });
     expect(fr.map((doc) => doc.route)).toEqual(["/fr/install"]);
     // No filter searches every language.
     const all = await queryOramaIndex(db, "install", 5);
     expect(all.length).toBe(2);
+  });
+
+  it("filters results to the requested content types", async () => {
+    const db = await buildOramaIndex([
+      {
+        content: "Install Blume with your package manager.",
+        contentType: "doc",
+        description: "",
+        route: "/install",
+        title: "Install",
+      },
+      {
+        content: "RFC: how Blume endpoints declare request schemas.",
+        contentType: "rfc",
+        description: "",
+        route: "/rfcs/schemas",
+        title: "Request schemas",
+      },
+      {
+        // No contentType (a pre-upgrade index entry): excluded by any filter.
+        content: "Blume changelog for the current release.",
+        description: "",
+        route: "/changelog",
+        title: "Changelog",
+      },
+    ]);
+    const rfcs = await queryOramaIndex(db, "blume", 5, {
+      contentTypes: ["rfc"],
+    });
+    expect(rfcs.map((doc) => doc.route)).toEqual(["/rfcs/schemas"]);
+    const both = await queryOramaIndex(db, "blume", 5, {
+      contentTypes: ["doc", "rfc"],
+    });
+    expect(both.map((doc) => doc.route).toSorted()).toEqual([
+      "/install",
+      "/rfcs/schemas",
+    ]);
+    // An empty list means "no filter", matching the MCP tool contract.
+    const all = await queryOramaIndex(db, "blume", 5, { contentTypes: [] });
+    expect(all.length).toBe(3);
   });
 
   const JA_DOCS = [
@@ -470,7 +596,7 @@ describe("orama index helpers", () => {
     const gdpr = await queryOramaIndex(db, "gdpr", 5);
     expect(gdpr.map((doc) => doc.route)).toEqual(["/ja/legal"]);
     // The locale enum filter is unaffected by the custom tokenizer.
-    const en = await queryOramaIndex(db, "install", 5, "en");
+    const en = await queryOramaIndex(db, "install", 5, { locale: "en" });
     expect(en.map((doc) => doc.route)).toEqual(["/en/start"]);
   });
 
@@ -855,17 +981,19 @@ describe("buildMcpData", () => {
       title: "Installation",
     });
 
-    // Documents are mapped down to the four MCP fields and skip hidden pages.
+    // Documents are mapped down to the five MCP fields and skip hidden pages.
     const doc = data.documents.find(
       (entry) => entry.route === "/guides/install"
     );
     expect(doc).toBeDefined();
     expect(Object.keys(doc ?? {}).toSorted()).toStrictEqual([
       "content",
+      "contentType",
       "description",
       "route",
       "title",
     ]);
+    expect(doc?.contentType).toBe("doc");
     expect(doc?.title).toBe("Installation");
     expect(data.documents.some((entry) => entry.route === "/secret")).toBe(
       false

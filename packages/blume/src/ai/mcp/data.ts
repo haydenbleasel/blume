@@ -91,6 +91,7 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
     defaultLocale: config.i18n?.defaultLocale,
     documents: documents.map((doc) => ({
       content: doc.content,
+      contentType: doc.contentType,
       description: doc.description,
       route: doc.route,
       title: doc.title,

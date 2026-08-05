@@ -121,6 +121,7 @@ describe("toSearchRecords", () => {
       {
         breadcrumb: ["Guides"],
         content: "body",
+        contentType: "doc",
         description: "desc",
         locale: "en",
         route: "/a",
@@ -147,6 +148,7 @@ describe("toSearchRecords", () => {
       {
         breadcrumb: [],
         content: "",
+        contentType: "doc",
         description: "",
         locale: "",
         route: "/x",

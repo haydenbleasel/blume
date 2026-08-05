@@ -13,6 +13,8 @@ export interface OramaDoc {
   title: string;
   /** Locale code; indexed as an enum so queries can filter to one language. */
   locale?: string;
+  /** Resolved page `type`; indexed as an enum so queries can filter by type. */
+  contentType?: string;
   /** Carried through for the search dialog's breadcrumb + filter pills. Stored
    * but not indexed, so they ride along on the returned document untouched. */
   breadcrumb?: string[];
@@ -21,8 +23,9 @@ export interface OramaDoc {
 
 const SCHEMA = {
   content: "string",
+  // Enums (not full-text "string") so `where` does an exact-match filter.
+  contentType: "enum",
   description: "string",
-  // Enum (not full-text "string") so `where` does an exact-match filter.
   locale: "enum",
   route: "string",
   title: "string",
@@ -176,10 +179,18 @@ export const buildOramaIndex = async (
 /** Orama keeps only documents matching every token at a threshold of 0. */
 const ALL_TOKENS = 0;
 
+/** Optional exact-match filters applied to a query via Orama's `where`. */
+export interface OramaQueryFilters {
+  /** Keep only documents whose `contentType` is in this list. */
+  contentTypes?: string[];
+  /** Keep only documents in this locale. */
+  locale?: string;
+}
+
 /**
  * Query the index, returning the matching documents (highest-ranked first).
- * When `locale` is given, results are filtered to that language via an exact
- * `where` match on the `locale` enum.
+ * `filters` narrows results by exact `where` matches on the enum fields:
+ * `locale` to one language, `contentTypes` to a set of page types.
  *
  * On a bigrammed index the strict pass runs first: a term is only meant to
  * match where its bigrams sit together, and scoring them independently lets a
@@ -191,14 +202,20 @@ export const queryOramaIndex = async (
   db: AnyOrama,
   term: string,
   limit: number,
-  locale?: string
+  filters?: OramaQueryFilters
 ): Promise<OramaDoc[]> => {
+  const where = {
+    ...(filters?.locale ? { locale: { eq: filters.locale } } : {}),
+    ...(filters?.contentTypes && filters.contentTypes.length > 0
+      ? { contentType: { in: filters.contentTypes } }
+      : {}),
+  };
   const params = {
     boost: BOOST,
     limit,
     properties: ["title", "description", "content"],
     term,
-    ...(locale ? { where: { locale: { eq: locale } } } : {}),
+    ...(Object.keys(where).length > 0 ? { where } : {}),
   };
   const bigrammed = BIGRAM_LANGUAGES.has(db.tokenizer?.language ?? "");
   const strict = bigrammed

@@ -23,7 +23,9 @@ export const createSearch = async (opts: {
   const db = await buildOramaIndex(documents, opts.locale);
 
   return async (query, options) => {
-    const docs = await queryOramaIndex(db, query, RESULT_POOL, options?.locale);
+    const docs = await queryOramaIndex(db, query, RESULT_POOL, {
+      locale: options?.locale,
+    });
     return buildResult(docs as IndexedDocument[], query, options?.section);
   };
 };

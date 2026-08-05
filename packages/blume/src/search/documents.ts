@@ -18,6 +18,8 @@ export interface SearchDocument {
   section: string;
   /** Locale code, so the dialog can filter results to the active language. */
   locale: string;
+  /** Resolved page `type` (`doc`, `blog`, a custom `rfc`…), for type filters. */
+  contentType: string;
   /** Frontmatter `search.tags`, surfaced for hosted-provider faceting. */
   tags?: string[];
 }
@@ -196,6 +198,7 @@ export const buildSearchDocuments = async (
       return {
         breadcrumb: crumb?.breadcrumb ?? [],
         content: body,
+        contentType: route.contentType,
         description: page?.description ?? "",
         locale: route.locale,
         route: route.path,
