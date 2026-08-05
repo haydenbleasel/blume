@@ -16,7 +16,9 @@ export const resolvePopularIconMarkup = (
     return undefined;
   }
   if (isInlineSvg(icon)) {
-    return icon.trim();
+    // Author SVG carries no guaranteed width/height (a viewBox-only <svg>
+    // defaults to 300x150), so size it the same way Icon.astro's wrapper does.
+    return `<span aria-hidden="true" style="display:inline-flex;width:16px;height:16px">${icon.trim()}</span>`;
   }
   if (isImageIcon(icon)) {
     const src = prefixBase(base, icon.trim())

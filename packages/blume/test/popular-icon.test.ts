@@ -15,9 +15,11 @@ describe("resolvePopularIconMarkup", () => {
     expect(markup).toContain('aria-hidden="true"');
   });
 
-  it("passes inline SVG through", () => {
+  it("wraps inline SVG in a fixed-size span, like Icon.astro's wrapper", () => {
     const svg = '  <svg viewBox="0 0 24 24" class="logo-svg"></svg>  ';
-    expect(resolvePopularIconMarkup(svg)).toBe(svg.trim());
+    expect(resolvePopularIconMarkup(svg)).toBe(
+      `<span aria-hidden="true" style="display:inline-flex;width:16px;height:16px">${svg.trim()}</span>`
+    );
   });
 
   it("rejects non-SVG markup (falls through to the file glyph)", () => {

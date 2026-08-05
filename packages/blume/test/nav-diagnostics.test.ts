@@ -53,6 +53,7 @@ describe("validateSearchPopularIcons", () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.code).toBe("BLUME_UNKNOWN_ICON");
     expect(result[0]?.message).toContain('<img src="/logo.svg">');
+    expect(result[0]?.message).toContain("isn't a complete inline <svg>");
   });
 });
 

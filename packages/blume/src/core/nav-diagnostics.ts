@@ -63,9 +63,14 @@ const unknownIconDiagnostics = (
       continue;
     }
     seen.add(icon);
+    // Markup that isn't a complete <svg> element (an <img> tag, a truncated
+    // svg) is a shape problem, not a set-name typo — say so.
+    const message = icon.trimStart().startsWith("<")
+      ? `Icon markup "${icon}" (${where}) isn't a complete inline <svg> element, so it won't render.`
+      : `Unknown icon "${icon}" (${where}) — it isn't in Blume's icon set.`;
     diagnostics.push({
       code: "BLUME_UNKNOWN_ICON",
-      message: `Unknown icon "${icon}" (${where}) — it isn't in Blume's icon set.`,
+      message,
       severity: "warning",
       suggestion,
     });
