@@ -63,6 +63,41 @@ describe("scanProject", () => {
     expect(routesOf(project.manifest.routes)).toStrictEqual(["/", "/draft"]);
   });
 
+  it("threads content.types frontmatter through to page validation", async () => {
+    // A dependency-free Standard Schema, so the temp config needs no imports.
+    const project = await scanProject(
+      await makeProject({
+        "blume.config.ts": `const status = {
+  "~standard": {
+    version: 1,
+    vendor: "test",
+    validate: (value) =>
+      typeof value === "string"
+        ? { value }
+        : { issues: [{ message: "must be a string" }] },
+  },
+};
+export default { content: { types: { rfc: { frontmatter: { status } } } } };`,
+        "docs/guide.md": "---\ntitle: Guide\n---\n# Guide\n",
+        "docs/incomplete.md": "---\ntitle: RFC 2\ntype: rfc\n---\n# RFC 2\n",
+        "docs/rfc.md":
+          "---\ntitle: RFC 1\ntype: rfc\nstatus: enforced\n---\n# RFC 1\n",
+      })
+    );
+
+    const byRoute = new Map(
+      project.graph.pages.map((page) => [page.route, page])
+    );
+    expect(byRoute.get("/rfc")?.custom).toStrictEqual({ status: "enforced" });
+    // The per-type key applies only to `type: rfc` pages, so the plain doc
+    // page carries no custom values and the incomplete RFC is rejected.
+    expect(byRoute.get("/guide")?.custom).toBeUndefined();
+    expect(byRoute.has("/incomplete")).toBe(false);
+    expect(project.diagnostics.map((d) => d.code)).toContain(
+      "BLUME_FRONTMATTER_INVALID"
+    );
+  });
+
   it("aggregates content diagnostics without throwing", async () => {
     const project = await scanProject(await makeProject(CONTENT));
     expect(project.diagnostics.map((d) => d.code)).toContain(

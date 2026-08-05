@@ -141,6 +141,37 @@ export const pageMetaSchema = pageMetaBaseSchema;
 export type PageMeta = z.infer<typeof pageMetaBaseSchema>;
 export type PageMetaInput = z.input<typeof pageMetaBaseSchema>;
 
+/**
+ * A map of custom frontmatter keys to user-supplied validation schemas,
+ * consumed through the Standard Schema `~standard` contract — never Zod's own
+ * API — so the consumer's zod (any version), Valibot, or ArkType all work
+ * (see `standard-schema.ts`). Shared by the site-wide `frontmatter.extend`
+ * and the per-type `content.types.<type>.frontmatter` maps. Built-in
+ * frontmatter fields can't be redeclared — they're load-bearing (routing,
+ * sidebar, SEO), and shadowing one would silently change its semantics.
+ */
+const customKeySchemaRecord = (where: string) =>
+  z
+    .record(
+      z.string(),
+      z.custom<StandardSchema>(isStandardSchema, {
+        message:
+          "Expected a Standard Schema (e.g. a Zod schema — any Zod version works).",
+      })
+    )
+    .default({})
+    .superRefine((value, ctx) => {
+      for (const key of Object.keys(value)) {
+        if (Object.hasOwn(pageMetaBaseSchema.shape, key)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `"${key}" is a built-in frontmatter field and cannot be redeclared via ${where}.`,
+            path: [key],
+          });
+        }
+      }
+    });
+
 // ---------------------------------------------------------------------------
 // Folder meta (meta.ts)
 // ---------------------------------------------------------------------------
@@ -345,6 +376,21 @@ const contentSourceSchema = z.discriminatedUnion("type", [
 /** A resolved content-source config entry (post-defaults). */
 export type ContentSourceConfig = z.infer<typeof contentSourceSchema>;
 
+/**
+ * Per-type content definition. An object (rather than a bare frontmatter map)
+ * so type-scoped concerns added later — search facets, templates — have a
+ * home without a breaking config change.
+ */
+const contentTypeConfigSchema = z.strictObject({
+  /**
+   * Custom frontmatter keys for pages of this type, layered on top of the
+   * site-wide `frontmatter.extend`. Every declared key is validated on every
+   * page of the type — absent ones included — so a required schema enforces
+   * the key type-wide while leaving other types untouched.
+   */
+  frontmatter: customKeySchemaRecord("content.types"),
+});
+
 const contentConfigSchema = z.strictObject({
   defaultType: z.string().default("doc"),
   exclude: z.array(z.string()).default(["**/_*", "**/.*"]),
@@ -357,6 +403,11 @@ const contentConfigSchema = z.strictObject({
    * existing projects are unchanged.
    */
   sources: z.array(contentSourceSchema).optional(),
+  /**
+   * Per-type content definitions, keyed by the frontmatter `type` they apply
+   * to (including `defaultType`, for pages that set none).
+   */
+  types: z.record(z.string(), contentTypeConfigSchema).default({}),
 });
 
 /**
@@ -1415,26 +1466,7 @@ const asyncapiConfigSchema = z.strictObject({
  * sidebar, SEO), and shadowing one would silently change its semantics.
  */
 const frontmatterConfigSchema = z.strictObject({
-  extend: z
-    .record(
-      z.string(),
-      z.custom<StandardSchema>(isStandardSchema, {
-        message:
-          "Expected a Standard Schema (e.g. a Zod schema — any Zod version works).",
-      })
-    )
-    .default({})
-    .superRefine((value, ctx) => {
-      for (const key of Object.keys(value)) {
-        if (Object.hasOwn(pageMetaBaseSchema.shape, key)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `"${key}" is a built-in frontmatter field and cannot be redeclared via frontmatter.extend.`,
-            path: [key],
-          });
-        }
-      }
-    }),
+  extend: customKeySchemaRecord("frontmatter.extend"),
 });
 
 /** Full user-facing config schema. All fields optional with defaults. */
@@ -1469,58 +1501,75 @@ const tocConfigSchema = z
       "toc.minHeadingLevel must be less than or equal to toc.maxHeadingLevel.",
   });
 
-export const blumeConfigSchema = z.strictObject({
-  ai: aiConfigSchema.prefault({}),
-  analytics: analyticsConfigSchema.optional(),
-  asyncapi: asyncapiConfigSchema.prefault({}),
-  banner: bannerConfigSchema.optional(),
-  /**
-   * Site-wide mount point prepended to every generated route (e.g. `/docs`),
-   * while staying invisible to the sidebar/nav tree. Distinct from a per-source
-   * `prefix` (which creates a group) and from `deployment.base` (Astro's
-   * host-subdirectory base); the two compose. Normalized to `""` or `/seg`.
-   */
-  basePath: z
-    .string()
-    .optional()
-    .transform((value) => normalizeBasePath(value)),
-  content: contentConfigSchema.prefault({}),
-  /**
-   * Date presentation for the "last updated" stamp and the changelog timeline.
-   * Pass-through `Intl.DateTimeFormat` options; defaults to `{ dateStyle: "long" }`.
-   */
-  dateFormat: dateFormatConfigSchema.default({ dateStyle: "long" }),
-  deployment: deploymentConfigSchema.prefault({}),
-  description: z.string().optional(),
-  /**
-   * Where `<Component path>` resolves live previews and their source from.
-   * A string is shorthand for `{ source }` — the directory (or glob, for
-   * colocated registry layouts) under the project root that holds example
-   * files. The object form adds `css`: a stylesheet injected into every
-   * preview frame (design tokens, shadcn variables, `@theme` mappings).
-   */
-  examples: examplesConfigSchema.prefault("examples"),
-  export: exportConfigSchema.prefault(false),
-  feedback: z.boolean().default(true),
-  /** Opt-in custom frontmatter keys, validated by user-supplied schemas. */
-  frontmatter: frontmatterConfigSchema.prefault({}),
-  github: githubConfigSchema.optional(),
-  i18n: i18nConfigSchema.optional(),
-  image: imageConfigSchema.prefault({}),
-  integrations: z.array(z.custom<AstroIntegration>()).default([]),
-  lastModified: lastModifiedConfigSchema.default(false),
-  logo: logoConfigSchema.optional(),
-  markdown: markdownConfigSchema.prefault({}),
-  navigation: navigationConfigSchema.prefault({}),
-  openapi: openapiConfigSchema.prefault({}),
-  react: reactConfigSchema.prefault({}),
-  redirects: z.array(redirectSchema).default([]),
-  search: searchConfigSchema.prefault({}),
-  seo: seoConfigSchema.prefault({}),
-  theme: themeConfigSchema.prefault({}),
-  title: z.string().default("Documentation"),
-  toc: tocConfigSchema,
-});
+export const blumeConfigSchema = z
+  .strictObject({
+    ai: aiConfigSchema.prefault({}),
+    analytics: analyticsConfigSchema.optional(),
+    asyncapi: asyncapiConfigSchema.prefault({}),
+    banner: bannerConfigSchema.optional(),
+    /**
+     * Site-wide mount point prepended to every generated route (e.g. `/docs`),
+     * while staying invisible to the sidebar/nav tree. Distinct from a per-source
+     * `prefix` (which creates a group) and from `deployment.base` (Astro's
+     * host-subdirectory base); the two compose. Normalized to `""` or `/seg`.
+     */
+    basePath: z
+      .string()
+      .optional()
+      .transform((value) => normalizeBasePath(value)),
+    content: contentConfigSchema.prefault({}),
+    /**
+     * Date presentation for the "last updated" stamp and the changelog timeline.
+     * Pass-through `Intl.DateTimeFormat` options; defaults to `{ dateStyle: "long" }`.
+     */
+    dateFormat: dateFormatConfigSchema.default({ dateStyle: "long" }),
+    deployment: deploymentConfigSchema.prefault({}),
+    description: z.string().optional(),
+    /**
+     * Where `<Component path>` resolves live previews and their source from.
+     * A string is shorthand for `{ source }` — the directory (or glob, for
+     * colocated registry layouts) under the project root that holds example
+     * files. The object form adds `css`: a stylesheet injected into every
+     * preview frame (design tokens, shadcn variables, `@theme` mappings).
+     */
+    examples: examplesConfigSchema.prefault("examples"),
+    export: exportConfigSchema.prefault(false),
+    feedback: z.boolean().default(true),
+    /** Opt-in custom frontmatter keys, validated by user-supplied schemas. */
+    frontmatter: frontmatterConfigSchema.prefault({}),
+    github: githubConfigSchema.optional(),
+    i18n: i18nConfigSchema.optional(),
+    image: imageConfigSchema.prefault({}),
+    integrations: z.array(z.custom<AstroIntegration>()).default([]),
+    lastModified: lastModifiedConfigSchema.default(false),
+    logo: logoConfigSchema.optional(),
+    markdown: markdownConfigSchema.prefault({}),
+    navigation: navigationConfigSchema.prefault({}),
+    openapi: openapiConfigSchema.prefault({}),
+    react: reactConfigSchema.prefault({}),
+    redirects: z.array(redirectSchema).default([]),
+    search: searchConfigSchema.prefault({}),
+    seo: seoConfigSchema.prefault({}),
+    theme: themeConfigSchema.prefault({}),
+    title: z.string().default("Documentation"),
+    toc: tocConfigSchema,
+  })
+  .superRefine((config, ctx) => {
+    // A custom key is declared site-wide (`frontmatter.extend`) or per-type
+    // (`content.types`), never both — two schemas for one key would make
+    // precedence on pages of that type ambiguous.
+    for (const [typeName, typeConfig] of Object.entries(config.content.types)) {
+      for (const key of Object.keys(typeConfig.frontmatter)) {
+        if (Object.hasOwn(config.frontmatter.extend, key)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `"${key}" is already declared in frontmatter.extend and cannot be redeclared for type "${typeName}".`,
+            path: ["content", "types", typeName, "frontmatter", key],
+          });
+        }
+      }
+    }
+  });
 
 /** Resolved config: every field present after defaults are applied. */
 export type ResolvedConfig = z.infer<typeof blumeConfigSchema>;

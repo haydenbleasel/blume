@@ -112,4 +112,9 @@ export interface NormalizeContext {
   /** Opt-in custom frontmatter keys (`frontmatter.extend`), schema per key. */
   frontmatterExtend?: FrontmatterExtend;
   i18n?: ResolvedI18nConfig;
+  /**
+   * Per-type custom frontmatter keys (`content.types.<type>.frontmatter`),
+   * applied to a page only when its resolved `type` matches.
+   */
+  typeFrontmatter?: Record<string, FrontmatterExtend>;
 }

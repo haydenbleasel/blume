@@ -269,6 +269,44 @@ export interface ContentConfig {
    * Releases, Sanity, Notion, or a custom `ContentSource`.
    */
   sources?: ContentSourceInput[];
+  /**
+   * Per-type content definitions, keyed by the frontmatter `type` they apply
+   * to (including `defaultType`, for pages that set none):
+   *
+   * ```ts
+   * import { z } from "zod";
+   *
+   * content: {
+   *   types: {
+   *     rfc: {
+   *       frontmatter: {
+   *         domain: z.string(),
+   *         status: z.enum(["draft", "enforced"]),
+   *       },
+   *     },
+   *   },
+   * },
+   * ```
+   */
+  types?: Record<string, ContentTypeConfig>;
+}
+
+/**
+ * A per-type content definition: configuration that applies only to pages
+ * whose resolved frontmatter `type` matches the map key.
+ */
+export interface ContentTypeConfig {
+  /**
+   * Custom frontmatter keys for pages of this type, layered on top of the
+   * site-wide `frontmatter.extend` (a key can be declared in one or the
+   * other, not both). Schemas follow the same rules as `extend`: any
+   * Standard Schema library works, every declared key is validated on every
+   * page of the type — absent ones included — so a required schema enforces
+   * the key type-wide (mark it `.optional()` to validate only when present),
+   * and validated values land on the page record's `custom` field. Built-in
+   * frontmatter fields cannot be redeclared.
+   */
+  frontmatter?: Record<string, StandardSchema>;
 }
 
 // ---------------------------------------------------------------------------
@@ -1161,7 +1199,8 @@ export interface FrontmatterConfig {
    * so a required schema enforces the key site-wide; mark it `.optional()`
    * to validate only when present. Validated values are preserved on each
    * page record's `custom` field. Built-in frontmatter fields cannot be
-   * redeclared.
+   * redeclared. To scope a key to one content type instead, declare it under
+   * `content.types.<type>.frontmatter`.
    */
   extend?: Record<string, StandardSchema>;
 }

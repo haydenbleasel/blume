@@ -146,9 +146,10 @@ export interface PageRecord {
   contentType: string;
   meta: PageMeta;
   /**
-   * Custom frontmatter values declared via `frontmatter.extend`, validated by
-   * the user-supplied schemas (schema output, so transforms apply). Present
-   * only when the project opts in and the page carries at least one value.
+   * Custom frontmatter values declared via `frontmatter.extend` or the page
+   * type's `content.types.<type>.frontmatter`, validated by the user-supplied
+   * schemas (schema output, so transforms apply). Present only when the
+   * project opts in and the page carries at least one value.
    */
   custom?: Record<string, unknown>;
   headings: Heading[];

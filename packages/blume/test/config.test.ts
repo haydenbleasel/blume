@@ -174,6 +174,42 @@ export default { frontmatter: { extend: { title: owner } } };`
     expect(error.diagnostic.message).toContain("built-in frontmatter field");
   });
 
+  it("accepts per-type frontmatter schemas under content.types", async () => {
+    const dir = await makeDir(
+      `${OWNER_SCHEMA}
+export default { content: { types: { rfc: { frontmatter: { owner } } } } };`
+    );
+    const result = await loadConfig(dir);
+    expect(
+      Object.keys(result.config.content.types.rfc?.frontmatter ?? {})
+    ).toStrictEqual(["owner"]);
+  });
+
+  it("rejects redeclaring a built-in frontmatter field via content.types", async () => {
+    const dir = await makeDir(
+      `${OWNER_SCHEMA}
+export default { content: { types: { rfc: { frontmatter: { title: owner } } } } };`
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+    expect(error.diagnostic.message).toContain("built-in frontmatter field");
+  });
+
+  it("rejects a key declared in both frontmatter.extend and a content type", async () => {
+    const dir = await makeDir(
+      `${OWNER_SCHEMA}
+export default {
+  content: { types: { rfc: { frontmatter: { owner } } } },
+  frontmatter: { extend: { owner } },
+};`
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+    expect(error.diagnostic.message).toContain(
+      "already declared in frontmatter.extend"
+    );
+  });
+
   it("throws a BlumeError when the config module fails to load", async () => {
     const dir = await makeDir('throw new Error("boom");');
     const error = await loadError(dir);

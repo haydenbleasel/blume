@@ -355,6 +355,16 @@ const ctxWith = (extend: FrontmatterExtend): NormalizeContext => ({
   source: { name: "filesystem", staged: false },
 });
 
+const typedCtx = (
+  typeFrontmatter: NonNullable<NormalizeContext["typeFrontmatter"]>,
+  extend?: FrontmatterExtend
+): NormalizeContext => ({
+  defaultType: "doc",
+  frontmatterExtend: extend,
+  source: { name: "filesystem", staged: false },
+  typeFrontmatter,
+});
+
 describe("normalizeEntry with frontmatter.extend", () => {
   it("rejects unknown keys when no extension is configured", () => {
     const { pages, diagnostics } = normalizeEntry(
@@ -456,6 +466,81 @@ describe("normalizeEntry with frontmatter.extend", () => {
     );
     expect(pages).toHaveLength(0);
     expect(diagnostics[0]?.message).toContain("Async schemas");
+  });
+});
+
+describe("normalizeEntry with content.types frontmatter", () => {
+  it("enforces a per-type key only on pages of that type", () => {
+    const ctx = typedCtx({ rfc: { status: z.string() } });
+
+    const rfc = normalizeEntry(entryWith({ title: "RFC 1", type: "rfc" }), ctx);
+    expect(rfc.pages).toHaveLength(0);
+    expect(rfc.diagnostics[0]?.code).toBe("BLUME_FRONTMATTER_INVALID");
+    expect(rfc.diagnostics[0]?.schemaPath).toBe("status");
+
+    const doc = normalizeEntry(entryWith({ title: "Guide" }), ctx);
+    expect(doc.diagnostics).toStrictEqual([]);
+    expect(doc.pages[0]?.custom).toBeUndefined();
+  });
+
+  it("preserves validated per-type values on the page's custom field", () => {
+    const { pages, diagnostics } = normalizeEntry(
+      entryWith({ status: "enforced", title: "RFC 1", type: "rfc" }),
+      typedCtx({ rfc: { status: z.string() } })
+    );
+    expect(diagnostics).toStrictEqual([]);
+    expect(pages[0]?.contentType).toBe("rfc");
+    expect(pages[0]?.custom).toStrictEqual({ status: "enforced" });
+  });
+
+  it("keeps a key declared for another type unknown", () => {
+    // `status` exists only for `rfc`, so on a doc page it's still a typo-level
+    // unknown key — per-type declarations don't loosen other types.
+    const { pages, diagnostics } = normalizeEntry(
+      entryWith({ status: "enforced", title: "Guide" }),
+      typedCtx({ rfc: { status: z.string() } })
+    );
+    expect(pages).toHaveLength(0);
+    expect(diagnostics[0]?.code).toBe("BLUME_FRONTMATTER_INVALID");
+    expect(diagnostics[0]?.message).toContain("status");
+  });
+
+  it("merges site-wide extend keys with the page type's keys", () => {
+    const { pages, diagnostics } = normalizeEntry(
+      entryWith({
+        owner: "@sam",
+        status: "draft",
+        title: "RFC 1",
+        type: "rfc",
+      }),
+      typedCtx({ rfc: { status: z.string() } }, { owner: z.string() })
+    );
+    expect(diagnostics).toStrictEqual([]);
+    expect(pages[0]?.custom).toStrictEqual({
+      owner: "@sam",
+      status: "draft",
+    });
+  });
+
+  it("applies the default type's declaration to pages that set no type", () => {
+    const { pages, diagnostics } = normalizeEntry(
+      entryWith({ owner: "@sam", title: "Guide" }),
+      typedCtx({ doc: { owner: z.string() } })
+    );
+    expect(diagnostics).toStrictEqual([]);
+    expect(pages[0]?.contentType).toBe("doc");
+    expect(pages[0]?.custom).toStrictEqual({ owner: "@sam" });
+  });
+
+  it("rejects a non-string type through the strict page schema", () => {
+    // Type resolution falls back to `defaultType` for the carve-out, but the
+    // strict parse still owns rejecting the malformed `type` itself.
+    const { pages, diagnostics } = normalizeEntry(
+      entryWith({ title: "Guide", type: 5 }),
+      typedCtx({ rfc: { status: z.string() } })
+    );
+    expect(pages).toHaveLength(0);
+    expect(diagnostics[0]?.code).toBe("BLUME_FRONTMATTER_INVALID");
   });
 });
 

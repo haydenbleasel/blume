@@ -189,6 +189,7 @@ content: {
 | `exclude` | `["**/_*", "**/.*"]` | Globs to ignore (underscore- and dot-files). |
 | `pages` | `"pages"` | Folder for custom `.astro` pages. |
 | `defaultType` | `"doc"` | Page `type` used when frontmatter omits it. |
+| `types` | `{}` | Per-type content definitions — custom frontmatter keys scoped to pages of one `type`. See [Frontmatter](#frontmatter). |
 
 Static assets live in `public/` — a file at `public/logo.png` is served at `/logo.png`, so a reference like `![](/images/create.png)` resolves against `public/images/create.png`. Images referenced by **relative path** (`![](./diagram.png)`) live next to your content instead, and are [optimized at build time](/docs/content/syntax#links-and-images).
 
@@ -229,6 +230,28 @@ export default defineConfig({
 ```
 
 Any [Standard Schema](https://standardschema.dev) library works — Zod (whichever version your project installs), Valibot, ArkType. Keys outside the extension stay strictly validated, so typo-catching is unchanged. See [Custom keys](/docs/reference/frontmatter#custom-keys) for the validation semantics.
+
+Keys under `extend` apply site-wide. To require keys only on pages of one content type — an RFC's `status`, a runbook's `service` — declare them per type under `content.types` instead:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { z } from "zod";
+
+export default defineConfig({
+  content: {
+    types: {
+      rfc: {
+        frontmatter: {
+          domain: z.string(),
+          status: z.enum(["draft", "review", "enforced"]),
+        },
+      },
+    },
+  },
+});
+```
+
+A key can be declared site-wide or per-type, not both. See [Per-type keys](/docs/reference/frontmatter#per-type-keys) for how the scoping resolves.
 
 ## GitHub
 

@@ -516,13 +516,13 @@ const segmentKey = (
 };
 
 /**
- * Validate the opt-in custom frontmatter keys (`frontmatter.extend`) through
- * the Standard Schema contract — the consumer's own Zod (any version),
- * Valibot, or ArkType, never Blume's bundled zod (see `standard-schema.ts`).
- * Every declared key is checked, absent ones included, so a required schema
- * enforces its key on every page. Async schemas are rejected with a
- * diagnostic: this funnel is synchronous, and frontmatter validation has no
- * business awaiting I/O.
+ * Validate the opt-in custom frontmatter keys (`frontmatter.extend` and
+ * `content.types.<type>.frontmatter`) through the Standard Schema contract —
+ * the consumer's own Zod (any version), Valibot, or ArkType, never Blume's
+ * bundled zod (see `standard-schema.ts`). Every declared key is checked,
+ * absent ones included, so a required schema enforces its key on every page
+ * it applies to. Async schemas are rejected with a diagnostic: this funnel is
+ * synchronous, and frontmatter validation has no business awaiting I/O.
  */
 const validateCustomKeys = (
   data: Record<string, unknown>,
@@ -534,7 +534,7 @@ const validateCustomKeys = (
     const outcome = schema["~standard"].validate(data[key]);
     if (outcome instanceof Promise) {
       issues.push({
-        message: "Async schemas are not supported in frontmatter.extend.",
+        message: "Async schemas are not supported for custom frontmatter keys.",
         path: [key],
       });
       continue;
@@ -562,9 +562,11 @@ const validateCustomKeys = (
 
 /**
  * Parse an entry's frontmatter: built-in keys through the strict page schema,
- * custom keys (`frontmatter.extend`) through their user-supplied schemas. The
- * custom keys are carved out before the strict parse, so the page schema stays
- * strict for everything else and unknown-key typo catching is unchanged.
+ * custom keys (`frontmatter.extend` plus the page type's
+ * `content.types.<type>.frontmatter`) through their user-supplied schemas.
+ * The custom keys are carved out before the strict parse, so the page schema
+ * stays strict for everything else and unknown-key typo catching is unchanged
+ * — a key declared only for some other type stays unknown here.
  * Returns diagnostics instead of meta when either side rejects.
  */
 const parseEntryMeta = (
@@ -573,7 +575,18 @@ const parseEntryMeta = (
 ):
   | { meta: PageMeta; custom?: Record<string, unknown>; diagnostics?: never }
   | { meta?: never; diagnostics: Diagnostic[] } => {
-  const extend = ctx.frontmatterExtend;
+  // Resolved the same way `contentType` is after parsing (`meta.type` falling
+  // back to `defaultType`); a non-string `type` fails the strict parse below,
+  // so which per-type map was merged for that entry never matters.
+  const entryType =
+    typeof entry.data.type === "string" ? entry.data.type : ctx.defaultType;
+  const typeExtend = ctx.typeFrontmatter?.[entryType];
+  // Config validation rejects a key declared both site-wide and per-type, so
+  // this merge never has to pick a winner.
+  const extend =
+    ctx.frontmatterExtend || typeExtend
+      ? { ...ctx.frontmatterExtend, ...typeExtend }
+      : undefined;
   const known = extend
     ? Object.fromEntries(
         Object.entries(entry.data).filter(

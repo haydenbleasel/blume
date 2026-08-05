@@ -143,11 +143,21 @@ const normalizeLoadedEntries = (
   loaded: ({ source: ContentSource } & SourceLoadResult)[],
   config: ResolvedConfig
 ): { pages: PageRecord[]; diagnostics: Diagnostic[]; droppedPages: number } => {
-  // Only thread `frontmatter.extend` through when a project opts in, so the
-  // known-key split in `normalizeEntry` stays off the default path.
+  // Only thread `frontmatter.extend` / `content.types` through when a project
+  // opts in, so the known-key split in `normalizeEntry` stays off the default
+  // path.
   const frontmatterExtend =
     Object.keys(config.frontmatter.extend).length > 0
       ? config.frontmatter.extend
+      : undefined;
+  const declaredTypes = Object.entries(config.content.types).filter(
+    ([, type]) => Object.keys(type.frontmatter).length > 0
+  );
+  const typeFrontmatter =
+    declaredTypes.length > 0
+      ? Object.fromEntries(
+          declaredTypes.map(([name, type]) => [name, type.frontmatter])
+        )
       : undefined;
 
   const pages: PageRecord[] = [];
@@ -166,6 +176,7 @@ const normalizeLoadedEntries = (
           prefix: source.prefix,
           staged: source.staged,
         },
+        typeFrontmatter,
       });
       if (normalized.pages.length === 0 && normalized.diagnostics.length > 0) {
         droppedPages += 1;

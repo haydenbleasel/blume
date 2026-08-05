@@ -109,6 +109,39 @@ reviewedAt: 2026-06-20
 
 Schemas are accepted through the [Standard Schema](https://standardschema.dev) interface, so Zod (whichever version your project installs), Valibot, and ArkType all work. Every declared key is validated on every page — absent ones included — so a required schema enforces the key site-wide; mark it `.optional()` to validate only where present. All other keys stay strictly validated, and built-in fields can't be redeclared.
 
+### Per-type keys
+
+To require keys only on one content type — an RFC's `status`, an incident report's `severity` — declare them under [`content.types`](/docs/configuration#content) instead, keyed by the frontmatter `type` they apply to:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { z } from "zod";
+
+export default defineConfig({
+  content: {
+    types: {
+      rfc: {
+        frontmatter: {
+          domain: z.string(),
+          status: z.enum(["draft", "review", "enforced"]),
+        },
+      },
+    },
+  },
+});
+```
+
+```yaml rfcs/openapi-request-schemas.mdx
+---
+title: OpenAPI request schemas
+type: rfc
+domain: architecture
+status: enforced
+---
+```
+
+Per-type keys follow the same validation rules as `extend`, scoped to pages whose resolved `type` matches — including pages that set no `type`, when the declaration is for [`content.defaultType`](/docs/configuration#content). A key belongs to one declaration, site-wide or per-type, not both. And a key declared only for another type stays unknown elsewhere, so a stray `status` on a plain doc page still fails the build.
+
 A page that fails validation fails `blume build` with a diagnostic naming the file and key. With [`--no-strict`](/docs/reference/cli#common-flags), the build succeeds anyway and the failing pages are dropped from the output — the build summary reports how many.
 
 Schemas are exported from `blume/schema` for editor and migration tooling.
