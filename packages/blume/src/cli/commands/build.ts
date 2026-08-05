@@ -38,6 +38,7 @@ import type { ProjectContext } from "../../core/types.ts";
 import {
   ADAPTER_IGNORE_DIRS,
   deployStaticDir,
+  servesClientSubdir,
   surfaceAdapterOutput,
 } from "../../deploy/adapter-output.ts";
 import { buildNetlifyHeaders } from "../../deploy/headers.ts";
@@ -435,6 +436,8 @@ export const isolatedOutputDir = (
  * bundle to the project root — a Vercel server build's static output stays at
  * `<runtime>/.vercel/output/static`, where `deployStaticDir` would instead
  * point at the project-root copy (a previous real build's assets, or nothing).
+ * Node and Cloudflare server builds serve one level down, at `client/` — see
+ * {@link servesClientSubdir}.
  */
 export const isolatedStaticDir = (
   config: ResolvedConfig,
@@ -445,7 +448,7 @@ export const isolatedStaticDir = (
   if (output === "server" && adapter === "vercel") {
     return join(outputDir, "static");
   }
-  if (output === "server" && adapter === "node") {
+  if (servesClientSubdir(config.deployment)) {
     return join(outputDir, "client");
   }
   return outputDir;

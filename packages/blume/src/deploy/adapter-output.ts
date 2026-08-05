@@ -45,13 +45,28 @@ export const ADAPTER_OUTPUT_PATHS: Partial<Record<Adapter, string>> = {
 };
 
 /**
+ * Whether this build keeps Astro's `dist/client` + `dist/server` split and
+ * serves only the `client/` half. True for Node and Cloudflare server builds:
+ * the Node standalone server's static handler reads only `build.client`, and
+ * `@astrojs/cloudflare` declares `preserveBuildClientDir: true` and points the
+ * ASSETS binding in the `dist/server/wrangler.json` it generates at
+ * `../client` — the Worker serves that directory and nothing above it. A
+ * Cloudflare *static* build has no server dir to split against, so its
+ * `outDir` root is what ships.
+ */
+export const servesClientSubdir = (
+  deployment: ResolvedConfig["deployment"]
+): boolean =>
+  deployment.output === "server" &&
+  (deployment.adapter === "node" || deployment.adapter === "cloudflare");
+
+/**
  * Directory whose contents the deploy platform serves as static files. Build
  * artifacts (robots.txt, sitemap.xml, llms.txt, …) must be written here to be
  * served. For a Vercel server build that is the adapter's
- * `.vercel/output/static`; for a Node server build it is Astro's
- * `build.client` dir (`dist/client/`), the only directory the standalone
- * server's static handler reads from. Netlify publishes `dist/` itself and
- * Cloudflare serves the `outDir` root, so every other build serves `dist/`.
+ * `.vercel/output/static`; for a Node or Cloudflare server build it is Astro's
+ * `build.client` dir (`dist/client/` — see {@link servesClientSubdir}). Every
+ * other build serves `dist/` itself, Netlify included.
  */
 export const deployStaticDir = (
   config: ResolvedConfig,
@@ -62,7 +77,7 @@ export const deployStaticDir = (
     return join(context.root, ".vercel", "output", "static");
   }
   const dist = context.distDir ?? join(context.root, "dist");
-  if (output === "server" && adapter === "node") {
+  if (servesClientSubdir(config.deployment)) {
     return join(dist, "client");
   }
   return dist;

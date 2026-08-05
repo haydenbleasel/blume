@@ -104,6 +104,26 @@ describe("deployStaticDir", () => {
     ).toBe("/proj/dist/client");
   });
 
+  it("serves dist/client/ for a Cloudflare server build", () => {
+    // `@astrojs/cloudflare` declares `preserveBuildClientDir: true`, keeping
+    // Astro's `dist/client` + `dist/server` split, and points the ASSETS
+    // binding in the `dist/server/wrangler.json` it generates at `../client`.
+    // Artifacts written to `dist/` itself are above what the Worker serves.
+    const ctx = context("/proj");
+    expect(
+      deployStaticDir(config({ adapter: "cloudflare", output: "server" }), ctx)
+    ).toBe("/proj/dist/client");
+  });
+
+  it("serves dist/ for a Cloudflare static build", () => {
+    // A static build has no server dir to split against, so the `outDir` root
+    // is what ships — unchanged by the server-build fix above.
+    const ctx = context("/proj");
+    expect(
+      deployStaticDir(config({ adapter: "cloudflare", output: "static" }), ctx)
+    ).toBe("/proj/dist");
+  });
+
   it("falls back to <root>/dist when the context has no distDir", () => {
     // Exercises the "no distDir" fallback; distDir is optional (string), so
     // it must be undefined rather than null.

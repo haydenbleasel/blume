@@ -1,3 +1,4 @@
+import { isAssetIcon } from "../theme/icon-kind.ts";
 import { hasIcon } from "../theme/icons.ts";
 import type { Diagnostic, NavNode, Navigation, PageRecord } from "./types.ts";
 
@@ -8,12 +9,8 @@ import type { Diagnostic, NavNode, Navigation, PageRecord } from "./types.ts";
  * covers every source (config, folder meta, frontmatter) at once.
  */
 
-const IMAGE_ICON =
-  /^(?:https?:\/\/|data:image\/|\/|\.{1,2}\/)|\.(?:avif|gif|jpe?g|png|svg|webp)$/iu;
-
-/** Whether an icon string is an asset (image/URL/inline SVG), not a set name. */
-const isAssetIcon = (value: string): boolean =>
-  value.startsWith("<") || IMAGE_ICON.test(value);
+const ICON_SHAPE_HINT =
+  "Use a built-in icon name, an image path/URL, or inline SVG markup.";
 
 /** Flatten a sidebar tree to every node, descending into groups. */
 const flattenNodes = (nodes: NavNode[]): NavNode[] =>
@@ -66,9 +63,14 @@ const unknownIconDiagnostics = (
       continue;
     }
     seen.add(icon);
+    // Markup that isn't a complete <svg> element (an <img> tag, a truncated
+    // svg) is a shape problem, not a set-name typo — say so.
+    const message = icon.trimStart().startsWith("<")
+      ? `Icon markup "${icon}" (${where}) isn't a complete inline <svg> element, so it won't render.`
+      : `Unknown icon "${icon}" (${where}) — it isn't in Blume's icon set.`;
     diagnostics.push({
       code: "BLUME_UNKNOWN_ICON",
-      message: `Unknown icon "${icon}" (${where}) — it isn't in Blume's icon set.`,
+      message,
       severity: "warning",
       suggestion,
     });
@@ -78,16 +80,11 @@ const unknownIconDiagnostics = (
 
 /** Warn about icon names that aren't in Blume's set (skipping image/SVG icons). */
 export const validateNavIcons = (navigation: Navigation): Diagnostic[] =>
-  unknownIconDiagnostics(
-    collectIcons(navigation),
-    "Use a built-in icon name, an image path/URL, or inline SVG markup."
-  );
+  unknownIconDiagnostics(collectIcons(navigation), ICON_SHAPE_HINT);
 
 /**
- * Warn about unknown icons on curated `search.popular` links. Separate from
- * {@link validateNavIcons} because these live under `search`, not the built
- * navigation — and unlike nav icons they resolve in a *client* island, so only
- * set names work (an image/SVG icon quietly falls back to the file glyph).
+ * Warn about unknown icons on curated `search.popular` links. Same accepted
+ * input shapes as nav icons — resolved to markup on the server for the island.
  */
 export const validateSearchPopularIcons = (
   popular: { icon?: string; label: string }[]
@@ -97,25 +94,7 @@ export const validateSearchPopularIcons = (
       ? [{ icon: link.icon, where: `popular link "${link.label}"` }]
       : []
   );
-  // Asset icons are valid in the nav, so the shared helper skips them — but
-  // here they are exactly the silent failure this validator exists to catch.
-  const diagnostics: Diagnostic[] = [];
-  const seen = new Set<string>();
-  for (const { icon, where } of icons) {
-    if (isAssetIcon(icon) && !seen.has(icon)) {
-      seen.add(icon);
-      diagnostics.push({
-        code: "BLUME_UNKNOWN_ICON",
-        message: `Icon "${icon}" (${where}) is an image or inline SVG — popular links render in the client search island, where only built-in icon names resolve, so it falls back to the file glyph.`,
-        severity: "warning",
-        suggestion: "Use a built-in icon name.",
-      });
-    }
-  }
-  return [
-    ...diagnostics,
-    ...unknownIconDiagnostics(icons, "Use a built-in icon name."),
-  ];
+  return unknownIconDiagnostics(icons, ICON_SHAPE_HINT);
 };
 
 /** Whether an internal path resolves to a page or a section that has pages. */

@@ -173,6 +173,14 @@ describe("isolatedStaticDir", () => {
       const config = (deployment) => ({ deployment });
       console.log(
         JSON.stringify({
+          cloudflareServer: isolatedStaticDir(
+            config({ adapter: "cloudflare", output: "server" }),
+            context
+          ),
+          cloudflareStatic: isolatedStaticDir(
+            config({ adapter: "cloudflare", output: "static" }),
+            context
+          ),
           missingDist: isolatedStaticDir(
             config({ output: "static" }),
             { ...context, distDir: null }
@@ -200,6 +208,12 @@ describe("isolatedStaticDir", () => {
     expect(parsed.static).toBe("/proj/.blume-verify/dist");
     // Node's standalone server serves only Astro's `build.client` dir.
     expect(parsed.nodeServer).toBe("/proj/.blume-verify/dist/client");
+    // `@astrojs/cloudflare` keeps the same client/server split and serves
+    // `dist/client` through the generated wrangler config's ASSETS binding, so
+    // the bundle report must measure there rather than a directory above it.
+    expect(parsed.cloudflareServer).toBe("/proj/.blume-verify/dist/client");
+    // A Cloudflare static build has no split — the `outDir` root ships as-is.
+    expect(parsed.cloudflareStatic).toBe("/proj/.blume-verify/dist");
     expect(parsed.missingDist).toBe("/proj/.blume-verify/dist");
   });
 });
