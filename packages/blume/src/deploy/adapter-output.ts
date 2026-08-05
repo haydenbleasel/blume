@@ -65,16 +65,18 @@ export const servesClientSubdir = (
  * serves. True for every static build (Netlify and Cloudflare Pages/Workers
  * both read it) and, additionally, for a **Cloudflare server** build: the
  * Worker serves `dist/client` through its ASSETS binding, and Workers static
- * assets honour `_headers` from that directory exactly as Pages does.
+ * assets honor `_headers` from that directory exactly as Pages does.
  *
  * Deliberately not true for a Node server build. Node's standalone server has
  * its own static handler with no `_headers` support, so writing the file there
  * would be inert — and reporting a header that is not applied is worse than
  * omitting it.
  *
- * Vercel is excluded because its headers arrive through the routing config
- * instead (see `deploy/vercel-negotiation.ts`), which `_headers` would
- * duplicate rather than complement.
+ * A Vercel **server** build is excluded because its headers arrive through the
+ * routing config instead (see `deploy/vercel-negotiation.ts`), which
+ * `_headers` would duplicate rather than complement. A *static* build on the
+ * Vercel adapter still returns true: Vercel ignores the file, so it is inert
+ * there, matching what the old `output === "static"` gate emitted.
  */
 export const readsHeaderFiles = (
   deployment: ResolvedConfig["deployment"]

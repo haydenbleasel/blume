@@ -151,14 +151,17 @@ const emitRedirectFiles = async (
  *
  * Gated on {@link readsHeaderFiles}, not on `output === "static"`. A **Cloudflare
  * server** build serves `dist/client` through the Worker's ASSETS binding, and
- * Workers static assets honour `_headers` from that directory — so the file
+ * Workers static assets honor `_headers` from that directory — so the file
  * applies there too, and skipping it left every Cloudflare server build with no
  * `Link` header and no media type on its own discovery files. The charset half
  * of this file *is* redundant on a server build, because the runtime endpoint
  * sets Content-Type on the Response itself; the `Link` and well-known halves are
  * not, and one conclusion about the first was applied to all three.
+ *
+ * Exported for the test suite, which exercises it in a subprocess like the
+ * other command helpers.
  */
-const emitHeaderFiles = async (
+export const emitHeaderFiles = async (
   project: BlumeProject,
   distDir: string
 ): Promise<void> => {
