@@ -6,8 +6,10 @@ import { join } from "pathe";
 
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
+import type { ResolvedConfig } from "../src/core/schema.ts";
 import type { PageRecord, RouteManifestEntry } from "../src/core/types.ts";
 import { buildSearchDocuments } from "../src/search/documents.ts";
+import { pageFacets } from "../src/search/facets.ts";
 
 let root: string;
 
@@ -51,7 +53,11 @@ const projectWith = (
   pages: PageRecord[],
   routes: RouteManifestEntry[]
 ): BlumeProject =>
-  ({ graph: { pages }, manifest: { routes } }) as unknown as BlumeProject;
+  ({
+    config: blumeConfigSchema.parse({}),
+    graph: { pages },
+    manifest: { routes },
+  }) as unknown as BlumeProject;
 
 const VIS_BODY = [
   "---",
@@ -83,7 +89,88 @@ afterAll(async () => {
   await rm(root, { force: true, recursive: true });
 });
 
+/** A resolved config with the given facet names declared for `type: rfc`. */
+const configWithRfcFacets = (facets: string[]): ResolvedConfig => {
+  const base = blumeConfigSchema.parse({});
+  return {
+    ...base,
+    // Bypasses parse-time facet validation (which needs schema fixtures);
+    // `pageFacets` reads only the resolved declaration.
+    content: {
+      ...base.content,
+      types: { rfc: { facets, frontmatter: {} } },
+    },
+  };
+};
+
+describe("pageFacets", () => {
+  it("resolves declared facets, stringifying numbers and booleans", () => {
+    const facets = pageFacets(
+      {
+        contentType: "rfc",
+        custom: {
+          domain: "architecture",
+          enforced: true,
+          revision: 3,
+          undeclared: "ignored",
+        },
+      },
+      configWithRfcFacets(["domain", "enforced", "revision", "absent"])
+    );
+    expect(facets).toStrictEqual({
+      domain: "architecture",
+      enforced: "true",
+      revision: "3",
+    });
+  });
+
+  it("skips non-scalar values and returns undefined when nothing facets", () => {
+    const config = configWithRfcFacets(["meta"]);
+    expect(
+      pageFacets(
+        { contentType: "rfc", custom: { meta: { nested: 1 } } },
+        config
+      )
+    ).toBeUndefined();
+    // No custom values, an undeclared type, and no facet declaration all
+    // resolve to "no facets" rather than an empty object.
+    expect(pageFacets({ contentType: "rfc" }, config)).toBeUndefined();
+    expect(
+      pageFacets({ contentType: "doc", custom: { meta: "x" } }, config)
+    ).toBeUndefined();
+    expect(
+      pageFacets(
+        { contentType: "rfc", custom: { meta: "x" } },
+        configWithRfcFacets([])
+      )
+    ).toBeUndefined();
+  });
+});
+
 describe("buildSearchDocuments", () => {
+  it("emits declared facet values and omits the field elsewhere", async () => {
+    const project = {
+      config: configWithRfcFacets(["status"]),
+      graph: {
+        pages: [
+          page({
+            contentType: "rfc",
+            custom: { status: "enforced" },
+            id: "a.md",
+          }),
+        ],
+      },
+      manifest: { routes: [route({ contentType: "rfc" })] },
+    } as unknown as BlumeProject;
+    const [doc] = await buildSearchDocuments(project);
+    expect(doc?.facets).toStrictEqual({ status: "enforced" });
+
+    const [plain] = await buildSearchDocuments(
+      projectWith([page({ id: "a.md" })], [route({})])
+    );
+    expect(plain && "facets" in plain).toBe(false);
+  });
+
   it("indexes only indexable routes, in manifest order", async () => {
     const docs = await buildSearchDocuments(
       projectWith(

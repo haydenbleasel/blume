@@ -259,6 +259,18 @@ The server exposes read-only tools — `search_docs`, `get_page`, `list_pages`, 
 
 `search_docs` and `list_pages` both accept an optional `contentTypes` filter, narrowing results to pages of the given frontmatter [`type`s](/docs/reference/frontmatter) — `["rfc"]`, `["blog", "changelog"]` — so an agent working against a site that mixes docs with RFCs, runbooks, or policies can scope retrieval to the kind of page it needs. Every result names its content type, and `list_pages` output shows the types in use.
 
+Both tools also accept a `filters` object matching against the facets a site declares per content type ([`content.types.<type>.facets`](/docs/configuration#frontmatter)) — custom frontmatter keys whose values become filterable metadata:
+
+```json
+{
+  "query": "OpenAPI request schemas",
+  "contentTypes": ["rfc"],
+  "filters": { "domain": "architecture", "status": "enforced" }
+}
+```
+
+Every `filters` entry must match (results carry their facet values, and `list_pages` shows each page's), so a knowledge base can drive progressive-disclosure agent workflows — enumerate the enforced standards, search only within them — without any server of its own.
+
 ### Server output required
 
 The MCP server is a live endpoint (`/mcp`), so it can't run on a static build. Switch to server output and pick an adapter:

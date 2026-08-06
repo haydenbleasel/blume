@@ -244,6 +244,7 @@ describe("MCP content-type filtering", () => {
         content: "RFC: how Blume endpoints declare request schemas.",
         contentType: "rfc",
         description: "RFC for request validation",
+        facets: { domain: "architecture", status: "enforced" },
         route: "/rfcs/schemas",
         title: "Request schemas",
       },
@@ -253,6 +254,7 @@ describe("MCP content-type filtering", () => {
       {
         contentType: "rfc",
         description: "RFC for request validation",
+        facets: { domain: "architecture", status: "enforced" },
         indexable: true,
         lastModified: null,
         route: "/rfcs/schemas",
@@ -316,6 +318,54 @@ describe("MCP content-type filtering", () => {
 
     const all = JSON.parse(
       await callTyped("list_pages", { contentTypes: ["doc", "rfc"] })
+    ) as unknown[];
+    expect(all.length).toBe(3);
+  });
+
+  it("search_docs filters hits by declared facet values", async () => {
+    const enforced = JSON.parse(
+      await callTyped("search_docs", {
+        filters: { status: "enforced" },
+        query: "blume",
+      })
+    ) as { facets?: Record<string, string>; route: string }[];
+    expect(enforced.map((hit) => hit.route)).toEqual(["/rfcs/schemas"]);
+    // Hits carry their facet values, so an agent sees why a page matched.
+    expect(enforced[0]?.facets).toStrictEqual({
+      domain: "architecture",
+      status: "enforced",
+    });
+
+    const none = JSON.parse(
+      await callTyped("search_docs", {
+        filters: { status: "draft" },
+        query: "blume",
+      })
+    ) as unknown[];
+    expect(none).toEqual([]);
+  });
+
+  it("list_pages filters routes by facets, composing with contentTypes", async () => {
+    const enforced = JSON.parse(
+      await callTyped("list_pages", {
+        contentTypes: ["rfc"],
+        filters: { domain: "architecture", status: "enforced" },
+      })
+    ) as { facets?: Record<string, string>; route: string }[];
+    expect(enforced.map((page) => page.route)).toEqual(["/rfcs/schemas"]);
+    expect(enforced[0]?.facets).toStrictEqual({
+      domain: "architecture",
+      status: "enforced",
+    });
+
+    // Pages without facet values never match a facet filter...
+    const none = JSON.parse(
+      await callTyped("list_pages", { filters: { status: "draft" } })
+    ) as unknown[];
+    expect(none).toEqual([]);
+    // ...and an empty filters object means "no filter".
+    const all = JSON.parse(
+      await callTyped("list_pages", { filters: {} })
     ) as unknown[];
     expect(all.length).toBe(3);
   });
@@ -550,6 +600,56 @@ describe("orama index helpers", () => {
     ]);
     // An empty list means "no filter", matching the MCP tool contract.
     const all = await queryOramaIndex(db, "blume", 5, { contentTypes: [] });
+    expect(all.length).toBe(3);
+  });
+
+  it("filters results to documents matching every facet", async () => {
+    const db = await buildOramaIndex([
+      {
+        content: "Blume RFC on request schemas.",
+        contentType: "rfc",
+        description: "",
+        facets: { domain: "architecture", status: "enforced" },
+        route: "/rfcs/schemas",
+        title: "Request schemas",
+      },
+      {
+        content: "Blume RFC on naming conventions.",
+        contentType: "rfc",
+        description: "",
+        facets: { domain: "architecture", status: "draft" },
+        route: "/rfcs/naming",
+        title: "Naming",
+      },
+      {
+        // No facets: excluded by any facet filter.
+        content: "Blume installation guide.",
+        contentType: "doc",
+        description: "",
+        route: "/install",
+        title: "Install",
+      },
+    ]);
+    // Every entry must match (AND semantics across keys).
+    const enforced = await queryOramaIndex(db, "blume", 5, {
+      facets: { domain: "architecture", status: "enforced" },
+    });
+    expect(enforced.map((doc) => doc.route)).toEqual(["/rfcs/schemas"]);
+    const architecture = await queryOramaIndex(db, "blume", 5, {
+      facets: { domain: "architecture" },
+    });
+    expect(architecture.map((doc) => doc.route).toSorted()).toEqual([
+      "/rfcs/naming",
+      "/rfcs/schemas",
+    ]);
+    // Facet filters compose with the content-type filter.
+    const composed = await queryOramaIndex(db, "blume", 5, {
+      contentTypes: ["rfc"],
+      facets: { status: "draft" },
+    });
+    expect(composed.map((doc) => doc.route)).toEqual(["/rfcs/naming"]);
+    // An empty map means "no filter".
+    const all = await queryOramaIndex(db, "blume", 5, { facets: {} });
     expect(all.length).toBe(3);
   });
 
@@ -936,6 +1036,35 @@ afterAll(async () => {
 });
 
 describe("buildMcpData", () => {
+  it("carries declared facet values onto routes and search documents", async () => {
+    const project = await scanFixture({
+      "blume.config.ts": `const str = {
+  "~standard": {
+    version: 1,
+    vendor: "test",
+    validate: (value) =>
+      typeof value === "string"
+        ? { value }
+        : { issues: [{ message: "must be a string" }] },
+  },
+};
+export default { content: { types: { rfc: { facets: ["status"], frontmatter: { status: str } } } } };`,
+      "docs/guide.md": "---\ntitle: Guide\n---\n# Guide\n\nPlain doc.\n",
+      "docs/rfc.md":
+        "---\ntitle: RFC 1\ntype: rfc\nstatus: enforced\n---\n# RFC 1\n\nBody.\n",
+    });
+
+    const data = await buildMcpData(project);
+
+    const rfcRoute = data.routes.find((route) => route.route === "/rfc");
+    expect(rfcRoute?.facets).toStrictEqual({ status: "enforced" });
+    const rfcDoc = data.documents.find((doc) => doc.route === "/rfc");
+    expect(rfcDoc?.facets).toStrictEqual({ status: "enforced" });
+    // Pages without declared facets omit the field entirely.
+    const guide = data.routes.find((route) => route.route === "/guide");
+    expect(guide && "facets" in guide).toBe(false);
+  });
+
   it("builds a snapshot, honoring config and filtering hidden routes", async () => {
     const project = await scanFixture({
       "blume.config.ts":

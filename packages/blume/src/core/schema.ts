@@ -383,6 +383,15 @@ export type ContentSourceConfig = z.infer<typeof contentSourceSchema>;
  */
 const contentTypeConfigSchema = z.strictObject({
   /**
+   * Custom frontmatter keys whose values become filterable facets for pages
+   * of this type — surfaced in search documents and filterable through the
+   * MCP tools' `filters` input. Each name must be a custom key declared for
+   * the type (in its `frontmatter` map or the site-wide `frontmatter.extend`),
+   * checked at the config level where both maps are visible. Only string
+   * (or number/boolean, stringified) values ever facet.
+   */
+  facets: z.array(z.string()).default([]),
+  /**
    * Custom frontmatter keys for pages of this type, layered on top of the
    * site-wide `frontmatter.extend`. Every declared key is validated on every
    * page of the type — absent ones included — so a required schema enforces
@@ -1565,6 +1574,23 @@ export const blumeConfigSchema = z
             code: z.ZodIssueCode.custom,
             message: `"${key}" is already declared in frontmatter.extend and cannot be redeclared for type "${typeName}".`,
             path: ["content", "types", typeName, "frontmatter", key],
+          });
+        }
+      }
+      // A facet with no declared key could never carry a value — pages can't
+      // even set the key — so it's a config mistake, caught here where both
+      // the per-type map and the site-wide extend are visible.
+      for (const [position, facet] of typeConfig.facets.entries()) {
+        if (
+          !(
+            Object.hasOwn(typeConfig.frontmatter, facet) ||
+            Object.hasOwn(config.frontmatter.extend, facet)
+          )
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Facet "${facet}" for type "${typeName}" is not a declared custom frontmatter key — add it to the type's frontmatter map or frontmatter.extend.`,
+            path: ["content", "types", typeName, "facets", position],
           });
         }
       }

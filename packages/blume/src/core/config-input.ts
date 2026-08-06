@@ -297,6 +297,29 @@ export interface ContentConfig {
  */
 export interface ContentTypeConfig {
   /**
+   * Custom frontmatter keys whose values become filterable facets for pages
+   * of this type. Faceted values ride along on search documents
+   * (`blume-search.json` and the MCP index), and the MCP `search_docs` and
+   * `list_pages` tools accept a `filters` input matching against them:
+   *
+   * ```ts
+   * content: {
+   *   types: {
+   *     rfc: {
+   *       facets: ["domain", "status"],
+   *       frontmatter: { domain: z.string(), status: z.string() },
+   *     },
+   *   },
+   * },
+   * ```
+   *
+   * Each name must be a custom key declared for the type — in its
+   * `frontmatter` map or the site-wide `frontmatter.extend`. String values
+   * facet as-is; numbers and booleans are stringified; anything else
+   * (objects, arrays, transformed dates) does not facet.
+   */
+  facets?: string[];
+  /**
    * Custom frontmatter keys for pages of this type, layered on top of the
    * site-wide `frontmatter.extend` (a key can be declared in one or the
    * other, not both). Schemas follow the same rules as `extend`: any

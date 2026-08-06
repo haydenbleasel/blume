@@ -2,6 +2,7 @@ import { normalizeBasePath } from "../../core/base-path.ts";
 import type { BlumeProject } from "../../core/project-graph.ts";
 import type { Navigation } from "../../core/types.ts";
 import { buildSearchDocuments } from "../../search/documents.ts";
+import { pageFacets } from "../../search/facets.ts";
 import type { OramaDoc } from "../../search/orama-index.ts";
 import { agentMarkdown, buildRawMarkdown } from "../markdown.ts";
 
@@ -9,6 +10,8 @@ import { agentMarkdown, buildRawMarkdown } from "../markdown.ts";
 export interface McpRoute {
   contentType: string;
   description?: string;
+  /** Declared facet values (`content.types.<type>.facets`), key → value. */
+  facets?: Record<string, string>;
   indexable: boolean;
   lastModified: string | null;
   route: string;
@@ -67,18 +70,19 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
     ])
   );
 
-  const descriptionById = new Map(
-    graph.pages.map((page) => [page.id, page.description])
-  );
+  const pageById = new Map(graph.pages.map((page) => [page.id, page]));
 
   const routes: McpRoute[] = [];
   for (const route of manifest.routes) {
     if (route.hidden) {
       continue;
     }
+    const page = pageById.get(route.id);
+    const facets = page ? pageFacets(page, config) : undefined;
     routes.push({
       contentType: route.contentType,
-      description: descriptionById.get(route.id),
+      description: page?.description,
+      ...(facets ? { facets } : {}),
       indexable: route.indexable,
       lastModified: route.lastModified ?? null,
       route: route.path,
@@ -93,6 +97,7 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
       content: doc.content,
       contentType: doc.contentType,
       description: doc.description,
+      ...(doc.facets ? { facets: doc.facets } : {}),
       route: doc.route,
       title: doc.title,
     })),

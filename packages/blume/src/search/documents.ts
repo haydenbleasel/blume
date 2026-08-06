@@ -5,6 +5,7 @@ import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readEntryText } from "../core/sources/read.ts";
 import type { NavNode } from "../core/types.ts";
+import { pageFacets } from "./facets.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
 export interface SearchDocument {
@@ -22,6 +23,11 @@ export interface SearchDocument {
   contentType: string;
   /** Frontmatter `search.tags`, surfaced for hosted-provider faceting. */
   tags?: string[];
+  /**
+   * Declared facet values (`content.types.<type>.facets`), key → value.
+   * Filterable through the MCP tools' `filters` input.
+   */
+  facets?: Record<string, string>;
 }
 
 /**
@@ -195,11 +201,13 @@ export const buildSearchDocuments = async (
         options?.content === "markdown" ? visible.trim() : toPlainText(visible);
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
+      const facets = page ? pageFacets(page, project.config) : undefined;
       return {
         breadcrumb: crumb?.breadcrumb ?? [],
         content: body,
         contentType: route.contentType,
         description: page?.description ?? "",
+        ...(facets ? { facets } : {}),
         locale: route.locale,
         route: route.path,
         section: crumb?.section || "Docs",

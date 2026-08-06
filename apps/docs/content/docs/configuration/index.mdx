@@ -241,6 +241,7 @@ export default defineConfig({
   content: {
     types: {
       rfc: {
+        facets: ["domain", "status"],
         frontmatter: {
           domain: z.string(),
           status: z.enum(["draft", "review", "enforced"]),
@@ -252,6 +253,8 @@ export default defineConfig({
 ```
 
 A key can be declared site-wide or per-type, not both. See [Per-type keys](/docs/reference/frontmatter#per-type-keys) for how the scoping resolves.
+
+`facets` names the custom keys whose values become filterable metadata: they ride along on search documents (`blume-search.json` and the MCP index), and the [MCP tools](/docs/configuration/ai#mcp-server) accept a `filters` input matching against them, so an agent can retrieve, say, only `enforced` RFCs in the `architecture` domain. Each facet must be a declared custom key — per-type or site-wide — and only string (or stringified number/boolean) values facet.
 
 ## GitHub
 

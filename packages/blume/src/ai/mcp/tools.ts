@@ -19,7 +19,7 @@ export const MCP_TOOLS: McpToolMeta[] = [
   {
     annotations: READ_ONLY,
     description:
-      "Full-text search across the documentation. Returns matching pages with their title, route, content type, and a short excerpt; pass `contentTypes` to search only pages of certain types (e.g. `rfc`, `changelog`). Use this first to discover relevant pages, then `get_page` to read one in full.",
+      'Full-text search across the documentation. Returns matching pages with their title, route, content type, and a short excerpt; pass `contentTypes` to search only pages of certain types (e.g. `rfc`, `changelog`), and `filters` to require facet values the site declares per type (e.g. `{"status": "enforced"}`). Use this first to discover relevant pages, then `get_page` to read one in full.',
     name: "search_docs",
     title: "Search documentation",
   },
@@ -33,7 +33,7 @@ export const MCP_TOOLS: McpToolMeta[] = [
   {
     annotations: READ_ONLY,
     description:
-      "List every documentation page with its route, title, description, and content type; pass `contentTypes` to list only pages of certain types. Useful for enumerating the docs or finding a page when search is too narrow.",
+      "List every documentation page with its route, title, description, content type, and any declared facet values; pass `contentTypes` and/or `filters` to narrow the list. Useful for enumerating the docs, discovering the types and facets in use, or finding a page when search is too narrow.",
     name: "list_pages",
     title: "List pages",
   },
