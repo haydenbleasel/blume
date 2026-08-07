@@ -370,6 +370,14 @@ const emitCloudflareNegotiation = async (
       base: config.deployment.base,
       homeLinkHeader: buildHomeLinkHeader(config, routePaths),
       homeTokens: home ? markdownTokenCount(agentMarkdown(home)) : undefined,
+      // Worker-first rules match the served URL, so the redirects are based
+      // the same way the platform files are — and they have to be exempted, or
+      // the Worker answers instead of `_redirects` and defaults their status.
+      redirectPaths: applyBaseToPlatformRedirects(
+        config.redirects,
+        config.basePath,
+        config.deployment.base ?? ""
+      ).map((redirect) => redirect.from),
       routePaths,
     }
   );

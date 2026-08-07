@@ -27,6 +27,13 @@ const ROUTES = [
 
 const HOME_LINK = '</llms.txt>; rel="describedby"; type="text/plain"';
 
+/**
+ * Served paths of configured redirects, as `deploy/redirects.ts` bases them for
+ * a host platform file: the retired `/docs/api` section of a site whose content
+ * lives under `basePath: "/docs"`.
+ */
+const REDIRECTS = ["/docs/api", "/docs/api/get-trace", "/docs/api/run-query"];
+
 /** The adapter-shaped `dist/server/wrangler.json` the injection rewrites. */
 const wranglerConfig = (overrides: Record<string, unknown> = {}): string =>
   JSON.stringify({
@@ -400,6 +407,102 @@ describe("buildRunWorkerFirstRules", () => {
       "!/site/_astro/*",
     ]);
   });
+
+  /**
+   * A configured redirect keeps its status only on Cloudflare's static layer,
+   * which reads the `_redirects` the adapter writes from Astro's `redirects`.
+   * Inside `run_worker_first` that layer never runs: the Worker answers, and
+   * Astro's SSR redirect handler defaults a GET to 301 unless the destination
+   * resolves to a discrete route — which it never does here, because Blume
+   * serves every page from `[...slug]`. So a redirect swallowed by a content
+   * group ships the user's 302 as a permanent 301. Exempting it is the fix.
+   */
+  it("exempts a redirect swallowed by a content group", () => {
+    expect(
+      buildRunWorkerFirstRules(["/", "/docs/reference"], undefined, [
+        "/docs/api",
+      ])
+    ).toStrictEqual([
+      "/",
+      "/docs/*",
+      "!/docs/*.md",
+      "!/docs/*.mdx",
+      "!/docs/api",
+      "!/docs/api/",
+    ]);
+  });
+
+  it("collapses a nested redirect family into one glob", () => {
+    // Wrangler rejects a rule another glob makes redundant, so the collapsed
+    // form pairs `!/docs/api` with `!/docs/api/*` and drops the members —
+    // exactly two rules however many URLs the retired section had.
+    expect(
+      buildRunWorkerFirstRules(["/", "/docs/reference"], undefined, REDIRECTS)
+    ).toStrictEqual([
+      "/",
+      "/docs/*",
+      "!/docs/*.md",
+      "!/docs/*.mdx",
+      "!/docs/api",
+      "!/docs/api/*",
+    ]);
+  });
+
+  it("does not collapse over a content route living under the redirect", () => {
+    // `/docs/api/*` would take `/docs/api/live` off the Worker and break its
+    // Markdown negotiation, so the members stay spelled out.
+    expect(
+      buildRunWorkerFirstRules(["/", "/docs/api/live"], undefined, [
+        "/docs/api",
+        "/docs/api/run-query",
+      ])
+    ).toStrictEqual([
+      "/",
+      "/docs/*",
+      "!/docs/*.md",
+      "!/docs/*.mdx",
+      "!/docs/api",
+      "!/docs/api/",
+      "!/docs/api/run-query",
+      "!/docs/api/run-query/",
+    ]);
+  });
+
+  it("ignores a redirect no generated rule would have claimed", () => {
+    // `/github` is already on the static layer: a rule for it would be noise,
+    // and every rule spent here counts against Wrangler's cap of 100.
+    expect(
+      buildRunWorkerFirstRules(["/", "/docs/reference"], undefined, ["/github"])
+    ).toStrictEqual(["/", "/docs/*", "!/docs/*.md", "!/docs/*.mdx"]);
+  });
+
+  it("never exempts a path that is also a content route", () => {
+    // A page and a redirect cannot both own a path; the page wins, since
+    // exempting it would silently disable negotiation for a real route.
+    expect(
+      buildRunWorkerFirstRules(["/", "/docs/reference"], undefined, [
+        "/docs/reference",
+      ])
+    ).toStrictEqual(["/", "/docs/*", "!/docs/*.md", "!/docs/*.mdx"]);
+  });
+
+  it("exempts redirects under the base on a subpath deploy", () => {
+    expect(
+      buildRunWorkerFirstRules(["/", "/docs/a"], "/site/", [
+        "/site/docs/api",
+        "/site/docs/api/run-query",
+      ])
+    ).toStrictEqual([
+      "/site",
+      "/site/*",
+      "!/site/*.md",
+      "!/site/*.mdx",
+      "!/site/*.txt",
+      "!/site/_astro/*",
+      "!/site/docs/api",
+      "!/site/docs/api/*",
+    ]);
+  });
 });
 
 describe("mergeRunWorkerFirstRules", () => {
@@ -519,6 +622,60 @@ describe("injectWorkerNegotiation", () => {
       "!/*.mdx",
       "!/*.txt",
     ]);
+  });
+
+  it("exempts configured redirects from the worker-first rules", () => {
+    const result = injectWorkerNegotiation(wranglerConfig(), {
+      redirectPaths: REDIRECTS,
+      routePaths: ["/", "/docs/reference"],
+    });
+    const config = JSON.parse(result?.wrangler ?? "");
+    expect(config.assets.run_worker_first).toStrictEqual([
+      "/",
+      "/docs/*",
+      "!/docs/*.md",
+      "!/docs/*.mdx",
+      "!/docs/api",
+      "!/docs/api/*",
+    ]);
+    // Wrangler rejects a set with no positive rule, so one must always survive.
+    expect(
+      config.assets.run_worker_first.some(
+        (rule: string) => !rule.startsWith("!")
+      )
+    ).toBe(true);
+  });
+
+  it("keeps redirect exemptions when falling back to the coarse rules", () => {
+    // `/*` claims every path, so the exemptions matter more here, not less:
+    // without them every configured redirect would lose its status.
+    const result = injectWorkerNegotiation(wranglerConfig(), {
+      redirectPaths: ["/docs/api"],
+      routePaths: Array.from({ length: 80 }, (_, i) => `/page-${i}`),
+    });
+    const config = JSON.parse(result?.wrangler ?? "");
+    expect(config.assets.run_worker_first).toStrictEqual([
+      "/*",
+      "!/_astro/*",
+      "!/*.md",
+      "!/*.mdx",
+      "!/*.txt",
+      "!/docs/api",
+      "!/docs/api/",
+    ]);
+  });
+
+  it("skips the negotiation when the exemptions cannot fit", () => {
+    // Correct redirect statuses outrank negotiation: returning null leaves
+    // `run_worker_first` unset, so the static layer serves every redirect with
+    // the configured status and the raw `.md` URLs stay reachable directly.
+    const many = Array.from({ length: 60 }, (_, i) => `/docs/gone-${i}`);
+    expect(
+      injectWorkerNegotiation(wranglerConfig(), {
+        redirectPaths: many,
+        routePaths: ["/", "/docs/reference"],
+      })
+    ).toBeNull();
   });
 
   it("returns null when even the fallback cannot fit", () => {
