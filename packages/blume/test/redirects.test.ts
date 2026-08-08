@@ -1,11 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
+import type { ResolvedConfig } from "../src/core/schema.ts";
 import {
   applyBaseToAstroRedirects,
   applyBaseToPlatformRedirects,
   buildNetlifyRedirects,
   buildRedirectManifest,
   buildVercelConfig,
+  platformRedirects,
 } from "../src/deploy/redirects.ts";
 
 const redirects = [
@@ -44,6 +46,26 @@ describe("redirect emitters", () => {
     // No base of either kind: the redirects pass through untouched.
     expect(applyBaseToAstroRedirects(redirects, "", "")).toBe(redirects);
     expect(applyBaseToPlatformRedirects(redirects, "", "")).toBe(redirects);
+  });
+
+  it("bases redirects from the resolved config via platformRedirects", () => {
+    // The one spelling every platform consumer (redirect files, Cloudflare
+    // worker-first exemptions) must share: both sides carry the full
+    // `{deployment.base}{basePath}` stack.
+    const config = {
+      basePath: "/docs",
+      deployment: { base: "/base" },
+      redirects,
+    } as ResolvedConfig;
+    expect(platformRedirects(config)).toStrictEqual(
+      applyBaseToPlatformRedirects(redirects, "/docs", "/base")
+    );
+    const unbased = {
+      basePath: "",
+      deployment: {},
+      redirects,
+    } as ResolvedConfig;
+    expect(platformRedirects(unbased)).toBe(redirects);
   });
 
   it("bases only `to` for Astro, which applies `base` to `from` itself", () => {

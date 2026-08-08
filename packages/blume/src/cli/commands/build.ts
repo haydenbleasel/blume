@@ -48,10 +48,10 @@ import {
 } from "../../deploy/cloudflare-negotiation.ts";
 import { buildNetlifyHeaders } from "../../deploy/headers.ts";
 import {
-  applyBaseToPlatformRedirects,
   buildNetlifyRedirects,
   buildRedirectManifest,
   buildVercelConfig,
+  platformRedirects,
 } from "../../deploy/redirects.ts";
 import { buildRobots } from "../../deploy/robots.ts";
 import { buildSitemap } from "../../deploy/sitemap.ts";
@@ -105,11 +105,7 @@ const emitRedirectFiles = async (
   config: ResolvedConfig,
   distDir: string
 ): Promise<void> => {
-  const redirects = applyBaseToPlatformRedirects(
-    config.redirects,
-    config.basePath,
-    config.deployment.base ?? ""
-  );
+  const redirects = platformRedirects(config);
   if (redirects.length === 0 || config.deployment.output !== "static") {
     return;
   }
@@ -368,16 +364,16 @@ const emitCloudflareNegotiation = async (
     await readFile(wranglerPath, "utf-8"),
     {
       base: config.deployment.base,
+      // The manifest routes guard the redirect exemptions; `routePaths` also
+      // carries the synthesized homepage mirror, which must not block a
+      // configured root redirect.
+      contentRoutePaths: project.manifest.routes.map((route) => route.path),
       homeLinkHeader: buildHomeLinkHeader(config, routePaths),
       homeTokens: home ? markdownTokenCount(agentMarkdown(home)) : undefined,
       // Worker-first rules match the served URL, so the redirects are based
       // the same way the platform files are — and they have to be exempted, or
       // the Worker answers instead of `_redirects` and defaults their status.
-      redirectPaths: applyBaseToPlatformRedirects(
-        config.redirects,
-        config.basePath,
-        config.deployment.base ?? ""
-      ).map((redirect) => redirect.from),
+      redirectPaths: platformRedirects(config).map((redirect) => redirect.from),
       routePaths,
     }
   );

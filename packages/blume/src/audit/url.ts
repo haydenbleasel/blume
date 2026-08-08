@@ -1,4 +1,8 @@
-import { stripBasePath } from "../core/base-path.ts";
+import { normalizePath, stripBasePath } from "../core/base-path.ts";
+
+// Re-exported from its home next to the other path helpers; the audit checks
+// (and their tests) import it from here.
+export { normalizePath } from "../core/base-path.ts";
 
 /** What an `href` in built HTML turned out to point at. */
 export type ResolvedHref =
@@ -12,15 +16,6 @@ export type ResolvedHref =
   | { kind: "ignored" };
 
 const NON_HTTP_SCHEME = /^(?!https?:)[a-z][a-z0-9+.-]*:/iu;
-
-/**
- * Normalize a site path for comparison: drop the trailing slash (Astro serves
- * `/docs` and `/docs/` as the same page) and collapse an empty path to `/`.
- */
-export const normalizePath = (path: string): string => {
-  const trimmed = path.replace(/\/+$/u, "");
-  return trimmed === "" ? "/" : trimmed;
-};
 
 /**
  * Percent-decode a pathname for comparison against the built file tree. Page

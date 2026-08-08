@@ -29,6 +29,15 @@ export const normalizeBasePath = (input?: string): string => {
 };
 
 /**
+ * Normalize a served path for comparison: drop the trailing slash (Astro serves
+ * `/docs` and `/docs/` as the same page) and collapse an empty path to `/`.
+ */
+export const normalizePath = (path: string): string => {
+  const trimmed = path.replace(/\/+$/u, "");
+  return trimmed === "" ? "/" : trimmed;
+};
+
+/**
  * Whether a link target is a root-relative internal path (`/x`) — the only
  * shape a base path applies to. Protocol-relative (`//host`), absolute URLs,
  * other schemes (`mailto:`), fragments (`#x`), and relative paths are excluded.

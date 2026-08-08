@@ -68,6 +68,19 @@ export const applyBaseToPlatformRedirects = (
     : redirects;
 };
 
+/**
+ * The configured redirects as the host platform matches them, via
+ * {@link applyBaseToPlatformRedirects}. The one basing every consumer must
+ * share: the emitted redirect files and the Cloudflare worker-first redirect
+ * exemptions both compare these paths against real served URLs.
+ */
+export const platformRedirects = (config: ResolvedConfig): Redirect[] =>
+  applyBaseToPlatformRedirects(
+    config.redirects,
+    config.basePath,
+    config.deployment.base ?? ""
+  );
+
 /** `_redirects` text (Netlify + Cloudflare Pages): `from to status` per line. */
 export const buildNetlifyRedirects = (redirects: Redirect[]): string =>
   `${redirects
