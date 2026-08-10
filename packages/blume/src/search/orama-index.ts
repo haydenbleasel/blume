@@ -80,6 +80,16 @@ const BIGRAM_SCRIPTS =
   /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}々〆〇ーﾞﾟ]+$/u;
 
 /**
+ * What separates terms inside a single word-like segment. Being word-like does
+ * not make a segment all letters: UAX #29 keeps connector punctuation,
+ * combining marks, format characters and mid-number punctuation *within* a
+ * word, so `Intl.Segmenter` reports スネーク_ケース and 1,000 as one segment
+ * each. Splitting on everything that is neither a letter nor a digit keeps
+ * those characters out of the terms they would otherwise ride along in.
+ */
+const NON_TERM = /[^\p{L}\p{N}]+/u;
+
+/**
  * Emit every overlapping 2-character window of `run`, or the lone character.
  * Windows are cut by code point: an ideograph outside the basic plane is a
  * surrogate pair, and slicing by code unit would split it into halves that
@@ -118,9 +128,9 @@ const addBigrams = (run: string, tokens: Set<string>): void => {
  * On a {@link BIGRAM_LANGUAGES} index, runs of adjacent
  * {@link BIGRAM_SCRIPTS} segments are joined and re-cut into character
  * bigrams; everything else (Latin, digits, and every segment on a Korean or
- * Thai index) is emitted as the segmenter produced it. Punctuation and spaces
- * are not word-like, so they end a run — 「クーリング・オフ」 bigrams either
- * side of the interpunct rather than across it.
+ * Thai index) is emitted as the segmenter produced it, minus the punctuation
+ * {@link NON_TERM} strips. Separators end a run either way — whether they stand
+ * between segments, as 「クーリング・オフ」 does, or inside one.
  */
 const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
   const language = locale?.toLowerCase().split(/[-_]/u)[0] ?? "";
@@ -146,17 +156,31 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
           run = "";
         }
       };
+      const take = (term: string): void => {
+        if (bigram && BIGRAM_SCRIPTS.test(term)) {
+          run += term;
+          return;
+        }
+        flush();
+        tokens.add(term);
+      };
       for (const segment of segmenter.segment(raw.toLowerCase())) {
         if (!segment.isWordLike) {
           flush();
           continue;
         }
-        if (bigram && BIGRAM_SCRIPTS.test(segment.segment)) {
-          run += segment.segment;
-          continue;
+        const terms = segment.segment.split(NON_TERM);
+        for (const [index, term] of terms.entries()) {
+          // A split means punctuation stood here, which ends the run as surely
+          // as a non-word-like segment would: スネーク_ケース pairs either side
+          // of the connector, never across it.
+          if (index > 0) {
+            flush();
+          }
+          if (term) {
+            take(term);
+          }
         }
-        flush();
-        tokens.add(segment.segment);
       }
       flush();
       return [...tokens];

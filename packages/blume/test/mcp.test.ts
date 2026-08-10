@@ -805,6 +805,66 @@ describe("orama index helpers", () => {
     expect(hits.map((doc) => doc.route)).toEqual(["/scold"]);
   });
 
+  it("keeps punctuation out of the terms a word-like segment yields", async () => {
+    // UAX #29 keeps connector punctuation, mid-number punctuation and format
+    // characters inside a word, so these each arrive as one word-like segment.
+    // Indexed verbatim they are reachable only by retyping the punctuation.
+    const db = await buildOramaIndex(
+      [
+        {
+          content: "スネーク_ケースで書きます。残高1,000万円まで。",
+          description: "",
+          locale: "ja",
+          route: "/naming",
+          title: "命名と上限",
+        },
+        {
+          content: "robots.txt も更新します。",
+          description: "",
+          locale: "ja",
+          route: "/crawl",
+          title: "クロール設定",
+        },
+      ],
+      "ja"
+    );
+    const routes = async (term: string) => {
+      const hits = await queryOramaIndex(db, term, 5);
+      return hits.map((doc) => doc.route);
+    };
+    const [tail, latin, whole] = await Promise.all([
+      // ケース bigrams to ケー / ース, neither of which prefix-matches the
+      // segment スネーク_ケース the connector held together.
+      routes("ケース"),
+      routes("txt"),
+      // The joined form still matches, so nothing that worked stops working.
+      routes("スネーク_ケース"),
+    ]);
+    expect(tail).toEqual(["/naming"]);
+    expect(latin).toEqual(["/crawl"]);
+    expect(whole).toEqual(["/naming"]);
+  });
+
+  it("indexes no term for a segment that is only a symbol", async () => {
+    // Some symbols are word-like on their own (U+00B8 here), and a whole
+    // segment failing the script test used to be added as a term as it stood.
+    const db = await buildOramaIndex(
+      [
+        {
+          content: "データ¸サーバの設定。",
+          description: "",
+          locale: "ja",
+          route: "/x",
+          title: "設定",
+        },
+      ],
+      "ja"
+    );
+    expect(await queryOramaIndex(db, "¸", 5)).toEqual([]);
+    const kana = await queryOramaIndex(db, "データ", 5);
+    expect(kana.length).toBe(1);
+  });
+
   it("leaves Han content alone on an index that is not bigrammed", async () => {
     // Korean and Thai indexes keep segmented words throughout, so the query
     // side's loose matching stays consistent with how they were indexed.
