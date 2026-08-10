@@ -5,7 +5,11 @@ import { withBase } from "../islands/base-path.ts";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
-import type { LocaleSwitchOption, Navigation } from "../../core/types.ts";
+import type {
+  LocaleSwitchOption,
+  Navigation,
+  NavSelector as NavSelectorConfig,
+} from "../../core/types.ts";
 import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
 import LanguageSwitcher from "./LanguageSwitcher.astro";
@@ -50,6 +54,12 @@ interface Props {
   /** Localized chrome labels (nav toggle, sections, GitHub, theme toggle). */
   navStrings?: UIStrings["nav"];
   localeSwitch?: LocaleSwitchOption[];
+  /**
+   * Auto-populated version switcher, rendered ahead of the configured
+   * selectors. `null`/absent when versioning is off — or when the user
+   * declares their own `kind: "version"` selector, which then owns the UI.
+   */
+  versionSelector?: NavSelectorConfig | null;
   /** Active locale for per-language search filtering. */
   searchLocale?: string;
   /**
@@ -77,6 +87,7 @@ const {
   switcherStrings,
   navStrings,
   localeSwitch,
+  versionSelector,
   searchLocale,
   layout = {},
 } = Astro.props;
@@ -143,8 +154,11 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
   }
   <LogoSlot logo={logo} site={site} />
   {
-    navigation.selectors.length > 0 && (
+    (versionSelector || navigation.selectors.length > 0) && (
       <div class="flex items-center gap-1.5">
+        {versionSelector && (
+          <NavSelector route={route} selector={versionSelector} />
+        )}
         {navigation.selectors.map((selector) => (
           <NavSelector route={route} selector={selector} />
         ))}

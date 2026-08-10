@@ -145,6 +145,18 @@ const uiStringsObject = z.object({
       title: z.string().default("On this page"),
     })
     .prefault({}),
+  versions: z
+    .object({
+      latest: z.string().default("Go to latest"),
+      // `{version}` is replaced with the archived version's label at render time.
+      notice: z
+        .string()
+        .default(
+          "You're viewing documentation for {version}. It may be out of date."
+        ),
+      switcher: z.string().default("Version"),
+    })
+    .prefault({}),
 });
 
 export const uiStringsSchema = uiStringsObject.prefault({});

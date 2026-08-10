@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
 
+import { buildRuntimeData } from "../src/astro/generate.ts";
+import { catchAllPageTemplate } from "../src/astro/templates.ts";
 import { discoverContent } from "../src/core/content.ts";
 import { buildContentGraph } from "../src/core/graph.ts";
 import { i18nDiagnostics } from "../src/core/i18n.ts";
@@ -697,6 +699,78 @@ describe("scanProject with versions", () => {
     expect(project.diagnostics.map((d) => d.code)).toContain(
       "BLUME_VERSIONS_UNCONFIGURED_VERSION"
     );
+  });
+});
+
+describe("runtime data with versions", () => {
+  it("serializes version config, per-version trees, and route alternates", async () => {
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n",
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n",
+    });
+    const root = dirname(contentRoot);
+    await writeFile(
+      join(root, "blume.config.ts"),
+      `export default {
+        versions: {
+          archived: [{ id: "v1.0", label: "1.0" }],
+          current: { badge: "Latest", label: "2.0" },
+        },
+      };\n`
+    );
+
+    const project = await scanProject(root, { mode: "build" });
+    const data = JSON.parse(buildRuntimeData(project));
+
+    expect(data.config.versions.current).toEqual({
+      badge: "Latest",
+      label: "2.0",
+    });
+    expect(data.config.versions.archived[0]).toMatchObject({
+      id: "v1.0",
+      label: "1.0",
+    });
+    expect(data.navigationByVersion["v1.0"]?.[""]?.root).toBe("/v1.0");
+
+    const archivedRoute = data.routes.find(
+      (route: { path: string }) => route.path === "/v1.0/guides/x"
+    );
+    expect(archivedRoute.version).toBe("v1.0");
+    expect(archivedRoute.versionAlternates).toEqual([
+      { path: "/guides/x", version: "" },
+      { path: "/v1.0/guides/x", version: "v1.0" },
+    ]);
+  });
+
+  it("serializes null versions and empty trees when versioning is off", async () => {
+    const contentRoot = await tempContent({
+      "index.mdx": "---\ntitle: Home\n---\n# Home\n",
+    });
+    const project = await scanProject(dirname(contentRoot), { mode: "build" });
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.versions).toBeNull();
+    expect(data.navigationByVersion).toEqual({});
+  });
+});
+
+describe("catch-all template with versions", () => {
+  it("threads version props into the page and layout", () => {
+    const template = catchAllPageTemplate({
+      exportEpub: false,
+      exportPdf: false,
+      mathEnabled: false,
+      needsReact: false,
+    });
+    // getStaticPaths forwards the route's version identity…
+    expect(template).toContain("version: route.version");
+    expect(template).toContain("versionAlternates: route.versionAlternates");
+    // …the canonical of an archived page can point at the latest equivalent…
+    expect(template).toContain('archived.canonical === "latest"');
+    // …and the layout receives the switcher, notice, and effective noindex.
+    expect(template).toContain("versionSelector={versionSelector}");
+    expect(template).toContain("versionNotice={versionNotice}");
+    expect(template).toContain("noindex={effectiveNoindex}");
+    expect(template).toContain("data.navigationByVersion[version]");
   });
 });
 

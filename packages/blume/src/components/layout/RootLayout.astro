@@ -8,6 +8,7 @@ import type {
   Heading,
   LocaleSwitchOption,
   Navigation,
+  NavSelector as NavSelectorType,
 } from "../../core/types.ts";
 import "blume:theme";
 import type { ComponentOverride } from "../../core/define-components.ts";
@@ -46,6 +47,7 @@ import PageActions from "./PageActions.astro";
 import PageFeedback from "./PageFeedback.astro";
 import Pagination from "./Pagination.astro";
 import TableOfContents from "./TableOfContents.astro";
+import VersionBanner from "./VersionBanner.astro";
 
 interface Props {
   site: { title: string; description?: string };
@@ -149,6 +151,14 @@ interface Props {
   xDefault?: string | null;
   /** Language-switcher entries for the current page. */
   localeSwitch?: LocaleSwitchOption[];
+  /** Auto-populated version switcher (`null` when versioning is off or a user selector owns it). */
+  versionSelector?: NavSelectorType | null;
+  /** Old-version notice for archived pages (`null` on current-docs pages). */
+  versionNotice?: {
+    message: string;
+    latestHref: string;
+    latestLabel: string;
+  } | null;
   /**
    * User layout-slot overrides from `components.ts` (`defineComponents`). Each
    * key replaces the matching built-in; unknown keys are ignored. Wired slots:
@@ -220,6 +230,8 @@ const {
   localeAlternates,
   xDefault,
   localeSwitch,
+  versionSelector,
+  versionNotice,
   layout = {},
   clientData,
   toc = { enabled: true, maxLevel: 3, minLevel: 2 },
@@ -499,11 +511,13 @@ const bannerKey = banner?.dismissible ? banner.key : null;
       href="#blume-content">{strings.page.skipToContent}</a
     >
     <Banner banner={banner} strings={strings.banner} />
+    <VersionBanner notice={versionNotice ?? null} />
     <HeaderSlot
       askEnabled={askEnabled}
       askStrings={strings.ask}
       layout={layout}
       localeSwitch={localeSwitch}
+      versionSelector={versionSelector}
       logo={logo}
       navigation={navigation}
       route={page.route}

@@ -1687,11 +1687,13 @@ export function getStaticPaths() {
       locale: route.locale,
       route: route.path,
       title: route.title,
+      version: route.version,
+      versionAlternates: route.versionAlternates,
     },
   }));
 }
 
-const { entryId, collection, route, title, indexable, editUrl, lastModified, locale, alternates, fallback } = Astro.props;
+const { entryId, collection, route, title, indexable, editUrl, lastModified, locale, alternates, fallback, version, versionAlternates } = Astro.props;
 const entry = await getEntry(collection as CollectionKey, entryId);
 if (!entry) {
   return new Response(null, { status: 404 });
@@ -1723,9 +1725,6 @@ const ogGenerated = !seo.image && Boolean(ogPath);
 const x = { ...data.config.x, ...(seo.x?.creator ? { creator: seo.x.creator } : {}) };
 
 const basedRoute = withBase(route);
-const canonical =
-  seo.canonical ??
-  (base ? \`\${base}\${basedRoute === "/" ? "" : encodeURI(basedRoute)}\` : null);
 
 // Locale resolution. With i18n on, pick the active locale's nav + dictionary,
 // build hreflang alternates, and derive the language-switcher targets.
@@ -1746,7 +1745,20 @@ const stripLocale = (path: string, codeArg: string) => {
   return prefix && path.startsWith(prefix) ? path.slice(prefix.length) || "/" : path;
 };
 
-const navigation = i18n ? (data.navigationByLocale[locale] ?? data.navigation) : data.navigation;
+// Version resolution. An archived page renders its snapshot's navigation tree,
+// points its canonical at the latest equivalent (unless configured otherwise),
+// and shows the old-version notice.
+const versionsConfig = data.config.versions;
+const archived = versionsConfig && version
+  ? (versionsConfig.archived.find((v) => v.id === version) ?? null)
+  : null;
+const latestVersionAlt = (versionAlternates ?? []).find((alt) => alt.version === "");
+
+const navigation = version
+  ? (data.navigationByVersion[version]?.[i18n ? locale : ""] ?? data.navigation)
+  : i18n
+    ? (data.navigationByLocale[locale] ?? data.navigation)
+    : data.navigation;
 const ui = i18n ? (data.uiByLocale[locale] ?? data.ui) : data.ui;
 const localeMeta = i18n ? i18n.locales.find((l) => l.code === locale) : null;
 const dir = localeMeta?.dir ?? "ltr";
@@ -1762,6 +1774,19 @@ const absolute = (path: string) => {
   const p = withBase(path);
   return base + (p === "/" ? "" : p);
 };
+
+// An archived page defaults its canonical to the same page in the latest docs
+// when that page still exists — search engines treat the live page as
+// authoritative without deindexing version-only content. A page's own
+// \`seo.canonical\` always wins, and \`canonical: "self"\` keeps the default.
+const canonical =
+  seo.canonical ??
+  (archived && archived.canonical === "latest" && latestVersionAlt && base
+    ? absolute(latestVersionAlt.path)
+    : base
+      ? \`\${base}\${basedRoute === "/" ? "" : encodeURI(basedRoute)}\`
+      : null);
+const effectiveNoindex = Boolean(seo.noindex) || (archived?.noindex ?? false);
 
 const localeAlternates =
   i18n && base
@@ -1784,6 +1809,65 @@ const localeSwitch = i18n
       };
     })
   : [];
+
+// Version switcher + old-version notice. The switcher auto-populates from the
+// versions config as a \`kind: "version"\` selector; a user-declared version
+// selector in \`navigation.selectors\` suppresses it (theirs renders instead).
+const versionRootFor = (id: string) => {
+  const logical = id ? \`/\${id}\` : "/";
+  return i18n ? localizeRoute(logical, locale) : logical;
+};
+const samePageSwitch = versionsConfig
+  ? versionsConfig.switcher.redirect === "same-page"
+  : true;
+const userHasVersionSelector = navigation.selectors.some(
+  (selector) => selector.kind === "version"
+);
+const versionSelector =
+  versionsConfig && !userHasVersionSelector
+    ? {
+        items: [
+          {
+            id: "",
+            label: versionsConfig.current.label,
+            tag: versionsConfig.current.badge,
+          },
+          ...versionsConfig.archived.map((v) => ({
+            id: v.id,
+            label: v.label ?? v.id,
+            tag: undefined,
+          })),
+        ].map((entry) => {
+          const alt = (versionAlternates ?? []).find(
+            (a) => a.version === entry.id
+          );
+          return {
+            label: entry.label,
+            path: samePageSwitch && alt ? alt.path : versionRootFor(entry.id),
+            ...(entry.tag ? { tag: entry.tag } : {}),
+          };
+        }),
+        kind: "version" as const,
+        label: ui.versions.switcher,
+      }
+    : null;
+
+const versionNotice =
+  archived && archived.banner !== false
+    ? {
+        latestHref: latestVersionAlt
+          ? latestVersionAlt.path
+          : versionRootFor(""),
+        latestLabel: ui.versions.latest,
+        message:
+          typeof archived.banner === "string"
+            ? archived.banner
+            : ui.versions.notice.replace(
+                "{version}",
+                archived.label ?? archived.id
+              ),
+      }
+    : null;
 
 // The whole page shell is overridable via \`layout.Layout\`; it receives the same
 // props as the built-in RootLayout, plus the \`layout\` map for its inner slots.
@@ -1809,6 +1893,8 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   localeAlternates={localeAlternates}
   xDefault={xDefault}
   localeSwitch={localeSwitch}
+  versionSelector={versionSelector}
+  versionNotice={versionNotice}
   page={{ title: seo.title ?? title, description: seo.description ?? frontmatter.description, route }}
   headings={headings}
   toc={data.config.toc}
@@ -1831,7 +1917,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   pageType={frontmatter.type}
   published={frontmatter.date ?? frontmatter.changelog?.date ?? null}
   lastModified={lastModified}
-  noindex={seo.noindex}
+  noindex={effectiveNoindex}
   structuredDataEnabled={data.config.structuredData}
 >
   <h1>{title}</h1>
