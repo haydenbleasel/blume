@@ -315,6 +315,13 @@ export interface LocaleSwitchOption {
   untranslated: boolean;
 }
 
+/** A docs version a logical page exists in, for the switcher and canonicals. */
+export interface VersionAlternate {
+  /** Version id; `""` for the current (unprefixed) docs. */
+  version: string;
+  path: string;
+}
+
 /** A route entry written to `blume.manifest.json`. */
 export interface RouteManifestEntry {
   id: string;
@@ -339,6 +346,15 @@ export interface RouteManifestEntry {
   locale: string;
   /** Locales this logical page is genuinely translated into (excludes fallbacks). */
   alternates: RouteAlternate[];
+  /** Resolved docs version (`""` for the current docs; see `PageRecord.version`). */
+  version: string;
+  /**
+   * Versions this logical page exists in within this route's locale — the
+   * current version first, then archived versions in configured order. Drives
+   * the switcher's same-page navigation and the canonical-to-latest lookup.
+   * Empty when versioning is off.
+   */
+  versionAlternates: VersionAlternate[];
   /** True when this route renders fallback content for a missing translation. */
   fallback?: boolean;
   /** Resolved "last updated" ISO date, when the feature is enabled. */

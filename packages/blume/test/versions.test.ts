@@ -7,6 +7,7 @@ import { dirname, join } from "pathe";
 import { discoverContent } from "../src/core/content.ts";
 import { buildContentGraph } from "../src/core/graph.ts";
 import { i18nDiagnostics } from "../src/core/i18n.ts";
+import { buildManifest } from "../src/core/manifest.ts";
 import { discoverFolderMeta } from "../src/core/meta.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
@@ -14,7 +15,12 @@ import type {
   ResolvedConfig,
   ResolvedVersionsConfig,
 } from "../src/core/schema.ts";
-import type { PageRecord } from "../src/core/types.ts";
+import type {
+  BlumeManifest,
+  PageRecord,
+  ProjectContext,
+  RouteManifestEntry,
+} from "../src/core/types.ts";
 import {
   archivedIds,
   archivedVersion,
@@ -569,6 +575,93 @@ describe("buildContentGraph with versions", () => {
     expect(
       archivedGroup?.kind === "group" ? labelsOf(archivedGroup.children) : []
     ).toContain("X v1");
+  });
+});
+
+const manifestIn = async (contentRoot: string, resolved: ResolvedConfig) => {
+  const graph = await graphIn(contentRoot, resolved);
+  return buildManifest({
+    config: resolved,
+    context: { contentRoot, root: dirname(contentRoot) } as ProjectContext,
+    graph,
+  });
+};
+
+const routeAt = (manifest: BlumeManifest, path: string): RouteManifestEntry => {
+  const route = manifest.routes.find((candidate) => candidate.path === path);
+  if (!route) {
+    throw new Error(
+      `no route at ${path}; got ${manifest.routes.map((r) => r.path).join(", ")}`
+    );
+  }
+  return route;
+};
+
+describe("buildManifest with versions", () => {
+  it("links the same logical page across versions, current first", async () => {
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n",
+      "v0.9/guides/x.mdx": "---\ntitle: X v0.9\n---\n# X\n",
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n",
+      "v1.0/old-only.mdx": "---\ntitle: Old Only\n---\n# Old\n",
+    });
+    const manifest = await manifestIn(contentRoot, resolved);
+
+    const current = routeAt(manifest, "/guides/x");
+    expect(current.version).toBe("");
+    expect(current.versionAlternates).toEqual([
+      { path: "/guides/x", version: "" },
+      { path: "/v1.0/guides/x", version: "v1.0" },
+      { path: "/v0.9/guides/x", version: "v0.9" },
+    ]);
+    // Both directions share the list: the archived page sees the same set.
+    expect(routeAt(manifest, "/v1.0/guides/x").versionAlternates).toEqual(
+      current.versionAlternates
+    );
+    // A version-only page has just itself.
+    expect(routeAt(manifest, "/v1.0/old-only").versionAlternates).toEqual([
+      { path: "/v1.0/old-only", version: "v1.0" },
+    ]);
+  });
+
+  it("keeps version alternates locale-scoped and includes fallback routes", async () => {
+    const resolved = config({ archived: [{ id: "v1.0" }] }, { i18n: I18N });
+    const contentRoot = await tempContent({
+      "fr/guides/x.mdx": "---\ntitle: X v2 fr\n---\n# X\n",
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n",
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n",
+    });
+    const manifest = await manifestIn(contentRoot, resolved);
+
+    // French current page: its v1.0 sibling is a fallback-materialized route,
+    // which still registers at its own localized URL.
+    expect(routeAt(manifest, "/fr/guides/x").versionAlternates).toEqual([
+      { path: "/fr/guides/x", version: "" },
+      { path: "/fr/v1.0/guides/x", version: "v1.0" },
+    ]);
+    const padded = routeAt(manifest, "/fr/v1.0/guides/x");
+    expect(padded.fallback).toBe(true);
+    expect(padded.version).toBe("v1.0");
+    // English lists stay separate from French ones.
+    expect(routeAt(manifest, "/guides/x").versionAlternates).toEqual([
+      { path: "/guides/x", version: "" },
+      { path: "/v1.0/guides/x", version: "v1.0" },
+    ]);
+  });
+
+  it("emits empty version alternates when versioning is off", async () => {
+    const resolved = blumeConfigSchema.parse({ i18n: I18N });
+    const contentRoot = await tempContent({
+      "fr/guides/x.mdx": "---\ntitle: X fr\n---\n# X\n",
+      "guides/x.mdx": "---\ntitle: X\n---\n# X\n",
+      "guides/y.mdx": "---\ntitle: Y\n---\n# Y\n",
+    });
+    const manifest = await manifestIn(contentRoot, resolved);
+    for (const route of manifest.routes) {
+      expect(route.version).toBe("");
+      expect(route.versionAlternates).toEqual([]);
+    }
   });
 });
 
