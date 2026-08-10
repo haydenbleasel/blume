@@ -998,6 +998,82 @@ const i18nConfigSchema = z
     }
   });
 
+/**
+ * Version ids must start with a letter (`v1.0`, not `1.0`): the id doubles as
+ * the snapshot directory name, and a leading digit would collide with the
+ * numeric-prefix ordering convention (`01-intro.mdx`), which strips `1.0/` to
+ * `0/`. The rest allows word characters, dots, and hyphens — URL-safe as-is.
+ */
+const VERSION_ID = /^[A-Za-z][\w.-]*$/u;
+
+/** A frozen documentation snapshot: a directory under the content root. */
+const archivedVersionSchema = z.strictObject({
+  /**
+   * The "you're viewing an old version" notice: `true` for the built-in
+   * message, a string for custom copy, `false` to hide it.
+   */
+  banner: z.union([z.boolean(), z.string()]).default(true),
+  /**
+   * Where this version's pages point their canonical URL: `latest` targets the
+   * same page in the current docs when it still exists (self otherwise), so
+   * search engines treat the live page as authoritative without deindexing
+   * version-only content. `self` keeps every page authoritative.
+   */
+  canonical: z.enum(["latest", "self"]).default("latest"),
+  /** Directory name under the content root, and the URL segment. */
+  id: z
+    .string()
+    .regex(
+      VERSION_ID,
+      'Version ids must start with a letter (e.g. "v1.0") and contain only letters, digits, dots, hyphens, and underscores.'
+    ),
+  /** Switcher label; defaults to the id. */
+  label: z.string().optional(),
+  /** Emit `noindex` on every page of this version. */
+  noindex: z.boolean().default(false),
+});
+
+/**
+ * Docs versioning. Opt-in: the latest docs live at the content root with
+ * unprefixed URLs, and each archived version is a frozen snapshot directory
+ * (`content/docs/<id>/`) cut with `blume version <id>`. Archived means frozen:
+ * snapshots carry their own translations and are never retranslated.
+ */
+const versionsConfigSchema = z
+  .strictObject({
+    /** Frozen snapshots, newest first — this order is the switcher order. */
+    archived: z.array(archivedVersionSchema).default([]),
+    /** Labels the unprefixed tree (the latest docs) in the switcher. */
+    current: z.strictObject({
+      /** Small tag rendered next to the label (e.g. `Latest`). */
+      badge: z.string().optional(),
+      label: z.string(),
+    }),
+    switcher: z
+      .strictObject({
+        /**
+         * Where switching lands when the page has no equivalent in the target
+         * version: `same-page` goes to the equivalent when it exists (version
+         * root otherwise); `root` always goes to the version root.
+         */
+        redirect: z.enum(["same-page", "root"]).default("same-page"),
+      })
+      .prefault({}),
+  })
+  .superRefine((value, ctx) => {
+    const seen = new Set<string>();
+    for (const [position, version] of value.archived.entries()) {
+      if (seen.has(version.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `versions.archived declares "${version.id}" more than once.`,
+          path: ["archived", position, "id"],
+        });
+      }
+      seen.add(version.id);
+    }
+  });
+
 const analyticsScriptSchema = z
   .strictObject({
     // Extra attributes (e.g. `data-domain`, `id`) spread onto the <script>.
@@ -1590,8 +1666,26 @@ export const blumeConfigSchema = z
     theme: themeConfigSchema.prefault({}),
     title: z.string().default("Documentation"),
     toc: tocConfigSchema,
+    versions: versionsConfigSchema.optional(),
   })
   .superRefine((config, ctx) => {
+    // A version id that is also a configured locale code would make a leading
+    // `<id>/` directory ambiguous between the two axes — refuse it outright so
+    // detection order (version first, then locale) never has to guess.
+    if (config.versions && config.i18n) {
+      const localeCodes = new Set(
+        config.i18n.locales.map((locale) => locale.code.toLowerCase())
+      );
+      for (const [position, version] of config.versions.archived.entries()) {
+        if (localeCodes.has(version.id.toLowerCase())) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Version id "${version.id}" is also a configured locale code — rename the version (e.g. "v${version.id}").`,
+            path: ["versions", "archived", position, "id"],
+          });
+        }
+      }
+    }
     // A custom key is declared site-wide (`frontmatter.extend`) or per-type
     // (`content.types`), never both — two schemas for one key would make
     // precedence on pages of that type ambiguous.
@@ -1635,6 +1729,10 @@ export type FrontmatterExtend = Record<string, StandardSchema>;
 export type ResolvedI18nConfig = z.infer<typeof i18nConfigSchema>;
 /** A configured locale with display metadata. */
 export type LocaleConfig = z.infer<typeof localeSchema>;
+/** Resolved versions block (present only when the project opts into versioning). */
+export type ResolvedVersionsConfig = z.infer<typeof versionsConfigSchema>;
+/** A configured archived (frozen) version. */
+export type ArchivedVersionConfig = z.infer<typeof archivedVersionSchema>;
 /**
  * User-authored config, straight off the schema. The public, hand-documented
  * authoring type is `BlumeConfig` in `./config-input.ts`, which a compile-time

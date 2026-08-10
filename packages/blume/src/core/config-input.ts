@@ -839,6 +839,59 @@ export interface I18nConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Versions
+// ---------------------------------------------------------------------------
+
+/** A frozen documentation snapshot: a directory under the content root. */
+export interface ArchivedVersionInput {
+  /**
+   * The "you're viewing an old version" notice: `true` (default) for the
+   * built-in message, a string for custom copy, `false` to hide it.
+   */
+  banner?: boolean | string;
+  /**
+   * Where this version's pages point their canonical URL. `latest` (default)
+   * targets the same page in the current docs when it still exists (self
+   * otherwise); `self` keeps every page authoritative.
+   */
+  canonical?: "latest" | "self";
+  /**
+   * Directory name under the content root, and the URL segment. Must start
+   * with a letter (e.g. `v1.0`).
+   */
+  id: string;
+  /** Switcher label; defaults to the id. */
+  label?: string;
+  /** Emit `noindex` on every page of this version. Defaults to `false`. */
+  noindex?: boolean;
+}
+
+/**
+ * Docs versioning. Opt-in: the latest docs live at the content root with
+ * unprefixed URLs, and each archived version is a frozen snapshot directory
+ * (`content/docs/<id>/`) cut with `blume version <id>`. Archived means frozen:
+ * snapshots carry their own translations and are never retranslated.
+ */
+export interface VersionsConfig {
+  /** Frozen snapshots, newest first — this order is the switcher order. */
+  archived?: ArchivedVersionInput[];
+  /** Labels the unprefixed tree (the latest docs) in the switcher. */
+  current: {
+    /** Small tag rendered next to the label (e.g. `Latest`). */
+    badge?: string;
+    label: string;
+  };
+  switcher?: {
+    /**
+     * Where switching lands when the page has no equivalent in the target
+     * version: `same-page` (default) goes to the equivalent when it exists
+     * (version root otherwise); `root` always goes to the version root.
+     */
+    redirect?: "same-page" | "root";
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Deployment & redirects
 // ---------------------------------------------------------------------------
 
@@ -1379,6 +1432,8 @@ export interface BlumeConfig {
   title?: string;
   /** On-page table of contents. Defaults to on (H2–H3). */
   toc?: TocConfig;
+  /** Docs versioning (opt-in frozen snapshots with a version switcher). */
+  versions?: VersionsConfig;
 }
 
 // ---------------------------------------------------------------------------
