@@ -76,6 +76,35 @@ const metaItems = (items: (PageWorkItem | MetaWorkItem)[]): MetaWorkItem[] =>
   items.filter((item): item is MetaWorkItem => item.kind === "meta");
 
 describe("computeWorkList", () => {
+  it("never translates archived-version snapshots", async () => {
+    const root = await fixture({
+      ...FILES,
+      "blume.config.ts": `export default {
+  title: "Test",
+  i18n: {
+    defaultLocale: "en",
+    locales: [
+      { code: "en", label: "English" },
+      { code: "fr", label: "French" },
+      { code: "de", label: "German" },
+    ],
+  },
+  versions: {
+    archived: [{ id: "v1.0" }],
+    current: { label: "v2.0" },
+  },
+};
+`,
+      // A frozen snapshot with a missing French translation: still not work.
+      "docs/v1.0/guides/install.mdx": "---\ntitle: Install v1\n---\n# Old\n",
+    });
+    const project = await scan(root);
+    const workList = await computeWorkList(project, emptyLedger());
+    const sources = pageItems(workList.items).map((item) => item.sourceRel);
+    expect(sources).toContain("docs/guides/install.mdx");
+    expect(sources.some((rel) => rel.includes("v1.0"))).toBe(false);
+  });
+
   it("classifies missing, untracked, and excluded sources across locales", async () => {
     const root = await fixture();
     const project = await scan(root);
