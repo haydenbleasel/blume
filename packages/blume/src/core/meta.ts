@@ -58,10 +58,18 @@ const metaKeyFor = (prefix: string | undefined, dir: string): string => {
  * group path starts with the source prefix, so a locale directory found at a
  * source root is hoisted in front of the prefix (`docs/fr/guides/meta.ts` keys
  * to `fr/docs/guides`, not `docs/fr/guides`).
+ *
+ * `versionDirs` names the archived-version snapshot directories, which sit
+ * outermost on disk — a locale directory inside a snapshot is one level deeper.
+ * Both are hoisted, version first (`v1.0/fr/guides/meta.ts` keys to
+ * `v1.0/fr/<prefix>/guides`), matching navigation's version-aware meta prefix.
  */
 export const discoverFolderMeta = async (
   sources: string | FolderMetaSource[],
-  options: { localeDirs?: readonly string[] } = {}
+  options: {
+    localeDirs?: readonly string[];
+    versionDirs?: readonly string[];
+  } = {}
 ): Promise<{
   meta: Map<string, FolderMeta>;
   shared: Map<string, FolderMeta>;
@@ -70,6 +78,7 @@ export const discoverFolderMeta = async (
   const list: FolderMetaSource[] =
     typeof sources === "string" ? [{ root: sources }] : sources;
   const localeDirs = new Set(options.localeDirs);
+  const versionDirs = new Set(options.versionDirs);
 
   const load = createModuleLoader();
   const meta = new Map<string, FolderMeta>();
@@ -115,16 +124,20 @@ export const discoverFolderMeta = async (
   for (const { loaded, source } of perSource) {
     for (const entry of loaded) {
       const dir = relative(source.root, dirname(entry.file));
+      // A version snapshot dir is outermost, with a locale dir one level
+      // deeper; both are hoisted in front of the (prefixed) group path, in
+      // that order — the lookup key reads `version/locale/prefix/dir`.
       const [head, ...tail] = dir.split("/");
-      // A locale directory sits between the source root and the folder, but the
-      // lookup key carries the locale in front of the (prefixed) group path.
-      const key =
-        head && localeDirs.has(head)
-          ? `${head}/${metaKeyFor(source.prefix, tail.join("/"))}`.replace(
-              /\/$/u,
-              ""
-            )
-          : metaKeyFor(source.prefix, dir);
+      const version = head && versionDirs.has(head) ? head : "";
+      const afterVersion = version ? tail : [head ?? "", ...tail];
+      const [localeHead, ...localeTail] = afterVersion;
+      const locale = localeHead && localeDirs.has(localeHead) ? localeHead : "";
+      const rest = (locale ? localeTail : afterVersion)
+        .filter(Boolean)
+        .join("/");
+      const key = [version, locale, metaKeyFor(source.prefix, rest)]
+        .filter(Boolean)
+        .join("/");
 
       if (!entry.ok) {
         diagnostics.push({

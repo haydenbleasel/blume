@@ -286,6 +286,12 @@ export interface ContentGraph {
   navigation: Navigation;
   /** Navigation per locale; one entry per configured locale under i18n. */
   navigationByLocale: Record<string, Navigation>;
+  /**
+   * Navigation per archived version, keyed by version id and then locale code
+   * (`""` on a single-locale site). The current version's trees are
+   * `navigation`/`navigationByLocale`; empty when versioning is off.
+   */
+  navigationByVersion: Record<string, Record<string, Navigation>>;
   /** Map of route -> pageId for fast lookup and duplicate detection. */
   routes: Map<string, string>;
   diagnostics: Diagnostic[];

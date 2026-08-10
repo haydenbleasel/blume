@@ -261,7 +261,10 @@ export const scanProject = async (
     Promise.all(
       sources.map(async (source) => ({ source, ...(await source.load()) }))
     ),
-    discoverFolderMeta(metaSources, { localeDirs }),
+    discoverFolderMeta(metaSources, {
+      localeDirs,
+      versionDirs: config.versions?.archived.map((version) => version.id),
+    }),
   ]);
 
   // Folder meta contributed by the sources themselves (the OpenAPI source
@@ -315,6 +318,7 @@ export const scanProject = async (
     i18n: config.i18n,
     navigation: config.navigation,
     sharedFolderMeta,
+    versions: config.versions,
   });
   const manifest = buildManifest({ config, context, graph });
 

@@ -5,7 +5,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "pathe";
 
 import { discoverContent } from "../src/core/content.ts";
+import { buildContentGraph } from "../src/core/graph.ts";
 import { i18nDiagnostics } from "../src/core/i18n.ts";
+import { discoverFolderMeta } from "../src/core/meta.ts";
+import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type {
   ResolvedConfig,
@@ -100,6 +103,30 @@ const I18N = {
     { code: "fr", label: "Français" },
   ],
 };
+
+/** Discover content + folder meta and build the graph, like scanProject does. */
+const graphIn = async (contentRoot: string, resolved: ResolvedConfig) => {
+  const { pages } = await discoverIn(contentRoot, resolved);
+  const folderMeta = await discoverFolderMeta(contentRoot, {
+    localeDirs:
+      resolved.i18n && resolved.i18n.parser === "dir"
+        ? resolved.i18n.locales.flatMap((locale) =>
+            locale.code === resolved.i18n?.defaultLocale ? [] : [locale.code]
+          )
+        : undefined,
+    versionDirs: resolved.versions?.archived.map((version) => version.id),
+  });
+  return buildContentGraph(pages, {
+    folderMeta: folderMeta.meta,
+    i18n: resolved.i18n,
+    navigation: resolved.navigation,
+    sharedFolderMeta: folderMeta.shared,
+    versions: resolved.versions,
+  });
+};
+
+const labelsOf = (nodes: { label: string }[] | undefined): string[] =>
+  (nodes ?? []).map((node) => node.label);
 
 describe("versions config schema", () => {
   it("applies defaults to archived versions", () => {
@@ -432,6 +459,151 @@ describe("normalizeEntry with versions", () => {
     const { pages } = await discoverIn(contentRoot, resolved);
 
     expect(page(pages, "/v1.0/intro").version).toBe("v1.0");
+  });
+});
+
+describe("buildContentGraph with versions", () => {
+  it("partitions pages into current and per-version trees", async () => {
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n",
+      "index.mdx": "---\ntitle: Home\n---\n# Home\n",
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n",
+      "v1.0/old-only.mdx": "---\ntitle: Old Only\n---\n# Old\n",
+    });
+    const graph = await graphIn(contentRoot, resolved);
+
+    // The current sidebar holds only current pages — no `v1.0` group, no
+    // duplicate entry for the shared logical page.
+    const currentLabels = labelsOf(graph.navigation.sidebar);
+    expect(currentLabels).toContain("Home");
+    expect(currentLabels).not.toContain("Old Only");
+    expect(currentLabels.filter((label) => label === "v1.0")).toHaveLength(0);
+
+    const archived = graph.navigationByVersion["v1.0"]?.[""];
+    expect(archived).toBeDefined();
+    const archivedLabels = labelsOf(archived?.sidebar);
+    expect(archivedLabels).toContain("Old Only");
+    expect(archivedLabels).not.toContain("Home");
+    // The snapshot tree roots at the version, not "/".
+    expect(archived?.root).toBe("/v1.0");
+  });
+
+  it("builds per-locale trees inside a snapshot with fallback padding", async () => {
+    const resolved = config({}, { i18n: I18N });
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n",
+      "v1.0/fr/guides/x.mdx": "---\ntitle: X v1 fr\n---\n# X\n",
+      "v1.0/guides/only-en.mdx": "---\ntitle: Only EN v1\n---\n# Only\n",
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n",
+    });
+    const graph = await graphIn(contentRoot, resolved);
+
+    const french = graph.navigationByVersion["v1.0"]?.fr;
+    expect(french?.root).toBe("/fr/v1.0");
+    const group = french?.sidebar.find((node) => node.kind === "group");
+    const childLabels = group?.kind === "group" ? labelsOf(group.children) : [];
+    expect(childLabels).toContain("X v1 fr");
+    // The untranslated snapshot page is padded from the fallback locale at a
+    // version-correct route.
+    expect(childLabels).toContain("Only EN v1");
+    const padded =
+      group?.kind === "group"
+        ? group.children.find((node) => node.label === "Only EN v1")
+        : undefined;
+    expect(padded?.kind === "page" ? padded.route : undefined).toBe(
+      "/fr/v1.0/guides/only-en"
+    );
+  });
+
+  it("applies snapshot folder meta through the version-hoisted keys", async () => {
+    const resolved = config({}, { i18n: I18N });
+    const contentRoot = await tempContent({
+      "guides/meta.ts": 'export default { title: "Current Guides" };\n',
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n",
+      "v1.0/fr/guides/meta.ts": 'export default { title: "Guides v1 fr" };\n',
+      "v1.0/fr/guides/x.mdx": "---\ntitle: X v1 fr\n---\n# X\n",
+      "v1.0/guides/meta.$.ts":
+        'export default { title: "Shared v1 Guides" };\n',
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n",
+    });
+    const graph = await graphIn(contentRoot, resolved);
+
+    // Current tree: its own meta, untouched by the snapshot's.
+    expect(labelsOf(graph.navigationByLocale.en?.sidebar)).toContain(
+      "Current Guides"
+    );
+    // Snapshot default locale: shared `meta.$.*` keyed under the version dir.
+    expect(labelsOf(graph.navigationByVersion["v1.0"]?.en?.sidebar)).toContain(
+      "Shared v1 Guides"
+    );
+    // Snapshot French: locale-specific meta wins over the shared one.
+    expect(labelsOf(graph.navigationByVersion["v1.0"]?.fr?.sidebar)).toContain(
+      "Guides v1 fr"
+    );
+  });
+
+  it("ignores a configured explicit sidebar inside snapshots", async () => {
+    const resolved = blumeConfigSchema.parse({
+      navigation: {
+        sidebar: { items: ["guides/x"] },
+      },
+      versions: {
+        archived: [{ id: "v1.0" }],
+        current: { label: "v2.0" },
+      },
+    });
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n",
+      "hidden-from-config.mdx": "---\ntitle: Unlisted\n---\n# U\n",
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n",
+    });
+    const graph = await graphIn(contentRoot, resolved);
+
+    // The configured sidebar drives the current tree…
+    expect(labelsOf(graph.navigation.sidebar)).not.toContain("Unlisted");
+    // …while the snapshot falls back to its own filesystem structure.
+    const archivedGroup = graph.navigationByVersion["v1.0"]?.[""]?.sidebar.find(
+      (node) => node.kind === "group"
+    );
+    expect(
+      archivedGroup?.kind === "group" ? labelsOf(archivedGroup.children) : []
+    ).toContain("X v1");
+  });
+});
+
+describe("scanProject with versions", () => {
+  it("runs the full pipeline and warns on an unregistered snapshot dir", async () => {
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n",
+      "v1.0/guides/meta.ts": 'export default { title: "Guides v1" };\n',
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n",
+      "v3/stray.mdx": "---\ntitle: Stray\n---\n# Stray\n",
+    });
+    const root = dirname(contentRoot);
+    await writeFile(
+      join(root, "blume.config.ts"),
+      `export default {
+        versions: {
+          archived: [{ id: "v1.0" }],
+          current: { label: "v2.0" },
+        },
+      };\n`
+    );
+
+    const project = await scanProject(root, { mode: "build" });
+    const paths = project.manifest.routes.map((route) => route.path);
+    expect(paths).toContain("/guides/x");
+    expect(paths).toContain("/v1.0/guides/x");
+    // The snapshot's folder meta reached the versioned tree through the
+    // version-hoisted key space discovered by scanProject itself.
+    expect(
+      labelsOf(project.graph.navigationByVersion["v1.0"]?.[""]?.sidebar)
+    ).toContain("Guides v1");
+    // `v3/` looks like a snapshot but is not registered in versions.archived.
+    expect(project.diagnostics.map((d) => d.code)).toContain(
+      "BLUME_VERSIONS_UNCONFIGURED_VERSION"
+    );
   });
 });
 

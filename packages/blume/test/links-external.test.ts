@@ -23,6 +23,7 @@ const graphWith = (links: PageLink[]): ContentGraph =>
       tabs: [],
     },
     navigationByLocale: {},
+    navigationByVersion: {},
     pages: [
       {
         contentType: "doc",
