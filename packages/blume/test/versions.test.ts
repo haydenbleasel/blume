@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
 
+import { buildLlmsFiles } from "../src/ai/llms.ts";
+import { buildMcpData } from "../src/ai/mcp/data.ts";
+import { createMcpFetchHandler } from "../src/ai/mcp/server.ts";
 import { buildRuntimeData } from "../src/astro/generate.ts";
 import { catchAllPageTemplate } from "../src/astro/templates.ts";
 import { discoverContent } from "../src/core/content.ts";
@@ -12,6 +15,7 @@ import { i18nDiagnostics } from "../src/core/i18n.ts";
 import { buildManifest } from "../src/core/manifest.ts";
 import { discoverFolderMeta } from "../src/core/meta.ts";
 import { scanProject } from "../src/core/project-graph.ts";
+import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type {
   ResolvedConfig,
@@ -34,8 +38,13 @@ import {
   versionsDiagnostics,
   versionsEnabled,
 } from "../src/core/versions.ts";
+import { buildSitemapFiles } from "../src/deploy/sitemap.ts";
 import { buildSearchDocuments } from "../src/search/documents.ts";
 import { buildOramaIndex, queryOramaIndex } from "../src/search/orama-index.ts";
+
+/** The classic single-file view the sitemap tests here assert against. */
+const buildSitemap = (project: BlumeProject): string | null =>
+  buildSitemapFiles(project)?.[0]?.xml ?? null;
 
 const config = (
   over: Record<string, unknown> = {},
@@ -815,6 +824,190 @@ describe("version-scoped search", () => {
       "/guides/x",
       "/v1.0/guides/x",
     ]);
+  });
+});
+
+describe("agent surfaces with versions", () => {
+  const versionedProject = async () => {
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n\nCurrent guide.\n",
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n\nOld guide.\n",
+      "v1.0/old-only.mdx": "---\ntitle: Old Only\n---\n# Old\n\nLegacy.\n",
+    });
+    const root = dirname(contentRoot);
+    await writeFile(
+      join(root, "blume.config.ts"),
+      `export default {
+        deployment: { site: "https://example.com" },
+        versions: {
+          archived: [{ id: "v1.0", label: "1.0" }],
+          current: { label: "2.0" },
+        },
+      };\n`
+    );
+    return await scanProject(root, { mode: "build" });
+  };
+
+  it("sections llms.txt by version and keeps llms-full.txt current-only", async () => {
+    const project = await versionedProject();
+    const { index, full } = await buildLlmsFiles(project);
+
+    // The index lists archived pages under a labeled archived section.
+    expect(index).toContain("## 1.0 (archived)");
+    expect(index).toContain("/v1.0/old-only");
+    // The flat dump serves the live docs only.
+    expect(full).toContain("Current guide.");
+    expect(full).not.toContain("Old guide.");
+    expect(full).not.toContain("Legacy.");
+  });
+
+  it("drops canonicalized archived pages from the sitemap, keeping version-only ones", async () => {
+    const project = await versionedProject();
+    const sitemap = buildSitemap(project);
+    expect(sitemap).toContain("https://example.com/guides/x");
+    // `/v1.0/guides/x` canonicalizes to the live page, so it leaves the map…
+    expect(sitemap).not.toContain("https://example.com/v1.0/guides/x");
+    // …while a page that exists only in the archive stays (self-canonical).
+    expect(sitemap).toContain("https://example.com/v1.0/old-only");
+  });
+
+  it("scopes the MCP tools to the current docs by default", async () => {
+    const project = await versionedProject();
+    const data = await buildMcpData(project);
+    expect(data.archivedVersions).toEqual(["v1.0"]);
+    expect(data.navigationByVersion?.["v1.0"]).toBeDefined();
+
+    const handler = createMcpFetchHandler(data);
+    const callTool = async (name: string, args?: Record<string, unknown>) => {
+      const response = await handler(
+        new Request("https://example.com/mcp", {
+          body: JSON.stringify({
+            id: 1,
+            jsonrpc: "2.0",
+            method: "tools/call",
+            params: { arguments: args, name },
+          }),
+          headers: {
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+          },
+          method: "POST",
+        })
+      );
+      const body = (await response.json()) as {
+        result?: { content?: { text: string }[] };
+      };
+      return body.result?.content?.[0]?.text ?? "";
+    };
+
+    // list_pages defaults to the current docs; "all" widens; an id narrows.
+    const current = JSON.parse(await callTool("list_pages")) as {
+      route: string;
+    }[];
+    expect(current.map((route) => route.route)).toEqual(["/guides/x"]);
+    const all = JSON.parse(
+      await callTool("list_pages", { version: "all" })
+    ) as { route: string }[];
+    expect(all.map((route) => route.route).toSorted()).toEqual([
+      "/guides/x",
+      "/v1.0/guides/x",
+      "/v1.0/old-only",
+    ]);
+    const archived = JSON.parse(
+      await callTool("list_pages", { version: "v1.0" })
+    ) as { route: string; version: string }[];
+    expect(archived.map((route) => route.route).toSorted()).toEqual([
+      "/v1.0/guides/x",
+      "/v1.0/old-only",
+    ]);
+    expect(archived[0]?.version).toBe("v1.0");
+
+    // search_docs mirrors the same scoping.
+    const hits = JSON.parse(
+      await callTool("search_docs", { query: "guide" })
+    ) as { route: string }[];
+    expect(hits.map((hit) => hit.route)).toEqual(["/guides/x"]);
+    const archivedHits = JSON.parse(
+      await callTool("search_docs", { query: "guide", version: "v1.0" })
+    ) as { route: string }[];
+    expect(archivedHits.map((hit) => hit.route)).toEqual(["/v1.0/guides/x"]);
+
+    // get_navigation returns the snapshot's tree for a version id.
+    const nav = JSON.parse(
+      await callTool("get_navigation", { version: "v1.0" })
+    ) as { root?: string };
+    expect(nav.root).toBe("/v1.0");
+  });
+});
+
+describe("agent surfaces with versions and i18n", () => {
+  it("labels localized archived llms.txt sections and noindexes them out of the sitemap", async () => {
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n\nCurrent guide.\n",
+      "v1.0/fr/guides/x.mdx": "---\ntitle: X v1 fr\n---\n# X\n\nVieux.\n",
+      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n\nOld guide.\n",
+    });
+    const root = dirname(contentRoot);
+    await writeFile(
+      join(root, "blume.config.ts"),
+      `export default {
+        deployment: { site: "https://example.com" },
+        i18n: {
+          defaultLocale: "en",
+          locales: [
+            { code: "en", label: "English" },
+            { code: "fr", label: "Français" },
+          ],
+        },
+        versions: {
+          archived: [{ id: "v1.0", label: "1.0", noindex: true }],
+          current: { label: "2.0" },
+        },
+      };\n`
+    );
+    const project = await scanProject(root, { mode: "build" });
+
+    const { index } = await buildLlmsFiles(project);
+    expect(index).toContain("## 1.0 (archived)");
+    expect(index).toContain("## Français — 1.0 (archived)");
+
+    // The noindexed version leaves the sitemap entirely, equivalents or not.
+    const sitemap = buildSitemap(project);
+    expect(sitemap).toContain("https://example.com/guides/x");
+    expect(sitemap).not.toContain("/v1.0/");
+
+    // get_navigation resolves a locale (with and without a version).
+    const data = await buildMcpData(project);
+    const handler = createMcpFetchHandler(data);
+    const navFor = async (args: Record<string, unknown>) => {
+      const response = await handler(
+        new Request("https://example.com/mcp", {
+          body: JSON.stringify({
+            id: 1,
+            jsonrpc: "2.0",
+            method: "tools/call",
+            params: { arguments: args, name: "get_navigation" },
+          }),
+          headers: {
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+          },
+          method: "POST",
+        })
+      );
+      const body = (await response.json()) as {
+        result?: { content?: { text: string }[] };
+      };
+      return JSON.parse(body.result?.content?.[0]?.text ?? "{}") as {
+        root?: string;
+      };
+    };
+    const french = await navFor({ locale: "fr" });
+    expect(french.root).toBe("/fr");
+    const frenchArchived = await navFor({ locale: "fr", version: "v1.0" });
+    expect(frenchArchived.root).toBe("/fr/v1.0");
+    const archivedDefault = await navFor({ version: "v1.0" });
+    expect(archivedDefault.root).toBe("/v1.0");
   });
 });
 

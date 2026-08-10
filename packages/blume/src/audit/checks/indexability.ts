@@ -101,13 +101,31 @@ const canonicalChecks = (
       )
     );
   } else if (context.byUrl.has(target)) {
-    found.push(
-      finding(
-        "BLUME_AUDIT_CANONICAL_NOT_SELF",
-        pageSite(context, page, ["seo", "canonical"]),
-        `Page declares ${target} as its canonical, so it will not be indexed itself.`
-      )
+    // An archived-version page pointing at its latest equivalent is Blume's
+    // own default (versions.archived[].canonical: "latest"), not a defect —
+    // the live page is the authoritative one by design.
+    const version = page.route?.version;
+    const archived = version
+      ? context.project.config.versions?.archived.find(
+          (entry) => entry.id === version
+        )
+      : undefined;
+    const latestAlternate = page.route?.versionAlternates.find(
+      (alternate) => alternate.version === ""
     );
+    const intentional =
+      archived?.canonical === "latest" &&
+      latestAlternate !== undefined &&
+      normalizePath(latestAlternate.path) === target;
+    if (!intentional) {
+      found.push(
+        finding(
+          "BLUME_AUDIT_CANONICAL_NOT_SELF",
+          pageSite(context, page, ["seo", "canonical"]),
+          `Page declares ${target} as its canonical, so it will not be indexed itself.`
+        )
+      );
+    }
   } else {
     found.push(
       finding(

@@ -64,6 +64,16 @@ interface ContextOptions {
   sources?: Map<string, string>;
   seo?: { robots?: boolean; sitemap?: boolean };
   configFile?: string;
+  /** Docs-versioning config, for the archived-canonical checks. */
+  versions?: {
+    archived: {
+      id: string;
+      canonical: "latest" | "self";
+      noindex: boolean;
+      banner: boolean | string;
+    }[];
+    current: { label: string };
+  };
 }
 
 /** A minimal AuditContext. Only the config fields the checks read are populated. */
@@ -84,6 +94,7 @@ export const context = (options: ContextOptions = {}): AuditContext => {
         robots: options.seo?.robots ?? true,
         sitemap: options.seo?.sitemap ?? true,
       },
+      versions: options.versions,
     },
     context: { configFile: options.configFile ?? null },
   } as unknown as BlumeProject;

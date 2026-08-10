@@ -74,6 +74,37 @@ export const buildSitemapFiles = (
   const base = siteRoot(site);
   // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top.
   const deployBase = normalizeBasePath(project.config.deployment.base);
+
+  // Archived-version pages leave the sitemap when the version is noindexed,
+  // or when their canonical points at a still-existing latest equivalent —
+  // listing a URL whose canonical says "index the other page" invites the
+  // noindexed-page-in-sitemap incoherence Docusaurus is known for. A page
+  // that exists only in an archived version stays listed (self-canonical).
+  const { versions } = project.config;
+  const archivedById = new Map(
+    (versions?.archived ?? []).map((version) => [version.id, version])
+  );
+  const currentKeys = versions
+    ? new Set(
+        project.graph.pages.flatMap((page) =>
+          page.version === "" ? [`${page.versionKey}\u0000${page.locale}`] : []
+        )
+      )
+    : null;
+  const archivedExcluded = (page: (typeof project.graph.pages)[number]) => {
+    if (!page.version) {
+      return false;
+    }
+    // A non-empty version always names a configured archived entry — that is
+    // the only way detection assigns one.
+    const archived = archivedById.get(page.version);
+    return Boolean(
+      archived?.noindex ||
+      (archived?.canonical === "latest" &&
+        currentKeys?.has(`${page.versionKey}\u0000${page.locale}`))
+    );
+  };
+
   const seen = new Set<string>();
   const urls: string[] = [];
   const pushUrl = (route: string, lastModified?: string): void => {
@@ -93,7 +124,8 @@ export const buildSitemapFiles = (
       page.meta.draft ||
       page.meta.sidebar.hidden ||
       page.meta.seo.noindex ||
-      ERROR_ROUTES.has(page.route)
+      ERROR_ROUTES.has(page.route) ||
+      archivedExcluded(page)
     ) {
       continue;
     }

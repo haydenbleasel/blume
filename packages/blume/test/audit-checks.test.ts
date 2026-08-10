@@ -16,7 +16,7 @@ import {
   urlChecks,
 } from "../src/audit/checks/social.ts";
 import type { AuditContext, CheckModule } from "../src/audit/types.ts";
-import type { Diagnostic } from "../src/core/types.ts";
+import type { Diagnostic, RouteManifestEntry } from "../src/core/types.ts";
 import { codes, context, snapshot } from "./audit-support.ts";
 
 /**
@@ -409,6 +409,50 @@ describe("indexability checks", () => {
       site: SITE,
     });
     expect(run(indexabilityChecks, ctx)).toContain("CANONICAL_NOT_SELF");
+  });
+
+  it("accepts an archived page's canonical-to-latest as intentional", () => {
+    const route = {
+      version: "v1.0",
+      versionAlternates: [
+        { path: "/a", version: "" },
+        { path: "/v1.0/a", version: "v1.0" },
+      ],
+    } as RouteManifestEntry;
+    const versions = {
+      archived: [
+        {
+          banner: true,
+          canonical: "latest" as const,
+          id: "v1.0",
+          noindex: false,
+        },
+      ],
+      current: { label: "v2.0" },
+    };
+    const intentional = context({
+      pages: [
+        snapshot({ canonical: `${SITE}/a`, route, url: "/v1.0/a" }),
+        snapshot({ canonical: `${SITE}/a`, url: "/a" }),
+      ],
+      site: SITE,
+      versions,
+    });
+    expect(run(indexabilityChecks, intentional)).not.toContain(
+      "CANONICAL_NOT_SELF"
+    );
+
+    // A hand-written canonical at some *other* page is still worth flagging,
+    // even on an archived page.
+    const elsewhere = context({
+      pages: [
+        snapshot({ canonical: `${SITE}/b`, route, url: "/v1.0/a" }),
+        snapshot({ canonical: `${SITE}/b`, url: "/b" }),
+      ],
+      site: SITE,
+      versions,
+    });
+    expect(run(indexabilityChecks, elsewhere)).toContain("CANONICAL_NOT_SELF");
   });
 
   it("reports a noindex page but not a 404", () => {

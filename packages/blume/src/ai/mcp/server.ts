@@ -98,21 +98,49 @@ const textField = (description: string) =>
     z.string().describe(description)
   );
 
+/** An optional trimmed text field; blank or non-string means "absent". */
+const optionalTextField = (description: string) =>
+  z.preprocess((value) => {
+    const trimmed = typeof value === "string" ? value.trim() : "";
+    return trimmed || undefined;
+  }, z.string().optional().describe(description));
+
+/** The optional locale filter `search_docs` and `list_pages` share. */
+const localeField = optionalTextField(
+  "Only include pages in this locale (e.g. `fr`). Omit for every language."
+);
+
+/** The optional docs-version scope `search_docs` and `list_pages` share. */
+const versionField = optionalTextField(
+  'Docs version to scope to on a versioned site: `"latest"` (the default — current docs only), `"all"` (every version), or an archived version id (e.g. `"v1.0"`). Ignored when the site is unversioned.'
+);
+
 /** Every tool's input schema — the runtime parse and tools/list source. */
 const TOOL_INPUTS = {
-  get_navigation: z.object({}),
+  get_navigation: z.object({
+    locale: optionalTextField(
+      "Locale whose navigation tree to return (defaults to the default locale)."
+    ),
+    version: optionalTextField(
+      "Archived version id whose tree to return (defaults to the current docs)."
+    ),
+  }),
   get_page: z.object({
     route: textField("The page route, e.g. `/guides/install`."),
   }),
   list_pages: z.object({
     contentTypes: contentTypesField,
     filters: filtersField,
+    locale: localeField,
+    version: versionField,
   }),
   search_docs: z.object({
     contentTypes: contentTypesField,
     filters: filtersField,
     limit: limitField,
+    locale: localeField,
     query: textField("The search query."),
+    version: versionField,
   }),
 };
 
@@ -148,6 +176,30 @@ const matchesFacets = (
   filters: Record<string, string>
 ): boolean =>
   Object.entries(filters).every(([key, value]) => facets?.[key] === value);
+
+/**
+ * Resolve the `version` scope on a versioned site: `undefined` disables the
+ * filter (`"all"`), `""` is the current docs (the default — agents almost
+ * always want the live documentation), and anything else is an archived id
+ * (an unknown id simply matches nothing). On an unversioned site the input is
+ * ignored entirely. The input arrives pre-trimmed (blank coerced to absent)
+ * from the tool's input schema.
+ */
+const asVersionScope = (
+  value: string | undefined,
+  data: McpData
+): string | undefined => {
+  if (!data.archivedVersions) {
+    return;
+  }
+  if (value === "all") {
+    return;
+  }
+  if (value === undefined || value === "latest" || value === "current") {
+    return "";
+  }
+  return value;
+};
 
 /**
  * Normalize a user-supplied route to a `pages` key (`/`, `/a/b`, no suffix).
@@ -252,6 +304,8 @@ export const buildServer = (
         {
           contentTypes: input.contentTypes,
           facets: input.filters,
+          locale: input.locale,
+          version: asVersionScope(input.version, data),
         }
       );
       // `route` is the key `get_page` takes (the tool descriptions promise
@@ -263,6 +317,7 @@ export const buildServer = (
         route: doc.route,
         title: doc.title,
         url: urlFor(doc.route, data),
+        ...(data.archivedVersions ? { version: doc.version ?? "" } : {}),
       }));
       return text(JSON.stringify(results, null, 2));
     }
@@ -281,11 +336,15 @@ export const buildServer = (
     }
 
     if (name === "list_pages") {
-      const { contentTypes, filters } = TOOL_INPUTS.list_pages.parse(args);
+      const input = TOOL_INPUTS.list_pages.parse(args);
+      const { contentTypes, filters, locale } = input;
+      const versionScope = asVersionScope(input.version, data);
       const routes = data.routes.filter(
         (route) =>
           (!contentTypes || contentTypes.includes(route.contentType)) &&
-          (!filters || matchesFacets(route.facets, filters))
+          (!filters || matchesFacets(route.facets, filters)) &&
+          (!locale || route.locale === locale) &&
+          (versionScope === undefined || route.version === versionScope)
       );
       return text(
         JSON.stringify(
@@ -297,6 +356,7 @@ export const buildServer = (
             route: route.route,
             title: route.title,
             url: urlFor(route.route, data),
+            ...(data.archivedVersions ? { version: route.version } : {}),
           })),
           null,
           2
@@ -305,7 +365,26 @@ export const buildServer = (
     }
 
     if (name === "get_navigation") {
-      return text(JSON.stringify(data.navigation, null, 2));
+      // A version id selects the snapshot's tree; a locale selects its
+      // language (falling back through the default locale to any tree the
+      // snapshot has). Without a version, a locale selects the current docs'
+      // localized tree.
+      const { locale, version: versionId } =
+        TOOL_INPUTS.get_navigation.parse(args);
+      let { navigation } = data;
+      const byLocale = versionId
+        ? data.navigationByVersion?.[versionId]
+        : undefined;
+      if (byLocale) {
+        navigation =
+          (locale ? byLocale[locale] : undefined) ??
+          byLocale[data.defaultLocale ?? ""] ??
+          Object.values(byLocale)[0] ??
+          navigation;
+      } else if (locale && data.navigationByLocale?.[locale]) {
+        navigation = data.navigationByLocale[locale];
+      }
+      return text(JSON.stringify(navigation, null, 2));
     }
 
     return text(`Unknown tool: ${name}`, true);

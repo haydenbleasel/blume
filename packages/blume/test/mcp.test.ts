@@ -60,16 +60,20 @@ const DATA: McpData = {
       description: "How to install Blume",
       indexable: true,
       lastModified: null,
+      locale: "en",
       route: "/guides/install",
       title: "Installation",
+      version: "",
     },
     {
       contentType: "doc",
       description: "Configuration reference",
       indexable: true,
       lastModified: null,
+      locale: "en",
       route: "/guides/config",
       title: "Configuration",
+      version: "",
     },
   ],
   site: "https://docs.example.com",
@@ -257,8 +261,10 @@ describe("MCP content-type filtering", () => {
         facets: { domain: "architecture", status: "enforced" },
         indexable: true,
         lastModified: null,
+        locale: "en",
         route: "/rfcs/schemas",
         title: "Request schemas",
+        version: "",
       },
     ],
   };
@@ -667,6 +673,7 @@ describe("orama index helpers", () => {
       locale: "en",
       route: "/en/start",
       title: "Getting started",
+      version: "",
     },
   ];
 
@@ -1314,7 +1321,7 @@ export default { content: { types: { rfc: { facets: ["status"], frontmatter: { s
       title: "Installation",
     });
 
-    // Documents are mapped down to the five MCP fields and skip hidden pages.
+    // Documents are mapped down to the MCP fields and skip hidden pages.
     const doc = data.documents.find(
       (entry) => entry.route === "/guides/install"
     );
@@ -1323,8 +1330,10 @@ export default { content: { types: { rfc: { facets: ["status"], frontmatter: { s
       "content",
       "contentType",
       "description",
+      "locale",
       "route",
       "title",
+      "version",
     ]);
     expect(doc?.contentType).toBe("doc");
     expect(doc?.title).toBe("Installation");
