@@ -1004,7 +1004,7 @@ const i18nConfigSchema = z
  * numeric-prefix ordering convention (`01-intro.mdx`), which strips `1.0/` to
  * `0/`. The rest allows word characters, dots, and hyphens — URL-safe as-is.
  */
-const VERSION_ID = /^[A-Za-z][\w.-]*$/u;
+export const VERSION_ID = /^[A-Za-z][\w.-]*$/u;
 
 /** A frozen documentation snapshot: a directory under the content root. */
 const archivedVersionSchema = z.strictObject({
