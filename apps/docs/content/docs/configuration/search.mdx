@@ -42,6 +42,8 @@ Write `href` as if the site were mounted at the root — a `basePath` is applied
 
 For every indexable page, Blume indexes its title, description, and body reduced to plain text — code blocks, images, and markup are stripped, so results stay relevant. The index is built from your source files, so it's identical in dev and production.
 
+On a [versioned](/docs/content/versioning) site, results default to the version being viewed, with an "All versions" toggle in the dialog footer (remembered per reader). Cross-version hits name their version on the row. Orama, FlexSearch, Algolia, and Typesense honor the scoping — hosted records carry a `version` facet, with the current docs uploaded as `"current"` — while Pagefind stays unscoped, matching its locale behavior.
+
 ## Tags
 
 Add `search.tags` to a page's frontmatter to group it under a filter in the search dialog — readers can narrow results to a tag with a click. Tags also become a facet on the hosted providers.

@@ -249,7 +249,7 @@ URLs are absolute when `deployment.site` is set. Pages marked `seo.noindex` are 
 
 ## Sitemap
 
-Blume writes a `sitemap.xml` of every indexable page at build time. It needs an absolute [`deployment.site`](/docs/deployment) and lists every page except drafts, hidden, and `noindex` pages. On by default:
+Blume writes a `sitemap.xml` of every indexable page at build time. It needs an absolute [`deployment.site`](/docs/deployment) and lists every page except drafts, hidden, and `noindex` pages. On a [versioned](/docs/content/versioning) site, archived pages whose canonical points at their live equivalent are left out too — the live page is the one to index. On by default:
 
 ```ts blume.config.ts lineNumbers
 seo: {

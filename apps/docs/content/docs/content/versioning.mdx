@@ -1,0 +1,106 @@
+---
+title: Versioning
+description: Freeze snapshots of your docs per release with a version switcher, canonical-to-latest SEO, version-scoped search, and a version-aware agent surface.
+---
+
+Blume versions your docs the way releases actually work: the latest documentation lives at your content root with clean, unprefixed URLs, and each past version is a frozen snapshot in its own folder. Cut a snapshot when you ship, and Blume wires up the switcher, the "old version" notice, search scoping, SEO, and the agent surface for you. It's opt-in: without a `versions` block, nothing changes.
+
+## Enable it
+
+Add a `versions` block naming the current docs and any archived snapshots:
+
+```ts blume.config.ts lineNumbers
+versions: {
+  current: { label: "v2.0", badge: "Latest" },
+  archived: [
+    { id: "v1.0" },
+    { id: "v0.9", label: "0.9 (legacy)" },
+  ],
+}
+```
+
+`current` labels the unprefixed tree in the switcher (with an optional `badge`). Each archived entry's `id` is both the snapshot's directory name and its URL segment — ids must start with a letter (`v1.0`, not `1.0`) so they can never collide with [numeric ordering prefixes](/docs/content/navigation#ordering). List archived versions newest first; that order is the switcher order.
+
+## Cut a version
+
+When you release, freeze the current docs with one command:
+
+```bash
+blume version v1.0
+```
+
+This copies your content tree into `docs/v1.0/` (existing snapshots excluded), rewrites root-absolute links inside the copy so they stay within the snapshot (`/guides/x` becomes `/v1.0/guides/x`, fenced and inline code untouched), and registers the id in `blume.config.ts` — or prints the entry to paste when your config is shaped in a way it won't touch. Run `blume version` with no id to list the configured versions.
+
+Review and commit the new directory like any other content. Restart `blume dev` to pick it up.
+
+```txt
+docs/
+  index.mdx               ->  /              (latest)
+  guides/quickstart.mdx   ->  /guides/quickstart
+  v1.0/
+    index.mdx             ->  /v1.0          (frozen)
+    guides/quickstart.mdx ->  /v1.0/guides/quickstart
+```
+
+**Archived means frozen.** Future edits belong in the live tree; a snapshot is the docs as they were. Blume leans on that: snapshots keep their own folder meta and translations, [`blume translate`](/docs/reference/translate) never retranslates them, and a configured explicit sidebar applies only to the current docs — a snapshot's sidebar always comes from its own files.
+
+## The switcher and the notice
+
+With versions configured, the header grows a version dropdown automatically. Switching lands on the same page in the target version when it exists, and on that version's root when it doesn't (set `switcher.redirect: "root"` to always land on the root). If you declare your own `kind: "version"` selector in [`navigation.selectors`](/docs/content/navigation#selectors), it replaces the automatic one.
+
+Every archived page also shows a non-dismissible notice with a "Go to latest" link pointing at the page's live equivalent. Customize or disable it per version:
+
+```ts blume.config.ts
+archived: [
+  { id: "v1.0", banner: "These docs cover the 1.x SDK." },
+  { id: "v0.9", banner: false },
+];
+```
+
+## SEO
+
+Old docs are search engines' favorite trap: the stale page outranks the live one, or both compete. Blume defaults to the answer SEO guides recommend and no other docs framework automates — archived pages stay indexable but declare the **latest equivalent as their canonical**, so the live page is authoritative while version-only content (a page that no longer exists in the latest docs) remains findable with a self-canonical.
+
+Per version you can pick a different treatment:
+
+```ts blume.config.ts
+archived: [
+  { id: "v1.0" }, // canonical → latest (default)
+  { id: "v0.9", canonical: "self" }, // every page authoritative
+  { id: "v0.8", noindex: true }, // deindexed entirely
+];
+```
+
+The sitemap follows suit: archived pages whose canonical points at a live equivalent are left out, `noindex` versions are left out wholesale, and version-only pages stay listed. A page's own `seo.canonical` frontmatter always wins.
+
+## Search
+
+The search dialog scopes results to the version being viewed, with an "All versions" toggle (remembered per reader) beside the language one. Cross-version hits name their version on the result row. Orama (the default), FlexSearch, Algolia, and Typesense all honor the scoping — hosted records carry a `version` facet, with the current docs uploaded as `"current"` — while Pagefind stays unscoped, matching its locale behavior.
+
+## Agents
+
+The agent surface is version-aware — something no other docs framework does:
+
+- The MCP `search_docs` and `list_pages` tools default to the current docs and accept `version`: an archived id (`"v1.0"`) or `"all"`. `get_navigation` returns an archived snapshot's tree on request.
+- `llms.txt` sections archived versions after the current docs, labeled `1.0 (archived)`, so an agent reading the index knows which docs are frozen.
+- `llms-full.txt` stays current-only — the flat dump never interleaves frozen copies of the same page.
+- Raw Markdown mirrors (`.md` URLs) exist for every version's pages, as for any route.
+
+## With i18n
+
+Versioning composes with [internationalization](/docs/content/i18n). On disk the version folder is outermost — a snapshot naturally contains its locale folders — while in URLs the locale stays outermost, matching the rest of the site:
+
+```txt
+docs/
+  guides/x.mdx            ->  /guides/x
+  fr/guides/x.mdx         ->  /fr/guides/x
+  v1.0/
+    guides/x.mdx          ->  /v1.0/guides/x
+    fr/guides/x.mdx       ->  /fr/v1.0/guides/x
+```
+
+Locale fallback works within each version: an untranslated snapshot page renders the fallback locale's content at the localized URL, and `hreflang` alternates group per version. A version id may not collide with a configured locale code — Blume rejects that config outright.
+
+## What stays unversioned
+
+Versioning covers the docs content tree. The blog, changelog, API references generated from OpenAPI specs, and custom pages are always current. Two more behaviors worth knowing: header tabs are defined against the current docs, so inside an archived tree the sidebar renders unscoped by tabs; and large sites should note each snapshot is a full copy — content, search index entries, and navigation data all grow per version.

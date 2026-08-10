@@ -203,6 +203,8 @@ navigation: {
 
 Each item takes a `label`, a `path`, and optional `icon`, `description`, and `tag`. `kind` (`dropdown`, `product`, `version`, or `language`) is a hint for how the selector is used; all render the same dropdown.
 
+With [versioning](/docs/content/versioning) configured, Blume renders a version selector automatically — declaring your own `kind: "version"` selector here replaces the automatic one, so hand-rolled setups keep working.
+
 ## Featured links
 
 Pin links to the top of the sidebar, above every section — a blog, a changelog, a contact or support page that should always be one click away. Unlike the generated tree, featured links are **not scoped by tab**: they show on every route, on every breakpoint.
