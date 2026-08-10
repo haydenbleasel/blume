@@ -19,7 +19,7 @@ export type ApiDocument = Document;
 // Keep Unicode letters/numbers so diacritics stay in the slug. ASCII-only
 // stripping turned `Größe` into `gr-e`, and the nav humanizer then rendered
 // that as `Gr E`.
-const NON_SLUG = /[^\p{L}\p{N}]+/gu;
+const NON_SLUG = /[^\p{L}\p{M}\p{N}]+/gu;
 const SLUG_EDGES = /^-+|-+$/gu;
 
 /** Lowercase, URL-safe slug: `Add a Pet!` -> `add-a-pet`. */

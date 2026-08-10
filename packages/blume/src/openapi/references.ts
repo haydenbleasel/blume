@@ -62,7 +62,7 @@ export interface ReferenceSource {
   collisions?: string[];
 }
 
-const NON_SLUG = /[^\p{L}\p{N}]+/gu;
+const NON_SLUG = /[^\p{L}\p{M}\p{N}]+/gu;
 
 export const slugify = (text: string): string =>
   trimChar(text.toLowerCase().replace(NON_SLUG, "-"), "-");

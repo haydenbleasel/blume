@@ -424,6 +424,7 @@ describe("model.extractOperations", () => {
   });
 
   it("keeps diacritics in tag slugs so nav labels stay one word", () => {
+    const nfdNinos = "Nin\u0303os";
     const { operations, tags } = extractOperations(
       {
         openapi: "3.1.0",
@@ -432,6 +433,12 @@ describe("model.extractOperations", () => {
             get: {
               operationId: "listChildren",
               tags: ["Niños"],
+            },
+          },
+          "/nfd-children": {
+            get: {
+              operationId: "listNfdChildren",
+              tags: [nfdNinos],
             },
           },
           "/sizes": {
@@ -446,11 +453,13 @@ describe("model.extractOperations", () => {
     );
     const byKey = new Map(operations.map((op) => [op.key, op]));
     expect(byKey.get("listchildren")?.tagSlug).toBe("niños");
+    expect(byKey.get("listnfdchildren")?.tagSlug).toBe(nfdNinos.toLowerCase());
     expect(byKey.get("listsizes")?.tagSlug).toBe("größe");
     expect(
       tags.map((tag) => ({ name: tag.name, slug: tag.slug }))
     ).toStrictEqual([
       { name: "Niños", slug: "niños" },
+      { name: nfdNinos, slug: nfdNinos.toLowerCase() },
       { name: "Größe", slug: "größe" },
     ]);
   });
