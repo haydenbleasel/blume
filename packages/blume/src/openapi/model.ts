@@ -16,7 +16,10 @@ import type {
 /** A normalized OpenAPI 3.1 document, internal `$ref`s intact. */
 export type ApiDocument = Document;
 
-const NON_SLUG = /[^a-z0-9]+/gu;
+// Keep Unicode letters/numbers so diacritics stay in the slug. ASCII-only
+// stripping turned `Größe` into `gr-e`, and the nav humanizer then rendered
+// that as `Gr E`.
+const NON_SLUG = /[^\p{L}\p{N}]+/gu;
 const SLUG_EDGES = /^-+|-+$/gu;
 
 /** Lowercase, URL-safe slug: `Add a Pet!` -> `add-a-pet`. */
@@ -103,8 +106,8 @@ const isOperation = (value: unknown): value is OperationObject =>
 
 /**
  * Assign each distinct tag name a unique slug. `slugify` can collapse
- * different names onto one value — any two all-non-ASCII tags (`ペット`,
- * `注文`) both fall through to the `operations` fallback — and a shared slug
+ * different names onto one value — any two punctuation-only tags (`!!!`,
+ * `???`) both fall through to the `operations` fallback — and a shared slug
  * silently merges the tags' routes, sidebar groups, and overview sections.
  * Collisions gain `-2`, `-3`, … in first-seen order.
  */

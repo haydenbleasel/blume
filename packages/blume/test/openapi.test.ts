@@ -397,7 +397,7 @@ describe("model.extractOperations", () => {
     ]);
   });
 
-  it("keeps distinct all-non-ASCII tags on distinct slugs", () => {
+  it("keeps distinct non-Latin tags on distinct letter-preserving slugs", () => {
     const { operations, tags } = extractOperations(
       {
         openapi: "3.1.0",
@@ -410,21 +410,70 @@ describe("model.extractOperations", () => {
       "/api"
     );
     const byKey = new Map(operations.map((op) => [op.key, op]));
-    // Both slugify to nothing and fall back to "operations"; sharing the slug
-    // would silently merge the two tags' routes and sections. Collisions gain
-    // a suffix in first-seen order.
-    expect(byKey.get("listorders")?.tagSlug).toBe("operations");
-    expect(byKey.get("listpets")?.tagSlug).toBe("operations-2");
-    expect(byKey.get("listorders")?.route).toBe("/api/operations/listorders");
-    expect(byKey.get("listpets")?.route).toBe("/api/operations-2/listpets");
-    // The same tag name still shares one slug across its operations.
-    expect(byKey.get("getpet")?.tagSlug).toBe("operations-2");
-    // The tag list resolves to the slugs its operations were routed under.
+    expect(byKey.get("listorders")?.tagSlug).toBe("注文");
+    expect(byKey.get("listpets")?.tagSlug).toBe("ペット");
+    expect(byKey.get("listorders")?.route).toBe("/api/注文/listorders");
+    expect(byKey.get("listpets")?.route).toBe("/api/ペット/listpets");
+    expect(byKey.get("getpet")?.tagSlug).toBe("ペット");
     expect(
       tags.map((tag) => ({ name: tag.name, slug: tag.slug }))
     ).toStrictEqual([
-      { name: "注文", slug: "operations" },
-      { name: "ペット", slug: "operations-2" },
+      { name: "注文", slug: "注文" },
+      { name: "ペット", slug: "ペット" },
+    ]);
+  });
+
+  it("keeps diacritics in tag slugs so nav labels stay one word", () => {
+    const { operations, tags } = extractOperations(
+      {
+        openapi: "3.1.0",
+        paths: {
+          "/children": {
+            get: {
+              operationId: "listChildren",
+              tags: ["Niños"],
+            },
+          },
+          "/sizes": {
+            get: {
+              operationId: "listSizes",
+              tags: ["Größe"],
+            },
+          },
+        },
+      } as unknown as ApiDocument,
+      "/api"
+    );
+    const byKey = new Map(operations.map((op) => [op.key, op]));
+    expect(byKey.get("listchildren")?.tagSlug).toBe("niños");
+    expect(byKey.get("listsizes")?.tagSlug).toBe("größe");
+    expect(
+      tags.map((tag) => ({ name: tag.name, slug: tag.slug }))
+    ).toStrictEqual([
+      { name: "Niños", slug: "niños" },
+      { name: "Größe", slug: "größe" },
+    ]);
+  });
+
+  it("falls back when a tag has no letters or numbers", () => {
+    const { operations, tags } = extractOperations(
+      {
+        openapi: "3.1.0",
+        paths: {
+          "/a": { get: { operationId: "a", tags: ["!!!"] } },
+          "/b": { get: { operationId: "b", tags: ["???"] } },
+        },
+      } as unknown as ApiDocument,
+      "/api"
+    );
+    const byKey = new Map(operations.map((op) => [op.key, op]));
+    expect(byKey.get("a")?.tagSlug).toBe("operations");
+    expect(byKey.get("b")?.tagSlug).toBe("operations-2");
+    expect(
+      tags.map((tag) => ({ name: tag.name, slug: tag.slug }))
+    ).toStrictEqual([
+      { name: "!!!", slug: "operations" },
+      { name: "???", slug: "operations-2" },
     ]);
   });
 
