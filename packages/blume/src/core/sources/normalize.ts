@@ -9,6 +9,7 @@ import { localePlacement, localizeRoute } from "../i18n.ts";
 import { pageMetaSchema } from "../schema.ts";
 import type { FrontmatterExtend, PageMeta } from "../schema.ts";
 import type { Diagnostic, Heading, PageLink, PageRecord } from "../types.ts";
+import { detectVersionRef, versionizeRoute } from "../versions.ts";
 import type { NormalizeContext, SourceEntry } from "./types.ts";
 
 const NUMERIC_PREFIX = /^\d+[-_.]/u;
@@ -678,14 +679,22 @@ export const normalizeEntry = (
     meta.seo.noindex = true;
   }
 
+  // The version is detected first: a snapshot directory is outermost on disk
+  // (`v1.0/fr/page.mdx`), so the locale parser and route mapping must see a
+  // version-stripped ref. The current version is `""` and lives at the root.
+  const { versions } = ctx;
+  const { version, rest: versionlessRef } = versions
+    ? detectVersionRef(entry.ref, versions)
+    : { rest: entry.ref, version: "" };
+
   // Locale and the locale-stripped nav path come from the entry's ref (a leading
   // dir, or a filename suffix under the `dot` parser), not the slug — the slug is
   // the logical, locale-agnostic path within a locale. A shared `$` file maps to
   // every locale. Remote/CMS sources without i18n placement map to one locale.
   const { i18n } = ctx;
   const { navPath: rawNavPath, locales } = i18n
-    ? localePlacement(entry.ref, ext, i18n)
-    : { locales: [""], navPath: entry.ref };
+    ? localePlacement(versionlessRef, ext, i18n)
+    : { locales: [""], navPath: versionlessRef };
 
   const navPath = withPrefix(ctx.source.prefix, rawNavPath);
   // Frontmatter `slug` wins, then the adapter-supplied `entry.slug` (the typed
@@ -699,7 +708,13 @@ export const normalizeEntry = (
     slug ? `${slug}${ext}` : rawNavPath
   );
 
-  const { segments, groups, route: logicalRoute } = mapRoute(routeInput);
+  // The version prefixes the mapped route *after* `mapRoute` runs: the mapped
+  // route is the version-agnostic key, the config id is prepended verbatim
+  // (never numeric-prefix-stripped), a frontmatter `slug` gets versionized so
+  // snapshots can't collide with the live page, and `translationKey` becomes
+  // version-specific for free.
+  const { segments, groups, route: versionKey } = mapRoute(routeInput);
+  const logicalRoute = versionizeRoute(versionKey, version);
   const headings = extractHeadings(entry.body.text);
   const { staged } = ctx.source;
 
@@ -729,6 +744,8 @@ export const normalizeEntry = (
     sourcePath: entry.sourcePath,
     title: deriveTitle(meta, headings, navPath),
     translationKey: logicalRoute,
+    version,
+    versionKey,
   } satisfies Omit<PageRecord, "locale" | "route">;
 
   // One record per locale this entry maps to (one normally; every locale for a

@@ -1,4 +1,8 @@
-import type { ResolvedConfig, ResolvedI18nConfig } from "./schema.ts";
+import type {
+  ResolvedConfig,
+  ResolvedI18nConfig,
+  ResolvedVersionsConfig,
+} from "./schema.ts";
 import type { Diagnostic, PageRecord } from "./types.ts";
 import { UI_PACKS } from "./ui-packs/index.ts";
 
@@ -187,17 +191,24 @@ export const localeTargetPath = (
  */
 export const i18nDiagnostics = (
   pages: PageRecord[],
-  i18n: ResolvedI18nConfig
+  i18n: ResolvedI18nConfig,
+  versions?: ResolvedVersionsConfig
 ): Diagnostic[] => {
   const configured = new Set(
     i18n.locales.map((locale) => locale.code.toLowerCase())
   );
+  const versionDirs = new Set(versions?.archived.map((version) => version.id));
   const seen = new Set<string>();
   const diagnostics: Diagnostic[] = [];
   for (const page of pages) {
     // The locale-looking folder is the first segment of the source-local ref
     // (e.g. `fr/guide.md`), not the namespaced id (`filesystem:fr/guide.md`).
-    const first = page.source.ref.split("/")[0]?.toLowerCase();
+    // Inside a version snapshot the locale dir sits one level deeper
+    // (`v1.0/fr/guide.md`), so a configured version segment is skipped first.
+    const parts = page.source.ref.split("/");
+    const first = (
+      parts[0] && versionDirs.has(parts[0]) ? parts[1] : parts[0]
+    )?.toLowerCase();
     if (
       first &&
       !seen.has(first) &&

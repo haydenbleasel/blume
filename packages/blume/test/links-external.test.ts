@@ -40,6 +40,8 @@ const graphWith = (links: PageLink[]): ContentGraph =>
         sourcePath: "/abs/a.mdx",
         title: "A",
         translationKey: "/a",
+        version: "",
+        versionKey: "/a",
       },
     ],
     routes: new Map([["/a", "a.mdx"]]),

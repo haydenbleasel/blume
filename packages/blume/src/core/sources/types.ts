@@ -2,6 +2,7 @@ import type {
   FolderMeta,
   FrontmatterExtend,
   ResolvedI18nConfig,
+  ResolvedVersionsConfig,
 } from "../schema.ts";
 import type { Diagnostic } from "../types.ts";
 
@@ -129,4 +130,6 @@ export interface NormalizeContext {
    * applied to a page only when its resolved `type` matches.
    */
   typeFrontmatter?: Record<string, FrontmatterExtend>;
+  /** Docs versioning config; a leading archived-version dir becomes the page's version. */
+  versions?: ResolvedVersionsConfig;
 }

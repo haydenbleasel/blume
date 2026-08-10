@@ -121,9 +121,24 @@ export interface PageRecord {
   locale: string;
   /**
    * Locale-agnostic logical route shared by every translation (e.g.
-   * `/guides/x`). Pages with the same key are translations of each other.
+   * `/guides/x`, or `/v1.0/guides/x` under versioning — the key is
+   * version-specific, so translations group within their version).
+   * Pages with the same key are translations of each other.
    */
   translationKey: string;
+  /**
+   * Resolved docs version: an archived id (`v1.0`) for snapshot pages, `""`
+   * for the current (unprefixed) docs — including every page of an
+   * unversioned project.
+   */
+  version: string;
+  /**
+   * Version- and locale-agnostic logical route (e.g. `/guides/x` for
+   * `/v1.0/guides/x`). Pages with the same key and locale are the same
+   * logical page across versions — this drives the switcher's same-page
+   * navigation and the canonical-to-latest lookup.
+   */
+  versionKey: string;
   /**
    * True for entries filled in from the fallback locale to pad a locale's
    * navigation for pages it hasn't translated yet. The record's content —

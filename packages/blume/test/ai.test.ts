@@ -63,6 +63,8 @@ const makePage = (
   sourcePath: join(root, id),
   title,
   translationKey: route,
+  version: "",
+  versionKey: route,
   ...over,
 });
 

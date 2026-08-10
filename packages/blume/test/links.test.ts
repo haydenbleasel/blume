@@ -38,6 +38,8 @@ const makePage = (
   sourcePath: `/abs/${over.id}`,
   title: over.id,
   translationKey: over.route,
+  version: "",
+  versionKey: over.route,
   ...over,
 });
 

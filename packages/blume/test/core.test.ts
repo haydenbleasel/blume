@@ -57,6 +57,8 @@ const manyPages = (count: number): PageRecord[] => {
     sourcePath: `/abs/p${index}`,
     title: `P${index}`,
     translationKey: `/p/${index}`,
+    version: "",
+    versionKey: `/p/${index}`,
   }));
 };
 
@@ -78,6 +80,8 @@ const makePage = (
   source: { name: "filesystem", ref: over.id },
   sourcePath: `/abs/${over.id}`,
   translationKey: over.route,
+  version: "",
+  versionKey: over.route,
   ...over,
 });
 

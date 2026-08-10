@@ -29,6 +29,8 @@ const page = (
   sourcePath: `/abs/${id}`,
   title,
   translationKey: route,
+  version: "",
+  versionKey: route,
 });
 
 const changelogPage = (
@@ -50,6 +52,8 @@ const changelogPage = (
   source: { name: "releases", ref },
   title,
   translationKey: `/changelog/${ref}`,
+  version: "",
+  versionKey: `/changelog/${ref}`,
 });
 
 const asGroup = (node: NavNode | undefined) => {
@@ -805,6 +809,8 @@ describe("buildNavigation — index title / folder meta title diagnostics", () =
           sourcePath: "/abs/guide/index.md",
           title: "Index",
           translationKey: "/guide",
+          version: "",
+          versionKey: "/guide",
         },
       ],
       { diagnostics, folderMeta }

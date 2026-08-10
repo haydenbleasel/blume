@@ -70,6 +70,19 @@ export const detectVersion = (
 };
 
 /**
+ * {@link detectVersion} over a slash-joined source ref (`v1.0/fr/x.mdx`):
+ * returns the version and the version-stripped ref for the locale parser and
+ * route mapping to consume.
+ */
+export const detectVersionRef = (
+  ref: string,
+  versions: ResolvedVersionsConfig
+): { version: string; rest: string } => {
+  const { version, rest } = detectVersion(ref.split("/"), versions);
+  return { rest: rest.join("/"), version };
+};
+
+/**
  * Prefix a version-agnostic logical route with its version: `/guides/x`
  * becomes `/v1.0/guides/x`, `/` becomes `/v1.0`. The current version (`""`)
  * is the identity.
