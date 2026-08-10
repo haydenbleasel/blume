@@ -123,6 +123,7 @@ const uiStringsObject = z.object({
     .object({
       all: z.string().default("All"),
       allLanguages: z.string().default("All languages"),
+      allVersions: z.string().default("All versions"),
       askAi: z.string().default("Ask AI"),
       askAiHint: z.string().default("Get an instant answer from AI"),
       button: z.string().default("Search"),

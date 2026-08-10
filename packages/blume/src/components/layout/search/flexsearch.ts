@@ -40,9 +40,15 @@ export const createSearch = async (opts: {
         }
         seen.add(route);
         const doc = byRoute.get(route);
-        // Filter to the active locale (when one is requested) before shaping,
-        // so section counts and results stay within the language.
-        if (doc && (!options?.locale || doc.locale === options.locale)) {
+        // Filter to the active locale and version (when requested) before
+        // shaping, so section counts and results stay within scope. `""` is
+        // the current version, so version presence is tested explicitly.
+        if (
+          doc &&
+          (!options?.locale || doc.locale === options.locale) &&
+          (options?.version === undefined ||
+            (doc.version ?? "") === options.version)
+        ) {
           matched.push(doc);
         }
       }

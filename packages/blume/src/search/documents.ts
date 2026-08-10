@@ -26,6 +26,8 @@ export interface SearchDocument {
   locale: string;
   /** Resolved page `type` (`doc`, `blog`, a custom `rfc`…), for type filters. */
   contentType: string;
+  /** Docs version (`""` for the current docs), so results scope to the viewed version. */
+  version: string;
   /** Frontmatter `search.tags`, surfaced for hosted-provider faceting. */
   tags?: string[];
   /**
@@ -48,6 +50,12 @@ export interface SearchRecord {
   content: string;
   /** Locale code, carried as a facet for per-language filtering. */
   locale: string;
+  /**
+   * Docs version, carried as a facet for per-version filtering. The current
+   * docs upload as `"current"` — hosted backends treat an empty facet value
+   * unreliably, so the sentinel stands in for the empty version id.
+   */
+  version: string;
   /** Single faceting tag (the first frontmatter tag, when present). */
   tag?: string;
 }
@@ -213,10 +221,17 @@ export const buildSearchDocuments = async (
   // locale-prefixed routes), so localized pages get the right section/breadcrumb.
   // Falls back to the single default-locale nav when i18n is off.
   const byLocale = Object.values(project.graph.navigationByLocale ?? {});
-  const sidebars =
-    byLocale.length > 0
+  // Archived versions' trees contribute too, so snapshot pages get their own
+  // section/breadcrumb instead of falling through to the "Docs" default.
+  const byVersion = Object.values(project.graph.navigationByVersion ?? {})
+    .flatMap((locales) => Object.values(locales))
+    .map((nav) => nav.sidebar);
+  const sidebars = [
+    ...(byLocale.length > 0
       ? byLocale.map((nav) => nav.sidebar)
-      : [project.graph.navigation?.sidebar ?? []];
+      : [project.graph.navigation?.sidebar ?? []]),
+    ...byVersion,
+  ];
   const crumbs = new Map<string, Crumbs>();
   for (const sidebar of sidebars) {
     for (const [route, crumb] of buildCrumbIndex(sidebar)) {
@@ -257,6 +272,7 @@ export const buildSearchDocuments = async (
         section: crumb?.section || "Docs",
         tags: tags && tags.length > 0 ? tags : undefined,
         title: route.title,
+        version: route.version,
       };
     })
   );
@@ -276,4 +292,5 @@ export const toSearchRecords = (documents: SearchDocument[]): SearchRecord[] =>
     tag: doc.tags?.[0],
     title: doc.title,
     url: doc.route,
+    version: doc.version || "current",
   }));

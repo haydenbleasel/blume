@@ -13,6 +13,11 @@ export interface OramaDoc {
   title: string;
   /** Locale code; indexed as an enum so queries can filter to one language. */
   locale?: string;
+  /**
+   * Docs version; indexed as an enum so queries can filter to one version.
+   * The current docs carry `""`, which the enum stores and matches exactly.
+   */
+  version?: string;
   /** Resolved page `type`; indexed as an enum so queries can filter by type. */
   contentType?: string;
   /** Declared facet values (`content.types.<type>.facets`), key → value. */
@@ -35,6 +40,7 @@ const SCHEMA = {
   locale: "enum",
   route: "string",
   title: "string",
+  version: "enum",
 } as const;
 
 /** Flatten a facet map to the `key:value` terms the `facetTerms` enum holds. */
@@ -244,6 +250,11 @@ export interface OramaQueryFilters {
   facets?: Record<string, string>;
   /** Keep only documents in this locale. */
   locale?: string;
+  /**
+   * Keep only documents of this docs version (`""` is the current docs — a
+   * meaningful filter value, so absence alone disables version filtering).
+   */
+  version?: string;
 }
 
 /**
@@ -267,6 +278,10 @@ export const queryOramaIndex = async (
   const facetTerms = filters?.facets ? toFacetTerms(filters.facets) : [];
   const where = {
     ...(filters?.locale ? { locale: { eq: filters.locale } } : {}),
+    // `""` (the current docs) is a real filter value, so test for presence.
+    ...(filters?.version === undefined
+      ? {}
+      : { version: { eq: filters.version } }),
     ...(filters?.contentTypes && filters.contentTypes.length > 0
       ? { contentType: { in: filters.contentTypes } }
       : {}),

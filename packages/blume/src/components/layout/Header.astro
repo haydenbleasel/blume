@@ -62,6 +62,8 @@ interface Props {
   versionSelector?: NavSelectorConfig | null;
   /** Active locale for per-language search filtering. */
   searchLocale?: string;
+  /** Viewed docs version for search filtering (`""` = current; `null`/absent = off). */
+  searchVersion?: string | null;
   /**
    * Layout-slot overrides forwarded from the root layout. The header honors
    * `Logo` and `Search` here so those pieces can be replaced without swapping
@@ -89,6 +91,7 @@ const {
   localeSwitch,
   versionSelector,
   searchLocale,
+  searchVersion = null,
   layout = {},
 } = Astro.props;
 
@@ -198,6 +201,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
         navigation={navigation}
         popularPages={data.config.search.popular}
         strings={searchStrings}
+        version={searchVersion}
       />
     )
   }

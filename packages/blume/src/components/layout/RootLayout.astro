@@ -159,6 +159,8 @@ interface Props {
     latestHref: string;
     latestLabel: string;
   } | null;
+  /** Viewed docs version for search filtering (`""` = current; `null`/absent = off). */
+  searchVersion?: string | null;
   /**
    * User layout-slot overrides from `components.ts` (`defineComponents`). Each
    * key replaces the matching built-in; unknown keys are ignored. Wired slots:
@@ -232,6 +234,7 @@ const {
   localeSwitch,
   versionSelector,
   versionNotice,
+  searchVersion = null,
   layout = {},
   clientData,
   toc = { enabled: true, maxLevel: 3, minLevel: 2 },
@@ -523,6 +526,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
       route={page.route}
       searchEnabled={searchEnabled}
       searchLocale={searchLocale}
+      searchVersion={searchVersion}
       navStrings={navStrings}
       searchStrings={strings.search}
       site={site}

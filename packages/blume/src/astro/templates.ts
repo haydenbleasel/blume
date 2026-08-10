@@ -1895,6 +1895,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   localeSwitch={localeSwitch}
   versionSelector={versionSelector}
   versionNotice={versionNotice}
+  searchVersion={versionsConfig ? version : null}
   page={{ title: seo.title ?? title, description: seo.description ?? frontmatter.description, route }}
   headings={headings}
   toc={data.config.toc}

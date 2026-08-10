@@ -19,10 +19,21 @@ interface Props {
   strings?: UIStrings["search"];
   /** Active locale to filter results to; omitted disables locale filtering. */
   locale?: string;
+  /**
+   * Docs version to filter results to (`""` = the current docs — a meaningful
+   * value, so `null`/omitted is what disables version filtering).
+   */
+  version?: string | null;
 }
 
-const { askEnabled = false, navigation, popularPages, strings, locale } =
-  Astro.props;
+const {
+  askEnabled = false,
+  navigation,
+  popularPages,
+  strings,
+  locale,
+  version = null,
+} = Astro.props;
 // Merge over the English baseline per key (rather than `strings ?? …`) so a
 // partial — or empty `{}` — strings object still resolves every label to a
 // default, matching the pattern PageActions uses for its own dictionary.
@@ -59,6 +70,8 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
   data-i18n-popular={s.popular}
   data-i18n-results={s.results}
   data-locale={locale || undefined}
+  data-version={version ?? undefined}
+  data-versioned={version === null ? undefined : ""}
 >
   {/* The label and shortcut hint wait until `lg`: below it the hamburger and
       inline tab bar share the header row, and a full-width search field would
@@ -135,15 +148,29 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       class="flex items-center justify-between gap-3 border-border border-t px-3 py-2 text-muted-foreground text-xs"
     >
       {
-        locale ? (
-          <label class="flex cursor-pointer select-none items-center gap-1.5">
-            <input
-              class="size-3.5 accent-accent"
-              data-blume-search-all-locales
-              type="checkbox"
-            />
-            {s.allLanguages}
-          </label>
+        locale || version !== null ? (
+          <span class="flex items-center gap-3">
+            {locale && (
+              <label class="flex cursor-pointer select-none items-center gap-1.5">
+                <input
+                  class="size-3.5 accent-accent"
+                  data-blume-search-all-locales
+                  type="checkbox"
+                />
+                {s.allLanguages}
+              </label>
+            )}
+            {version !== null && (
+              <label class="flex cursor-pointer select-none items-center gap-1.5">
+                <input
+                  class="size-3.5 accent-accent"
+                  data-blume-search-all-versions
+                  type="checkbox"
+                />
+                {s.allVersions}
+              </label>
+            )}
+          </span>
         ) : (
           <span />
         )
@@ -268,6 +295,11 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       // reader has opted to search across every language instead.
       locale: string | null = null;
       allLocales = false;
+      // The viewed docs version ("" = current; null when versioning is off),
+      // and the opt-in to search across every version.
+      versioned = false;
+      version = "";
+      allVersions = false;
 
       connectedCallback() {
         this.devOnlyMsg =
@@ -284,6 +316,10 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         this.resultsMsg =
           this.getAttribute("data-i18n-results") || this.resultsMsg;
         this.locale = this.getAttribute("data-locale");
+        // "" (the current docs) is a real version value, so a presence flag —
+        // not the attribute's truthiness — decides whether filtering is on.
+        this.versioned = this.hasAttribute("data-versioned");
+        this.version = this.getAttribute("data-version") ?? "";
         this.dialog = this.querySelector("[data-blume-search-dialog]")!;
         this.input = this.querySelector("[data-blume-search-input]")!;
         this.grid = this.querySelector("[data-blume-search-grid]")!;
@@ -318,6 +354,25 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
             writeStorage(
               "blume-search-all-locales",
               this.allLocales ? "1" : "0"
+            );
+            this.render();
+          });
+        }
+
+        // Per-version filtering mirrors the locale toggle: default to the
+        // viewed version, with a remembered opt-in to search every version.
+        const allVersionsToggle = this.querySelector<HTMLInputElement>(
+          "[data-blume-search-all-versions]"
+        );
+        if (allVersionsToggle) {
+          this.allVersions =
+            localStorage.getItem("blume-search-all-versions") === "1";
+          allVersionsToggle.checked = this.allVersions;
+          allVersionsToggle.addEventListener("change", () => {
+            this.allVersions = allVersionsToggle.checked;
+            localStorage.setItem(
+              "blume-search-all-versions",
+              this.allVersions ? "1" : "0"
             );
             this.render();
           });
@@ -483,11 +538,14 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 
         const localeFilter =
           this.locale && !this.allLocales ? this.locale : undefined;
+        const versionFilter =
+          this.versioned && !this.allVersions ? this.version : undefined;
         let result: Awaited<ReturnType<SearchFn>>;
         try {
           result = await this.searchFn(query, {
             locale: localeFilter,
             section: this.activeSection ?? undefined,
+            version: versionFilter,
           });
         } catch {
           // A hosted provider can reject (network error, outage); the results
@@ -636,10 +694,16 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         const excerpt = hit.excerpt
           ? `<span class="mt-0.5 line-clamp-2 text-muted-foreground text-xs">${hit.excerpt}</span>`
           : "";
+        // A cross-version hit (all-versions search) names its version so the
+        // reader knows they're about to leave the docs they're viewing.
+        const versionTag =
+          this.versioned && hit.version !== undefined && hit.version !== this.version
+            ? `<span class="ms-2 inline-block rounded-full bg-muted px-1.5 py-0.5 align-middle text-[0.65rem] text-muted-foreground">${escapeHtml(hit.version || "latest")}</span>`
+            : "";
         el.innerHTML = `
           <span class="mt-0.5 shrink-0 text-muted-foreground">${svg("file")}</span>
           <span class="flex-1">
-            <span class="block truncate font-normal text-foreground text-sm">${hit.title}</span>
+            <span class="block truncate font-normal text-foreground text-sm">${hit.title}${versionTag}</span>
             ${excerpt}
           </span>`;
         const item: Selectable = { el, hit, kind: "link", url: href };

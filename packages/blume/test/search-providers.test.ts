@@ -128,6 +128,7 @@ describe("toSearchRecords", () => {
         section: "Guides",
         tags: ["guides", "intro"],
         title: "A",
+        version: "",
       },
     ];
     expect(toSearchRecords(docs)).toStrictEqual([
@@ -139,6 +140,7 @@ describe("toSearchRecords", () => {
         tag: "guides",
         title: "A",
         url: "/a",
+        version: "current",
       },
     ]);
   });
@@ -154,6 +156,7 @@ describe("toSearchRecords", () => {
         route: "/x",
         section: "Docs",
         title: "X",
+        version: "",
       },
     ]);
     expect(record?.tag).toBeUndefined();

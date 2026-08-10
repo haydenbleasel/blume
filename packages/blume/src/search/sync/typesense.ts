@@ -56,9 +56,10 @@ export const syncTypesense = async (
       { name: "content", type: "string" },
       { name: "url", type: "string" },
       { facet: true, name: "tag", optional: true, type: "string" },
-      // Carried as a facet so an i18n site can filter hosted results per
-      // language (the SearchRecord contract).
+      // Carried as facets so hosted results can filter per language and per
+      // docs version (the SearchRecord contract; current docs = "current").
       { facet: true, name: "locale", optional: true, type: "string" },
+      { facet: true, name: "version", optional: true, type: "string" },
     ],
     name: config.collection,
   });
@@ -71,6 +72,7 @@ export const syncTypesense = async (
     tag: record.tag,
     title: record.title,
     url: record.url,
+    version: record.version,
   }));
   await client
     .collections(config.collection)

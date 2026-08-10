@@ -275,6 +275,7 @@ describe("hosted sync uploads", () => {
       tag: "guides",
       title: "A",
       url: "/a",
+      version: "current",
     },
   ];
 

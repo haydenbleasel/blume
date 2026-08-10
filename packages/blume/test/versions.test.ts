@@ -34,6 +34,8 @@ import {
   versionsDiagnostics,
   versionsEnabled,
 } from "../src/core/versions.ts";
+import { buildSearchDocuments } from "../src/search/documents.ts";
+import { buildOramaIndex, queryOramaIndex } from "../src/search/orama-index.ts";
 
 const config = (
   over: Record<string, unknown> = {},
@@ -771,6 +773,48 @@ describe("catch-all template with versions", () => {
     expect(template).toContain("versionNotice={versionNotice}");
     expect(template).toContain("noindex={effectiveNoindex}");
     expect(template).toContain("data.navigationByVersion[version]");
+  });
+});
+
+describe("version-scoped search", () => {
+  it("filters the orama index by version, including the current docs", async () => {
+    const contentRoot = await tempContent({
+      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n\nWidget frobnication.\n",
+      "v1.0/guides/x.mdx":
+        "---\ntitle: X v1\n---\n# X\n\nWidget frobnication.\n",
+    });
+    const root = dirname(contentRoot);
+    await writeFile(
+      join(root, "blume.config.ts"),
+      `export default {
+        versions: {
+          archived: [{ id: "v1.0" }],
+          current: { label: "v2.0" },
+        },
+      };\n`
+    );
+    const project = await scanProject(root, { mode: "build" });
+    const documents = await buildSearchDocuments(project);
+
+    expect(documents.find((doc) => doc.route === "/guides/x")?.version).toBe(
+      ""
+    );
+    expect(
+      documents.find((doc) => doc.route === "/v1.0/guides/x")?.version
+    ).toBe("v1.0");
+
+    const db = await buildOramaIndex(documents);
+    const current = await queryOramaIndex(db, "widget", 10, { version: "" });
+    expect(current.map((doc) => doc.route)).toEqual(["/guides/x"]);
+    const archived = await queryOramaIndex(db, "widget", 10, {
+      version: "v1.0",
+    });
+    expect(archived.map((doc) => doc.route)).toEqual(["/v1.0/guides/x"]);
+    const all = await queryOramaIndex(db, "widget", 10);
+    expect(all.map((doc) => doc.route).toSorted()).toEqual([
+      "/guides/x",
+      "/v1.0/guides/x",
+    ]);
   });
 });
 

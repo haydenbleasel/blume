@@ -13,6 +13,8 @@ export interface SearchHit {
   section?: string;
   /** Plain-text page content, used to render the preview pane. */
   content?: string;
+  /** Docs version the hit belongs to (`""` = current; local providers only). */
+  version?: string;
 }
 
 /** A category pill with its result count. */
@@ -30,7 +32,12 @@ export interface SearchResult {
 /** A configured query function — the common contract every provider returns. */
 export type SearchFn = (
   query: string,
-  options?: { section?: string; locale?: string }
+  options?: {
+    section?: string;
+    locale?: string;
+    /** Docs version to scope to (`""` = current); omitted disables it. */
+    version?: string;
+  }
 ) => Promise<SearchResult>;
 
 /** A document in the client-loaded `blume-search.json` index. */
@@ -42,6 +49,7 @@ export interface IndexedDocument {
   breadcrumb?: string[];
   section?: string;
   locale?: string;
+  version?: string;
 }
 
 /** Max results surfaced in the dialog. */
@@ -193,6 +201,7 @@ export const buildResult = (
     section: doc.section ?? "",
     title: highlight(doc.title, query),
     url: doc.route,
+    version: doc.version,
   }));
   return { hits, sections };
 };
