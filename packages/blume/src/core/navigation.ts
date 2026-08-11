@@ -79,6 +79,7 @@ interface MutableGroup {
   label: string;
   icon?: string;
   collapsed?: boolean;
+  display?: SidebarDisplay;
   order: number;
   children: MutableNode[];
   index: Map<string, MutableGroup>;
@@ -164,18 +165,26 @@ const metaKey = (path: string, metaPrefix: string): string => {
   return path ? `${metaPrefix}/${path}` : metaPrefix;
 };
 
-/** Apply folder meta (title/order/icon/collapsed and explicit page order). */
+/**
+ * Apply folder meta (title/order/icon/collapsed/display and explicit page
+ * order), plus the index-frontmatter display sugar collected per folder path.
+ */
 const applyFolderMeta = (
   group: MutableGroup,
   folderMeta: Map<string, FolderMeta>,
   sharedMeta: Map<string, FolderMeta>,
-  metaPrefix: string
+  metaPrefix: string,
+  indexDisplay: Map<string, SidebarDisplay>
 ): void => {
   // Locale-specific meta wins; a shared `meta.$.*` (keyed by the locale-stripped
   // group path) applies to every locale otherwise.
   const meta =
     folderMeta.get(metaKey(group.path, metaPrefix)) ??
     sharedMeta.get(group.path);
+  // The group's own render mode, resolved index frontmatter first, then folder
+  // meta; `toNavNode` falls back to the global mode. Applies to this group
+  // only — nested subgroups resolve their own value through the same chain.
+  group.display = indexDisplay.get(group.path) ?? meta?.display;
   if (meta) {
     group.label = meta.title ?? group.label;
     group.icon = meta.icon ?? group.icon;
@@ -198,7 +207,7 @@ const applyFolderMeta = (
 
   for (const child of group.children) {
     if (child.kind === "group") {
-      applyFolderMeta(child, folderMeta, sharedMeta, metaPrefix);
+      applyFolderMeta(child, folderMeta, sharedMeta, metaPrefix, indexDisplay);
     }
   }
 };
@@ -374,7 +383,7 @@ const toNavNode = (node: MutableNode, display: SidebarDisplay): NavNode => {
   return {
     children: node.children.map((child) => toNavNode(child, display)),
     collapsed: node.collapsed,
-    display,
+    display: node.display ?? display,
     icon: node.icon,
     kind: "group",
     label: node.label,
@@ -393,6 +402,10 @@ const buildFileSystemSidebar = (
   diagnostics: Diagnostic[] = []
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
+  // Folder path -> `sidebar.display` from that folder's index page frontmatter.
+  // Collected before the hidden filter (like the title check): hiding the index
+  // row from the panel shouldn't stop it configuring its group.
+  const indexDisplay = new Map<string, SidebarDisplay>();
 
   for (const page of pages) {
     // Group by the locale-stripped path so the locale dir is not a nav group.
@@ -414,6 +427,20 @@ const buildFileSystemSidebar = (
       if (diagnostic) {
         diagnostics.push(diagnostic);
       }
+      if (page.meta.sidebar.display) {
+        indexDisplay.set(dirs.join("/"), page.meta.sidebar.display);
+      }
+    } else if (page.meta.sidebar.display) {
+      // Only a folder's index page configures its group; anywhere else the key
+      // is dead weight — warn instead of silently dropping it.
+      diagnostics.push({
+        code: "BLUME_SIDEBAR_DISPLAY_IGNORED",
+        file: page.sourcePath ?? page.id,
+        message: `"${page.navPath}" sets sidebar.display, but only a folder's index page can set its group's display mode — the value is ignored.`,
+        severity: "warning",
+        suggestion:
+          "Move display to the folder's index page frontmatter, or set it in the folder's meta.ts.",
+      });
     }
 
     if (page.meta.sidebar.hidden) {
@@ -461,7 +488,7 @@ const buildFileSystemSidebar = (
     });
   }
 
-  applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix);
+  applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix, indexDisplay);
   sortNodes(root.children, diagnostics);
   hoistPages(root.children, display === "flat");
   hoistTabSections(root.children, tabPaths, display === "flat");

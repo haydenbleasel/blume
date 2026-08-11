@@ -40,12 +40,28 @@ const dateSchema = z
   .union([z.string(), z.date()])
   .transform((value) => (value instanceof Date ? value.toISOString() : value));
 
+/**
+ * How a sidebar group renders:
+ * - `flat`: a non-collapsible header with its items listed beneath (default).
+ * - `group`: a collapsible `<details>` disclosure.
+ * - `page`: a single row that drills into a sub-panel showing only this group's
+ *   items, with a back arrow at the top.
+ */
+const sidebarDisplaySchema = z.enum(["flat", "group", "page"]);
+export type SidebarDisplay = z.infer<typeof sidebarDisplaySchema>;
+
 // ---------------------------------------------------------------------------
 // Page frontmatter
 // ---------------------------------------------------------------------------
 
 const sidebarMetaSchema = z.strictObject({
   badge: z.string().optional(),
+  /**
+   * Render mode for this page's folder group. Only meaningful on a folder's
+   * `index` page — it configures the group, not the page. Overrides the
+   * folder's `meta.ts` `display` and the global `navigation.sidebar.display`.
+   */
+  display: sidebarDisplaySchema.optional(),
   hidden: z.boolean().default(false),
   icon: iconName.optional(),
   label: z.string().optional(),
@@ -176,18 +192,10 @@ const customKeySchemaRecord = (where: string) =>
 // Folder meta (meta.ts)
 // ---------------------------------------------------------------------------
 
-/**
- * How a sidebar group renders:
- * - `flat`: a non-collapsible header with its items listed beneath (default).
- * - `group`: a collapsible `<details>` disclosure.
- * - `page`: a single row that drills into a sub-panel showing only this group's
- *   items, with a back arrow at the top.
- */
-const sidebarDisplaySchema = z.enum(["flat", "group", "page"]);
-export type SidebarDisplay = z.infer<typeof sidebarDisplaySchema>;
-
 export const folderMetaSchema = z.strictObject({
   collapsed: z.boolean().optional(),
+  /** Render mode for this group; overrides `navigation.sidebar.display`. */
+  display: sidebarDisplaySchema.optional(),
   icon: iconName.optional(),
   order: z.number().optional(),
   /** Explicit child ordering by slug segment (without numeric prefix). */
