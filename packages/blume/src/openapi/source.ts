@@ -1,5 +1,6 @@
 import { withBasePath } from "../core/base-path.ts";
 import matter from "../core/frontmatter.ts";
+import type { FolderMeta } from "../core/schema.ts";
 import { hashText } from "../core/sources/cache.ts";
 import type {
   ContentSource,
@@ -75,10 +76,33 @@ const specEntries = (
   return entries;
 };
 
+/**
+ * Label each tag's sidebar group with the spec's own tag name. The group label
+ * is otherwise re-humanized from the tag's route slug (split on hyphens,
+ * title-cased), which mangles authored casing and symbols — `OAuth2` →
+ * "Oauth2", `Größe` → "Größe" only by luck of the slug. Keys are the tag
+ * directories under the reference route, the same group paths `meta.ts` files
+ * use, so user-authored meta still overrides these.
+ */
+const tagFolderMeta = (
+  spec: ApiSpecData,
+  tags: { slug: string; name: string }[]
+): Record<string, FolderMeta> => {
+  const base = routeToRef(spec.route);
+  return Object.fromEntries(
+    tags.map((tag) => [
+      base ? `${base}/${tag.slug}` : tag.slug,
+      { title: tag.name },
+    ])
+  );
+};
+
 interface LoadedSpec {
   slug: string;
   spec: ApiSpecData;
   entries: SourceEntry[];
+  /** Sidebar-group labels for the spec's tag directories. */
+  folderMeta: Record<string, FolderMeta>;
   /** Non-fatal notes from the load (e.g. an offline cache fallback). */
   diagnostics: Diagnostic[];
 }
@@ -157,6 +181,7 @@ export const openApiSource = (
             : []),
         ],
         entries: specEntries(spec, operations, reference),
+        folderMeta: tagFolderMeta(spec, tags),
         slug: reference.slug,
         spec,
       };
@@ -192,6 +217,7 @@ export const openApiSource = (
       }))
     );
     const data: OpenApiData = {};
+    const folderMeta: Record<string, FolderMeta> = {};
     for (const result of results) {
       if ("severity" in result) {
         diagnostics.push(result);
@@ -199,10 +225,11 @@ export const openApiSource = (
       }
       data[result.slug] = result.spec;
       entries.push(...result.entries);
+      Object.assign(folderMeta, result.folderMeta);
       diagnostics.push(...result.diagnostics);
     }
     parsed = data;
-    return { diagnostics, entries };
+    return { diagnostics, entries, folderMeta };
   };
 
   return {

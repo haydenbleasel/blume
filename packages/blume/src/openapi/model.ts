@@ -4,6 +4,13 @@ import type {
   PathItemObject,
 } from "@scalar/openapi-types/3.1";
 
+import { slugify } from "./references.ts";
+
+// The slug rules live with the reference resolver so operation routes and
+// reference-source tokens can never drift apart; re-exported for existing
+// importers.
+export { slugify } from "./references.ts";
+
 /**
  * Blume's own OpenAPI model. Specs are parsed and upgraded to 3.1 (see
  * `parse.ts`) with internal `$ref`s left intact — the document stays
@@ -15,16 +22,6 @@ import type {
 
 /** A normalized OpenAPI 3.1 document, internal `$ref`s intact. */
 export type ApiDocument = Document;
-
-// Keep Unicode letters/numbers so diacritics stay in the slug. ASCII-only
-// stripping turned `Größe` into `gr-e`, and the nav humanizer then rendered
-// that as `Gr E`.
-const NON_SLUG = /[^\p{L}\p{M}\p{N}]+/gu;
-const SLUG_EDGES = /^-+|-+$/gu;
-
-/** Lowercase, URL-safe slug: `Add a Pet!` -> `add-a-pet`. */
-export const slugify = (text: string): string =>
-  text.toLowerCase().replace(NON_SLUG, "-").replace(SLUG_EDGES, "");
 
 /** The HTTP methods an OpenAPI path item may declare, in spec order. */
 export const HTTP_METHODS = [

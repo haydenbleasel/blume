@@ -1,6 +1,5 @@
 import { withBasePath } from "../../core/base-path.ts";
-import { trimEnd } from "../../core/trim.ts";
-import { slugify } from "../../openapi/references.ts";
+import { trimChar, trimEnd } from "../../core/trim.ts";
 import { MCP_TOOLS } from "./tools.ts";
 
 /** Inputs needed to describe the MCP server in discovery documents. */
@@ -49,10 +48,29 @@ const CARD_TEXT_MAX = 100;
 const truncate = (text: string): string =>
   text.length > CARD_TEXT_MAX ? `${text.slice(0, CARD_TEXT_MAX - 1)}…` : text;
 
+// The server-card schema constrains `name` to `namespace/server` in ASCII
+// (`^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$`), so the display name cannot reuse the
+// route slugifier, which keeps Unicode letters. Decompose (NFKD) and drop
+// combining marks first so an accented name transliterates (`Café` → `cafe`)
+// instead of losing the letter.
+const NON_ASCII_SLUG = /[^a-z0-9]+/gu;
+const COMBINING_MARKS = /\p{M}+/gu;
+
+const asciiSlugify = (text: string): string =>
+  trimChar(
+    text
+      .normalize("NFKD")
+      .replace(COMBINING_MARKS, "")
+      .toLowerCase()
+      .replace(NON_ASCII_SLUG, "-"),
+    "-"
+  );
+
 /**
  * The card's identity in the schema's reverse-DNS `namespace/server` form:
  * the site hostname reversed (`useblume.dev` → `dev.useblume`), or
- * `localhost` when no site is configured, plus the slugged display name.
+ * `localhost` when no site is configured, plus the slugged display name (an
+ * entirely non-ASCII name falls back to `docs`).
  */
 const reverseDnsName = (input: McpDiscoveryInput): string => {
   let namespace = "localhost";
@@ -66,7 +84,7 @@ const reverseDnsName = (input: McpDiscoveryInput): string => {
       // Not a parsable URL; the local namespace is honest enough.
     }
   }
-  return `${namespace}/${slugify(input.name) || "docs"}`;
+  return `${namespace}/${asciiSlugify(input.name) || "docs"}`;
 };
 
 const HTTP_URL = /^https?:\/\//u;

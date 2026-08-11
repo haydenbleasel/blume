@@ -62,10 +62,37 @@ export interface ReferenceSource {
   collisions?: string[];
 }
 
+// Keep Unicode letters/marks/numbers so diacritics stay in the slug (ASCII-only
+// stripping turned `Größe` into `gr-e`, which the nav humanizer rendered as
+// `Gr E`); `\p{M}` keeps combining marks attached to their base letter, which
+// NFC cannot always compose away (Devanagari vowel signs, Turkish `İ`'s
+// lowercased combining dot).
 const NON_SLUG = /[^\p{L}\p{M}\p{N}]+/gu;
+// Format characters (ZWNJ, ZWJ, bidi controls) separate no words — hyphenating
+// them would split Persian/Indic compounds the way ASCII stripping split
+// `Größe` — so they are dropped, not replaced.
+const FORMAT_CHARS = /\p{Cf}/gu;
+// A combining mark at the start of the slug has no base letter to attach to
+// (it would glue onto the preceding `/` in a URL), and a marks-only slug must
+// come out empty so callers' fallbacks (`operations`, `reference`) fire.
+const LEADING_MARKS = /^\p{M}+/u;
 
+/**
+ * Lowercase, hyphen-separated slug: `Add a Pet!` -> `add-a-pet`. Unicode
+ * letters are kept (`Größe` -> `größe`), NFC-normalized so canonically
+ * equivalent spellings (NFD input from macOS tooling) land on one slug.
+ * Non-ASCII slugs rely on the emitter percent-encoding the URL where a raw
+ * URI is required (sitemap, canonical).
+ */
 export const slugify = (text: string): string =>
-  trimChar(text.toLowerCase().replace(NON_SLUG, "-"), "-");
+  trimChar(
+    text
+      .normalize("NFC")
+      .toLowerCase()
+      .replace(FORMAT_CHARS, "")
+      .replace(NON_SLUG, "-"),
+    "-"
+  ).replace(LEADING_MARKS, "");
 
 /** Normalize a configured route to a single leading slash, no trailing slash. */
 export const normalizeRoute = (route: string): string => {

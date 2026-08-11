@@ -1680,8 +1680,11 @@ const frontmatter = entry.data ?? {};
 const seo = frontmatter.seo ?? {};
 const base = data.config.site ? data.config.site.replace(/\\/$/, "") : null;
 
+// Percent-encode the route-derived path (the sitemap convention): a Unicode
+// slug (\`/api/größe\`) is not legal in a raw URI, and crawlers compare
+// canonical against the sitemap's encoded <loc> byte-for-byte.
 const ogPath = data.config.og.enabled
-  ? \`/og/\${route === "/" ? "index" : route.slice(1)}.png\`
+  ? encodeURI(\`/og/\${route === "/" ? "index" : route.slice(1)}.png\`)
   : null;
 const ogRel = seo.image ?? ogPath;
 // Absolute URLs also carry the deployment base (the page is served under it):
@@ -1700,7 +1703,7 @@ const x = { ...data.config.x, ...(seo.x?.creator ? { creator: seo.x.creator } : 
 const basedRoute = withBase(route);
 const canonical =
   seo.canonical ??
-  (base ? \`\${base}\${basedRoute === "/" ? "" : basedRoute}\` : null);
+  (base ? \`\${base}\${basedRoute === "/" ? "" : encodeURI(basedRoute)}\` : null);
 
 // Locale resolution. With i18n on, pick the active locale's nav + dictionary,
 // build hreflang alternates, and derive the language-switcher targets.

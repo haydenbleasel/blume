@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
@@ -28,9 +28,10 @@ import {
   buildRequestSample,
   sampleLanguages,
 } from "../src/components/openapi/snippets.ts";
+import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
-import type { ProjectContext } from "../src/core/types.ts";
+import type { NavNode, ProjectContext } from "../src/core/types.ts";
 import {
   extractOperations,
   operationKey,
@@ -453,15 +454,55 @@ describe("model.extractOperations", () => {
     );
     const byKey = new Map(operations.map((op) => [op.key, op]));
     expect(byKey.get("listchildren")?.tagSlug).toBe("niños");
-    expect(byKey.get("listnfdchildren")?.tagSlug).toBe(nfdNinos.toLowerCase());
+    // The NFD spelling normalizes onto the same slug as the NFC tag; the two
+    // are still distinct tag *names*, so the collision suffix keeps their
+    // routes apart visibly instead of minting a byte-distinct, pixel-identical
+    // twin slug.
+    expect(byKey.get("listnfdchildren")?.tagSlug).toBe("niños-2");
     expect(byKey.get("listsizes")?.tagSlug).toBe("größe");
     expect(
       tags.map((tag) => ({ name: tag.name, slug: tag.slug }))
     ).toStrictEqual([
       { name: "Niños", slug: "niños" },
-      { name: nfdNinos, slug: nfdNinos.toLowerCase() },
+      { name: nfdNinos, slug: "niños-2" },
       { name: "Größe", slug: "größe" },
     ]);
+  });
+
+  it("drops format characters instead of splitting on them", () => {
+    // ZWNJ (U+200C) is orthographically mandatory inside Persian compounds;
+    // turning it into a hyphen re-creates the word-splitting bug this slug
+    // policy exists to fix (the humanizer splits on hyphens).
+    const { operations, tags } = extractOperations(
+      {
+        openapi: "3.1.0",
+        paths: {
+          "/apps": {
+            get: { operationId: "listApps", tags: ["نرم‌افزار"] },
+          },
+        },
+      } as unknown as ApiDocument,
+      "/api"
+    );
+    expect(operations[0]?.tagSlug).toBe("نرمافزار");
+    expect(tags[0]?.slug).toBe("نرمافزار");
+  });
+
+  it("falls back when a tag is only combining marks", () => {
+    // A bare combining mark is truthy but has no base letter — without the
+    // leading-mark trim it would bypass the `operations` fallback and mint an
+    // invisible route segment that glues onto the preceding `/` in URLs.
+    const { operations, tags } = extractOperations(
+      {
+        openapi: "3.1.0",
+        paths: {
+          "/a": { get: { operationId: "a", tags: ["̃"] } },
+        },
+      } as unknown as ApiDocument,
+      "/api"
+    );
+    expect(operations[0]?.tagSlug).toBe("operations");
+    expect(tags[0]?.slug).toBe("operations");
   });
 
   it("falls back when a tag has no letters or numbers", () => {
@@ -1168,13 +1209,19 @@ describe("source.openApiSource", () => {
     const source = openApiSource([reference], ctx(dir));
     expect(isOpenApiSource(source)).toBe(true);
 
-    const { entries, diagnostics } = await source.load();
+    const { entries, diagnostics, folderMeta } = await source.load();
     expect(diagnostics).toStrictEqual([]);
     // 3 operations + 1 overview index.
     expect(entries).toHaveLength(4);
     const refs = entries.map((entry) => entry.ref);
     expect(refs).toContain("api/pet/addpet.mdx");
     expect(refs.at(-1)).toBe("api/index.mdx");
+    // Each tag directory is labeled with the spec's own tag name, so the
+    // sidebar group renders the authored casing instead of a re-humanized slug.
+    expect(folderMeta).toStrictEqual({
+      "api/operations": { title: "Operations" },
+      "api/pet": { title: "pet" },
+    });
 
     const data = source.openApiData();
     expect(data.api?.title).toBe("Petstore");
@@ -1388,6 +1435,51 @@ describe("source.openApiSource", () => {
     } finally {
       globalThis.fetch = original;
       await rm(cacheDir, { force: true, recursive: true });
+    }
+  });
+
+  it("labels tag sidebar groups with the spec's own tag name", async () => {
+    const root = await mkdtemp(join(tmpdir(), "blume-openapi-nav-"));
+    try {
+      await mkdir(join(root, "docs"), { recursive: true });
+      await writeFile(
+        join(root, "blume.config.ts"),
+        'export default {\n  openapi: { enabled: true, route: "/api", spec: "./openapi.json" },\n};\n'
+      );
+      await writeFile(join(root, "docs/index.md"), "# Home\n");
+      await writeFile(
+        join(root, "openapi.json"),
+        JSON.stringify({
+          info: { title: "API", version: "1" },
+          openapi: "3.1.0",
+          paths: {
+            "/token": {
+              post: {
+                operationId: "createToken",
+                summary: "Create token",
+                tags: ["OAuth2"],
+              },
+            },
+          },
+        })
+      );
+      const project = await scanProject(root);
+      const labels: string[] = [];
+      const walk = (nodes: NavNode[]): void => {
+        for (const node of nodes) {
+          if (node.kind === "group") {
+            labels.push(node.label);
+            walk(node.children);
+          }
+        }
+      };
+      walk(project.graph.navigation.sidebar);
+      // The group label is the tag name the spec authored, not a re-humanized
+      // slug ("Oauth2").
+      expect(labels).toContain("OAuth2");
+      expect(labels).not.toContain("Oauth2");
+    } finally {
+      await rm(root, { force: true, recursive: true });
     }
   });
 });

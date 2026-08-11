@@ -1,4 +1,8 @@
-import type { FrontmatterExtend, ResolvedI18nConfig } from "../schema.ts";
+import type {
+  FolderMeta,
+  FrontmatterExtend,
+  ResolvedI18nConfig,
+} from "../schema.ts";
 import type { Diagnostic } from "../types.ts";
 
 /**
@@ -40,6 +44,14 @@ export interface SourceLoadResult {
   entries: SourceEntry[];
   /** Source-level diagnostics (e.g. an offline cache fallback warning). */
   diagnostics: Diagnostic[];
+  /**
+   * Folder meta the source derives for the sidebar groups its entries create,
+   * keyed by locale-stripped group path (the `meta.ts` key space). The OpenAPI
+   * source labels each tag directory with the spec's own tag name, so the
+   * sidebar shows `OAuth2`/`Größe` instead of a re-humanized slug. Merged
+   * beneath user-authored meta files, which always win.
+   */
+  folderMeta?: Record<string, FolderMeta>;
 }
 
 /**

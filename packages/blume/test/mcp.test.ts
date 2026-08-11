@@ -974,6 +974,20 @@ describe("discovery documents", () => {
     );
   });
 
+  it("keeps the reverse-DNS name inside the schema's ASCII pattern", () => {
+    // The server-card schema constrains `name` to ASCII; the route slugifier
+    // keeps Unicode letters, so the card must not reuse it. Accented names
+    // transliterate rather than losing the letter.
+    expect(buildMcpServerCard({ ...input, name: "Café Docs" }).name).toBe(
+      "com.example.docs/cafe-docs"
+    );
+    // An entirely non-ASCII name falls back to `docs` instead of publishing a
+    // schema-invalid identifier.
+    expect(buildMcpServerCard({ ...input, name: "ドキュメント" }).name).toBe(
+      "com.example.docs/docs"
+    );
+  });
+
   it("caps card text at the schema's 100-character limit", () => {
     const card = buildMcpServerCard({ ...input, name: "N".repeat(120) });
     expect((card.description as string).length).toBe(100);

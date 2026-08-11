@@ -262,6 +262,17 @@ export const scanProject = async (
     discoverFolderMeta(metaSources, { localeDirs }),
   ]);
 
+  // Folder meta contributed by the sources themselves (the OpenAPI source
+  // labels each tag directory with the spec's own tag name). It applies to
+  // every locale, so it merges into the shared map — beneath user-authored
+  // entries, which are spread last and win.
+  const sharedFolderMeta = new Map([
+    ...loaded.flatMap(({ folderMeta: sourceMeta }) =>
+      Object.entries(sourceMeta ?? {})
+    ),
+    ...folderMeta.shared,
+  ]);
+
   const {
     diagnostics: contentDiagnostics,
     droppedPages,
@@ -301,7 +312,7 @@ export const scanProject = async (
     folderMeta: folderMeta.meta,
     i18n: config.i18n,
     navigation: config.navigation,
-    sharedFolderMeta: folderMeta.shared,
+    sharedFolderMeta,
   });
   const manifest = buildManifest({ config, context, graph });
 
