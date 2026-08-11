@@ -31,11 +31,12 @@ Every field is optional — set only what you want to override.
 | `icon` | `string` | Icon shown next to the label. |
 | `order` | `number` | Position among sibling groups and pages. Lower numbers sort first. |
 | `collapsed` | `boolean` | Under the [`group` display mode](/docs/content/navigation#display-modes), whether the group starts collapsed. |
+| `display` | `"flat" \| "group" \| "page"` | Render mode for this group; overrides the global [`navigation.sidebar.display`](/docs/content/navigation#display-modes). |
 | `pages` | `string[]` | Explicit order for the group's children, by slug. |
 
 The `pages` array lists children by slug — the folder or file name with its numeric prefix and any parentheses stripped (so `01-quickstart.mdx` is `"quickstart"`). Children you leave out still appear, after the listed ones.
 
-How groups render — flat headers, collapsible disclosures, or drill-in panels — is a sidebar-wide setting, not per folder: see [display modes](/docs/content/navigation#display-modes).
+How groups render — flat headers, collapsible disclosures, or drill-in panels — defaults to the sidebar-wide `navigation.sidebar.display`; set `display` here to override it for this group alone. A folder's `index` page can also set it from frontmatter, which wins over `meta.ts` — see [per-group overrides](/docs/content/navigation#per-group-overrides).
 
 ## Computed meta
 

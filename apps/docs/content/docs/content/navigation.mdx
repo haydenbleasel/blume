@@ -69,7 +69,39 @@ navigation: {
 `page` mode keeps deep sections tidy — reach for it when groups have many children and you'd rather drill into them than scroll past them.
 :::
 
-A group in an [explicit sidebar](#explicit-sidebar) can override the global mode with its own `display`.
+### Per-group overrides
+
+Any generated group can opt out of the global mode — no explicit sidebar required. Set `display` in the folder's [`meta.ts`](/docs/content/meta), or — when the folder has an `index` page — under `sidebar` in that page's frontmatter, and only that group changes:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Client SDKs",
+  display: "page",
+});
+```
+
+```yaml index.mdx
+---
+title: Client SDKs
+sidebar:
+  display: page
+---
+```
+
+A generated group's effective mode resolves highest priority first:
+
+1. `sidebar.display` in the group's own `index` page frontmatter
+2. `display` in the folder's `meta.ts`
+3. The global `navigation.sidebar.display`
+4. The Blume default (`flat`)
+
+A group's `display` applies to that group only — nested subgroups resolve their own value through the same chain. A `page`-mode group with an index page still drills into its sub-panel: the index page lists as the panel's first item, and landing on its URL opens the panel directly.
+
+`sidebar.display` means nothing on a non-index page — there's no group for it to configure — so Blume reports a `BLUME_SIDEBAR_DISPLAY_IGNORED` warning instead of silently dropping it. `collapsed` remains specific to `group` mode; it's inert when a group resolves to `flat` or `page`.
+
+A group in an [explicit sidebar](#explicit-sidebar) overrides the global mode with its own `display`, exactly as before.
 
 ## Ordering
 
