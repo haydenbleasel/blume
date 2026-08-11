@@ -333,6 +333,118 @@ describe("buildNavigation — filesystem sidebar", () => {
   });
 });
 
+describe("buildNavigation — per-group display", () => {
+  it("resolves a group's display from folder meta over the global mode", () => {
+    const nav = buildNavigation(
+      [
+        page("guide/setup.md", "/guide/setup", "Setup"),
+        page("api/auth.md", "/api/auth", "Auth"),
+      ],
+      {
+        folderMeta: new Map<string, FolderMeta>([
+          ["guide", { display: "page" }],
+        ]),
+      }
+    );
+    // Groups sort alphabetically: "Api" first, then "Guide".
+    expect(asGroup(nav.sidebar[1]).display).toBe("page");
+    // The sibling group keeps the global mode (default `flat`).
+    expect(asGroup(nav.sidebar[0]).display).toBe("flat");
+  });
+
+  it("lets index frontmatter sidebar.display beat folder meta", () => {
+    const nav = buildNavigation(
+      [
+        page("guide/index.md", "/guide", "Guide", { display: "page" }),
+        page("guide/setup.md", "/guide/setup", "Setup"),
+      ],
+      {
+        folderMeta: new Map<string, FolderMeta>([
+          ["guide", { display: "group" }],
+        ]),
+      }
+    );
+    const guide = asGroup(nav.sidebar[0]);
+    expect(guide.display).toBe("page");
+    // The index page still lists first inside the drill-in panel.
+    expect(labels(guide.children)).toStrictEqual(["Guide", "Setup"]);
+  });
+
+  it("falls back to a non-flat global mode when nothing overrides", () => {
+    const nav = buildNavigation(
+      [page("guide/setup.md", "/guide/setup", "Setup")],
+      { display: "group", folderMeta: empty }
+    );
+    expect(asGroup(nav.sidebar[0]).display).toBe("group");
+  });
+
+  it("does not inherit a group's display into nested subgroups", () => {
+    const nav = buildNavigation(
+      [
+        page("guide/index.md", "/guide", "Guide", { display: "page" }),
+        page("guide/advanced/tuning.md", "/guide/advanced/tuning", "Tuning"),
+      ],
+      { folderMeta: empty }
+    );
+    const guide = asGroup(nav.sidebar[0]);
+    expect(guide.display).toBe("page");
+    // The subgroup resolves its own chain and lands on the global default.
+    expect(asGroup(guide.children.at(-1))).toHaveProperty("display", "flat");
+  });
+
+  it("accepts a meta display on a parenthesized (group) folder", () => {
+    const nav = buildNavigation(
+      [page("(legal)/privacy.md", "/privacy", "Privacy")],
+      {
+        folderMeta: new Map<string, FolderMeta>([
+          ["(legal)", { display: "page" }],
+        ]),
+      }
+    );
+    expect(asGroup(nav.sidebar[0]).display).toBe("page");
+  });
+
+  it("applies a hidden index page's display without listing the page", () => {
+    const nav = buildNavigation(
+      [
+        page("guide/index.md", "/guide", "Guide", {
+          display: "page",
+          hidden: true,
+        }),
+        page("guide/setup.md", "/guide/setup", "Setup"),
+      ],
+      { folderMeta: empty }
+    );
+    const guide = asGroup(nav.sidebar[0]);
+    expect(guide.display).toBe("page");
+    expect(labels(guide.children)).toStrictEqual(["Setup"]);
+  });
+
+  it("warns when a non-index page sets sidebar.display", () => {
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [page("guide/setup.md", "/guide/setup", "Setup", { display: "page" })],
+      { diagnostics, folderMeta: empty }
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_SIDEBAR_DISPLAY_IGNORED");
+    expect(diagnostics[0]?.file).toBe("/abs/guide/setup.md");
+    expect(diagnostics[0]?.message).toContain("guide/setup.md");
+  });
+
+  it("does not warn for display on an index page", () => {
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        page("guide/index.md", "/guide", "Guide", { display: "page" }),
+        page("guide/setup.md", "/guide/setup", "Setup"),
+      ],
+      { diagnostics, folderMeta: empty }
+    );
+    expect(diagnostics).toHaveLength(0);
+  });
+});
+
 describe("buildNavigation — group route paths", () => {
   it("keeps the folder route when the index page is inserted first", () => {
     // index.mdx sorts before its siblings, and an index page's route has no

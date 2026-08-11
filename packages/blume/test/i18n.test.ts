@@ -98,6 +98,18 @@ const buildProject = async (resolved: ResolvedConfig) => {
 const labelsOf = (nodes: NavNode[]): string[] =>
   nodes.map((node) => node.label);
 
+const groupDisplayOf = (
+  nodes: NavNode[],
+  label: string
+): string | undefined => {
+  for (const node of nodes) {
+    if (node.kind === "group" && node.label === label) {
+      return node.display;
+    }
+  }
+  return undefined;
+};
+
 /** Write a content tree to a fresh temp dir and return its content root. */
 const tempContent = async (files: Record<string, string>): Promise<string> => {
   const root = await mkdtemp(join(tmpdir(), "blume-i18n-"));
@@ -599,6 +611,55 @@ describe("dot parser and shared files", () => {
     expect(labelsOf(graph.navigationByLocale.fr?.sidebar ?? [])).toContain(
       "Handbook"
     );
+  });
+
+  it("resolves per-locale meta display independently", async () => {
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "fr/guides/intro.mdx": "# Intro fr\n",
+      "fr/guides/meta.ts": 'export default { display: "group" };\n',
+      "guides/intro.mdx": "# Intro\n",
+      "guides/meta.ts": 'export default { display: "page" };\n',
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const folderMeta = await discoverFolderMeta(contentRoot);
+    const graph = buildContentGraph(pages, {
+      folderMeta: folderMeta.meta,
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+      sharedFolderMeta: folderMeta.shared,
+    });
+
+    expect(
+      groupDisplayOf(graph.navigationByLocale.en?.sidebar ?? [], "Guides")
+    ).toBe("page");
+    expect(
+      groupDisplayOf(graph.navigationByLocale.fr?.sidebar ?? [], "Guides")
+    ).toBe("group");
+  });
+
+  it("shares a meta.$.ts display with every locale", async () => {
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "fr/guides/intro.mdx": "# Intro fr\n",
+      "guides/intro.mdx": "# Intro\n",
+      "guides/meta.$.ts": 'export default { display: "page" };\n',
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const folderMeta = await discoverFolderMeta(contentRoot);
+    const graph = buildContentGraph(pages, {
+      folderMeta: folderMeta.meta,
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+      sharedFolderMeta: folderMeta.shared,
+    });
+
+    expect(
+      groupDisplayOf(graph.navigationByLocale.en?.sidebar ?? [], "Guides")
+    ).toBe("page");
+    expect(
+      groupDisplayOf(graph.navigationByLocale.fr?.sidebar ?? [], "Guides")
+    ).toBe("page");
   });
 
   it("reports an index-title mismatch once, not once per locale", async () => {

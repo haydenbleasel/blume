@@ -363,6 +363,24 @@ describe("normalizeEntry", () => {
       "BLUME_FRONTMATTER_INVALID"
     );
   });
+
+  it("rejects an invalid sidebar.display naming the file and key", () => {
+    const { pages, diagnostics } = normalizeEntry(
+      {
+        body: { format: "md", text: "# SDKs\n" },
+        data: { sidebar: { display: "pages" }, title: "SDKs" },
+        ref: "sdks/index.md",
+        sourcePath: "/abs/sdks/index.md",
+      },
+      { defaultType: "doc", source: { name: "filesystem", staged: false } }
+    );
+    // The invalid page is dropped; strict builds fail on the diagnostic and
+    // `--no-strict` surfaces it in the dropped-page count.
+    expect(pages).toHaveLength(0);
+    expect(diagnostics[0]?.code).toBe("BLUME_FRONTMATTER_INVALID");
+    expect(diagnostics[0]?.file).toBe("/abs/sdks/index.md");
+    expect(diagnostics[0]?.schemaPath).toBe("sidebar.display");
+  });
 });
 
 const entryWith = (data: Record<string, unknown>): SourceEntry => ({

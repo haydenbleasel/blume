@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
-import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
+import {
+  blumeConfigSchema,
+  folderMetaSchema,
+  pageMetaSchema,
+} from "../src/core/schema.ts";
 
 describe("dateSchema normalization", () => {
   it("passes a string date through unchanged", () => {
@@ -31,6 +35,38 @@ describe("authors frontmatter", () => {
 
   it("still rejects an unknown top-level key", () => {
     expect(pageMetaSchema.safeParse({ unknownKey: 1 }).success).toBeFalsy();
+  });
+});
+
+describe("sidebar.display frontmatter", () => {
+  it("accepts each display mode", () => {
+    for (const display of ["flat", "group", "page"] as const) {
+      const meta = pageMetaSchema.parse({ sidebar: { display } });
+      expect(meta.sidebar.display).toBe(display);
+    }
+  });
+
+  it("leaves display unset by default", () => {
+    expect(pageMetaSchema.parse({}).sidebar.display).toBeUndefined();
+  });
+
+  it("rejects an invalid display value", () => {
+    const result = pageMetaSchema.safeParse({
+      sidebar: { display: "pages" },
+    });
+    expect(result.success).toBeFalsy();
+  });
+});
+
+describe("folder meta display", () => {
+  it("accepts a display mode", () => {
+    expect(folderMetaSchema.parse({ display: "page" }).display).toBe("page");
+  });
+
+  it("rejects an invalid display value", () => {
+    expect(folderMetaSchema.safeParse({ display: "drawer" }).success).toBe(
+      false
+    );
   });
 });
 

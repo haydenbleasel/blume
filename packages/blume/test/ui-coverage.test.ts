@@ -492,6 +492,16 @@ describe("layout chrome sources", () => {
     );
   });
 
+  it("resolves the display mode per node, never from a global prop", async () => {
+    // The builder stamps each generated group with its resolved display
+    // (index frontmatter > folder meta > global); the renderer must read that
+    // node value for both the row branches and the drill-in panel collection,
+    // or per-group overrides silently regress to the sidebar-wide mode.
+    const source = await layoutSource("NavTree.astro");
+    expect(source).toContain('const display = item.display ?? "flat";');
+    expect(source).toContain('(node.display ?? "flat") === "page"');
+  });
+
   it("uses the sidebar row radius for the full-width NavTree back button", async () => {
     const source = await layoutSource("NavTree.astro");
     expect(source).toMatch(
