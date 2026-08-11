@@ -258,6 +258,42 @@ const indexTitleMismatchDiagnostic = (
   };
 };
 
+/**
+ * Warn when a non-index page sets `sidebar.display`: only a folder's index
+ * page can configure its group's display mode, so anywhere else the key is
+ * dead weight — warn instead of silently dropping it. Checked for every page
+ * in `buildNavigation`, before the explicit-sidebar branch: an explicit
+ * config sidebar ignores the key just the same, and skipping the check there
+ * would hide the mistake exactly when nothing renders the value.
+ *
+ * Defaults an omitted sink to a discard array and returns it, so the caller
+ * can thread one array through both diagnostic-producing paths.
+ */
+const sidebarDisplayIgnoredDiagnostics = (
+  pages: PageRecord[],
+  sink: Diagnostic[] | undefined
+): Diagnostic[] => {
+  const diagnostics = sink ?? [];
+  for (const page of pages) {
+    if (!page.meta.sidebar.display) {
+      continue;
+    }
+    const filename = page.navPath.split("/").at(-1) ?? page.navPath;
+    if (isIndexStem(filename.replace(extname(filename), ""))) {
+      continue;
+    }
+    diagnostics.push({
+      code: "BLUME_SIDEBAR_DISPLAY_IGNORED",
+      file: page.sourcePath ?? page.id,
+      message: `"${page.navPath}" sets sidebar.display, but only a folder's index page can set its group's display mode — the value is ignored.`,
+      severity: "warning",
+      suggestion:
+        "Move display to the folder's index page frontmatter, or set it in the folder's meta.ts.",
+    });
+  }
+  return diagnostics;
+};
+
 /** Whether a node's `order` reflects a deliberate authoring choice. */
 const isAuthoredOrder = (node: MutableNode): boolean =>
   node.kind === "group" || node.orderIsAuthored;
@@ -430,17 +466,6 @@ const buildFileSystemSidebar = (
       if (page.meta.sidebar.display) {
         indexDisplay.set(dirs.join("/"), page.meta.sidebar.display);
       }
-    } else if (page.meta.sidebar.display) {
-      // Only a folder's index page configures its group; anywhere else the key
-      // is dead weight — warn instead of silently dropping it.
-      diagnostics.push({
-        code: "BLUME_SIDEBAR_DISPLAY_IGNORED",
-        file: page.sourcePath ?? page.id,
-        message: `"${page.navPath}" sets sidebar.display, but only a folder's index page can set its group's display mode — the value is ignored.`,
-        severity: "warning",
-        suggestion:
-          "Move display to the folder's index page frontmatter, or set it in the folder's meta.ts.",
-      });
     }
 
     if (page.meta.sidebar.hidden) {
@@ -754,6 +779,14 @@ export const buildNavigation = (
   // returned navigation so render-time scoping compares in the same space too.
   const rootTabPath = withBasePath(basePath, options.localizedRoot ?? "/");
 
+  // Emitted here, before the sidebar-mode branch: an explicit config sidebar
+  // ignores a stray non-index `sidebar.display` just like the filesystem
+  // sidebar does, so both paths must warn.
+  const diagnostics = sidebarDisplayIgnoredDiagnostics(
+    pages,
+    options.diagnostics
+  );
+
   if (options.sidebar) {
     const sidebar = buildConfigSidebar(
       options.sidebar,
@@ -779,7 +812,7 @@ export const buildNavigation = (
     new Set(
       tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path]))
     ),
-    options.diagnostics
+    diagnostics
   );
   return {
     featured,
