@@ -432,6 +432,20 @@ describe("buildNavigation — per-group display", () => {
     expect(diagnostics[0]?.message).toContain("guide/setup.md");
   });
 
+  it("warns for a non-index sidebar.display even with an explicit sidebar", () => {
+    const diagnostics: Diagnostic[] = [];
+    const nav = buildNavigation(
+      [page("guide/setup.md", "/guide/setup", "Setup", { display: "page" })],
+      { diagnostics, folderMeta: empty, sidebar: ["guide/setup"] }
+    );
+    // The explicit sidebar still renders unchanged...
+    expect(labels(nav.sidebar)).toStrictEqual(["Setup"]);
+    // ...but the dead key is flagged instead of silently dropped.
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_SIDEBAR_DISPLAY_IGNORED");
+    expect(diagnostics[0]?.file).toBe("/abs/guide/setup.md");
+  });
+
   it("does not warn for display on an index page", () => {
     const diagnostics: Diagnostic[] = [];
     buildNavigation(
