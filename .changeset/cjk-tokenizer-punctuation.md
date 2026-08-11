@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-Keep punctuation out of the index terms the segmenting search tokenizer produces. `Intl.Segmenter` follows UAX #29, which holds connector punctuation, combining marks, format characters and mid-number punctuation _inside_ a word, so `スネーク_ケース` and `robots.txt` each arrived as a single word-like segment and were indexed as they stood — reachable only by retyping the punctuation, and unreachable from `ケース` or `txt`. Word-like segments made of nothing but a symbol became index terms of their own. Segments are now split into runs of letters, combining marks and digits — marks are spelling, so Thai vowel and tone signs and the voicing in decomposed kana survive, as do a word-internal apostrophe (`don't`) and punctuation flanked by digits (`1.0.3`, `1,000`) — and each boundary ends a bigram run the same way a space or an interpunct does, so no window spans it. Text is also NFC-normalized before segmenting, so decomposed input indexes the same terms as a composed query.
