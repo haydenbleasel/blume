@@ -80,14 +80,21 @@ const BIGRAM_SCRIPTS =
   /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}々〆〇ーﾞﾟ]+$/u;
 
 /**
- * What separates terms inside a single word-like segment. Being word-like does
- * not make a segment all letters: UAX #29 keeps connector punctuation,
- * combining marks, format characters and mid-number punctuation *within* a
- * word, so `Intl.Segmenter` reports スネーク_ケース and 1,000 as one segment
- * each. Splitting on everything that is neither a letter nor a digit keeps
- * those characters out of the terms they would otherwise ride along in.
+ * One index term inside a word-like segment. Being word-like does not make a
+ * segment all letters: UAX #29 keeps connector punctuation, format characters
+ * and mid-number punctuation *within* a word, so `Intl.Segmenter` reports
+ * スネーク_ケース and robots.txt as one segment each. A term is a run of
+ * letters, combining marks and digits. Marks are spelling, not punctuation —
+ * Thai writes vowels and tones as combining marks, so dropping them leaves
+ * consonant skeletons that collapse distinct words (เสื้อ, shirt, and เสือ,
+ * tiger, differ by one mark). Two separators stay where the surrounding text
+ * makes them part of the word: an apostrophe followed by a letter (don't),
+ * and a decimal point or thousands separator flanked by digits (1.0.3,
+ * 1,000) — split, either would leave one-letter and one-digit fragments that
+ * co-occur on unrelated pages.
  */
-const NON_TERM = /[^\p{L}\p{N}]+/u;
+const TERM =
+  /[\p{L}\p{M}\p{N}]+(?:(?:['’](?=\p{L})|(?<=\p{N})[.,](?=\p{N}))[\p{L}\p{M}\p{N}]+)*/gu;
 
 /**
  * Emit every overlapping 2-character window of `run`, or the lone character.
@@ -119,8 +126,10 @@ const addBigrams = (run: string, tokens: Set<string>): void => {
 /**
  * A word-segmenting tokenizer for languages the default splitter can't handle,
  * built on `Intl.Segmenter` (the same engine `@orama/tokenizers` wraps).
- * Input is lowercased before segmenting — unlike the upstream tokenizers —
- * so Latin terms ("GDPR", English pages on a mixed-locale site) still match
+ * Input is NFC-normalized and lowercased before segmenting — unlike the
+ * upstream tokenizers — so decomposed text (macOS filenames, some CMS
+ * pipelines) indexes the same terms a composed query produces, and Latin
+ * terms ("GDPR", English pages on a mixed-locale site) still match
  * case-insensitively. Returns `undefined` for languages the default tokenizer
  * already serves, and on runtimes without `Intl.Segmenter`, where the caller
  * falls back to Orama's default.
@@ -128,9 +137,9 @@ const addBigrams = (run: string, tokens: Set<string>): void => {
  * On a {@link BIGRAM_LANGUAGES} index, runs of adjacent
  * {@link BIGRAM_SCRIPTS} segments are joined and re-cut into character
  * bigrams; everything else (Latin, digits, and every segment on a Korean or
- * Thai index) is emitted as the segmenter produced it, minus the punctuation
- * {@link NON_TERM} strips. Separators end a run either way — whether they stand
- * between segments, as 「クーリング・オフ」 does, or inside one.
+ * Thai index) is emitted one {@link TERM} at a time. Separators end a run
+ * either way — whether they stand between segments, as 「クーリング・オフ」
+ * does, or inside one.
  */
 const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
   const language = locale?.toLowerCase().split(/[-_]/u)[0] ?? "";
@@ -164,22 +173,26 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
         flush();
         tokens.add(term);
       };
-      for (const segment of segmenter.segment(raw.toLowerCase())) {
+      for (const segment of segmenter.segment(
+        raw.normalize("NFC").toLowerCase()
+      )) {
         if (!segment.isWordLike) {
           flush();
           continue;
         }
-        const terms = segment.segment.split(NON_TERM);
-        for (const [index, term] of terms.entries()) {
-          // A split means punctuation stood here, which ends the run as surely
+        let end = 0;
+        for (const match of segment.segment.matchAll(TERM)) {
+          // A gap means punctuation stood there, which ends the run as surely
           // as a non-word-like segment would: スネーク_ケース pairs either side
           // of the connector, never across it.
-          if (index > 0) {
+          if (match.index > end) {
             flush();
           }
-          if (term) {
-            take(term);
-          }
+          take(match[0]);
+          end = match.index + match[0].length;
+        }
+        if (end < segment.segment.length) {
+          flush();
         }
       }
       flush();
@@ -195,7 +208,9 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
  * `i18n.defaultLocale` — swaps in a word-segmenting tokenizer for languages
  * written without spaces (Japanese, Chinese, Korean, Thai); the tokenizer
  * belongs to the database, so on a mixed-locale site it applies to every
- * document, which is safe because Latin words survive segmentation intact.
+ * document, which is safe because words in other scripts — Latin, and
+ * mark-bearing scripts like Hebrew or Devanagari — survive segmentation
+ * intact.
  */
 export const buildOramaIndex = async (
   documents: OramaDoc[],
