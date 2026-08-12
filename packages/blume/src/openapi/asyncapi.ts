@@ -161,8 +161,14 @@ export const applyAsyncApiTraits = (
       mergeTraits(operation);
     }
   }
+  const channelMaps = [
+    ...Object.values(document.channels ?? {}),
+    // Reusable channels under components carry messages too; their traits
+    // must merge the same way so a resolved component channel renders alike.
+    ...Object.values(document.components?.channels ?? {}),
+  ];
   const messageMaps = [
-    ...Object.values(document.channels ?? {}).map((channel) =>
+    ...channelMaps.map((channel) =>
       isObject(channel) ? channel.messages : undefined
     ),
     document.components?.messages,
