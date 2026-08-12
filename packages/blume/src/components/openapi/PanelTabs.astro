@@ -26,6 +26,15 @@ interface Props {
 
 const { heading, panels, copy = false, mono = false } = Astro.props;
 
+// A stable per-instance id prefix so tab/tabpanel pairs can reference each
+// other without colliding across the multiple PanelTabs on one page (the
+// heading is unique per rail group; panel keys are unique within a group).
+const NON_ID = /[^a-z0-9]+/gu;
+const idFor = (kind: "tab" | "panel", key: string): string =>
+  ["panel-tabs", heading, kind, key]
+    .map((part) => part.toLowerCase().replace(NON_ID, "-"))
+    .join("-");
+
 // A `.prose` wrapper gives Shiki its scoped token colors; the global style at
 // the foot of this file strips the standalone code block's own box (border,
 // injected copy button, language label) so the code sits flush inside the one
@@ -50,9 +59,11 @@ const TAB_CLASS =
           <div class="flex flex-wrap gap-4" role="tablist">
             {panels.map((panel, index) => (
               <button
+                aria-controls={idFor("panel", panel.key)}
                 aria-selected={index === 0 ? "true" : "false"}
                 class:list={[TAB_CLASS, mono && "font-mono"]}
                 data-panel-tab={panel.key}
+                id={idFor("tab", panel.key)}
                 role="tab"
                 type="button"
               >
@@ -74,8 +85,11 @@ const TAB_CLASS =
         </div>
         {panels.map((panel, index) => (
           <div
+            aria-labelledby={idFor("tab", panel.key)}
             class:list={[index === 0 ? "" : "hidden"]}
             data-panel={panel.key}
+            id={idFor("panel", panel.key)}
+            role="tabpanel"
           >
             {panel.html ? (
               <div class={CODE_WRAP}>

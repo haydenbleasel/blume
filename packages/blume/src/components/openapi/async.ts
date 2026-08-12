@@ -121,30 +121,33 @@ export const messageLabel = (named: NamedMessage): string =>
   named.message.title ?? named.message.name ?? named.key;
 
 /**
- * The JSON-schema view of a message payload. A multi-format payload
- * (`{ schemaFormat, schema }`) unwraps when the format is JSON-schema
- * compatible and yields nothing otherwise (an Avro or Protobuf payload can't
- * render as a schema table — callers fall back to the content type).
+ * The JSON-schema view of a possibly multi-format schema value
+ * (`{ schemaFormat, schema }`, allowed on both message payloads and headers).
+ * Unwraps when the format is JSON-schema compatible and yields nothing
+ * otherwise (an Avro or Protobuf schema can't render as a schema table —
+ * callers fall back to a note).
  */
-export const payloadSchema = (
-  message: AsyncApiMessageLike
-): SchemaLike | undefined => {
-  const { payload } = message;
-  if (!isObject(payload)) {
+export const schemaOf = (value: unknown): SchemaLike | undefined => {
+  if (!isObject(value)) {
     return undefined;
   }
-  if (typeof payload.schemaFormat === "string" && "schema" in payload) {
-    const format = payload.schemaFormat;
+  if (typeof value.schemaFormat === "string" && "schema" in value) {
+    const format = value.schemaFormat;
     const jsonish =
       format.includes("json") ||
       format.includes("asyncapi") ||
       format.includes("openapi");
-    return jsonish && isObject(payload.schema)
-      ? (payload.schema as SchemaLike)
+    return jsonish && isObject(value.schema)
+      ? (value.schema as SchemaLike)
       : undefined;
   }
-  return payload as SchemaLike;
+  return value as SchemaLike;
 };
+
+/** The JSON-schema view of a message payload; see {@link schemaOf}. */
+export const payloadSchema = (
+  message: AsyncApiMessageLike
+): SchemaLike | undefined => schemaOf(message.payload);
 
 /**
  * Channel parameters lowered into the shared parameter-table shape. AsyncAPI
@@ -219,6 +222,7 @@ const PROTOCOL_ALIASES: Record<string, string> = {
   "kafka-secure": "kafka",
   mqtt5: "mqtt",
   mqtts: "mqtt",
+  "secure-mqtt": "mqtt",
   wss: "ws",
 };
 

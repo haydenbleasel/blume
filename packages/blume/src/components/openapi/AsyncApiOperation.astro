@@ -14,6 +14,7 @@ import {
   operationMessages,
   payloadSchema,
   protocolOf,
+  schemaOf,
 } from "./async.ts";
 import type { MessageSample } from "./async-snippets.ts";
 import { asyncSampleLanguages } from "./async-snippets.ts";
@@ -133,7 +134,9 @@ const channelBindings = bindingGroups(channel?.bindings);
           <ParametersTable parameters={parameters} schemas={schemas} />
           {messages.map((named) => {
             const payload = payloadSchema(named.message);
-            const headers = named.message.headers;
+            // Headers may be multi-format too; undefined with `headers`
+            // present means an inline-unrenderable schema format.
+            const headers = schemaOf(named.message.headers);
             const messageBindings = bindingGroups(named.message.bindings);
             return (
               <section class="mt-6">
@@ -172,22 +175,30 @@ const channelBindings = bindingGroups(channel?.bindings);
                     render inline.
                   </p>
                 )}
-                {headers && (
+                {named.message.headers && (
                   <div class="mt-3">
                     <div class="mb-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                       Headers
                     </div>
-                    <div class="not-prose rounded-blume border border-border px-4 py-3">
-                      <SchemaTable
-                        expandAll={spec.expandSchemas}
-                        schema={headers}
-                        schemas={schemas}
-                      />
-                    </div>
+                    {headers ? (
+                      <div class="not-prose rounded-blume border border-border px-4 py-3">
+                        <SchemaTable
+                          expandAll={spec.expandSchemas}
+                          schema={headers}
+                          schemas={schemas}
+                        />
+                      </div>
+                    ) : (
+                      <p class="text-muted-foreground text-sm">
+                        The headers use a schema format this reference can't
+                        render inline.
+                      </p>
+                    )}
                   </div>
                 )}
                 {messageBindings.length > 0 && (
                   <Bindings
+                    expandAll={spec.expandSchemas}
                     groups={messageBindings}
                     schemas={schemas}
                     title="Message bindings"
