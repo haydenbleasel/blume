@@ -39,7 +39,7 @@ Everything else is `defineConfig({ title })`.
 | `description` | **drop** (folders have no description) |
 | `collapsible: false` | **drop** (report — no per-folder equivalent) |
 
-`meta.ts` accepts **only** `title`, `icon`, `order`, `collapsed`, `pages` — there is **no `display` field** (writing one is a build error). Collapse rendering is global: when any folder needs collapsing, set `navigation.sidebar.display: "group"` once in `blume.config.ts`.
+`meta.ts` accepts **only** `title`, `icon`, `order`, `collapsed`, `pages`, `display`. Render mode is per-folder or global: a folder that needs collapsible rendering sets its own `meta.ts` `display: "group"` (drill-in is `"page"`); when the whole sidebar should collapse, set `navigation.sidebar.display: "group"` once in `blume.config.ts` instead of repeating it per folder.
 
 **`root: true` folders are Fumadocs' tab mechanism** — Fumadocs UI renders them as layout tabs and scopes the sidebar to the active one. That is exactly Blume's `navigation.tabs`: add `{ label, path, icon? }` per root folder (label/icon from its `meta.json`), pointing at the folder's route. Blume then scopes the sidebar by URL prefix the same way. Don't try to model root folders inside `meta.ts`.
 

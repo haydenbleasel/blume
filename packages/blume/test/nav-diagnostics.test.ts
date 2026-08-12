@@ -162,6 +162,7 @@ describe("validateNavIcons", () => {
                 route: "/b",
               },
             ],
+            display: "flat",
             icon: "bogus",
             kind: "group",
             label: "Group",

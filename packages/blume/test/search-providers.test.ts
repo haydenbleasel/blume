@@ -356,6 +356,7 @@ describe("buildSearchDocuments — localized sidebars", () => {
                     route: "/intro",
                   },
                 ],
+                display: "flat",
                 kind: "group",
                 label: "Guides",
               },

@@ -638,6 +638,35 @@ describe("dot parser and shared files", () => {
     ).toBe("group");
   });
 
+  it("ignores a fallback-filled index's display over the locale's own meta", async () => {
+    const resolved = config();
+    const contentRoot = await tempContent({
+      "fr/guides/intro.mdx": "# Intro fr\n",
+      "fr/guides/meta.ts": 'export default { display: "group" };\n',
+      "guides/index.mdx":
+        "---\ntitle: Guides\nsidebar:\n  display: page\n---\n# Guides\n",
+      "guides/intro.mdx": "# Intro\n",
+    });
+    const { pages } = await discoverIn(contentRoot, resolved);
+    const folderMeta = await discoverFolderMeta(contentRoot);
+    const graph = buildContentGraph(pages, {
+      folderMeta: folderMeta.meta,
+      i18n: resolved.i18n,
+      navigation: resolved.navigation,
+      sharedFolderMeta: folderMeta.shared,
+    });
+
+    // The default locale honors its own index frontmatter...
+    expect(
+      groupDisplayOf(graph.navigationByLocale.en?.sidebar ?? [], "Guides")
+    ).toBe("page");
+    // ...but fr's tree is padded with that index as a fallback fill, and the
+    // fallback locale's frontmatter must not override fr's authored meta.ts.
+    expect(
+      groupDisplayOf(graph.navigationByLocale.fr?.sidebar ?? [], "Guides")
+    ).toBe("group");
+  });
+
   it("shares a meta.$.ts display with every locale", async () => {
     const resolved = config();
     const contentRoot = await tempContent({

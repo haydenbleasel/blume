@@ -180,7 +180,12 @@ export type NavNode =
       label: string;
       badge?: string;
       directory?: DirectoryMode;
-      display?: SidebarDisplay;
+      /**
+       * The group's resolved render mode. Always stamped by both builders
+       * (generated and explicit-config sidebars), so the renderer can rely
+       * on it per node.
+       */
+      display: SidebarDisplay;
       icon?: string;
       route?: string;
       /**

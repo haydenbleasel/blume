@@ -130,6 +130,7 @@ describe("flattenPages", () => {
           route: "/group/old",
         },
       ],
+      display: "flat",
       kind: "group",
       label: "Group",
       route: "/group",
@@ -154,6 +155,7 @@ describe("findBreadcrumbs", () => {
       children: [
         { kind: "page", label: "Intro", pageId: "i", route: "/group/intro" },
       ],
+      display: "flat",
       kind: "group",
       label: "Group",
       route: "/group",

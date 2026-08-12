@@ -787,6 +787,7 @@ describe("nav utilities", () => {
           route: "/g/deploy",
         },
       ],
+      display: "flat" as const,
       kind: "group" as const,
       label: "Guides",
     },

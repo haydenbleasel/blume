@@ -99,7 +99,7 @@ A generated group's effective mode resolves highest priority first:
 
 A group's `display` applies to that group only — nested subgroups resolve their own value through the same chain. A `page`-mode group with an index page still drills into its sub-panel: the index page lists as the panel's first item, and landing on its URL opens the panel directly.
 
-`sidebar.display` means nothing on a non-index page — there's no group for it to configure — so Blume reports a `BLUME_SIDEBAR_DISPLAY_IGNORED` warning instead of silently dropping it. `collapsed` remains specific to `group` mode; it's inert when a group resolves to `flat` or `page`.
+`sidebar.display` means nothing anywhere else — on a non-index page, on the content root's own `index` page (the root isn't a group; use `navigation.sidebar.display`), or on any page when an [explicit sidebar](#explicit-sidebar) is configured (its items own each group's mode) — so Blume reports a `BLUME_SIDEBAR_DISPLAY_IGNORED` warning instead of silently dropping it. `collapsed` remains specific to `group` mode; it's inert when a group resolves to `flat` or `page`.
 
 A group in an [explicit sidebar](#explicit-sidebar) overrides the global mode with its own `display`, exactly as before.
 

@@ -15,6 +15,7 @@ const page = (label: string, route: string): NavNode => ({
 
 const group = (label: string, path: string, children: NavNode[]): NavNode => ({
   children,
+  display: "flat",
   kind: "group",
   label,
   path,
@@ -151,6 +152,7 @@ describe("sidebarForRoute", () => {
       page("Home", "/"),
       {
         children: [page("Files", "/api/files")],
+        display: "flat",
         kind: "group",
         label: "API",
         route: "/api",

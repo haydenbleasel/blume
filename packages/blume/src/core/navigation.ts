@@ -47,6 +47,19 @@ const segmentKey = (raw: string): string => {
 const isIndexStem = (stem: string): boolean =>
   stem.replace(NUMERIC_PREFIX, "") === "index";
 
+/** A filename's stem: the name with its extension stripped. */
+const stemOf = (filename: string): string =>
+  filename.replace(extname(filename), "");
+
+/**
+ * The stem of a nav path's last segment. The single index-detection input for
+ * the warn path (`sidebarDisplayIgnoredDiagnostics`) and the apply path
+ * (`buildFileSystemSidebar`), so the two can't drift apart on what counts as
+ * a folder's index page.
+ */
+const navStem = (navPath: string): string =>
+  stemOf(navPath.split("/").at(-1) ?? navPath);
+
 interface MutablePage {
   kind: "page";
   key: string;
@@ -129,7 +142,7 @@ const pageOrder = (
   if (page.meta.sidebar.order !== undefined) {
     return { order: page.meta.sidebar.order, orderIsAuthored: true };
   }
-  if (isIndexStem(filename.replace(extname(filename), ""))) {
+  if (isIndexStem(stemOf(filename))) {
     return { order: Number.NEGATIVE_INFINITY, orderIsAuthored: false };
   }
   // Changelog entries read newest-first, matching the generated timeline. Sort
@@ -259,27 +272,56 @@ const indexTitleMismatchDiagnostic = (
 };
 
 /**
- * Warn when a non-index page sets `sidebar.display`: only a folder's index
- * page can configure its group's display mode, so anywhere else the key is
- * dead weight — warn instead of silently dropping it. Checked for every page
- * in `buildNavigation`, before the explicit-sidebar branch: an explicit
- * config sidebar ignores the key just the same, and skipping the check there
- * would hide the mistake exactly when nothing renders the value.
+ * Warn wherever a page's `sidebar.display` is dead weight, instead of
+ * silently dropping it:
  *
- * Defaults an omitted sink to a discard array and returns it, so the caller
- * can thread one array through both diagnostic-producing paths.
+ * - On any page under an explicit `navigation.sidebar` config: the config
+ *   items own each group's display mode, and neither index frontmatter nor
+ *   folder meta is read — index pages included.
+ * - On the content root's own index page: the root is not a sidebar group,
+ *   so there is nothing for the value to configure; the sidebar-wide mode
+ *   lives in `navigation.sidebar.display`.
+ * - On any other non-index page: only a folder's index page can configure
+ *   its group's display mode.
+ *
+ * A non-root folder index under the generated sidebar is the one placement
+ * that IS honored, so it alone is exempt. Under i18n fallback fill the same
+ * source file is checked once per locale with an identical message, and the
+ * graph-level code+file+message dedupe collapses the copies.
  */
 const sidebarDisplayIgnoredDiagnostics = (
   pages: PageRecord[],
-  sink: Diagnostic[] | undefined
+  explicitSidebar: boolean
 ): Diagnostic[] => {
-  const diagnostics = sink ?? [];
+  const diagnostics: Diagnostic[] = [];
   for (const page of pages) {
     if (!page.meta.sidebar.display) {
       continue;
     }
-    const filename = page.navPath.split("/").at(-1) ?? page.navPath;
-    if (isIndexStem(filename.replace(extname(filename), ""))) {
+    const isIndex = isIndexStem(navStem(page.navPath));
+    if (explicitSidebar) {
+      diagnostics.push({
+        code: "BLUME_SIDEBAR_DISPLAY_IGNORED",
+        file: page.sourcePath ?? page.id,
+        message: `"${page.navPath}" sets sidebar.display, but the explicit navigation.sidebar config owns each group's display mode — the value is ignored.`,
+        severity: "warning",
+        suggestion:
+          "Set display on the matching group in navigation.sidebar, or remove the frontmatter key.",
+      });
+      continue;
+    }
+    if (isIndex && !page.navPath.includes("/")) {
+      diagnostics.push({
+        code: "BLUME_SIDEBAR_DISPLAY_IGNORED",
+        file: page.sourcePath ?? page.id,
+        message: `"${page.navPath}" sets sidebar.display, but the content root is not a sidebar group — the value is ignored.`,
+        severity: "warning",
+        suggestion:
+          "Set navigation.sidebar.display in blume.config to change the sidebar-wide mode.",
+      });
+      continue;
+    }
+    if (isIndex) {
       continue;
     }
     diagnostics.push({
@@ -364,20 +406,28 @@ const sortNodes = (nodes: MutableNode[], diagnostics: Diagnostic[]): void => {
 };
 
 /**
- * Hoist loose pages above groups so root-level pages read as top-level entries
- * rather than a group's trailing children (relative order otherwise preserved).
- * All display modes hoist the root level. Flat additionally recurses into every
- * group: there a group renders as a plain section header, so a loose page sorted
- * after a group would visually read as that group's last child.
+ * Hoist loose pages above groups so they read as their own level's entries
+ * rather than a preceding group's trailing children (relative order otherwise
+ * preserved). The root level always hoists, in every display mode. A deeper
+ * level hoists only when a sibling group renders flat — a flat group is a
+ * plain section header, so a loose page sorted after it would visually read
+ * as its last child — while `group`/`page` groups are self-delimiting
+ * disclosure/drill-in rows, so authored interleaving is kept. Each group's
+ * render mode is its own resolved `display` falling back to the global mode,
+ * mirroring `toNavNode`.
  */
-const hoistPages = (nodes: MutableNode[], recurse: boolean): void => {
-  const pages = nodes.filter((node) => node.kind === "page");
+const hoistPages = (
+  nodes: MutableNode[],
+  display: SidebarDisplay,
+  hoist: boolean
+): void => {
   const groups = nodes.filter((node) => node.kind === "group");
-  nodes.splice(0, nodes.length, ...pages, ...groups);
-  if (recurse) {
-    for (const group of groups) {
-      hoistPages(group.children, recurse);
-    }
+  if (hoist || groups.some((group) => (group.display ?? display) === "flat")) {
+    const pages = nodes.filter((node) => node.kind === "page");
+    nodes.splice(0, nodes.length, ...pages, ...groups);
+  }
+  for (const group of groups) {
+    hoistPages(group.children, display, false);
   }
 };
 
@@ -390,16 +440,16 @@ const hoistPages = (nodes: MutableNode[], recurse: boolean): void => {
 const hoistTabSections = (
   nodes: MutableNode[],
   tabPaths: Set<string>,
-  recurse: boolean
+  display: SidebarDisplay
 ): void => {
   for (const node of nodes) {
     if (node.kind !== "group") {
       continue;
     }
     if (node.routePath !== undefined && tabPaths.has(node.routePath)) {
-      hoistPages(node.children, recurse);
+      hoistPages(node.children, display, true);
     }
-    hoistTabSections(node.children, tabPaths, recurse);
+    hoistTabSections(node.children, tabPaths, display);
   }
 };
 
@@ -447,7 +497,7 @@ const buildFileSystemSidebar = (
     // Group by the locale-stripped path so the locale dir is not a nav group.
     const parts = page.navPath.split("/");
     const filename = parts.at(-1) ?? page.navPath;
-    const stem = filename.replace(extname(filename), "");
+    const stem = stemOf(filename);
     const dirs = parts.slice(0, -1);
 
     // Checked before the hidden filter: a sidebar-hidden index page still
@@ -463,7 +513,11 @@ const buildFileSystemSidebar = (
       if (diagnostic) {
         diagnostics.push(diagnostic);
       }
-      if (page.meta.sidebar.display) {
+      // Fallback-filled pages are exempt (like the title check above): their
+      // frontmatter belongs to the fallback locale, and letting it through
+      // would override this locale's own authored `meta.ts` display — then
+      // silently flip again the day the index gets translated.
+      if (page.meta.sidebar.display && !page.fallback) {
         indexDisplay.set(dirs.join("/"), page.meta.sidebar.display);
       }
     }
@@ -515,8 +569,8 @@ const buildFileSystemSidebar = (
 
   applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix, indexDisplay);
   sortNodes(root.children, diagnostics);
-  hoistPages(root.children, display === "flat");
-  hoistTabSections(root.children, tabPaths, display === "flat");
+  hoistPages(root.children, display, true);
+  hoistTabSections(root.children, tabPaths, display);
   return root.children.map((child) => toNavNode(child, display));
 };
 
@@ -678,6 +732,50 @@ const withTabHrefs = (tabs: NavTab[], sidebar: NavNode[]): NavTab[] =>
     return href === tab.path ? tab : { ...tab, href };
   });
 
+/**
+ * Apply the site base path to config-provided nav chrome. Config paths are
+ * authored as if mounted at root, so the base is applied here (idempotently,
+ * and only to internal paths — external URLs pass through). Content-derived
+ * sidebar routes are already based via `page.route`. The based tab paths also
+ * feed tab-scoping, so they must agree with the based content routes. With no
+ * base, this is a pure pass-through — the arrays keep their exact authored
+ * shape.
+ */
+const rebaseNavChrome = (
+  basePath: string,
+  options: {
+    featured?: FeaturedLink[];
+    selectors?: NavSelector[];
+    tabs?: NavTab[];
+  }
+): { featured: FeaturedLink[]; selectors: NavSelector[]; tabs: NavTab[] } => {
+  const rebasePath = <T extends { path: string }>(item: T): T => ({
+    ...item,
+    path: withBasePath(basePath, item.path),
+  });
+  const featured = basePath
+    ? (options.featured ?? []).map((link) => ({
+        ...link,
+        href: withBasePath(basePath, link.href),
+      }))
+    : (options.featured ?? []);
+  const selectors = basePath
+    ? (options.selectors ?? []).map((selector) => ({
+        ...selector,
+        items: selector.items.map(rebasePath),
+      }))
+    : (options.selectors ?? []);
+  const tabs = basePath
+    ? (options.tabs ?? []).map((tab) => ({
+        ...tab,
+        ...(tab.href ? { href: withBasePath(basePath, tab.href) } : {}),
+        items: tab.items?.map(rebasePath),
+        path: withBasePath(basePath, tab.path),
+      }))
+    : (options.tabs ?? []);
+  return { featured, selectors, tabs };
+};
+
 /** Build the complete navigation model from pages, meta, and config. */
 export const buildNavigation = (
   pages: PageRecord[],
@@ -721,36 +819,7 @@ export const buildNavigation = (
   const metaPrefix = options.metaPrefix ?? "";
   const sharedFolderMeta = options.sharedFolderMeta ?? new Map();
 
-  // Config-provided nav paths are authored as if mounted at root, so the base
-  // is applied here (idempotently, and only to internal paths — external URLs
-  // pass through). Content-derived sidebar routes are already based via
-  // `page.route`. The based tab paths also feed tab-scoping below, so they must
-  // agree with the based content routes. With no base, this is a pure pass-
-  // through — the arrays keep their exact authored shape.
-  const rebasePath = <T extends { path: string }>(item: T): T => ({
-    ...item,
-    path: withBasePath(basePath, item.path),
-  });
-  const featured = basePath
-    ? (options.featured ?? []).map((link) => ({
-        ...link,
-        href: withBasePath(basePath, link.href),
-      }))
-    : (options.featured ?? []);
-  const selectors = basePath
-    ? (options.selectors ?? []).map((selector) => ({
-        ...selector,
-        items: selector.items.map(rebasePath),
-      }))
-    : (options.selectors ?? []);
-  const tabs = basePath
-    ? (options.tabs ?? []).map((tab) => ({
-        ...tab,
-        ...(tab.href ? { href: withBasePath(basePath, tab.href) } : {}),
-        items: tab.items?.map(rebasePath),
-        path: withBasePath(basePath, tab.path),
-      }))
-    : (options.tabs ?? []);
+  const { featured, selectors, tabs } = rebaseNavChrome(basePath, options);
   const byRoute = new Map(
     pages.map((page) => [
       options.refByLogical ? page.translationKey : page.route,
@@ -780,11 +849,11 @@ export const buildNavigation = (
   const rootTabPath = withBasePath(basePath, options.localizedRoot ?? "/");
 
   // Emitted here, before the sidebar-mode branch: an explicit config sidebar
-  // ignores a stray non-index `sidebar.display` just like the filesystem
-  // sidebar does, so both paths must warn.
-  const diagnostics = sidebarDisplayIgnoredDiagnostics(
-    pages,
-    options.diagnostics
+  // ignores a stray `sidebar.display` just like the filesystem sidebar does
+  // (and ignores it on index pages too), so both paths must warn.
+  const diagnostics = options.diagnostics ?? [];
+  diagnostics.push(
+    ...sidebarDisplayIgnoredDiagnostics(pages, Boolean(options.sidebar))
   );
 
   if (options.sidebar) {

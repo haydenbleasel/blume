@@ -269,6 +269,7 @@ describe("buildSearchDocuments", () => {
               route: "/guides/setup",
             },
           ],
+          display: "flat",
           kind: "group",
           label: "Guides",
           route: "/guides",
