@@ -817,12 +817,7 @@ describe("source.openApiSource with AsyncAPI references", () => {
   });
 
   it("surfaces converter warnings and skipped operations as diagnostics", async () => {
-    const dir = await tempSpec({
-      ...ASYNC_SPEC_2,
-      channels: {
-        ...(ASYNC_SPEC_2.channels as Record<string, unknown>),
-      },
-    });
+    const dir = await tempSpec(ASYNC_SPEC_2);
     const { diagnostics } = await openApiSource(
       [asyncReference],
       ctx(dir)
