@@ -568,3 +568,37 @@ describe("buildStructuredData — dateModified and locale", () => {
     expect(article?.datePublished).toBeUndefined();
   });
 });
+
+describe("openapi playground sources", () => {
+  it("loads the playground client lazily behind the details toggle", async () => {
+    // The client module must stay a dynamic import: it becomes its own chunk,
+    // downloaded only when a reader actually opens the Try It panel.
+    const source = await componentSource("openapi/Playground.astro");
+    expect(source).toContain('await import("./playground-client.ts")');
+    expect(source).toContain("initPlayground(this)");
+    expect(source).toContain("{ once: true }");
+  });
+
+  it("keeps Operation.astro the only importer of Playground.astro", async () => {
+    // The no-playground-JS-on-non-operation-pages guarantee: any other .astro
+    // importing the panel would pull its loader script onto that page too.
+    const srcRoot = new URL("../src/", import.meta.url).pathname;
+    const importers: string[] = [];
+    for await (const file of new Bun.Glob("**/*.astro").scan(srcRoot)) {
+      const source = await readFile(join(srcRoot, file), "utf-8");
+      if (/from\s+"[^"]*Playground\.astro"/u.test(source)) {
+        importers.push(file);
+      }
+    }
+    expect(importers).toEqual(["components/openapi/Operation.astro"]);
+  });
+
+  it("tags each request-sample pane with its language for live sync", async () => {
+    // The playground client re-renders samples by [data-sample-lang]; the
+    // attribute must ride the same element as the tab-switcher's data-panel.
+    const source = await componentSource("openapi/RequestPanel.astro");
+    expect(source).toMatch(
+      /data-panel=\{entry\.id\}\s+data-sample-lang=\{entry\.id\}/u
+    );
+  });
+});

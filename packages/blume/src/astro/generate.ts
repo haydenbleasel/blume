@@ -94,6 +94,7 @@ import {
   mixedbreadSearchEndpointTemplate,
   notFoundPageTemplate,
   ogEndpointTemplate,
+  playgroundProxyTemplate,
   rawMarkdownEndpointTemplate,
   rssEndpointTemplate,
   runtimeDirWithin,
@@ -1371,6 +1372,27 @@ const writeMcpFiles = async (
 };
 
 /**
+ * Decide whether to generate the playground's built-in CORS proxy endpoint.
+ * Only the Blume renderer's playground with `proxy: true` needs it — a proxy
+ * URL string points at an external service, and `false` sends requests
+ * directly. Injected at `/_api-proxy` (rather than written under `pages/`)
+ * because Astro treats `_`-prefixed page files as private; the endpoint's own
+ * `prerender = false` export wins over the injection default.
+ */
+const planPlaygroundProxy = (
+  config: ResolvedConfig,
+  srcDir: string
+): { enabled: boolean; entrypoint: string; pattern: string } => ({
+  enabled:
+    config.openapi.enabled &&
+    config.openapi.renderer === "blume" &&
+    config.openapi.playground.enabled &&
+    config.openapi.playground.proxy === true,
+  entrypoint: join(srcDir, "blume-openapi", "api-proxy.ts"),
+  pattern: "/_api-proxy",
+});
+
+/**
  * Write the Ask AI endpoint and, unless the backend runs its own retrieval
  * (Inkeep), the grounding snapshot the endpoint queries at request time. A no-op
  * when Ask AI is disabled.
@@ -1606,6 +1628,16 @@ export const generateRuntime = async (
   const mcp = planMcp(project, srcDir, pages);
   pages.push(...mcp.discoveryPages);
 
+  // The playground's built-in CORS proxy rides the same injection path as the
+  // MCP discovery docs; the endpoint itself opts out of prerendering.
+  const playgroundProxy = planPlaygroundProxy(config, srcDir);
+  if (playgroundProxy.enabled) {
+    pages.push({
+      entrypoint: playgroundProxy.entrypoint,
+      pattern: playgroundProxy.pattern,
+    });
+  }
+
   const hasStaged = staged.size > 0;
   // Only emit a project-scanning `docs` collection when a filesystem source
   // actually feeds it. An all-staged project (openapi/notion/…) has only staged
@@ -1751,6 +1783,9 @@ export const generateRuntime = async (
     ),
     writeAskFiles(project, srcDir, write),
     writeMcpFiles(project, mcp, write),
+    playgroundProxy.enabled
+      ? write(playgroundProxy.entrypoint, playgroundProxyTemplate())
+      : Promise.resolve(false),
   ]);
 
   if (config.seo.og.enabled) {

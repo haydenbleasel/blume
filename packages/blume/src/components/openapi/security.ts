@@ -85,9 +85,6 @@ export const resolveSecurity = (
   return { alternatives, optional };
 };
 
-const capitalize = (text: string): string =>
-  text.charAt(0).toUpperCase() + text.slice(1);
-
 /** A short human label for a scheme row, e.g. `Bearer token` or `API key`. */
 export const schemeLabel = (resolved: ResolvedScheme): string => {
   const { scheme } = resolved;
@@ -145,57 +142,4 @@ export const schemeCarrier = (
       return undefined;
     }
   }
-};
-
-/** Placeholder credentials the request samples send. */
-export interface SampleAuth {
-  headers: Record<string, string>;
-  query: Record<string, string>;
-}
-
-/**
- * Placeholder credentials for an operation's request samples, from its first
- * alternative (the spec's preferred way to authorize). Schemes that don't
- * travel in the request (mutual TLS) and unknown refs contribute nothing.
- */
-export const sampleAuth = (security: OperationSecurity): SampleAuth => {
-  const headers: Record<string, string> = {};
-  const query: Record<string, string> = {};
-  const cookies: string[] = [];
-  for (const resolved of security.alternatives[0] ?? []) {
-    const { scheme } = resolved;
-    switch (scheme?.type) {
-      case "http": {
-        const kind = (scheme.scheme ?? "bearer").toLowerCase();
-        headers.Authorization =
-          kind === "bearer"
-            ? "Bearer YOUR_TOKEN"
-            : `${capitalize(kind)} YOUR_CREDENTIALS`;
-        break;
-      }
-      case "oauth2":
-      case "openIdConnect": {
-        headers.Authorization = "Bearer YOUR_ACCESS_TOKEN";
-        break;
-      }
-      case "apiKey": {
-        const name = scheme.name ?? resolved.key;
-        if (scheme.in === "query") {
-          query[name] = "YOUR_API_KEY";
-        } else if (scheme.in === "cookie") {
-          cookies.push(`${name}=YOUR_API_KEY`);
-        } else {
-          headers[name] = "YOUR_API_KEY";
-        }
-        break;
-      }
-      default: {
-        break;
-      }
-    }
-  }
-  if (cookies.length > 0) {
-    headers.Cookie = cookies.join("; ");
-  }
-  return { headers, query };
 };

@@ -25,6 +25,12 @@ export interface ReferenceDisplay {
   codeSamples: string[];
   /** Whether nested schema rows start expanded. */
   expandSchemas: boolean;
+  /**
+   * The "Try it" playground: whether operation pages render it, and the CORS
+   * proxy the Send button routes through (`false` off, a URL string, or
+   * `true` for the built-in `/_api-proxy` endpoint).
+   */
+  playground: { enabled: boolean; proxy: string | boolean };
 }
 
 /** A spec source resolved to a concrete route, label, and renderer. */
@@ -174,7 +180,11 @@ const referencesFor = (
   });
 };
 
-const NO_DISPLAY: ReferenceDisplay = { codeSamples: [], expandSchemas: false };
+const NO_DISPLAY: ReferenceDisplay = {
+  codeSamples: [],
+  expandSchemas: false,
+  playground: { enabled: false, proxy: false },
+};
 
 /**
  * Resolve every enabled reference. OpenAPI honors its `renderer` (Blume's own UI
@@ -191,6 +201,7 @@ export const resolveReferences = (
     {
       codeSamples: config.openapi.codeSamples,
       expandSchemas: config.openapi.expandSchemas,
+      playground: config.openapi.playground,
     },
     config.basePath
   ),

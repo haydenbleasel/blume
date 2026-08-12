@@ -101,6 +101,7 @@ const responseEntries = await Promise.all(
             <div
               class:list={[index === 0 ? "" : "hidden", CODE_WRAP]}
               data-panel={entry.id}
+              data-sample-lang={entry.id}
             >
               <Fragment set:html={entry.html} />
             </div>

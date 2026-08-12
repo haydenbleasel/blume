@@ -14,6 +14,17 @@ export const serverFeatures = (config: ResolvedConfig): string[] => {
   if (config.ai.mcp.enabled) {
     features.push("MCP server");
   }
+  // The built-in playground proxy (`openapi.playground.proxy: true`) is a
+  // live fetch endpoint at `/_api-proxy`; an external proxy URL (string) or a
+  // proxy-less playground stays fully static.
+  if (
+    config.openapi.enabled &&
+    config.openapi.renderer === "blume" &&
+    config.openapi.playground.enabled &&
+    config.openapi.playground.proxy === true
+  ) {
+    features.push("API playground proxy");
+  }
   // Mixedbread (and any future provider) that proxies queries through a secret
   // server endpoint can't run on a static build.
   if (searchProviderMeta(config.search.provider).requiresServer) {

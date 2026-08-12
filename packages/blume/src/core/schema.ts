@@ -1448,6 +1448,26 @@ const openapiConfigSchema = z.strictObject({
   enabled: z.boolean().default(false),
   /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
   expandSchemas: z.boolean().default(false),
+  /**
+   * The interactive "Try it" panel on operation pages (Blume renderer). On by
+   * default; `false` hides it. The object form keeps it on and sets `proxy`,
+   * the CORS escape hatch the Send button routes requests through: a proxy
+   * URL, or `true` for the built-in `/_api-proxy` endpoint (which requires
+   * `deployment.output: "server"`). Booleans normalize to the object shape so
+   * consumers read `{ enabled, proxy }` directly.
+   */
+  playground: z
+    .union([
+      z.boolean(),
+      z.strictObject({
+        enabled: z.boolean().default(true),
+        proxy: z.union([z.boolean(), z.string()]).default(false),
+      }),
+    ])
+    .default(true)
+    .transform((value) =>
+      typeof value === "boolean" ? { enabled: value, proxy: false } : value
+    ),
   /** Who renders the reference: Blume's own UI, or the embedded Scalar SPA. */
   renderer: z.enum(["blume", "scalar"]).default("blume"),
   /** Where the reference mounts. */

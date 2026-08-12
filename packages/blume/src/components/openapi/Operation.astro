@@ -6,17 +6,19 @@ import {
   resolveComponentRef,
   type SchemaLike,
 } from "./helpers.ts";
+import { operationModel } from "./operation-model.ts";
+import { buildRequest, defaultValues } from "./request.ts";
 import {
   effectiveSecurity,
   resolveSecurity,
-  sampleAuth,
   type SecurityRequirementLike,
   type SecuritySchemeLike,
 } from "./security.ts";
-import { buildRequestSample, sampleLanguages } from "./snippets.ts";
+import { sampleLanguages } from "./snippets.ts";
 import Authorization from "./Authorization.astro";
 import MethodBadge from "./MethodBadge.astro";
 import ParametersTable from "./ParametersTable.astro";
+import Playground from "./Playground.astro";
 import RequestBody from "./RequestBody.astro";
 import RequestPanel from "./RequestPanel.astro";
 import Responses from "./Responses.astro";
@@ -100,17 +102,21 @@ const security = resolveSecurity(
   doc.components?.securitySchemes
 );
 
-const sample =
+// One derived model feeds the static default sample, the playground form,
+// and (client-side) the live samples + fetch — they can never drift apart.
+const model =
   ref && operation
-    ? buildRequestSample(
-        { parameters: params, requestBody },
-        ref.method,
-        ref.path,
-        doc.servers ?? [],
+    ? operationModel({
+        method: ref.method,
+        parameters: params,
+        path: ref.path,
+        requestBody,
         schemas,
-        sampleAuth(security)
-      )
+        security,
+        servers: doc.servers ?? [],
+      })
     : null;
+const sample = model ? buildRequest(model, defaultValues(model)) : null;
 const languages = sampleLanguages(spec?.codeSamples ?? []);
 ---
 
@@ -149,8 +155,16 @@ const languages = sampleLanguages(spec?.codeSamples ?? []);
             />
           )}
         </div>
-        {sample && (
-          <div class="xl:sticky xl:top-24 xl:self-start">
+        {sample && model && (
+          <div class="xl:sticky xl:top-24 xl:self-start" data-operation-panel>
+            {spec.playground.enabled && (
+              <Playground
+                model={model}
+                operation={id}
+                proxy={spec.playground.proxy}
+                slug={spec.slug}
+              />
+            )}
             <RequestPanel
               languages={languages}
               responses={responses}

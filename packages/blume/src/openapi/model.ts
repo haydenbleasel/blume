@@ -93,6 +93,13 @@ export interface ApiSpecData {
   codeSamples: string[];
   /** Whether nested schema rows start expanded. */
   expandSchemas: boolean;
+  /**
+   * The "Try it" playground: whether operation pages render it, and the
+   * resolved proxy the Send button targets — `false` for direct requests, a
+   * URL string otherwise (the built-in `/_api-proxy` route already carries
+   * the site `basePath`).
+   */
+  playground: { enabled: boolean; proxy: string | false };
 }
 
 /** The generated `blume:openapi` module: specs keyed by {@link ApiSpecData.slug}. */

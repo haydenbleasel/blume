@@ -17,17 +17,18 @@ import {
   typeLabel,
 } from "../src/components/openapi/helpers.ts";
 import type { SchemaLike } from "../src/components/openapi/helpers.ts";
+import { operationModel } from "../src/components/openapi/operation-model.ts";
+import {
+  buildRequest,
+  defaultValues,
+} from "../src/components/openapi/request.ts";
 import {
   effectiveSecurity,
   resolveSecurity,
-  sampleAuth,
   schemeCarrier,
   schemeLabel,
 } from "../src/components/openapi/security.ts";
-import {
-  buildRequestSample,
-  sampleLanguages,
-} from "../src/components/openapi/snippets.ts";
+import { sampleLanguages } from "../src/components/openapi/snippets.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
@@ -174,6 +175,7 @@ describe("references", () => {
     expect(refs[0]?.display).toStrictEqual({
       codeSamples: ["curl", "js", "python"],
       expandSchemas: false,
+      playground: { enabled: true, proxy: false },
     });
     expect(hasScalarReferences(config)).toBe(false);
     expect(blumeReferences(config)).toHaveLength(1);
@@ -866,6 +868,7 @@ describe("render-mdx", () => {
       expandSchemas: false,
       label: "API",
       operations: {},
+      playground: { enabled: true, proxy: false },
       route: "/api",
       slug: "api",
       tags: [],
@@ -1373,7 +1376,11 @@ describe("source.openApiSource", () => {
     const reference = {
       ...indexedReference,
       basePath: "",
-      display: { codeSamples: ["curl"], expandSchemas: false },
+      display: {
+        codeSamples: ["curl"],
+        expandSchemas: false,
+        playground: { enabled: true, proxy: false },
+      },
       kind: "openapi" as const,
       label: "API",
       renderer: "blume" as const,
@@ -1409,7 +1416,11 @@ describe("source.openApiSource", () => {
     const reference = {
       ...indexedReference,
       basePath: "/docs",
-      display: { codeSamples: [], expandSchemas: false },
+      display: {
+        codeSamples: [],
+        expandSchemas: false,
+        playground: { enabled: true, proxy: false },
+      },
       kind: "openapi" as const,
       label: "API",
       renderer: "blume" as const,
@@ -1438,7 +1449,11 @@ describe("source.openApiSource", () => {
     const reference = {
       ...indexedReference,
       basePath: "",
-      display: { codeSamples: [], expandSchemas: false },
+      display: {
+        codeSamples: [],
+        expandSchemas: false,
+        playground: { enabled: true, proxy: false },
+      },
       kind: "openapi" as const,
       label: "API",
       renderer: "blume" as const,
@@ -1465,7 +1480,11 @@ describe("source.openApiSource", () => {
     const reference = {
       ...indexedReference,
       basePath: "",
-      display: { codeSamples: [], expandSchemas: false },
+      display: {
+        codeSamples: [],
+        expandSchemas: false,
+        playground: { enabled: true, proxy: false },
+      },
       kind: "openapi" as const,
       label: "API",
       renderer: "blume" as const,
@@ -1492,7 +1511,11 @@ describe("source.openApiSource", () => {
     const reference = {
       ...indexedReference,
       basePath: "",
-      display: { codeSamples: [], expandSchemas: false },
+      display: {
+        codeSamples: [],
+        expandSchemas: false,
+        playground: { enabled: true, proxy: false },
+      },
       kind: "openapi" as const,
       label: "API",
       renderer: "blume" as const,
@@ -1518,7 +1541,11 @@ describe("source.openApiSource", () => {
       collisions: [
         "Two API reference sources resolve to /api; keeping the first.",
       ],
-      display: { codeSamples: [], expandSchemas: false },
+      display: {
+        codeSamples: [],
+        expandSchemas: false,
+        playground: { enabled: true, proxy: false },
+      },
       kind: "openapi" as const,
       label: "API",
       renderer: "blume" as const,
@@ -1538,7 +1565,11 @@ describe("source.openApiSource", () => {
   const missingReference = {
     ...indexedReference,
     basePath: "",
-    display: { codeSamples: [], expandSchemas: false },
+    display: {
+      codeSamples: [],
+      expandSchemas: false,
+      playground: { enabled: true, proxy: false },
+    },
     kind: "openapi" as const,
     label: "API",
     renderer: "blume" as const,
@@ -1573,7 +1604,11 @@ describe("source.openApiSource", () => {
     const reference = {
       ...indexedReference,
       basePath: "",
-      display: { codeSamples: [], expandSchemas: false },
+      display: {
+        codeSamples: [],
+        expandSchemas: false,
+        playground: { enabled: true, proxy: false },
+      },
       kind: "openapi" as const,
       label: "API",
       renderer: "blume" as const,
@@ -1881,7 +1916,8 @@ describe("helpers.mergeParameters", () => {
 
 describe("snippets", () => {
   it("builds a request sample and renders each language", () => {
-    const operation = {
+    const model = operationModel({
+      method: "post",
       parameters: [
         {
           example: 7,
@@ -1902,17 +1938,15 @@ describe("snippets", () => {
           schema: { type: "string" },
         },
       ],
+      path: "/pet/{petId}",
       requestBody: {
         content: { "application/json": { schema: { type: "object" } } },
       },
-    };
-    const sample = buildRequestSample(
-      operation,
-      "post",
-      "/pet/{petId}",
-      [{ url: "https://api.test/v1/" }],
-      schemas
-    );
+      schemas,
+      security: { alternatives: [], optional: false },
+      servers: [{ url: "https://api.test/v1/" }],
+    });
+    const sample = buildRequest(model, defaultValues(model));
     expect(sample.method).toBe("POST");
     expect(sample.url).toBe("https://api.test/v1/pet/7?verbose=true");
     expect(sample.headers["Content-Type"]).toBe("application/json");
@@ -2078,51 +2112,17 @@ describe("security", () => {
     expect(schemeCarrier({ key: "ghost", scopes: [] })).toBeUndefined();
   });
 
-  it("builds placeholder credentials from the first alternative only", () => {
-    const security = resolveSecurity(
-      [{ apiCookie: [], apiHeader: [], apiQuery: [], bearerAuth: [] }],
-      SCHEMES
-    );
-    const auth = sampleAuth(security);
-    expect(auth.headers.Authorization).toBe("Bearer YOUR_TOKEN");
-    expect(auth.headers["X-Api-Key"]).toBe("YOUR_API_KEY");
-    expect(auth.headers.Cookie).toBe("session=YOUR_API_KEY");
-    expect(auth.query).toStrictEqual({ api_key: "YOUR_API_KEY" });
-
-    const second = sampleAuth(
-      resolveSecurity([{ basicAuth: [] }, { apiHeader: [] }], SCHEMES)
-    );
-    expect(second.headers).toStrictEqual({
-      Authorization: "Basic YOUR_CREDENTIALS",
-    });
-
-    // OAuth2 (and OpenID Connect) degrade to a bearer access token.
-    expect(
-      sampleAuth(resolveSecurity([{ oauth: ["read:pets"] }], SCHEMES)).headers
-    ).toStrictEqual({ Authorization: "Bearer YOUR_ACCESS_TOKEN" });
-
-    // Mutual TLS travels outside the request; an unknown ref can't be guessed.
-    expect(
-      sampleAuth(resolveSecurity([{ ghost: [], tls: [] }], SCHEMES))
-    ).toStrictEqual({ headers: {}, query: {} });
-
-    // Public operation: nothing to add.
-    expect(sampleAuth(resolveSecurity([], SCHEMES))).toStrictEqual({
-      headers: {},
-      query: {},
-    });
-  });
-
   it("threads auth placeholders into the request sample and snippets", () => {
     const security = resolveSecurity([{ bearerAuth: [] }], SCHEMES);
-    const sample = buildRequestSample(
-      { parameters: [] },
-      "post",
-      "/pet",
-      [{ url: "https://api.test/v1" }],
-      {},
-      sampleAuth(security)
-    );
+    const model = operationModel({
+      method: "post",
+      parameters: [],
+      path: "/pet",
+      schemas: {},
+      security,
+      servers: [{ url: "https://api.test/v1" }],
+    });
+    const sample = buildRequest(model, defaultValues(model));
     expect(sample.headers.Authorization).toBe("Bearer YOUR_TOKEN");
     const [curl] = sampleLanguages(["curl"]).map((language) =>
       language.build(sample)
@@ -2132,23 +2132,22 @@ describe("security", () => {
 
   it("appends a query API key to the sample URL", () => {
     const security = resolveSecurity([{ apiQuery: [] }], SCHEMES);
-    const sample = buildRequestSample(
-      {
-        parameters: [
-          {
-            in: "query",
-            name: "verbose",
-            required: true,
-            schema: { type: "boolean" },
-          },
-        ],
-      },
-      "get",
-      "/pet",
-      [{ url: "https://api.test/v1" }],
-      {},
-      sampleAuth(security)
-    );
+    const model = operationModel({
+      method: "get",
+      parameters: [
+        {
+          in: "query",
+          name: "verbose",
+          required: true,
+          schema: { type: "boolean" },
+        },
+      ],
+      path: "/pet",
+      schemas: {},
+      security,
+      servers: [{ url: "https://api.test/v1" }],
+    });
+    const sample = buildRequest(model, defaultValues(model));
     expect(sample.url).toBe(
       "https://api.test/v1/pet?verbose=true&api_key=YOUR_API_KEY"
     );
@@ -2156,45 +2155,43 @@ describe("security", () => {
 
   it("lets an explicit query parameter override the auth placeholder", () => {
     const security = resolveSecurity([{ apiQuery: [] }], SCHEMES);
-    const sample = buildRequestSample(
-      {
-        parameters: [
-          {
-            example: "from-the-spec",
-            in: "query",
-            name: "api_key",
-            required: true,
-          },
-        ],
-      },
-      "get",
-      "/pet",
-      [{ url: "https://api.test/v1" }],
-      {},
-      sampleAuth(security)
-    );
+    const model = operationModel({
+      method: "get",
+      parameters: [
+        {
+          example: "from-the-spec",
+          in: "query",
+          name: "api_key",
+          required: true,
+        },
+      ],
+      path: "/pet",
+      schemas: {},
+      security,
+      servers: [{ url: "https://api.test/v1" }],
+    });
+    const sample = buildRequest(model, defaultValues(model));
     expect(sample.url).toBe("https://api.test/v1/pet?api_key=from-the-spec");
   });
 
   it("lets an explicit header parameter override the auth placeholder", () => {
     const security = resolveSecurity([{ bearerAuth: [] }], SCHEMES);
-    const sample = buildRequestSample(
-      {
-        parameters: [
-          {
-            example: "Bearer from-the-spec",
-            in: "header",
-            name: "Authorization",
-            required: true,
-          },
-        ],
-      },
-      "get",
-      "/pet",
-      [{ url: "https://api.test/v1" }],
-      {},
-      sampleAuth(security)
-    );
+    const model = operationModel({
+      method: "get",
+      parameters: [
+        {
+          example: "Bearer from-the-spec",
+          in: "header",
+          name: "Authorization",
+          required: true,
+        },
+      ],
+      path: "/pet",
+      schemas: {},
+      security,
+      servers: [{ url: "https://api.test/v1" }],
+    });
+    const sample = buildRequest(model, defaultValues(model));
     expect(sample.headers.Authorization).toBe("Bearer from-the-spec");
   });
 });

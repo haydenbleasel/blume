@@ -1,0 +1,296 @@
+---
+import { paramKey, type PlaygroundModel } from "./request.ts";
+
+/**
+ * The interactive "Try it" panel for one operation. Everything is
+ * server-rendered — a native collapsed `<details>` with plain labelled
+ * inputs, keyboard-operable with zero JS — and the client module only loads
+ * when the reader first opens it (see the loader script at the foot of this
+ * file). The request model the client consumes is embedded as JSON so the
+ * lazy chunk needs no data fetch.
+ */
+
+interface Props {
+  model: PlaygroundModel;
+  /** Proxy route for the send, or false to fetch the API directly. */
+  proxy: string | false;
+  /** Spec slug + operation key form the per-operation localStorage key. */
+  slug: string;
+  operation: string;
+}
+
+const { model, proxy, slug, operation } = Astro.props;
+
+// `</script>`-proof embedding: `<` only ever occurs inside JSON strings,
+// where the \u escape is equivalent, so a spec description can never close
+// the model script early and inject markup.
+const modelJson = JSON.stringify(model).replaceAll("<", "\\u003c");
+
+const LABEL_ROW =
+  "mb-1 flex flex-wrap items-baseline gap-x-1.5 font-medium text-foreground text-xs";
+const FIELD =
+  "w-full rounded border border-border bg-background px-2 py-1.5 font-mono text-foreground text-xs";
+const HINT = "mt-1 block text-muted-foreground text-xs";
+const GROUP = "flex flex-col gap-3";
+const GROUP_HEADING =
+  "font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide";
+const CHECKBOX_ROW =
+  "flex cursor-pointer items-center gap-2 text-foreground text-xs";
+---
+
+<blume-playground
+  class="mb-6 block"
+  data-proxy={proxy || undefined}
+  data-storage-key={`blume-playground:${slug}:${operation}`}
+>
+  <script
+    data-playground-model
+    is:inline
+    set:html={modelJson}
+    type="application/json"
+  />
+  <details
+    class="not-prose rounded-blume border border-border bg-background"
+    data-playground
+  >
+    <summary class="cursor-pointer px-4 py-3 font-semibold text-foreground text-sm">
+      Try it
+    </summary>
+    <div class="flex flex-col gap-5 border-border border-t px-4 py-4">
+      <div class={GROUP}>
+        <div class={GROUP_HEADING}>Server</div>
+        {
+          model.servers.length > 0 && (
+            <label class="block">
+              <span class={LABEL_ROW}>Base URL</span>
+              <select class={FIELD} data-server>
+                {model.servers.map((server) => (
+                  <option value={server}>{server}</option>
+                ))}
+              </select>
+            </label>
+          )
+        }
+        <label class="block">
+          <span class={LABEL_ROW}>Custom base URL</span>
+          <input
+            class={FIELD}
+            data-server-custom
+            placeholder="https://api.example.com"
+            type="text"
+          />
+          <span class={HINT}>Overrides the selected server when set.</span>
+        </label>
+      </div>
+      {
+        model.auth.length > 0 && (
+          <div class={GROUP}>
+            <div class={GROUP_HEADING}>
+              Authorization{model.authOptional && " (optional)"}
+            </div>
+            {model.auth.map((input) =>
+              input.kind === "basic" ? (
+                <div class={GROUP}>
+                  <label class="block">
+                    <span class={LABEL_ROW}>{input.label} username</span>
+                    <input
+                      autocomplete="off"
+                      class={FIELD}
+                      data-auth-username={input.id}
+                      type="text"
+                    />
+                  </label>
+                  <label class="block">
+                    <span class={LABEL_ROW}>{input.label} password</span>
+                    <input
+                      autocomplete="off"
+                      class={FIELD}
+                      data-auth-password={input.id}
+                      type="password"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label class="block">
+                  <span class={LABEL_ROW}>{input.label}</span>
+                  <input
+                    autocomplete="off"
+                    class={FIELD}
+                    data-auth-value={input.id}
+                    placeholder={input.placeholder}
+                    type="password"
+                  />
+                </label>
+              )
+            )}
+            <label class={CHECKBOX_ROW}>
+              <input data-auth-remember type="checkbox" />
+              Remember on this device
+            </label>
+            <label class={CHECKBOX_ROW}>
+              <input data-samples-auth type="checkbox" />
+              Include my values in samples
+            </label>
+          </div>
+        )
+      }
+      {
+        model.params.length > 0 && (
+          <div class={GROUP}>
+            <div class={GROUP_HEADING}>Parameters</div>
+            {model.params.map((param) => (
+              <label class="block">
+                <span class={LABEL_ROW}>
+                  <code class="font-mono">{param.name}</code>
+                  <span class="text-muted-foreground">{param.in}</span>
+                  {param.required && (
+                    <span
+                      class="text-red-600 dark:text-red-400"
+                      title="required"
+                    >
+                      *
+                    </span>
+                  )}
+                </span>
+                {param.enum ? (
+                  <select
+                    class={FIELD}
+                    data-param={paramKey(param)}
+                    title={param.description}
+                  >
+                    {!param.required && <option value="">—</option>}
+                    {param.enum.map((value) => (
+                      <option selected={value === param.value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    class={FIELD}
+                    data-param={paramKey(param)}
+                    placeholder={param.type}
+                    title={param.description}
+                    type="text"
+                    value={param.value}
+                  />
+                )}
+                {param.description && (
+                  <span class={HINT} set:text={param.description} />
+                )}
+              </label>
+            ))}
+          </div>
+        )
+      }
+      {
+        model.body && (
+          <div class={GROUP}>
+            <div class={GROUP_HEADING}>
+              Body
+              <span class="ml-1.5 font-mono normal-case">
+                {model.body.contentType}
+              </span>
+            </div>
+            {model.body.fields ? (
+              model.body.fields.map((bodyField) => (
+                <label class="block">
+                  <span class={LABEL_ROW}>
+                    <code class="font-mono">{bodyField.name}</code>
+                    <span class="text-muted-foreground">{bodyField.type}</span>
+                    {bodyField.required && (
+                      <span
+                        class="text-red-600 dark:text-red-400"
+                        title="required"
+                      >
+                        *
+                      </span>
+                    )}
+                  </span>
+                  {bodyField.enum ? (
+                    <select
+                      class={FIELD}
+                      data-body-field={bodyField.name}
+                      title={bodyField.description}
+                    >
+                      {!bodyField.required && <option value="">—</option>}
+                      {bodyField.enum.map((value) => (
+                        <option
+                          selected={value === bodyField.value}
+                          value={value}
+                        >
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      class={FIELD}
+                      data-body-field={bodyField.name}
+                      placeholder={bodyField.type}
+                      title={bodyField.description}
+                      type="text"
+                      value={bodyField.value}
+                    />
+                  )}
+                  {bodyField.description && (
+                    <span class={HINT} set:text={bodyField.description} />
+                  )}
+                </label>
+              ))
+            ) : (
+              <label class="block">
+                <span class={LABEL_ROW}>Request body</span>
+                <textarea class={FIELD} data-body rows="8" spellcheck="false"
+                  >{model.body.example}</textarea
+                >
+                <div class="mt-1 flex flex-col gap-0.5" data-body-errors />
+              </label>
+            )}
+          </div>
+        )
+      }
+      <div>
+        <button
+          class="cursor-pointer rounded-blume bg-accent px-4 py-2 font-medium text-accent-foreground text-sm transition hover:bg-accent/90"
+          data-send
+          type="button"
+        >
+          Send
+        </button>
+      </div>
+      <div
+        aria-live="polite"
+        class="flex flex-col gap-2 empty:hidden"
+        data-response
+      />
+    </div>
+  </details>
+</blume-playground>
+
+<script>
+  // Hydration waits for intent: a collapsed <details> can only fire its first
+  // `toggle` by opening, so the one-shot listener imports the client module —
+  // a separate chunk readers who never try a request never download — and
+  // wires the form. The custom element lives here, not in the client module,
+  // so that module stays import-safe under the test runner.
+  class BlumePlayground extends HTMLElement {
+    connectedCallback() {
+      const details = this.querySelector<HTMLDetailsElement>(
+        "details[data-playground]"
+      );
+      details?.addEventListener(
+        "toggle",
+        async () => {
+          const { initPlayground } = await import("./playground-client.ts");
+          initPlayground(this);
+        },
+        { once: true }
+      );
+    }
+  }
+
+  if (!customElements.get("blume-playground")) {
+    customElements.define("blume-playground", BlumePlayground);
+  }
+</script>

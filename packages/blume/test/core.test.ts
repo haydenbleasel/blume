@@ -1487,6 +1487,7 @@ describe("api reference (scalar)", () => {
         display: {
           codeSamples: ["curl", "js", "python"],
           expandSchemas: false,
+          playground: { enabled: true, proxy: false },
         },
         includeInLlms: true,
         includeInSearch: true,

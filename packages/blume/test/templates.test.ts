@@ -28,6 +28,7 @@ import {
   mixedbreadSearchEndpointTemplate,
   notFoundPageTemplate,
   ogEndpointTemplate,
+  playgroundProxyTemplate,
   rawMarkdownEndpointTemplate,
   rssEndpointTemplate,
   runtimeDependencies,
@@ -1540,6 +1541,19 @@ describe("mcp templates", () => {
     const out = staticJsonEndpointTemplate({ ok: true });
     expect(out).toContain("export const prerender = true;");
     expect(out).toContain('"ok": true');
+  });
+});
+
+describe("playgroundProxyTemplate", () => {
+  it("wraps the shipped proxy handler in a server-rendered ALL endpoint", () => {
+    const out = playgroundProxyTemplate();
+    expect(out).toContain("export const prerender = false;");
+    expect(out).toContain(
+      'import { createPlaygroundProxyHandler } from "blume/openapi/proxy.ts"'
+    );
+    expect(out).toContain(
+      "export const ALL: APIRoute = ({ request }) => handler(request);"
+    );
   });
 });
 

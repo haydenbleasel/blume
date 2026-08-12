@@ -3,7 +3,7 @@ title: OpenAPI / AsyncAPI
 description: Drop in an OpenAPI spec and get a native API reference — one real page per operation, in your sidebar and search.
 ---
 
-Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, and generated code samples. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. The config below points Blume at the public Petstore spec as an example.
+Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, generated code samples, and an interactive [Try it](#try-it-playground) panel. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. The config below points Blume at the public Petstore spec as an example.
 
 ```ts blume.config.ts lineNumbers
 openapi: {
@@ -59,6 +59,40 @@ openapi: {
   spec: "./openapi.yaml",
   codeSamples: ["curl", "js"],
   expandSchemas: true,
+}
+```
+
+## Try it playground
+
+Operation pages rendered natively ship an interactive **Try it** panel by default. Blume generates the form from the operation itself: an input per path, query, and header parameter, a body editor built from the request-body schema, everything prefilled from the spec's examples. A server picker lists the spec's `servers`, with a free-text field for any other base URL, and auth inputs match the operation's [resolved security](#authorization) — bearer token, API key, and basic credentials, with OAuth2 as a token paste field (bring an access token; Blume doesn't run the flow).
+
+The panel and the code samples stay in lockstep: values typed into the form update the generated samples live, so a copied curl command always matches exactly what **Send** would do. And it stays out of the way — the panel is server-rendered collapsed, and its JavaScript loads only when a reader first opens it. Readers who never touch it download none of it.
+
+`playground: false` is the entire off switch:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+  playground: false,
+}
+```
+
+### Credentials
+
+Credentials typed into the auth inputs stay in memory and vanish on reload. Checking **Remember on this device** persists them in `localStorage`, scoped to the docs origin — they're never sent anywhere except the API being called. Code samples keep showing placeholders (`YOUR_TOKEN` and friends) whatever's typed, unless the reader toggles **Include my values in samples**.
+
+### CORS and the proxy
+
+As with the [Scalar renderer](#the-scalar-renderer), requests go **directly from the browser** to the target API, so the API must allow cross-origin requests from the docs site (`Access-Control-Allow-Origin`). For APIs that can't, set `playground.proxy`: a URL routes requests through a proxy you host, and `true` enables the built-in `/_api-proxy` route — which needs a server build, so it requires [`deployment.output: "server"`](/docs/deployment#server-rendering):
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  spec: "./openapi.yaml",
+  playground: {
+    proxy: true,   // or a URL of your own
+  },
 }
 ```
 
@@ -118,7 +152,7 @@ The OpenAPI semantics carry over as written:
 
 ## The Scalar renderer
 
-The native renderer is the default. If you'd rather embed [Scalar](https://scalar.com)'s self-contained API reference — its own sidebar, search, theme, and "Try it" playground on a single route — set `renderer: "scalar"`:
+The native renderer is the default — operation pages, search integration, and the [Try it playground](#try-it-playground) above are all its work. If you'd rather embed [Scalar](https://scalar.com)'s self-contained API reference UI — its own sidebar, search, theme, and request client on a single route — set `renderer: "scalar"`:
 
 ```ts blume.config.ts lineNumbers
 openapi: {
@@ -129,7 +163,7 @@ openapi: {
 }
 ```
 
-A Scalar-rendered reference is a self-contained embed on its own route — it doesn't weave into Blume's sidebar, search, or `llms.txt`. Its "Try it" playground calls your **target API directly from the browser** (Blume doesn't proxy), so the API must allow cross-origin requests from the docs site (`Access-Control-Allow-Origin`). `theme` and the playground apply to the Scalar renderer only.
+A Scalar-rendered reference is a self-contained embed on its own route — it doesn't weave into Blume's sidebar, search, or `llms.txt`, and Blume's [`playground`](#try-it-playground) config doesn't apply to it. Scalar brings its own request client, which calls your **target API directly from the browser** (the `playground.proxy` route isn't available here), so the API must allow cross-origin requests from the docs site (`Access-Control-Allow-Origin`). `theme` applies to the Scalar renderer only.
 
 ### Passing Scalar options
 
@@ -163,5 +197,5 @@ asyncapi: {
 ```
 
 :::warning
-Scalar's AsyncAPI support is still a work in progress — it renders channels, operations, messages, and a Models section, but there's **no interactive playground** for events yet. It improves upstream over time.
+Scalar's AsyncAPI support is still a work in progress — it renders channels, operations, messages, and a Models section, but there's **no interactive playground** for events yet (Blume's own [Try it playground](#try-it-playground) is OpenAPI-only). It improves upstream over time.
 :::

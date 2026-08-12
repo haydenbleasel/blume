@@ -1,0 +1,707 @@
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
+
+import { initPlayground } from "../src/components/openapi/playground-client.ts";
+import type { PlaygroundModel } from "../src/components/openapi/request.ts";
+
+/**
+ * Tests for the lazily loaded "Try it" client
+ * (`src/components/openapi/playground-client.ts`), driven against a minimal
+ * fake DOM in the copy-feedback.test.ts style: a FakeEl tree implementing
+ * just enough querySelector/attribute/event surface for the module, plus fake
+ * document/localStorage/fetch globals restored after the suite. The module's
+ * collaborators (request.ts, validate-json.ts, snippets.ts) are real — these
+ * tests exercise the integrated pipeline the browser runs.
+ */
+
+/** Matches the tag + attribute selector subset the client uses. */
+const SELECTOR_CLAUSE = /\[(?<name>[^\]=]+)(?:="(?<value>[^"]*)")?\]/gu;
+
+/** Narrow a maybe-undefined fixture handle; a missing element is a test bug. */
+const must = <T>(value: T | undefined | null): T => {
+  if (value === undefined || value === null) {
+    throw new Error("expected element");
+  }
+  return value;
+};
+
+/** A minimal element: attributes, tree, form state, listeners. */
+class FakeEl {
+  attributes = new Map<string, string>();
+  checked = false;
+  children: FakeEl[] = [];
+  className = "";
+  listeners = new Map<string, ((event: { target: unknown }) => unknown)[]>();
+  parent: FakeEl | null = null;
+  tag: string;
+  value = "";
+  #text = "";
+
+  /** Read-only dataset mirror of `data-*` attributes. */
+  dataset: Record<string, string | undefined>;
+
+  constructor(tag = "div", attrs: Record<string, string> = {}, text = "") {
+    this.tag = tag;
+    for (const [name, value] of Object.entries(attrs)) {
+      this.attributes.set(name, value);
+    }
+    this.#text = text;
+    this.dataset = new Proxy(
+      {},
+      {
+        get: (_, prop) =>
+          typeof prop === "string"
+            ? this.attributes.get(
+                `data-${prop.replaceAll(/[A-Z]/gu, (ch) => `-${ch.toLowerCase()}`)}`
+              )
+            : undefined,
+      }
+    );
+  }
+
+  get textContent(): string {
+    return (
+      this.#text + this.children.map((child) => child.textContent).join("")
+    );
+  }
+
+  set textContent(value: string) {
+    this.children = [];
+    this.#text = value;
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
+
+  append(...nodes: FakeEl[]): void {
+    for (const node of nodes) {
+      node.parent = this;
+      this.children.push(node);
+    }
+  }
+
+  addEventListener(
+    type: string,
+    listener: (event: { target: unknown }) => unknown
+  ): void {
+    const list = this.listeners.get(type) ?? [];
+    list.push(listener);
+    this.listeners.set(type, list);
+  }
+
+  matches(selector: string): boolean {
+    const [tag] = /^[a-z-]+/u.exec(selector) ?? [];
+    if (tag && this.tag !== tag) {
+      return false;
+    }
+    for (const clause of selector.matchAll(SELECTOR_CLAUSE)) {
+      const actual = this.attributes.get(clause.groups?.name ?? "");
+      const wanted = clause.groups?.value;
+      if (wanted === undefined ? actual === undefined : actual !== wanted) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  descendants(): FakeEl[] {
+    return this.children.flatMap((child) => [child, ...child.descendants()]);
+  }
+
+  querySelectorAll(selector: string): FakeEl[] {
+    return this.descendants().filter((node) => node.matches(selector));
+  }
+
+  querySelector(selector: string): FakeEl | null {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+
+  closest(selector: string): FakeEl | null {
+    if (this.matches(selector)) {
+      return this;
+    }
+    return this.parent ? this.parent.closest(selector) : null;
+  }
+}
+
+const el = (
+  tag: string,
+  attrs: Record<string, string> = {},
+  text = ""
+): FakeEl => new FakeEl(tag, attrs, text);
+
+/** Invoke `el`'s listeners for `type` as if `target` dispatched the event. */
+const fire = (host: FakeEl, type: string, target: unknown): unknown[] =>
+  [...(host.listeners.get(type) ?? [])].map((listener) => listener({ target }));
+
+// --- fake globals -----------------------------------------------------------
+
+const storage = new Map<string, string>();
+const fakeStorage = {
+  getItem: (key: string) => storage.get(key) ?? null,
+  removeItem: (key: string) => {
+    storage.delete(key);
+  },
+  setItem: (key: string, value: string) => {
+    storage.set(key, value);
+  },
+};
+
+let fetchCalls: { init: RequestInit; url: string }[] = [];
+let fetchImpl: () => Promise<Response> = () =>
+  Promise.resolve(new Response("{}"));
+const fakeFetch = (url: string, init: RequestInit): Promise<Response> => {
+  fetchCalls.push({ init, url });
+  return fetchImpl();
+};
+
+const fakeDocument = {
+  createElement: (tag: string) => new FakeEl(tag),
+  // Fallback sample-pane scope when no [data-operation-panel] wraps the root.
+  querySelectorAll: () => [],
+};
+
+const saved = new Map(
+  ["document", "localStorage", "fetch", "HTMLElement"].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ])
+);
+
+beforeAll(() => {
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: fakeDocument,
+  });
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: fakeStorage,
+  });
+  Object.defineProperty(globalThis, "fetch", {
+    configurable: true,
+    value: fakeFetch,
+  });
+  Object.defineProperty(globalThis, "HTMLElement", {
+    configurable: true,
+    value: FakeEl,
+  });
+});
+
+afterAll(() => {
+  for (const [name, descriptor] of saved) {
+    if (descriptor) {
+      Object.defineProperty(globalThis, name, descriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, name);
+    }
+  }
+});
+
+afterEach(() => {
+  storage.clear();
+  fetchCalls = [];
+  fetchImpl = () => Promise.resolve(new Response("{}"));
+});
+
+// --- fixtures ----------------------------------------------------------------
+
+const STORAGE_KEY = "blume-playground:petstore:getPet";
+
+const bearerModel = (): PlaygroundModel => ({
+  auth: [
+    {
+      carrier: { in: "header", name: "Authorization" },
+      id: "bearerAuth",
+      kind: "bearer",
+      label: "Bearer token",
+      placeholder: "YOUR_TOKEN",
+      prefix: "Bearer ",
+    },
+  ],
+  authOptional: false,
+  method: "get",
+  params: [
+    { in: "path", name: "id", required: true, type: "string", value: "42" },
+    { in: "query", name: "sort", required: false, type: "string", value: "" },
+    {
+      in: "header",
+      name: "X-Trace",
+      required: false,
+      type: "string",
+      value: "",
+    },
+  ],
+  path: "/pets/{id}",
+  servers: ["https://api.example.com"],
+});
+
+const flatModel = (): PlaygroundModel => ({
+  auth: [],
+  authOptional: true,
+  body: {
+    contentType: "application/json",
+    example: '{\n  "name": "Rex"\n}',
+    fields: [
+      { name: "name", required: true, type: "string", value: "Rex" },
+      { name: "age", required: false, type: "integer", value: "" },
+      { name: "good", required: false, type: "boolean", value: "" },
+      { name: "note", required: false, type: "string", value: "" },
+    ],
+  },
+  method: "post",
+  params: [],
+  path: "/pets",
+  servers: ["https://api.example.com"],
+});
+
+const deepModel = (): PlaygroundModel => ({
+  auth: [],
+  authOptional: true,
+  body: {
+    contentType: "application/json",
+    example: '{\n  "name": "Rex"\n}',
+    schema: {
+      properties: { name: { type: "string" } },
+      required: ["name"],
+      type: "object",
+    },
+  },
+  method: "post",
+  params: [],
+  path: "/pets",
+  servers: ["https://api.example.com"],
+});
+
+const basicModel = (): PlaygroundModel => ({
+  auth: [
+    {
+      carrier: { in: "header", name: "Authorization" },
+      id: "basicAuth",
+      kind: "basic",
+      label: "Basic auth",
+      placeholder: "YOUR_CREDENTIALS",
+      prefix: "Basic ",
+    },
+    {
+      carrier: { in: "query", name: "api_key" },
+      id: "keyAuth",
+      kind: "apiKey",
+      label: "API key",
+      placeholder: "YOUR_API_KEY",
+      prefix: "",
+    },
+  ],
+  authOptional: false,
+  method: "get",
+  params: [],
+  path: "/pets",
+  servers: ["https://api.example.com"],
+});
+
+interface Fixture {
+  auth: Record<string, FakeEl>;
+  bodyArea?: FakeEl;
+  bodyErrors?: FakeEl;
+  curlCode: FakeEl;
+  custom: FakeEl;
+  fields: Record<string, FakeEl>;
+  js: FakeEl;
+  params: Record<string, FakeEl>;
+  remember: FakeEl;
+  response: FakeEl;
+  root: FakeEl;
+  samplesAuthBox: FakeEl;
+  sendButton: FakeEl;
+  server: FakeEl;
+  weird: FakeEl;
+}
+
+/** Build the server-rendered DOM Playground.astro + RequestPanel.astro emit. */
+const createFixture = (model: PlaygroundModel, proxy?: string): Fixture => {
+  const panel = el("div", { "data-operation-panel": "" });
+  const curl = el("div", { "data-panel": "curl", "data-sample-lang": "curl" });
+  const curlCode = el("code");
+  curl.append(curlCode);
+  // No <code> child: exercises the pane-itself fallback target.
+  const js = el("div", { "data-panel": "js", "data-sample-lang": "js" });
+  // Unknown language id: the client must skip it.
+  const weird = el("div", { "data-sample-lang": "weird" });
+
+  const root = el("blume-playground", {
+    "data-storage-key": STORAGE_KEY,
+    ...(proxy ? { "data-proxy": proxy } : {}),
+  });
+  root.append(
+    el(
+      "script",
+      { "data-playground-model": "", type: "application/json" },
+      JSON.stringify(model)
+    )
+  );
+  const server = el("select", { "data-server": "" });
+  server.value = model.servers[0] ?? "";
+  const custom = el("input", { "data-server-custom": "" });
+  root.append(server, custom);
+
+  const params: Record<string, FakeEl> = {};
+  for (const param of model.params) {
+    const input = el("input", { "data-param": `${param.in}:${param.name}` });
+    input.value = param.value;
+    params[param.name] = input;
+    root.append(input);
+  }
+
+  const auth: Record<string, FakeEl> = {};
+  for (const input of model.auth) {
+    if (input.kind === "basic") {
+      const username = el("input", { "data-auth-username": input.id });
+      const password = el("input", { "data-auth-password": input.id });
+      auth[`${input.id}:username`] = username;
+      auth[`${input.id}:password`] = password;
+      root.append(username, password);
+    } else {
+      const value = el("input", { "data-auth-value": input.id });
+      auth[input.id] = value;
+      root.append(value);
+    }
+  }
+  const remember = el("input", { "data-auth-remember": "", type: "checkbox" });
+  const samplesAuthBox = el("input", {
+    "data-samples-auth": "",
+    type: "checkbox",
+  });
+  root.append(remember, samplesAuthBox);
+
+  const fields: Record<string, FakeEl> = {};
+  let bodyArea: FakeEl | undefined;
+  let bodyErrors: FakeEl | undefined;
+  if (model.body?.fields) {
+    for (const field of model.body.fields) {
+      const input = el("input", { "data-body-field": field.name });
+      input.value = field.value;
+      fields[field.name] = input;
+      root.append(input);
+    }
+  } else if (model.body) {
+    bodyArea = el("textarea", { "data-body": "" });
+    bodyArea.value = model.body.example;
+    bodyErrors = el("div", { "data-body-errors": "" });
+    root.append(bodyArea, bodyErrors);
+  }
+
+  const sendButton = el("button", { "data-send": "" });
+  const response = el("div", { "data-response": "" });
+  root.append(sendButton, response);
+  panel.append(curl, js, weird, root);
+  return {
+    auth,
+    bodyArea,
+    bodyErrors,
+    curlCode,
+    custom,
+    fields,
+    js,
+    params,
+    remember,
+    response,
+    root,
+    samplesAuthBox,
+    sendButton,
+    server,
+    weird,
+  };
+};
+
+const init = (fixture: Fixture): void =>
+  initPlayground(fixture.root as unknown as HTMLElement);
+
+/** Dispatch the delegated edit event the client listens for on the root. */
+const edit = (fixture: Fixture, target: FakeEl, type = "input"): void => {
+  fire(fixture.root, type, target);
+};
+
+const clickSend = async (fixture: Fixture): Promise<void> => {
+  await Promise.all(fire(fixture.sendButton, "click", fixture.sendButton));
+};
+
+// --- tests --------------------------------------------------------------------
+
+describe("sample sync", () => {
+  it("re-renders every known pane from the live form, redacted by default", () => {
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+
+    edit(fixture, must(fixture.params.id));
+    expect(fixture.curlCode.textContent).toContain(
+      'curl -X GET "https://api.example.com/pets/42"'
+    );
+    expect(fixture.curlCode.textContent).toContain(
+      '-H "Authorization: Bearer YOUR_TOKEN"'
+    );
+    // The js pane has no <code> child — the pane itself is the target.
+    expect(fixture.js.textContent).toContain("fetch(");
+    // Unknown language panes stay untouched.
+    expect(fixture.weird.textContent).toBe("");
+
+    // Edits to path/query/header params and the custom server flow through.
+    must(fixture.params.id).value = "7";
+    must(fixture.params.sort).value = "asc";
+    must(fixture.params["X-Trace"]).value = "trace-1";
+    fixture.custom.value = "https://alt.example.com/";
+    edit(fixture, must(fixture.params.sort));
+    expect(fixture.curlCode.textContent).toContain(
+      'curl -X GET "https://alt.example.com/pets/7?sort=asc"'
+    );
+    expect(fixture.curlCode.textContent).toContain('-H "X-Trace: trace-1"');
+  });
+
+  it("includes real credentials in samples only after opt-in", () => {
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+
+    must(fixture.auth.bearerAuth).value = "sekret";
+    edit(fixture, must(fixture.auth.bearerAuth));
+    expect(fixture.curlCode.textContent).toContain("Bearer YOUR_TOKEN");
+    expect(fixture.curlCode.textContent).not.toContain("sekret");
+
+    fixture.samplesAuthBox.checked = true;
+    edit(fixture, fixture.samplesAuthBox, "change");
+    expect(fixture.curlCode.textContent).toContain("Bearer sekret");
+
+    fixture.samplesAuthBox.checked = false;
+    edit(fixture, fixture.samplesAuthBox, "change");
+    expect(fixture.curlCode.textContent).toContain("Bearer YOUR_TOKEN");
+  });
+});
+
+describe("flat body assembly", () => {
+  it("coerces typed fields and omits empty optionals", async () => {
+    const fixture = createFixture(flatModel());
+    init(fixture);
+    must(fixture.fields.age).value = "3";
+    must(fixture.fields.good).value = "true";
+    edit(fixture, must(fixture.fields.age));
+
+    await clickSend(fixture);
+    expect(fetchCalls).toHaveLength(1);
+    expect(must(fetchCalls[0]).url).toBe("https://api.example.com/pets");
+    expect(must(fetchCalls[0]).init.method).toBe("POST");
+    expect(
+      (must(fetchCalls[0]).init.headers as Record<string, string>)[
+        "Content-Type"
+      ]
+    ).toBe("application/json");
+    expect(JSON.parse(must(fetchCalls[0]).init.body as string)).toEqual({
+      age: 3,
+      good: true,
+      name: "Rex",
+    });
+  });
+
+  it("keeps unparseable typed input verbatim and empty required fields", async () => {
+    const fixture = createFixture(flatModel());
+    init(fixture);
+    must(fixture.fields.name).value = "";
+    must(fixture.fields.age).value = "many";
+    must(fixture.fields.good).value = "maybe";
+    await clickSend(fixture);
+    expect(JSON.parse(must(fetchCalls[0]).init.body as string)).toEqual({
+      age: "many",
+      good: "maybe",
+      name: "",
+    });
+  });
+
+  it("sends no body when every field is empty and optional", async () => {
+    const model = flatModel();
+    for (const field of must(must(model.body).fields)) {
+      field.required = false;
+      field.value = "";
+    }
+    const fixture = createFixture(model);
+    init(fixture);
+    await clickSend(fixture);
+    expect(must(fetchCalls[0]).init.body).toBeUndefined();
+  });
+});
+
+describe("deep body validation", () => {
+  it("lists errors for invalid JSON and blocks the send", async () => {
+    const fixture = createFixture(deepModel());
+    init(fixture);
+
+    must(fixture.bodyArea).value = "{ nope";
+    edit(fixture, must(fixture.bodyArea));
+    expect(must(fixture.bodyErrors).children.length).toBeGreaterThan(0);
+
+    await clickSend(fixture);
+    expect(fetchCalls).toHaveLength(0);
+
+    must(fixture.bodyArea).value = '{ "name": "Rex" }';
+    edit(fixture, must(fixture.bodyArea));
+    expect(must(fixture.bodyErrors).children).toHaveLength(0);
+    await clickSend(fixture);
+    expect(fetchCalls).toHaveLength(1);
+    expect(must(fetchCalls[0]).init.body).toBe('{ "name": "Rex" }');
+  });
+});
+
+describe("send + response rendering", () => {
+  it("renders status, timing, headers, and pretty JSON", async () => {
+    const fixture = createFixture(deepModel());
+    init(fixture);
+    fetchImpl = () =>
+      Promise.resolve(
+        new Response('{"ok":true,"n":1}', {
+          headers: {
+            "content-type": "application/json",
+            "x-request-id": "abc",
+          },
+          status: 201,
+          statusText: "Created",
+        })
+      );
+
+    await clickSend(fixture);
+    const [status, table, pre] = fixture.response.children;
+    expect(must(status).textContent).toMatch(/^201 Created · \d+ ms$/u);
+    expect(must(table).textContent).toContain("x-request-id");
+    expect(must(table).textContent).toContain("abc");
+    expect(must(pre).textContent).toBe('{\n  "ok": true,\n  "n": 1\n}');
+  });
+
+  it("renders non-JSON bodies verbatim, HTTP errors like any response", async () => {
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+    fetchImpl = () =>
+      Promise.resolve(
+        new Response("service on fire", { status: 500, statusText: "Nope" })
+      );
+    await clickSend(fixture);
+    expect(must(fixture.response.children[0]).textContent).toMatch(
+      /^500 Nope/u
+    );
+    expect(must(fixture.response.children[2]).textContent).toBe(
+      "service on fire"
+    );
+  });
+
+  it("routes through the proxy when configured", async () => {
+    const fixture = createFixture(bearerModel(), "/_api-proxy");
+    init(fixture);
+    await clickSend(fixture);
+    expect(must(fetchCalls[0]).url).toBe(
+      `/_api-proxy?url=${encodeURIComponent("https://api.example.com/pets/42")}`
+    );
+  });
+
+  it("explains the CORS wall on a rejected fetch, naming the proxy option", async () => {
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+    fetchImpl = () => Promise.reject(new TypeError("Failed to fetch"));
+    await clickSend(fixture);
+    expect(fixture.response.textContent).toContain("cross-origin");
+    expect(fixture.response.textContent).toContain(
+      "`openapi.playground.proxy`"
+    );
+
+    fetchImpl = () => Promise.reject(new Error("boom"));
+    await clickSend(fixture);
+    expect(fixture.response.textContent).toBe("Request failed: Error: boom");
+  });
+});
+
+describe("remember on this device", () => {
+  it("persists on check, follows edits, restores on init, clears on uncheck", () => {
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+
+    must(fixture.auth.bearerAuth).value = "tok-1";
+    fixture.remember.checked = true;
+    edit(fixture, fixture.remember, "change");
+    expect(JSON.parse(storage.get(STORAGE_KEY) ?? "")).toEqual({
+      bearerAuth: { value: "tok-1" },
+    });
+
+    // Later credential edits keep the stored copy fresh while checked.
+    must(fixture.auth.bearerAuth).value = "tok-2";
+    edit(fixture, must(fixture.auth.bearerAuth));
+    expect(JSON.parse(storage.get(STORAGE_KEY) ?? "")).toEqual({
+      bearerAuth: { value: "tok-2" },
+    });
+
+    // A fresh page (new DOM, same key) restores the value and the checkbox.
+    const again = createFixture(bearerModel());
+    init(again);
+    expect(must(again.auth.bearerAuth).value).toBe("tok-2");
+    expect(again.remember.checked).toBe(true);
+
+    // Unchecking forgets; further edits must not resurrect the entry.
+    again.remember.checked = false;
+    edit(again, again.remember, "change");
+    expect(storage.has(STORAGE_KEY)).toBe(false);
+    must(again.auth.bearerAuth).value = "tok-3";
+    edit(again, must(again.auth.bearerAuth));
+    expect(storage.has(STORAGE_KEY)).toBe(false);
+  });
+
+  it("restores basic-auth pairs and skips ids missing from the entry", () => {
+    storage.set(
+      STORAGE_KEY,
+      JSON.stringify({
+        basicAuth: { password: "pw", username: "us", value: "" },
+      })
+    );
+    const fixture = createFixture(basicModel());
+    init(fixture);
+    expect(must(fixture.auth["basicAuth:username"]).value).toBe("us");
+    expect(must(fixture.auth["basicAuth:password"]).value).toBe("pw");
+    expect(fixture.remember.checked).toBe(true);
+
+    // Real values in samples after opt-in: RFC 7617 pair + query-borne key
+    // placeholder (the reader typed no API key).
+    fixture.samplesAuthBox.checked = true;
+    edit(fixture, fixture.samplesAuthBox, "change");
+    expect(fixture.curlCode.textContent).toContain(
+      `Authorization: Basic ${btoa("us:pw")}`
+    );
+    expect(fixture.curlCode.textContent).toContain("api_key=YOUR_API_KEY");
+  });
+
+  it("drops a corrupt stored entry instead of breaking init", () => {
+    storage.set(STORAGE_KEY, "{ nope");
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+    expect(storage.has(STORAGE_KEY)).toBe(false);
+    expect(fixture.remember.checked).toBe(false);
+  });
+});
+
+describe("degenerate DOM", () => {
+  it("does nothing without the model script", () => {
+    expect(() =>
+      initPlayground(el("div") as unknown as HTMLElement)
+    ).not.toThrow();
+  });
+
+  it("tolerates a panel with no inputs, no response region, no wrapper", async () => {
+    const root = el("blume-playground", {});
+    root.append(
+      el(
+        "script",
+        { "data-playground-model": "", type: "application/json" },
+        JSON.stringify(bearerModel())
+      )
+    );
+    const sendButton = el("button", { "data-send": "" });
+    root.append(sendButton);
+    initPlayground(root as unknown as HTMLElement);
+
+    // Non-element event targets are ignored; element targets sync harmlessly.
+    fire(root, "input", {});
+    fire(root, "input", root);
+    // No [data-response] region: send bails before fetching.
+    await Promise.all(fire(sendButton, "click", sendButton));
+    expect(fetchCalls).toHaveLength(0);
+  });
+});
