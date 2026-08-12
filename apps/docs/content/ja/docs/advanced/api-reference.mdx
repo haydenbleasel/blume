@@ -103,7 +103,7 @@ openapi: {
 - `includeInLlms: false` は、両方の `llms.txt` ファイルから除外します。
 - `noindex: true` は、クローラー向けの noindex メタデータを追加し、サイトマップからページを削除します。
 
-[Scalar レンダラー](#the-scalar-renderer)では `noindex` のみが適用されます — Scalar でレンダリングされたリファレンスはもともと Blume の検索や `llms.txt` の外側にあるため、2 つの `include*` 設定はそこでは作用する対象がありません。
+[Scalar レンダラー](#scalar-レンダラー)では `noindex` のみが適用されます — Scalar でレンダリングされたリファレンスはもともと Blume の検索や `llms.txt` の外側にあるため、2 つの `include*` 設定はそこでは作用する対象がありません。
 
 ## 認可
 
@@ -166,4 +166,4 @@ AsyncAPI **2.x の仕様は、公式の AsyncAPI コンバーターによって�
 
 コードサンプルは**プロトコル対応**で、操作のバインディング（またはそのサーバーのプロトコル）に基づいて選ばれます。WebSocket には `wscat` とブラウザーの `WebSocket` スニペット、Kafka には `kcat`、MQTT には `mosquitto_pub`/`mosquitto_sub` です。`codeSamples` は、`openapi` ブロックで言語を選ぶのと同じ方法でそのセットを絞り込みます。サポートされているツールがないプロトコルでは、でっち上げのクライアントを生成する代わりに、メッセージペイロードの例のみをレンダリングします。
 
-上で説明した内容はすべてそのまま引き継がれます: `route`、`label`/`route` 付きの `sources`、`expandSchemas`、[ソースごとのインデックス](#per-source-indexing)のフラグ、そして操作のサマリーとタグによる検索インデックスです。`renderer: "scalar"` を設定すると埋め込みの Scalar SPA に戻れます — Scalar はドキュメントタイプを自動検出し、チャネル、操作、メッセージ、Models セクションをレンダリングします（イベント向けのインタラクティブなプレイグラウンドはありません）— そこでは、OpenAPI と同様に `noindex` のみが適用されます。
+上で説明した内容はすべてそのまま引き継がれます: `route`、`label`/`route` 付きの `sources`、`expandSchemas`、[ソースごとのインデックス](#ソースごとのインデックス)のフラグ、そして操作のサマリーとタグによる検索インデックスです。`renderer: "scalar"` を設定すると埋め込みの Scalar SPA に戻れます — Scalar はドキュメントタイプを自動検出し、チャネル、操作、メッセージ、Models セクションをレンダリングします（イベント向けのインタラクティブなプレイグラウンドはありません）— そこでは、OpenAPI と同様に `noindex` のみが適用されます。

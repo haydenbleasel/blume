@@ -104,7 +104,7 @@ openapi: {
 - `includeInLlms: false` as mantém fora de ambos os arquivos `llms.txt`.
 - `noindex: true` adiciona metadados noindex para rastreadores e remove as páginas do sitemap.
 
-Com o [renderizador Scalar](#the-scalar-renderer), apenas `noindex` se aplica — uma referência renderizada pelo Scalar já fica fora da busca e do `llms.txt` do Blume, então as duas configurações `include*` não têm sobre o que atuar ali.
+Com o [renderizador Scalar](#o-renderizador-scalar), apenas `noindex` se aplica — uma referência renderizada pelo Scalar já fica fora da busca e do `llms.txt` do Blume, então as duas configurações `include*` não têm sobre o que atuar ali.
 
 ## Autorização
 
@@ -167,4 +167,4 @@ Especificações AsyncAPI **2.x são normalizadas para 3.x automaticamente** com
 
 As amostras de código são **sensíveis ao protocolo**, derivadas do binding da operação (ou do protocolo dos seus servidores): `wscat` e um snippet de `WebSocket` do navegador para WebSockets, `kcat` para Kafka, `mosquitto_pub`/`mosquitto_sub` para MQTT. `codeSamples` filtra esse conjunto, da mesma forma que escolhe linguagens no bloco `openapi`; um protocolo sem uma ferramenta suportada renderiza apenas o exemplo de payload da mensagem em vez de um cliente fabricado.
 
-Tudo o que foi documentado acima se mantém sem alterações: `route`, `sources` com `label`/`route`, `expandSchemas`, as flags de [indexação por fonte](#per-source-indexing) e a indexação de busca por resumo e tag da operação. Definir `renderer: "scalar"` volta a optar pelo SPA incorporado do Scalar — o Scalar detecta automaticamente o tipo de documento e renderiza canais, operações, mensagens e uma seção de Modelos (sem playground interativo para eventos) — onde, como no OpenAPI, apenas `noindex` se aplica.
+Tudo o que foi documentado acima se mantém sem alterações: `route`, `sources` com `label`/`route`, `expandSchemas`, as flags de [indexação por fonte](#indexação-por-fonte) e a indexação de busca por resumo e tag da operação. Definir `renderer: "scalar"` volta a optar pelo SPA incorporado do Scalar — o Scalar detecta automaticamente o tipo de documento e renderiza canais, operações, mensagens e uma seção de Modelos (sem playground interativo para eventos) — onde, como no OpenAPI, apenas `noindex` se aplica.

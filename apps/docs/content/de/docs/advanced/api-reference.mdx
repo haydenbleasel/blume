@@ -104,7 +104,7 @@ openapi: {
 - `includeInLlms: false` hält sie aus beiden `llms.txt`-Dateien heraus.
 - `noindex: true` fügt Crawler-Noindex-Metadaten hinzu und entfernt die Seiten aus der Sitemap.
 
-Beim [Scalar-Renderer](#the-scalar-renderer) gilt nur `noindex` – eine von Scalar gerenderte Referenz liegt ohnehin außerhalb von Blumes Suche und `llms.txt`, sodass die beiden `include*`-Einstellungen dort nichts bewirken können.
+Beim [Scalar-Renderer](#der-scalar-renderer) gilt nur `noindex` – eine von Scalar gerenderte Referenz liegt ohnehin außerhalb von Blumes Suche und `llms.txt`, sodass die beiden `include*`-Einstellungen dort nichts bewirken können.
 
 ## Autorisierung
 
@@ -167,4 +167,4 @@ AsyncAPI-**2.x-Spezifikationen werden automatisch auf 3.x normalisiert** – mit
 
 Codebeispiele sind **protokollbewusst** und richten sich nach dem Binding der Operation (oder dem Protokoll ihrer Server): `wscat` und ein Browser-`WebSocket`-Snippet für WebSockets, `kcat` für Kafka, `mosquitto_pub`/`mosquitto_sub` für MQTT. `codeSamples` filtert diese Auswahl – genauso, wie es beim `openapi`-Block die Sprachen auswählt; ein Protokoll ohne unterstütztes Tool rendert nur das Message-Payload-Beispiel statt eines erfundenen Clients.
 
-Alles oben Dokumentierte gilt unverändert weiter: `route`, `sources` mit `label`/`route`, `expandSchemas`, die Flags für die [Indexierung pro Quelle](#per-source-indexing) sowie die Suchindexierung nach Zusammenfassung und Tag der Operation. Mit `renderer: "scalar"` wechselst du zurück zur eingebetteten Scalar-SPA – Scalar erkennt den Dokumenttyp automatisch und rendert Channels, Operationen, Messages und einen Models-Abschnitt (kein interaktiver Playground für Events) – wobei, wie bei OpenAPI, nur `noindex` gilt.
+Alles oben Dokumentierte gilt unverändert weiter: `route`, `sources` mit `label`/`route`, `expandSchemas`, die Flags für die [Indexierung pro Quelle](#indexierung-pro-quelle) sowie die Suchindexierung nach Zusammenfassung und Tag der Operation. Mit `renderer: "scalar"` wechselst du zurück zur eingebetteten Scalar-SPA – Scalar erkennt den Dokumenttyp automatisch und rendert Channels, Operationen, Messages und einen Models-Abschnitt (kein interaktiver Playground für Events) – wobei, wie bei OpenAPI, nur `noindex` gilt.
