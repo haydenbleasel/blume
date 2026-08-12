@@ -1463,16 +1463,30 @@ const openapiConfigSchema = z.strictObject({
 });
 
 /**
- * AsyncAPI reference. Same shape and Scalar pipeline as {@link openapiConfigSchema}
- * (Scalar auto-detects the document type); only the default `route` differs.
+ * AsyncAPI reference. Same shape as {@link openapiConfigSchema}: by default
+ * (`renderer: "blume"`) Blume normalizes the spec to AsyncAPI 3.x and renders
+ * its own UI — one real page per operation — with `renderer: "scalar"` as the
+ * embedded-SPA opt-out. Only the defaults differ: the reference mounts at
+ * `/events`, and `codeSamples` defaults to every tool the operation's protocol
+ * binding suggests.
  */
 const asyncapiConfigSchema = z.strictObject({
+  /**
+   * Code-sample tools shown per operation (Blume renderer). Empty means every
+   * tool appropriate to the operation's protocol binding.
+   */
+  codeSamples: z.array(z.string()).default([]),
   enabled: z.boolean().default(false),
+  /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
+  expandSchemas: z.boolean().default(false),
+  /** Who renders the reference: Blume's own UI, or the embedded Scalar SPA. */
+  renderer: z.enum(["blume", "scalar"]).default("blume"),
   route: z.string().default("/events"),
-  /** Extra Scalar config forwarded to `<ScalarComponent>`. */
+  /** Extra Scalar config forwarded to `<ScalarComponent>` (Scalar renderer only). */
   scalar: scalarConfigSchema,
   sources: z.array(openapiSourceSchema).default([]),
   spec: z.string().optional(),
+  /** Scalar theme name (Scalar renderer only). */
   theme: z.string().optional(),
 });
 

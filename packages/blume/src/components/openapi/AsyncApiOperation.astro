@@ -1,0 +1,223 @@
+---
+import data from "blume:data";
+import specs from "blume:openapi";
+
+import type { AsyncApiDocument } from "../../openapi/asyncapi.ts";
+import { asyncApiOperationObject } from "../../openapi/asyncapi.ts";
+import { highlightCode } from "../../markdown/index.ts";
+import {
+  asyncApiSecurityEntries,
+  bindingGroups,
+  channelParameters,
+  channelServers,
+  messageLabel,
+  operationMessages,
+  payloadSchema,
+  protocolOf,
+} from "./async.ts";
+import type { MessageSample } from "./async-snippets.ts";
+import { asyncSampleLanguages } from "./async-snippets.ts";
+import Authorization from "./Authorization.astro";
+import Bindings from "./Bindings.astro";
+import { exampleValue, type SchemaLike, toJson } from "./helpers.ts";
+import MethodBadge from "./MethodBadge.astro";
+import PanelTabs from "./PanelTabs.astro";
+import ParametersTable from "./ParametersTable.astro";
+import SchemaTable from "./SchemaTable.astro";
+import type { SecuritySchemeLike } from "./security.ts";
+import { resolveAsyncApiSecurity } from "./security.ts";
+
+/**
+ * The AsyncAPI front-end of the operation page: message payloads instead of
+ * request/response, channel parameters instead of path/query, protocol
+ * bindings, and binding-aware samples in the right rail. Everything below the
+ * dispatch — schema tables, parameter rows, authorization, the tabbed panels —
+ * is the same component set the OpenAPI operation renders.
+ */
+interface Props {
+  source: string;
+  id: string;
+}
+
+const { source, id } = Astro.props;
+const spec = specs[source];
+const ref = spec?.operations[id];
+const document = (spec?.document ?? {}) as AsyncApiDocument;
+const operation = ref ? asyncApiOperationObject(document, ref) : undefined;
+const channel = ref?.channelId
+  ? document.channels?.[ref.channelId]
+  : undefined;
+
+const schemas = (document.components?.schemas ?? {}) as Record<
+  string,
+  SchemaLike
+>;
+const servers = channelServers(channel, document);
+const security = resolveAsyncApiSecurity(
+  asyncApiSecurityEntries(operation, servers),
+  document.components?.securitySchemes as
+    | Record<string, SecuritySchemeLike>
+    | undefined
+);
+const parameters = channelParameters(channel, document);
+const messages = operation ? operationMessages(operation, channel, document) : [];
+const protocol = protocolOf(operation, channel, servers);
+
+/** Declared example first, else a sampled value from the payload schema. */
+const exampleOf = (message: (typeof messages)[number]["message"]): unknown =>
+  message.examples?.[0]?.payload ?? exampleValue(payloadSchema(message), schemas);
+
+const messagePanels = await Promise.all(
+  messages.map(async (named, index) => {
+    const example = exampleOf(named.message);
+    return {
+      html:
+        example === undefined || example === null
+          ? null
+          : await highlightCode(toJson(example), "json", {
+              icons: false,
+              themes: data.config.codeThemes,
+            }),
+      key: `message-${index}`,
+      label: messageLabel(named),
+      text: named.message.summary || "No example payload.",
+    };
+  })
+);
+
+const sample: MessageSample | null = ref
+  ? {
+      action: ref.method === "send" ? "send" : "receive",
+      address: ref.path,
+      payload: messages.length > 0 ? exampleOf(messages[0].message) : undefined,
+      server: servers[0],
+    }
+  : null;
+const languages = asyncSampleLanguages(spec?.codeSamples ?? [], protocol);
+const samplePanels = sample
+  ? await Promise.all(
+      languages.map(async (language) => ({
+        html: await highlightCode(language.build(sample), language.lang, {
+          icons: false,
+          themes: data.config.codeThemes,
+        }),
+        key: language.id,
+        label: language.label,
+      }))
+    )
+  : [];
+
+const operationBindings = bindingGroups(operation?.bindings);
+const channelBindings = bindingGroups(channel?.bindings);
+---
+
+{
+  !(spec && ref && operation) ? (
+    <div class="text-muted-foreground">This API operation could not be found.</div>
+  ) : (
+    <div class="not-prose">
+      <div class="mb-6 flex flex-wrap items-center gap-3">
+        <MethodBadge method={ref.method} />
+        <code class="break-all font-mono text-foreground text-sm">
+          {ref.path}
+        </code>
+        {ref.deprecated && (
+          <span class="font-medium text-[0.625rem] text-orange-600 uppercase tracking-wide dark:text-orange-400">
+            deprecated
+          </span>
+        )}
+      </div>
+      <div class="grid grid-cols-1 items-start gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
+        <div>
+          <Authorization security={security} />
+          <ParametersTable parameters={parameters} schemas={schemas} />
+          {messages.map((named) => {
+            const payload = payloadSchema(named.message);
+            const headers = named.message.headers;
+            const messageBindings = bindingGroups(named.message.bindings);
+            return (
+              <section class="mt-6">
+                <div
+                  aria-level="2"
+                  class="mb-2 font-semibold text-foreground text-sm"
+                  role="heading"
+                >
+                  {messages.length > 1
+                    ? `Message: ${messageLabel(named)}`
+                    : "Message"}
+                </div>
+                {named.message.description && (
+                  <p class="mb-2 text-muted-foreground text-sm">
+                    {named.message.description}
+                  </p>
+                )}
+                {named.message.contentType && (
+                  <div class="mb-2 text-muted-foreground text-xs">
+                    <code class="rounded bg-muted px-1 py-0.5">
+                      {named.message.contentType}
+                    </code>
+                  </div>
+                )}
+                {payload ? (
+                  <div class="not-prose rounded-blume border border-border px-4 py-3">
+                    <SchemaTable
+                      expandAll={spec.expandSchemas}
+                      schema={payload}
+                      schemas={schemas}
+                    />
+                  </div>
+                ) : (
+                  <p class="text-muted-foreground text-sm">
+                    The payload uses a schema format this reference can't
+                    render inline.
+                  </p>
+                )}
+                {headers && (
+                  <div class="mt-3">
+                    <div class="mb-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      Headers
+                    </div>
+                    <div class="not-prose rounded-blume border border-border px-4 py-3">
+                      <SchemaTable
+                        expandAll={spec.expandSchemas}
+                        schema={headers}
+                        schemas={schemas}
+                      />
+                    </div>
+                  </div>
+                )}
+                {messageBindings.length > 0 && (
+                  <Bindings
+                    groups={messageBindings}
+                    schemas={schemas}
+                    title="Message bindings"
+                  />
+                )}
+              </section>
+            );
+          })}
+          <Bindings
+            expandAll={spec.expandSchemas}
+            groups={operationBindings}
+            schemas={schemas}
+            title="Operation bindings"
+          />
+          <Bindings
+            expandAll={spec.expandSchemas}
+            groups={channelBindings}
+            schemas={schemas}
+            title="Channel bindings"
+          />
+        </div>
+        {(samplePanels.length > 0 || messagePanels.length > 0) && (
+          <div class="xl:sticky xl:top-24 xl:self-start">
+            <div class="not-prose flex flex-col gap-6">
+              <PanelTabs copy heading="Example" panels={samplePanels} />
+              <PanelTabs heading="Message" panels={messagePanels} />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

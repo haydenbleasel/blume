@@ -169,8 +169,8 @@ export const runtimeDependencies = (options: {
     deps.push("@astrojs/svelte");
   }
   // The Scalar integration is only declared for a Scalar-rendered reference
-  // (the `renderer: "scalar"` fallback, or AsyncAPI). Blume-rendered OpenAPI
-  // parses at generate time and needs no runtime Scalar dependency.
+  // (the `renderer: "scalar"` opt-out on either block). Blume-rendered
+  // references parse at generate time and need no runtime Scalar dependency.
   if (hasScalarReferences(config)) {
     deps.push("@scalar/astro");
   }

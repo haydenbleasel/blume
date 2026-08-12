@@ -179,9 +179,26 @@ describe("references", () => {
     expect(blumeReferences(config)).toHaveLength(1);
   });
 
-  it("keeps AsyncAPI on the Scalar renderer", () => {
+  it("resolves a Blume-rendered AsyncAPI reference by default", () => {
     const config = blumeConfigSchema.parse({
       asyncapi: { enabled: true, spec: "async.yaml" },
+    });
+    const refs = resolveReferences(config);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]?.renderer).toBe("blume");
+    expect(refs[0]?.kind).toBe("asyncapi");
+    expect(refs[0]?.slug).toBe("events");
+    expect(refs[0]?.display).toStrictEqual({
+      codeSamples: [],
+      expandSchemas: false,
+    });
+    expect(hasScalarReferences(config)).toBe(false);
+    expect(blumeReferences(config)).toHaveLength(1);
+  });
+
+  it("keeps the Scalar opt-out for AsyncAPI", () => {
+    const config = blumeConfigSchema.parse({
+      asyncapi: { enabled: true, renderer: "scalar", spec: "async.yaml" },
     });
     expect(hasScalarReferences(config)).toBe(true);
     expect(blumeReferences(config)).toStrictEqual([]);

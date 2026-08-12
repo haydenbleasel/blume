@@ -1,9 +1,9 @@
 ---
 title: OpenAPI / AsyncAPI
-description: Drop in an OpenAPI spec and get a native API reference — one real page per operation, in your sidebar and search.
+description: Drop in an OpenAPI or AsyncAPI spec and get a native API reference — one real page per operation, in your sidebar and search.
 ---
 
-Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, and generated code samples. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. The config below points Blume at the public Petstore spec as an example.
+Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, and generated code samples. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. Event-driven APIs get the [same treatment from an AsyncAPI spec](#asyncapi). The config below points Blume at the public Petstore spec as an example.
 
 ```ts blume.config.ts lineNumbers
 openapi: {
@@ -153,7 +153,7 @@ Blume's own [`i18n`](/docs/content/i18n) translates the docs chrome, but Scalar 
 
 ## AsyncAPI
 
-Event-driven APIs use a sibling `asyncapi` block with the same shape. AsyncAPI is rendered by Scalar (the native renderer is OpenAPI-only for now); only the default route differs (`/events`):
+Event-driven APIs use a sibling `asyncapi` block with the same shape — and the same native renderer. Each `send`/`receive` operation becomes a real page with message payload and header schema tables, channel parameters, protocol bindings, and an Authorization section derived from the spec's `securitySchemes` (server-level and operation-level, alternatives as "or" groups). Only the default route differs (`/events`):
 
 ```ts blume.config.ts lineNumbers
 asyncapi: {
@@ -162,6 +162,8 @@ asyncapi: {
 }
 ```
 
-:::warning
-Scalar's AsyncAPI support is still a work in progress — it renders channels, operations, messages, and a Models section, but there's **no interactive playground** for events yet. It improves upstream over time.
-:::
+AsyncAPI **2.x specs are normalized to 3.x automatically** with the official AsyncAPI converter, so `publish`/`subscribe` channels map onto `send`/`receive` operation pages with stable URLs — later upgrading the spec file itself through the converter moves nothing. Operations group by tag; untagged operations group under their channel address.
+
+Code samples are **protocol-aware**, keyed off the operation's binding (or its servers' protocol): `wscat` and a browser `WebSocket` snippet for WebSockets, `kcat` for Kafka, `mosquitto_pub`/`mosquitto_sub` for MQTT. `codeSamples` filters that set, the same way it picks languages on the `openapi` block; a protocol without a supported tool renders the message payload example alone rather than a fabricated client.
+
+Everything documented above carries over unchanged: `route`, `sources` with `label`/`route`, `expandSchemas`, the [per-source indexing](#per-source-indexing) flags, and search indexing by operation summary and tag. Setting `renderer: "scalar"` opts back into the embedded Scalar SPA — Scalar auto-detects the document type and renders channels, operations, messages, and a Models section (no interactive playground for events) — where, as with OpenAPI, only `noindex` applies.

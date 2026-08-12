@@ -4,6 +4,8 @@ import type {
   PathItemObject,
 } from "@scalar/openapi-types/3.1";
 
+import type { AsyncApiAction, AsyncApiDocument } from "./asyncapi.ts";
+import type { ReferenceKind } from "./references.ts";
 import { slugify } from "./references.ts";
 
 // The slug rules live with the reference resolver so operation routes and
@@ -12,8 +14,9 @@ import { slugify } from "./references.ts";
 export { slugify } from "./references.ts";
 
 /**
- * Blume's own OpenAPI model. Specs are parsed and upgraded to 3.1 (see
- * `parse.ts`) with internal `$ref`s left intact — the document stays
+ * Blume's own API reference model, shared by both spec kinds. OpenAPI specs
+ * are parsed and upgraded to 3.1, AsyncAPI specs normalized to 3.x (see
+ * `parse.ts`), with internal `$ref`s left intact — the document stays
  * JSON-serializable (a fully dereferenced graph can be circular), and the schema
  * components resolve refs against `document.components.schemas` at render time.
  * Each operation is flattened into an {@link ApiOperationRef} with a real,
@@ -50,22 +53,26 @@ export const operationKey = (
   return fromId || slugify(`${method}-${path}`);
 };
 
-/** One operation, flattened out of the paths object and mapped to a route. */
+/** One operation, flattened out of its document and mapped to a route. */
 export interface ApiOperationRef {
   /** Stable key, unique within a spec; matches the MDX `<Operation id>`. */
   key: string;
-  method: HttpMethod;
-  /** Templated path, e.g. `/pets/{id}`. */
+  /** HTTP method (OpenAPI) or `send`/`receive` action (AsyncAPI). */
+  method: HttpMethod | AsyncApiAction;
+  /** Templated path, e.g. `/pets/{id}` — or the channel address (AsyncAPI). */
   path: string;
   /** Full site route for this operation's page, e.g. `/reference/pet/add-pet`. */
   route: string;
-  /** Display tag name (first tag, or `Operations` when untagged). */
+  /** Display tag name (first tag; `Operations` or the channel address when untagged). */
   tag: string;
   tagSlug: string;
   summary: string;
   description: string;
+  /** The `operationId` (OpenAPI) or the `operations` map key (AsyncAPI). */
   operationId?: string;
   deprecated: boolean;
+  /** The channel the operation acts on (AsyncAPI only). */
+  channelId?: string;
 }
 
 /** A tag/section, in first-seen order. */
@@ -77,6 +84,8 @@ export interface ApiTagRef {
 
 /** Everything the runtime needs for one spec, serialized into `blume:openapi`. */
 export interface ApiSpecData {
+  /** Which front-end parsed the spec (and which components render it). */
+  kind: ReferenceKind;
   /** Unique token used as the `<Operation source>` and the data-module key. */
   slug: string;
   /** Base route the spec's operations hang off, e.g. `/reference`. */
@@ -85,7 +94,7 @@ export interface ApiSpecData {
   title: string;
   version: string;
   description: string;
-  document: ApiDocument;
+  document: ApiDocument | AsyncApiDocument;
   /** Operations keyed by {@link ApiOperationRef.key}. */
   operations: Record<string, ApiOperationRef>;
   tags: ApiTagRef[];
@@ -106,9 +115,11 @@ const isOperation = (value: unknown): value is OperationObject =>
  * different names onto one value — any two punctuation-only tags (`!!!`,
  * `???`) both fall through to the `operations` fallback — and a shared slug
  * silently merges the tags' routes, sidebar groups, and overview sections.
- * Collisions gain `-2`, `-3`, … in first-seen order.
+ * Collisions gain `-2`, `-3`, … in first-seen order. Shared with the AsyncAPI
+ * extractor (`asyncapi.ts`), whose untagged fallback groups are channel
+ * addresses.
  */
-const tagSlugger = (): ((name: string) => string) => {
+export const tagSlugger = (): ((name: string) => string) => {
   const assigned = new Map<string, string>();
   const taken = new Set<string>();
   return (name) => {
@@ -201,14 +212,18 @@ export const extractOperations = (
   return { operations, tags, warnings };
 };
 
-/** Resolve the operation object for a ref out of its document. */
+/** Resolve the operation object for a ref out of its (OpenAPI) document. */
 export const operationObject = (
   spec: ApiSpecData,
   ref: ApiOperationRef
 ): OperationObject | undefined => {
-  const item = (spec.document.paths?.[ref.path] ?? undefined) as
+  // Only OpenAPI refs carry HTTP methods; the AsyncAPI counterpart is
+  // `asyncApiOperationObject` in `asyncapi.ts`.
+  const method = HTTP_METHODS.find((candidate) => candidate === ref.method);
+  const document = spec.document as ApiDocument;
+  const item = (document.paths?.[ref.path] ?? undefined) as
     | PathItemObject
     | undefined;
-  const operation = item?.[ref.method];
+  const operation = method === undefined ? undefined : item?.[method];
   return isOperation(operation) ? operation : undefined;
 };

@@ -1,10 +1,10 @@
 ---
 title: OpenAPI / AsyncAPI
 description: >-
-  Adicione uma especificação OpenAPI e obtenha uma referência de API nativa — uma página real por operação, na sua barra lateral e na busca.
+  Adicione uma especificação OpenAPI ou AsyncAPI e obtenha uma referência de API nativa — uma página real por operação, na sua barra lateral e na busca.
 ---
 
-Aponte o Blume para uma especificação OpenAPI e ele gera uma referência de API nativa: uma **página real por operação**, agrupada por tag em uma barra lateral delimitada por aba, com tabelas de esquema, exemplos de requisição/resposta e amostras de código geradas. Como cada operação é uma página Blume genuína, ela ganha sua própria URL, aparece na **busca do site** e no `llms.txt`, e recebe uma imagem Open Graph — igual a qualquer documento escrito à mão. A configuração abaixo aponta o Blume para a especificação pública do Petstore como exemplo.
+Aponte o Blume para uma especificação OpenAPI e ele gera uma referência de API nativa: uma **página real por operação**, agrupada por tag em uma barra lateral delimitada por aba, com tabelas de esquema, exemplos de requisição/resposta e amostras de código geradas. Como cada operação é uma página Blume genuína, ela ganha sua própria URL, aparece na **busca do site** e no `llms.txt`, e recebe uma imagem Open Graph — igual a qualquer documento escrito à mão. APIs orientadas a eventos recebem o [mesmo tratamento a partir de uma especificação AsyncAPI](#asyncapi). A configuração abaixo aponta o Blume para a especificação pública do Petstore como exemplo.
 
 ```ts blume.config.ts lineNumbers
 openapi: {
@@ -154,7 +154,7 @@ O [`i18n`](/docs/content/i18n) do próprio Blume traduz a interface da documenta
 
 ## AsyncAPI
 
-APIs orientadas a eventos usam um bloco irmão `asyncapi` com o mesmo formato. O AsyncAPI é renderizado pelo Scalar (o renderizador nativo é somente para OpenAPI por enquanto); apenas a rota padrão difere (`/events`):
+APIs orientadas a eventos usam um bloco irmão `asyncapi` com o mesmo formato — e o mesmo renderizador nativo. Cada operação `send`/`receive` se torna uma página real com tabelas de esquema do payload e dos cabeçalhos da mensagem, parâmetros de canal, bindings de protocolo e uma seção de Autorização derivada dos `securitySchemes` da especificação (em nível de servidor e de operação, com alternativas como grupos "ou"). Apenas a rota padrão difere (`/events`):
 
 ```ts blume.config.ts lineNumbers
 asyncapi: {
@@ -163,6 +163,8 @@ asyncapi: {
 }
 ```
 
-:::warning
-O suporte do Scalar a AsyncAPI ainda está em desenvolvimento — ele renderiza canais, operações, mensagens e uma seção de Modelos, mas ainda **não há playground interativo** para eventos. Isso melhora com o tempo no projeto original.
-:::
+Especificações AsyncAPI **2.x são normalizadas para 3.x automaticamente** com o conversor oficial do AsyncAPI, então canais `publish`/`subscribe` são mapeados para páginas de operação `send`/`receive` com URLs estáveis — atualizar mais tarde o próprio arquivo de especificação através do conversor não move nada. As operações são agrupadas por tag; operações sem tag são agrupadas sob o endereço do seu canal.
+
+As amostras de código são **sensíveis ao protocolo**, derivadas do binding da operação (ou do protocolo dos seus servidores): `wscat` e um snippet de `WebSocket` do navegador para WebSockets, `kcat` para Kafka, `mosquitto_pub`/`mosquitto_sub` para MQTT. `codeSamples` filtra esse conjunto, da mesma forma que escolhe linguagens no bloco `openapi`; um protocolo sem uma ferramenta suportada renderiza apenas o exemplo de payload da mensagem em vez de um cliente fabricado.
+
+Tudo o que foi documentado acima se mantém sem alterações: `route`, `sources` com `label`/`route`, `expandSchemas`, as flags de [indexação por fonte](#per-source-indexing) e a indexação de busca por resumo e tag da operação. Definir `renderer: "scalar"` volta a optar pelo SPA incorporado do Scalar — o Scalar detecta automaticamente o tipo de documento e renderiza canais, operações, mensagens e uma seção de Modelos (sem playground interativo para eventos) — onde, como no OpenAPI, apenas `noindex` se aplica.

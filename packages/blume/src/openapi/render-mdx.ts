@@ -149,8 +149,11 @@ const operationDescription = (
   spec: ApiSpecData,
   operation: ApiOperationRef
 ): string => {
-  const endpoint = `${operation.method.toUpperCase()} ${operation.path}`;
-  const suffix = `Reference for the ${endpoint} endpoint in the ${apiName(spec)} API.`;
+  // AsyncAPI operations act on a channel, not an HTTP endpoint.
+  const suffix =
+    spec.kind === "asyncapi"
+      ? `Reference for the ${operation.method} operation on ${operation.path} in the ${apiName(spec)} API.`
+      : `Reference for the ${operation.method.toUpperCase()} ${operation.path} endpoint in the ${apiName(spec)} API.`;
   const prose = clip(
     plainProse(operation.description || operation.summary),
     META_DESCRIPTION_MAX - suffix.length - 1
