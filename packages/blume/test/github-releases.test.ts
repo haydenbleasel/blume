@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { dirname, join } from "pathe";
+import stringWidth from "string-width";
 
 import { generateRuntime } from "../src/astro/generate.ts";
 import { scanProject } from "../src/core/project-graph.ts";
@@ -229,6 +230,25 @@ describe("githubReleasesSource", () => {
     expect(short.seo?.description).toBe("Added widgets");
     const empty = entries[1]?.data as { seo?: { description?: string } };
     expect(empty.seo).toBeUndefined();
+  });
+
+  it("trims a fullwidth description to the snippet's display columns", async () => {
+    // 120 fullwidth characters pass a character count (120 <= 160) untouched,
+    // but render 240 columns wide — the audit, which now grades in display
+    // columns, would flag every generated changelog page as "too long". The
+    // summary must budget in the same columns the audit measures.
+    const body = `- abc1234: ${"あ".repeat(120)}`;
+    const { fetchImpl } = releasesFetch({ 1: [makeRelease({ body })] });
+    const source = githubReleasesSource(
+      { fetchImpl, name: "changelog", owner: "acme", repo: "sdk" },
+      ctxFor(await tempDir())
+    );
+    const { entries } = await source.load();
+    const meta = entries[0]?.data as { seo?: { description?: string } };
+    const description = meta.seo?.description ?? "";
+    expect(stringWidth(description)).toBeGreaterThanOrEqual(110);
+    expect(stringWidth(description)).toBeLessThanOrEqual(160);
+    expect(description).toEndWith("…");
   });
 
   it("hard-cuts a description whose word boundary falls under the minimum", async () => {

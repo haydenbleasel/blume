@@ -7,6 +7,12 @@ import { pageSite } from "../locate.ts";
 import { ERROR_ROUTES } from "../types.ts";
 import type { AuditContext, CheckModule, PageSnapshot } from "../types.ts";
 
+// Extraction trims only the ends; interior runs of whitespace (a <title>
+// authored across indented source lines) survive. A search engine collapses
+// them to single spaces before rendering, so the width is measured on the
+// collapsed text — source formatting must not move a page across a threshold.
+const WHITESPACE = /\s+/gu;
+
 /**
  * The `date` a source file's front matter declares, when it parses to a real
  * date. YAML hands back a `Date` for an unquoted `2026-01-01` and a string for
@@ -56,7 +62,7 @@ const titleChecks = (
   }
   // Columns, not characters: a search engine truncates by the space the text
   // takes up. See {@link AuditThresholds}.
-  const width = stringWidth(title);
+  const width = stringWidth(title.replaceAll(WHITESPACE, " "));
   if (width > titleMax || width < titleMin) {
     const direction = width > titleMax ? "long" : "short";
     found.push(
@@ -105,7 +111,7 @@ const descriptionChecks = (
     );
   }
   // Columns, not characters. See {@link AuditThresholds}.
-  const width = stringWidth(description);
+  const width = stringWidth(description.replaceAll(WHITESPACE, " "));
   if (width > descriptionMax || width < descriptionMin) {
     const direction = width > descriptionMax ? "long" : "short";
     found.push(

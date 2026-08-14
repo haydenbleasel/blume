@@ -111,7 +111,7 @@ describe("content checks", () => {
     expect(run(contentChecks, ctx)).toContain("TITLE_LENGTH");
   });
 
-  it("scores Latin text exactly as a character count would", () => {
+  it("scores ASCII text exactly as a character count would", () => {
     // Every ASCII character is one column, so nothing about an English site's
     // findings changes: 60 characters short, 200 long, 120 fine.
     const at = (description: string) =>
@@ -122,6 +122,32 @@ describe("content checks", () => {
     expect(at("x".repeat(60))).toContain("DESCRIPTION_LENGTH");
     expect(at("x".repeat(200))).toContain("DESCRIPTION_LENGTH");
     expect(at("x".repeat(120))).not.toContain("DESCRIPTION_LENGTH");
+  });
+
+  it("counts a decomposed combining mark as zero columns", () => {
+    // NFD spells "é" as e + U+0301: two code units, one column on screen. A
+    // character count saw 2, so ASCII-exact parity does not extend to NFD —
+    // at the 110 floor, 108 x's plus an NFD é is 110 characters but only 109
+    // columns, and the page now (correctly) reads as one column short.
+    const at = (description: string) =>
+      run(
+        contentChecks,
+        context({ pages: [snapshot({ descriptions: [description] })] })
+      );
+    expect(at(`${"x".repeat(108)}e\u0301`)).toContain("DESCRIPTION_LENGTH");
+    expect(at(`${"x".repeat(109)}e\u0301`)).not.toContain("DESCRIPTION_LENGTH");
+  });
+
+  it("measures a title on its collapsed whitespace", () => {
+    // A <title> authored across indented source lines keeps interior newlines
+    // and indent spaces (extraction only trims the ends), but a SERP collapses
+    // them to single spaces. Raw, this measures 62 columns (the newline is 0,
+    // each indent space 1); collapsed it is exactly titleMax at 60 — source
+    // formatting must not push a page over a threshold.
+    const ctx = context({
+      pages: [snapshot({ titles: [`${"a".repeat(58)}\n   b`] })],
+    });
+    expect(run(contentChecks, ctx)).not.toContain("TITLE_LENGTH");
   });
 
   it("does not grade descriptions on error routes", () => {

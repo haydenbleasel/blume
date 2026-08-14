@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
+import stringWidth from "string-width";
 
 import {
   constraints,
@@ -1195,6 +1196,31 @@ describe("render-mdx", () => {
     expect(description).not.toContain("second paragraph");
     // Truncation cuts on a word boundary, never mid-word.
     expect(description).toContain("…");
+  });
+
+  it("caps a fullwidth meta description by display columns", () => {
+    // 100 fullwidth characters are within the 160-character cap but render
+    // ~200 columns wide — the audit, which grades in display columns, would
+    // flag every generated operation page as "too long" with no fix short of
+    // editing the upstream spec. The clip must budget in the same columns.
+    const op = {
+      deprecated: false,
+      description: "あ".repeat(100),
+      key: "op",
+      method: "get" as const,
+      operationId: "op",
+      path: "/pet",
+      route: "/api/pet/op",
+      summary: "List pets",
+      tag: "pet",
+      tagSlug: "pet",
+    };
+    const { description } = operationMdx(specData(), op).data.seo as {
+      description: string;
+    };
+    expect(stringWidth(description)).toBeLessThanOrEqual(160);
+    expect(description).toContain("…");
+    expect(description).toEndWith("API.");
   });
 
   it("keeps literal punctuation intact in the meta description", () => {

@@ -1,7 +1,9 @@
 import type { Nodes } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { toString as mdastToString } from "mdast-util-to-string";
+import stringWidth from "string-width";
 
+import { columnsPrefix } from "../core/text-width.ts";
 import type { ApiOperationRef, ApiSpecData } from "./model.ts";
 import type { ReferenceSource } from "./references.ts";
 
@@ -123,19 +125,19 @@ const plainProse = (markdown: string): string => {
   return first ? mdastToString(first).replace(WHITESPACE, " ").trim() : "";
 };
 
-/** Cap `text` at `max` characters, cutting on a word boundary. */
+/** Cap `text` at `max` display columns, cutting on a word boundary. */
 const clip = (text: string, max: number): string => {
   if (max <= 0) {
     return "";
   }
-  if (text.length <= max) {
+  if (stringWidth(text) <= max) {
     return text;
   }
-  const head = text.slice(0, max - 1);
+  const head = columnsPrefix(text, max - 1);
   const onWordBoundary = head.replace(TRAILING_WORD, "");
   // One very long token — an endpoint path has no spaces — would be dropped
   // whole, leaving a stub. Hard-cut it instead of losing it.
-  return `${onWordBoundary.length >= max / 2 ? onWordBoundary : head}…`;
+  return `${stringWidth(onWordBoundary) >= max / 2 ? onWordBoundary : head}…`;
 };
 
 const apiName = (spec: ApiSpecData): string => spec.title || spec.label;
@@ -153,7 +155,7 @@ const operationDescription = (
   const suffix = `Reference for the ${endpoint} endpoint in the ${apiName(spec)} API.`;
   const prose = clip(
     plainProse(operation.description || operation.summary),
-    META_DESCRIPTION_MAX - suffix.length - 1
+    META_DESCRIPTION_MAX - stringWidth(suffix) - 1
   );
   return clip([prose, suffix].filter(Boolean).join(" "), META_DESCRIPTION_MAX);
 };
