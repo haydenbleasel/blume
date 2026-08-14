@@ -161,8 +161,22 @@ export interface LinkGraph {
 /** Astro's reserved error routes. Never indexable, never crawlable — by design. */
 export const ERROR_ROUTES: ReadonlySet<string> = new Set(["/404", "/500"]);
 
-/** Tunable limits. Not yet configurable — CLI-only until the ids settle. */
+/**
+ * Tunable limits. Not yet configurable — CLI-only until the ids settle.
+ *
+ * The title and description limits are measured in **display columns**, where
+ * a fullwidth or wide character counts 2 and everything else 1 — not in
+ * characters. What a search engine truncates is the space the text takes up,
+ * and a character count only stands in for that where every character is one
+ * column wide, which is true of Latin text and of nothing else. Counted in
+ * characters one range cannot serve both scripts: it is at once too strict for
+ * a Japanese description (which says in ~60 characters what English needs ~120
+ * for, and so reads as "too short") and too loose for a Japanese title (60
+ * characters render as wide as 120 Latin ones, and truncate). Latin text
+ * scores identically either way.
+ */
 export interface AuditThresholds {
+  /** Display columns, not characters. */
   titleMin: number;
   titleMax: number;
   descriptionMin: number;
@@ -174,8 +188,9 @@ export interface AuditThresholds {
 }
 
 export const DEFAULT_THRESHOLDS: AuditThresholds = {
-  // Ahrefs' guidance: 110–160 characters. Under ~110 wastes the snippet
-  // space search results give you; over ~160 gets truncated.
+  // Ahrefs' guidance: 110–160. Under ~110 wastes the snippet space search
+  // results give you; over ~160 gets truncated. Stated there in characters of
+  // English, which is the same number of columns.
   descriptionMax: 160,
   descriptionMin: 110,
   maxAssetBytes: 500 * 1024,

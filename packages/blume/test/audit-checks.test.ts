@@ -93,6 +93,37 @@ describe("content checks", () => {
     expect(run(contentChecks, ctx)).toContain("DESCRIPTION_LENGTH");
   });
 
+  it("passes a Japanese description that fills the snippet", () => {
+    // 66 fullwidth characters render as wide as ~132 Latin ones, so this fills
+    // the snippet the way a 132-character English description would. Counted
+    // in characters it fell under the 110 floor, which put a finding on every
+    // page of a Japanese site.
+    const ctx = context({
+      pages: [snapshot({ descriptions: ["あ".repeat(66)] })],
+    });
+    expect(run(contentChecks, ctx)).not.toContain("DESCRIPTION_LENGTH");
+  });
+
+  it("reports a Japanese title that renders past the limit", () => {
+    // 40 fullwidth characters render as wide as 80 Latin ones and truncate.
+    // Counted in characters this sat inside 10–60 and went unreported.
+    const ctx = context({ pages: [snapshot({ titles: ["あ".repeat(40)] })] });
+    expect(run(contentChecks, ctx)).toContain("TITLE_LENGTH");
+  });
+
+  it("scores Latin text exactly as a character count would", () => {
+    // Every ASCII character is one column, so nothing about an English site's
+    // findings changes: 60 characters short, 200 long, 120 fine.
+    const at = (description: string) =>
+      run(
+        contentChecks,
+        context({ pages: [snapshot({ descriptions: [description] })] })
+      );
+    expect(at("x".repeat(60))).toContain("DESCRIPTION_LENGTH");
+    expect(at("x".repeat(200))).toContain("DESCRIPTION_LENGTH");
+    expect(at("x".repeat(120))).not.toContain("DESCRIPTION_LENGTH");
+  });
+
   it("does not grade descriptions on error routes", () => {
     // A 404's description never renders as a search snippet, and it usually
     // inherits the site default — grading it would flag every site.

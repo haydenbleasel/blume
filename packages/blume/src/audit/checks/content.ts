@@ -1,3 +1,5 @@
+import stringWidth from "string-width";
+
 import matter from "../../core/frontmatter.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { finding } from "../catalog.ts";
@@ -52,13 +54,16 @@ const titleChecks = (
       )
     );
   }
-  if (title.length > titleMax || title.length < titleMin) {
-    const direction = title.length > titleMax ? "long" : "short";
+  // Columns, not characters: a search engine truncates by the space the text
+  // takes up. See {@link AuditThresholds}.
+  const width = stringWidth(title);
+  if (width > titleMax || width < titleMin) {
+    const direction = width > titleMax ? "long" : "short";
     found.push(
       finding(
         "BLUME_AUDIT_TITLE_LENGTH",
         pageSite(context, page, ["title"]),
-        `Title is ${title.length} characters — too ${direction} (aim for ${titleMin}–${titleMax}).`
+        `Title renders ${width} columns wide — too ${direction} (aim for ${titleMin}–${titleMax}).`
       )
     );
   }
@@ -99,16 +104,15 @@ const descriptionChecks = (
       )
     );
   }
-  if (
-    description.length > descriptionMax ||
-    description.length < descriptionMin
-  ) {
-    const direction = description.length > descriptionMax ? "long" : "short";
+  // Columns, not characters. See {@link AuditThresholds}.
+  const width = stringWidth(description);
+  if (width > descriptionMax || width < descriptionMin) {
+    const direction = width > descriptionMax ? "long" : "short";
     found.push(
       finding(
         "BLUME_AUDIT_DESCRIPTION_LENGTH",
         pageSite(context, page, ["description"]),
-        `Meta description is ${description.length} characters — too ${direction} (aim for ${descriptionMin}–${descriptionMax}).`
+        `Meta description renders ${width} columns wide — too ${direction} (aim for ${descriptionMin}–${descriptionMax}).`
       )
     );
   }
