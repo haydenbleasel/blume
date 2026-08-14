@@ -9,7 +9,7 @@ import { isAbsolute, join } from "pathe";
 
 import { hashText } from "../core/sources/cache.ts";
 import type { AsyncApiDocument } from "./asyncapi.ts";
-import { applyAsyncApiTraits } from "./asyncapi.ts";
+import { normalizeAsyncApiDocument } from "./asyncapi.ts";
 import type { ApiDocument } from "./model.ts";
 
 /**
@@ -366,5 +366,5 @@ export const parseAsyncApiSpec = async (
       )
     );
   }
-  return { document: applyAsyncApiTraits(document), warnings };
+  return { document: normalizeAsyncApiDocument(document), warnings };
 };

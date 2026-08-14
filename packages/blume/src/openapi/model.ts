@@ -138,6 +138,62 @@ export const tagSlugger = (): ((name: string) => string) => {
   };
 };
 
+/** An operation before the collector assigns its unique key and route. */
+type CollectedOperation = Omit<ApiOperationRef, "route" | "tagSlug">;
+
+/**
+ * The collector behind both extractors (OpenAPI here, AsyncAPI in
+ * `asyncapi.ts`): first-seen tag ordering, key de-duplication (a repeated key
+ * gains its method/action as a suffix), and the shared route template — so
+ * URL shape and slug rules can never drift between the two spec kinds.
+ */
+export const operationCollector = (
+  baseRoute: string,
+  tagMeta: ReadonlyMap<string, string>
+): {
+  add: (entry: CollectedOperation) => void;
+  finish: () => { operations: ApiOperationRef[]; tags: ApiTagRef[] };
+} => {
+  const operations: ApiOperationRef[] = [];
+  const tagOrder: string[] = [];
+  const tagsSeen = new Set<string>();
+  const seen = new Set<string>();
+  const slugForTag = tagSlugger();
+
+  const add = (entry: CollectedOperation): void => {
+    const tagSlug = slugForTag(entry.tag);
+    if (!tagsSeen.has(entry.tag)) {
+      tagsSeen.add(entry.tag);
+      tagOrder.push(entry.tag);
+    }
+    let { key } = entry;
+    while (seen.has(key)) {
+      key = `${key}-${entry.method}`;
+    }
+    seen.add(key);
+    operations.push({
+      ...entry,
+      key,
+      // A root-mounted reference (`route: "/"`) must not emit `//tag/key`.
+      route: `${baseRoute === "/" ? "" : baseRoute}/${tagSlug}/${key}`,
+      tagSlug,
+    });
+  };
+
+  const finish = (): { operations: ApiOperationRef[]; tags: ApiTagRef[] } => ({
+    operations,
+    tags: tagOrder.map((name) => ({
+      description: tagMeta.get(name) ?? "",
+      name,
+      // The same slugger instance, so every tag resolves to the slug its
+      // operations were routed under.
+      slug: slugForTag(name),
+    })),
+  });
+
+  return { add, finish };
+};
+
 /**
  * Flatten a 3.1 document into a route-mapped operation list and its ordered
  * tags. Operations inherit the first tag they declare; keys are de-duplicated so
@@ -148,15 +204,13 @@ export const extractOperations = (
   document: ApiDocument,
   baseRoute: string
 ): { operations: ApiOperationRef[]; tags: ApiTagRef[]; warnings: string[] } => {
-  const operations: ApiOperationRef[] = [];
-  const tagOrder: string[] = [];
-  const tagsSeen = new Set<string>();
-  const tagMeta = new Map(
-    (document.tags ?? []).map((tag) => [tag.name, tag.description ?? ""])
-  );
-  const seen = new Set<string>();
   const warnings: string[] = [];
-  const slugForTag = tagSlugger();
+  const tagMeta = new Map(
+    (document.tags ?? [])
+      .filter((tag) => typeof tag.name === "string")
+      .map((tag) => [tag.name as string, tag.description ?? ""])
+  );
+  const collector = operationCollector(baseRoute, tagMeta);
 
   for (const [path, rawItem] of Object.entries(document.paths ?? {})) {
     const item = rawItem as PathItemObject | undefined;
@@ -174,42 +228,20 @@ export const extractOperations = (
       if (!isOperation(operation)) {
         continue;
       }
-      const tag = operation.tags?.[0] ?? UNTAGGED;
-      const tagSlug = slugForTag(tag);
-      if (!tagsSeen.has(tag)) {
-        tagsSeen.add(tag);
-        tagOrder.push(tag);
-      }
-      let key = operationKey(method, path, operation.operationId);
-      while (seen.has(key)) {
-        key = `${key}-${method}`;
-      }
-      seen.add(key);
-      operations.push({
+      collector.add({
         deprecated: operation.deprecated ?? false,
         description: operation.description ?? "",
-        key,
+        key: operationKey(method, path, operation.operationId),
         method,
         operationId: operation.operationId,
         path,
-        // A root-mounted reference (`route: "/"`) must not emit `//tag/key`.
-        route: `${baseRoute === "/" ? "" : baseRoute}/${tagSlug}/${key}`,
         summary: operation.summary ?? "",
-        tag,
-        tagSlug,
+        tag: operation.tags?.[0] ?? UNTAGGED,
       });
     }
   }
 
-  const tags: ApiTagRef[] = tagOrder.map((name) => ({
-    description: tagMeta.get(name) ?? "",
-    name,
-    // The same slugger instance, so every tag resolves to the slug its
-    // operations were routed under.
-    slug: slugForTag(name),
-  }));
-
-  return { operations, tags, warnings };
+  return { ...collector.finish(), warnings };
 };
 
 /** Resolve the operation object for a ref out of its (OpenAPI) document. */

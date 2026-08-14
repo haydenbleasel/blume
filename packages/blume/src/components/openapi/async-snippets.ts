@@ -161,7 +161,9 @@ export const asyncSampleLanguages = (
   const chosen: AsyncSampleLanguage[] = [];
   const seen = new Set<string>();
   for (const raw of ids) {
-    const id = ALIASES[raw] ?? raw;
+    // Case-insensitive like `sampleLanguages` — the docs spell the tools
+    // `WebSocket`/`mosquitto_pub`, so configured ids arrive in any casing.
+    const id = ALIASES[raw.toLowerCase()] ?? raw.toLowerCase();
     if (candidates.includes(id) && !seen.has(id)) {
       seen.add(id);
       chosen.push(TOOLS[id] as AsyncSampleLanguage);

@@ -161,7 +161,7 @@ const channelBindings = bindingGroups(channel?.bindings);
                     </code>
                   </div>
                 )}
-                {payload ? (
+                {payload && (
                   <div class="not-prose rounded-blume border border-border px-4 py-3">
                     <SchemaTable
                       expandAll={spec.expandSchemas}
@@ -169,7 +169,10 @@ const channelBindings = bindingGroups(channel?.bindings);
                       schemas={schemas}
                     />
                   </div>
-                ) : (
+                )}
+                {/* Payload is optional on a message — only a payload that
+                    failed to unwrap earns the can't-render note. */}
+                {named.message.payload !== undefined && !payload && (
                   <p class="text-muted-foreground text-sm">
                     The payload uses a schema format this reference can't
                     render inline.

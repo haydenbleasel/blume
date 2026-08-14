@@ -27,6 +27,7 @@ import {
   channelAddress,
   channelIdOf,
   extractAsyncApiOperations,
+  normalizeAsyncApiDocument,
 } from "../src/openapi/asyncapi.ts";
 import type { AsyncApiDocument } from "../src/openapi/asyncapi.ts";
 import type { ApiOperationRef, ApiSpecData } from "../src/openapi/model.ts";
@@ -337,6 +338,53 @@ describe("asyncapi.extractAsyncApiOperations", () => {
     expect(operations[0]?.route).toBe("/topic/get-thing");
   });
 
+  it("inlines component channel and operation refs at normalization", () => {
+    const document = normalizeAsyncApiDocument({
+      channels: {
+        "user/signedup": { $ref: "#/components/channels/userSignedup" },
+      },
+      components: {
+        channels: { userSignedup: { address: "user.signedup.v1" } },
+        operations: {
+          sendSignup: {
+            action: "send",
+            channel: { $ref: "#/channels/user~1signedup" },
+          },
+        },
+      },
+      operations: {
+        dangling: { $ref: "#/components/operations/missing" },
+        sendSignup: { $ref: "#/components/operations/sendSignup" },
+      },
+    } as unknown as AsyncApiDocument);
+    const { operations, warnings } = extractAsyncApiOperations(
+      document,
+      "/events"
+    );
+    // The component channel's real address flows through, not the map key.
+    expect(operations).toHaveLength(1);
+    expect(operations[0]).toMatchObject({
+      channelId: "user/signedup",
+      method: "send",
+      path: "user.signedup.v1",
+    });
+    // A ref normalization couldn't inline gets its own warning, not the
+    // missing-action one.
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('"dangling" is a reference');
+  });
+
+  it("falls back to action + address for an id that slugifies to nothing", () => {
+    const document = {
+      channels: { c: { address: "topic" } },
+      operations: {
+        "!!!": { action: "send", channel: { $ref: "#/channels/c" } },
+      },
+    } as unknown as AsyncApiDocument;
+    const { operations } = extractAsyncApiOperations(document, "/events");
+    expect(operations[0]?.key).toBe("send-topic");
+  });
+
   it("resolves pointer-escaped channel refs and titles", () => {
     expect(channelIdOf({ $ref: "#/channels/user~1signedup" })).toBe(
       "user/signedup"
@@ -462,6 +510,24 @@ describe("components/openapi/async helpers", () => {
         },
       })
     ).toBeUndefined();
+    // Avro's `+json` encoding is JSON but not JSON Schema — no unwrap.
+    expect(
+      payloadSchema({
+        payload: {
+          schema: { fields: [{ name: "id" }], name: "User", type: "record" },
+          schemaFormat: "application/vnd.apache.avro+json;version=1.9.0",
+        },
+      })
+    ).toBeUndefined();
+    // The default AsyncAPI format unwraps in every registered spelling.
+    expect(
+      payloadSchema({
+        payload: {
+          schema: { type: "object" },
+          schemaFormat: "application/vnd.aai.asyncapi+yaml;version=3.0.0",
+        },
+      })
+    ).toStrictEqual({ type: "object" });
     expect(payloadSchema({})).toBeUndefined();
   });
 
@@ -591,6 +657,14 @@ describe("components/openapi/async-snippets", () => {
     expect(asyncSampleLanguages([], "amqp")).toStrictEqual([]);
     expect(asyncSampleLanguages([])).toStrictEqual([]);
     expect(asyncSampleLanguages(["kcat"], "ws")).toStrictEqual([]);
+    // Ids match case-insensitively, like the OpenAPI `codeSamples` path (the
+    // docs spell the tools `WebSocket`/`mosquitto_pub`).
+    expect(
+      asyncSampleLanguages(["WebSocket"], "ws").map((t) => t.id)
+    ).toStrictEqual(["js"]);
+    expect(
+      asyncSampleLanguages(["Mosquitto_Pub"], "mqtt").map((t) => t.id)
+    ).toStrictEqual(["mosquitto"]);
   });
 
   it("builds kcat producer/consumer samples", () => {

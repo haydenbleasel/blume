@@ -100,6 +100,10 @@ export interface AsyncApiSecurityEntryLike {
 
 const SECURITY_SCHEME_REF = /^#\/components\/securitySchemes\/(?<name>[^/]+)$/u;
 
+/** Decode a JSON-pointer token: `kafka~1sasl` -> `kafka/sasl`. */
+const unescapePointer = (token: string): string =>
+  token.replaceAll("~1", "/").replaceAll("~0", "~");
+
 /**
  * Resolve an AsyncAPI 3.x security list. Unlike OpenAPI's requirement maps,
  * each entry names a single scheme and any one entry satisfies the operation
@@ -116,7 +120,8 @@ export const resolveAsyncApiSecurity = (
     if (typeof entry !== "object" || entry === null) {
       continue;
     }
-    const name = SECURITY_SCHEME_REF.exec(entry.$ref ?? "")?.groups?.name;
+    const pointer = SECURITY_SCHEME_REF.exec(entry.$ref ?? "")?.groups?.name;
+    const name = pointer === undefined ? undefined : unescapePointer(pointer);
     const inline = name === undefined && typeof entry.$ref !== "string";
     const scheme = inline
       ? (entry as SecuritySchemeLike)

@@ -1112,22 +1112,17 @@ export interface ReactConfig {
 // ---------------------------------------------------------------------------
 
 /**
- * OpenAPI reference. By default (`renderer: "blume"`) Blume renders its own UI:
- * one real page per operation, grouped by tag in the sidebar and included in
- * search, llms.txt, and OG. Set `renderer: "scalar"` for the embedded Scalar
- * SPA (a single self-contained route).
+ * The shared shape of both API-reference blocks (`openapi`, `asyncapi`). Only
+ * the per-block defaults differ; those are documented on the extending
+ * interfaces.
  */
-export interface OpenApiConfig {
-  /** Code-sample languages shown per operation (Blume renderer). */
-  codeSamples?: string[];
+interface ReferenceConfig {
   /** Turn the reference on. Defaults to `false`. */
   enabled?: boolean;
   /** Start nested schema rows expanded (Blume renderer). Defaults to `false`. */
   expandSchemas?: boolean;
   /** Who renders the reference. Defaults to `blume`. */
   renderer?: "blume" | "scalar";
-  /** Where the reference mounts. Defaults to `/reference`. */
-  route?: string;
   /**
    * Extra Scalar options forwarded verbatim to the embedded `<ScalarComponent>`
    * (Scalar renderer only) — e.g. `localization`, `agent`,
@@ -1144,38 +1139,36 @@ export interface OpenApiConfig {
 }
 
 /**
+ * OpenAPI reference. By default (`renderer: "blume"`) Blume renders its own UI:
+ * one real page per operation, grouped by tag in the sidebar and included in
+ * search, llms.txt, and OG. Set `renderer: "scalar"` for the embedded Scalar
+ * SPA (a single self-contained route).
+ */
+export interface OpenApiConfig extends ReferenceConfig {
+  /**
+   * Code-sample languages shown per operation (Blume renderer). Defaults to
+   * `["curl", "js", "python"]`.
+   */
+  codeSamples?: string[];
+  /** Where the reference mounts. Defaults to `/reference`. */
+  route?: string;
+}
+
+/**
  * AsyncAPI reference. Same shape as {@link OpenApiConfig}: by default
  * (`renderer: "blume"`) Blume normalizes the spec to AsyncAPI 3.x and renders
  * its own UI — one real page per operation, grouped by tag (or channel) in the
  * sidebar and included in search, llms.txt, and OG. Set `renderer: "scalar"`
  * for the embedded Scalar SPA (a single self-contained route).
  */
-export interface AsyncApiConfig {
+export interface AsyncApiConfig extends ReferenceConfig {
   /**
    * Code-sample tools shown per operation (Blume renderer). Defaults to every
    * tool appropriate to the operation's protocol binding.
    */
   codeSamples?: string[];
-  /** Turn the reference on. Defaults to `false`. */
-  enabled?: boolean;
-  /** Start nested schema rows expanded (Blume renderer). Defaults to `false`. */
-  expandSchemas?: boolean;
-  /** Who renders the reference. Defaults to `blume`. */
-  renderer?: "blume" | "scalar";
   /** Where the reference mounts. Defaults to `/events`. */
   route?: string;
-  /**
-   * Extra Scalar options forwarded verbatim to the embedded `<ScalarComponent>`
-   * (Scalar renderer only). These win over Blume's derived spec/theme config —
-   * a full escape hatch to Scalar's API.
-   */
-  scalar?: Record<string, unknown>;
-  /** One or more specs. */
-  sources?: OpenApiSource[];
-  /** Shorthand for a single source. */
-  spec?: string;
-  /** Scalar theme name (Scalar renderer only). */
-  theme?: string;
 }
 
 // ---------------------------------------------------------------------------

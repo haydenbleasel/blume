@@ -121,6 +121,14 @@ export const messageLabel = (named: NamedMessage): string =>
   named.message.title ?? named.message.name ?? named.key;
 
 /**
+ * The `schemaFormat` media types whose schemas render as JSON Schema: the
+ * AsyncAPI Schema Object (a JSON Schema superset), OpenAPI Schema Objects,
+ * and JSON Schema itself, in their bare and `+json`/`+yaml` spellings.
+ */
+const JSON_SCHEMA_FORMAT =
+  /^application\/(?:vnd\.aai\.asyncapi|vnd\.oai\.openapi|schema)(?:\+(?:json|yaml))?$/u;
+
+/**
  * The JSON-schema view of a possibly multi-format schema value
  * (`{ schemaFormat, schema }`, allowed on both message payloads and headers).
  * Unwraps when the format is JSON-schema compatible and yields nothing
@@ -132,11 +140,14 @@ export const schemaOf = (value: unknown): SchemaLike | undefined => {
     return undefined;
   }
   if (typeof value.schemaFormat === "string" && "schema" in value) {
-    const format = value.schemaFormat;
-    const jsonish =
-      format.includes("json") ||
-      format.includes("asyncapi") ||
-      format.includes("openapi");
+    // Match the media type proper (parameters like `;version=…` stripped)
+    // against the JSON-Schema-compatible formats AsyncAPI registers. A
+    // substring test would misclassify e.g. Avro's `+json` encoding, whose
+    // schema is JSON but not JSON Schema.
+    const format = (value.schemaFormat.split(";")[0] ?? "")
+      .trim()
+      .toLowerCase();
+    const jsonish = JSON_SCHEMA_FORMAT.test(format);
     return jsonish && isObject(value.schema)
       ? (value.schema as SchemaLike)
       : undefined;

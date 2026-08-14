@@ -27,8 +27,11 @@ if (spec?.kind === "asyncapi") {
     }
   }
 } else {
-  const servers =
-    ((spec?.document ?? {}) as { servers?: { url?: string }[] }).servers ?? [];
+  // Hand-written specs sometimes declare `servers` as a bare object; degrade
+  // to no address chips instead of throwing mid-build.
+  const declared = ((spec?.document ?? {}) as { servers?: { url?: string }[] })
+    .servers;
+  const servers = Array.isArray(declared) ? declared : [];
   for (const server of servers) {
     if (server.url) {
       addresses.push(server.url);

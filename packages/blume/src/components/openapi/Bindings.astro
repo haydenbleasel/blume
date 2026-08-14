@@ -17,10 +17,29 @@ interface Props {
 
 const { title, groups, schemas, expandAll = false } = Astro.props;
 
-const isSchemaish = (value: unknown): value is SchemaLike =>
-  typeof value === "object" &&
-  value !== null &&
-  ("properties" in value || "type" in value || "$ref" in value);
+// A bare `type` key is not enough — binding sub-objects carry protocol enums
+// there (the AMQP exchange's `type: "topic"`), so only a JSON-Schema type
+// value counts.
+const SCHEMA_TYPES = new Set([
+  "array",
+  "boolean",
+  "integer",
+  "null",
+  "number",
+  "object",
+  "string",
+]);
+
+const isSchemaish = (value: unknown): value is SchemaLike => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  if ("properties" in value || "$ref" in value) {
+    return true;
+  }
+  const { type } = value as { type?: unknown };
+  return typeof type === "string" && SCHEMA_TYPES.has(type);
+};
 ---
 
 {

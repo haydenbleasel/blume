@@ -1,6 +1,5 @@
 import type { ApiOperationRef, ApiTagRef } from "./model.ts";
-import { tagSlugger } from "./model.ts";
-import { slugify } from "./references.ts";
+import { operationCollector, operationKey } from "./model.ts";
 
 /**
  * Blume's own AsyncAPI model — the second front-end of the API reference
@@ -108,6 +107,44 @@ export const channelAddress = (
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+const COMPONENT_SECTION_REF =
+  /^#\/components\/(?<section>channels|operations)\/(?<name>[^/]+)$/u;
+
+/**
+ * Inline top-level `channels`/`operations` entries declared as Reference
+ * Objects (`{ $ref: "#/components/channels/…" }` — the spec's reuse pattern)
+ * by replacing them with their components target. Runs before trait merging
+ * so an inlined operation's traits merge exactly like an inline one's.
+ * Unresolvable refs stay in place; the extractor reports them.
+ */
+const inlineComponentRefs = (document: AsyncApiDocument): void => {
+  const maps: [Record<string, unknown> | undefined, string][] = [
+    [document.channels, "channels"],
+    [document.operations, "operations"],
+  ];
+  for (const [map, section] of maps) {
+    if (!isObject(map)) {
+      continue;
+    }
+    const table = document.components?.[section];
+    for (const [id, entry] of Object.entries(map)) {
+      if (!isObject(entry) || typeof entry.$ref !== "string") {
+        continue;
+      }
+      const groups = COMPONENT_SECTION_REF.exec(entry.$ref)?.groups;
+      if (groups?.section !== section) {
+        continue;
+      }
+      const resolved = isObject(table)
+        ? table[unescapePointer(groups.name ?? "")]
+        : undefined;
+      if (isObject(resolved) && typeof resolved.$ref !== "string") {
+        map[id] = resolved;
+      }
+    }
+  }
+};
+
 const TRAIT_REF =
   /^#\/components\/(?<section>operationTraits|messageTraits)\/(?<name>[^/]+)$/u;
 
@@ -189,6 +226,18 @@ export const applyAsyncApiTraits = (
 };
 
 /**
+ * The parse-time normalization pass: component channel/operation refs inlined,
+ * then traits merged. The serialized document and every downstream consumer
+ * see plain channel/operation objects, trait-free.
+ */
+export const normalizeAsyncApiDocument = (
+  document: AsyncApiDocument
+): AsyncApiDocument => {
+  inlineComponentRefs(document);
+  return applyAsyncApiTraits(document);
+};
+
+/**
  * Resolve where one operation renders from: its action and its declared
  * channel. A string return is the warning explaining why the operation can't
  * appear in the reference.
@@ -204,7 +253,13 @@ const operationSite = (
   }
   const channelId = channelIdOf(operation.channel);
   const channel = channelId === undefined ? undefined : channels[channelId];
-  if (channelId === undefined || !isObject(channel)) {
+  // A channel entry that is still a bare `$ref` survived normalization — its
+  // components target doesn't exist — so it renders nothing useful either.
+  if (
+    channelId === undefined ||
+    !isObject(channel) ||
+    typeof channel.$ref === "string"
+  ) {
     return `Operation "${id}" references a channel that isn't declared under "channels"; it is missing from the reference.`;
   }
   return { action, address: channelAddress(channelId, channel), channelId };
@@ -213,32 +268,38 @@ const operationSite = (
 /**
  * Flatten a normalized AsyncAPI 3.x document into a route-mapped operation
  * list and its ordered tags — the AsyncAPI counterpart of `extractOperations`
- * in `model.ts`. Operations group by their
- * first tag; untagged operations fall back to their channel address, so a spec
- * with no tags still gets one sidebar group per channel. Keys come from the
- * operation id (the `operations` map key), which the official 2.x converter
- * synthesizes deterministically (`<channel>.publish` / `<channel>.subscribe`)
- * — so a 2.x spec and its converter-upgraded 3.x form yield identical URLs.
+ * in `model.ts`, built on the same `operationCollector`. Operations group by
+ * their first tag; untagged operations fall back to their channel address, so
+ * a spec with no tags still gets one sidebar group per channel. Keys come from
+ * the operation id (the `operations` map key), which the official 2.x
+ * converter synthesizes deterministically (`<channel>.publish` /
+ * `<channel>.subscribe`) — so a 2.x spec and its converter-upgraded 3.x form
+ * yield identical URLs. An id that slugifies to nothing falls back to
+ * action + address, the same scheme `operationKey` uses for method + path.
  */
 export const extractAsyncApiOperations = (
   document: AsyncApiDocument,
   baseRoute: string
 ): { operations: ApiOperationRef[]; tags: ApiTagRef[]; warnings: string[] } => {
-  const operations: ApiOperationRef[] = [];
-  const tagOrder: string[] = [];
-  const tagsSeen = new Set<string>();
+  const warnings: string[] = [];
   const tagMeta = new Map(
     (document.info?.tags ?? [])
       .filter((tag) => typeof tag?.name === "string")
       .map((tag) => [tag.name as string, tag.description ?? ""])
   );
-  const seen = new Set<string>();
-  const warnings: string[] = [];
-  const slugForTag = tagSlugger();
+  const collector = operationCollector(baseRoute, tagMeta);
   const channels = document.channels ?? {};
 
   for (const [id, operation] of Object.entries(document.operations ?? {})) {
     if (!isObject(operation)) {
+      continue;
+    }
+    // An operation entry still carrying a `$ref` is one normalization could
+    // not inline; name the real problem instead of the missing-action one.
+    if (typeof operation.$ref === "string") {
+      warnings.push(
+        `Operation "${id}" is a reference that doesn't resolve to a components operation; it is missing from the reference.`
+      );
       continue;
     }
     const site = operationSite(id, operation, channels);
@@ -250,42 +311,20 @@ export const extractAsyncApiOperations = (
     const tag = operation.tags?.find(
       (candidate) => typeof candidate?.name === "string"
     )?.name;
-    const group = tag ?? address;
-    const tagSlug = slugForTag(group);
-    if (!tagsSeen.has(group)) {
-      tagsSeen.add(group);
-      tagOrder.push(group);
-    }
-    let key = slugify(id) || "operation";
-    while (seen.has(key)) {
-      key = `${key}-${action}`;
-    }
-    seen.add(key);
-    operations.push({
+    collector.add({
       channelId,
       deprecated: operation.deprecated === true,
       description: operation.description ?? "",
-      key,
+      key: operationKey(action, address, id),
       method: action,
       operationId: id,
       path: address,
-      // A root-mounted reference (`route: "/"`) must not emit `//tag/key`.
-      route: `${baseRoute === "/" ? "" : baseRoute}/${tagSlug}/${key}`,
       summary: operation.title ?? operation.summary ?? "",
-      tag: group,
-      tagSlug,
+      tag: tag ?? address,
     });
   }
 
-  const tags: ApiTagRef[] = tagOrder.map((name) => ({
-    description: tagMeta.get(name) ?? "",
-    name,
-    // The same slugger instance, so every group resolves to the slug its
-    // operations were routed under.
-    slug: slugForTag(name),
-  }));
-
-  return { operations, tags, warnings };
+  return { ...collector.finish(), warnings };
 };
 
 /** Resolve the operation object for a ref out of its (AsyncAPI) document. */
