@@ -187,7 +187,7 @@ Blume's own [`i18n`](/docs/content/i18n) translates the docs chrome, but Scalar 
 
 ## AsyncAPI
 
-Event-driven APIs use a sibling `asyncapi` block with the same shape — and the same native renderer. Each `send`/`receive` operation becomes a real page with message payload and header schema tables, channel parameters, protocol bindings, and an Authorization section derived from the spec's `securitySchemes` (server-level and operation-level, alternatives as "or" groups). Only the default route differs (`/events`):
+Event-driven APIs use a sibling `asyncapi` block with the same shape — and the same native renderer. Each `send`/`receive` operation becomes a real page with message payload and header schema tables, channel parameters, protocol bindings, an Authorization section derived from the spec's `securitySchemes` (server-level and operation-level, alternatives as "or" groups), and a [Try it](#try-it-for-events) message composer. Only the default route differs (`/events`):
 
 ```ts blume.config.ts lineNumbers
 asyncapi: {
@@ -200,4 +200,30 @@ AsyncAPI **2.x specs are normalized to 3.x automatically** with the official Asy
 
 Code samples are **protocol-aware**, keyed off the operation's binding (or its servers' protocol): `wscat` and a browser `WebSocket` snippet for WebSockets, `kcat` for Kafka, `mosquitto_pub`/`mosquitto_sub` for MQTT. `codeSamples` filters that set, the same way it picks languages on the `openapi` block; a protocol without a supported tool renders the message payload example alone rather than a fabricated client.
 
-Everything documented above carries over unchanged: `route`, `sources` with `label`/`route`, `expandSchemas`, the [per-source indexing](#per-source-indexing) flags, and search indexing by operation summary and tag. The one exception is [`playground`](#try-it-playground), which is OpenAPI-only — an event operation has no HTTP request to send, so the `asyncapi` block rejects the key. Setting `renderer: "scalar"` opts back into the embedded Scalar SPA — Scalar auto-detects the document type and renders channels, operations, messages, and a Models section (no interactive playground for events) — where, as with OpenAPI, only `noindex` applies.
+Everything documented above carries over, [`playground`](#try-it-for-events) included: `route`, `sources` with `label`/`route`, `expandSchemas`, the [per-source indexing](#per-source-indexing) flags, and search indexing by operation summary and tag.
+
+Setting `renderer: "scalar"` opts back into the embedded Scalar SPA, where — as with OpenAPI — only `noindex` applies. Scalar has no AsyncAPI playground of its own; its embed auto-detects the document type and renders channels, operations, messages, and a Models section, so that swap trades the composer away.
+
+### Try it for events
+
+Operation pages rendered natively ship a **Try it** panel here too, on the same terms as the [OpenAPI panel](#try-it-playground): server-rendered collapsed, with its JavaScript loaded only when a reader first opens it.
+
+Whatever the protocol, the panel opens with a payload editor prefilled from the message's `examples` — or, when the message declares none, from a value sampled out of the payload schema — validated against the message payload schema as you type. Under it sit an input per channel parameter and a server picker fed by the channel's `servers`, with a free-text field for any other URL. The protocol-aware code samples stay in lockstep with the form exactly as curl, js, and python do on an HTTP operation: the channel address template is filled in with the parameter values you type, so a copied `wscat`, `WebSocket`, `kcat`, or `mosquitto_pub` snippet matches what the form says.
+
+Live connect is WebSocket-only. On a `ws` or `wss` binding the panel connects to the resolved channel URL, shows the connection state, and logs every frame with a timestamp. AsyncAPI 3 states an action from the API's side, and the panel follows it: a `receive` operation is one the API receives from you, so it gets a **Send** button that publishes the composed payload; a `send` operation only streams messages at you, so it connects and logs. There's no reconnect logic — once a socket closes, it stays closed until you connect again. Kafka, MQTT, AMQP, and every other protocol get the composer and the copyable CLI samples, and the panel says as much on the page: Blume doesn't fake broker connectivity from a browser tab.
+
+`asyncapi.playground` mirrors `openapi.playground` — on by default with the native renderer, and `false` is the entire off switch:
+
+```ts blume.config.ts lineNumbers
+asyncapi: {
+  enabled: true,
+  spec: "./asyncapi.yaml",
+  playground: false,
+}
+```
+
+:::note
+`playground.proxy` is OpenAPI-only. It forwards HTTP requests, and a WebSocket connect goes straight from the browser to the server named in the URL, so there's nothing for a proxy to sit in front of.
+:::
+
+The event composer collects no broker credentials. Each operation page's **Authorization** section documents what the broker expects, and a WebSocket connect carries only what's already in the URL. Nothing is persisted for event operations.

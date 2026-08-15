@@ -207,8 +207,7 @@ export const resolveReferences = (
     {
       codeSamples: config.asyncapi.codeSamples,
       expandSchemas: config.asyncapi.expandSchemas,
-      // OpenAPI-only: an event operation has no HTTP request to send.
-      playground: { enabled: false, proxy: false },
+      playground: config.asyncapi.playground,
     },
     config.basePath
   ),

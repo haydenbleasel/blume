@@ -18,6 +18,9 @@ import {
 } from "./async.ts";
 import type { MessageSample } from "./async-snippets.ts";
 import { asyncSampleLanguages } from "./async-snippets.ts";
+import { buildMessage, defaultMessageValues } from "./message.ts";
+import { messageModel } from "./message-model.ts";
+import MessageComposer from "./MessageComposer.astro";
 import Authorization from "./Authorization.astro";
 import Bindings from "./Bindings.astro";
 import { exampleValue, type SchemaLike, toJson } from "./helpers.ts";
@@ -86,13 +89,21 @@ const messagePanels = await Promise.all(
   })
 );
 
-const sample: MessageSample | null = ref
-  ? {
+// One derived model feeds the static default sample, the composer form, and
+// (client-side) the live samples + WebSocket frame — they can never drift.
+const model = ref
+  ? messageModel({
       action: ref.method === "send" ? "send" : "receive",
       address: ref.path,
-      payload: messages.length > 0 ? exampleOf(messages[0].message) : undefined,
-      server: servers[0],
-    }
+      messages,
+      parameters,
+      protocol,
+      schemas,
+      servers,
+    })
+  : null;
+const sample: MessageSample | null = model
+  ? buildMessage(model, defaultMessageValues(model))
   : null;
 const languages = asyncSampleLanguages(spec?.codeSamples ?? [], protocol);
 const samplePanels = sample
@@ -104,6 +115,7 @@ const samplePanels = sample
         }),
         key: language.id,
         label: language.label,
+        lang: language.id,
       }))
     )
   : [];
@@ -223,8 +235,11 @@ const channelBindings = bindingGroups(channel?.bindings);
             title="Channel bindings"
           />
         </div>
-        {(samplePanels.length > 0 || messagePanels.length > 0) && (
-          <div class="xl:sticky xl:top-24 xl:self-start">
+        {(spec.playground.enabled ||
+          samplePanels.length > 0 ||
+          messagePanels.length > 0) && (
+          <div class="xl:sticky xl:top-24 xl:self-start" data-operation-panel>
+            {spec.playground.enabled && model && <MessageComposer model={model} />}
             <div class="not-prose flex flex-col gap-6">
               <PanelTabs copy heading="Example" panels={samplePanels} />
               <PanelTabs heading="Message" panels={messagePanels} />

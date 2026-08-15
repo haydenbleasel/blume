@@ -2,7 +2,6 @@ import type {
   AsyncApiAction,
   AsyncApiServerObject,
 } from "../../openapi/asyncapi.ts";
-import { toJson } from "./helpers.ts";
 
 /**
  * Protocol-aware code samples for AsyncAPI operations — the async counterpart
@@ -12,6 +11,11 @@ import { toJson } from "./helpers.ts";
  * Protocols without a supported tool yield no samples at all — the message
  * example panel already shows the payload, and fabricating a client for an
  * unknown binding would be worse than nothing.
+ *
+ * Dependency-free for the same reason `snippets.ts` is: the event composer
+ * re-renders these samples live in the browser, so importing anything from
+ * `helpers.ts` would drag openapi-sampler into that lazy chunk (~13 kB) to
+ * pretty-print a payload.
  */
 
 /** Everything a snippet builder needs about one operation. */
@@ -41,15 +45,20 @@ const hostParts = (
 const shellQuote = (text: string): string =>
   `'${text.replaceAll("'", String.raw`'\''`)}'`;
 
+/** Indented payload for a snippet that spans lines, matching `toJson`. */
 const payloadJson = (sample: MessageSample): string =>
-  toJson(sample.payload ?? {});
+  JSON.stringify(sample.payload ?? {}, null, 2);
 
 /** Compact single-line payload for shell `-m`/`echo` arguments. */
 const payloadInline = (sample: MessageSample): string =>
   JSON.stringify(sample.payload ?? {});
 
-/** `wss://host/path` for a WebSocket channel; the address is the path. */
-const wsUrl = (sample: MessageSample): string => {
+/**
+ * `wss://host/path` for a WebSocket channel; the address is the path. Exported
+ * because the live composer connects to exactly this URL — the samples and the
+ * connection cannot point at different endpoints.
+ */
+export const webSocketUrl = (sample: MessageSample): string => {
   const { server } = sample;
   const scheme = server?.protocol === "ws" ? "ws" : "wss";
   const host = server?.host ?? "localhost";
@@ -61,14 +70,14 @@ const wsUrl = (sample: MessageSample): string => {
 };
 
 const wscatSnippet = (sample: MessageSample): string => {
-  const connect = `wscat -c ${shellQuote(wsUrl(sample))}`;
+  const connect = `wscat -c ${shellQuote(webSocketUrl(sample))}`;
   return sample.action === "receive"
     ? `${connect}\n> ${payloadInline(sample)}`
     : `# Prints each message as it arrives\n${connect}`;
 };
 
 const webSocketSnippet = (sample: MessageSample): string => {
-  const open = `const socket = new WebSocket(${JSON.stringify(wsUrl(sample))});`;
+  const open = `const socket = new WebSocket(${JSON.stringify(webSocketUrl(sample))});`;
   if (sample.action === "receive") {
     return [
       open,

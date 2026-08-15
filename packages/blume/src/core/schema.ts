@@ -1451,6 +1451,27 @@ const referenceConfigSchema = (defaults: {
     enabled: z.boolean().default(false),
     /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
     expandSchemas: z.boolean().default(false),
+    /**
+     * The interactive "Try it" panel on operation pages (Blume renderer). On by
+     * default; `false` hides it. The object form keeps it on and sets `proxy`,
+     * the CORS escape hatch the OpenAPI Send button routes requests through: a
+     * proxy URL, or `true` for the built-in `/_api-proxy` endpoint (which
+     * requires `deployment.output: "server"`). Booleans normalize to the object
+     * shape so consumers read `{ enabled, proxy }` directly. `proxy` is
+     * OpenAPI-only — an event composer's WebSocket connect is direct.
+     */
+    playground: z
+      .union([
+        z.boolean(),
+        z.strictObject({
+          enabled: z.boolean().default(true),
+          proxy: z.union([z.boolean(), z.string()]).default(false),
+        }),
+      ])
+      .default(true)
+      .transform((value) =>
+        typeof value === "boolean" ? { enabled: value, proxy: false } : value
+      ),
     /** Who renders the reference: Blume's own UI, or the embedded Scalar SPA. */
     renderer: z.enum(["blume", "scalar"]).default("blume"),
     /** Where the reference mounts. */
@@ -1475,28 +1496,6 @@ const referenceConfigSchema = (defaults: {
 const openapiConfigSchema = referenceConfigSchema({
   codeSamples: ["curl", "js", "python"],
   route: "/reference",
-}).extend({
-  /**
-   * The interactive "Try it" panel on operation pages (Blume renderer). On by
-   * default; `false` hides it. The object form keeps it on and sets `proxy`,
-   * the CORS escape hatch the Send button routes requests through: a proxy
-   * URL, or `true` for the built-in `/_api-proxy` endpoint (which requires
-   * `deployment.output: "server"`). Booleans normalize to the object shape so
-   * consumers read `{ enabled, proxy }` directly. OpenAPI-only — an event
-   * operation has no HTTP request to send.
-   */
-  playground: z
-    .union([
-      z.boolean(),
-      z.strictObject({
-        enabled: z.boolean().default(true),
-        proxy: z.union([z.boolean(), z.string()]).default(false),
-      }),
-    ])
-    .default(true)
-    .transform((value) =>
-      typeof value === "boolean" ? { enabled: value, proxy: false } : value
-    ),
 });
 
 /**

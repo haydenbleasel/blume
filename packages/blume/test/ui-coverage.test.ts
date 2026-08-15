@@ -605,3 +605,32 @@ describe("openapi playground sources", () => {
     );
   });
 });
+
+describe("asyncapi composer sources", () => {
+  it("loads the composer client lazily behind the details toggle", async () => {
+    // Same island discipline as the OpenAPI panel: its own chunk, downloaded
+    // only when a reader actually opens the composer.
+    const source = await componentSource("openapi/MessageComposer.astro");
+    expect(source).toContain('await import("./message-composer.ts")');
+    expect(source).toContain("initComposer(this)");
+    expect(source).toContain("{ once: true }");
+  });
+
+  it("keeps AsyncApiOperation.astro the only importer of MessageComposer.astro", async () => {
+    const srcRoot = new URL("../src/", import.meta.url).pathname;
+    const importers: string[] = [];
+    for await (const file of new Bun.Glob("**/*.astro").scan(srcRoot)) {
+      const source = await readFile(join(srcRoot, file), "utf-8");
+      if (/from\s+"[^"]*MessageComposer\.astro"/u.test(source)) {
+        importers.push(file);
+      }
+    }
+    expect(importers).toEqual(["components/openapi/AsyncApiOperation.astro"]);
+  });
+
+  it("tags each event-sample pane with its tool id for live sync", async () => {
+    expect(await componentSource("openapi/AsyncApiOperation.astro")).toContain(
+      "lang: language.id"
+    );
+  });
+});

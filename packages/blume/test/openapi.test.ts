@@ -194,7 +194,7 @@ describe("references", () => {
     expect(refs[0]?.display).toStrictEqual({
       codeSamples: [],
       expandSchemas: false,
-      playground: { enabled: false, proxy: false },
+      playground: { enabled: true, proxy: false },
     });
     expect(hasScalarReferences(config)).toBe(false);
     expect(blumeReferences(config)).toHaveLength(1);

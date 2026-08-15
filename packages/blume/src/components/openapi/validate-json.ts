@@ -98,11 +98,13 @@ const walk = (
 /**
  * Validate raw JSON text against a pruned schema. Returns human-readable
  * error messages; an empty array means valid. With no schema, only syntax is
- * checked.
+ * checked. `root` names the value in those messages — the HTTP panel edits a
+ * `body`, the event composer a `payload`.
  */
 export const validateJson = (
   text: string,
-  schema?: ValidationSchema
+  schema?: ValidationSchema,
+  root = "body"
 ): string[] => {
   let value: unknown;
   try {
@@ -113,6 +115,6 @@ export const validateJson = (
     ];
   }
   const errors: string[] = [];
-  walk(value, schema, "body", errors);
+  walk(value, schema, root, errors);
   return errors;
 };

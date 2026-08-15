@@ -1,0 +1,216 @@
+---
+import type { MessageModel } from "./message.ts";
+
+/**
+ * The interactive "Try it" panel for one event operation. Server-rendered as a
+ * native collapsed `<details>` with plain labelled controls — keyboard
+ * operable with zero JS — and the client module loads only when the reader
+ * first opens it (loader script at the foot of this file). The message model
+ * rides along as JSON so the lazy chunk needs no data fetch.
+ *
+ * Composing and copying a sample works on every protocol; a live connection is
+ * offered only where a browser can actually make one (WebSocket bindings), and
+ * the panel says so plainly rather than presenting a dead button.
+ */
+
+interface Props {
+  model: MessageModel;
+}
+
+const { model } = Astro.props;
+
+// `</script>`-proof embedding: `<` only ever occurs inside JSON strings, where
+// the \u escape is equivalent, so a spec description can never close the model
+// script early and inject markup.
+const modelJson = JSON.stringify(model).replaceAll("<", "\\u003c");
+
+const LABEL_ROW =
+  "mb-1 flex flex-wrap items-baseline gap-x-1.5 font-medium text-foreground text-xs";
+const FIELD =
+  "w-full rounded border border-border bg-background px-2 py-1.5 font-mono text-foreground text-xs";
+const HINT = "mt-1 block text-muted-foreground text-xs";
+const GROUP = "flex flex-col gap-3";
+const GROUP_HEADING =
+  "font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide";
+const BUTTON =
+  "cursor-pointer rounded-blume bg-accent px-4 py-2 font-medium text-accent-foreground text-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_QUIET =
+  "cursor-pointer rounded-blume border border-border px-4 py-2 font-medium text-foreground text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
+---
+
+<blume-message-composer class="mb-6 block">
+  <script
+    data-composer-model
+    is:inline
+    set:html={modelJson}
+    type="application/json"
+  />
+  <details
+    class="not-prose rounded-blume border border-border bg-background"
+    data-composer
+  >
+    <summary class="cursor-pointer px-4 py-3 font-semibold text-foreground text-sm">
+      Try it
+    </summary>
+    <div class="flex flex-col gap-5 border-border border-t px-4 py-4">
+      <div class={GROUP}>
+        <div class={GROUP_HEADING}>Server</div>
+        {
+          model.servers.length > 0 && (
+            <label class="block">
+              <span class={LABEL_ROW}>Server</span>
+              <select class={FIELD} data-server>
+                {model.servers.map((option, index) => (
+                  <option value={String(index)}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          )
+        }
+        <label class="block">
+          <span class={LABEL_ROW}>Custom server URL</span>
+          <input
+            class={FIELD}
+            data-server-custom
+            placeholder="wss://events.example.com"
+            type="text"
+          />
+          <span class={HINT}>
+            Overrides the selected server; the channel address is appended.
+          </span>
+        </label>
+      </div>
+      {
+        model.params.length > 0 && (
+          <div class={GROUP}>
+            <div class={GROUP_HEADING}>Channel parameters</div>
+            {model.params.map((param) => (
+              <label class="block">
+                <span class={LABEL_ROW}>
+                  <code class="font-mono">{param.name}</code>
+                  <span class="text-red-600 dark:text-red-400" title="required">
+                    *
+                  </span>
+                </span>
+                {param.enum ? (
+                  <select
+                    class={FIELD}
+                    data-param={param.name}
+                    title={param.description}
+                  >
+                    {param.enum.map((value) => (
+                      <option selected={value === param.value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    class={FIELD}
+                    data-param={param.name}
+                    placeholder="string"
+                    title={param.description}
+                    type="text"
+                    value={param.value}
+                  />
+                )}
+                {param.description && (
+                  <span class={HINT} set:text={param.description} />
+                )}
+              </label>
+            ))}
+          </div>
+        )
+      }
+      <div class={GROUP}>
+        <div class={GROUP_HEADING}>
+          Payload
+          {
+            model.payload.contentType && (
+              <span class="ml-1.5 font-mono normal-case">
+                {model.payload.contentType}
+              </span>
+            )
+          }
+        </div>
+        <label class="block">
+          <span class={LABEL_ROW}>Message payload</span>
+          <textarea class={FIELD} data-payload rows="8" spellcheck="false"
+            >{model.payload.example}</textarea
+          >
+          <div class="mt-1 flex flex-col gap-0.5" data-payload-errors />
+        </label>
+      </div>
+      {
+        model.connectable ? (
+          <div class={GROUP}>
+            <div class={GROUP_HEADING}>Connection</div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button class={BUTTON} data-connect type="button">
+                Connect
+              </button>
+              <button class={BUTTON_QUIET} data-disconnect disabled type="button">
+                Disconnect
+              </button>
+              {/* AsyncAPI 3 states the action from the API's side: a
+                  `receive` operation is the one a reader publishes to, while a
+                  `send` operation only streams frames at them. */}
+              {model.action === "receive" && (
+                <button class={BUTTON} data-send disabled type="button">
+                  Send
+                </button>
+              )}
+            </div>
+            <div
+              aria-live="polite"
+              class="text-muted-foreground text-xs"
+              data-status
+            >
+              {model.action === "send"
+                ? "Not connected. Connect to stream messages as they arrive."
+                : "Not connected."}
+            </div>
+            <div
+              aria-live="polite"
+              class="flex flex-col gap-1 empty:hidden"
+              data-log
+            />
+          </div>
+        ) : (
+          <p class="text-muted-foreground text-xs">
+            {model.protocol
+              ? `Live sending isn't possible for ${model.protocol} from a browser tab — copy the sample above and run it against your broker.`
+              : "Live sending needs a WebSocket binding — copy the sample above and run it against your broker."}
+          </p>
+        )
+      }
+    </div>
+  </details>
+</blume-message-composer>
+
+<script>
+  // Hydration waits for intent: a collapsed <details> can only fire its first
+  // `toggle` by opening, so the one-shot listener imports the client module —
+  // a separate chunk readers who never compose a message never download — and
+  // wires the form. The custom element lives here, not in the client module,
+  // so that module stays import-safe under the test runner.
+  class BlumeMessageComposer extends HTMLElement {
+    connectedCallback() {
+      const details = this.querySelector<HTMLDetailsElement>(
+        "details[data-composer]"
+      );
+      details?.addEventListener(
+        "toggle",
+        async () => {
+          const { initComposer } = await import("./message-composer.ts");
+          initComposer(this);
+        },
+        { once: true }
+      );
+    }
+  }
+
+  if (!customElements.get("blume-message-composer")) {
+    customElements.define("blume-message-composer", BlumeMessageComposer);
+  }
+</script>

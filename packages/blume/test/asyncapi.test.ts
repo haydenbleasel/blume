@@ -61,7 +61,7 @@ const asyncReference = {
   display: {
     codeSamples: [],
     expandSchemas: false,
-    playground: { enabled: false, proxy: false },
+    playground: { enabled: true, proxy: false },
   },
   kind: "asyncapi" as const,
   label: "Events",
