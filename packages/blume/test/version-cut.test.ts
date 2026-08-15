@@ -241,6 +241,39 @@ export default {
     expect(result.configSnippet).toContain('{ id: "v1.0" }');
   });
 
+  it("leaves links to pages outside the copied tree untouched", async () => {
+    const root = await makeProject({
+      // Spec-rendered reference pages carry no sourcePath and are not copied
+      // into the snapshot, so links to them must keep pointing at the live
+      // routes rather than a 404 inside the frozen tree.
+      "blume.config.ts": `export default {
+  openapi: { enabled: true, route: "/api", spec: "./openapi.yaml" },
+  versions: { archived: [], current: { label: "v2.0" } },
+};
+`,
+      "docs/guides/x.mdx": "---\ntitle: X\n---\n# X\n",
+      "docs/index.mdx":
+        "---\ntitle: Home\n---\nSee [guide](/guides/x) and [API](/api).\n",
+      "openapi.yaml": `openapi: 3.1.0
+info:
+  title: T
+  version: "1.0"
+paths:
+  /auth:
+    get:
+      operationId: getAuth
+      summary: Get auth
+      responses:
+        "200":
+          description: OK
+`,
+    });
+    await cutVersion(root, "v1.0");
+    const index = await readFile(join(root, "docs/v1.0/index.mdx"), "utf-8");
+    expect(index).toContain("(/v1.0/guides/x)");
+    expect(index).toContain("(/api)");
+  });
+
   it("never nests an unregistered version-shaped snapshot in a new cut", async () => {
     const root = await makeProject({
       // No `versions` config: the first cut leaves v1.0 unregistered (the CLI

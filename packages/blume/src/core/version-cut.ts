@@ -46,16 +46,28 @@ const ROOT_LINK = /(?<prefix>\]\(|href="|src=")(?<target>\/[^\s"')]*)/gu;
 /**
  * Build the link-rewrite table: every current-version route (basePath
  * stripped, since authors write root-absolute links as if mounted at root)
- * mapped to the same page's route inside the new snapshot.
+ * mapped to the same page's route inside the new snapshot. Only pages the
+ * snapshot actually contains qualify — filesystem pages under the content
+ * root. Spec-rendered references (`/api`, `/events`) and remote sources
+ * aren't copied, so links to them keep pointing at the live pages instead of
+ * a 404 inside the snapshot.
  */
 const buildRouteRewrites = (
   project: BlumeProject,
   id: string
 ): Map<string, string> => {
   const { basePath, i18n } = project.config;
+  const { contentRoot } = project.context;
   const rewrites = new Map<string, string>();
   for (const page of project.graph.pages) {
-    if (page.version !== "") {
+    // `sourcePath` is set by the filesystem adapter only, so its absence
+    // already excludes generated and remote pages.
+    const { sourcePath } = page;
+    if (
+      page.version !== "" ||
+      !sourcePath ||
+      relative(contentRoot, sourcePath).startsWith("..")
+    ) {
       continue;
     }
     const logical = versionizeRoute(page.versionKey, id);

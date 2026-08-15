@@ -29,7 +29,7 @@ When you release, freeze the current docs with one command:
 blume version v1.0
 ```
 
-This copies your content tree into `docs/v1.0/` (existing snapshots excluded), rewrites root-absolute links inside the copy so they stay within the snapshot (`/guides/x` becomes `/v1.0/guides/x`, fenced and inline code untouched), and registers the id in `blume.config.ts` — or prints the entry to paste when your config is shaped in a way it won't touch. Run `blume version` with no id to list the configured versions.
+This copies your content tree into `docs/v1.0/` (existing snapshots excluded), rewrites root-absolute links inside the copy so they stay within the snapshot (`/guides/x` becomes `/v1.0/guides/x`, fenced and inline code untouched), and registers the id in `blume.config.ts` — or prints the entry to paste when your config is shaped in a way it won't touch. Links to pages that aren't part of the copied tree — generated API references, remote sources like a changelog — keep pointing at the live pages, since the snapshot has no copy of them. Run `blume version` with no id to list the configured versions.
 
 Review and commit the new directory like any other content. Restart `blume dev` to pick it up.
 

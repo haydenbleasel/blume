@@ -1,0 +1,17 @@
+---
+title: Writing
+description: A page inside a collapsible sidebar group, with a badge.
+sidebar:
+  badge: New
+owner: docs-team
+---
+
+This page lives in the **Guides** group, which `meta.ts` renders as a collapsible disclosure (`display: "group"`). Its sidebar row carries a `New` badge from frontmatter, and it sets the custom `owner` key — which is also a search facet on the `doc` type.
+
+## Frontmatter in play
+
+```yaml
+sidebar:
+  badge: New
+owner: docs-team
+```

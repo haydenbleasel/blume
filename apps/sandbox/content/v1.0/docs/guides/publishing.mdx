@@ -1,0 +1,17 @@
+---
+title: Publishing
+description: Deployment, export, and the agent-facing surface.
+---
+
+The sandbox deploys as a server build with the Node adapter, which keeps the MCP endpoint and Ask AI backend live.
+
+## Agent-facing surface
+
+- `/llms.txt` and `/llms-full.txt` — generated Markdown indexes.
+- Append `.md` to any page URL for its Markdown mirror.
+- `/mcp` — the docs as an MCP server.
+- `/.well-known/agent-skills/` — published Agent Skills from `skills/`.
+
+## Reader export
+
+The page actions menu offers **PDF** and **EPUB** export (`export: true`).

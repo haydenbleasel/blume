@@ -1,0 +1,66 @@
+---
+title: Syntax
+description: Markdown features — code fences, math, diagrams, tables, and more.
+icon: pilcrow
+---
+
+## Emphasis
+
+**Bold**, _italic_, ~~strikethrough~~, `inline code`, E = mc^2^, and H~2~O.
+
+## Code
+
+A titled fence with line numbers and wrapped long lines (`markdown.code.wrap` is on in this sandbox):
+
+```ts server.ts lineNumbers
+import { createServer } from "node:http";
+
+const server = createServer((request, response) => {
+  response.end(
+    "This is a deliberately long line to demonstrate soft wrapping inside code blocks when markdown.code.wrap is enabled."
+  );
+});
+
+server.listen(3000);
+```
+
+A package-install block:
+
+```package-install
+npm i blume
+```
+
+## Tables
+
+| Feature  | Route     | Renderer |
+| -------- | --------- | -------- |
+| OpenAPI  | `/api`    | blume    |
+| AsyncAPI | `/events` | blume    |
+
+## Task lists
+
+- [x] Check out PR #186
+- [x] Create the sandbox app
+- [ ] Kick the tires on every feature
+
+## Math
+
+$$
+\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}
+$$
+
+## Mermaid
+
+```mermaid
+sequenceDiagram
+  participant Store as Storefront
+  participant Kafka
+  participant Consumer as Fulfillment
+  Store->>Kafka: OrderCreated (orders.eu.created)
+  Kafka->>Consumer: OrderCreated
+  Consumer-->>Store: OrderStatusChanged (wss)
+```
+
+## Blockquote
+
+> Documentation should be fast, AI-ready, and zero-config.
