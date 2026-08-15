@@ -206,6 +206,30 @@ describe("buildRequest", () => {
     );
   });
 
+  it("encodes basic credentials outside Latin-1 as UTF-8", () => {
+    // Bare `btoa` throws on any code point above U+00FF, which would take down
+    // every sample render on the keystroke that typed it. RFC 7617 names UTF-8.
+    const model = buildModel({
+      security: resolveSecurity([{ basicAuth: [] }], SCHEMES),
+    });
+    const values = defaultValues(model);
+    values.auth.basicAuth = {
+      password: "секрет",
+      username: "алладин",
+      value: "",
+    };
+    const encoded = buildRequest(model, values).headers.Authorization ?? "";
+    expect(encoded.startsWith("Basic ")).toBe(true);
+    expect(
+      new TextDecoder().decode(
+        Uint8Array.from(
+          atob(encoded.slice("Basic ".length)),
+          (character) => character.codePointAt(0) ?? 0
+        )
+      )
+    ).toBe("алладин:секрет");
+  });
+
   it("joins cookie-carried api keys into one Cookie header", () => {
     const model = buildModel({
       security: resolveSecurity([{ apiCookie: [], apiCookie2: [] }], SCHEMES),

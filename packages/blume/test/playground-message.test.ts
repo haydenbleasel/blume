@@ -243,6 +243,12 @@ describe("messageFrame", () => {
         },
         payload: "[1,2,3]",
       },
+      {
+        // A documented empty payload is a value, not a missing one: it must not
+        // fall back to a schema sample, and it travels as `null`.
+        overrides: { messages: [named({ examples: [{ payload: null }] })] },
+        payload: "null",
+      },
       { overrides: {}, payload: "{}" },
     ];
     for (const { overrides, payload } of cases) {

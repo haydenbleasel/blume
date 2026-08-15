@@ -259,6 +259,26 @@ describe("createWsClient", () => {
     expect(client.state()).toBe("open");
   });
 
+  it("ignores events from a socket the reconnect replaced", () => {
+    const { client, frames, sockets, states } = setup();
+    client.connect("wss://api.test");
+    const first = last(sockets);
+    first.fire("error");
+    client.connect("wss://again.test");
+    last(sockets).fire("open");
+    expect(client.state()).toBe("open");
+    const settled = states.length;
+    // The browser can still deliver the discarded socket's tail; replaying it
+    // would report the dead connection's fate as the live one's.
+    first.fire("open");
+    first.fire("error");
+    first.fire("close", { code: 1006, reason: "abnormal" });
+    first.fire("message", { data: "stale" });
+    expect(client.state()).toBe("open");
+    expect(states).toHaveLength(settled);
+    expect(frames).toEqual([]);
+  });
+
   it("connects again after an error", () => {
     const { client, sockets } = setup();
     client.connect("wss://api.test");

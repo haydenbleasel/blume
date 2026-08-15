@@ -208,5 +208,8 @@ export const installFakeDom = (options: FakeDomOptions = {}): (() => void) => {
         Reflect.deleteProperty(globalThis, name);
       }
     }
+    // The storage map is module-level, so entries a suite persisted would
+    // otherwise leak into the next suite's "fresh" localStorage.
+    storage.clear();
   };
 };

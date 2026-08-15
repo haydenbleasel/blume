@@ -293,4 +293,52 @@ describe("initComposer", () => {
     click(fixture, "[data-send]");
     expect(must(sockets[0]).sent).toStrictEqual(["{}"]);
   });
+
+  it("drops a connection whose endpoint the form moved away from", () => {
+    const fixture = createFixture();
+    initComposer(fixture.root as unknown as HTMLElement);
+    click(fixture, "[data-connect]");
+    must(sockets[0]).emit("open");
+
+    // The socket is still on one.test; the form now describes two.test, so the
+    // live connection can no longer answer for what the panel shows.
+    type(fixture, "[data-server]", "1");
+    expect(must(sockets[0]).closed).toBeTrue();
+    expect(fixture.status.textContent).toBe(
+      "The endpoint changed. Connect again to use it."
+    );
+    expect(field(fixture, "[data-send]").disabled).toBeTrue();
+    expect(field(fixture, "[data-connect]").disabled).toBeFalse();
+
+    click(fixture, "[data-connect]");
+    expect(must(sockets[1]).url).toBe("ws://two.test/tenants/acme/signedup");
+    must(sockets[1]).emit("open");
+    expect(fixture.status.textContent).toBe(
+      "Connected to ws://two.test/tenants/acme/signedup."
+    );
+
+    // A channel parameter is the same story: the address it resolved is baked
+    // into the open socket.
+    type(fixture, '[data-param="tenant"]', "beta");
+    expect(must(sockets[1]).closed).toBeTrue();
+    expect(sockets).toHaveLength(2);
+  });
+
+  it("refuses to connect while a channel parameter is blank", () => {
+    const fixture = createFixture();
+    initComposer(fixture.root as unknown as HTMLElement);
+    type(fixture, '[data-param="tenant"]', "");
+    click(fixture, "[data-connect]");
+    // Connecting would dial `…/tenants/{tenant}/signedup`, a channel no broker
+    // has.
+    expect(sockets).toHaveLength(0);
+    expect(fixture.status.textContent).toBe(
+      "Fill in every channel parameter before connecting: tenant."
+    );
+    expect(fixture.status.className).toContain("text-red-600");
+
+    type(fixture, '[data-param="tenant"]', "beta");
+    click(fixture, "[data-connect]");
+    expect(must(sockets[0]).url).toBe("wss://one.test/tenants/beta/signedup");
+  });
 });

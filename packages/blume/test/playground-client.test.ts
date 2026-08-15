@@ -137,6 +137,24 @@ const basicModel = (): PlaygroundModel => ({
   servers: ["https://api.example.com"],
 });
 
+const cookieModel = (): PlaygroundModel => ({
+  auth: [
+    {
+      carrier: { in: "cookie", name: "session" },
+      id: "cookieAuth",
+      kind: "apiKey",
+      label: "Session cookie",
+      placeholder: "YOUR_SESSION",
+      prefix: "",
+    },
+  ],
+  authOptional: false,
+  method: "get",
+  params: [],
+  path: "/pets",
+  servers: ["https://api.example.com"],
+});
+
 interface Fixture {
   auth: Record<string, FakeEl>;
   bodyArea?: FakeEl;
@@ -351,6 +369,25 @@ describe("flat body assembly", () => {
     });
   });
 
+  it("leaves a blank required numeric or boolean field blank on the wire", async () => {
+    // `Number("")` is 0 and would invent a value the reader never typed, hiding
+    // the miss the API is supposed to report.
+    const model = flatModel();
+    for (const field of must(must(model.body).fields)) {
+      field.required = true;
+      field.value = "";
+    }
+    const fixture = createFixture(model);
+    init(fixture);
+    await clickSend(fixture);
+    expect(JSON.parse(must(fetchCalls[0]).init.body as string)).toEqual({
+      age: "",
+      good: "",
+      name: "",
+      note: "",
+    });
+  });
+
   it("sends no body when every field is empty and optional", async () => {
     const model = flatModel();
     for (const field of must(must(model.body).fields)) {
@@ -382,6 +419,22 @@ describe("deep body validation", () => {
     await clickSend(fixture);
     expect(fetchCalls).toHaveLength(1);
     expect(must(fetchCalls[0]).init.body).toBe('{ "name": "Rex" }');
+  });
+
+  it("treats a cleared editor as no body and sends it", async () => {
+    const fixture = createFixture(deepModel());
+    init(fixture);
+    must(fixture.bodyArea).value = "  \n";
+    edit(fixture, must(fixture.bodyArea));
+    // An empty editor means "no body" (`bodyFor`), so there is nothing to
+    // report and nothing to block.
+    expect(must(fixture.bodyErrors).children).toHaveLength(0);
+    must(fixture.bodyArea).value = "";
+    edit(fixture, must(fixture.bodyArea));
+    await clickSend(fixture);
+    expect(fetchCalls).toHaveLength(1);
+    expect(must(fetchCalls[0]).init.body).toBeUndefined();
+    expect(must(fetchCalls[0]).init.headers).not.toHaveProperty("Content-Type");
   });
 });
 
@@ -447,6 +500,40 @@ describe("send + response rendering", () => {
     fetchImpl = () => Promise.reject(new Error("boom"));
     await clickSend(fixture);
     expect(fixture.response.textContent).toBe("Request failed: Error: boom");
+  });
+
+  it("refuses to send a cookie credential the browser would drop", async () => {
+    const fixture = createFixture(cookieModel());
+    init(fixture);
+    // Nothing typed: the placeholder cookie is meaningless either way, so the
+    // request goes out without it rather than being blocked.
+    await clickSend(fixture);
+    expect(fetchCalls).toHaveLength(1);
+    expect(must(fetchCalls[0]).init.headers).not.toHaveProperty("Cookie");
+
+    must(fixture.auth.cookieAuth).value = "sid-1";
+    fixture.samplesAuthBox.checked = true;
+    edit(fixture, fixture.samplesAuthBox, "change");
+    await clickSend(fixture);
+    // `Cookie` is a forbidden header name, so the send would arrive
+    // unauthenticated; the sample, which a terminal can run, still carries it.
+    expect(fetchCalls).toHaveLength(1);
+    expect(fixture.response.textContent).toContain("`Cookie` header");
+    expect(fixture.curlCode.textContent).toContain("Cookie: session=sid-1");
+  });
+
+  it("ignores a second click while a request is in flight", async () => {
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+    const gate = Promise.withResolvers<Response>();
+    fetchImpl = () => gate.promise;
+    const inFlight = clickSend(fixture);
+    await clickSend(fixture);
+    expect(fetchCalls).toHaveLength(1);
+    expect(fixture.sendButton.disabled).toBe(true);
+    gate.resolve(new Response("{}"));
+    await inFlight;
+    expect(fixture.sendButton.disabled).toBe(false);
   });
 });
 

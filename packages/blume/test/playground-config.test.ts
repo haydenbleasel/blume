@@ -275,6 +275,9 @@ const generateWith = async (playground: string) => {
       info: { title: "API", version: "1" },
       openapi: "3.0.0",
       paths: { "/ping": { get: { responses: { "200": {} } } } },
+      // One absolute server (the proxy's allowlist) and one relative server,
+      // which has no origin to allow.
+      servers: [{ url: "https://api.example.com/v1" }, { url: "/v1" }],
     })
   );
   const project = await scanProject(root);
@@ -285,7 +288,13 @@ const generateWith = async (playground: string) => {
 describe("generateRuntime playground proxy endpoint", () => {
   it("writes and injects /_api-proxy when proxy is true", async () => {
     const out = await generateWith("{ proxy: true }");
-    expect(existsSync(join(out, "src/blume-openapi/api-proxy.ts"))).toBe(true);
+    const endpoint = join(out, "src/blume-openapi/api-proxy.ts");
+    expect(existsSync(endpoint)).toBe(true);
+    // The handler's allowlist is baked in from the spec's own servers: the
+    // target arrives as a query parameter, so an open proxy is the alternative.
+    expect(await readFile(endpoint, "utf-8")).toContain(
+      'createPlaygroundProxyHandler(["https://api.example.com"])'
+    );
     // Injected (rather than served from `pages/`) because `_`-prefixed page
     // files are private to Astro; the pattern rides the integration's pages.
     const astroConfig = await readFile(join(out, "astro.config.mjs"), "utf-8");

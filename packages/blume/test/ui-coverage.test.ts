@@ -449,6 +449,27 @@ const componentSource = (path: string): Promise<string> =>
 const layoutSource = (name: string): Promise<string> =>
   componentSource(`layout/${name}`);
 
+/**
+ * Every `.astro` file under `src/` that imports the named component. The
+ * single-importer tests below use it to pin which pages can ever carry a
+ * lazy panel's loader script.
+ */
+const astroImportersOf = async (component: string): Promise<string[]> => {
+  const srcRoot = new URL("../src/", import.meta.url).pathname;
+  const importPattern = new RegExp(
+    String.raw`from\s+"[^"]*${component}\.astro"`,
+    "u"
+  );
+  const importers: string[] = [];
+  for await (const file of new Bun.Glob("**/*.astro").scan(srcRoot)) {
+    const source = await readFile(join(srcRoot, file), "utf-8");
+    if (importPattern.test(source)) {
+      importers.push(file);
+    }
+  }
+  return importers;
+};
+
 describe("layout chrome sources", () => {
   it("toggles the search dialog on ⌘K and guards re-entrant opens", async () => {
     const source = await layoutSource("Search.astro");
@@ -582,15 +603,9 @@ describe("openapi playground sources", () => {
   it("keeps Operation.astro the only importer of Playground.astro", async () => {
     // The no-playground-JS-on-non-operation-pages guarantee: any other .astro
     // importing the panel would pull its loader script onto that page too.
-    const srcRoot = new URL("../src/", import.meta.url).pathname;
-    const importers: string[] = [];
-    for await (const file of new Bun.Glob("**/*.astro").scan(srcRoot)) {
-      const source = await readFile(join(srcRoot, file), "utf-8");
-      if (/from\s+"[^"]*Playground\.astro"/u.test(source)) {
-        importers.push(file);
-      }
-    }
-    expect(importers).toEqual(["components/openapi/Operation.astro"]);
+    expect(await astroImportersOf("Playground")).toEqual([
+      "components/openapi/Operation.astro",
+    ]);
   });
 
   it("tags each request-sample pane with its language for live sync", async () => {
@@ -617,15 +632,9 @@ describe("asyncapi composer sources", () => {
   });
 
   it("keeps AsyncApiOperation.astro the only importer of MessageComposer.astro", async () => {
-    const srcRoot = new URL("../src/", import.meta.url).pathname;
-    const importers: string[] = [];
-    for await (const file of new Bun.Glob("**/*.astro").scan(srcRoot)) {
-      const source = await readFile(join(srcRoot, file), "utf-8");
-      if (/from\s+"[^"]*MessageComposer\.astro"/u.test(source)) {
-        importers.push(file);
-      }
-    }
-    expect(importers).toEqual(["components/openapi/AsyncApiOperation.astro"]);
+    expect(await astroImportersOf("MessageComposer")).toEqual([
+      "components/openapi/AsyncApiOperation.astro",
+    ]);
   });
 
   it("tags each event-sample pane with its tool id for live sync", async () => {
