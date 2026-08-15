@@ -45,13 +45,17 @@ const hostParts = (
 const shellQuote = (text: string): string =>
   `'${text.replaceAll("'", String.raw`'\''`)}'`;
 
-/** Indented payload for a snippet that spans lines, matching `toJson`. */
+/**
+ * Indented payload for a snippet that spans lines, matching `toJson`. Only an
+ * absent payload (unparseable editor text) becomes `{}`; a payload of `null`
+ * is what the reader typed and travels as written.
+ */
 const payloadJson = (sample: MessageSample): string =>
-  JSON.stringify(sample.payload ?? {}, null, 2);
+  JSON.stringify(sample.payload === undefined ? {} : sample.payload, null, 2);
 
 /** Compact single-line payload for shell `-m`/`echo` arguments. */
 const payloadInline = (sample: MessageSample): string =>
-  JSON.stringify(sample.payload ?? {});
+  JSON.stringify(sample.payload === undefined ? {} : sample.payload);
 
 /**
  * `wss://host/path` for a WebSocket channel; the address is the path. Exported

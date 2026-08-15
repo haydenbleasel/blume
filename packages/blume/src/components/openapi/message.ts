@@ -143,7 +143,9 @@ export const buildMessage = (
 /**
  * The exact bytes a live send transmits. Identical to the payload the `wscat`
  * and browser-`WebSocket` samples embed, which is the whole point: what a
- * reader copies is what Send puts on the wire.
+ * reader copies is what Send puts on the wire. Only an absent payload
+ * (unparseable editor text) degrades to `{}` — a `null` payload is a value the
+ * reader typed, so it goes out as `null`.
  */
 export const messageFrame = (sample: MessageSample): string =>
-  JSON.stringify(sample.payload ?? {});
+  JSON.stringify(sample.payload === undefined ? {} : sample.payload);

@@ -127,6 +127,20 @@ export const redactAuth = (
 const TRAILING_SLASH = /\/+$/u;
 
 /**
+ * Base64 of `text`'s UTF-8 bytes. `btoa` alone throws on any code point above
+ * U+00FF, so a credential with non-Latin-1 characters (a Cyrillic username, an
+ * emoji in a password) would take down every sample render; RFC 7617 names
+ * UTF-8 as the charset to encode a `user:password` pair in.
+ */
+const base64Utf8 = (text: string): string => {
+  let binary = "";
+  for (const byte of new TextEncoder().encode(text)) {
+    binary += String.fromCodePoint(byte);
+  }
+  return btoa(binary);
+};
+
+/**
  * The credential a request carries for one auth input: the user's value when
  * present, else the redaction placeholder. Basic auth encodes user:password
  * per RFC 7617 — the placeholder stands in until either field is filled.
@@ -139,7 +153,7 @@ const credentialFor = (
     const username = auth?.username ?? "";
     const password = auth?.password ?? "";
     return username !== "" || password !== ""
-      ? btoa(`${username}:${password}`)
+      ? base64Utf8(`${username}:${password}`)
       : input.placeholder;
   }
   const value = auth?.value ?? "";

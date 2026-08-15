@@ -119,10 +119,21 @@ export const createWsClient = (options: WsClientOptions): WsClient => {
     transition("connecting");
     const next = create(url);
     socket = next;
+    // Every listener below is scoped to the socket it was wired for: a browser
+    // can deliver a discarded socket's error/close/message after `disconnect`
+    // or after the reader reconnected, and replaying those would report the
+    // dead connection's fate as the live one's.
+    const stale = (): boolean => socket !== next;
     next.addEventListener("open", () => {
+      if (stale()) {
+        return;
+      }
       transition("open");
     });
     next.addEventListener("message", (event) => {
+      if (stale()) {
+        return;
+      }
       options.onFrame({
         at: now(),
         direction: "received",
@@ -132,13 +143,16 @@ export const createWsClient = (options: WsClientOptions): WsClient => {
       });
     });
     next.addEventListener("error", () => {
+      if (stale()) {
+        return;
+      }
       transition("error");
     });
     next.addEventListener("close", (event) => {
       // Once settled, stay settled: browsers always follow an error event with
       // a close event, and the error is the message worth keeping. A close that
       // answers our own `disconnect` has been reported already.
-      if (state === "error" || state === "closed") {
+      if (stale() || state === "error" || state === "closed") {
         return;
       }
       // Code plus the reason when the server bothered to send one; a bare

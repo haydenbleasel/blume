@@ -1,4 +1,6 @@
 ---
+import { randomUUID } from "node:crypto";
+
 import type { MessageModel } from "./message.ts";
 
 /**
@@ -23,6 +25,10 @@ const { model } = Astro.props;
 // the \u escape is equivalent, so a spec description can never close the model
 // script early and inject markup.
 const modelJson = JSON.stringify(model).replaceAll("<", "\\u003c");
+
+// Unique per rendered composer (a page can hold several), so the textarea's
+// aria-describedby can point at ITS error container and no other.
+const payloadErrorsId = `blume-payload-errors-${randomUUID()}`;
 
 const LABEL_ROW =
   "mb-1 flex flex-wrap items-baseline gap-x-1.5 font-medium text-foreground text-xs";
@@ -135,11 +141,20 @@ const BUTTON_QUIET =
         </div>
         <label class="block">
           <span class={LABEL_ROW}>Message payload</span>
-          <textarea class={FIELD} data-payload rows="8" spellcheck="false"
-            >{model.payload.example}</textarea
+          <textarea
+            aria-describedby={payloadErrorsId}
+            class={FIELD}
+            data-payload
+            rows="8"
+            spellcheck="false">{model.payload.example}</textarea
           >
-          <div class="mt-1 flex flex-col gap-0.5" data-payload-errors />
         </label>
+        <div
+          aria-live="polite"
+          class="mt-1 flex flex-col gap-0.5 empty:hidden"
+          data-payload-errors
+          id={payloadErrorsId}
+        />
       </div>
       {
         model.connectable ? (
@@ -199,14 +214,21 @@ const BUTTON_QUIET =
       const details = this.querySelector<HTMLDetailsElement>(
         "details[data-composer]"
       );
-      details?.addEventListener(
-        "toggle",
-        async () => {
-          const { initComposer } = await import("./message-composer.ts");
-          initComposer(this);
-        },
-        { once: true }
-      );
+      if (!details) {
+        return;
+      }
+      const init = async () => {
+        const { initComposer } = await import("./message-composer.ts");
+        initComposer(this);
+      };
+      // A re-attached element (bfcache restore, DOM moves) can arrive with the
+      // panel already open — its first toggle has fired, so a listener alone
+      // would leave a visible form dead.
+      if (details.open) {
+        void init();
+        return;
+      }
+      details.addEventListener("toggle", init, { once: true });
     }
   }
 

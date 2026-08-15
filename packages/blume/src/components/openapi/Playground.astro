@@ -1,4 +1,6 @@
 ---
+import { randomUUID } from "node:crypto";
+
 import { paramKey, type PlaygroundModel } from "./request.ts";
 
 /**
@@ -25,6 +27,10 @@ const { model, proxy, slug, operation } = Astro.props;
 // where the \u escape is equivalent, so a spec description can never close
 // the model script early and inject markup.
 const modelJson = JSON.stringify(model).replaceAll("<", "\\u003c");
+
+// Unique per rendered panel (a page can hold several), so the textarea's
+// aria-describedby can point at ITS error container and no other.
+const bodyErrorsId = `blume-body-errors-${randomUUID()}`;
 
 const LABEL_ROW =
   "mb-1 flex flex-wrap items-baseline gap-x-1.5 font-medium text-foreground text-xs";
@@ -239,13 +245,24 @@ const CHECKBOX_ROW =
                 </label>
               ))
             ) : (
-              <label class="block">
-                <span class={LABEL_ROW}>Request body</span>
-                <textarea class={FIELD} data-body rows="8" spellcheck="false"
-                  >{model.body.example}</textarea
-                >
-                <div class="mt-1 flex flex-col gap-0.5" data-body-errors />
-              </label>
+              <>
+                <label class="block">
+                  <span class={LABEL_ROW}>Request body</span>
+                  <textarea
+                    aria-describedby={bodyErrorsId}
+                    class={FIELD}
+                    data-body
+                    rows="8"
+                    spellcheck="false">{model.body.example}</textarea
+                  >
+                </label>
+                <div
+                  aria-live="polite"
+                  class="mt-1 flex flex-col gap-0.5 empty:hidden"
+                  data-body-errors
+                  id={bodyErrorsId}
+                />
+              </>
             )}
           </div>
         )
@@ -279,14 +296,21 @@ const CHECKBOX_ROW =
       const details = this.querySelector<HTMLDetailsElement>(
         "details[data-playground]"
       );
-      details?.addEventListener(
-        "toggle",
-        async () => {
-          const { initPlayground } = await import("./playground-client.ts");
-          initPlayground(this);
-        },
-        { once: true }
-      );
+      if (!details) {
+        return;
+      }
+      const init = async () => {
+        const { initPlayground } = await import("./playground-client.ts");
+        initPlayground(this);
+      };
+      // A re-attached element (bfcache restore, DOM moves) can arrive with the
+      // panel already open — its first toggle has fired, so a listener alone
+      // would leave a visible form dead.
+      if (details.open) {
+        void init();
+        return;
+      }
+      details.addEventListener("toggle", init, { once: true });
     }
   }
 

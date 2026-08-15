@@ -26,15 +26,38 @@ const CORS_MESSAGE =
   "`openapi.playground.proxy` in the Blume config to route playground " +
   "requests through the docs server instead.";
 
+/**
+ * `Cookie` is a forbidden header name: a page cannot set it, so a credential
+ * the spec carries in a cookie can never ride a live send — the request would
+ * simply arrive unauthenticated. The samples DO carry it, so the message points
+ * at them rather than pretending the panel can.
+ */
+const COOKIE_MESSAGE =
+  "Browsers don't allow a page to set a `Cookie` header, so this panel can't " +
+  "send the cookie credential you entered. Copy the sample above and run it " +
+  "from a terminal instead.";
+
+/**
+ * How long a live send waits before giving up. Without a deadline a request
+ * that never answers leaves the panel on "Sending…" and the Send button
+ * disabled for the rest of the page's life.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 /** Convention used across the OpenAPI components for error-severity text. */
 const ERROR_TEXT = "text-red-600 text-xs dark:text-red-400";
 
 /**
  * Coerce a typed flat-body field's raw input text into its JSON value. Text
  * that doesn't parse as the declared type is kept verbatim so the API (not
- * the playground) reports the real validation error.
+ * the playground) reports the real validation error. An empty field stays the
+ * empty string — `Number("")` is 0, which would silently invent a value for a
+ * required numeric field the reader left blank.
  */
 const coerce = (raw: string, type: string): unknown => {
+  if (raw === "") {
+    return raw;
+  }
   if (type === "number" || type === "integer") {
     const numeric = Number(raw);
     return Number.isNaN(numeric) ? raw : numeric;
@@ -104,6 +127,9 @@ export const initPlayground = (root: HTMLElement): void => {
   const response = root.querySelector<HTMLElement>("[data-response]");
   const storageKey = root.dataset.storageKey ?? "";
   const proxy = root.dataset.proxy ?? "";
+
+  /** True while a send is outstanding, so a second click can't race it. */
+  let sending = false;
 
   const field = (selector: string): HTMLInputElement | null =>
     root.querySelector<HTMLInputElement>(selector);
@@ -190,7 +216,13 @@ export const initPlayground = (root: HTMLElement): void => {
     if (!(bodyArea && bodyErrors)) {
       return [];
     }
-    const errors = validateJson(bodyArea.value, model.body?.schema);
+    // An emptied editor means "no body" (see `bodyFor`), not invalid JSON —
+    // reporting a syntax error there would block a send the request builder is
+    // perfectly happy to make.
+    const errors =
+      bodyArea.value.trim() === ""
+        ? []
+        : validateJson(bodyArea.value, model.body?.schema);
     bodyErrors.textContent = "";
     for (const error of errors) {
       bodyErrors.append(line(ERROR_TEXT, error));
@@ -276,20 +308,46 @@ export const initPlayground = (root: HTMLElement): void => {
 
   /**
    * Send the real request. HTTP error statuses render like any response; only
-   * a rejected fetch (the CORS wall) gets the explanatory message.
+   * a rejected fetch (the CORS wall) gets the explanatory message. One request
+   * at a time: the Send button stays disabled until the exchange is rendered,
+   * and a request that never answers is abandoned after
+   * {@link REQUEST_TIMEOUT_MS} instead of leaving the panel stuck on "Sending".
    */
   const send = async (): Promise<void> => {
-    if (!response) {
+    if (!response || sending) {
       return;
     }
     if (validateBody().length > 0) {
       return;
     }
-    const sample = buildRequest(model, collect());
+    const values = collect();
+    // A cookie-borne credential cannot ride a live send: `Cookie` is a
+    // forbidden header name, so the browser drops it and the API answers 401
+    // for reasons the reader can't see. The copyable sample carries it fine.
+    if (
+      model.auth.some(
+        (input) =>
+          input.carrier.in === "cookie" &&
+          (values.auth[input.id]?.value ?? "") !== ""
+      )
+    ) {
+      response.textContent = "";
+      response.append(line(ERROR_TEXT, COOKIE_MESSAGE));
+      return;
+    }
+    const sample = buildRequest(model, values);
     const url = proxy
       ? `${proxy}?url=${encodeURIComponent(sample.url)}`
       : sample.url;
+    // Any remaining `Cookie` header carries only the redaction placeholder;
+    // sending it would just earn a console warning from the browser.
+    const headers = { ...sample.headers };
+    delete headers.Cookie;
     response.textContent = "Sending\u2026";
+    sending = true;
+    if (sendButton) {
+      sendButton.disabled = true;
+    }
     const start = performance.now();
     try {
       const res = await fetch(url, {
@@ -300,8 +358,11 @@ export const initPlayground = (root: HTMLElement): void => {
           sample.method === "GET" || sample.method === "HEAD"
             ? undefined
             : sample.body,
-        headers: sample.headers,
+        headers,
         method: sample.method,
+        // A `TimeoutError` DOMException is not a TypeError, so it reads as a
+        // request failure rather than the CORS wall.
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       const ms = Math.round(performance.now() - start);
       renderResponse(response, res, ms, await res.text());
@@ -315,6 +376,11 @@ export const initPlayground = (root: HTMLElement): void => {
             : `Request failed: ${String(error)}`
         )
       );
+    } finally {
+      sending = false;
+      if (sendButton) {
+        sendButton.disabled = false;
+      }
     }
   };
 

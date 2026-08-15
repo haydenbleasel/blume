@@ -20,6 +20,9 @@ import { createWsClient } from "./ws-client.ts";
 /** Convention used across the OpenAPI components for error-severity text. */
 const ERROR_TEXT = "text-red-600 text-xs dark:text-red-400";
 
+/** The status line's normal (non-error) styling. */
+const MUTED_TEXT = "text-muted-foreground text-xs";
+
 /**
  * A failed WebSocket handshake gives the page no reason — the browser withholds
  * it — so the status line explains the causes a docs author can act on instead
@@ -120,9 +123,31 @@ export const initComposer = (root: HTMLElement): void => {
     return errors;
   };
 
+  /**
+   * The URL the live socket was dialed with; "" when nothing is connected. The
+   * status line and the send path read this rather than recomputing from the
+   * form, because the form can move on while a socket stays where it was.
+   */
+  let connectedUrl = "";
+
+  /** The connect URL the form currently describes. */
+  const formUrl = (): string => webSocketUrl(buildMessage(model, collect()));
+
+  /** Write one message onto the status line, if the panel rendered one. */
+  const setStatus = (text: string, className: string): void => {
+    if (!status) {
+      return;
+    }
+    status.textContent = text;
+    status.className = className;
+  };
+
   /** Reflect the connection state onto the status line and the buttons. */
   const renderState = (state: WsState, detail?: string): void => {
     const live = state === "connecting" || state === "open";
+    if (!live) {
+      connectedUrl = "";
+    }
     if (connectButton) {
       connectButton.disabled = live;
     }
@@ -132,28 +157,22 @@ export const initComposer = (root: HTMLElement): void => {
     if (sendButton) {
       sendButton.disabled = state !== "open";
     }
-    if (!status) {
-      return;
-    }
     if (state === "connecting") {
-      status.textContent = "Connecting\u2026";
-      status.className = "text-muted-foreground text-xs";
+      setStatus("Connecting\u2026", MUTED_TEXT);
       return;
     }
     if (state === "open") {
-      status.textContent = `Connected to ${webSocketUrl(buildMessage(model, collect()))}.`;
-      status.className = "text-muted-foreground text-xs";
+      setStatus(`Connected to ${connectedUrl}.`, MUTED_TEXT);
       return;
     }
     if (state === "error") {
-      status.textContent = ERROR_MESSAGE;
-      status.className = ERROR_TEXT;
+      setStatus(ERROR_MESSAGE, ERROR_TEXT);
       return;
     }
-    status.textContent = detail
-      ? `Disconnected (${detail}).`
-      : "Not connected.";
-    status.className = "text-muted-foreground text-xs";
+    setStatus(
+      detail ? `Disconnected (${detail}).` : "Not connected.",
+      MUTED_TEXT
+    );
   };
 
   /** Append one frame to the log: timestamp, direction, and the raw text. */
@@ -179,7 +198,20 @@ export const initComposer = (root: HTMLElement): void => {
     if (validatePayload().length > 0) {
       return;
     }
-    client.connect(webSocketUrl(buildMessage(model, collect())));
+    // A blank channel parameter leaves its `{name}` template in the address, so
+    // connecting would dial a URL no broker has a channel for.
+    const missing = paramInputs
+      .filter((input) => input.value === "")
+      .map((input) => input.dataset.param ?? "");
+    if (missing.length > 0) {
+      setStatus(
+        `Fill in every channel parameter before connecting: ${missing.join(", ")}.`,
+        ERROR_TEXT
+      );
+      return;
+    }
+    connectedUrl = formUrl();
+    client.connect(connectedUrl);
   });
   disconnectButton?.addEventListener("click", () => client.disconnect());
   sendButton?.addEventListener("click", () => {
@@ -190,6 +222,13 @@ export const initComposer = (root: HTMLElement): void => {
   });
 
   const onEdit = (): void => {
+    // The socket is bound to the URL it was dialed with: once the server or a
+    // channel parameter moves, the open connection is the wrong endpoint, so it
+    // is dropped rather than left to answer for the form on screen.
+    if (connectedUrl !== "" && formUrl() !== connectedUrl) {
+      client.disconnect();
+      setStatus("The endpoint changed. Connect again to use it.", MUTED_TEXT);
+    }
     validatePayload();
     syncSamples();
   };

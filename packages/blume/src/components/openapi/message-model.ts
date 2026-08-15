@@ -59,8 +59,11 @@ const messagePayload = (
     return { example: "" };
   }
   const schema = payloadSchema(message);
+  // `undefined` means the message declares no example, `null` means it declares
+  // an empty one — only the former falls back to a schema sample.
+  const declared = message.examples?.[0]?.payload;
   const example =
-    message.examples?.[0]?.payload ?? exampleValue(schema, schemas);
+    declared === undefined ? exampleValue(schema, schemas) : declared;
   return {
     contentType: message.contentType,
     example: toJson(example) ?? "",
