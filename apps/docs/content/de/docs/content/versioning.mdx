@@ -30,7 +30,7 @@ Wenn du ein Release veröffentlichst, friere die aktuellen Docs mit einem Befehl
 blume version v1.0
 ```
 
-Das kopiert deinen Inhaltsbaum nach `docs/v1.0/` (bestehende Snapshots ausgenommen), schreibt wurzelabsolute Links innerhalb der Kopie so um, dass sie im Snapshot bleiben (`/guides/x` wird zu `/v1.0/guides/x`, umzäunter und Inline-Code bleiben unberührt), und registriert die ID in `blume.config.ts` – oder gibt den Eintrag zum Einfügen aus, wenn deine Konfiguration so aufgebaut ist, dass sie nicht angetastet wird. Führe `blume version` ohne ID aus, um die konfigurierten Versionen aufzulisten.
+Das kopiert deinen Inhaltsbaum nach `docs/v1.0/` (bestehende Snapshots ausgenommen), schreibt wurzelabsolute Links innerhalb der Kopie so um, dass sie im Snapshot bleiben (`/guides/x` wird zu `/v1.0/guides/x`, umzäunter und Inline-Code bleiben unberührt), und registriert die ID in `blume.config.ts` – oder gibt den Eintrag zum Einfügen aus, wenn deine Konfiguration so aufgebaut ist, dass sie nicht angetastet wird. Links auf Seiten, die nicht Teil des kopierten Baums sind – generierte API-Referenzen, entfernte Quellen wie ein Changelog –, zeigen weiterhin auf die aktuellen Seiten, da der Snapshot keine Kopie davon enthält. Führe `blume version` ohne ID aus, um die konfigurierten Versionen aufzulisten.
 
 Prüfe und committe das neue Verzeichnis wie jeden anderen Inhalt. Starte `blume dev` neu, damit es übernommen wird.
 

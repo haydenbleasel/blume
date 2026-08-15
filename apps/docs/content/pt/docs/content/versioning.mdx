@@ -30,7 +30,7 @@ Quando você lançar, congele os docs atuais com um comando:
 blume version v1.0
 ```
 
-Isso copia sua árvore de conteúdo para `docs/v1.0/` (snapshots existentes são excluídos), reescreve os links absolutos a partir da raiz dentro da cópia para que continuem dentro do snapshot (`/guides/x` vira `/v1.0/guides/x`, com código em blocos e inline intocados) e registra o id em `blume.config.ts` — ou imprime a entrada para você colar, quando seu config estiver estruturado de um jeito que ele não vai mexer. Rode `blume version` sem id para listar as versões configuradas.
+Isso copia sua árvore de conteúdo para `docs/v1.0/` (snapshots existentes são excluídos), reescreve os links absolutos a partir da raiz dentro da cópia para que continuem dentro do snapshot (`/guides/x` vira `/v1.0/guides/x`, com código em blocos e inline intocados) e registra o id em `blume.config.ts` — ou imprime a entrada para você colar, quando seu config estiver estruturado de um jeito que ele não vai mexer. Links para páginas que não fazem parte da árvore copiada — referências de API geradas, fontes remotas como um changelog — continuam apontando para as páginas vivas, já que o snapshot não tem cópia delas. Rode `blume version` sem id para listar as versões configuradas.
 
 Revise e commite o novo diretório como qualquer outro conteúdo. Reinicie o `blume dev` para que ele seja reconhecido.
 
@@ -76,7 +76,7 @@ O sitemap segue a mesma lógica: páginas arquivadas cujo canônico aponta para 
 
 ## Busca
 
-O diálogo de busca limita os resultados à versão que está sendo vista, com um alternador "Todas as versões" (lembrado por leitor) ao lado do de idioma. Orama (o padrão), FlexSearch, Algolia e Typesense todos respeitam esse escopo — os registros hospedados carregam uma faceta `version`, com os docs atuais enviados como `"current"` — enquanto o Pagefind fica sem escopo, coerente com o comportamento dele para locales.
+O diálogo de busca limita os resultados à versão que está sendo vista, com um alternador "Todas as versões" (lembrado por leitor) ao lado do de idioma. Resultados de outras versões mostram a versão deles na linha do resultado. Orama (o padrão), FlexSearch, Algolia e Typesense todos respeitam esse escopo — os registros hospedados carregam uma faceta `version`, com os docs atuais enviados como `"current"` — enquanto o Pagefind fica sem escopo, coerente com o comportamento dele para locales.
 
 ## Agentes
 
