@@ -8,6 +8,7 @@ interface AlgoliaRecord {
   title: string;
   description?: string;
   content?: string;
+  version?: string;
 }
 
 /**
@@ -53,6 +54,9 @@ export const createSearch = (opts: {
       ),
       title: highlight(record.title, query),
       url: record.url,
+      // Records store the current docs' version as "current" (hosted backends
+      // treat empty facet values unreliably); the hit contract uses "".
+      version: record.version === "current" ? "" : record.version,
     }));
     return { hits, sections: [] };
   };

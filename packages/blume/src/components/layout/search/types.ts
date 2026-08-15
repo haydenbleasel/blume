@@ -13,7 +13,10 @@ export interface SearchHit {
   section?: string;
   /** Plain-text page content, used to render the preview pane. */
   content?: string;
-  /** Docs version the hit belongs to (`""` = current; local providers only). */
+  /**
+   * Docs version the hit belongs to (`""` = current). Local indexes and the
+   * hosted Algolia/Typesense adapters set it; other providers leave it unset.
+   */
   version?: string;
 }
 

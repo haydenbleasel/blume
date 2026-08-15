@@ -366,11 +366,11 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         );
         if (allVersionsToggle) {
           this.allVersions =
-            localStorage.getItem("blume-search-all-versions") === "1";
+            readStorage("blume-search-all-versions") === "1";
           allVersionsToggle.checked = this.allVersions;
           allVersionsToggle.addEventListener("change", () => {
             this.allVersions = allVersionsToggle.checked;
-            localStorage.setItem(
+            writeStorage(
               "blume-search-all-versions",
               this.allVersions ? "1" : "0"
             );

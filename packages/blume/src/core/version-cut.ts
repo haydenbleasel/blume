@@ -11,7 +11,7 @@ import { scanProject } from "./project-graph.ts";
 import { VERSION_ID } from "./schema.ts";
 import { nextFenceState } from "./sources/normalize.ts";
 import type { FenceState } from "./sources/normalize.ts";
-import { versionizeRoute } from "./versions.ts";
+import { VERSION_SHAPED, versionizeRoute } from "./versions.ts";
 
 /** What `cutVersion` did, for the CLI to report. */
 export interface CutResult {
@@ -212,8 +212,11 @@ export const cutVersion = async (
     await rm(dir, { force: true, recursive: true });
   }
 
-  // Existing snapshots (configured, or merely on disk and version-shaped via
-  // the config) must not nest inside the new one.
+  // Existing snapshots must not nest inside the new one: configured ids, plus
+  // any version-shaped directory (`v1.0/`) that never made it into the config —
+  // e.g. a prior cut whose config update fell back to a printed snippet. A
+  // genuine content folder that merely looks like a version already draws the
+  // rename-or-register diagnostic, so skipping it here is consistent.
   const excluded = new Set([
     id,
     "node_modules",
@@ -223,7 +226,11 @@ export const cutVersion = async (
   let copied = 0;
   await Promise.all(
     entries.map(async (entry) => {
-      if (excluded.has(entry.name) || entry.name.startsWith(".")) {
+      if (
+        excluded.has(entry.name) ||
+        entry.name.startsWith(".") ||
+        (entry.isDirectory() && VERSION_SHAPED.test(entry.name))
+      ) {
         return;
       }
       await cp(join(contentRoot, entry.name), join(dir, entry.name), {

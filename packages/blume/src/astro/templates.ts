@@ -1813,9 +1813,16 @@ const localeSwitch = i18n
 // Version switcher + old-version notice. The switcher auto-populates from the
 // versions config as a \`kind: "version"\` selector; a user-declared version
 // selector in \`navigation.selectors\` suppresses it (theirs renders instead).
+// Fallback version roots compose like real routes — \`{basePath}/{locale?}/{id}\`
+// (manifest \`versionAlternates\` paths arrive with the base already applied).
 const versionRootFor = (id: string) => {
   const logical = id ? \`/\${id}\` : "/";
-  return i18n ? localizeRoute(logical, locale) : logical;
+  const localized = i18n ? localizeRoute(logical, locale) : logical;
+  const mount = data.config.basePath;
+  if (!mount) {
+    return localized;
+  }
+  return localized === "/" ? mount : \`\${mount}\${localized}\`;
 };
 const samePageSwitch = versionsConfig
   ? versionsConfig.switcher.redirect === "same-page"

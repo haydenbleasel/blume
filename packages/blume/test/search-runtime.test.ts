@@ -168,7 +168,26 @@ describe("client loaders", () => {
       captured.value = params;
       return Promise.resolve({
         results: [
-          { hits: [{ content: "c", description: "d", title: "A", url: "/a" }] },
+          {
+            hits: [
+              // Current docs upload as version "current"; archived keep their
+              // id; pre-versioning records have none.
+              {
+                content: "c",
+                description: "d",
+                title: "A",
+                url: "/a",
+                version: "current",
+              },
+              {
+                content: "c2",
+                description: "d2",
+                title: "B",
+                url: "/b",
+                version: "v1.0",
+              },
+            ],
+          },
         ],
       });
     };
@@ -185,6 +204,10 @@ describe("client loaders", () => {
     expect(captured.value?.requests[0]?.facetFilters).toBeUndefined();
     expect(hits[0]?.url).toBe("/a");
     expect(hits[0]?.excerpt).toBe("d");
+    // The record's version maps into the hit contract ("" = current) so the
+    // cross-version badge works for hosted results too.
+    expect(hits[0]?.version).toBe("");
+    expect(hits[1]?.version).toBe("v1.0");
 
     await search("q", { locale: "fr" });
     expect(captured.value?.requests[0]?.facetFilters).toStrictEqual([
@@ -226,7 +249,22 @@ describe("client loaders", () => {
       return Promise.resolve({
         hits: [
           {
-            document: { content: "c", description: "d", title: "T", url: "/t" },
+            document: {
+              content: "c",
+              description: "d",
+              title: "T",
+              url: "/t",
+              version: "current",
+            },
+          },
+          {
+            document: {
+              content: "c2",
+              description: "d2",
+              title: "T1",
+              url: "/v1.0/t",
+              version: "v1.0",
+            },
           },
         ],
       });
@@ -244,6 +282,10 @@ describe("client loaders", () => {
     // No locale option means no filter — every language matches.
     expect(captured.value?.filter_by).toBeUndefined();
     expect(result.hits[0]?.url).toBe("/t");
+    // The document's version maps into the hit contract ("" = current) so the
+    // cross-version badge works for hosted results too.
+    expect(result.hits[0]?.version).toBe("");
+    expect(result.hits[1]?.version).toBe("v1.0");
 
     await search("q", { locale: "fr" });
     expect(captured.value?.filter_by).toBe("locale:=fr");

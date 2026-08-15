@@ -878,7 +878,10 @@ describe("agent surfaces with versions", () => {
     expect(data.navigationByVersion?.["v1.0"]).toBeDefined();
 
     const handler = createMcpFetchHandler(data);
-    const callTool = async (name: string, args?: Record<string, unknown>) => {
+    const callToolRaw = async (
+      name: string,
+      args?: Record<string, unknown>
+    ) => {
       const response = await handler(
         new Request("https://example.com/mcp", {
           body: JSON.stringify({
@@ -894,9 +897,12 @@ describe("agent surfaces with versions", () => {
           method: "POST",
         })
       );
-      const body = (await response.json()) as {
-        result?: { content?: { text: string }[] };
+      return (await response.json()) as {
+        result?: { content?: { text: string }[]; isError?: boolean };
       };
+    };
+    const callTool = async (name: string, args?: Record<string, unknown>) => {
+      const body = await callToolRaw(name, args);
       return body.result?.content?.[0]?.text ?? "";
     };
 
@@ -937,6 +943,14 @@ describe("agent surfaces with versions", () => {
       await callTool("get_navigation", { version: "v1.0" })
     ) as { root?: string };
     expect(nav.root).toBe("/v1.0");
+
+    // An unknown version id is an error — never the current tree posing as
+    // the requested snapshot.
+    const unknown = await callToolRaw("get_navigation", { version: "v9.0" });
+    expect(unknown.result?.isError).toBe(true);
+    expect(unknown.result?.content?.[0]?.text).toContain(
+      'Unknown version "v9.0"'
+    );
   });
 });
 
@@ -1047,6 +1061,17 @@ describe("versionsDiagnostics", () => {
       severity: "warning",
     });
     expect(diagnostics[0]?.message).toContain('"v3/"');
+  });
+
+  it("warns when a folder differs from a configured id only by case", () => {
+    // `detectVersion` compares exactly, so `V1.0/` is NOT routed as the
+    // configured `v1.0` snapshot — the diagnostic must not treat it as one.
+    const diagnostics = versionsDiagnostics(
+      [pageWithRef("V1.0/intro.mdx")],
+      versionsOf()
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.message).toContain('"V1.0/"');
   });
 
   it("stays quiet for configured snapshots and ordinary folders", () => {

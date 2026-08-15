@@ -202,6 +202,23 @@ const asVersionScope = (
 };
 
 /**
+ * Error message for a `get_navigation` version id that isn't a configured
+ * archived version, or `null` when the id is valid (or the site is
+ * unversioned, where the id is ignored like the other tools' scopes). Unlike
+ * `asVersionScope`'s match-nothing filters, a bad id here would otherwise
+ * silently return the *current* tree posing as the requested snapshot.
+ */
+const unknownVersionError = (
+  versionId: string | undefined,
+  data: McpData
+): string | null =>
+  versionId &&
+  data.archivedVersions &&
+  !data.archivedVersions.includes(versionId)
+    ? `Unknown version "${versionId}". Archived versions: ${data.archivedVersions.join(", ")}.`
+    : null;
+
+/**
  * Normalize a user-supplied route to a `pages` key (`/`, `/a/b`, no suffix).
  * Accepts a full URL too — `search_docs` hits and llms.txt entries carry
  * `site` + `deployment.base`, and an agent following "pass a route from
@@ -368,9 +385,14 @@ export const buildServer = (
       // A version id selects the snapshot's tree; a locale selects its
       // language (falling back through the default locale to any tree the
       // snapshot has). Without a version, a locale selects the current docs'
-      // localized tree.
+      // localized tree. An unknown id on a versioned site is an error — the
+      // current tree would silently masquerade as the requested snapshot.
       const { locale, version: versionId } =
         TOOL_INPUTS.get_navigation.parse(args);
+      const unknownVersion = unknownVersionError(versionId, data);
+      if (unknownVersion) {
+        return text(unknownVersion, true);
+      }
       let { navigation } = data;
       const byLocale = versionId
         ? data.navigationByVersion?.[versionId]

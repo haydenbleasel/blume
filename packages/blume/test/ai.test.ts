@@ -297,9 +297,13 @@ describe("buildLlmsFiles — navigation structure", () => {
       makeProject(
         [
           makePage("a.md", "/a", "Alpha", { locale: "en" }),
+          // The helper defaults versionKey/translationKey to the route; both
+          // are locale-agnostic by contract, so override them here.
           makePage("a.md", "/fr/a", "Alpha FR", {
             locale: "fr",
             navPath: "a.md",
+            translationKey: "/a",
+            versionKey: "/a",
           }),
         ],
         {

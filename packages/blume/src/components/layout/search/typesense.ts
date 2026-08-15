@@ -8,6 +8,7 @@ interface TypesenseRecord extends Record<string, unknown> {
   title: string;
   description?: string;
   content?: string;
+  version?: string;
 }
 
 /**
@@ -67,6 +68,10 @@ export const createSearch = (opts: {
         ),
         title: highlight(doc.title, query),
         url: doc.url,
+        // Records store the current docs' version as "current" (hosted
+        // backends treat empty facet values unreliably); the hit contract
+        // uses "".
+        version: doc.version === "current" ? "" : doc.version,
       };
     });
     return { hits, sections: [] };

@@ -18,8 +18,12 @@ import type { Diagnostic, PageRecord } from "./types.ts";
  * directory and a URL segment.
  */
 
-/** Top-level folders that look like a version (`v1`, `V2.0`) for diagnostics. */
-const VERSION_SHAPED = /^v\d/iu;
+/**
+ * Top-level folders that look like a version (`v1`, `V2.0`) — used by the
+ * unconfigured-snapshot diagnostic and by `blume version` to keep such folders
+ * out of new snapshots.
+ */
+export const VERSION_SHAPED = /^v\d/iu;
 
 /** True when the project opts into versioning. */
 export const versionsEnabled = (
@@ -124,15 +128,17 @@ export const versionsDiagnostics = (
   pages: PageRecord[],
   versions: ResolvedVersionsConfig
 ): Diagnostic[] => {
-  const configured = new Set(
-    versions.archived.map((version) => version.id.toLowerCase())
-  );
+  // Exact-id comparison, matching `detectVersion`: a folder that differs from
+  // a configured id only by case (`V1.0/` vs `v1.0`) is NOT routed as that
+  // snapshot, so it must still warn. `VERSION_SHAPED` is case-insensitive on
+  // its own.
+  const configured = new Set(versions.archived.map((version) => version.id));
   const seen = new Set<string>();
   const diagnostics: Diagnostic[] = [];
   for (const page of pages) {
     // The version-looking folder is the first segment of the source-local ref
     // (e.g. `v1.0/guide.md`), not the namespaced id (`filesystem:v1.0/guide.md`).
-    const first = page.source.ref.split("/")[0]?.toLowerCase();
+    const [first] = page.source.ref.split("/");
     if (
       first &&
       !seen.has(first) &&

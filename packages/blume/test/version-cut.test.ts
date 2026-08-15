@@ -241,6 +241,21 @@ export default {
     expect(result.configSnippet).toContain('{ id: "v1.0" }');
   });
 
+  it("never nests an unregistered version-shaped snapshot in a new cut", async () => {
+    const root = await makeProject({
+      // No `versions` config: the first cut leaves v1.0 unregistered (the CLI
+      // prints the snippet), so only the shape check can keep it out of v2.0.
+      "blume.config.ts": "export default {};\n",
+      "docs/guides/x.mdx": "---\ntitle: X\n---\n# X\n",
+      "docs/index.mdx": "---\ntitle: Home\n---\n# Home\n",
+    });
+    await cutVersion(root, "v1.0");
+    await cutVersion(root, "v2.0");
+    expect(existsSync(join(root, "docs/v2.0/index.mdx"))).toBe(true);
+    expect(existsSync(join(root, "docs/v2.0/guides/x.mdx"))).toBe(true);
+    expect(existsSync(join(root, "docs/v2.0/v1.0"))).toBe(false);
+  });
+
   it("rejects an invalid id, a registered id, and an existing directory", async () => {
     const root = await makeProject({
       "blume.config.ts": VERSIONED_CONFIG,
@@ -248,11 +263,13 @@ export default {
       "docs/v1.0/index.mdx": "---\ntitle: Old\n---\n# Old\n",
     });
 
-    expect(cutVersion(root, "1.0")).rejects.toThrow(CutError);
-    expect(cutVersion(root, "v1.0")).rejects.toThrow("already registered");
+    await expect(cutVersion(root, "1.0")).rejects.toThrow(CutError);
+    await expect(cutVersion(root, "v1.0")).rejects.toThrow(
+      "already registered"
+    );
 
     await mkdir(join(root, "docs/v3.0"), { recursive: true });
-    expect(cutVersion(root, "v3.0")).rejects.toThrow("--force");
+    await expect(cutVersion(root, "v3.0")).rejects.toThrow("--force");
     // --force replaces the stale directory.
     const forced = await cutVersion(root, "v3.0", { force: true });
     expect(forced.copied).toBeGreaterThan(0);
@@ -265,6 +282,6 @@ export default {
       "docs/x.md": "---\ntitle: A\n---\n# A\n",
       "docs/x.mdx": "---\ntitle: B\n---\n# B\n",
     });
-    expect(cutVersion(root, "v2.0")).rejects.toThrow("error diagnostic");
+    await expect(cutVersion(root, "v2.0")).rejects.toThrow("error diagnostic");
   });
 });
