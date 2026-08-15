@@ -96,6 +96,8 @@ openapi: {
 }
 ```
 
+The built-in proxy only forwards requests to the origins your specs declare in `servers` — including across redirects — so a public docs deployment can't be aimed at other hosts on its network. A **Custom base URL** typed into the panel isn't a documented server: with the proxy enabled, requests to it are refused with a 403.
+
 ## Multiple specs
 
 Use `sources` to publish more than one spec. Each source gets its own overview route, operation pages, and header tab. Give each a `label` (used for the tab and to derive its route), or set an explicit `route`:
