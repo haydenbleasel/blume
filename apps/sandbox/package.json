@@ -1,0 +1,18 @@
+{
+  "name": "sandbox",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "blume dev",
+    "build": "blume build",
+    "preview": "blume preview",
+    "typecheck": "blume check",
+    "audit": "blume audit"
+  },
+  "dependencies": {
+    "blume": "workspace:*"
+  },
+  "devDependencies": {
+    "zod": "^4.3.6"
+  }
+}

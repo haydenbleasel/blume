@@ -1,0 +1,37 @@
+---
+title: Welcome
+description: The Blume kitchen sink — every feature enabled in one project.
+icon: rocket
+---
+
+This sandbox turns on every Blume feature at once so each one can be exercised in a single dev server. Use the tabs above to reach the generated **API** and **Events** references, the **Blog**, and the GitHub-releases-backed **Changelog**.
+
+<CardGroup cols={2}>
+  <Card title="Components" icon="blocks" href="/docs/components">
+    Callouts, tabs, steps, accordions, cards, and the rest of the MDX kit.
+  </Card>
+  <Card title="Syntax" icon="pilcrow" href="/docs/syntax">
+    Markdown features: code fences, math, Mermaid diagrams, tables.
+  </Card>
+  <Card title="Islands" icon="atom" href="/docs/islands">
+    Live component previews rendered from the `examples/` directory.
+  </Card>
+  <Card title="Event reference" icon="radio" href="/events">
+    The new native AsyncAPI renderer — one real page per operation.
+  </Card>
+</CardGroup>
+
+## What's enabled
+
+- **Native OpenAPI reference** at [/api](/api), with expanded schema rows and code samples.
+- **Native AsyncAPI reference** at [/events](/events) — Kafka, WebSocket, and MQTT operations from `specs/asyncapi.yaml`.
+- **Search** (Orama) with curated popular links — press <kbd>⌘K</kbd>.
+- **Ask AI**, **MCP server** at `/mcp`, `llms.txt`, and WebMCP.
+- **i18n** with English and German (fallback to English).
+- **Export** to PDF and EPUB from the page actions menu.
+- **RSS** for the blog and changelog, OG images, sitemap, structured data.
+- **Last modified** stamps from git, feedback widget, dismissible banner.
+
+:::note
+The changelog tab is materialized from the `haydenbleasel/blume` GitHub releases at startup, so it needs network access (and may rate-limit without a `GITHUB_TOKEN`).
+:::
