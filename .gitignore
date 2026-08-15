@@ -19,3 +19,17 @@ packages/blume/docs
 packages/blume/skills
 packages/blume/README.md
 packages/blume/LICENSE
+
+# Docs
+test-results/
+playwright-report/
+.playwright/
+.vercel/
+
+# Blume
+.blume-verify
+
+# Remotion
+build/
+out/
+.remotion/

@@ -11,9 +11,16 @@ import { isUnderPath } from "./nav-utils.ts";
 interface Props {
   selector: NavSelector;
   route: string;
+  /**
+   * Which edge the dropdown panel anchors to. `start` (the default) suits the
+   * header's leading selector group; the version selector sits at the trailing
+   * edge next to the language switcher, where a start-anchored panel would
+   * overflow the viewport — pass `end` there.
+   */
+  align?: "start" | "end";
 }
 
-const { selector, route } = Astro.props;
+const { selector, route, align = "start" } = Astro.props;
 
 // The active item is the deepest path the current route sits under (on a path
 // boundary, so `/api` never claims `/api-reference` routes), falling back to
@@ -46,7 +53,9 @@ const menuRowClass =
           size={14}
         />
       </summary>
-      <div class="absolute start-0 z-50 mt-2 min-w-56 rounded-blume border border-border bg-background p-1 shadow-xl">
+      <div
+        class={`absolute z-50 mt-2 min-w-56 rounded-blume border border-border bg-background p-1 shadow-xl ${align === "end" ? "end-0" : "start-0"}`}
+      >
         {selector.items.map((item) => (
           <a
             aria-current={item.path === active?.path ? "true" : undefined}

@@ -157,11 +157,8 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
   }
   <LogoSlot logo={logo} site={site} />
   {
-    (versionSelector || navigation.selectors.length > 0) && (
+    navigation.selectors.length > 0 && (
       <div class="flex items-center gap-1.5">
-        {versionSelector && (
-          <NavSelector route={route} selector={versionSelector} />
-        )}
         {navigation.selectors.map((selector) => (
           <NavSelector route={route} selector={selector} />
         ))}
@@ -184,6 +181,15 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
     )
   }
   <div class="flex-1"></div>
+  {
+    /* Right-aligned next to the language switcher: the spacer absorbs its
+       width, so pages without a version selector (blog, generated references)
+       keep the logo, tabs, and the rest of this cluster in place — no layout
+       shift when crossing into the docs. */
+    versionSelector && (
+      <NavSelector align="end" route={route} selector={versionSelector} />
+    )
+  }
   {
     localeSwitch && localeSwitch.length > 1 && (
       <LanguageSwitcher
