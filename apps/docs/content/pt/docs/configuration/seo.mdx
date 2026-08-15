@@ -250,7 +250,7 @@ As URLs são absolutas quando `deployment.site` está definido. Páginas marcada
 
 ## Sitemap
 
-O Blume escreve um `sitemap.xml` com todas as páginas indexáveis no momento do build. Ele precisa de um [`deployment.site`](/docs/deployment) absoluto e lista todas as páginas, exceto rascunhos, ocultas e páginas com `noindex`. Ativado por padrão:
+O Blume escreve um `sitemap.xml` com todas as páginas indexáveis no momento do build. Ele precisa de um [`deployment.site`](/docs/deployment) absoluto e lista todas as páginas, exceto rascunhos, ocultas e páginas com `noindex`. Em um site [versionado](/docs/content/versioning), as páginas arquivadas cujo canônico aponta para o equivalente em produção também ficam de fora — a página em produção é a que deve ser indexada. Ativado por padrão:
 
 ```ts blume.config.ts lineNumbers
 seo: {

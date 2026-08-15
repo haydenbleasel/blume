@@ -250,7 +250,7 @@ URLs sind absolut, wenn `deployment.site` gesetzt ist. Seiten, die mit `seo.noin
 
 ## Sitemap
 
-Blume schreibt zur Build-Zeit eine `sitemap.xml` mit jeder indexierbaren Seite. Sie benötigt ein absolutes [`deployment.site`](/docs/deployment) und listet jede Seite auf, außer Entwürfen, versteckten und `noindex`-Seiten. Standardmäßig aktiviert:
+Blume schreibt zur Build-Zeit eine `sitemap.xml` mit jeder indexierbaren Seite. Sie benötigt ein absolutes [`deployment.site`](/docs/deployment) und listet jede Seite auf, außer Entwürfen, versteckten und `noindex`-Seiten. Auf einer [versionierten](/docs/content/versioning) Site bleiben außerdem archivierte Seiten außen vor, deren Canonical auf ihre aktuelle Entsprechung zeigt – die aktuelle Seite ist die, die indexiert werden soll. Standardmäßig aktiviert:
 
 ```ts blume.config.ts lineNumbers
 seo: {

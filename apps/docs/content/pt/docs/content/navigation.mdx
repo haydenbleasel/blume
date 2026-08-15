@@ -205,6 +205,8 @@ navigation: {
 
 Cada item recebe um `label`, um `path` e, opcionalmente, `icon`, `description` e `tag`. `kind` (`dropdown`, `product`, `version` ou `language`) é uma indicação de como o seletor é usado; todos renderizam o mesmo dropdown.
 
+Com [versionamento](/docs/content/versioning) configurado, o Blume renderiza um seletor de versão automaticamente — declarar aqui o seu próprio seletor `kind: "version"` substitui o automático, então configurações feitas à mão continuam funcionando.
+
 ## Links em destaque
 
 Fixe links no topo da barra lateral, acima de todas as seções — um blog, um changelog, uma página de contato ou suporte que deva estar sempre a um clique de distância. Diferentemente da árvore gerada, os links em destaque **não são delimitados por aba**: eles aparecem em todas as rotas, em todos os breakpoints.

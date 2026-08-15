@@ -44,6 +44,8 @@ Escreva o `href` como se o site estivesse montado na raiz — um `basePath` é a
 
 Para cada página indexável, o Blume indexa seu título, sua descrição e o corpo reduzido a texto simples — blocos de código, imagens e marcação são removidos, para que os resultados permaneçam relevantes. O índice é construído a partir dos seus arquivos-fonte, então é idêntico em desenvolvimento e em produção.
 
+Em um site com [versionamento](/docs/content/versioning), os resultados ficam restritos por padrão à versão que está sendo visualizada, com um botão "Todas as versões" no rodapé do diálogo (memorizado por leitor). As correspondências de outras versões indicam sua versão na linha. Orama, FlexSearch, Algolia e Typesense respeitam esse escopo — os registros hospedados carregam uma faceta `version`, com a documentação atual enviada como `"current"` — enquanto o Pagefind permanece sem escopo, seguindo o mesmo comportamento que tem com idiomas.
+
 ## Tags
 
 Adicione `search.tags` ao frontmatter de uma página para agrupá-la sob um filtro no diálogo de busca — os leitores podem restringir os resultados a uma tag com um clique. As tags também se tornam uma faceta nos provedores hospedados.

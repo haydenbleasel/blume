@@ -249,7 +249,7 @@ seo: {
 
 ## サイトマップ
 
-Blume はビルド時に、インデックス可能なすべてのページを含む `sitemap.xml` を書き出します。絶対 URL の [`deployment.site`](/docs/deployment) が必要で、下書き、非表示、`noindex` のページを除くすべてのページを一覧します。デフォルトで有効です。
+Blume はビルド時に、インデックス可能なすべてのページを含む `sitemap.xml` を書き出します。絶対 URL の [`deployment.site`](/docs/deployment) が必要で、下書き、非表示、`noindex` のページを除くすべてのページを一覧します。[バージョン管理](/docs/content/versioning)されたサイトでは、canonical が公開中の同等ページを指しているアーカイブ済みのページも除外されます。インデックスすべきなのは公開中のページだからです。デフォルトで有効です。
 
 ```ts blume.config.ts lineNumbers
 seo: {

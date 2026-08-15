@@ -45,6 +45,8 @@ Schreibe `href` so, als wäre die Website im Stammverzeichnis eingehängt — ei
 
 Für jede indexierbare Seite indexiert Blume ihren Titel, ihre Beschreibung und den auf reinen Text reduzierten Fließtext — Codeblöcke, Bilder und Markup werden entfernt, damit die Ergebnisse relevant bleiben. Der Index wird aus deinen Quelldateien erstellt und ist daher in der Entwicklung und in der Produktion identisch.
 
+Auf einer [versionierten](/docs/content/versioning) Website beziehen sich die Ergebnisse standardmäßig auf die gerade angesehene Version, mit einem „Alle Versionen“-Schalter in der Fußzeile des Dialogs (der pro Leser gemerkt wird). Treffer aus anderen Versionen nennen ihre Version in der Zeile. Orama, FlexSearch, Algolia und Typesense berücksichtigen diese Eingrenzung — gehostete Datensätze tragen eine `version`-Facette, wobei die aktuelle Doku als `"current"` hochgeladen wird —, während Pagefind ohne Eingrenzung bleibt, passend zu seinem Verhalten bei Sprachen.
+
 ## Tags
 
 Füge `search.tags` zum Frontmatter einer Seite hinzu, um sie im Suchdialog unter einem Filter zu gruppieren — Leser können Ergebnisse mit einem Klick auf ein Tag eingrenzen. Tags werden bei den gehosteten Anbietern außerdem zu einer Facette.

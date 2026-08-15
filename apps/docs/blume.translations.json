@@ -91,16 +91,16 @@
       "pt": "8eabf2eba068b192"
     },
     "content/docs/configuration/search.mdx": {
-      "de": "3fef557d71fce514",
-      "hi": "3fef557d71fce514",
-      "ja": "3fef557d71fce514",
-      "pt": "3fef557d71fce514"
+      "de": "3080aee7937265e4",
+      "hi": "3080aee7937265e4",
+      "ja": "3080aee7937265e4",
+      "pt": "3080aee7937265e4"
     },
     "content/docs/configuration/seo.mdx": {
-      "de": "14038d13fcc30656",
-      "hi": "14038d13fcc30656",
-      "ja": "14038d13fcc30656",
-      "pt": "14038d13fcc30656"
+      "de": "0694af2155c9201f",
+      "hi": "0694af2155c9201f",
+      "ja": "0694af2155c9201f",
+      "pt": "0694af2155c9201f"
     },
     "content/docs/configuration/theming.mdx": {
       "de": "26c689f54888ceb2",
@@ -115,10 +115,10 @@
       "pt": "2707421e481e5d0a"
     },
     "content/docs/content/i18n.mdx": {
-      "de": "3daeee5d79221bd3",
-      "hi": "3daeee5d79221bd3",
-      "ja": "3daeee5d79221bd3",
-      "pt": "3daeee5d79221bd3"
+      "de": "2d0ecedea7020aaa",
+      "hi": "2d0ecedea7020aaa",
+      "ja": "2d0ecedea7020aaa",
+      "pt": "2d0ecedea7020aaa"
     },
     "content/docs/content/index.mdx": {
       "de": "c45f621f8cd6ab21",
@@ -139,16 +139,16 @@
       "pt": "673cb660024ce44a"
     },
     "content/docs/content/meta.ts": {
-      "de": "13e3c4a15b2070bf",
-      "hi": "13e3c4a15b2070bf",
-      "ja": "13e3c4a15b2070bf",
-      "pt": "13e3c4a15b2070bf"
+      "de": "e670341fb4457dcb",
+      "hi": "e670341fb4457dcb",
+      "ja": "e670341fb4457dcb",
+      "pt": "e670341fb4457dcb"
     },
     "content/docs/content/navigation.mdx": {
-      "de": "c076630216c19205",
-      "hi": "c076630216c19205",
-      "ja": "c076630216c19205",
-      "pt": "c076630216c19205"
+      "de": "334eed34f148094f",
+      "hi": "334eed34f148094f",
+      "ja": "334eed34f148094f",
+      "pt": "334eed34f148094f"
     },
     "content/docs/content/sources.mdx": {
       "de": "1b7a578403f867d9",
@@ -162,6 +162,12 @@
       "ja": "a5d02160da19c093",
       "pt": "a5d02160da19c093"
     },
+    "content/docs/content/versioning.mdx": {
+      "de": "01357d2535f3dfaa",
+      "hi": "01357d2535f3dfaa",
+      "ja": "01357d2535f3dfaa",
+      "pt": "01357d2535f3dfaa"
+    },
     "content/docs/index.mdx": {
       "de": "03dda104af083a83",
       "hi": "03dda104af083a83",
@@ -169,10 +175,10 @@
       "pt": "03dda104af083a83"
     },
     "content/docs/reference/cli.mdx": {
-      "de": "24e1b9cb94ecca7d",
-      "hi": "24e1b9cb94ecca7d",
-      "ja": "24e1b9cb94ecca7d",
-      "pt": "24e1b9cb94ecca7d"
+      "de": "8dc4708d36eca642",
+      "hi": "8dc4708d36eca642",
+      "ja": "8dc4708d36eca642",
+      "pt": "8dc4708d36eca642"
     },
     "content/docs/reference/eval.mdx": {
       "de": "d35e4fbf659ae938",

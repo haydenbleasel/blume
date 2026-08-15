@@ -206,6 +206,8 @@ navigation: {
 
 Jeder Eintrag nimmt ein `label`, einen `path` sowie optional `icon`, `description` und `tag` entgegen. `kind` (`dropdown`, `product`, `version` oder `language`) ist ein Hinweis darauf, wie der Selektor verwendet wird; alle stellen dasselbe Dropdown dar.
 
+Ist [Versionierung](/docs/content/versioning) konfiguriert, stellt Blume automatisch einen Versions-Selektor dar – deklarierst du hier einen eigenen `kind: "version"`-Selektor, ersetzt er den automatischen, sodass selbstgebaute Setups weiterhin funktionieren.
+
 ## Hervorgehobene Links
 
 Hefte Links an den oberen Rand der Seitenleiste, über alle Abschnitte – ein Blog, ein Changelog, eine Kontakt- oder Supportseite, die immer nur einen Klick entfernt sein sollte. Anders als der generierte Baum sind hervorgehobene Links **nicht nach Tab eingegrenzt**: Sie erscheinen auf jeder Route und bei jedem Breakpoint.
