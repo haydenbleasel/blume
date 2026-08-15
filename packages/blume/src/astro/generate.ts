@@ -50,6 +50,7 @@ import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import { missingFontFiles, resolveOgFonts } from "../og/derive.ts";
 import type { DerivedOgFonts } from "../og/derive.ts";
 import { resolveOgLogo } from "../og/logo.ts";
+import type { OpenApiData } from "../openapi/model.ts";
 import { hasScalarReferences, referenceRoutes } from "../openapi/references.ts";
 import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
@@ -1393,6 +1394,32 @@ const planPlaygroundProxy = (
 });
 
 /**
+ * The origins the built-in proxy is allowed to reach: one per absolute
+ * `servers[].url` across the parsed specs. This is the endpoint's whole trust
+ * boundary — the client sends the target as a query parameter, and a reader's
+ * custom base URL is not a documented server — so it is derived here, at build
+ * time, from the same documents the operation pages render.
+ *
+ * Relative (`/v1`) and templated (`{env}.api.example.com`) server URLs carry no
+ * origin to allow and are skipped; AsyncAPI documents declare `servers` as a
+ * map and contribute nothing (the proxy is OpenAPI-only).
+ */
+const specOrigins = (data: OpenApiData): string[] => {
+  const origins = new Set<string>();
+  for (const spec of Object.values(data)) {
+    const { servers } = spec.document as { servers?: { url?: string }[] };
+    for (const server of Array.isArray(servers) ? servers : []) {
+      try {
+        origins.add(new URL(server.url ?? "").origin);
+      } catch {
+        // Not an absolute URL: nothing to allow.
+      }
+    }
+  }
+  return [...origins].toSorted();
+};
+
+/**
  * Write the Ask AI endpoint and, unless the backend runs its own retrieval
  * (Inkeep), the grounding snapshot the endpoint queries at request time. A no-op
  * when Ask AI is disabled.
@@ -1628,6 +1655,12 @@ export const generateRuntime = async (
   const mcp = planMcp(project, srcDir, pages);
   pages.push(...mcp.discoveryPages);
 
+  // The parsed OpenAPI specs behind the `blume:openapi` alias, also the source
+  // of the proxy's origin allowlist below. The source parsed them during the
+  // scan, so reading them here is free.
+  const openApiSource = project.sources.find(isOpenApiSource);
+  const openApiData = openApiSource ? openApiSource.openApiData() : {};
+
   // The playground's built-in CORS proxy rides the same injection path as the
   // MCP discovery docs; the endpoint itself opts out of prerendering.
   const playgroundProxy = planPlaygroundProxy(config, srcDir);
@@ -1784,7 +1817,10 @@ export const generateRuntime = async (
     writeAskFiles(project, srcDir, write),
     writeMcpFiles(project, mcp, write),
     playgroundProxy.enabled
-      ? write(playgroundProxy.entrypoint, playgroundProxyTemplate())
+      ? write(
+          playgroundProxy.entrypoint,
+          playgroundProxyTemplate(specOrigins(openApiData))
+        )
       : Promise.resolve(false),
   ]);
 
@@ -1967,20 +2003,16 @@ export const generateRuntime = async (
     );
   }
 
-  // The parsed OpenAPI specs behind the `blume:openapi` alias. Always written
-  // (even as `{}`) so the alias resolves whether or not a reference is enabled;
-  // the source parsed the specs during the scan, so this is just serialization.
-  const openApiSource = project.sources.find(isOpenApiSource);
+  // `openapi.json` (the `blume:openapi` alias) is always written — even as `{}`
+  // — so the alias resolves whether or not a reference is enabled; the specs
+  // were parsed during the scan, so this is just serialization.
   // These write to distinct trees and never read one another, so they batch.
   // `data.json`/`openapi.json` and the manifest are not "structural" for Astro;
   // they hot-reload. `writeStagedContent` owns the `.blume/content` tree (its
   // own pruning), outside `.blume/src`, so a removed remote entry doesn't linger.
   await Promise.all([
     write(join(srcDir, "generated", "data.json"), buildRuntimeData(project)),
-    write(
-      openapiPath,
-      `${JSON.stringify(openApiSource ? openApiSource.openApiData() : {})}\n`
-    ),
+    write(openapiPath, `${JSON.stringify(openApiData)}\n`),
     write(
       join(out, "blume.manifest.json"),
       `${JSON.stringify(project.manifest, null, 2)}\n`
