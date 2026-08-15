@@ -1,6 +1,8 @@
 ---
 import specs from "blume:openapi";
 
+import type { AsyncApiDocument } from "../../openapi/asyncapi.ts";
+
 // The spec-level metadata block (version + base URLs) at the top of an API
 // overview page. The tag sections that follow are emitted by `overviewMdx` as
 // markdown headings plus `<ApiTagOperations>` lists, so they land in the
@@ -11,8 +13,32 @@ interface Props {
 
 const { source } = Astro.props;
 const spec = specs[source];
-const servers =
-  ((spec?.document ?? {}) as { servers?: { url?: string }[] }).servers ?? [];
+
+// OpenAPI declares `servers` as an array of URLs; AsyncAPI as a named map of
+// host/protocol/pathname. Both flatten into one list of address chips.
+const addresses: string[] = [];
+if (spec?.kind === "asyncapi") {
+  const servers = (spec.document as AsyncApiDocument).servers ?? {};
+  for (const server of Object.values(servers)) {
+    if (server?.host) {
+      addresses.push(
+        `${server.protocol ? `${server.protocol}://` : ""}${server.host}${server.pathname ?? ""}`
+      );
+    }
+  }
+} else {
+  // Hand-written specs sometimes declare `servers` as a bare object; degrade
+  // to no address chips instead of throwing mid-build.
+  const declared = ((spec?.document ?? {}) as { servers?: { url?: string }[] })
+    .servers;
+  const servers = Array.isArray(declared) ? declared : [];
+  for (const server of servers) {
+    if (server.url) {
+      addresses.push(server.url);
+    }
+  }
+}
+const addressLabel = spec?.kind === "asyncapi" ? "Servers" : "Base URL";
 ---
 
 {
@@ -23,12 +49,12 @@ const servers =
           Version {spec.version}
         </div>
       )}
-      {servers.length > 0 && (
+      {addresses.length > 0 && (
         <div class="not-prose mb-8 flex flex-wrap items-center gap-2">
-          <span class="text-muted-foreground text-xs">Base URL</span>
-          {servers.map((server) => (
+          <span class="text-muted-foreground text-xs">{addressLabel}</span>
+          {addresses.map((address) => (
             <code class="rounded bg-muted px-2 py-0.5 text-foreground text-xs">
-              {server.url}
+              {address}
             </code>
           ))}
         </div>

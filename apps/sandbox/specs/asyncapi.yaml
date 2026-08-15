@@ -1,0 +1,231 @@
+asyncapi: 3.0.0
+info:
+  title: Acme Commerce Events
+  version: 1.4.0
+  description: |
+    Event-driven surface of the Acme Commerce platform. Order lifecycle
+    events stream over Kafka, customer-facing status updates fan out over
+    WebSockets, and device telemetry arrives over MQTT.
+  tags:
+    - name: Orders
+      description: Order lifecycle events
+    - name: Notifications
+      description: Customer-facing status updates
+    - name: Telemetry
+      description: Device telemetry ingestion
+servers:
+  production-kafka:
+    host: kafka.acme.dev:9092
+    protocol: kafka
+    description: Primary Kafka cluster.
+    security:
+      - $ref: "#/components/securitySchemes/saslScram"
+  public-ws:
+    host: ws.acme.dev
+    protocol: wss
+    description: Public WebSocket gateway.
+  iot-mqtt:
+    host: mqtt.acme.dev
+    protocol: mqtt
+    description: IoT ingestion broker.
+channels:
+  orderEvents:
+    address: orders.{region}.created
+    description: New orders, partitioned by region.
+    servers:
+      - $ref: "#/servers/production-kafka"
+    parameters:
+      region:
+        description: Deployment region the order was placed in.
+        enum:
+          - eu
+          - us
+          - apac
+        default: eu
+    messages:
+      OrderCreated:
+        $ref: "#/components/messages/OrderCreated"
+    bindings:
+      kafka:
+        bindingVersion: 0.5.0
+        topic: order-created
+        partitions: 12
+  orderStatus:
+    address: orders/{orderId}/status
+    description: Per-order status stream for storefront clients.
+    servers:
+      - $ref: "#/servers/public-ws"
+    parameters:
+      orderId:
+        description: Identifier of the order to watch.
+    messages:
+      OrderStatusChanged:
+        $ref: "#/components/messages/OrderStatusChanged"
+    bindings:
+      ws:
+        bindingVersion: 0.1.0
+        query:
+          type: object
+          properties:
+            token:
+              type: string
+              description: Short-lived access token.
+  deviceTelemetry:
+    address: devices/{deviceId}/telemetry
+    description: Sensor readings reported by field devices.
+    servers:
+      - $ref: "#/servers/iot-mqtt"
+    parameters:
+      deviceId:
+        description: Unique device identifier.
+    messages:
+      TelemetryReading:
+        $ref: "#/components/messages/TelemetryReading"
+operations:
+  publishOrderCreated:
+    action: send
+    channel:
+      $ref: "#/channels/orderEvents"
+    title: Publish order created
+    summary: Emit an event when a customer places an order.
+    description: >
+      Producers publish one event per confirmed order. Consumers must be idempotent — redelivery is possible on rebalance.
+    tags:
+      - name: Orders
+    messages:
+      - $ref: "#/channels/orderEvents/messages/OrderCreated"
+  subscribeOrderStatus:
+    action: receive
+    channel:
+      $ref: "#/channels/orderStatus"
+    title: Subscribe to order status
+    summary: Receive live status updates for a single order.
+    tags:
+      - name: Notifications
+    messages:
+      - $ref: "#/channels/orderStatus/messages/OrderStatusChanged"
+  ingestTelemetry:
+    action: receive
+    channel:
+      $ref: "#/channels/deviceTelemetry"
+    title: Ingest device telemetry
+    summary: Accept telemetry readings from field devices.
+    tags:
+      - name: Telemetry
+    messages:
+      - $ref: "#/channels/deviceTelemetry/messages/TelemetryReading"
+    bindings:
+      mqtt:
+        bindingVersion: 0.2.0
+        qos: 1
+components:
+  messages:
+    OrderCreated:
+      name: OrderCreated
+      title: Order created
+      contentType: application/json
+      headers:
+        type: object
+        properties:
+          correlationId:
+            type: string
+            description: Traces the event back to the originating request.
+        required:
+          - correlationId
+      payload:
+        $ref: "#/components/schemas/Order"
+    OrderStatusChanged:
+      name: OrderStatusChanged
+      title: Order status changed
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          orderId:
+            type: string
+          status:
+            type: string
+            enum:
+              - confirmed
+              - shipped
+              - delivered
+              - cancelled
+          changedAt:
+            type: string
+            format: date-time
+        required:
+          - orderId
+          - status
+    TelemetryReading:
+      name: TelemetryReading
+      title: Telemetry reading
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          deviceId:
+            type: string
+          temperature:
+            type: number
+            description: Ambient temperature in degrees Celsius.
+          battery:
+            type: integer
+            minimum: 0
+            maximum: 100
+          recordedAt:
+            type: string
+            format: date-time
+        required:
+          - deviceId
+          - recordedAt
+  schemas:
+    Order:
+      type: object
+      description: A confirmed customer order.
+      properties:
+        id:
+          type: string
+          description: Order identifier.
+        customerId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        total:
+          type: number
+          description: Order total in the customer's currency.
+        currency:
+          type: string
+          examples:
+            - USD
+        placedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - customerId
+        - items
+        - total
+    OrderItem:
+      type: object
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+      required:
+        - sku
+        - quantity
+  securitySchemes:
+    saslScram:
+      type: scramSha256
+      description: SASL/SCRAM credentials issued per producer service.
+    wsToken:
+      type: httpApiKey
+      name: token
+      in: query
+      description: Short-lived token minted by the storefront session API.

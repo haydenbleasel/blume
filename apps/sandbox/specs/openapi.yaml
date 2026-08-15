@@ -1,0 +1,207 @@
+openapi: 3.1.0
+info:
+  title: Acme Commerce API
+  version: 1.4.0
+  description: REST surface of the Acme Commerce platform.
+servers:
+  - url: https://api.acme.dev/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Orders
+    description: Create and inspect orders
+  - name: Customers
+    description: Customer records
+paths:
+  /orders:
+    get:
+      operationId: listOrders
+      tags:
+        - Orders
+      summary: List orders
+      description: Returns orders newest-first, paginated.
+      parameters:
+        - name: page
+          in: query
+          description: Page number, starting at 1.
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Page size, capped at 100.
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: A page of orders.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: createOrder
+      tags:
+        - Orders
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewOrder"
+      responses:
+        "201":
+          description: The created order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "422":
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      tags:
+        - Orders
+      summary: Get an order
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: No such order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: cancelOrder
+      tags:
+        - Orders
+      summary: Cancel an order
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Cancelled.
+  /customers/{customerId}:
+    get:
+      operationId: getCustomer
+      tags:
+        - Customers
+      summary: Get a customer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Order:
+      type: object
+      description: A confirmed customer order.
+      properties:
+        id:
+          type: string
+        customerId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        total:
+          type: number
+        currency:
+          type: string
+          examples:
+            - USD
+        placedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - customerId
+        - items
+        - total
+    NewOrder:
+      type: object
+      properties:
+        customerId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+      required:
+        - customerId
+        - items
+    OrderItem:
+      type: object
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+      required:
+        - sku
+        - quantity
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+        - id
+        - email
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required:
+        - code
+        - message

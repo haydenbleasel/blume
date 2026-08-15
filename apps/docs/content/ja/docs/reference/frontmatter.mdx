@@ -49,7 +49,10 @@ sidebar:
   icon: download
   badge: New
   hidden: false
+  display: page
 ```
+
+`display` はそのページが属するフォルダーグループの表示モードを設定し（[グループ単位の上書き](/docs/content/navigation#per-group-overrides)）、生成されるサイドバーにおけるフォルダーの `index` ページでのみ意味を持ちます。それ以外の場所（index 以外のページ、コンテンツルート自身の `index` ページ、明示的な `navigation.sidebar` 配下のページ）では設定対象となるグループが存在しないため、Blume は `BLUME_SIDEBAR_DISPLAY_IGNORED` の警告を出します。
 
 ## SEO
 

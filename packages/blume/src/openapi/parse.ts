@@ -1,11 +1,15 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import type { AsyncAPIDocument as ConverterDocument } from "@asyncapi/converter";
+import { convert } from "@asyncapi/converter";
 import { normalize, upgrade } from "@scalar/openapi-parser";
 import pRetry, { AbortError } from "p-retry";
 import { isAbsolute, join } from "pathe";
 
 import { hashText } from "../core/sources/cache.ts";
+import type { AsyncApiDocument } from "./asyncapi.ts";
+import { normalizeAsyncApiDocument } from "./asyncapi.ts";
 import type { ApiDocument } from "./model.ts";
 
 /**
@@ -300,4 +304,67 @@ export const parseSpec = async (
     );
   }
   return { document: specification as ApiDocument, warnings };
+};
+
+export interface ParsedAsyncApiSpec {
+  document: AsyncApiDocument;
+  warnings: string[];
+}
+
+/**
+ * Read and normalize a spec to an AsyncAPI 3.x document — the AsyncAPI mirror
+ * of {@link parseSpec}. 1.x/2.x documents are lifted to 3.0 with the official
+ * `@asyncapi/converter` (channels + operations with `send`/`receive` actions),
+ * so the extractor and components only ever handle one shape; `$ref`s stay
+ * intact, matching the OpenAPI path. Error semantics match `parseSpec`: an
+ * unreadable spec throws, a readable non-AsyncAPI document throws
+ * {@link InvalidSpecError}, and callers lower both into source diagnostics.
+ */
+export const parseAsyncApiSpec = async (
+  spec: string,
+  root: string,
+  options: SpecFetchOptions = {}
+): Promise<ParsedAsyncApiSpec> => {
+  const { text, warnings } = await readSpecText(spec, root, options);
+  const normalized = normalize(text) as AsyncApiDocument | null | undefined;
+  const version =
+    normalized !== null && typeof normalized === "object"
+      ? normalized.asyncapi
+      : undefined;
+  if (typeof version !== "string" || version === "") {
+    throw new InvalidSpecError(
+      `${spec} is not a valid AsyncAPI document (expected a YAML or JSON object with an \`asyncapi\` version field).`
+    );
+  }
+  let document = normalized as AsyncApiDocument;
+  if (!version.startsWith("3.")) {
+    // The converter reports lossy conversions (e.g. a 2.x parameter schema
+    // that 3.0 can't express) through console.warn — capture those as spec
+    // warnings instead of letting them leak into CLI output.
+    const captured: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      captured.push(args.map(String).join(" "));
+    };
+    try {
+      document = convert(
+        document as ConverterDocument,
+        "3.0.0"
+      ) as AsyncApiDocument;
+    } catch (error) {
+      // An unconvertible document (say, an unknown `asyncapi` version) is a
+      // content problem, not a network one — same class as a non-document.
+      throw new InvalidSpecError(
+        `${spec} could not be converted to AsyncAPI 3.0 (${(error as Error).message}).`
+      );
+    } finally {
+      console.warn = originalWarn;
+    }
+    warnings.push(
+      ...captured.map(
+        (message) => `Converting ${spec} to AsyncAPI 3.0: ${message}`
+      )
+    );
+  }
+  return { document: normalizeAsyncApiDocument(document), warnings };
 };

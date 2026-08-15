@@ -48,7 +48,10 @@ sidebar:
   icon: download
   badge: New
   hidden: false
+  display: page
 ```
+
+`display` legt den Rendermodus der Ordnergruppe der Seite fest ([Overrides pro Gruppe](/docs/content/navigation#per-group-overrides)) und ist nur auf der `index`-Seite eines Ordners unter der generierten Sidebar sinnvoll — überall sonst (auf einer Nicht-Index-Seite, auf der `index`-Seite des Content-Roots selbst oder auf einer beliebigen Seite unter einer expliziten `navigation.sidebar`) gibt es keine Gruppe zu konfigurieren, und Blume warnt mit `BLUME_SIDEBAR_DISPLAY_IGNORED`.
 
 ## SEO
 

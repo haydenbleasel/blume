@@ -48,7 +48,10 @@ sidebar:
   icon: download
   badge: New
   hidden: false
+  display: page
 ```
+
+`display` define o modo de renderização do grupo de pasta da página ([sobrescritas por grupo](/docs/content/navigation#per-group-overrides)) e só faz sentido na página `index` de uma pasta sob a barra lateral gerada — em qualquer outro lugar (uma página que não seja index, a própria página `index` da raiz de conteúdo ou qualquer página sob uma `navigation.sidebar` explícita) não há grupo para configurar, e o Blume avisa com `BLUME_SIDEBAR_DISPLAY_IGNORED`.
 
 ## SEO
 

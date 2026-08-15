@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
+import stringWidth from "string-width";
 
 import {
   constraints,
@@ -181,9 +182,27 @@ describe("references", () => {
     expect(blumeReferences(config)).toHaveLength(1);
   });
 
-  it("keeps AsyncAPI on the Scalar renderer", () => {
+  it("resolves a Blume-rendered AsyncAPI reference by default", () => {
     const config = blumeConfigSchema.parse({
       asyncapi: { enabled: true, spec: "async.yaml" },
+    });
+    const refs = resolveReferences(config);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]?.renderer).toBe("blume");
+    expect(refs[0]?.kind).toBe("asyncapi");
+    expect(refs[0]?.slug).toBe("events");
+    expect(refs[0]?.display).toStrictEqual({
+      codeSamples: [],
+      expandSchemas: false,
+      playground: { enabled: false, proxy: false },
+    });
+    expect(hasScalarReferences(config)).toBe(false);
+    expect(blumeReferences(config)).toHaveLength(1);
+  });
+
+  it("keeps the Scalar opt-out for AsyncAPI", () => {
+    const config = blumeConfigSchema.parse({
+      asyncapi: { enabled: true, renderer: "scalar", spec: "async.yaml" },
     });
     expect(hasScalarReferences(config)).toBe(true);
     expect(blumeReferences(config)).toStrictEqual([]);
@@ -1198,6 +1217,31 @@ describe("render-mdx", () => {
     expect(description).not.toContain("second paragraph");
     // Truncation cuts on a word boundary, never mid-word.
     expect(description).toContain("…");
+  });
+
+  it("caps a fullwidth meta description by display columns", () => {
+    // 100 fullwidth characters are within the 160-character cap but render
+    // ~200 columns wide — the audit, which grades in display columns, would
+    // flag every generated operation page as "too long" with no fix short of
+    // editing the upstream spec. The clip must budget in the same columns.
+    const op = {
+      deprecated: false,
+      description: "あ".repeat(100),
+      key: "op",
+      method: "get" as const,
+      operationId: "op",
+      path: "/pet",
+      route: "/api/pet/op",
+      summary: "List pets",
+      tag: "pet",
+      tagSlug: "pet",
+    };
+    const { description } = operationMdx(specData(), op).data.seo as {
+      description: string;
+    };
+    expect(stringWidth(description)).toBeLessThanOrEqual(160);
+    expect(description).toContain("…");
+    expect(description).toEndWith("API.");
   });
 
   it("keeps literal punctuation intact in the meta description", () => {

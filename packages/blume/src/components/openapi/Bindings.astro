@@ -1,0 +1,89 @@
+---
+import type { BindingGroup } from "./async.ts";
+import type { SchemaLike } from "./helpers.ts";
+import SchemaTable from "./SchemaTable.astro";
+
+/**
+ * Protocol binding fields as a key/value list, one group per protocol
+ * (`kafka`, `ws`, `mqtt`, …). Schema-shaped values — the ws binding's `query`
+ * and `headers` — render as nested schema tables; everything else as code.
+ */
+interface Props {
+  title: string;
+  groups: BindingGroup[];
+  schemas: Record<string, SchemaLike>;
+  expandAll?: boolean;
+}
+
+const { title, groups, schemas, expandAll = false } = Astro.props;
+
+// A bare `type` key is not enough — binding sub-objects carry protocol enums
+// there (the AMQP exchange's `type: "topic"`), so only a JSON-Schema type
+// value counts.
+const SCHEMA_TYPES = new Set([
+  "array",
+  "boolean",
+  "integer",
+  "null",
+  "number",
+  "object",
+  "string",
+]);
+
+const isSchemaish = (value: unknown): value is SchemaLike => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  if ("properties" in value || "$ref" in value) {
+    return true;
+  }
+  const { type } = value as { type?: unknown };
+  return typeof type === "string" && SCHEMA_TYPES.has(type);
+};
+---
+
+{
+  groups.length > 0 && (
+    <section class="mt-6">
+      <div
+        aria-level="2"
+        class="mb-2 font-semibold text-foreground text-sm"
+        role="heading"
+      >
+        {title}
+      </div>
+      {groups.map((group) => (
+        <div class="not-prose mb-3 rounded-blume border border-border px-4 last:mb-0">
+          <div class="flex items-baseline gap-2 border-border py-3">
+            <code class="font-mono font-semibold text-foreground text-sm">
+              {group.protocol}
+            </code>
+          </div>
+          {group.rows.map((row) => (
+            <div class="border-border border-t py-3">
+              <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <code class="font-mono text-foreground text-sm">{row.name}</code>
+                {!isSchemaish(row.value) && (
+                  <code class="rounded bg-muted px-1 py-0.5 text-foreground text-xs">
+                    {typeof row.value === "string"
+                      ? row.value
+                      : JSON.stringify(row.value)}
+                  </code>
+                )}
+              </div>
+              {isSchemaish(row.value) && (
+                <div class="mt-2">
+                  <SchemaTable
+                    expandAll={expandAll}
+                    schema={row.value}
+                    schemas={schemas}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
+  )
+}

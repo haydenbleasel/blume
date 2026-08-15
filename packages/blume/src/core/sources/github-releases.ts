@@ -2,8 +2,10 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { toString as mdastToString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
+import stringWidth from "string-width";
 
 import matter from "../frontmatter.ts";
+import { columnsPrefix } from "../text-width.ts";
 import {
   hashText,
   loadWithCache,
@@ -61,9 +63,10 @@ const LEADING_V = /^v/iu;
 const NON_SLUG = /[^a-z0-9]+/gu;
 const EDGE_DASHES = /^-+|-+$/gu;
 
-// `blume audit` grades meta descriptions against the 110–160 character search
-// snippet range (audit/types.ts thresholds), so the derived summary aims for
-// the longest word-boundary cut under the cap.
+// `blume audit` grades meta descriptions against the 110–160 display-column
+// search snippet range (audit/types.ts thresholds), so the derived summary
+// budgets in the same columns and aims for the longest word-boundary cut
+// under the cap.
 const DESCRIPTION_MAX = 160;
 const DESCRIPTION_MIN = 110;
 
@@ -85,26 +88,6 @@ const NON_PROSE = new Set(["code", "heading", "html", "thematicBreak"]);
  * content kept — then cut at a word boundary to fit the search snippet cap.
  * Undefined when the notes have no prose at all.
  */
-/**
- * The longest prefix of `text` that fits `max` UTF-16 units without cutting
- * inside a grapheme cluster. A bare `String#slice` counts code units, so it
- * can split a surrogate pair (emitting a lone surrogate — invalid Unicode —
- * into a meta description) or halve an emoji sequence. Grapheme segmentation
- * is rule-based (UAX #29), so unlike word segmentation it does not drift
- * across ICU builds.
- */
-const graphemePrefix = (text: string, max: number): string => {
-  let end = 0;
-  const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  for (const { index, segment } of graphemes.segment(text)) {
-    if (index + segment.length > max) {
-      break;
-    }
-    end = index + segment.length;
-  }
-  return text.slice(0, end);
-};
-
 const releaseDescription = (body: string): string | undefined => {
   const tree = fromMarkdown(body.replaceAll(CHANGESET_HASH, "$<mark>"), {
     extensions: [gfm()],
@@ -123,15 +106,17 @@ const releaseDescription = (body: string): string | undefined => {
   if (!text) {
     return undefined;
   }
-  if (text.length <= DESCRIPTION_MAX) {
+  if (stringWidth(text) <= DESCRIPTION_MAX) {
     return text;
   }
   // Cut before the cap at a word boundary (kept only when it doesn't drop the
   // summary under the minimum), shed any dangling punctuation, and mark the cut.
-  const slice = graphemePrefix(text, DESCRIPTION_MAX - 1);
+  const slice = columnsPrefix(text, DESCRIPTION_MAX - 1);
   const boundary = slice.lastIndexOf(" ");
   const head = (
-    boundary >= DESCRIPTION_MIN ? slice.slice(0, boundary) : slice
+    boundary !== -1 && stringWidth(slice.slice(0, boundary)) >= DESCRIPTION_MIN
+      ? slice.slice(0, boundary)
+      : slice
   ).replace(TRAILING_FRAGMENT, "");
   return `${head}…`;
 };

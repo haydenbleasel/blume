@@ -78,14 +78,25 @@ describe("resolveReferences playground display", () => {
     });
   });
 
-  it("disables the playground for AsyncAPI (Scalar-only) references", () => {
+  it("disables the playground on natively-rendered AsyncAPI references", () => {
     const config = blumeConfigSchema.parse({
       asyncapi: { enabled: true, spec: "async.yaml" },
     });
+    expect(resolveReferences(config)[0]?.renderer).toBe("blume");
     expect(resolveReferences(config)[0]?.display.playground).toStrictEqual({
       enabled: false,
       proxy: false,
     });
+  });
+
+  it("rejects playground on the asyncapi block", () => {
+    // An event operation has no HTTP request to send, so the key is
+    // OpenAPI-only rather than part of the shared reference shape.
+    expect(
+      blumeConfigSchema.safeParse({
+        asyncapi: { enabled: true, playground: false, spec: "async.yaml" },
+      }).success
+    ).toBeFalsy();
   });
 });
 

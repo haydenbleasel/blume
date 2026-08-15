@@ -1,10 +1,10 @@
 ---
 title: OpenAPI / AsyncAPI
 description: >-
-  Binde eine OpenAPI-Spezifikation ein und erhalte eine native API-Referenz – eine echte Seite pro Operation, in deiner Seitenleiste und Suche.
+  Binde eine OpenAPI- oder AsyncAPI-Spezifikation ein und erhalte eine native API-Referenz – eine echte Seite pro Operation, in deiner Seitenleiste und Suche.
 ---
 
-Richte Blume auf eine OpenAPI-Spezifikation aus, und es generiert eine native API-Referenz: eine **echte Seite pro Operation**, nach Tag gruppiert in einer tab-bezogenen Seitenleiste, mit Schema-Tabellen, Request-/Response-Beispielen und generierten Codebeispielen. Da jede Operation eine echte Blume-Seite ist, erhält sie eine eigene URL, erscheint in der **Website-Suche** und in `llms.txt` und bekommt ein Open-Graph-Bild – genau wie jedes handgeschriebene Dokument. Die folgende Konfiguration richtet Blume beispielhaft auf die öffentliche Petstore-Spezifikation aus.
+Richte Blume auf eine OpenAPI-Spezifikation aus, und es generiert eine native API-Referenz: eine **echte Seite pro Operation**, nach Tag gruppiert in einer tab-bezogenen Seitenleiste, mit Schema-Tabellen, Request-/Response-Beispielen und generierten Codebeispielen. Da jede Operation eine echte Blume-Seite ist, erhält sie eine eigene URL, erscheint in der **Website-Suche** und in `llms.txt` und bekommt ein Open-Graph-Bild – genau wie jedes handgeschriebene Dokument. Ereignisgesteuerte APIs erhalten [dieselbe Behandlung aus einer AsyncAPI-Spezifikation](#asyncapi). Die folgende Konfiguration richtet Blume beispielhaft auf die öffentliche Petstore-Spezifikation aus.
 
 ```ts blume.config.ts lineNumbers
 openapi: {
@@ -104,7 +104,7 @@ openapi: {
 - `includeInLlms: false` hält sie aus beiden `llms.txt`-Dateien heraus.
 - `noindex: true` fügt Crawler-Noindex-Metadaten hinzu und entfernt die Seiten aus der Sitemap.
 
-Beim [Scalar-Renderer](#the-scalar-renderer) gilt nur `noindex` – eine von Scalar gerenderte Referenz liegt ohnehin außerhalb von Blumes Suche und `llms.txt`, sodass die beiden `include*`-Einstellungen dort nichts bewirken können.
+Beim [Scalar-Renderer](#der-scalar-renderer) gilt nur `noindex` – eine von Scalar gerenderte Referenz liegt ohnehin außerhalb von Blumes Suche und `llms.txt`, sodass die beiden `include*`-Einstellungen dort nichts bewirken können.
 
 ## Autorisierung
 
@@ -154,7 +154,7 @@ Blumes eigenes [`i18n`](/docs/content/i18n) übersetzt die Doku-Oberfläche, abe
 
 ## AsyncAPI
 
-Ereignisgesteuerte APIs verwenden einen gleichrangigen `asyncapi`-Block mit derselben Struktur. AsyncAPI wird von Scalar gerendert (der native Renderer unterstützt vorerst nur OpenAPI); nur die Standardroute unterscheidet sich (`/events`):
+Ereignisgesteuerte APIs verwenden einen gleichrangigen `asyncapi`-Block mit derselben Struktur – und demselben nativen Renderer. Jede `send`-/`receive`-Operation wird zu einer echten Seite mit Schema-Tabellen für Message-Payload und -Header, Channel-Parametern, Protokoll-Bindings und einem Authorization-Abschnitt, der aus den `securitySchemes` der Spezifikation abgeleitet wird (auf Server- und Operationsebene, Alternativen als „oder“-Gruppen). Nur die Standardroute unterscheidet sich (`/events`):
 
 ```ts blume.config.ts lineNumbers
 asyncapi: {
@@ -163,6 +163,8 @@ asyncapi: {
 }
 ```
 
-:::warning
-Scalars AsyncAPI-Unterstützung befindet sich noch in Arbeit – sie rendert Channels, Operationen, Messages und einen Models-Abschnitt, aber es gibt noch **keinen interaktiven Playground** für Events. Sie wird im Upstream nach und nach verbessert.
-:::
+AsyncAPI-**2.x-Spezifikationen werden automatisch auf 3.x normalisiert** – mit dem offiziellen AsyncAPI-Konverter, sodass `publish`-/`subscribe`-Channels auf `send`-/`receive`-Operationsseiten mit stabilen URLs abgebildet werden; ein späteres Aktualisieren der Spezifikationsdatei selbst über den Konverter verschiebt daher nichts. Operationen werden nach Tag gruppiert; Operationen ohne Tag werden unter ihrer Channel-Adresse gruppiert.
+
+Codebeispiele sind **protokollbewusst** und richten sich nach dem Binding der Operation (oder dem Protokoll ihrer Server): `wscat` und ein Browser-`WebSocket`-Snippet für WebSockets, `kcat` für Kafka, `mosquitto_pub`/`mosquitto_sub` für MQTT. `codeSamples` filtert diese Auswahl – genauso, wie es beim `openapi`-Block die Sprachen auswählt; ein Protokoll ohne unterstütztes Tool rendert nur das Message-Payload-Beispiel statt eines erfundenen Clients.
+
+Alles oben Dokumentierte gilt unverändert weiter: `route`, `sources` mit `label`/`route`, `expandSchemas`, die Flags für die [Indexierung pro Quelle](#indexierung-pro-quelle) sowie die Suchindexierung nach Zusammenfassung und Tag der Operation. Mit `renderer: "scalar"` wechselst du zurück zur eingebetteten Scalar-SPA – Scalar erkennt den Dokumenttyp automatisch und rendert Channels, Operationen, Messages und einen Models-Abschnitt (kein interaktiver Playground für Events) – wobei, wie bei OpenAPI, nur `noindex` gilt.

@@ -49,7 +49,10 @@ sidebar:
   icon: download
   badge: New
   hidden: false
+  display: page
 ```
+
+`display` पृष्ठ के फ़ोल्डर समूह का रेंडर मोड निर्धारित करती है ([प्रति-समूह ओवरराइड](/docs/content/navigation#per-group-overrides)) और यह केवल जनरेट किए गए साइडबार के अंतर्गत किसी फ़ोल्डर के `index` पृष्ठ पर ही सार्थक है — अन्यत्र कहीं भी (किसी गैर-index पृष्ठ पर, सामग्री रूट के अपने `index` पृष्ठ पर, या किसी स्पष्ट `navigation.sidebar` के अंतर्गत आने वाले किसी पृष्ठ पर) इसके पास कॉन्फ़िगर करने के लिए कोई समूह नहीं होता, और Blume `BLUME_SIDEBAR_DISPLAY_IGNORED` के साथ चेतावनी देता है।
 
 ## SEO
 

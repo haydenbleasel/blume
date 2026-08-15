@@ -9,19 +9,30 @@ import type {
   SourceLoadResult,
 } from "../core/sources/types.ts";
 import type { Diagnostic } from "../core/types.ts";
+import { extractAsyncApiOperations } from "./asyncapi.ts";
+import type { AsyncApiDocument } from "./asyncapi.ts";
 import { extractOperations } from "./model.ts";
-import type { ApiOperationRef, ApiSpecData, OpenApiData } from "./model.ts";
-import { InvalidSpecError, parseSpec } from "./parse.ts";
+import type {
+  ApiDocument,
+  ApiOperationRef,
+  ApiSpecData,
+  ApiTagRef,
+  OpenApiData,
+} from "./model.ts";
+import { InvalidSpecError, parseAsyncApiSpec, parseSpec } from "./parse.ts";
 import type { ReferenceSource } from "./references.ts";
 import { operationMdx, overviewMdx } from "./render-mdx.ts";
 import type { RenderedPage } from "./render-mdx.ts";
 
 /**
- * The staged content source behind Blume's own OpenAPI renderer. Each configured
- * spec is parsed once here, then lowered into one MDX page per operation plus an
- * overview page — so operations become first-class Blume pages (real routes,
- * sidebar, search, i18n, OG) and the parsed documents are handed to the
- * generated `blume:openapi` module for the UI components to render.
+ * The staged content source behind Blume's own API reference renderer (OpenAPI
+ * and AsyncAPI alike). Each configured spec is parsed once here, then lowered
+ * into one MDX page per operation plus an overview page — so operations become
+ * first-class Blume pages (real routes, sidebar, search, i18n, OG) and the
+ * parsed documents are handed to the generated `blume:openapi` module for the
+ * UI components to render. The source keeps its historical `openapi` name for
+ * both kinds — downstream consumers (`ai.llmsTxt.openapi`, the llms noindex
+ * exemption) key on it as "the generated API reference source".
  */
 
 /** A content source that also exposes the specs it parsed during `load()`. */
@@ -107,6 +118,50 @@ interface LoadedSpec {
   diagnostics: Diagnostic[];
 }
 
+/** One parsed spec, whichever front-end read it — the kind dispatch seam. */
+interface ParsedReference {
+  document: ApiDocument | AsyncApiDocument;
+  warnings: string[];
+  operations: ApiOperationRef[];
+  tags: ApiTagRef[];
+  extractWarnings: string[];
+}
+
+const parseReference = async (
+  reference: ReferenceSource,
+  ctx: SourceContext
+): Promise<ParsedReference> => {
+  const options = { cacheDir: ctx.cacheDir, refresh: ctx.refresh };
+  if (reference.kind === "asyncapi") {
+    const { document, warnings } = await parseAsyncApiSpec(
+      reference.spec,
+      ctx.projectRoot,
+      options
+    );
+    const extracted = extractAsyncApiOperations(document, reference.route);
+    return {
+      document,
+      extractWarnings: extracted.warnings,
+      operations: extracted.operations,
+      tags: extracted.tags,
+      warnings,
+    };
+  }
+  const { document, warnings } = await parseSpec(
+    reference.spec,
+    ctx.projectRoot,
+    options
+  );
+  const extracted = extractOperations(document, reference.route);
+  return {
+    document,
+    extractWarnings: extracted.warnings,
+    operations: extracted.operations,
+    tags: extracted.tags,
+    warnings,
+  };
+};
+
 export const openApiSource = (
   references: ReferenceSource[],
   ctx: SourceContext
@@ -116,17 +171,14 @@ export const openApiSource = (
   const loadReference = async (
     reference: ReferenceSource
   ): Promise<LoadedSpec | Diagnostic> => {
+    // Human label and diagnostic-code prefix for the spec's kind, so an
+    // AsyncAPI failure never reads as an OpenAPI one.
+    const kindLabel = reference.kind === "asyncapi" ? "AsyncAPI" : "OpenAPI";
+    const codePrefix =
+      reference.kind === "asyncapi" ? "BLUME_ASYNCAPI" : "BLUME_OPENAPI";
     try {
-      const { document, warnings } = await parseSpec(
-        reference.spec,
-        ctx.projectRoot,
-        { cacheDir: ctx.cacheDir, refresh: ctx.refresh }
-      );
-      const {
-        operations,
-        tags,
-        warnings: extractWarnings,
-      } = extractOperations(document, reference.route);
+      const { document, warnings, operations, tags, extractWarnings } =
+        await parseReference(reference, ctx);
       const info = document.info ?? { title: reference.label, version: "" };
       // The playground proxy resolves here, not client-side: `true` selects
       // the built-in `/_api-proxy` route (mounted under the site `basePath`,
@@ -148,6 +200,7 @@ export const openApiSource = (
         description: info.description ?? "",
         document,
         expandSchemas: reference.display.expandSchemas,
+        kind: reference.kind,
         label: reference.label,
         // Operation pages flow through the content pipeline, which mounts them
         // under the site-wide `basePath` (staged entry refs below stay
@@ -172,13 +225,24 @@ export const openApiSource = (
       return {
         diagnostics: [
           ...warnings.map((message) => ({
-            code: "BLUME_OPENAPI_STALE",
+            // Parse-level notes: an offline cache fallback for either kind,
+            // plus lossy 2.x→3.0 conversion notes for AsyncAPI — hence the
+            // broader code on that side (OpenAPI keeps its historical one).
+            code:
+              reference.kind === "asyncapi"
+                ? "BLUME_ASYNCAPI_SPEC_WARNING"
+                : "BLUME_OPENAPI_STALE",
             message,
             severity: "warning" as const,
           })),
           ...extractWarnings.map((message) => ({
-            code: "BLUME_OPENAPI_REF_PATH_ITEM",
-            message: `In OpenAPI spec "${reference.spec}": ${message}`,
+            // OpenAPI keeps its historical code (the only extract warning it
+            // emits is the unresolved $ref path item).
+            code:
+              reference.kind === "asyncapi"
+                ? "BLUME_ASYNCAPI_SKIPPED_OPERATION"
+                : "BLUME_OPENAPI_REF_PATH_ITEM",
+            message: `In ${kindLabel} spec "${reference.spec}": ${message}`,
             severity: "warning" as const,
           })),
           // A document with no operations (say, a config file that happens to
@@ -187,11 +251,13 @@ export const openApiSource = (
           ...(operations.length === 0
             ? [
                 {
-                  code: "BLUME_OPENAPI_EMPTY",
-                  message: `OpenAPI spec "${reference.spec}" for ${reference.route} declares no operations; its API reference is empty.`,
+                  code: `${codePrefix}_EMPTY`,
+                  message: `${kindLabel} spec "${reference.spec}" for ${reference.route} declares no operations; its API reference is empty.`,
                   severity: "warning" as const,
                   suggestion:
-                    "Check the spec points at an OpenAPI document with operations under `paths`.",
+                    reference.kind === "asyncapi"
+                      ? "Check the spec points at an AsyncAPI document with `channels` and `operations`."
+                      : "Check the spec points at an OpenAPI document with operations under `paths`.",
                 },
               ]
             : []),
@@ -203,8 +269,8 @@ export const openApiSource = (
       };
     } catch (error) {
       return {
-        code: "BLUME_OPENAPI_UNAVAILABLE",
-        message: `Could not load OpenAPI spec "${reference.spec}" for ${reference.route} (${(error as Error).message}); its reference pages were skipped.`,
+        code: `${codePrefix}_UNAVAILABLE`,
+        message: `Could not load ${kindLabel} spec "${reference.spec}" for ${reference.route} (${(error as Error).message}); its reference pages were skipped.`,
         // A configured-but-unloadable spec ships a dead nav tab (a 404 route),
         // so fail loudly in build (blocks under --strict) while staying a warning
         // in dev so offline work still runs.
@@ -213,7 +279,7 @@ export const openApiSource = (
         // only point at reachability for actual fetch/read failures.
         suggestion:
           error instanceof InvalidSpecError
-            ? "Point the spec at an OpenAPI document (a YAML or JSON file with an object at the top level)."
+            ? `Point the spec at ${reference.kind === "asyncapi" ? "an AsyncAPI" : "an OpenAPI"} document (a YAML or JSON file with an object at the top level).`
             : "Check the spec URL/path is reachable from the build environment; behind a proxy, set HTTP(S)_PROXY.",
       };
     }

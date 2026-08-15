@@ -180,15 +180,9 @@ const referencesFor = (
   });
 };
 
-const NO_DISPLAY: ReferenceDisplay = {
-  codeSamples: [],
-  expandSchemas: false,
-  playground: { enabled: false, proxy: false },
-};
-
 /**
- * Resolve every enabled reference. OpenAPI honors its `renderer` (Blume's own UI
- * by default); AsyncAPI is always rendered by Scalar for now.
+ * Resolve every enabled reference. Both blocks honor their `renderer` —
+ * Blume's own UI by default, with the embedded Scalar SPA as the opt-out.
  */
 export const resolveReferences = (
   config: ResolvedConfig
@@ -209,8 +203,13 @@ export const resolveReferences = (
     "asyncapi",
     config.asyncapi,
     "Events",
-    "scalar",
-    NO_DISPLAY,
+    config.asyncapi.renderer,
+    {
+      codeSamples: config.asyncapi.codeSamples,
+      expandSchemas: config.asyncapi.expandSchemas,
+      // OpenAPI-only: an event operation has no HTTP request to send.
+      playground: { enabled: false, proxy: false },
+    },
     config.basePath
   ),
 ];
@@ -243,7 +242,7 @@ const blumeReferenceOf = (
   seen: Map<string, ReferenceSource>,
   usedSlugs: Set<string>
 ): ReferenceSource | null => {
-  if (ref.kind !== "openapi" || ref.renderer !== "blume") {
+  if (ref.renderer !== "blume") {
     return null;
   }
   const kept = seen.get(ref.route);
@@ -271,7 +270,7 @@ const blumeReferenceOf = (
   return accepted;
 };
 
-/** Blume-rendered OpenAPI references, deduped by route (first wins). */
+/** Blume-rendered references (both kinds), deduped by route (first wins). */
 export const blumeReferences = (config: ResolvedConfig): ReferenceSource[] => {
   const seen = new Map<string, ReferenceSource>();
   const usedSlugs = new Set<string>();

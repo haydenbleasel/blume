@@ -32,11 +32,12 @@ Todos os campos são opcionais — defina apenas o que você quiser sobrescrever
 | `icon` | `string` | Ícone exibido ao lado do rótulo. |
 | `order` | `number` | Posição entre grupos e páginas irmãos. Números menores vêm primeiro. |
 | `collapsed` | `boolean` | Sob o [modo de exibição `group`](/docs/content/navigation#display-modes), define se o grupo começa recolhido. |
+| `display` | `"flat" \| "group" \| "page"` | Modo de renderização deste grupo; sobrescreve o [`navigation.sidebar.display`](/docs/content/navigation#display-modes) global. |
 | `pages` | `string[]` | Ordem explícita dos filhos do grupo, por slug. |
 
 O array `pages` lista os filhos por slug — o nome da pasta ou do arquivo com o prefixo numérico e quaisquer parênteses removidos (portanto `01-quickstart.mdx` é `"quickstart"`). Os filhos que você deixar de fora ainda aparecem, depois dos listados.
 
-Como os grupos são renderizados — cabeçalhos planos, blocos recolhíveis ou painéis de navegação em profundidade — é uma configuração de toda a barra lateral, não por pasta: veja [modos de exibição](/docs/content/navigation#display-modes).
+Como os grupos são renderizados — cabeçalhos planos, blocos recolhíveis ou painéis de navegação em profundidade — o padrão é o `navigation.sidebar.display` de toda a barra lateral; defina `display` aqui para sobrescrevê-lo apenas para este grupo. A página `index` de uma pasta também pode defini-lo pelo frontmatter, o que tem precedência sobre o `meta.ts` — veja [sobrescritas por grupo](/docs/content/navigation#per-group-overrides).
 
 ## Meta computado
 

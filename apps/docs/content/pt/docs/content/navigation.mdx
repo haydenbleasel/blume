@@ -70,7 +70,39 @@ navigation: {
 O modo `page` mantém seções profundas organizadas — use-o quando os grupos tiverem muitos filhos e você preferir navegar dentro deles a rolar por eles.
 :::
 
-Um grupo em uma [barra lateral explícita](#explicit-sidebar) pode substituir o modo global com seu próprio `display`.
+### Substituições por grupo
+
+Qualquer grupo gerado pode abrir mão do modo global — sem precisar de uma barra lateral explícita. Defina `display` no [`meta.ts`](/docs/content/meta) da pasta ou — quando a pasta tem uma página `index` — sob `sidebar` no frontmatter dessa página, e apenas aquele grupo muda:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Client SDKs",
+  display: "page",
+});
+```
+
+```yaml index.mdx
+---
+title: Client SDKs
+sidebar:
+  display: page
+---
+```
+
+O modo efetivo de um grupo gerado é resolvido da maior prioridade para a menor:
+
+1. `sidebar.display` no frontmatter da própria página `index` do grupo
+2. `display` no `meta.ts` da pasta
+3. O `navigation.sidebar.display` global
+4. O padrão do Blume (`flat`)
+
+O `display` de um grupo se aplica somente àquele grupo — subgrupos aninhados resolvem seu próprio valor pela mesma cadeia. Um grupo em modo `page` com uma página de índice ainda navega para o seu subpainel: a página de índice aparece como o primeiro item do painel, e cair na URL dela abre o painel diretamente.
+
+`sidebar.display` não significa nada em nenhum outro lugar — em uma página que não seja de índice, na própria página `index` da raiz do conteúdo (a raiz não é um grupo; use `navigation.sidebar.display`) ou em qualquer página quando uma [barra lateral explícita](#explicit-sidebar) estiver configurada (seus itens são donos do modo de cada grupo) — então o Blume emite um aviso `BLUME_SIDEBAR_DISPLAY_IGNORED` em vez de descartá-lo silenciosamente. `collapsed` continua específico do modo `group`; ele fica inerte quando um grupo resolve para `flat` ou `page`.
+
+Um grupo em uma [barra lateral explícita](#explicit-sidebar) substitui o modo global com seu próprio `display`, exatamente como antes.
 
 ## Ordenação
 

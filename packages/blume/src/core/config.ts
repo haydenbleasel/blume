@@ -68,7 +68,8 @@ import type { Diagnostic } from "./types.ts";
  * **Reference docs**
  * - `openapi` — native OpenAPI reference: one real page per operation, woven
  *   into the sidebar and search. Point `sources`/`spec` at your spec.
- * - `asyncapi` — AsyncAPI reference via the embedded Scalar renderer.
+ * - `asyncapi` — native AsyncAPI reference with the same treatment; 2.x specs
+ *   are normalized to 3.x automatically.
  *
  * **Search & AI**
  * - `search` — search backend `provider` (`orama` by default; `pagefind`,

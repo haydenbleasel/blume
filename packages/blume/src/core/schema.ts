@@ -1406,7 +1406,8 @@ const reactConfigSchema = z.strictObject({
 
 /**
  * A single spec rendered by the API reference. `spec` is a local path or an
- * `http(s)` URL (OpenAPI for the Blume renderer; OpenAPI or AsyncAPI for Scalar).
+ * `http(s)` URL (an OpenAPI document under `openapi`, an AsyncAPI document
+ * under `asyncapi`).
  */
 const openapiSourceSchema = z.strictObject({
   /** Include generated pages from this spec in llms.txt/llms-full.txt. */
@@ -1436,25 +1437,53 @@ export type OpenApiSource = z.input<typeof openapiSourceSchema>;
 const scalarConfigSchema = z.record(z.string(), z.unknown()).optional();
 
 /**
+ * The shared shape of both API-reference blocks — only the mount route and
+ * code-sample defaults differ per spec kind, so each block declares just
+ * those.
+ */
+const referenceConfigSchema = (defaults: {
+  codeSamples: string[];
+  route: string;
+}) =>
+  z.strictObject({
+    /** Code-sample languages/tools shown per operation (Blume renderer). */
+    codeSamples: z.array(z.string()).default(defaults.codeSamples),
+    enabled: z.boolean().default(false),
+    /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
+    expandSchemas: z.boolean().default(false),
+    /** Who renders the reference: Blume's own UI, or the embedded Scalar SPA. */
+    renderer: z.enum(["blume", "scalar"]).default("blume"),
+    /** Where the reference mounts. */
+    route: z.string().default(defaults.route),
+    /** Extra Scalar config forwarded to `<ScalarComponent>` (Scalar renderer only). */
+    scalar: scalarConfigSchema,
+    /** One or more specs; each renders on its own route by default. */
+    sources: z.array(openapiSourceSchema).default([]),
+    /** Shorthand for a single source: `sources: [{ spec }]`. */
+    spec: z.string().optional(),
+    /** Scalar theme name (Scalar renderer only). */
+    theme: z.string().optional(),
+  });
+
+/**
  * OpenAPI reference. By default (`renderer: "blume"`) Blume parses the spec with
  * Scalar's parser and renders its own UI: one real page per operation, grouped
  * by tag in the sidebar and included in site search, llms.txt, and OG. Set
  * `renderer: "scalar"` to fall back to the embedded Scalar SPA (a single
  * self-contained route that doesn't weave into the sidebar or search).
  */
-const openapiConfigSchema = z.strictObject({
-  /** Code-sample languages shown per operation (Blume renderer). */
-  codeSamples: z.array(z.string()).default(["curl", "js", "python"]),
-  enabled: z.boolean().default(false),
-  /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
-  expandSchemas: z.boolean().default(false),
+const openapiConfigSchema = referenceConfigSchema({
+  codeSamples: ["curl", "js", "python"],
+  route: "/reference",
+}).extend({
   /**
    * The interactive "Try it" panel on operation pages (Blume renderer). On by
    * default; `false` hides it. The object form keeps it on and sets `proxy`,
    * the CORS escape hatch the Send button routes requests through: a proxy
    * URL, or `true` for the built-in `/_api-proxy` endpoint (which requires
    * `deployment.output: "server"`). Booleans normalize to the object shape so
-   * consumers read `{ enabled, proxy }` directly.
+   * consumers read `{ enabled, proxy }` directly. OpenAPI-only — an event
+   * operation has no HTTP request to send.
    */
   playground: z
     .union([
@@ -1468,32 +1497,19 @@ const openapiConfigSchema = z.strictObject({
     .transform((value) =>
       typeof value === "boolean" ? { enabled: value, proxy: false } : value
     ),
-  /** Who renders the reference: Blume's own UI, or the embedded Scalar SPA. */
-  renderer: z.enum(["blume", "scalar"]).default("blume"),
-  /** Where the reference mounts. */
-  route: z.string().default("/reference"),
-  /** Extra Scalar config forwarded to `<ScalarComponent>` (Scalar renderer only). */
-  scalar: scalarConfigSchema,
-  /** One or more specs; each renders on its own route by default. */
-  sources: z.array(openapiSourceSchema).default([]),
-  /** Shorthand for a single source: `sources: [{ spec }]`. */
-  spec: z.string().optional(),
-  /** Scalar theme name (Scalar renderer only). */
-  theme: z.string().optional(),
 });
 
 /**
- * AsyncAPI reference. Same shape and Scalar pipeline as {@link openapiConfigSchema}
- * (Scalar auto-detects the document type); only the default `route` differs.
+ * AsyncAPI reference. Same shape as {@link openapiConfigSchema}: by default
+ * (`renderer: "blume"`) Blume normalizes the spec to AsyncAPI 3.x and renders
+ * its own UI — one real page per operation — with `renderer: "scalar"` as the
+ * embedded-SPA opt-out. Only the defaults differ: the reference mounts at
+ * `/events`, and empty `codeSamples` means every tool the operation's protocol
+ * binding suggests.
  */
-const asyncapiConfigSchema = z.strictObject({
-  enabled: z.boolean().default(false),
-  route: z.string().default("/events"),
-  /** Extra Scalar config forwarded to `<ScalarComponent>`. */
-  scalar: scalarConfigSchema,
-  sources: z.array(openapiSourceSchema).default([]),
-  spec: z.string().optional(),
-  theme: z.string().optional(),
+const asyncapiConfigSchema = referenceConfigSchema({
+  codeSamples: [],
+  route: "/events",
 });
 
 /**

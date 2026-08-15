@@ -595,10 +595,13 @@ describe("openapi playground sources", () => {
 
   it("tags each request-sample pane with its language for live sync", async () => {
     // The playground client re-renders samples by [data-sample-lang]; the
-    // attribute must ride the same element as the tab-switcher's data-panel.
-    const source = await componentSource("openapi/RequestPanel.astro");
-    expect(source).toMatch(
-      /data-panel=\{entry\.id\}\s+data-sample-lang=\{entry\.id\}/u
+    // attribute must ride the same element as the tab-switcher's data-panel,
+    // and only request samples opt in (response/message panels pass no lang).
+    expect(await componentSource("openapi/PanelTabs.astro")).toMatch(
+      /data-panel=\{panel\.key\}\s+data-sample-lang=\{panel\.lang\}/u
+    );
+    expect(await componentSource("openapi/RequestPanel.astro")).toContain(
+      "lang: language.id"
     );
   });
 });

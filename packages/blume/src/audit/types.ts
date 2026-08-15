@@ -161,11 +161,32 @@ export interface LinkGraph {
 /** Astro's reserved error routes. Never indexable, never crawlable — by design. */
 export const ERROR_ROUTES: ReadonlySet<string> = new Set(["/404", "/500"]);
 
-/** Tunable limits. Not yet configurable — CLI-only until the ids settle. */
+/**
+ * Tunable limits. Not yet configurable — CLI-only until the ids settle.
+ *
+ * The title and description limits are measured in **display columns**, where
+ * a fullwidth or wide character counts 2 and everything else 1 — not in
+ * characters. What a search engine truncates is the space the text takes up,
+ * and a character count only stands in for that where every character is one
+ * column wide, which is true of Latin text and of nothing else. Counted in
+ * characters one range cannot serve both scripts: it is at once too strict for
+ * a Japanese description (which says in ~60 characters what English needs ~120
+ * for, and so reads as "too short") and too loose for a Japanese title (60
+ * characters render as wide as 120 Latin ones, and truncate). ASCII and
+ * precomposed (NFC) Latin text score identically either way; a decomposed
+ * (NFD) combining mark counts 0 where a character count saw 1. East-Asian
+ * "ambiguous"-width characters (★ ※ ①) count 1 per `string-width`'s default,
+ * though CJK fonts render them fullwidth — resolving that would need the
+ * page's language, which the audit does not thread through yet.
+ */
 export interface AuditThresholds {
+  /** Display columns, not characters. */
   titleMin: number;
+  /** Display columns, not characters. */
   titleMax: number;
+  /** Display columns, not characters. */
   descriptionMin: number;
+  /** Display columns, not characters. */
   descriptionMax: number;
   minWordCount: number;
   maxHtmlBytes: number;
@@ -174,8 +195,9 @@ export interface AuditThresholds {
 }
 
 export const DEFAULT_THRESHOLDS: AuditThresholds = {
-  // Ahrefs' guidance: 110–160 characters. Under ~110 wastes the snippet
-  // space search results give you; over ~160 gets truncated.
+  // Ahrefs' guidance: 110–160. Under ~110 wastes the snippet space search
+  // results give you; over ~160 gets truncated. Stated there in characters of
+  // English, which is the same number of columns.
   descriptionMax: 160,
   descriptionMin: 110,
   maxAssetBytes: 500 * 1024,

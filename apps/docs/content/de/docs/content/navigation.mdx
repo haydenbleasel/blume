@@ -70,7 +70,39 @@ navigation: {
 Der `page`-Modus hält tiefe Abschnitte aufgeräumt – greif darauf zurück, wenn Gruppen viele untergeordnete Einträge haben und du lieber in sie hineinnavigieren möchtest, als an ihnen vorbeizuscrollen.
 :::
 
-Eine Gruppe in einer [expliziten Seitenleiste](#explicit-sidebar) kann den globalen Modus mit einem eigenen `display` überschreiben.
+### Überschreibungen pro Gruppe
+
+Jede generierte Gruppe kann sich vom globalen Modus abmelden – ganz ohne explizite Seitenleiste. Setze `display` in der [`meta.ts`](/docs/content/meta) des Ordners oder – wenn der Ordner eine `index`-Seite hat – unter `sidebar` im Frontmatter dieser Seite, und nur diese eine Gruppe ändert sich:
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Client SDKs",
+  display: "page",
+});
+```
+
+```yaml index.mdx
+---
+title: Client SDKs
+sidebar:
+  display: page
+---
+```
+
+Der effektive Modus einer generierten Gruppe wird nach absteigender Priorität aufgelöst:
+
+1. `sidebar.display` im Frontmatter der eigenen `index`-Seite der Gruppe
+2. `display` in der `meta.ts` des Ordners
+3. Das globale `navigation.sidebar.display`
+4. Der Blume-Standard (`flat`)
+
+Das `display` einer Gruppe gilt nur für diese Gruppe – verschachtelte Untergruppen lösen ihren eigenen Wert über dieselbe Kette auf. Eine Gruppe im `page`-Modus mit einer Index-Seite navigiert weiterhin in ihr Unterpanel: Die Index-Seite wird als erster Eintrag des Panels aufgeführt, und beim Aufruf ihrer URL öffnet sich das Panel direkt.
+
+`sidebar.display` bedeutet an allen anderen Stellen nichts – auf einer Nicht-Index-Seite, auf der eigenen `index`-Seite des Inhalts-Roots (der Root ist keine Gruppe; verwende `navigation.sidebar.display`) oder auf jeder Seite, wenn eine [explizite Seitenleiste](#explicit-sidebar) konfiguriert ist (deren Einträge bestimmen den Modus jeder Gruppe) –, daher meldet Blume eine `BLUME_SIDEBAR_DISPLAY_IGNORED`-Warnung, statt es stillschweigend zu verwerfen. `collapsed` bleibt spezifisch für den `group`-Modus; es ist wirkungslos, wenn eine Gruppe zu `flat` oder `page` aufgelöst wird.
+
+Eine Gruppe in einer [expliziten Seitenleiste](#explicit-sidebar) überschreibt den globalen Modus mit einem eigenen `display`, genau wie zuvor.
 
 ## Reihenfolge
 

@@ -70,7 +70,39 @@ navigation: {
 `page` モードは深いセクションをすっきり保ちます — グループの子要素が多く、スクロールして通り過ぎるよりも掘り下げたい場合に選んでください。
 :::
 
-[明示的なサイドバー](#explicit-sidebar)内のグループは、自身の `display` でグローバルなモードを上書きできます。
+### グループ単位の上書き
+
+生成されたグループは、明示的なサイドバーを用意しなくてもグローバルなモードから外れることができます。フォルダーの [`meta.ts`](/docs/content/meta) で `display` を設定するか、そのフォルダーに `index` ページがある場合はそのページのフロントマターの `sidebar` 以下で設定すると、そのグループだけが変わります。
+
+```ts meta.ts
+import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Client SDKs",
+  display: "page",
+});
+```
+
+```yaml index.mdx
+---
+title: Client SDKs
+sidebar:
+  display: page
+---
+```
+
+生成されたグループの実効モードは、優先度の高いものから順に解決されます。
+
+1. グループ自身の `index` ページのフロントマターの `sidebar.display`
+2. フォルダーの `meta.ts` の `display`
+3. グローバルな `navigation.sidebar.display`
+4. Blume のデフォルト（`flat`）
+
+グループの `display` はそのグループにのみ適用されます — 入れ子のサブグループは、同じ連鎖を通じて自身の値を解決します。インデックスページを持つ `page` モードのグループも、これまでどおりサブパネルへ掘り下げます。インデックスページはパネルの最初の項目として並び、その URL にアクセスするとパネルが直接開きます。
+
+`sidebar.display` は、それ以外の場所では意味を持ちません — インデックス以外のページ、コンテンツルート自身の `index` ページ（ルートはグループではありません。`navigation.sidebar.display` を使ってください）、および[明示的なサイドバー](#explicit-sidebar)が設定されている場合のあらゆるページ（その項目が各グループのモードを決めます）です。そのため Blume は、黙って無視する代わりに `BLUME_SIDEBAR_DISPLAY_IGNORED` 警告を報告します。`collapsed` は引き続き `group` モード専用で、グループが `flat` や `page` に解決される場合は効果がありません。
+
+[明示的なサイドバー](#explicit-sidebar)内のグループは、これまでどおり自身の `display` でグローバルなモードを上書きできます。
 
 ## 並び順
 

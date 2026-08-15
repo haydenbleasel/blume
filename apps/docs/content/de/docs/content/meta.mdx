@@ -32,11 +32,12 @@ Jedes Feld ist optional — setze nur das, was du überschreiben möchtest.
 | `icon` | `string` | Icon, das neben der Bezeichnung angezeigt wird. |
 | `order` | `number` | Position unter gleichrangigen Gruppen und Seiten. Niedrigere Zahlen werden zuerst einsortiert. |
 | `collapsed` | `boolean` | Legt im [Anzeigemodus `group`](/docs/content/navigation#display-modes) fest, ob die Gruppe eingeklappt startet. |
+| `display` | `"flat" \| "group" \| "page"` | Darstellungsmodus für diese Gruppe; überschreibt das globale [`navigation.sidebar.display`](/docs/content/navigation#display-modes). |
 | `pages` | `string[]` | Explizite Reihenfolge der Kinder der Gruppe, nach Slug. |
 
 Das `pages`-Array listet die Kinder nach Slug auf — dem Ordner- oder Dateinamen ohne numerisches Präfix und ohne Klammern (aus `01-quickstart.mdx` wird also `"quickstart"`). Kinder, die du weglässt, erscheinen trotzdem, und zwar nach den aufgeführten.
 
-Wie Gruppen dargestellt werden — als flache Überschriften, aufklappbare Bereiche oder Drill-in-Panels — ist eine sidebarweite Einstellung, nicht pro Ordner: siehe [Anzeigemodi](/docs/content/navigation#display-modes).
+Wie Gruppen dargestellt werden — als flache Überschriften, aufklappbare Bereiche oder Drill-in-Panels — richtet sich standardmäßig nach dem sidebarweiten `navigation.sidebar.display`; setze hier `display`, um das nur für diese Gruppe zu überschreiben. Die `index`-Seite eines Ordners kann es zudem im Frontmatter setzen, was Vorrang vor `meta.ts` hat — siehe [Overrides pro Gruppe](/docs/content/navigation#per-group-overrides).
 
 ## Berechnetes Meta
 

@@ -1,0 +1,177 @@
+---
+title: Components
+description: A tour of every built-in MDX component, rendered live.
+icon: blocks
+owner: platform-team
+---
+
+Every component below ships with Blume and needs no imports. This page also sets the custom `owner` frontmatter key declared in `frontmatter.extend`.
+
+## Callouts
+
+:::note
+A neutral note callout.
+:::
+
+:::tip
+A tip with **bold text** and a [link](/docs).
+:::
+
+:::warning
+A warning callout.
+:::
+
+:::danger
+A danger callout.
+:::
+
+## Badges
+
+<Badge>Stable</Badge> <Badge variant="accent">New</Badge>
+<Badge variant="success">Passing</Badge> <Badge variant="warning">Beta</Badge>
+<Badge variant="danger">Deprecated</Badge>
+
+## Steps
+
+<Steps>
+  <Step title="Install">Run `npm i blume` in your project.</Step>
+  <Step title="Write">Drop Markdown files in a `docs/` folder.</Step>
+  <Step title="Ship">Run `blume build` and deploy the output.</Step>
+</Steps>
+
+## Tabs
+
+<Tabs>
+  <Tab title="npm">`npm run dev`</Tab>
+  <Tab title="bun">`bun dev`</Tab>
+  <Tab title="pnpm">`pnpm dev`</Tab>
+</Tabs>
+
+## Accordion and Expandable
+
+<Accordion>
+  <AccordionItem title="What is this?">
+    A collapsible list of items.
+  </AccordionItem>
+  <AccordionItem title="Why use it?">
+    To keep long optional detail out of the reading flow.
+  </AccordionItem>
+</Accordion>
+
+<Expandable title="Show advanced options">
+  Content hidden behind a disclosure.
+</Expandable>
+
+## Cards and Columns
+
+<CardGroup cols={2}>
+  <Card title="First card" icon="rocket" href="/docs">
+    Cards link anywhere and take a Lucide icon.
+  </Card>
+  <Card title="Second card" icon="radio" href="/events">
+    This one goes to the AsyncAPI reference.
+  </Card>
+</CardGroup>
+
+<Columns cols={2}>
+  <div>Left column content.</div>
+  <div>Right column content.</div>
+</Columns>
+
+## Code group
+
+<CodeGroup>
+
+```ts request.ts
+const res = await fetch("https://api.acme.dev/v1/orders");
+```
+
+```python request.py
+import requests
+res = requests.get("https://api.acme.dev/v1/orders")
+```
+
+</CodeGroup>
+
+## File tree
+
+<FileTree>
+
+- apps/
+  - sandbox/
+    - blume.config.ts
+    - content/
+      - docs/
+    - specs/
+      - asyncapi.yaml
+      - openapi.yaml
+
+</FileTree>
+
+## Type table
+
+<TypeTable
+  type={{
+    spec: {
+      description: "Path or URL to the AsyncAPI document.",
+      type: "string",
+      required: true,
+    },
+    renderer: {
+      description: "Who renders the reference.",
+      type: '"blume" | "scalar"',
+      default: '"blume"',
+    },
+    expandSchemas: {
+      description: "Start nested schema rows expanded.",
+      type: "boolean",
+      default: "false",
+    },
+  }}
+/>
+
+## Tooltip, Panel, and Tile
+
+Hover the <Tooltip tip="Asynchronous API definition format for event-driven architectures." headline="AsyncAPI" cta="See the reference" href="/events">AsyncAPI</Tooltip> term.
+
+<Panel title="Good to know">
+  Panels highlight supporting context beside the main flow.
+</Panel>
+
+<Tile
+  title="Native renderer"
+  description="One real page per operation, straight from the spec."
+  href="/events"
+>
+  <Icon icon="radio" size={28} />
+</Tile>
+
+## Prompt
+
+<Prompt description="Ask an agent to **migrate** your docs." actions={["copy"]}>
+  Migrate my docs to Blume and keep the URLs stable.
+</Prompt>
+
+## Visibility
+
+<Visibility for="web">This sentence renders on the site only.</Visibility>
+<Visibility for="agents">
+  This sentence only appears in the generated Markdown.
+</Visibility>
+
+## Icons and colors
+
+<Icon icon="rocket" size={20} />
+
+<Color variant="compact">
+  <Color.Item name="accent" value="#8B5CF6" />
+  <Color.Item name="background" value={{ light: "#FFFFFF", dark: "#0A0A0A" }} />
+</Color>
+
+## GitHub info
+
+<GithubInfo owner="haydenbleasel" repo="blume" />
+
+## YouTube
+
+<YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />

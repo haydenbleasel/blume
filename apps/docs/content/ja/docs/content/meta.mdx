@@ -32,11 +32,12 @@ export default defineMeta({
 | `icon` | `string` | ラベルの横に表示されるアイコン。 |
 | `order` | `number` | 兄弟のグループやページの中での位置。数値が小さいほど先に並びます。 |
 | `collapsed` | `boolean` | [`group` 表示モード](/docs/content/navigation#display-modes)において、グループを折りたたんだ状態で開始するかどうか。 |
+| `display` | `"flat" \| "group" \| "page"` | このグループの描画モード。グローバルの [`navigation.sidebar.display`](/docs/content/navigation#display-modes) を上書きします。 |
 | `pages` | `string[]` | スラッグによる、グループの子要素の明示的な順序。 |
 
 `pages` 配列は子要素をスラッグで列挙します — スラッグとは、フォルダー名またはファイル名から数値プレフィックスと括弧を取り除いたものです（つまり `01-quickstart.mdx` は `"quickstart"` になります）。省略した子要素も、列挙されたものの後に表示されます。
 
-グループの描画方法 — フラットなヘッダー、折りたたみ可能な開閉要素、ドリルインパネル — はフォルダーごとではなくサイドバー全体の設定です: [表示モード](/docs/content/navigation#display-modes)を参照してください。
+グループの描画方法 — フラットなヘッダー、折りたたみ可能な開閉要素、ドリルインパネル — はデフォルトでサイドバー全体の `navigation.sidebar.display` に従います。このグループだけで上書きするには、ここで `display` を設定してください。フォルダーの `index` ページもフロントマターからこれを設定でき、そちらが `meta.ts` よりも優先されます — [グループごとの上書き](/docs/content/navigation#per-group-overrides)を参照してください。
 
 ## 計算されたメタ
 

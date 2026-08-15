@@ -85,39 +85,105 @@ export const resolveSecurity = (
   return { alternatives, optional };
 };
 
+/**
+ * One AsyncAPI 3.x security entry: a `$ref` into
+ * `components.securitySchemes`, or an inline scheme object (the shape the
+ * official 2.x converter emits for scoped requirements, `scopes` on the
+ * scheme itself).
+ */
+export interface AsyncApiSecurityEntryLike {
+  $ref?: string;
+  type?: string;
+  scopes?: unknown;
+  [key: string]: unknown;
+}
+
+const SECURITY_SCHEME_REF = /^#\/components\/securitySchemes\/(?<name>[^/]+)$/u;
+
+/** Decode a JSON-pointer token: `kafka~1sasl` -> `kafka/sasl`. */
+const unescapePointer = (token: string): string =>
+  token.replaceAll("~1", "/").replaceAll("~0", "~");
+
+/**
+ * Resolve an AsyncAPI 3.x security list. Unlike OpenAPI's requirement maps,
+ * each entry names a single scheme and any one entry satisfies the operation
+ * — so every entry becomes its own one-scheme "or" alternative. A `$ref`
+ * pointing at an undeclared scheme is kept (with `scheme` undefined),
+ * matching {@link resolveSecurity}'s render-don't-drop rule.
+ */
+export const resolveAsyncApiSecurity = (
+  entries: AsyncApiSecurityEntryLike[],
+  schemes: Record<string, SecuritySchemeLike> | undefined
+): OperationSecurity => {
+  const alternatives: ResolvedScheme[][] = [];
+  for (const entry of entries) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const pointer = SECURITY_SCHEME_REF.exec(entry.$ref ?? "")?.groups?.name;
+    const name = pointer === undefined ? undefined : unescapePointer(pointer);
+    const inline = name === undefined && typeof entry.$ref !== "string";
+    const scheme = inline
+      ? (entry as SecuritySchemeLike)
+      : schemes?.[name ?? ""];
+    alternatives.push([
+      {
+        key:
+          name ??
+          (typeof entry.type === "string" && entry.type !== ""
+            ? entry.type
+            : "security"),
+        scheme,
+        scopes:
+          inline && Array.isArray(entry.scopes)
+            ? entry.scopes.filter(
+                (scope): scope is string => typeof scope === "string"
+              )
+            : [],
+      },
+    ]);
+  }
+  return { alternatives, optional: false };
+};
+
+/**
+ * Fixed labels for scheme types with no per-scheme variation. Covers both
+ * OpenAPI's types and the broker-auth types AsyncAPI adds; `http` is handled
+ * separately (its label depends on the scheme/bearerFormat fields).
+ */
+const TYPE_LABELS: Record<string, string> = {
+  X509: "X.509 certificate",
+  apiKey: "API key",
+  asymmetricEncryption: "Asymmetric encryption",
+  gssapi: "SASL/GSSAPI",
+  httpApiKey: "API key",
+  mutualTLS: "Mutual TLS",
+  oauth2: "OAuth2 access token",
+  openIdConnect: "OpenID Connect token",
+  plain: "SASL/PLAIN",
+  scramSha256: "SASL/SCRAM-SHA-256",
+  scramSha512: "SASL/SCRAM-SHA-512",
+  symmetricEncryption: "Symmetric encryption",
+  userPassword: "Username & password",
+};
+
 /** A short human label for a scheme row, e.g. `Bearer token` or `API key`. */
 export const schemeLabel = (resolved: ResolvedScheme): string => {
   const { scheme } = resolved;
-  switch (scheme?.type) {
-    case "http": {
-      const kind = (scheme.scheme ?? "").toLowerCase();
-      if (kind === "bearer") {
-        return scheme.bearerFormat
-          ? `Bearer token (${scheme.bearerFormat})`
-          : "Bearer token";
-      }
-      if (kind === "basic") {
-        return "Basic auth";
-      }
-      return kind ? `HTTP ${kind}` : "HTTP auth";
+  if (scheme?.type === "http") {
+    const kind = (scheme.scheme ?? "").toLowerCase();
+    if (kind === "bearer") {
+      return scheme.bearerFormat
+        ? `Bearer token (${scheme.bearerFormat})`
+        : "Bearer token";
     }
-    case "apiKey": {
-      return "API key";
+    if (kind === "basic") {
+      return "Basic auth";
     }
-    case "oauth2": {
-      return "OAuth2 access token";
-    }
-    case "openIdConnect": {
-      return "OpenID Connect token";
-    }
-    case "mutualTLS": {
-      return "Mutual TLS";
-    }
-    default: {
-      // Unknown scheme ref: the component name is the best label available.
-      return resolved.key;
-    }
+    return kind ? `HTTP ${kind}` : "HTTP auth";
   }
+  // Unknown scheme ref: the component name is the best label available.
+  return TYPE_LABELS[scheme?.type ?? ""] ?? resolved.key;
 };
 
 /**
@@ -135,7 +201,8 @@ export const schemeCarrier = (
     case "openIdConnect": {
       return { in: "header", name: "Authorization" };
     }
-    case "apiKey": {
+    case "apiKey":
+    case "httpApiKey": {
       return { in: scheme.in ?? "header", name: scheme.name ?? resolved.key };
     }
     default: {

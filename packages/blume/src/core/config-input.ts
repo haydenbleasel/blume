@@ -1112,29 +1112,17 @@ export interface ReactConfig {
 // ---------------------------------------------------------------------------
 
 /**
- * OpenAPI reference. By default (`renderer: "blume"`) Blume renders its own UI:
- * one real page per operation, grouped by tag in the sidebar and included in
- * search, llms.txt, and OG. Set `renderer: "scalar"` for the embedded Scalar
- * SPA (a single self-contained route).
+ * The shared shape of both API-reference blocks (`openapi`, `asyncapi`). Only
+ * the per-block defaults differ; those are documented on the extending
+ * interfaces.
  */
-export interface OpenApiConfig {
-  /** Code-sample languages shown per operation (Blume renderer). */
-  codeSamples?: string[];
+interface ReferenceConfig {
   /** Turn the reference on. Defaults to `false`. */
   enabled?: boolean;
   /** Start nested schema rows expanded (Blume renderer). Defaults to `false`. */
   expandSchemas?: boolean;
-  /**
-   * The interactive "Try it" panel on operation pages (Blume renderer). On by
-   * default; `false` hides it. `proxy` is the CORS escape hatch the Send
-   * button routes requests through: a proxy URL, or `true` for the built-in
-   * `/_api-proxy` endpoint (which requires `deployment.output: "server"`).
-   */
-  playground?: boolean | { enabled?: boolean; proxy?: boolean | string };
   /** Who renders the reference. Defaults to `blume`. */
   renderer?: "blume" | "scalar";
-  /** Where the reference mounts. Defaults to `/reference`. */
-  route?: string;
   /**
    * Extra Scalar options forwarded verbatim to the embedded `<ScalarComponent>`
    * (Scalar renderer only) — e.g. `localization`, `agent`,
@@ -1151,27 +1139,43 @@ export interface OpenApiConfig {
 }
 
 /**
- * AsyncAPI reference, rendered via the embedded Scalar SPA (which auto-detects
- * the document type). Same shape as {@link OpenApiConfig}; only the default
- * `route` differs.
+ * OpenAPI reference. By default (`renderer: "blume"`) Blume renders its own UI:
+ * one real page per operation, grouped by tag in the sidebar and included in
+ * search, llms.txt, and OG. Set `renderer: "scalar"` for the embedded Scalar
+ * SPA (a single self-contained route).
  */
-export interface AsyncApiConfig {
-  /** Turn the reference on. Defaults to `false`. */
-  enabled?: boolean;
+export interface OpenApiConfig extends ReferenceConfig {
+  /**
+   * Code-sample languages shown per operation (Blume renderer). Defaults to
+   * `["curl", "js", "python"]`.
+   */
+  codeSamples?: string[];
+  /**
+   * The interactive "Try it" panel on operation pages (Blume renderer). On by
+   * default; `false` hides it. `proxy` is the CORS escape hatch the Send
+   * button routes requests through: a proxy URL, or `true` for the built-in
+   * `/_api-proxy` endpoint (which requires `deployment.output: "server"`).
+   */
+  playground?: boolean | { enabled?: boolean; proxy?: boolean | string };
+  /** Where the reference mounts. Defaults to `/reference`. */
+  route?: string;
+}
+
+/**
+ * AsyncAPI reference. Same shape as {@link OpenApiConfig}: by default
+ * (`renderer: "blume"`) Blume normalizes the spec to AsyncAPI 3.x and renders
+ * its own UI — one real page per operation, grouped by tag (or channel) in the
+ * sidebar and included in search, llms.txt, and OG. Set `renderer: "scalar"`
+ * for the embedded Scalar SPA (a single self-contained route).
+ */
+export interface AsyncApiConfig extends ReferenceConfig {
+  /**
+   * Code-sample tools shown per operation (Blume renderer). Defaults to every
+   * tool appropriate to the operation's protocol binding.
+   */
+  codeSamples?: string[];
   /** Where the reference mounts. Defaults to `/events`. */
   route?: string;
-  /**
-   * Extra Scalar options forwarded verbatim to the embedded `<ScalarComponent>`.
-   * These win over Blume's derived spec/theme config — a full escape hatch to
-   * Scalar's API.
-   */
-  scalar?: Record<string, unknown>;
-  /** One or more specs. */
-  sources?: OpenApiSource[];
-  /** Shorthand for a single source. */
-  spec?: string;
-  /** Scalar theme name. */
-  theme?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1309,7 +1313,7 @@ export interface BlumeConfig {
   ai?: AiConfig;
   /** Analytics providers (PostHog, Vercel, or arbitrary scripts). */
   analytics?: AnalyticsConfig;
-  /** AsyncAPI reference (embedded Scalar renderer). */
+  /** AsyncAPI reference (native renderer by default, Scalar opt-out). */
   asyncapi?: AsyncApiConfig;
   /** Site-wide announcement banner shown above the header. */
   banner?: BannerConfig;
