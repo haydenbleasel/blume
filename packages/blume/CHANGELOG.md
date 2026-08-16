@@ -1,5 +1,20 @@
 # blume
 
+## 1.5.1
+
+### Patch Changes
+
+- ca28fb8: Generate an Open Graph card for the changelog index. The `/changelog` page previously shipped no `og:image` (and fell back to X's compact summary card); it now gets the same generated card every other page has, served at `/og/changelog.png`.
+- ca28fb8: Stop doubling the site title in the changelog index's document title. The page passed "{site title} {Changelog}" to a layout that suffixes "- {site title}" itself, producing titles like "Acme Changelog - Acme"; it now reads "Changelog - Acme".
+- 8db1ecb: The default display font is now Inter, matching the body font — default sites download one text family instead of two (Inter Tight's files alone were ~190 KB per page). To keep the tightened display look, headings now get `letter-spacing: -0.05em` from the theme itself, which also means any font you configure for `display` reads correctly at heading sizes instead of depending on tracking built into the font. Inter Tight remains available as the `inter-tight` slug.
+- ca28fb8: Let a user-supplied `ogImage` on `PageLayout` declare its alt text and pixel size via the new `ogImageAlt` and `ogImageSize` props, emitted as `og:image:alt` / `og:image:width` / `og:image:height` — the metadata Blume's generated cards already declare automatically.
+- ca28fb8: Emit schema.org JSON-LD from `PageLayout`, so custom pages — most importantly a custom home page — carry the same `WebSite` structured-data graph the docs pages do. On by default; pass `structuredDataEnabled={false}` to opt a page out.
+- ca28fb8: Keep the trailing slash on the home page's canonical, `og:url`, and hreflang URLs (`https://site/` instead of `https://site`), so they byte-match the sitemap's `<loc>` for the root route.
+- ca28fb8: Warn when `lastModified` runs in a shallow git clone. CI platforms usually check out limited history, which silently dropped most git-derived dates — sitemap `<lastmod>` and "Last updated" stamps vanished in production while working locally. The build now emits a `BLUME_SHALLOW_GIT_HISTORY` warning pointing at the fix (`VERCEL_DEEP_CLONE=true` on Vercel, `fetch-depth: 0` for actions/checkout).
+- bad025f: Smooth out page navigation: every link now prefetches on hover/viewport, and same-origin navigations opt into cross-document view transitions in supporting browsers, replacing the hard flash between pages with a crossfade. Respects `prefers-reduced-motion`.
+- 8db1ecb: Preload only the font weights above-the-fold text actually renders in (body 400/500, display 500/600, mono 400) instead of every configured face. On a default site this cuts the per-page font preloads from ten files (~260 KB) to a handful (~50 KB), bandwidth that was competing with the critical CSS and pushing out mobile LCP. All other faces still load on demand through their `@font-face` rules with `font-display: swap`.
+- ca28fb8: Redirect trailing-slash URLs to their slashless twins on Vercel with a 308. `/docs/` and `/docs` previously both served 200 as duplicate URLs; the routing config now collapses the slashed form onto the canonical slashless one (the root `/` is untouched).
+
 ## 1.5.0
 
 ### Minor Changes
