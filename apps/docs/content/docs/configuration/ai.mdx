@@ -160,6 +160,33 @@ The page the reader is currently on is added to the context first and used to sc
 
 Grounding is on for every backend except **[Inkeep](#backends)**, which runs its own retrieval over the content you've indexed in its dashboard.
 
+### Retrieval size
+
+How much documentation a question carries is the biggest lever on how long the reader waits for the first word: the model reads every injected character before it emits a token. On a hosted frontier model that's invisible, but on a self-hosted backend it dominates. `retrieval` sizes it:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    retrieval: {
+      maxResults: 3, // fewer pages retrieved per question
+      excerptChars: 1200, // shorter excerpt from each one
+      contextBudget: 3000, // smaller total injection
+    },
+  },
+}
+```
+
+| Option          | Default | Description                                     |
+| --------------- | ------- | ----------------------------------------------- |
+| `maxResults`    | `6`     | Documents retrieved per question.               |
+| `excerptChars`  | `2000`  | Characters kept from each retrieved page.       |
+| `contextBudget` | `10000` | Total injected characters, across all excerpts. |
+
+The three aren't interchangeable. `contextBudget` caps the whole injection, `excerptChars` decides how deep into a single long page its excerpt reaches — raise it when one page holds the whole answer and the excerpt cuts it off — and `maxResults` is the ceiling on how many pages an answer can cite.
+
+The defaults suit a hosted model. Lower them when you're serving from your own hardware and time-to-first-token matters more than recall; answers stay grounded either way, and the assistant is told to say when something isn't covered rather than fill the gap.
+
 ### External endpoint
 
 Already have an API backend for AI? Point the panel at it and keep the docs build static:

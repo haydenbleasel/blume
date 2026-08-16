@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 
 import { dirname, isAbsolute, join, relative } from "pathe";
 
+import type { AskRetrievalOptions } from "../ai/ask-context.ts";
 import { askBackendRuntimeDep } from "../ai/ask.ts";
 import type { AskBackend } from "../ai/ask.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
@@ -892,17 +893,30 @@ export const collections = { docs${options.staged ? ", staged" : ""} };
 const ASK_FALLBACK_PROMPT =
   "You are a helpful documentation assistant. Answer using the project's documentation.";
 
+/** The `ai.ask` values the generated endpoint has to carry with it. */
+export interface AskEndpointOptions {
+  /** `ai.ask.instructions` — extra system-prompt text. */
+  instructions?: string;
+  /** `ai.ask.retrieval` — how much documentation each question carries. */
+  retrieval?: AskRetrievalOptions;
+}
+
 /**
  * Generate the Ask AI server endpoint (`.blume/src/pages/api/ask.ts`).
- * `instructions` (the `ai.ask.instructions` config) is appended to the
+ *
+ * `options.instructions` (the `ai.ask.instructions` config) is appended to the
  * built-in prompt on every path: the grounded prompt via `createAskContext`,
- * and the plain fallback here.
+ * and the plain fallback here. `options.retrieval` (the `ai.ask.retrieval`
+ * config) is forwarded to `createAskContext` on the grounded path, where it
+ * sizes retrieval. Both travel in one options object so a new call site can't
+ * silently drop one of them.
  */
 export const askEndpointTemplate = (
   backend: AskBackend,
   grounded: boolean,
-  instructions?: string
+  options?: AskEndpointOptions
 ): string => {
+  const instructions = options?.instructions;
   const fallbackPrompt = instructions
     ? `${ASK_FALLBACK_PROMPT}\n\n${instructions}`
     : ASK_FALLBACK_PROMPT;
@@ -938,9 +952,15 @@ export const askEndpointTemplate = (
       'import { createAskContext } from "blume/ai/ask-context.ts";',
       'import askData from "../../generated/ask-data.json";'
     );
-    const groundOptions = instructions
-      ? `, { instructions: ${JSON.stringify(instructions)} }`
-      : "";
+    const groundFields: string[] = [];
+    if (instructions) {
+      groundFields.push(`instructions: ${JSON.stringify(instructions)}`);
+    }
+    if (options?.retrieval) {
+      groundFields.push(`retrieval: ${JSON.stringify(options.retrieval)}`);
+    }
+    const groundOptions =
+      groundFields.length > 0 ? `, { ${groundFields.join(", ")} }` : "";
     setup += `\nconst ground = createAskContext(askData${groundOptions});\n`;
   }
   // Validate the client-supplied body and cap its size. The endpoint is

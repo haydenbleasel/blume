@@ -1384,11 +1384,9 @@ describe("askEndpointTemplate", () => {
   });
 
   it("threads custom instructions into the grounded route and its fallback", () => {
-    const out = askEndpointTemplate(
-      resolveAskBackend(),
-      true,
-      "Answer in French."
-    );
+    const out = askEndpointTemplate(resolveAskBackend(), true, {
+      instructions: "Answer in French.",
+    });
     expect(out).toContain(
       'createAskContext(askData, { instructions: "Answer in French." })'
     );
@@ -1397,12 +1395,28 @@ describe("askEndpointTemplate", () => {
     );
   });
 
-  it("appends custom instructions to the ungrounded prompt", () => {
-    const out = askEndpointTemplate(
-      resolveAskBackend(),
-      false,
-      "Answer in French."
+  it("threads the configured retrieval sizes into the grounded route", () => {
+    const out = askEndpointTemplate(resolveAskBackend(), true, {
+      retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
+    });
+    expect(out).toContain(
+      'createAskContext(askData, { retrieval: {"contextBudget":2500,"excerptChars":1200,"maxResults":3} })'
     );
+  });
+
+  it("carries instructions and retrieval together", () => {
+    const out = askEndpointTemplate(resolveAskBackend(), true, {
+      instructions: "Answer in French.",
+      retrieval: { contextBudget: 2500 },
+    });
+    expect(out).toContain('instructions: "Answer in French."');
+    expect(out).toContain('retrieval: {"contextBudget":2500}');
+  });
+
+  it("appends custom instructions to the ungrounded prompt", () => {
+    const out = askEndpointTemplate(resolveAskBackend(), false, {
+      instructions: "Answer in French.",
+    });
     expect(out).not.toContain("createAskContext");
     expect(out).toContain(
       "Answer using the project's documentation.\\n\\nAnswer in French."

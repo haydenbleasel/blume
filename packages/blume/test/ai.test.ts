@@ -872,6 +872,25 @@ const askData: AskData = {
   site: "https://example.com",
 };
 
+/** Four long, equally-matching pages, for the retrieval-size assertions. */
+const longAskData: AskData = {
+  documents: Array.from({ length: 4 }, (_, index) => ({
+    content: `Install guide ${index}. ${"Install the dev server and preview the docs. ".repeat(150)}`,
+    description: "How to install Blume",
+    locale: "",
+    route: `/guides/install-${index}`,
+    title: `Installation ${index}`,
+  })),
+  site: null,
+};
+
+/** The text between the `<docs>` markers — what the question actually carries. */
+const docsBlock = (system: string | undefined): string => {
+  const start = system?.indexOf("<docs>") ?? -1;
+  const end = system?.indexOf("</docs>") ?? -1;
+  return start === -1 || end === -1 ? "" : (system ?? "").slice(start + 6, end);
+};
+
 describe("createAskContext", () => {
   it("grounds the prompt in the retrieved page and asks the model to cite", async () => {
     const ground = createAskContext(askData);
@@ -902,6 +921,52 @@ describe("createAskContext", () => {
     expect(base).toBeGreaterThanOrEqual(0);
     expect(custom).toBeGreaterThan(base);
     expect(docs).toBeGreaterThan(custom);
+  });
+
+  it("keeps every retrieval size at its default when none are configured", async () => {
+    const ground = createAskContext(longAskData);
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    // Four matching pages, each cut to the 2000-character excerpt default and
+    // all of them inside the 10,000-character budget.
+    expect(injected.split("## ").length - 1).toBe(4);
+    expect(injected.length).toBeGreaterThan(7000);
+  });
+
+  it("caps the retrieved documents at `maxResults`", async () => {
+    const ground = createAskContext(longAskData, {
+      retrieval: { maxResults: 1 },
+    });
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    expect(injected.split("## ").length - 1).toBe(1);
+  });
+
+  it("caps each excerpt at `excerptChars`", async () => {
+    const ground = createAskContext(longAskData, {
+      retrieval: { excerptChars: 300, maxResults: 1 },
+    });
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    // 300 characters of body, plus the `## Title (/route)` heading and the
+    // ellipses marking the trimmed edges.
+    expect(injected.length).toBeLessThan(400);
+    expect(injected).toContain("install");
+  });
+
+  it("caps the total injected text at `contextBudget`", async () => {
+    const ground = createAskContext(longAskData, {
+      retrieval: { contextBudget: 1000 },
+    });
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    // The first excerpt spends the whole budget, so no further page fits.
+    expect(injected.split("## ").length - 1).toBe(1);
+    expect(injected.length).toBeLessThan(1100);
   });
 
   it("returns undefined when there is no user message to ground on", async () => {

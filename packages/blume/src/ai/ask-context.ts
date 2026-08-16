@@ -36,6 +36,23 @@ const MAX_RESULTS = 6;
 const EXCERPT_CHARS = 2000;
 /** Overall cap on injected documentation characters. */
 const CONTEXT_BUDGET = 10_000;
+
+/**
+ * How much retrieved documentation a question carries (the `ai.ask.retrieval`
+ * config). Every field falls back to the built-in default, so a partial object
+ * only changes what it names. Injected characters dominate time-to-first-token
+ * on a self-hosted backend, and the three knobs aren't interchangeable: the
+ * budget caps the total, `excerptChars` decides how deep into one long page the
+ * excerpt reaches, and `maxResults` decides how many pages can be cited at all.
+ */
+export interface AskRetrievalOptions {
+  /** Overall cap on injected documentation characters. Defaults to `10000`. */
+  contextBudget?: number;
+  /** Characters kept per injected excerpt. Defaults to `2000`. */
+  excerptChars?: number;
+  /** Documents retrieved per question. Defaults to `6`. */
+  maxResults?: number;
+}
 /** Chars of lead-in kept before the matched region, for heading/sentence context. */
 const EXCERPT_LEAD = 160;
 
@@ -232,10 +249,13 @@ export const relevantExcerpt = (
  * the base instruction rather than replacing it: the base carries the
  * functional contract (answer only from the excerpts, cite pages as Markdown
  * links) that the panel's citation rendering depends on.
+ *
+ * `options.retrieval` (the `ai.ask.retrieval` config) sizes how much
+ * documentation each question carries; omitted fields keep today's defaults.
  */
 export const createAskContext = (
   data: AskData,
-  options?: { instructions?: string }
+  options?: { instructions?: string; retrieval?: AskRetrievalOptions }
 ): ((
   messages: AskMessage[],
   page?: AskPage
@@ -250,6 +270,9 @@ export const createAskContext = (
   const instruction = options?.instructions
     ? `${BASE_INSTRUCTION}\n\n${options.instructions}`
     : BASE_INSTRUCTION;
+  const maxResults = options?.retrieval?.maxResults ?? MAX_RESULTS;
+  const excerptChars = options?.retrieval?.excerptChars ?? EXCERPT_CHARS;
+  const contextBudget = options?.retrieval?.contextBudget ?? CONTEXT_BUDGET;
 
   return async (messages, page) => {
     const list = Array.isArray(messages) ? messages : [];
@@ -263,13 +286,13 @@ export const createAskContext = (
       ? byRoute.get(normalizeRoute(page.path))
       : undefined;
     const db = await index();
-    const hits = await queryOramaIndex(db, query, MAX_RESULTS, {
+    const hits = await queryOramaIndex(db, query, maxResults, {
       locale: current?.locale || undefined,
     });
 
     const seen = new Set<string>();
     const sections: string[] = [];
-    let budget = CONTEXT_BUDGET;
+    let budget = contextBudget;
     const push = (doc: OramaDoc, label: string) => {
       if (seen.has(doc.route) || budget <= 0) {
         return;
@@ -278,7 +301,7 @@ export const createAskContext = (
       const body = relevantExcerpt(
         doc.content,
         query,
-        Math.min(EXCERPT_CHARS, budget)
+        Math.min(excerptChars, budget)
       );
       budget -= body.length;
       sections.push(`## ${doc.title} (${doc.route})${label}\n${body}`);

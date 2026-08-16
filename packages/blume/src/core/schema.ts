@@ -813,6 +813,16 @@ const aiConfigSchema = z.strictObject({
       instructions: z.string().trim().min(1).optional(),
       model: z.string().default("openai/gpt-5.5"),
       provider: z.enum(askAiProviders).default("gateway"),
+      // How much documentation each question carries. Injected characters are
+      // the dominant term in time-to-first-token on a self-hosted backend, so
+      // these trade recall for latency; the defaults are the built-in behavior.
+      retrieval: z
+        .strictObject({
+          contextBudget: z.number().int().positive().default(10_000),
+          excerptChars: z.number().int().positive().default(2000),
+          maxResults: z.number().int().positive().default(6),
+        })
+        .prefault({}),
       // Empty-state prompts shown before the first question. Each renders as a
       // clickable suggestion; `icon` is an optional Lucide name beside it.
       suggestions: z

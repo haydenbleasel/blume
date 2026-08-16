@@ -1417,7 +1417,10 @@ const writeAskFiles = async (
   }
   await write(
     join(srcDir, "pages", "api", "ask.ts"),
-    askEndpointTemplate(resolveAskBackend(ask), grounded, ask.instructions)
+    askEndpointTemplate(resolveAskBackend(ask), grounded, {
+      instructions: ask.instructions,
+      retrieval: ask.retrieval,
+    })
   );
 };
 

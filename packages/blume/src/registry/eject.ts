@@ -127,11 +127,10 @@ const askFiles = async (
   const grounded = ask.provider !== "inkeep";
   const files = [
     {
-      content: askEndpointTemplate(
-        resolveAskBackend(ask),
-        grounded,
-        ask.instructions
-      ),
+      content: askEndpointTemplate(resolveAskBackend(ask), grounded, {
+        instructions: ask.instructions,
+        retrieval: ask.retrieval,
+      }),
       path: join(srcDir, "pages", "api", "ask.ts"),
     },
   ];

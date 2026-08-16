@@ -66,7 +66,11 @@ describe("eject", () => {
     await writeFiles(root, {
       "blume.config.ts": `export default {
         ai: {
-          ask: { enabled: true, instructions: "Answer in pirate speak." },
+          ask: {
+            enabled: true,
+            instructions: "Answer in pirate speak.",
+            retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
+          },
           mcp: { enabled: true },
         },
         deployment: { site: "https://example.com" },
@@ -112,10 +116,15 @@ describe("eject", () => {
     // feed, and the OpenAPI reference page.
     expect(has("src/pages/api/ask.ts")).toBe(true);
     // The custom `ai.ask.instructions` survive ejection in the endpoint's
-    // system prompt (they were previously dropped on this path).
-    expect(readFileSync(join(root, "src/pages/api/ask.ts"), "utf-8")).toContain(
-      "Answer in pirate speak."
+    // system prompt (they were previously dropped on this path), as do the
+    // configured `ai.ask.retrieval` sizes.
+    const ejectedAsk = readFileSync(
+      join(root, "src/pages/api/ask.ts"),
+      "utf-8"
     );
+    expect(ejectedAsk).toContain("Answer in pirate speak.");
+    expect(ejectedAsk).toContain('"contextBudget":2500');
+    expect(ejectedAsk).toContain('"maxResults":3');
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/api/search.ts")).toBe(true);
     expect(has("src/pages/[section]/rss.xml.ts")).toBe(true);
