@@ -56,12 +56,32 @@ const toFacetTerms = (facets: Record<string, string>): string[] =>
 const BOOST = { description: 2, title: 3 };
 
 /**
- * Scripts written without spaces between words. Orama's default tokenizer
- * splits on a Latin-centric delimiter class, so text in these languages
- * collapses to zero tokens and every query silently returns no hits. Keyed by
- * the primary language subtag of `i18n.defaultLocale`.
+ * The script Orama's default tokenizer is built for. Its delimiter class is
+ * `/[^A-Za-zàèéìòóù0-9_'-]+/`, so every character outside Latin counts as a
+ * separator: text in any other script collapses to zero tokens and every
+ * query silently returns no hits. Unspaced scripts are the best-known
+ * casualty, but the failure is not about spacing — Russian, Greek, Hebrew and
+ * Hindi lose their tokens the same way Japanese does.
  */
-const SEGMENTED_LANGUAGES = new Set(["ja", "ko", "th", "zh"]);
+const LATIN_SCRIPT = "Latn";
+
+/**
+ * Whether a locale's script needs {@link segmentingTokenizer} in place of
+ * Orama's default. The script comes from `Intl.Locale.maximize()`, which fills
+ * in the script a bare language tag implies (`ru` → `Cyrl`) and honors an
+ * explicit one, so `sr-Latn` keeps the default tokenizer while `az-Cyrl` is
+ * segmented. A tag ICU cannot parse throws, and one it knows no script for
+ * reports `undefined`; both keep the default tokenizer, which is what those
+ * locales already got.
+ */
+const needsSegmenting = (locale: string): boolean => {
+  try {
+    const { script } = new Intl.Locale(locale).maximize();
+    return script !== undefined && script !== LATIN_SCRIPT;
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Languages indexed as character bigrams rather than whole segments, and
@@ -161,8 +181,11 @@ const hasSegmenter = (
 ): segmenter is typeof Intl.Segmenter => typeof segmenter === "function";
 
 const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
-  const language = locale?.toLowerCase().split(/[-_]/u)[0] ?? "";
-  if (!SEGMENTED_LANGUAGES.has(language)) {
+  // Underscored tags (`ru_RU`) reach this from hand-written config; ICU only
+  // parses the hyphenated form.
+  const tag = locale?.replaceAll("_", "-") ?? "";
+  const language = tag.toLowerCase().split("-")[0] ?? "";
+  if (!needsSegmenting(tag)) {
     return;
   }
   if (!hasSegmenter(Intl.Segmenter)) {
@@ -224,12 +247,11 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
  * Build an in-memory Orama full-text index from search documents. Shared by the
  * Orama client loader (browser), the MCP server, and Ask AI grounding (Node),
  * so ranking is identical wherever docs are queried. `locale` — the site's
- * `i18n.defaultLocale` — swaps in a word-segmenting tokenizer for languages
- * written without spaces (Japanese, Chinese, Korean, Thai); the tokenizer
- * belongs to the database, so on a mixed-locale site it applies to every
- * document, which is safe because words in other scripts — Latin, and
- * mark-bearing scripts like Hebrew or Devanagari — survive segmentation
- * intact.
+ * `i18n.defaultLocale` — swaps in a word-segmenting tokenizer for every
+ * non-Latin script, all of which Orama's default tokenizer reduces to zero
+ * tokens; the tokenizer belongs to the database, so on a mixed-locale site it
+ * applies to every document, which is safe because Latin words survive
+ * segmentation intact.
  */
 export const buildOramaIndex = async (
   documents: OramaDoc[],

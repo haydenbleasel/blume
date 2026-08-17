@@ -67,9 +67,9 @@ search: {
 }
 ```
 
-#### Languages written without spaces
+#### Non-Latin scripts
 
-Orama's standard tokenizer splits on word boundaries that only exist in space-separated scripts, so Japanese, Chinese, Korean, and Thai text would otherwise produce no matches at all. Blume handles this for you: when [`i18n.defaultLocale`](/docs/content/i18n) is one of those languages, the index switches to a word-segmenting tokenizer (built on the browser- and Node-native `Intl.Segmenter`). Declaring your site's language is all it takes:
+Orama's standard tokenizer splits on a Latin-only delimiter class, so text in any other script — Japanese, Chinese, Korean and Thai, but equally Russian, Greek, Hebrew and Hindi — would otherwise produce no matches at all. Blume handles this for you: when [`i18n.defaultLocale`](/docs/content/i18n) resolves to a non-Latin script, the index switches to a word-segmenting tokenizer (built on the browser- and Node-native `Intl.Segmenter`). Declaring your site's language is all it takes:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -78,7 +78,7 @@ i18n: {
 }
 ```
 
-The same tokenizer serves the search dialog, the MCP server's `search_docs` tool, and Ask AI grounding. On a mixed-language site the whole index shares the default locale's tokenizer — that's safe, because Latin words survive segmentation intact, so pages in English (or any spaced language) stay searchable alongside the default language.
+The same tokenizer serves the search dialog, the MCP server's `search_docs` tool, and Ask AI grounding. On a mixed-language site the whole index shares the default locale's tokenizer — that's safe, because Latin words survive segmentation intact, so pages in English stay searchable alongside the default language. The script is what decides, not the language name: a `sr-Latn` site keeps Orama's tokenizer, while `az-Cyrl` is segmented.
 
 Japanese and Chinese go one step further. Segmenting alone indexes a compound term as its parts — 資金決済法 as 資金, 決済 and 法 — which lets a page mentioning each part somewhere outrank the page the term is actually about. Han, Hiragana and Katakana are therefore indexed as overlapping character pairs, and queries on those indexes prefer pages carrying a term's pairs together, loosening to any-pair matching when no page carries them all, so typing a whole sentence still returns its closest pages. Korean and Thai keep their segmented words.
 
@@ -86,7 +86,7 @@ Japanese and Chinese go one step further. Segmenting alone indexes a compound te
 
 A second keyless, client-side option. It reuses the same `/blume-search.json` index Orama ships and builds a [FlexSearch](https://github.com/nextapps-de/flexsearch) document index in the browser. Works in `blume dev` and `blume build`.
 
-FlexSearch has no equivalent segmentation hook, so for sites in Japanese, Chinese, Korean, or Thai prefer Orama (the default) or [Pagefind](#pagefind), whose `pagefind_extended` binary segments those languages natively.
+FlexSearch has no equivalent segmentation hook, so for sites in a non-Latin script prefer Orama (the default) or [Pagefind](#pagefind), whose `pagefind_extended` binary segments those languages natively.
 
 ```ts blume.config.ts lineNumbers
 search: {
