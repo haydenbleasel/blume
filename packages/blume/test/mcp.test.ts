@@ -784,7 +784,7 @@ describe("orama index helpers", () => {
     const cyrillic = await buildOramaIndex(
       [
         {
-          content: "Müqavilə səlahiyyət",
+          content: "Мүгавилә сәлаһијјәт",
           description: "",
           locale: "az-Cyrl",
           route: "/az",
@@ -794,6 +794,8 @@ describe("orama index helpers", () => {
       "az-Cyrl"
     );
     expect(cyrillic.tokenizer?.language).toBe("az");
+    const cyrillicHits = await queryOramaIndex(cyrillic, "сәлаһијјәт", 5);
+    expect(cyrillicHits.length).toBe(1);
   });
 
   it("falls back to Orama's tokenizer for locales ICU resolves no script for", async () => {

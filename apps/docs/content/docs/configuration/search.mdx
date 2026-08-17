@@ -86,7 +86,7 @@ Japanese and Chinese go one step further. Segmenting alone indexes a compound te
 
 A second keyless, client-side option. It reuses the same `/blume-search.json` index Orama ships and builds a [FlexSearch](https://github.com/nextapps-de/flexsearch) document index in the browser. Works in `blume dev` and `blume build`.
 
-FlexSearch has no equivalent segmentation hook, so for sites in a non-Latin script prefer Orama (the default) or [Pagefind](#pagefind), whose `pagefind_extended` binary segments those languages natively.
+FlexSearch has no equivalent segmentation hook, so for sites in a non-Latin script prefer Orama (the default) or [Pagefind](#pagefind), whose `pagefind_extended` binary indexes a broad set of languages and segments Chinese, Japanese and Korean natively.
 
 ```ts blume.config.ts lineNumbers
 search: {
