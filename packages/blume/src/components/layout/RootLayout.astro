@@ -36,7 +36,7 @@ import {
 import Header from "./Header.astro";
 import Icon from "../Icon.astro";
 import {
-  activeTabForRoute,
+  currentTabForRoute,
   findBreadcrumbs,
   flattenPages,
   getPagination,
@@ -356,14 +356,21 @@ const mcpUrl =
 // pages. Without tabs — or on a route under none — this is the full sidebar.
 // `navigation.root` keeps the root-tab check in the tabs' localized/based
 // path space (`/en`, `/docs`), so a locale or base prefix doesn't misread the
-// root tab as a section tab.
+// root tab as a section tab; in an archived version tree the root is
+// versionized (`/v1.0`) while tabs stay in current-docs space, so the root
+// tab is matched by containment and the snapshot renders unscoped — the same
+// reason no tab is marked current there (tabs link back to current docs).
 const sidebar = sidebarForRoute(
   navigation.sidebar,
   navigation.tabs,
   page.route,
   navigation.root
 );
-const activeTab = activeTabForRoute(navigation.tabs, page.route);
+const activeTab = currentTabForRoute(
+  navigation.tabs,
+  page.route,
+  navigation.root
+);
 const crumbs = findBreadcrumbs(sidebar, page.route);
 const { prev, next } = getPagination(flattenPages(sidebar), page.route);
 

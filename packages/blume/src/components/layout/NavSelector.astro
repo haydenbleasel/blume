@@ -6,7 +6,7 @@ import { withBase } from "../islands/base-path.ts";
 // <details>/<summary> like the language switcher.
 import type { NavSelector } from "../../core/types.ts";
 import Icon from "../Icon.astro";
-import { isUnderPath } from "./nav-utils.ts";
+import { isUnderPath } from "../../core/navigation.ts";
 
 interface Props {
   selector: NavSelector;

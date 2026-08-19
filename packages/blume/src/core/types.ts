@@ -269,9 +269,12 @@ export interface Navigation {
   sidebar: NavNode[];
   /**
    * The tree root in final path space — localized and based (`/`, `/en`,
-   * `/docs`). Tab paths arrive in the same space, so the tab sitting at this
-   * path spans the whole tree and must be scoped as the root tab, not as a
-   * section tab. Absent on older serialized graphs; treat as `/`.
+   * `/docs`), and versionized for an archived version tree (`/v1.0`). Tab
+   * paths share that space except under a version, where they stay in
+   * current-docs space — so the root tab is the tab this root sits under
+   * (`isRootTab`), not necessarily the tab at this exact path, and must be
+   * scoped as the root tab, not as a section tab. Absent on older serialized
+   * graphs; treat as `/`.
    */
   root?: string;
   /** Pinned links shown above the sidebar sections, unscoped by tab. */

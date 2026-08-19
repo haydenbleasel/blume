@@ -20,6 +20,28 @@ const NUMERIC_PREFIX = /^(?<order>\d+)[-_.]/u;
 const GROUP_FOLDER = /^\((?<label>.+)\)$/u;
 const WORD_SPLIT = /[-_]/u;
 
+/**
+ * Whether `route` is the section root `base` or nested beneath it. Requires a
+ * path boundary, so `/api-reference` is not under `/api`. The root `/` spans
+ * every route.
+ */
+export const isUnderPath = (route: string, base: string): boolean =>
+  base === "/" || route === base || route.startsWith(`${base}/`);
+
+/**
+ * Whether `tab` is the root tab of the tree rooted at `root` — the tab that
+ * spans the whole sidebar rather than one section. Tab paths and the root
+ * normally share one path space, so the root tab sits at `root` exactly (`/`,
+ * `/en`, `/docs`); in an archived version tree the root is versionized
+ * (`/v1.0`, `/docs/v1.0`) while tab paths stay in current-docs space, so the
+ * root tab is any tab the whole root sits under. The one definition shared by
+ * sidebar scoping, tab-section hoisting, and the header's current-tab state —
+ * consumers that disagree on which tab is the root tab prune an archived
+ * sidebar or highlight the wrong tab over it.
+ */
+export const isRootTab = (tab: NavTab, root: string): boolean =>
+  isUnderPath(root, tab.path);
+
 const humanize = (segment: string): string =>
   segment
     .replace(NUMERIC_PREFIX, "")
@@ -896,6 +918,9 @@ export const buildNavigation = (
   // prefix (`/docs`, `/fr`) and a bare `"/"` check would miss the match (or,
   // under a base, falsely scope a group named like the prefix). Carried on the
   // returned navigation so render-time scoping compares in the same space too.
+  // In a version snapshot the root arrives versionized (`/v1.0`) while tab
+  // paths stay in current-docs space, so root-tab checks use `isRootTab`
+  // containment, not equality.
   const rootTabPath = withBasePath(basePath, options.localizedRoot ?? "/");
 
   // Emitted here, before the sidebar-mode branch: an explicit config sidebar
@@ -930,7 +955,7 @@ export const buildNavigation = (
     sharedMetaPrefix,
     display,
     new Set(
-      tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path]))
+      tabs.flatMap((tab) => (isRootTab(tab, rootTabPath) ? [] : [tab.path]))
     ),
     diagnostics
   );

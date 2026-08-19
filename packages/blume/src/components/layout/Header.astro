@@ -14,7 +14,7 @@ import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
 import LanguageSwitcher from "./LanguageSwitcher.astro";
 import Logo from "./Logo.astro";
-import { activeTabForRoute } from "./nav-utils.ts";
+import { currentTabForRoute } from "./nav-utils.ts";
 import NavSelector from "./NavSelector.astro";
 import { resolveSlot } from "./overrides.ts";
 import Search from "./Search.astro";
@@ -108,7 +108,7 @@ const SearchSlot = resolveSlot(layout.Search, Search);
 // PageLayout) it's a tabs-only drawer the layout renders — so the button is also
 // needed whenever there are tabs to reveal.
 const showNavToggle = hasDrawer && (hasSidebar || navigation.tabs.length > 0);
-const activeTab = activeTabForRoute(navigation.tabs, route);
+const activeTab = currentTabForRoute(navigation.tabs, route, navigation.root);
 // Where the header's inline tab bar appears. With a sidebar it shares the `md`
 // breakpoint with the docs drawer; without one, the tabs-only drawer is the sole
 // mobile nav below `lg`, so the inline tabs wait until `lg` to avoid duplicating

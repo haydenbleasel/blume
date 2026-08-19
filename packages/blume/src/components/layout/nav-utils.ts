@@ -1,3 +1,4 @@
+import { isRootTab, isUnderPath } from "../../core/navigation.ts";
 import type { NavNode, NavTab } from "../../core/types.ts";
 
 /** A flat, ordered page reference used for previous/next pagination. */
@@ -72,14 +73,6 @@ export const findBreadcrumbs = (nodes: NavNode[], route: string): Crumb[] => {
 };
 
 /**
- * Whether `route` is the section root `base` or nested beneath it. Requires a
- * path boundary, so `/api-reference` is not under `/api`. The root `/` spans
- * every route.
- */
-export const isUnderPath = (route: string, base: string): boolean =>
-  base === "/" || route === base || route.startsWith(`${base}/`);
-
-/**
  * The tab whose `path` is the longest prefix of `route`. The root tab (`/`)
  * acts as the fallback when no more specific tab matches.
  */
@@ -97,6 +90,28 @@ export const activeTabForRoute = (
     }
   }
   return match;
+};
+
+/**
+ * The tab to mark as the current one (`aria-current`) for `route`. Same
+ * longest-prefix match as {@link activeTabForRoute}, except inside an archived
+ * version tree: the root tab claims every archived route through its
+ * spans-everything fallback while its link points back at the current docs, so
+ * no tab is genuinely current there.
+ */
+export const currentTabForRoute = (
+  tabs: NavTab[],
+  route: string,
+  root = "/"
+): NavTab | null => {
+  const tab = activeTabForRoute(tabs, route);
+  // The root tab sitting away from the tree root means the tree is a version
+  // snapshot in a different path space — the tab matched as a fallback, not
+  // because it owns the route.
+  if (tab && isRootTab(tab, root) && tab.path !== root) {
+    return null;
+  }
+  return tab;
 };
 
 /**
@@ -144,7 +159,7 @@ const withoutTabSections = (
 ): NavNode[] => {
   const tabPaths = new Set<string>();
   for (const tab of tabs) {
-    if (tab.path !== root) {
+    if (!isRootTab(tab, root)) {
       tabPaths.add(tab.path);
     }
   }
@@ -181,11 +196,15 @@ const withoutTabSections = (
  * the root tab), the tab-owned groups are hidden so the root sidebar shows
  * only pages that don't belong to a tab.
  *
- * `root` is the tree root in the tabs' own path space (`Navigation.root`) —
- * tab paths arrive localized and based, so under i18n or a `basePath` the root
- * tab is `/en` or `/docs`, not `/`. Comparing against `/` would misread it as
- * a section tab: a root-level `(group)` folder's path is exactly that prefix,
- * so the sidebar collapsed to that one group (or blanked entirely).
+ * `root` is the tree root (`Navigation.root`), localized and based like tab
+ * paths — under i18n or a `basePath` the root tab sits at `/en` or `/docs`,
+ * not `/`, and a bare-`/` comparison would misread it as a section tab (a
+ * root-level `(group)` folder's path is exactly that prefix, so the sidebar
+ * collapsed to that one group or blanked entirely). In an archived version
+ * tree the root is versionized (`/v1.0`) while tab paths stay in current-docs
+ * space, so root-tab checks use {@link isRootTab} containment, not equality:
+ * the root tab owns no group in a snapshot, and misreading it as a section
+ * tab blanked the archived sidebar.
  *
  * When a matched tab owns no sidebar group — a standalone page like the
  * generated changelog timeline (`/changelog`), or a tab whose source produced
@@ -201,12 +220,7 @@ export const sidebarForRoute = (
   root = "/"
 ): NavNode[] => {
   const tab = activeTabForRoute(tabs, route);
-  // A tab whose path contains the whole tree root is the root tab for this
-  // navigation, even when the paths differ: an archived version tree's root
-  // is versionized ("/v1.0") while tab paths stay in current-docs space
-  // ("/"), so a plain equality check misread the root tab as a section tab
-  // that owns no group there and blanked the sidebar.
-  if (tab && tab.path !== root && !isUnderPath(root, tab.path)) {
+  if (tab && !isRootTab(tab, root)) {
     return sectionChildren(sidebar, tab.path) ?? [];
   }
   const scoped = withoutTabSections(sidebar, tabs, root);

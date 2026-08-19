@@ -41,7 +41,7 @@ import Favicon from "./Favicon.astro";
 import Fonts from "./Fonts.astro";
 import { BANNER_INIT_SCRIPT, THEME_INIT_SCRIPT } from "./head-scripts.ts";
 import Header from "./Header.astro";
-import { activeTabForRoute } from "./nav-utils.ts";
+import { currentTabForRoute } from "./nav-utils.ts";
 import WebMcp from "./WebMcp.astro";
 
 interface Props {
@@ -160,7 +160,7 @@ const searchLocale =
 const pageTitle = page?.title ?? site.title;
 const description = page?.description ?? site.description;
 const route = page?.route ?? "/";
-const activeTab = activeTabForRoute(navigation.tabs, route);
+const activeTab = currentTabForRoute(navigation.tabs, route, navigation.root);
 
 // Derive canonical + og:image from the site URL the same way the catch-all does
 // for content pages, so a custom page gets both for free. The matching OG card
