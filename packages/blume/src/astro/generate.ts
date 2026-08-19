@@ -964,6 +964,14 @@ const FAVICON_CANDIDATES = [
   "icon.ico",
 ];
 
+/**
+ * Dark-scheme favicon filenames, in the same priority order. A `-dark` sibling of
+ * any favicon name opts the site into a `prefers-color-scheme` icon pair.
+ */
+const FAVICON_DARK_CANDIDATES = FAVICON_CANDIDATES.map((name) =>
+  name.replace(".", "-dark.")
+);
+
 /** `<link type>` MIME for the favicon extensions we recognize. */
 const FAVICON_TYPES = new Map([
   ["ico", "image/x-icon"],
@@ -983,8 +991,19 @@ const faviconType = (name: string): string | undefined => {
 const inlineDataUri = (file: string, type: string): string =>
   `data:${type};base64,${readFileSync(file).toString("base64")}`;
 
-/** The bundled Blume favicon, inlined as a data URI so it needs no public file. */
+/**
+ * The bundled Blume favicon, inlined as a data URI so it needs no public file.
+ * The mark is dark, so it ships with a light-on-transparent dark-scheme variant —
+ * otherwise it disappears against dark browser chrome.
+ */
 const defaultFavicon = (): BlumeFavicon => ({
+  dark: {
+    href: inlineDataUri(
+      join(BLUME_SRC, "assets", "icon-dark.png"),
+      "image/png"
+    ),
+    type: "image/png",
+  },
   href: inlineDataUri(join(BLUME_SRC, "assets", "icon.png"), "image/png"),
   type: "image/png",
 });
@@ -1029,10 +1048,18 @@ const resolveIconFile = (
 
 /**
  * Resolve the site favicon by convention, falling back to the bundled Blume mark
- * when the project ships no `icon.*`/`favicon.*` file.
+ * when the project ships no `icon.*`/`favicon.*` file. A `-dark` sibling (e.g.
+ * `icon-dark.svg`) is picked up as the dark-scheme variant; on its own it pairs
+ * with the bundled default for light.
  */
-const resolveFavicon = (project: BlumeProject): BlumeFavicon =>
-  resolveIconFile(project, FAVICON_CANDIDATES) ?? defaultFavicon();
+const resolveFavicon = (project: BlumeProject): BlumeFavicon => {
+  const light = resolveIconFile(project, FAVICON_CANDIDATES);
+  const dark = resolveIconFile(project, FAVICON_DARK_CANDIDATES);
+  if (!light) {
+    return dark ? { ...defaultFavicon(), dark } : defaultFavicon();
+  }
+  return dark ? { ...light, dark } : light;
+};
 
 /**
  * Resolve the Apple touch icon by convention, or null when the project ships

@@ -5,10 +5,16 @@ import { withBase } from "../islands/base-path.ts";
 // Each href is either a URL to a file the project ships in public/, or a data
 // URI (a root-level icon, or the bundled Blume favicon default) — both resolved
 // by the generator's resolveFavicon / resolveAppleIcon.
+//
+// When the favicon has a dark variant, both icons are emitted behind a
+// prefers-color-scheme media query so a dark mark doesn't vanish against dark
+// browser chrome. Browsers that ignore `media` on rel="icon" take the last
+// matching link, so the light icon is emitted second as the safe default.
 interface Props {
   favicon?: {
     href: string;
     type?: string;
+    dark?: { href: string; type?: string };
   } | null;
   appleIcon?: {
     href: string;
@@ -19,5 +25,24 @@ interface Props {
 const { appleIcon, favicon } = Astro.props;
 ---
 
-{favicon && <link href={withBase(favicon.href)} rel="icon" type={favicon.type} />}
+{
+  favicon?.dark ? (
+    <>
+      <link
+        href={withBase(favicon.dark.href)}
+        media="(prefers-color-scheme: dark)"
+        rel="icon"
+        type={favicon.dark.type}
+      />
+      <link
+        href={withBase(favicon.href)}
+        media="(prefers-color-scheme: light)"
+        rel="icon"
+        type={favicon.type}
+      />
+    </>
+  ) : (
+    favicon && <link href={withBase(favicon.href)} rel="icon" type={favicon.type} />
+  )
+}
 {appleIcon && <link href={withBase(appleIcon.href)} rel="apple-touch-icon" />}
