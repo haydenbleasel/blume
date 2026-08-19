@@ -69,7 +69,7 @@ search: {
 
 #### Non-Latin scripts
 
-Orama's standard tokenizer splits on a Latin-only delimiter class, so text in any other script — Japanese, Chinese, Korean and Thai, but equally Russian, Greek, Hebrew and Hindi — would otherwise produce no matches at all. Blume handles this for you: when [`i18n.defaultLocale`](/docs/content/i18n) resolves to a non-Latin script, the index switches to a word-segmenting tokenizer (built on the browser- and Node-native `Intl.Segmenter`). Declaring your site's language is all it takes:
+Orama's standard tokenizer keeps only basic Latin letters, digits and a handful of accented vowels, so text in any other script — Japanese, Chinese, Korean and Thai, but equally Russian, Greek, Hebrew and Hindi — would otherwise produce no matches at all. Blume handles this for you: when [`i18n.defaultLocale`](/docs/content/i18n) resolves to a non-Latin script, the index switches to a word-segmenting tokenizer (built on the browser- and Node-native `Intl.Segmenter`). Declaring your site's language is all it takes:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -78,7 +78,7 @@ i18n: {
 }
 ```
 
-The same tokenizer serves the search dialog, the MCP server's `search_docs` tool, and Ask AI grounding. On a mixed-language site the whole index shares the default locale's tokenizer — that's safe, because Latin words survive segmentation intact, so pages in English stay searchable alongside the default language. The script is what decides, not the language name: a `sr-Latn` site keeps Orama's tokenizer, while `az-Cyrl` is segmented.
+The same tokenizer serves the search dialog, the MCP server's `search_docs` tool, and Ask AI grounding. The script is what decides, not the language name — `az-Cyrl` is segmented while `sr-Latn` is not — and it is the default locale that decides for the whole index: on a mixed-language site every page shares the default locale's tokenizer. With a non-Latin default that's safe, because Latin words survive segmentation intact, so pages in English stay searchable alongside the default language. The reverse doesn't hold: non-Latin translations on a Latin-default site aren't searchable. Latin-script languages that lean heavily on diacritics (Vietnamese, or Serbian in Latin script) also fare worse on the standard tokenizer, which folds only a few accented vowels and splits words on the rest.
 
 Japanese and Chinese go one step further. Segmenting alone indexes a compound term as its parts — 資金決済法 as 資金, 決済 and 法 — which lets a page mentioning each part somewhere outrank the page the term is actually about. Han, Hiragana and Katakana are therefore indexed as overlapping character pairs, and queries on those indexes prefer pages carrying a term's pairs together, loosening to any-pair matching when no page carries them all, so typing a whole sentence still returns its closest pages. Korean and Thai keep their segmented words.
 

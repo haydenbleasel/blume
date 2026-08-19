@@ -311,8 +311,9 @@ export type OramaIndexProvider = () => Promise<
 
 /**
  * Memoize the search index so every server built from a snapshot shares it.
- * `locale` is the snapshot's `defaultLocale`, forwarded so unspaced scripts
- * (Japanese, Chinese, Korean, Thai) get a word-segmenting tokenizer.
+ * `locale` is the snapshot's `defaultLocale`, forwarded so non-Latin scripts
+ * (Japanese and Chinese, but equally Cyrillic, Greek, Hebrew, Devanagari…)
+ * get a word-segmenting tokenizer.
  */
 export const createIndexProvider = (
   documents: OramaDoc[],

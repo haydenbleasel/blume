@@ -799,8 +799,9 @@ describe("orama index helpers", () => {
   });
 
   it("falls back to Orama's tokenizer for locales ICU resolves no script for", async () => {
-    // An unparseable tag throws inside `Intl.Locale`, and a well-formed tag
-    // ICU knows nothing about resolves to no script; neither may break search.
+    // A well-formed tag ICU knows nothing about resolves to no script; a
+    // malformed tag throws but its primary subtag parses; a tag whose primary
+    // subtag is itself unparseable throws twice. None may break search.
     const doc = {
       content: "Authorization contract",
       description: "",
@@ -810,11 +811,99 @@ describe("orama index helpers", () => {
     };
     const unknown = await buildOramaIndex([doc], "xx");
     const malformed = await buildOramaIndex([doc], "not a locale");
+    const unparseable = await buildOramaIndex([doc], "€");
     const hits = await Promise.all([
       queryOramaIndex(unknown, "authorization", 5),
       queryOramaIndex(malformed, "authorization", 5),
+      queryOramaIndex(unparseable, "authorization", 5),
     ]);
-    expect(hits.map((found) => found.length)).toEqual([1, 1]);
+    expect(hits.map((found) => found.length)).toEqual([1, 1, 1]);
+  });
+
+  it("segments legacy POSIX and extlang locale tags by their language subtag", async () => {
+    // `ja_JP.UTF-8`-style tags copied from environment config and extlang
+    // forms like `zh-cmn-Hans` throw inside `Intl.Locale`, but the primary
+    // language subtag still resolves the script — these sites segmented
+    // before the script-based gate and must keep doing so.
+    const ja = {
+      content: "検索設定を変更します。",
+      description: "",
+      locale: "ja",
+      route: "/ja",
+      title: "X",
+    };
+    const zh = {
+      content: "修改搜索设置。",
+      description: "",
+      locale: "zh",
+      route: "/zh",
+      title: "X",
+    };
+    const posix = await buildOramaIndex([ja], "ja_JP.UTF-8");
+    expect(posix.tokenizer?.language).toBe("ja");
+    const posixHits = await queryOramaIndex(posix, "検索", 5);
+    expect(posixHits.length).toBe(1);
+    const extlang = await buildOramaIndex([zh], "zh-cmn-Hans");
+    expect(extlang.tokenizer?.language).toBe("zh");
+    const extlangHits = await queryOramaIndex(extlang, "搜索", 5);
+    expect(extlangHits.length).toBe(1);
+  });
+
+  it("bigrams Han-script languages beyond ja and zh, like Cantonese", async () => {
+    // The writing system, not the language subtag, carries the compound
+    // convention: `yue` maximizes to Hant and needs bigrams — and the strict
+    // query pass — the same way `zh` does. The fragments page shares the
+    // compound's parts but not its bigram windows, so the strict pass keeps
+    // it out entirely.
+    const fragments = {
+      content: "資金 決済 法",
+      description: "",
+      locale: "yue",
+      route: "/fragments",
+      title: "X",
+    };
+    const compound = {
+      content: "資金決済法の適用範囲",
+      description: "",
+      locale: "yue",
+      route: "/compound",
+      title: "X",
+    };
+    const db = await buildOramaIndex([fragments, compound], "yue");
+    expect(db.tokenizer?.language).toBe("yue");
+    const hits = await queryOramaIndex(db, "資金決済法", 5);
+    expect(hits.map((doc) => doc.route)).toEqual(["/compound"]);
+  });
+
+  it("folds Latin diacritics on a segmented index, keeping marks elsewhere", async () => {
+    // Orama's default tokenizer folds café → cafe; the segmenting tokenizer
+    // must not lose that on the Latin loanwords a non-Latin site mixes in.
+    // Marks stay everywhere else — й is not и plus a mark to strip.
+    const docs = [
+      {
+        content: "Встретимся в café",
+        description: "",
+        locale: "ru",
+        route: "/cafe",
+        title: "X",
+      },
+      {
+        content: "йогурт на завтрак",
+        description: "",
+        locale: "ru",
+        route: "/yogurt",
+        title: "X",
+      },
+    ];
+    const db = await buildOramaIndex(docs, "ru");
+    const unaccented = await queryOramaIndex(db, "cafe", 5);
+    expect(unaccented.map((doc) => doc.route)).toEqual(["/cafe"]);
+    const accented = await queryOramaIndex(db, "café", 5);
+    expect(accented.map((doc) => doc.route)).toEqual(["/cafe"]);
+    const stripped = await queryOramaIndex(db, "иогурт", 5);
+    expect(stripped.length).toBe(0);
+    const spelled = await queryOramaIndex(db, "йогурт", 5);
+    expect(spelled.map((doc) => doc.route)).toEqual(["/yogurt"]);
   });
 
   it("segments Chinese, Korean, and Thai content too", async () => {

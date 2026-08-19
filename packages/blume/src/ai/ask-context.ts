@@ -22,8 +22,8 @@ export interface AskPage {
 export interface AskData {
   /**
    * The site's `i18n.defaultLocale`, when i18n is configured. Selects a
-   * word-segmenting Orama tokenizer for languages written without spaces, so
-   * retrieval can match CJK/Thai content.
+   * word-segmenting Orama tokenizer for every non-Latin script, so retrieval
+   * can match CJK, Cyrillic, Greek, Hebrew, or Devanagari content.
    */
   defaultLocale?: string;
   documents: OramaDoc[];

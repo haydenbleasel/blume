@@ -37,8 +37,9 @@ export interface McpData {
   base: string;
   /**
    * The site's `i18n.defaultLocale`, when i18n is configured. Selects a
-   * word-segmenting Orama tokenizer for languages written without spaces, so
-   * `search_docs` can match CJK/Thai content.
+   * word-segmenting Orama tokenizer for every non-Latin script, so
+   * `search_docs` can match CJK, Cyrillic, Greek, Hebrew, or Devanagari
+   * content.
    */
   defaultLocale?: string;
   /**

@@ -11,8 +11,9 @@ import type { IndexedDocument, SearchFn } from "./types.ts";
  * available in both dev and the production build. A generous match pool is
  * pulled so the section pills can count across the whole result set before the
  * active filter and display limit are applied. `locale` is the site's
- * `i18n.defaultLocale`, baked into the generated client so unspaced scripts
- * (Japanese, Chinese, Korean, Thai) get a word-segmenting tokenizer.
+ * `i18n.defaultLocale`, baked into the generated client so non-Latin scripts
+ * (Japanese and Chinese, but equally Cyrillic, Greek, Hebrew, Devanagari…)
+ * get a word-segmenting tokenizer.
  */
 export const createSearch = async (opts: {
   indexUrl: string;

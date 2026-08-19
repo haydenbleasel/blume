@@ -1104,7 +1104,7 @@ const SEARCH_BASE_IMPORT =
 /**
  * A client that loads a static `blume-search.json` index (Orama, FlexSearch).
  * `locale` (Orama only) is the site's `i18n.defaultLocale`, which selects a
- * word-segmenting tokenizer for languages written without spaces.
+ * word-segmenting tokenizer for every non-Latin script.
  */
 const staticSearchClient = (module: string, locale?: string): string =>
   `${SEARCH_CLIENT_HEADER}${searchClientImport(module)}${SEARCH_BASE_IMPORT}
