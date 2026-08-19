@@ -1,5 +1,6 @@
 ---
 import "blume:theme";
+import type { BlumeFavicon } from "../../core/data.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { FontHead } from "../../theme/fonts.ts";
@@ -25,15 +26,8 @@ interface Props {
     href: string;
     text?: string;
   } | null;
-  favicon?: {
-    href: string;
-    type?: string;
-    dark?: { href: string; type?: string };
-  } | null;
-  appleIcon?: {
-    href: string;
-    type?: string;
-  } | null;
+  favicon?: BlumeFavicon | null;
+  appleIcon?: BlumeFavicon | null;
   banner?: {
     content: string;
     link?: { text: string; href: string };

@@ -1,4 +1,5 @@
 ---
+import type { BlumeFavicon } from "../../core/data.ts";
 import { withBase } from "../islands/base-path.ts";
 // Emits the icon <link>s for the document <head>: the favicon (rel="icon") and,
 // when the project ships one, the Apple touch icon (rel="apple-touch-icon").
@@ -6,27 +7,24 @@ import { withBase } from "../islands/base-path.ts";
 // URI (a root-level icon, or the bundled Blume favicon default) — both resolved
 // by the generator's resolveFavicon / resolveAppleIcon.
 //
-// When the favicon has a dark variant, both icons are emitted behind a
-// prefers-color-scheme media query so a dark mark doesn't vanish against dark
-// browser chrome. Browsers that ignore `media` on rel="icon" take the last
-// matching link, so the light icon is emitted second as the safe default.
+// When the favicon has a dark variant, three links cover every consumer class:
+// an unconditional light link first (bots and services that take the first
+// rel="icon" and ignore `media`, and UAs that honor `media` but match neither
+// color-scheme query), then the media-gated pair. Browsers that honor `media`
+// take the last matching link — the dark link in dark mode, the trailing light
+// link in light mode — and browsers that ignore `media` but take the last link
+// also land on light, the safe default against light browser chrome.
 interface Props {
-  favicon?: {
-    href: string;
-    type?: string;
-    dark?: { href: string; type?: string };
-  } | null;
-  appleIcon?: {
-    href: string;
-    type?: string;
-  } | null;
+  favicon?: BlumeFavicon | null;
+  appleIcon?: BlumeFavicon | null;
 }
 
 const { appleIcon, favicon } = Astro.props;
 ---
 
+{favicon && <link href={withBase(favicon.href)} rel="icon" type={favicon.type} />}
 {
-  favicon?.dark ? (
+  favicon?.dark && (
     <>
       <link
         href={withBase(favicon.dark.href)}
@@ -41,8 +39,6 @@ const { appleIcon, favicon } = Astro.props;
         type={favicon.type}
       />
     </>
-  ) : (
-    favicon && <link href={withBase(favicon.href)} rel="icon" type={favicon.type} />
   )
 }
 {appleIcon && <link href={withBase(appleIcon.href)} rel="apple-touch-icon" />}

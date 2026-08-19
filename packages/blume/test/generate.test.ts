@@ -721,7 +721,40 @@ describe("buildRuntimeData", () => {
     });
   });
 
-  it("pairs a dark-only favicon with the bundled default", async () => {
+  it("ignores a dark file that is not a sibling of the resolved icon", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "docs/index.md": "# Home\n",
+        "public/favicon-dark.png": "FAKEPNG",
+        "public/icon.svg": "<svg></svg>",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.favicon).toEqual({
+      href: "/icon.svg",
+      type: "image/svg+xml",
+    });
+  });
+
+  it("pairs a root dark favicon sibling as inline data uris", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "docs/index.md": "# Home\n",
+        "icon-dark.png": "FAKEDARKPNG",
+        "icon.png": "FAKEPNG",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.favicon.href.startsWith("data:image/png;base64,")).toBe(
+      true
+    );
+    expect(
+      data.config.favicon.dark.href.startsWith("data:image/png;base64,")
+    ).toBe(true);
+    expect(data.config.favicon.dark.href).not.toBe(data.config.favicon.href);
+  });
+
+  it("uses a dark-only favicon for both schemes", async () => {
     const project = await scanProject(
       await writeProject({
         "docs/index.md": "# Home\n",
@@ -729,10 +762,7 @@ describe("buildRuntimeData", () => {
       })
     );
     const data = JSON.parse(buildRuntimeData(project));
-    expect(data.config.favicon.href.startsWith("data:image/png;base64,")).toBe(
-      true
-    );
-    expect(data.config.favicon.dark).toEqual({
+    expect(data.config.favicon).toEqual({
       href: "/icon-dark.svg",
       type: "image/svg+xml",
     });

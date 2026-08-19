@@ -140,7 +140,7 @@ my-docs/
 
 SVG wins over PNG over ICO when several are present, and a file in `public/` is preferred over one at the root. If Blume finds no icon, it falls back to its own mark.
 
-A dark mark disappears against dark browser chrome, so you can ship a second file for dark mode. Add a `-dark` sibling of any icon name — `icon-dark.svg`, `favicon-dark.png`, and so on — and Blume emits both icons behind a `prefers-color-scheme` media query:
+A dark mark disappears against dark browser chrome, so you can ship a second file for dark mode. Add a `-dark` sibling of your icon file — the same name and directory, with `-dark` before the extension (`icon.png` → `icon-dark.png`) — and Blume emits both icons behind a `prefers-color-scheme` media query, plus a plain light tag for browsers and crawlers that ignore media queries on icons:
 
 ```
 my-docs/
@@ -150,7 +150,7 @@ my-docs/
 └─ docs/
 ```
 
-The dark file is optional; with only one icon, Blume emits a single tag as before. Blume's own fallback mark ships both variants.
+Only the sibling of the icon Blume picked is used — a `-dark` file with a different name stays ignored, so an unrelated file can't pair with your mark by accident. The dark file is optional; with only one icon, Blume emits a single tag as before. Blume's own fallback mark ships both variants.
 
 ### Apple touch icon
 
@@ -163,7 +163,7 @@ my-docs/
 └─ docs/
 ```
 
-Put the file in `public/` rather than the project root: iOS ignores the inlined data URI Blume uses for a root-level icon, so only a `public/` file (served at `/apple-icon.png`) reliably reaches the home screen.
+Put the file in `public/` rather than the project root: iOS ignores the inlined data URI Blume uses for a root-level icon, so only a `public/` file (served at `/apple-icon.png`) reliably reaches the home screen. Unlike the favicon, there's no `-dark` sibling here — iOS ignores media queries on home-screen icons, so a dark variant could never be served.
 
 ### Banner
 

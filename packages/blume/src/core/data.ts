@@ -31,10 +31,11 @@ export interface BlumeFavicon {
   href: string;
   type?: string;
   /**
-   * Dark-scheme variant, when the project ships an `icon-dark.*`/`favicon-dark.*`
-   * file (or falls back to the bundled default pair). When set, the layout emits
-   * both icons behind `media="(prefers-color-scheme: …)"` so a dark mark doesn't
-   * vanish against dark browser chrome.
+   * Dark-scheme variant: the `-dark` sibling of the resolved icon file (e.g.
+   * `icon.svg` → `icon-dark.svg`), or the bundled default pair. When set, the
+   * layout emits an unconditional light link plus both icons behind
+   * `media="(prefers-color-scheme: …)"` so a dark mark doesn't vanish against
+   * dark browser chrome.
    */
   dark?: { href: string; type?: string };
 }
