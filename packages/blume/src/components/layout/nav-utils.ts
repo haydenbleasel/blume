@@ -201,7 +201,12 @@ export const sidebarForRoute = (
   root = "/"
 ): NavNode[] => {
   const tab = activeTabForRoute(tabs, route);
-  if (tab && tab.path !== root) {
+  // A tab whose path contains the whole tree root is the root tab for this
+  // navigation, even when the paths differ: an archived version tree's root
+  // is versionized ("/v1.0") while tab paths stay in current-docs space
+  // ("/"), so a plain equality check misread the root tab as a section tab
+  // that owns no group there and blanked the sidebar.
+  if (tab && tab.path !== root && !isUnderPath(root, tab.path)) {
     return sectionChildren(sidebar, tab.path) ?? [];
   }
   const scoped = withoutTabSections(sidebar, tabs, root);

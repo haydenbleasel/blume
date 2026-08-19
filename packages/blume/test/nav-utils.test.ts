@@ -250,6 +250,34 @@ describe("sidebarForRoute", () => {
     );
   });
 
+  it("keeps the sidebar unscoped inside an archived version tree", () => {
+    // A version navigation's root is versionized (`/v1.0`) while tab paths
+    // stay in current-docs space, so the root tab must be recognized as the
+    // root — not a section tab owning no group here, which blanked the
+    // sidebar on every archived page.
+    const tree: NavNode[] = [
+      page("Introduction", "/v1.0"),
+      page("Installation", "/v1.0/installation"),
+    ];
+    const tabs: NavTab[] = [
+      { label: "Docs", path: "/" },
+      { label: "API", path: "/api" },
+    ];
+    expect(
+      labels(sidebarForRoute(tree, tabs, "/v1.0/installation", "/v1.0"))
+    ).toStrictEqual(["Introduction", "Installation"]);
+    // Same under a basePath: rebased tabs (`/docs`) are still ancestors of
+    // the versionized root (`/docs/v1.0`).
+    const based: NavNode[] = [page("Home", "/docs/v1.0")];
+    const basedTabs: NavTab[] = [
+      { label: "Docs", path: "/docs" },
+      { label: "API", path: "/docs/api" },
+    ];
+    expect(
+      labels(sidebarForRoute(based, basedTabs, "/docs/v1.0", "/docs/v1.0"))
+    ).toStrictEqual(["Home"]);
+  });
+
   it("does not treat a sibling prefix as the section (/adapters vs /adapters-x)", () => {
     const tree: NavNode[] = [
       group("Adapters", "/adapters", [page("S3", "/adapters/s3")]),
