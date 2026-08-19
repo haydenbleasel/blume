@@ -36,6 +36,13 @@ const MAX_RESULTS = 6;
 const EXCERPT_CHARS = 2000;
 /** Overall cap on injected documentation characters. */
 const CONTEXT_BUDGET = 10_000;
+/**
+ * Smallest excerpt worth injecting. A long page pushed under a tiny residual
+ * budget would get a full `## Title (/route)` heading over a fragment of a few
+ * dozen characters — a section the model is invited to cite but that grounds
+ * nothing. Short pages that fit whole are still injected below this floor.
+ */
+const MIN_EXCERPT_CHARS = 200;
 
 /**
  * How much retrieved documentation a question carries (the `ai.ask.retrieval`
@@ -43,14 +50,18 @@ const CONTEXT_BUDGET = 10_000;
  * only changes what it names. Injected characters dominate time-to-first-token
  * on a self-hosted backend, and the three knobs aren't interchangeable: the
  * budget caps the total, `excerptChars` decides how deep into one long page the
- * excerpt reaches, and `maxResults` decides how many pages can be cited at all.
+ * excerpt reaches, and `maxResults` decides how many pages retrieval adds (the
+ * page the reader is viewing is injected on top of them).
  */
 export interface AskRetrievalOptions {
   /** Overall cap on injected documentation characters. Defaults to `10000`. */
   contextBudget?: number;
   /** Characters kept per injected excerpt. Defaults to `2000`. */
   excerptChars?: number;
-  /** Documents retrieved per question. Defaults to `6`. */
+  /**
+   * Documents retrieved per question. Defaults to `6`. The current page is
+   * injected in addition when it isn't among the hits.
+   */
   maxResults?: number;
 }
 /** Chars of lead-in kept before the matched region, for heading/sentence context. */
@@ -193,13 +204,14 @@ export const relevantExcerpt = (
     return `${prefix}${slice}${suffix}`;
   };
 
-  const lower = trimmed.toLowerCase();
+  // Case-insensitive matching via regex rather than `indexOf` on a lowercased
+  // copy: length-changing case mappings (Turkish İ → "i" + U+0307) would shift
+  // every index in the copy, sliding the excerpt window off the match. Terms
+  // come from TERM (letters, marks and digits only), so no regex escaping.
   const positions: number[] = [];
   for (const term of queryTerms(query)) {
-    let idx = lower.indexOf(term);
-    while (idx !== -1) {
-      positions.push(idx);
-      idx = lower.indexOf(term, idx + term.length);
+    for (const match of trimmed.matchAll(new RegExp(term, "giu"))) {
+      positions.push(match.index);
     }
   }
   // No query terms hit this doc — nothing to center on, so keep the head.
@@ -295,6 +307,11 @@ export const createAskContext = (
     let budget = contextBudget;
     const push = (doc: OramaDoc, label: string) => {
       if (seen.has(doc.route) || budget <= 0) {
+        return;
+      }
+      // Skip a page that would be cut to a junk fragment: its excerpt is only
+      // useful when it either fits whole or gets at least the minimum window.
+      if (budget < MIN_EXCERPT_CHARS && doc.content.trim().length > budget) {
         return;
       }
       seen.add(doc.route);

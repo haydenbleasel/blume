@@ -1,6 +1,7 @@
 import type { AstroIntegration } from "astro";
 import type { z } from "zod";
 
+import type { AskRetrievalOptions } from "../ai/ask-context.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
 import type { FontSlug } from "../theme/fonts.ts";
@@ -651,8 +652,9 @@ export interface AskRetrievalConfig {
    */
   excerptChars?: number;
   /**
-   * Documents retrieved per question. Defaults to `6`. This is the ceiling on
-   * how many pages an answer can cite.
+   * Documents retrieved per question. Defaults to `6`. The page the reader is
+   * viewing is injected on top of the retrieved ones, so an answer can cite up
+   * to one page more than this.
    */
   maxResults?: number;
 }
@@ -1491,4 +1493,18 @@ type _NoExtraOrMissingKeys = AssertExtends<
   | Exclude<keyof BlumeConfig, keyof SchemaInput>
   | Exclude<keyof SchemaInput, keyof BlumeConfig>,
   never
+>;
+// The retrieval shape lives in three places: this documented config interface,
+// the schema, and the runtime `AskRetrievalOptions` that `createAskContext`
+// reads (all-optional, so plain assignability is a weak-type check that a
+// renamed field slips through — the value would be baked into the generated
+// endpoint and silently ignored at request time). `Required` makes a rename in
+// either copy a missing property, which stops compiling.
+type _AskRetrievalMatchesRuntime = AssertExtends<
+  Required<AskRetrievalConfig>,
+  Required<AskRetrievalOptions>
+>;
+type _AskRuntimeMatchesRetrieval = AssertExtends<
+  Required<AskRetrievalOptions>,
+  Required<AskRetrievalConfig>
 >;

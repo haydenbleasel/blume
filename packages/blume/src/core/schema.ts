@@ -815,14 +815,17 @@ const aiConfigSchema = z.strictObject({
       provider: z.enum(askAiProviders).default("gateway"),
       // How much documentation each question carries. Injected characters are
       // the dominant term in time-to-first-token on a self-hosted backend, so
-      // these trade recall for latency; the defaults are the built-in behavior.
+      // these trade recall for latency. No zod defaults here: only what the
+      // user set reaches the generated (and ejected) endpoint, so omitted
+      // fields keep tracking the installed package's built-in defaults in
+      // `ai/ask-context.ts` instead of pinning today's numbers as literals.
       retrieval: z
         .strictObject({
-          contextBudget: z.number().int().positive().default(10_000),
-          excerptChars: z.number().int().positive().default(2000),
-          maxResults: z.number().int().positive().default(6),
+          contextBudget: z.number().int().positive().optional(),
+          excerptChars: z.number().int().positive().optional(),
+          maxResults: z.number().int().positive().optional(),
         })
-        .prefault({}),
+        .optional(),
       // Empty-state prompts shown before the first question. Each renders as a
       // clickable suggestion; `icon` is an optional Lucide name beside it.
       suggestions: z

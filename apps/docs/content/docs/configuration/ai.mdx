@@ -183,7 +183,7 @@ ai: {
 | `excerptChars`  | `2000`  | Characters kept from each retrieved page.       |
 | `contextBudget` | `10000` | Total injected characters, across all excerpts. |
 
-The three aren't interchangeable. `contextBudget` caps the whole injection, `excerptChars` decides how deep into a single long page its excerpt reaches — raise it when one page holds the whole answer and the excerpt cuts it off — and `maxResults` is the ceiling on how many pages an answer can cite.
+The three aren't interchangeable. `contextBudget` caps the whole injection, `excerptChars` decides how deep into a single long page its excerpt reaches — raise it when one page holds the whole answer and the excerpt cuts it off — and `maxResults` caps how many pages retrieval adds. The page the reader is viewing is injected on top of the retrieved ones, so an answer can cite up to one page more than `maxResults`.
 
 The defaults suit a hosted model. Lower them when you're serving from your own hardware and time-to-first-token matters more than recall; answers stay grounded either way, and the assistant is told to say when something isn't covered rather than fill the gap.
 
