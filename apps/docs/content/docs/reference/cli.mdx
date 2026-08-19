@@ -123,7 +123,7 @@ Without a project `tsconfig.json`, only the generated runtime is checked.
 
 - **Internal page links** (`/guides/intro`, `./sibling`) must resolve to a real page — broken ones are reported as errors.
 - **Anchor links** (`#section`, `/guides/intro#setup`) must match a heading on the target page — misses are warnings.
-- **Asset links** (`/logo.png`) are checked against the `public/` directory.
+- **Asset links** are checked where the file lives: an absolute path (`/logo.png`) against the `public/` directory, a relative image (`./diagram.png`) against the page's own folder.
 - **External links** are only checked with `--external` (off by default since it requires the network); dead links (404/410/unreachable) are errors, while rate-limited or transient responses (403/429/5xx/timeout) are warnings.
 
 ## Auditing the built site

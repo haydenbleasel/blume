@@ -69,9 +69,10 @@ export const contentAssetParam = (
  * Resolve one image target against its page's directory. Returns the absolute
  * file path when the target is relative, is an image, and exists on disk —
  * anything else (remote URLs, `public/` absolutes, broken refs, code-block
- * examples that happen to look like paths) is null and left untouched.
+ * examples that happen to look like paths) is null and left untouched. Shared
+ * with link validation, so what counts as a colocated image is decided once.
  */
-const resolveRelativeImage = (
+export const resolveRelativeImage = (
   sourceDir: string,
   target: string
 ): string | null => {

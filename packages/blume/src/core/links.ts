@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
 
-import { basename, join } from "pathe";
+import { basename, dirname, join } from "pathe";
 
 import { stripBasePath, withBasePath } from "./base-path.ts";
+import { resolveRelativeImage } from "./content-assets.ts";
 import { gradeExternal, probeAll } from "./probe.ts";
 import type {
   ContentGraph,
@@ -274,6 +275,16 @@ const classifyLink = (
 
   if (rawPath === "") {
     return fragment ? checkAnchor(page.route, fragment, site, ctx) : null;
+  }
+
+  // A colocated image (`./diagram.png`) is resolved from beside the page
+  // source and emitted to `_astro/` by the image pipeline, so it never lands
+  // in `public/` — probing there alone reports a reference the site renders.
+  if (
+    page.sourcePath &&
+    resolveRelativeImage(dirname(page.sourcePath), rawPath) !== null
+  ) {
+    return null;
   }
 
   const resolved = rawPath.startsWith("/")

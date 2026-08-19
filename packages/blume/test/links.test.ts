@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
@@ -383,14 +383,21 @@ describe(validateLinks, () => {
 
 describe("validateLinks — assets against a public dir", () => {
   let publicDir: string;
+  let contentDir: string;
 
   beforeAll(async () => {
     publicDir = await mkdtemp(join(tmpdir(), "blume-public-"));
     await writeFile(join(publicDir, "logo.png"), "binary");
+    contentDir = await mkdtemp(join(tmpdir(), "blume-content-"));
+    await mkdir(join(contentDir, "guides"), { recursive: true });
+    await mkdir(join(contentDir, "images"), { recursive: true });
+    await writeFile(join(contentDir, "guides", "screenshot.png"), "binary");
+    await writeFile(join(contentDir, "images", "diagram.png"), "binary");
   });
 
   afterAll(async () => {
     await rm(publicDir, { force: true, recursive: true });
+    await rm(contentDir, { force: true, recursive: true });
   });
 
   const validateWithPublic = (pages: PageRecord[]) =>
@@ -421,5 +428,34 @@ describe("validateLinks — assets against a public dir", () => {
       makePage({ id: "releases/v1.0.mdx", route: "/releases/v1.0" }),
     ]);
     expect(diagnostics).toHaveLength(0);
+  });
+
+  it("accepts a colocated image that exists next to the page source", async () => {
+    // A relative image never reaches `public/` — Astro's pipeline emits it to
+    // `_astro/` from beside the content — so probing the public dir alone
+    // reports a reference the built site renders.
+    const diagnostics = await validateWithPublic([
+      makePage({
+        id: "guides/a.mdx",
+        links: [link("./screenshot.png"), link("../images/diagram.png")],
+        route: "/guides/a",
+        sourcePath: join(contentDir, "guides", "a.mdx"),
+      }),
+    ]);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("still warns when a relative image is missing from both locations", async () => {
+    const diagnostics = await validateWithPublic([
+      makePage({
+        id: "guides/a.mdx",
+        links: [link("./missing.png")],
+        route: "/guides/a",
+        sourcePath: join(contentDir, "guides", "a.mdx"),
+      }),
+    ]);
+    expect(diagnostics.map((d) => d.code)).toStrictEqual([
+      "BLUME_BROKEN_ASSET",
+    ]);
   });
 });
