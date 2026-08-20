@@ -77,9 +77,12 @@ export const gitLastModifiedTimes = (
   contentRoots: string[],
   sourcePaths: string[]
 ): Map<string, string> => {
-  // Nothing to date — don't pay for a git scan (an empty pathspec list would
-  // log the entire repository).
-  if (sourcePaths.length === 0) {
+  // Nothing to date, or nowhere bounded to look — either way, don't pay for a
+  // git scan. Both guards matter: `git log -- ` with no pathspec logs the
+  // entire repository, which is what an all-staged project produces (a staged
+  // source contributes no content root, yet its entries can still carry a
+  // `sourcePath`).
+  if (sourcePaths.length === 0 || contentRoots.length === 0) {
     return new Map();
   }
   try {

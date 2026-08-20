@@ -193,6 +193,15 @@ describe("gitLastModifiedTimes", () => {
     );
   });
 
+  it("skips the scan when no content root bounds the pathspec", () => {
+    // An all-staged project contributes no content root, yet its entries can
+    // still carry a `sourcePath`. `git log -- ` with an empty pathspec would
+    // log the entire repository.
+    expect(
+      gitLastModifiedTimes("/does-not-matter", [], ["/some/note.md"])
+    ).toEqual(new Map());
+  });
+
   it("reads the most recent commit date for a tracked file", async () => {
     const root = await makeRepoDir();
     const contentRoot = join(root, "docs");

@@ -28,9 +28,15 @@ export interface SourceEntry {
    */
   raw?: string;
   /**
-   * Absolute filesystem path when the entry originates from disk. Populated by
-   * the filesystem adapter only; powers git last-modified and edit URLs and the
-   * `sourcePath` back-compat window. Omitted by remote/CMS adapters.
+   * Absolute filesystem path when the entry originates from disk. Set by any
+   * local-file adapter — the filesystem source, and staged local sources such
+   * as Obsidian, whose bodies are rewritten but whose notes are still real
+   * files. It gives diagnostics a path the author recognizes and lets relative
+   * image checks resolve next to the file. Omitted by remote/CMS adapters.
+   *
+   * It does *not* imply the entry renders through the docs glob collection —
+   * read `source.staged` for that — and git last-modified additionally needs
+   * the owning source to expose a `contentRoot` to bound the log's pathspec.
    */
   sourcePath?: string;
   /** Optional provenance for "edit this page". */

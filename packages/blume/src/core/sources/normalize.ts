@@ -104,14 +104,20 @@ const addRouteSegment = (
 };
 
 /** URL + nav metadata mapped from one content-root-relative path. */
-interface MappedRoute {
+export interface MappedRoute {
   segments: string[];
   groups: string[];
   route: string;
 }
 
-/** Convert a content-root-relative path into URL + nav metadata. */
-const mapRoute = (relativePath: string): MappedRoute => {
+/**
+ * Convert a content-root-relative path into URL + nav metadata.
+ *
+ * Exported because a source that rewrites cross-note links must predict the
+ * route this pipeline will assign — the Obsidian source turns `[[Note]]` into a
+ * real href, and any second derivation of a route is a second answer.
+ */
+export const mapRoute = (relativePath: string): MappedRoute => {
   const withoutExt = relativePath.slice(
     0,
     relativePath.length - extname(relativePath).length
@@ -537,7 +543,15 @@ const trimSlashes = (value: string): string =>
 const isStringValue = (value: SourceEntry["data"][string]): value is string =>
   typeof value === "string";
 
-const withPrefix = (prefix: string | undefined, path: string): string => {
+/**
+ * Mount a source-relative path under the source's route prefix. Exported
+ * alongside {@link mapRoute} so a link-rewriting source composes the prefix the
+ * same way this pipeline does, slashes and all.
+ */
+export const withPrefix = (
+  prefix: string | undefined,
+  path: string
+): string => {
   const clean = prefix ? trimSlashes(prefix) : "";
   return clean ? `${clean}/${path}` : path;
 };
