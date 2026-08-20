@@ -359,7 +359,7 @@ const obsidianSourceSchema = z.strictObject({
   prefix: z.string().optional(),
   type: z.literal("obsidian"),
   /** Vault directory, absolute or relative to the project root. */
-  vault: z.string(),
+  vault: z.string().min(1),
 });
 
 /**

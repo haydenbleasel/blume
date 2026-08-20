@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
@@ -250,10 +250,27 @@ describe("obsidianSource", () => {
     expect(entries.map((entry) => entry.ref)).toEqual(["Index.md"]);
   });
 
+  it("skips a note that vanished between the walk and the read", async () => {
+    const root = await makeVault({ "Kept.md": "# Kept\n" });
+    // A broken symlink is listed by the walk and gone by the read — the same
+    // window Obsidian opens every time it renames or deletes a note in dev.
+    await symlink(join(root, "gone.md"), join(root, "Ghost.md"));
+    const { entries } = await sourceFor(root).load();
+    expect(entries.map((entry) => entry.ref)).toEqual(["Kept.md"]);
+  });
+
+  it("still fails on a read error that is not a missing file", async () => {
+    const root = await makeVault({ "Kept.md": "# Kept\n" });
+    // A self-referential symlink is listed by the walk and yields ELOOP, not
+    // ENOENT — a real read failure the load must not swallow.
+    await symlink("Loop.md", join(root, "Loop.md"));
+    await expect(sourceFor(root).load()).rejects.toThrow();
+  });
+
   it("read() refuses a ref that resolves outside the vault", async () => {
     const root = await makeVault(BASIC);
     // No load has run, so the snapshot cannot vouch for the ref.
-    expect(
+    await expect(
       sourceFor(root, { vault: "guides" }).read?.("../Index.md")
     ).rejects.toThrow(/outside the vault/u);
   });
@@ -617,6 +634,16 @@ describe("resolveSources (obsidian)", () => {
     const sources = resolveSources(config, projectContext, { mode: "build" });
     expect(sources[0]?.name).toBe("obsidian");
     expect(sources[0]?.prefix).toBeUndefined();
+  });
+
+  it("rejects an empty vault path", () => {
+    // `""` resolves to the project root, so the walk would treat node_modules
+    // and build output as vault content.
+    expect(() =>
+      blumeConfigSchema.parse({
+        content: { sources: [{ type: "obsidian", vault: "" }] },
+      })
+    ).toThrow();
   });
 
   it("rejects an obsidian source with no vault", () => {

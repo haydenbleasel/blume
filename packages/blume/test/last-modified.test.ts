@@ -193,13 +193,23 @@ describe("gitLastModifiedTimes", () => {
     );
   });
 
-  it("skips the scan when no content root bounds the pathspec", () => {
+  it("skips the scan when no content root bounds the pathspec", async () => {
     // An all-staged project contributes no content root, yet its entries can
-    // still carry a `sourcePath`. `git log -- ` with an empty pathspec would
-    // log the entire repository.
-    expect(
-      gitLastModifiedTimes("/does-not-matter", [], ["/some/note.md"])
-    ).toEqual(new Map());
+    // still carry a `sourcePath`. Without the guard, `git log -- ` runs with an
+    // empty pathspec and logs the entire repository — which in this fixture
+    // would happily date the tracked file. An empty map proves the scan was
+    // skipped, not merely that git failed.
+    const root = await makeRepoDir();
+    const tracked = join(root, "note.md");
+    await writeFile(tracked, "# Note\n");
+    initRepo(root);
+    runGit(root, ["add", "-A"]);
+    runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add note"]);
+
+    expect(gitLastModifiedTimes(root, [root], [tracked]).get(tracked)).toMatch(
+      /^\d{4}-\d{2}-\d{2}T/u
+    );
+    expect(gitLastModifiedTimes(root, [], [tracked])).toEqual(new Map());
   });
 
   it("reads the most recent commit date for a tracked file", async () => {

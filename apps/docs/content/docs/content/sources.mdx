@@ -72,7 +72,9 @@ export default defineConfig({
 **Two limitations to know about.** The Obsidian source does not support Blume's [i18n](/docs/content/i18n) or [versioned content](/docs/content/versioning) routing yet: both transformations happen during normalization, after wikilinks have been rewritten, so a localized or versioned note publishes at a route its wikilinks don't point to.
 
 And a heading that itself contains Markdown — a link, most often — gets its manifest anchor from the heading's Markdown and its rendered `id` from its text content. The two differ for that heading, so a wikilink to it may land on the page rather than on the section.
-::: A link to an `index` note lands on its folder's route rather than a phantom `/index`. **An unresolved wikilink degrades to plain text with a build warning instead of failing the build**, so a vault mid-refactor still publishes. Single-line `%%comments%%` are stripped, and a note with no `title` in its frontmatter is titled by its filename — the same rule Obsidian itself applies. An `index` note is the one exception: it names a route rather than a note, so its title falls through to Blume's usual derivation (first heading, then the humanized segment). Code fences and inline code spans pass through verbatim, so a note documenting the syntax survives.
+:::
+
+A link to an `index` note lands on its folder's route rather than a phantom `/index`. **An unresolved wikilink degrades to plain text with a build warning instead of failing the build**, so a vault mid-refactor still publishes. Single-line `%%comments%%` are stripped, and a note with no `title` in its frontmatter is titled by its filename — the same rule Obsidian itself applies. An `index` note is the one exception: it names a route rather than a note, so its title falls through to Blume's usual derivation (first heading, then the humanized segment). Code fences and inline code spans pass through verbatim, so a note documenting the syntax survives.
 
 Dot-folders are skipped, including Obsidian's own `.obsidian` config directory — which the dev watcher also ignores, so moving a pane in the app doesn't rebuild your site. Editing a note does.
 

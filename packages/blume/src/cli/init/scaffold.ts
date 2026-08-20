@@ -245,7 +245,8 @@ const SOURCE_SNIPPETS = {
         prefix: "notion",
       },`,
   obsidian: `      // An Obsidian vault, read in place. No export step, and no
-      // generated notes in your repo.
+      // generated notes in your repo. Point \`vault\` at your vault directory,
+      // relative to this config file.
       {
         type: "obsidian",
         vault: "vault",

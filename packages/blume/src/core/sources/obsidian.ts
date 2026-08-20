@@ -176,10 +176,21 @@ const buildNoteIndex = (
   bodyOf: (note: ParsedNote) => string
 ): NoteIndex => {
   const index = new Map<string, IndexedNote>();
-  const indexed = (note: ParsedNote): IndexedNote => ({
-    anchors: anchorsOf(bodyOf(note)),
-    href: routeFor(note, prefix),
-  });
+  // Memoized: the name loop and the path loop below both index most notes, and
+  // `anchorsOf` re-scans the whole body each time.
+  const entries = new Map<string, IndexedNote>();
+  const indexed = (note: ParsedNote): IndexedNote => {
+    const cached = entries.get(note.rel);
+    if (cached) {
+      return cached;
+    }
+    const built: IndexedNote = {
+      anchors: anchorsOf(bodyOf(note)),
+      href: routeFor(note, prefix),
+    };
+    entries.set(note.rel, built);
+    return built;
+  };
   for (const [name, claimants] of byNoteName(notes)) {
     const [first, ...rest] = claimants;
     if (first === undefined) {
@@ -398,6 +409,30 @@ const noteToEntry = (
   };
 };
 
+/**
+ * Read and split one note, or null when it vanished between the walk and the
+ * read. Obsidian renames and deletes notes while a dev server watches the
+ * vault, and one file disappearing mid-load must not fail the whole reload.
+ * Any other read failure still throws.
+ */
+const readNote = async (
+  vaultDir: string,
+  rel: string
+): Promise<ParsedNote | null> => {
+  const absPath = join(vaultDir, rel);
+  try {
+    const { content, data } = matter(await readFile(absPath, "utf-8"));
+    return { absPath, content, data, rel };
+  } catch (error) {
+    // SAFETY: a rejected `readFile` always yields a Node system error, whose
+    // `code` is the only field read here.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+};
+
 /** Recursively list vault-relative `.md` paths, skipping dot/excluded dirs. */
 const walkVault = async (
   dir: string,
@@ -480,13 +515,8 @@ export const obsidianSource = (
 
   const load = async (): Promise<SourceLoadResult> => {
     const files = await walkVault(vaultDir, vaultDir, exclude);
-    const notes = await Promise.all(
-      files.map(async (rel): Promise<ParsedNote> => {
-        const absPath = join(vaultDir, rel);
-        const { content, data } = matter(await readFile(absPath, "utf-8"));
-        return { absPath, content, data, rel };
-      })
-    );
+    const read = await Promise.all(files.map((rel) => readNote(vaultDir, rel)));
+    const notes = read.filter((note): note is ParsedNote => note !== null);
     // Resolving `[[Note#H]]` needs the target's route and headings, so every
     // note is parsed first. Headings come from the rendered body and rendering
     // needs the index, so the rewrite runs twice: the first pass settles each
