@@ -182,6 +182,7 @@ interface AsyncApiParameterLike extends AsyncApiRefLike {
   description?: string;
   default?: AsyncApiSpecValue;
   enum?: AsyncApiSpecValue[];
+  examples?: AsyncApiSpecValue[];
 }
 
 /**
@@ -213,7 +214,7 @@ export const channelParameters = (
     if (parameter.default !== undefined) {
       schema.default = parameter.default;
     }
-    parameters.push({
+    const lowered: ParameterLike = {
       description: isString(parameter.description)
         ? parameter.description
         : undefined,
@@ -221,7 +222,17 @@ export const channelParameters = (
       name,
       required: true,
       schema,
-    });
+    };
+    // AsyncAPI parameters carry `examples` (an array of strings) rather than
+    // OpenAPI's singular; the first usable one lowers into the shared slot so
+    // the composer can prefill from it.
+    const example = Array.isArray(parameter.examples)
+      ? parameter.examples.find(isString)
+      : undefined;
+    if (example !== undefined) {
+      lowered.example = example;
+    }
+    parameters.push(lowered);
   }
   return parameters;
 };

@@ -10,7 +10,12 @@
  * back must never execute in the docs page.
  */
 
-import type { AuthValue, PlaygroundModel, RequestValues } from "./request.ts";
+import type {
+  AuthValue,
+  PlaygroundAuthInput,
+  PlaygroundModel,
+  RequestValues,
+} from "./request.ts";
 import { buildRequest, redactAuth } from "./request.ts";
 import { sampleLanguages } from "./snippets.ts";
 import { validateJson } from "./validate-json.ts";
@@ -57,6 +62,15 @@ type FieldValue = string | number | boolean;
  * empty string — `Number("")` is 0, which would silently invent a value for a
  * required numeric field the reader left blank.
  */
+/**
+ * Escape a spec-derived name for interpolation into a double-quoted attribute
+ * selector. `querySelector` throws a SyntaxError on an unescaped `"` or `\`,
+ * so one hostile body-property or scheme name would otherwise take the whole
+ * panel down on the first sync.
+ */
+const attrEscape = (value: string): string =>
+  value.replaceAll(/["\\]/gu, String.raw`\$&`);
+
 const coerce = (raw: string, type: string): FieldValue => {
   if (raw === "") {
     return raw;
@@ -147,12 +161,18 @@ export const initPlayground = (root: HTMLElement): void => {
         input.kind === "basic"
           ? {
               password:
-                field(`[data-auth-password="${input.id}"]`)?.value ?? "",
+                field(`[data-auth-password="${attrEscape(input.id)}"]`)
+                  ?.value ?? "",
               username:
-                field(`[data-auth-username="${input.id}"]`)?.value ?? "",
+                field(`[data-auth-username="${attrEscape(input.id)}"]`)
+                  ?.value ?? "",
               value: "",
             }
-          : { value: field(`[data-auth-value="${input.id}"]`)?.value ?? "" };
+          : {
+              value:
+                field(`[data-auth-value="${attrEscape(input.id)}"]`)?.value ??
+                "",
+            };
     }
     return auth;
   };
@@ -165,7 +185,8 @@ export const initPlayground = (root: HTMLElement): void => {
   const flatBody = (): string | undefined => {
     const out: Record<string, FieldValue> = {};
     for (const spec of model.body?.fields ?? []) {
-      const raw = field(`[data-body-field="${spec.name}"]`)?.value ?? "";
+      const raw =
+        field(`[data-body-field="${attrEscape(spec.name)}"]`)?.value ?? "";
       if (raw === "" && !spec.required) {
         continue;
       }
@@ -252,8 +273,12 @@ export const initPlayground = (root: HTMLElement): void => {
           continue;
         }
         if (input.kind === "basic") {
-          const username = field(`[data-auth-username="${input.id}"]`);
-          const password = field(`[data-auth-password="${input.id}"]`);
+          const username = field(
+            `[data-auth-username="${attrEscape(input.id)}"]`
+          );
+          const password = field(
+            `[data-auth-password="${attrEscape(input.id)}"]`
+          );
           if (username) {
             username.value = value.username ?? "";
           }
@@ -261,7 +286,7 @@ export const initPlayground = (root: HTMLElement): void => {
             password.value = value.password ?? "";
           }
         } else {
-          const single = field(`[data-auth-value="${input.id}"]`);
+          const single = field(`[data-auth-value="${attrEscape(input.id)}"]`);
           if (single) {
             single.value = value.value;
           }
@@ -343,14 +368,46 @@ export const initPlayground = (root: HTMLElement): void => {
       response.append(line(ERROR_TEXT, COOKIE_MESSAGE));
       return;
     }
-    const sample = buildRequest(model, values);
+    // An auth input the reader left empty must not ride the wire:
+    // `buildRequest` would substitute the redaction placeholder \u2014 right for
+    // samples, but a live `Authorization: Bearer YOUR_TOKEN` turns an
+    // anonymous-capable request into a guaranteed 401. Untouched inputs are
+    // omitted so the send goes out without them.
+    const filled = (input: PlaygroundAuthInput): boolean => {
+      const auth = values.auth[input.id];
+      return input.kind === "basic"
+        ? (auth?.username ?? "") !== "" || (auth?.password ?? "") !== ""
+        : (auth?.value ?? "") !== "";
+    };
+    const sample = buildRequest(
+      { ...model, auth: model.auth.filter(filled) },
+      values
+    );
+    // An external proxy URL may already carry a query string of its own; the
+    // target parameter joins with `&` there, or the proxy would receive no
+    // `url` at all.
     const url = proxy
-      ? `${proxy}?url=${encodeURIComponent(sample.url)}`
+      ? `${proxy}${proxy.includes("?") ? "&" : "?"}url=${encodeURIComponent(
+          sample.url
+        )}`
       : sample.url;
-    // Any remaining `Cookie` header carries only the redaction placeholder;
-    // sending it would just earn a console warning from the browser.
+    // A `Cookie` header can still arrive via a spec-declared header parameter;
+    // the browser would silently drop the forbidden name anyway, so strip it
+    // rather than earn a console warning.
     const headers = { ...sample.headers };
     delete headers.Cookie;
+    // fetch surfaces an invalid URL or header value as the same TypeError a
+    // CORS rejection produces, and the catch below would misdiagnose it as the
+    // CORS wall. Both are validated here, where the real error can be shown,
+    // before anything is sent.
+    try {
+      void new Headers(headers);
+      void new URL(url, "http://localhost/");
+    } catch (error) {
+      response.textContent = "";
+      response.append(line(ERROR_TEXT, `Request failed: ${String(error)}`));
+      return;
+    }
     response.textContent = "Sending\u2026";
     sending = true;
     if (sendButton) {

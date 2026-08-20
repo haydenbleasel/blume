@@ -44,7 +44,10 @@ const buildModel = (overrides: Partial<ModelArgs> = {}) =>
 const WSCAT = /^wscat -c '(?<url>[^']+)'\n> (?<payload>[\s\S]*)$/u;
 
 describe("messageModel", () => {
-  it("prefills channel parameters from default, example, then schema", () => {
+  it("prefills channel parameters from default, example, then enum", () => {
+    // Every parameter carries the `{ type: "string" }` schema
+    // `channelParameters` actually lowers: the sampler literal for it is the
+    // word "string", which must never leak into an address prefill.
     const parameters: ParameterLike[] = [
       {
         description: "Tenant slug.",
@@ -53,7 +56,19 @@ describe("messageModel", () => {
         required: true,
         schema: { default: "acme", enum: ["acme", "globex"], type: "string" },
       },
-      { example: "42", in: "channel", name: "userId", required: true },
+      {
+        example: "42",
+        in: "channel",
+        name: "userId",
+        required: true,
+        schema: { type: "string" },
+      },
+      {
+        in: "channel",
+        name: "env",
+        required: true,
+        schema: { enum: ["staging", "prod"], type: "string" },
+      },
       { in: "channel", name: "region", required: true },
     ];
     expect(buildModel({ parameters }).params).toStrictEqual([
@@ -64,6 +79,14 @@ describe("messageModel", () => {
         value: "acme",
       },
       { description: undefined, enum: undefined, name: "userId", value: "42" },
+      {
+        description: undefined,
+        enum: ["staging", "prod"],
+        name: "env",
+        value: "staging",
+      },
+      // Nothing declared: an empty prefill keeps the `{region}` template in
+      // the address samples rather than junk like `user/string/signedup`.
       {
         description: undefined,
         enum: undefined,
@@ -120,6 +143,25 @@ describe("messageModel", () => {
 
   it("leaves the payload empty when the operation has no message", () => {
     expect(buildModel().payload).toStrictEqual({ example: "" });
+  });
+
+  it("leaves the editor empty for a message with no example and no schema", () => {
+    // `exampleValue(undefined)` returns null — the sampler's no-schema
+    // sentinel, not a value — so the prefill must be empty (sampling `{}`
+    // downstream), not the literal string "null".
+    const model = buildModel({
+      messages: [named({ contentType: "application/json" })],
+    });
+    expect(model.payload).toStrictEqual({
+      contentType: "application/json",
+      example: "",
+      schema: undefined,
+    });
+    // A *declared* null example is a value the author wrote and stays `null`.
+    const declared = buildModel({
+      messages: [named({ examples: [{ payload: null }] })],
+    });
+    expect(declared.payload.example).toBe("null");
   });
 
   it("labels servers by protocol and path, falling back to the bare host", () => {
@@ -248,6 +290,12 @@ describe("messageFrame", () => {
         // fall back to a schema sample, and it travels as `null`.
         overrides: { messages: [named({ examples: [{ payload: null }] })] },
         payload: "null",
+      },
+      {
+        // A message with no example and no payload schema degrades to `{}`,
+        // exactly like an operation with no message at all — never `null`.
+        overrides: { messages: [named({})] },
+        payload: "{}",
       },
       { overrides: {}, payload: "{}" },
     ];

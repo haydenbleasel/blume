@@ -2092,6 +2092,25 @@ describe("snippets", () => {
     expect(python).toContain('"tags": None');
   });
 
+  it("keeps JS and Python samples syntactically valid mid-edit", () => {
+    // While the body editor holds invalid JSON (no `bodyValue` mirror), the
+    // raw text can't be inlined as a JS/Python expression — it travels as a
+    // string literal instead, matching what the live send transmits.
+    const sample = {
+      body: '{"count": 2',
+      headers: {},
+      method: "POST",
+      url: "https://api.test/v1/pet",
+    };
+    const [js, python] = sampleLanguages(["js", "python"]).map((language) =>
+      language.build(sample)
+    );
+    expect(js).toContain(String.raw`body: "{\"count\": 2"`);
+    expect(js).not.toContain("JSON.stringify(");
+    expect(python).toContain(String.raw`data="{\"count\": 2"`);
+    expect(python).not.toContain("json=");
+  });
+
   it("resolves language ids through aliases and drops unknowns", () => {
     const ids = sampleLanguages(["shell", "typescript", "nope"]).map(
       (language) => language.id

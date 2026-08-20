@@ -216,6 +216,21 @@ describe("initComposer", () => {
     expect(sockets).toHaveLength(0);
   });
 
+  it("connects and sends with an empty payload editor", () => {
+    // An operation with no message example renders an empty editor; "" is not
+    // JSON, but it means "no payload" — it must not block Connect (which sends
+    // nothing) or Send (which degrades to the `{}` the samples show).
+    const model: MessageModel = { ...MODEL, payload: { example: "  \n" } };
+    const fixture = createFixture(model);
+    initComposer(asElement(fixture.root));
+    click(fixture, "[data-connect]");
+    expect(sockets).toHaveLength(1);
+    expect(fixture.errors.textContent).toBe("");
+    must(sockets[0]).emit("open");
+    click(fixture, "[data-send]");
+    expect(must(sockets[0]).sent).toStrictEqual(["{}"]);
+  });
+
   it("connects, logs both directions, and disconnects", () => {
     const fixture = createFixture();
     initComposer(asElement(fixture.root));

@@ -111,11 +111,13 @@ export const initComposer = (root: HTMLElement): void => {
     if (!(payloadArea && payloadErrors)) {
       return [];
     }
-    const errors = validateJson(
-      payloadArea.value,
-      model.payload.schema,
-      "payload"
-    );
+    // An empty editor means "no payload" — `buildMessage` derives none and the
+    // frame degrades to `{}` — not invalid JSON. Reporting a syntax error there
+    // would permanently block Connect on an operation with no message example.
+    const errors =
+      payloadArea.value.trim() === ""
+        ? []
+        : validateJson(payloadArea.value, model.payload.schema, "payload");
     payloadErrors.textContent = "";
     for (const error of errors) {
       const item = document.createElement("span");

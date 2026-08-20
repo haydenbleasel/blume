@@ -46,7 +46,15 @@ const fetchSnippet = (sample: RequestSample): string => {
     options.push(`  headers: {\n${headers}\n  }`);
   }
   if (sample.body) {
-    options.push(`  body: JSON.stringify(${sample.body})`);
+    // `bodyValue` mirrors the body only when it parses as JSON. Mid-edit text
+    // that doesn't can't be inlined as a JS expression — a string literal of
+    // the raw text keeps the snippet syntactically valid and byte-identical
+    // to what the live send transmits.
+    options.push(
+      sample.bodyValue === undefined
+        ? `  body: ${JSON.stringify(sample.body)}`
+        : `  body: JSON.stringify(${sample.body})`
+    );
   }
   return `const response = await fetch("${sample.url}", {\n${options.join(
     ",\n"
@@ -81,7 +89,14 @@ const pythonSnippet = (sample: RequestSample): string => {
     args.push(`    headers={\n${headers}\n    }`);
   }
   if (sample.body) {
-    args.push(`    json=${toPython(sample.body)}`);
+    // Same rule as the fetch snippet: only valid JSON rewrites into a Python
+    // literal for `json=`; anything else travels as a raw string via `data=`
+    // (JSON string escapes are a subset of Python's, so the literal is valid).
+    args.push(
+      sample.bodyValue === undefined
+        ? `    data=${JSON.stringify(sample.body)}`
+        : `    json=${toPython(sample.body)}`
+    );
   }
   return `import requests\n\nresponse = requests.${sample.method.toLowerCase()}(\n${args.join(
     ",\n"

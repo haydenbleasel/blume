@@ -261,7 +261,16 @@ afterAll(async () => {
   );
 });
 
-const generateWith = async (playground: string) => {
+const generateWith = async (
+  playground: string,
+  // One absolute server (the proxy's allowlist), one relative and one
+  // templated server — neither of which has an origin to allow.
+  servers: { url: string }[] = [
+    { url: "https://api.example.com/v1" },
+    { url: "/v1" },
+    { url: "https://{region}.api.example.com" },
+  ]
+) => {
   const root = await mkdtemp(join(tmpdir(), "blume-playground-gen-"));
   projectDirs.push(root);
   await writeFile(
@@ -278,34 +287,58 @@ const generateWith = async (playground: string) => {
       info: { title: "API", version: "1" },
       openapi: "3.0.0",
       paths: { "/ping": { get: { responses: { "200": {} } } } },
-      // One absolute server (the proxy's allowlist) and one relative server,
-      // which has no origin to allow.
-      servers: [{ url: "https://api.example.com/v1" }, { url: "/v1" }],
+      servers,
     })
   );
   const project = await scanProject(root);
-  await generateRuntime(project);
-  return project.context.outDir;
+  const { warnings } = await generateRuntime(project);
+  return { out: project.context.outDir, warnings };
 };
 
 describe("generateRuntime playground proxy endpoint", () => {
   it("writes and injects /_api-proxy when proxy is true", async () => {
-    const out = await generateWith("{ proxy: true }");
+    const { out, warnings } = await generateWith("{ proxy: true }");
     const endpoint = join(out, "src/blume-openapi/api-proxy.ts");
     expect(existsSync(endpoint)).toBe(true);
     // The handler's allowlist is baked in from the spec's own servers: the
     // target arrives as a query parameter, so an open proxy is the alternative.
+    // Relative and templated servers contribute nothing — `new URL` happily
+    // parses `{region}` into a hostname, so the junk literal must be excluded
+    // rather than allowlisted.
     expect(await readFile(endpoint, "utf-8")).toContain(
       'createPlaygroundProxyHandler(["https://api.example.com"])'
     );
+    expect(
+      warnings.filter((warning) => warning.includes("playground.proxy"))
+    ).toStrictEqual([]);
     // Injected (rather than served from `pages/`) because `_`-prefixed page
     // files are private to Astro; the pattern rides the integration's pages.
     const astroConfig = await readFile(join(out, "astro.config.mjs"), "utf-8");
     expect(astroConfig).toContain('"pattern":"/_api-proxy"');
   }, 30_000);
 
+  it("warns when no server yields an origin to allow", async () => {
+    // A spec with only relative/templated servers produces an empty allowlist:
+    // the endpoint still generates, but every send would 403 — the author
+    // needs a build-time pointer, not a silent dead proxy.
+    const { out, warnings } = await generateWith("{ proxy: true }", [
+      { url: "/v1" },
+      { url: "https://{region}.api.example.com" },
+    ]);
+    expect(
+      await readFile(join(out, "src/blume-openapi/api-proxy.ts"), "utf-8")
+    ).toContain("createPlaygroundProxyHandler([])");
+    expect(
+      warnings.some(
+        (warning) =>
+          warning.includes("playground.proxy") &&
+          warning.includes("refuse every request")
+      )
+    ).toBe(true);
+  }, 30_000);
+
   it("skips the endpoint for an external proxy URL", async () => {
-    const out = await generateWith('{ proxy: "https://proxy.example" }');
+    const { out } = await generateWith('{ proxy: "https://proxy.example" }');
     expect(existsSync(join(out, "src/blume-openapi/api-proxy.ts"))).toBe(false);
     const astroConfig = await readFile(join(out, "astro.config.mjs"), "utf-8");
     expect(astroConfig).not.toContain("/_api-proxy");

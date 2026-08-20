@@ -569,7 +569,9 @@ describe("components/openapi/async helpers", () => {
       },
     ]);
     expect(channelParameters(undefined, ASYNC_SPEC_3)).toStrictEqual([]);
-    // Component refs resolve; malformed entries drop.
+    // Component refs resolve; malformed entries drop. The first *string*
+    // `examples` entry lowers into the shared `example` slot (AsyncAPI
+    // parameters are string-only, so a non-string entry is spec noise).
     const viaRef = channelParameters(
       {
         parameters: {
@@ -579,12 +581,17 @@ describe("components/openapi/async helpers", () => {
         },
       },
       {
-        components: { parameters: { p: { description: "Ref'd" } } },
+        components: {
+          parameters: {
+            p: { description: "Ref'd", examples: [7, "us-east"] },
+          },
+        },
       }
     );
     expect(viaRef).toStrictEqual([
       {
         description: "Ref'd",
+        example: "us-east",
         in: "channel",
         name: "p",
         required: true,

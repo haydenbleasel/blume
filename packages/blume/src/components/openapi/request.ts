@@ -242,7 +242,10 @@ export const buildRequest = (
       continue;
     }
     const value = values.params[paramKey(param)] ?? "";
-    if (value === "") {
+    // A required param stays visible even when blank (`filter=`) — silently
+    // dropping it would make the samples deny the parameter exists. Optional
+    // blanks drop out entirely.
+    if (value === "" && !param.required) {
       continue;
     }
     seen.add(param.name);
@@ -260,7 +263,10 @@ export const buildRequest = (
       continue;
     }
     const value = values.params[paramKey(param)] ?? "";
-    if (value !== "") {
+    // Required headers emit even when blank, mirroring the query rule above —
+    // except a blank one never clobbers a credential auth already placed
+    // under the same name.
+    if (value !== "" || (param.required && headers[param.name] === undefined)) {
       headers[param.name] = value;
     }
   }

@@ -264,18 +264,40 @@ describe("buildRequest", () => {
       parameters: [
         { in: "path", name: "petId", schema: { type: "integer" } },
         { in: "query", name: "q", required: true },
+        { in: "query", name: "opt" },
         { in: "header", name: "X-Trace", required: true },
+        { in: "header", name: "X-Opt" },
       ],
       path: "/pets/{petId}",
     });
-    // Missing keys read as "": path templates by name, query/header dropped.
+    // Missing keys read as "": path templates by name; blank REQUIRED params
+    // stay visible (`q=`, an empty header) so the samples never deny they
+    // exist, while blank optional ones drop out entirely.
     const sample = buildRequest(model, {
       ...defaultValues(model),
       params: {},
       server: "https://api.test/v2///",
     });
-    expect(sample.url).toBe("https://api.test/v2/pets/petId");
-    expect(sample.headers).toStrictEqual({});
+    expect(sample.url).toBe("https://api.test/v2/pets/petId?q=");
+    expect(sample.headers).toStrictEqual({ "X-Trace": "" });
+  });
+
+  it("never clobbers a placed credential with a blank required header", () => {
+    // A spec can declare `Authorization` BOTH as a security scheme and as an
+    // explicit required header parameter; while the parameter is blank, the
+    // filled credential must survive.
+    const model = buildModel({
+      parameters: [{ in: "header", name: "Authorization", required: true }],
+      security: resolveSecurity([{ bearerAuth: [] }], SCHEMES),
+    });
+    const values = defaultValues(model);
+    values.auth.bearerAuth = { value: "sekret" };
+    expect(buildRequest(model, values).headers.Authorization).toBe(
+      "Bearer sekret"
+    );
+    // Once the parameter has a value, the spec's explicit example wins.
+    values.params["header:Authorization"] = "Token abc";
+    expect(buildRequest(model, values).headers.Authorization).toBe("Token abc");
   });
 
   it("sends the body verbatim, mirroring parseable JSON into bodyValue", () => {

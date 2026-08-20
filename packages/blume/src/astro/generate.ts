@@ -1487,8 +1487,15 @@ const specOrigins = (data: OpenApiData): string[] => {
     // `Array.isArray(servers)` guards the list and `server.url ?? ""` the url.
     const { servers } = spec.document as { servers?: { url?: string }[] };
     for (const server of Array.isArray(servers) ? servers : []) {
+      const url = server.url ?? "";
+      // `new URL("https://{region}.api.example.com")` parses — the braces land
+      // in the hostname — so templated URLs need an explicit check or their
+      // junk literal becomes an allowlist entry no real request can match.
+      if (url.includes("{")) {
+        continue;
+      }
       try {
-        origins.add(new URL(server.url ?? "").origin);
+        origins.add(new URL(url).origin);
       } catch {
         // Not an absolute URL: nothing to allow.
       }
@@ -1496,6 +1503,22 @@ const specOrigins = (data: OpenApiData): string[] => {
   }
   return [...origins].toSorted();
 };
+
+/**
+ * The build-time diagnostic for a proxy whose allowlist came out empty. The
+ * allowlist comes solely from absolute `servers[].url` entries — relative and
+ * templated ones carry no origin — and with none at all the endpoint would
+ * 403 every playground send with nothing pointing the author at the spec.
+ */
+const proxyAllowlistWarnings = (
+  enabled: boolean,
+  origins: string[]
+): string[] =>
+  enabled && origins.length === 0
+    ? [
+        "openapi.playground.proxy is enabled, but no spec declares an absolute servers[].url (relative and templated URLs carry no origin), so the proxy's allowlist is empty and it will refuse every request. Add an absolute server URL to the spec, or point playground.proxy at an external proxy URL.",
+      ]
+    : [];
 
 /**
  * Write the Ask AI endpoint and, unless the backend runs its own retrieval
@@ -1756,6 +1779,9 @@ export const generateRuntime = async (
       pattern: playgroundProxy.pattern,
     });
   }
+  // Computed once: the endpoint template bakes it in below, and an empty list
+  // is worth a diagnostic — the proxy would refuse every request it gets.
+  const proxyOrigins = specOrigins(openApiData);
 
   const hasStaged = staged.size > 0;
   // Only emit a project-scanning `docs` collection when a filesystem source
@@ -1903,10 +1929,7 @@ export const generateRuntime = async (
     writeAskFiles(project, srcDir, write),
     writeMcpFiles(project, mcp, write),
     playgroundProxy.enabled
-      ? write(
-          playgroundProxy.entrypoint,
-          playgroundProxyTemplate(specOrigins(openApiData))
-        )
+      ? write(playgroundProxy.entrypoint, playgroundProxyTemplate(proxyOrigins))
       : Promise.resolve(false),
   ]);
 
@@ -2023,6 +2046,7 @@ export const generateRuntime = async (
   // regenerated each run.
   const warnings: string[] = [
     ...(depsLinkWarning ? [depsLinkWarning] : []),
+    ...proxyAllowlistWarnings(playgroundProxy.enabled, proxyOrigins),
     ...reactCompilerWarnings(config, needsReact, reactCompilerPath),
     ...mcp.warnings,
     ...islandDiscovery.warnings,

@@ -402,6 +402,28 @@ describe("flat body assembly", () => {
     });
   });
 
+  it("collects a field whose name needs selector escaping", async () => {
+    // An unescaped `"` in a spec-derived name would make `querySelector`
+    // throw a SyntaxError and take down every sync and send.
+    const model = flatModel();
+    must(must(model.body).fields).push({
+      name: 'size"large',
+      required: false,
+      type: "string",
+      value: "",
+    });
+    const fixture = createFixture(model);
+    init(fixture);
+    must(fixture.fields['size"large']).value = "XL";
+    edit(fixture, must(fixture.fields['size"large']));
+    await clickSend(fixture);
+    // SAFETY: a flat-fields body is always JSON.stringify output — a string.
+    expect(JSON.parse(must(fetchCalls[0]).init.body as string)).toEqual({
+      name: "Rex",
+      'size"large': "XL",
+    });
+  });
+
   it("sends no body when every field is empty and optional", async () => {
     const model = flatModel();
     for (const field of must(must(model.body).fields)) {
@@ -499,6 +521,76 @@ describe("send + response rendering", () => {
     expect(must(fetchCalls[0]).url).toBe(
       `/_api-proxy?url=${encodeURIComponent("https://api.example.com/pets/42")}`
     );
+  });
+
+  it("joins with & when the proxy URL already carries a query string", async () => {
+    // A hardcoded `?url=` would bury the target inside the existing parameter
+    // and the proxy would never see a `url` at all.
+    const fixture = createFixture(
+      bearerModel(),
+      "https://cors.example.com/fetch?key=abc"
+    );
+    init(fixture);
+    await clickSend(fixture);
+    const url = new URL(must(fetchCalls[0]).url);
+    expect(url.searchParams.get("key")).toBe("abc");
+    expect(url.searchParams.get("url")).toBe("https://api.example.com/pets/42");
+  });
+
+  it("omits an untouched auth input from the live send", async () => {
+    // Samples show `Bearer YOUR_TOKEN`, but transmitting the placeholder as a
+    // real credential would turn an anonymous-capable request into a 401.
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+    edit(fixture, must(fixture.params.id));
+    await clickSend(fixture);
+    expect(must(fetchCalls[0]).init.headers).not.toHaveProperty(
+      "Authorization"
+    );
+    expect(fixture.curlCode.textContent).toContain("Bearer YOUR_TOKEN");
+
+    must(fixture.auth.bearerAuth).value = "sekret";
+    edit(fixture, must(fixture.auth.bearerAuth));
+    await clickSend(fixture);
+    expect(
+      // SAFETY: the client assembles `init.headers` as a plain string-keyed
+      // object literal, never a `Headers` instance or entry array.
+      (must(fetchCalls[1]).init.headers as Record<string, string>).Authorization
+    ).toBe("Bearer sekret");
+  });
+
+  it("omits untouched basic and api-key auth, sending only what was typed", async () => {
+    const fixture = createFixture(basicModel());
+    init(fixture);
+    must(fixture.auth["basicAuth:username"]).value = "us";
+    await clickSend(fixture);
+    expect(
+      // SAFETY: the client assembles `init.headers` as a plain string-keyed
+      // object literal, never a `Headers` instance or entry array.
+      (must(fetchCalls[0]).init.headers as Record<string, string>).Authorization
+    ).toBe(`Basic ${btoa("us:")}`);
+    // The untouched query api key contributes nothing to the wire.
+    expect(must(fetchCalls[0]).url).toBe("https://api.example.com/pets");
+  });
+
+  it("reports an invalid custom URL instead of blaming CORS", async () => {
+    // fetch would throw the same pre-network TypeError a CORS rejection
+    // produces; the panel must show the real error, not the proxy advice.
+    const fixture = createFixture(bearerModel());
+    init(fixture);
+    fixture.custom.value = "https://bad host";
+    await clickSend(fixture);
+    expect(fetchCalls).toHaveLength(0);
+    expect(fixture.response.textContent).toStartWith("Request failed:");
+    expect(fixture.response.textContent).not.toContain("cross-origin");
+
+    // Same for a header value fetch would reject (an interior newline).
+    const again = createFixture(bearerModel());
+    init(again);
+    must(again.params["X-Trace"]).value = "a\nb";
+    await clickSend(again);
+    expect(fetchCalls).toHaveLength(0);
+    expect(again.response.textContent).toStartWith("Request failed:");
   });
 
   it("explains the CORS wall on a rejected fetch, naming the proxy option", async () => {

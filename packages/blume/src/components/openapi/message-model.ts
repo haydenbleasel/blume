@@ -29,12 +29,12 @@ const LIVE_PROTOCOLS = { ws: true } satisfies Record<string, true>;
  * Channel parameters as composer inputs. `channelParameters` has already
  * lowered AsyncAPI's string-only parameters (enum, default, examples) into the
  * shared parameter shape, so all that is left is picking a prefill: the
- * declared default or first example, else nothing.
+ * declared default, first example, or first enum member, else nothing. Never
+ * the sampler — its `{type:"string"}` output is the literal word `string`,
+ * which would replace every `{name}` template in the address samples with
+ * junk like `user/string/signedup`.
  */
-const messageParams = (
-  parameters: ParameterLike[],
-  schemas: Record<string, SchemaLike>
-): MessageParam[] =>
+const messageParams = (parameters: ParameterLike[]): MessageParam[] =>
   parameters.map((parameter) => ({
     description: parameter.description,
     enum: parameter.schema?.enum?.map(String),
@@ -42,7 +42,7 @@ const messageParams = (
     value: inputValue(
       parameter.schema?.default ??
         parameter.example ??
-        exampleValue(parameter.schema, schemas)
+        parameter.schema?.enum?.[0]
     ),
   }));
 
@@ -60,13 +60,17 @@ const messagePayload = (
   }
   const schema = payloadSchema(message);
   // `undefined` means the message declares no example, `null` means it declares
-  // an empty one — only the former falls back to a schema sample.
+  // an empty one — only the former falls back to a schema sample. The sampler's
+  // own `null` is its no-schema/failure sentinel, not a value a reader typed:
+  // it degrades to an empty editor (which samples and sends `{}`) rather than
+  // prefilling the literal `null`.
   const declared = message.examples?.[0]?.payload;
   const example =
     declared === undefined ? exampleValue(schema, schemas) : declared;
   return {
     contentType: message.contentType,
-    example: toJson(example) ?? "",
+    example:
+      declared === undefined && example === null ? "" : (toJson(example) ?? ""),
     schema: validationSchema(schema, schemas),
   };
 };
@@ -97,7 +101,7 @@ export const messageModel = (args: {
   action: args.action,
   address: args.address,
   connectable: Object.hasOwn(LIVE_PROTOCOLS, args.protocol ?? ""),
-  params: messageParams(args.parameters, args.schemas),
+  params: messageParams(args.parameters),
   payload: messagePayload(args.messages[0]?.message, args.schemas),
   protocol: args.protocol,
   servers: args.servers.map(serverOption),

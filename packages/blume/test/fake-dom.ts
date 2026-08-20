@@ -9,12 +9,19 @@
  * Selectors understood by `matches`/`querySelector`/`querySelectorAll`/`closest`
  * are the subset the clients emit: an optional leading tag name followed by any
  * number of ANDed attribute clauses — `[attr]` for presence, `[attr="value"]`
- * for equality. Classes, ids, combinators, and pseudo-selectors are not
- * supported; a client that needs one must grow this helper alongside it.
+ * for equality, with `\"`/`\\` escapes inside the quoted value (the clients
+ * escape spec-derived names before interpolating them). Classes, ids,
+ * combinators, and pseudo-selectors are not supported; a client that needs one
+ * must grow this helper alongside it.
  */
 
 /** Matches the tag + attribute selector subset the clients use. */
-const SELECTOR_CLAUSE = /\[(?<name>[^\]=]+)(?:="(?<value>[^"]*)")?\]/gu;
+const SELECTOR_CLAUSE =
+  /\[(?<name>[^\]=]+)(?:="(?<value>(?:\\.|[^"\\])*)")?\]/gu;
+
+/** Undo the attribute-value escaping a client applied: `\"` -> `"`. */
+const unescapeValue = (value: string): string =>
+  value.replaceAll(/\\(?<char>.)/gu, "$<char>");
 
 /** Proxy keys arrive as `string | symbol`; only string `data-*` keys exist. */
 const isStringKey = (key: string | symbol): key is string =>
@@ -117,7 +124,8 @@ export class FakeEl {
     }
     for (const clause of selector.matchAll(SELECTOR_CLAUSE)) {
       const actual = this.attributes.get(clause.groups?.name ?? "");
-      const wanted = clause.groups?.value;
+      const raw = clause.groups?.value;
+      const wanted = raw === undefined ? undefined : unescapeValue(raw);
       if (wanted === undefined ? actual === undefined : actual !== wanted) {
         return false;
       }
