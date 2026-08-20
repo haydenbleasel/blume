@@ -343,4 +343,44 @@ describe("generateRuntime playground proxy endpoint", () => {
     const astroConfig = await readFile(join(out, "astro.config.mjs"), "utf-8");
     expect(astroConfig).not.toContain("/_api-proxy");
   }, 30_000);
+
+  it("allowlists a GraphQL endpoint's origin for the built-in proxy", async () => {
+    // A GraphQL schema names no servers, so its configured live endpoint is
+    // the origin the proxy must allow; a non-absolute endpoint contributes
+    // nothing rather than a junk allowlist entry.
+    const root = await mkdtemp(join(tmpdir(), "blume-playground-gen-"));
+    projectDirs.push(root);
+    await writeFile(
+      join(root, "blume.config.ts"),
+      `export default {
+  graphql: {
+    enabled: true,
+    endpoint: "https://gql.example.com/graphql",
+    playground: { proxy: true },
+    sources: [
+      { label: "Main", spec: "./schema.graphql" },
+      { endpoint: "/relative", label: "Alt", route: "/alt", spec: "./schema.graphql" },
+    ],
+  },
+};
+`
+    );
+    await Bun.write(join(root, "docs/index.md"), "# Home\n");
+    await writeFile(
+      join(root, "schema.graphql"),
+      "type Query { ping: String }"
+    );
+    const project = await scanProject(root);
+    const { warnings } = await generateRuntime(project);
+    const endpoint = join(
+      project.context.outDir,
+      "src/blume-openapi/api-proxy.ts"
+    );
+    expect(await readFile(endpoint, "utf-8")).toContain(
+      'createPlaygroundProxyHandler(["https://gql.example.com"])'
+    );
+    expect(
+      warnings.filter((warning) => warning.includes("playground.proxy"))
+    ).toStrictEqual([]);
+  }, 30_000);
 });

@@ -51,7 +51,11 @@ import { missingFontFiles, resolveOgFonts } from "../og/derive.ts";
 import type { DerivedOgFonts } from "../og/derive.ts";
 import { resolveOgLogo } from "../og/logo.ts";
 import type { OpenApiData } from "../openapi/model.ts";
-import { hasScalarReferences, referenceRoutes } from "../openapi/references.ts";
+import {
+  hasScalarReferences,
+  needsPlaygroundProxy,
+  referenceRoutes,
+} from "../openapi/references.ts";
 import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
 import { registry } from "../registry/registry.ts";
@@ -1418,11 +1422,7 @@ const writeMcpFiles = async (
  * `prerender = false` export wins over the injection default.
  */
 const planPlaygroundProxy = (config: ResolvedConfig, srcDir: string) => ({
-  enabled:
-    config.openapi.enabled &&
-    config.openapi.renderer === "blume" &&
-    config.openapi.playground.enabled &&
-    config.openapi.playground.proxy === true,
+  enabled: needsPlaygroundProxy(config),
   entrypoint: join(srcDir, "blume-openapi", "api-proxy.ts"),
   pattern: "/_api-proxy",
 });
@@ -1441,6 +1441,15 @@ const planPlaygroundProxy = (config: ResolvedConfig, srcDir: string) => ({
 const specOrigins = (data: OpenApiData): string[] => {
   const origins = new Set<string>();
   for (const spec of Object.values(data)) {
+    // A GraphQL schema names no servers; its configured live endpoint is the
+    // one origin the playground targets.
+    if (spec.endpoint !== undefined) {
+      try {
+        origins.add(new URL(spec.endpoint).origin);
+      } catch {
+        // Not an absolute URL: nothing to allow.
+      }
+    }
     // SAFETY: `document` is arbitrary parsed JSON; the assertion only names
     // the optional `servers` shape, and every access below re-checks it —
     // `Array.isArray(servers)` guards the list and `server.url ?? ""` the url.
@@ -1475,7 +1484,7 @@ const proxyAllowlistWarnings = (
 ): string[] =>
   enabled && origins.length === 0
     ? [
-        "openapi.playground.proxy is enabled, but no spec declares an absolute servers[].url (relative and templated URLs carry no origin), so the proxy's allowlist is empty and it will refuse every request. Add an absolute server URL to the spec, or point playground.proxy at an external proxy URL.",
+        "The playground proxy is enabled, but no OpenAPI spec declares an absolute servers[].url (relative and templated URLs carry no origin) and no GraphQL source sets an endpoint, so the proxy's allowlist is empty and it will refuse every request. Add an absolute server URL to the spec (or an `endpoint` to the graphql block), or point playground.proxy at an external proxy URL.",
       ]
     : [];
 

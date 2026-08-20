@@ -1,0 +1,119 @@
+---
+import { withBase } from "../islands/base-path.ts";
+import type { GraphqlFieldRow } from "./graphql-helpers.ts";
+import { isOutputField } from "./graphql-helpers.ts";
+
+/**
+ * The row list shared by every GraphQL member table: a type page's fields or
+ * input fields, an operation page's arguments, and an enum's values (passed as
+ * typeless rows). Types link to their pages via `routes`; a name with no page
+ * (a built-in scalar) renders as plain text.
+ */
+interface Props {
+  title: string;
+  rows: GraphqlFieldRow[];
+  routes: Map<string, string>;
+}
+
+const { title, rows, routes } = Astro.props;
+
+/** Whether a type expression is non-null at the top level (required-ish). */
+const isRequired = (display: string): boolean => display.endsWith("!");
+---
+
+{
+  rows.length > 0 && (
+    <section class="mt-6">
+      <div
+        aria-level="2"
+        class="mb-2 font-semibold text-foreground text-sm"
+        role="heading"
+      >
+        {title}
+      </div>
+      <div class="not-prose rounded-blume border border-border px-4">
+        {rows.map((row) => {
+          const route = routes.get(row.type.name);
+          const args = isOutputField(row) ? row.args : [];
+          return (
+            <div class="border-border border-t py-3 first:border-t-0">
+              <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <code class="font-mono text-foreground text-sm">
+                  {row.name}
+                </code>
+                {route ? (
+                  <a
+                    class="font-mono text-accent text-xs hover:underline"
+                    href={withBase(route)}
+                  >
+                    {row.type.display}
+                  </a>
+                ) : (
+                  <span class="font-mono text-muted-foreground text-xs">
+                    {row.type.display}
+                  </span>
+                )}
+                {isRequired(row.type.display) && (
+                  <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
+                    required
+                  </span>
+                )}
+                {row.deprecationReason !== undefined && (
+                  <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
+                    deprecated
+                  </span>
+                )}
+              </div>
+              {row.description && (
+                <div
+                  class="mt-1 text-muted-foreground text-sm"
+                  set:text={row.description}
+                />
+              )}
+              {"default" in row && row.default !== undefined && (
+                <div class="mt-1 text-muted-foreground text-xs">
+                  Default:{" "}
+                  <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+                    {row.default}
+                  </code>
+                </div>
+              )}
+              {row.deprecationReason && (
+                <div class="mt-1 text-muted-foreground text-xs">
+                  Deprecated: <span set:text={row.deprecationReason} />
+                </div>
+              )}
+              {args.length > 0 && (
+                <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
+                  <span class="text-muted-foreground">Arguments:</span>
+                  {args.map((arg) => {
+                    const argRoute = routes.get(arg.type.name);
+                    return (
+                      <span class="inline-flex items-baseline gap-1">
+                        <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+                          {arg.name}
+                        </code>
+                        {argRoute ? (
+                          <a
+                            class="font-mono text-accent hover:underline"
+                            href={withBase(argRoute)}
+                          >
+                            {arg.type.display}
+                          </a>
+                        ) : (
+                          <span class="font-mono text-muted-foreground">
+                            {arg.type.display}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  )
+}

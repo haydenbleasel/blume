@@ -1,0 +1,211 @@
+---
+import type { GraphqlDocument } from "../../openapi/graphql.ts";
+import { graphqlTypeDef } from "../../openapi/graphql.ts";
+import type { ApiOperationRef, ApiSpecData } from "../../openapi/model.ts";
+import { withBase } from "../islands/base-path.ts";
+import { graphqlRoutes, graphqlUsage } from "./graphql-helpers.ts";
+import GraphqlFieldsTable from "./GraphqlFieldsTable.astro";
+import MethodBadge from "./MethodBadge.astro";
+
+/**
+ * A named-type reference page: the type's fields (or input fields, enum
+ * values, union members), what it implements or is implemented by, and usage
+ * backlinks — which operations return or accept it and which types reference
+ * it. The description prose is already in the MDX body above this component.
+ */
+interface Props {
+  spec: ApiSpecData;
+  refOp: ApiOperationRef;
+}
+
+const { spec, refOp } = Astro.props;
+const document = spec.document as GraphqlDocument;
+const type = graphqlTypeDef(document, refOp);
+const routes = graphqlRoutes(spec);
+
+/** A schema name rendered as a link when it has a page, plain text otherwise. */
+const chips = (names: string[]): { name: string; route?: string }[] =>
+  names.map((name) => {
+    const target: { name: string; route?: string } = { name };
+    const route = routes.get(name);
+    if (route !== undefined) {
+      target.route = route;
+    }
+    return target;
+  });
+
+const usage = type ? graphqlUsage(document, type.name) : { operations: [], types: [] };
+const operationRoutes = new Map(
+  Object.values(spec.operations).map((operation) => [
+    `${operation.method}:${operation.operationId ?? ""}`,
+    operation.route,
+  ])
+);
+const usageOperations = usage.operations.map((operation) => {
+  const linked: { label: string; kind: string; route?: string } = {
+    kind: operation.kind,
+    label: operation.name,
+  };
+  const route = operationRoutes.get(`${operation.kind}:${operation.name}`);
+  if (route !== undefined) {
+    linked.route = route;
+  }
+  return linked;
+});
+
+const CHIP_LINK = "font-mono text-accent text-xs hover:underline";
+const CHIP_TEXT = "font-mono text-muted-foreground text-xs";
+const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
+---
+
+{
+  !(type) ? (
+    <div class="text-muted-foreground">This GraphQL type could not be found.</div>
+  ) : (
+    <div class="not-prose">
+      <div class="mb-6 flex flex-wrap items-center gap-3">
+        <MethodBadge method={refOp.method} />
+        <code class="break-all font-mono text-foreground text-sm">
+          {type.name}
+        </code>
+      </div>
+      {type.specifiedByUrl && (
+        <div class="mb-4 text-muted-foreground text-sm">
+          Specified by{" "}
+          <a class="text-accent hover:underline" href={type.specifiedByUrl}>
+            {type.specifiedByUrl}
+          </a>
+        </div>
+      )}
+      <GraphqlFieldsTable
+        routes={routes}
+        rows={type.fields ?? []}
+        title="Fields"
+      />
+      <GraphqlFieldsTable
+        routes={routes}
+        rows={type.inputFields ?? []}
+        title="Input fields"
+      />
+      {(type.enumValues ?? []).length > 0 && (
+        <section class="mt-6">
+          <div aria-level="2" class={SECTION_HEADING} role="heading">
+            Values
+          </div>
+          <div class="rounded-blume border border-border px-4">
+            {(type.enumValues ?? []).map((value) => (
+              <div class="border-border border-t py-3 first:border-t-0">
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <code class="font-mono text-foreground text-sm">
+                    {value.name}
+                  </code>
+                  {value.deprecationReason !== undefined && (
+                    <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
+                      deprecated
+                    </span>
+                  )}
+                </div>
+                {value.description && (
+                  <div
+                    class="mt-1 text-muted-foreground text-sm"
+                    set:text={value.description}
+                  />
+                )}
+                {value.deprecationReason && (
+                  <div class="mt-1 text-muted-foreground text-xs">
+                    Deprecated: <span set:text={value.deprecationReason} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {(type.kind === "union" ? chips(type.possibleTypes ?? []) : []).length >
+        0 && (
+        <section class="mt-6">
+          <div aria-level="2" class={SECTION_HEADING} role="heading">
+            Member types
+          </div>
+          <div class="flex flex-wrap gap-2">
+            {chips(type.possibleTypes ?? []).map((member) =>
+              member.route ? (
+                <a class={CHIP_LINK} href={withBase(member.route)}>
+                  {member.name}
+                </a>
+              ) : (
+                <span class={CHIP_TEXT}>{member.name}</span>
+              )
+            )}
+          </div>
+        </section>
+      )}
+      {type.kind === "interface" && (type.possibleTypes ?? []).length > 0 && (
+        <section class="mt-6">
+          <div aria-level="2" class={SECTION_HEADING} role="heading">
+            Implemented by
+          </div>
+          <div class="flex flex-wrap gap-2">
+            {chips(type.possibleTypes ?? []).map((member) =>
+              member.route ? (
+                <a class={CHIP_LINK} href={withBase(member.route)}>
+                  {member.name}
+                </a>
+              ) : (
+                <span class={CHIP_TEXT}>{member.name}</span>
+              )
+            )}
+          </div>
+        </section>
+      )}
+      {(type.interfaces ?? []).length > 0 && (
+        <section class="mt-6">
+          <div aria-level="2" class={SECTION_HEADING} role="heading">
+            Implements
+          </div>
+          <div class="flex flex-wrap gap-2">
+            {chips(type.interfaces ?? []).map((iface) =>
+              iface.route ? (
+                <a class={CHIP_LINK} href={withBase(iface.route)}>
+                  {iface.name}
+                </a>
+              ) : (
+                <span class={CHIP_TEXT}>{iface.name}</span>
+              )
+            )}
+          </div>
+        </section>
+      )}
+      {(usageOperations.length > 0 || usage.types.length > 0) && (
+        <section class="mt-6">
+          <div aria-level="2" class={SECTION_HEADING} role="heading">
+            Used by
+          </div>
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            {usageOperations.map((operation) => (
+              <span class="inline-flex items-baseline gap-1 text-xs">
+                {operation.route ? (
+                  <a class={CHIP_LINK} href={withBase(operation.route)}>
+                    {operation.label}
+                  </a>
+                ) : (
+                  <span class={CHIP_TEXT}>{operation.label}</span>
+                )}
+                <span class="text-muted-foreground">{operation.kind}</span>
+              </span>
+            ))}
+            {chips(usage.types).map((used) =>
+              used.route ? (
+                <a class={CHIP_LINK} href={withBase(used.route)}>
+                  {used.name}
+                </a>
+              ) : (
+                <span class={CHIP_TEXT}>{used.name}</span>
+              )
+            )}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}

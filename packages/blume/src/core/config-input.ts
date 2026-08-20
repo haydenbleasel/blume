@@ -7,6 +7,7 @@ import type { CodeTheme } from "../markdown/themes.ts";
 import type { FontSlug } from "../theme/fonts.ts";
 import type {
   blumeConfigSchema,
+  GraphqlSource,
   OpenApiSource,
   OpenInChatProvider,
   SearchProvider,
@@ -1278,6 +1279,45 @@ export interface AsyncApiConfig extends ReferenceConfig {
   route?: string;
 }
 
+/**
+ * GraphQL reference. Blume lowers the schema — SDL text or an introspection
+ * JSON result, local or remote — into one real page per root field (grouped
+ * as Queries/Mutations/Subscriptions) plus one page per named type (Objects,
+ * Input Objects, Enums, Interfaces, Unions, Scalars), all in the sidebar,
+ * search, llms.txt, and OG. Always Blume-rendered — the embedded Scalar SPA
+ * reads OpenAPI documents only — so unlike the other reference blocks there
+ * is no `renderer` opt-out.
+ */
+export interface GraphqlConfig {
+  /**
+   * Code-sample languages shown per operation. Defaults to
+   * `["curl", "js", "python"]`.
+   */
+  codeSamples?: string[];
+  /** Turn the reference on. Defaults to `false`. */
+  enabled?: boolean;
+  /**
+   * URL of the live GraphQL endpoint the playground and code samples target —
+   * a schema, unlike an OpenAPI document, names no server. Applies to every
+   * source in the block; a per-source `endpoint` wins.
+   */
+  endpoint?: string;
+  /**
+   * The interactive "Try it" panel on operation pages. On by default; `false`
+   * hides it. The object form keeps it on and sets `proxy`, the CORS escape
+   * hatch the Send button routes requests through: a proxy URL, or `true` for
+   * the built-in `/_api-proxy` endpoint (which requires
+   * `deployment.output: "server"`).
+   */
+  playground?: boolean | { enabled?: boolean; proxy?: boolean | string };
+  /** Where the reference mounts. Defaults to `/graphql`. */
+  route?: string;
+  /** One or more schemas; each renders on its own route by default. */
+  sources?: GraphqlSource[];
+  /** Shorthand for a single source: `sources: [{ spec }]`. */
+  spec?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Misc top-level unions
 // ---------------------------------------------------------------------------
@@ -1456,6 +1496,8 @@ export interface BlumeConfig {
   frontmatter?: FrontmatterConfig;
   /** Source repository (Edit-this-page links and the header repo link). */
   github?: GithubConfig;
+  /** Native GraphQL reference (root fields and named types as real pages). */
+  graphql?: GraphqlConfig;
   /** Internationalization (opt-in multi-locale). */
   i18n?: I18nConfig;
   /** Image optimization: remote-host authorization for the image service. */

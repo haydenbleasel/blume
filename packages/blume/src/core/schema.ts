@@ -1652,6 +1652,60 @@ const asyncapiConfigSchema = referenceConfigSchema({
 });
 
 /**
+ * A single GraphQL schema rendered by the reference. `spec` is a local path or
+ * an `http(s)` URL to SDL text or an introspection JSON result; `endpoint` is
+ * the live GraphQL API URL the playground and code samples target (a schema,
+ * unlike an OpenAPI document, names no server).
+ */
+const graphqlSourceSchema = openapiSourceSchema.extend({
+  /** URL of the live GraphQL endpoint (playground + code samples). */
+  endpoint: z.string().optional(),
+});
+
+export type GraphqlSource = z.input<typeof graphqlSourceSchema>;
+
+/**
+ * GraphQL reference. Blume lowers the schema (SDL or introspection JSON) to
+ * one real page per root field — grouped as Queries/Mutations/Subscriptions —
+ * plus one page per named type (Objects, Input Objects, Enums, Interfaces,
+ * Unions, Scalars), all included in the sidebar, search, llms.txt, and OG.
+ * Always Blume-rendered: the Scalar SPA reads OpenAPI documents only, so the
+ * block declares no `renderer`/`scalar`/`theme` escape hatches.
+ */
+const graphqlConfigSchema = z.strictObject({
+  /** Code-sample languages shown per operation. */
+  codeSamples: z.array(z.string()).default(["curl", "js", "python"]),
+  enabled: z.boolean().default(false),
+  /** Default live endpoint URL for every source (per-source `endpoint` wins). */
+  endpoint: z.string().optional(),
+  /**
+   * The interactive "Try it" panel on operation pages. Same shape as the
+   * OpenAPI block's: booleans normalize to `{ enabled, proxy }`, and `proxy`
+   * routes the Send button's POST through a CORS proxy — a URL, or `true` for
+   * the built-in `/_api-proxy` endpoint (requires `deployment.output:
+   * "server"`).
+   */
+  playground: z
+    .union([
+      z.boolean(),
+      z.strictObject({
+        enabled: z.boolean().default(true),
+        proxy: z.union([z.boolean(), z.string()]).default(false),
+      }),
+    ])
+    .default(true)
+    .transform((value) =>
+      isBoolean(value) ? { enabled: value, proxy: false } : value
+    ),
+  /** Where the reference mounts. */
+  route: z.string().default("/graphql"),
+  /** One or more schemas; each renders on its own route by default. */
+  sources: z.array(graphqlSourceSchema).default([]),
+  /** Shorthand for a single source: `sources: [{ spec }]`. */
+  spec: z.string().optional(),
+});
+
+/**
  * Opt-in custom frontmatter keys. `extend` maps each extra key a project's
  * pages may carry (e.g. `owner`, `reviewedAt`) to a validation schema; the
  * page schema stays strict for everything else, so typo-catching is preserved.
@@ -1736,6 +1790,7 @@ export const blumeConfigSchema = z
     /** Opt-in custom frontmatter keys, validated by user-supplied schemas. */
     frontmatter: frontmatterConfigSchema.prefault({}),
     github: githubConfigSchema.optional(),
+    graphql: graphqlConfigSchema.prefault({}),
     i18n: i18nConfigSchema.optional(),
     image: imageConfigSchema.prefault({}),
     integrations: z.array(z.custom<AstroIntegration>()).default([]),

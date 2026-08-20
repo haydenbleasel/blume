@@ -1,0 +1,84 @@
+---
+title: GraphQL
+description: Drop in a GraphQL schema and get a native API reference — one real page per operation and per type, in your sidebar and search.
+---
+
+Point Blume at a GraphQL schema and it generates a native API reference: one **real page per root field** — queries, mutations, and subscriptions — plus one **page per named type** (objects, input objects, enums, interfaces, unions, and custom scalars). Every page shows arguments, defaults, deprecations, and usage backlinks, alongside a generated example operation, code samples, and an interactive [Try it](#try-it-playground) panel. Because each page is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc.
+
+```ts blume.config.ts lineNumbers
+graphql: {
+  enabled: true,
+  spec: "./schema.graphql",
+  endpoint: "https://api.example.com/graphql",
+}
+```
+
+That mounts the reference at `/graphql` (an overview page), with root fields at `/graphql/queries/<field>`, `/graphql/mutations/<field>`, and `/graphql/subscriptions/<field>`, and types grouped by kind at `/graphql/objects/<type>`, `/graphql/enums/<type>`, and so on.
+
+The `spec` is either a path to a local file in your project or an `http(s)` URL, and accepts two formats:
+
+- **SDL text** — a `.graphql` file with type definitions.
+- **An introspection result** — the JSON produced by running the standard introspection query, either the raw `{ "__schema": … }` shape or the full `{ "data": { "__schema": … } }` response envelope.
+
+The `endpoint` is the live GraphQL API URL. A schema, unlike an OpenAPI document, names no server — so the endpoint is what the Try it panel and the generated code samples target. Leave it off and the samples render with a placeholder URL readers replace.
+
+The reference doesn't add a header tab on its own. To surface it, point a [navigation tab](/docs/content/navigation#tabs) at its route — this also scopes the reference sidebar:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [{ label: "GraphQL", path: "/graphql" }],
+}
+```
+
+## Generated examples
+
+Every operation page carries a complete, valid example operation — one variable per argument, typed off the schema, with a bounded-depth selection set over the return type — plus matching example variables and an example response that mirrors the same selection. Code samples show the exact HTTP request (a JSON `POST` of `{ query, variables }`) in each configured language:
+
+```ts blume.config.ts lineNumbers
+graphql: {
+  enabled: true,
+  spec: "./schema.graphql",
+  codeSamples: ["curl", "js"],   // built in: curl, js, python
+}
+```
+
+## Type pages
+
+Named types get their own deep-linkable pages, grouped by kind in the sidebar: fields and input fields with their types linked, enum values, union members, interface implementations, and a **Used by** section listing the operations that return or accept the type and the other types that reference it. Spec-defined scalars (`String`, `Int`, …) don't get pages; custom scalars do, including their `specifiedBy` URL.
+
+## Multiple schemas
+
+`sources` renders several schemas, each on its own route. A per-source `endpoint` overrides the block-level one:
+
+```ts blume.config.ts lineNumbers
+graphql: {
+  enabled: true,
+  endpoint: "https://api.example.com/graphql",
+  sources: [
+    { label: "Public API", spec: "./schema.graphql" },
+    {
+      label: "Admin API",
+      route: "/graphql-admin",
+      spec: "./admin.graphql",
+      endpoint: "https://admin.example.com/graphql",
+    },
+  ],
+}
+```
+
+Each source takes the same per-source controls as the [OpenAPI block](/docs/advanced/api-reference): `includeInSearch`, `includeInLlms`, and `noindex`.
+
+## Try it playground
+
+Operation pages render an interactive panel: edit the request body (the query and variables), point it at your endpoint or a custom URL, and send — the code samples update live so what you copy is byte-for-byte what was sent. Disable it with `playground: false`.
+
+If your GraphQL API doesn't allow cross-origin requests from the docs site, route sends through a CORS proxy — a URL of your own, or `true` for the built-in `/_api-proxy` endpoint (which requires `deployment.output: "server"`). The built-in proxy only forwards to the configured `endpoint`'s origin:
+
+```ts blume.config.ts lineNumbers
+graphql: {
+  enabled: true,
+  spec: "./schema.graphql",
+  endpoint: "https://api.example.com/graphql",
+  playground: { proxy: true },
+}
+```

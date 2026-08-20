@@ -1,0 +1,171 @@
+---
+import data from "blume:data";
+import specs from "blume:openapi";
+
+import type {
+  GraphqlDocument,
+  GraphqlOperationKind,
+} from "../../openapi/graphql.ts";
+import {
+  graphqlRootField,
+  isGraphqlOperationKind,
+} from "../../openapi/graphql.ts";
+import { highlightCode } from "../../markdown/index.ts";
+import { withBase } from "../islands/base-path.ts";
+import {
+  exampleQuery,
+  exampleResponse,
+  exampleVariables,
+  graphqlPlaygroundModel,
+  graphqlRoutes,
+} from "./graphql-helpers.ts";
+import { buildRequest, defaultValues } from "./request.ts";
+import { sampleLanguages } from "./snippets.ts";
+import GraphqlFieldsTable from "./GraphqlFieldsTable.astro";
+import GraphqlType from "./GraphqlType.astro";
+import MethodBadge from "./MethodBadge.astro";
+import PanelTabs from "./PanelTabs.astro";
+import Playground from "./Playground.astro";
+
+/**
+ * The GraphQL front-end of the reference page, dispatched from
+ * `Operation.astro`: root fields render as operations — arguments, return
+ * type, a generated example query, live code samples, and the "Try it"
+ * playground (the OpenAPI panel reused verbatim: a GraphQL call is a plain
+ * POST whose JSON body carries the query and variables) — while named types
+ * defer to `GraphqlType.astro`.
+ */
+interface Props {
+  source: string;
+  id: string;
+}
+
+const { source, id } = Astro.props;
+const spec = specs[source];
+const ref = spec?.operations[id];
+const document = (spec?.document ?? { roots: {}, types: {} }) as GraphqlDocument;
+const isOperation = ref !== undefined && isGraphqlOperationKind(ref.method);
+const field = ref && isOperation ? graphqlRootField(document, ref) : undefined;
+const routes = spec ? graphqlRoutes(spec) : new Map<string, string>();
+
+const query =
+  field && isOperation
+    ? exampleQuery(document, field, ref.method as GraphqlOperationKind)
+    : "";
+const variables = field ? exampleVariables(document, field) : undefined;
+const model =
+  spec && field ? graphqlPlaygroundModel(spec, query, variables) : null;
+const sample = model ? buildRequest(model, defaultValues(model)) : null;
+const languages = sampleLanguages(spec?.codeSamples ?? []);
+
+const requestPanels = sample
+  ? await Promise.all(
+      languages.map(async (language) => ({
+        html: await highlightCode(language.build(sample), language.lang, {
+          icons: false,
+          themes: data.config.codeThemes,
+        }),
+        key: language.id,
+        label: language.label,
+        lang: language.id,
+      }))
+    )
+  : [];
+const responsePanels =
+  field && spec
+    ? [
+        {
+          html: await highlightCode(
+            JSON.stringify(exampleResponse(document, field), null, 2),
+            "json",
+            { icons: false, themes: data.config.codeThemes }
+          ),
+          key: "example",
+          label: "Example",
+        },
+      ]
+    : [];
+
+const returnRoute = field ? routes.get(field.type.name) : undefined;
+---
+
+{
+  ref && !isOperation ? (
+    spec && <GraphqlType refOp={ref} spec={spec} />
+  ) : !(spec && ref && field) ? (
+    <div class="text-muted-foreground">This API operation could not be found.</div>
+  ) : (
+    <div class="not-prose">
+      <div class="mb-6 flex flex-wrap items-center gap-3">
+        <MethodBadge method={ref.method} />
+        <code class="break-all font-mono text-foreground text-sm">
+          {field.name}
+        </code>
+        {field.deprecationReason !== undefined && (
+          <span class="font-medium text-[0.625rem] text-orange-600 uppercase tracking-wide dark:text-orange-400">
+            deprecated
+          </span>
+        )}
+      </div>
+      <div class="grid grid-cols-1 items-start gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
+        <div>
+          {field.deprecationReason && (
+            <p class="mb-4 text-muted-foreground text-sm">
+              Deprecated: <span set:text={field.deprecationReason} />
+            </p>
+          )}
+          <GraphqlFieldsTable
+            routes={routes}
+            rows={field.args}
+            title="Arguments"
+          />
+          <section class="mt-6">
+            <div
+              aria-level="2"
+              class="mb-2 font-semibold text-foreground text-sm"
+              role="heading"
+            >
+              Returns
+            </div>
+            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              {returnRoute ? (
+                <a
+                  class="font-mono text-accent text-sm hover:underline"
+                  href={withBase(returnRoute)}
+                >
+                  {field.type.display}
+                </a>
+              ) : (
+                <code class="font-mono text-muted-foreground text-sm">
+                  {field.type.display}
+                </code>
+              )}
+            </div>
+            {document.types[field.type.name]?.description && (
+              <p
+                class="mt-1 text-muted-foreground text-sm"
+                set:text={document.types[field.type.name]?.description}
+              />
+            )}
+          </section>
+        </div>
+        {sample && model && (
+          <div class="xl:sticky xl:top-24 xl:self-start" data-operation-panel>
+            {spec.playground.enabled && (
+              <Playground
+                model={model}
+                operation={id}
+                proxy={spec.playground.proxy}
+                slug={spec.slug}
+              />
+            )}
+            <div class="not-prose flex flex-col gap-6">
+              <PanelTabs copy heading="Request" panels={requestPanels} />
+              <PanelTabs heading="Response" panels={responsePanels} />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

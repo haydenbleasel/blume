@@ -4,6 +4,7 @@ import { toString as mdastToString } from "mdast-util-to-string";
 import stringWidth from "string-width";
 
 import { columnsPrefix } from "../core/text-width.ts";
+import type { GraphqlMember } from "./graphql.ts";
 import type { ApiOperationRef, ApiSpecData } from "./model.ts";
 import type { ReferenceSource } from "./references.ts";
 
@@ -156,6 +157,19 @@ const clip = (text: string, max: number): string => {
 
 const apiName = (spec: ApiSpecData): string => spec.title || spec.label;
 
+/** Human phrase for each GraphQL page kind, for meta descriptions. */
+const GRAPHQL_MEMBER_PHRASES = {
+  enum: "enum type",
+  input: "input object type",
+  interface: "interface type",
+  mutation: "mutation",
+  object: "object type",
+  query: "query",
+  scalar: "scalar type",
+  subscription: "subscription",
+  union: "union type",
+} satisfies Record<GraphqlMember, string>;
+
 /**
  * The spec's own prose for the operation, followed by the endpoint it documents
  * — so every operation page carries a distinct, self-describing meta
@@ -165,11 +179,18 @@ const operationDescription = (
   spec: ApiSpecData,
   operation: ApiOperationRef
 ): string => {
-  // AsyncAPI operations act on a channel, not an HTTP endpoint.
-  const suffix =
-    spec.kind === "asyncapi"
-      ? `Reference for the ${operation.method} operation on ${operation.path} in the ${apiName(spec)} API.`
-      : `Reference for the ${operation.method.toUpperCase()} ${operation.path} endpoint in the ${apiName(spec)} API.`;
+  // AsyncAPI operations act on a channel, not an HTTP endpoint; GraphQL pages
+  // document a root field or a named type.
+  let suffix: string;
+  if (spec.kind === "asyncapi") {
+    suffix = `Reference for the ${operation.method} operation on ${operation.path} in the ${apiName(spec)} API.`;
+  } else if (spec.kind === "graphql") {
+    // SAFETY: the GraphQL extractor only ever assigns member kinds as the
+    // method (see `extractGraphqlOperations`).
+    suffix = `Reference for the ${operation.path} ${GRAPHQL_MEMBER_PHRASES[operation.method as GraphqlMember]} in the ${apiName(spec)} API.`;
+  } else {
+    suffix = `Reference for the ${operation.method.toUpperCase()} ${operation.path} endpoint in the ${apiName(spec)} API.`;
+  }
   const prose = clip(
     plainProse(operation.description || operation.summary),
     META_DESCRIPTION_MAX - stringWidth(suffix) - 1
@@ -192,7 +213,11 @@ export const operationMdx = (
   >
 ): RenderedPage => {
   const method = operation.method.toUpperCase();
-  const title = operation.summary || `${method} ${operation.path}`;
+  // A GraphQL page IS its field/type — `QUERY pets` would double the badge the
+  // page already renders; the other kinds title an endpoint or channel action.
+  const fallbackTitle =
+    spec.kind === "graphql" ? operation.path : `${method} ${operation.path}`;
+  const title = operation.summary || fallbackTitle;
   // Skip the body description when it only repeats the summary (the `<h1>`) —
   // common in specs that set summary and description to the same string.
   const description =

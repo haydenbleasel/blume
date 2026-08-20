@@ -1,3 +1,4 @@
+import { needsPlaygroundProxy } from "../openapi/references.ts";
 import { searchProviderMeta } from "../search/providers.ts";
 import type { ResolvedConfig } from "./schema.ts";
 
@@ -14,15 +15,10 @@ export const serverFeatures = (config: ResolvedConfig): string[] => {
   if (config.ai.mcp.enabled) {
     features.push("MCP server");
   }
-  // The built-in playground proxy (`openapi.playground.proxy: true`) is a
-  // live fetch endpoint at `/_api-proxy`; an external proxy URL (string) or a
-  // proxy-less playground stays fully static.
-  if (
-    config.openapi.enabled &&
-    config.openapi.renderer === "blume" &&
-    config.openapi.playground.enabled &&
-    config.openapi.playground.proxy === true
-  ) {
+  // The built-in playground proxy (`playground.proxy: true` on the OpenAPI or
+  // GraphQL block) is a live fetch endpoint at `/_api-proxy`; an external
+  // proxy URL (string) or a proxy-less playground stays fully static.
+  if (needsPlaygroundProxy(config)) {
     features.push("API playground proxy");
   }
   // Mixedbread (and any future provider) that proxies queries through a secret
