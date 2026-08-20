@@ -58,6 +58,10 @@ export interface Heading {
 export interface PageLink {
   /** Raw link target as written, e.g. `./foo`, `/api#auth`, `https://x.dev`. */
   target: string;
+  /** Set when the target was written as an image embed (`![alt](target)`) —
+   * only those go through the image pipeline; a plain link to the same path
+   * resolves as a site route. */
+  image?: boolean;
   /** 1-based line number in the source file. */
   line: number;
   /** 1-based column of the target within the line. */

@@ -1,7 +1,14 @@
-import { existsSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
-import { dirname, extname, relative, resolve } from "pathe";
+import {
+  basename,
+  dirname,
+  extname,
+  normalize,
+  relative,
+  resolve,
+} from "pathe";
 
 import { normalizeBasePath } from "./base-path.ts";
 import { hashText } from "./sources/cache.ts";
@@ -65,6 +72,52 @@ export const contentAssetParam = (
   return rel;
 };
 
+/** Percent-decode an image target; malformed escapes stay verbatim. */
+const decodeTarget = (target: string): string => {
+  try {
+    return decodeURI(target);
+  } catch {
+    return target;
+  }
+};
+
+/**
+ * Whether a target is *shaped* like a colocated image reference: a relative
+ * filesystem path with an image extension. Exported so link validation can
+ * tell "not a colocated candidate" apart from "a candidate that resolves
+ * nowhere" — the former falls through to the public-dir probe, the latter is
+ * a broken reference beside the page source.
+ */
+export const isRelativeImageTarget = (target: string): boolean =>
+  isRelativeTarget(target) &&
+  IMAGE_EXTENSIONS.has(extname(decodeTarget(target)).toLowerCase());
+
+/**
+ * Whether `abs` is a file whose trailing `segments` names match the on-disk
+ * entries exactly. A bare `existsSync` accepts `./Diagram.PNG` for
+ * `diagram.png` (or a directory named like an image) on a case-insensitive
+ * filesystem — the reference then validates and serves locally but breaks on
+ * the case-sensitive Linux build.
+ */
+const existsAsWritten = (abs: string, segments: number): boolean => {
+  let current = abs;
+  for (let i = 0; i < segments; i += 1) {
+    const parent = dirname(current);
+    let entries: string[];
+    try {
+      entries = readdirSync(parent);
+    } catch {
+      return false;
+    }
+    if (!entries.includes(basename(current))) {
+      return false;
+    }
+    current = parent;
+  }
+  const stat = statSync(abs, { throwIfNoEntry: false });
+  return stat !== undefined && stat.isFile();
+};
+
 /**
  * Resolve one image target against its page's directory. Returns the absolute
  * file path when the target is relative, is an image, and exists on disk —
@@ -76,20 +129,17 @@ export const resolveRelativeImage = (
   sourceDir: string,
   target: string
 ): string | null => {
-  if (!isRelativeTarget(target)) {
+  if (!isRelativeImageTarget(target)) {
     return null;
   }
-  let decoded = target;
-  try {
-    decoded = decodeURI(target);
-  } catch {
-    // Malformed escapes — try the raw text.
-  }
-  if (!IMAGE_EXTENSIONS.has(extname(decoded).toLowerCase())) {
-    return null;
-  }
+  const decoded = decodeTarget(target);
+  // Only the segments the author wrote are checked against on-disk names;
+  // `sourceDir`'s own casing is the filesystem's business, not the target's.
+  const segments = normalize(decoded)
+    .split("/")
+    .filter((part) => part !== "" && part !== "..").length;
   const abs = resolve(sourceDir, decoded);
-  return existsSync(abs) ? abs : null;
+  return existsAsWritten(abs, segments) ? abs : null;
 };
 
 /** Encode an endpoint param for use in a Markdown URL, keeping `/` separators. */

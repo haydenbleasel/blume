@@ -413,11 +413,18 @@ const scanLinkLine = (
     // for its text — a label that contains the same text (e.g. `[/a/b](/a/b)`)
     // would otherwise report the column inside the label.
     const targetOffset = targetOffsetIn(match[0], target, match.groups?.title);
-    links.push({
+    const entry: PageLink = {
       column: match.index + targetOffset + 1,
       line: lineNumber,
       target,
-    });
+    };
+    // `MD_LINK` matches the `[label](target)` tail of an image embed too; the
+    // preceding `!` is what marks the target as going through the image
+    // pipeline rather than resolving as a site route.
+    if (masked[match.index - 1] === "!") {
+      entry.image = true;
+    }
+    links.push(entry);
     // An image nested in the label (`[![alt](/img.png)](/target)`) carries its
     // own target; surface it too so a missing image is still caught.
     const label = match[0].slice(0, targetOffset - "](".length);
@@ -432,6 +439,7 @@ const scanLinkLine = (
           image.index +
           targetOffsetIn(image[0], imageTarget, image.groups?.title) +
           1,
+        image: true,
         line: lineNumber,
         target: imageTarget,
       });

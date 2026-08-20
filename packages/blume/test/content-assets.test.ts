@@ -17,6 +17,7 @@ let pagePath: string;
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "blume-content-assets-"));
   await mkdir(join(root, "docs", "images"), { recursive: true });
+  await mkdir(join(root, "docs", "dir.png"), { recursive: true });
   pagePath = join(root, "docs", "page.mdx");
   await Promise.all([
     writeFile(join(root, "docs", "photo.png"), "png"),
@@ -82,7 +83,18 @@ describe("rewriteRelativeImages", () => {
   });
 
   it("leaves references to missing files and non-images alone", () => {
-    const source = "![m](./missing.png) ![d](./spec.pdf)";
+    // `./nope/missing.png` has no parent directory at all — the resolver must
+    // treat an unreadable parent the same as a missing file.
+    const source =
+      "![m](./missing.png) ![d](./spec.pdf) ![n](./nope/missing.png)";
+    expect(rewrite(source)).toBe(source);
+  });
+
+  it("leaves case-mismatched and directory references alone", () => {
+    // `./Photo.PNG` passes a bare existsSync on a case-insensitive filesystem
+    // but breaks on the Linux build; `./dir.png` is a directory. Neither is a
+    // servable colocated image, so neither may be rewritten.
+    const source = "![c](./Photo.PNG) ![d](./dir.png)";
     expect(rewrite(source)).toBe(source);
   });
 

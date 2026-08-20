@@ -3,7 +3,10 @@ import { existsSync } from "node:fs";
 import { basename, dirname, join } from "pathe";
 
 import { stripBasePath, withBasePath } from "./base-path.ts";
-import { resolveRelativeImage } from "./content-assets.ts";
+import {
+  isRelativeImageTarget,
+  resolveRelativeImage,
+} from "./content-assets.ts";
 import { gradeExternal, probeAll } from "./probe.ts";
 import type {
   ContentGraph,
@@ -155,7 +158,8 @@ const checkAnchor = (
 const checkPathLink = (
   resolved: string,
   fragment: string,
-  target: string,
+  page: PageRecord,
+  link: PageLink,
   site: LinkSite,
   ctx: LinkContext
 ): LinkResult => {
@@ -187,6 +191,27 @@ const checkPathLink = (
     if (assetIsPresent(assetPath, ctx)) {
       return null;
     }
+    // A colocated image embed (`![](./diagram.png)`) is resolved from beside
+    // the page source and emitted to `_astro/` by the image pipeline, so it
+    // never lands in `public/`. The *raw* target goes through the same
+    // resolver that decides what the `/blume-assets/content` endpoint serves,
+    // so a reference the rewriter skips (a `?v=2` suffix, a double-encoded
+    // name) is reported here, not accepted. Plain links to the same path stay
+    // on the public-dir probe — an href resolves as a site route, and only
+    // image nodes are rewritten.
+    if (link.image && page.sourcePath && isRelativeImageTarget(link.target)) {
+      if (resolveRelativeImage(dirname(page.sourcePath), link.target)) {
+        return null;
+      }
+      return {
+        ...site,
+        code: "BLUME_BROKEN_ASSET",
+        message: `Image ${link.target} was not found next to ${basename(page.sourcePath)}.`,
+        severity: "warning",
+        suggestion:
+          "Add the file next to the page source or fix the reference.",
+      };
+    }
     // Nowhere to look: no `public/` directory.
     if (ctx.publicDir === null) {
       return "asset-unchecked";
@@ -203,7 +228,7 @@ const checkPathLink = (
   return {
     ...site,
     code: "BLUME_BROKEN_LINK",
-    message: `Broken link to ${target}: no page resolves to ${route}.`,
+    message: `Broken link to ${link.target}: no page resolves to ${route}.`,
     severity: "error",
     suggestion: "Check the path, or create the target page.",
   };
@@ -277,20 +302,10 @@ const classifyLink = (
     return fragment ? checkAnchor(page.route, fragment, site, ctx) : null;
   }
 
-  // A colocated image (`./diagram.png`) is resolved from beside the page
-  // source and emitted to `_astro/` by the image pipeline, so it never lands
-  // in `public/` — probing there alone reports a reference the site renders.
-  if (
-    page.sourcePath &&
-    resolveRelativeImage(dirname(page.sourcePath), rawPath) !== null
-  ) {
-    return null;
-  }
-
   const resolved = rawPath.startsWith("/")
     ? rawPath
     : resolveRelative(page.route, rawPath, isIndexPage(page));
-  return checkPathLink(resolved, fragment, target, site, ctx);
+  return checkPathLink(resolved, fragment, page, link, site, ctx);
 };
 
 /**
