@@ -3,7 +3,7 @@ import { rewriteRelativeImages } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
-import { readEntryText } from "../core/sources/read.ts";
+import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode, Navigation, PageRecord } from "../core/types.ts";
 import { buildRssFeeds } from "../deploy/rss.ts";
 import {
@@ -208,7 +208,7 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
 
   const sections = await Promise.all(
     pages.map(async (page) => {
-      let raw = await readEntryText(project, page);
+      let raw = await readExpandedEntryText(project, page);
       // Colocated `./image.png` references resolve to nothing for a reader of
       // llms-full.txt; point them at the served originals instead.
       if (page.sourcePath) {

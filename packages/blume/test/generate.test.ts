@@ -906,6 +906,37 @@ describe("generateRuntime", () => {
     expect(generated).not.toContain("must-not-leak");
   });
 
+  it("writes the include graph for dev-server partial invalidation", async () => {
+    const root = await writeProject({
+      "docs/_snippets/shared.mdx": "## Shared\n",
+      "docs/a.mdx": "# A\n\n<include>./_snippets/shared.mdx</include>\n",
+      "docs/b.mdx": "# B\n\n<include>./_snippets/shared.mdx</include>\n",
+      "docs/index.md": "# Home\n",
+    });
+    const project = await scanProject(root);
+    await generateRuntime(project);
+    // SAFETY: the file under test was just written by `generateRuntime`,
+    // which serializes exactly this shape.
+    const graph = JSON.parse(
+      await readFile(
+        join(project.context.outDir, "src", "generated", "includes.json"),
+        "utf-8"
+      )
+    ) as Record<string, string[]>;
+    const partial = join(root, "docs", "_snippets", "shared.mdx");
+    expect(graph[partial]?.toSorted()).toEqual([
+      join(root, "docs", "a.mdx"),
+      join(root, "docs", "b.mdx"),
+    ]);
+    // The generated config wires the HMR plugin at that graph path.
+    const config = await readFile(
+      join(project.context.outDir, "astro.config.mjs"),
+      "utf-8"
+    );
+    expect(config).toContain("includeHmrPlugin(");
+    expect(config).toContain("includes.json");
+  });
+
   it("rewrites generated config when integration source changes", async () => {
     const root = await writeProject({
       "blume.config.ts": `export default {

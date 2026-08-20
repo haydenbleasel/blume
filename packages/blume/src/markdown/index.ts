@@ -13,6 +13,7 @@ import { baseLinksPlugin } from "./base-links.ts";
 import { codeTitleTransformer } from "./code-title.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
 import { headingAnchorPlugin } from "./heading-anchors.ts";
+import { includePlugin } from "./include.ts";
 import { inlineCodeHighlightPlugin } from "./inline-code.ts";
 import { languageIconTransformer } from "./language-icon.ts";
 import { mathPlugin } from "./math.ts";
@@ -39,6 +40,7 @@ export {
 } from "./code-title.ts";
 export { calloutTypeFor } from "./directives.ts";
 export { headingAnchorPlugin } from "./heading-anchors.ts";
+export { includePlugin } from "./include.ts";
 export { mermaidPlugin } from "./mermaid.ts";
 export { packageInstallPlugin } from "./package-install.ts";
 export { ts2jsPlugin } from "./ts2js.ts";
@@ -272,12 +274,17 @@ export interface BlumeMarkdownOptions {
    * `basePath` link isn't double-prefixed (see `withComposedBasePath`).
    */
   deployBase?: string;
+  /**
+   * The docs content root, bounding `<include>` target resolution (and
+   * anchoring `/`-leading include paths). When unset, relative includes still
+   * resolve from the including file.
+   */
+  contentRoot?: string;
 }
 
 /**
- * MDAST plugins that apply to both `.md` and `.mdx`. Currently just the
- * base-path link rewrite, added only when a `basePath` or `deployBase` is
- * configured.
+ * MDAST plugins that apply to both `.md` and `.mdx`: the base-path link
+ * rewrite (added only when a `basePath` or `deployBase` is configured).
  */
 const blumeSharedMdastPlugins = (
   options: BlumeMarkdownOptions
@@ -290,12 +297,23 @@ const blumeSharedMdastPlugins = (
       ]
     : [];
 
+/**
+ * The `<include>` splice. Always first: its mutations apply before the next
+ * plugin runs, so spliced content flows through the rest of the chain
+ * (callouts, mermaid, math, base links) like inline content.
+ */
+const blumeIncludePlugin = (options: BlumeMarkdownOptions): MdastPlugin =>
+  asMdastPlugin(includePlugin({ contentRoot: options.contentRoot }));
+
 /** Sätteri processor for plain `.md`, with Blume's curated feature set. */
 export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
   satteri({
     features: { ...FEATURES },
     hastPlugins: blumeHastPlugins(options),
-    mdastPlugins: blumeSharedMdastPlugins(options),
+    mdastPlugins: [
+      blumeIncludePlugin(options),
+      ...blumeSharedMdastPlugins(options),
+    ],
   });
 
 export type BlumeMdxOptions = BlumeMarkdownOptions;
@@ -327,6 +345,7 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
     },
     hastPlugins: blumeHastPlugins(options),
     mdastPlugins: [
+      blumeIncludePlugin(options),
       asMdastPlugin(packageInstallPlugin()),
       asMdastPlugin(ts2jsPlugin()),
       asMdastPlugin(directiveToCalloutPlugin()),

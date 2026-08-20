@@ -271,7 +271,9 @@ const classifyLink = (
   const { target } = link;
   const site: LinkSite = {
     column: link.column,
-    file: page.sourcePath ?? page.id,
+    // A link written inside an included partial reports against the partial
+    // file, so the author fixes it where it lives.
+    file: link.file ?? page.sourcePath ?? page.id,
     line: link.line,
   };
 

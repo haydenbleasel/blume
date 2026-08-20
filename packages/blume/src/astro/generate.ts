@@ -1628,6 +1628,31 @@ const assertFontFilesExist = (project: BlumeProject): void => {
 };
 
 /**
+ * Invert the scan's page → included-partials edges into the partial →
+ * including-pages map `includeHmrPlugin` reads (`generated/includes.json`),
+ * so editing a partial invalidates every page that splices it. Localized
+ * pages share a source path, hence the dedupe.
+ */
+const buildIncludeGraph = (
+  pages: { sourcePath?: string; includes?: string[] }[]
+) => {
+  const graph: Record<string, string[]> = {};
+  for (const page of pages) {
+    const { sourcePath } = page;
+    if (!sourcePath) {
+      continue;
+    }
+    for (const partial of page.includes ?? []) {
+      const includers = (graph[partial] ??= []);
+      if (!includers.includes(sourcePath)) {
+        includers.push(sourcePath);
+      }
+    }
+  }
+  return graph;
+};
+
+/**
  * Write (or update) the generated `.blume/` Astro runtime for a project.
  * Only files whose content changed are rewritten so Vite HMR stays fast.
  */
@@ -1772,6 +1797,7 @@ export const generateRuntime = async (
           aliases: resolveTsconfigAliases(context.root),
           askPath,
           config,
+          contentRoot: docsCollection.base,
           contentRoutes: markdownRoutePaths(project),
           context,
           dataPath,
@@ -1955,6 +1981,14 @@ export const generateRuntime = async (
       mixedbreadSearchEndpointTemplate(config.search.mixedbread?.storeId ?? "")
     );
   }
+
+  // The include graph (partial → including pages) behind `includeHmrPlugin`:
+  // editing a partial invalidates every page that splices it. Written even
+  // when empty so the plugin's configured path always resolves.
+  await write(
+    join(srcDir, "generated", "includes.json"),
+    `${JSON.stringify(buildIncludeGraph(project.graph.pages))}\n`
+  );
 
   const rawMarkdown = await buildRawMarkdown(project);
   // The originals behind the rewritten `/blume-assets/content/…` references in

@@ -685,11 +685,16 @@ describe("astroConfigTemplate", () => {
     expect(out).not.toContain('import react from "@astrojs/react"');
     expect(out).toContain("blumeIntegration(");
     // The prerender dep-link plugin is wired into the Vite config so isolated
-    // linkers can resolve externalized deps when generating static pages.
+    // linkers can resolve externalized deps when generating static pages, and
+    // the include-HMR plugin turns a partial edit into an invalidation of the
+    // pages that splice it.
     expect(out).toContain(
-      'import { blumeIntegration, prerenderDepsPlugin } from "blume/astro"'
+      'import { blumeIntegration, includeHmrPlugin, prerenderDepsPlugin } from "blume/astro"'
     );
     expect(out).toContain("prerenderDepsPlugin()");
+    expect(out).toContain(
+      'includeHmrPlugin("/p/.blume/src/generated/includes.json")'
+    );
     // The client router's in-place swaps read from the prefetch cache, so
     // every link prefetches on hover/viewport to hide the request latency
     // behind user intent.

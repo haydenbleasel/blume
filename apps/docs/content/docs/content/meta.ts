@@ -6,6 +6,7 @@ export default defineMeta({
     "navigation",
     "meta",
     "syntax",
+    "includes",
     "components",
     "islands",
     "sources",

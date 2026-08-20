@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import { expandIncludes, hasIncludeStatements } from "../includes.ts";
 import type { PageRecord } from "../types.ts";
 import type { ContentSource } from "./types.ts";
 
@@ -33,4 +34,30 @@ export const readEntryText = async (
     return await readFile(page.sourcePath, "utf-8");
   }
   return "";
+};
+
+/**
+ * Read an entry's raw body with `<include>` statements expanded — what search
+ * indexing, the `.md`/`.mdx` mirrors, and llms-full.txt should see, matching
+ * the spliced content the rendered page shows. Filesystem entries only
+ * (includes resolve as filesystem paths); everything else passes through
+ * verbatim. Expansion errors were already surfaced as scan diagnostics, so
+ * unresolvable statements simply stay verbatim here.
+ */
+export const readExpandedEntryText = async (
+  ctx: EntryReadContext,
+  page: PageRecord
+): Promise<string> => {
+  const raw = await readEntryText(ctx, page);
+  if (!(page.sourcePath && hasIncludeStatements(raw))) {
+    return raw;
+  }
+  const source = ctx.sources?.find(
+    (candidate) => candidate.name === page.source.name
+  );
+  const expansion = await expandIncludes(raw, {
+    contentRoot: source?.contentRoot,
+    sourcePath: page.sourcePath,
+  });
+  return expansion.text;
 };

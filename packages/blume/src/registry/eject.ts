@@ -383,6 +383,7 @@ export const eject = async (
       content: astroConfigTemplate({
         askPath: "./src/generated/Ask.astro",
         config,
+        contentRoot: relContext.contentRoot,
         contentRoutes: project.manifest.routes.map((route) => route.path),
         context: relContext,
         dataPath: "./src/generated/data.json",

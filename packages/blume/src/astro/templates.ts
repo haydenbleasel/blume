@@ -416,6 +416,11 @@ export const astroConfigTemplate = (options: {
   reactCompilerPath?: string | null;
   /** Project tsconfig path aliases (`find` -> absolute dir), e.g. `@` -> src. */
   aliases?: Record<string, string>;
+  /**
+   * The docs collection's content root; bounds `<include>` resolution in the
+   * processors and locates the include graph for dev-server invalidation.
+   */
+  contentRoot?: string;
   /** Bridge used to load configured integrations without serializing them. */
   integrationBridge?: IntegrationBridgeOptions;
 }): string => {
@@ -571,6 +576,7 @@ export const astroConfigTemplate = (options: {
     : "";
   const blumeImports = [
     "blumeIntegration",
+    "includeHmrPlugin",
     "prerenderDepsPlugin",
     ...(adapterOption.includes("withAdapterRoot") ? ["withAdapterRoot"] : []),
   ];
@@ -596,6 +602,7 @@ export const astroConfigTemplate = (options: {
     `mdx({ processor: blumeMdxProcessor(${JSON.stringify({
       basePath: config.basePath,
       codeThemes: config.markdown.codeBlocks.theme,
+      contentRoot: options.contentRoot,
       deployBase,
       headingAnchors: config.markdown.headingAnchors,
     })}) })`,
@@ -645,6 +652,7 @@ ${userConfigSetup}export default defineConfig({
     processor: blumeMarkdownProcessor(${JSON.stringify({
       basePath: config.basePath,
       codeThemes: config.markdown.codeBlocks.theme,
+      contentRoot: options.contentRoot,
       deployBase,
       headingAnchors: config.markdown.headingAnchors,
     })}),
@@ -666,7 +674,9 @@ ${userConfigSetup}export default defineConfig({
   // instantly.
   prefetch: { prefetchAll: true },
   vite: {
-    plugins: [tailwindcss(), prerenderDepsPlugin()],
+    plugins: [tailwindcss(), includeHmrPlugin(${JSON.stringify(
+      `${context.outDir}/src/generated/includes.json`
+    )}), prerenderDepsPlugin()],
     // Everything hydration can reach must be part of the dev dep optimizer's
     // FIRST run. The Vite root is the generated runtime, so user pages,
     // islands, and aliased components live outside it and are only crawled

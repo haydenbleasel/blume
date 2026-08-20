@@ -19,6 +19,9 @@ import {
   nextFenceState,
   targetOffsetIn,
 } from "./sources/normalize.ts";
+import { readExpandedEntryText } from "./sources/read.ts";
+import type { ContentSource } from "./sources/types.ts";
+import type { PageRecord } from "./types.ts";
 
 /**
  * Colocated content images — `![alt](./diagram.png)` next to the page that
@@ -217,22 +220,30 @@ export const rewriteRelativeImages = (options: {
  * Every colocated image the project's pages reference, keyed by endpoint param.
  * Serialized to `generated/content-assets.json`, which the
  * `/blume-assets/[...asset]` endpoint reads to serve the original files. Runs
- * the same rewrite the agent-Markdown builders apply, so the served set and the
- * rewritten URLs can't drift apart.
+ * the same rewrite the agent-Markdown builders apply — over the same
+ * include-expanded text, so a partial's colocated images (rebased into the
+ * including page by the expander) are served too — keeping the served set and
+ * the rewritten URLs from drifting apart.
  */
 export const collectContentAssets = async (project: {
   context: { root: string };
-  manifest: { routes: { sourcePath?: string }[] };
+  manifest: { routes: { id: string; sourcePath?: string }[] };
+  graph: { pages: PageRecord[] };
+  sources?: ContentSource[];
 }): Promise<Record<string, string>> => {
+  const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
   const files: Record<string, string> = {};
   await Promise.all(
     project.manifest.routes.map(async (route) => {
       if (!route.sourcePath) {
         return;
       }
+      const page = pageById.get(route.id);
       let source: string;
       try {
-        source = await readFile(route.sourcePath, "utf-8");
+        source = page
+          ? await readExpandedEntryText(project, page)
+          : await readFile(route.sourcePath, "utf-8");
       } catch {
         return;
       }

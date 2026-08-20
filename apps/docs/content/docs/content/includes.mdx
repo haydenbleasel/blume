@@ -1,0 +1,68 @@
+---
+title: Includes
+description: Reuse content across pages — splice shared Markdown, MDX, or code files into any page with the include syntax.
+---
+
+Write a snippet once and splice it into any page. An `<include>` statement on its own line embeds another file at build time, as if its content were written inline — headings join the page's table of contents, text is indexed by search, and the content appears in the page's `.md` mirror and llms-full.txt.
+
+```mdx
+<include>./_snippets/prerequisites.mdx</include>
+```
+
+The path is resolved relative to the including file. Paths starting with `/` resolve from your content root, so deeply nested pages can reference shared snippets without `../../..` chains:
+
+```mdx
+<include>/_snippets/prerequisites.mdx</include>
+```
+
+The syntax matches Fumadocs' include syntax, so migrated content works unchanged.
+
+Here it is live — this next callout is spliced from a shared snippet:
+
+<include>../_snippets/include-demo.mdx</include>
+
+## Partials
+
+Any file whose name (or folder) starts with an underscore is excluded from routing, navigation, search, and sitemaps by default — that convention is the natural home for shared snippets:
+
+```text
+docs/
+  _snippets/
+    prerequisites.mdx
+    cli-flags.md
+  guides/
+    quickstart.mdx   ← <include>../_snippets/prerequisites.mdx</include>
+  index.mdx
+```
+
+A partial is a normal Markdown or MDX file. Its front matter is stripped when spliced (the including page's front matter wins), and everything else — callouts, code fences, components, math — renders exactly as it would inline. Partials can include other partials; a circular include is reported as an error.
+
+Relative image references inside a partial keep working: they're rebased onto the including page, so a colocated `![diagram](./diagram.png)` next to the partial resolves wherever the partial is spliced.
+
+Editing a partial while `blume dev` is running reloads every page that includes it.
+
+## Including code files
+
+A target that isn't `.md`/`.mdx` is embedded as a fenced code block, with the language inferred from the extension. Use `lang` to override the language (or to show a Markdown file as source rather than splicing it), and `meta` to pass a fence meta string such as a title:
+
+```mdx
+<include>./examples/config.ts</include>
+
+<include lang="ts" meta='title="blume.config.ts"'>
+  ../blume.config.ts
+</include>
+
+<include lang="mdx">./_snippets/prerequisites.mdx</include>
+```
+
+## Rules and diagnostics
+
+Include statements must occupy their own line — they're block-level, not inline. Statements inside fenced code blocks are left alone, so you can document the syntax itself (like this page does).
+
+Targets must live inside your content root: a file outside it would be silently missing from version snapshots and ejected projects, so `blume` reports `BLUME_INCLUDE_OUTSIDE_ROOT` instead of splicing it. A target that doesn't exist is `BLUME_INCLUDE_NOT_FOUND`, and a loop of includes is `BLUME_INCLUDE_CYCLE` — all three fail `blume build` (pass `--no-strict` to build anyway) and appear in `blume validate`.
+
+Broken links inside a partial are reported against the partial file, not the pages that splice it, so you fix them where they live.
+
+:::note
+Partials are shared across locales and are not translated by `blume translate` — keep partials language-neutral (code, tables, diagrams), or create per-locale partials and include them from each locale's pages.
+:::

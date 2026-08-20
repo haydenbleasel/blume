@@ -578,8 +578,58 @@ export const extractComponentTags = (body: string): string[] => {
  * extracted from the stripped body, but diagnostics point into the raw
  * document — recorded lines must shift by this offset to match it.
  */
-const strippedLineOffset = (raw: string | undefined, body: string): number =>
+export const strippedLineOffset = (
+  raw: string | undefined,
+  body: string
+): number =>
   raw ? Math.max(0, raw.split("\n").length - body.split("\n").length) : 0;
+
+/**
+ * Map links extracted from include-expanded text back to the file and raw
+ * line each expanded line came from, so a broken link inside a partial is
+ * reported against the partial. Links whose origin is the page's own source
+ * carry no `file` override (origins already hold raw-file lines).
+ */
+const remapExpandedLinks = (
+  links: PageLink[],
+  origins: { file: string; line: number }[],
+  sourcePath: string | undefined
+): PageLink[] =>
+  links.map((link) => {
+    const origin = origins[link.line - 1];
+    if (!origin) {
+      return link;
+    }
+    const remapped: PageLink = { ...link, line: origin.line };
+    if (origin.file !== sourcePath) {
+      remapped.file = origin.file;
+    }
+    return remapped;
+  });
+
+/** The entry's transitively included files, when the scan expanded any. */
+const entryIncludes = (entry: SourceEntry): string[] | undefined =>
+  entry.expanded && entry.expanded.includes.length > 0
+    ? entry.expanded.includes
+    : undefined;
+
+/**
+ * Extract an entry's links for validation. When the scan expanded includes,
+ * extraction runs over the expanded text (origins already hold raw-file
+ * lines); otherwise over the stripped body, shifted by the stripped front
+ * matter block's height.
+ */
+const entryLinks = (entry: SourceEntry): PageLink[] =>
+  entry.expanded
+    ? remapExpandedLinks(
+        extractLinks(entry.expanded.text),
+        entry.expanded.origins,
+        entry.sourcePath
+      )
+    : extractLinks(
+        entry.body.text,
+        strippedLineOffset(entry.raw, entry.body.text)
+      );
 
 const deriveTitle = (
   meta: PageMeta,
@@ -821,14 +871,18 @@ export const normalizeEntry = (
   // version-specific for free.
   const { segments, groups, route: versionKey } = mapRoute(routeInput);
   const logicalRoute = versionizeRoute(versionKey, version);
-  const headings = extractHeadings(entry.body.text);
+  // Extraction runs on the include-expanded body when the scan expanded one,
+  // so a partial's headings anchor-index and TOC under every including page
+  // and its components register for the runtime import map.
+  const bodyText = entry.expanded?.text ?? entry.body.text;
+  const headings = extractHeadings(bodyText);
   const { staged } = ctx.source;
 
   const base = {
     body: staged ? { format, text: entry.raw ?? entry.body.text } : undefined,
     collection: staged ? "staged" : undefined,
     componentsUsed:
-      format === "mdx" ? extractComponentTags(entry.body.text) : undefined,
+      format === "mdx" ? extractComponentTags(bodyText) : undefined,
     contentType: meta.type ?? ctx.defaultType,
     custom: parsed.custom,
     description: meta.description,
@@ -838,11 +892,9 @@ export const normalizeEntry = (
     groups,
     headings,
     id: `${ctx.source.name}:${entry.ref}`,
+    includes: entryIncludes(entry),
     lastModified: meta.lastModified ?? entry.lastModified,
-    links: extractLinks(
-      entry.body.text,
-      strippedLineOffset(entry.raw, entry.body.text)
-    ),
+    links: entryLinks(entry),
     meta,
     navPath,
     segments,

@@ -9,7 +9,7 @@ import matter from "../core/frontmatter.ts";
 import { parseHeadingMarkers } from "../core/heading-markers.ts";
 import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
-import { readEntryText } from "../core/sources/read.ts";
+import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode } from "../core/types.ts";
 import { pageFacets } from "./facets.ts";
 
@@ -273,7 +273,7 @@ export const buildSearchDocuments = async (
   return await Promise.all(
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
-      const raw = page ? await readEntryText(project, page) : "";
+      const raw = page ? await readExpandedEntryText(project, page) : "";
       const source = raw ? matter(raw).content : "";
       const visible = applyAudienceVisibility(
         source,
