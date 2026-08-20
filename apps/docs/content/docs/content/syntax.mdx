@@ -285,6 +285,42 @@ config.title;
 ```
 ````
 
+### TypeScript and JavaScript tabs
+
+Mark a `ts` or `tsx` block `ts2js` to render it as a tab pair: your TypeScript alongside an auto-generated JavaScript variant, so you maintain one snippet and readers pick their dialect. The conversion strips type syntax and type-only imports while keeping your formatting, comments, and JSX exactly as written — and tabs sync, so choosing JavaScript once switches every pair on the page. Like diagrams and math, this is an MDX-only feature — in a `.md` file the block renders as a plain TypeScript fence.
+
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+
+````md
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+````
+
+Other fence meta composes: a `title="..."` shows on both tabs, while `{1,4-5}` line ranges apply only to the TypeScript tab (line numbers shift once types are gone). The one exception is `twoslash` — hover types can't carry over to generated code, so a fence marked both stays a plain Twoslash block.
+
 :::note
 Hide the language icons or wrap long lines instead of scrolling with `markdown: { code: { icons: false, wrap: true } }` in `blume.config.ts`.
 :::

@@ -39,12 +39,12 @@ const withoutQuotedAttrs = (raw: string): string =>
 
 // The first bare token is the title (```ts blume.config.ts): a non-empty token
 // that isn't a Shiki line range (`{1,3-5}`), a `key=value` attr, or a reserved
-// `lineNumbers`/`twoslash` keyword.
+// `lineNumbers`/`twoslash`/`ts2js` keyword.
 const isTitleToken = (token: string): boolean => {
   if (token.length === 0 || token.startsWith("{") || token.includes("=")) {
     return false;
   }
-  return token !== "lineNumbers" && token !== "twoslash";
+  return token !== "lineNumbers" && token !== "twoslash" && token !== "ts2js";
 };
 
 const parseTitle = (raw: string | undefined): string | undefined => {

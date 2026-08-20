@@ -35,6 +35,7 @@ import {
   toPackageCommands,
 } from "../src/markdown/package-commands.ts";
 import { packageInstallPlugin } from "../src/markdown/package-install.ts";
+import { ts2jsPlugin } from "../src/markdown/ts2js.ts";
 
 /** Run a plugin visitor and capture the node it replaces, if any. */
 const captureReplacement = (
@@ -232,6 +233,10 @@ describe(codeTitleTransformer, () => {
 
   it("does not treat the twoslash keyword as a title", () => {
     expect(metaAttrs("twoslash").dataTitle).toBeUndefined();
+  });
+
+  it("does not treat the ts2js keyword as a title", () => {
+    expect(metaAttrs("ts2js").dataTitle).toBeUndefined();
   });
 
   it("ignores line ranges and leaves plain blocks bare", () => {
@@ -516,6 +521,163 @@ describe("packageInstallPlugin", () => {
       packageInstallPlugin().code(node, ctx)
     );
     expect(result).toBeUndefined();
+  });
+});
+
+/** Run the ts2js plugin over a fence and capture the replacement, if any. */
+const ts2js = (node: {
+  lang?: string | null;
+  meta?: string | null;
+  value: string;
+}) =>
+  captureReplacement((ctx) =>
+    ts2jsPlugin().code({ type: "code", ...node }, ctx)
+  );
+
+/** The expected TypeScript/JavaScript tab pair. */
+const tabs = (
+  ts: { lang: string; meta: string | null; value: string },
+  js: { lang: string; meta: string | null; value: string }
+) =>
+  jsxFlowElement(
+    "Tabs",
+    // hash off so picking a dialect can't clobber the page hash.
+    [jsxAttribute("hash", "false")],
+    [
+      jsxFlowElement(
+        "Tab",
+        [jsxAttribute("title", "TypeScript")],
+        [codeBlock(ts.lang, ts.value, ts.meta)]
+      ),
+      jsxFlowElement(
+        "Tab",
+        [jsxAttribute("title", "JavaScript")],
+        [codeBlock(js.lang, js.value, js.meta)]
+      ),
+    ]
+  );
+
+describe("ts2jsPlugin", () => {
+  it("expands a marked ts fence into TypeScript/JavaScript tabs", () => {
+    const result = ts2js({
+      lang: "ts",
+      meta: "ts2js",
+      value: 'const greeting: string = "hi";',
+    });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value: 'const greeting: string = "hi";' },
+        { lang: "js", meta: null, value: 'const greeting = "hi";' }
+      )
+    );
+  });
+
+  it("preserves formatting, JSX, and comments; elides type-only imports", () => {
+    const value = [
+      'import { type ReactNode, useState } from "react";',
+      "",
+      "interface Props {",
+      "  children: ReactNode;",
+      "}",
+      "",
+      "// toggles [!code highlight]",
+      "export function Wrap({ children }: Props) {",
+      "  const [open, setOpen] = useState<boolean>(false);",
+      "",
+      "  return <div data-open={open}>{children}</div>;",
+      "}",
+    ].join("\n");
+    const result = ts2js({ lang: "tsx", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "tsx", meta: null, value },
+        {
+          lang: "jsx",
+          meta: null,
+          value: [
+            'import { useState } from "react";',
+            "",
+            "// toggles [!code highlight]",
+            "export function Wrap({ children }) {",
+            "  const [open, setOpen] = useState(false);",
+            "",
+            "  return <div data-open={open}>{children}</div>;",
+            "}",
+          ].join("\n"),
+        }
+      )
+    );
+  });
+
+  it("cleans up the space an erased trailing type operator leaves", () => {
+    const result = ts2js({
+      lang: "ts",
+      meta: "ts2js",
+      value: "const pair = [1, 2] as const;",
+    });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value: "const pair = [1, 2] as const;" },
+        { lang: "js", meta: null, value: "const pair = [1, 2];" }
+      )
+    );
+  });
+
+  it("keeps titles on both tabs but drops line ranges from the JavaScript tab", () => {
+    const result = ts2js({
+      lang: "ts",
+      meta: 'ts2js title="demo.ts" {1-2} lineNumbers',
+      value: "const n: number = 1;",
+    });
+    expect(result).toStrictEqual(
+      tabs(
+        {
+          lang: "ts",
+          meta: 'title="demo.ts" {1-2} lineNumbers',
+          value: "const n: number = 1;",
+        },
+        {
+          lang: "js",
+          meta: 'title="demo.ts" lineNumbers',
+          value: "const n = 1;",
+        }
+      )
+    );
+  });
+
+  it("ignores fences in other languages", () => {
+    expect(ts2js({ lang: "js", meta: "ts2js", value: "1;" })).toBeUndefined();
+  });
+
+  it("ignores unmarked fences and keywords inside quoted attributes", () => {
+    expect(
+      ts2js({ lang: "ts", value: "const x: number = 1;" })
+    ).toBeUndefined();
+    expect(
+      ts2js({
+        lang: "ts",
+        meta: 'title="enable ts2js later"',
+        value: "const x: number = 1;",
+      })
+    ).toBeUndefined();
+  });
+
+  it("leaves twoslash fences alone", () => {
+    expect(
+      ts2js({ lang: "ts", meta: "ts2js twoslash", value: "const x = 1;" })
+    ).toBeUndefined();
+  });
+
+  it("keeps a types-only fence as-is instead of emitting an empty tab", () => {
+    expect(
+      ts2js({ lang: "ts", meta: "ts2js", value: "type Id = string;" })
+    ).toBeUndefined();
+  });
+
+  it("keeps a fence Sucrase can't parse as-is", () => {
+    expect(
+      ts2js({ lang: "ts", meta: "ts2js", value: "const = <<<" })
+    ).toBeUndefined();
   });
 });
 

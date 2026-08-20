@@ -21,6 +21,7 @@ import { packageInstallPlugin } from "./package-install.ts";
 import { tableWrapPlugin } from "./table-wrap.ts";
 import { DEFAULT_CODE_THEMES } from "./themes.ts";
 import type { CodeThemes } from "./themes.ts";
+import { ts2jsPlugin } from "./ts2js.ts";
 
 export type { CodeTheme, CodeThemes } from "./themes.ts";
 
@@ -40,6 +41,7 @@ export { calloutTypeFor } from "./directives.ts";
 export { headingAnchorPlugin } from "./heading-anchors.ts";
 export { mermaidPlugin } from "./mermaid.ts";
 export { packageInstallPlugin } from "./package-install.ts";
+export { ts2jsPlugin } from "./ts2js.ts";
 export { blumeTwoslashTransformer } from "./twoslash.ts";
 
 /** Element type of Satteri's `mdastPlugins`, sourced from the (alpha) core. */
@@ -303,8 +305,9 @@ export type BlumeMdxOptions = BlumeMarkdownOptions;
 
 /**
  * Sätteri MDX processor: Blume's feature set plus the MDAST plugins that target
- * components — `package-install` → package-manager tabs, `:::note` →
- * `<Callout>`, ` ```mermaid ` → a `<blume-mermaid>` element, and block math
+ * components — `package-install` → package-manager tabs, ` ```ts ts2js ` →
+ * TypeScript/JavaScript tabs, `:::note` → `<Callout>`, ` ```mermaid ` → a
+ * `<blume-mermaid>` element, and block math
  * (`$$…$$`) → the `<Math>` component. Used as the `processor` for
  * `@astrojs/mdx` so these apply to `.mdx` only (plain `.md` uses
  * {@link blumeMarkdownProcessor}).
@@ -328,6 +331,7 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
     hastPlugins: blumeHastPlugins(options),
     mdastPlugins: [
       asMdastPlugin(packageInstallPlugin()),
+      asMdastPlugin(ts2jsPlugin()),
       asMdastPlugin(directiveToCalloutPlugin()),
       asMdastPlugin(mermaidPlugin()),
       asMdastPlugin(mathPlugin()),
