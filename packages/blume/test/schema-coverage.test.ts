@@ -189,7 +189,7 @@ describe("pruned Mintlify-compat config fields", () => {
   });
 
   it("rejects removed nested config fields", () => {
-    const cases: Record<string, unknown> = {
+    const cases = {
       navigation: { chromeVariants: [] },
       search: { prompt: "Ask" },
       seo: { metatags: {} },

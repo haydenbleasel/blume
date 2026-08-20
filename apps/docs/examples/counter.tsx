@@ -5,7 +5,7 @@ const Counter = () => {
 
   return (
     <button
-      className="rounded-blume border border-border bg-background px-4 py-2 font-medium text-foreground text-sm transition-colors hover:bg-muted"
+      className="rounded-blume border-border bg-background text-foreground hover:bg-muted border px-4 py-2 text-sm font-medium transition-colors"
       onClick={() => setCount((value) => value + 1)}
       type="button"
     >

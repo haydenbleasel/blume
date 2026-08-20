@@ -75,6 +75,9 @@ export const extractTypeTable = async (
 ): Promise<TypeTableProperty[]> => {
   const { name, path, root = process.cwd(), source } = options;
   const tsModule = await import("typescript");
+  // SAFETY: CJS/ESM interop — the typescript package exposes its API namespace
+  // either directly or under `default` depending on the loader; both are the
+  // same object, which TypeScriptApi models structurally.
   const ts = (tsModule.default ?? tsModule) as TypeScriptApi;
 
   const compilerOptions: CompilerOptions = {

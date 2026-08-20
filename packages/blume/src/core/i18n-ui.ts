@@ -123,6 +123,7 @@ const uiStringsObject = z.object({
     .object({
       all: z.string().default("All"),
       allLanguages: z.string().default("All languages"),
+      allVersions: z.string().default("All versions"),
       askAi: z.string().default("Ask AI"),
       askAiHint: z.string().default("Get an instant answer from AI"),
       button: z.string().default("Search"),
@@ -143,6 +144,18 @@ const uiStringsObject = z.object({
   toc: z
     .object({
       title: z.string().default("On this page"),
+    })
+    .prefault({}),
+  versions: z
+    .object({
+      latest: z.string().default("Go to latest"),
+      // `{version}` is replaced with the archived version's label at render time.
+      notice: z
+        .string()
+        .default(
+          "You're viewing documentation for {version}. It may be out of date."
+        ),
+      switcher: z.string().default("Version"),
     })
     .prefault({}),
 });
@@ -186,6 +199,8 @@ const mergeUI = (base: UIStrings, override?: UIStringsOverride): UIStrings => {
   }
   const out: UIStrings = structuredClone(base);
   for (const [group, values] of Object.entries(override)) {
+    // SAFETY: UIStrings is exactly two levels of string leaves, and the
+    // override schema mirrors its groups, so `group` indexes a string map.
     const target = (out as Record<string, Record<string, string>>)[group];
     if (target && values) {
       Object.assign(target, values);

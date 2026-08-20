@@ -263,12 +263,12 @@ export const runEval = async (options: EvalRunOptions): Promise<EvalResult> => {
     });
   }
 
-  const counts: Record<QuestionStatus, number> = {
+  const counts = {
     error: 0,
     fail: 0,
     pass: 0,
     skip: 0,
-  };
+  } satisfies Record<QuestionStatus, number>;
   for (const result of results) {
     counts[result.status] += 1;
   }

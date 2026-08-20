@@ -1,15 +1,15 @@
 import { describe, expect, it } from "bun:test";
 
+import type { BlumeConfig } from "../src/core/config-input.ts";
 import { applyDeploymentEnv } from "../src/core/deployment-env.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
 
 /** A fully-resolved config with the given deployment overrides applied. */
-const resolve = (deployment: Record<string, unknown> = {}): ResolvedConfig =>
+const resolve = (deployment: BlumeConfig["deployment"] = {}): ResolvedConfig =>
   blumeConfigSchema.parse({ deployment });
 
-const env = (vars: Record<string, string>): NodeJS.ProcessEnv =>
-  vars as NodeJS.ProcessEnv;
+const env = (vars: Record<string, string>): NodeJS.ProcessEnv => vars;
 
 describe("applyDeploymentEnv", () => {
   it("returns the config untouched when no platform env is present", () => {

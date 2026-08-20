@@ -19,10 +19,21 @@ interface Props {
   strings?: UIStrings["search"];
   /** Active locale to filter results to; omitted disables locale filtering. */
   locale?: string;
+  /**
+   * Docs version to filter results to (`""` = the current docs — a meaningful
+   * value, so `null`/omitted is what disables version filtering).
+   */
+  version?: string | null;
 }
 
-const { askEnabled = false, navigation, popularPages, strings, locale } =
-  Astro.props;
+const {
+  askEnabled = false,
+  navigation,
+  popularPages,
+  strings,
+  locale,
+  version = null,
+} = Astro.props;
 // Merge over the English baseline per key (rather than `strings ?? …`) so a
 // partial — or empty `{}` — strings object still resolves every label to a
 // default, matching the pattern PageActions uses for its own dictionary.
@@ -59,13 +70,15 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
   data-i18n-popular={s.popular}
   data-i18n-results={s.results}
   data-locale={locale || undefined}
+  data-version={version ?? undefined}
+  data-versioned={version === null ? undefined : ""}
 >
   {/* The label and shortcut hint wait until `lg`: below it the hamburger and
       inline tab bar share the header row, and a full-width search field would
       press into the language switcher. */}
   <button
     aria-label={s.button}
-    class="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground lg:min-w-48"
+    class="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground lg:min-w-40"
     data-blume-search-open
     type="button"
   >
@@ -135,15 +148,29 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       class="flex items-center justify-between gap-3 border-border border-t px-3 py-2 text-muted-foreground text-xs"
     >
       {
-        locale ? (
-          <label class="flex cursor-pointer select-none items-center gap-1.5">
-            <input
-              class="size-3.5 accent-accent"
-              data-blume-search-all-locales
-              type="checkbox"
-            />
-            {s.allLanguages}
-          </label>
+        locale || version !== null ? (
+          <span class="flex items-center gap-3">
+            {locale && (
+              <label class="flex cursor-pointer select-none items-center gap-1.5">
+                <input
+                  class="size-3.5 accent-accent"
+                  data-blume-search-all-locales
+                  type="checkbox"
+                />
+                {s.allLanguages}
+              </label>
+            )}
+            {version !== null && (
+              <label class="flex cursor-pointer select-none items-center gap-1.5">
+                <input
+                  class="size-3.5 accent-accent"
+                  data-blume-search-all-versions
+                  type="checkbox"
+                />
+                {s.allVersions}
+              </label>
+            )}
+          </span>
         ) : (
           <span />
         )
@@ -176,6 +203,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
   />
 
   <script>
+    import { navigate } from "astro:transitions/client";
     import { chromeIcons as icons } from "../../theme/chrome-icons.ts";
     import { prefixBase } from "../islands/base-path.ts";
     import { escape as escapeHtml } from "html-escaper";
@@ -268,6 +296,41 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       // reader has opted to search across every language instead.
       locale: string | null = null;
       allLocales = false;
+      // The viewed docs version ("" = current; null when versioning is off),
+      // and the opt-in to search across every version.
+      versioned = false;
+      version = "";
+      allVersions = false;
+
+      // Document-level, so it outlives this element unless removed: each
+      // client-router swap rebuilds the header (and this element with it), and
+      // an orphaned copy would keep toggling a dialog that is no longer in the
+      // document. Held as a field so disconnectedCallback can detach it.
+      #onDocumentKeydown = (event: KeyboardEvent) => {
+        if (
+          (event.key === "k" || event.key === "K") &&
+          (event.metaKey || event.ctrlKey) &&
+          // Ctrl+Shift+K is Firefox's web console; a shifted or alted chord
+          // belongs to the browser, not the search dialog.
+          !event.shiftKey &&
+          !event.altKey
+        ) {
+          // ⌘K toggles, mirroring the Ask AI panel's ⌘I: pressing it with
+          // the dialog open must close it, not re-showModal an open dialog
+          // (an InvalidStateError on older engines).
+          event.preventDefault();
+          if (this.dialog.open) {
+            this.dialog.close();
+          } else {
+            this.open();
+          }
+        } else if (event.key === "/" && !this.isField(event.target)) {
+          // "/" stays open-only; the field guard keeps it inert while
+          // typing (including in the search input itself).
+          event.preventDefault();
+          this.open();
+        }
+      };
 
       connectedCallback() {
         this.devOnlyMsg =
@@ -284,6 +347,10 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         this.resultsMsg =
           this.getAttribute("data-i18n-results") || this.resultsMsg;
         this.locale = this.getAttribute("data-locale");
+        // "" (the current docs) is a real version value, so a presence flag —
+        // not the attribute's truthiness — decides whether filtering is on.
+        this.versioned = this.hasAttribute("data-versioned");
+        this.version = this.getAttribute("data-version") ?? "";
         this.dialog = this.querySelector("[data-blume-search-dialog]")!;
         this.input = this.querySelector("[data-blume-search-input]")!;
         this.grid = this.querySelector("[data-blume-search-grid]")!;
@@ -323,6 +390,25 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
           });
         }
 
+        // Per-version filtering mirrors the locale toggle: default to the
+        // viewed version, with a remembered opt-in to search every version.
+        const allVersionsToggle = this.querySelector<HTMLInputElement>(
+          "[data-blume-search-all-versions]"
+        );
+        if (allVersionsToggle) {
+          this.allVersions =
+            readStorage("blume-search-all-versions") === "1";
+          allVersionsToggle.checked = this.allVersions;
+          allVersionsToggle.addEventListener("change", () => {
+            this.allVersions = allVersionsToggle.checked;
+            writeStorage(
+              "blume-search-all-versions",
+              this.allVersions ? "1" : "0"
+            );
+            this.render();
+          });
+        }
+
         // The handlers accept both ⌘ and Ctrl chords; show the right modifier
         // per platform on the button hint and the footer's preview hint.
         const isApple = /mac|iphone|ipad|ipod/iu.test(navigator.platform);
@@ -342,31 +428,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
           () => this.open()
         );
 
-        document.addEventListener("keydown", (event) => {
-          if (
-            (event.key === "k" || event.key === "K") &&
-            (event.metaKey || event.ctrlKey) &&
-            // Ctrl+Shift+K is Firefox's web console; a shifted or alted chord
-            // belongs to the browser, not the search dialog.
-            !event.shiftKey &&
-            !event.altKey
-          ) {
-            // ⌘K toggles, mirroring the Ask AI panel's ⌘I: pressing it with
-            // the dialog open must close it, not re-showModal an open dialog
-            // (an InvalidStateError on older engines).
-            event.preventDefault();
-            if (this.dialog.open) {
-              this.dialog.close();
-            } else {
-              this.open();
-            }
-          } else if (event.key === "/" && !this.isField(event.target)) {
-            // "/" stays open-only; the field guard keeps it inert while
-            // typing (including in the search input itself).
-            event.preventDefault();
-            this.open();
-          }
-        });
+        document.addEventListener("keydown", this.#onDocumentKeydown);
 
         this.input.addEventListener("input", () => this.render());
         this.dialog.addEventListener("keydown", (event) =>
@@ -377,6 +439,10 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
             this.dialog.close();
           }
         });
+      }
+
+      disconnectedCallback() {
+        document.removeEventListener("keydown", this.#onDocumentKeydown);
       }
 
       isField(target: EventTarget | null): boolean {
@@ -483,11 +549,14 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 
         const localeFilter =
           this.locale && !this.allLocales ? this.locale : undefined;
+        const versionFilter =
+          this.versioned && !this.allVersions ? this.version : undefined;
         let result: Awaited<ReturnType<SearchFn>>;
         try {
           result = await this.searchFn(query, {
             locale: localeFilter,
             section: this.activeSection ?? undefined,
+            version: versionFilter,
           });
         } catch {
           // A hosted provider can reject (network error, outage); the results
@@ -636,10 +705,16 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         const excerpt = hit.excerpt
           ? `<span class="mt-0.5 line-clamp-2 text-muted-foreground text-xs">${hit.excerpt}</span>`
           : "";
+        // A cross-version hit (all-versions search) names its version so the
+        // reader knows they're about to leave the docs they're viewing.
+        const versionTag =
+          this.versioned && hit.version !== undefined && hit.version !== this.version
+            ? `<span class="ms-2 inline-block rounded-full bg-muted px-1.5 py-0.5 align-middle text-[0.65rem] text-muted-foreground">${escapeHtml(hit.version || "latest")}</span>`
+            : "";
         el.innerHTML = `
           <span class="mt-0.5 shrink-0 text-muted-foreground">${svg("file")}</span>
           <span class="flex-1">
-            <span class="block truncate font-normal text-foreground text-sm">${hit.title}</span>
+            <span class="block truncate font-normal text-foreground text-sm">${hit.title}${versionTag}</span>
             ${excerpt}
           </span>`;
         const item: Selectable = { el, hit, kind: "link", url: href };
@@ -735,7 +810,11 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
             new CustomEvent("blume:open-ask-ai", { detail: { query } })
           );
         } else if (item.url) {
-          window.location.href = item.url;
+          // Close first so the dialog isn't left open over the transition;
+          // navigate() rides the client router (and falls back to a normal
+          // full load on pages without it).
+          this.dialog.close();
+          navigate(item.url);
         }
       }
 

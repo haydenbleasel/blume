@@ -13,7 +13,6 @@ import type {
   FontsConfig,
   FontValue,
   LocalFontConfig,
-  RemoteFontConfig,
 } from "../theme/fonts.ts";
 import { GOOGLE_FONTS, isFontSlug } from "../theme/fonts.ts";
 import type { OgFont, OgFontFamilies, OgLocalFont } from "./card.ts";
@@ -31,6 +30,23 @@ const CARD_WEIGHTS = [400, 600];
 const absoluteSrc = (root: string, src: string): string =>
   isAbsolute(src) ? src : join(root, src);
 
+/** A concrete numeric face weight (as opposed to a variable-range string). */
+const isNumericWeight = (
+  weight: number | string | undefined
+): weight is number => typeof weight === "number";
+
+/** A variable-range weight spec string, e.g. `"100..900"`. */
+const isRangeWeight = (weight: number | string | undefined): weight is string =>
+  typeof weight === "string";
+
+/** A theme role configured as a font slug / family-name string. */
+const isFontName = (value: FontValue): value is string =>
+  typeof value === "string";
+
+/** An OG font entry that reads a local file (as opposed to a Google family). */
+const isLocalOgFont = (font: OgFont): font is OgLocalFont =>
+  typeof font !== "string" && "src" in font;
+
 /**
  * The weight spec to fetch for a derived Google family: the declared weights
  * the card uses, the declared numeric weights otherwise, a lone variable
@@ -39,9 +55,7 @@ const absoluteSrc = (root: string, src: string): string =>
 const googleWeights = (
   weights: (number | string)[]
 ): number[] | string | undefined => {
-  const numbers = weights.filter(
-    (weight): weight is number => typeof weight === "number"
-  );
+  const numbers = weights.filter(isNumericWeight);
   const used = numbers.filter((weight) => CARD_WEIGHTS.includes(weight));
   if (used.length > 0) {
     return used;
@@ -50,7 +64,7 @@ const googleWeights = (
     return numbers;
   }
   const [first] = weights;
-  return weights.length === 1 && typeof first === "string" ? first : undefined;
+  return weights.length === 1 && isRangeWeight(first) ? first : undefined;
 };
 
 const googleOgFont = (name: string, weights: (number | string)[]): OgFont => {
@@ -60,15 +74,19 @@ const googleOgFont = (name: string, weights: (number | string)[]): OgFont => {
 
 /** Per-variant local entries for the renderer (paths made absolute). */
 const localOgFonts = (font: LocalFontConfig, root: string): OgLocalFont[] =>
-  font.variants.map((variant) => ({
-    name: font.name,
-    src: absoluteSrc(root, variant.src),
-    ...(typeof variant.weight === "number" ? { weight: variant.weight } : {}),
+  font.variants.map((variant) => {
+    const entry: OgLocalFont = {
+      name: font.name,
+      src: absoluteSrc(root, variant.src),
+    };
+    const withWeight: OgLocalFont = isNumericWeight(variant.weight)
+      ? { ...entry, weight: variant.weight }
+      : entry;
     // Takumi's per-face style is normal/italic; oblique falls back to the file.
-    ...(variant.style === "normal" || variant.style === "italic"
-      ? { style: variant.style }
-      : {}),
-  }));
+    return variant.style === "normal" || variant.style === "italic"
+      ? { ...withWeight, style: variant.style }
+      : withWeight;
+  });
 
 /**
  * The card fonts for one theme role, or null when the role can't flow into
@@ -76,7 +94,7 @@ const localOgFonts = (font: LocalFontConfig, root: string): OgLocalFont[] =>
  * `googleFonts` only speaks Google's css2 endpoint).
  */
 const roleFonts = (value: FontValue, root: string): OgFont[] | null => {
-  if (typeof value === "string") {
+  if (isFontName(value)) {
     if (!isFontSlug(value)) {
       return null;
     }
@@ -86,16 +104,15 @@ const roleFonts = (value: FontValue, root: string): OgFont[] | null => {
   if ("variants" in value) {
     return localOgFonts(value, root);
   }
-  const remote = value as RemoteFontConfig;
-  if ((remote.provider ?? "google") !== "google") {
+  if ((value.provider ?? "google") !== "google") {
     return null;
   }
-  return [googleOgFont(remote.name, remote.weights ?? CARD_WEIGHTS)];
+  return [googleOgFont(value.name, value.weights ?? CARD_WEIGHTS)];
 };
 
 /** The family name a theme role registers under. */
 const roleFamily = (value: FontValue): string | null => {
-  if (typeof value === "string") {
+  if (isFontName(value)) {
     return isFontSlug(value) ? GOOGLE_FONTS[value].family : null;
   }
   return value.name;
@@ -136,18 +153,17 @@ export const deriveOgFonts = (
     }
   }
 
-  return {
-    fonts: derived,
-    ...(families.title || families.body ? { families } : {}),
-  };
+  const result: DerivedOgFonts = { fonts: derived };
+  if (families.title || families.body) {
+    result.families = families;
+  }
+  return result;
 };
 
 /** Explicit `seo.og.fonts` with local `src` paths resolved to absolute. */
 export const resolveOgFontSources = (fonts: OgFont[], root: string): OgFont[] =>
   fonts.map((font) =>
-    typeof font !== "string" && "src" in font
-      ? { ...font, src: absoluteSrc(root, font.src) }
-      : font
+    isLocalOgFont(font) ? { ...font, src: absoluteSrc(root, font.src) } : font
   );
 
 /**
@@ -185,14 +201,14 @@ export const missingFontFiles = (
 ): string[] => {
   const sources: string[] = [];
   for (const value of Object.values(options.themeFonts ?? {})) {
-    if (typeof value !== "string" && "variants" in value) {
+    if (!isFontName(value) && "variants" in value) {
       sources.push(
         ...value.variants.map((variant) => absoluteSrc(root, variant.src))
       );
     }
   }
   for (const font of options.ogFonts) {
-    if (typeof font !== "string" && "src" in font) {
+    if (isLocalOgFont(font)) {
       sources.push(absoluteSrc(root, font.src));
     }
   }

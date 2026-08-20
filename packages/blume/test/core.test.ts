@@ -19,7 +19,12 @@ import { buildContentGraph } from "../src/core/graph.ts";
 import { buildManifest } from "../src/core/manifest.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
-import type { PageRecord, ProjectContext } from "../src/core/types.ts";
+import type { BlumeConfigInput, PageMetaInput } from "../src/core/schema.ts";
+import type {
+  ContentGraph,
+  PageRecord,
+  ProjectContext,
+} from "../src/core/types.ts";
 import { buildRobots } from "../src/deploy/robots.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
 import { buildSitemapFiles } from "../src/deploy/sitemap.ts";
@@ -57,6 +62,8 @@ const manyPages = (count: number): PageRecord[] => {
     sourcePath: `/abs/p${index}`,
     title: `P${index}`,
     translationKey: `/p/${index}`,
+    version: "",
+    versionKey: `/p/${index}`,
   }));
 };
 
@@ -78,6 +85,8 @@ const makePage = (
   source: { name: "filesystem", ref: over.id },
   sourcePath: `/abs/${over.id}`,
   translationKey: over.route,
+  version: "",
+  versionKey: over.route,
   ...over,
 });
 
@@ -85,7 +94,7 @@ const postPage = (
   id: string,
   route: string,
   type: string,
-  meta: Record<string, unknown>
+  meta: PageMetaInput
 ): PageRecord =>
   makePage({
     contentType: type,
@@ -98,23 +107,31 @@ const postPage = (
 
 const makeProject = (
   pages: PageRecord[],
-  config: Record<string, unknown> = {},
+  config: BlumeConfigInput = {},
   context: Partial<ProjectContext> = {}
-): BlumeProject =>
-  ({
+): BlumeProject => {
+  const project: Partial<BlumeProject> = {
     config: blumeConfigSchema.parse({
       deployment: { site: "https://example.com" },
       title: "Docs",
       ...config,
     }),
-    context: { pagesRoot: null, ...context },
-    graph: { pages },
-  }) as unknown as BlumeProject;
+    // SAFETY: the deploy/seo builders under test read only `pagesRoot` plus
+    // whatever context fields the caller supplies.
+    context: { pagesRoot: null, ...context } as ProjectContext,
+    // SAFETY: the deploy/seo builders under test read only `graph.pages`.
+    graph: { pages } as ContentGraph,
+  };
+  // SAFETY: the builders under test touch only config, context, and graph.
+  return project as BlumeProject;
+};
 
-const graphOf = (
-  data: Record<string, unknown> | null
-): Record<string, unknown>[] =>
-  (data?.["@graph"] ?? []) as Record<string, unknown>[];
+/** One node of the JSON-LD `@graph` that `buildStructuredData` emits. */
+type JsonLdNode = NonNullable<ReturnType<typeof buildStructuredData>>;
+
+const graphOf = (data: ReturnType<typeof buildStructuredData>): JsonLdNode[] =>
+  // SAFETY: buildStructuredData always emits `@graph` as an array of nodes.
+  (data?.["@graph"] ?? []) as JsonLdNode[];
 
 describe("config schema", () => {
   it("applies defaults for an empty config", () => {
@@ -220,6 +237,8 @@ const localFamily = (name: string) => ({
 describe("astro config template", () => {
   it("emits dual light and dark Shiki themes", () => {
     const config = blumeConfigSchema.parse({});
+    // SAFETY: astroConfigTemplate reads only root, outDir, and pagesRoot from
+    // the context.
     const context = {
       outDir: "/r/.blume",
       pagesRoot: null,
@@ -250,6 +269,8 @@ describe("astro config template", () => {
     const config = blumeConfigSchema.parse({
       markdown: { codeBlocks: { theme: { dark: "vesper" } } },
     });
+    // SAFETY: astroConfigTemplate reads only root, outDir, and pagesRoot from
+    // the context.
     const context = {
       outDir: "/r/.blume",
       pagesRoot: null,
@@ -296,6 +317,8 @@ describe("astro config template", () => {
     const config = blumeConfigSchema.parse({
       markdown: { codeBlocks: { theme: { dark: customDark } } },
     });
+    // SAFETY: astroConfigTemplate reads only root, outDir, and pagesRoot from
+    // the context.
     const context = {
       outDir: "/r/.blume",
       pagesRoot: null,
@@ -322,6 +345,8 @@ describe("astro config template", () => {
     expect(output).toContain('"codeThemes":{"dark":{"colors"');
   });
 
+  // SAFETY: astroConfigTemplate reads only root, outDir, and pagesRoot from
+  // the context.
   const context = {
     outDir: "/r/.blume",
     pagesRoot: null,
@@ -349,8 +374,9 @@ describe("astro config template", () => {
       'import { defineConfig, fontProviders } from "astro/config";'
     );
     expect(output).toContain("provider: fontProviders.google()");
-    expect(output).toContain('name: "Inter Tight"');
+    // Body and display both default to Inter, deduped into a single entry.
     expect(output).toContain('name: "Inter"');
+    expect(output).not.toContain('name: "Inter Tight"');
     expect(output).toContain('cssVariable: "--blume-ff-ibm-plex-mono"');
   });
 
@@ -359,7 +385,7 @@ describe("astro config template", () => {
       blumeConfigSchema.parse({ theme: { fonts: { body: "geist" } } })
     );
     expect(output).toContain('name: "Geist"');
-    expect(output).toContain('name: "Inter Tight"');
+    expect(output).toContain('name: "Inter"');
     expect(output).toContain('cssVariable: "--blume-ff-ibm-plex-mono"');
   });
 
@@ -751,6 +777,7 @@ describe("content graph", () => {
 });
 
 describe("manifest indexability", () => {
+  // SAFETY: buildManifest reads only contentRoot and root from the context.
   const context = { contentRoot: "/c", root: "/r" } as ProjectContext;
 
   it("indexes pages by default and respects search.exclude", () => {
@@ -877,6 +904,7 @@ describe("rss feeds", () => {
       postPage("Tom & Jerry", "/blog/post", "blog", { date: "2026-01-01" }),
     ];
     const [feed] = buildRssFeeds(makeProject(pages));
+    // SAFETY: the single blog post above guarantees one feed is built.
     const xml = renderRssFeed(feed as NonNullable<typeof feed>);
     expect(xml).toContain('<rss version="2.0"');
     expect(xml).toContain("<title>Tom &amp; Jerry</title>");
@@ -1243,9 +1271,14 @@ describe("robots.txt", () => {
 
 const markdownArtifact = (
   manifest: ReturnType<typeof buildAgentReadability>
-): Record<string, unknown> | undefined =>
-  (manifest?.artifacts as { markdown?: Record<string, unknown> } | undefined)
-    ?.markdown;
+): { contentNegotiation?: string; pattern?: string } | undefined =>
+  // SAFETY: buildAgentReadability always writes `artifacts.markdown` with an
+  // optional contentNegotiation claim and a pattern URL.
+  (
+    manifest?.artifacts as
+      | { markdown?: { contentNegotiation?: string; pattern?: string } }
+      | undefined
+  )?.markdown;
 
 describe("agent-readability.json", () => {
   it("indexes the Markdown mirror and sitemap with absolute URLs", () => {
@@ -1410,7 +1443,13 @@ describe("agent-readability.json", () => {
     const manifest = buildAgentReadability(
       makeProject([], { ai: { llmsTxt: true }, deployment: {} })
     );
-    const artifacts = (manifest?.artifacts ?? {}) as Record<string, unknown>;
+    // SAFETY: only these artifact keys are asserted below; buildAgentReadability
+    // emits them as strings (llmsTxt, sitemap) and a pattern object (markdown).
+    const artifacts = (manifest?.artifacts ?? {}) as {
+      llmsTxt?: string;
+      markdown?: { pattern?: string };
+      sitemap?: string;
+    };
     expect(manifest?.site).toBeNull();
     expect(artifacts).toMatchObject({
       llmsTxt: "/llms.txt",

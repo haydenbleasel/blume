@@ -10,19 +10,19 @@ import { duration, money, seconds } from "../cli/report-format.ts";
 import { countBySeverity } from "../core/diagnostics.ts";
 import type { EvalResult, QuestionResult, QuestionStatus } from "./run.ts";
 
-const GLYPH: Record<QuestionStatus, string> = {
+const GLYPH = {
   error: "!",
   fail: "✖",
   pass: "✔",
   skip: "⊘",
-};
+} satisfies Record<QuestionStatus, string>;
 
-const STATUS_COLOR: Record<QuestionStatus, ColorFunction> = {
+const STATUS_COLOR = {
   error: colors.yellow,
   fail: colors.red,
   pass: colors.green,
   skip: colors.dim,
-};
+} satisfies Record<QuestionStatus, ColorFunction>;
 
 /** Longest id gets the room; everything shorter aligns to it. */
 const ID_PAD = 28;

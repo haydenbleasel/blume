@@ -23,7 +23,7 @@ import { inputValue, validationSchema } from "./playground-schema.ts";
  */
 
 /** The protocols a docs page can actually open a live connection to. */
-const LIVE_PROTOCOLS: Record<string, true> = { ws: true };
+const LIVE_PROTOCOLS = { ws: true } satisfies Record<string, true>;
 
 /**
  * Channel parameters as composer inputs. `channelParameters` has already
@@ -96,7 +96,7 @@ export const messageModel = (args: {
 }): MessageModel => ({
   action: args.action,
   address: args.address,
-  connectable: LIVE_PROTOCOLS[args.protocol ?? ""] === true,
+  connectable: Object.hasOwn(LIVE_PROTOCOLS, args.protocol ?? ""),
   params: messageParams(args.parameters, args.schemas),
   payload: messagePayload(args.messages[0]?.message, args.schemas),
   protocol: args.protocol,

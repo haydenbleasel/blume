@@ -6,9 +6,20 @@ import { enrichDiagnostic } from "../core/diagnostics.ts";
 import type { Diagnostic } from "../core/types.ts";
 import { markdownVariantUrl, prefersMarkdown } from "./markdown-negotiation.ts";
 
+/** The `{ type: "error" }` payload Vite's browser overlay renders. */
+interface OverlayErrorPayload {
+  err: {
+    id?: string;
+    message: string;
+    plugin: string;
+    stack: string;
+  };
+  type: "error";
+}
+
 /** The dev server's HMR channel — either `.ws` (Vite ≤5) or `.hot` (Vite 6+). */
 interface OverlayChannel {
-  send: (payload: unknown) => void;
+  send: (payload: OverlayErrorPayload) => void;
 }
 interface OverlayServer {
   hot?: OverlayChannel;
@@ -164,7 +175,7 @@ export const blumeIntegration = (
     "astro:server:setup": ({ server }) => {
       // Keep a handle on the dev server so Blume diagnostics can be pushed to
       // its browser error overlay (see `showBlumeErrorOverlay`).
-      overlayServer = server as unknown as OverlayServer;
+      overlayServer = server;
       // Prepend so the rewrite happens before Astro's own request handler,
       // letting the rewritten URL resolve to the `.md` endpoint.
       server.middlewares.stack.unshift({

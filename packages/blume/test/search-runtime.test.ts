@@ -28,9 +28,17 @@ interface AlgoliaSearchParams {
     query: string;
   }[];
 }
+/** A hosted search record as the mock responses hand it back to a loader. */
+interface HostedRecord {
+  content: string;
+  description: string;
+  title: string;
+  url: string;
+  version?: string;
+}
 interface SaveObjectsArgs {
   indexName: string;
-  objects: Record<string, unknown>[];
+  objects: { objectID: string }[];
 }
 interface TypesenseSearchParams {
   filter_by?: string;
@@ -38,33 +46,79 @@ interface TypesenseSearchParams {
   q: string;
   query_by: string;
 }
+interface TypesenseCollectionSchema {
+  fields: { facet?: boolean; name: string; optional?: boolean; type: string }[];
+  name: string;
+}
 interface OramaCloudSearchParams {
   limit: number;
   term: string;
   where?: Record<string, string>;
 }
+/** The subset of an uploaded sync record the assertions read back. */
+interface SyncedRecord {
+  content: string;
+  description: string;
+  id: string;
+  locale?: string;
+  tag?: string;
+  title: string;
+  url: string;
+  version?: string;
+}
+/** Mutable holder a mock implementation writes the captured call into. */
+interface Captured<T> {
+  value?: T;
+}
+interface CapturedRequest {
+  body?: string;
+  url?: Parameters<typeof globalThis.fetch>[0];
+}
+interface CapturedOramaSync {
+  deployed?: boolean;
+  snapshot?: SyncedRecord[];
+}
+interface CapturedTypesenseSync {
+  created?: boolean;
+  deleted?: boolean;
+  docs?: SyncedRecord[];
+  options?: { action: string };
+}
 
 // --- Mutable SDK behaviors the module mocks delegate to (set per test) ---
-let algoliaSearch: (params: AlgoliaSearchParams) => Promise<unknown>;
-let algoliaSave: (args: SaveObjectsArgs) => Promise<unknown>;
-let oramaCloudSearch: (query: OramaCloudSearchParams) => Promise<unknown>;
-let cloudSnapshot: (data: unknown[]) => Promise<boolean>;
+let algoliaSearch: (
+  params: AlgoliaSearchParams
+) => Promise<{ results: { hits: HostedRecord[] }[] }>;
+let algoliaSave: (args: SaveObjectsArgs) => Promise<void>;
+let oramaCloudSearch: (
+  query: OramaCloudSearchParams
+) => Promise<{ hits: { document: HostedRecord }[] }>;
+let cloudSnapshot: (data: SyncedRecord[]) => Promise<boolean>;
 let cloudDeploy: () => Promise<boolean>;
-let typesenseSearch: (params: TypesenseSearchParams) => Promise<unknown>;
-let typesenseRetrieve: () => Promise<unknown>;
-let typesenseCreate: (schema: unknown) => Promise<unknown>;
+let typesenseSearch: (
+  params: TypesenseSearchParams
+) => Promise<{ hits: { document: HostedRecord }[] }>;
+let typesenseRetrieve: () => Promise<Record<string, never>>;
+let typesenseCreate: (
+  schema: TypesenseCollectionSchema
+) => Promise<TypesenseCollectionSchema>;
 let typesenseImport: (
-  docs: Record<string, unknown>[],
+  docs: SyncedRecord[],
   options: { action: string }
-) => Promise<unknown>;
-let typesenseDelete: () => Promise<unknown>;
+) => Promise<{ success: boolean }[]>;
+let typesenseDelete: () => Promise<Record<string, never>>;
 
 // Turn an object factory into a `new`-able constructor — the SDKs are used as
-// `new Client(...)` etc., and a constructor that returns an object yields it.
-const asConstructor = <T>(make: () => T): new () => T =>
-  function build(this: unknown) {
+// `new Client(...)` etc., and a function invoked with `new` that returns an
+// object yields that object.
+const asConstructor = <T extends object>(make: () => T): new () => T => {
+  const construct = function construct() {
     return make();
-  } as unknown as new () => T;
+  };
+  // SAFETY: `new construct()` returns the object `make` builds, so the
+  // callable behaves exactly as the `new () => T` constructor it is used as.
+  return construct as never;
+};
 
 mock.module("algoliasearch/lite", () => ({
   liteClient: () => ({
@@ -80,7 +134,7 @@ mock.module("@oramacloud/client", () => ({
   CloudManager: asConstructor(() => ({
     index: () => ({
       deploy: () => cloudDeploy(),
-      snapshot: (data: unknown[]) => cloudSnapshot(data),
+      snapshot: (data: SyncedRecord[]) => cloudSnapshot(data),
     }),
   })),
   OramaClient: asConstructor(() => ({
@@ -90,14 +144,14 @@ mock.module("@oramacloud/client", () => ({
 // Hoisted out of the mock factory so its inner methods don't nest past the
 // four-level depth limit (mock.module → constructor → collections → documents).
 const typesenseDocuments = () => ({
-  import: (docs: Record<string, unknown>[], options: { action: string }) =>
+  import: (docs: SyncedRecord[], options: { action: string }) =>
     typesenseImport(docs, options),
   search: (params: TypesenseSearchParams) => typesenseSearch(params),
 });
 mock.module("typesense", () => ({
   Client: asConstructor(() => ({
     collections: (_name?: string) => ({
-      create: (schema: unknown) => typesenseCreate(schema),
+      create: (schema: TypesenseCollectionSchema) => typesenseCreate(schema),
       delete: () => typesenseDelete(),
       documents: typesenseDocuments,
       retrieve: () => typesenseRetrieve(),
@@ -111,8 +165,12 @@ const INDEX = [
 ];
 
 let originalFetch: typeof globalThis.fetch;
-const stubFetch = (impl: (...args: unknown[]) => Promise<Response>): void => {
-  globalThis.fetch = impl as unknown as typeof globalThis.fetch;
+const stubFetch = (
+  impl: (...args: Parameters<typeof globalThis.fetch>) => Promise<Response>
+): void => {
+  // SAFETY: the loaders under test only call fetch; Bun's extra fetch statics
+  // (like preconnect) are never touched.
+  globalThis.fetch = impl as typeof globalThis.fetch;
 };
 
 beforeAll(() => {
@@ -145,10 +203,10 @@ describe("client loaders", () => {
   });
 
   it("endpoint posts the query and returns the server's hits", async () => {
-    const captured: { body?: string; url?: unknown } = {};
-    stubFetch((url: unknown, init: unknown) => {
-      const request = init as { body?: string };
-      captured.body = request?.body;
+    const captured: CapturedRequest = {};
+    stubFetch((url, init) => {
+      // SAFETY: the endpoint loader always POSTs a JSON string body.
+      captured.body = init?.body as string;
       captured.url = url;
       return Promise.resolve(
         Response.json([{ excerpt: "e", title: "X", url: "/x" }])
@@ -163,12 +221,31 @@ describe("client loaders", () => {
   });
 
   it("algolia queries the configured index and maps hits", async () => {
-    const captured: { value?: AlgoliaSearchParams } = {};
+    const captured: Captured<AlgoliaSearchParams> = {};
     algoliaSearch = (params) => {
       captured.value = params;
       return Promise.resolve({
         results: [
-          { hits: [{ content: "c", description: "d", title: "A", url: "/a" }] },
+          {
+            hits: [
+              // Current docs upload as version "current"; archived keep their
+              // id; pre-versioning records have none.
+              {
+                content: "c",
+                description: "d",
+                title: "A",
+                url: "/a",
+                version: "current",
+              },
+              {
+                content: "c2",
+                description: "d2",
+                title: "B",
+                url: "/b",
+                version: "v1.0",
+              },
+            ],
+          },
         ],
       });
     };
@@ -185,6 +262,10 @@ describe("client loaders", () => {
     expect(captured.value?.requests[0]?.facetFilters).toBeUndefined();
     expect(hits[0]?.url).toBe("/a");
     expect(hits[0]?.excerpt).toBe("d");
+    // The record's version maps into the hit contract ("" = current) so the
+    // cross-version badge works for hosted results too.
+    expect(hits[0]?.version).toBe("");
+    expect(hits[1]?.version).toBe("v1.0");
 
     await search("q", { locale: "fr" });
     expect(captured.value?.requests[0]?.facetFilters).toStrictEqual([
@@ -193,9 +274,7 @@ describe("client loaders", () => {
   });
 
   it("orama-cloud queries the hosted index", async () => {
-    const captured: {
-      value?: { limit: number; term: string; where?: Record<string, string> };
-    } = {};
+    const captured: Captured<OramaCloudSearchParams> = {};
     oramaCloudSearch = (query) => {
       captured.value = query;
       return Promise.resolve({
@@ -220,13 +299,28 @@ describe("client loaders", () => {
   });
 
   it("typesense searches the collection by the indexed fields", async () => {
-    const captured: { value?: TypesenseSearchParams } = {};
+    const captured: Captured<TypesenseSearchParams> = {};
     typesenseSearch = (params) => {
       captured.value = params;
       return Promise.resolve({
         hits: [
           {
-            document: { content: "c", description: "d", title: "T", url: "/t" },
+            document: {
+              content: "c",
+              description: "d",
+              title: "T",
+              url: "/t",
+              version: "current",
+            },
+          },
+          {
+            document: {
+              content: "c2",
+              description: "d2",
+              title: "T1",
+              url: "/v1.0/t",
+              version: "v1.0",
+            },
           },
         ],
       });
@@ -244,6 +338,10 @@ describe("client loaders", () => {
     // No locale option means no filter — every language matches.
     expect(captured.value?.filter_by).toBeUndefined();
     expect(result.hits[0]?.url).toBe("/t");
+    // The document's version maps into the hit contract ("" = current) so the
+    // cross-version badge works for hosted results too.
+    expect(result.hits[0]?.version).toBe("");
+    expect(result.hits[1]?.version).toBe("v1.0");
 
     await search("q", { locale: "fr" });
     expect(captured.value?.filter_by).toBe("locale:=fr");
@@ -275,12 +373,13 @@ describe("hosted sync uploads", () => {
       tag: "guides",
       title: "A",
       url: "/a",
+      version: "current",
     },
   ];
 
   it("algolia uploads objects keyed by objectID", async () => {
     process.env.ALGOLIA_ADMIN_API_KEY = "admin";
-    const captured: { value?: SaveObjectsArgs } = {};
+    const captured: Captured<SaveObjectsArgs> = {};
     algoliaSave = (args) => {
       captured.value = args;
       return Promise.resolve();
@@ -293,7 +392,7 @@ describe("hosted sync uploads", () => {
 
   it("orama-cloud snapshots the records and deploys", async () => {
     process.env.ORAMA_PRIVATE_API_KEY = "private";
-    const captured: { snapshot?: unknown[]; deployed?: boolean } = {};
+    const captured: CapturedOramaSync = {};
     cloudSnapshot = (data) => {
       captured.snapshot = data;
       return Promise.resolve(true);
@@ -305,19 +404,14 @@ describe("hosted sync uploads", () => {
     const { syncOramaCloud } =
       await import("../src/search/sync/orama-cloud.ts");
     await syncOramaCloud(records, { indexId: "idx" });
-    const first = captured.snapshot?.[0] as { id: string } | undefined;
+    const first = captured.snapshot?.[0];
     expect(first?.id).toBe("/a");
     expect(captured.deployed).toBe(true);
   });
 
   it("typesense creates the collection then upserts documents", async () => {
     process.env.TYPESENSE_ADMIN_API_KEY = "admin";
-    const captured: {
-      created?: boolean;
-      deleted?: boolean;
-      docs?: Record<string, unknown>[];
-      options?: { action: string };
-    } = {};
+    const captured: CapturedTypesenseSync = {};
     typesenseRetrieve = () => Promise.reject(new Error("not found"));
     typesenseDelete = () => {
       captured.deleted = true;
@@ -343,7 +437,7 @@ describe("hosted sync uploads", () => {
 
   it("typesense drops an existing collection before recreating it", async () => {
     process.env.TYPESENSE_ADMIN_API_KEY = "admin";
-    const captured: { created?: boolean; deleted?: boolean } = {};
+    const captured: CapturedTypesenseSync = {};
     typesenseRetrieve = () => Promise.resolve({});
     typesenseDelete = () => {
       captured.deleted = true;
@@ -363,21 +457,50 @@ describe("hosted sync uploads", () => {
 
   it("the dispatcher runs the provider sync and reports success", async () => {
     process.env.ALGOLIA_ADMIN_API_KEY = "admin";
-    const captured: { value?: SaveObjectsArgs } = {};
+    const captured: Captured<SaveObjectsArgs> = {};
     algoliaSave = (args) => {
       captured.value = args;
       return Promise.resolve();
     };
-    const project = {
-      config: blumeConfigSchema.parse({
-        search: {
-          algolia: { appId: "app", indexName: "docs", searchApiKey: "k" },
-          provider: "algolia",
-        },
-      }),
-      graph: { pages: [] },
-      manifest: { routes: [] },
-    } as unknown as BlumeProject;
+    const config = blumeConfigSchema.parse({
+      search: {
+        algolia: { appId: "app", indexName: "docs", searchApiKey: "k" },
+        provider: "algolia",
+      },
+    });
+    const project: BlumeProject = {
+      config,
+      context: {
+        componentsFile: null,
+        configFile: null,
+        contentRoot: "/tmp/docs",
+        outDir: "/tmp/.blume",
+        pagesRoot: null,
+        root: "/tmp",
+        themeFile: null,
+      },
+      diagnostics: [],
+      droppedPages: 0,
+      graph: {
+        diagnostics: [],
+        navigation: { featured: [], selectors: [], sidebar: [], tabs: [] },
+        navigationByLocale: {},
+        navigationByVersion: {},
+        pages: [],
+        routes: new Map(),
+      },
+      manifest: {
+        blumeVersion: "0.0.0",
+        contentRoot: "/tmp/docs",
+        output: config.deployment.output,
+        projectRoot: "/tmp",
+        routes: [],
+        version: 1,
+      },
+      mode: "build",
+      sources: [],
+      themeFontsConfigured: false,
+    };
     const messages: string[] = [];
     await syncSearchProvider(project, {
       start: (message) => messages.push(message),

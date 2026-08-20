@@ -32,6 +32,13 @@ const tool = (tools: WebMcpTool[], name: string): WebMcpTool => {
 const okResponse = (body: string): Response =>
   new Response(body, { status: 200 });
 
+/** Wrap a URL-only handler as the global `fetch` type the tools expect. */
+const asFetch = (handler: (url: string) => Promise<Response>): typeof fetch =>
+  // SAFETY: the tools invoke fetchFn with a single string URL and only read
+  // the Response; the extra statics on Bun's fetch type (e.g. `preconnect`)
+  // are never touched.
+  handler as typeof fetch;
+
 const hitSearch: SearchFn = () =>
   Promise.resolve({
     hits: [
@@ -136,10 +143,10 @@ describe("buildWebMcpTools", () => {
 
   it("get_page fetches the based .md mirror and maps the home route", async () => {
     const fetched: string[] = [];
-    const fetchFn = ((url: string) => {
+    const fetchFn = asFetch((url) => {
       fetched.push(url);
       return Promise.resolve(okResponse(`# page at ${url}\n`));
-    }) as unknown as typeof fetch;
+    });
     const getPage = tool(toolsWith({ fetchFn }), "get_page");
 
     const page = await getPage.execute({ route: "/quickstart/" });
@@ -151,10 +158,9 @@ describe("buildWebMcpTools", () => {
     expect(relative.isError).toBe(true);
     const missing = tool(
       toolsWith({
-        fetchFn: (() =>
-          Promise.resolve(
-            new Response("nope", { status: 404 })
-          )) as unknown as typeof fetch,
+        fetchFn: asFetch(() =>
+          Promise.resolve(new Response("nope", { status: 404 }))
+        ),
       }),
       "get_page"
     );
@@ -162,8 +168,7 @@ describe("buildWebMcpTools", () => {
     expect(gone.isError).toBe(true);
     const offline = tool(
       toolsWith({
-        fetchFn: (() =>
-          Promise.reject(new Error("offline"))) as unknown as typeof fetch,
+        fetchFn: asFetch(() => Promise.reject(new Error("offline"))),
       }),
       "get_page"
     );
@@ -173,10 +178,10 @@ describe("buildWebMcpTools", () => {
 
   it("list_pages returns llms.txt from the deployment base", async () => {
     const fetched: string[] = [];
-    const fetchFn = ((url: string) => {
+    const fetchFn = asFetch((url) => {
       fetched.push(url);
       return Promise.resolve(okResponse("# Docs\n- [A](/a)\n"));
-    }) as unknown as typeof fetch;
+    });
     const list = tool(toolsWith({ fetchFn }), "list_pages");
     const result = await list.execute({});
     expect(fetched).toEqual(["/base/llms.txt"]);
@@ -184,10 +189,9 @@ describe("buildWebMcpTools", () => {
 
     const missing = tool(
       toolsWith({
-        fetchFn: (() =>
-          Promise.resolve(
-            new Response("", { status: 404 })
-          )) as unknown as typeof fetch,
+        fetchFn: asFetch(() =>
+          Promise.resolve(new Response("", { status: 404 }))
+        ),
       }),
       "list_pages"
     );
@@ -195,8 +199,7 @@ describe("buildWebMcpTools", () => {
     expect(gone.isError).toBe(true);
     const offline = tool(
       toolsWith({
-        fetchFn: (() =>
-          Promise.reject(new Error("offline"))) as unknown as typeof fetch,
+        fetchFn: asFetch(() => Promise.reject(new Error("offline"))),
       }),
       "list_pages"
     );

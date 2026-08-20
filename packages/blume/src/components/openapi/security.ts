@@ -20,7 +20,6 @@ export interface SecuritySchemeLike {
   scheme?: string;
   /** `http` bearer: a hint at the token format, e.g. `JWT`. */
   bearerFormat?: string;
-  [key: string]: unknown;
 }
 
 /** One security requirement: scheme name -> required scopes (empty outside OAuth). */
@@ -95,10 +94,19 @@ export interface AsyncApiSecurityEntryLike {
   $ref?: string;
   type?: string;
   scopes?: unknown;
-  [key: string]: unknown;
 }
 
 const SECURITY_SCHEME_REF = /^#\/components\/securitySchemes\/(?<name>[^/]+)$/u;
+
+/** Runtime string check for spec fields a hand-written document may corrupt. */
+const isSpecString = (value: string | undefined): value is string =>
+  typeof value === "string";
+
+/** Parsed YAML can put anything in a security list; keep only real objects. */
+const isSecurityEntryObject = (
+  entry: AsyncApiSecurityEntryLike
+): entry is AsyncApiSecurityEntryLike =>
+  typeof entry === "object" && entry !== null;
 
 /** Decode a JSON-pointer token: `kafka~1sasl` -> `kafka/sasl`. */
 const unescapePointer = (token: string): string =>
@@ -117,20 +125,18 @@ export const resolveAsyncApiSecurity = (
 ): OperationSecurity => {
   const alternatives: ResolvedScheme[][] = [];
   for (const entry of entries) {
-    if (typeof entry !== "object" || entry === null) {
+    if (!isSecurityEntryObject(entry)) {
       continue;
     }
     const pointer = SECURITY_SCHEME_REF.exec(entry.$ref ?? "")?.groups?.name;
     const name = pointer === undefined ? undefined : unescapePointer(pointer);
-    const inline = name === undefined && typeof entry.$ref !== "string";
-    const scheme = inline
-      ? (entry as SecuritySchemeLike)
-      : schemes?.[name ?? ""];
+    const inline = name === undefined && !isSpecString(entry.$ref);
+    const scheme = inline ? entry : schemes?.[name ?? ""];
     alternatives.push([
       {
         key:
           name ??
-          (typeof entry.type === "string" && entry.type !== ""
+          (isSpecString(entry.type) && entry.type !== ""
             ? entry.type
             : "security"),
         scheme,
@@ -151,21 +157,21 @@ export const resolveAsyncApiSecurity = (
  * OpenAPI's types and the broker-auth types AsyncAPI adds; `http` is handled
  * separately (its label depends on the scheme/bearerFormat fields).
  */
-const TYPE_LABELS: Record<string, string> = {
-  X509: "X.509 certificate",
-  apiKey: "API key",
-  asymmetricEncryption: "Asymmetric encryption",
-  gssapi: "SASL/GSSAPI",
-  httpApiKey: "API key",
-  mutualTLS: "Mutual TLS",
-  oauth2: "OAuth2 access token",
-  openIdConnect: "OpenID Connect token",
-  plain: "SASL/PLAIN",
-  scramSha256: "SASL/SCRAM-SHA-256",
-  scramSha512: "SASL/SCRAM-SHA-512",
-  symmetricEncryption: "Symmetric encryption",
-  userPassword: "Username & password",
-};
+const TYPE_LABELS = new Map<string, string>([
+  ["X509", "X.509 certificate"],
+  ["apiKey", "API key"],
+  ["asymmetricEncryption", "Asymmetric encryption"],
+  ["gssapi", "SASL/GSSAPI"],
+  ["httpApiKey", "API key"],
+  ["mutualTLS", "Mutual TLS"],
+  ["oauth2", "OAuth2 access token"],
+  ["openIdConnect", "OpenID Connect token"],
+  ["plain", "SASL/PLAIN"],
+  ["scramSha256", "SASL/SCRAM-SHA-256"],
+  ["scramSha512", "SASL/SCRAM-SHA-512"],
+  ["symmetricEncryption", "Symmetric encryption"],
+  ["userPassword", "Username & password"],
+]);
 
 /** A short human label for a scheme row, e.g. `Bearer token` or `API key`. */
 export const schemeLabel = (resolved: ResolvedScheme): string => {
@@ -183,7 +189,7 @@ export const schemeLabel = (resolved: ResolvedScheme): string => {
     return kind ? `HTTP ${kind}` : "HTTP auth";
   }
   // Unknown scheme ref: the component name is the best label available.
-  return TYPE_LABELS[scheme?.type ?? ""] ?? resolved.key;
+  return TYPE_LABELS.get(scheme?.type ?? "") ?? resolved.key;
 };
 
 /**

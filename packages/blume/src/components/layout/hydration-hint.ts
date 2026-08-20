@@ -13,7 +13,7 @@ const PATTERNS = [
   /server rendered html/iu,
 ];
 
-if (import.meta.env.DEV && typeof window !== "undefined") {
+if (import.meta.env.DEV && "window" in globalThis) {
   const original = console.error.bind(console);
   let shown = false;
   console.error = (...args: unknown[]) => {

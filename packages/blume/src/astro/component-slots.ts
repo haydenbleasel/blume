@@ -77,6 +77,8 @@ const importClause = (variable: string, name: string, path: string): string =>
 
 /** A wrapper `.astro` that statically imports a component and hydrates it. */
 const wrapperContent = (override: NormalizedOverride): string => {
+  // SAFETY: the only caller guards `if (!source)` and bails before invoking
+  // this, so the override always carries a resolved source here.
   const { name, path } = override.source as NonNullable<
     NormalizedOverride["source"]
   >;

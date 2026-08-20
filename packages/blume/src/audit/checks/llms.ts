@@ -6,12 +6,17 @@ import { ERROR_ROUTES } from "../types.ts";
 import type { AuditContext, CheckModule } from "../types.ts";
 import { normalizePath, siteOrigin } from "../url.ts";
 
+/** The object form of `ai.llmsTxt`. The schema always emits it, but hand-built
+ * audit contexts (tests, partial configs) may still carry the raw boolean. */
+const isLlmsToggleObject = (
+  value: boolean | { enabled: boolean; openapi: boolean } | undefined
+): value is { enabled: boolean; openapi: boolean } =>
+  typeof value === "object" && value !== null;
+
 /** The `ai.llmsTxt` config normalized to what the checks need. */
-const llmsConfig = (
-  context: AuditContext
-): { enabled: boolean; openapi: boolean } => {
+const llmsConfig = (context: AuditContext) => {
   const value = context.project.config.ai?.llmsTxt;
-  if (typeof value === "object" && value !== null) {
+  if (isLlmsToggleObject(value)) {
     return { enabled: value.enabled, openapi: value.openapi };
   }
   return { enabled: value !== false, openapi: true };

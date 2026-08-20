@@ -11,6 +11,11 @@ import { BlumeError } from "../src/core/diagnostics.ts";
 const dirs: string[] = [];
 const setup = () => {};
 
+type SetupHook = NonNullable<AstroIntegration["hooks"]["astro:config:setup"]>;
+
+const isFunction = (value: SetupHook | undefined): value is SetupHook =>
+  typeof value === "function";
+
 const makeDir = async (configSource?: string): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), "blume-config-"));
   dirs.push(dir);
@@ -24,6 +29,8 @@ const loadError = async (dir: string): Promise<BlumeError> => {
   try {
     await loadConfig(dir);
   } catch (error) {
+    // SAFETY: loadConfig only throws BlumeError (load and validation failures
+    // are both wrapped), and every fixture passed here triggers one.
     return error as BlumeError;
   }
   throw new Error("expected loadConfig to throw");
@@ -72,7 +79,7 @@ describe("loadConfig", () => {
     const [integration] = result.config.integrations;
 
     expect(integration?.name).toBe("probe");
-    expect(typeof integration?.hooks["astro:config:setup"]).toBe("function");
+    expect(isFunction(integration?.hooks["astro:config:setup"])).toBe(true);
   });
 
   it("rejects a non-array integrations value", async () => {
@@ -86,12 +93,12 @@ describe("loadConfig", () => {
       'export default { integrations: ["not-an-integration"] };'
     );
     const result = await loadConfig(dir);
-    // Blume only validates the array boundary; an invalid element passes
-    // through unchanged for Astro to reject, hence the `as unknown` cast to
-    // compare against the resolved `AstroIntegration[]` type.
-    expect(result.config.integrations).toEqual([
+    // SAFETY: Blume only validates the array boundary; an invalid element
+    // passes through unchanged for Astro to reject, so the resolved
+    // `AstroIntegration[]` really holds the raw string at runtime.
+    expect(result.config.integrations as unknown[]).toEqual([
       "not-an-integration",
-    ] as unknown as typeof result.config.integrations);
+    ]);
   });
 
   it("lets the page-feedback rating be disabled", async () => {

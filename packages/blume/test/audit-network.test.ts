@@ -6,9 +6,12 @@ import {
   networkChecks,
   servedPageChecks,
 } from "../src/audit/checks/network.ts";
-import type { PageSnapshot } from "../src/audit/types.ts";
+import type {
+  AuditContext,
+  CheckModule,
+  PageSnapshot,
+} from "../src/audit/types.ts";
 import { gradeExternal, probe, probeAll } from "../src/core/probe.ts";
-import type { Diagnostic } from "../src/core/types.ts";
 import { codes, context, snapshot } from "./audit-support.ts";
 
 /**
@@ -18,26 +21,30 @@ import { codes, context, snapshot } from "./audit-support.ts";
  * having, but they must never reach the real network in a test.
  */
 
+/** A canned fixture response. */
+interface RouteFixture {
+  status?: number;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
 /** Routes the fixture server answers, keyed by pathname. */
-const ROUTES: Record<
-  string,
-  { status?: number; headers?: Record<string, string>; body?: string }
-> = {
-  "/": { headers: { "content-encoding": "gzip" } },
-  "/docs/based": { headers: { "content-encoding": "gzip" } },
-  "/gone": { status: 404 },
-  "/insecure": { headers: { "x-robots-tag": "noindex" } },
-  "/oops": { status: 500 },
-  "/plain": {},
-  "/redirects": { status: 302 },
-  "/robots.txt": { status: 404 },
-  "/sitemap.xml": { status: 404 },
-};
+const ROUTES = new Map<string, RouteFixture>([
+  ["/", { headers: { "content-encoding": "gzip" } }],
+  ["/docs/based", { headers: { "content-encoding": "gzip" } }],
+  ["/gone", { status: 404 }],
+  ["/insecure", { headers: { "x-robots-tag": "noindex" } }],
+  ["/oops", { status: 500 }],
+  ["/plain", {}],
+  ["/redirects", { status: 302 }],
+  ["/robots.txt", { status: 404 }],
+  ["/sitemap.xml", { status: 404 }],
+]);
 
 const server = Bun.serve({
   fetch(request) {
     const { pathname } = new URL(request.url);
-    const route = ROUTES[pathname];
+    const route = ROUTES.get(pathname);
     if (!route) {
       return new Response("not found", { status: 404 });
     }
@@ -58,10 +65,8 @@ afterAll(() => {
   server.stop(true);
 });
 
-const run = async (
-  module: { run: (c: never) => unknown },
-  ctx: unknown
-): Promise<string[]> => codes((await module.run(ctx as never)) as Diagnostic[]);
+const run = async (module: CheckModule, ctx: AuditContext): Promise<string[]> =>
+  codes(await module.run(ctx));
 
 const withOrigin = (pages: PageSnapshot[]) => ({
   ...context({ pages }),

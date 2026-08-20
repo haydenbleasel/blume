@@ -10,6 +10,7 @@ export default defineMeta({
     "islands",
     "sources",
     "i18n",
+    "versioning",
   ],
   title: "Content",
 });

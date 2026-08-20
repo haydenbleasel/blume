@@ -53,6 +53,9 @@ const launchAgentCode = async (
   try {
     return await launchAgent(cli.bin, prompt);
   } catch (error) {
+    // SAFETY: only the `code` tag is inspected; a spawn failure throws an
+    // ErrnoException, and any other thrown value fails the comparison and
+    // rethrows unchanged.
     if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
       throw error;
     }
@@ -123,14 +126,16 @@ export const auditCommand = defineCommand({
     }
 
     const root = process.cwd();
-    const gate = (args["fail-on"] ??
-      (args.strict ? "warning" : "error")) as DiagnosticSeverity;
-    if (!SEVERITIES.includes(gate)) {
+    const gateInput = args["fail-on"] ?? (args.strict ? "warning" : "error");
+    const gate = SEVERITIES.find((severity) => severity === gateInput);
+    if (gate === undefined) {
       logger.error(
-        `Invalid --fail-on "${gate}" (use ${SEVERITIES.join(" | ")}).`
+        `Invalid --fail-on "${gateInput}" (use ${SEVERITIES.join(" | ")}).`
       );
       process.exit(1);
     }
+    // SAFETY: AGENTS is a closed record keyed by AgentKind, so its keys are
+    // exactly the agent kinds.
     const agents = (Object.keys(AGENTS) as AgentKind[]).filter(
       (kind) => args[kind]
     );

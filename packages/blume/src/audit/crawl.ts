@@ -104,6 +104,35 @@ const sitemapParser = new XMLParser({
 });
 
 /**
+ * What fast-xml-parser produces for a parsed element: a string for text
+ * content (`parseTagValue: false`), an object of child elements, an array for
+ * a repeated element, or null for a self-closed one.
+ */
+type XmlValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | XmlValue[]
+  | { [element: string]: XmlValue };
+
+/**
+ * fast-xml-parser models an element with child elements as an object; a
+ * text-only or self-closed element parses to a string or null instead, which
+ * these guards reject the same way the crawler always has.
+ */
+const isUrlsetElement = (value: XmlValue): value is { url?: XmlValue } =>
+  typeof value === "object" && value !== null;
+
+const isUrlEntry = (
+  value: XmlValue
+): value is { lastmod?: XmlValue; loc?: XmlValue } =>
+  typeof value === "object" && value !== null;
+
+const isText = (value: XmlValue): value is string => typeof value === "string";
+
+/**
  * Parse `sitemap.xml`. Deliberately shallow: the checks only need the `<loc>`
  * list, each loc's `<lastmod>`, and whether the document is a urlset at all.
  */
@@ -113,9 +142,9 @@ export const parseSitemap = (
   bytes: number
 ): SitemapDoc => {
   const doc: SitemapDoc = { bytes, file, lastmod: new Map(), urls: [] };
-  let parsed: Record<string, unknown>;
+  let parsed: { sitemapindex?: XmlValue; urlset?: XmlValue };
   try {
-    parsed = sitemapParser.parse(xml) as Record<string, unknown>;
+    parsed = sitemapParser.parse(xml);
   } catch {
     doc.error = "no <urlset> element";
     return doc;
@@ -126,20 +155,19 @@ export const parseSitemap = (
       : "no <urlset> element";
     return doc;
   }
-  const urlset = parsed.urlset as { url?: unknown } | string | null;
-  const entries =
-    typeof urlset === "object" && urlset !== null ? [urlset.url].flat() : [];
+  const { urlset } = parsed;
+  const entries = isUrlsetElement(urlset) ? [urlset.url].flat() : [];
   for (const entry of entries) {
-    if (typeof entry !== "object" || entry === null) {
+    if (!isUrlEntry(entry)) {
       continue;
     }
-    const { loc, lastmod } = entry as { loc?: unknown; lastmod?: unknown };
-    const locText = typeof loc === "string" ? loc.trim() : "";
+    const { loc, lastmod } = entry;
+    const locText = isText(loc) ? loc.trim() : "";
     if (!locText) {
       continue;
     }
     doc.urls.push(locText);
-    if (typeof lastmod === "string" && lastmod.trim() !== "") {
+    if (isText(lastmod) && lastmod.trim() !== "") {
       doc.lastmod?.set(locText, lastmod.trim());
     }
   }

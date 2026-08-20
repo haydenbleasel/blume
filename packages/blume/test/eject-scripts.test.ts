@@ -9,6 +9,7 @@ import {
   droppedArtifactNotices,
   updatePackageScripts,
 } from "../src/cli/eject-scripts.ts";
+import type { BlumeConfig } from "../src/core/config-input.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
 
@@ -26,10 +27,17 @@ afterAll(async () => {
   );
 });
 
-const readPkg = async (root: string): Promise<Record<string, unknown>> =>
+/** The package.json fields these tests write and read back. */
+interface TestPackageManifest {
+  dependencies?: Record<string, string>;
+  name?: string;
+  scripts?: Record<string, string>;
+}
+
+const readPkg = async (root: string): Promise<TestPackageManifest> =>
   JSON.parse(await readFile(join(root, "package.json"), "utf-8"));
 
-const config = (raw: Record<string, unknown> = {}): ResolvedConfig =>
+const config = (raw: BlumeConfig = {}): ResolvedConfig =>
   blumeConfigSchema.parse(raw);
 
 describe("updatePackageScripts", () => {
@@ -64,8 +72,8 @@ describe("updatePackageScripts", () => {
     await updatePackageScripts(root);
     const pkg = await readPkg(root);
     expect(pkg.dependencies).toEqual({ blume: "^1.0.0" });
-    expect((pkg.scripts as Record<string, string>).lint).toBe("eslint .");
-    expect((pkg.scripts as Record<string, string>).dev).toBe("astro dev");
+    expect(pkg.scripts?.lint).toBe("eslint .");
+    expect(pkg.scripts?.dev).toBe("astro dev");
   });
 
   it("adds a scripts block when the package.json has none", async () => {

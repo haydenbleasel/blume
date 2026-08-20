@@ -84,9 +84,7 @@ const collectAssets = (
     .filter((asset) => asset.src.length > 0);
 
 /** Parse each JSON-LD block, keeping the parse failures rather than dropping them. */
-const collectJsonLd = (
-  document: HtmlDocument
-): { jsonld: unknown[]; jsonldErrors: string[] } => {
+const collectJsonLd = (document: HtmlDocument) => {
   const jsonld: unknown[] = [];
   const jsonldErrors: string[] = [];
   for (const script of document.querySelectorAll(
@@ -106,7 +104,7 @@ const prefixedMeta = (
   document: HtmlDocument,
   keyAttr: "property" | "name",
   prefix: string
-): Record<string, string> => {
+) => {
   const found: Record<string, string> = {};
   for (const element of document.querySelectorAll(
     `meta[${keyAttr}^="${prefix}"]`

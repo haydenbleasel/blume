@@ -113,4 +113,8 @@ export default defineConfig({
     radius: "lg",
   },
   title: "Blume Sandbox",
+  versions: {
+    archived: [{ id: "v1.0" }],
+    current: { badge: "Latest", label: "v2.0" },
+  },
 });

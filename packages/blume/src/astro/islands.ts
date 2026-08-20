@@ -40,13 +40,20 @@ const VALID_MODES = new Set<IslandClientMode>([
   "visible",
 ]);
 
+/** Whether a declared client mode is one Astro's directives support. */
+const isClientMode = (mode: string): mode is IslandClientMode =>
+  // SAFETY: `Set.has` only compares identity at runtime; the assertion widens
+  // the lookup key so the narrower-typed set accepts it, and the `has` result
+  // is exactly the predicate being claimed.
+  VALID_MODES.has(mode as IslandClientMode);
+
 /** Island extensions mapped to the Astro renderer that handles them. */
-const FRAMEWORK_BY_EXT: Record<string, IslandFramework> = {
-  jsx: "react",
-  svelte: "svelte",
-  tsx: "react",
-  vue: "vue",
-};
+const FRAMEWORK_BY_EXT = new Map<string, IslandFramework>([
+  ["jsx", "react"],
+  ["svelte", "svelte"],
+  ["tsx", "react"],
+  ["vue", "vue"],
+]);
 
 // Captures the extension so we can both strip it from the name and pick the
 // framework. Kept in sync with the glob below.
@@ -66,13 +73,13 @@ export const readClientMode = (
   if (!mode) {
     return DEFAULT_CLIENT;
   }
-  if (!VALID_MODES.has(mode as IslandClientMode)) {
+  if (!isClientMode(mode)) {
     warnings.push(
       `Island "${file}" declares an unknown client mode "${mode}"; defaulting to "${DEFAULT_CLIENT}". Use "load", "idle", "visible", or "only".`
     );
     return DEFAULT_CLIENT;
   }
-  return mode as IslandClientMode;
+  return mode;
 };
 
 /**
@@ -109,7 +116,7 @@ export const discoverIslands = async (
   const collectIsland = (file: string, source: string): void => {
     const base = basename(file);
     const ext = base.match(ISLAND_FILE)?.groups?.ext;
-    const framework = ext ? FRAMEWORK_BY_EXT[ext] : undefined;
+    const framework = ext ? FRAMEWORK_BY_EXT.get(ext) : undefined;
     if (!framework) {
       return;
     }

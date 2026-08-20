@@ -34,13 +34,13 @@ const EVALS = `questions:
     routes: /guides/install
 `;
 
-const PROJECT_FILES: Record<string, string> = {
+const PROJECT_FILES = {
   "blume.config.ts": 'export default { title: "Test Docs" };',
   "docs/guides/install.md":
     "---\ntitle: Installation\n---\n# Installation\n\nNode 22.12 or newer.\n",
   "docs/index.md": "---\ntitle: Home\n---\n# Home\n\nWelcome.\n",
   "evals.yaml": EVALS,
-};
+} satisfies Record<string, string>;
 
 const fixture = async (
   files: Record<string, string> = PROJECT_FILES

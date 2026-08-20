@@ -17,6 +17,7 @@ import {
   validateContentDir,
 } from "../src/cli/init/scaffold.ts";
 import type { InitAnswers, ScaffoldLog } from "../src/cli/init/scaffold.ts";
+import type { BlumeConfig } from "../src/core/config-input.ts";
 import { blumePackageJson, toPackageName } from "../src/core/package-json.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { getBlumeVersion } from "../src/core/version.ts";
@@ -46,7 +47,7 @@ const answersWith = (overrides: Partial<InitAnswers> = {}): InitAnswers => ({
 });
 
 /** Evaluate the generated `blume.config.ts` down to its config object. */
-const evalConfig = (config: string): unknown => {
+const evalConfig = (config: string): BlumeConfig => {
   const object = config
     .replace('import { defineConfig } from "blume";', "")
     .replace("export default defineConfig(", "return (")
@@ -55,14 +56,14 @@ const evalConfig = (config: string): unknown => {
   return new Function(object)();
 };
 
-const collectLog = (): { lines: string[]; log: ScaffoldLog } => {
+const collectLog = () => {
   const lines: string[] = [];
   return {
     lines,
     log: {
       info: (message) => lines.push(`info:${message}`),
       success: (message) => lines.push(`success:${message}`),
-    },
+    } satisfies ScaffoldLog,
   };
 };
 
@@ -269,6 +270,8 @@ describe("blumePackageJson", () => {
   });
 
   it("merges and sorts extra dependencies", () => {
+    // SAFETY: blumePackageJson emits a manifest whose dependencies block is
+    // asserted on right below.
     const json = JSON.parse(
       blumePackageJson("docs", { "@notionhq/client": "^2.2.15" })
     ) as { dependencies: Record<string, string> };

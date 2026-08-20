@@ -161,6 +161,33 @@ Die Seite, auf der sich der Leser gerade befindet, wird dem Kontext zuerst hinzu
 
 Die Fundierung ist für jedes Backend aktiv außer **[Inkeep](#backends)**, das seinen eigenen Abruf über die in seinem Dashboard indizierten Inhalte durchführt.
 
+### Abrufumfang
+
+Wie viel Dokumentation eine Frage mit sich trägt, ist der größte Hebel dafür, wie lange der Leser auf das erste Wort wartet: Das Modell liest jedes eingefügte Zeichen, bevor es ein Token ausgibt. Bei einem gehosteten Spitzenmodell ist das unsichtbar, bei einem selbst gehosteten Backend dominiert es. `retrieval` bemisst ihn:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    retrieval: {
+      maxResults: 3, // fewer pages retrieved per question
+      excerptChars: 1200, // shorter excerpt from each one
+      contextBudget: 3000, // smaller total injection
+    },
+  },
+}
+```
+
+| Option | Standard | Beschreibung |
+| --- | --- | --- |
+| `maxResults` | `6` | Pro Frage abgerufene Dokumente. |
+| `excerptChars` | `2000` | Zeichen, die von jeder abgerufenen Seite behalten werden. |
+| `contextBudget` | `10000` | Insgesamt eingefügte Zeichen, über alle Auszüge hinweg. |
+
+Die drei sind nicht austauschbar. `contextBudget` deckelt die gesamte Einfügung, `excerptChars` entscheidet, wie tief der Auszug in eine einzelne lange Seite hineinreicht — erhöhe es, wenn eine Seite die ganze Antwort enthält und der Auszug sie abschneidet —, und `maxResults` deckelt, wie viele Seiten der Abruf hinzufügt. Die Seite, die der Leser gerade betrachtet, wird zusätzlich zu den abgerufenen eingefügt, sodass eine Antwort bis zu eine Seite mehr zitieren kann, als `maxResults` angibt.
+
+Die Standardwerte passen zu einem gehosteten Modell. Senke sie, wenn du von eigener Hardware ausspielst und die Zeit bis zum ersten Token wichtiger ist als die Trefferabdeckung; Antworten bleiben so oder so fundiert, und dem Assistenten wird aufgetragen, zu sagen, wenn etwas nicht abgedeckt ist, statt die Lücke zu füllen.
+
 ### Externer Endpunkt
 
 Du hast bereits ein API-Backend für KI? Richte das Panel darauf aus und halte den Dokumentations-Build statisch:

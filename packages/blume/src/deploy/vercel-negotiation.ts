@@ -24,7 +24,11 @@
 export const ACCEPT_MARKDOWN_HEADER_VALUE =
   "(.*,)?\\s*text/(x-)?markdown(\\s*[;,].*)?$";
 
-/** A Build Output API route — the subset these helpers read and write. */
+/**
+ * A Build Output API route — the subset these helpers read and write. Parsed
+ * routes keep whatever other fields they carry at runtime; only these are
+ * typed.
+ */
 export interface VercelRoute {
   continue?: boolean;
   dest?: string;
@@ -32,8 +36,12 @@ export interface VercelRoute {
   has?: { key?: string; type: string; value?: string }[];
   headers?: Record<string, string>;
   src?: string;
-  [key: string]: unknown;
+  status?: number;
 }
+
+/** Whether a parsed route field is a real string (the config is raw JSON). */
+const isString = (value: string | undefined): value is string =>
+  typeof value === "string";
 
 const ACCEPT_MARKDOWN_CONDITION: VercelRoute["has"] = [
   { key: "accept", type: "header", value: ACCEPT_MARKDOWN_HEADER_VALUE },
@@ -157,6 +165,21 @@ export const buildNegotiationRoutes = (
 const HOME_SRC = "^/$";
 
 /**
+ * Permanent redirect from any trailing-slash URL to its slashless twin, so
+ * `/docs/` and `/docs` don't serve as duplicate URLs (canonicals, sitemap, and
+ * hreflang all use the slashless form; the root `/` is untouched — `.+`
+ * requires a non-empty path). Spliced into the main phase before `handle:
+ * "filesystem"`, after the Markdown rewrites, so an agent's `Accept:
+ * text/markdown` request on a slashed URL still rewrites without the extra
+ * hop. Vercel carries the query string over to the `Location` target itself.
+ */
+export const TRAILING_SLASH_REDIRECT: VercelRoute = {
+  headers: { Location: "/$1" },
+  src: "^/(.+)/$",
+  status: 308,
+};
+
+/**
  * Whether a route is one this module previously injected, so re-injection
  * replaces rather than duplicates. Rewrites are identified by their `accept`
  * condition; the `Vary` routes by their exact three-field shape (a
@@ -171,12 +194,14 @@ const isNegotiationRoute = (route: VercelRoute): boolean =>
   ) === true ||
   (route.continue === true &&
     route.headers?.vary === "Accept" &&
-    typeof route.src === "string" &&
+    isString(route.src) &&
     Object.keys(route).length === 3) ||
   (route.continue === true &&
-    typeof route.headers?.link === "string" &&
+    isString(route.headers?.link) &&
     route.src === HOME_SRC &&
-    Object.keys(route).length === 3);
+    Object.keys(route).length === 3) ||
+  (route.status === TRAILING_SLASH_REDIRECT.status &&
+    route.src === TRAILING_SLASH_REDIRECT.src);
 
 /**
  * Splice the negotiation routes into a Build Output `config.json`, plus — when
@@ -186,10 +211,12 @@ const isNegotiationRoute = (route: VercelRoute): boolean =>
  * rides on the prerendered homepage response. `contentTypeOverrides` maps static-dir
  * relative paths to media types via the Build Output `overrides` field — the
  * platform's mechanism for extensionless static files (e.g. the Web Bot Auth
- * signature directory). Returns the updated JSON text (tab-indented, like the
- * adapter's own output), or `null` when there is nothing to do or nowhere
- * safe to do it: nothing to inject, an unparsable config, no `routes` array,
- * or no `handle: "filesystem"` marker to anchor the splice.
+ * signature directory). The trailing-slash 308 redirect is always spliced in
+ * alongside, so slashed duplicates of every page collapse onto the canonical
+ * slashless URL. Returns the updated JSON text (tab-indented, like the
+ * adapter's own output), or `null` when there is nowhere safe to splice: an
+ * unparsable config, no `routes` array, or no `handle: "filesystem"` marker
+ * to anchor the splice.
  */
 export const injectNegotiationRoutes = (
   configText: string,
@@ -199,13 +226,6 @@ export const injectNegotiationRoutes = (
   homeTokens?: number
 ): string | null => {
   const overrideEntries = Object.entries(contentTypeOverrides ?? {});
-  if (
-    routePaths.length === 0 &&
-    !homeLinkHeader &&
-    overrideEntries.length === 0
-  ) {
-    return null;
-  }
   let config: {
     overrides?: Record<string, { contentType?: string; path?: string }>;
     routes?: VercelRoute[];
@@ -243,8 +263,15 @@ export const injectNegotiationRoutes = (
   }
   // Headers first: `continue` routes accumulate, so a request the rewrite
   // route then terminates (Markdown negotiation on the homepage) still carries
-  // the Link header.
-  routes.splice(filesystemIndex, 0, ...headerRoutes, ...rewriteRoutes);
+  // the Link header. The trailing-slash redirect goes last so a slashed URL's
+  // Markdown negotiation still rewrites directly instead of bouncing.
+  routes.splice(
+    filesystemIndex,
+    0,
+    ...headerRoutes,
+    ...rewriteRoutes,
+    TRAILING_SLASH_REDIRECT
+  );
   config.routes = routes;
   return `${JSON.stringify(config, null, "\t")}\n`;
 };

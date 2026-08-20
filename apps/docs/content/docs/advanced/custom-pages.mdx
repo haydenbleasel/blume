@@ -231,13 +231,17 @@ Passing `siteUrl` (and `ogEnabled`) derives the page's `canonical` and a generat
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
   ogImage="/opengraph-image.png"
+  ogImageAlt="Acme — the fastest docs"
+  ogImageSize={{ width: 1200, height: 630 }}
   page={{ title: config.title }}
 >
   <!-- page content -->
 </PageLayout>
 ```
 
-Only this page changes — every other route keeps its generated card — so it's how you give the home page alone a bespoke share image.
+Only this page changes — every other route keeps its generated card — so it's how you give the home page alone a bespoke share image. The generated card declares its size and alt text to crawlers on its own; for your own `ogImage`, pass `ogImageAlt` and `ogImageSize` alongside so the share card gets the same treatment.
+
+The page also emits schema.org JSON-LD — the same `WebSite` graph the docs pages carry, so the home page (usually a custom page) isn't the one URL without structured data. Pass `structuredDataEnabled={config.structuredData}` to keep it in sync with the [`structuredData`](/docs/configuration/seo) config, or `structuredDataEnabled={false}` to turn it off for one page.
 
 `page.title` is used verbatim as the document title (no `- siteTitle` suffix), since marketing pages usually set their own. To give a custom page the full docs chrome instead — sidebar, TOC, and all — wrap it in `RootLayout`, the layout the generated pages use. Pull the required props straight from `blume:data`:
 

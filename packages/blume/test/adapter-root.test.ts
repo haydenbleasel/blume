@@ -14,20 +14,18 @@ interface Seen {
   setup?: URL;
 }
 
-/**
- * The adapter reads only `config.root` from each hook's options, so a spy needs
- * only that field; the cast narrows the real (large) hook option type down to
- * the slice under test.
- */
-const setupSpy = (record: (root: URL) => void): SetupHook =>
-  (({ config }: { config: { root: URL } }) => {
+/** A spy hook that records the `root` it was handed. */
+const setupSpy =
+  (record: (root: URL) => void): SetupHook =>
+  ({ config }) => {
     record(config.root);
-  }) as unknown as SetupHook;
+  };
 
-const doneSpy = (record: (root: URL) => void): DoneHook =>
-  (({ config }: { config: { root: URL } }) => {
+const doneSpy =
+  (record: (root: URL) => void): DoneHook =>
+  ({ config }) => {
     record(config.root);
-  }) as unknown as DoneHook;
+  };
 
 const spyIntegration = (
   seen: Seen,
@@ -57,14 +55,18 @@ const noop = (): void => {
 const call = async (
   integration: AstroIntegration,
   root: string,
-  extra: Record<string, unknown> = {}
+  extra: { srcDir?: URL | string } = {}
 ): Promise<void> => {
   const options = { config: { root: new URL(root), ...extra } };
+  // SAFETY: withAdapterRoot's wrapped hooks read only `config.root` from their
+  // options and pass the rest of the object through untouched, so this narrow
+  // stand-in exercises them fully.
   await integration.hooks["astro:config:setup"]?.(
-    options as unknown as Parameters<SetupHook>[0]
+    options as Parameters<SetupHook>[0]
   );
+  // SAFETY: same as above — only `config.root` is read.
   await integration.hooks["astro:config:done"]?.(
-    options as unknown as Parameters<DoneHook>[0]
+    options as Parameters<DoneHook>[0]
   );
 };
 
@@ -109,13 +111,9 @@ describe("withAdapterRoot", () => {
     let srcDir: unknown;
     const integration: AstroIntegration = {
       hooks: {
-        "astro:config:setup": (({
-          config,
-        }: {
-          config: { root: URL; srcDir?: unknown };
-        }) => {
+        "astro:config:setup": ({ config }) => {
           ({ srcDir } = config);
-        }) as unknown as SetupHook,
+        },
       },
       name: "spy",
     };

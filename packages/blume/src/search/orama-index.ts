@@ -1,5 +1,10 @@
 import { create, insertMultiple, search } from "@orama/orama";
-import type { AnyOrama, Tokenizer } from "@orama/orama";
+import type {
+  AnyOrama,
+  EnumArrComparisonOperator,
+  EnumComparisonOperator,
+  Tokenizer,
+} from "@orama/orama";
 
 /**
  * The minimal document shape both the client-side search dialog and the
@@ -13,6 +18,11 @@ export interface OramaDoc {
   title: string;
   /** Locale code; indexed as an enum so queries can filter to one language. */
   locale?: string;
+  /**
+   * Docs version; indexed as an enum so queries can filter to one version.
+   * The current docs carry `""`, which the enum stores and matches exactly.
+   */
+  version?: string;
   /** Resolved page `type`; indexed as an enum so queries can filter by type. */
   contentType?: string;
   /** Declared facet values (`content.types.<type>.facets`), key → value. */
@@ -35,6 +45,7 @@ const SCHEMA = {
   locale: "enum",
   route: "string",
   title: "string",
+  version: "enum",
 } as const;
 
 /** Flatten a facet map to the `key:value` terms the `facetTerms` enum holds. */
@@ -45,19 +56,59 @@ const toFacetTerms = (facets: Record<string, string>): string[] =>
 const BOOST = { description: 2, title: 3 };
 
 /**
- * Scripts written without spaces between words. Orama's default tokenizer
- * splits on a Latin-centric delimiter class, so text in these languages
- * collapses to zero tokens and every query silently returns no hits. Keyed by
- * the primary language subtag of `i18n.defaultLocale`.
+ * The script whose text Orama's default tokenizer keeps mostly intact. Its
+ * delimiter class is `/[^A-Za-zàèéìòóù0-9_'-]+/`, so every character outside
+ * that set counts as a separator: text in any other script collapses to zero
+ * tokens and every query silently returns no hits. Unspaced scripts are the
+ * best-known casualty, but the failure is not about spacing — Russian, Greek,
+ * Hebrew and Hindi lose their tokens the same way Japanese does.
  */
-const SEGMENTED_LANGUAGES = new Set(["ja", "ko", "th", "zh"]);
+const LATIN_SCRIPT = "Latn";
 
 /**
- * Languages indexed as character bigrams rather than whole segments, and
- * queried to match accordingly. Japanese and Chinese write compounds in
- * {@link BIGRAM_SCRIPTS} without delimiters; Korean separates words with
- * spaces and Thai has no comparable bigram convention, so both keep the plain
- * segmented tokens even where a page mixes in Han or kana.
+ * Parse a locale tag, tolerating the legacy forms that reach here from
+ * hand-written config: underscores (`ru_RU`), POSIX suffixes (`ja_JP.UTF-8`,
+ * `zh_TW@Big5`), and extlang tags ICU rejects (`zh-cmn-Hans`). `Intl.Locale`
+ * throws on all of these, so a failed parse retries with the primary language
+ * subtag alone — enough to resolve the script, which is all that gates the
+ * tokenizer. Returns `undefined` when even that subtag is unparseable.
+ */
+const parseLocale = (tag: string): Intl.Locale | undefined => {
+  const hyphenated = tag.replaceAll("_", "-");
+  try {
+    return new Intl.Locale(hyphenated);
+  } catch {
+    // Retry below with the primary subtag.
+  }
+  const [primary = ""] = hyphenated.split("-");
+  try {
+    return new Intl.Locale(primary);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The maximized locale — script and language filled in from CLDR likely-subtags
+ * and alias data, so `ru` resolves to `Cyrl`, `cmn` to the canonical `zh`, and
+ * an explicit script subtag is honored: `sr-Latn` reports `Latn` while
+ * `az-Cyrl` reports `Cyrl`. `undefined` for tags {@link parseLocale} cannot
+ * salvage; a well-formed tag ICU knows nothing about keeps an `undefined`
+ * script instead.
+ */
+const resolveLocale = (tag: string): Intl.Locale | undefined =>
+  parseLocale(tag)?.maximize();
+
+/**
+ * Indexes whose language maximizes to one of these scripts are built as
+ * character bigrams rather than whole segments, and queried to match
+ * accordingly. Japanese and Chinese write compounds in {@link BIGRAM_SCRIPTS}
+ * without delimiters, and the writing system — not the language subtag — is
+ * what carries that convention: `yue` (Cantonese) maximizes to `Hant` and
+ * needs bigrams the same way `zh` does. Korean maximizes to `Kore` and Thai
+ * to `Thai`; Korean separates words with spaces and Thai has no comparable
+ * bigram convention, so both keep the plain segmented tokens even where a
+ * page mixes in Han or kana.
  *
  * Dictionary segmentation alone drops the adjacency that makes a compound term
  * distinctive: 資金決済法 becomes 資金 / 決済 / 法, and because Orama scores a
@@ -66,7 +117,19 @@ const SEGMENTED_LANGUAGES = new Set(["ja", "ko", "th", "zh"]);
  * terms, and dropping the whole-segment tokens keeps a fragment as common as
  * 法 from matching on its own.
  */
-const BIGRAM_LANGUAGES = new Set(["ja", "zh"]);
+const BIGRAM_INDEX_SCRIPTS = new Set(["Hans", "Hant", "Jpan"]);
+
+/**
+ * Whether the index keyed to this tokenizer language is built from bigrams.
+ * {@link segmentingTokenizer} stores the canonical maximized language, so the
+ * builder and the strict pass in {@link queryOramaIndex} share this predicate
+ * — an index is never built from bigrams that the query side then matches
+ * loosely, or vice versa.
+ */
+const isBigramLanguage = (language: string): boolean => {
+  const script = resolveLocale(language)?.script;
+  return script !== undefined && BIGRAM_INDEX_SCRIPTS.has(script);
+};
 
 /**
  * Segments written entirely in these scripts are the ones re-cut into bigrams,
@@ -97,6 +160,23 @@ const TERM =
   /[\p{L}\p{M}\p{N}]+(?:(?:['’](?=\p{L})|(?<=\p{N})[.,](?=\p{N}))[\p{L}\p{M}\p{N}]+)*/gu;
 
 /**
+ * A term written entirely in Latin script (plus digits and the separators
+ * {@link TERM} keeps within a word). Orama's default tokenizer folds the
+ * accented vowels it recognizes (café → cafe), so a segmented index folds
+ * Latin terms too — otherwise switching a Cyrillic- or Greek-default site to
+ * the segmenting tokenizer would silently drop the unaccented-query matches
+ * the default tokenizer provided. Only all-Latin terms fold: marks are
+ * spelling elsewhere (Thai vowels and tones; the breve that separates
+ * Cyrillic й from и), so a term carrying any other script keeps its marks.
+ */
+const LATIN_TERM = /^[\p{Script=Latin}\p{N}'’.,]+$/u;
+
+const MARKS = /\p{M}+/gu;
+
+const foldDiacritics = (term: string): string =>
+  LATIN_TERM.test(term) ? term.normalize("NFD").replace(MARKS, "") : term;
+
+/**
  * Emit every overlapping 2-character window of `run`, or the lone character.
  * Windows are cut by code point: an ideograph outside the basic plane is a
  * surrogate pair, and slicing by code unit would split it into halves that
@@ -124,17 +204,27 @@ const addBigrams = (run: string, tokens: Set<string>): void => {
 };
 
 /**
+ * `Intl.Segmenter` is missing on some runtimes even though the lib type
+ * declares it, so the constructor's presence is probed before use.
+ */
+const hasSegmenter = (
+  segmenter: typeof Intl.Segmenter | undefined
+): segmenter is typeof Intl.Segmenter => typeof segmenter === "function";
+
+/**
  * A word-segmenting tokenizer for languages the default splitter can't handle,
  * built on `Intl.Segmenter` (the same engine `@orama/tokenizers` wraps).
  * Input is NFC-normalized and lowercased before segmenting — unlike the
  * upstream tokenizers — so decomposed text (macOS filenames, some CMS
  * pipelines) indexes the same terms a composed query produces, and Latin
  * terms ("GDPR", English pages on a mixed-locale site) still match
- * case-insensitively. Returns `undefined` for languages the default tokenizer
- * already serves, and on runtimes without `Intl.Segmenter`, where the caller
- * falls back to Orama's default.
+ * case-insensitively, with their diacritics folded by
+ * {@link foldDiacritics}. Returns `undefined` for scripts the default
+ * tokenizer already serves ({@link resolveLocale} decides, so `sr-Latn` keeps
+ * the default while `az-Cyrl` is segmented), and on runtimes without
+ * `Intl.Segmenter`, where the caller falls back to Orama's default.
  *
- * On a {@link BIGRAM_LANGUAGES} index, runs of adjacent
+ * On a {@link BIGRAM_INDEX_SCRIPTS} index, runs of adjacent
  * {@link BIGRAM_SCRIPTS} segments are joined and re-cut into character
  * bigrams; everything else (Latin, digits, and every segment on a Korean or
  * Thai index) is emitted one {@link TERM} at a time. Separators end a run
@@ -142,17 +232,18 @@ const addBigrams = (run: string, tokens: Set<string>): void => {
  * does, or inside one.
  */
 const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
-  const language = locale?.toLowerCase().split(/[-_]/u)[0] ?? "";
-  if (!SEGMENTED_LANGUAGES.has(language)) {
+  const resolved = resolveLocale(locale ?? "");
+  if (!resolved?.script || resolved.script === LATIN_SCRIPT) {
     return;
   }
-  if (typeof Intl.Segmenter !== "function") {
+  if (!hasSegmenter(Intl.Segmenter)) {
     return;
   }
+  // The canonical maximized language (`cmn` → `zh`), so the bigram predicate
+  // here and the strict query pass read the same name.
+  const { language } = resolved;
   const segmenter = new Intl.Segmenter(language, { granularity: "word" });
-  // Keyed off the same set the strict query pass reads, so an index is never
-  // built from bigrams that the query side then matches loosely.
-  const bigram = BIGRAM_LANGUAGES.has(language);
+  const bigram = isBigramLanguage(language);
   return {
     language,
     normalizationCache: new Map(),
@@ -171,7 +262,7 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
           return;
         }
         flush();
-        tokens.add(term);
+        tokens.add(foldDiacritics(term));
       };
       for (const segment of segmenter.segment(
         raw.normalize("NFC").toLowerCase()
@@ -205,22 +296,22 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
  * Build an in-memory Orama full-text index from search documents. Shared by the
  * Orama client loader (browser), the MCP server, and Ask AI grounding (Node),
  * so ranking is identical wherever docs are queried. `locale` — the site's
- * `i18n.defaultLocale` — swaps in a word-segmenting tokenizer for languages
- * written without spaces (Japanese, Chinese, Korean, Thai); the tokenizer
- * belongs to the database, so on a mixed-locale site it applies to every
- * document, which is safe because words in other scripts — Latin, and
- * mark-bearing scripts like Hebrew or Devanagari — survive segmentation
- * intact.
+ * `i18n.defaultLocale` — swaps in a word-segmenting tokenizer for every
+ * non-Latin script, all of which Orama's default tokenizer reduces to zero
+ * tokens; the tokenizer belongs to the database, so on a mixed-locale site it
+ * applies to every document. That is safe in one direction only: Latin words
+ * survive segmentation intact, so English pages on a segmented index stay
+ * searchable, but non-Latin translations on a Latin-default index still
+ * collapse to zero tokens.
  */
 export const buildOramaIndex = async (
   documents: OramaDoc[],
   locale?: string
 ): Promise<AnyOrama> => {
   const tokenizer = segmentingTokenizer(locale);
-  const db = create({
-    schema: SCHEMA,
-    ...(tokenizer ? { components: { tokenizer } } : {}),
-  });
+  const db = tokenizer
+    ? create({ components: { tokenizer }, schema: SCHEMA })
+    : create({ schema: SCHEMA });
   await insertMultiple(
     db,
     documents.map((doc) =>
@@ -244,6 +335,23 @@ export interface OramaQueryFilters {
   facets?: Record<string, string>;
   /** Keep only documents in this locale. */
   locale?: string;
+  /**
+   * Keep only documents of this docs version (`""` is the current docs — a
+   * meaningful filter value, so absence alone disables version filtering).
+   */
+  version?: string;
+}
+
+/**
+ * The exact-match `where` clause the filters compile to. Orama types `where`
+ * openly (any schema property to an operator), mirrored here by the index
+ * signature; this module only ever emits the two enum operators.
+ */
+interface OramaWhereClause {
+  [property: string]:
+    | EnumArrComparisonOperator
+    | EnumComparisonOperator
+    | undefined;
 }
 
 /**
@@ -265,27 +373,38 @@ export const queryOramaIndex = async (
   filters?: OramaQueryFilters
 ): Promise<OramaDoc[]> => {
   const facetTerms = filters?.facets ? toFacetTerms(filters.facets) : [];
-  const where = {
-    ...(filters?.locale ? { locale: { eq: filters.locale } } : {}),
-    ...(filters?.contentTypes && filters.contentTypes.length > 0
-      ? { contentType: { in: filters.contentTypes } }
-      : {}),
-    ...(facetTerms.length > 0
-      ? { facetTerms: { containsAll: facetTerms } }
-      : {}),
-  };
-  const params = {
+  const where: OramaWhereClause = {};
+  if (filters?.locale) {
+    where.locale = { eq: filters.locale };
+  }
+  // `""` (the current docs) is a real filter value, so test for presence.
+  if (filters?.version !== undefined) {
+    where.version = { eq: filters.version };
+  }
+  if (filters?.contentTypes && filters.contentTypes.length > 0) {
+    where.contentType = { in: filters.contentTypes };
+  }
+  if (facetTerms.length > 0) {
+    where.facetTerms = { containsAll: facetTerms };
+  }
+  const unfiltered = {
     boost: BOOST,
     limit,
     properties: ["title", "description", "content"],
     term,
-    ...(Object.keys(where).length > 0 ? { where } : {}),
   };
-  const bigrammed = BIGRAM_LANGUAGES.has(db.tokenizer?.language ?? "");
+  const params =
+    Object.keys(where).length > 0 ? { ...unfiltered, where } : unfiltered;
+  const bigrammed = isBigramLanguage(db.tokenizer?.language ?? "");
+  // The result-document generic is OramaDoc because `buildOramaIndex` is the
+  // only writer to this database and inserts OramaDoc records (plus the
+  // derived `facetTerms`).
   const strict = bigrammed
-    ? await search(db, { ...params, threshold: ALL_TOKENS })
+    ? await search<AnyOrama, OramaDoc>(db, { ...params, threshold: ALL_TOKENS })
     : undefined;
   const found =
-    strict && strict.hits.length > 0 ? strict : await search(db, params);
-  return found.hits.map((hit) => hit.document as unknown as OramaDoc);
+    strict && strict.hits.length > 0
+      ? strict
+      : await search<AnyOrama, OramaDoc>(db, params);
+  return found.hits.map((hit) => hit.document);
 };

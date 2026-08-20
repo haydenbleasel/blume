@@ -13,7 +13,7 @@ import { blumeConfigSchema } from "../src/core/schema.ts";
 import { githubReleasesSource } from "../src/core/sources/github-releases.ts";
 import { normalizeEntry } from "../src/core/sources/normalize.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
-import type { SourceContext } from "../src/core/sources/types.ts";
+import type { SourceContext, SourceEntry } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 
 const dirs: string[] = [];
@@ -67,46 +67,60 @@ interface Call {
   url: string;
 }
 
+type FetchHandler = (
+  input: string | URL | Request,
+  init?: RequestInit
+) => Promise<Response>;
+
+// SAFETY: githubReleasesSource calls fetchImpl as a plain function; the
+// preconnect helper Bun attaches to the real fetch is never accessed.
+const asFetch = (handler: FetchHandler): typeof fetch =>
+  handler as typeof fetch;
+
+/** The frontmatter shape githubReleasesSource stages for a release entry. */
+interface ReleaseMeta {
+  changelog?: { category?: string };
+  seo?: { description?: string };
+}
+
+// SAFETY: every entry passed here comes straight from githubReleasesSource,
+// whose staged frontmatter matches ReleaseMeta.
+const metaOf = (entry: SourceEntry | undefined): ReleaseMeta =>
+  (entry?.data ?? {}) as ReleaseMeta;
+
+/** A recording fetch stub plus the calls it captured. */
+interface ReleasesFetch {
+  calls: Call[];
+  fetchImpl: typeof fetch;
+}
+
 /** A fetch stub that serves a fixed release payload per `page` query param. */
-const releasesFetch = (
-  pages: Record<number, Release[]>
-): { calls: Call[]; fetchImpl: typeof fetch } => {
+const releasesFetch = (pages: Record<number, Release[]>): ReleasesFetch => {
   const calls: Call[] = [];
-  const fetchImpl = ((input: string | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input.toString();
+  const fetchImpl = asFetch((input, init) => {
+    const url = String(input);
     const page = Number(url.match(/[?&]page=(?<n>\d+)/u)?.groups?.n ?? "1");
-    const headers = init?.headers as Headers | undefined;
-    calls.push({ auth: headers?.get("Authorization") ?? null, url });
-    return Promise.resolve({
-      json: () => Promise.resolve(pages[page] ?? []),
-      ok: true,
-      status: 200,
-    } as unknown as Response);
-  }) as unknown as typeof fetch;
+    calls.push({ auth: new Headers(init?.headers).get("Authorization"), url });
+    return Promise.resolve(Response.json(pages[page] ?? []));
+  });
   return { calls, fetchImpl };
 };
 
-const failingFetch: typeof fetch = (() =>
-  Promise.resolve({
-    ok: false,
-    status: 404,
-    text: () => Promise.resolve(""),
-  } as unknown as Response)) as unknown as typeof fetch;
+const failingFetch = asFetch(() =>
+  Promise.resolve(new Response("", { status: 404 }))
+);
 
 describe("githubReleasesSource", () => {
   it("watch polls fresh past the dev cache and fires on a new release", async () => {
     let version = 0;
-    const fetchImpl = (() => {
+    const fetchImpl = asFetch(() => {
       version += 1;
-      return Promise.resolve({
-        json: () =>
-          Promise.resolve([
-            makeRelease({ id: version, tag_name: `v${version}.0.0` }),
-          ]),
-        ok: true,
-        status: 200,
-      } as unknown as Response);
-    }) as unknown as typeof fetch;
+      return Promise.resolve(
+        Response.json([
+          makeRelease({ id: version, tag_name: `v${version}.0.0` }),
+        ])
+      );
+    });
     const source = githubReleasesSource(
       {
         fetchImpl,
@@ -179,8 +193,7 @@ describe("githubReleasesSource", () => {
       ctxFor(await tempDir())
     );
     const { entries } = await source.load();
-    const meta = entries[0]?.data as { seo?: { description?: string } };
-    const description = meta.seo?.description ?? "";
+    const description = metaOf(entries[0]).seo?.description ?? "";
     // The section heading and changeset hash prefixes are noise, not summary.
     expect(description).toStartWith("Fix the spacing inside directive");
     expect(description).not.toContain("Patch Changes");
@@ -206,8 +219,7 @@ describe("githubReleasesSource", () => {
       ctxFor(await tempDir())
     );
     const { entries } = await source.load();
-    const meta = entries[0]?.data as { seo?: { description?: string } };
-    const description = meta.seo?.description ?? "";
+    const description = metaOf(entries[0]).seo?.description ?? "";
     expect(description).toEndWith("…");
     // No lone surrogate anywhere: the string must round-trip through UTF-8.
     expect(description).toBe(Buffer.from(description, "utf-8").toString());
@@ -226,10 +238,8 @@ describe("githubReleasesSource", () => {
       ctxFor(await tempDir())
     );
     const { entries } = await source.load();
-    const short = entries[0]?.data as { seo?: { description?: string } };
-    expect(short.seo?.description).toBe("Added widgets");
-    const empty = entries[1]?.data as { seo?: { description?: string } };
-    expect(empty.seo).toBeUndefined();
+    expect(metaOf(entries[0]).seo?.description).toBe("Added widgets");
+    expect(metaOf(entries[1]).seo).toBeUndefined();
   });
 
   it("trims a fullwidth description to the snippet's display columns", async () => {
@@ -244,8 +254,7 @@ describe("githubReleasesSource", () => {
       ctxFor(await tempDir())
     );
     const { entries } = await source.load();
-    const meta = entries[0]?.data as { seo?: { description?: string } };
-    const description = meta.seo?.description ?? "";
+    const description = metaOf(entries[0]).seo?.description ?? "";
     expect(stringWidth(description)).toBeGreaterThanOrEqual(110);
     expect(stringWidth(description)).toBeLessThanOrEqual(160);
     expect(description).toEndWith("…");
@@ -259,8 +268,7 @@ describe("githubReleasesSource", () => {
       ctxFor(await tempDir())
     );
     const { entries } = await source.load();
-    const meta = entries[0]?.data as { seo?: { description?: string } };
-    const description = meta.seo?.description ?? "";
+    const description = metaOf(entries[0]).seo?.description ?? "";
     expect(description.length).toBe(160);
     expect(description).toEndWith("…");
   });
@@ -330,8 +338,7 @@ describe("githubReleasesSource", () => {
     const { entries } = await source.load();
     expect(entries).toHaveLength(3);
     const rc = entries.find((e) => e.ref === "v1-1-0-rc-1.md");
-    const meta = rc?.data as { changelog: { category: string } };
-    expect(meta.changelog.category).toBe("Prerelease");
+    expect(metaOf(rc).changelog?.category).toBe("Prerelease");
   });
 
   it("paginates until a short page and honors the limit", async () => {
@@ -520,8 +527,8 @@ describe("githubReleasesSource", () => {
     const ctx = ctxFor(await tempDir());
     expect(githubReleasesSource(opts, ctx).watch).toBeUndefined();
     expect(
-      typeof githubReleasesSource({ ...opts, pollInterval: 30 }, ctx).watch
-    ).toBe("function");
+      githubReleasesSource({ ...opts, pollInterval: 30 }, ctx).watch
+    ).toBeInstanceOf(Function);
   });
 });
 
@@ -540,6 +547,8 @@ describe("resolveSources (github-releases)", () => {
         ],
       },
     });
+    // SAFETY: resolveSources reads only root, contentRoot, and outDir from the
+    // project context; the remaining fields are never touched.
     const context = {
       contentRoot: "/p/docs",
       outDir: "/p/.blume",
@@ -558,7 +567,7 @@ describe("generateRuntime with a staged changelog source", () => {
   it("makes the changelog page read the staged collection", async () => {
     const root = await mkdtemp(join(tmpdir(), "blume-staged-cl-"));
     dirs.push(root);
-    const files: Record<string, string> = {
+    const files = {
       "blume.config.ts": `export default {
   content: {
     sources: [
@@ -608,7 +617,7 @@ describe("generateRuntime with a staged changelog source", () => {
   it("still generates the /changelog page when the releases source yields nothing", async () => {
     const root = await mkdtemp(join(tmpdir(), "blume-empty-cl-"));
     dirs.push(root);
-    const files: Record<string, string> = {
+    const files = {
       "blume.config.ts": `export default {
   content: {
     sources: [
@@ -631,12 +640,7 @@ describe("generateRuntime with a staged changelog source", () => {
     // The releases API returns no releases, so the source materializes nothing —
     // the page must still be generated so its nav tab does not 404.
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (() =>
-      Promise.resolve({
-        json: () => Promise.resolve([]),
-        ok: true,
-        status: 200,
-      } as unknown as Response)) as unknown as typeof fetch;
+    globalThis.fetch = asFetch(() => Promise.resolve(Response.json([])));
     try {
       const project = await scanProject(root, { mode: "build" });
       await generateRuntime(project);

@@ -12,7 +12,7 @@ import {
 let root: string;
 
 // filename -> file contents (keys sorted to satisfy sort-keys)
-const FILES: Record<string, string> = {
+const FILES = {
   "examples/Card.astro": "<div>card</div>",
   "examples/counter.tsx": "export default function Counter() { return null; }",
   "examples/eager.jsx":
@@ -21,7 +21,7 @@ const FILES: Record<string, string> = {
   "examples/forms/login.tsx": "export default function Login() {}",
   "examples/toggle.svelte": "<button>toggle</button>",
   "examples/widget.vue": "<template><div /></template>",
-};
+} satisfies Record<string, string>;
 
 const byPath = (discovery: Awaited<ReturnType<typeof discoverExamples>>) =>
   new Map(discovery.examples.map((example) => [example.path, example]));

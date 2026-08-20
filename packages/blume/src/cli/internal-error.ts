@@ -33,6 +33,7 @@ export const remapBlumeStack = (stack: string): string =>
  * message, a trimmed stack, and an environment dump for bug reports. Callers
  * exit after this — it doesn't exit itself, so it's testable.
  */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- last-resort handler for whatever a catch clause caught; anything narrower would force casts at every call site
 export const reportInternalError = (error: unknown): void => {
   const err = error instanceof Error ? error : new Error(String(error));
   const lines = [

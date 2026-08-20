@@ -42,6 +42,8 @@ Write `href` as if the site were mounted at the root — a `basePath` is applied
 
 For every indexable page, Blume indexes its title, description, and body reduced to plain text — code blocks, images, and markup are stripped, so results stay relevant. The index is built from your source files, so it's identical in dev and production.
 
+On a [versioned](/docs/content/versioning) site, results default to the version being viewed, with an "All versions" toggle in the dialog footer (remembered per reader). Cross-version hits name their version on the row. Orama, FlexSearch, Algolia, and Typesense honor the scoping — hosted records carry a `version` facet, with the current docs uploaded as `"current"` — while Pagefind stays unscoped, matching its locale behavior.
+
 ## Tags
 
 Add `search.tags` to a page's frontmatter to group it under a filter in the search dialog — readers can narrow results to a tag with a click. Tags also become a facet on the hosted providers.
@@ -65,9 +67,9 @@ search: {
 }
 ```
 
-#### Languages written without spaces
+#### Non-Latin scripts
 
-Orama's standard tokenizer splits on word boundaries that only exist in space-separated scripts, so Japanese, Chinese, Korean, and Thai text would otherwise produce no matches at all. Blume handles this for you: when [`i18n.defaultLocale`](/docs/content/i18n) is one of those languages, the index switches to a word-segmenting tokenizer (built on the browser- and Node-native `Intl.Segmenter`). Declaring your site's language is all it takes:
+Orama's standard tokenizer keeps only basic Latin letters, digits and a handful of accented vowels, so text in any other script — Japanese, Chinese, Korean and Thai, but equally Russian, Greek, Hebrew and Hindi — would otherwise produce no matches at all. Blume handles this for you: when [`i18n.defaultLocale`](/docs/content/i18n) resolves to a non-Latin script, the index switches to a word-segmenting tokenizer (built on the browser- and Node-native `Intl.Segmenter`). Declaring your site's language is all it takes:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -76,7 +78,7 @@ i18n: {
 }
 ```
 
-The same tokenizer serves the search dialog, the MCP server's `search_docs` tool, and Ask AI grounding. On a mixed-language site the whole index shares the default locale's tokenizer — that's safe, because Latin words survive segmentation intact, so pages in English (or any spaced language) stay searchable alongside the default language.
+The same tokenizer serves the search dialog, the MCP server's `search_docs` tool, and Ask AI grounding. The script is what decides, not the language name — `az-Cyrl` is segmented while `sr-Latn` is not — and it is the default locale that decides for the whole index: on a mixed-language site every page shares the default locale's tokenizer. With a non-Latin default that's safe, because Latin words survive segmentation intact, so pages in English stay searchable alongside the default language. The reverse doesn't hold: non-Latin translations on a Latin-default site aren't searchable. Latin-script languages that lean heavily on diacritics (Vietnamese, or Serbian in Latin script) also fare worse on the standard tokenizer, which folds only a few accented vowels and splits words on the rest.
 
 Japanese and Chinese go one step further. Segmenting alone indexes a compound term as its parts — 資金決済法 as 資金, 決済 and 法 — which lets a page mentioning each part somewhere outrank the page the term is actually about. Han, Hiragana and Katakana are therefore indexed as overlapping character pairs, and queries on those indexes prefer pages carrying a term's pairs together, loosening to any-pair matching when no page carries them all, so typing a whole sentence still returns its closest pages. Korean and Thai keep their segmented words.
 
@@ -84,7 +86,7 @@ Japanese and Chinese go one step further. Segmenting alone indexes a compound te
 
 A second keyless, client-side option. It reuses the same `/blume-search.json` index Orama ships and builds a [FlexSearch](https://github.com/nextapps-de/flexsearch) document index in the browser. Works in `blume dev` and `blume build`.
 
-FlexSearch has no equivalent segmentation hook, so for sites in Japanese, Chinese, Korean, or Thai prefer Orama (the default) or [Pagefind](#pagefind), whose `pagefind_extended` binary segments those languages natively.
+FlexSearch has no equivalent segmentation hook, so for sites in a non-Latin script prefer Orama (the default) or [Pagefind](#pagefind), whose `pagefind_extended` binary indexes a broad set of languages and segments Chinese, Japanese and Korean natively.
 
 ```ts blume.config.ts lineNumbers
 search: {

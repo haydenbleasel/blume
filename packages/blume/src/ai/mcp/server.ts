@@ -1,4 +1,5 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import {
   CallToolRequestSchema,
@@ -33,7 +34,7 @@ const MAX_SEARCH_LIMIT = 20;
 /** Excerpt length when a page has no description. */
 const EXCERPT_LENGTH = 200;
 
-const CORS_HEADERS: Record<string, string> = {
+const CORS_HEADERS = {
   "Access-Control-Allow-Headers":
     "Content-Type, Mcp-Session-Id, Mcp-Protocol-Version",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -65,11 +66,15 @@ const contentTypesField = z.preprocess((value) => {
  * The optional facet filter `search_docs` and `list_pages` share. Only
  * string-valued entries survive; an empty `{}` means "no filter".
  */
+/** Accepts any plain object, so the string-valued entries can be sifted out. */
+const looseFacetObject = z.record(z.string(), z.unknown());
+
 const filtersField = z.preprocess((value) => {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  const candidate = looseFacetObject.safeParse(value);
+  if (!candidate.success) {
     return;
   }
-  const entries = Object.entries(value).filter(
+  const entries = Object.entries(candidate.data).filter(
     (entry): entry is [string, string] => typeof entry[1] === "string"
   );
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
@@ -78,7 +83,9 @@ const filtersField = z.preprocess((value) => {
 /** Clamped into range rather than rejected; non-numeric means the default. */
 const limitField = z.preprocess(
   (value) => {
-    const num = typeof value === "number" ? value : Number(value);
+    // `Number` is the identity on numbers, so one conversion covers both the
+    // well-typed call and a numeric string.
+    const num = Number(value);
     return Number.isFinite(num)
       ? Math.min(Math.max(Math.trunc(num), 1), MAX_SEARCH_LIMIT)
       : undefined;
@@ -93,26 +100,55 @@ const limitField = z.preprocess(
 
 /** A required text field; a missing or non-string value coerces to "". */
 const textField = (description: string) =>
-  z.preprocess(
-    (value) => (typeof value === "string" ? value : ""),
-    z.string().describe(description)
-  );
+  z.preprocess((value) => {
+    const parsed = z.string().safeParse(value);
+    return parsed.success ? parsed.data : "";
+  }, z.string().describe(description));
+
+/** An optional trimmed text field; blank or non-string means "absent". */
+const optionalTextField = (description: string) =>
+  z.preprocess((value) => {
+    const parsed = z.string().safeParse(value);
+    const trimmed = parsed.success ? parsed.data.trim() : "";
+    return trimmed || undefined;
+  }, z.string().optional().describe(description));
+
+/** The optional locale filter `search_docs` and `list_pages` share. */
+const localeField = optionalTextField(
+  "Only include pages in this locale (e.g. `fr`). Omit for every language."
+);
+
+/** The optional docs-version scope `search_docs` and `list_pages` share. */
+const versionField = optionalTextField(
+  'Docs version to scope to on a versioned site: `"latest"` (the default — current docs only), `"all"` (every version), or an archived version id (e.g. `"v1.0"`). Ignored when the site is unversioned.'
+);
 
 /** Every tool's input schema — the runtime parse and tools/list source. */
 const TOOL_INPUTS = {
-  get_navigation: z.object({}),
+  get_navigation: z.object({
+    locale: optionalTextField(
+      "Locale whose navigation tree to return (defaults to the default locale)."
+    ),
+    version: optionalTextField(
+      "Archived version id whose tree to return (defaults to the current docs)."
+    ),
+  }),
   get_page: z.object({
     route: textField("The page route, e.g. `/guides/install`."),
   }),
   list_pages: z.object({
     contentTypes: contentTypesField,
     filters: filtersField,
+    locale: localeField,
+    version: versionField,
   }),
   search_docs: z.object({
     contentTypes: contentTypesField,
     filters: filtersField,
     limit: limitField,
+    locale: localeField,
     query: textField("The search query."),
+    version: versionField,
   }),
 };
 
@@ -122,7 +158,7 @@ const TOOL_INPUTS = {
  * runtime strips unknown keys rather than rejecting them, and the advertised
  * schema shouldn't promise stricter validation than the server performs.
  */
-const inputSchemaFor = (schema: z.ZodType): Record<string, unknown> => {
+const inputSchemaFor = (schema: z.ZodType) => {
   const {
     $schema: _dialect,
     additionalProperties: _closed,
@@ -136,11 +172,36 @@ const TOOL_DEFINITIONS = MCP_TOOLS.map((tool) => ({
   annotations: tool.annotations,
   description: tool.description,
   inputSchema: inputSchemaFor(
+    // SAFETY: TOOL_INPUTS declares a schema for every MCP_TOOLS name; the two
+    // lists are maintained together so names and descriptions never drift.
     TOOL_INPUTS[tool.name as keyof typeof TOOL_INPUTS]
   ),
   name: tool.name,
   title: tool.title,
 }));
+
+/** One `search_docs` result entry; `version` only appears on versioned sites. */
+interface SearchHitPayload {
+  contentType: string | undefined;
+  excerpt: string;
+  facets: Record<string, string> | undefined;
+  route: string;
+  title: string;
+  url: string;
+  version?: string;
+}
+
+/** One `list_pages` entry; `version` only appears on versioned sites. */
+interface PageListingPayload {
+  contentType: string;
+  description: string | undefined;
+  facets: Record<string, string> | undefined;
+  lastModified: string | null;
+  route: string;
+  title: string;
+  url: string;
+  version?: string;
+}
 
 /** Whether a page's facet values satisfy every requested filter entry. */
 const matchesFacets = (
@@ -148,6 +209,47 @@ const matchesFacets = (
   filters: Record<string, string>
 ): boolean =>
   Object.entries(filters).every(([key, value]) => facets?.[key] === value);
+
+/**
+ * Resolve the `version` scope on a versioned site: `undefined` disables the
+ * filter (`"all"`), `""` is the current docs (the default — agents almost
+ * always want the live documentation), and anything else is an archived id
+ * (an unknown id simply matches nothing). On an unversioned site the input is
+ * ignored entirely. The input arrives pre-trimmed (blank coerced to absent)
+ * from the tool's input schema.
+ */
+const asVersionScope = (
+  value: string | undefined,
+  data: McpData
+): string | undefined => {
+  if (!data.archivedVersions) {
+    return;
+  }
+  if (value === "all") {
+    return;
+  }
+  if (value === undefined || value === "latest" || value === "current") {
+    return "";
+  }
+  return value;
+};
+
+/**
+ * Error message for a `get_navigation` version id that isn't a configured
+ * archived version, or `null` when the id is valid (or the site is
+ * unversioned, where the id is ignored like the other tools' scopes). Unlike
+ * `asVersionScope`'s match-nothing filters, a bad id here would otherwise
+ * silently return the *current* tree posing as the requested snapshot.
+ */
+const unknownVersionError = (
+  versionId: string | undefined,
+  data: McpData
+): string | null =>
+  versionId &&
+  data.archivedVersions &&
+  !data.archivedVersions.includes(versionId)
+    ? `Unknown version "${versionId}". Archived versions: ${data.archivedVersions.join(", ")}.`
+    : null;
 
 /**
  * Normalize a user-supplied route to a `pages` key (`/`, `/a/b`, no suffix).
@@ -196,10 +298,11 @@ const excerptFor = (doc: OramaDoc): string => {
   return doc.content.length > EXCERPT_LENGTH ? `${head}…` : head;
 };
 
-const text = (value: string, isError = false) => ({
-  content: [{ text: value, type: "text" as const }],
-  ...(isError ? { isError: true } : {}),
-});
+/** A tool call's text result, marked as an error when `isError` is set. */
+const text = (value: string, isError = false) => {
+  const content = [{ text: value, type: "text" as const }];
+  return isError ? { content, isError: true } : { content };
+};
 
 /** Lazily builds the Orama index over a snapshot's documents, once. */
 export type OramaIndexProvider = () => Promise<
@@ -208,8 +311,9 @@ export type OramaIndexProvider = () => Promise<
 
 /**
  * Memoize the search index so every server built from a snapshot shares it.
- * `locale` is the snapshot's `defaultLocale`, forwarded so unspaced scripts
- * (Japanese, Chinese, Korean, Thai) get a word-segmenting tokenizer.
+ * `locale` is the snapshot's `defaultLocale`, forwarded so non-Latin scripts
+ * (Japanese and Chinese, but equally Cyrillic, Greek, Hebrew, Devanagari…)
+ * get a word-segmenting tokenizer.
  */
 export const createIndexProvider = (
   documents: OramaDoc[],
@@ -227,12 +331,12 @@ export const buildServer = (
   data: McpData,
   index: OramaIndexProvider
 ): Server => {
+  const serverOptions: ServerOptions = data.instructions
+    ? { capabilities: { tools: {} }, instructions: data.instructions }
+    : { capabilities: { tools: {} } };
   const server = new Server(
     { name: data.name, version: data.version },
-    {
-      capabilities: { tools: {} },
-      ...(data.instructions ? { instructions: data.instructions } : {}),
-    }
+    serverOptions
   );
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
@@ -252,18 +356,26 @@ export const buildServer = (
         {
           contentTypes: input.contentTypes,
           facets: input.filters,
+          locale: input.locale,
+          version: asVersionScope(input.version, data),
         }
       );
       // `route` is the key `get_page` takes (the tool descriptions promise
       // it); `url` is where the page is served.
-      const results = hits.map((doc: OramaDoc) => ({
-        contentType: doc.contentType,
-        excerpt: excerptFor(doc),
-        facets: doc.facets,
-        route: doc.route,
-        title: doc.title,
-        url: urlFor(doc.route, data),
-      }));
+      const results = hits.map((doc: OramaDoc) => {
+        const hit: SearchHitPayload = {
+          contentType: doc.contentType,
+          excerpt: excerptFor(doc),
+          facets: doc.facets,
+          route: doc.route,
+          title: doc.title,
+          url: urlFor(doc.route, data),
+        };
+        if (data.archivedVersions) {
+          hit.version = doc.version ?? "";
+        }
+        return hit;
+      });
       return text(JSON.stringify(results, null, 2));
     }
 
@@ -281,23 +393,33 @@ export const buildServer = (
     }
 
     if (name === "list_pages") {
-      const { contentTypes, filters } = TOOL_INPUTS.list_pages.parse(args);
+      const input = TOOL_INPUTS.list_pages.parse(args);
+      const { contentTypes, filters, locale } = input;
+      const versionScope = asVersionScope(input.version, data);
       const routes = data.routes.filter(
         (route) =>
           (!contentTypes || contentTypes.includes(route.contentType)) &&
-          (!filters || matchesFacets(route.facets, filters))
+          (!filters || matchesFacets(route.facets, filters)) &&
+          (!locale || route.locale === locale) &&
+          (versionScope === undefined || route.version === versionScope)
       );
       return text(
         JSON.stringify(
-          routes.map((route) => ({
-            contentType: route.contentType,
-            description: route.description,
-            facets: route.facets,
-            lastModified: route.lastModified,
-            route: route.route,
-            title: route.title,
-            url: urlFor(route.route, data),
-          })),
+          routes.map((route) => {
+            const listing: PageListingPayload = {
+              contentType: route.contentType,
+              description: route.description,
+              facets: route.facets,
+              lastModified: route.lastModified,
+              route: route.route,
+              title: route.title,
+              url: urlFor(route.route, data),
+            };
+            if (data.archivedVersions) {
+              listing.version = route.version;
+            }
+            return listing;
+          }),
           null,
           2
         )
@@ -305,7 +427,31 @@ export const buildServer = (
     }
 
     if (name === "get_navigation") {
-      return text(JSON.stringify(data.navigation, null, 2));
+      // A version id selects the snapshot's tree; a locale selects its
+      // language (falling back through the default locale to any tree the
+      // snapshot has). Without a version, a locale selects the current docs'
+      // localized tree. An unknown id on a versioned site is an error — the
+      // current tree would silently masquerade as the requested snapshot.
+      const { locale, version: versionId } =
+        TOOL_INPUTS.get_navigation.parse(args);
+      const unknownVersion = unknownVersionError(versionId, data);
+      if (unknownVersion) {
+        return text(unknownVersion, true);
+      }
+      let { navigation } = data;
+      const byLocale = versionId
+        ? data.navigationByVersion?.[versionId]
+        : undefined;
+      if (byLocale) {
+        navigation =
+          (locale ? byLocale[locale] : undefined) ??
+          byLocale[data.defaultLocale ?? ""] ??
+          Object.values(byLocale)[0] ??
+          navigation;
+      } else if (locale && data.navigationByLocale?.[locale]) {
+        navigation = data.navigationByLocale[locale];
+      }
+      return text(JSON.stringify(navigation, null, 2));
     }
 
     return text(`Unknown tool: ${name}`, true);

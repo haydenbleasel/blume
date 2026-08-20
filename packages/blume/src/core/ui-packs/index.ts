@@ -47,7 +47,15 @@ import { zh } from "./zh.ts";
  * `zh-TW`). A locale's pack is merged onto English by {@link resolveUIStrings},
  * so a pack only needs the keys it translates.
  */
-export const UI_PACKS: Record<string, UIStringsOverride> = {
+/**
+ * Starter packs keyed by locale code. Open-keyed on purpose: resolvers look
+ * packs up by whatever locale a project configures, not only the codes here.
+ */
+interface UiPackRegistry {
+  [locale: string]: UIStringsOverride;
+}
+
+export const UI_PACKS: UiPackRegistry = {
   ar,
   bg,
   bn,

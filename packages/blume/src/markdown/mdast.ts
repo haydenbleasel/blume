@@ -5,15 +5,29 @@
  * Satteri's real `MdastPlugin` type at a single boundary in `index.ts`.
  */
 
+/**
+ * A property value on an MDAST node: primitives, nested nodes, and lists of
+ * either. Covers everything Blume's plugins read or build (positions, data
+ * flags, attribute lists) without admitting functions or class instances.
+ */
+export type MdastValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | MdastValue[]
+  | { [key: string]: MdastValue };
+
 /** The visitor context Blume's plugins use to mutate the tree. */
 export interface MdastVisitorContext {
-  replaceNode: (node: unknown, replacement: unknown) => void;
+  replaceNode: (node: MdastNode, replacement: MdastNode) => void;
 }
 
 /** Any MDAST node, keyed loosely since we build a small subset by hand. */
 export interface MdastNode {
   type: string;
-  [key: string]: unknown;
+  [key: string]: MdastValue;
 }
 
 /** Build an MDX JSX attribute. A `null` value renders as a boolean attribute. */
@@ -29,14 +43,14 @@ type JsxAttribute = ReturnType<typeof jsxAttribute>;
 export const jsxFlowElement = (
   name: string,
   attributes: JsxAttribute[],
-  children: unknown[]
+  children: MdastValue[]
 ) => ({ attributes, children, name, type: "mdxJsxFlowElement" });
 
 /** Build an inline MDX JSX element (phrasing context). */
 export const jsxTextElement = (
   name: string,
   attributes: JsxAttribute[],
-  children: unknown[] = []
+  children: MdastValue[] = []
 ) => ({ attributes, children, name, type: "mdxJsxTextElement" });
 
 /** Build a fenced code block node. */

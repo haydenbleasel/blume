@@ -22,7 +22,7 @@ const makeProject = async (files: Record<string, string>): Promise<string> => {
   return root;
 };
 
-const CONTENT: Record<string, string> = {
+const CONTENT = {
   "docs/bad.md": "---\nnope: 1\n---\n# Bad\n",
   "docs/draft.md": "---\ntitle: Draft\ndraft: true\n---\n# Draft\n",
   "docs/index.md": "# Home\n",
@@ -173,6 +173,7 @@ export default { content: { types: { rfc: { frontmatter: { status } } } } };`,
       thrown = error;
     }
     expect(thrown).toBeInstanceOf(BlumeError);
+    // SAFETY: asserted to be a BlumeError on the line above.
     expect((thrown as BlumeError).diagnostic.code).toBe(
       "BLUME_CONTENT_ROOT_MISSING"
     );

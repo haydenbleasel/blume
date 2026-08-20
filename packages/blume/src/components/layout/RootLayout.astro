@@ -3,13 +3,16 @@ import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import { resolveDateFormatOptions } from "../../core/date-format.ts";
 import type { ResolvedDateFormat } from "../../core/schema.ts";
-import type { BlumeClientData } from "../../core/data.ts";
+import type { BlumeClientData, BlumeFavicon } from "../../core/data.ts";
 import type {
   Heading,
   LocaleSwitchOption,
   Navigation,
+  NavSelector as NavSelectorType,
 } from "../../core/types.ts";
 import "blume:theme";
+import { ClientRouter } from "astro:transitions";
+import type { FontHead } from "../../theme/fonts.ts";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import {
   OG_IMAGE_HEIGHT,
@@ -34,7 +37,7 @@ import {
 import Header from "./Header.astro";
 import Icon from "../Icon.astro";
 import {
-  activeTabForRoute,
+  currentTabForRoute,
   findBreadcrumbs,
   flattenPages,
   getPagination,
@@ -46,6 +49,7 @@ import PageActions from "./PageActions.astro";
 import PageFeedback from "./PageFeedback.astro";
 import Pagination from "./Pagination.astro";
 import TableOfContents from "./TableOfContents.astro";
+import VersionBanner from "./VersionBanner.astro";
 
 interface Props {
   site: { title: string; description?: string };
@@ -57,14 +61,8 @@ interface Props {
     href: string;
     text?: string;
   } | null;
-  favicon?: {
-    href: string;
-    type?: string;
-  } | null;
-  appleIcon?: {
-    href: string;
-    type?: string;
-  } | null;
+  favicon?: BlumeFavicon | null;
+  appleIcon?: BlumeFavicon | null;
   banner?: {
     content: string;
     link?: { text: string; href: string };
@@ -88,7 +86,7 @@ interface Props {
   imageZoom?: boolean;
   codeWrap?: boolean;
   themeMode: "system" | "light" | "dark";
-  fontCssVars?: string[];
+  fontCssVars?: (string | FontHead)[];
   searchEnabled: boolean;
   indexable: boolean;
   ogImage?: string | null;
@@ -149,6 +147,16 @@ interface Props {
   xDefault?: string | null;
   /** Language-switcher entries for the current page. */
   localeSwitch?: LocaleSwitchOption[];
+  /** Auto-populated version switcher (`null` when versioning is off or a user selector owns it). */
+  versionSelector?: NavSelectorType | null;
+  /** Old-version notice for archived pages (`null` on current-docs pages). */
+  versionNotice?: {
+    message: string;
+    latestHref: string;
+    latestLabel: string;
+  } | null;
+  /** Viewed docs version for search filtering (`""` = current; `null`/absent = off). */
+  searchVersion?: string | null;
   /**
    * User layout-slot overrides from `components.ts` (`defineComponents`). Each
    * key replaces the matching built-in; unknown keys are ignored. Wired slots:
@@ -220,6 +228,9 @@ const {
   localeAlternates,
   xDefault,
   localeSwitch,
+  versionSelector,
+  versionNotice,
+  searchVersion = null,
   layout = {},
   clientData,
   toc = { enabled: true, maxLevel: 3, minLevel: 2 },
@@ -340,14 +351,21 @@ const mcpUrl =
 // pages. Without tabs — or on a route under none — this is the full sidebar.
 // `navigation.root` keeps the root-tab check in the tabs' localized/based
 // path space (`/en`, `/docs`), so a locale or base prefix doesn't misread the
-// root tab as a section tab.
+// root tab as a section tab; in an archived version tree the root is
+// versionized (`/v1.0`) while tabs stay in current-docs space, so the root
+// tab is matched by containment and the snapshot renders unscoped — the same
+// reason no tab is marked current there (tabs link back to current docs).
 const sidebar = sidebarForRoute(
   navigation.sidebar,
   navigation.tabs,
   page.route,
   navigation.root
 );
-const activeTab = activeTabForRoute(navigation.tabs, page.route);
+const activeTab = currentTabForRoute(
+  navigation.tabs,
+  page.route,
+  navigation.root
+);
 const crumbs = findBreadcrumbs(sidebar, page.route);
 const { prev, next } = getPagination(flattenPages(sidebar), page.route);
 
@@ -382,6 +400,13 @@ const bannerKey = banner?.dismissible ? banner.key : null;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* Client-side navigation: same-origin link clicks swap the DOM in place
+        instead of tearing the document down, so no browser ever paints a blank
+        frame between pages (Firefox has no cross-document paint holding and
+        flickered on every full load). Uses native view transitions where
+        supported, with Astro's simulated fade elsewhere; pairs with the
+        prefetch option in the generated Astro config. */}
+    <ClientRouter />
     <title>{pageTitle}</title>
     <Favicon favicon={favicon} appleIcon={appleIcon} />
     <Fonts cssVars={fontCssVars ?? []} />
@@ -499,16 +524,19 @@ const bannerKey = banner?.dismissible ? banner.key : null;
       href="#blume-content">{strings.page.skipToContent}</a
     >
     <Banner banner={banner} strings={strings.banner} />
+    <VersionBanner notice={versionNotice ?? null} />
     <HeaderSlot
       askEnabled={askEnabled}
       askStrings={strings.ask}
       layout={layout}
       localeSwitch={localeSwitch}
+      versionSelector={versionSelector}
       logo={logo}
       navigation={navigation}
       route={page.route}
       searchEnabled={searchEnabled}
       searchLocale={searchLocale}
+      searchVersion={searchVersion}
       navStrings={navStrings}
       searchStrings={strings.search}
       site={site}
@@ -725,6 +753,8 @@ const bannerKey = banner?.dismissible ? banner.key : null;
       // Tree-shaken out of production builds.
       import "./hydration-hint.ts";
 
+      // Runs once per real page load; re-syncs itself after client-router
+      // swaps (see drawer-inert.ts).
       syncDrawerInert();
 
       const svg = (name: string, cls = "") =>
@@ -735,14 +765,6 @@ const bannerKey = banner?.dismissible ? banner.key : null;
       const buttonClass =
         "absolute right-3 z-[2] inline-flex size-[1.875rem] select-none items-center justify-center rounded-md text-muted-foreground bg-background transition-colors [&_svg]:pointer-events-none [&_svg]:shrink-0";
       const idleClasses = ["hover:bg-muted", "hover:text-foreground"];
-
-      // Localized copy-button labels, stamped on <body> by the layout markup
-      // (the Search.astro data-attribute channel) since this bundled script
-      // can't interpolate server values directly.
-      const copyCodeLabel =
-        document.body.getAttribute("data-i18n-copy-code") || "Copy code";
-      const copiedLabel =
-        document.body.getAttribute("data-i18n-copied") || "Copied!";
 
       const languageLabels: Record<string, string> = {
         astro: "Astro",
@@ -765,111 +787,131 @@ const bannerKey = banner?.dismissible ? banner.key : null;
         zsh: "Zsh",
       };
 
-      for (const pre of document.querySelectorAll(".prose pre")) {
-        if (pre.querySelector("[data-blume-copy]")) {
-          continue;
-        }
-        // Skip nested <pre>: Twoslash renders each hover popup's type signature
-        // as a <pre> inside the code block, which shouldn't get its own button.
-        if (pre.parentElement?.closest("pre")) {
-          continue;
-        }
-        const language = pre.getAttribute("data-language");
-        if (language) {
-          pre.setAttribute(
-            "data-language",
-            languageLabels[language.toLowerCase()] ?? language
-          );
-        }
-        pre.classList.add("group", "relative");
-        // The code element is the scroll container (see the theme entry), but
-        // Shiki's tab stop lands on the pre, which no longer scrolls. Move the
-        // stop to the code so keyboard users can actually scroll the block
-        // (WCAG 2.1.1 — the same rule the table wrapper handles). Twoslash and
-        // API-panel blocks keep the pre as their scroller, so theirs stays.
-        const scroller = pre.querySelector("code");
-        if (scroller && !pre.matches(".twoslash, blume-panel-tabs *")) {
-          scroller.setAttribute("tabindex", "0");
-          pre.removeAttribute("tabindex");
-        }
-        const button = document.createElement("button");
-        button.type = "button";
-        // The language-label bar (prose) vs flush code (tabs) need a different
-        // offset; pick the Tailwind class by context instead of a CSS override.
-        const topClass = pre.closest("blume-tabs, .not-prose")
-          ? "top-2.5"
-          : "top-2";
-        button.className = `${buttonClass} ${idleClasses.join(" ")} ${topClass}`;
-        button.setAttribute("data-blume-copy", "");
-        button.setAttribute("aria-label", copyCodeLabel);
-        button.innerHTML =
-          svg(
-            "check",
-            "scale-0 text-green-600 transition-transform dark:text-green-500"
-          ) + svg("copy", "absolute transition-transform");
-        const [checkIcon, copyIcon] = button.querySelectorAll("svg");
-        // While checked the button drops its idle hover tint so the green
-        // check reads as a steady confirmation, mirroring Lina's copied state.
-        // The accessible name tracks the visual state for anyone probing the
-        // button mid-confirmation.
-        const setChecked = (checked: boolean) => {
-          checkIcon?.classList.toggle("scale-0", !checked);
-          copyIcon?.classList.toggle("scale-0", checked);
-          button.setAttribute(
-            "aria-label",
-            checked ? copiedLabel : copyCodeLabel
-          );
-          for (const cls of idleClasses) {
-            button.classList.toggle(cls, !checked);
-          }
-        };
-        const flash = createCopyFlash(setChecked, copiedLabel);
-        button.addEventListener("click", async () => {
-          const code = pre.querySelector("code");
-          let text = code?.textContent ?? "";
-          // Twoslash nests each hover popup's type signature and docs inside
-          // the <code>; copying textContent verbatim would interleave them
-          // with the source. Strip the popups from a clone first.
-          if (code?.querySelector(".twoslash-popup-container")) {
-            const clone = code.cloneNode(true) as HTMLElement;
-            for (const popup of clone.querySelectorAll(
-              ".twoslash-popup-container"
-            )) {
-              popup.remove();
-            }
-            text = clone.textContent ?? "";
-          }
-          if (await copyText(text)) {
-            flash();
-          }
-        });
-        pre.appendChild(button);
-      }
+      // Per-page setup, run on the initial load and again after every
+      // client-router swap (which replaces the body with server-rendered
+      // markup that has none of this applied). Everything in here binds to
+      // elements the swap just created, so nothing double-attaches.
+      const initPage = async () => {
+        // Localized copy-button labels, stamped on <body> by the layout markup
+        // (the Search.astro data-attribute channel) since this bundled script
+        // can't interpolate server values directly. Read per page so a
+        // cross-locale navigation picks up the new language's labels.
+        const copyCodeLabel =
+          document.body.getAttribute("data-i18n-copy-code") || "Copy code";
+        const copiedLabel =
+          document.body.getAttribute("data-i18n-copied") || "Copied!";
 
-      // Click-to-zoom for content images (gated by `markdown.imageZoom`),
-      // via medium-zoom: ESC/scroll/click dismissal, natural-size capping,
-      // and the open/close transition races are its problem, not ours.
-      // Opt out per-image with `data-no-zoom`.
-      if (document.body.hasAttribute("data-blume-image-zoom")) {
-        const zoomTargets = Array.from(
-          document.querySelectorAll<HTMLImageElement>(
-            ".prose img:not([data-no-zoom])"
-          )
-          // An image that is itself a link navigates on click — binding zoom
-          // to it would flash a zoom overlay in the instant before navigation
-          // and advertise (via the cursor) a zoom that never happens.
-        ).filter((image) => !image.closest("a"));
-        if (zoomTargets.length > 0) {
-          // Lazy: pages without a zoomable image never load the library,
-          // matching how mermaid is only fetched on pages with a diagram.
-          const { default: mediumZoom } = await import("medium-zoom");
-          mediumZoom(zoomTargets, {
-            background:
-              "color-mix(in oklab, var(--color-background) 80%, transparent)",
-            margin: 24,
+        for (const pre of document.querySelectorAll(".prose pre")) {
+          if (pre.querySelector("[data-blume-copy]")) {
+            continue;
+          }
+          // Skip nested <pre>: Twoslash renders each hover popup's type signature
+          // as a <pre> inside the code block, which shouldn't get its own button.
+          if (pre.parentElement?.closest("pre")) {
+            continue;
+          }
+          const language = pre.getAttribute("data-language");
+          if (language) {
+            pre.setAttribute(
+              "data-language",
+              languageLabels[language.toLowerCase()] ?? language
+            );
+          }
+          pre.classList.add("group", "relative");
+          // The code element is the scroll container (see the theme entry), but
+          // Shiki's tab stop lands on the pre, which no longer scrolls. Move the
+          // stop to the code so keyboard users can actually scroll the block
+          // (WCAG 2.1.1 — the same rule the table wrapper handles). Twoslash and
+          // API-panel blocks keep the pre as their scroller, so theirs stays.
+          const scroller = pre.querySelector("code");
+          if (scroller && !pre.matches(".twoslash, blume-panel-tabs *")) {
+            scroller.setAttribute("tabindex", "0");
+            pre.removeAttribute("tabindex");
+          }
+          const button = document.createElement("button");
+          button.type = "button";
+          // The language-label bar (prose) vs flush code (tabs) need a different
+          // offset; pick the Tailwind class by context instead of a CSS override.
+          const topClass = pre.closest("blume-tabs, .not-prose")
+            ? "top-2.5"
+            : "top-2";
+          button.className = `${buttonClass} ${idleClasses.join(" ")} ${topClass}`;
+          button.setAttribute("data-blume-copy", "");
+          button.setAttribute("aria-label", copyCodeLabel);
+          button.innerHTML =
+            svg(
+              "check",
+              "scale-0 text-green-600 transition-transform dark:text-green-500"
+            ) + svg("copy", "absolute transition-transform");
+          const [checkIcon, copyIcon] = button.querySelectorAll("svg");
+          // While checked the button drops its idle hover tint so the green
+          // check reads as a steady confirmation, mirroring Lina's copied state.
+          // The accessible name tracks the visual state for anyone probing the
+          // button mid-confirmation.
+          const setChecked = (checked: boolean) => {
+            checkIcon?.classList.toggle("scale-0", !checked);
+            copyIcon?.classList.toggle("scale-0", checked);
+            button.setAttribute(
+              "aria-label",
+              checked ? copiedLabel : copyCodeLabel
+            );
+            for (const cls of idleClasses) {
+              button.classList.toggle(cls, !checked);
+            }
+          };
+          const flash = createCopyFlash(setChecked, copiedLabel);
+          button.addEventListener("click", async () => {
+            const code = pre.querySelector("code");
+            let text = code?.textContent ?? "";
+            // Twoslash nests each hover popup's type signature and docs inside
+            // the <code>; copying textContent verbatim would interleave them
+            // with the source. Strip the popups from a clone first.
+            if (code?.querySelector(".twoslash-popup-container")) {
+              const clone = code.cloneNode(true) as HTMLElement;
+              for (const popup of clone.querySelectorAll(
+                ".twoslash-popup-container"
+              )) {
+                popup.remove();
+              }
+              text = clone.textContent ?? "";
+            }
+            if (await copyText(text)) {
+              flash();
+            }
           });
+          pre.appendChild(button);
         }
-      }
+
+        // Click-to-zoom for content images (gated by `markdown.imageZoom`),
+        // via medium-zoom: ESC/scroll/click dismissal, natural-size capping,
+        // and the open/close transition races are its problem, not ours.
+        // Opt out per-image with `data-no-zoom`.
+        if (document.body.hasAttribute("data-blume-image-zoom")) {
+          const zoomTargets = Array.from(
+            document.querySelectorAll<HTMLImageElement>(
+              ".prose img:not([data-no-zoom])"
+            )
+            // An image that is itself a link navigates on click — binding zoom
+            // to it would flash a zoom overlay in the instant before navigation
+            // and advertise (via the cursor) a zoom that never happens.
+          ).filter((image) => !image.closest("a"));
+          if (zoomTargets.length > 0) {
+            // Lazy: pages without a zoomable image never load the library,
+            // matching how mermaid is only fetched on pages with a diagram.
+            const { default: mediumZoom } = await import("medium-zoom");
+            mediumZoom(zoomTargets, {
+              background:
+                "color-mix(in oklab, var(--color-background) 80%, transparent)",
+              margin: 24,
+            });
+          }
+        }
+      };
+
+      void initPage();
+      document.addEventListener("astro:after-swap", () => {
+        void initPage();
+      });
     </script>
     <style is:global>
       /* medium-zoom ships no z-index; lift the lightbox above the chrome

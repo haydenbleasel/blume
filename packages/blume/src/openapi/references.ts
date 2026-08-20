@@ -60,9 +60,10 @@ export interface ReferenceSource {
   theme?: string;
   /**
    * Arbitrary Scalar config forwarded to `<ScalarComponent>` (Scalar renderer
-   * only). Takes precedence over Blume's derived spec/theme config.
+   * only). Takes precedence over Blume's derived spec/theme config. Typed off
+   * the config schema so the two can never drift.
    */
-  scalar?: Record<string, unknown>;
+  scalar?: ResolvedConfig["openapi"]["scalar"];
   /** Display options carried through to the Blume renderer. */
   display: ReferenceDisplay;
   /**

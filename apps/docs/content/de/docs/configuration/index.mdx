@@ -141,6 +141,18 @@ my-docs/
 
 Sind mehrere vorhanden, gewinnt SVG vor PNG vor ICO, und eine Datei in `public/` wird gegenüber einer im Stammverzeichnis bevorzugt. Findet Blume kein Icon, greift es auf die eigene Bildmarke zurück.
 
+Eine dunkle Bildmarke verschwindet vor dunkler Browser-Oberfläche, deshalb kannst du eine zweite Datei für den Dunkelmodus mitliefern. Lege eine `-dark`-Geschwisterdatei neben deine Icon-Datei — gleicher Name, gleiches Verzeichnis, mit `-dark` vor der Dateiendung (`icon.png` → `icon-dark.png`) — und Blume gibt beide Icons hinter einer `prefers-color-scheme`-Media-Query aus, plus ein einfaches helles Tag für Browser und Crawler, die Media Queries bei Icons ignorieren:
+
+```
+my-docs/
+├─ blume.config.ts
+├─ icon.png          ← light mode
+├─ icon-dark.png     ← dark mode
+└─ docs/
+```
+
+Verwendet wird nur die Geschwisterdatei des Icons, das Blume ausgewählt hat — eine `-dark`-Datei mit einem anderen Namen bleibt unbeachtet, sodass sich keine unbeteiligte Datei versehentlich mit deiner Bildmarke paaren kann. Die dunkle Datei ist optional; bei nur einem Icon gibt Blume wie bisher ein einzelnes Tag aus. Blumes eigene Fallback-Bildmarke bringt beide Varianten mit.
+
 ### Apple-Touch-Icon
 
 Das Symbol, das iOS verwendet, wenn jemand deine Website zum Home-Bildschirm hinzufügt, wird auf dieselbe Weise erkannt. Lege eine `apple-icon`-Datei (`.png`, `.jpg` oder `.jpeg`) — oder eine `apple-touch-icon.png`, den Namen, den die meisten Favicon-Generatoren ausgeben — in das Stammverzeichnis deines Projekts oder in das Verzeichnis `public/`, und Blume richtet `<link rel="apple-touch-icon">` für dich ein. Es gibt keinen Standardwert; wird keine Datei gefunden, wird kein Tag ausgegeben.
@@ -152,7 +164,7 @@ my-docs/
 └─ docs/
 ```
 
-Lege die Datei in `public/` statt in das Stammverzeichnis des Projekts: iOS ignoriert die Inline-Daten-URI, die Blume für ein Icon im Stammverzeichnis verwendet, sodass nur eine Datei in `public/` (ausgeliefert unter `/apple-icon.png`) zuverlässig auf den Home-Bildschirm gelangt.
+Lege die Datei in `public/` statt in das Stammverzeichnis des Projekts: iOS ignoriert die Inline-Daten-URI, die Blume für ein Icon im Stammverzeichnis verwendet, sodass nur eine Datei in `public/` (ausgeliefert unter `/apple-icon.png`) zuverlässig auf den Home-Bildschirm gelangt. Anders als beim Favicon gibt es hier keine `-dark`-Geschwisterdatei — iOS ignoriert Media Queries bei Home-Bildschirm-Icons, eine dunkle Variante könnte also nie ausgeliefert werden.
 
 ### Banner
 
@@ -290,7 +302,7 @@ lastModified: true,
 | `{ type: "git" }` | Dasselbe wie `true`, nur explizit geschrieben. |
 | `{ type: "frontmatter" }` | Git nie ausführen — ausschließlich das Frontmatter-Feld `lastModified` verwenden. |
 
-Die Git-Quelle liest den jüngsten Commit, der die jeweilige Datei berührt hat, funktioniert also in jedem Git-Repository — auch in Monorepos — und benötigt die Historie des Repositorys zur Build-Zeit (vermeide einen flachen Checkout mit `--depth 1` in der CI). Das seiteneigene `lastModified`-Frontmatter gewinnt immer, was praktisch ist, um ein Datum festzuschreiben oder für Dateien, die noch nicht committet sind:
+Die Git-Quelle liest den jüngsten Commit, der die jeweilige Datei berührt hat, funktioniert also in jedem Git-Repository — auch in Monorepos — und benötigt die Historie des Repositorys zur Build-Zeit. CI-Plattformen checken üblicherweise einen flachen Klon aus, wodurch die meisten Daten stillschweigend verloren gehen (der Build warnt in diesem Fall mit `BLUME_SHALLOW_GIT_HISTORY`): Setze auf Vercel die Umgebungsvariable `VERCEL_DEEP_CLONE=true`; bei `actions/checkout` setze `fetch-depth: 0`. Das seiteneigene `lastModified`-Frontmatter gewinnt immer, was praktisch ist, um ein Datum festzuschreiben oder für Dateien, die noch nicht committet sind:
 
 ```mdx page.mdx
 ---

@@ -24,18 +24,18 @@ import type { ReferenceSource } from "./references.ts";
 // deliberately not escaped: it isn't MDX-special on its own, and escaping it
 // turns a `> Note:` blockquote into literal "&gt; Note:" text.
 const MDX_UNSAFE = /[<{}]/gu;
-const ENTITIES: Record<string, string> = {
-  "<": "&lt;",
-  "{": "&#123;",
-  "}": "&#125;",
-};
+const ENTITIES = new Map([
+  ["<", "&lt;"],
+  ["{", "&#123;"],
+  ["}", "&#125;"],
+]);
 // MDX also parses lines starting with `import`/`export` as ESM ("import the
 // SDK…" is common spec prose). Entity-escape the keyword's first letter so the
 // construct can't match; it still renders as the literal word.
 const MDX_ESM_KEYWORD = /^(?<keyword>import|export)\b/gmu;
 const escapeProse = (text: string): string =>
   text
-    .replace(MDX_UNSAFE, (char) => ENTITIES[char] ?? char)
+    .replace(MDX_UNSAFE, (char) => ENTITIES.get(char) ?? char)
     .replace(
       MDX_ESM_KEYWORD,
       (keyword) => `&#${keyword.codePointAt(0)};${keyword.slice(1)}`
@@ -96,9 +96,23 @@ const mdxSafe = (text: string): string => {
   return out + escapeProse(text.slice(cursor));
 };
 
+/**
+ * Frontmatter emitted for one operation or overview page. Boolean flags are
+ * assigned only when set, so absent keys stay absent in the staged MDX.
+ */
+export interface RenderedPageData {
+  ai?: { exclude: boolean };
+  deprecated?: boolean;
+  search?: { exclude?: boolean; tags?: string[] };
+  seo: { description: string; noindex?: boolean };
+  sidebar: { badge?: string; label: string };
+  title: string;
+  type?: string;
+}
+
 /** Frontmatter + body for one operation or overview page. */
 export interface RenderedPage {
-  data: Record<string, unknown>;
+  data: RenderedPageData;
   body: string;
 }
 
@@ -185,22 +199,35 @@ export const operationMdx = (
     operation.description.trim() === operation.summary.trim()
       ? ""
       : operation.description;
+  const flags: Pick<RenderedPageData, "ai" | "deprecated"> = {};
+  if (reference?.includeInLlms === false) {
+    flags.ai = { exclude: true };
+  }
+  if (operation.deprecated) {
+    flags.deprecated = true;
+  }
+  const searchFlags: Pick<
+    NonNullable<RenderedPageData["search"]>,
+    "exclude"
+  > = {};
+  if (reference?.includeInSearch === false) {
+    searchFlags.exclude = true;
+  }
+  const seo: RenderedPageData["seo"] = {
+    description: operationDescription(spec, operation),
+  };
+  if (reference?.noindex) {
+    seo.noindex = true;
+  }
   return {
     body: withDescription(
       description,
       `<Operation source="${spec.slug}" id="${operation.key}" />`
     ),
     data: {
-      ...(reference?.includeInLlms === false ? { ai: { exclude: true } } : {}),
-      ...(operation.deprecated ? { deprecated: true } : {}),
-      search: {
-        ...(reference?.includeInSearch === false ? { exclude: true } : {}),
-        tags: [operation.tag, method],
-      },
-      seo: {
-        description: operationDescription(spec, operation),
-        ...(reference?.noindex ? { noindex: true } : {}),
-      },
+      ...flags,
+      search: { ...searchFlags, tags: [operation.tag, method] },
+      seo,
       sidebar: { badge: method, label: operation.summary || operation.path },
       title,
       // Signals the two-column API layout (request panel instead of the TOC).
@@ -258,6 +285,21 @@ export const overviewMdx = (
       ].join("\n\n")
     );
   }
+  const flags: Pick<RenderedPageData, "ai" | "search"> = {};
+  if (reference?.includeInLlms === false) {
+    flags.ai = { exclude: true };
+  }
+  if (reference?.includeInSearch === false) {
+    flags.search = { exclude: true };
+  }
+  const seo: RenderedPageData["seo"] = {
+    description:
+      clip(plainProse(spec.description), META_DESCRIPTION_MAX) ||
+      `${apiName(spec)} API reference.`,
+  };
+  if (reference?.noindex) {
+    seo.noindex = true;
+  }
   return {
     body: [
       withDescription(
@@ -267,16 +309,8 @@ export const overviewMdx = (
       ...tagSections,
     ].join("\n\n"),
     data: {
-      ...(reference?.includeInLlms === false ? { ai: { exclude: true } } : {}),
-      ...(reference?.includeInSearch === false
-        ? { search: { exclude: true } }
-        : {}),
-      seo: {
-        description:
-          clip(plainProse(spec.description), META_DESCRIPTION_MAX) ||
-          `${apiName(spec)} API reference.`,
-        ...(reference?.noindex ? { noindex: true } : {}),
-      },
+      ...flags,
+      seo,
       sidebar: { label: "Overview" },
       title: apiName(spec),
     },

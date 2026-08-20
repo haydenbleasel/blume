@@ -1,7 +1,9 @@
 ---
 import "blume:theme";
+import type { BlumeFavicon } from "../../core/data.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
+import type { FontHead } from "../../theme/fonts.ts";
 import type { Navigation } from "../../core/types.ts";
 import Analytics from "./Analytics.astro";
 import WebMcp from "./WebMcp.astro";
@@ -14,6 +16,13 @@ import Header from "./Header.astro";
 // A minimal shell for the Scalar API/AsyncAPI reference: Blume's banner + navbar
 // on top, then a full-height region the reference mounts into. Unlike RootLayout
 // it has no docs sidebar/TOC/prose column, so the reference renders edge to edge.
+//
+// Deliberately NOT wired into the client router (`<ClientRouter />`): Scalar is
+// a SPA whose mount script runs once per real page load, so a client-side swap
+// back onto this page would leave the mount region empty (Astro never re-runs a
+// script it has already executed). Without the router's marker meta, the docs
+// pages' router falls back to a normal full load when navigating here — exactly
+// what a fresh Scalar mount needs.
 interface Props {
   site: { title: string; description?: string };
   logo?: {
@@ -24,14 +33,8 @@ interface Props {
     href: string;
     text?: string;
   } | null;
-  favicon?: {
-    href: string;
-    type?: string;
-  } | null;
-  appleIcon?: {
-    href: string;
-    type?: string;
-  } | null;
+  favicon?: BlumeFavicon | null;
+  appleIcon?: BlumeFavicon | null;
   banner?: {
     content: string;
     link?: { text: string; href: string };
@@ -51,7 +54,7 @@ interface Props {
   navigation: Navigation;
   route: string;
   themeMode: "system" | "light" | "dark";
-  fontCssVars?: string[];
+  fontCssVars?: (string | FontHead)[];
   searchEnabled: boolean;
   pageTitle: string;
   /** Keep the reference route out of crawler indexes. */

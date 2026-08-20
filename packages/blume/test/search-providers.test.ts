@@ -6,8 +6,10 @@ import {
   searchClientTemplate,
 } from "../src/astro/templates.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
+import type { BlumeConfigInput, ResolvedConfig } from "../src/core/schema.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { serverFeatures } from "../src/core/server-features.ts";
+import type { NavNode, PageRecord } from "../src/core/types.ts";
 import type { SearchDocument } from "../src/search/documents.ts";
 import {
   buildSearchDocuments,
@@ -19,20 +21,55 @@ import { syncSearchProvider } from "../src/search/sync/index.ts";
 import { syncOramaCloud } from "../src/search/sync/orama-cloud.ts";
 import { syncTypesense } from "../src/search/sync/typesense.ts";
 
-const parse = (search: Record<string, unknown>) =>
-  blumeConfigSchema.parse({ search });
+type SearchInput = NonNullable<BlumeConfigInput["search"]>;
+
+/**
+ * The slice of {@link BlumeProject} these tests exercise. Each leaf uses the
+ * real domain type, so the full project type stays assignable to the fixture
+ * type and a single asserted widening suffices.
+ */
+interface ProjectFixture {
+  config: ResolvedConfig;
+  graph: {
+    navigationByLocale?: Record<string, { sidebar: NavNode[] }>;
+    pages: PageRecord[];
+  };
+  manifest: {
+    routes: {
+      id: string;
+      indexable: boolean;
+      locale: string;
+      path: string;
+      title: string;
+    }[];
+  };
+}
+
+const parse = (search: SearchInput) => blumeConfigSchema.parse({ search });
 
 /** A minimal project with no pages — enough to drive the sync dispatcher. */
-const emptyProject = (search: Record<string, unknown>): BlumeProject =>
-  ({
+const emptyProject = (search: SearchInput): BlumeProject => {
+  const fixture: ProjectFixture = {
     config: parse(search),
     graph: { pages: [] },
     manifest: { routes: [] },
-  }) as unknown as BlumeProject;
+  };
+  // SAFETY: the sync dispatcher reads only config, graph.pages, and
+  // manifest.routes from the project; the remaining BlumeProject fields are
+  // never touched by these tests.
+  return fixture as BlumeProject;
+};
+
+/** The channels a reporter fixture records, one message list per channel. */
+interface ReporterCalls {
+  start: string[];
+  success: string[];
+  warn: string[];
+}
 
 /** A reporter that records every message it receives, by channel. */
 const reporter = () => {
-  const calls: { start: string[]; success: string[]; warn: string[] } = {
+  const calls: ReporterCalls = {
     start: [],
     success: [],
     warn: [],
@@ -128,6 +165,7 @@ describe("toSearchRecords", () => {
         section: "Guides",
         tags: ["guides", "intro"],
         title: "A",
+        version: "",
       },
     ];
     expect(toSearchRecords(docs)).toStrictEqual([
@@ -139,6 +177,7 @@ describe("toSearchRecords", () => {
         tag: "guides",
         title: "A",
         url: "/a",
+        version: "current",
       },
     ]);
   });
@@ -154,6 +193,7 @@ describe("toSearchRecords", () => {
         route: "/x",
         section: "Docs",
         title: "X",
+        version: "",
       },
     ]);
     expect(record?.tag).toBeUndefined();
@@ -173,7 +213,7 @@ describe("searchClientTemplate", () => {
   });
 
   it("loads the static index for both client-side providers", () => {
-    for (const provider of ["orama", "flexsearch"]) {
+    for (const provider of ["orama", "flexsearch"] as const) {
       const client = searchClientTemplate(parse({ provider }));
       expect(client).toContain(`search/${provider}.ts`);
       expect(client).toContain("blume-search.json");
@@ -293,7 +333,7 @@ describe("syncSearchProvider", () => {
         typesense: { collection: "c", host: "h", searchApiKey: "k" },
       },
     },
-  ];
+  ] as const;
 
   for (const { env, search } of hosted) {
     it(`warns and skips ${search.provider} when ${env} is missing`, async () => {
@@ -341,7 +381,7 @@ describe("hosted sync config guards", () => {
 
 describe("buildSearchDocuments — localized sidebars", () => {
   it("derives the section and breadcrumb from a locale's sidebar", async () => {
-    const project = {
+    const fixture: ProjectFixture = {
       config: blumeConfigSchema.parse({}),
       graph: {
         navigationByLocale: {
@@ -376,7 +416,10 @@ describe("buildSearchDocuments — localized sidebars", () => {
           },
         ],
       },
-    } as unknown as BlumeProject;
+    };
+    // SAFETY: buildSearchDocuments reads only config, graph, and
+    // manifest.routes; the remaining BlumeProject fields are never touched.
+    const project = fixture as BlumeProject;
 
     const [doc] = await buildSearchDocuments(project);
     expect(doc?.route).toBe("/intro");

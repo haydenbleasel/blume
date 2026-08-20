@@ -16,6 +16,22 @@ import {
 } from "../src/cli/dev-lock.ts";
 import { logger } from "../src/cli/log.ts";
 
+/**
+ * A `logger.error` replacement that swallows the diagnostic so test output
+ * stays clean. Consola's `LogFn` shape requires a `raw` variant; nothing in
+ * these tests calls it.
+ */
+const silentLog = Object.assign(
+  (): void => {
+    // Swallow the diagnostic.
+  },
+  {
+    raw: (): void => {
+      // Unused; present only to satisfy consola's LogFn shape.
+    },
+  }
+);
+
 const dirs: string[] = [];
 const rootDir = async (): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), "blume-lock-"));
@@ -70,6 +86,8 @@ describe("dev lock", () => {
       thrown = error;
     }
     expect(thrown).toBeInstanceOf(DevLockHeldError);
+    // SAFETY: the toBeInstanceOf assertion above has already thrown if
+    // `thrown` is anything but a DevLockHeldError.
     expect((thrown as DevLockHeldError).lock).toStrictEqual({
       pid: 1,
       port: 3001,
@@ -194,9 +212,9 @@ describe("describeDevLock", () => {
 describe("refuseIfDevRunning", () => {
   it("does nothing when .blume is not locked", async () => {
     const root = await rootDir();
-    const exit = spyOn(process, "exit").mockImplementation((() => {
+    const exit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
     try {
       expect(() => refuseIfDevRunning(root, "building")).not.toThrow();
       expect(exit).not.toHaveBeenCalled();
@@ -209,12 +227,10 @@ describe("refuseIfDevRunning", () => {
     const root = await rootDir();
     // Hold a live lock (our own pid) on <root>/.blume without releasing it.
     acquireDevLock(join(root, ".blume"));
-    const errorSpy = spyOn(logger, "error").mockImplementation((() => {
-      // Swallow the diagnostic so the test output stays clean.
-    }) as never);
-    const exit = spyOn(process, "exit").mockImplementation((() => {
+    const errorSpy = spyOn(logger, "error").mockImplementation(silentLog);
+    const exit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
     try {
       expect(() => refuseIfDevRunning(root, "building")).toThrow("exit");
       expect(exit).toHaveBeenCalledWith(1);
@@ -229,9 +245,9 @@ describe("refuseIfDevRunning", () => {
     const root = await rootDir();
     // Dev owns <root>/.blume, but an isolated build targets .blume-verify.
     acquireDevLock(join(root, ".blume"));
-    const exit = spyOn(process, "exit").mockImplementation((() => {
+    const exit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
     try {
       expect(() =>
         refuseIfDevRunning(root, "building", { runtimeDir: ".blume-verify" })
@@ -246,14 +262,15 @@ describe("refuseIfDevRunning", () => {
     const root = await rootDir();
     acquireDevLock(join(root, ".blume"), 3001);
     let message = "";
-    const errorSpy = spyOn(logger, "error").mockImplementation(((
-      text: string
-    ) => {
+    const record = (text: string): void => {
       message = text;
-    }) as never);
-    const exit = spyOn(process, "exit").mockImplementation((() => {
+    };
+    const errorSpy = spyOn(logger, "error").mockImplementation(
+      Object.assign(record, { raw: record })
+    );
+    const exit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
     try {
       expect(() => refuseIfDevRunning(root, "building")).toThrow("exit");
       expect(message).toContain("http://localhost:3001");
@@ -266,12 +283,10 @@ describe("refuseIfDevRunning", () => {
   it("still refuses when the runtime dir override points back at .blume", async () => {
     const root = await rootDir();
     acquireDevLock(join(root, ".blume"));
-    const errorSpy = spyOn(logger, "error").mockImplementation((() => {
-      // Swallow the diagnostic so the test output stays clean.
-    }) as never);
-    const exit = spyOn(process, "exit").mockImplementation((() => {
+    const errorSpy = spyOn(logger, "error").mockImplementation(silentLog);
+    const exit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
     try {
       expect(() =>
         refuseIfDevRunning(root, "building", { runtimeDir: ".blume" })
@@ -287,14 +302,15 @@ describe("refuseIfDevRunning", () => {
     const root = await rootDir();
     acquireDevLock(join(root, ".blume"));
     let message = "";
-    const errorSpy = spyOn(logger, "error").mockImplementation(((
-      text: string
-    ) => {
+    const record = (text: string): void => {
       message = text;
-    }) as never);
-    const exit = spyOn(process, "exit").mockImplementation((() => {
+    };
+    const errorSpy = spyOn(logger, "error").mockImplementation(
+      Object.assign(record, { raw: record })
+    );
+    const exit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
     try {
       // build/check accept --isolated, so they keep the escape-hatch hint.
       expect(() =>

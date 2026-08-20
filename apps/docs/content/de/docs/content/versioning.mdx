@@ -1,0 +1,107 @@
+---
+title: Versionierung
+description: >-
+  Friere Snapshots deiner Docs pro Release ein – mit Versionsumschalter, Canonical-auf-Latest-SEO, versionsbezogener Suche und einer versionsbewussten Agent-Oberfläche.
+---
+
+Blume versioniert deine Docs so, wie Releases tatsächlich funktionieren: Die aktuelle Dokumentation liegt im Wurzelverzeichnis deiner Inhalte mit sauberen, präfixfreien URLs, und jede vergangene Version ist ein eingefrorener Snapshot in einem eigenen Ordner. Erstelle einen Snapshot, wenn du ausliefertst, und Blume verkabelt den Umschalter, den Hinweis auf die „alte Version", das Scoping der Suche, SEO und die Agent-Oberfläche für dich. Es ist opt-in: Ohne einen `versions`-Block ändert sich nichts.
+
+## Aktivieren
+
+Füge einen `versions`-Block hinzu, der die aktuellen Docs und alle archivierten Snapshots benennt:
+
+```ts blume.config.ts lineNumbers
+versions: {
+  current: { label: "v2.0", badge: "Latest" },
+  archived: [
+    { id: "v1.0" },
+    { id: "v0.9", label: "0.9 (legacy)" },
+  ],
+}
+```
+
+`current` beschriftet den präfixfreien Baum im Umschalter (mit einem optionalen `badge`). Die `id` jedes archivierten Eintrags ist zugleich der Verzeichnisname des Snapshots und sein URL-Segment – IDs müssen mit einem Buchstaben beginnen (`v1.0`, nicht `1.0`), damit sie niemals mit [numerischen Sortierpräfixen](/docs/content/navigation#ordering) kollidieren können. Liste archivierte Versionen mit der neuesten zuerst; diese Reihenfolge ist die Reihenfolge im Umschalter.
+
+## Eine Version einfrieren
+
+Wenn du ein Release veröffentlichst, friere die aktuellen Docs mit einem Befehl ein:
+
+```bash
+blume version v1.0
+```
+
+Das kopiert deinen Inhaltsbaum nach `docs/v1.0/` (bestehende Snapshots ausgenommen), schreibt wurzelabsolute Links innerhalb der Kopie so um, dass sie im Snapshot bleiben (`/guides/x` wird zu `/v1.0/guides/x`, umzäunter und Inline-Code bleiben unberührt), und registriert die ID in `blume.config.ts` – oder gibt den Eintrag zum Einfügen aus, wenn deine Konfiguration so aufgebaut ist, dass sie nicht angetastet wird. Links auf Seiten, die nicht Teil des kopierten Baums sind – generierte API-Referenzen, entfernte Quellen wie ein Changelog –, zeigen weiterhin auf die aktuellen Seiten, da der Snapshot keine Kopie davon enthält. Führe `blume version` ohne ID aus, um die konfigurierten Versionen aufzulisten.
+
+Prüfe und committe das neue Verzeichnis wie jeden anderen Inhalt. Starte `blume dev` neu, damit es übernommen wird.
+
+```txt
+docs/
+  index.mdx               ->  /              (latest)
+  guides/quickstart.mdx   ->  /guides/quickstart
+  v1.0/
+    index.mdx             ->  /v1.0          (frozen)
+    guides/quickstart.mdx ->  /v1.0/guides/quickstart
+```
+
+**Archiviert heißt eingefroren.** Künftige Änderungen gehören in den lebenden Baum; ein Snapshot ist die Doku so, wie sie war. Blume stützt sich darauf: Snapshots behalten ihre eigenen Ordner-Metadaten und Übersetzungen, [`blume translate`](/docs/reference/translate) übersetzt sie nie erneut, und eine konfigurierte explizite Sidebar gilt nur für die aktuellen Docs – die Sidebar eines Snapshots stammt immer aus seinen eigenen Dateien.
+
+## Der Umschalter und der Hinweis
+
+Mit konfigurierten Versionen erhält der Header automatisch ein Versions-Dropdown. Beim Wechseln landest du auf derselben Seite in der Zielversion, sofern sie existiert, und andernfalls im Wurzelverzeichnis dieser Version (setze `switcher.redirect: "root"`, um immer im Wurzelverzeichnis zu landen). Wenn du in [`navigation.selectors`](/docs/content/navigation#selectors) einen eigenen Selektor mit `kind: "version"` deklarierst, ersetzt dieser den automatischen.
+
+Jede archivierte Seite zeigt außerdem einen nicht ausblendbaren Hinweis mit einem „Zur neuesten Version"-Link, der auf das aktuelle Gegenstück der Seite verweist. Passe ihn pro Version an oder deaktiviere ihn:
+
+```ts blume.config.ts
+archived: [
+  { id: "v1.0", banner: "These docs cover the 1.x SDK." },
+  { id: "v0.9", banner: false },
+];
+```
+
+## SEO
+
+Alte Docs sind die Lieblingsfalle von Suchmaschinen: Die veraltete Seite rankt besser als die aktuelle, oder beide konkurrieren miteinander. Blume setzt standardmäßig auf die Lösung, die SEO-Leitfäden empfehlen und die kein anderes Docs-Framework automatisiert: Archivierte Seiten bleiben indexierbar, deklarieren aber das **aktuelle Gegenstück als ihr Canonical**, sodass die aktuelle Seite maßgeblich ist, während versionsspezifische Inhalte (eine Seite, die in den aktuellen Docs nicht mehr existiert) mit einem Self-Canonical auffindbar bleiben.
+
+Pro Version kannst du eine andere Behandlung wählen:
+
+```ts blume.config.ts
+archived: [
+  { id: "v1.0" }, // canonical → latest (default)
+  { id: "v0.9", canonical: "self" }, // every page authoritative
+  { id: "v0.8", noindex: true }, // deindexed entirely
+];
+```
+
+Die Sitemap zieht mit: Archivierte Seiten, deren Canonical auf ein aktuelles Gegenstück zeigt, werden weggelassen, `noindex`-Versionen fallen vollständig weg, und versionsspezifische Seiten bleiben gelistet. Das eigene `seo.canonical`-Frontmatter einer Seite gewinnt immer.
+
+## Suche
+
+Der Suchdialog begrenzt die Ergebnisse auf die gerade betrachtete Version, mit einem „Alle Versionen"-Umschalter (pro Leser gespeichert) neben dem für die Sprache. Versionsübergreifende Treffer nennen ihre Version in der Ergebniszeile. Orama (die Standardoption), FlexSearch, Algolia und Typesense berücksichtigen das Scoping alle – gehostete Datensätze tragen eine `version`-Facette, wobei die aktuellen Docs als `"current"` hochgeladen werden –, während Pagefind ungescopt bleibt, passend zu seinem Verhalten bei Sprachen.
+
+## Agents
+
+Die Agent-Oberfläche ist versionsbewusst – etwas, das kein anderes Docs-Framework bietet:
+
+- Die MCP-Tools `search_docs` und `list_pages` verwenden standardmäßig die aktuellen Docs und akzeptieren `version`: eine archivierte ID (`"v1.0"`) oder `"all"`. `get_navigation` gibt auf Anfrage den Baum eines archivierten Snapshots zurück.
+- `llms.txt` ordnet archivierte Versionen nach den aktuellen Docs ein, beschriftet als `1.0 (archived)`, sodass ein Agent beim Lesen des Index weiß, welche Docs eingefroren sind.
+- `llms-full.txt` bleibt ausschließlich aktuell – der flache Dump vermischt nie eingefrorene Kopien derselben Seite.
+- Rohe Markdown-Spiegel (`.md`-URLs) existieren für die Seiten jeder Version, wie für jede andere Route auch.
+
+## Zusammen mit i18n
+
+Versionierung lässt sich mit [Internationalisierung](/docs/content/i18n) kombinieren. Auf der Festplatte liegt der Versionsordner außen – ein Snapshot enthält naturgemäß seine Sprachordner –, während in den URLs die Sprache außen bleibt, passend zum Rest der Website:
+
+```txt
+docs/
+  guides/x.mdx            ->  /guides/x
+  fr/guides/x.mdx         ->  /fr/guides/x
+  v1.0/
+    guides/x.mdx          ->  /v1.0/guides/x
+    fr/guides/x.mdx       ->  /fr/v1.0/guides/x
+```
+
+Der Sprach-Fallback funktioniert innerhalb jeder Version: Eine nicht übersetzte Snapshot-Seite rendert den Inhalt der Fallback-Sprache unter der lokalisierten URL, und `hreflang`-Alternativen werden pro Version gruppiert. Eine Versions-ID darf nicht mit einem konfigurierten Sprachcode kollidieren – Blume weist eine solche Konfiguration rundweg zurück.
+
+## Was unversioniert bleibt
+
+Die Versionierung umfasst den Inhaltsbaum der Docs. Der Blog, das Changelog, aus OpenAPI-Spezifikationen generierte API-Referenzen und benutzerdefinierte Seiten sind immer aktuell. Zwei weitere Verhaltensweisen solltest du kennen: Header-Tabs werden gegen die aktuellen Docs definiert, sodass die Sidebar innerhalb eines archivierten Baums ohne Tab-Scoping gerendert wird; und bei großen Websites solltest du bedenken, dass jeder Snapshot eine vollständige Kopie ist – Inhalte, Suchindex-Einträge und Navigationsdaten wachsen alle pro Version.

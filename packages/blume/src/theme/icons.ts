@@ -17,9 +17,11 @@ import { getIconData, iconToSVG } from "@iconify/utils";
 // strips it when externalizing) and then rejects the module, whereas `require`
 // of a JSON file needs no attribute and works under both Node and Bun.
 const requireJson = createRequire(import.meta.url);
+// SAFETY: the required file is the Iconify-published icon-set JSON, whose
+// shape is exactly `IconifyJSON`.
 const loadSet = (pkg: string): IconifyJSON => requireJson(pkg) as IconifyJSON;
 
-const SETS: Record<string, IconifyJSON> = {
+const SETS = {
   lucide: loadSet("@iconify-json/lucide/icons.json"),
 };
 
@@ -27,7 +29,7 @@ const SETS: Record<string, IconifyJSON> = {
 const DEFAULT_SET = "lucide";
 
 /** Explicit `prefix:name` prefixes. Lucide is the only bundled set. */
-const PREFIX_SETS: Record<string, string> = {
+const PREFIX_SETS = {
   lucide: "lucide",
 };
 

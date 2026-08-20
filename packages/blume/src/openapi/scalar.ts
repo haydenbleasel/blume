@@ -32,9 +32,7 @@ const referencePagePath = (route: string): string => {
   return `${segments === "" ? "index" : segments}.astro`;
 };
 
-const darkModeConfig = (
-  mode: ResolvedConfig["theme"]["mode"]
-): Record<string, boolean> => {
+const darkModeConfig = (mode: ResolvedConfig["theme"]["mode"]) => {
   if (mode === "dark") {
     return { darkMode: true };
   }
@@ -51,10 +49,7 @@ const darkModeConfig = (
  * `customCss`. Scalar re-injects `customCss` after its bundled theme, so these
  * variables reliably override the defaults. Best-effort, not pixel-exact.
  */
-const themeConfiguration = (
-  config: ResolvedConfig,
-  override?: string
-): Record<string, unknown> => {
+const themeConfiguration = (config: ResolvedConfig, override?: string) => {
   if (override) {
     return { theme: override };
   }
@@ -70,7 +65,10 @@ const themeConfiguration = (
 const specConfiguration = async (
   spec: string,
   root: string
-): Promise<{ config: Record<string, unknown>; warning?: string }> => {
+): Promise<{
+  config: { content: string } | { url: string };
+  warning?: string;
+}> => {
   if (URL_SPEC.test(spec)) {
     return { config: { url: spec } };
   }

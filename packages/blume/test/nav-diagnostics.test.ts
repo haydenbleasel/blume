@@ -174,8 +174,9 @@ describe("validateNavIcons", () => {
   });
 });
 
+// SAFETY: validateNavTargets reads only a page's id and sidebar visibility.
 const page = (id: string, hidden: boolean): PageRecord =>
-  ({ id, meta: { sidebar: { hidden } } }) as unknown as PageRecord;
+  ({ id, meta: { sidebar: { hidden } } }) as PageRecord;
 
 describe("validateNavTargets", () => {
   it("warns when a tab points at a route with no pages", () => {

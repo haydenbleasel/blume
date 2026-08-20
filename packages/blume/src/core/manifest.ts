@@ -8,8 +8,38 @@ import type {
   ProjectContext,
   RouteAlternate,
   RouteManifestEntry,
+  VersionAlternate,
 } from "./types.ts";
 import { getBlumeVersion } from "./version.ts";
+
+/**
+ * Key for the same logical page across versions within one locale: the
+ * version- and locale-agnostic route plus the locale code. NUL never appears
+ * in either part, so the join is unambiguous.
+ */
+const versionAlternateKey = (versionKey: string, locale: string): string =>
+  `${versionKey}\u0000${locale}`;
+
+/**
+ * Get-or-create the shared alternate list for a (versionKey, locale) pair.
+ * Lists are attached to route entries by reference and mutated as fallback
+ * routes materialize, then sorted once at the end — every holder sees the
+ * final list.
+ */
+const versionAlternatesFor = (
+  byKey: Map<string, VersionAlternate[]>,
+  versionKey: string,
+  locale: string
+): VersionAlternate[] => {
+  const key = versionAlternateKey(versionKey, locale);
+  const existing = byKey.get(key);
+  if (existing) {
+    return existing;
+  }
+  const list: VersionAlternate[] = [];
+  byKey.set(key, list);
+  return list;
+};
 
 /** The current manifest schema version. */
 export const MANIFEST_VERSION = 1;
@@ -37,7 +67,8 @@ const buildFallbackRoutes = (
   graph: ContentGraph,
   i18n: NonNullable<ResolvedConfig["i18n"]>,
   alternatesByKey: Map<string, RouteAlternate[]>,
-  basePath: string
+  basePath: string,
+  versionAlternatesByKey: Map<string, VersionAlternate[]> | undefined
 ): RouteManifestEntry[] => {
   const fallback = resolveFallbackLocale(i18n);
   if (!fallback) {
@@ -62,6 +93,17 @@ const buildFallbackRoutes = (
       if (present.has(key)) {
         continue;
       }
+      const path = withBasePath(basePath, localizeRoute(key, code, i18n));
+      // A fallback route is a real prerendered page, so it registers as a
+      // version alternate too — the switcher on a sibling version's page
+      // lands here instead of bouncing to the version root. Its own path is
+      // recorded (not the fallback source's), keeping the target in-locale.
+      const versionAlternates: VersionAlternate[] = versionAlternatesByKey
+        ? versionAlternatesFor(versionAlternatesByKey, source.versionKey, code)
+        : [];
+      if (versionAlternatesByKey) {
+        versionAlternates.push({ path, version: source.version });
+      }
       routes.push({
         alternates: alternatesByKey.get(key) ?? [],
         collection: source.collection ?? "docs",
@@ -75,10 +117,12 @@ const buildFallbackRoutes = (
         indexable: false,
         lastModified: source.lastModified,
         locale: code,
-        path: withBasePath(basePath, localizeRoute(key, code, i18n)),
+        path,
         source: source.source,
         sourcePath: source.sourcePath,
         title: source.title,
+        version: source.version,
+        versionAlternates,
       });
     }
   }
@@ -106,6 +150,23 @@ export const buildManifest = (options: {
     }
   }
 
+  // The same logical page across versions, within each locale — for the
+  // version switcher and the canonical-to-latest lookup. Built only under
+  // versioning; lists are shared by reference and finalized (fallback routes
+  // appended, then sorted) before the manifest is returned.
+  const versionAlternatesByKey = config.versions
+    ? new Map<string, VersionAlternate[]>()
+    : undefined;
+  if (versionAlternatesByKey) {
+    for (const page of graph.pages) {
+      versionAlternatesFor(
+        versionAlternatesByKey,
+        page.versionKey,
+        page.locale
+      ).push({ path: page.route, version: page.version });
+    }
+  }
+
   const routes: RouteManifestEntry[] = graph.pages.map((page) => ({
     alternates: alternatesByKey.get(page.translationKey) ?? [],
     collection: page.collection ?? "docs",
@@ -122,12 +183,40 @@ export const buildManifest = (options: {
     source: page.source,
     sourcePath: page.sourcePath,
     title: page.title,
+    version: page.version,
+    versionAlternates: versionAlternatesByKey
+      ? versionAlternatesFor(
+          versionAlternatesByKey,
+          page.versionKey,
+          page.locale
+        )
+      : [],
   }));
 
   if (i18n) {
     routes.push(
-      ...buildFallbackRoutes(graph, i18n, alternatesByKey, config.basePath)
+      ...buildFallbackRoutes(
+        graph,
+        i18n,
+        alternatesByKey,
+        config.basePath,
+        versionAlternatesByKey
+      )
     );
+  }
+
+  // Alternate lists read current-first, then archived versions in configured
+  // (switcher) order. Sorted once here — every route holding a list by
+  // reference sees the final ordering.
+  if (versionAlternatesByKey && config.versions) {
+    const rank = new Map<string, number>(
+      config.versions.archived.map((version, index) => [version.id, index + 1])
+    );
+    for (const list of versionAlternatesByKey.values()) {
+      list.sort(
+        (a, b) => (rank.get(a.version) ?? 0) - (rank.get(b.version) ?? 0)
+      );
+    }
   }
 
   routes.sort((a, b) => a.path.localeCompare(b.path));

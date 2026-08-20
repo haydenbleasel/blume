@@ -65,18 +65,20 @@ const GROUPS = ["mdx", "layout", "islands"] as const;
 const GROUP_SET = new Set<string>(GROUPS);
 type Group = (typeof GROUPS)[number];
 
-const FRAMEWORK_BY_EXT: Record<string, OverrideFramework> = {
-  jsx: "react",
-  svelte: "svelte",
-  tsx: "react",
-  vue: "vue",
-};
+const isGroup = (name: string): name is Group => GROUP_SET.has(name);
 
-const FRAMEWORK_LABEL: Record<OverrideFramework, string> = {
+const FRAMEWORK_BY_EXT = new Map<string, OverrideFramework>([
+  ["jsx", "react"],
+  ["svelte", "svelte"],
+  ["tsx", "react"],
+  ["vue", "vue"],
+]);
+
+const FRAMEWORK_LABEL = {
   react: "React",
   svelte: "Svelte",
   vue: "Vue",
-};
+} satisfies Record<OverrideFramework, string>;
 
 /** Extensions probed (in order) when a specifier omits one. */
 const COMPONENT_EXTS = [
@@ -90,13 +92,16 @@ const COMPONENT_EXTS = [
   "svelte",
 ];
 
-const HYDRATION_MODES = new Set<HydrationMode>([
+const HYDRATION_MODES: ReadonlySet<string> = new Set<HydrationMode>([
   "idle",
   "load",
   "media",
   "only",
   "visible",
 ]);
+
+const isHydrationMode = (value: string): value is HydrationMode =>
+  HYDRATION_MODES.has(value);
 
 interface ImportBinding {
   /** Exported name: `"default"` or a named export. */
@@ -226,7 +231,7 @@ const toImport = (
     }
   }
   return {
-    framework: FRAMEWORK_BY_EXT[extension] ?? null,
+    framework: FRAMEWORK_BY_EXT.get(extension) ?? null,
     name: imported,
     path,
   };
@@ -270,9 +275,9 @@ const applyDescriptorProperty = (
   } else if (
     name === "client" &&
     ts.isStringLiteral(init) &&
-    HYDRATION_MODES.has(init.text as HydrationMode)
+    isHydrationMode(init.text)
   ) {
-    descriptor.client = init.text as HydrationMode;
+    descriptor.client = init.text;
   } else if (name === "media" && ts.isStringLiteral(init)) {
     descriptor.media = init.text;
   }
@@ -334,13 +339,14 @@ const finalize = (
     );
   }
 
-  return {
-    identifier,
-    key,
-    ...(client ? { client } : {}),
-    ...(media ? { media } : {}),
-    source,
-  };
+  const normalized: NormalizedOverride = { identifier, key, source };
+  if (client) {
+    normalized.client = client;
+  }
+  if (media) {
+    normalized.media = media;
+  }
+  return normalized;
 };
 
 const normalizeEntry = (
@@ -446,22 +452,21 @@ const collectGroupOverrides = (
   }
   const name = propName(property.name);
   if (
-    !(name && GROUP_SET.has(name)) ||
+    !(name && isGroup(name)) ||
     !ts.isObjectLiteralExpression(property.initializer)
   ) {
     return;
   }
-  const group = name as Group;
   for (const entry of property.initializer.properties) {
     const normalized = normalizeEntry(
       entry,
-      group,
+      name,
       imports,
       dir,
       result.warnings
     );
     if (normalized) {
-      result[group].push(normalized);
+      result[name].push(normalized);
     }
   }
 };

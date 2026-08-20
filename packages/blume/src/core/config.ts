@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 
+import { z } from "zod";
+
 import type { BlumeConfig } from "./config-input.ts";
 import { applyDeploymentEnv } from "./deployment-env.ts";
 import { BlumeError, diagnosticsFromZod } from "./diagnostics.ts";
@@ -163,6 +165,15 @@ export interface ConfigLoadResult {
 const importConfigModule = createModuleLoader();
 
 /**
+ * The slice of a user config module probed before schema defaults apply:
+ * whether `theme.fonts` was actually set. `looseObject` keeps every other key
+ * out of scope; a non-object at either level simply fails the probe.
+ */
+const themeFontsProbeSchema = z.looseObject({
+  theme: z.looseObject({ fonts: z.unknown() }).optional(),
+});
+
+/**
  * Load and validate the project config. When no config file exists, schema
  * defaults produce a fully resolved config so the zero-boilerplate path works.
  */
@@ -177,11 +188,14 @@ export const loadConfig = async (
 ): Promise<ConfigLoadResult> => {
   const configFile = findConfigFile(root);
 
-  let raw: unknown = {};
+  let raw: unknown;
   if (configFile) {
     try {
       raw = await importConfigModule(configFile);
     } catch (error) {
+      // SAFETY: the module loader rejects with the thrown load/parse failure,
+      // which Node surfaces as an Error; a non-Error rejection only degrades
+      // the interpolated message.
       throw new BlumeError({
         code: "BLUME_CONFIG_LOAD_FAILED",
         file: configFile,
@@ -192,11 +206,9 @@ export const loadConfig = async (
   }
 
   // Read before parsing: schema defaults erase the set-vs-defaulted distinction.
-  const themeFontsConfigured = Boolean(
-    raw &&
-    typeof raw === "object" &&
-    (raw as { theme?: { fonts?: unknown } }).theme?.fonts !== undefined
-  );
+  const probe = themeFontsProbeSchema.safeParse(raw);
+  const themeFontsConfigured =
+    probe.success && probe.data.theme?.fonts !== undefined;
 
   const parsed = blumeConfigSchema.safeParse(raw ?? {});
   if (!parsed.success) {

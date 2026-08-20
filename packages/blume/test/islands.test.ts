@@ -9,7 +9,7 @@ import { discoverIslands } from "../src/astro/islands.ts";
 let root: string;
 
 // filename -> file contents (keys sorted to satisfy sort-keys)
-const FILES: Record<string, string> = {
+const FILES = {
   "islands/Bad.tsx":
     'export const client = "whenever";\nexport default function Bad() {}',
   "islands/Chart.jsx":
@@ -28,7 +28,7 @@ const FILES: Record<string, string> = {
   "islands/notes.md": "# Island notes",
   // Lowercase filename can't be a JSX tag — should be skipped.
   "islands/widget.tsx": "export default function widget() {}",
-};
+} satisfies Record<string, string>;
 
 const byName = (discovery: Awaited<ReturnType<typeof discoverIslands>>) =>
   new Map(discovery.islands.map((island) => [island.name, island]));

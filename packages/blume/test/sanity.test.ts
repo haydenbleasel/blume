@@ -7,6 +7,7 @@ import { join } from "pathe";
 
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { portableTextToMarkdown } from "../src/core/sources/portable-text.ts";
+import type { PortableTextBlock } from "../src/core/sources/portable-text.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
 import { sanitySource } from "../src/core/sources/sanity.ts";
 import type { SanityClientLike } from "../src/core/sources/sanity.ts";
@@ -30,7 +31,20 @@ const ctxFor = (cacheDir: string): SourceContext => ({
   projectRoot: cacheDir,
 });
 
-const clientReturning = (docs: unknown[]): SanityClientLike => ({
+/** A hand-built Sanity document fixture: an id plus the fields the test maps. */
+interface SanityDocFixture {
+  _id: string;
+  _updatedAt?: string;
+  body?: PortableTextBlock[];
+  description?: string;
+  meta?: string;
+  slug?: { current: string };
+  title?: string;
+}
+
+// SAFETY: `SanityClientLike.fetch` lets each caller pick its result type; the
+// fixture always resolves with the document array the test supplied for it.
+const clientReturning = (docs: SanityDocFixture[]): SanityClientLike => ({
   fetch: () => Promise.resolve(docs as never),
 });
 
@@ -76,6 +90,7 @@ describe("portableTextToMarkdown", () => {
       ],
       {
         imageUrl: (block) => {
+          // SAFETY: the image fixture above declares `asset._ref` as a string.
           const ref = (block.asset as { _ref?: string })._ref;
           return ref ? `https://cdn/${ref}` : null;
         },
@@ -146,6 +161,8 @@ describe("sanitySource", () => {
     const client: SanityClientLike = {
       fetch: () => {
         calls += 1;
+        // SAFETY: same generic-fetch contract as `clientReturning` — the test
+        // always resolves with the fixture doc it builds here.
         return Promise.resolve([
           { ...doc, title: `Getting Started v${calls}` },
         ] as never);
@@ -410,11 +427,15 @@ describe("resolveSources (sanity)", () => {
         ],
       },
     });
-    const context = {
+    const context: ProjectContext = {
+      componentsFile: null,
+      configFile: null,
       contentRoot: "/p/docs",
       outDir: "/p/.blume",
+      pagesRoot: null,
       root: "/p",
-    } as ProjectContext;
+      themeFile: null,
+    };
 
     const sources = resolveSources(config, context, { mode: "build" });
     expect(sources).toHaveLength(1);

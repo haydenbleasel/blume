@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
+import type { BlumeConfigInput } from "../src/core/schema.ts";
+
 /**
  * `emitHeaderFiles` behavior that the `readsHeaderFiles` predicate tests can't
  * see: where the user opt-out is read from and what happens to a `_headers`
@@ -59,7 +61,7 @@ const projectFixture = async (options: {
 const emit = async (
   root: string,
   staticDir: string,
-  deployment: Record<string, unknown>
+  deployment: BlumeConfigInput["deployment"]
 ): Promise<void> => {
   const proc = Bun.spawn(
     [
@@ -88,7 +90,10 @@ const emit = async (
   expect(exitCode).toBe(0);
 };
 
-const CLOUDFLARE_SERVER = { adapter: "cloudflare", output: "server" };
+const CLOUDFLARE_SERVER = {
+  adapter: "cloudflare",
+  output: "server",
+} satisfies BlumeConfigInput["deployment"];
 
 describe("emitHeaderFiles", () => {
   it("writes the discovery rules for a Cloudflare server build", async () => {

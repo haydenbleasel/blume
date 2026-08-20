@@ -38,10 +38,14 @@ const makePage = (
   sourcePath: `/abs/${over.id}`,
   title: over.id,
   translationKey: over.route,
+  version: "",
+  versionKey: over.route,
   ...over,
 });
 
 const makeGraph = (pages: PageRecord[]): ContentGraph =>
+  // SAFETY: link validation reads only pages and routes; the empty nav shells
+  // stand in for the graph fields it never touches.
   ({
     diagnostics: [],
     navigation: {
@@ -51,6 +55,7 @@ const makeGraph = (pages: PageRecord[]): ContentGraph =>
       tabs: [],
     },
     navigationByLocale: {},
+    navigationByVersion: {},
     pages,
     routes: new Map(pages.map((page) => [page.route, page.id])),
   }) as ContentGraph;

@@ -54,7 +54,7 @@ interface Starter {
 const page = (title: string, description: string, body: string): string =>
   `---\ntitle: ${title}\ndescription: ${description}\n---\n\n${body}\n`;
 
-export const STARTERS: Record<Template, Starter> = {
+export const STARTERS = {
   api: {
     configExtra: `
   openapi: {
@@ -135,16 +135,14 @@ export const STARTERS: Record<Template, Starter> = {
       },
     ],
   },
-};
+} satisfies Record<Template, Starter>;
 
 /**
  * Install + dev commands to print for the chosen package manager, plus the
  * prefix that runs a locally installed bin (`exec`, e.g. `npx blume eject`) —
  * dependency bins aren't on PATH, so a bare `blume …` hint would not run.
  */
-export const commandsFor = (
-  pm: PackageManager
-): { build: string; dev: string; exec: string; install: string } => ({
+export const commandsFor = (pm: PackageManager) => ({
   // `bun build` invokes Bun's bundler, not the package.json `build` script —
   // unlike `bun dev`, the script name is shadowed by a builtin subcommand.
   build: pm === "npm" || pm === "bun" ? `${pm} run build` : `${pm} build`,
@@ -153,6 +151,9 @@ export const commandsFor = (
   install: `${pm} install`,
 });
 
+const isPackageManager = (value: string): value is PackageManager =>
+  PACKAGE_MANAGERS.some((pm) => pm === value);
+
 /**
  * Derive the package manager from an npm user-agent string (the first
  * `name/version` token of `npm_config_user_agent`), falling back to npm.
@@ -160,8 +161,8 @@ export const commandsFor = (
  * runner is the only signal.
  */
 export const detectPackageManager = (userAgent?: string): PackageManager => {
-  const name = userAgent?.split("/")[0] as PackageManager | undefined;
-  return name !== undefined && PACKAGE_MANAGERS.includes(name) ? name : "npm";
+  const name = userAgent?.split("/")[0];
+  return name !== undefined && isPackageManager(name) ? name : "npm";
 };
 
 /**
@@ -176,8 +177,8 @@ export const detectProjectPackageManager = async (
   root: string
 ): Promise<PackageManager> => {
   const detected = await detect({ cwd: root });
-  const name = detected?.name as PackageManager | undefined;
-  return name !== undefined && PACKAGE_MANAGERS.includes(name)
+  const name = detected?.name;
+  return name !== undefined && isPackageManager(name)
     ? name
     : detectPackageManager(process.env.npm_config_user_agent);
 };
@@ -216,7 +217,7 @@ const hasRemoteSource = (sources: SourceKind[]): boolean =>
  * Config snippets for each remote source kind, with placeholder values to
  * replace and comments naming the env var each source authenticates with.
  */
-const SOURCE_SNIPPETS: Record<Exclude<SourceKind, "filesystem">, string> = {
+const SOURCE_SNIPPETS = {
   "github-releases": `      // Changelog entries from GitHub Releases. Private repos read
       // GITHUB_TOKEN from the environment.
       {
@@ -247,7 +248,7 @@ const SOURCE_SNIPPETS: Record<Exclude<SourceKind, "filesystem">, string> = {
         query: \`*[_type == "doc"]\`,
         prefix: "sanity",
       },`,
-};
+} satisfies Record<Exclude<SourceKind, "filesystem">, string>;
 
 /**
  * The `content` block for the generated config, or an empty string when the
@@ -293,10 +294,16 @@ export default defineConfig({
 `;
 
 /** SDK dependencies required by the selected remote sources. */
-const extraDepsFor = (sources: SourceKind[]): Record<string, string> => ({
-  ...(sources.includes("notion") && { "@notionhq/client": "^2.2.15" }),
-  ...(sources.includes("sanity") && { "@sanity/client": "^7.25.0" }),
-});
+const extraDepsFor = (sources: SourceKind[]) => {
+  const deps: Record<string, string> = {};
+  if (sources.includes("notion")) {
+    deps["@notionhq/client"] = "^2.2.15";
+  }
+  if (sources.includes("sanity")) {
+    deps["@sanity/client"] = "^7.25.0";
+  }
+  return deps;
+};
 
 /** Every file `init` should write for the given answers, package.json first. */
 export const buildPlan = (

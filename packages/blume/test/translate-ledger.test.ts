@@ -76,12 +76,12 @@ describe("readLedger", () => {
     );
     expect(await readLedger(wrongVersion)).toStrictEqual(emptyLedger());
 
-    const wrongShape = await scratch();
+    const malformedEntry = await scratch();
     await writeFile(
-      join(wrongShape, LEDGER_FILE),
+      join(malformedEntry, LEDGER_FILE),
       JSON.stringify({ files: { "a.mdx": "not-an-object" }, version: 1 })
     );
-    expect(await readLedger(wrongShape)).toStrictEqual(emptyLedger());
+    expect(await readLedger(malformedEntry)).toStrictEqual(emptyLedger());
   });
 });
 

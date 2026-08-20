@@ -2,11 +2,17 @@ import { afterAll, describe, expect, it, mock } from "bun:test";
 import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { buildSearchIndex } from "../src/search/build.ts";
+
+/** A bound TCP listener reports an AddressInfo; pipes report a string. */
+const isAddressInfo = (
+  value: AddressInfo | string | null
+): value is AddressInfo => typeof value === "object" && value !== null;
 
 describe("Pagefind build", () => {
   const buildDirs: string[] = [];
@@ -48,8 +54,8 @@ describe("Pagefind build", () => {
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
     const address = server.address();
-    expect(typeof address).toBe("object");
-    const origin = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
+    expect(isAddressInfo(address)).toBe(true);
+    const origin = `http://127.0.0.1:${isAddressInfo(address) ? address.port : 0}`;
     const pagefind = await import(
       `${pathToFileURL(path.join(output, "pagefind/pagefind.js")).href}?${crypto.randomUUID()}`
     );

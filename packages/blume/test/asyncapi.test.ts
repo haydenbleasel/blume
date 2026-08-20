@@ -6,6 +6,7 @@ import { join } from "pathe";
 
 import type { MessageSample } from "../src/components/openapi/async-snippets.ts";
 import { asyncSampleLanguages } from "../src/components/openapi/async-snippets.ts";
+import type { NamedMessage } from "../src/components/openapi/async.ts";
 import {
   asyncApiSecurityEntries,
   bindingGroups,
@@ -42,7 +43,7 @@ const ctx = (projectRoot: string) => ({
   projectRoot,
 });
 
-const tempSpec = async (contents: unknown): Promise<string> => {
+const tempSpec = async (contents: AsyncApiDocument): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), "blume-asyncapi-"));
   const file = join(dir, "spec.json");
   await writeFile(file, JSON.stringify(contents));
@@ -72,7 +73,7 @@ const asyncReference = {
 };
 
 /** A small but complete AsyncAPI 3.0 document exercising the whole surface. */
-const ASYNC_SPEC_3 = {
+const ASYNC_SPEC_3: AsyncApiDocument = {
   asyncapi: "3.0.0",
   channels: {
     ping: { address: null },
@@ -133,7 +134,7 @@ const ASYNC_SPEC_3 = {
       security: [{ $ref: "#/components/securitySchemes/sasl" }],
     },
   },
-} as unknown as AsyncApiDocument;
+};
 
 /** The 2.x fixture from the converter's own documented behavior. */
 const ASYNC_SPEC_2 = {
@@ -216,14 +217,13 @@ describe("parse.parseAsyncApiSpec", () => {
     // The operation's own bindings win over the trait's.
     expect(operation?.bindings).toStrictEqual({ ws: {} });
     expect(operation?.summary).toBe("From trait");
-    const inline = document.channels?.c?.messages?.inline as Record<
-      string,
-      unknown
-    >;
-    expect(inline.contentType).toBe("application/json");
-    expect(inline.traits).toBeUndefined();
+    const inline = document.channels?.c?.messages?.inline;
+    expect(inline?.contentType).toBe("application/json");
+    expect(inline?.traits).toBeUndefined();
     // Non-array `traits` stays untouched.
-    const kept = document.components?.messages?.m as Record<string, unknown>;
+    // SAFETY: the fixture above declares `m` as a message object whose
+    // `traits` is the string "not-an-array".
+    const kept = document.components?.messages?.m as { traits?: string };
     expect(kept.traits).toBe("not-an-array");
     await rm(dir, { force: true, recursive: true });
   });
@@ -314,9 +314,10 @@ describe("asyncapi.extractAsyncApiOperations", () => {
           bad: { channel: { $ref: "#/channels/c" } },
           broken: { action: "send", channel: { $ref: "#/channels/missing" } },
           noChannel: { action: "receive" },
-          notAnObject: null,
+          // SAFETY: a non-object entry exercises the extractor's object guard.
+          notAnObject: null as never,
         },
-      } as unknown as AsyncApiDocument,
+      },
       "/events"
     );
     expect(operations).toStrictEqual([]);
@@ -333,7 +334,7 @@ describe("asyncapi.extractAsyncApiOperations", () => {
         "get.thing": { action: "send", channel: { $ref: "#/channels/c" } },
         "get/thing": { action: "receive", channel: { $ref: "#/channels/c" } },
       },
-    } as unknown as AsyncApiDocument;
+    };
     const { operations } = extractAsyncApiOperations(document, "/");
     expect(operations.map((op) => op.key)).toStrictEqual([
       "get-thing",
@@ -360,7 +361,7 @@ describe("asyncapi.extractAsyncApiOperations", () => {
         dangling: { $ref: "#/components/operations/missing" },
         sendSignup: { $ref: "#/components/operations/sendSignup" },
       },
-    } as unknown as AsyncApiDocument);
+    });
     const { operations, warnings } = extractAsyncApiOperations(
       document,
       "/events"
@@ -384,7 +385,7 @@ describe("asyncapi.extractAsyncApiOperations", () => {
       operations: {
         "!!!": { action: "send", channel: { $ref: "#/channels/c" } },
       },
-    } as unknown as AsyncApiDocument;
+    };
     const { operations } = extractAsyncApiOperations(document, "/events");
     expect(operations[0]?.key).toBe("send-topic");
   });
@@ -409,12 +410,14 @@ describe("asyncapi.extractAsyncApiOperations", () => {
           title: "Nice title",
         },
       },
-    } as unknown as AsyncApiDocument;
+    };
     const { operations } = extractAsyncApiOperations(document, "/events");
     expect(operations[0]?.summary).toBe("Nice title");
   });
 
   it("resolves operation objects for refs (and nothing else)", () => {
+    // SAFETY: ASYNC_SPEC_3 declares two operations, so a first extracted
+    // operation exists.
     const ref = extractAsyncApiOperations(ASYNC_SPEC_3, "/events")
       .operations[0] as ApiOperationRef;
     expect(asyncApiOperationObject(ASYNC_SPEC_3, ref)?.action).toBeDefined();
@@ -425,7 +428,21 @@ describe("asyncapi.extractAsyncApiOperations", () => {
       asyncApiOperationObject(ASYNC_SPEC_3, { ...ref, operationId: "nope" })
     ).toBeUndefined();
     // The OpenAPI resolver refuses AsyncAPI actions outright.
-    const spec = { document: ASYNC_SPEC_3 } as unknown as ApiSpecData;
+    const spec = {
+      codeSamples: [],
+      description: "Events API.",
+      document: ASYNC_SPEC_3,
+      expandSchemas: false,
+      kind: "asyncapi" as const,
+      label: "Events",
+      operations: {},
+      playground: { enabled: true, proxy: false },
+      route: "/events",
+      slug: "events",
+      tags: [],
+      title: "Events",
+      version: "2.0.0",
+    } satisfies ApiSpecData;
     expect(operationObject(spec, ref)).toBeUndefined();
   });
 
@@ -443,9 +460,11 @@ describe("asyncapi.extractAsyncApiOperations", () => {
           m: { payload: { type: "string" }, traits: [{ name: "Named" }] },
         },
       },
-    } as unknown as AsyncApiDocument;
+    };
     applyAsyncApiTraits(document);
-    const message = document.components?.messages?.m as Record<string, unknown>;
+    // SAFETY: applyAsyncApiTraits merged the trait's `name` into the message
+    // object above.
+    const message = document.components.messages.m as { name?: string };
     expect(message.name).toBe("Named");
     // The channel-level `$ref` entry stays a bare ref.
     expect(document.channels?.c?.messages?.direct).toStrictEqual({
@@ -463,7 +482,8 @@ describe("components/openapi/async helpers", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0]?.key).toBe("UserSignedUp");
     expect(messages[0]?.message.contentType).toBe("application/json");
-    expect(messageLabel(messages[0] as never)).toBe("UserSignedUp");
+    // SAFETY: the length assertion above guarantees a first message.
+    expect(messageLabel(messages[0] as NamedMessage)).toBe("UserSignedUp");
   });
 
   it("falls back to every channel message when the operation names none", () => {
@@ -482,14 +502,16 @@ describe("components/openapi/async helpers", () => {
           { $ref: "#/channels/userSignedup/messages/Missing" },
           { $ref: "#/components/messages/Missing" },
           { payload: { type: "object" }, title: "Inline" },
-          "not-an-object",
+          // SAFETY: a non-object entry exercises the message-ref guard.
+          "not-an-object" as never,
         ],
-      } as never,
+      },
       channel,
       ASYNC_SPEC_3
     );
     expect(messages).toHaveLength(1);
-    expect(messageLabel(messages[0] as never)).toBe("Inline");
+    // SAFETY: the length assertion above guarantees a first message.
+    expect(messageLabel(messages[0] as NamedMessage)).toBe("Inline");
     // No channel at all: nothing to fall back to.
     expect(operationMessages({}, undefined, ASYNC_SPEC_3)).toStrictEqual([]);
   });
@@ -550,11 +572,15 @@ describe("components/openapi/async helpers", () => {
     // Component refs resolve; malformed entries drop.
     const viaRef = channelParameters(
       {
-        parameters: { p: { $ref: "#/components/parameters/p" }, q: null },
-      } as never,
+        parameters: {
+          p: { $ref: "#/components/parameters/p" },
+          // SAFETY: a non-object entry exercises the parameter guard.
+          q: null as never,
+        },
+      },
       {
         components: { parameters: { p: { description: "Ref'd" } } },
-      } as never
+      }
     );
     expect(viaRef).toStrictEqual([
       {
@@ -581,11 +607,17 @@ describe("components/openapi/async helpers", () => {
     // Unresolvable refs drop; a document with no servers yields none.
     expect(
       channelServers(
-        { servers: [{ $ref: "#/servers/missing" }, "junk"] } as never,
+        {
+          servers: [
+            { $ref: "#/servers/missing" },
+            // SAFETY: a non-object entry exercises the server-ref guard.
+            "junk" as never,
+          ],
+        },
         ASYNC_SPEC_3
       )
     ).toStrictEqual([]);
-    expect(channelServers(undefined, {} as never)).toStrictEqual([]);
+    expect(channelServers(undefined, {})).toStrictEqual([]);
   });
 
   it("detects the protocol from bindings, then servers, with aliases", () => {
@@ -604,18 +636,19 @@ describe("components/openapi/async helpers", () => {
         security: [
           { $ref: "#/components/securitySchemes/sasl" },
           { type: "userPassword" },
-          "junk",
+          // SAFETY: a non-object entry exercises the security-entry guard.
+          "junk" as never,
         ],
       },
     ];
-    expect(asyncApiSecurityEntries(undefined, servers as never)).toStrictEqual([
+    expect(asyncApiSecurityEntries(undefined, servers)).toStrictEqual([
       { $ref: "#/components/securitySchemes/sasl" },
       { type: "userPassword" },
     ]);
     // A declared list wins outright — even an empty one (public operation).
-    expect(
-      asyncApiSecurityEntries({ security: [] }, servers as never)
-    ).toStrictEqual([]);
+    expect(asyncApiSecurityEntries({ security: [] }, servers)).toStrictEqual(
+      []
+    );
   });
 
   it("flattens binding maps, dropping bindingVersion and empty groups", () => {
@@ -623,6 +656,7 @@ describe("components/openapi/async helpers", () => {
       bindingGroups({
         empty: { bindingVersion: "0.5.0" },
         kafka: { bindingVersion: "0.5.0", topic: "user-signups" },
+        // SAFETY: a non-object group exercises the runtime guard.
         malformed: null as never,
       })
     ).toStrictEqual([
@@ -750,6 +784,7 @@ describe("security.resolveAsyncApiSecurity", () => {
         { $ref: "#/components/securitySchemes/missing" },
         { $ref: "http://example.com/external#/x" },
         { scopes: "not-an-array" },
+        // SAFETY: a null entry exercises the entry guard.
         null as never,
       ],
       schemes

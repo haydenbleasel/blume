@@ -33,6 +33,20 @@ describe("serverFeatures", () => {
   });
 });
 
+describe("ask retrieval config", () => {
+  it("stays undefined when not configured, so generated endpoints keep tracking the built-in defaults", () => {
+    const config = blumeConfigSchema.parse({ ai: { ask: { enabled: true } } });
+    expect(config.ai.ask?.retrieval).toBeUndefined();
+  });
+
+  it("carries only the fields the user set", () => {
+    const config = blumeConfigSchema.parse({
+      ai: { ask: { enabled: true, retrieval: { maxResults: 3 } } },
+    });
+    expect(config.ai.ask?.retrieval).toStrictEqual({ maxResults: 3 });
+  });
+});
+
 describe("defineComponents", () => {
   it("returns the overrides unchanged (identity helper)", () => {
     const overrides: ComponentOverrides = {

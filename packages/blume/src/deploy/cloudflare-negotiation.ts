@@ -75,6 +75,25 @@ const FALLBACK_RULES = ["/*", "!/_astro/*", "!/*.md", "!/*.mdx", "!/*.txt"];
 const basePrefix = (base?: string): string =>
   base && base !== "/" ? base.replace(/\/$/u, "") : "";
 
+/** A value as `JSON.parse` produces it (the wrangler config's value space). */
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+/** Narrow a parsed JSON value to a plain (non-array) object. */
+const isJsonObject = (
+  value: JsonValue | undefined
+): value is { [key: string]: JsonValue } =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Narrow a parsed JSON value to a string. */
+const isJsonString = (value: JsonValue | undefined): value is string =>
+  typeof value === "string";
+
 const isNegativeRule = (rule: string): boolean => rule.startsWith("!");
 
 const ruleBody = (rule: string): string =>
@@ -163,7 +182,7 @@ const coveredBy = (rule: string, other: string): boolean =>
  * validation error at deploy time.
  */
 export const mergeRunWorkerFirstRules = (
-  existing: unknown,
+  existing: JsonValue | undefined,
   added: readonly string[]
 ): string[] | true => {
   if (existing === true) {
@@ -466,29 +485,25 @@ export const injectWorkerNegotiation = (
   if (options.routePaths.length === 0) {
     return null;
   }
-  let config: Record<string, unknown>;
+  let config: JsonValue;
   try {
     config = JSON.parse(wranglerText);
   } catch {
     return null;
   }
-  if (config === null || typeof config !== "object" || Array.isArray(config)) {
+  if (!isJsonObject(config)) {
     return null;
   }
   const { main } = config;
   if (
-    typeof main !== "string" ||
+    !isJsonString(main) ||
     main.length === 0 ||
     main === NEGOTIATION_WORKER_FILE
   ) {
     return null;
   }
-  const assets = config.assets as Record<string, unknown> | undefined;
-  if (
-    assets === null ||
-    typeof assets !== "object" ||
-    typeof assets.binding !== "string"
-  ) {
+  const { assets } = config;
+  if (!isJsonObject(assets) || !isJsonString(assets.binding)) {
     return null;
   }
   const {

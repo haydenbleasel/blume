@@ -13,6 +13,24 @@ export type ValidationResult =
   | { ok: true; text: string }
   | { ok: false; reason: string };
 
+/**
+ * A parsed YAML frontmatter value (agent meta replies parse from JSON into the
+ * same shape). js-yaml can also mint Dates and other rich scalars; the
+ * traversal below only ever distinguishes "keyed object" from "string", so
+ * they ride along as the object arm.
+ */
+type FrontmatterValue =
+  | string
+  | number
+  | boolean
+  | null
+  | FrontmatterValue[]
+  | FrontmatterData;
+
+interface FrontmatterData {
+  [key: string]: FrontmatterValue;
+}
+
 const FRONTMATTER_OPEN = /^---\r?\n/u;
 const FENCE_LINE = /^\s*(?:```|~~~)/u;
 
@@ -33,27 +51,41 @@ export const stripOuterFence = (text: string): string => {
 const countFenceLines = (text: string): number =>
   text.split("\n").filter((line) => FENCE_LINE.test(line)).length;
 
-const getPath = (data: unknown, path: readonly string[]): unknown => {
-  let value: unknown = data;
+const isKeyedObject = (
+  value: FrontmatterValue | undefined
+): value is FrontmatterData => typeof value === "object" && value !== null;
+
+const isString = (value: FrontmatterValue | undefined): value is string =>
+  typeof value === "string";
+
+const getPath = (
+  data: FrontmatterValue,
+  path: readonly string[]
+): FrontmatterValue | undefined => {
+  let value: FrontmatterValue | undefined = data;
   for (const key of path) {
-    if (typeof value !== "object" || value === null) {
+    if (!isKeyedObject(value)) {
       return;
     }
-    value = (value as Record<string, unknown>)[key];
+    value = value[key];
   }
   return value;
 };
 
 /** Set `path` on `data`; only called for paths whose parents exist in `data`. */
 const setPath = (
-  data: Record<string, unknown>,
+  data: FrontmatterData,
   path: readonly string[],
   value: string
 ): void => {
   let parent = data;
   for (const key of path.slice(0, -1)) {
-    parent = parent[key] as Record<string, unknown>;
+    // SAFETY: callers only set paths that getPath already resolved to a string
+    // on this same (cloned) data, so every intermediate step is a keyed object.
+    parent = parent[key] as FrontmatterData;
   }
+  // SAFETY: every TRANSLATABLE_KEY_PATHS entry is a non-empty tuple, so the
+  // path always has a final key.
   parent[path.at(-1) as string] = value;
 };
 
@@ -84,7 +116,7 @@ export const validateTranslation = (
     };
   }
 
-  let parsed: { content: string; data: Record<string, unknown> };
+  let parsed: { content: string; data: FrontmatterData };
   try {
     parsed = matter(candidate);
   } catch {
@@ -114,13 +146,13 @@ export const validateTranslation = (
   // Reconciliation by reconstruction: start from the SOURCE data and overlay
   // only the translatable key paths where both sides hold a string and the
   // translation is non-empty.
-  const data = structuredClone(source.data) as Record<string, unknown>;
+  const data: FrontmatterData = structuredClone(source.data);
   for (const path of TRANSLATABLE_KEY_PATHS) {
     const original = getPath(source.data, path);
     const translated = getPath(parsed.data, path);
     if (
-      typeof original === "string" &&
-      typeof translated === "string" &&
+      isString(original) &&
+      isString(translated) &&
       translated.trim() !== ""
     ) {
       setPath(data, path, translated);
@@ -133,6 +165,12 @@ export const validateTranslation = (
   };
 };
 
+/** A meta-batch parse: recovered titles by key, plus the keys still missing. */
+export interface MetaTitlesResult {
+  titles: Record<string, string>;
+  missing: string[];
+}
+
 /**
  * Extract translated sidebar titles from a meta reply: tolerant first-`{`
  * to-last-`}` extraction (the eval `parseVerdict` idiom). Keys missing or
@@ -141,10 +179,10 @@ export const validateTranslation = (
 export const parseMetaTitles = (
   agentText: string,
   expectedKeys: readonly string[]
-): { titles: Record<string, string>; missing: string[] } => {
+): MetaTitlesResult => {
   const start = agentText.indexOf("{");
   const end = agentText.lastIndexOf("}");
-  let parsed: unknown;
+  let parsed: FrontmatterValue | undefined;
   if (start !== -1 && end > start) {
     try {
       parsed = JSON.parse(agentText.slice(start, end + 1));
@@ -152,16 +190,13 @@ export const parseMetaTitles = (
       parsed = undefined;
     }
   }
-  const record =
-    typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : {};
+  const record: FrontmatterData = isKeyedObject(parsed) ? parsed : {};
 
   const titles: Record<string, string> = {};
   const missing: string[] = [];
   for (const key of expectedKeys) {
     const value = record[key];
-    if (typeof value === "string" && value.trim() !== "") {
+    if (isString(value) && value.trim() !== "") {
       titles[key] = value;
     } else {
       missing.push(key);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   activeTabForRoute,
+  currentTabForRoute,
   sidebarForRoute,
 } from "../src/components/layout/nav-utils.ts";
 import type { NavNode, NavTab } from "../src/core/types.ts";
@@ -56,6 +57,41 @@ describe("activeTabForRoute", () => {
 
   it("returns null when no tab matches", () => {
     expect(activeTabForRoute(TABS, "/changelog")).toBeNull();
+  });
+});
+
+describe("currentTabForRoute", () => {
+  const documentation: NavTab = { label: "Documentation", path: "/" };
+  const examples: NavTab = { label: "Examples", path: "/examples" };
+  const tabs = [documentation, examples];
+
+  it("matches like activeTabForRoute in the current docs", () => {
+    expect(currentTabForRoute(tabs, "/examples/hello-world", "/")).toBe(
+      examples
+    );
+    // The root tab is genuinely current on an un-tabbed route.
+    expect(currentTabForRoute(tabs, "/guides/services", "/")).toBe(
+      documentation
+    );
+    expect(currentTabForRoute(TABS, "/changelog", "/")).toBeNull();
+  });
+
+  it("marks no tab current inside an archived version tree", () => {
+    // The root tab claims every archived route through its spans-everything
+    // fallback, but it links back at the current docs — so neither it nor any
+    // section tab is the current page there.
+    expect(
+      currentTabForRoute(tabs, "/v1.0/examples/hello", "/v1.0")
+    ).toBeNull();
+    // Same under a basePath: the rebased root tab (`/docs`) is an ancestor of
+    // the versionized root (`/docs/v1.0`), not the root itself.
+    const based = [
+      { label: "Docs", path: "/docs" },
+      { label: "API", path: "/docs/api" },
+    ];
+    expect(
+      currentTabForRoute(based, "/docs/v1.0/api/files", "/docs/v1.0")
+    ).toBeNull();
   });
 });
 
@@ -248,6 +284,52 @@ describe("sidebarForRoute", () => {
     expect(labels(sidebarForRoute(tree, tabs, "/docs", "/docs"))).toStrictEqual(
       ["Home"]
     );
+  });
+
+  it("keeps the sidebar unscoped inside an archived version tree", () => {
+    // A version navigation's root is versionized (`/v1.0`) while tab paths
+    // stay in current-docs space, so the root tab must be recognized as the
+    // root — not a section tab owning no group here, which blanked the
+    // sidebar on every archived page.
+    const tree: NavNode[] = [
+      page("Introduction", "/v1.0"),
+      page("Installation", "/v1.0/installation"),
+    ];
+    const tabs: NavTab[] = [
+      { label: "Docs", path: "/" },
+      { label: "API", path: "/api" },
+    ];
+    expect(
+      labels(sidebarForRoute(tree, tabs, "/v1.0/installation", "/v1.0"))
+    ).toStrictEqual(["Introduction", "Installation"]);
+    // Same under a basePath: rebased tabs (`/docs`) are still ancestors of
+    // the versionized root (`/docs/v1.0`).
+    const based: NavNode[] = [page("Home", "/docs/v1.0")];
+    const basedTabs: NavTab[] = [
+      { label: "Docs", path: "/docs" },
+      { label: "API", path: "/docs/api" },
+    ];
+    expect(
+      labels(sidebarForRoute(based, basedTabs, "/docs/v1.0", "/docs/v1.0"))
+    ).toStrictEqual(["Home"]);
+  });
+
+  it("does not prune a group at the root tab's own path inside an archived tree", () => {
+    // The root tab must never land in the tab-section prune set, even when its
+    // path differs from the versionized root — a slug-flattened `(group)`
+    // folder can sit at exactly the unversionized prefix (`/docs`), and
+    // pruning it would drop that container from the snapshot's sidebar.
+    const tree: NavNode[] = [
+      group("Guides", "/docs", [page("Setup", "/docs/v1.0/setup")]),
+      page("Home", "/docs/v1.0"),
+    ];
+    const tabs: NavTab[] = [
+      { label: "Docs", path: "/docs" },
+      { label: "API", path: "/docs/api" },
+    ];
+    expect(
+      labels(sidebarForRoute(tree, tabs, "/docs/v1.0/setup", "/docs/v1.0"))
+    ).toStrictEqual(["Guides", "Home"]);
   });
 
   it("does not treat a sibling prefix as the section (/adapters vs /adapters-x)", () => {

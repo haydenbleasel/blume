@@ -47,10 +47,31 @@ interface Splice {
   text: string;
 }
 
+/**
+ * A statically-recovered data value. Parsed front matter and evaluated
+ * attribute literals are both plain data — scalars, dates, arrays, and
+ * nested maps — never functions or class instances.
+ */
+export type EvaluatedValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | Date
+  | EvaluatedValue[]
+  | { [key: string]: EvaluatedValue };
+
+const isString = <Value>(value: Value): value is Value & string =>
+  typeof value === "string";
+
+const isNumber = <Value>(value: Value): value is Value & number =>
+  typeof value === "number";
+
 /** Evaluated props plus whether any attribute resisted static evaluation. */
 interface EvaluatedProps {
   lossy: boolean;
-  props: Record<string, unknown>;
+  props: Record<string, EvaluatedValue>;
 }
 
 /** A child component extracted by name (e.g. each `<Step>` under `<Steps>`). */
@@ -70,7 +91,7 @@ export interface ComponentMarkdownContext extends EvaluatedProps {
    * serializer read page metadata directly, even when a prop expression is
    * not statically evaluable.
    */
-  frontmatter: Record<string, unknown>;
+  frontmatter: Record<string, EvaluatedValue>;
 }
 
 /**
@@ -93,15 +114,16 @@ export type ComponentMarkdown = (
  */
 const evaluateExpression = (
   raw: string,
-  frontmatter: Record<string, unknown> | undefined
-): { ok: boolean; value: unknown } => {
+  frontmatter: Record<string, EvaluatedValue> | undefined
+) => {
   try {
     // Build-time eval of the author's own attribute literals; a throw falls
     // back to leaving the JSX verbatim.
     // oxlint-disable-next-line no-new-func
-    const value = new Function("frontmatter", `"use strict"; return (${raw});`)(
-      frontmatter
-    );
+    const value: EvaluatedValue = new Function(
+      "frontmatter",
+      `"use strict"; return (${raw});`
+    )(frontmatter);
     return { ok: true, value };
   } catch {
     return { ok: false, value: undefined };
@@ -111,9 +133,9 @@ const evaluateExpression = (
 /** Evaluate an element's attributes into a plain props object. */
 const readProps = (
   node: MdastNode,
-  frontmatter: Record<string, unknown> | undefined
+  frontmatter: Record<string, EvaluatedValue> | undefined
 ): EvaluatedProps => {
-  const props: Record<string, unknown> = {};
+  const props: Record<string, EvaluatedValue> = {};
   let lossy = false;
   for (const attribute of node.attributes ?? []) {
     // A spread ({...props}) can't be recovered statically.
@@ -124,7 +146,7 @@ const readProps = (
     if (attribute.value === null || attribute.value === undefined) {
       // Boolean shorthand: `<Steps compact>`.
       props[attribute.name] = true;
-    } else if (typeof attribute.value === "string") {
+    } else if (isString(attribute.value)) {
       props[attribute.name] = attribute.value;
     } else {
       const result = evaluateExpression(attribute.value.value, frontmatter);
@@ -198,35 +220,49 @@ const isJsxElement = (node: MdastNode): boolean =>
   node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement";
 
 /** Flatten a value to a single Markdown table cell (pipes escaped). */
-const cellText = (value: unknown): string =>
+const cellText = (value: EvaluatedValue): string =>
   String(value ?? "")
     .replaceAll(/\s*\n\s*/gu, " ")
     .replaceAll("|", "\\|")
     .trim();
 
 /** A cell rendered as inline code, unless the value itself uses backticks. */
-const cellCode = (value: unknown): string => {
+const cellCode = (value: EvaluatedValue): string => {
   const text = cellText(value);
   return text && !text.includes("`") ? `\`${text}\`` : text;
 };
 
-/** One `<TypeTable type={{...}}>` entry, matching the component's shape. */
+/**
+ * One `<TypeTable type={{...}}>` entry, matching the component's props. The
+ * index signature keeps the interface interchangeable with the evaluated
+ * data-value maps it is narrowed from.
+ */
 interface TypeEntry {
-  default?: unknown;
-  description?: unknown;
-  required?: unknown;
-  type?: unknown;
-  typeDescription?: unknown;
-  typeDescriptionLink?: unknown;
+  [field: string]: EvaluatedValue;
+  default?: EvaluatedValue;
+  description?: EvaluatedValue;
+  required?: EvaluatedValue;
+  type?: EvaluatedValue;
+  typeDescription?: EvaluatedValue;
+  typeDescriptionLink?: EvaluatedValue;
 }
+
+/**
+ * The `type` data prop's entry map. Structural only: each entry's fields are
+ * rendered through cellText/cellCode, which stringify any value.
+ */
+const isTypeEntryMap = (
+  value: EvaluatedValue
+): value is Record<string, TypeEntry> =>
+  typeof value === "object" && value !== null;
 
 const typeTable: ComponentMarkdown = ({ children, props }) => {
   const { type } = props;
-  if (type === null || typeof type !== "object") {
+  if (!isTypeEntryMap(type)) {
     // The data prop is missing or wasn't statically evaluable.
     return null;
   }
-  const entries = Object.entries(type as Record<string, TypeEntry>);
+  const entries = Object.entries(type);
   const rows = entries.map(([name, info]) => {
     const prop = cellCode(`${name}${info.required ? "" : "?"}`);
     const typeCell = info.typeDescriptionLink
@@ -236,7 +272,7 @@ const typeTable: ComponentMarkdown = ({ children, props }) => {
       info.default === undefined ? "-" : cellCode(info.default);
     const description = cellText(
       [info.description, info.typeDescription]
-        .filter((part) => typeof part === "string" && part !== "")
+        .filter((part) => isString(part) && part !== "")
         .join(" ")
     );
     return [prop, typeCell, defaultCell, description];
@@ -254,9 +290,9 @@ const typeTable: ComponentMarkdown = ({ children, props }) => {
 };
 
 const callout: ComponentMarkdown = ({ children, props }) => {
-  const type = typeof props.type === "string" ? props.type : "info";
+  const type = isString(props.type) ? props.type : "info";
   const label =
-    typeof props.title === "string" && props.title !== ""
+    isString(props.title) && props.title !== ""
       ? props.title
       : type.charAt(0).toUpperCase() + type.slice(1);
   if (!children) {
@@ -291,7 +327,7 @@ const steps: ComponentMarkdown = ({ childComponents, children }) => {
   return items
     .map((step, index) => {
       const title =
-        typeof step.props.title === "string" && step.props.title !== ""
+        isString(step.props.title) && step.props.title !== ""
           ? `**${step.props.title}**`
           : "";
       const content = [title, step.children].filter(Boolean).join("\n\n");
@@ -308,7 +344,7 @@ const tabs: ComponentMarkdown = ({ childComponents, children }) => {
   return items
     .map((tab, index) => {
       const title =
-        typeof tab.props.title === "string" && tab.props.title !== ""
+        isString(tab.props.title) && tab.props.title !== ""
           ? tab.props.title
           : `Tab ${index + 1}`;
       return tab.children ? `**${title}**\n\n${tab.children}` : `**${title}**`;
@@ -318,9 +354,9 @@ const tabs: ComponentMarkdown = ({ childComponents, children }) => {
 
 const youtube: ComponentMarkdown = ({ props }) => {
   let input = "";
-  if (typeof props.id === "string") {
+  if (isString(props.id)) {
     input = props.id;
-  } else if (typeof props.url === "string") {
+  } else if (isString(props.url)) {
     input = props.url;
   }
   const videoId = parseYouTubeId(input);
@@ -328,11 +364,11 @@ const youtube: ComponentMarkdown = ({ props }) => {
     return null;
   }
   const start =
-    typeof props.start === "number" && props.start > 0
+    isNumber(props.start) && props.start > 0
       ? `&t=${Math.floor(props.start)}s`
       : "";
   const title =
-    typeof props.title === "string" && props.title !== ""
+    isString(props.title) && props.title !== ""
       ? props.title
       : "Watch on YouTube";
   return `[${title}](https://www.youtube.com/watch?v=${videoId}${start})`;
@@ -355,28 +391,27 @@ const fencedBlock = (lang: string, code: string): string => {
  * the JSX verbatim, mirroring the "no example found" note the component renders
  * on the page.
  */
-export const exampleComponentSerializers = (
-  examples: ExampleLookup
-): Record<string, ComponentMarkdown> => ({
-  Component: ({ props }) => {
-    const path = typeof props.path === "string" ? props.path : undefined;
-    const example = path === undefined ? undefined : examples[path];
-    return example ? fencedBlock(example.lang, example.source) : null;
-  },
-});
+export const exampleComponentSerializers = (examples: ExampleLookup) =>
+  ({
+    Component: ({ props }) => {
+      const path = isString(props.path) ? props.path : undefined;
+      const example = path === undefined ? undefined : examples[path];
+      return example ? fencedBlock(example.lang, example.source) : null;
+    },
+  }) satisfies Record<string, ComponentMarkdown>;
 
 /**
  * The built-in serializer registry, keyed by JSX name. `Step` and `Tab` are
  * intentionally absent: they only carry meaning inside their containers,
  * which extract them via `childComponents`; a stray one stays verbatim.
  */
-const SERIALIZERS: Record<string, ComponentMarkdown> = {
+const SERIALIZERS = {
   Callout: callout,
   Steps: steps,
   Tabs: tabs,
   TypeTable: typeTable,
   YouTube: youtube,
-};
+} satisfies Record<string, ComponentMarkdown>;
 
 const escapeRegExp = (value: string): string =>
   value.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`);
@@ -394,7 +429,7 @@ const BUILT_IN_HINT = componentHint(SERIALIZERS);
 
 /** One downlevel pass's inputs: the source, registry, and page metadata. */
 interface Walk {
-  frontmatter: Record<string, unknown> | undefined;
+  frontmatter: Record<string, EvaluatedValue> | undefined;
   registry: Record<string, ComponentMarkdown>;
   source: string;
 }
@@ -494,7 +529,7 @@ const collectSplices = (
 export const downlevelComponents = (
   source: string,
   components?: Record<string, ComponentMarkdown>,
-  frontmatter?: Record<string, unknown>
+  frontmatter?: Record<string, EvaluatedValue>
 ): string => {
   const custom = components && Object.keys(components).length > 0;
   const registry = custom ? { ...SERIALIZERS, ...components } : SERIALIZERS;
@@ -504,6 +539,8 @@ export const downlevelComponents = (
   }
   let tree: MdastNode;
   try {
+    // SAFETY: MdastNode is a structural subset of Satteri's mdast output —
+    // every node carries `type`, and the walk reads only optional fields.
     tree = mdxToMdast(source) as MdastNode;
   } catch {
     return source;

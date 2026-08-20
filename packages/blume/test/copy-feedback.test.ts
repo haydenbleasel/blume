@@ -70,6 +70,8 @@ beforeAll(() => {
 });
 
 afterAll(() => {
+  // SAFETY: views globalThis as carrying just the two globals faked above, so
+  // `delete` can remove them where no original descriptor existed.
   const globals = globalThis as { document?: unknown; navigator?: unknown };
   if (documentDescriptor) {
     Object.defineProperty(globalThis, "document", documentDescriptor);
@@ -88,6 +90,11 @@ const { announceCopied, copyText, createCopyFlash, flashLabel } =
 
 /** The current live region (always the newest appended body child). */
 const liveRegion = (): FakeEl | undefined => body.children.at(-1);
+
+/** Present a fake element to `flashLabel`, which expects a DOM element. */
+// SAFETY: flashLabel touches only `textContent` and `dataset`, both of which
+// FakeEl provides; bun's test runtime has no real DOM element to construct.
+const asLabel = (el: FakeEl): HTMLElement => el as FakeEl & HTMLElement;
 
 describe("copyText", () => {
   it("returns true and writes the clipboard on success", async () => {
@@ -167,7 +174,7 @@ describe("flashLabel", () => {
   it("captures the original label once and restores it", async () => {
     const label = new FakeEl();
     label.textContent = "Copy URL";
-    flashLabel(label as unknown as HTMLElement, "Copied!", 10);
+    flashLabel(asLabel(label), "Copied!", 10);
     expect(label.textContent).toBe("Copied!");
     expect(liveRegion()?.textContent).toBe("Copied!");
     await Bun.sleep(30);
@@ -177,11 +184,11 @@ describe("flashLabel", () => {
   it("keeps the original label across a double flash and extends the hold", async () => {
     const label = new FakeEl();
     label.textContent = "Copy URL";
-    flashLabel(label as unknown as HTMLElement, "Copied!", 25);
+    flashLabel(asLabel(label), "Copied!", 25);
     await Bun.sleep(10);
     // A second flash while showing "Copied!" must not capture "Copied!" as
     // the label, and must restart the hold rather than reverting early.
-    flashLabel(label as unknown as HTMLElement, "Copied!", 25);
+    flashLabel(asLabel(label), "Copied!", 25);
     await Bun.sleep(10);
     expect(label.textContent).toBe("Copied!");
     await Bun.sleep(30);

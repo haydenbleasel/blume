@@ -232,13 +232,17 @@ Passar `siteUrl` (e `ogEnabled`) deriva automaticamente o `canonical` da página
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
   ogImage="/opengraph-image.png"
+  ogImageAlt="Acme — the fastest docs"
+  ogImageSize={{ width: 1200, height: 630 }}
   page={{ title: config.title }}
 >
   <!-- page content -->
 </PageLayout>
 ```
 
-Apenas esta página muda — todas as outras rotas mantêm seu card gerado — então é assim que você dá somente à página inicial uma imagem de compartilhamento sob medida.
+Apenas esta página muda — todas as outras rotas mantêm seu card gerado — então é assim que você dá somente à página inicial uma imagem de compartilhamento sob medida. O card gerado declara seu tamanho e texto alternativo aos rastreadores por conta própria; para a sua própria `ogImage`, passe `ogImageAlt` e `ogImageSize` junto para que o card de compartilhamento receba o mesmo tratamento.
+
+A página também emite JSON-LD do schema.org — o mesmo grafo `WebSite` que as páginas de documentação carregam, para que a página inicial (geralmente uma página personalizada) não seja a única URL sem dados estruturados. Passe `structuredDataEnabled={config.structuredData}` para mantê-lo em sincronia com a configuração [`structuredData`](/docs/configuration/seo), ou `structuredDataEnabled={false}` para desativá-lo em uma página específica.
 
 `page.title` é usado literalmente como título do documento (sem o sufixo `- siteTitle`), já que páginas de marketing geralmente definem o seu próprio. Para dar a uma página personalizada toda a estrutura da documentação — barra lateral, índice e tudo mais — envolva-a no `RootLayout`, o layout que as páginas geradas usam. Puxe as props necessárias diretamente do `blume:data`:
 

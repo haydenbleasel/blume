@@ -49,6 +49,7 @@ import { scanProject } from "../core/project-graph.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ProjectContext } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
+import type { OpenApiData } from "../openapi/model.ts";
 import { hasScalarReferences } from "../openapi/references.ts";
 import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
@@ -97,7 +98,7 @@ export const blumeSourceGlob = (
 };
 
 /** The `blume:openapi` payload for the ejected app (`{}` when none). */
-const ejectOpenApiData = (project: BlumeProject): unknown => {
+const ejectOpenApiData = (project: BlumeProject): OpenApiData => {
   const source = project.sources.find(isOpenApiSource);
   return source ? source.openApiData() : {};
 };
@@ -126,7 +127,10 @@ const askFiles = async (
   const grounded = ask.provider !== "inkeep";
   const files = [
     {
-      content: askEndpointTemplate(resolveAskBackend(ask), grounded),
+      content: askEndpointTemplate(resolveAskBackend(ask), grounded, {
+        instructions: ask.instructions,
+        retrieval: ask.retrieval,
+      }),
       path: join(srcDir, "pages", "api", "ask.ts"),
     },
   ];

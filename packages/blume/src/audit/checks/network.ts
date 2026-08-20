@@ -252,6 +252,8 @@ export const externalChecks: CheckModule = {
       if (!result) {
         continue;
       }
+      // SAFETY: every `linkers` entry is created with its linking page and only
+      // ever appended to, so the array is never empty.
       const site = pageSite(context, pages[0] as PageSnapshot);
 
       const grade = gradeExternal(result);

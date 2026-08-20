@@ -27,42 +27,44 @@ const DOCS_CONTENT_SOURCES = "/docs/content/sources";
 const DOCS_CONTENT_NAVIGATION = "/docs/content/navigation";
 
 /** Diagnostic code → the docs page that explains it. */
-const DOCS_PATHS: Record<string, string> = {
-  BLUME_ADAPTER_REQUIRED: DOCS_DEPLOYMENT,
-  BLUME_ASSETS_UNCHECKED: DOCS_REFERENCE_CLI,
-  BLUME_ASSET_FETCH_FAILED: DOCS_CONTENT_SOURCES,
-  BLUME_BROKEN_ANCHOR: DOCS_REFERENCE_CLI,
-  BLUME_BROKEN_ASSET: DOCS_REFERENCE_CLI,
-  BLUME_BROKEN_LINK: DOCS_REFERENCE_CLI,
-  BLUME_CONFIG_INVALID: "/docs/configuration",
-  BLUME_CONFIG_LOAD_FAILED: "/docs/configuration",
-  BLUME_CONTENT_ROOT_MISSING: DOCS_CONTENT_SOURCES,
-  BLUME_DEAD_LINK: DOCS_REFERENCE_CLI,
-  BLUME_DUPLICATE_ROUTE: DOCS_CONTENT_NAVIGATION,
-  BLUME_DUPLICATE_SIDEBAR_ORDER: DOCS_CONTENT_NAVIGATION,
-  BLUME_FRONTMATTER_INVALID: "/docs/reference/frontmatter",
-  BLUME_META_INVALID: "/docs/content/meta",
-  BLUME_META_LOAD_FAILED: "/docs/content/meta",
-  BLUME_MISSING_SECRET: DOCS_DEPLOYMENT,
-  BLUME_NAV_DUPLICATE_LABEL: DOCS_CONTENT_NAVIGATION,
-  BLUME_NAV_HIDDEN_IN_SIDEBAR: DOCS_CONTENT_NAVIGATION,
-  BLUME_NAV_INDEX_TITLE_MISMATCH: DOCS_CONTENT_NAVIGATION,
-  BLUME_NAV_MISSING_PAGE: DOCS_CONTENT_NAVIGATION,
-  BLUME_NODE_VERSION: "/docs/quickstart",
-  BLUME_SERVER_FEATURE_REQUIRED: DOCS_DEPLOYMENT,
-  BLUME_SIDEBAR_DISPLAY_IGNORED: DOCS_CONTENT_NAVIGATION,
-  BLUME_SOURCE_FETCH_FAILED: DOCS_CONTENT_SOURCES,
-  BLUME_SOURCE_MISCONFIGURED: DOCS_CONTENT_SOURCES,
-  BLUME_SOURCE_OFFLINE: DOCS_CONTENT_SOURCES,
-  BLUME_SOURCE_SDK_MISSING: DOCS_CONTENT_SOURCES,
-  BLUME_SOURCE_UNAVAILABLE: DOCS_CONTENT_SOURCES,
-  BLUME_UNKNOWN_COMPONENT: "/docs/configuration/customization",
-  BLUME_UNKNOWN_ICON: DOCS_CONTENT_NAVIGATION,
-};
+const DOCS_PATHS = new Map(
+  Object.entries({
+    BLUME_ADAPTER_REQUIRED: DOCS_DEPLOYMENT,
+    BLUME_ASSETS_UNCHECKED: DOCS_REFERENCE_CLI,
+    BLUME_ASSET_FETCH_FAILED: DOCS_CONTENT_SOURCES,
+    BLUME_BROKEN_ANCHOR: DOCS_REFERENCE_CLI,
+    BLUME_BROKEN_ASSET: DOCS_REFERENCE_CLI,
+    BLUME_BROKEN_LINK: DOCS_REFERENCE_CLI,
+    BLUME_CONFIG_INVALID: "/docs/configuration",
+    BLUME_CONFIG_LOAD_FAILED: "/docs/configuration",
+    BLUME_CONTENT_ROOT_MISSING: DOCS_CONTENT_SOURCES,
+    BLUME_DEAD_LINK: DOCS_REFERENCE_CLI,
+    BLUME_DUPLICATE_ROUTE: DOCS_CONTENT_NAVIGATION,
+    BLUME_DUPLICATE_SIDEBAR_ORDER: DOCS_CONTENT_NAVIGATION,
+    BLUME_FRONTMATTER_INVALID: "/docs/reference/frontmatter",
+    BLUME_META_INVALID: "/docs/content/meta",
+    BLUME_META_LOAD_FAILED: "/docs/content/meta",
+    BLUME_MISSING_SECRET: DOCS_DEPLOYMENT,
+    BLUME_NAV_DUPLICATE_LABEL: DOCS_CONTENT_NAVIGATION,
+    BLUME_NAV_HIDDEN_IN_SIDEBAR: DOCS_CONTENT_NAVIGATION,
+    BLUME_NAV_INDEX_TITLE_MISMATCH: DOCS_CONTENT_NAVIGATION,
+    BLUME_NAV_MISSING_PAGE: DOCS_CONTENT_NAVIGATION,
+    BLUME_NODE_VERSION: "/docs/quickstart",
+    BLUME_SERVER_FEATURE_REQUIRED: DOCS_DEPLOYMENT,
+    BLUME_SIDEBAR_DISPLAY_IGNORED: DOCS_CONTENT_NAVIGATION,
+    BLUME_SOURCE_FETCH_FAILED: DOCS_CONTENT_SOURCES,
+    BLUME_SOURCE_MISCONFIGURED: DOCS_CONTENT_SOURCES,
+    BLUME_SOURCE_OFFLINE: DOCS_CONTENT_SOURCES,
+    BLUME_SOURCE_SDK_MISSING: DOCS_CONTENT_SOURCES,
+    BLUME_SOURCE_UNAVAILABLE: DOCS_CONTENT_SOURCES,
+    BLUME_UNKNOWN_COMPONENT: "/docs/configuration/customization",
+    BLUME_UNKNOWN_ICON: DOCS_CONTENT_NAVIGATION,
+  })
+);
 
 /** The docs URL that explains a diagnostic code, if one is mapped. */
 export const resolveDocsUrl = (code: string): string | undefined => {
-  const path = DOCS_PATHS[code];
+  const path = DOCS_PATHS.get(code);
   return path ? `${DOCS_BASE}${path}` : undefined;
 };
 
@@ -76,6 +78,10 @@ const REGEXP_SPECIAL = /[$()*+.?[\\\]^{|}]/gu;
 const escapeRegExp = (value: string): string =>
   value.replaceAll(REGEXP_SPECIAL, String.raw`\$&`);
 
+/** A key segment scans the source text; an array index has no key to find. */
+const isKeySegment = (segment: string | number): segment is string =>
+  typeof segment === "string";
+
 /**
  * Best-effort source position for a Zod issue path (e.g. `["seo", "title"]`) in
  * the raw config / frontmatter text. Narrows key-by-key — finding each string
@@ -87,9 +93,9 @@ const stepSegment = (
   source: string,
   segment: string | number,
   cursor: number
-): { index: number; next: number; stop: boolean } => {
+) => {
   // A non-string path segment (array index) is skipped without moving on.
-  if (typeof segment !== "string") {
+  if (!isKeySegment(segment)) {
     return { index: -1, next: cursor, stop: false };
   }
   // The negative lookbehind keeps a segment like `title` from matching the
@@ -248,10 +254,11 @@ export const formatDiagnostic = (
 export const hasErrors = (diagnostics: Diagnostic[]): boolean =>
   diagnostics.some((d) => d.severity === "error");
 
-export const countBySeverity = (
-  diagnostics: Diagnostic[]
-): Record<Diagnostic["severity"], number> => {
-  const counts = { error: 0, info: 0, warning: 0 };
+export const countBySeverity = (diagnostics: Diagnostic[]) => {
+  const counts = { error: 0, info: 0, warning: 0 } satisfies Record<
+    Diagnostic["severity"],
+    number
+  >;
   for (const diagnostic of diagnostics) {
     counts[diagnostic.severity] += 1;
   }

@@ -7,6 +7,7 @@ import type {
   LocalizableLabel,
   ResolvedConfig,
   ResolvedI18nConfig,
+  ResolvedVersionsConfig,
 } from "./schema.ts";
 import type {
   ContentGraph,
@@ -15,6 +16,7 @@ import type {
   NavTab,
   PageRecord,
 } from "./types.ts";
+import { versionizeRoute } from "./versions.ts";
 
 interface BuildContentGraphOptions {
   /** Site-wide route mount point (`""` or `/seg`); invisible to the nav tree. */
@@ -23,14 +25,13 @@ interface BuildContentGraphOptions {
   sharedFolderMeta?: Map<string, FolderMeta>;
   navigation: ResolvedConfig["navigation"];
   i18n?: ResolvedI18nConfig;
+  versions?: ResolvedVersionsConfig;
 }
 
 type FallbackLocale = ReturnType<typeof resolveFallbackLocale>;
 
 /** Build the route → page-id map, flagging any duplicate-route collisions. */
-const collectRoutes = (
-  pages: PageRecord[]
-): { diagnostics: Diagnostic[]; routes: Map<string, string> } => {
+const collectRoutes = (pages: PageRecord[]) => {
   const routes = new Map<string, string>();
   const diagnostics: Diagnostic[] = [];
   for (const page of pages) {
@@ -86,12 +87,16 @@ const localePagesFor = (
  * the active locale's entry, else the default locale's, else the map's first
  * entry (which is also what a single-locale site gets).
  */
+/** A label is either one string for every locale or a per-locale map. */
+const isSingleLabel = (label: LocalizableLabel): label is string =>
+  typeof label === "string";
+
 const resolveLabel = (
   label: LocalizableLabel,
   locale: string,
   defaultLocale?: string
 ): string => {
-  if (typeof label === "string") {
+  if (isSingleLabel(label)) {
     return label;
   }
   return (
@@ -117,7 +122,12 @@ const resolveTabLabels = (
     label: resolveLabel(tab.label, locale, defaultLocale),
   }));
 
-/** Build one locale's navigation tree from its own pages and folder meta. */
+/**
+ * Build one locale's navigation tree from its own pages and folder meta.
+ * `version` is the archived version id when building a snapshot's tree
+ * (`""` for the current docs): it shifts the folder-meta lookups into the
+ * snapshot's key space and roots the tree at the localized version root.
+ */
 const buildLocaleNavigation = (
   code: string,
   pages: PageRecord[],
@@ -125,7 +135,8 @@ const buildLocaleNavigation = (
   fallbackByKey: Map<string, PageRecord>,
   options: BuildContentGraphOptions,
   i18n: ResolvedI18nConfig,
-  diagnostics: Diagnostic[]
+  diagnostics: Diagnostic[],
+  version = ""
 ): Navigation => {
   // Localize internal tab paths — the tab's own and its dropdown items' — so a
   // header tab points to its in-locale route (e.g. `/docs` -> `/fr/docs`);
@@ -137,15 +148,20 @@ const buildLocaleNavigation = (
     options.navigation.tabs,
     code,
     i18n.defaultLocale
-  ).map((tab) => ({
-    ...tab,
-    ...(tab.href ? { href: localizePath(tab.href) } : {}),
-    items: tab.items?.map((item) => ({
-      ...item,
-      path: localizePath(item.path),
-    })),
-    path: localizePath(tab.path),
-  }));
+  ).map((tab) => {
+    const localized = {
+      ...tab,
+      items: tab.items?.map((item) => ({
+        ...item,
+        path: localizePath(item.path),
+      })),
+      path: localizePath(tab.path),
+    };
+    if (localized.href) {
+      localized.href = localizePath(localized.href);
+    }
+    return localized;
+  });
   const real = pages.filter((page) => page.locale === code);
   const localePages = localePagesFor(
     code,
@@ -155,6 +171,13 @@ const buildLocaleNavigation = (
     i18n,
     options.basePath ?? ""
   );
+  // Meta files live in locale directories only under the `dir` parser
+  // (`fr/guides/meta.ts` -> key `fr/guides`). Under `dot`, translations sit
+  // next to the originals and `guides/meta.ts` applies to every locale —
+  // prefixing would look up keys that can never exist. Inside a snapshot the
+  // version dir is hoisted in front (`v1.0/fr`), matching `discoverFolderMeta`.
+  const localeDir =
+    i18n.parser === "dir" && code !== i18n.defaultLocale ? code : "";
   return buildNavigation(localePages, {
     basePath: options.basePath ?? "",
     diagnostics,
@@ -167,34 +190,37 @@ const buildLocaleNavigation = (
       href: localizePath(link.href),
     })),
     folderMeta: options.folderMeta,
-    // The localized tree root ("/" for the hidden default, "/fr" otherwise):
-    // the tab pointing here spans the whole tree and must not be treated as a
-    // tab section.
-    localizedRoot: localizeRoute("/", code, i18n),
-    // Meta files live in locale directories only under the `dir` parser
-    // (`fr/guides/meta.ts` -> key `fr/guides`). Under `dot`, translations sit
-    // next to the originals and `guides/meta.ts` applies to every locale —
-    // prefixing would look up keys that can never exist.
-    metaPrefix:
-      i18n.parser === "dir" && code !== i18n.defaultLocale ? code : "",
+    // The localized tree root ("/" for the hidden default, "/fr" otherwise;
+    // "/fr/v1.0" inside a snapshot): the tab pointing here spans the whole
+    // tree and must not be treated as a tab section.
+    localizedRoot: localizeRoute(versionizeRoute("/", version), code, i18n),
+    metaPrefix: [version, localeDir].filter(Boolean).join("/"),
     refByLogical: true,
     selectors: options.navigation.selectors,
     sharedFolderMeta: options.sharedFolderMeta,
-    sidebar: options.navigation.sidebar.items,
+    // Shared `meta.$.*` files are locale-agnostic but version-specific: a
+    // snapshot's shared meta keys under its version dir.
+    sharedMetaPrefix: version,
+    // A configured explicit sidebar describes the current docs; a frozen
+    // snapshot's structure comes from the snapshot itself, so archived trees
+    // always build from the filesystem.
+    sidebar: version ? undefined : options.navigation.sidebar.items,
     tabs,
   });
 };
 
-/** Per-locale navigation trees plus the default-locale tree for i18n sites. */
+/**
+ * Per-locale navigation trees plus the default-locale tree for i18n sites.
+ * Called once for the current docs and once per archived version (with that
+ * version's pages and its id as `version`).
+ */
 const buildI18nNavigation = (
   pages: PageRecord[],
   options: BuildContentGraphOptions,
   i18n: ResolvedI18nConfig,
-  diagnostics: Diagnostic[]
-): {
-  navigation: Navigation;
-  navigationByLocale: Record<string, Navigation>;
-} => {
+  diagnostics: Diagnostic[],
+  version = ""
+) => {
   // Pages of the fallback locale, by translation key — used to fill in a
   // locale's sidebar for pages it hasn't translated yet.
   const fallback = resolveFallbackLocale(i18n);
@@ -223,7 +249,8 @@ const buildI18nNavigation = (
       fallbackByKey,
       options,
       i18n,
-      localeDiagnostics
+      localeDiagnostics,
+      version
     );
     for (const diagnostic of localeDiagnostics) {
       const key = `${diagnostic.code}\n${diagnostic.file ?? ""}\n${diagnostic.message}`;
@@ -233,13 +260,44 @@ const buildI18nNavigation = (
       }
     }
   }
-  const navigation = navigationByLocale[i18n.defaultLocale] ?? {
+  const navigation: Navigation = navigationByLocale[i18n.defaultLocale] ?? {
     featured: [],
     selectors: [],
     sidebar: [],
     tabs: [],
   };
   return { navigation, navigationByLocale };
+};
+
+/** One archived version's navigation trees, keyed by locale (`""` sans i18n). */
+const buildVersionNavigation = (
+  id: string,
+  versionPages: PageRecord[],
+  options: BuildContentGraphOptions,
+  diagnostics: Diagnostic[]
+) => {
+  const { i18n } = options;
+  if (i18n) {
+    return buildI18nNavigation(versionPages, options, i18n, diagnostics, id)
+      .navigationByLocale;
+  }
+  return {
+    "": buildNavigation(versionPages, {
+      basePath: options.basePath ?? "",
+      diagnostics,
+      display: options.navigation.sidebar.display,
+      featured: options.navigation.featured,
+      folderMeta: options.folderMeta,
+      localizedRoot: versionizeRoute("/", id),
+      metaPrefix: id,
+      selectors: options.navigation.selectors,
+      sharedFolderMeta: options.sharedFolderMeta,
+      sharedMetaPrefix: id,
+      // A configured explicit sidebar describes the current docs; a snapshot's
+      // structure comes from the snapshot itself.
+      tabs: resolveTabLabels(options.navigation.tabs, ""),
+    }),
+  };
 };
 
 /** Assemble the content graph: routes map, nav, and duplicate diagnostics. */
@@ -250,37 +308,63 @@ export const buildContentGraph = (
   const { diagnostics, routes } = collectRoutes(pages);
   const { i18n } = options;
 
-  const { navigation, navigationByLocale } = i18n
-    ? buildI18nNavigation(pages, options, i18n, diagnostics)
-    : {
-        navigation: buildNavigation(pages, {
-          basePath: options.basePath ?? "",
-          diagnostics,
-          display: options.navigation.sidebar.display,
-          featured: options.navigation.featured,
-          folderMeta: options.folderMeta,
-          selectors: options.navigation.selectors,
-          sharedFolderMeta: options.sharedFolderMeta,
-          sidebar: options.navigation.sidebar.items,
-          // No locale to prefer: a per-locale label map resolves to its first
-          // entry on a single-locale site.
-          tabs: resolveTabLabels(options.navigation.tabs, ""),
-        }),
-        navigationByLocale: {} as Record<string, Navigation>,
-      };
+  // Under versioning, each version gets independent trees: navPath is
+  // version-stripped, so mixing versions into one build would collide the
+  // same logical page once per version.
+  const currentPages = options.versions
+    ? pages.filter((page) => page.version === "")
+    : pages;
+
+  // A single-locale site has no per-locale trees; the empty map is its
+  // navigationByLocale.
+  let navigationByLocale: Record<string, Navigation> = {};
+  let navigation: Navigation;
+  if (i18n) {
+    ({ navigation, navigationByLocale } = buildI18nNavigation(
+      currentPages,
+      options,
+      i18n,
+      diagnostics
+    ));
+  } else {
+    navigation = buildNavigation(currentPages, {
+      basePath: options.basePath ?? "",
+      diagnostics,
+      display: options.navigation.sidebar.display,
+      featured: options.navigation.featured,
+      folderMeta: options.folderMeta,
+      selectors: options.navigation.selectors,
+      sharedFolderMeta: options.sharedFolderMeta,
+      sidebar: options.navigation.sidebar.items,
+      // No locale to prefer: a per-locale label map resolves to its first
+      // entry on a single-locale site.
+      tabs: resolveTabLabels(options.navigation.tabs, ""),
+    });
+  }
+
+  const navigationByVersion: Record<string, Record<string, Navigation>> = {};
+  for (const { id } of options.versions?.archived ?? []) {
+    navigationByVersion[id] = buildVersionNavigation(
+      id,
+      pages.filter((page) => page.version === id),
+      options,
+      diagnostics
+    );
+  }
 
   // Icon typos, duplicate labels, and hidden-page-in-sidebar are validated on
   // the built navigation. Missing-target detection needs the full route set
   // (incl. custom + generated pages), so it runs later in generateRuntime.
   diagnostics.push(
     ...validateNavIcons(navigation),
-    ...validateNavStructure(navigation, pages)
+    ...validateNavStructure(navigation, currentPages)
   );
 
   return {
     diagnostics,
     navigation,
     navigationByLocale,
+    navigationByVersion,
     pages,
     routes,
   };

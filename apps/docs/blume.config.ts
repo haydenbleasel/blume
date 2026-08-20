@@ -10,11 +10,6 @@ export default defineConfig({
   analytics: {
     vercel: true,
   },
-  banner: {
-    content: "Blume is now publicly available.",
-    dismissible: true,
-    id: "beta",
-  },
   content: {
     root: "content",
     sources: [

@@ -16,6 +16,18 @@
 /** Matches the tag + attribute selector subset the clients use. */
 const SELECTOR_CLAUSE = /\[(?<name>[^\]=]+)(?:="(?<value>[^"]*)")?\]/gu;
 
+/** Proxy keys arrive as `string | symbol`; only string `data-*` keys exist. */
+const isStringKey = (key: string | symbol): key is string =>
+  typeof key === "string";
+
+/** The event payload the fake tree hands a client's listener. */
+export interface FakeEvent {
+  target: unknown;
+}
+
+/** A client's handler: sync wiring returns void, the send handler a Promise. */
+export type FakeListener = (event: FakeEvent) => void | Promise<void>;
+
 /** Narrow a maybe-undefined fixture handle; a missing element is a test bug. */
 export const must = <T>(value: T | undefined | null): T => {
   if (value === undefined || value === null) {
@@ -32,7 +44,7 @@ export class FakeEl {
   disabled = false;
   children: FakeEl[] = [];
   className = "";
-  listeners = new Map<string, ((event: { target: unknown }) => unknown)[]>();
+  listeners = new Map<string, FakeListener[]>();
   parent: FakeEl | null = null;
   tag: string;
   value = "";
@@ -51,7 +63,7 @@ export class FakeEl {
       {},
       {
         get: (_, prop) =>
-          typeof prop === "string"
+          isStringKey(prop)
             ? this.attributes.get(
                 `data-${prop.replaceAll(/[A-Z]/gu, (ch) => `-${ch.toLowerCase()}`)}`
               )
@@ -92,10 +104,7 @@ export class FakeEl {
     }
   }
 
-  addEventListener(
-    type: string,
-    listener: (event: { target: unknown }) => unknown
-  ): void {
+  addEventListener(type: string, listener: FakeListener): void {
     const list = this.listeners.get(type) ?? [];
     list.push(listener);
     this.listeners.set(type, list);
@@ -142,7 +151,18 @@ export const el = (
   text = ""
 ): FakeEl => new FakeEl(tag, attrs, text);
 
+/**
+ * Present a FakeEl to a client entry point that expects a real element.
+ * Kept as one helper so the assertion and its justification live in one place.
+ */
+export const asElement = (fake: FakeEl): HTMLElement =>
+  // SAFETY: installFakeDom registers FakeEl as `globalThis.HTMLElement`, so at
+  // runtime this instance passes the clients' `instanceof HTMLElement` checks
+  // and implements the query/attribute/event surface they read.
+  fake as FakeEl & HTMLElement;
+
 /** Invoke `el`'s listeners for `type` as if `target` dispatched the event. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- suites dispatch arbitrary targets (elements, null, plain objects) to exercise the clients' own target guards
 export const fire = (host: FakeEl, type: string, target: unknown): unknown[] =>
   [...(host.listeners.get(type) ?? [])].map((listener) => listener({ target }));
 
@@ -178,6 +198,14 @@ export interface FakeDomOptions {
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
+/** The globals an install swaps in, keyed by the global name each replaces. */
+interface FakeGlobals {
+  HTMLElement: typeof FakeEl;
+  document: typeof fakeDocument;
+  fetch?: FakeDomOptions["fetch"];
+  localStorage: typeof fakeStorage;
+}
+
 /**
  * Install the fake `document`, `localStorage` and `HTMLElement` globals (plus
  * `fetch` when a stub is given) and return the undo. Clients read these off
@@ -185,12 +213,14 @@ export interface FakeDomOptions {
  * returned function in `afterAll` to leave the runtime as it found it.
  */
 export const installFakeDom = (options: FakeDomOptions = {}): (() => void) => {
-  const values: Record<string, unknown> = {
+  const values: FakeGlobals = {
     HTMLElement: FakeEl,
     document: fakeDocument,
     localStorage: fakeStorage,
-    ...(options.fetch ? { fetch: options.fetch } : {}),
   };
+  if (options.fetch) {
+    values.fetch = options.fetch;
+  }
   const saved = new Map(
     Object.keys(values).map((name) => [
       name,

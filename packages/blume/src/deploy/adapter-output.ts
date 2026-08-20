@@ -8,6 +8,9 @@ import type { ProjectContext } from "../core/types.ts";
 
 type Adapter = NonNullable<ResolvedConfig["deployment"]["adapter"]>;
 
+/** An optional per-adapter path, keyed by the closed adapter union. */
+type AdapterPathMap = { [A in Adapter]?: string };
+
 /**
  * Top-level directory each server adapter writes its deploy bundle into, for
  * `.gitignore` — the bundle is a build artifact, and the platform's own state
@@ -15,7 +18,7 @@ type Adapter = NonNullable<ResolvedConfig["deployment"]["adapter"]>;
  * whole directory is ignored. `node` and `cloudflare` emit into `dist/`, which
  * `blume init` already ignores.
  */
-export const ADAPTER_IGNORE_DIRS: Partial<Record<Adapter, string>> = {
+export const ADAPTER_IGNORE_DIRS: AdapterPathMap = {
   netlify: ".netlify/",
   vercel: ".vercel/",
 };
@@ -40,7 +43,7 @@ export const ADAPTER_IGNORE_DIRS: Partial<Record<Adapter, string>> = {
  * chunks and `node_modules`. Given the right root it writes its Build Output
  * tree straight to `<root>/.vercel/output`, so there is nothing left to move.
  */
-export const ADAPTER_OUTPUT_PATHS: Partial<Record<Adapter, string>> = {
+export const ADAPTER_OUTPUT_PATHS: AdapterPathMap = {
   netlify: ".netlify/v1",
 };
 

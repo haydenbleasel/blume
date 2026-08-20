@@ -19,8 +19,15 @@ process.env.BASE_URL = "/";
 
 let cells: unknown[] = [];
 let cursor = 0;
-let effects: (() => unknown)[] = [];
+/** What the mocked useEffect stores: an effect returning an optional cleanup. */
+type Effect = () => (() => void) | undefined;
+let effects: Effect[] = [];
 let cleanups: (() => void)[] = [];
+
+/** Distinguishes updater callbacks from direct next-state values. */
+const isUpdater = <T>(
+  next: T | ((current: T) => T)
+): next is (current: T) => T => typeof next === "function";
 
 mock.module("react", () => ({
   // Not used by ask-ai.tsx, but module mocks leak across test files and the
@@ -28,11 +35,11 @@ mock.module("react", () => ({
   // it first. hooks.test.ts imports useCallback from the same mock, so this
   // mock must export it too or that import dies when this file runs first
   // (Linux CI orders files differently than macOS).
-  useCallback: (fn: unknown) => fn,
-  useEffect: (effect: () => unknown) => {
+  useCallback: <T>(fn: T) => fn,
+  useEffect: (effect: Effect) => {
     effects.push(effect);
   },
-  useRef: (initial: unknown) => {
+  useRef: <T>(initial: T) => {
     const index = cursor;
     cursor += 1;
     if (!(index in cells)) {
@@ -40,17 +47,18 @@ mock.module("react", () => ({
     }
     return cells[index];
   },
-  useState: (initial: unknown) => {
+  useState: <T>(initial: T) => {
     const index = cursor;
     cursor += 1;
     if (!(index in cells)) {
       cells[index] = initial;
     }
-    const set = (next: unknown) => {
-      cells[index] =
-        typeof next === "function"
-          ? (next as (current: unknown) => unknown)(cells[index])
-          : next;
+    const set = (nextState: T | ((current: T) => T)) => {
+      // SAFETY: this cell was seeded by this same useState slot, so it holds
+      // whatever T that slot's caller stores.
+      cells[index] = isUpdater(nextState)
+        ? nextState(cells[index] as T)
+        : nextState;
     };
     return [cells[index], set];
   },
@@ -58,18 +66,61 @@ mock.module("react", () => ({
 
 // --- stub renderer ----------------------------------------------------------
 
+/** The composer keydown shape the island's onKeyDown handler reads. */
+interface ComposerKeyEvent {
+  key: string;
+  nativeEvent: { isComposing: boolean };
+  preventDefault: () => void;
+  shiftKey: boolean;
+}
+
+/**
+ * Test-only inspection bag for rendered props. Handlers and value fields are
+ * declared required because tests drive them directly — every element a given
+ * assertion touches carries the ones it reads.
+ */
+interface StubProps {
+  "aria-expanded"?: boolean;
+  "aria-label"?: string;
+  children?: StubNode;
+  className?: string;
+  dangerouslySetInnerHTML?: { __html: string };
+  disabled: boolean;
+  inert: boolean;
+  onChange: (event: { target: { value: string } }) => void;
+  onClick: () => void;
+  onKeyDown: (event: ComposerKeyEvent) => void;
+  onSubmit: (event: { preventDefault: () => void }) => void;
+  value: string;
+}
+
 /** A rendered element; function components are already invoked inline. */
 interface StubElement {
-  // Test-only inspection bag: prop values are asserted with precise casts.
-  // oxlint-disable-next-line no-explicit-any -- heterogeneous JSX props
-  props: Record<string, any>;
+  props: StubProps;
   type: unknown;
 }
 
-const jsx = (type: unknown, props: StubElement["props"]): unknown =>
-  typeof type === "function"
-    ? (type as (p: StubElement["props"]) => unknown)(props)
-    : { props, type };
+/** What the stub runtime yields: element records, arrays, and primitives. */
+type StubNode =
+  | StubElement
+  | StubNode[]
+  | boolean
+  | number
+  | string
+  | null
+  | undefined;
+
+/** A function component, invoked inline by the stub runtime. */
+type StubComponent = (props: StubProps) => StubNode;
+
+const isComponent = (
+  type: StubComponent | string | symbol
+): type is StubComponent => typeof type === "function";
+
+const jsx = (
+  type: StubComponent | string | symbol,
+  props: StubProps
+): StubNode => (isComponent(type) ? type(props) : { props, type });
 
 const JSX_RUNTIME = {
   Fragment: Symbol.for("blume.test.fragment"),
@@ -81,7 +132,7 @@ mock.module("react/jsx-runtime", () => JSX_RUNTIME);
 mock.module("react/jsx-dev-runtime", () => JSX_RUNTIME);
 
 mock.module("react-dom", () => ({
-  createPortal: (node: unknown) => node,
+  createPortal: <T>(node: T) => node,
 }));
 
 // DOMPurify needs a browser DOM; pass-through here so assertions can target
@@ -113,9 +164,27 @@ class FakeElement {
     this.attributes.set(name, value);
   }
 }
-(globalThis as { HTMLElement?: unknown }).HTMLElement = FakeElement;
 
-type Listener = (event: unknown) => void;
+// SAFETY: the island reads browser globals Bun's test environment does not
+// declare; this widened view is the single install/uninstall point for fakes.
+const browserGlobals = globalThis as {
+  document?: unknown;
+  HTMLElement?: unknown;
+  MutationObserver?: unknown;
+  window?: unknown;
+};
+browserGlobals.HTMLElement = FakeElement;
+
+/** The window/media event shapes the island's listeners read. */
+interface FakeEventInit {
+  ctrlKey?: boolean;
+  detail?: { query?: string };
+  key?: string;
+  metaKey?: boolean;
+  preventDefault?: () => void;
+  target?: { closest: (selector: string) => object | null };
+}
+type Listener = (event: FakeEventInit) => void;
 const windowListeners = new Map<string, Listener[]>();
 
 // The overlay-mode focus sweep asks matchMedia whether the desktop dock is
@@ -145,22 +214,52 @@ const fakeWindow = {
     );
   },
 };
-(globalThis as { window?: unknown }).window = fakeWindow;
+browserGlobals.window = fakeWindow;
 
-const fakeBody = {
-  children: [] as FakeElement[],
-  dataset: {} as Record<string, string>,
+/** The `document.body` fields the island's overlay sweep touches. */
+interface FakeBody {
+  children: FakeElement[];
+  dataset: { blumeAsk?: string };
+}
+const fakeBody: FakeBody = { children: [], dataset: {} };
+
+/**
+ * The `document` fields the island reads: focus restore, the portal target,
+ * and the `astro:after-swap` subscription that re-anchors the portal after a
+ * client-router navigation replaces `<body>`.
+ */
+interface FakeDocument {
+  activeElement: FakeElement | null;
+  addEventListener: (type: string, listener: Listener) => void;
+  body: FakeBody;
+  removeEventListener: (type: string, listener: Listener) => void;
+}
+const documentListeners = new Map<string, Listener[]>();
+const fakeDocument: FakeDocument = {
+  activeElement: null,
+  addEventListener(type: string, listener: Listener) {
+    documentListeners.set(type, [
+      ...(documentListeners.get(type) ?? []),
+      listener,
+    ]);
+  },
+  body: fakeBody,
+  removeEventListener(type: string, listener: Listener) {
+    documentListeners.set(
+      type,
+      (documentListeners.get(type) ?? []).filter((l) => l !== listener)
+    );
+  },
 };
-const fakeDocument = { activeElement: null as unknown, body: fakeBody };
-(globalThis as { document?: unknown }).document = fakeDocument;
+browserGlobals.document = fakeDocument;
 
 type MutationBatch = { addedNodes: unknown[] }[];
 interface RecordedObserver {
   disconnect: () => void;
   disconnected: boolean;
   notify: (records: MutationBatch) => void;
-  observe: (target: unknown) => void;
-  observed: unknown;
+  observe: (target: FakeBody) => void;
+  observed: FakeBody | null;
 }
 let mutationObservers: RecordedObserver[] = [];
 /**
@@ -169,7 +268,6 @@ let mutationObservers: RecordedObserver[] = [];
  * Returning an object literal makes `new` hand it back as the instance.
  */
 const fakeMutationObserver = function fakeMutationObserver(
-  this: unknown,
   notify: (records: MutationBatch) => void
 ): RecordedObserver {
   const observer: RecordedObserver = {
@@ -186,8 +284,7 @@ const fakeMutationObserver = function fakeMutationObserver(
   mutationObservers.push(observer);
   return observer;
 };
-(globalThis as { MutationObserver?: unknown }).MutationObserver =
-  fakeMutationObserver;
+browserGlobals.MutationObserver = fakeMutationObserver;
 
 // An Apple platform (⌘ hint) with a recording clipboard. Defined before the
 // island is imported, since `IS_APPLE` is computed at module scope.
@@ -221,33 +318,39 @@ const runCleanups = () => {
   cleanups = [];
 };
 
+/** Effects may return a cleanup; anything else is discarded. */
+const isCleanup = (value: (() => void) | undefined): value is () => void =>
+  typeof value === "function";
+
 let props: AskProps = {};
 
 /** One "render": reset the cursor, call the component, re-run all effects. */
-const render = (): unknown => {
+const render = (): StubNode => {
   cursor = 0;
   effects = [];
   const tree = AskAI(props);
   runCleanups();
   for (const effect of effects) {
     const cleanup = effect();
-    if (typeof cleanup === "function") {
-      cleanups.push(cleanup as () => void);
+    if (isCleanup(cleanup)) {
+      cleanups.push(cleanup);
     }
   }
   return tree;
 };
 
 /** Mount a fresh component instance (empty state cells, clean globals). */
-const fresh = (nextProps: AskProps = {}): unknown => {
+const fresh = (nextProps: AskProps = {}): StubNode => {
   runCleanups();
   windowListeners.clear();
+  documentListeners.clear();
   mediaMatches = true;
   mediaListeners = [];
   mutationObservers = [];
   fakeBody.children = [];
   delete fakeBody.dataset.blumeAsk;
   fakeDocument.activeElement = null;
+  fakeDocument.body = fakeBody;
   cells = [];
   props = nextProps;
   // Two passes: the first flips the post-mount portal guard, the second
@@ -257,8 +360,15 @@ const fresh = (nextProps: AskProps = {}): unknown => {
 };
 
 /** Deliver a window event to the island's live listeners. */
-const dispatch = (type: string, event: unknown) => {
+const dispatch = (type: string, event: FakeEventInit) => {
   for (const listener of windowListeners.get(type) ?? []) {
+    listener(event);
+  }
+};
+
+/** Deliver a document event (the client-router swap events live here). */
+const dispatchDocument = (type: string, event: FakeEventInit) => {
+  for (const listener of documentListeners.get(type) ?? []) {
     listener(event);
   }
 };
@@ -272,7 +382,9 @@ const settle = async (rounds = 5) => {
 };
 
 /** A composer keydown event; overrides adjust the Enter-to-send defaults. */
-const keyEvent = (overrides: Record<string, unknown> = {}) => ({
+const keyEvent = (
+  overrides: Partial<ComposerKeyEvent> = {}
+): ComposerKeyEvent => ({
   key: "Enter",
   nativeEvent: { isComposing: false },
   preventDefault: () => {
@@ -284,11 +396,11 @@ const keyEvent = (overrides: Record<string, unknown> = {}) => ({
 
 // --- tree traversal ---------------------------------------------------------
 
-const isElement = (node: unknown): node is StubElement =>
+const isElement = (node: StubNode): node is StubElement =>
   typeof node === "object" && node !== null && "props" in node;
 
 const findAll = (
-  node: unknown,
+  node: StubNode,
   predicate: (el: StubElement) => boolean,
   out: StubElement[] = []
 ): StubElement[] => {
@@ -309,7 +421,7 @@ const findAll = (
 };
 
 const find = (
-  node: unknown,
+  node: StubNode,
   predicate: (el: StubElement) => boolean
 ): StubElement => {
   const [first] = findAll(node, predicate);
@@ -319,33 +431,33 @@ const find = (
   return first;
 };
 
-const byLabel = (tree: unknown, label: string): StubElement =>
+const byLabel = (tree: StubNode, label: string): StubElement =>
   find(tree, (el) => el.props["aria-label"] === label);
 
 const hasClass = (el: StubElement, name: string): boolean =>
-  typeof el.props.className === "string" && el.props.className.includes(name);
+  el.props.className?.includes(name) ?? false;
 
-const userBubbles = (tree: unknown): StubElement[] =>
+const userBubbles = (tree: StubNode): StubElement[] =>
   findAll(tree, (el) => hasClass(el, "self-end"));
 
-const answers = (tree: unknown): StubElement[] =>
+const answers = (tree: StubNode): StubElement[] =>
   findAll(tree, (el) => hasClass(el, "prose"));
 
-const answerHtml = (el: StubElement): string => {
+const answerHtml = (el: StubNode): string => {
   const [inner] = findAll(el, (node) =>
     Boolean(node.props.dangerouslySetInnerHTML)
   );
   return String(inner?.props.dangerouslySetInnerHTML?.__html ?? "");
 };
 
-const aside = (tree: unknown): StubElement =>
+const aside = (tree: StubNode): StubElement =>
   find(tree, (el) => el.type === "aside");
 
-const setComposer = (tree: unknown, value: string): void => {
+const setComposer = (tree: StubNode, value: string): void => {
   byLabel(tree, "Ask a question").props.onChange({ target: { value } });
 };
 
-const submit = (tree: unknown): void => {
+const submit = (tree: StubNode): void => {
   find(tree, (el) => el.type === "form").props.onSubmit({
     preventDefault: () => {
       /* form stub */
@@ -360,6 +472,8 @@ const originalFetch = globalThis.fetch;
 const setFetch = (
   handler: (url: string, init?: RequestInit) => Promise<Response>
 ) => {
+  // SAFETY: the island only ever calls fetch(url, init); none of the other
+  // fetch overloads or statics are exercised in these tests.
   globalThis.fetch = handler as typeof fetch;
 };
 
@@ -405,9 +519,9 @@ const manualStream = () => {
 afterAll(() => {
   globalThis.fetch = originalFetch;
   runCleanups();
-  delete (globalThis as { window?: unknown }).window;
-  delete (globalThis as { document?: unknown }).document;
-  delete (globalThis as { HTMLElement?: unknown }).HTMLElement;
+  delete browserGlobals.window;
+  delete browserGlobals.document;
+  delete browserGlobals.HTMLElement;
   if (navigatorDescriptor) {
     Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
   }
@@ -544,6 +658,34 @@ describe("AskAI open/close", () => {
     expect(aside(tree).props.inert).toBe(true);
   });
 
+  it("re-anchors onto the new body and re-stamps the push attribute after a client-router swap", () => {
+    let tree = fresh();
+    byLabel(tree, "Ask AI").props.onClick();
+    tree = render();
+    expect(fakeBody.dataset.blumeAsk).toBe("open");
+
+    // A swap installs a brand-new <body>: the push attribute arrives unset and
+    // the previous portal container is a detached element. The island's
+    // astro:after-swap subscription must adopt the new body and re-stamp it
+    // while the panel is open.
+    const swappedBody: FakeBody = { children: [], dataset: {} };
+    fakeDocument.body = swappedBody;
+    dispatchDocument("astro:after-swap", {});
+    tree = render();
+    expect(aside(tree).props.inert).toBe(false);
+    expect(swappedBody.dataset.blumeAsk).toBe("open");
+
+    // With the panel closed, a swap leaves the incoming body unstamped.
+    dispatch("keydown", { ctrlKey: false, key: "Escape", metaKey: false });
+    tree = render();
+    const closedSwapBody: FakeBody = { children: [], dataset: {} };
+    fakeDocument.body = closedSwapBody;
+    dispatchDocument("astro:after-swap", {});
+    tree = render();
+    expect(aside(tree).props.inert).toBe(true);
+    expect(closedSwapBody.dataset.blumeAsk).toBeUndefined();
+  });
+
   it("accepts the search handoff event, with and without a forwarded query", () => {
     let tree = fresh();
     dispatch("blume:open-ask-ai", { detail: { query: "from search" } });
@@ -621,6 +763,8 @@ describe("AskAI open/close", () => {
     mediaMatches = false;
     byLabel(tree, "Ask AI").props.onClick();
     tree = render();
+    // SAFETY: opening the panel just constructed exactly one observer through
+    // the mocked MutationObserver, so the list is non-empty.
     const observer = mutationObservers.at(-1) as RecordedObserver;
     expect(observer.observed).toBe(fakeBody);
 
@@ -648,6 +792,8 @@ describe("AskAI open/close", () => {
     mediaMatches = false;
     byLabel(tree, "Ask AI").props.onClick();
     tree = render();
+    // SAFETY: opening the panel just constructed exactly one observer through
+    // the mocked MutationObserver, so the list is non-empty.
     const observer = mutationObservers.at(-1) as RecordedObserver;
 
     // Growing into the dock releases the sweep; a node arriving then must
@@ -724,8 +870,8 @@ describe("AskAI conversation", () => {
     ]);
     const [answer] = answers(tree);
     expect(answer).toBeDefined();
-    expect(answerHtml(answer as StubElement)).toContain('href="/guide"');
-    expect(answerHtml(answer as StubElement)).toContain("for more.");
+    expect(answerHtml(answer)).toContain('href="/guide"');
+    expect(answerHtml(answer)).toContain("for more.");
   });
 
   it("submits on Enter but not Shift+Enter, mid-composition, or when empty", async () => {
@@ -766,9 +912,7 @@ describe("AskAI conversation", () => {
     await settle();
     tree = render();
     const [nonOk] = answers(tree);
-    expect(answerHtml(nonOk as StubElement)).toContain(
-      "Sorry, something went wrong."
-    );
+    expect(answerHtml(nonOk)).toContain("Sorry, something went wrong.");
 
     setFetch(() => Promise.reject(new TypeError("Failed to fetch")));
     tree = fresh();
@@ -778,9 +922,7 @@ describe("AskAI conversation", () => {
     await settle();
     tree = render();
     const [offline] = answers(tree);
-    expect(answerHtml(offline as StubElement)).toContain(
-      "Sorry, something went wrong."
-    );
+    expect(answerHtml(offline)).toContain("Sorry, something went wrong.");
   });
 
   it("copies the conversation as You/AI lines", async () => {
@@ -834,7 +976,7 @@ describe("AskAI clear during a streaming answer", () => {
     await settle();
     tree = render();
     const [streaming] = answers(tree);
-    expect(answerHtml(streaming as StubElement)).toContain("Hello");
+    expect(answerHtml(streaming)).toContain("Hello");
 
     byLabel(tree, "Clear conversation").props.onClick();
     expect(signal?.aborted).toBe(true);
@@ -857,7 +999,7 @@ describe("AskAI clear during a streaming answer", () => {
       "Question two",
     ]);
     const [followUp] = answers(tree);
-    expect(answerHtml(followUp as StubElement)).toContain("Fresh answer");
+    expect(answerHtml(followUp)).toContain("Fresh answer");
   });
 
   it("does not paint the cleared stream's abort as an error notice", async () => {

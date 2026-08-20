@@ -50,11 +50,24 @@ const entry = (ref: string, text: string): SourceEntry => ({
   ref,
 });
 
-const okText = (text: string): Response =>
-  ({ ok: true, status: 200, text: () => Promise.resolve(text) }) as Response;
-const okJson = (data: unknown): Response =>
-  ({ json: () => Promise.resolve(data), ok: true, status: 200 }) as Response;
-const notOk = (status: number): Response => ({ ok: false, status }) as Response;
+/** The GitHub tree-listing payload the mocked tree API serves. */
+interface TreeListing {
+  tree: { path: string; type: string }[];
+}
+
+const okText = (text: string): Response => new Response(text);
+const okJson = (data: TreeListing): Response => Response.json(data);
+const notOk = (status: number): Response => new Response(null, { status });
+
+type FetchHandler = (
+  input: string | URL | Request,
+  init?: RequestInit
+) => Promise<Response>;
+
+// SAFETY: the source adapters call fetchImpl as a plain function; the
+// preconnect helper Bun attaches to the real fetch is never accessed.
+const asFetch = (handler: FetchHandler): typeof fetch =>
+  handler as typeof fetch;
 
 /**
  * Whether a mocked request is the repo tree listing (rather than a raw file
@@ -67,14 +80,22 @@ const isTreeApi = (url: string): boolean =>
 
 describe("cache: entriesDigest", () => {
   it("is stable per content and sensitive to the entry set", () => {
-    const entries: SourceEntry[] = [
-      { body: { format: "md", text: "a" }, data: {}, hash: "h1", ref: "a.md" },
-      // No `hash` → falls back to hashing the body text.
-      { body: { format: "md", text: "b" }, data: {}, ref: "b.md" },
-    ];
+    const hashed: SourceEntry = {
+      body: { format: "md", text: "a" },
+      data: {},
+      hash: "h1",
+      ref: "a.md",
+    };
+    // No `hash` → falls back to hashing the body text.
+    const unhashed: SourceEntry = {
+      body: { format: "md", text: "b" },
+      data: {},
+      ref: "b.md",
+    };
+    const entries = [hashed, unhashed];
     const digest = entriesDigest(entries);
     expect(digest).toBe(entriesDigest(entries));
-    expect(digest).not.toBe(entriesDigest([entries[0] as SourceEntry]));
+    expect(digest).not.toBe(entriesDigest([hashed]));
   });
 });
 
@@ -170,6 +191,7 @@ describe("cache: loadWithCache", () => {
       thrown = error;
     }
     expect(thrown).toBeInstanceOf(BlumeError);
+    // SAFETY: the toBeInstanceOf assertion above proves thrown is a BlumeError.
     expect((thrown as BlumeError).diagnostic.code).toBe(
       "BLUME_SOURCE_FETCH_FAILED"
     );
@@ -178,7 +200,7 @@ describe("cache: loadWithCache", () => {
 
 describe("mdxRemoteSource", () => {
   it("fetches an explicit file list and reads back from snapshot + cache", async () => {
-    const fetchImpl = ((input: string | URL) => {
+    const fetchImpl = asFetch((input) => {
       const url = String(input);
       if (url.endsWith("guide.md")) {
         return Promise.resolve(okText("---\ntitle: Guide\n---\n# Guide\n"));
@@ -187,7 +209,7 @@ describe("mdxRemoteSource", () => {
         return Promise.resolve(okText("# API\n"));
       }
       return Promise.resolve(notOk(404));
-    }) as unknown as typeof fetch;
+    });
     const source = mdxRemoteSource(
       {
         fetchImpl,
@@ -209,16 +231,17 @@ describe("mdxRemoteSource", () => {
     expect(entries.find((e) => e.ref === "guide.md")?.data.title).toBe("Guide");
     expect(entries.find((e) => e.ref === "guide.md")?.body.format).toBe("md");
     expect(entries.find((e) => e.ref === "api.mdx")?.body.format).toBe("mdx");
-    expect(typeof source.watch).toBe("function");
+    expect(source.watch).toBeInstanceOf(Function);
     expect(await source.read?.("guide.md")).toContain("title: Guide");
     expect(await source.read?.("missing.md")).toBe("");
   });
 
   it("treats **/ as whole segments, not a substring wildcard", async () => {
-    const fetchImpl = ((input: string | URL) =>
+    const fetchImpl = asFetch((input) =>
       Promise.resolve(
         String(input).endsWith(".md") ? okText("# Doc\n") : notOk(404)
-      )) as unknown as typeof fetch;
+      )
+    );
     const source = mdxRemoteSource(
       {
         fetchImpl,
@@ -242,13 +265,13 @@ describe("mdxRemoteSource", () => {
 
   it("watch polls fresh past the dev cache and fires on changed remote files", async () => {
     let calls = 0;
-    const fetchImpl = ((input: string | URL) => {
+    const fetchImpl = asFetch((input) => {
       if (String(input).endsWith("a.md")) {
         calls += 1;
         return Promise.resolve(okText(`# Doc v${calls}\n`));
       }
       return Promise.resolve(notOk(404));
-    }) as unknown as typeof fetch;
+    });
     const source = mdxRemoteSource(
       {
         fetchImpl,
@@ -281,7 +304,7 @@ describe("mdxRemoteSource", () => {
         { path: "other/x.md", type: "blob" },
       ],
     };
-    const fetchImpl = ((input: string | URL) => {
+    const fetchImpl = asFetch((input) => {
       const url = String(input);
       if (isTreeApi(url)) {
         return Promise.resolve(okJson(tree));
@@ -293,7 +316,7 @@ describe("mdxRemoteSource", () => {
         return Promise.resolve(okText("# Api\n"));
       }
       return Promise.resolve(notOk(404));
-    }) as unknown as typeof fetch;
+    });
     const source = mdxRemoteSource(
       {
         fetchImpl,
@@ -314,8 +337,7 @@ describe("mdxRemoteSource", () => {
   });
 
   it("throws when the github tree request fails", async () => {
-    const fetchImpl = (() =>
-      Promise.resolve(notOk(403))) as unknown as typeof fetch;
+    const fetchImpl = asFetch(() => Promise.resolve(notOk(403)));
     const source = mdxRemoteSource(
       {
         fetchImpl,
@@ -329,8 +351,7 @@ describe("mdxRemoteSource", () => {
   });
 
   it("throws when a file fetch fails and no cache exists", async () => {
-    const fetchImpl = (() =>
-      Promise.resolve(notOk(404))) as unknown as typeof fetch;
+    const fetchImpl = asFetch(() => Promise.resolve(notOk(404)));
     const source = mdxRemoteSource(
       {
         fetchImpl,
@@ -409,8 +430,7 @@ describe("portableTextToMarkdown: extra marks", () => {
 
 describe("materializeAssets: failure path", () => {
   it("records a diagnostic and keeps the original url when a download fails", async () => {
-    const fetchImpl = (() =>
-      Promise.resolve(notOk(503))) as unknown as typeof fetch;
+    const fetchImpl = asFetch(() => Promise.resolve(notOk(503)));
     const dir = await tempDir();
     const { diagnostics, markdown } = await materializeAssets(
       "![pic](https://cdn.example.com/a.png)",
@@ -427,11 +447,9 @@ const localAssetFile = (md: string): string | undefined =>
 
 describe("materializeAssets: signed-url stability", () => {
   it("addresses an asset by its query-less url, so re-signed urls reuse one file", async () => {
-    const fetchImpl = (() =>
-      Promise.resolve({
-        arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)),
-        ok: true,
-      })) as unknown as typeof fetch;
+    const fetchImpl = asFetch(() =>
+      Promise.resolve(new Response(new ArrayBuffer(4)))
+    );
     const dir = await tempDir();
     const materialize = (signature: string) =>
       materializeAssets(
@@ -445,7 +463,7 @@ describe("materializeAssets: signed-url stability", () => {
     const second = await materialize("bbb");
     expect(localAssetFile(first.markdown)).toBeDefined();
     expect(localAssetFile(first.markdown)).toBe(
-      localAssetFile(second.markdown) as string
+      localAssetFile(second.markdown)
     );
     expect(localAssetFile(first.markdown)).toEndWith(".png");
   });
@@ -454,13 +472,10 @@ describe("materializeAssets: signed-url stability", () => {
 describe("materializeAssets: fenced code", () => {
   it("never downloads or rewrites an image url inside a code fence", async () => {
     const fetched: string[] = [];
-    const fetchImpl = ((input: string | URL) => {
+    const fetchImpl = asFetch((input) => {
       fetched.push(String(input));
-      return Promise.resolve({
-        arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)),
-        ok: true,
-      });
-    }) as unknown as typeof fetch;
+      return Promise.resolve(new Response(new ArrayBuffer(4)));
+    });
     const dir = await tempDir();
     const body = [
       "![real](https://cdn.example.com/a.png)",
@@ -482,22 +497,30 @@ describe("materializeAssets: fenced code", () => {
   });
 });
 
+// SAFETY: readEntryText reads only body, source, and sourcePath from the page
+// record, so a partial fixture stands in for a full PageRecord.
+const pageOf = (page: Partial<PageRecord>): PageRecord => page as PageRecord;
+
 describe("readEntryText", () => {
   it("returns the staged body text when present", async () => {
-    const text = await readEntryText({}, {
-      body: { format: "md", text: "staged" },
-    } as PageRecord);
+    const text = await readEntryText(
+      {},
+      pageOf({ body: { format: "md", text: "staged" } })
+    );
     expect(text).toBe("staged");
   });
 
   it("reads from the owning source for unstaged entries", async () => {
-    const source = {
+    const source: ContentSource = {
+      load: () => Promise.resolve({ diagnostics: [], entries: [] }),
       name: "s",
       read: (ref: string) => Promise.resolve(`read:${ref}`),
-    } as unknown as ContentSource;
-    const text = await readEntryText({ sources: [source] }, {
-      source: { name: "s", ref: "a.md" },
-    } as PageRecord);
+      staged: true,
+    };
+    const text = await readEntryText(
+      { sources: [source] },
+      pageOf({ source: { name: "s", ref: "a.md" } })
+    );
     expect(text).toBe("read:a.md");
   });
 
@@ -505,17 +528,18 @@ describe("readEntryText", () => {
     const dir = await tempDir();
     const file = join(dir, "x.md");
     await writeFile(file, "from disk");
-    const text = await readEntryText({}, {
-      source: { name: "fs", ref: "x.md" },
-      sourcePath: file,
-    } as PageRecord);
+    const text = await readEntryText(
+      {},
+      pageOf({ source: { name: "fs", ref: "x.md" }, sourcePath: file })
+    );
     expect(text).toBe("from disk");
   });
 
   it("returns an empty string when nothing resolves", async () => {
-    const text = await readEntryText({}, {
-      source: { name: "x", ref: "y" },
-    } as PageRecord);
+    const text = await readEntryText(
+      {},
+      pageOf({ source: { name: "x", ref: "y" } })
+    );
     expect(text).toBe("");
   });
 });
@@ -529,10 +553,25 @@ describe("scanProject: git last-modified branch", () => {
       "export default { lastModified: true };\n"
     );
     await writeFile(join(root, "docs", "index.md"), "# Home\n");
+    // Strip the repo-locating GIT_* variables a parent git process exports to
+    // its hooks: under the pre-commit hook in a linked worktree, an inherited
+    // absolute GIT_DIR overrides `-C` discovery and the fixture's
+    // `add -A`/`commit` would run against the real repository's branch.
+    const gitLocationVars = new Set([
+      "GIT_COMMON_DIR",
+      "GIT_DIR",
+      "GIT_INDEX_FILE",
+      "GIT_OBJECT_DIRECTORY",
+      "GIT_PREFIX",
+      "GIT_WORK_TREE",
+    ]);
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !gitLocationVars.has(key))
+    );
     const git = (args: string[]): void => {
       // Test fixture drives a real git repo; `git` is expected on PATH in CI/dev.
       // oxlint-disable-next-line sonarjs/no-os-command-from-path
-      execFileSync("git", ["-C", root, ...args], { stdio: "ignore" });
+      execFileSync("git", ["-C", root, ...args], { env, stdio: "ignore" });
     };
     git(["init"]);
     git(["config", "user.email", "test@blume.dev"]);

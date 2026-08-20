@@ -71,7 +71,7 @@ export const ignoringWatchListener = (
   const ignore = new Set(ignoreDirs);
   return (_event, filename) => {
     if (
-      typeof filename === "string" &&
+      filename !== null &&
       filename.split(/[/\\]/u).some((segment) => ignore.has(segment))
     ) {
       return;

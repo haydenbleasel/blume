@@ -7,7 +7,7 @@ const FALLBACK_ACCENT = "oklch(0.62 0.16 250)";
  * preset colors: the theme CSS and the OG card (og/card.ts) both resolve from
  * this table, so a site and its social cards can't disagree about "blue".
  */
-export const ACCENTS: Record<string, string> = {
+export const ACCENTS = {
   blue: FALLBACK_ACCENT,
   green: "oklch(0.6 0.16 150)",
   orange: "oklch(0.68 0.17 50)",
@@ -15,7 +15,16 @@ export const ACCENTS: Record<string, string> = {
   purple: "oklch(0.58 0.2 290)",
   red: "oklch(0.58 0.22 25)",
   teal: "oklch(0.6 0.12 195)",
-};
+} satisfies Record<string, string>;
+
+/**
+ * Whether a raw config value names an accent preset. `hasOwn` keeps a value
+ * like "constructor" from resolving an Object.prototype member — which would
+ * stringify a function into the generated CSS, breaking the rule (the exact
+ * breakout {@link safeColor} exists to prevent).
+ */
+export const isAccentPreset = (value: string): value is keyof typeof ACCENTS =>
+  Object.hasOwn(ACCENTS, value);
 
 // Characters valid in a CSS color value (hex, rgb/hsl/oklch functions, named
 // colors). Anything else — notably `;`, `{`, `}` — could break out of the
@@ -26,27 +35,20 @@ const CSS_COLOR = /^[\w\s#%.,()/+-]+$/u;
 const safeColor = (value: string, fallback: string): string =>
   CSS_COLOR.test(value.trim()) ? value.trim() : fallback;
 
-/**
- * Resolve a named preset or fall back to {@link safeColor}. `hasOwn` keeps a
- * value like "constructor" from resolving an Object.prototype member — which
- * would stringify a function into the generated CSS, breaking the rule (the
- * exact breakout safeColor exists to prevent).
- */
+/** Resolve a named preset or fall back to {@link safeColor}. */
 const presetOrColor = (value: string): string =>
-  Object.hasOwn(ACCENTS, value)
-    ? (ACCENTS[value] as string)
-    : safeColor(value, FALLBACK_ACCENT);
+  isAccentPreset(value) ? ACCENTS[value] : safeColor(value, FALLBACK_ACCENT);
 
 /** Like {@link safeColor} but drops an unsafe/absent value to `null`. */
 const safeColorOrNull = (value: string | undefined): string | null =>
   value && CSS_COLOR.test(value.trim()) ? value.trim() : null;
 
-const RADII: Record<ResolvedConfig["theme"]["radius"], string> = {
+const RADII = {
   lg: "0.75rem",
   md: "0.5rem",
   none: "0",
   sm: "0.25rem",
-};
+} satisfies Record<ResolvedConfig["theme"]["radius"], string>;
 
 const cssString = (value: string): string => JSON.stringify(value);
 
@@ -116,6 +118,12 @@ ${tokens.join("\n")}
 `;
 };
 
+/** Per-mode accent CSS colors. */
+export interface AccentColors {
+  dark: string;
+  light: string;
+}
+
 /**
  * Resolve the configured accent to per-mode CSS colors. A named accent
  * resolves to its preset; any other value is treated as a raw CSS color so
@@ -125,7 +133,7 @@ ${tokens.join("\n")}
  */
 export const resolveAccent = (
   theme: ResolvedConfig["theme"]
-): { dark: string; light: string } => ({
+): AccentColors => ({
   dark: presetOrColor(theme.accent.dark),
   light: presetOrColor(theme.accent.light),
 });

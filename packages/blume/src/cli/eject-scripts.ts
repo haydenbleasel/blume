@@ -5,6 +5,21 @@ import { join } from "pathe";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { searchProviderMeta } from "../search/providers.ts";
 
+/** A JSON value, as `JSON.parse` of a manifest can return. */
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+/** The slice of package.json the rewrite touches; the rest rides along. */
+interface PackageManifest {
+  [key: string]: JsonValue | undefined;
+  scripts?: Record<string, string>;
+}
+
 /**
  * The `blume build`-only artifacts this project's config actually produces, as
  * notice lines for the eject command. After an eject the build script runs
@@ -55,13 +70,13 @@ export const droppedArtifactNotices = (config: ResolvedConfig): string[] => {
  */
 export const updatePackageScripts = async (root: string): Promise<void> => {
   const pkgPath = join(root, "package.json");
-  let pkg: Record<string, unknown>;
+  let pkg: PackageManifest;
   try {
     pkg = JSON.parse(await readFile(pkgPath, "utf-8"));
   } catch {
     return;
   }
-  const scripts = (pkg.scripts ?? {}) as Record<string, string>;
+  const scripts = pkg.scripts ?? {};
   pkg.scripts = {
     ...scripts,
     build: "astro build",

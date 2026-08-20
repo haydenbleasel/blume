@@ -27,10 +27,25 @@ export interface StructuredDataInput {
 }
 
 /** schema.org `@type` for each content type; defaults to TechArticle. */
-const ARTICLE_TYPES: Record<string, string> = {
+const ARTICLE_TYPES = {
   blog: "BlogPosting",
   changelog: "TechArticle",
-};
+} as const;
+
+/**
+ * `hasOwn` (not a bare index) so a content type named like an
+ * `Object.prototype` member can't resolve a function up the prototype chain.
+ */
+const isArticleType = (value: string): value is keyof typeof ARTICLE_TYPES =>
+  Object.hasOwn(ARTICLE_TYPES, value);
+
+/** A value a schema.org node property can hold. */
+type JsonLdValue = string | number | JsonLdValue[] | JsonLdNode;
+
+/** A schema.org node: JSON-LD keys to concrete JSON values. */
+export interface JsonLdNode {
+  [key: string]: JsonLdValue;
+}
 
 const trimSlash = (value: string): string => value.replace(/\/$/u, "");
 
@@ -59,14 +74,14 @@ export const toIso = (value: DateInput | undefined): string | undefined => {
  */
 export const buildStructuredData = (
   input: StructuredDataInput
-): Record<string, unknown> | null => {
+): JsonLdNode | null => {
   const base = input.siteUrl ? trimSlash(input.siteUrl) : null;
   // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top
   // so JSON-LD URLs match the served location.
   const deployBase = normalizeBasePath(input.base);
   const pageUrl = absolute(base, withBasePath(deployBase, input.route));
   const rootUrl = absolute(base, deployBase);
-  const graph: Record<string, unknown>[] = [];
+  const graph: JsonLdNode[] = [];
 
   if (base) {
     graph.push({
@@ -80,9 +95,12 @@ export const buildStructuredData = (
   // The homepage is fully described by the WebSite node; deeper pages get an
   // article node plus a breadcrumb trail.
   if (input.route !== "/") {
-    const node: Record<string, unknown> = {
+    const pageType = input.pageType ?? "";
+    const node: JsonLdNode = {
       "@id": `${pageUrl}#page`,
-      "@type": ARTICLE_TYPES[input.pageType ?? ""] ?? "TechArticle",
+      "@type": isArticleType(pageType)
+        ? ARTICLE_TYPES[pageType]
+        : "TechArticle",
       headline: input.title,
       inLanguage: input.locale || "en",
       name: input.title,

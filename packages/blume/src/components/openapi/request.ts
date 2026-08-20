@@ -198,7 +198,7 @@ const applyAuth = (
 /** The raw editor text to send, with a parsed mirror when it is valid JSON. */
 const bodyFor = (
   text: string | undefined
-): { body?: string; bodyValue?: unknown } => {
+): Pick<RequestSample, "body" | "bodyValue"> => {
   if (text === undefined || text === "") {
     return {};
   }

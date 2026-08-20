@@ -17,6 +17,14 @@
  * reconnect policy belongs to the API's own client library, not to a docs page.
  */
 
+// `typeof` checks live in named predicates (the form the oxlint anti-slop
+// config sanctions); generic so each DOM-event field keeps its own narrowing.
+const isString = <Value>(value: Value): value is Value & string =>
+  typeof value === "string";
+
+const isNumber = <Value>(value: Value): value is Value & number =>
+  typeof value === "number";
+
 export type WsState = "idle" | "connecting" | "open" | "closed" | "error";
 
 export interface WsFrame {
@@ -76,13 +84,13 @@ const defaultCreate = (url: string): SocketLike => {
     addEventListener: (type, listener) => {
       socket.addEventListener(type, (event) => {
         const reduced: SocketEvent = {};
-        if ("code" in event && typeof event.code === "number") {
+        if ("code" in event && isNumber(event.code)) {
           reduced.code = event.code;
         }
         if ("data" in event) {
           reduced.data = event.data;
         }
-        if ("reason" in event && typeof event.reason === "string") {
+        if ("reason" in event && isString(event.reason)) {
           reduced.reason = event.reason;
         }
         listener(reduced);
@@ -139,7 +147,7 @@ export const createWsClient = (options: WsClientOptions): WsClient => {
         direction: "received",
         // Binary frames arrive as Blob/ArrayBuffer; showing their stringified
         // form beats showing nothing while the reader debugs a payload.
-        text: typeof event.data === "string" ? event.data : String(event.data),
+        text: isString(event.data) ? event.data : String(event.data),
       });
     });
     next.addEventListener("error", () => {

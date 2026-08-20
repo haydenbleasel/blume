@@ -17,7 +17,7 @@ const questionSchema = z.strictObject({
   routes: z
     .union([z.string(), z.array(z.string())])
     .default([])
-    .transform((value) => (typeof value === "string" ? [value] : value)),
+    .transform((value) => (Array.isArray(value) ? value : [value])),
   severity: z.enum(["error", "warning"]).default("error"),
   skip: z.boolean().default(false),
 });

@@ -332,6 +332,7 @@ describe("createProgressRenderer", () => {
       total: 1,
     });
     expect(writes[0]).toStartWith("\r[K");
+    // SAFETY: the item-start above painted the spinner, so writes[0] exists.
     expect(strip(writes[0] as string)).toContain(
       `${SPINNER_FRAMES[0]} docs/guides/install.mdx → fr`
     );
@@ -343,6 +344,8 @@ describe("createProgressRenderer", () => {
       result: resultOf(page(), { costUsd: 0.03 }),
       total: 1,
     });
+    // SAFETY: the item-end above wrote the permanent line, so a last write
+    // exists.
     const last = writes.at(-1) as string;
     expect(last).toStartWith("\r[K");
     expect(last).toEndWith("\n");
@@ -369,6 +372,8 @@ describe("createProgressRenderer", () => {
       kind: "item-start",
       total: 3,
     });
+    // SAFETY: both item-starts above painted the spinner, so a last write
+    // exists.
     expect(strip(writes.at(-1) as string)).toContain("(+1 more) 0/3");
 
     // The first lane finishes: its permanent line prints, then the spinner
@@ -379,7 +384,10 @@ describe("createProgressRenderer", () => {
       result: resultOf(page()),
       total: 3,
     });
+    // SAFETY: the item-end above wrote the permanent line and then repainted
+    // the surviving lane, so the last two writes exist.
     expect(strip(writes.at(-2) as string)).toContain("✔");
+    // SAFETY: see above — the repaint is the last write.
     const repaint = strip(writes.at(-1) as string);
     expect(repaint).toContain("docs/guides/install.mdx → de 1/3");
     expect(repaint).not.toContain("more");
@@ -407,6 +415,7 @@ describe("createProgressRenderer", () => {
     });
     expect(writes).toHaveLength(1);
     expect(writes[0]).not.toContain("\r");
+    // SAFETY: toHaveLength(1) above proved writes[0] exists.
     expect(strip(writes[0] as string)).toBe(
       "  ✔ docs/guides/install.mdx → fr 4.2s\n"
     );

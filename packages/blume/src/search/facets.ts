@@ -10,6 +10,12 @@ import type { PageRecord } from "../core/types.ts";
  * when nothing facets, so the field stays absent from serialized documents
  * rather than shipping as `{}` on every page.
  */
+/** Whether a custom frontmatter value stringifies into a usable facet value. */
+const isFacetValue = <T>(value: T): value is T & (string | number | boolean) =>
+  typeof value === "string" ||
+  typeof value === "number" ||
+  typeof value === "boolean";
+
 export const pageFacets = (
   page: Pick<PageRecord, "contentType" | "custom">,
   config: ResolvedConfig
@@ -21,11 +27,7 @@ export const pageFacets = (
   const facets: Record<string, string> = {};
   for (const key of declared) {
     const value = page.custom[key];
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    ) {
+    if (isFacetValue(value)) {
       facets[key] = String(value);
     }
   }

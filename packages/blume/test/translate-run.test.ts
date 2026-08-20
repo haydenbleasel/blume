@@ -34,6 +34,8 @@ const scratch = async (): Promise<string> => {
 };
 
 const project = (root: string): BlumeProject =>
+  // SAFETY: runTranslate reads only config.i18n and context.root; the
+  // remaining BlumeProject fields are never touched by these tests.
   ({
     config: blumeConfigSchema.parse({
       i18n: {
@@ -86,6 +88,8 @@ interface RecordedCall {
   options: HeadlessOptions;
 }
 
+// SAFETY: every recorded argv contains `--output-last-message` followed by
+// its file path, so the index after it is always populated.
 const args0LastMessage = (call: RecordedCall): string =>
   call.args[call.args.indexOf("--output-last-message") + 1] as string;
 
@@ -95,38 +99,50 @@ const args0LastMessage = (call: RecordedCall): string =>
  * instead, which run.ts had to translate).
  */
 const notFoundRunner = (): Promise<HeadlessResult> => {
+  // SAFETY: ErrnoException is Error plus optional errno fields; `code` is
+  // assigned on the next line.
   const missing = new Error("spawn claude ENOENT") as NodeJS.ErrnoException;
   missing.code = "ENOENT";
   return Promise.reject(missing);
 };
 
-/** A fake claude: replies with a canned envelope per call, records argv. */
-const claudeRunner = (
-  replies: { result: string; costUsd?: number; isError?: boolean }[]
-): {
+/** The result envelope a headless claude run prints to stdout. */
+interface ClaudeEnvelope {
+  is_error: boolean;
+  result: string;
+  total_cost_usd?: number;
+}
+
+interface ClaudeRunnerStub {
   calls: RecordedCall[];
   run: (
     bin: string,
     args: string[],
     options: HeadlessOptions
   ) => Promise<HeadlessResult>;
-} => {
+}
+
+/** A fake claude: replies with a canned envelope per call, records argv. */
+const claudeRunner = (
+  replies: { result: string; costUsd?: number; isError?: boolean }[]
+): ClaudeRunnerStub => {
   const calls: RecordedCall[] = [];
   return {
     calls,
     run: (bin, args, options) => {
       const reply = replies[calls.length] ?? { result: "" };
       calls.push({ args, bin, options });
+      const envelope: ClaudeEnvelope = {
+        is_error: reply.isError ?? false,
+        result: reply.result,
+      };
+      if (reply.costUsd !== undefined) {
+        envelope.total_cost_usd = reply.costUsd;
+      }
       return Promise.resolve({
         code: 0,
         stderr: "",
-        stdout: JSON.stringify({
-          is_error: reply.isError ?? false,
-          result: reply.result,
-          ...(reply.costUsd === undefined
-            ? {}
-            : { total_cost_usd: reply.costUsd }),
-        }),
+        stdout: JSON.stringify(envelope),
         timedOut: false,
       });
     },
@@ -209,7 +225,7 @@ describe("runTranslate pages", () => {
       onProgress: (event) => events.push(event),
       persistLedger: () => {
         persists += 1;
-        return Promise.resolve();
+        return Promise.resolve(true);
       },
       project: project(root),
       run,
@@ -219,6 +235,7 @@ describe("runTranslate pages", () => {
     expect(peak).toBeGreaterThan(1);
     expect(result.counts.translated).toBe(4);
     // Results stay indexed by work item, regardless of completion order.
+    // SAFETY: this work list was built from page items only.
     expect(
       result.results.map((r) => (r.item as PageWorkItem).sourceRel)
     ).toEqual(items.map((item) => item.sourceRel));
@@ -301,6 +318,8 @@ describe("runTranslate pages", () => {
       options: HeadlessOptions
     ): Promise<HeadlessResult> => {
       calls.push({ args, bin, options });
+      // SAFETY: the codex argv always carries `--output-last-message` followed
+      // by its file path, so the index after it is populated.
       const messagePath = args[
         args.indexOf("--output-last-message") + 1
       ] as string;
@@ -321,6 +340,7 @@ describe("runTranslate pages", () => {
     expect(calls[0]?.bin).toBe("codex");
     // The per-call last-message file is indexed and lives in the run temp dir.
     expect(calls[0]?.args).toContain("--output-last-message");
+    // SAFETY: the runner was invoked exactly once above, so calls[0] exists.
     expect(calls[0]?.options.cwd).toBe(
       dirname(args0LastMessage(calls[0] as RecordedCall))
     );
@@ -357,6 +377,8 @@ describe("runTranslate pages", () => {
 
   it("throws when the project has no i18n config", async () => {
     const root = await scratch();
+    // SAFETY: runTranslate rejects on the missing i18n config before reading
+    // any other BlumeProject field.
     const bare = { config: {}, context: { root } } as BlumeProject;
     await expect(
       runTranslate({

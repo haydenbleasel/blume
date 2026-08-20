@@ -89,23 +89,46 @@ const collectEntries = async (
   return entries;
 };
 
+/** The two SKILL.md frontmatter fields the discovery index publishes. */
+interface SkillMeta {
+  description: string;
+  name: string;
+}
+
+interface SkillMetaResult {
+  meta: SkillMeta | null;
+  warning?: string;
+}
+
+/**
+ * What js-yaml can put in a SKILL.md frontmatter field. Rich scalars (Dates)
+ * ride along as the object arm; only strings are accepted below anyway.
+ */
+type FrontmatterField =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | FrontmatterField[]
+  | { [key: string]: FrontmatterField };
+
+const isString = (value: FrontmatterField): value is string =>
+  typeof value === "string";
+
 /** Frontmatter of a SKILL.md, or null with a warning when unusable. */
-const skillMeta = (
-  raw: string,
-  dirName: string
-): { meta: { description: string; name: string } | null; warning?: string } => {
-  let data: Record<string, unknown>;
+const skillMeta = (raw: string, dirName: string): SkillMetaResult => {
+  let data: { description?: FrontmatterField; name?: FrontmatterField };
   try {
-    ({ data } = matter(raw) as unknown as { data: Record<string, unknown> });
+    ({ data } = matter(raw));
   } catch {
     return {
       meta: null,
       warning: `Skill "${dirName}" has unparsable SKILL.md frontmatter; skipped.`,
     };
   }
-  const name = typeof data.name === "string" ? data.name : "";
-  const description =
-    typeof data.description === "string" ? data.description : "";
+  const name = isString(data.name) ? data.name : "";
+  const description = isString(data.description) ? data.description : "";
   if (!(name && description)) {
     return {
       meta: null,

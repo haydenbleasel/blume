@@ -1,0 +1,23 @@
+name: Translations
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  translations:
+    runs-on: ubuntu-latest
+    # Only the changesets release PR carries pending translation updates;
+    # regular PRs haven't been translated yet, so checking them is noise.
+    # (pull_request branch filters only match the base branch, hence the job-level if.)
+    if: github.head_ref == 'changeset-release/main'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - name: Check translations
+        run: cd apps/docs && bun run translate --check

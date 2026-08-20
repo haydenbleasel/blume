@@ -9,11 +9,11 @@ import ContentSources from "./_home/ContentSources.astro";
 import Footer from "./_home/Footer.astro";
 import Hero from "./_home/Hero.astro";
 import InstallCta from "./_home/InstallCta.astro";
+import LogoGrid from "./_home/LogoGrid.astro";
 import MarkdownShowcase from "./_home/MarkdownShowcase.astro";
 import ProductPreview from "./_home/ProductPreview.astro";
 import { installCopyScript } from "./_home/shared.ts";
 import Sponsors from "./_home/Sponsors.astro";
-import Spotlight from "./_home/Spotlight.astro";
 
 // Everything the landing page needs comes from the resolved Blume config, so it
 // stays in sync with the docs site (title, description, banner, theme mode).
@@ -37,10 +37,13 @@ const pageDescription =
   navigation={data.navigation}
   ogEnabled={config.og.enabled}
   ogImage="/opengraph-image.png"
+  ogImageAlt={pageTitle}
+  ogImageSize={{ height: 630, width: 1200 }}
   page={{ description: pageDescription, route: "/", title: pageTitle }}
   searchEnabled={config.search.enabled}
   site={{ description: config.description, title: config.title }}
   siteUrl={config.site}
+  structuredDataEnabled={config.structuredData}
   themeMode={config.theme.mode}
   x={config.x}
 >
@@ -51,6 +54,8 @@ const pageDescription =
 
     <ProductPreview />
 
+    <LogoGrid />
+
     <Batteries />
 
     <MarkdownShowcase />
@@ -58,8 +63,6 @@ const pageDescription =
     <ContentSources />
 
     <BuiltForModels />
-
-    <Spotlight />
 
     <Components />
 

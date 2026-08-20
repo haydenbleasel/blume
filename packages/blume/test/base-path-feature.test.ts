@@ -199,9 +199,7 @@ describe("markdown base-links plugin", () => {
     expect(plain).toContain('href="/guides/intro"');
 
     const mdx = await renderMd(
-      blumeMdxProcessor({ basePath: "/docs" }) as unknown as ReturnType<
-        typeof blumeMarkdownProcessor
-      >,
+      blumeMdxProcessor({ basePath: "/docs" }),
       "[Guide](/guides/intro)"
     );
     expect(mdx).toContain('href="/docs/guides/intro"');
@@ -233,7 +231,7 @@ afterAll(async () => {
   );
 });
 
-const FIXTURE: Record<string, string> = {
+const FIXTURE = {
   "blume.config.ts":
     'export default { basePath: "/manual", deployment: { site: "https://example.com" } };\n',
   "docs/getting-started.md": "# Getting started\n",
@@ -313,16 +311,18 @@ const makePage = (
   sourcePath: `/abs/${navPath}.mdx`,
   title: route,
   translationKey: navPath,
+  version: "",
+  versionKey: navPath,
 });
 
-const makeGraph = (pages: PageRecord[]): ContentGraph =>
-  ({
-    diagnostics: [],
-    navigation: { featured: [], selectors: [], sidebar: [], tabs: [] },
-    navigationByLocale: {},
-    pages,
-    routes: new Map(pages.map((page) => [page.route, page.id])),
-  }) as ContentGraph;
+const makeGraph = (pages: PageRecord[]): ContentGraph => ({
+  diagnostics: [],
+  navigation: { featured: [], selectors: [], sidebar: [], tabs: [] },
+  navigationByLocale: {},
+  navigationByVersion: {},
+  pages,
+  routes: new Map(pages.map((page) => [page.route, page.id])),
+});
 
 describe("validateLinks under basePath", () => {
   it("resolves author-written root-relative links against the based routes", async () => {

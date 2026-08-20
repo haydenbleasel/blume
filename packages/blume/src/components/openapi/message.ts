@@ -125,6 +125,8 @@ export const buildMessage = (
   const picked = model.servers[values.server] ?? model.servers[0];
   let payload: unknown;
   try {
+    // SAFETY: JSON.parse returns `any`; widening it to `unknown` claims
+    // nothing about the shape and forces consumers to narrow.
     payload = JSON.parse(values.payload) as unknown;
   } catch {
     payload = undefined;

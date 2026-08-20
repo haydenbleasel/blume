@@ -225,13 +225,13 @@ describe("readAgentOutput", () => {
     expect(garbage.isError).toBe(true);
     expect(garbage.detail).toContain("unparseable");
 
-    const wrongShape = await readAgentOutput(
+    const mistyped = await readAgentOutput(
       "claude",
       finished({ stdout: JSON.stringify({ result: 42 }) }),
       "/nowhere"
     );
-    expect(wrongShape.isError).toBe(true);
-    expect(wrongShape.detail).toContain("shape");
+    expect(mistyped.isError).toBe(true);
+    expect(mistyped.detail).toContain("shape");
   });
 
   it("reads the codex last-message file and flags a missing or empty one", async () => {

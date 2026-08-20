@@ -5,6 +5,8 @@ import { extractComponentTags } from "../src/core/sources/normalize.ts";
 import type { PageRecord } from "../src/core/types.ts";
 
 const page = (over: Partial<PageRecord>): PageRecord =>
+  // SAFETY: the validators under test read only the fields a fixture sets
+  // (id, route, and the overrides); the remaining PageRecord fields go unread.
   ({ id: "p", route: "/p", ...over }) as PageRecord;
 
 describe("extractComponentTags", () => {

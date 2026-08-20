@@ -58,8 +58,9 @@ export interface TranslateRunOptions {
    * Called after each finished item to flush the ledger to disk, so an
    * interrupted run keeps everything already translated. Calls are serialized
    * here — concurrent workers finishing together never race the same file.
+   * The flush's result (`writeLedger`'s wrote-or-not boolean) is ignored.
    */
-  persistLedger?: () => Promise<unknown>;
+  persistLedger?: () => Promise<boolean | undefined>;
   project: BlumeProject;
   /** The spawn function — injectable so tests never launch a real agent. */
   run?: HeadlessRunner;
@@ -129,6 +130,8 @@ const runPageItem = async (
   });
 
   const sourceText = await readFile(item.sourcePath, "utf-8");
+  // SAFETY: `targets` maps every configured locale, and work items only carry
+  // configured locale codes.
   const target = context.targets.get(item.locale) as LocaleConfig;
   // A hand-authored translation can live at a non-canonical name (see
   // WorkStatus); the disk probe finds only canonical targets, and a miss just
@@ -175,6 +178,8 @@ const runMetaItem = async (
   const titles = Object.fromEntries(
     item.entries.map((entry) => [metaDirKey(entry.meta.dir), entry.meta.title])
   );
+  // SAFETY: `targets` maps every configured locale, and work items only carry
+  // configured locale codes.
   const target = context.targets.get(item.locale) as LocaleConfig;
   const output = await invokeAgent(
     context,
@@ -257,6 +262,7 @@ export const runTranslate = async (
   if (!i18n) {
     throw new Error("blume translate requires i18n to be configured");
   }
+  // SAFETY: the config schema requires `defaultLocale` to be one of `locales`.
   const source = i18n.locales.find(
     (locale) => locale.code === i18n.defaultLocale
   ) as LocaleConfig;
@@ -280,7 +286,7 @@ export const runTranslate = async (
   // The persist mutex: ledger flushes from concurrent lanes are serialized so
   // two lanes never write the ledger file at the same time.
   const persistLimit = pLimit(1);
-  const persist = (): Promise<unknown> =>
+  const persist = (): Promise<boolean | undefined> =>
     persistLimit(() => options.persistLedger?.());
 
   const results = await pMap(
@@ -316,11 +322,11 @@ export const runTranslate = async (
     }
   }
 
-  const counts: Record<TranslateItemStatus, number> = {
+  const counts = {
     failed: 0,
     partial: 0,
     translated: 0,
-  };
+  } satisfies Record<TranslateItemStatus, number>;
   for (const result of results) {
     counts[result.status] += 1;
   }

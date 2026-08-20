@@ -1,6 +1,7 @@
+import type { FontHead } from "../theme/fonts.ts";
 import type { UIStrings } from "./i18n-ui.ts";
 import type { ResolvedConfig, SearchProvider } from "./schema.ts";
-import type { Navigation, RouteAlternate } from "./types.ts";
+import type { Navigation, RouteAlternate, VersionAlternate } from "./types.ts";
 
 /**
  * The shape of the `blume:data` virtual module — the resolved, serializable
@@ -29,6 +30,14 @@ export interface BlumeLogo {
 export interface BlumeFavicon {
   href: string;
   type?: string;
+  /**
+   * Dark-scheme variant: the `-dark` sibling of the resolved icon file (e.g.
+   * `icon.svg` → `icon-dark.svg`), or the bundled default pair. When set, the
+   * layout emits an unconditional light link plus both icons behind
+   * `media="(prefers-color-scheme: …)"` so a dark mark doesn't vanish against
+   * dark browser chrome.
+   */
+  dark?: { href: string; type?: string };
 }
 
 /** Announcement banner, normalized from its config (string shorthand or object). */
@@ -85,6 +94,14 @@ export interface BlumeRoute {
   locale: string;
   path: string;
   title: string;
+  /** Resolved docs version (`""` for the current docs). */
+  version: string;
+  /**
+   * Versions this logical page exists in within this route's locale — the
+   * current version first, then archived versions in configured order. Empty
+   * when versioning is off.
+   */
+  versionAlternates: VersionAlternate[];
 }
 
 /** Site-wide settings derived from `blume.config` — the `config` field of {@link BlumeData}. */
@@ -161,6 +178,8 @@ export interface BlumeDataConfig {
    * WebMCP in-page tools (`ai.webmcp`), plus whether llms.txt exists for the
    * list tool to fetch (`ai.llmsTxt.enabled`).
    */
+  /** Docs versioning config; `null` when the site is unversioned. */
+  versions: NonNullable<ResolvedConfig["versions"]> | null;
   webmcp: { enabled: boolean; llms: boolean };
   /** X (Twitter) attribution: the site's account, and a default creator. */
   x: { creator?: string; handle?: string };
@@ -182,12 +201,17 @@ export interface BlumeClientData {
 export interface BlumeData {
   config: BlumeDataConfig;
   feeds: BlumeFeed[];
-  /** CSS variable names for the configured fonts (Astro `<Font>` integration). */
-  fontCssVars: string[];
+  /** Configured fonts for the head: CSS variable + preload weights per family. */
+  fontCssVars: FontHead[];
   /** Sidebar + tab tree for the default locale. */
   navigation: Navigation;
   /** Per-locale navigation trees, keyed by locale code (empty without i18n). */
   navigationByLocale: Record<string, Navigation>;
+  /**
+   * Per-archived-version navigation trees, keyed by version id and then locale
+   * code (`""` on a single-locale site). Empty when versioning is off.
+   */
+  navigationByVersion: Record<string, Record<string, Navigation>>;
   routes: BlumeRoute[];
   /** Resolved UI strings for the default locale. */
   ui: UIStrings;

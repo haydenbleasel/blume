@@ -6,6 +6,7 @@ import { buildContentGraph } from "./graph.ts";
 import { i18nDiagnostics } from "./i18n.ts";
 import {
   gitLastModifiedTimes,
+  lastModifiedShallowWarning,
   resolveLastModifiedConfig,
 } from "./last-modified.ts";
 import { buildManifest } from "./manifest.ts";
@@ -24,6 +25,7 @@ import type {
   PageRecord,
   ProjectContext,
 } from "./types.ts";
+import { versionsDiagnostics } from "./versions.ts";
 
 /** Build mode: drafts are kept in `dev` and dropped in `build`. */
 export type BuildMode = "dev" | "build";
@@ -142,7 +144,7 @@ const entryIdDiagnostics = (
 const normalizeLoadedEntries = (
   loaded: ({ source: ContentSource } & SourceLoadResult)[],
   config: ResolvedConfig
-): { pages: PageRecord[]; diagnostics: Diagnostic[]; droppedPages: number } => {
+) => {
   // Only thread `frontmatter.extend` / `content.types` through when a project
   // opts in, so the known-key split in `normalizeEntry` stays off the default
   // path.
@@ -177,6 +179,7 @@ const normalizeLoadedEntries = (
           staged: source.staged,
         },
         typeFrontmatter,
+        versions: config.versions,
       });
       if (normalized.pages.length === 0 && normalized.diagnostics.length > 0) {
         droppedPages += 1;
@@ -259,7 +262,10 @@ export const scanProject = async (
     Promise.all(
       sources.map(async (source) => ({ source, ...(await source.load()) }))
     ),
-    discoverFolderMeta(metaSources, { localeDirs }),
+    discoverFolderMeta(metaSources, {
+      localeDirs,
+      versionDirs: config.versions?.archived.map((version) => version.id),
+    }),
   ]);
 
   // Folder meta contributed by the sources themselves (the OpenAPI source
@@ -289,6 +295,7 @@ export const scanProject = async (
   // (which shares these page objects) picks them up. Frontmatter always wins;
   // git applies to filesystem entries, other sources supply dates on the entry.
   const lastModified = resolveLastModifiedConfig(config.lastModified);
+  const lastModifiedWarnings: Diagnostic[] = [];
   if (lastModified.enabled && lastModified.source === "git") {
     const fsPaths = pages
       .map((page) => page.sourcePath)
@@ -305,6 +312,14 @@ export const scanProject = async (
         page.lastModified = gitTimes.get(page.sourcePath);
       }
     }
+    // A shallow CI clone (Vercel, actions/checkout) silently drops most dates;
+    // surface that instead of letting production diverge from local builds.
+    const undated = pages.filter(
+      (page) => page.sourcePath && !page.lastModified
+    ).length;
+    lastModifiedWarnings.push(
+      ...lastModifiedShallowWarning(context.root, undated)
+    );
   }
 
   const graph = buildContentGraph(pages, {
@@ -313,10 +328,16 @@ export const scanProject = async (
     i18n: config.i18n,
     navigation: config.navigation,
     sharedFolderMeta,
+    versions: config.versions,
   });
   const manifest = buildManifest({ config, context, graph });
 
-  const i18nWarnings = config.i18n ? i18nDiagnostics(pages, config.i18n) : [];
+  const i18nWarnings = config.i18n
+    ? i18nDiagnostics(pages, config.i18n, config.versions)
+    : [];
+  const versionWarnings = config.versions
+    ? versionsDiagnostics(pages, config.versions)
+    : [];
 
   return {
     config,
@@ -327,6 +348,8 @@ export const scanProject = async (
       ...entryIdDiagnostics(pages, resolveDocsCollection(config, context).base),
       ...graph.diagnostics,
       ...i18nWarnings,
+      ...versionWarnings,
+      ...lastModifiedWarnings,
     ],
     droppedPages,
     graph,

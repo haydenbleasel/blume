@@ -26,8 +26,13 @@ export const resolveSearchPopular = (
   popular: { href: string; icon?: string; label: string }[],
   basePath: string
 ): SearchPopularPage[] =>
-  popular.map(({ href, icon, label }) => ({
-    ...(icon ? { icon } : {}),
-    label,
-    route: withBasePath(basePath, href),
-  }));
+  popular.map(({ href, icon, label }) => {
+    const page: SearchPopularPage = {
+      label,
+      route: withBasePath(basePath, href),
+    };
+    if (icon) {
+      page.icon = icon;
+    }
+    return page;
+  });

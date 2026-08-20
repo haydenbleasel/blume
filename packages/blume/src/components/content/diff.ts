@@ -62,8 +62,11 @@ const registeredDiffThemeNames = new Set<string>();
  * shared between both modes must not hand light mode the dark-typed
  * registration.
  */
+const isThemeName = (theme: CodeTheme): theme is string =>
+  typeof theme === "string";
+
 const diffThemeName = (theme: CodeTheme, mode: "dark" | "light"): string => {
-  if (typeof theme === "string") {
+  if (isThemeName(theme)) {
     return theme;
   }
   const type = theme.type ?? mode;
@@ -90,7 +93,7 @@ const diffThemeName = (theme: CodeTheme, mode: "dark" | "light"): string => {
   return name;
 };
 
-const diffThemes = (themes: CodeThemes): { dark: string; light: string } => ({
+const diffThemes = (themes: CodeThemes) => ({
   dark: diffThemeName(themes.dark, "dark"),
   light: diffThemeName(themes.light, "light"),
 });
@@ -113,11 +116,12 @@ export const renderDiff = async (options: DiffOptions): Promise<string> => {
     theme = DEFAULT_CODE_THEMES,
   } = options;
 
-  if (patch !== undefined || src !== undefined) {
-    const text = patch ?? (await readText(src as string, root));
+  const patchText =
+    patch ?? (src === undefined ? undefined : await readText(src, root));
+  if (patchText !== undefined) {
     const result = await preloadPatchDiff({
       options: { theme: diffThemes(theme) },
-      patch: text,
+      patch: patchText,
     });
     return result.prerenderedHTML;
   }

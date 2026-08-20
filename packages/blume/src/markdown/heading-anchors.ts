@@ -19,11 +19,14 @@
 import { satteriCollectHastText } from "@astrojs/markdown-satteri";
 import GithubSlugger from "github-slugger";
 
+/** A hast property value: an attribute primitive or a token list. */
+type HastPropertyValue = string | number | boolean | (string | number)[];
+
 /** A minimal hast node (avoids a hast type dependency). */
 interface HastNode {
   children?: HastNode[];
   name?: string;
-  properties?: Record<string, unknown>;
+  properties?: Record<string, HastPropertyValue>;
   tagName?: string;
   type: string;
   value?: string;
@@ -31,8 +34,10 @@ interface HastNode {
 
 /** The slice of Satteri's hast visitor context this plugin reads. */
 interface HastContext {
-  data?: { astro?: { frontmatter?: Record<string, unknown> } };
-  setProperty: (node: HastNode, key: string, value: unknown) => void;
+  data?: {
+    astro?: { frontmatter?: Parameters<typeof satteriCollectHastText>[1] };
+  };
+  setProperty: (node: HastNode, key: string, value: HastPropertyValue) => void;
   textContent: (node: HastNode) => string;
 }
 
@@ -63,7 +68,7 @@ const containsAnchor = (node: HastNode): boolean => {
 // page, but slug disambiguation must reset per document; the render-scoped
 // `astro` data object is a stable, unique key for one render (entries are
 // dropped once the render is collected, so this never leaks).
-const FALLBACK_SCOPE: object = {};
+const FALLBACK_SCOPE = {};
 const sluggers = new WeakMap<object, GithubSlugger>();
 
 const sluggerFor = (ctx: HastContext): GithubSlugger => {
@@ -77,6 +82,10 @@ const sluggerFor = (ctx: HastContext): GithubSlugger => {
   return slugger;
 };
 
+/** Whether a heading already carries a usable string `id`. */
+const isStringId = (value: HastPropertyValue | undefined): value is string =>
+  typeof value === "string";
+
 /** The slug for a heading, mirroring Satteri's `heading-ids` exactly. */
 const slugFor = (
   node: HastNode,
@@ -86,6 +95,8 @@ const slugFor = (
   const rawText = ctx.textContent(node);
   // `frontmatter`-interpolated MDX headings (`## {frontmatter.title}`) need the
   // resolved value; the helper is the same one `heading-ids` defers to.
+  // SAFETY: HastNode is a structural subset of the hast element shape the
+  // helper walks (children/type/value), so the visited node always fits.
   const text = rawText.includes("frontmatter")
     ? satteriCollectHastText(
         node as Parameters<typeof satteriCollectHastText>[0],
@@ -93,7 +104,7 @@ const slugFor = (
       )
     : rawText;
   const existingId = node.properties?.id;
-  return typeof existingId === "string" ? existingId : slugger.slug(text);
+  return isStringId(existingId) ? existingId : slugger.slug(text);
 };
 
 /** Build the plugin. Wraps `<h2>`–`<h6>` in self-linking anchors. */
@@ -108,7 +119,7 @@ export const headingAnchorPlugin = (): HeadingAnchorPlugin => ({
       if (!wrap) {
         // Unwrapped headings (h1, an empty slug, or one that already links) still
         // need the id so `heading-ids` adopts it instead of re-slugging.
-        if (typeof node.properties?.id !== "string") {
+        if (!isStringId(node.properties?.id)) {
           ctx.setProperty(node, "id", slug);
         }
         return;

@@ -2,14 +2,18 @@ import { describe, expect, it } from "bun:test";
 
 import { buildNavigation } from "../src/core/navigation.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
-import type { FolderMeta, SidebarItemConfig } from "../src/core/schema.ts";
+import type {
+  FolderMeta,
+  PageMetaInput,
+  SidebarItemConfig,
+} from "../src/core/schema.ts";
 import type { Diagnostic, NavNode, PageRecord } from "../src/core/types.ts";
 
 const page = (
   id: string,
   route: string,
   title: string,
-  sidebar: Record<string, unknown> = {},
+  sidebar: PageMetaInput["sidebar"] = {},
   draft = false
 ): PageRecord => ({
   contentType: "doc",
@@ -29,6 +33,8 @@ const page = (
   sourcePath: `/abs/${id}`,
   title,
   translationKey: route,
+  version: "",
+  versionKey: route,
 });
 
 const changelogPage = (
@@ -50,6 +56,8 @@ const changelogPage = (
   source: { name: "releases", ref },
   title,
   translationKey: `/changelog/${ref}`,
+  version: "",
+  versionKey: `/changelog/${ref}`,
 });
 
 const asGroup = (node: NavNode | undefined) => {
@@ -805,6 +813,8 @@ describe("buildNavigation — index title / folder meta title diagnostics", () =
           sourcePath: "/abs/guide/index.md",
           title: "Index",
           translationKey: "/guide",
+          version: "",
+          versionKey: "/guide",
         },
       ],
       { diagnostics, folderMeta }

@@ -15,10 +15,19 @@
 import { DEFAULT_CODE_THEMES } from "./themes.ts";
 import type { CodeThemes } from "./themes.ts";
 
+/** The value space of a hast element property (mirrors hast's `Properties`). */
+type HastPropertyValue =
+  | string
+  | number
+  | boolean
+  | (string | number)[]
+  | null
+  | undefined;
+
 /** A minimal hast node (avoids a hast type dependency). */
 interface HastNode {
   children?: HastNode[];
-  properties?: Record<string, unknown>;
+  properties?: Record<string, HastPropertyValue>;
   tagName?: string;
   type: string;
   value?: string;
@@ -71,7 +80,10 @@ type InlineHighlighter = (
 // `import()` caches the module, so this dedupes Shiki across calls on its own.
 const loadHighlighter = async (): Promise<InlineHighlighter> => {
   const mod = await import("shiki");
-  return mod.codeToHast as unknown as InlineHighlighter;
+  // SAFETY: Shiki accepts arbitrary lang/theme strings at runtime (an unknown
+  // one rejects the promise, which the caller catches); only its bundled types
+  // constrain them to known ids, so the loose signature narrows nothing real.
+  return mod.codeToHast as InlineHighlighter;
 };
 
 /** Build the plugin. Highlights inline `` `code{:lang}` `` snippets. */

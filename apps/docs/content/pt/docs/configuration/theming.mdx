@@ -16,7 +16,7 @@ theme: {
   radius: "md",     // none | sm | md | lg
   mode: "system",   // system | light | dark
   fonts: {          // self-hosted Google Fonts
-    display: "inter-tight",
+    display: "inter",
     body: "inter",
     mono: "ibm-plex-mono",
   },
@@ -58,12 +58,14 @@ Um alternador no cabeçalho sempre permite que os leitores mudem, e a escolha de
 - **`body`** — texto do corpo, interface e prosa
 - **`mono`** — blocos de código e código em linha
 
+Os títulos recebem letter-spacing de display (`-0.05em`) do próprio tema, então o que você escolher para `display` — incluindo fontes de texto como o padrão Inter — fica correto nos tamanhos de título, sem depender do tracking embutido na fonte.
+
 Cada uma tem como padrão uma Google Font selecionada, para que o Blume pareça intencional desde o início:
 
 ```ts blume.config.ts lineNumbers
 theme: {
   fonts: {
-    display: "inter-tight",   // default
+    display: "inter",         // default
     body: "inter",            // default
     mono: "ibm-plex-mono",    // default
   },

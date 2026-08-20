@@ -110,6 +110,9 @@ const tagList = Array.isArray(tags) ? tags : tags ? [tags] : [];
       }
     };
 
+    // Client-router swaps replace the body with fresh server-rendered entries
+    // (duplicate ids and all), so the dedupe has to run again for each page.
+    document.addEventListener("astro:after-swap", dedupeUpdateIds);
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", dedupeUpdateIds, {
         once: true,

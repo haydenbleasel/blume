@@ -8,7 +8,7 @@ import { discoverContent } from "../src/core/content.ts";
 import { discoverFolderMeta } from "../src/core/meta.ts";
 import type { Diagnostic, PageRecord } from "../src/core/types.ts";
 
-const FILES: Record<string, string> = {
+const FILES = {
   "(marketing)/about.md": "Just some text with no heading.\n",
   "01-intro.mdx":
     "---\ntitle: Intro\ndescription: Getting started\n---\n# Intro\n",
@@ -25,7 +25,7 @@ const FILES: Record<string, string> = {
   // A dependency that ships its own meta.ts must never be scanned (matters when
   // the content root is the project root, e.g. a migrated Mintlify project).
   "node_modules/pkg/meta.ts": "export default { notARealMetaKey: true };\n",
-};
+} satisfies Record<string, string>;
 
 let root: string;
 

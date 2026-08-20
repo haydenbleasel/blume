@@ -36,12 +36,10 @@ const fakePrompter = (answers: FakeAnswers): Fake => {
     prompter: {
       multiselect: (opts) =>
         Promise.resolve(
-          dequeue(answers.multiselect, opts.message) as SourceKind[] | symbol
+          dequeue<SourceKind[]>(answers.multiselect, opts.message)
         ),
       select: (opts) =>
-        Promise.resolve(
-          dequeue(answers.select, opts.message) as Template | symbol
-        ),
+        Promise.resolve(dequeue<Template>(answers.select, opts.message)),
       text: (opts) => {
         textOpts.push(opts);
         return Promise.resolve(dequeue(answers.text, opts.message));
@@ -51,7 +49,7 @@ const fakePrompter = (answers: FakeAnswers): Fake => {
   };
 };
 
-const DEFAULTS: { cwd: string; userAgent?: string } = { cwd: "/work/site" };
+const DEFAULTS: Parameters<typeof collectAnswers>[2] = { cwd: "/work/site" };
 
 const collect = (
   answers: FakeAnswers,

@@ -4,7 +4,7 @@ import { initComposer } from "../src/components/openapi/message-composer.ts";
 import type { MessageModel } from "../src/components/openapi/message.ts";
 import type { SocketEvent } from "../src/components/openapi/ws-client.ts";
 import type { FakeEl } from "./fake-dom.ts";
-import { el, fire, installFakeDom, must } from "./fake-dom.ts";
+import { asElement, el, fire, installFakeDom, must } from "./fake-dom.ts";
 
 /**
  * Tests for the lazily loaded event composer
@@ -173,12 +173,12 @@ afterAll(() => {
 describe("initComposer", () => {
   it("does nothing without an embedded model", () => {
     const root = el("blume-message-composer");
-    expect(() => initComposer(root as unknown as HTMLElement)).not.toThrow();
+    expect(() => initComposer(asElement(root))).not.toThrow();
   });
 
   it("server-renders nothing and syncs samples from the live form", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     type(fixture, "[data-payload]", '{"id":"2"}');
     const [wscat, unknown] = fixture.panes;
     expect(must(wscat).textContent).toBe(
@@ -190,7 +190,7 @@ describe("initComposer", () => {
 
   it("follows the server picker and the custom URL override", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     type(fixture, "[data-server]", "1");
     expect(must(fixture.panes[0]).textContent).toContain("ws://two.test/");
     type(fixture, "[data-server-custom]", "wss://custom.test/socket");
@@ -201,7 +201,7 @@ describe("initComposer", () => {
 
   it("falls back to the document when there is no operation-panel wrapper", () => {
     const fixture = createFixture(MODEL, { panel: true });
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     // No panes are found, so a sync is a no-op rather than a crash.
     type(fixture, "[data-payload]", '{"id":"3"}');
     expect(must(fixture.panes[0]).textContent).toBe("");
@@ -209,7 +209,7 @@ describe("initComposer", () => {
 
   it("reports payload schema violations and refuses to connect", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     type(fixture, "[data-payload]", "{}");
     expect(fixture.errors.textContent).toBe("payload.id is required");
     click(fixture, "[data-connect]");
@@ -218,7 +218,7 @@ describe("initComposer", () => {
 
   it("connects, logs both directions, and disconnects", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     click(fixture, "[data-connect]");
     expect(fixture.status.textContent).toBe("Connecting\u2026");
     expect(field(fixture, "[data-connect]").disabled).toBeTrue();
@@ -241,7 +241,7 @@ describe("initComposer", () => {
 
   it("refuses to send a payload that no longer validates", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     click(fixture, "[data-connect]");
     must(sockets[0]).emit("open");
     type(fixture, "[data-payload]", "{oops");
@@ -251,7 +251,7 @@ describe("initComposer", () => {
 
   it("explains a failed handshake instead of showing a bare error", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     click(fixture, "[data-connect]");
     must(sockets[0]).emit("error");
     expect(fixture.status.textContent).toContain("The connection failed.");
@@ -260,7 +260,7 @@ describe("initComposer", () => {
 
   it("names the close reason when the broker gives one", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     click(fixture, "[data-connect]");
     must(sockets[0]).emit("open");
     must(sockets[0]).emit("close", { code: 1006, reason: "abnormal" });
@@ -269,7 +269,7 @@ describe("initComposer", () => {
 
   it("survives a panel rendered without a status line or log", () => {
     const fixture = createFixture(MODEL, { log: true, status: true });
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     click(fixture, "[data-connect]");
     must(sockets[0]).emit("open");
     click(fixture, "[data-send]");
@@ -287,7 +287,7 @@ describe("initComposer", () => {
     };
     const fixture = createFixture(model);
     must(fixture.root.querySelector("[data-payload]")).remove();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     click(fixture, "[data-connect]");
     must(sockets[0]).emit("open");
     click(fixture, "[data-send]");
@@ -296,7 +296,7 @@ describe("initComposer", () => {
 
   it("drops a connection whose endpoint the form moved away from", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     click(fixture, "[data-connect]");
     must(sockets[0]).emit("open");
 
@@ -326,7 +326,7 @@ describe("initComposer", () => {
 
   it("refuses to connect while a channel parameter is blank", () => {
     const fixture = createFixture();
-    initComposer(fixture.root as unknown as HTMLElement);
+    initComposer(asElement(fixture.root));
     type(fixture, '[data-param="tenant"]', "");
     click(fixture, "[data-connect]");
     // Connecting would dial `…/tenants/{tenant}/signedup`, a channel no broker

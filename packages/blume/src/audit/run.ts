@@ -183,11 +183,11 @@ export const runAudit = async (options: AuditOptions): Promise<AuditResult> => {
     thresholds: DEFAULT_THRESHOLDS,
   };
 
-  const tiers: Record<AuditTier, boolean> = {
+  const tiers = {
     external: Boolean(options.external),
     network: origin !== null,
     static: true,
-  };
+  } satisfies Record<AuditTier, boolean>;
 
   const results = await Promise.all(
     MODULES.filter((module) => tiers[module.tier]).map((module) =>
@@ -197,11 +197,14 @@ export const runAudit = async (options: AuditOptions): Promise<AuditResult> => {
 
   let diagnostics = results.flat();
   if (options.only?.length) {
+    // SAFETY: audit diagnostics are created through `finding()`, whose codes
+    // all come from the check catalog's `CheckId` set.
     diagnostics = diagnostics.filter((d) =>
       matches(d.code as CheckId, options.only ?? [])
     );
   }
   if (options.skip?.length) {
+    // SAFETY: same invariant — every audit diagnostic code is a catalog `CheckId`.
     diagnostics = diagnostics.filter(
       (d) => !matches(d.code as CheckId, options.skip ?? [])
     );

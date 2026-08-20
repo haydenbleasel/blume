@@ -24,23 +24,29 @@ let cells: unknown[] = [];
 let cursor = 0;
 let effects: (() => void)[] = [];
 
+/** Distinguish the updater form `setState(fn)` from a plain `setState(value)`. */
+const isStateUpdater = <T>(
+  value: T | ((current: T) => T)
+): value is (current: T) => T => typeof value === "function";
+
 mock.module("react", () => ({
-  useCallback: (fn: unknown) => fn,
+  useCallback: <T>(fn: T) => fn,
   useEffect: (effect: () => void) => {
     effects.push(effect);
   },
-  useRef: (value: unknown) => ({ current: value }),
-  useState: (initial: unknown) => {
+  useRef: <T>(value: T) => ({ current: value }),
+  useState: <T>(initial: T) => {
     const index = cursor;
     cursor += 1;
     if (!(index in cells)) {
       cells[index] = initial;
     }
-    const set = (next: unknown) => {
-      cells[index] =
-        typeof next === "function"
-          ? (next as (current: unknown) => unknown)(cells[index])
-          : next;
+    const set = (update: T | ((current: T) => T)) => {
+      // SAFETY: cell `index` is owned by this useState call, so it always
+      // holds that hook's T across renders.
+      cells[index] = isStateUpdater(update)
+        ? update(cells[index] as T)
+        : update;
     };
     return [cells[index], set];
   },
@@ -52,10 +58,14 @@ const hitFor = (query: string) => ({
   sections: [],
 });
 
+/** What the mocked provider yields for a query, sync or via a promise. */
+type SearchOutcome = ReturnType<typeof hitFor>;
+
 // Both call sites in `useSearch` await their results, so plain returns work.
 // The implementation is swappable so the race tests can control when (and in
 // which order) each query's response lands.
-let searchImpl: (query: string) => unknown = hitFor;
+let searchImpl: (query: string) => SearchOutcome | Promise<SearchOutcome> =
+  hitFor;
 mock.module("blume:search-client", () => ({
   createSearch: () => (query: string) => searchImpl(query),
 }));
@@ -78,6 +88,8 @@ const freshRender = <T>(hook: () => T): T => {
 };
 
 // `currentPath()` reads window.location; give the hooks a page to ground on.
+// SAFETY: installs a test-only window stub on the global; the hooks read only
+// `location.pathname` from it.
 (globalThis as { window?: unknown }).window = {
   location: { pathname: "/guide" },
 };
@@ -86,7 +98,9 @@ const originalFetch = globalThis.fetch;
 
 afterAll(() => {
   globalThis.fetch = originalFetch;
+  // SAFETY: removes the window stub installed above.
   delete (globalThis as { window?: unknown }).window;
+  // SAFETY: removes the document stubs installed by the snapshot tests.
   delete (globalThis as { document?: unknown }).document;
 });
 
@@ -112,6 +126,8 @@ const streamResponse = (chunks: string[]): Response => {
 const setFetch = (
   handler: (url: string, init?: RequestInit) => Promise<Response>
 ) => {
+  // SAFETY: the hooks call fetch with (url, init) only; the extra statics on
+  // Bun's fetch type (e.g. `preconnect`) are never touched.
   globalThis.fetch = handler as typeof fetch;
 };
 
@@ -129,6 +145,8 @@ describe("useBlume / usePage", () => {
   });
 
   it("returns null when the snapshot script is missing", () => {
+    // SAFETY: a document stub answering the one querySelector call the hook
+    // makes.
     (globalThis as { document?: unknown }).document = {
       querySelector: () => null,
     };
@@ -137,6 +155,8 @@ describe("useBlume / usePage", () => {
   });
 
   it("returns null when the snapshot is not valid JSON", () => {
+    // SAFETY: a document stub answering the one querySelector call the hook
+    // makes.
     (globalThis as { document?: unknown }).document = {
       querySelector: () => ({ textContent: "not json" }),
     };
@@ -145,11 +165,15 @@ describe("useBlume / usePage", () => {
   });
 
   it("reads config, navigation, and page from the snapshot", () => {
-    const snapshot = {
-      config: { title: "Docs" },
-      navigation: { sidebar: [] },
+    const snapshot: BlumeClientData = {
+      // SAFETY: useBlume surfaces the injected config verbatim, so a
+      // title-only stub stands in for the full client config.
+      config: { title: "Docs" } as BlumeClientData["config"],
+      navigation: { featured: [], selectors: [], sidebar: [], tabs: [] },
       page: { route: "/guide", title: "Guide" },
-    } as unknown as BlumeClientData;
+    };
+    // SAFETY: a document stub answering the one querySelector call the hook
+    // makes.
     (globalThis as { document?: unknown }).document = {
       querySelector: () => ({ textContent: JSON.stringify(snapshot) }),
     };
@@ -194,8 +218,8 @@ describe("useSearch", () => {
   });
 
   it("ignores a stale response that lands after a newer query's", async () => {
-    const a = Promise.withResolvers<unknown>();
-    const ab = Promise.withResolvers<unknown>();
+    const a = Promise.withResolvers<SearchOutcome>();
+    const ab = Promise.withResolvers<SearchOutcome>();
     searchImpl = (query) => (query === "a" ? a.promise : ab.promise);
     try {
       const { search } = freshRender(useSearch);
@@ -220,8 +244,8 @@ describe("useSearch", () => {
   });
 
   it("keeps loading while a newer query is still in flight", async () => {
-    const a = Promise.withResolvers<unknown>();
-    const ab = Promise.withResolvers<unknown>();
+    const a = Promise.withResolvers<SearchOutcome>();
+    const ab = Promise.withResolvers<SearchOutcome>();
     searchImpl = (query) => (query === "a" ? a.promise : ab.promise);
     try {
       const { search } = freshRender(useSearch);

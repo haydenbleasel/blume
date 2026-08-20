@@ -66,11 +66,11 @@ const ENTRIES: Entry[] = [
   },
 ];
 
-const TAG_STYLES: Record<Entry["category"], { bg: string; fg: string }> = {
+const TAG_STYLES = {
   Features: { bg: "rgba(0,150,150,0.12)", fg: "#0f7d7d" },
   Fixes: { bg: "rgba(180,83,9,0.12)", fg: "#b45309" },
   Release: { bg: "rgba(111,66,193,0.12)", fg: "#6f42c1" },
-};
+} satisfies Record<Entry["category"], { bg: string; fg: string }>;
 
 const rssLabelStyle = {
   alignItems: "center",

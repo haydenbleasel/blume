@@ -1,0 +1,39 @@
+---
+import { withBase } from "../islands/base-path.ts";
+import Icon from "../Icon.astro";
+
+// The "you're viewing an old version" notice, shared by RootLayout and
+// ReferenceLayout so every shell shows the same bar on archived pages. Unlike
+// the announcement Banner it is never dismissible — the reader should know
+// they're on frozen docs for as long as they are. The message and link label
+// arrive fully resolved (localized, `{version}` substituted) from the
+// catch-all, so this component carries no string fallbacks of its own.
+interface Props {
+  notice: {
+    message: string;
+    /** The same page in the latest docs when it exists, else the docs root. */
+    latestHref: string;
+    latestLabel: string;
+  } | null;
+}
+
+const { notice } = Astro.props;
+---
+
+{
+  notice && (
+    <div
+      class="flex items-center justify-center gap-x-2 gap-y-0.5 border-amber-300 border-b bg-amber-100 px-10 py-2.5 text-center text-amber-900 text-sm max-sm:flex-wrap dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+      data-blume-version-banner
+    >
+      <span>{notice.message}</span>
+      <a
+        class="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+        href={withBase(notice.latestHref)}
+      >
+        {notice.latestLabel}
+        <Icon name="arrow-right" size={14} />
+      </a>
+    </div>
+  )
+}

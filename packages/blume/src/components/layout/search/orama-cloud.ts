@@ -31,7 +31,7 @@ export const createSearch = (opts: {
       ...(options?.locale && { where: { locale: options.locale } }),
     });
     const hits = (results?.hits ?? []).map((hit) => {
-      const doc = hit.document as unknown as OramaCloudRecord;
+      const doc: OramaCloudRecord = hit.document;
       return {
         content: doc.content ?? "",
         excerpt: highlight(

@@ -15,8 +15,12 @@ import {
   structuredDataChecks,
   urlChecks,
 } from "../src/audit/checks/social.ts";
-import type { AuditContext, CheckModule } from "../src/audit/types.ts";
-import type { Diagnostic } from "../src/core/types.ts";
+import type {
+  AuditContext,
+  CheckModule,
+  PageSnapshot,
+} from "../src/audit/types.ts";
+import type { Diagnostic, RouteManifestEntry } from "../src/core/types.ts";
 import { codes, context, snapshot } from "./audit-support.ts";
 
 /**
@@ -27,11 +31,33 @@ import { codes, context, snapshot } from "./audit-support.ts";
  * report — so the whole audit is only as trustworthy as its false-positive rate.
  */
 
-// Every static check is synchronous; only the network tiers return a promise.
+// SAFETY: every static check here runs synchronously; only the network tiers
+// return a promise.
 const run = (module: CheckModule, ctx: AuditContext): string[] =>
   codes(module.run(ctx) as Diagnostic[]);
 
 const SITE = "https://x.dev";
+
+/** A complete manifest route; tests override only the fields under test. */
+const manifestRoute = (
+  over: Partial<RouteManifestEntry> = {}
+): RouteManifestEntry => ({
+  alternates: [],
+  collection: "docs",
+  contentType: "doc",
+  draft: false,
+  entryId: "a",
+  hidden: false,
+  id: "a.md",
+  indexable: true,
+  locale: "en",
+  path: "/a",
+  source: { name: "docs", ref: "a.md" },
+  title: "A",
+  version: "",
+  versionAlternates: [],
+  ...over,
+});
 
 describe("content checks", () => {
   it("is silent on a healthy page", () => {
@@ -232,7 +258,7 @@ describe("duplicate checks", () => {
       pages: [
         snapshot({ url: "/a" }),
         snapshot({
-          route: { fallback: true } as never,
+          route: manifestRoute({ fallback: true }),
           url: "/fr/a",
         }),
       ],
@@ -303,6 +329,7 @@ describe("indexability checks", () => {
     // hardcoded `deployment.site` here would have `--claude`/`--codex` (which
     // apply suggestions verbatim) duplicate state the platform owns.
     const ctx = context({ adapter: "vercel" });
+    // SAFETY: indexability checks are static-tier and return synchronously.
     const found = indexabilityChecks.run(ctx) as Diagnostic[];
     const ids = found.map((d) => d.code);
     expect(ids).toContain("BLUME_AUDIT_SITE_INFERRED_AT_DEPLOY");
@@ -409,6 +436,50 @@ describe("indexability checks", () => {
       site: SITE,
     });
     expect(run(indexabilityChecks, ctx)).toContain("CANONICAL_NOT_SELF");
+  });
+
+  it("accepts an archived page's canonical-to-latest as intentional", () => {
+    const route = manifestRoute({
+      version: "v1.0",
+      versionAlternates: [
+        { path: "/a", version: "" },
+        { path: "/v1.0/a", version: "v1.0" },
+      ],
+    });
+    const versions = {
+      archived: [
+        {
+          banner: true,
+          canonical: "latest" as const,
+          id: "v1.0",
+          noindex: false,
+        },
+      ],
+      current: { label: "v2.0" },
+    };
+    const intentional = context({
+      pages: [
+        snapshot({ canonical: `${SITE}/a`, route, url: "/v1.0/a" }),
+        snapshot({ canonical: `${SITE}/a`, url: "/a" }),
+      ],
+      site: SITE,
+      versions,
+    });
+    expect(run(indexabilityChecks, intentional)).not.toContain(
+      "CANONICAL_NOT_SELF"
+    );
+
+    // A hand-written canonical at some *other* page is still worth flagging,
+    // even on an archived page.
+    const elsewhere = context({
+      pages: [
+        snapshot({ canonical: `${SITE}/b`, route, url: "/v1.0/a" }),
+        snapshot({ canonical: `${SITE}/b`, url: "/b" }),
+      ],
+      site: SITE,
+      versions,
+    });
+    expect(run(indexabilityChecks, elsewhere)).toContain("CANONICAL_NOT_SELF");
   });
 
   it("reports a noindex page but not a 404", () => {
@@ -629,6 +700,7 @@ describe("social checks", () => {
     // Half a card fails to render just like no card, but the fix is smaller —
     // the message names exactly which properties to add.
     const ctx = context({ pages: [snapshot({ og: { "og:title": "t" } })] });
+    // SAFETY: social checks are static-tier and return synchronously.
     const found = socialChecks.run(ctx) as Diagnostic[];
     const incomplete = found.find(
       (d) => d.code === "BLUME_AUDIT_OG_INCOMPLETE"
@@ -1184,7 +1256,7 @@ describe("robots rule matching (robots-parser semantics)", () => {
   });
 });
 
-const pair = () => [
+const pair = (): [PageSnapshot, PageSnapshot] => [
   snapshot({
     hreflang: [
       { href: `${SITE}/`, lang: "en" },
@@ -1316,7 +1388,7 @@ describe("i18n checks", () => {
     const [home] = pair();
     const ctx = context({
       pages: [
-        home as never,
+        home,
         snapshot({
           hreflang: [
             { href: `${SITE}/fr`, lang: "fr" },
@@ -1417,6 +1489,7 @@ describe("anchor checks", () => {
 describe("URL style", () => {
   it("names every offense the slug commits", () => {
     const ctx = context({ pages: [snapshot({ url: "/Docs_Setup" })] });
+    // SAFETY: URL checks are static-tier and return synchronously.
     const found = (
       urlChecks.run(
         context({ pages: [snapshot({ url: "/Docs_Setup" })] })
@@ -1486,7 +1559,7 @@ describe("draft leak", () => {
     const ctx = context({
       pages: [
         snapshot({
-          route: { draft: true, hidden: false } as never,
+          route: manifestRoute({ draft: true }),
           url: "/wip",
         }),
       ],
@@ -1498,7 +1571,7 @@ describe("draft leak", () => {
     const ctx = context({
       pages: [
         snapshot({
-          route: { draft: false, hidden: false } as never,
+          route: manifestRoute(),
           url: "/a",
         }),
         snapshot({ url: "/b" }),
@@ -1627,8 +1700,8 @@ describe("sitemap lastmod", () => {
 });
 
 /** A manifest route as the llms checks read it. */
-const route = (over: Record<string, unknown> = {}) =>
-  ({ draft: false, hidden: false, source: { name: "docs" }, ...over }) as never;
+const route = (over: Partial<RouteManifestEntry> = {}): RouteManifestEntry =>
+  manifestRoute(over);
 
 describe("llms.txt checks", () => {
   it("reports a missing llms.txt when the feature is enabled", () => {
@@ -1706,7 +1779,7 @@ describe("llms.txt checks", () => {
           url: "/noindex",
         }),
         snapshot({
-          route: route({ source: { name: "openapi" } }),
+          route: route({ source: { name: "openapi", ref: "a.md" } }),
           url: "/api",
         }),
         snapshot({ url: "/custom" }),

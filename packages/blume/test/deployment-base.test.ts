@@ -10,6 +10,7 @@ import { scanProject } from "../src/core/project-graph.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
 import { buildSitemapFiles } from "../src/deploy/sitemap.ts";
 import { buildStructuredData } from "../src/seo/jsonld.ts";
+import type { JsonLdNode } from "../src/seo/jsonld.ts";
 
 // ---------------------------------------------------------------------------
 // Render helper (`prefixBase` / `withBase`)
@@ -57,13 +58,15 @@ describe("buildStructuredData under deployment.base", () => {
       siteUrl: "https://example.com",
       title: "Intro",
     });
-    const graph = (data?.["@graph"] ?? []) as Record<string, unknown>[];
+    // SAFETY: buildStructuredData always emits `@graph` as the node array.
+    const graph = (data?.["@graph"] ?? []) as JsonLdNode[];
     const site = graph.find((n) => n["@type"] === "WebSite");
     const page = graph.find((n) => n["@type"] === "TechArticle");
     const crumbs = graph.find((n) => n["@type"] === "BreadcrumbList");
     expect(site?.url).toBe("https://example.com/sub");
     expect(page?.url).toBe("https://example.com/sub/guides/intro");
-    const items = (crumbs?.itemListElement ?? []) as Record<string, unknown>[];
+    // SAFETY: the BreadcrumbList node's `itemListElement` is always a ListItem array.
+    const items = (crumbs?.itemListElement ?? []) as JsonLdNode[];
     expect(items[1]?.item).toBe("https://example.com/sub/guides");
   });
 });
@@ -93,7 +96,7 @@ afterAll(async () => {
   );
 });
 
-const FIXTURE: Record<string, string> = {
+const FIXTURE = {
   "blume.config.ts":
     'export default { deployment: { base: "/sub", site: "https://example.com" }, seo: { rss: { types: ["blog"] } } };\n',
   "docs/blog/hello.md": "---\ndate: 2026-01-01\ntype: blog\n---\n# Hello\n",

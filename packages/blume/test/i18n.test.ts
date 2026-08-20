@@ -23,6 +23,7 @@ import { buildManifest } from "../src/core/manifest.ts";
 import { discoverFolderMeta } from "../src/core/meta.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type {
+  BlumeConfigInput,
   FolderMeta,
   ResolvedConfig,
   ResolvedI18nConfig,
@@ -30,7 +31,9 @@ import type {
 import type { NavNode, ProjectContext } from "../src/core/types.ts";
 import { UI_PACKS } from "../src/core/ui-packs/index.ts";
 
-const config = (i18nOver: Record<string, unknown> = {}): ResolvedConfig =>
+type I18nInput = Partial<NonNullable<BlumeConfigInput["i18n"]>>;
+
+const config = (i18nOver: I18nInput = {}): ResolvedConfig =>
   blumeConfigSchema.parse({
     i18n: {
       defaultLocale: "en",
@@ -42,7 +45,7 @@ const config = (i18nOver: Record<string, unknown> = {}): ResolvedConfig =>
     },
   });
 
-const i18nOf = (over: Record<string, unknown> = {}): ResolvedI18nConfig => {
+const i18nOf = (over: I18nInput = {}): ResolvedI18nConfig => {
   const value = config(over).i18n;
   if (!value) {
     throw new Error("expected i18n");
@@ -58,7 +61,7 @@ afterAll(async () => {
   );
 });
 
-const FILES: Record<string, string> = {
+const FILES = {
   "docs/fr/guides/quickstart.mdx": "---\ntitle: Démarrage\n---\n# Démarrage\n",
   "docs/fr/index.mdx": "---\ntitle: Accueil\n---\n# Accueil\n",
   "docs/guides/only-en.mdx": "---\ntitle: Only EN\n---\n# Only EN\n",
@@ -90,6 +93,7 @@ const buildProject = async (resolved: ResolvedConfig) => {
     i18n: resolved.i18n,
     navigation: resolved.navigation,
   });
+  // SAFETY: buildManifest reads only contentRoot and root from the context.
   const context = { contentRoot, root } as ProjectContext;
   const manifest = buildManifest({ config: resolved, context, graph });
   return { graph, manifest, pages };
@@ -935,9 +939,7 @@ describe("UI dictionaries", () => {
     // each group to `{}` — and since layout components resolve Zod from the
     // consuming project, a ui-less PageLayout would then render blank chrome
     // (empty search labels/aria-labels, empty skip link).
-    const groups = Object.entries(
-      EN_UI as unknown as Record<string, Record<string, string>>
-    );
+    const groups = Object.entries(EN_UI);
     expect(groups.length).toBeGreaterThan(0);
     for (const [group, values] of groups) {
       expect(
@@ -1087,6 +1089,8 @@ describe("UI dictionaries", () => {
   });
 
   it("every shipped pack uses only known UI keys", () => {
+    // SAFETY: EN_UI is a two-level structure of string leaves; the dictionary
+    // view only enables lookups by the arbitrary group names packs declare.
     const baseline = EN_UI as Record<string, Record<string, string>>;
     const violations: string[] = [];
     for (const [code, pack] of Object.entries(UI_PACKS)) {

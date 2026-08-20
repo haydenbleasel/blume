@@ -55,7 +55,11 @@ interface SimpleIcon {
 }
 
 /** Fence language (and common aliases) → icon. Unmapped languages get none. */
-const LANGUAGE_ICONS: Record<string, SimpleIcon> = {
+interface LanguageIcons {
+  [language: string]: SimpleIcon;
+}
+
+const LANGUAGE_ICONS: LanguageIcons = {
   astro: siAstro,
   bash: siGnubash,
   c: siC,
@@ -119,7 +123,7 @@ const LANGUAGE_ICONS: Record<string, SimpleIcon> = {
 /** A minimal hast node (avoids a hast type dependency). */
 interface HastNode {
   children?: HastNode[];
-  properties?: Record<string, unknown>;
+  properties?: Record<string, boolean | number | string | string[] | undefined>;
   tagName?: string;
   type: string;
   value?: string;

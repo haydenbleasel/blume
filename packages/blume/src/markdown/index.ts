@@ -52,6 +52,28 @@ type HastPlugin = NonNullable<
   NonNullable<Parameters<typeof satteri>[0]>["hastPlugins"]
 >[number];
 
+/*
+ * Blume's plugins model only the node/context slices they touch (no hast or
+ * Satteri type dependency); these bridges are the single boundary where those
+ * minimal structural shapes meet the host pipeline's full plugin types.
+ */
+
+// SAFETY: Satteri drives plugins through the same visitor protocol Blume's
+// minimal structural shapes model; they narrow the node/context types the
+// visitor hooks receive, never widen them.
+const asHastPlugin = (plugin: { name: string }): HastPlugin =>
+  plugin as HastPlugin;
+
+// SAFETY: the same visitor-protocol bridge as `asHastPlugin`, for the mdast
+// phase's plugins.
+const asMdastPlugin = (plugin: { name: string }): MdastPlugin =>
+  plugin as MdastPlugin;
+
+// SAFETY: Shiki calls only the hooks a transformer declares, and Blume's
+// transformers type their hook parameters as the hast slices they touch.
+const asShikiTransformer = (transformer: { name: string }): ShikiTransformer =>
+  transformer as ShikiTransformer;
+
 /**
  * Hast plugins enabled by config. Inline `` `code`{:lang} `` highlighting is
  * always on: it only fires on an explicit trailing `{:lang}` marker, so plain
@@ -62,11 +84,11 @@ type HastPlugin = NonNullable<
  */
 const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => {
   const plugins: HastPlugin[] = [
-    inlineCodeHighlightPlugin(options.codeThemes) as unknown as HastPlugin,
-    tableWrapPlugin() as unknown as HastPlugin,
+    asHastPlugin(inlineCodeHighlightPlugin(options.codeThemes)),
+    asHastPlugin(tableWrapPlugin()),
   ];
   if (options.headingAnchors !== false) {
-    plugins.push(headingAnchorPlugin() as unknown as HastPlugin);
+    plugins.push(asHastPlugin(headingAnchorPlugin()));
   }
   return plugins;
 };
@@ -101,29 +123,55 @@ export const blumeShikiTransformers = (
     transformerMetaHighlight(),
   ];
   if (options.icons !== false) {
-    transformers.push(languageIconTransformer() as unknown as ShikiTransformer);
+    transformers.push(asShikiTransformer(languageIconTransformer()));
   }
   // The fence-meta reader (title / line numbers) always runs last.
-  transformers.push(codeTitleTransformer() as unknown as ShikiTransformer);
+  transformers.push(asShikiTransformer(codeTitleTransformer()));
   return transformers;
 };
+
+/** The value space of a hast element property. */
+type HastPropertyValue =
+  | string
+  | number
+  | boolean
+  | (string | number)[]
+  | null
+  | undefined;
+
+/** The `<pre>` slice the class/language transformers touch. */
+interface PreElement {
+  properties: { class?: HastPropertyValue; dataLanguage?: HastPropertyValue };
+}
+
+const isStringProperty = (value: HastPropertyValue): value is string =>
+  typeof value === "string";
+
+/** A Blume-local Shiki transformer: a name plus the `pre` hook it declares. */
+interface PreTransformer {
+  name: string;
+  pre: (node: PreElement) => void;
+}
 
 /**
  * Tag the highlighted `<pre>` with `astro-code` (plus any extra classes) so the
  * theme's code-block styles apply — `codeToHtml`'s bare output is `pre.shiki`,
  * which the theme doesn't style.
  */
-const astroCodeClassTransformer = (extra?: string): ShikiTransformer =>
-  ({
+const astroCodeClassTransformer = (extra?: string): ShikiTransformer => {
+  const transformer: PreTransformer = {
     name: "blume:astro-code-class",
-    pre(node: { properties: Record<string, unknown> }) {
-      const existing =
-        typeof node.properties.class === "string" ? node.properties.class : "";
+    pre(node) {
+      const existing = isStringProperty(node.properties.class)
+        ? node.properties.class
+        : "";
       node.properties.class = `astro-code ${extra ?? ""} ${existing}`
         .replaceAll(/\s+/gu, " ")
         .trim();
     },
-  }) as unknown as ShikiTransformer;
+  };
+  return asShikiTransformer(transformer);
+};
 
 /**
  * Tag the `<pre>` with `data-language` — raw `codeToHtml` omits it (unlike
@@ -132,13 +180,15 @@ const astroCodeClassTransformer = (extra?: string): ShikiTransformer =>
  * fence would, while header-less panes (e.g. the Component source view) stay
  * untouched.
  */
-const languageAttrTransformer = (lang: string): ShikiTransformer =>
-  ({
+const languageAttrTransformer = (lang: string): ShikiTransformer => {
+  const transformer: PreTransformer = {
     name: "blume:data-language",
-    pre(node: { properties: Record<string, unknown> }) {
+    pre(node) {
       node.properties.dataLanguage ??= lang;
     },
-  }) as unknown as ShikiTransformer;
+  };
+  return asShikiTransformer(transformer);
+};
 
 export interface HighlightCodeOptions extends BlumeShikiOptions {
   /** Extra `<pre>` class names, e.g. `blume-source` for a height-capped pane. */
@@ -235,10 +285,9 @@ const blumeSharedMdastPlugins = (
 ): MdastPlugin[] =>
   options.basePath || options.deployBase
     ? [
-        baseLinksPlugin(
-          options.deployBase ?? "",
-          options.basePath ?? ""
-        ) as unknown as MdastPlugin,
+        asMdastPlugin(
+          baseLinksPlugin(options.deployBase ?? "", options.basePath ?? "")
+        ),
       ]
     : [];
 
@@ -278,10 +327,10 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
     },
     hastPlugins: blumeHastPlugins(options),
     mdastPlugins: [
-      packageInstallPlugin(),
-      directiveToCalloutPlugin(),
-      mermaidPlugin(),
-      mathPlugin(),
+      asMdastPlugin(packageInstallPlugin()),
+      asMdastPlugin(directiveToCalloutPlugin()),
+      asMdastPlugin(mermaidPlugin()),
+      asMdastPlugin(mathPlugin()),
       ...blumeSharedMdastPlugins(options),
-    ] as unknown as MdastPlugin[],
+    ],
   });

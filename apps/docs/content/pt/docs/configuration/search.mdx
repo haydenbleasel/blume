@@ -44,6 +44,8 @@ Escreva o `href` como se o site estivesse montado na raiz — um `basePath` é a
 
 Para cada página indexável, o Blume indexa seu título, sua descrição e o corpo reduzido a texto simples — blocos de código, imagens e marcação são removidos, para que os resultados permaneçam relevantes. O índice é construído a partir dos seus arquivos-fonte, então é idêntico em desenvolvimento e em produção.
 
+Em um site com [versionamento](/docs/content/versioning), os resultados ficam restritos por padrão à versão que está sendo visualizada, com um botão "Todas as versões" no rodapé do diálogo (memorizado por leitor). As correspondências de outras versões indicam sua versão na linha. Orama, FlexSearch, Algolia e Typesense respeitam esse escopo — os registros hospedados carregam uma faceta `version`, com a documentação atual enviada como `"current"` — enquanto o Pagefind permanece sem escopo, seguindo o mesmo comportamento que tem com idiomas.
+
 ## Tags
 
 Adicione `search.tags` ao frontmatter de uma página para agrupá-la sob um filtro no diálogo de busca — os leitores podem restringir os resultados a uma tag com um clique. As tags também se tornam uma faceta nos provedores hospedados.
@@ -67,9 +69,9 @@ search: {
 }
 ```
 
-#### Idiomas escritos sem espaços
+#### Escritas não latinas
 
-O tokenizador padrão do Orama divide o texto em limites de palavra que só existem em escritas separadas por espaços, então textos em japonês, chinês, coreano e tailandês não produziriam nenhuma correspondência. O Blume cuida disso para você: quando [`i18n.defaultLocale`](/docs/content/i18n) é um desses idiomas, o índice passa a usar um tokenizador que segmenta palavras (baseado no `Intl.Segmenter`, nativo do navegador e do Node). Basta declarar o idioma do seu site:
+O tokenizador padrão do Orama mantém apenas letras latinas básicas, dígitos e um punhado de vogais acentuadas, então textos em qualquer outra escrita — japonês, chinês, coreano e tailandês, mas igualmente russo, grego, hebraico e híndi — não produziriam nenhuma correspondência. O Blume cuida disso para você: quando [`i18n.defaultLocale`](/docs/content/i18n) corresponde a uma escrita não latina, o índice passa a usar um tokenizador que segmenta palavras (baseado no `Intl.Segmenter`, nativo do navegador e do Node). Basta declarar o idioma do seu site:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -78,7 +80,7 @@ i18n: {
 }
 ```
 
-O mesmo tokenizador atende o diálogo de busca, a ferramenta `search_docs` do servidor MCP e o embasamento do Ask AI. Em um site com vários idiomas, todo o índice compartilha o tokenizador do idioma padrão — o que é seguro, porque as palavras latinas sobrevivem intactas à segmentação, então páginas em inglês (ou em qualquer idioma com espaços) permanecem pesquisáveis ao lado do idioma padrão.
+O mesmo tokenizador atende o diálogo de busca, a ferramenta `search_docs` do servidor MCP e o embasamento do Ask AI. Quem decide é a escrita, não o nome do idioma — `az-Cyrl` é segmentado, enquanto `sr-Latn` não é — e é o idioma padrão que decide por todo o índice: em um site com vários idiomas, todas as páginas compartilham o tokenizador do idioma padrão. Com um padrão não latino, isso é seguro, porque as palavras latinas sobrevivem intactas à segmentação, então páginas em inglês permanecem pesquisáveis ao lado do idioma padrão. O contrário não vale: traduções não latinas em um site com padrão latino não são pesquisáveis. Idiomas de escrita latina que dependem bastante de diacríticos (vietnamita, ou sérvio em escrita latina) também se saem pior no tokenizador padrão, que normaliza apenas algumas vogais acentuadas e divide as palavras no restante.
 
 Japonês e chinês vão um passo além. A segmentação sozinha indexa um termo composto como suas partes — 資金決済法 como 資金, 決済 e 法 — o que permite que uma página que mencione cada parte em algum lugar seja melhor classificada do que a página que realmente trata do termo. Por isso, Han, Hiragana e Katakana são indexados como pares de caracteres sobrepostos, e as consultas sobre esses índices preferem páginas que contenham os pares de um termo juntos, afrouxando para a correspondência de qualquer par quando nenhuma página os contém todos, de modo que digitar uma frase inteira ainda retorna as páginas mais próximas. Coreano e tailandês mantêm suas palavras segmentadas.
 
@@ -86,7 +88,7 @@ Japonês e chinês vão um passo além. A segmentação sozinha indexa um termo 
 
 Uma segunda opção do lado do cliente e sem chaves. Ela reutiliza o mesmo índice `/blume-search.json` que o Orama gera e constrói um índice de documentos do [FlexSearch](https://github.com/nextapps-de/flexsearch) no navegador. Funciona em `blume dev` e `blume build`.
 
-O FlexSearch não tem um mecanismo equivalente de segmentação, então, para sites em japonês, chinês, coreano ou tailandês, prefira o Orama (o padrão) ou o [Pagefind](#pagefind), cujo binário `pagefind_extended` segmenta esses idiomas nativamente.
+O FlexSearch não tem um mecanismo equivalente de segmentação, então, para sites em escritas não latinas, prefira o Orama (o padrão) ou o [Pagefind](#pagefind), cujo binário `pagefind_extended` indexa um conjunto amplo de idiomas e segmenta chinês, japonês e coreano nativamente.
 
 ```ts blume.config.ts lineNumbers
 search: {

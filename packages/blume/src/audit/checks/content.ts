@@ -13,6 +13,11 @@ import type { AuditContext, CheckModule, PageSnapshot } from "../types.ts";
 // collapsed text — source formatting must not move a page across a threshold.
 const WHITESPACE = /\s+/gu;
 
+/** Whether front matter `date` arrived in one of YAML's two date spellings. */
+const isDateValue = (
+  value: string | Date | undefined
+): value is string | Date => typeof value === "string" || value instanceof Date;
+
 /**
  * The `date` a source file's front matter declares, when it parses to a real
  * date. YAML hands back a `Date` for an unquoted `2026-01-01` and a string for
@@ -22,8 +27,8 @@ const WHITESPACE = /\s+/gu;
  */
 const frontmatterDate = (source: string): Date | null => {
   try {
-    const { date } = matter(source).data as { date?: unknown };
-    if (typeof date !== "string" && !(date instanceof Date)) {
+    const { date } = matter(source).data;
+    if (!isDateValue(date)) {
       return null;
     }
     const parsed = date instanceof Date ? date : new Date(date);

@@ -52,6 +52,9 @@ const launchAgentCode = async (
   try {
     return await launchAgent(AGENTS[agent].bin, prompt);
   } catch (error) {
+    // SAFETY: only the `code` tag is inspected; a spawn failure throws an
+    // ErrnoException, and any other thrown value fails the comparison and
+    // rethrows unchanged.
     if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
       throw error;
     }
@@ -76,9 +79,7 @@ interface EvalFlags {
 }
 
 /** Validate the flag surface, exiting with a message on the first offense. */
-const parseFlags = (
-  args: EvalFlags
-): { agent: AgentKind; threshold: number; timeoutS: number } => {
+const parseFlags = (args: EvalFlags) => {
   if (!isAgentKind(args.agent)) {
     logger.error(`Invalid --agent "${args.agent}" (use claude | codex).`);
     process.exit(1);
@@ -237,6 +238,9 @@ export const evalCommand = defineCommand({
         logger.error(error.diagnostic.message);
         process.exit(1);
       }
+      // SAFETY: only the `code` tag is inspected; a spawn failure throws an
+      // ErrnoException, and any other thrown value fails the comparison and
+      // falls through to the internal-error report.
       if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
         notInstalled(agent);
       }

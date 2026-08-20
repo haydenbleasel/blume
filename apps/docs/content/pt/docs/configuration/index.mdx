@@ -141,6 +141,18 @@ my-docs/
 
 O SVG prevalece sobre o PNG, que prevalece sobre o ICO quando existem vários, e um ficheiro em `public/` é preferido a um na raiz. Se o Blume não encontrar nenhum ícone, recorre à sua própria marca.
 
+Uma marca escura desaparece contra a interface escura do browser, por isso podes fornecer um segundo ficheiro para o modo escuro. Acrescenta um ficheiro irmão `-dark` ao teu ficheiro de ícone — o mesmo nome e o mesmo diretório, com `-dark` antes da extensão (`icon.png` → `icon-dark.png`) — e o Blume emite ambos os ícones atrás de uma media query `prefers-color-scheme`, além de uma tag clara simples para browsers e crawlers que ignoram media queries em ícones:
+
+```
+my-docs/
+├─ blume.config.ts
+├─ icon.png          ← light mode
+├─ icon-dark.png     ← dark mode
+└─ docs/
+```
+
+Só o irmão do ícone que o Blume escolheu é usado — um ficheiro `-dark` com um nome diferente continua ignorado, pelo que um ficheiro sem relação não pode emparelhar-se com a tua marca por acidente. O ficheiro escuro é opcional; com apenas um ícone, o Blume emite uma única tag como antes. A marca de recurso do próprio Blume inclui ambas as variantes.
+
 ### Ícone Apple touch
 
 O ícone que o iOS usa quando alguém adiciona o teu site ao ecrã principal é detetado da mesma forma. Coloca um ficheiro `apple-icon` (`.png`, `.jpg` ou `.jpeg`) — ou um `apple-touch-icon.png`, o nome que a maioria dos geradores de favicons produz — na raiz do teu projeto ou no diretório `public/` e o Blume trata de configurar `<link rel="apple-touch-icon">` por ti. Não há predefinição; se não for encontrado nenhum ficheiro, não é emitida nenhuma tag.
@@ -152,7 +164,7 @@ my-docs/
 └─ docs/
 ```
 
-Coloca o ficheiro em `public/` em vez de na raiz do projeto: o iOS ignora o URI de dados incorporado que o Blume usa para um ícone ao nível da raiz, pelo que só um ficheiro em `public/` (servido em `/apple-icon.png`) chega de forma fiável ao ecrã principal.
+Coloca o ficheiro em `public/` em vez de na raiz do projeto: o iOS ignora o URI de dados incorporado que o Blume usa para um ícone ao nível da raiz, pelo que só um ficheiro em `public/` (servido em `/apple-icon.png`) chega de forma fiável ao ecrã principal. Ao contrário do favicon, aqui não existe um irmão `-dark` — o iOS ignora media queries nos ícones do ecrã principal, pelo que uma variante escura nunca poderia ser servida.
 
 ### Faixa
 
@@ -290,7 +302,7 @@ lastModified: true,
 | `{ type: "git" }` | O mesmo que `true`, escrito explicitamente. |
 | `{ type: "frontmatter" }` | Nunca executa o git — usa apenas o campo `lastModified` do frontmatter. |
 
-A fonte git lê o commit mais recente que tocou em cada ficheiro, pelo que funciona em qualquer repositório git — incluindo monorepos — e precisa do histórico do repositório no momento da compilação (evita um checkout superficial com `--depth 1` no CI). O `lastModified` do frontmatter da própria página prevalece sempre, o que é útil para fixar uma data ou para ficheiros que ainda não foram commitados:
+A fonte git lê o commit mais recente que tocou em cada ficheiro, pelo que funciona em qualquer repositório git — incluindo monorepos — e precisa do histórico do repositório no momento da compilação. As plataformas de CI costumam fazer checkout de um clone superficial, o que descarta silenciosamente a maioria das datas (a compilação avisa com `BLUME_SHALLOW_GIT_HISTORY` quando isso acontece): na Vercel, define a variável de ambiente `VERCEL_DEEP_CLONE=true`; com o `actions/checkout`, define `fetch-depth: 0`. O `lastModified` do frontmatter da própria página prevalece sempre, o que é útil para fixar uma data ou para ficheiros que ainda não foram commitados:
 
 ```mdx page.mdx
 ---

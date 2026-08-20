@@ -33,8 +33,10 @@ const DATA: McpData = {
       description: "How to install Blume",
       indexable: true,
       lastModified: null,
+      locale: "en",
       route: "/guides/install",
       title: "Installation",
+      version: "",
     },
   ],
   site: null,
@@ -51,6 +53,9 @@ interface RpcResponse {
   };
 }
 
+const isText = (chunk: Uint8Array | string): chunk is string =>
+  typeof chunk === "string";
+
 /**
  * Yield newline-delimited JSON-RPC responses as they stream in. Works over
  * both Node streams (`PassThrough`) and Bun subprocess stdout (a web
@@ -64,10 +69,7 @@ const readLines = async function* readLines(
   const decoder = new TextDecoder();
   let buffer = "";
   for await (const chunk of stream) {
-    buffer +=
-      typeof chunk === "string"
-        ? chunk
-        : decoder.decode(chunk, { stream: true });
+    buffer += isText(chunk) ? chunk : decoder.decode(chunk, { stream: true });
     let index = buffer.indexOf("\n");
     while (index !== -1) {
       yield buffer.slice(0, index);
@@ -84,6 +86,8 @@ const lineReader = (stream: AsyncIterable<Uint8Array | string>) => {
     if (done) {
       throw new Error("stream ended before a response arrived");
     }
+    // SAFETY: each line is one JSON-RPC response emitted by the server under
+    // test, which speaks newline-delimited JSON-RPC exclusively.
     return JSON.parse(value) as RpcResponse;
   };
 };

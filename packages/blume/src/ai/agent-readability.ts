@@ -47,12 +47,41 @@ const askApiUrl = (
     : endpoint;
 };
 
+/** The `.well-known` discovery URLs a site can publish. */
+interface WellKnownArtifacts {
+  httpMessageSignaturesDirectory?: string;
+  apiCatalog?: string;
+  agentSkills?: string;
+}
+
+/** The agent-facing artifact index the manifest publishes. */
+interface AgentArtifacts extends WellKnownArtifacts {
+  markdown: { contentNegotiation?: string; pattern: string };
+  llmsFullTxt?: string;
+  llmsTxt?: string;
+  mcp?: { discovery: string; url: string };
+  askApi?: string;
+  sitemap?: string;
+  feeds?: string[];
+}
+
+/** The published `agent-readability.json` document. */
+export interface AgentReadabilityManifest {
+  artifacts: AgentArtifacts;
+  description?: string;
+  generator?: string;
+  name: string;
+  site: string | null;
+  contentUsage?: Record<string, boolean>;
+  repository?: string;
+}
+
 /** The `.well-known` discovery artifacts the site publishes, if any. */
 const wellKnownArtifacts = (
   config: BlumeProject["config"],
   abs: (path: string) => string
-): Record<string, string> => {
-  const artifacts: Record<string, string> = {};
+): WellKnownArtifacts => {
+  const artifacts: WellKnownArtifacts = {};
   if (config.ai.webBotAuth.keys.length > 0) {
     artifacts.httpMessageSignaturesDirectory = abs(
       "/.well-known/http-message-signatures-directory"
@@ -77,7 +106,7 @@ const wellKnownArtifacts = (
  */
 export const buildAgentReadability = (
   project: BlumeProject
-): Record<string, unknown> | null => {
+): AgentReadabilityManifest | null => {
   const { config } = project;
   if (!config.seo.agentReadability) {
     return null;
@@ -103,12 +132,10 @@ export const buildAgentReadability = (
     config.deployment.output === "server" &&
     (config.deployment.adapter === "vercel" ||
       config.deployment.adapter === "cloudflare");
-  const artifacts: Record<string, unknown> = {
-    markdown: {
-      ...(negotiates ? { contentNegotiation: "text/markdown" } : {}),
-      pattern: abs("/{route}.md"),
-    },
-  };
+  const markdown: AgentArtifacts["markdown"] = negotiates
+    ? { contentNegotiation: "text/markdown", pattern: abs("/{route}.md") }
+    : { pattern: abs("/{route}.md") };
+  const artifacts: AgentArtifacts = { markdown };
   if (config.ai.llmsTxt.enabled) {
     artifacts.llmsFullTxt = abs("/llms-full.txt");
     artifacts.llmsTxt = abs("/llms.txt");
@@ -135,7 +162,7 @@ export const buildAgentReadability = (
   }
 
   const version = project.manifest?.blumeVersion;
-  const manifest: Record<string, unknown> = {
+  const manifest: AgentReadabilityManifest = {
     artifacts,
     description: config.description,
     generator: version ? `blume@${version}` : undefined,

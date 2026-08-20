@@ -17,10 +17,24 @@ export const ASYNCAPI_ACTIONS = ["send", "receive"] as const;
 
 export type AsyncApiAction = (typeof ASYNCAPI_ACTIONS)[number];
 
+/**
+ * A value carried by a parsed spec document: JSON-compatible data whose exact
+ * position in the document is not modeled (extension fields, bindings,
+ * protocol-specific extras). `undefined` covers absent optional members.
+ */
+export type AsyncApiSpecValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | AsyncApiSpecValue[]
+  | { [key: string]: AsyncApiSpecValue };
+
 /** A permissive view of an AsyncAPI reference object. */
 export interface AsyncApiRefLike {
   $ref?: string;
-  [key: string]: unknown;
+  [key: string]: AsyncApiSpecValue;
 }
 
 /** A permissive view of an AsyncAPI 3.x channel — only the fields we render. */
@@ -32,8 +46,8 @@ export interface AsyncApiChannelObject {
   messages?: Record<string, AsyncApiRefLike>;
   parameters?: Record<string, AsyncApiRefLike>;
   servers?: AsyncApiRefLike[];
-  bindings?: Record<string, Record<string, unknown>>;
-  [key: string]: unknown;
+  bindings?: Record<string, Record<string, AsyncApiSpecValue>>;
+  [key: string]: AsyncApiSpecValue;
 }
 
 /** A permissive view of an AsyncAPI 3.x operation — only the fields we render. */
@@ -47,8 +61,8 @@ export interface AsyncApiOperationObject {
   tags?: { name?: string; description?: string }[];
   security?: AsyncApiRefLike[];
   messages?: AsyncApiRefLike[];
-  bindings?: Record<string, Record<string, unknown>>;
-  [key: string]: unknown;
+  bindings?: Record<string, Record<string, AsyncApiSpecValue>>;
+  [key: string]: AsyncApiSpecValue;
 }
 
 /** A permissive view of an AsyncAPI 3.x server object. */
@@ -58,7 +72,7 @@ export interface AsyncApiServerObject {
   pathname?: string;
   description?: string;
   security?: AsyncApiRefLike[];
-  [key: string]: unknown;
+  [key: string]: AsyncApiSpecValue;
 }
 
 /** A normalized AsyncAPI 3.x document, internal `$ref`s intact. */
@@ -69,14 +83,14 @@ export interface AsyncApiDocument {
     version?: string;
     description?: string;
     tags?: { name?: string; description?: string }[];
-    [key: string]: unknown;
+    [key: string]: AsyncApiSpecValue;
   };
   defaultContentType?: string;
   servers?: Record<string, AsyncApiServerObject>;
   channels?: Record<string, AsyncApiChannelObject>;
   operations?: Record<string, AsyncApiOperationObject>;
-  components?: Record<string, Record<string, unknown>>;
-  [key: string]: unknown;
+  components?: Record<string, Record<string, AsyncApiSpecValue>>;
+  [key: string]: AsyncApiSpecValue;
 }
 
 /** Decode a JSON-pointer token: `user~1signedup` -> `user/signedup`. */
@@ -84,6 +98,9 @@ const unescapePointer = (token: string): string =>
   token.replaceAll("~1", "/").replaceAll("~0", "~");
 
 const CHANNEL_REF = /^#\/channels\/(?<id>.+)$/u;
+
+const isString = (value: AsyncApiSpecValue): value is string =>
+  typeof value === "string";
 
 /** The channel id an operation's `channel.$ref` points at, if resolvable. */
 export const channelIdOf = (channel?: AsyncApiRefLike): string | undefined => {
@@ -99,12 +116,14 @@ export const channelIdOf = (channel?: AsyncApiRefLike): string | undefined => {
 export const channelAddress = (
   channelId: string,
   channel?: AsyncApiChannelObject
-): string =>
-  typeof channel?.address === "string" && channel.address !== ""
-    ? channel.address
-    : channelId;
+): string => {
+  const address = channel?.address;
+  return isString(address) && address !== "" ? address : channelId;
+};
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
+const isObject = (
+  value: AsyncApiSpecValue
+): value is Record<string, AsyncApiSpecValue> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const COMPONENT_SECTION_REF =
@@ -118,7 +137,7 @@ const COMPONENT_SECTION_REF =
  * Unresolvable refs stay in place; the extractor reports them.
  */
 const inlineComponentRefs = (document: AsyncApiDocument): void => {
-  const maps: [Record<string, unknown> | undefined, string][] = [
+  const maps: [Record<string, AsyncApiSpecValue> | undefined, string][] = [
     [document.channels, "channels"],
     [document.operations, "operations"],
   ];
@@ -128,7 +147,7 @@ const inlineComponentRefs = (document: AsyncApiDocument): void => {
     }
     const table = document.components?.[section];
     for (const [id, entry] of Object.entries(map)) {
-      if (!isObject(entry) || typeof entry.$ref !== "string") {
+      if (!isObject(entry) || !isString(entry.$ref)) {
         continue;
       }
       const groups = COMPONENT_SECTION_REF.exec(entry.$ref)?.groups;
@@ -138,7 +157,7 @@ const inlineComponentRefs = (document: AsyncApiDocument): void => {
       const resolved = isObject(table)
         ? table[unescapePointer(groups.name ?? "")]
         : undefined;
-      if (isObject(resolved) && typeof resolved.$ref !== "string") {
+      if (isObject(resolved) && !isString(resolved.$ref)) {
         map[id] = resolved;
       }
     }
@@ -160,12 +179,12 @@ export const applyAsyncApiTraits = (
   document: AsyncApiDocument
 ): AsyncApiDocument => {
   const resolveTrait = (
-    trait: unknown
-  ): Record<string, unknown> | undefined => {
+    trait: AsyncApiSpecValue
+  ): Record<string, AsyncApiSpecValue> | undefined => {
     if (!isObject(trait)) {
       return undefined;
     }
-    if (typeof trait.$ref !== "string") {
+    if (!isString(trait.$ref)) {
       return trait;
     }
     const groups = TRAIT_REF.exec(trait.$ref)?.groups;
@@ -176,13 +195,13 @@ export const applyAsyncApiTraits = (
     return isObject(resolved) ? resolved : undefined;
   };
 
-  const mergeTraits = (node: Record<string, unknown>): void => {
+  const mergeTraits = (node: Record<string, AsyncApiSpecValue>): void => {
     const { traits } = node;
     if (!Array.isArray(traits)) {
       return;
     }
     delete node.traits;
-    const merged: Record<string, unknown> = {};
+    const merged: Record<string, AsyncApiSpecValue> = {};
     for (const trait of traits) {
       Object.assign(merged, resolveTrait(trait));
     }
@@ -217,7 +236,7 @@ export const applyAsyncApiTraits = (
     for (const message of Object.values(messages)) {
       // A channel message that is itself a `$ref` resolves to a components
       // message, which this loop also visits — don't merge through the ref.
-      if (isObject(message) && typeof message.$ref !== "string") {
+      if (isObject(message) && !isString(message.$ref)) {
         mergeTraits(message);
       }
     }
@@ -255,15 +274,18 @@ const operationSite = (
   const channel = channelId === undefined ? undefined : channels[channelId];
   // A channel entry that is still a bare `$ref` survived normalization — its
   // components target doesn't exist — so it renders nothing useful either.
-  if (
-    channelId === undefined ||
-    !isObject(channel) ||
-    typeof channel.$ref === "string"
-  ) {
+  if (channelId === undefined || !isObject(channel) || isString(channel.$ref)) {
     return `Operation "${id}" references a channel that isn't declared under "channels"; it is missing from the reference.`;
   }
   return { action, address: channelAddress(channelId, channel), channelId };
 };
+
+/** The route-mapped operations, ordered tags, and skip warnings of one document. */
+export interface AsyncApiOperationCatalog {
+  operations: ApiOperationRef[];
+  tags: ApiTagRef[];
+  warnings: string[];
+}
 
 /**
  * Flatten a normalized AsyncAPI 3.x document into a route-mapped operation
@@ -280,12 +302,15 @@ const operationSite = (
 export const extractAsyncApiOperations = (
   document: AsyncApiDocument,
   baseRoute: string
-): { operations: ApiOperationRef[]; tags: ApiTagRef[]; warnings: string[] } => {
+): AsyncApiOperationCatalog => {
   const warnings: string[] = [];
   const tagMeta = new Map(
     (document.info?.tags ?? [])
-      .filter((tag) => typeof tag?.name === "string")
-      .map((tag) => [tag.name as string, tag.description ?? ""])
+      .filter(
+        (tag): tag is { name: string; description?: string } =>
+          typeof tag?.name === "string"
+      )
+      .map((tag): [string, string] => [tag.name, tag.description ?? ""])
   );
   const collector = operationCollector(baseRoute, tagMeta);
   const channels = document.channels ?? {};
@@ -296,20 +321,21 @@ export const extractAsyncApiOperations = (
     }
     // An operation entry still carrying a `$ref` is one normalization could
     // not inline; name the real problem instead of the missing-action one.
-    if (typeof operation.$ref === "string") {
+    if (isString(operation.$ref)) {
       warnings.push(
         `Operation "${id}" is a reference that doesn't resolve to a components operation; it is missing from the reference.`
       );
       continue;
     }
     const site = operationSite(id, operation, channels);
-    if (typeof site === "string") {
+    if (isString(site)) {
       warnings.push(site);
       continue;
     }
     const { action, address, channelId } = site;
     const tag = operation.tags?.find(
-      (candidate) => typeof candidate?.name === "string"
+      (candidate): candidate is { name: string; description?: string } =>
+        typeof candidate?.name === "string"
     )?.name;
     collector.add({
       channelId,

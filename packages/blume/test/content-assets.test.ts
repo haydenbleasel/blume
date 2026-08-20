@@ -32,7 +32,10 @@ afterAll(async () => {
   await rm(root, { force: true, recursive: true });
 });
 
-const rewrite = (source: string, over: Record<string, unknown> = {}): string =>
+const rewrite = (
+  source: string,
+  over: Partial<Parameters<typeof rewriteRelativeImages>[0]> = {}
+): string =>
   rewriteRelativeImages({
     projectRoot: root,
     source,

@@ -8,6 +8,7 @@ interface TypesenseRecord extends Record<string, unknown> {
   title: string;
   description?: string;
   content?: string;
+  version?: string;
 }
 
 /**
@@ -40,9 +41,20 @@ export const createSearch = (opts: {
           per_page: SEARCH_LIMIT,
           q: query,
           query_by: "title,description,content",
-          // The sync marks `locale` as a facet so an i18n site can scope
-          // hosted results to the active language.
-          ...(options?.locale && { filter_by: `locale:=${options.locale}` }),
+          // The sync marks `locale` and `version` as facets so hosted results
+          // scope to the active language and the viewed docs version (the
+          // current docs upload as "current").
+          ...(() => {
+            const clauses = [
+              ...(options?.locale ? [`locale:=${options.locale}`] : []),
+              ...(options?.version === undefined
+                ? []
+                : [`version:=${options.version || "current"}`]),
+            ];
+            return clauses.length > 0
+              ? { filter_by: clauses.join(" && ") }
+              : {};
+          })(),
         },
         {}
       );
@@ -56,6 +68,10 @@ export const createSearch = (opts: {
         ),
         title: highlight(doc.title, query),
         url: doc.url,
+        // Records store the current docs' version as "current" (hosted
+        // backends treat empty facet values unreliably); the hit contract
+        // uses "".
+        version: doc.version === "current" ? "" : doc.version,
       };
     });
     return { hits, sections: [] };

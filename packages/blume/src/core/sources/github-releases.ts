@@ -136,6 +136,19 @@ const githubHeaders = (): Headers => {
 };
 
 /**
+ * The changelog frontmatter one release lowers to. `title`/`type` are always
+ * assigned (optional only so assignment order can keep the emitted YAML key
+ * order — and so each entry's content hash — stable).
+ */
+interface ChangelogFrontmatter {
+  changelog: { category: string; version: string };
+  date: string;
+  seo?: { description: string };
+  title?: string;
+  type?: string;
+}
+
+/**
  * Lower one release to a staged Markdown entry: the notes become the body,
  * `type: changelog` frontmatter (title/date/version/category) drives the
  * generated `/changelog` timeline and RSS feed, and a summary derived from the
@@ -151,19 +164,25 @@ const releaseToEntry = (release: GithubRelease): SourceEntry => {
   // description (instead of the site-wide fallback) without also rendering the
   // visible lede paragraph a top-level `description` would add.
   const description = releaseDescription(body);
-  const data = {
+  // Assignment order matters: js-yaml serializes keys in insertion order, so
+  // `seo` lands between `date` and `title` exactly as it always has.
+  const data: ChangelogFrontmatter = {
     changelog: { category, version },
     date,
-    ...(description ? { seo: { description } } : {}),
-    title,
-    type: "changelog",
   };
+  if (description) {
+    data.seo = { description };
+  }
+  data.title = title;
+  data.type = "changelog";
   const raw = matter.stringify(`${body}\n`, data);
   const fallbackRef = `release-${release.id}`;
   const ref = `${slugifyTag(release.tag_name) || fallbackRef}.md`;
   return {
     body: { format: "md", text: body },
-    data,
+    // Spread: `SourceEntry.data` is an open dictionary, which the interface
+    // (no index signature) only satisfies as a fresh object literal.
+    data: { ...data },
     editUrl: release.html_url,
     hash: hashText(raw),
     lastModified: date,
@@ -199,6 +218,8 @@ export const githubReleasesSource = (
     if (!res.ok) {
       throw new Error(`${url} -> ${res.status}`);
     }
+    // SAFETY: GitHub's releases endpoint returns a JSON array of release
+    // objects; `GithubRelease` models only the fields the adapter reads.
     return (await res.json()) as GithubRelease[];
   };
 
@@ -238,6 +259,8 @@ export const githubReleasesSource = (
       // repo), degrade to an empty changelog with a warning rather than failing
       // the whole build.
       snapshot = new Map();
+      // SAFETY: everything thrown on this path is an Error — fetch rejects
+      // with a TypeError, fetchPage and loadWithCache throw Error instances.
       return {
         diagnostics: [
           {

@@ -8,6 +8,7 @@ import { i18nChecks } from "../src/audit/checks/i18n.ts";
 import { sitemapChecks } from "../src/audit/checks/sitemap.ts";
 import { crawlStaticDir, parseLlms, parseSitemap } from "../src/audit/crawl.ts";
 import { pageSite } from "../src/audit/locate.ts";
+import type { AuditContext, CheckModule } from "../src/audit/types.ts";
 import { resolveHref } from "../src/audit/url.ts";
 import type { BlumeManifest, Diagnostic } from "../src/core/types.ts";
 import { codes, context, snapshot } from "./audit-support.ts";
@@ -35,8 +36,16 @@ const build = async (files: Record<string, string>): Promise<string> => {
   return root;
 };
 
+// SAFETY: the crawl reads only `routes` off the manifest, so the fixture can
+// omit the other manifest fields.
 const manifest = (routes: BlumeManifest["routes"]): BlumeManifest =>
   ({ routes }) as BlumeManifest;
+
+// SAFETY: the crawl's route join reads only `path` and `sourcePath`, so the
+// fixture can omit the other route-entry fields.
+const route = (path: string, sourcePath: string): BlumeManifest["routes"] => [
+  { path, sourcePath } as BlumeManifest["routes"][number],
+];
 
 const page = (title: string, body = "") =>
   `<!doctype html><html lang="en"><head><title>${title}</title></head><body><main>${body}</main></body></html>`;
@@ -105,9 +114,7 @@ describe("crawlStaticDir", () => {
     const dir = await build({ "docs/api/index.html": page("API") });
     const result = await crawlStaticDir({
       basePath: "",
-      manifest: manifest([
-        { path: "/docs/api", sourcePath: "/src/docs/api.mdx" },
-      ] as BlumeManifest["routes"]),
+      manifest: manifest(route("/docs/api", "/src/docs/api.mdx")),
       staticDir: dir,
     });
     expect(result.pages[0]?.source).toBe("/src/docs/api.mdx");
@@ -117,9 +124,7 @@ describe("crawlStaticDir", () => {
     const dir = await build({ "guide/index.html": page("Guide") });
     const result = await crawlStaticDir({
       basePath: "/docs",
-      manifest: manifest([
-        { path: "/docs/guide", sourcePath: "/src/guide.mdx" },
-      ] as BlumeManifest["routes"]),
+      manifest: manifest(route("/docs/guide", "/src/guide.mdx")),
       staticDir: dir,
     });
     expect(result.pages[0]?.source).toBe("/src/guide.mdx");
@@ -242,8 +247,9 @@ describe("pageSite", () => {
   });
 });
 
-const run = (module: { run: (c: never) => unknown }, ctx: unknown): string[] =>
-  codes(module.run(ctx as never) as Diagnostic[]);
+// SAFETY: the static-tier checks exercised here all return synchronously.
+const run = (module: CheckModule, ctx: AuditContext): string[] =>
+  codes(module.run(ctx) as Diagnostic[]);
 
 describe("uncommon branches", () => {
   it("ignores a malformed absolute href", () => {

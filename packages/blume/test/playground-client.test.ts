@@ -2,7 +2,14 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { initPlayground } from "../src/components/openapi/playground-client.ts";
 import type { PlaygroundModel } from "../src/components/openapi/request.ts";
-import { el, fire, installFakeDom, must, storage } from "./fake-dom.ts";
+import {
+  asElement,
+  el,
+  fire,
+  installFakeDom,
+  must,
+  storage,
+} from "./fake-dom.ts";
 import type { FakeEl } from "./fake-dom.ts";
 
 /**
@@ -184,10 +191,12 @@ const createFixture = (model: PlaygroundModel, proxy?: string): Fixture => {
   // Unknown language id: the client must skip it.
   const weird = el("div", { "data-sample-lang": "weird" });
 
-  const root = el("blume-playground", {
-    "data-storage-key": STORAGE_KEY,
-    ...(proxy ? { "data-proxy": proxy } : {}),
-  });
+  const root = el(
+    "blume-playground",
+    proxy
+      ? { "data-proxy": proxy, "data-storage-key": STORAGE_KEY }
+      : { "data-storage-key": STORAGE_KEY }
+  );
   root.append(
     el(
       "script",
@@ -270,7 +279,7 @@ const createFixture = (model: PlaygroundModel, proxy?: string): Fixture => {
 };
 
 const init = (fixture: Fixture): void =>
-  initPlayground(fixture.root as unknown as HTMLElement);
+  initPlayground(asElement(fixture.root));
 
 /** Dispatch the delegated edit event the client listens for on the root. */
 const edit = (fixture: Fixture, target: FakeEl, type = "input"): void => {
@@ -344,10 +353,13 @@ describe("flat body assembly", () => {
     expect(must(fetchCalls[0]).url).toBe("https://api.example.com/pets");
     expect(must(fetchCalls[0]).init.method).toBe("POST");
     expect(
+      // SAFETY: the client assembles `init.headers` as a plain string-keyed
+      // object literal, never a `Headers` instance or entry array.
       (must(fetchCalls[0]).init.headers as Record<string, string>)[
         "Content-Type"
       ]
     ).toBe("application/json");
+    // SAFETY: a flat-fields body is always JSON.stringify output — a string.
     expect(JSON.parse(must(fetchCalls[0]).init.body as string)).toEqual({
       age: 3,
       good: true,
@@ -362,6 +374,7 @@ describe("flat body assembly", () => {
     must(fixture.fields.age).value = "many";
     must(fixture.fields.good).value = "maybe";
     await clickSend(fixture);
+    // SAFETY: a flat-fields body is always JSON.stringify output — a string.
     expect(JSON.parse(must(fetchCalls[0]).init.body as string)).toEqual({
       age: "many",
       good: "maybe",
@@ -380,6 +393,7 @@ describe("flat body assembly", () => {
     const fixture = createFixture(model);
     init(fixture);
     await clickSend(fixture);
+    // SAFETY: a flat-fields body is always JSON.stringify output — a string.
     expect(JSON.parse(must(fetchCalls[0]).init.body as string)).toEqual({
       age: "",
       good: "",
@@ -605,9 +619,7 @@ describe("remember on this device", () => {
 
 describe("degenerate DOM", () => {
   it("does nothing without the model script", () => {
-    expect(() =>
-      initPlayground(el("div") as unknown as HTMLElement)
-    ).not.toThrow();
+    expect(() => initPlayground(asElement(el("div")))).not.toThrow();
   });
 
   it("tolerates a panel with no inputs, no response region, no wrapper", async () => {
@@ -621,7 +633,7 @@ describe("degenerate DOM", () => {
     );
     const sendButton = el("button", { "data-send": "" });
     root.append(sendButton);
-    initPlayground(root as unknown as HTMLElement);
+    initPlayground(asElement(root));
 
     // Non-element event targets are ignored; element targets sync harmlessly.
     fire(root, "input", {});

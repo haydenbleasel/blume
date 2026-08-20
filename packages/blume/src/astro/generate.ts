@@ -62,7 +62,7 @@ import {
   examplesEntryTemplate,
   tailwindEntryTemplate,
 } from "../theme/entry.ts";
-import { buildFontsCss, configuredCssVars } from "../theme/fonts.ts";
+import { buildFontsCss, configuredFonts } from "../theme/fonts.ts";
 import { buildThemeCss } from "../theme/palette.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
 import { planComponentSlots } from "./component-slots.ts";
@@ -491,12 +491,14 @@ export const ensureDepsLink = async (
  * (`<build.server>/.prerender/`) output — so it fires for exactly that build.
  * Inert in dev, where there is no build and `writeBundle` never runs.
  */
-export const prerenderDepsPlugin = (
-  pkgDir: string = packageRoot()
-): {
+export interface PrerenderDepsPlugin {
   name: string;
   writeBundle: (options: { dir?: string }) => Promise<void>;
-} => ({
+}
+
+export const prerenderDepsPlugin = (
+  pkgDir: string = packageRoot()
+): PrerenderDepsPlugin => ({
   name: "blume:prerender-deps",
   writeBundle: async (options) => {
     if (!options.dir || basename(options.dir) !== ".prerender") {
@@ -530,14 +532,16 @@ interface ServerAppResolveContext {
  * Stripping the spurious `.js` and delegating back to Astro's resolver lets the
  * reload complete cleanly, so the renamed route resolves without a restart.
  */
-export const serverAppResolvePlugin = (): {
+export interface ServerAppResolvePlugin {
   enforce: "pre";
   name: string;
   resolveId: (
     this: ServerAppResolveContext,
     id: string
   ) => Promise<string | null>;
-} => ({
+}
+
+export const serverAppResolvePlugin = (): ServerAppResolvePlugin => ({
   enforce: "pre",
   name: "blume:server-app-resolve",
   async resolveId(id) {
@@ -550,20 +554,20 @@ export const serverAppResolvePlugin = (): {
 });
 
 /** Astro integration package each non-React island framework needs installed. */
-const ISLAND_FRAMEWORK_DEPS: Record<string, string> = {
-  svelte: "@astrojs/svelte",
-  vue: "@astrojs/vue",
-};
+const ISLAND_FRAMEWORK_DEPS = new Map([
+  ["svelte", "@astrojs/svelte"],
+  ["vue", "@astrojs/vue"],
+]);
 
 /**
  * Adapter package the project must install itself for each deployment
  * platform whose adapter Blume doesn't ship. Node and Vercel ship with Blume,
  * so they never need this.
  */
-const DEPLOYMENT_ADAPTER_DEPS: Record<string, string> = {
-  cloudflare: "@astrojs/cloudflare",
-  netlify: "@astrojs/netlify",
-};
+const DEPLOYMENT_ADAPTER_DEPS = new Map([
+  ["cloudflare", "@astrojs/cloudflare"],
+  ["netlify", "@astrojs/netlify"],
+]);
 
 /**
  * Warn when a Vue/Svelte island is present but its Astro integration isn't
@@ -576,7 +580,7 @@ const islandFrameworkWarnings = (
 ): string[] => {
   const warnings: string[] = [];
   for (const framework of frameworks) {
-    const dep = ISLAND_FRAMEWORK_DEPS[framework];
+    const dep = ISLAND_FRAMEWORK_DEPS.get(framework);
     if (dep && !canResolveFrom(root, dep)) {
       warnings.push(
         `Islands use ${framework}, which needs "${dep}". Install it (e.g. \`npm install ${dep} ${framework}\`).`
@@ -601,7 +605,7 @@ const deploymentAdapterWarnings = (
 ): string[] => {
   const dep =
     deployment.output === "server" && deployment.adapter
-      ? DEPLOYMENT_ADAPTER_DEPS[deployment.adapter]
+      ? DEPLOYMENT_ADAPTER_DEPS.get(deployment.adapter)
       : undefined;
   if (
     dep &&
@@ -908,6 +912,10 @@ const readLogoSvg = (
   return file ? readFileSync(file, "utf-8") : undefined;
 };
 
+/** Narrows a config union's string shorthand from its object form. */
+const isStringShorthand = <T>(value: T | string): value is string =>
+  typeof value === "string";
+
 /**
  * Resolve the configured logo. A single SVG is read and inlined so a
  * `currentColor` logo follows the theme; other images keep their URL for an
@@ -918,12 +926,12 @@ const resolveLogo = (project: BlumeProject): BlumeLogo | null => {
   if (!logo) {
     return null;
   }
-  const config = typeof logo === "string" ? { image: logo } : logo;
+  const config = isStringShorthand(logo) ? { image: logo } : logo;
   // `text` is passed through verbatim: `undefined` lets the brand fall back to
   // the site title, `""` renders the mark alone (a logo with the wordmark baked
   // in).
   const { href, image: source, text } = config;
-  const image = typeof source === "string" ? { light: source } : source;
+  const image = isStringShorthand(source) ? { light: source } : source;
   const light = image?.light ?? image?.dark;
   const dark = image?.dark ?? image?.light;
   const alt = image?.alt ?? "";
@@ -958,27 +966,45 @@ const FAVICON_CANDIDATES = [
   "icon.ico",
 ];
 
+/**
+ * Derive the `-dark` sibling of an icon filename (`icon.svg` → `icon-dark.svg`),
+ * inserting the suffix before the extension.
+ */
+const darkSibling = (name: string): string =>
+  name.replace(/\.(?=[^.]+$)/u, "-dark.");
+
 /** `<link type>` MIME for the favicon extensions we recognize. */
-const FAVICON_TYPES: Record<string, string> = {
-  ico: "image/x-icon",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  png: "image/png",
-  svg: "image/svg+xml",
-};
+const FAVICON_TYPES = new Map([
+  ["ico", "image/x-icon"],
+  ["jpeg", "image/jpeg"],
+  ["jpg", "image/jpeg"],
+  ["png", "image/png"],
+  ["svg", "image/svg+xml"],
+]);
 
 /** Infer the `<link type>` MIME from a filename, when we recognize the extension. */
 const faviconType = (name: string): string | undefined => {
   const ext = name.split(".").pop()?.toLowerCase();
-  return ext ? FAVICON_TYPES[ext] : undefined;
+  return ext ? FAVICON_TYPES.get(ext) : undefined;
 };
 
 /** Read a file and encode it as a `data:` URI of the given MIME type. */
 const inlineDataUri = (file: string, type: string): string =>
   `data:${type};base64,${readFileSync(file).toString("base64")}`;
 
-/** The bundled Blume favicon, inlined as a data URI so it needs no public file. */
+/**
+ * The bundled Blume favicon, inlined as a data URI so it needs no public file.
+ * The mark is dark, so it ships with a light-on-transparent dark-scheme variant —
+ * otherwise it disappears against dark browser chrome.
+ */
 const defaultFavicon = (): BlumeFavicon => ({
+  dark: {
+    href: inlineDataUri(
+      join(BLUME_SRC, "assets", "icon-dark.png"),
+      "image/png"
+    ),
+    type: "image/png",
+  },
   href: inlineDataUri(join(BLUME_SRC, "assets", "icon.png"), "image/png"),
   type: "image/png",
 });
@@ -1023,16 +1049,52 @@ const resolveIconFile = (
 
 /**
  * Resolve the site favicon by convention, falling back to the bundled Blume mark
- * when the project ships no `icon.*`/`favicon.*` file.
+ * when the project ships no `icon.*`/`favicon.*` file. The dark-scheme variant
+ * is anchored to the resolved icon: its `-dark` sibling (e.g. `icon.svg` →
+ * `icon-dark.svg`) in the same directory — never an unrelated `-dark` file, so a
+ * stale or foreign `favicon-dark.*` can't silently pair with a different mark.
+ * A `-dark` file with no light sibling is the site's only mark and is used for
+ * both schemes, mirroring how `resolveLogo` treats a single-variant image.
  */
-const resolveFavicon = (project: BlumeProject): BlumeFavicon =>
-  resolveIconFile(project, FAVICON_CANDIDATES) ?? defaultFavicon();
+const resolveFavicon = (project: BlumeProject): BlumeFavicon => {
+  const { root } = project.context;
+  for (const name of FAVICON_CANDIDATES) {
+    if (existsSync(join(root, "public", name))) {
+      const type = faviconType(name);
+      const sibling = darkSibling(name);
+      return existsSync(join(root, "public", sibling))
+        ? { dark: { href: `/${sibling}`, type }, href: `/${name}`, type }
+        : { href: `/${name}`, type };
+    }
+  }
+  for (const name of FAVICON_CANDIDATES) {
+    const file = join(root, name);
+    if (existsSync(file)) {
+      const type = faviconType(name);
+      const mime = type ?? "image/x-icon";
+      const siblingFile = join(root, darkSibling(name));
+      return existsSync(siblingFile)
+        ? {
+            dark: { href: inlineDataUri(siblingFile, mime), type },
+            href: inlineDataUri(file, mime),
+            type,
+          }
+        : { href: inlineDataUri(file, mime), type };
+    }
+  }
+  return (
+    resolveIconFile(project, FAVICON_CANDIDATES.map(darkSibling)) ??
+    defaultFavicon()
+  );
+};
 
 /**
  * Resolve the Apple touch icon by convention, or null when the project ships
  * none (unlike the favicon, there's no bundled default). Note: iOS ignores
  * `data:`-URI apple-touch-icons, so a `public/` file (served by URL) is the
  * reliable path; a root-level file is still inlined for symmetry with favicons.
+ * Deliberately no `-dark` sibling detection here: iOS ignores `media` on
+ * `apple-touch-icon` links, so a dark variant could never be served.
  */
 const resolveAppleIcon = (project: BlumeProject): BlumeFavicon | null =>
   resolveIconFile(project, APPLE_ICON_CANDIDATES);
@@ -1043,7 +1105,7 @@ const resolveBanner = (config: ResolvedConfig): BlumeBanner | null => {
   if (!banner) {
     return null;
   }
-  if (typeof banner === "string") {
+  if (isStringShorthand(banner)) {
     return { content: banner, dismissible: false, key: banner };
   }
   return {
@@ -1236,6 +1298,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       theme: config.theme,
       title: config.title,
       toc: config.toc,
+      versions: config.versions ?? null,
       webmcp: {
         enabled: config.ai.webmcp,
         llms: config.ai.llmsTxt.enabled,
@@ -1248,10 +1311,23 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     })),
     // CSS variables for Astro's <Font> component; matches the astro.config
     // `fonts:` entries derived from the same theme.fonts config.
-    fontCssVars: configuredCssVars(config.theme.fonts),
+    fontCssVars: configuredFonts(config.theme.fonts),
     navigation: withRepoUrl(graph.navigation),
     // Per-locale navigation; the catch-all selects the active locale's tree.
     navigationByLocale,
+    // Per-archived-version navigation; the catch-all selects by the route's
+    // version, then locale.
+    navigationByVersion: Object.fromEntries(
+      Object.entries(graph.navigationByVersion).map(([id, byLocale]) => [
+        id,
+        Object.fromEntries(
+          Object.entries(byLocale).map(([code, nav]) => [
+            code,
+            withRepoUrl(nav),
+          ])
+        ),
+      ])
+    ),
     routes: manifest.routes.map((route) => ({
       alternates: route.alternates,
       collection: route.collection,
@@ -1266,6 +1342,8 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       locale: route.locale,
       path: route.path,
       title: route.title,
+      version: route.version,
+      versionAlternates: route.versionAlternates,
     })),
     // Default-locale chrome strings (English baseline when not under i18n).
     ui: defaultUi,
@@ -1380,10 +1458,7 @@ const writeMcpFiles = async (
  * because Astro treats `_`-prefixed page files as private; the endpoint's own
  * `prerender = false` export wins over the injection default.
  */
-const planPlaygroundProxy = (
-  config: ResolvedConfig,
-  srcDir: string
-): { enabled: boolean; entrypoint: string; pattern: string } => ({
+const planPlaygroundProxy = (config: ResolvedConfig, srcDir: string) => ({
   enabled:
     config.openapi.enabled &&
     config.openapi.renderer === "blume" &&
@@ -1407,6 +1482,9 @@ const planPlaygroundProxy = (
 const specOrigins = (data: OpenApiData): string[] => {
   const origins = new Set<string>();
   for (const spec of Object.values(data)) {
+    // SAFETY: `document` is arbitrary parsed JSON; the assertion only names
+    // the optional `servers` shape, and every access below re-checks it —
+    // `Array.isArray(servers)` guards the list and `server.url ?? ""` the url.
     const { servers } = spec.document as { servers?: { url?: string }[] };
     for (const server of Array.isArray(servers) ? servers : []) {
       try {
@@ -1442,7 +1520,10 @@ const writeAskFiles = async (
   }
   await write(
     join(srcDir, "pages", "api", "ask.ts"),
-    askEndpointTemplate(resolveAskBackend(ask), grounded, ask.instructions)
+    askEndpointTemplate(resolveAskBackend(ask), grounded, {
+      instructions: ask.instructions,
+      retrieval: ask.retrieval,
+    })
   );
 };
 
@@ -1649,6 +1730,11 @@ export const generateRuntime = async (
   // private and filtered out anyway, but the intent is the user's pages.
   const ogRoutes = customOgRoutes(pages, config.title, config.seo.og.titles);
 
+  // Whether the generated `/changelog` index exists — shared by the OG endpoint
+  // (which adds the index's own card) and the page write below. Computed here,
+  // before the MCP discovery pages are appended, on the user's own pages.
+  const changelogIndex = hasGeneratedChangelog(project, pages);
+
   // The hosted MCP server. The `.well-known` discovery docs are injected as
   // prerendered routes alongside user pages; the server endpoint itself is a
   // normal (server-rendered) page written by `writeMcpFiles`.
@@ -1827,12 +1913,12 @@ export const generateRuntime = async (
   if (config.seo.og.enabled) {
     await write(
       join(srcDir, "pages", "og", "[...slug].png.ts"),
-      ogEndpointTemplate(ogRoutes, projectOgFonts(project))
+      ogEndpointTemplate(ogRoutes, projectOgFonts(project), changelogIndex)
     );
   }
 
   // Changelog index (`/changelog`), rendered through the Update timeline layout.
-  if (hasGeneratedChangelog(project, pages)) {
+  if (changelogIndex) {
     await write(
       join(srcDir, "pages", "changelog.astro"),
       changelogIndexTemplate({
@@ -1953,7 +2039,7 @@ export const generateRuntime = async (
     ...pages.map((page) => page.pattern),
     ...referenceRoutes(config),
   ]);
-  if (hasGeneratedChangelog(project, pages)) {
+  if (changelogIndex) {
     navTargetRoutes.add("/changelog");
   }
   // Curated `search.popular` icons live outside the navigation model, so they

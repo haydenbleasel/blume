@@ -23,6 +23,8 @@ const FALLBACK_NODE_RANGE = ">=22.12.0";
  * doctor can never drift from what the package actually declares. */
 const supportedNodeRange = (): string => {
   try {
+    // SAFETY: this parses blume's own package.json; the optional fields cover
+    // an `engines` block going missing, and a bad read falls to the catch.
     const pkg = JSON.parse(
       readFileSync(join(packageRoot(), "package.json"), "utf-8")
     ) as { engines?: { node?: string } };

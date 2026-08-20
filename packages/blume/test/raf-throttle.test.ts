@@ -17,10 +17,10 @@ const pumpFrame = (): void => {
 };
 
 beforeAll(() => {
-  globalThis.requestAnimationFrame = ((frame: FrameRequestCallback) => {
+  globalThis.requestAnimationFrame = (frame: FrameRequestCallback) => {
     frames.push(frame);
     return frames.length;
-  }) as typeof requestAnimationFrame;
+  };
 });
 
 afterAll(() => {

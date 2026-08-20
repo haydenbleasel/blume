@@ -705,6 +705,96 @@ describe("buildRuntimeData", () => {
     });
   });
 
+  it("pairs a public dark favicon with the light one", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "docs/index.md": "# Home\n",
+        "public/favicon-dark.svg": "<svg></svg>",
+        "public/favicon.svg": "<svg></svg>",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.favicon).toEqual({
+      dark: { href: "/favicon-dark.svg", type: "image/svg+xml" },
+      href: "/favicon.svg",
+      type: "image/svg+xml",
+    });
+  });
+
+  it("ignores a dark file that is not a sibling of the resolved icon", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "docs/index.md": "# Home\n",
+        "public/favicon-dark.png": "FAKEPNG",
+        "public/icon.svg": "<svg></svg>",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.favicon).toEqual({
+      href: "/icon.svg",
+      type: "image/svg+xml",
+    });
+  });
+
+  it("pairs a root dark favicon sibling as inline data uris", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "docs/index.md": "# Home\n",
+        "icon-dark.png": "FAKEDARKPNG",
+        "icon.png": "FAKEPNG",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.favicon.href.startsWith("data:image/png;base64,")).toBe(
+      true
+    );
+    expect(
+      data.config.favicon.dark.href.startsWith("data:image/png;base64,")
+    ).toBe(true);
+    expect(data.config.favicon.dark.href).not.toBe(data.config.favicon.href);
+  });
+
+  it("uses a dark-only favicon for both schemes", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "docs/index.md": "# Home\n",
+        "public/icon-dark.svg": "<svg></svg>",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.favicon).toEqual({
+      href: "/icon-dark.svg",
+      type: "image/svg+xml",
+    });
+  });
+
+  it("emits no dark variant when the project ships only a light icon", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "docs/index.md": "# Home\n",
+        "public/icon.svg": "<svg></svg>",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.favicon.dark).toBeUndefined();
+  });
+
+  it("falls back to the bundled light/dark favicon pair", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.favicon.href.startsWith("data:image/png;base64,")).toBe(
+      true
+    );
+    expect(
+      data.config.favicon.dark.href.startsWith("data:image/png;base64,")
+    ).toBe(true);
+    expect(data.config.favicon.dark.href).not.toBe(data.config.favicon.href);
+  });
+
   it("references a public apple touch icon by url", async () => {
     const project = await scanProject(
       await writeProject({
@@ -759,7 +849,7 @@ describe("buildRuntimeData", () => {
   });
 });
 
-const KITCHEN_SINK: Record<string, string> = {
+const KITCHEN_SINK = {
   "blume.config.ts": `export default {
   ai: { ask: { enabled: true }, mcp: { enabled: true } },
   deployment: { site: "https://example.com" },
@@ -1342,7 +1432,10 @@ describe("ensureDepsLink version-less conflict", () => {
 });
 
 describe("resolveReactCompiler", () => {
+  // SAFETY: resolveReactCompiler reads only `react.compiler`, so this partial
+  // config is all it needs.
   const compilerOn = { react: { compiler: true } } as ResolvedConfig;
+  // SAFETY: same partial-config shortcut as `compilerOn`.
   const compilerOff = { react: { compiler: false } } as ResolvedConfig;
 
   it("resolves Blume's shipped babel plugin as an absolute path", () => {
@@ -1365,6 +1458,8 @@ describe("resolveReactCompiler", () => {
 });
 
 describe("reactCompilerWarnings", () => {
+  // SAFETY: reactCompilerWarnings reads only `react.compiler`, so this partial
+  // config is all it needs.
   const compilerOn = { react: { compiler: true } } as ResolvedConfig;
 
   it("warns when the compiler was requested but its plugin is missing", () => {
@@ -1414,8 +1509,12 @@ describe("diagnosticWarning", () => {
 
 // A parsed (schema-defaulted) `ai.ask` block, the shape askProviderWarnings
 // receives from the resolved config.
-const parsedAsk = (ask: Record<string, unknown>) =>
-  blumeConfigSchema.parse({ ai: { ask } }).ai.ask;
+const parsedAsk = (ask: {
+  baseUrl?: string;
+  enabled: boolean;
+  endpoint?: string;
+  provider?: string;
+}) => blumeConfigSchema.parse({ ai: { ask } }).ai.ask;
 
 describe("generateRuntime preflight and write failures", () => {
   it("warns when the search provider's SDK isn't installed anywhere", () => {

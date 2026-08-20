@@ -60,16 +60,20 @@ const DATA: McpData = {
       description: "How to install Blume",
       indexable: true,
       lastModified: null,
+      locale: "en",
       route: "/guides/install",
       title: "Installation",
+      version: "",
     },
     {
       contentType: "doc",
       description: "Configuration reference",
       indexable: true,
       lastModified: null,
+      locale: "en",
       route: "/guides/config",
       title: "Configuration",
+      version: "",
     },
   ],
   site: "https://docs.example.com",
@@ -78,7 +82,30 @@ const DATA: McpData = {
 
 const handler = createMcpFetchHandler(DATA);
 
-const post = (method: string, params?: unknown): Promise<Response> =>
+/** Every argument shape the registered tools accept. */
+interface ToolArguments {
+  contentTypes?: string[];
+  filters?: Record<string, string>;
+  limit?: number;
+  query?: string;
+  route?: string;
+}
+
+interface RpcParams {
+  arguments?: ToolArguments;
+  name: string;
+}
+
+interface RpcBody {
+  error?: { message: string };
+  result?: {
+    content?: { text: string }[];
+    isError?: boolean;
+    tools?: { name: string }[];
+  };
+}
+
+const post = (method: string, params?: RpcParams): Promise<Response> =>
   handler(
     new Request("https://docs.example.com/mcp", {
       body: JSON.stringify({ id: 1, jsonrpc: "2.0", method, params }),
@@ -90,17 +117,15 @@ const post = (method: string, params?: unknown): Promise<Response> =>
     })
   );
 
-const rpc = async (method: string, params?: unknown) => {
+const rpc = async (method: string, params?: RpcParams): Promise<RpcBody> => {
   const response = await post(method, params);
-  return (await response.json()) as {
-    error?: { message: string };
-    result?: Record<string, unknown>;
-  };
+  const body: RpcBody = await response.json();
+  return body;
 };
 
-const callTool = async (name: string, args?: Record<string, unknown>) => {
+const callTool = async (name: string, args?: ToolArguments) => {
   const body = await rpc("tools/call", { arguments: args, name });
-  const content = body.result?.content as { text: string }[] | undefined;
+  const content = body.result?.content;
   return {
     isError: body.result?.isError === true,
     text: content?.[0]?.text ?? "",
@@ -125,7 +150,7 @@ describe("createMcpFetchHandler transport", () => {
 
   it("lists every registered tool", async () => {
     const body = await rpc("tools/list");
-    const tools = (body.result?.tools as { name: string }[]) ?? [];
+    const tools = body.result?.tools ?? [];
     expect(tools.map((tool) => tool.name).toSorted()).toEqual(
       MCP_TOOLS.map((tool) => tool.name).toSorted()
     );
@@ -138,7 +163,7 @@ describe("MCP tools", () => {
       query: "install dev server",
     });
     expect(isError).toBe(false);
-    const hits = JSON.parse(text) as { url: string }[];
+    const hits: { url: string }[] = JSON.parse(text);
     expect(hits[0]?.url).toBe("https://docs.example.com/guides/install");
   });
 
@@ -147,14 +172,15 @@ describe("MCP tools", () => {
       limit: 1,
       query: "blume",
     });
-    expect((JSON.parse(text) as unknown[]).length).toBe(1);
+    const hits: { url: string }[] = JSON.parse(text);
+    expect(hits.length).toBe(1);
   });
 
   it("search_docs includes the base-less route alongside the served URL", async () => {
     const { text } = await callTool("search_docs", {
       query: "install dev server",
     });
-    const hits = JSON.parse(text) as { route: string; url: string }[];
+    const hits: { route: string; url: string }[] = JSON.parse(text);
     // `route` is what `get_page` takes; `url` is where the page is served.
     expect(hits[0]?.route).toBe("/guides/install");
     expect(hits[0]?.url).toBe("https://docs.example.com/guides/install");
@@ -188,12 +214,10 @@ describe("MCP tools", () => {
         method: "POST",
       })
     );
-    const body = (await response.json()) as {
-      result?: { content?: { text: string }[] };
-    };
-    const hits = JSON.parse(body.result?.content?.[0]?.text ?? "[]") as {
-      route: string;
-    }[];
+    const body: RpcBody = await response.json();
+    const hits: { route: string }[] = JSON.parse(
+      body.result?.content?.[0]?.text ?? "[]"
+    );
     expect(hits.map((hit) => hit.route)).toEqual(["/ja/legal"]);
   });
 
@@ -227,7 +251,7 @@ describe("MCP tools", () => {
 
   it("list_pages returns every non-hidden route", async () => {
     const { text } = await callTool("list_pages");
-    const routes = JSON.parse(text) as { route: string }[];
+    const routes: { route: string }[] = JSON.parse(text);
     expect(routes.map((route) => route.route).toSorted()).toEqual([
       "/guides/config",
       "/guides/install",
@@ -257,14 +281,16 @@ describe("MCP content-type filtering", () => {
         facets: { domain: "architecture", status: "enforced" },
         indexable: true,
         lastModified: null,
+        locale: "en",
         route: "/rfcs/schemas",
         title: "Request schemas",
+        version: "",
       },
     ],
   };
   const typedHandler = createMcpFetchHandler(TYPED);
 
-  const callTyped = async (name: string, args?: Record<string, unknown>) => {
+  const callTyped = async (name: string, args?: ToolArguments) => {
     const response = await typedHandler(
       new Request("https://docs.example.com/mcp", {
         body: JSON.stringify({
@@ -280,23 +306,21 @@ describe("MCP content-type filtering", () => {
         method: "POST",
       })
     );
-    const body = (await response.json()) as {
-      result?: { content?: { text: string }[] };
-    };
+    const body: RpcBody = await response.json();
     return body.result?.content?.[0]?.text ?? "";
   };
 
   it("search_docs filters hits to the requested content types", async () => {
-    const rfcs = JSON.parse(
+    const rfcs: { contentType: string; route: string }[] = JSON.parse(
       await callTyped("search_docs", { contentTypes: ["rfc"], query: "blume" })
-    ) as { contentType: string; route: string }[];
+    );
     expect(rfcs.map((hit) => hit.route)).toEqual(["/rfcs/schemas"]);
     // Hits name their type, so an agent can see what it got back.
     expect(rfcs[0]?.contentType).toBe("rfc");
 
-    const docs = JSON.parse(
+    const docs: { route: string }[] = JSON.parse(
       await callTyped("search_docs", { contentTypes: ["doc"], query: "blume" })
-    ) as { route: string }[];
+    );
     expect(docs.map((hit) => hit.route).toSorted()).toEqual([
       "/guides/config",
       "/guides/install",
@@ -304,31 +328,32 @@ describe("MCP content-type filtering", () => {
   });
 
   it("search_docs treats an empty or absent contentTypes as no filter", async () => {
-    const unfiltered = JSON.parse(
+    const unfiltered: { route: string }[] = JSON.parse(
       await callTyped("search_docs", { contentTypes: [], query: "blume" })
-    ) as unknown[];
+    );
     expect(unfiltered.length).toBe(3);
   });
 
   it("list_pages filters routes by content type", async () => {
-    const rfcs = JSON.parse(
+    const rfcs: { route: string }[] = JSON.parse(
       await callTyped("list_pages", { contentTypes: ["rfc"] })
-    ) as { route: string }[];
+    );
     expect(rfcs.map((page) => page.route)).toEqual(["/rfcs/schemas"]);
 
-    const all = JSON.parse(
+    const all: { route: string }[] = JSON.parse(
       await callTyped("list_pages", { contentTypes: ["doc", "rfc"] })
-    ) as unknown[];
+    );
     expect(all.length).toBe(3);
   });
 
   it("search_docs filters hits by declared facet values", async () => {
-    const enforced = JSON.parse(
-      await callTyped("search_docs", {
-        filters: { status: "enforced" },
-        query: "blume",
-      })
-    ) as { facets?: Record<string, string>; route: string }[];
+    const enforced: { facets?: Record<string, string>; route: string }[] =
+      JSON.parse(
+        await callTyped("search_docs", {
+          filters: { status: "enforced" },
+          query: "blume",
+        })
+      );
     expect(enforced.map((hit) => hit.route)).toEqual(["/rfcs/schemas"]);
     // Hits carry their facet values, so an agent sees why a page matched.
     expect(enforced[0]?.facets).toStrictEqual({
@@ -336,22 +361,23 @@ describe("MCP content-type filtering", () => {
       status: "enforced",
     });
 
-    const none = JSON.parse(
+    const none: { route: string }[] = JSON.parse(
       await callTyped("search_docs", {
         filters: { status: "draft" },
         query: "blume",
       })
-    ) as unknown[];
+    );
     expect(none).toEqual([]);
   });
 
   it("list_pages filters routes by facets, composing with contentTypes", async () => {
-    const enforced = JSON.parse(
-      await callTyped("list_pages", {
-        contentTypes: ["rfc"],
-        filters: { domain: "architecture", status: "enforced" },
-      })
-    ) as { facets?: Record<string, string>; route: string }[];
+    const enforced: { facets?: Record<string, string>; route: string }[] =
+      JSON.parse(
+        await callTyped("list_pages", {
+          contentTypes: ["rfc"],
+          filters: { domain: "architecture", status: "enforced" },
+        })
+      );
     expect(enforced.map((page) => page.route)).toEqual(["/rfcs/schemas"]);
     expect(enforced[0]?.facets).toStrictEqual({
       domain: "architecture",
@@ -359,26 +385,26 @@ describe("MCP content-type filtering", () => {
     });
 
     // Pages without facet values never match a facet filter...
-    const none = JSON.parse(
+    const none: { route: string }[] = JSON.parse(
       await callTyped("list_pages", { filters: { status: "draft" } })
-    ) as unknown[];
+    );
     expect(none).toEqual([]);
     // ...and an empty filters object means "no filter".
-    const all = JSON.parse(
+    const all: { route: string }[] = JSON.parse(
       await callTyped("list_pages", { filters: {} })
-    ) as unknown[];
+    );
     expect(all.length).toBe(3);
   });
 
   it("get_navigation returns the navigation tree", async () => {
     const { text } = await callTool("get_navigation");
-    const nav = JSON.parse(text) as { tabs: unknown[] };
+    const nav: { tabs: { label: string; path: string }[] } = JSON.parse(text);
     expect(nav.tabs.length).toBe(1);
   });
 
   it("layers deployment.base into tool URLs (routes are base-less)", async () => {
     const based = createMcpFetchHandler({ ...DATA, base: "/sub" });
-    const call = async (name: string, args?: Record<string, unknown>) => {
+    const call = async (name: string, args?: ToolArguments) => {
       const response = await based(
         new Request("https://docs.example.com/sub/mcp", {
           body: JSON.stringify({
@@ -394,21 +420,19 @@ describe("MCP content-type filtering", () => {
           method: "POST",
         })
       );
-      const body = (await response.json()) as {
-        result?: { content?: { text: string }[] };
-      };
+      const body: RpcBody = await response.json();
       return body.result?.content?.[0]?.text ?? "";
     };
 
-    const pages = JSON.parse(await call("list_pages")) as { url: string }[];
+    const pages: { url: string }[] = JSON.parse(await call("list_pages"));
     expect(pages.map((page) => page.url).toSorted()).toEqual([
       "https://docs.example.com/sub/guides/config",
       "https://docs.example.com/sub/guides/install",
     ]);
 
-    const hits = JSON.parse(
+    const hits: { url: string }[] = JSON.parse(
       await call("search_docs", { query: "install dev server" })
-    ) as { url: string }[];
+    );
     expect(hits[0]?.url).toBe("https://docs.example.com/sub/guides/install");
   });
 
@@ -430,9 +454,7 @@ describe("MCP content-type filtering", () => {
           method: "POST",
         })
       );
-      const body = (await response.json()) as {
-        result?: { content?: { text: string }[]; isError?: boolean };
-      };
+      const body: RpcBody = await response.json();
       return {
         isError: body.result?.isError === true,
         text: body.result?.content?.[0]?.text ?? "",
@@ -502,12 +524,10 @@ describe("search_docs fallback excerpts", () => {
         method: "POST",
       })
     );
-    const body = (await response.json()) as {
-      result?: { content?: { text: string }[] };
-    };
-    const hits = JSON.parse(body.result?.content?.[0]?.text ?? "[]") as {
-      excerpt: string;
-    }[];
+    const body: RpcBody = await response.json();
+    const hits: { excerpt: string }[] = JSON.parse(
+      body.result?.content?.[0]?.text ?? "[]"
+    );
     return hits[0]?.excerpt ?? "missing";
   };
 
@@ -667,6 +687,7 @@ describe("orama index helpers", () => {
       locale: "en",
       route: "/en/start",
       title: "Getting started",
+      version: "",
     },
   ];
 
@@ -698,6 +719,191 @@ describe("orama index helpers", () => {
     // The locale enum filter is unaffected by the custom tokenizer.
     const en = await queryOramaIndex(db, "install", 5, { locale: "en" });
     expect(en.map((doc) => doc.route)).toEqual(["/en/start"]);
+  });
+
+  it("segments spaced non-Latin scripts too", async () => {
+    // Spacing is not what breaks tokenization — Orama's Latin-only delimiter
+    // class is, so these lose every token exactly as Japanese does.
+    const cases = [
+      {
+        content: "Контракт авторизации агента",
+        locale: "ru",
+        term: "авторизации",
+      },
+      {
+        content: "Σύμβαση εξουσιοδότησης πράκτορα",
+        locale: "el",
+        term: "εξουσιοδότησης",
+      },
+      { content: "חוזה הרשאה לסוכן", locale: "he", term: "הרשאה" },
+      { content: "एजेंट प्राधिकरण अनुबंध", locale: "hi", term: "प्राधिकरण" },
+    ];
+    const found = await Promise.all(
+      cases.map(async ({ content, locale, term }) => {
+        const doc = {
+          content,
+          description: "",
+          locale,
+          route: "/x",
+          title: "X",
+        };
+        const unsegmented = await buildOramaIndex([doc]);
+        const segmented = await buildOramaIndex([doc], locale);
+        const before = await queryOramaIndex(unsegmented, term, 5);
+        const after = await queryOramaIndex(segmented, term, 5);
+        return [before.length, after.length];
+      })
+    );
+    expect(found).toEqual([
+      [0, 1],
+      [0, 1],
+      [0, 1],
+      [0, 1],
+    ]);
+  });
+
+  it("keeps Orama's tokenizer for Latin-script locales, including by script subtag", async () => {
+    // The script, not the language, decides: Serbian in Latin script stays on
+    // the default tokenizer, and Azerbaijani in Cyrillic is segmented.
+    const latin = await buildOramaIndex(
+      [
+        {
+          content: "Ugovor o autorizaciji",
+          description: "",
+          locale: "sr-Latn",
+          route: "/sr",
+          title: "X",
+        },
+      ],
+      "sr-Latn"
+    );
+    expect(latin.tokenizer?.language).toBe("english");
+    const latinHits = await queryOramaIndex(latin, "autorizaciji", 5);
+    expect(latinHits.length).toBe(1);
+
+    const cyrillic = await buildOramaIndex(
+      [
+        {
+          content: "Мүгавилә сәлаһијјәт",
+          description: "",
+          locale: "az-Cyrl",
+          route: "/az",
+          title: "X",
+        },
+      ],
+      "az-Cyrl"
+    );
+    expect(cyrillic.tokenizer?.language).toBe("az");
+    const cyrillicHits = await queryOramaIndex(cyrillic, "сәлаһијјәт", 5);
+    expect(cyrillicHits.length).toBe(1);
+  });
+
+  it("falls back to Orama's tokenizer for locales ICU resolves no script for", async () => {
+    // A well-formed tag ICU knows nothing about resolves to no script; a
+    // malformed tag throws but its primary subtag parses; a tag whose primary
+    // subtag is itself unparseable throws twice. None may break search.
+    const doc = {
+      content: "Authorization contract",
+      description: "",
+      locale: "en",
+      route: "/x",
+      title: "X",
+    };
+    const unknown = await buildOramaIndex([doc], "xx");
+    const malformed = await buildOramaIndex([doc], "not a locale");
+    const unparseable = await buildOramaIndex([doc], "€");
+    const hits = await Promise.all([
+      queryOramaIndex(unknown, "authorization", 5),
+      queryOramaIndex(malformed, "authorization", 5),
+      queryOramaIndex(unparseable, "authorization", 5),
+    ]);
+    expect(hits.map((found) => found.length)).toEqual([1, 1, 1]);
+  });
+
+  it("segments legacy POSIX and extlang locale tags by their language subtag", async () => {
+    // `ja_JP.UTF-8`-style tags copied from environment config and extlang
+    // forms like `zh-cmn-Hans` throw inside `Intl.Locale`, but the primary
+    // language subtag still resolves the script — these sites segmented
+    // before the script-based gate and must keep doing so.
+    const ja = {
+      content: "検索設定を変更します。",
+      description: "",
+      locale: "ja",
+      route: "/ja",
+      title: "X",
+    };
+    const zh = {
+      content: "修改搜索设置。",
+      description: "",
+      locale: "zh",
+      route: "/zh",
+      title: "X",
+    };
+    const posix = await buildOramaIndex([ja], "ja_JP.UTF-8");
+    expect(posix.tokenizer?.language).toBe("ja");
+    const posixHits = await queryOramaIndex(posix, "検索", 5);
+    expect(posixHits.length).toBe(1);
+    const extlang = await buildOramaIndex([zh], "zh-cmn-Hans");
+    expect(extlang.tokenizer?.language).toBe("zh");
+    const extlangHits = await queryOramaIndex(extlang, "搜索", 5);
+    expect(extlangHits.length).toBe(1);
+  });
+
+  it("bigrams Han-script languages beyond ja and zh, like Cantonese", async () => {
+    // The writing system, not the language subtag, carries the compound
+    // convention: `yue` maximizes to Hant and needs bigrams — and the strict
+    // query pass — the same way `zh` does. The fragments page shares the
+    // compound's parts but not its bigram windows, so the strict pass keeps
+    // it out entirely.
+    const fragments = {
+      content: "資金 決済 法",
+      description: "",
+      locale: "yue",
+      route: "/fragments",
+      title: "X",
+    };
+    const compound = {
+      content: "資金決済法の適用範囲",
+      description: "",
+      locale: "yue",
+      route: "/compound",
+      title: "X",
+    };
+    const db = await buildOramaIndex([fragments, compound], "yue");
+    expect(db.tokenizer?.language).toBe("yue");
+    const hits = await queryOramaIndex(db, "資金決済法", 5);
+    expect(hits.map((doc) => doc.route)).toEqual(["/compound"]);
+  });
+
+  it("folds Latin diacritics on a segmented index, keeping marks elsewhere", async () => {
+    // Orama's default tokenizer folds café → cafe; the segmenting tokenizer
+    // must not lose that on the Latin loanwords a non-Latin site mixes in.
+    // Marks stay everywhere else — й is not и plus a mark to strip.
+    const docs = [
+      {
+        content: "Встретимся в café",
+        description: "",
+        locale: "ru",
+        route: "/cafe",
+        title: "X",
+      },
+      {
+        content: "йогурт на завтрак",
+        description: "",
+        locale: "ru",
+        route: "/yogurt",
+        title: "X",
+      },
+    ];
+    const db = await buildOramaIndex(docs, "ru");
+    const unaccented = await queryOramaIndex(db, "cafe", 5);
+    expect(unaccented.map((doc) => doc.route)).toEqual(["/cafe"]);
+    const accented = await queryOramaIndex(db, "café", 5);
+    expect(accented.map((doc) => doc.route)).toEqual(["/cafe"]);
+    const stripped = await queryOramaIndex(db, "иогурт", 5);
+    expect(stripped.length).toBe(0);
+    const spelled = await queryOramaIndex(db, "йогурт", 5);
+    expect(spelled.map((doc) => doc.route)).toEqual(["/yogurt"]);
   });
 
   it("segments Chinese, Korean, and Thai content too", async () => {
@@ -1079,6 +1285,8 @@ describe("orama index helpers", () => {
 
   it("falls back to the default tokenizer when Intl.Segmenter is unavailable", async () => {
     // Simulate a runtime without Intl.Segmenter (e.g. Firefox before 125).
+    // SAFETY: widens Segmenter to optional so the test can unset it for the
+    // duration of this test; the finally block restores the original value.
     const intl = Intl as { Segmenter?: typeof Intl.Segmenter };
     const original = intl.Segmenter;
     intl.Segmenter = undefined;
@@ -1104,6 +1312,8 @@ describe("discovery documents", () => {
   };
 
   it("advertises the absolute server URL", () => {
+    // SAFETY: buildMcpDiscovery returns Record<string, unknown>, but always
+    // builds a document with a one-entry `servers` list of `{ url }` objects.
     const discovery = buildMcpDiscovery(input) as {
       servers: { url: string }[];
     };
@@ -1113,6 +1323,8 @@ describe("discovery documents", () => {
   it("keeps a subpath site's base path in the server URL", () => {
     // new URL("/mcp", "https://acme.com/docs") drops the base; concatenation
     // must keep it, matching how llms.txt builds page URLs.
+    // SAFETY: buildMcpDiscovery returns Record<string, unknown>, but always
+    // builds a document with a one-entry `servers` list of `{ url }` objects.
     const discovery = buildMcpDiscovery({
       ...input,
       site: "https://acme.com/docs",
@@ -1121,6 +1333,8 @@ describe("discovery documents", () => {
   });
 
   it("lists the tool set in the server card", () => {
+    // SAFETY: buildMcpServerCard returns Record<string, unknown>, but always
+    // maps MCP_TOOLS into a `tools` list of `{ name }` objects.
     const card = buildMcpServerCard(input) as { tools: { name: string }[] };
     expect(card.tools.map((tool) => tool.name).toSorted()).toEqual(
       MCP_TOOLS.map((tool) => tool.name).toSorted()
@@ -1141,7 +1355,9 @@ describe("discovery documents", () => {
     expect(card.remotes).toEqual([
       { type: "streamable-http", url: "https://docs.example.com/mcp" },
     ]);
-    expect((card.description as string).length).toBeLessThanOrEqual(100);
+    // SAFETY: the card builder always derives `description` from strings.
+    const { description } = card as { description: string };
+    expect(description.length).toBeLessThanOrEqual(100);
   });
 
   it("carries initialize-shaped compat fields for older scanners", () => {
@@ -1180,12 +1396,20 @@ describe("discovery documents", () => {
 
   it("caps card text at the schema's 100-character limit", () => {
     const card = buildMcpServerCard({ ...input, name: "N".repeat(120) });
-    expect((card.description as string).length).toBe(100);
-    expect((card.title as string).length).toBe(100);
-    expect((card.description as string).endsWith("…")).toBe(true);
+    // SAFETY: the card builder always derives `description` and `title` from
+    // strings.
+    const { description, title } = card as {
+      description: string;
+      title: string;
+    };
+    expect(description.length).toBe(100);
+    expect(title.length).toBe(100);
+    expect(description.endsWith("…")).toBe(true);
   });
 
   it("falls back to a relative URL without a site", () => {
+    // SAFETY: buildMcpDiscovery returns Record<string, unknown>, but always
+    // builds a document with a one-entry `servers` list of `{ url }` objects.
     const discovery = buildMcpDiscovery({ ...input, site: null }) as {
       servers: { url: string }[];
     };
@@ -1194,11 +1418,14 @@ describe("discovery documents", () => {
 
   it("layers deployment.base under the advertised URL", () => {
     // The endpoint is a generated Astro page, served under the base.
+    // SAFETY: buildMcpDiscovery returns Record<string, unknown>, but always
+    // builds a document with a one-entry `servers` list of `{ url }` objects.
     const discovery = buildMcpDiscovery({ ...input, base: "/sub" }) as {
       servers: { url: string }[];
     };
     expect(discovery.servers[0]?.url).toBe("https://docs.example.com/sub/mcp");
 
+    // SAFETY: without a site, the card builder always emits a string `url`.
     const card = buildMcpServerCard({
       ...input,
       base: "/sub",
@@ -1291,7 +1518,7 @@ export default { content: { types: { rfc: { facets: ["status"], frontmatter: { s
     expect(data.site).toBe("https://docs.example.com");
     // `deployment.base` is normalized for layering onto base-less routes.
     expect(data.base).toBe("/sub");
-    expect(typeof data.version).toBe("string");
+    expect(data.version).toBeTypeOf("string");
     expect(data.version).toBe(project.manifest.blumeVersion);
 
     // Navigation is passed through from the graph verbatim.
@@ -1314,7 +1541,7 @@ export default { content: { types: { rfc: { facets: ["status"], frontmatter: { s
       title: "Installation",
     });
 
-    // Documents are mapped down to the five MCP fields and skip hidden pages.
+    // Documents are mapped down to the MCP fields and skip hidden pages.
     const doc = data.documents.find(
       (entry) => entry.route === "/guides/install"
     );
@@ -1323,8 +1550,10 @@ export default { content: { types: { rfc: { facets: ["status"], frontmatter: { s
       "content",
       "contentType",
       "description",
+      "locale",
       "route",
       "title",
+      "version",
     ]);
     expect(doc?.contentType).toBe("doc");
     expect(doc?.title).toBe("Installation");

@@ -19,7 +19,7 @@ export interface AgentCli {
 
 export type AgentKind = "claude" | "codex";
 
-export const AGENTS: Record<AgentKind, AgentCli> = {
+export const AGENTS = {
   claude: {
     bin: "claude",
     install: "npm install -g @anthropic-ai/claude-code",
@@ -30,7 +30,7 @@ export const AGENTS: Record<AgentKind, AgentCli> = {
     install: "npm install -g @openai/codex",
     name: "Codex",
   },
-};
+} satisfies Record<AgentKind, AgentCli>;
 
 /**
  * Write the full JSON report where the agent can read it. A file rather than

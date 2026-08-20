@@ -14,8 +14,12 @@ export interface McpRoute {
   facets?: Record<string, string>;
   indexable: boolean;
   lastModified: string | null;
+  /** Resolved locale code (the default locale when not under i18n). */
+  locale: string;
   route: string;
   title: string;
+  /** Docs version (`""` for the current docs). */
+  version: string;
 }
 
 /**
@@ -33,14 +37,25 @@ export interface McpData {
   base: string;
   /**
    * The site's `i18n.defaultLocale`, when i18n is configured. Selects a
-   * word-segmenting Orama tokenizer for languages written without spaces, so
-   * `search_docs` can match CJK/Thai content.
+   * word-segmenting Orama tokenizer for every non-Latin script, so
+   * `search_docs` can match CJK, Cyrillic, Greek, Hebrew, or Devanagari
+   * content.
    */
   defaultLocale?: string;
+  /**
+   * Archived docs version ids, in configured order. Present only on a
+   * versioned site; its presence is what makes `search_docs`/`list_pages`
+   * default to the current docs.
+   */
+  archivedVersions?: string[];
   documents: OramaDoc[];
   instructions?: string;
   name: string;
   navigation: Navigation;
+  /** Per-locale trees for a locale-aware `get_navigation` (i18n sites only). */
+  navigationByLocale?: Record<string, Navigation>;
+  /** Per-archived-version trees, keyed by version id then locale code. */
+  navigationByVersion?: Record<string, Record<string, Navigation>>;
   pages: Record<string, string>;
   routes: McpRoute[];
   site: string | null;
@@ -79,28 +94,40 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
     }
     const page = pageById.get(route.id);
     const facets = page ? pageFacets(page, config) : undefined;
-    routes.push({
+    const entry: McpRoute = {
       contentType: route.contentType,
       description: page?.description,
-      ...(facets ? { facets } : {}),
       indexable: route.indexable,
       lastModified: route.lastModified ?? null,
+      locale: route.locale,
       route: route.path,
       title: route.title,
-    });
+      version: route.version,
+    };
+    if (facets) {
+      entry.facets = facets;
+    }
+    routes.push(entry);
   }
 
-  return {
+  const data: McpData = {
     base: normalizeBasePath(config.deployment.base),
     defaultLocale: config.i18n?.defaultLocale,
-    documents: documents.map((doc) => ({
-      content: doc.content,
-      contentType: doc.contentType,
-      description: doc.description,
-      ...(doc.facets ? { facets: doc.facets } : {}),
-      route: doc.route,
-      title: doc.title,
-    })),
+    documents: documents.map((doc) => {
+      const document: OramaDoc = {
+        content: doc.content,
+        contentType: doc.contentType,
+        description: doc.description,
+        locale: doc.locale,
+        route: doc.route,
+        title: doc.title,
+        version: doc.version,
+      };
+      if (doc.facets) {
+        document.facets = doc.facets;
+      }
+      return document;
+    }),
     instructions: config.ai.mcp.instructions,
     name: config.ai.mcp.name ?? config.title,
     navigation: graph.navigation,
@@ -109,4 +136,14 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
     site: config.deployment.site ?? null,
     version: manifest.blumeVersion,
   };
+  if (config.versions) {
+    data.archivedVersions = config.versions.archived.map(
+      (version) => version.id
+    );
+    data.navigationByVersion = graph.navigationByVersion;
+  }
+  if (config.i18n) {
+    data.navigationByLocale = graph.navigationByLocale;
+  }
+  return data;
 };

@@ -48,6 +48,8 @@ describe("catalog", () => {
   });
 
   it("throws on an id that is not in the catalog", () => {
+    // SAFETY: deliberately smuggles an id outside the catalog union past the
+    // compiler to exercise the runtime throw.
     expect(() => checkMeta("BLUME_AUDIT_NOPE" as never)).toThrow(
       "Unknown audit check"
     );

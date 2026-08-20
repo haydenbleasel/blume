@@ -87,10 +87,12 @@ describe("fetchRepositoryInfo", () => {
 
   it("sends a bearer token and dedupes repeated lookups via the cache", async () => {
     let calls = 0;
-    const seen: { authorization?: string | null } = {};
-    globalThis.fetch = ((_input: unknown, init: { headers: Headers }) => {
+    let seenAuthorization: string | null | undefined;
+    // SAFETY: the stub implements the one call fetchRepositoryInfo makes;
+    // fetch's extra properties (preconnect) are never touched.
+    globalThis.fetch = ((_input, init) => {
       calls += 1;
-      seen.authorization = init.headers.get("Authorization");
+      seenAuthorization = new Headers(init?.headers).get("Authorization");
       return Promise.resolve(
         Response.json({
           description: null,
@@ -98,7 +100,7 @@ describe("fetchRepositoryInfo", () => {
           stargazers_count: 9,
         })
       );
-    }) as unknown as typeof fetch;
+    }) as typeof fetch;
 
     const options = {
       baseUrl: "https://gh.test",
@@ -109,7 +111,7 @@ describe("fetchRepositoryInfo", () => {
     const first = await fetchRepositoryInfo(options);
     const second = await fetchRepositoryInfo(options);
 
-    expect(seen.authorization).toBe("Bearer secret");
+    expect(seenAuthorization).toBe("Bearer secret");
     expect(first).toEqual({ description: null, forks: 3, stars: 9 });
     // The second lookup resolves the cached promise to the same object.
     expect(second).toBe(first);
@@ -209,10 +211,10 @@ describe("server-proxied search endpoint", () => {
   });
 
   it("returns an empty result when the endpoint responds non-ok", async () => {
-    globalThis.fetch = (() =>
-      Promise.resolve(
-        new Response("boom", { status: 500 })
-      )) as unknown as typeof fetch;
+    // SAFETY: the stub covers the single search request; fetch's extra
+    // properties (preconnect) are never touched.
+    globalThis.fetch = ((_input) =>
+      Promise.resolve(new Response("boom", { status: 500 }))) as typeof fetch;
     const result = await createSearch({ api: "/api/search" })("q");
     expect(result).toStrictEqual({ hits: [], sections: [] });
   });
@@ -223,8 +225,10 @@ describe("server-proxied search endpoint", () => {
       title: `T${index}`,
       url: `/p${index}`,
     }));
-    globalThis.fetch = (() =>
-      Promise.resolve(Response.json(hits))) as unknown as typeof fetch;
+    // SAFETY: the stub covers the single search request; fetch's extra
+    // properties (preconnect) are never touched.
+    globalThis.fetch = ((_input) =>
+      Promise.resolve(Response.json(hits))) as typeof fetch;
     const result = await createSearch({ api: "/api/search" })("q");
     expect(result.hits).toHaveLength(12);
     expect(result.sections).toStrictEqual([]);
@@ -233,7 +237,9 @@ describe("server-proxied search endpoint", () => {
   it("escapes server-derived hit text and marks the query matches", async () => {
     // The dialog injects title/excerpt as HTML, so markup returned by the
     // service must render literally rather than execute.
-    globalThis.fetch = (() =>
+    // SAFETY: the stub covers the single search request; fetch's extra
+    // properties (preconnect) are never touched.
+    globalThis.fetch = ((_input) =>
       Promise.resolve(
         Response.json([
           {
@@ -242,7 +248,7 @@ describe("server-proxied search endpoint", () => {
             url: "/x",
           },
         ])
-      )) as unknown as typeof fetch;
+      )) as typeof fetch;
     const result = await createSearch({ api: "/api/search" })("needle");
     expect(result.hits[0]?.title).toBe(
       "&lt;b&gt;<mark>needle</mark>&lt;/b&gt;"
@@ -408,6 +414,8 @@ describe("buildResult", () => {
   });
 });
 
+// SAFETY: only the fields the RSS builder reads; the rest of PageRecord is
+// immaterial to these feeds.
 const blogPage = (over: Partial<PageRecord>): PageRecord =>
   ({
     contentType: "blog",
@@ -418,6 +426,8 @@ const blogPage = (over: Partial<PageRecord>): PageRecord =>
     ...over,
   }) as PageRecord;
 
+// SAFETY: buildRssFeeds reads only the config and the graph's pages; the
+// rest of BlumeProject is immaterial to these feeds.
 const rssProject = (pages: PageRecord[]): BlumeProject =>
   ({
     config: blumeConfigSchema.parse({
@@ -426,7 +436,7 @@ const rssProject = (pages: PageRecord[]): BlumeProject =>
       title: "T",
     }),
     graph: { pages },
-  }) as unknown as BlumeProject;
+  }) as BlumeProject;
 
 describe("buildRssFeeds — pages without a date", () => {
   it("includes a publishable page that declares no date", () => {
@@ -437,6 +447,7 @@ describe("buildRssFeeds — pages without a date", () => {
 
   it("renders an item with no pubDate when the page has no date", () => {
     const [feed] = buildRssFeeds(rssProject([blogPage({})]));
+    // SAFETY: the single blog page above always yields exactly one feed.
     const xml = renderRssFeed(feed as RssFeed);
     expect(xml).toContain("<title>A</title>");
     expect(xml).not.toContain("<pubDate>");
@@ -570,6 +581,14 @@ describe("layout chrome sources", () => {
   });
 });
 
+/** The JSON-LD node fields this test asserts on. */
+interface JsonLdArticle {
+  "@type"?: unknown;
+  dateModified?: unknown;
+  datePublished?: unknown;
+  inLanguage?: unknown;
+}
+
 describe("buildStructuredData — dateModified and locale", () => {
   it("emits dateModified and inLanguage for a deeper page", () => {
     const data = buildStructuredData({
@@ -582,7 +601,9 @@ describe("buildStructuredData — dateModified and locale", () => {
       siteUrl: "https://x.test",
       title: "Guide",
     });
-    const graph = (data?.["@graph"] ?? []) as Record<string, unknown>[];
+    // SAFETY: buildStructuredData always emits `@graph` as an array of
+    // schema.org node objects.
+    const graph = (data?.["@graph"] ?? []) as JsonLdArticle[];
     const article = graph.find((node) => node["@type"] === "TechArticle");
     expect(article?.dateModified).toBe("2026-02-01T00:00:00.000Z");
     expect(article?.inLanguage).toBe("fr");

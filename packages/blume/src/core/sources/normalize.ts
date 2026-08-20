@@ -9,6 +9,7 @@ import { localePlacement, localizeRoute } from "../i18n.ts";
 import { pageMetaSchema } from "../schema.ts";
 import type { FrontmatterExtend, PageMeta } from "../schema.ts";
 import type { Diagnostic, Heading, PageLink, PageRecord } from "../types.ts";
+import { detectVersionRef, versionizeRoute } from "../versions.ts";
 import type { NormalizeContext, SourceEntry } from "./types.ts";
 
 const NUMERIC_PREFIX = /^\d+[-_.]/u;
@@ -102,10 +103,15 @@ const addRouteSegment = (
   segments.push(safe);
 };
 
+/** URL + nav metadata mapped from one content-root-relative path. */
+interface MappedRoute {
+  segments: string[];
+  groups: string[];
+  route: string;
+}
+
 /** Convert a content-root-relative path into URL + nav metadata. */
-const mapRoute = (
-  relativePath: string
-): { segments: string[]; groups: string[]; route: string } => {
+const mapRoute = (relativePath: string): MappedRoute => {
   const withoutExt = relativePath.slice(
     0,
     relativePath.length - extname(relativePath).length
@@ -138,10 +144,10 @@ export type FenceState = "```" | "~~~" | null;
  */
 export const nextFenceState = (line: string, fence: FenceState): FenceState => {
   const trimmed = line.trimStart();
-  const delimiter = trimmed.match(CODE_FENCE)?.groups?.delimiter as
-    | Exclude<FenceState, null>
-    | undefined;
-  if (delimiter === undefined) {
+  const delimiter = trimmed.match(CODE_FENCE)?.groups?.delimiter;
+  // The `delimiter` group matches exactly ``` or ~~~; comparing against both
+  // narrows it without a cast.
+  if (delimiter !== "```" && delimiter !== "~~~") {
     return fence;
   }
   if (fence === null) {
@@ -519,6 +525,10 @@ const deriveTitle = (
 const trimSlashes = (value: string): string =>
   value.replaceAll(/^\/+|\/+$/gu, "");
 
+/** Whether a raw frontmatter value is a string (e.g. the `type` override). */
+const isStringValue = (value: SourceEntry["data"][string]): value is string =>
+  typeof value === "string";
+
 const withPrefix = (prefix: string | undefined, path: string): string => {
   const clean = prefix ? trimSlashes(prefix) : "";
   return clean ? `${clean}/${path}` : path;
@@ -530,13 +540,27 @@ interface CustomKeyIssue {
   path: (string | number)[];
 }
 
+/** The validated custom keys (if any survived) plus every failure found. */
+interface CustomKeyValidation {
+  custom?: PageRecord["custom"];
+  issues: CustomKeyIssue[];
+}
+
+/** Whether a Standard Schema path segment is the wrapped `{ key }` form. */
+const isKeyCarrier = (
+  segment: PropertyKey | { readonly key: PropertyKey }
+): segment is { readonly key: PropertyKey } =>
+  typeof segment === "object" && segment !== null;
+
+const isSymbolKey = (key: PropertyKey): key is symbol =>
+  typeof key === "symbol";
+
 /** Lower a Standard Schema path segment (`key` or `{ key }`) for joining. */
 const segmentKey = (
   segment: PropertyKey | { readonly key: PropertyKey }
 ): string | number => {
-  const key =
-    typeof segment === "object" && segment !== null ? segment.key : segment;
-  return typeof key === "symbol" ? String(key) : key;
+  const key = isKeyCarrier(segment) ? segment.key : segment;
+  return isSymbolKey(key) ? String(key) : key;
 };
 
 /**
@@ -549,10 +573,10 @@ const segmentKey = (
  * synchronous, and frontmatter validation has no business awaiting I/O.
  */
 const validateCustomKeys = (
-  data: Record<string, unknown>,
+  data: SourceEntry["data"],
   extend: FrontmatterExtend
-): { custom?: Record<string, unknown>; issues: CustomKeyIssue[] } => {
-  const custom: Record<string, unknown> = {};
+): CustomKeyValidation => {
+  const custom: NonNullable<PageRecord["custom"]> = {};
   const issues: CustomKeyIssue[] = [];
   for (const [key, schema] of Object.entries(extend)) {
     const outcome = schema["~standard"].validate(data[key]);
@@ -597,13 +621,14 @@ const parseEntryMeta = (
   entry: SourceEntry,
   ctx: NormalizeContext
 ):
-  | { meta: PageMeta; custom?: Record<string, unknown>; diagnostics?: never }
+  | { meta: PageMeta; custom?: PageRecord["custom"]; diagnostics?: never }
   | { meta?: never; diagnostics: Diagnostic[] } => {
   // Resolved the same way `contentType` is after parsing (`meta.type` falling
   // back to `defaultType`); a non-string `type` fails the strict parse below,
   // so which per-type map was merged for that entry never matters.
-  const entryType =
-    typeof entry.data.type === "string" ? entry.data.type : ctx.defaultType;
+  const entryType = isStringValue(entry.data.type)
+    ? entry.data.type
+    : ctx.defaultType;
   const typeExtend = ctx.typeFrontmatter?.[entryType];
   // Config validation rejects a key declared both site-wide and per-type, so
   // this merge never has to pick a winner.
@@ -649,6 +674,12 @@ const parseEntryMeta = (
   };
 };
 
+/** The per-locale page records and diagnostics from one source entry. */
+export interface NormalizedEntry {
+  pages: PageRecord[];
+  diagnostics: Diagnostic[];
+}
+
 /**
  * Normalize one source entry into per-locale `PageRecord`s. This is the single
  * funnel every adapter's entries pass through, so route mapping, heading/link
@@ -657,7 +688,7 @@ const parseEntryMeta = (
 export const normalizeEntry = (
   entry: SourceEntry,
   ctx: NormalizeContext
-): { pages: PageRecord[]; diagnostics: Diagnostic[] } => {
+): NormalizedEntry => {
   const { format } = entry.body;
   const ext = format === "mdx" ? ".mdx" : ".md";
 
@@ -678,14 +709,22 @@ export const normalizeEntry = (
     meta.seo.noindex = true;
   }
 
+  // The version is detected first: a snapshot directory is outermost on disk
+  // (`v1.0/fr/page.mdx`), so the locale parser and route mapping must see a
+  // version-stripped ref. The current version is `""` and lives at the root.
+  const { versions } = ctx;
+  const { version, rest: versionlessRef } = versions
+    ? detectVersionRef(entry.ref, versions)
+    : { rest: entry.ref, version: "" };
+
   // Locale and the locale-stripped nav path come from the entry's ref (a leading
   // dir, or a filename suffix under the `dot` parser), not the slug — the slug is
   // the logical, locale-agnostic path within a locale. A shared `$` file maps to
   // every locale. Remote/CMS sources without i18n placement map to one locale.
   const { i18n } = ctx;
   const { navPath: rawNavPath, locales } = i18n
-    ? localePlacement(entry.ref, ext, i18n)
-    : { locales: [""], navPath: entry.ref };
+    ? localePlacement(versionlessRef, ext, i18n)
+    : { locales: [""], navPath: versionlessRef };
 
   const navPath = withPrefix(ctx.source.prefix, rawNavPath);
   // Frontmatter `slug` wins, then the adapter-supplied `entry.slug` (the typed
@@ -699,7 +738,13 @@ export const normalizeEntry = (
     slug ? `${slug}${ext}` : rawNavPath
   );
 
-  const { segments, groups, route: logicalRoute } = mapRoute(routeInput);
+  // The version prefixes the mapped route *after* `mapRoute` runs: the mapped
+  // route is the version-agnostic key, the config id is prepended verbatim
+  // (never numeric-prefix-stripped), a frontmatter `slug` gets versionized so
+  // snapshots can't collide with the live page, and `translationKey` becomes
+  // version-specific for free.
+  const { segments, groups, route: versionKey } = mapRoute(routeInput);
+  const logicalRoute = versionizeRoute(versionKey, version);
   const headings = extractHeadings(entry.body.text);
   const { staged } = ctx.source;
 
@@ -729,6 +774,8 @@ export const normalizeEntry = (
     sourcePath: entry.sourcePath,
     title: deriveTitle(meta, headings, navPath),
     translationKey: logicalRoute,
+    version,
+    versionKey,
   } satisfies Omit<PageRecord, "locale" | "route">;
 
   // One record per locale this entry maps to (one normally; every locale for a

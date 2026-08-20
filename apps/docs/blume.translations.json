@@ -37,10 +37,10 @@
       "pt": "f3e6d514d2c5e7ba"
     },
     "content/docs/advanced/custom-pages.mdx": {
-      "de": "2bb62fa2ecf9eb71",
-      "hi": "2bb62fa2ecf9eb71",
-      "ja": "2bb62fa2ecf9eb71",
-      "pt": "2bb62fa2ecf9eb71"
+      "de": "7d78d8673e8b7b18",
+      "hi": "7d78d8673e8b7b18",
+      "ja": "7d78d8673e8b7b18",
+      "pt": "7d78d8673e8b7b18"
     },
     "content/docs/advanced/meta.ts": {
       "de": "f7ebc2a62e03edf7",
@@ -55,10 +55,10 @@
       "pt": "a1ff81d90a13852a"
     },
     "content/docs/configuration/ai.mdx": {
-      "de": "c37f2e196e58285e",
-      "hi": "c37f2e196e58285e",
-      "ja": "c37f2e196e58285e",
-      "pt": "c37f2e196e58285e"
+      "de": "43643694b2c85b62",
+      "hi": "43643694b2c85b62",
+      "ja": "43643694b2c85b62",
+      "pt": "43643694b2c85b62"
     },
     "content/docs/configuration/analytics.mdx": {
       "de": "511b3d92b49a8df3",
@@ -79,10 +79,10 @@
       "pt": "c8a86983704d7ad4"
     },
     "content/docs/configuration/index.mdx": {
-      "de": "db751b2920f4057f",
-      "hi": "db751b2920f4057f",
-      "ja": "db751b2920f4057f",
-      "pt": "db751b2920f4057f"
+      "de": "e98584af96c3374e",
+      "hi": "e98584af96c3374e",
+      "ja": "e98584af96c3374e",
+      "pt": "e98584af96c3374e"
     },
     "content/docs/configuration/meta.ts": {
       "de": "8eabf2eba068b192",
@@ -91,22 +91,22 @@
       "pt": "8eabf2eba068b192"
     },
     "content/docs/configuration/search.mdx": {
-      "de": "3fef557d71fce514",
-      "hi": "3fef557d71fce514",
-      "ja": "3fef557d71fce514",
-      "pt": "3fef557d71fce514"
+      "de": "eae70908a650ced0",
+      "hi": "eae70908a650ced0",
+      "ja": "eae70908a650ced0",
+      "pt": "eae70908a650ced0"
     },
     "content/docs/configuration/seo.mdx": {
-      "de": "14038d13fcc30656",
-      "hi": "14038d13fcc30656",
-      "ja": "14038d13fcc30656",
-      "pt": "14038d13fcc30656"
+      "de": "0694af2155c9201f",
+      "hi": "0694af2155c9201f",
+      "ja": "0694af2155c9201f",
+      "pt": "0694af2155c9201f"
     },
     "content/docs/configuration/theming.mdx": {
-      "de": "26c689f54888ceb2",
-      "hi": "26c689f54888ceb2",
-      "ja": "26c689f54888ceb2",
-      "pt": "26c689f54888ceb2"
+      "de": "b117b5206c05d540",
+      "hi": "b117b5206c05d540",
+      "ja": "b117b5206c05d540",
+      "pt": "b117b5206c05d540"
     },
     "content/docs/content/components.mdx": {
       "de": "2707421e481e5d0a",
@@ -115,10 +115,10 @@
       "pt": "2707421e481e5d0a"
     },
     "content/docs/content/i18n.mdx": {
-      "de": "3daeee5d79221bd3",
-      "hi": "3daeee5d79221bd3",
-      "ja": "3daeee5d79221bd3",
-      "pt": "3daeee5d79221bd3"
+      "de": "2d0ecedea7020aaa",
+      "hi": "2d0ecedea7020aaa",
+      "ja": "2d0ecedea7020aaa",
+      "pt": "2d0ecedea7020aaa"
     },
     "content/docs/content/index.mdx": {
       "de": "c45f621f8cd6ab21",
@@ -139,16 +139,16 @@
       "pt": "673cb660024ce44a"
     },
     "content/docs/content/meta.ts": {
-      "de": "13e3c4a15b2070bf",
-      "hi": "13e3c4a15b2070bf",
-      "ja": "13e3c4a15b2070bf",
-      "pt": "13e3c4a15b2070bf"
+      "de": "e670341fb4457dcb",
+      "hi": "e670341fb4457dcb",
+      "ja": "e670341fb4457dcb",
+      "pt": "e670341fb4457dcb"
     },
     "content/docs/content/navigation.mdx": {
-      "de": "c076630216c19205",
-      "hi": "c076630216c19205",
-      "ja": "c076630216c19205",
-      "pt": "c076630216c19205"
+      "de": "334eed34f148094f",
+      "hi": "334eed34f148094f",
+      "ja": "334eed34f148094f",
+      "pt": "334eed34f148094f"
     },
     "content/docs/content/sources.mdx": {
       "de": "1b7a578403f867d9",
@@ -162,6 +162,12 @@
       "ja": "a5d02160da19c093",
       "pt": "a5d02160da19c093"
     },
+    "content/docs/content/versioning.mdx": {
+      "de": "b9ddbe5fd04e6e27",
+      "hi": "b9ddbe5fd04e6e27",
+      "ja": "b9ddbe5fd04e6e27",
+      "pt": "b9ddbe5fd04e6e27"
+    },
     "content/docs/index.mdx": {
       "de": "03dda104af083a83",
       "hi": "03dda104af083a83",
@@ -169,10 +175,10 @@
       "pt": "03dda104af083a83"
     },
     "content/docs/reference/cli.mdx": {
-      "de": "24e1b9cb94ecca7d",
-      "hi": "24e1b9cb94ecca7d",
-      "ja": "24e1b9cb94ecca7d",
-      "pt": "24e1b9cb94ecca7d"
+      "de": "de0d9381d6209081",
+      "hi": "de0d9381d6209081",
+      "ja": "de0d9381d6209081",
+      "pt": "de0d9381d6209081"
     },
     "content/docs/reference/eval.mdx": {
       "de": "d35e4fbf659ae938",

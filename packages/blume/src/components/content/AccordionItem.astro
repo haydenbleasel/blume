@@ -121,6 +121,10 @@ const accordionId = id ?? componentSlug(title);
     };
 
     window.addEventListener("hashchange", openHashAccordion);
+    // Client-router swaps replace the body with fresh server-rendered
+    // accordions (duplicate ids and all), so the dedupe + hash-open pass has
+    // to run again for each new page.
+    document.addEventListener("astro:after-swap", init);
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", init, { once: true });
     } else {

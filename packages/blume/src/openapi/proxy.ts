@@ -18,7 +18,7 @@
  * to an arbitrary target. `accept-encoding`/`content-length` are recomputed
  * by the runtime's own fetch.
  */
-const REQUEST_DROP: Record<string, true> = {
+const REQUEST_DROP = {
   "accept-encoding": true,
   connection: true,
   "content-length": true,
@@ -26,7 +26,7 @@ const REQUEST_DROP: Record<string, true> = {
   host: true,
   origin: true,
   referer: true,
-};
+} satisfies Record<string, true>;
 
 /**
  * Upstream response headers never returned to the browser: the runtime's
@@ -36,23 +36,17 @@ const REQUEST_DROP: Record<string, true> = {
  * cookies on the docs origin — where they'd ride along on every later docs
  * request, including the proxy's own.
  */
-const RESPONSE_DROP: Record<string, true> = {
+const RESPONSE_DROP = {
   connection: true,
   "content-encoding": true,
   "content-length": true,
   "keep-alive": true,
   "set-cookie": true,
   "transfer-encoding": true,
-};
+} satisfies Record<string, true>;
 
 /** Redirect statuses the handler resolves itself; see {@link followUpstream}. */
-const REDIRECT_STATUS: Record<number, true> = {
-  301: true,
-  302: true,
-  303: true,
-  307: true,
-  308: true,
-};
+const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
 
 /** Hops followed before giving up, matching fetch's own redirect limit. */
 const MAX_REDIRECTS = 20;
@@ -110,7 +104,7 @@ const followUpstream = async (args: {
     method: args.method,
     redirect: "manual",
   });
-  const location = REDIRECT_STATUS[response.status]
+  const location = REDIRECT_STATUS.has(response.status)
     ? response.headers.get("location")
     : null;
   if (location === null) {
@@ -201,6 +195,9 @@ export const createPlaygroundProxyHandler = (
         url: parsed,
       });
     } catch (error) {
+      // SAFETY: followUpstream itself only throws `new Error(...)`, and a
+      // failed fetch rejects with a TypeError per spec — both are Errors
+      // carrying `.message`.
       return Response.json(
         { error: (error as Error).message },
         { status: 502 }

@@ -41,6 +41,8 @@ const load = async (
     return null;
   }
 
+  // SAFETY: GitHub's `GET /repos/{owner}/{repo}` contract carries these three
+  // fields on every 2xx response; a malformed body rejects into `loadSafe`.
   const data = (await response.json()) as {
     description: string | null;
     forks_count: number;

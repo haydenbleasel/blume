@@ -15,12 +15,14 @@ describe("parsePort", () => {
   });
 
   it("logs an error and exits for a non-integer or out-of-range port", () => {
+    // SAFETY: parsePort only calls the logger as a function; the `raw` member
+    // consola's LogFn declares is never touched, so a bare no-op suffices.
     const errorSpy = spyOn(logger, "error").mockImplementation((() => {
       // Swallow the diagnostic so the test output stays clean.
     }) as never);
-    const exit = spyOn(process, "exit").mockImplementation((() => {
+    const exit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
     try {
       for (const invalid of ["abc", "0", "99999"]) {
         expect(() => parsePort(invalid)).toThrow("exit");

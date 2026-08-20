@@ -167,14 +167,47 @@ describe("injectNegotiationRoutes", () => {
     expect(config.routes.map((route: { src?: string }) => route.src)).toEqual([
       "^(?:/docs/a)/?$",
       "^(/docs/a)/?$",
+      "^/(.+)/$",
       undefined,
       "^/_astro/(.*)$",
       "^/api/ask/?$",
       "^/.*$",
     ]);
-    expect(config.routes[2]).toStrictEqual({ handle: "filesystem" });
+    expect(config.routes[3]).toStrictEqual({ handle: "filesystem" });
     expect(config.routes[0].continue).toBe(true);
     expect(config.routes[1].dest).toBe("$1.md");
+  });
+
+  it("splices a trailing-slash 308 redirect after the rewrites", () => {
+    const injected = injectNegotiationRoutes(JSON.stringify(baseConfig), [
+      "/docs/a",
+    ]);
+    const config = JSON.parse(injected ?? "");
+    const redirect = config.routes.find(
+      (route: { status?: number }) => route.status === 308
+    );
+    expect(redirect).toStrictEqual({
+      headers: { Location: "/$1" },
+      src: "^/(.+)/$",
+      status: 308,
+    });
+    // Main phase, after the Markdown rewrite (so a slashed URL's negotiation
+    // rewrites directly) and before handle:filesystem (so it actually fires
+    // for prerendered pages).
+    const redirectIndex = config.routes.indexOf(redirect);
+    const rewriteIndex = config.routes.findIndex(
+      (route: { dest?: string }) => route.dest === "$1.md"
+    );
+    const filesystemIndex = config.routes.findIndex(
+      (route: { handle?: string }) => route.handle === "filesystem"
+    );
+    expect(redirectIndex).toBeGreaterThan(rewriteIndex);
+    expect(redirectIndex).toBeLessThan(filesystemIndex);
+    // The pattern spares the root and strips exactly one trailing slash.
+    const src = new RegExp(redirect.src, "u");
+    expect(src.test("/")).toBe(false);
+    expect(src.test("/docs/a")).toBe(false);
+    expect("/docs/a/".replace(src, "/$1")).toBe("/docs/a");
   });
 
   it("is idempotent across re-injection", () => {
@@ -323,11 +356,23 @@ describe("injectNegotiationRoutes", () => {
     expect(JSON.parse(alone ?? "").overrides).toBeDefined();
   });
 
-  it("returns null when there is nothing to do or nowhere to splice", () => {
+  it("still injects the trailing-slash redirect with nothing else to add", () => {
     const text = JSON.stringify(baseConfig);
-    expect(injectNegotiationRoutes(text, [])).toBeNull();
-    expect(injectNegotiationRoutes(text, [], null)).toBeNull();
-    expect(injectNegotiationRoutes(text, [], null, {})).toBeNull();
+    for (const injected of [
+      injectNegotiationRoutes(text, []),
+      injectNegotiationRoutes(text, [], null),
+      injectNegotiationRoutes(text, [], null, {}),
+    ]) {
+      const config = JSON.parse(injected ?? "");
+      expect(
+        config.routes.filter(
+          (route: { status?: number }) => route.status === 308
+        )
+      ).toHaveLength(1);
+    }
+  });
+
+  it("returns null when there is nowhere to splice", () => {
     expect(injectNegotiationRoutes("not json", ["/docs/a"])).toBeNull();
     expect(injectNegotiationRoutes("{}", ["/docs/a"])).toBeNull();
     expect(

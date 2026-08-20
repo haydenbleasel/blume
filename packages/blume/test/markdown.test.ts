@@ -8,6 +8,7 @@ import {
   directiveToCalloutPlugin,
 } from "../src/markdown/directives.ts";
 import { headingAnchorPlugin } from "../src/markdown/heading-anchors.ts";
+import type { HeadingAnchorPlugin } from "../src/markdown/heading-anchors.ts";
 import {
   blumeMarkdownProcessor,
   blumeMdxProcessor,
@@ -27,6 +28,7 @@ import {
   jsxFlowElement,
   jsxTextElement,
 } from "../src/markdown/mdast.ts";
+import type { MdastNode, MdastVisitorContext } from "../src/markdown/mdast.ts";
 import { mermaidPlugin } from "../src/markdown/mermaid.ts";
 import {
   PACKAGE_MANAGERS,
@@ -36,26 +38,27 @@ import { packageInstallPlugin } from "../src/markdown/package-install.ts";
 
 /** Run a plugin visitor and capture the node it replaces, if any. */
 const captureReplacement = (
-  run: (ctx: {
-    replaceNode: (node: unknown, replacement: unknown) => void;
-  }) => void
-): unknown => {
-  let replacement: unknown;
+  run: (ctx: MdastVisitorContext) => void
+): MdastNode | undefined => {
+  let replacement: MdastNode | undefined;
   run({
     replaceNode: (_node, value) => {
-      replacement = value;
+      // SAFETY: Blume's MDAST plugins only ever replace nodes with the mdast
+      // builders' output (jsxFlowElement/jsxTextElement/codeBlock results).
+      replacement = value as MdastNode;
     },
   });
   return replacement;
 };
 
+/** The `<pre>` node the code-meta transformer's `pre` hook receives. */
+type MetaPreNode = Parameters<
+  ReturnType<typeof codeTitleTransformer>["pre"]
+>[0];
+
 /** Run the code-meta transformer over a fence's meta and return the <pre> attrs. */
-const metaAttrs = (
-  raw?: string
-): Record<string, boolean | number | string | undefined> => {
-  const node = {
-    properties: {} as Record<string, boolean | number | string | undefined>,
-  };
+const metaAttrs = (raw?: string): MetaPreNode["properties"] => {
+  const node: MetaPreNode = { properties: {} };
   codeTitleTransformer().pre.call({ options: { meta: { __raw: raw } } }, node);
   return node.properties;
 };
@@ -313,7 +316,7 @@ describe(languageIconTransformer, () => {
 
   /** Run the icon transformer over a language and return the <pre> node. */
   const runIcon = (lang?: string): IconPreNode => {
-    const node = { children: [], properties: {} } as unknown as IconPreNode;
+    const node: IconPreNode = { children: [], properties: {} };
     languageIconTransformer().pre.call({ options: { lang } }, node);
     return node;
   };
@@ -451,9 +454,11 @@ describe("directiveToCalloutPlugin", () => {
       name: "note",
       type: "containerDirective",
     };
+    // SAFETY: the `note` directive above maps onto a Callout, so the captured
+    // replacement is a `jsxFlowElement` result carrying its attributes.
     const result = captureReplacement((ctx) =>
       directiveToCalloutPlugin().containerDirective(node, ctx)
-    ) as { attributes: { name: string; value: string }[] };
+    ) as ReturnType<typeof jsxFlowElement>;
     const title = result.attributes.find((a) => a.name === "title");
     expect(title?.value).toBe("Read this now");
   });
@@ -538,40 +543,36 @@ describe("mathPlugin", () => {
   });
 });
 
+/** The hast node and context types the anchor plugin's visitor declares. */
+type AnchorVisit = HeadingAnchorPlugin["element"]["visit"];
+type AnchorNode = Parameters<AnchorVisit>[0];
+type AnchorContext = Parameters<AnchorVisit>[1];
+
+const isString = (value: AnchorNode | string): value is string =>
+  typeof value === "string";
+
 /** Recursively read a node's text, like Satteri's `textContent`. */
-const textOf = (node: { children?: unknown[]; value?: unknown }): string =>
-  typeof node.value === "string"
-    ? node.value
-    : (node.children ?? [])
-        .map((child) => textOf(child as { value?: unknown }))
-        .join("");
+const textOf = (node: AnchorNode): string =>
+  node.value ?? (node.children ?? []).map((child) => textOf(child)).join("");
 
 describe("headingAnchorPlugin", () => {
-  interface HeadingNode {
-    children: { type: string; value?: string }[];
-    properties: Record<string, unknown>;
-    tagName: string;
-    type: string;
-  }
-
   /** A hast context whose `setProperty` mutates the node so tests can assert. */
-  const makeCtx = () => ({
+  const makeCtx = (): AnchorContext => ({
     data: { astro: { frontmatter: {} } },
-    setProperty(
-      node: { properties?: Record<string, unknown> },
-      key: string,
-      value: unknown
-    ) {
+    setProperty(node, key, value) {
       node.properties = { ...node.properties, [key]: value };
     },
     textContent: textOf,
   });
 
   /** A heading node with text (or element) children. */
-  const heading = (tagName: string, ...children: unknown[]): HeadingNode => ({
+  const heading = (
+    tagName: string,
+    ...children: (AnchorNode | string)[]
+  ): AnchorNode & { properties: NonNullable<AnchorNode["properties"]> } => ({
     children: children.map((child) =>
-      typeof child === "string" ? { type: "text", value: child } : child
-    ) as HeadingNode["children"],
+      isString(child) ? { type: "text", value: child } : child
+    ),
     properties: {},
     tagName,
     type: "element",
@@ -1005,13 +1006,9 @@ describe("headingAnchorPlugin (frontmatter interpolation)", () => {
       tagName: "h2",
       type: "element",
     };
-    const ctx = {
+    const ctx: AnchorContext = {
       data: { astro: { frontmatter: { title: "Real Title" } } },
-      setProperty(
-        target: { properties?: Record<string, unknown> },
-        key: string,
-        value: unknown
-      ) {
+      setProperty(target, key, value) {
         target.properties = { ...target.properties, [key]: value };
       },
       textContent: textOf,

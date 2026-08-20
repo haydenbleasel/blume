@@ -29,7 +29,7 @@ export interface SearchProviderMeta {
   syncs: boolean;
 }
 
-export const SEARCH_PROVIDERS: Record<SearchProvider, SearchProviderMeta> = {
+export const SEARCH_PROVIDERS = {
   algolia: {
     kind: "hosted",
     requiresServer: false,
@@ -80,7 +80,7 @@ export const SEARCH_PROVIDERS: Record<SearchProvider, SearchProviderMeta> = {
     runtimeDeps: ["typesense"],
     syncs: true,
   },
-};
+} satisfies Record<SearchProvider, SearchProviderMeta>;
 
 export const searchProviderMeta = (
   provider: SearchProvider

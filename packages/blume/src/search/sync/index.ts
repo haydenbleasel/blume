@@ -45,6 +45,8 @@ export const syncSearchProvider = async (
       `Synced ${records.length} record(s) to ${search.provider}`
     );
   } catch (error) {
+    // SAFETY: the three sync clients surface network/auth failures as Error
+    // instances; the message is read only to annotate the skip warning.
     reporter.warn(`Search sync skipped: ${(error as Error).message}`);
   }
 };

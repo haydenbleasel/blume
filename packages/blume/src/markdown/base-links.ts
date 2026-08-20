@@ -11,7 +11,7 @@ interface UrlNode extends MdastNode {
  * `setProperty`, not by mutating the node object.
  */
 interface MdastUrlContext {
-  setProperty: (node: unknown, key: "url", value: string) => void;
+  setProperty: (node: MdastNode, key: "url", value: string) => void;
 }
 
 /**
@@ -26,6 +26,10 @@ const ASSET_PATH = /\.[a-z0-9]+$/iu;
 /** Strip any `#fragment`/`?query` so only the path is extension-tested. */
 const pathOf = (url: string): string => url.replace(/[#?].*$/u, "");
 
+/** Only a string URL can be rebased; MDAST allows null or absent urls. */
+const isUrl = (url: string | null | undefined): url is string =>
+  typeof url === "string";
+
 /**
  * Satteri MDAST plugin that prepends the served-URL base — `deployment.base`
  * layered over the site-wide `basePath` — to root-relative internal page links
@@ -38,11 +42,7 @@ const pathOf = (url: string): string => url.replace(/[#?].*$/u, "");
 export const baseLinksPlugin = (deployBase: string, basePath: string) => {
   const rebase = (node: UrlNode, ctx: MdastUrlContext): void => {
     const { url } = node;
-    if (
-      typeof url === "string" &&
-      isInternalPath(url) &&
-      !ASSET_PATH.test(pathOf(url))
-    ) {
+    if (isUrl(url) && isInternalPath(url) && !ASSET_PATH.test(pathOf(url))) {
       const next = withComposedBasePath(deployBase, basePath, url);
       if (next !== url) {
         ctx.setProperty(node, "url", next);

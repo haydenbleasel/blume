@@ -16,11 +16,36 @@ interface WebMcpResult {
   isError?: boolean;
 }
 
+/** A JSON value as a WebMCP agent may supply it in a tool call. */
+export type WebMcpJsonValue =
+  | boolean
+  | number
+  | string
+  | null
+  | WebMcpJsonValue[]
+  | { [key: string]: WebMcpJsonValue };
+
+/**
+ * Tool arguments exactly as the calling agent supplied them. WebMCP doesn't
+ * guarantee schema validation, so each tool checks its own fields at runtime.
+ */
+export interface WebMcpToolArgs {
+  query?: WebMcpJsonValue;
+  route?: WebMcpJsonValue;
+}
+
+/** The JSON Schema subset these string-argument tools declare. */
+export interface WebMcpInputSchema {
+  properties: Record<string, { description: string; type: "string" }>;
+  required?: string[];
+  type: "object";
+}
+
 export interface WebMcpTool {
   annotations: { openWorldHint: boolean; readOnlyHint: boolean };
   description: string;
-  execute: (input: Record<string, unknown>) => Promise<WebMcpResult>;
-  inputSchema: Record<string, unknown>;
+  execute: (input: WebMcpToolArgs) => Promise<WebMcpResult>;
+  inputSchema: WebMcpInputSchema;
   name: string;
 }
 
@@ -31,14 +56,26 @@ export interface WebMcpTool {
  * individually via `registerTool`.
  */
 export interface ModelContext {
-  provideContext?: (context: { tools: WebMcpTool[] }) => unknown;
-  registerTool?: (tool: WebMcpTool) => unknown;
+  provideContext?: (context: { tools: WebMcpTool[] }) => void;
+  registerTool?: (tool: WebMcpTool) => void;
 }
 
-const text = (value: string, isError = false): WebMcpResult => ({
-  content: [{ text: value, type: "text" }],
-  ...(isError ? { isError: true } : {}),
-});
+const text = (value: string, isError = false): WebMcpResult => {
+  const result: WebMcpResult = { content: [{ text: value, type: "text" }] };
+  if (isError) {
+    result.isError = true;
+  }
+  return result;
+};
+
+/** Validates an agent-supplied tool argument before it is used as a string. */
+const isString = (value: WebMcpJsonValue | undefined): value is string =>
+  typeof value === "string";
+
+/** Detects which registration surface a model context actually implements. */
+const isCallable = <T extends (...args: never[]) => void>(
+  value: T | undefined
+): value is T => typeof value === "function";
 
 const TAG = /<[^>]*>?/gu;
 
@@ -89,7 +126,7 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
       description:
         "Full-text search across this documentation site. Returns matching pages with their title, URL, and a short excerpt.",
       async execute(input) {
-        const query = typeof input.query === "string" ? input.query : "";
+        const query = isString(input.query) ? input.query : "";
         if (!query.trim()) {
           return text("Provide a non-empty `query` string.", true);
         }
@@ -128,7 +165,7 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
     description:
       "Fetch a page of this site as plain Markdown. Pass the page's root-relative route, e.g. `/quickstart`.",
     async execute(input) {
-      const route = typeof input.route === "string" ? input.route : "";
+      const route = isString(input.route) ? input.route : "";
       if (!route.startsWith("/")) {
         return text("Pass a root-relative route, e.g. `/quickstart`.", true);
       }
@@ -189,11 +226,11 @@ export const registerWebMcpTools = (
   if (!context) {
     return false;
   }
-  if (typeof context.provideContext === "function") {
+  if (isCallable(context.provideContext)) {
     context.provideContext({ tools });
     return true;
   }
-  if (typeof context.registerTool === "function") {
+  if (isCallable(context.registerTool)) {
     for (const tool of tools) {
       context.registerTool(tool);
     }

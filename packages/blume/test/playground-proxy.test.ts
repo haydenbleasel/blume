@@ -22,15 +22,34 @@ const proxyRequest = (target: string | null, init?: RequestInit): Request =>
     init
   );
 
+/**
+ * Wrap a request handler as a full `fetch`: Bun's `fetch` also carries a
+ * `preconnect` helper, so the stub borrows the real one (never called here).
+ */
+const asFetch = (
+  handler: (
+    input: string | URL | Request,
+    init?: RequestInit
+  ) => Promise<Response>
+): typeof fetch => Object.assign(handler, { preconnect: fetch.preconnect });
+
+/** Read the proxy's JSON error body. */
+const errorJson = async (response: Response): Promise<{ error: string }> =>
+  // SAFETY: every proxy failure path responds with `Response.json({ error })`;
+  // these assertions exist to verify exactly that contract.
+  (await response.json()) as { error: string };
+
 /** A fake upstream fetch that records its call and yields a fixed response. */
 const fakeFetch = (response: Response) => {
   let url: URL | undefined;
   let init: RequestInit | undefined;
-  const impl = ((input: URL, options?: RequestInit) => {
-    url = input;
+  const impl = asFetch((input, options) => {
+    // SAFETY: the handler always dispatches upstream with a parsed `URL`
+    // instance (`followUpstream` receives and forwards `url: URL`).
+    url = input as URL;
     init = options;
     return Promise.resolve(response);
-  }) as unknown as typeof fetch;
+  });
   return {
     impl,
     get init() {
@@ -50,12 +69,14 @@ const fakeFetch = (response: Response) => {
 const chainFetch = (responses: Response[]) => {
   const calls: { init?: RequestInit; url: URL }[] = [];
   let index = 0;
-  const impl = ((url: URL, init?: RequestInit) => {
-    calls.push({ init, url });
+  const impl = asFetch((url, init) => {
+    // SAFETY: the handler always dispatches upstream with a parsed `URL`
+    // instance (`followUpstream` receives and forwards `url: URL`).
+    calls.push({ init, url: url as URL });
     const response = responses[Math.min(index, responses.length - 1)];
     index += 1;
     return Promise.resolve(must(response));
-  }) as unknown as typeof fetch;
+  });
   return { calls, impl };
 };
 
@@ -69,7 +90,7 @@ describe("createPlaygroundProxyHandler", () => {
     const handler = createPlaygroundProxyHandler(ORIGINS);
     const response = await handler(proxyRequest(null));
     expect(response.status).toBe(400);
-    const body = (await response.json()) as { error: string };
+    const body = await errorJson(response);
     expect(body.error).toContain("url");
   });
 
@@ -80,7 +101,7 @@ describe("createPlaygroundProxyHandler", () => {
     );
     const response = await handler(proxyRequest("not a url"));
     expect(response.status).toBe(400);
-    const body = (await response.json()) as { error: string };
+    const body = await errorJson(response);
     expect(body.error).toContain("not a url");
   });
 
@@ -91,7 +112,7 @@ describe("createPlaygroundProxyHandler", () => {
     );
     const response = await handler(proxyRequest("ftp://files.example/spec"));
     expect(response.status).toBe(400);
-    const body = (await response.json()) as { error: string };
+    const body = await errorJson(response);
     expect(body.error).toContain("http");
   });
 
@@ -108,7 +129,7 @@ describe("createPlaygroundProxyHandler", () => {
         "https://api.example:8443/pets",
       ].map(async (target) => {
         const response = await handler(proxyRequest(target));
-        const body = (await response.json()) as { error: string };
+        const body = await errorJson(response);
         return { error: body.error, status: response.status };
       })
     );
@@ -159,6 +180,8 @@ describe("createPlaygroundProxyHandler", () => {
     expect(upstream.init?.body).toBeUndefined();
 
     // Reader-identifying / hop-by-hop request headers never reach upstream.
+    // SAFETY: the handler builds the upstream init's headers via
+    // `filterHeaders`, which always returns a `Headers` instance.
     const sent = upstream.init?.headers as Headers;
     expect(sent.get("accept")).toBe("application/json");
     expect(sent.get("authorization")).toBe("Bearer token");
@@ -195,9 +218,13 @@ describe("createPlaygroundProxyHandler", () => {
       })
     );
     expect(upstream.init?.method).toBe("POST");
+    // SAFETY: the handler buffers a non-GET/HEAD request body with
+    // `request.arrayBuffer()`, so the forwarded body is always an ArrayBuffer.
     expect(
       new TextDecoder().decode(must(upstream.init?.body) as ArrayBuffer)
     ).toBe('{"name":"Rex"}');
+    // SAFETY: the handler builds the upstream init's headers via
+    // `filterHeaders`, which always returns a `Headers` instance.
     expect((must(upstream.init?.headers) as Headers).get("content-type")).toBe(
       "application/json"
     );
@@ -240,6 +267,8 @@ describe("createPlaygroundProxyHandler", () => {
       })
     );
     expect(must(upstream.calls[1]).init?.method).toBe("PUT");
+    // SAFETY: the handler buffers a non-GET/HEAD request body with
+    // `request.arrayBuffer()`, so the forwarded body is always an ArrayBuffer.
     expect(
       new TextDecoder().decode(
         must(must(upstream.calls[1]).init?.body) as ArrayBuffer
@@ -258,7 +287,7 @@ describe("createPlaygroundProxyHandler", () => {
     const response = await handler(proxyRequest("https://api.example/pets"));
     expect(upstream.calls).toHaveLength(1);
     expect(response.status).toBe(403);
-    const blocked = (await response.json()) as { error: string };
+    const blocked = await errorJson(response);
     expect(blocked.error).toContain("169.254.169.254");
   });
 
@@ -271,7 +300,7 @@ describe("createPlaygroundProxyHandler", () => {
       proxyRequest("https://api.example/pets")
     );
     expect(schemeResponse.status).toBe(502);
-    expect((await schemeResponse.json()) as { error: string }).toStrictEqual({
+    expect(await errorJson(schemeResponse)).toStrictEqual({
       error: "Upstream redirected to a non-http(s) URL: file:///etc/passwd",
     });
 
@@ -283,7 +312,7 @@ describe("createPlaygroundProxyHandler", () => {
       proxyRequest("https://api.example/pets")
     );
     expect(brokenResponse.status).toBe(502);
-    expect((await brokenResponse.json()) as { error: string }).toStrictEqual({
+    expect(await errorJson(brokenResponse)).toStrictEqual({
       error: "Upstream redirected to an invalid URL: http://",
     });
 
@@ -293,19 +322,18 @@ describe("createPlaygroundProxyHandler", () => {
     );
     const loopResponse = await loop(proxyRequest("https://api.example/pets"));
     expect(loopResponse.status).toBe(502);
-    const body = (await loopResponse.json()) as { error: string };
+    const body = await errorJson(loopResponse);
     expect(body.error).toContain("Too many redirects");
   });
 
   it("turns an unreachable upstream into a 502 with a JSON error", async () => {
-    const failing = (() =>
-      Promise.reject(
-        new Error("getaddrinfo ENOTFOUND api.example")
-      )) as unknown as typeof fetch;
+    const failing = asFetch(() =>
+      Promise.reject(new Error("getaddrinfo ENOTFOUND api.example"))
+    );
     const handler = createPlaygroundProxyHandler(ORIGINS, failing);
     const response = await handler(proxyRequest("https://api.example/ping"));
     expect(response.status).toBe(502);
-    expect((await response.json()) as { error: string }).toStrictEqual({
+    expect(await errorJson(response)).toStrictEqual({
       error: "getaddrinfo ENOTFOUND api.example",
     });
   });

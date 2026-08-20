@@ -312,7 +312,7 @@ describe("createWsClient", () => {
 
   it("drives a real WebSocket through the default factory and clock", () => {
     StubWebSocket.created = [];
-    const original = Reflect.get(globalThis, "WebSocket");
+    const original = globalThis.WebSocket;
     Reflect.set(globalThis, "WebSocket", StubWebSocket);
     try {
       const frames: WsFrame[] = [];

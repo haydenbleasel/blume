@@ -37,8 +37,20 @@ const REDIRECTS = [
   { from: "/ja/古い", status: 307, to: "/ja/新しい" },
 ];
 
+/** The slices of the adapter's wrangler config a test overrides. */
+interface WranglerOverrides {
+  assets?:
+    | {
+        binding?: string;
+        directory: string;
+        run_worker_first?: string[] | boolean;
+      }
+    | undefined;
+  main?: string | undefined;
+}
+
 /** The adapter-shaped `dist/server/wrangler.json` the injection rewrites. */
-const wranglerConfig = (overrides: Record<string, unknown> = {}): string =>
+const wranglerConfig = (overrides: WranglerOverrides = {}): string =>
   JSON.stringify({
     assets: { binding: "ASSETS", directory: "../client" },
     main: "index.js",
@@ -60,11 +72,23 @@ const SERVER_STUB = `export default {
 };
 `;
 
+/** The harness env the stub server and the wrapper's negotiation read. */
+interface WorkerEnv {
+  ASSETS: { fetch: (request: Request) => Promise<Response> };
+  serverCalls: string[];
+  serverResponse: () => Response;
+}
+
+/** The subset of Cloudflare's ExecutionContext the wrapper forwards. */
+interface WorkerExecutionContext {
+  waitUntil?: (task: Promise<Response>) => void;
+}
+
 interface WorkerModule {
   fetch: (
     request: Request,
-    env: unknown,
-    context: unknown
+    env: WorkerEnv,
+    context: WorkerExecutionContext
   ) => Promise<Response>;
 }
 
@@ -74,6 +98,8 @@ const loadWorker = async (workerText: string): Promise<WorkerModule> => {
   await writeFile(join(dir, "index.js"), SERVER_STUB, "utf-8");
   const file = join(dir, NEGOTIATION_WORKER_FILE);
   await writeFile(file, workerText, "utf-8");
+  // SAFETY: the file written two lines up is the generated wrapper Worker,
+  // which default-exports a `{ fetch }` module.
   const loaded = (await import(pathToFileURL(file).href)) as {
     default: WorkerModule;
   };
@@ -85,9 +111,14 @@ interface HarnessCalls {
   server: string[];
 }
 
+interface Harness {
+  calls: HarnessCalls;
+  env: WorkerEnv;
+}
+
 const makeEnv = (
   options: { assetsStatus?: number; serverResponse?: () => Response } = {}
-): { calls: HarnessCalls; env: Record<string, unknown> } => {
+): Harness => {
   const calls: HarnessCalls = { assets: [], server: [] };
   return {
     calls,

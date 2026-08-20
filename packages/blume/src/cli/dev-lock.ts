@@ -29,15 +29,32 @@ export interface DevLockInfo {
 
 const lockPath = (outDir: string): string => join(outDir, "dev.lock");
 
-const isValidPid = (pid: unknown): pid is number =>
+/** What `JSON.parse` can yield for a lock file body. */
+type LockFileValue =
+  | string
+  | number
+  | boolean
+  | null
+  | LockFileValue[]
+  | { [key: string]: LockFileValue };
+
+const isValidPid = (pid: LockFileValue | undefined): pid is number =>
   typeof pid === "number" && Number.isInteger(pid) && pid > 0;
+
+const isPortNumber = (port: LockFileValue | undefined): port is number =>
+  typeof port === "number";
+
+const isLockRecord = (
+  data: LockFileValue
+): data is { pid?: LockFileValue; port?: LockFileValue } =>
+  typeof data === "object" && data !== null;
 
 /**
  * Parse a lock file body. Current locks are JSON (`{"pid":123,"port":3001}`);
  * a bare integer (the pre-port format) still parses as a pid-only lock.
  */
 const parseLock = (raw: string): DevLockInfo | null => {
-  let data: unknown;
+  let data: LockFileValue;
   try {
     data = JSON.parse(raw.trim());
   } catch {
@@ -46,10 +63,10 @@ const parseLock = (raw: string): DevLockInfo | null => {
   if (isValidPid(data)) {
     return { pid: data };
   }
-  if (typeof data === "object" && data !== null) {
-    const { pid, port } = data as { pid?: unknown; port?: unknown };
+  if (isLockRecord(data)) {
+    const { pid, port } = data;
     if (isValidPid(pid)) {
-      return typeof port === "number" ? { pid, port } : { pid };
+      return isPortNumber(port) ? { pid, port } : { pid };
     }
   }
   return null;
@@ -63,6 +80,7 @@ const isProcessAlive = (pid: number): boolean => {
   } catch (error) {
     // EPERM means the process exists but belongs to another user — still
     // live, so the lock must hold (only ESRCH proves it's gone).
+    // SAFETY: `process.kill` failures are errno exceptions.
     return (error as NodeJS.ErrnoException).code === "EPERM";
   }
 };
@@ -84,11 +102,13 @@ export const readDevLock = (outDir: string): DevLockInfo | null => {
 export const isDevLocked = (outDir: string): boolean =>
   readDevLock(outDir) !== null;
 
-const lockPayload = (port?: number): string =>
-  JSON.stringify({
-    pid: process.pid,
-    ...(port === undefined ? {} : { port }),
-  });
+const lockPayload = (port?: number): string => {
+  const info: DevLockInfo = { pid: process.pid };
+  if (port !== undefined) {
+    info.port = port;
+  }
+  return JSON.stringify(info);
+};
 
 const writeLock = (outDir: string, port?: number): void => {
   writeFileSync(lockPath(outDir), lockPayload(port));
@@ -128,6 +148,7 @@ const tryClaimLock = (outDir: string, port?: number): boolean => {
     writeFileSync(lockPath(outDir), lockPayload(port), { flag: "wx" });
     return true;
   } catch (error) {
+    // SAFETY: `writeFileSync` failures are errno exceptions.
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
       throw error;
     }

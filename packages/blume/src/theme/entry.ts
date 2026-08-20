@@ -179,7 +179,11 @@ ${THEME_MAPPING}
     scroll-padding-top: 4.5rem;
     text-rendering: optimizeLegibility;
   }
-  /* Headings use the display font (defaults to the body font when unset). */
+  /* Headings use the display font (defaults to the body font when unset).
+     The tightened tracking is part of the theme, not the font: display-tuned
+     families bake it into their metrics, but a text family promoted to
+     headings (including the Inter default) reads loose without it. -0.05em
+     was matched visually against Inter Tight, the previous display default. */
   h1,
   h2,
   h3,
@@ -187,6 +191,7 @@ ${THEME_MAPPING}
   h5,
   h6 {
     font-family: var(--font-display);
+    letter-spacing: -0.05em;
   }
   :focus-visible {
     outline: 2px solid var(--blume-accent);
@@ -206,6 +211,13 @@ ${THEME_MAPPING}
     }
   }
 }
+
+/* Same-origin navigations ride Astro's client router (the layouts render
+   ClientRouter), which owns the page-transition styling — including its own
+   prefers-reduced-motion guard — so the theme declares nothing about it. The
+   cross-document view-transition opt-in that briefly lived here is
+   deliberately gone: mixing it with the client router double-animates the
+   full-load navigations the router hands back to the browser. */
 
 /* Code reads left-to-right regardless of page direction; only the surrounding
    chrome mirrors for RTL. Inline code is isolated so LTR identifiers don't
@@ -242,9 +254,10 @@ ${THEME_MAPPING}
   line-height: 1.7;
 }
 
+/* No letter-spacing here: prose headings inherit the base h1-h6 rule's
+   display tracking, same as headings outside the prose column. */
 .prose :where(h1, h2, h3, h4) {
   font-weight: 500;
-  letter-spacing: 0;
 }
 
 /* A heading can carry one long unbreakable token — an OpenAPI operation's title

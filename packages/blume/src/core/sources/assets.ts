@@ -78,6 +78,8 @@ export const materializeAssets = async (
         await writeFile(join(ctx.assetsDir, file), bytes);
         rewrites.set(url, `${ctx.assetsBaseUrl}/${file}`);
       } catch (error) {
+        // SAFETY: everything thrown in this block is an Error — the manual
+        // `!res.ok` throw above, and fetch/fs failures.
         diagnostics.push({
           code: "BLUME_ASSET_FETCH_FAILED",
           message: `Failed to download asset ${url}: ${(error as Error).message}`,

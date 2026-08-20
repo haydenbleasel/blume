@@ -1,5 +1,0 @@
----
-"blume": minor
----
-
-Per-group sidebar display modes on the generated sidebar. A folder can opt its group into `flat`, `group`, or `page` without an explicit `navigation.sidebar` config: set `display` in the folder's `meta.ts`, or — sugar for folders with an `index` page — `sidebar.display` in the index page's frontmatter. A generated group's effective mode resolves index frontmatter first, then folder meta, then the global `navigation.sidebar.display`, then the `flat` default; a group's value applies to that group only, and nested subgroups resolve their own chain. `page`-mode drill-in panels stay route-aware and list the index page first, loose pages hoist above sibling groups only where a sibling renders `flat` (self-delimiting `group`/`page` rows keep authored interleaving), and under i18n a fallback-filled index page never overrides a locale's own `meta.ts` display. `sidebar.display` anywhere it is dead — a non-index page, the content root's own index page, or any page under an explicit config sidebar — reports a new `BLUME_SIDEBAR_DISPLAY_IGNORED` warning instead of being silently dropped. Explicit config sidebars render exactly as before.

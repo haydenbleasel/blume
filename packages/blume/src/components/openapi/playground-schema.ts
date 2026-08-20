@@ -1,5 +1,5 @@
 import { resolveSchema } from "./helpers.ts";
-import type { SchemaLike } from "./helpers.ts";
+import type { SchemaLike, SpecValue } from "./helpers.ts";
 import type { ValidationSchema } from "./request.ts";
 
 /**
@@ -11,6 +11,11 @@ import type { ValidationSchema } from "./request.ts";
  * OpenAPI and AsyncAPI panels behave identically on the parts that are
  * genuinely identical.
  */
+
+// `typeof` checks live in named predicates (the form the oxlint anti-slop
+// config sanctions), mirroring the private guard in `helpers.ts`.
+const isString = (value: SpecValue): value is string =>
+  typeof value === "string";
 
 /** A schema's declared non-null type names (3.1 arrays flattened). */
 export const declaredTypes = (
@@ -35,11 +40,11 @@ export const scalarType = (
  * default"; non-string primitives round-trip through JSON so booleans and
  * numbers read back exactly.
  */
-export const inputValue = (value: unknown): string => {
+export const inputValue = (value: SpecValue): string => {
   if (value === undefined || value === null) {
     return "";
   }
-  return typeof value === "string" ? value : JSON.stringify(value);
+  return isString(value) ? value : JSON.stringify(value);
 };
 
 /** Recursion limit for pruned validation schemas — deep enough for real specs. */
@@ -61,7 +66,7 @@ const pruneSchema = (
     return undefined;
   }
   let visited = seen;
-  if (typeof schema.$ref === "string") {
+  if (isString(schema.$ref)) {
     if (seen.has(schema.$ref)) {
       return undefined;
     }

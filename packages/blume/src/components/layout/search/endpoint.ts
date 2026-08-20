@@ -18,6 +18,9 @@ export const createSearch =
     if (!response.ok) {
       return { hits: [], sections: [] };
     }
+    // SAFETY: the endpoint is Blume-generated (`search-endpoint` template) and
+    // responds with the SearchHit list it built; title/excerpt are still
+    // escaped below before the dialog injects them as HTML.
     const records = (await response.json()) as SearchHit[];
     const hits = records.slice(0, SEARCH_LIMIT).map((hit) => ({
       ...hit,

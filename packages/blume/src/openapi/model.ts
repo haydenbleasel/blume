@@ -1,8 +1,4 @@
-import type {
-  Document,
-  OperationObject,
-  PathItemObject,
-} from "@scalar/openapi-types/3.1";
+import type { Document, OperationObject } from "@scalar/openapi-types/3.1";
 
 import type { AsyncApiAction, AsyncApiDocument } from "./asyncapi.ts";
 import type { ReferenceKind } from "./references.ts";
@@ -114,8 +110,16 @@ export interface ApiSpecData {
 /** The generated `blume:openapi` module: specs keyed by {@link ApiSpecData.slug}. */
 export type OpenApiData = Record<string, ApiSpecData>;
 
-const isOperation = (value: unknown): value is OperationObject =>
-  typeof value === "object" && value !== null;
+// The runtime object check stands guard because the document was parsed from
+// arbitrary YAML/JSON: a spec can put a scalar where the type promises an
+// operation object.
+const isOperation = (
+  value: OperationObject | undefined
+): value is OperationObject => typeof value === "object" && value !== null;
+
+/** A declared tag whose `name` really is a string at runtime, type aside. */
+const hasTagName = (tag: SpecTag): tag is SpecTag =>
+  typeof tag.name === "string";
 
 /**
  * Assign each distinct tag name a unique slug. `slugify` can collapse
@@ -148,6 +152,26 @@ export const tagSlugger = (): ((name: string) => string) => {
 /** An operation before the collector assigns its unique key and route. */
 type CollectedOperation = Omit<ApiOperationRef, "route" | "tagSlug">;
 
+/** A document's declared tag entry (`tags[n]`). */
+type SpecTag = NonNullable<ApiDocument["tags"]>[number];
+
+/** The flattened output both extractors produce. */
+export interface CollectedOperations {
+  operations: ApiOperationRef[];
+  tags: ApiTagRef[];
+}
+
+/** The collector handle: feed operations in, read the flattened output out. */
+export interface OperationCollector {
+  add: (entry: CollectedOperation) => void;
+  finish: () => CollectedOperations;
+}
+
+/** {@link CollectedOperations} plus anything the extractor had to skip. */
+export interface ExtractedOperations extends CollectedOperations {
+  warnings: string[];
+}
+
 /**
  * The collector behind both extractors (OpenAPI here, AsyncAPI in
  * `asyncapi.ts`): first-seen tag ordering, key de-duplication (a repeated key
@@ -157,10 +181,7 @@ type CollectedOperation = Omit<ApiOperationRef, "route" | "tagSlug">;
 export const operationCollector = (
   baseRoute: string,
   tagMeta: ReadonlyMap<string, string>
-): {
-  add: (entry: CollectedOperation) => void;
-  finish: () => { operations: ApiOperationRef[]; tags: ApiTagRef[] };
-} => {
+): OperationCollector => {
   const operations: ApiOperationRef[] = [];
   const tagOrder: string[] = [];
   const tagsSeen = new Set<string>();
@@ -187,7 +208,7 @@ export const operationCollector = (
     });
   };
 
-  const finish = (): { operations: ApiOperationRef[]; tags: ApiTagRef[] } => ({
+  const finish = (): CollectedOperations => ({
     operations,
     tags: tagOrder.map((name) => ({
       description: tagMeta.get(name) ?? "",
@@ -210,17 +231,17 @@ export const operationCollector = (
 export const extractOperations = (
   document: ApiDocument,
   baseRoute: string
-): { operations: ApiOperationRef[]; tags: ApiTagRef[]; warnings: string[] } => {
+): ExtractedOperations => {
   const warnings: string[] = [];
   const tagMeta = new Map(
     (document.tags ?? [])
-      .filter((tag) => typeof tag.name === "string")
-      .map((tag) => [tag.name as string, tag.description ?? ""])
+      .filter(hasTagName)
+      .map((tag) => [tag.name, tag.description ?? ""])
   );
   const collector = operationCollector(baseRoute, tagMeta);
 
-  for (const [path, rawItem] of Object.entries(document.paths ?? {})) {
-    const item = rawItem as PathItemObject | undefined;
+  for (const [path, item] of Object.entries(document.paths ?? {})) {
+    // A parsed spec can carry a null path item despite the type; skip it.
     if (!item) {
       continue;
     }
@@ -259,10 +280,11 @@ export const operationObject = (
   // Only OpenAPI refs carry HTTP methods; the AsyncAPI counterpart is
   // `asyncApiOperationObject` in `asyncapi.ts`.
   const method = HTTP_METHODS.find((candidate) => candidate === ref.method);
+  // SAFETY: only OpenAPI specs route their refs through this resolver
+  // (AsyncAPI documents go to `asyncApiOperationObject`), so the spec's
+  // document is the OpenAPI shape.
   const document = spec.document as ApiDocument;
-  const item = (document.paths?.[ref.path] ?? undefined) as
-    | PathItemObject
-    | undefined;
+  const item = document.paths?.[ref.path];
   const operation = method === undefined ? undefined : item?.[method];
   return isOperation(operation) ? operation : undefined;
 };

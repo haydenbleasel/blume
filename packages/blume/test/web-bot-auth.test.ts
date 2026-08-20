@@ -5,6 +5,7 @@ import {
   SIGNATURES_DIRECTORY_PATH,
   SIGNATURES_DIRECTORY_TYPE,
 } from "../src/ai/web-bot-auth.ts";
+import type { BlumeConfig } from "../src/core/config-input.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
 
@@ -14,10 +15,13 @@ const ED25519_PUBLIC = {
   x: "JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs",
 };
 
-const parseAi = (webBotAuth: unknown) =>
+const parseAi = (webBotAuth: NonNullable<BlumeConfig["ai"]>["webBotAuth"]) =>
   blumeConfigSchema.safeParse({ ai: { webBotAuth } });
 
-const configWith = (keys: Record<string, unknown>[]): ResolvedConfig =>
+const configWith = (
+  keys: ResolvedConfig["ai"]["webBotAuth"]["keys"]
+): ResolvedConfig =>
+  // SAFETY: buildSignaturesDirectory reads only the configured keys.
   ({ ai: { webBotAuth: { keys } } }) as ResolvedConfig;
 
 describe("ai.webBotAuth schema", () => {

@@ -252,11 +252,11 @@ const AGENT_SCRIPT = makeScript(AGENT_LINES, 56);
 export const AUDIT_REPORT_DURATION = REPORT_SCRIPT.duration;
 export const AUDIT_AGENT_DURATION = AGENT_SCRIPT.duration;
 
-const SEVERITY_COLOR: Record<Severity, string> = {
+const SEVERITY_COLOR = {
   error: ERROR,
   warning: WARNING,
-};
-const GLYPH: Record<Severity, string> = { error: "✖", warning: "⚠" };
+} satisfies Record<Severity, string>;
+const GLYPH = { error: "✖", warning: "⚠" } satisfies Record<Severity, string>;
 
 // Braille spinner for the Codex working line, advanced every 3 frames.
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];

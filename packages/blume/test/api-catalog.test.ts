@@ -7,8 +7,9 @@ import {
   hasApiCatalog,
 } from "../src/ai/api-catalog.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
+import type { BlumeConfigInput } from "../src/core/schema.ts";
 
-const configWith = (overrides: Record<string, unknown> = {}) =>
+const configWith = (overrides: BlumeConfigInput = {}) =>
   blumeConfigSchema.parse({ title: "Docs", ...overrides });
 
 describe("buildApiCatalog", () => {

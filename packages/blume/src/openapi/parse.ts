@@ -196,6 +196,8 @@ const fetchSpecText = async (spec: string): Promise<string> => {
       // stacking on it: p-retry's own (capped) delay still runs after this
       // hook, so only the difference is slept here.
       onFailedAttempt: async (context) => {
+        // SAFETY: every retryable throw above is a RetryableFetchError; any
+        // other error reaching this hook reads an absent retryAfter.
         const { retryAfter } = context.error as RetryableFetchError;
         if (retryAfter !== undefined && context.retriesLeft > 0) {
           await sleep(
@@ -269,6 +271,8 @@ const readSpecText = async (
     if (cacheFile) {
       const cached = await readCache(cacheFile);
       if (cached !== undefined) {
+        // SAFETY: fetchSpecText throws only Error instances — attemptFetch
+        // wraps every non-Error throw in an Error.
         return {
           text: cached,
           warnings: [
@@ -287,6 +291,14 @@ const readSpecText = async (
  * diagnostic (an error in build, a warning in dev) rather than a hard failure so
  * a broken spec doesn't take down the whole build.
  */
+/**
+ * A parsed mapping is the only shape the renderer can treat as a document:
+ * `normalize` yields undefined for anything that isn't a YAML/JSON mapping
+ * (empty file, scalar, list) and `upgrade(undefined)` a null specification.
+ */
+const isApiDocument = <Value>(value: Value): value is Value & ApiDocument =>
+  typeof value === "object" && value !== null;
+
 export const parseSpec = async (
   spec: string,
   root: string,
@@ -295,15 +307,13 @@ export const parseSpec = async (
   const { text, warnings } = await readSpecText(spec, root, options);
   const normalized = normalize(text);
   const { specification } = upgrade(normalized);
-  // `normalize` yields undefined for anything that isn't a YAML/JSON mapping
-  // (empty file, scalar, list) and `upgrade(undefined)` yields a null
-  // specification — reject it here so the renderer never sees a non-document.
-  if (specification === null || typeof specification !== "object") {
+  // Reject a non-mapping here so the renderer never sees a non-document.
+  if (!isApiDocument(specification)) {
     throw new InvalidSpecError(
       `${spec} is not a valid OpenAPI document (expected a YAML or JSON object).`
     );
   }
-  return { document: specification as ApiDocument, warnings };
+  return { document: specification, warnings };
 };
 
 export interface ParsedAsyncApiSpec {
@@ -320,23 +330,34 @@ export interface ParsedAsyncApiSpec {
  * unreadable spec throws, a readable non-AsyncAPI document throws
  * {@link InvalidSpecError}, and callers lower both into source diagnostics.
  */
+/**
+ * An object carrying a non-empty `asyncapi` version string — the only input
+ * the converter and extractor can key on. `normalize` yields undefined for
+ * non-mapping input, which fails the object check here.
+ */
+const isAsyncApiDocument = <Value>(
+  value: Value
+): value is Value & AsyncApiDocument & { asyncapi: string } =>
+  typeof value === "object" &&
+  value !== null &&
+  "asyncapi" in value &&
+  typeof value.asyncapi === "string" &&
+  value.asyncapi !== "";
+
 export const parseAsyncApiSpec = async (
   spec: string,
   root: string,
   options: SpecFetchOptions = {}
 ): Promise<ParsedAsyncApiSpec> => {
   const { text, warnings } = await readSpecText(spec, root, options);
-  const normalized = normalize(text) as AsyncApiDocument | null | undefined;
-  const version =
-    normalized !== null && typeof normalized === "object"
-      ? normalized.asyncapi
-      : undefined;
-  if (typeof version !== "string" || version === "") {
+  const normalized = normalize(text);
+  if (!isAsyncApiDocument(normalized)) {
     throw new InvalidSpecError(
       `${spec} is not a valid AsyncAPI document (expected a YAML or JSON object with an \`asyncapi\` version field).`
     );
   }
-  let document = normalized as AsyncApiDocument;
+  const version = normalized.asyncapi;
+  let document: AsyncApiDocument = normalized;
   if (!version.startsWith("3.")) {
     // The converter reports lossy conversions (e.g. a 2.x parameter schema
     // that 3.0 can't express) through console.warn — capture those as spec
@@ -347,6 +368,9 @@ export const parseAsyncApiSpec = async (
       captured.push(args.map(String).join(" "));
     };
     try {
+      // SAFETY: the converter accepts any pre-3.0 AsyncAPI object and returns
+      // the 3.0 shape the extractor consumes; the two packages just declare
+      // the document type differently.
       document = convert(
         document as ConverterDocument,
         "3.0.0"
@@ -354,6 +378,7 @@ export const parseAsyncApiSpec = async (
     } catch (error) {
       // An unconvertible document (say, an unknown `asyncapi` version) is a
       // content problem, not a network one — same class as a non-document.
+      // SAFETY: @asyncapi/converter throws Error instances for bad input.
       throw new InvalidSpecError(
         `${spec} could not be converted to AsyncAPI 3.0 (${(error as Error).message}).`
       );

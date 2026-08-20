@@ -46,7 +46,7 @@ export interface OpenApiContentSource extends ContentSource {
 export const isOpenApiSource = (
   source: ContentSource
 ): source is OpenApiContentSource =>
-  (source as Partial<OpenApiContentSource>).kind === "openapi-source";
+  "kind" in source && source.kind === "openapi-source";
 
 /** Route (`/reference/pet/add-pet`) to a staged content ref, without extension. */
 const routeToRef = (route: string): string => route.replace(/^\/+/u, "");
@@ -55,7 +55,9 @@ const toEntry = (rendered: RenderedPage, ref: string): SourceEntry => {
   const raw = matter.stringify(`${rendered.body}\n`, rendered.data);
   return {
     body: { format: "mdx", text: rendered.body },
-    data: rendered.data,
+    // Spread so the named frontmatter shape satisfies the open metadata
+    // dictionary every source entry carries.
+    data: { ...rendered.data },
     hash: hashText(raw),
     raw,
     ref,
@@ -189,10 +191,7 @@ export const openApiSource = (
       let proxy: string | false = false;
       if (configuredProxy === true) {
         proxy = withBasePath(reference.basePath, "/_api-proxy");
-      } else if (
-        typeof configuredProxy === "string" &&
-        configuredProxy !== ""
-      ) {
+      } else if (configuredProxy !== false && configuredProxy !== "") {
         proxy = configuredProxy;
       }
       const spec: ApiSpecData = {
@@ -270,6 +269,8 @@ export const openApiSource = (
     } catch (error) {
       return {
         code: `${codePrefix}_UNAVAILABLE`,
+        // SAFETY: spec loading fails with Error instances (fetch, read, and
+        // parse errors alike); only the message is read for the diagnostic.
         message: `Could not load ${kindLabel} spec "${reference.spec}" for ${reference.route} (${(error as Error).message}); its reference pages were skipped.`,
         // A configured-but-unloadable spec ships a dead nav tab (a 404 route),
         // so fail loudly in build (blocks under --strict) while staying a warning

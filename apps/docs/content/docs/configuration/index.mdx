@@ -140,6 +140,18 @@ my-docs/
 
 SVG wins over PNG over ICO when several are present, and a file in `public/` is preferred over one at the root. If Blume finds no icon, it falls back to its own mark.
 
+A dark mark disappears against dark browser chrome, so you can ship a second file for dark mode. Add a `-dark` sibling of your icon file — the same name and directory, with `-dark` before the extension (`icon.png` → `icon-dark.png`) — and Blume emits both icons behind a `prefers-color-scheme` media query, plus a plain light tag for browsers and crawlers that ignore media queries on icons:
+
+```
+my-docs/
+├─ blume.config.ts
+├─ icon.png          ← light mode
+├─ icon-dark.png     ← dark mode
+└─ docs/
+```
+
+Only the sibling of the icon Blume picked is used — a `-dark` file with a different name stays ignored, so an unrelated file can't pair with your mark by accident. The dark file is optional; with only one icon, Blume emits a single tag as before. Blume's own fallback mark ships both variants.
+
 ### Apple touch icon
 
 The icon iOS uses when someone adds your site to their home screen is detected the same way. Drop an `apple-icon` file (`.png`, `.jpg`, or `.jpeg`) — or an `apple-touch-icon.png`, the name most favicon generators emit — in your project root or `public/` directory and Blume wires up `<link rel="apple-touch-icon">` for you. There's no default; if no file is found, no tag is emitted.
@@ -151,7 +163,7 @@ my-docs/
 └─ docs/
 ```
 
-Put the file in `public/` rather than the project root: iOS ignores the inlined data URI Blume uses for a root-level icon, so only a `public/` file (served at `/apple-icon.png`) reliably reaches the home screen.
+Put the file in `public/` rather than the project root: iOS ignores the inlined data URI Blume uses for a root-level icon, so only a `public/` file (served at `/apple-icon.png`) reliably reaches the home screen. Unlike the favicon, there's no `-dark` sibling here — iOS ignores media queries on home-screen icons, so a dark variant could never be served.
 
 ### Banner
 
@@ -289,7 +301,7 @@ lastModified: true,
 | `{ type: "git" }` | Same as `true`, written explicitly. |
 | `{ type: "frontmatter" }` | Never run git — use only the `lastModified` frontmatter field. |
 
-The git source reads the most recent commit that touched each file, so it works in any git repository — including monorepos — and needs the repo's history at build time (avoid a shallow `--depth 1` checkout in CI). A page's own `lastModified` frontmatter always wins, which is handy for pinning a date or for files that aren't committed yet:
+The git source reads the most recent commit that touched each file, so it works in any git repository — including monorepos — and needs the repo's history at build time. CI platforms usually check out a shallow clone, which silently drops most dates (the build warns with `BLUME_SHALLOW_GIT_HISTORY` when that happens): on Vercel, set the `VERCEL_DEEP_CLONE=true` environment variable; with `actions/checkout`, set `fetch-depth: 0`. A page's own `lastModified` frontmatter always wins, which is handy for pinning a date or for files that aren't committed yet:
 
 ```mdx page.mdx
 ---

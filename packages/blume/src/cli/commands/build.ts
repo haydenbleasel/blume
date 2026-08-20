@@ -64,6 +64,9 @@ import { prepareProject } from "../prepare.ts";
 
 const ADAPTERS = ["vercel", "node", "netlify", "cloudflare"] as const;
 
+const isAdapter = (value: string): value is (typeof ADAPTERS)[number] =>
+  ADAPTERS.some((adapter) => adapter === value);
+
 const BUDGET_JS = "budget-js";
 const BUDGET_CSS = "budget-css";
 
@@ -295,14 +298,13 @@ const emitVercelNegotiation = async (
   if (!existsSync(configPath)) {
     return;
   }
-  const overrides: Record<string, string> = {
-    ...(hasApiCatalog(config)
-      ? { [API_CATALOG_PATH.slice(1)]: API_CATALOG_TYPE }
-      : {}),
-    ...(config.ai.webBotAuth.keys.length > 0
-      ? { [SIGNATURES_DIRECTORY_PATH.slice(1)]: SIGNATURES_DIRECTORY_TYPE }
-      : {}),
-  };
+  const overrides: Record<string, string> = {};
+  if (hasApiCatalog(config)) {
+    overrides[API_CATALOG_PATH.slice(1)] = API_CATALOG_TYPE;
+  }
+  if (config.ai.webBotAuth.keys.length > 0) {
+    overrides[SIGNATURES_DIRECTORY_PATH.slice(1)] = SIGNATURES_DIRECTORY_TYPE;
+  }
   // The homepage rewrite serves `/index.md` from the static layer, so its
   // `x-markdown-tokens` estimate has to ride the routing config; the runtime
   // endpoint stamps it on dev/server-rendered responses itself.
@@ -754,7 +756,7 @@ export const buildCommand = defineCommand({
       logger.error(`Invalid --output "${args.output}" (use static | server).`);
       process.exit(1);
     }
-    if (args.adapter && !ADAPTERS.includes(args.adapter as never)) {
+    if (args.adapter && !isAdapter(args.adapter)) {
       logger.error(
         `Invalid --adapter "${args.adapter}" (use ${ADAPTERS.join(" | ")}).`
       );
@@ -765,8 +767,12 @@ export const buildCommand = defineCommand({
     const project = await prepareProject({
       mode: "build",
       overrides: {
+        // SAFETY: an invalid --adapter exited above; a set flag is an ADAPTERS
+        // member.
         adapter: args.adapter as (typeof ADAPTERS)[number] | undefined,
         base: args.base,
+        // SAFETY: an invalid --output exited above; a set flag is static or
+        // server.
         output: args.output as "server" | "static" | undefined,
       },
       preview: args.preview,

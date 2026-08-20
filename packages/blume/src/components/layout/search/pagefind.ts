@@ -23,6 +23,8 @@ export const createSearch = async (opts: {
 }): Promise<SearchFn> => {
   // The pagefind bundle lives in the built site (not node_modules) and is
   // resolved at runtime by URL — it can't be a static, code-splittable path.
+  // SAFETY: the URL points at the `pagefind.js` module our own build emitted,
+  // whose export contract (`search()`) is fixed by pagefind.
   // oxlint-disable-next-line react-doctor/no-dynamic-import-path
   const pagefind = (await import(
     /* @vite-ignore */

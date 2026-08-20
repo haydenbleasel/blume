@@ -4,7 +4,7 @@ import {
   resolveSchema,
   toJson,
 } from "./helpers.ts";
-import type { ParameterLike, SchemaLike } from "./helpers.ts";
+import type { ParameterLike, SchemaLike, SpecValue } from "./helpers.ts";
 import {
   declaredTypes,
   inputValue,
@@ -34,12 +34,18 @@ interface MediaTypeLike {
 }
 
 /** Primitive types the flat-body fields UI can edit directly. */
-const PRIMITIVE_TYPES: Record<string, true> = {
+const PRIMITIVE_TYPES = {
   boolean: true,
   integer: true,
   number: true,
   string: true,
-};
+} as const;
+
+/** Whether a spec example is a plain object usable for per-field defaults. */
+const isExampleObject = (
+  value: SpecValue
+): value is Record<string, SpecValue> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
  * Playground inputs for the operation's parameters. Cookie params are skipped
@@ -95,7 +101,7 @@ const jsonContentType = (
 const bodyFields = (
   schema: SchemaLike | undefined,
   schemas: Record<string, SchemaLike>,
-  example: unknown
+  example: SpecValue
 ): PlaygroundBodyField[] | undefined => {
   const resolved = resolveSchema(schemas, schema);
   if (declaredTypes(resolved.type).some((type) => type !== "object")) {
@@ -105,16 +111,13 @@ const bodyFields = (
   if (properties.length === 0) {
     return undefined;
   }
-  const defaults =
-    typeof example === "object" && example !== null && !Array.isArray(example)
-      ? (example as Record<string, unknown>)
-      : {};
+  const defaults = isExampleObject(example) ? example : undefined;
   const fields: PlaygroundBodyField[] = [];
   for (const [name, property] of properties) {
     const propertySchema = resolveSchema(schemas, property);
     const type = scalarType(property, schemas);
     if (
-      !PRIMITIVE_TYPES[type] ||
+      !(type in PRIMITIVE_TYPES) ||
       propertySchema.properties ||
       propertySchema.items
     ) {
@@ -126,7 +129,7 @@ const bodyFields = (
       name,
       required: required.has(name),
       type,
-      value: inputValue(defaults[name]),
+      value: inputValue(defaults?.[name]),
     });
   }
   return fields;
@@ -142,8 +145,10 @@ const modelBody = (
     return undefined;
   }
   const [contentType, mediaType] = media;
+  // SAFETY: `example` comes from the parsed spec document (YAML/JSON), whose
+  // values are exactly the JSON-shaped tree `SpecValue` models.
   const exampleData =
-    mediaType.example ?? exampleValue(mediaType.schema, schemas);
+    (mediaType.example as SpecValue) ?? exampleValue(mediaType.schema, schemas);
   return {
     contentType,
     example: toJson(exampleData) ?? "",

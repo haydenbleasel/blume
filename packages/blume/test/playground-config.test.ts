@@ -8,12 +8,16 @@ import { join } from "pathe";
 import { generateRuntime } from "../src/astro/generate.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
+import type { BlumeConfigInput } from "../src/core/schema.ts";
 import { serverFeatures } from "../src/core/server-features.ts";
 import { resolveReferences } from "../src/openapi/references.ts";
 import { openApiSource } from "../src/openapi/source.ts";
 
+/** The user-authored `openapi` config block, straight off the schema input. */
+type OpenApiInput = NonNullable<BlumeConfigInput["openapi"]>;
+
 /** Shorthand: the resolved `openapi.playground` for a given input. */
-const playgroundOf = (playground?: unknown) =>
+const playgroundOf = (playground?: OpenApiInput["playground"]) =>
   blumeConfigSchema.parse({
     openapi: { enabled: true, playground, spec: "spec.json" },
   }).openapi.playground;
@@ -183,8 +187,7 @@ describe("ApiSpecData.playground resolution", () => {
   });
 });
 
-const parse = (openapi: Record<string, unknown>) =>
-  blumeConfigSchema.parse({ openapi });
+const parse = (openapi: OpenApiInput) => blumeConfigSchema.parse({ openapi });
 
 describe("serverFeatures playground proxy", () => {
   it("requires server output only for the built-in proxy (proxy: true)", () => {

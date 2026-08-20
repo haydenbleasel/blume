@@ -16,11 +16,7 @@ import {
   TEMPLATES,
   validateContentDir,
 } from "../init/scaffold.ts";
-import type {
-  InitAnswers,
-  PackageManager,
-  Template,
-} from "../init/scaffold.ts";
+import type { InitAnswers } from "../init/scaffold.ts";
 import { logger } from "../log.ts";
 
 /**
@@ -45,6 +41,8 @@ const ejectScaffold = async (
     const steps = [...cd, commands.install, commands.dev];
     logger.box(`Next steps:\n\n  ${steps.join("\n  ")}\n`);
   } catch (error) {
+    // SAFETY: eject and the script rewrite throw Error instances; only the
+    // message is surfaced in the fallback hint.
     logger.warn(
       `Scaffolded, but eject needs the project's dependencies installed to load blume.config.ts: ${(error as Error).message}`
     );
@@ -93,15 +91,17 @@ export const initCommand = defineCommand({
   async run({ args }) {
     const cwd = process.cwd();
 
-    const template = args.template as Template | undefined;
-    if (template !== undefined && !TEMPLATES.includes(template)) {
+    const template = TEMPLATES.find((candidate) => candidate === args.template);
+    if (args.template !== undefined && template === undefined) {
       logger.error(
         `Unknown template "${args.template}" (use ${TEMPLATES.join(" | ")}).`
       );
       process.exit(1);
     }
-    const pm = args["package-manager"] as PackageManager | undefined;
-    if (pm !== undefined && !PACKAGE_MANAGERS.includes(pm)) {
+    const pm = PACKAGE_MANAGERS.find(
+      (candidate) => candidate === args["package-manager"]
+    );
+    if (args["package-manager"] !== undefined && pm === undefined) {
       logger.error(
         `Unknown package manager "${args["package-manager"]}" (use ${PACKAGE_MANAGERS.join(" | ")}).`
       );

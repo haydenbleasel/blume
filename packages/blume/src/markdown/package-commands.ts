@@ -14,12 +14,12 @@ export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
  * (yarnpkg/berry#821), so global installs on the yarn tab honestly render
  * npm's form, matching `ni`'s table.
  */
-const AGENT_FOR: Record<PackageManager, Agent> = {
+const AGENT_FOR = {
   bun: "bun",
   npm: "npm",
   pnpm: "pnpm",
   yarn: "yarn@berry",
-};
+} satisfies Record<PackageManager, Agent>;
 
 /** Words that mark the input as an explicit command rather than a bare list. */
 const MANAGER_PREFIXES = new Set(["bun", "bunx", "npm", "npx", "pnpm", "yarn"]);
@@ -137,14 +137,14 @@ const parseIntent = (input: string): Intent => {
 };
 
 /** The package-manager-detector command for each non-global operation. */
-const COMMAND_FOR: Record<Exclude<Operation, "create">, Command> = {
+const COMMAND_FOR = {
   add: "add",
   ci: "frozen",
   exec: "execute",
   install: "install",
   remove: "uninstall",
   run: "run",
-};
+} satisfies Record<Exclude<Operation, "create">, Command>;
 
 /**
  * Render one manager's command for the given intent, via
@@ -188,9 +188,7 @@ const buildCommand = (manager: PackageManager, intent: Intent): string => {
  * manager. Accepts a bare package list (`react`) or a full command
  * (`npm i -D typescript`, `npx astro add react`).
  */
-export const toPackageCommands = (
-  input: string
-): Record<PackageManager, string> => {
+export const toPackageCommands = (input: string) => {
   const intent = parseIntent(input);
   const normalize = (command: string): string =>
     command.replaceAll(WHITESPACE_RUN, " ").trim();
@@ -199,5 +197,5 @@ export const toPackageCommands = (
     npm: normalize(buildCommand("npm", intent)),
     pnpm: normalize(buildCommand("pnpm", intent)),
     yarn: normalize(buildCommand("yarn", intent)),
-  };
+  } satisfies Record<PackageManager, string>;
 };

@@ -38,6 +38,8 @@ const require = createRequire(import.meta.url);
  * never pays the TypeScript parse cost.
  */
 export const blumeTwoslashTransformer = (): ShikiTransformer => {
+  // SAFETY: this resolves Blume's own pinned `typescript` dependency, whose
+  // CJS entry exports exactly the API namespace `typeof TS` describes.
   const tsModule = require("typescript") as typeof TS;
   const twoslasher = createTwoslasher({
     // Match the stock transformer's default: fence snippets are authored

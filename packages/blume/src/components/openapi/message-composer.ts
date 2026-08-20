@@ -45,6 +45,9 @@ export const initComposer = (root: HTMLElement): void => {
   if (!modelScript) {
     return;
   }
+  // SAFETY: this script tag is written only by MessageComposer.astro, which
+  // serializes a typed MessageModel into it at build time — the JSON here can
+  // hold nothing else.
   const model = JSON.parse(modelScript.textContent ?? "") as MessageModel;
 
   // The sample panes live in the sibling rail, so they are looked up from the

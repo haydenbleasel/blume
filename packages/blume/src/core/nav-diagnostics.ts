@@ -9,7 +9,7 @@ import type { Diagnostic, NavNode, Navigation, PageRecord } from "./types.ts";
  * covers every source (config, folder meta, frontmatter) at once.
  */
 
-const ICON_SHAPE_HINT =
+const ICON_FORMAT_HINT =
   "Use a built-in icon name, an image path/URL, or inline SVG markup.";
 
 /** Flatten a sidebar tree to every node, descending into groups. */
@@ -80,7 +80,7 @@ const unknownIconDiagnostics = (
 
 /** Warn about icon names that aren't in Blume's set (skipping image/SVG icons). */
 export const validateNavIcons = (navigation: Navigation): Diagnostic[] =>
-  unknownIconDiagnostics(collectIcons(navigation), ICON_SHAPE_HINT);
+  unknownIconDiagnostics(collectIcons(navigation), ICON_FORMAT_HINT);
 
 /**
  * Warn about unknown icons on curated `search.popular` links. Same accepted
@@ -94,7 +94,7 @@ export const validateSearchPopularIcons = (
       ? [{ icon: link.icon, where: `popular link "${link.label}"` }]
       : []
   );
-  return unknownIconDiagnostics(icons, ICON_SHAPE_HINT);
+  return unknownIconDiagnostics(icons, ICON_FORMAT_HINT);
 };
 
 /** Whether an internal path resolves to a page or a section that has pages. */

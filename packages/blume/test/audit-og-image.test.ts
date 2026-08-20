@@ -6,7 +6,6 @@ import { join } from "pathe";
 
 import { ogImageChecks } from "../src/audit/checks/og-image.ts";
 import { imageSize } from "../src/audit/image-size.ts";
-import type { Diagnostic } from "../src/core/types.ts";
 import { codes, context, snapshot } from "./audit-support.ts";
 
 /** The og:image byte checks, and the header-only dimension parser under them. */
@@ -124,7 +123,7 @@ const run = async (
 ): Promise<string[]> => {
   ctx.staticDir = dir;
   ctx.files = files;
-  return codes((await ogImageChecks.run(ctx)) as Diagnostic[]);
+  return codes(await ogImageChecks.run(ctx));
 };
 
 describe("ogImageChecks", () => {

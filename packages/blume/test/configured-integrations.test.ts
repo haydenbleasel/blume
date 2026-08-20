@@ -9,6 +9,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { createServer } from "node:net";
+import type { AddressInfo } from "node:net";
 
 import { dirname, join } from "pathe";
 
@@ -58,7 +59,7 @@ export default {
 };
 `;
 
-const fixtureFiles = (labels: string[]): Record<string, string> => ({
+const fixtureFiles = (labels: string[]) => ({
   "blume.config.ts": configSource(labels),
   "docs/index.md": "# Home\n",
   "node_modules/site-integration/index.mjs": integrationPackage,
@@ -213,12 +214,16 @@ const waitForQuiescentMarkers = async (
   return settle(startingLines.length);
 };
 
+const isAddressInfo = (
+  value: AddressInfo | string | null
+): value is AddressInfo => Boolean(value) && typeof value !== "string";
+
 const availablePort = async (): Promise<number> => {
   const server = createServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = server.address();
-  const port = address && typeof address !== "string" ? address.port : null;
+  const port = isAddressInfo(address) ? address.port : null;
   const closed = once(server, "close");
   server.close();
   await closed;
@@ -405,6 +410,8 @@ it("runs configured integrations in order for build and dev, regenerates once on
   let lines = await markerLines(root);
   expectPair(lines, "config", initial);
   expectPair(lines, "build", initial);
+  // SAFETY: the generated runtime package.json always declares a
+  // `dependencies` map (generate.ts writes one unconditionally).
   const runtimePackage = JSON.parse(
     await readFile(join(root, ".blume-verify/package.json"), "utf-8")
   ) as { dependencies: Record<string, string> };
@@ -427,6 +434,7 @@ it("runs configured integrations in order for build and dev, regenerates once on
       configSource(updated),
       "utf-8"
     );
+    // SAFETY: the expect above already failed the test if hashBefore is null.
     await waitForConfigHashChange(root, hashBefore as string);
     await waitForMarkerCount(root, markerCountBefore + 1);
     const settledMarkers = await waitForQuiescentMarkers(root);

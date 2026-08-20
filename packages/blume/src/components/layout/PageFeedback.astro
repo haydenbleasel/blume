@@ -42,8 +42,14 @@ const buttonClass =
 <script>
   import { track } from "./analytics-client.ts";
 
-  const root = document.querySelector("[data-blume-page-feedback]");
-  if (root) {
+  // Run on the initial load and again after every client-router swap, which
+  // rebuilds the rating widget from server-rendered markup — the handlers
+  // below always bind to the freshly swapped-in elements.
+  const initFeedback = () => {
+    const root = document.querySelector("[data-blume-page-feedback]");
+    if (!root) {
+      return;
+    }
     const actions = root.querySelector("[data-feedback-actions]");
     const thanks = root.querySelector("[data-feedback-thanks]");
     for (const button of root.querySelectorAll("[data-feedback-value]")) {
@@ -57,5 +63,8 @@ const buttonClass =
         thanks?.classList.remove("hidden");
       });
     }
-  }
+  };
+
+  initFeedback();
+  document.addEventListener("astro:after-swap", initFeedback);
 </script>

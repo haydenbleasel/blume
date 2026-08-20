@@ -16,6 +16,8 @@ let cached: string | undefined;
 export const getBlumeVersion = (): string => {
   if (cached === undefined) {
     const pkgPath = join(packageRoot(), "package.json");
+    // SAFETY: this reads blume's own package.json, which always declares a
+    // `version` (publishing requires it).
     cached = (JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string })
       .version;
   }

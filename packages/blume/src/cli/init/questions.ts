@@ -52,7 +52,7 @@ export interface InitFlags {
   template?: Template;
 }
 
-const cancelled = (value: unknown): value is symbol =>
+const cancelled = (value: string | string[] | symbol): value is symbol =>
   typeof value === "symbol";
 
 /**

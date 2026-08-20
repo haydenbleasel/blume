@@ -47,6 +47,9 @@ const REQUEST_TIMEOUT_MS = 30_000;
 /** Convention used across the OpenAPI components for error-severity text. */
 const ERROR_TEXT = "text-red-600 text-xs dark:text-red-400";
 
+/** A typed flat-body field's JSON value: the raw input text or its coercion. */
+type FieldValue = string | number | boolean;
+
 /**
  * Coerce a typed flat-body field's raw input text into its JSON value. Text
  * that doesn't parse as the declared type is kept verbatim so the API (not
@@ -54,7 +57,7 @@ const ERROR_TEXT = "text-red-600 text-xs dark:text-red-400";
  * empty string — `Number("")` is 0, which would silently invent a value for a
  * required numeric field the reader left blank.
  */
-const coerce = (raw: string, type: string): unknown => {
+const coerce = (raw: string, type: string): FieldValue => {
   if (raw === "") {
     return raw;
   }
@@ -98,6 +101,8 @@ export const initPlayground = (root: HTMLElement): void => {
   if (!modelScript) {
     return;
   }
+  // SAFETY: the script tag is rendered by Playground.astro, which serializes
+  // exactly the `PlaygroundModel` that `operationModel` produced at build time.
   const model = JSON.parse(modelScript.textContent ?? "") as PlaygroundModel;
 
   // The sample panes live in the sibling RequestPanel, so they are looked up
@@ -135,7 +140,7 @@ export const initPlayground = (root: HTMLElement): void => {
     root.querySelector<HTMLInputElement>(selector);
 
   /** Credentials straight from the inputs, keyed by security-scheme id. */
-  const collectAuth = (): Record<string, AuthValue> => {
+  const collectAuth = () => {
     const auth: Record<string, AuthValue> = {};
     for (const input of model.auth) {
       auth[input.id] =
@@ -158,7 +163,7 @@ export const initPlayground = (root: HTMLElement): void => {
    * the miss. No fields set at all means no body.
    */
   const flatBody = (): string | undefined => {
-    const out: Record<string, unknown> = {};
+    const out: Record<string, FieldValue> = {};
     for (const spec of model.body?.fields ?? []) {
       const raw = field(`[data-body-field="${spec.name}"]`)?.value ?? "";
       if (raw === "" && !spec.required) {
@@ -237,6 +242,9 @@ export const initPlayground = (root: HTMLElement): void => {
       return;
     }
     try {
+      // SAFETY: this storage key is only ever written by `onEdit` below, which
+      // persists exactly the `collectAuth()` record; a corrupt foreign value at
+      // worst restores odd strings into the credential inputs.
       const saved = JSON.parse(stored) as Record<string, AuthValue>;
       for (const input of model.auth) {
         const value = saved[input.id];

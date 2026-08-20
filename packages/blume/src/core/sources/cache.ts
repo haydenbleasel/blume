@@ -85,6 +85,9 @@ export const snapshotCache = (cacheDir: string): SnapshotCache => {
   return {
     read: async () => {
       try {
+        // SAFETY: the snapshot file is only ever written by `write` below, from
+        // a `SourceEntry[]` via JSON.stringify; a corrupt file lands in the
+        // catch and reads as empty.
         return JSON.parse(await readFile(file, "utf-8")) as SourceEntry[];
       } catch {
         return [];
@@ -126,6 +129,8 @@ export const loadWithCache = async (
   } catch (error) {
     const fallback = await cache.read();
     if (fallback.length > 0) {
+      // SAFETY: everything thrown on this path is an Error — fetch rejects
+      // with a TypeError and the source adapters throw Error instances.
       const diagnostic: Diagnostic = {
         code: "BLUME_SOURCE_OFFLINE",
         message: `Source "${name}" could not be fetched (${(error as Error).message}); served ${fallback.length} cached entries.`,
@@ -133,6 +138,7 @@ export const loadWithCache = async (
       };
       return { diagnostics: [diagnostic], entries: fallback };
     }
+    // SAFETY: same invariant as above — `fetchEntries` failures are Errors.
     throw new BlumeError({
       code: "BLUME_SOURCE_FETCH_FAILED",
       message: `Source "${name}" failed to load and no cache is available: ${(error as Error).message}`,

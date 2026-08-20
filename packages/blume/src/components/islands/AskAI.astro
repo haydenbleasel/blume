@@ -44,12 +44,18 @@ const icons = {
 };
 ---
 
+{/* transition:persist carries the island — and with it the conversation,
+    the draft input, and the open panel — across client-router navigations
+    instead of remounting it empty on every page. The island re-portals its
+    panel and re-stamps the body push attribute itself on astro:after-swap
+    (see ask-ai.tsx), since the swap replaces <body> wholesale. */}
 <AskAI
   client:load
   endpoint={endpoint}
   icons={icons}
   strings={strings}
   suggestions={items}
+  transition:persist="blume-ask"
 />
 
 <style is:global>

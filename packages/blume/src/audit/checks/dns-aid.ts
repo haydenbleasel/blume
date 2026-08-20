@@ -68,6 +68,9 @@ const fetchDohJson = async (
     if (!response.ok) {
       return null;
     }
+    // SAFETY: the resolver answered a dns-json query, whose response schema
+    // DohResponse models with every field optional; a malformed body that
+    // fails to parse rejects into the catch below.
     return (await response.json()) as DohResponse;
   } catch {
     return null;

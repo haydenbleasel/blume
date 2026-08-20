@@ -17,7 +17,10 @@ declare module "blume:search-client" {
 
 declare module "blume:ask" {
   /** The generated Ask trigger (see `askComponentTemplate`); empty when Ask is off. */
-  const Ask: (props: Record<string, unknown>) => unknown;
+  // Mirrors the generated `.blume/src/env.d.ts` declaration: the trigger's type
+  // is the AskAI island the enabled template re-exports.
+  // oxlint-disable-next-line typescript/consistent-type-imports
+  const Ask: typeof import("./components/islands/AskAI.astro").default;
   export default Ask;
 }
 
@@ -34,6 +37,7 @@ declare module "blume:data" {
 // `tsc` (where the Astro TS plugin isn't active). Not shipped in `dist/types`, so
 // consumers keep Astro's real `.astro` types and get the true prop shapes.
 declare module "*.astro" {
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type, anti-slop/no-unknown-returns -- a wildcard shim spans every `.astro` component, whose prop shapes and render output only Astro's own TS plugin can type
   const component: (props: Record<string, unknown>) => unknown;
   export default component;
 }

@@ -39,7 +39,7 @@ const CONFIG = `export default {
 };
 `;
 
-const FILES: Record<string, string> = {
+const FILES = {
   "blume.config.ts": CONFIG,
   "docs/changelog.$.mdx": "---\ntitle: Changelog\n---\n# Changelog\n",
   "docs/concepts/meta.ts": "export default { order: 2 };\n",
@@ -76,6 +76,35 @@ const metaItems = (items: (PageWorkItem | MetaWorkItem)[]): MetaWorkItem[] =>
   items.filter((item): item is MetaWorkItem => item.kind === "meta");
 
 describe("computeWorkList", () => {
+  it("never translates archived-version snapshots", async () => {
+    const root = await fixture({
+      ...FILES,
+      "blume.config.ts": `export default {
+  title: "Test",
+  i18n: {
+    defaultLocale: "en",
+    locales: [
+      { code: "en", label: "English" },
+      { code: "fr", label: "French" },
+      { code: "de", label: "German" },
+    ],
+  },
+  versions: {
+    archived: [{ id: "v1.0" }],
+    current: { label: "v2.0" },
+  },
+};
+`,
+      // A frozen snapshot with a missing French translation: still not work.
+      "docs/v1.0/guides/install.mdx": "---\ntitle: Install v1\n---\n# Old\n",
+    });
+    const project = await scan(root);
+    const workList = await computeWorkList(project, emptyLedger());
+    const sources = pageItems(workList.items).map((item) => item.sourceRel);
+    expect(sources).toContain("docs/guides/install.mdx");
+    expect(sources.some((rel) => rel.includes("v1.0"))).toBe(false);
+  });
+
   it("classifies missing, untracked, and excluded sources across locales", async () => {
     const root = await fixture();
     const project = await scan(root);
@@ -95,9 +124,9 @@ describe("computeWorkList", () => {
       ["docs/index.mdx", "de", "missing"],
     ]);
     // Canonical dir-parser target paths.
-    const install = pageItems(workList.items)[1] as PageWorkItem;
-    expect(install.targetRel).toBe("docs/fr/guides/install.mdx");
-    expect(install.targetPath).toBe(join(root, "docs/fr/guides/install.mdx"));
+    const [, install] = pageItems(workList.items);
+    expect(install?.targetRel).toBe("docs/fr/guides/install.mdx");
+    expect(install?.targetPath).toBe(join(root, "docs/fr/guides/install.mdx"));
 
     // The hand-authored fr/index.mdx and fr/guides/meta.ts are adopted, never
     // overwritten.
@@ -255,6 +284,9 @@ describe("computeWorkList", () => {
     const project = await scan(root);
     const txtPath = join(root, "docs/raw.txt");
     await writeFile(txtPath, "not markdown");
+    // SAFETY: a real scanned project with extra hand-built page records; only
+    // the provenance fields `computeWorkList` filters on differ from the real
+    // records they spread.
     const doctored = {
       ...project,
       graph: {

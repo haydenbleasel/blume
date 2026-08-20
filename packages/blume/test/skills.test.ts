@@ -194,6 +194,7 @@ describe("buildSkillsIndex", () => {
     await mkdir(join(dir, "simple"), { recursive: true });
     await writeFile(join(dir, "simple", "SKILL.md"), skillMd("simple"));
     const { skills } = await collectSkills(dir);
+    // SAFETY: buildSkillsIndex reads only deployment.base off the config.
     const index = JSON.parse(
       buildSkillsIndex(skills, {
         deployment: { base: "/base/" },

@@ -19,10 +19,10 @@ const visibilityBlock = (audience: VisibilityAudience): RegExp =>
     "gu"
   );
 
-const BLOCKS: Record<VisibilityAudience, RegExp> = {
+const BLOCKS = {
   agents: visibilityBlock("agents"),
   web: visibilityBlock("web"),
-};
+} satisfies Record<VisibilityAudience, RegExp>;
 
 /**
  * Resolve `<Visibility>` blocks for one audience: blocks addressed to the

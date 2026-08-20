@@ -3,6 +3,11 @@ import { describe, expect, it } from "bun:test";
 import { buildHomeLinkHeader } from "../src/ai/link-headers.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
 
+/** Treat a partial fixture as the full resolved config the header builder takes. */
+const asResolvedConfig = <Fixture>(fixture: Fixture): ResolvedConfig =>
+  // SAFETY: each caller populates every field buildHomeLinkHeader reads.
+  fixture as ResolvedConfig;
+
 const configWith = (
   overrides: Partial<{
     agentReadability: boolean;
@@ -11,7 +16,9 @@ const configWith = (
     mcp: boolean;
   }> = {}
 ): ResolvedConfig =>
-  ({
+  // SAFETY: buildHomeLinkHeader reads only the ai, api-reference, base, and
+  // seo fields populated here.
+  asResolvedConfig({
     ai: {
       llmsTxt: { enabled: overrides.llmsTxt ?? true },
       mcp: { enabled: overrides.mcp ?? false, route: "/mcp" },
@@ -21,7 +28,7 @@ const configWith = (
     deployment: { base: overrides.base },
     openapi: { enabled: false, sources: [] },
     seo: { agentReadability: overrides.agentReadability ?? true },
-  }) as unknown as ResolvedConfig;
+  });
 
 describe("buildHomeLinkHeader", () => {
   it("advertises the manifest, llms.txt, and the home Markdown mirror", () => {

@@ -59,12 +59,44 @@ export interface SanitySourceOptions {
 
 const IMAGE_REF = /^image-(?<id>[a-f0-9]+)-(?<dims>\d+x\d+)-(?<ext>\w+)$/u;
 
+/** A value in a fetched document: arbitrary JSON the GROQ query returned. */
+type SanityValue =
+  | string
+  | number
+  | boolean
+  | null
+  | SanityValue[]
+  | { [key: string]: SanityValue };
+
+/** A document as the GROQ query returns it. */
+interface SanityDocument {
+  [key: string]: SanityValue;
+}
+
+/** The frontmatter fields this adapter maps from a document. */
+interface SanityFrontmatter {
+  description?: string;
+  title?: string;
+}
+
+/**
+ * A node a dot path can descend into. Arrays pass too (matching their runtime
+ * string-key indexing, e.g. `items.0`), so the predicate types them as the
+ * keyed form both traverse through.
+ */
+const isTraversable = (
+  value: SanityValue | undefined
+): value is SanityDocument => typeof value === "object" && value !== null;
+
 /** Resolve a dot path (`slug.current`) against a document. */
-const getPath = (doc: Record<string, unknown>, path: string): unknown => {
-  let current: unknown = doc;
+const getPath = (
+  doc: SanityDocument,
+  path: string
+): SanityValue | undefined => {
+  let current: SanityValue | undefined = doc;
   for (const key of path.split(".")) {
-    if (current && typeof current === "object") {
-      current = (current as Record<string, unknown>)[key];
+    if (isTraversable(current)) {
+      current = current[key];
     } else {
       return;
     }
@@ -72,8 +104,11 @@ const getPath = (doc: Record<string, unknown>, path: string): unknown => {
   return current;
 };
 
-const asString = (value: unknown): string | undefined =>
-  typeof value === "string" ? value : undefined;
+const isStringValue = (value: SanityValue | undefined): value is string =>
+  typeof value === "string";
+
+const asString = (value: SanityValue | undefined): string | undefined =>
+  isStringValue(value) ? value : undefined;
 
 /** Build a Sanity CDN URL from an image asset `_ref`. */
 const imageUrlFromRef = (
@@ -89,6 +124,16 @@ const imageUrlFromRef = (
   return `https://cdn.sanity.io/images/${projectId}/${dataset}/${id}-${dims}.${ext}`;
 };
 
+/** The `createClient` config slice this adapter passes. */
+interface SanityClientConfig {
+  apiVersion: string;
+  dataset: string;
+  perspective: "previewDrafts" | "published";
+  projectId: string;
+  token: string | undefined;
+  useCdn: boolean;
+}
+
 const resolveClient = async (
   options: SanitySourceOptions,
   preview: boolean
@@ -96,10 +141,13 @@ const resolveClient = async (
   if (options.client) {
     return options.client;
   }
-  let createClient: (config: Record<string, unknown>) => SanityClientLike;
+  let createClient: (config: SanityClientConfig) => SanityClientLike;
   try {
+    // SAFETY: `@sanity/client` is an optional dependency; its `createClient`
+    // accepts a superset of this config slice and returns a client exposing
+    // the `fetch` method this adapter uses.
     ({ createClient } = (await import("@sanity/client")) as {
-      createClient: (config: Record<string, unknown>) => SanityClientLike;
+      createClient: (config: SanityClientConfig) => SanityClientLike;
     });
   } catch {
     throw new BlumeError({
@@ -135,7 +183,7 @@ export const sanitySource = (
   );
   let snapshot = new Map<string, SourceEntry>();
 
-  const toEntry = (doc: Record<string, unknown>): SourceEntry => {
+  const toEntry = (doc: SanityDocument): SourceEntry => {
     const slugValue =
       asString(getPath(doc, fields.slug ?? "slug.current")) ??
       asString(doc._id) ??
@@ -148,7 +196,7 @@ export const sanitySource = (
     const slug =
       slugifyPath(slugValue) || slugify(asString(doc._id) ?? "") || "untitled";
 
-    const data: Record<string, unknown> = {};
+    const data: SanityFrontmatter = {};
     const title = asString(getPath(doc, fields.title ?? "title"));
     const description = asString(
       getPath(doc, fields.description ?? "description")
@@ -160,11 +208,17 @@ export const sanitySource = (
       data.description = description;
     }
 
+    // SAFETY: the configured body field holds Portable Text blocks; a value of
+    // any other shape fails the `Array.isArray` check below and yields an
+    // empty body, and the serializer tolerates malformed blocks.
     const blocks = (getPath(doc, fields.body ?? "body") ??
       []) as PortableTextBlock[];
     const markdown = Array.isArray(blocks)
       ? portableTextToMarkdown(blocks, {
           imageUrl: (block) => {
+            // SAFETY: `asset` on an image block is Sanity's asset reference
+            // object; any other shape yields no `_ref` and the image is
+            // skipped.
             const ref = (block.asset as { _ref?: string } | undefined)?._ref;
             return ref
               ? imageUrlFromRef(ref, options.projectId, options.dataset)
@@ -177,7 +231,9 @@ export const sanitySource = (
     const raw = matter.stringify(markdown, data);
     return {
       body: { format: "md", text: markdown },
-      data,
+      // Spread into a fresh literal: `SourceEntry.data` wants an
+      // index-signature type, which the named interface lacks.
+      data: { ...data },
       hash: hashText(raw),
       lastModified: asString(getPath(doc, fields.lastModified ?? "_updatedAt")),
       raw,
@@ -193,9 +249,7 @@ export const sanitySource = (
       cache,
       async () => {
         const client = await resolveClient(options, ctx?.preview ?? false);
-        const docs = await client.fetch<Record<string, unknown>[]>(
-          options.query
-        );
+        const docs = await client.fetch<SanityDocument[]>(options.query);
         return docs.map(toEntry);
       },
       refresh

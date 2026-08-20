@@ -38,7 +38,7 @@ export interface StandardSchema<Input = unknown, Output = Input> {
     readonly version: 1;
     readonly vendor: string;
     readonly validate: (
-      value: unknown
+      value: Input
     ) => StandardSchemaResult<Output> | Promise<StandardSchemaResult<Output>>;
     readonly types?:
       | { readonly input: Input; readonly output: Output }
@@ -46,9 +46,15 @@ export interface StandardSchema<Input = unknown, Output = Input> {
   };
 }
 
-/** Whether a config-supplied value implements the `~standard` contract. */
-export const isStandardSchema = (value: unknown): value is StandardSchema =>
+/**
+ * Whether a config-supplied value implements the `~standard` contract. Generic
+ * so it can decode any input at the config boundary (`z.custom` hands it the
+ * raw config value) while narrowing whatever type the caller holds.
+ */
+export const isStandardSchema = <T>(value: T): value is T & StandardSchema =>
   typeof value === "object" &&
   value !== null &&
+  // SAFETY: the assertion only widens the checked object for property probing;
+  // the trailing typeof check is what verifies `~standard.validate` exists.
   typeof (value as { "~standard"?: { validate?: unknown } })["~standard"]
     ?.validate === "function";

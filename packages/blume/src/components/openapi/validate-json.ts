@@ -9,36 +9,57 @@ import type { ValidationSchema } from "./request.ts";
  * not gate the Send button.
  */
 
+/** An already-parsed JSON object — string keys, parsed-JSON values. */
+interface JsonObject {
+  [key: string]: JsonValue;
+}
+
+/** Already-parsed JSON — everything `JSON.parse` can produce. */
+type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
+
+// `typeof` checks live in named predicates (the form the oxlint anti-slop
+// config sanctions); each narrows the parsed-JSON union at its call site.
+const isString = (value: JsonValue): value is string =>
+  typeof value === "string";
+
+const isNumber = (value: JsonValue): value is number =>
+  typeof value === "number";
+
+const isBoolean = (value: JsonValue): value is boolean =>
+  typeof value === "boolean";
+
+const isJsonObject = (value: JsonValue): value is JsonObject =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 /** A human-readable name for a value's actual type, for mismatch messages. */
-const describeValue = (value: unknown): string => {
+const describeValue = (value: JsonValue): string => {
   if (value === null) {
     return "null";
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- typeof's result string is itself the human-readable label here, not a narrowing check
   return Array.isArray(value) ? "array" : typeof value;
 };
 
 /** Whether `value` satisfies a schema `type` keyword; unknown keywords pass. */
-const matchesType = (value: unknown, type: string): boolean => {
+const matchesType = (value: JsonValue, type: string): boolean => {
   switch (type) {
     case "object": {
-      return (
-        typeof value === "object" && value !== null && !Array.isArray(value)
-      );
+      return isJsonObject(value);
     }
     case "array": {
       return Array.isArray(value);
     }
     case "string": {
-      return typeof value === "string";
+      return isString(value);
     }
     case "number": {
-      return typeof value === "number";
+      return isNumber(value);
     }
     case "integer": {
-      return typeof value === "number" && Number.isInteger(value);
+      return isNumber(value) && Number.isInteger(value);
     }
     case "boolean": {
-      return typeof value === "boolean";
+      return isBoolean(value);
     }
     default: {
       // A keyword the pruned subset doesn't model (e.g. "null"): no opinion.
@@ -48,7 +69,7 @@ const matchesType = (value: unknown, type: string): boolean => {
 };
 
 const walk = (
-  value: unknown,
+  value: JsonValue,
   schema: ValidationSchema | undefined,
   path: string,
   errors: string[]
@@ -75,16 +96,18 @@ const walk = (
         .join(", ")}`
     );
   }
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    const record = value as Record<string, unknown>;
+  if (isJsonObject(value)) {
     for (const name of schema.required ?? []) {
-      if (!(name in record)) {
+      if (!(name in value)) {
         errors.push(`${path}.${name} is required`);
       }
     }
     for (const [name, property] of Object.entries(schema.properties ?? {})) {
-      if (name in record) {
-        walk(record[name], property, `${path}.${name}`, errors);
+      if (name in value) {
+        // SAFETY: `name in value` above proves the key exists, and parsed
+        // JSON never holds `undefined` — the lookup is always a `JsonValue`
+        // that `noUncheckedIndexedAccess` alone cannot see.
+        walk(value[name] as JsonValue, property, `${path}.${name}`, errors);
       }
     }
   }
@@ -106,7 +129,8 @@ export const validateJson = (
   schema?: ValidationSchema,
   root = "body"
 ): string[] => {
-  let value: unknown;
+  // `JSON.parse` returns `any`; `JsonValue` is exactly its possible outputs.
+  let value: JsonValue;
   try {
     value = JSON.parse(text);
   } catch (error) {

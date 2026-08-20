@@ -161,6 +161,33 @@ A página em que o leitor está é adicionada primeiro ao contexto e usada para 
 
 A fundamentação fica ativa em todos os backends, exceto o **[Inkeep](#backends)**, que executa a própria recuperação sobre o conteúdo que você indexou no painel dele.
 
+### Tamanho da recuperação
+
+Quanta documentação uma pergunta carrega é a maior alavanca sobre quanto tempo o leitor espera pela primeira palavra: o modelo lê cada caractere injetado antes de emitir um token. Em um modelo de fronteira hospedado isso é invisível, mas em um backend auto-hospedado é o fator dominante. `retrieval` dimensiona isso:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    retrieval: {
+      maxResults: 3, // fewer pages retrieved per question
+      excerptChars: 1200, // shorter excerpt from each one
+      contextBudget: 3000, // smaller total injection
+    },
+  },
+}
+```
+
+| Opção | Padrão | Descrição |
+| --- | --- | --- |
+| `maxResults` | `6` | Documentos recuperados por pergunta. |
+| `excerptChars` | `2000` | Caracteres mantidos de cada página recuperada. |
+| `contextBudget` | `10000` | Total de caracteres injetados, somando os trechos. |
+
+Os três não são intercambiáveis. `contextBudget` limita a injeção inteira, `excerptChars` decide quão fundo o trecho de uma única página longa chega — aumente quando uma página guarda a resposta inteira e o trecho a corta — e `maxResults` limita quantas páginas a recuperação adiciona. A página que o leitor está vendo é injetada além das recuperadas, então uma resposta pode citar até uma página a mais do que `maxResults`.
+
+Os padrões servem bem a um modelo hospedado. Reduza-os quando você estiver servindo a partir do seu próprio hardware e o tempo até o primeiro token importar mais que a abrangência; as respostas continuam fundamentadas nos dois casos, e o assistente é instruído a dizer quando algo não está coberto, em vez de preencher a lacuna.
+
 ### Endpoint externo
 
 Já tem um backend de API para IA? Aponte o painel para ele e mantenha o build da documentação estático:

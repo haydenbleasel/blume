@@ -17,9 +17,23 @@ const META_FILES = [
   "**/meta.$.mjs",
 ];
 
+/**
+ * A meta module's default export before validation: `folderMetaSchema` parses
+ * it only after any factory is resolved, so it carries the loader's raw type.
+ */
+type MetaModuleExport = Awaited<
+  ReturnType<ReturnType<typeof createModuleLoader>>
+>;
+
+/** A factory-style meta module default-exports a function returning the meta. */
+const isMetaFactory = (
+  mod: MetaModuleExport
+): mod is () => MetaModuleExport | Promise<MetaModuleExport> =>
+  typeof mod === "function";
+
 /** Resolve a meta module's default export, calling it if it is a factory. */
-const resolveMeta = async (mod: unknown): Promise<unknown> =>
-  typeof mod === "function" ? await (mod as () => unknown)() : mod;
+const resolveMeta = async (mod: MetaModuleExport) =>
+  isMetaFactory(mod) ? await mod() : mod;
 
 /** A filesystem content source to scan for folder meta: its on-disk root and
  * optional route prefix. The prefix is folded into every key so meta lines up
@@ -58,18 +72,28 @@ const metaKeyFor = (prefix: string | undefined, dir: string): string => {
  * group path starts with the source prefix, so a locale directory found at a
  * source root is hoisted in front of the prefix (`docs/fr/guides/meta.ts` keys
  * to `fr/docs/guides`, not `docs/fr/guides`).
+ *
+ * `versionDirs` names the archived-version snapshot directories, which sit
+ * outermost on disk — a locale directory inside a snapshot is one level deeper.
+ * Both are hoisted, version first (`v1.0/fr/guides/meta.ts` keys to
+ * `v1.0/fr/<prefix>/guides`), matching navigation's version-aware meta prefix.
  */
 export const discoverFolderMeta = async (
   sources: string | FolderMetaSource[],
-  options: { localeDirs?: readonly string[] } = {}
+  options: {
+    localeDirs?: readonly string[];
+    versionDirs?: readonly string[];
+  } = {}
 ): Promise<{
   meta: Map<string, FolderMeta>;
   shared: Map<string, FolderMeta>;
   diagnostics: Diagnostic[];
 }> => {
-  const list: FolderMetaSource[] =
-    typeof sources === "string" ? [{ root: sources }] : sources;
+  const list: FolderMetaSource[] = Array.isArray(sources)
+    ? sources
+    : [{ root: sources }];
   const localeDirs = new Set(options.localeDirs);
+  const versionDirs = new Set(options.versionDirs);
 
   const load = createModuleLoader();
   const meta = new Map<string, FolderMeta>();
@@ -103,6 +127,8 @@ export const discoverFolderMeta = async (
                 value: await resolveMeta(await load(file)),
               };
             } catch (error) {
+              // SAFETY: jiti surfaces load/evaluate failures as Error
+              // instances, and only `message` is read downstream.
               return { error: error as Error, file, ok: false };
             }
           }
@@ -115,16 +141,20 @@ export const discoverFolderMeta = async (
   for (const { loaded, source } of perSource) {
     for (const entry of loaded) {
       const dir = relative(source.root, dirname(entry.file));
+      // A version snapshot dir is outermost, with a locale dir one level
+      // deeper; both are hoisted in front of the (prefixed) group path, in
+      // that order — the lookup key reads `version/locale/prefix/dir`.
       const [head, ...tail] = dir.split("/");
-      // A locale directory sits between the source root and the folder, but the
-      // lookup key carries the locale in front of the (prefixed) group path.
-      const key =
-        head && localeDirs.has(head)
-          ? `${head}/${metaKeyFor(source.prefix, tail.join("/"))}`.replace(
-              /\/$/u,
-              ""
-            )
-          : metaKeyFor(source.prefix, dir);
+      const version = head && versionDirs.has(head) ? head : "";
+      const afterVersion = version ? tail : [head ?? "", ...tail];
+      const [localeHead, ...localeTail] = afterVersion;
+      const locale = localeHead && localeDirs.has(localeHead) ? localeHead : "";
+      const rest = (locale ? localeTail : afterVersion)
+        .filter(Boolean)
+        .join("/");
+      const key = [version, locale, metaKeyFor(source.prefix, rest)]
+        .filter(Boolean)
+        .join("/");
 
       if (!entry.ok) {
         diagnostics.push({

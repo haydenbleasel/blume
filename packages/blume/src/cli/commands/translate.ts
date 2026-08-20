@@ -47,10 +47,17 @@ interface TranslateFlags {
   timeout?: string;
 }
 
+/** The validated flag surface `parseFlags` hands the command body. */
+interface ParsedTranslateFlags {
+  agent: AgentKind | undefined;
+  concurrency: number;
+  timeoutS: number;
+}
+
 /** Validate the flag surface, exiting with a message on the first offense. */
-const parseFlags = (
-  args: TranslateFlags
-): { agent: AgentKind | undefined; concurrency: number; timeoutS: number } => {
+const parseFlags = (args: TranslateFlags): ParsedTranslateFlags => {
+  // SAFETY: Object.keys of the AGENTS table returns exactly its declared
+  // AgentKind keys.
   const agents = (Object.keys(AGENTS) as AgentKind[]).filter(
     (kind) => args[kind]
   );
@@ -227,6 +234,8 @@ export const translateCommand = defineCommand({
         return;
       }
 
+      // SAFETY: parseFlags exits unless --check was passed or exactly one
+      // agent flag was; on this non-check path the agent is therefore set.
       const kind = agent as AgentKind;
       process.stderr.write(
         `${translateHeaderLine(workList.items.length, workList.targetLocales.length, kind)}\n\n`
@@ -290,6 +299,8 @@ export const translateCommand = defineCommand({
         logger.error(error.diagnostic.message);
         process.exit(1);
       }
+      // SAFETY: an ENOENT from spawning the agent CLI is an ErrnoException;
+      // any other thrown shape reads `code` as undefined and falls through.
       if ((error as NodeJS.ErrnoException)?.code === "ENOENT" && agent) {
         notInstalled(agent);
       }

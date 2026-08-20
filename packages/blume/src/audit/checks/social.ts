@@ -89,6 +89,18 @@ export const socialChecks: CheckModule = {
   tier: "static",
 };
 
+/** The JSON-LD keywords the audit reads off a parsed block. */
+interface JsonLdNode {
+  "@context"?: unknown;
+  "@graph"?: unknown;
+  "@type"?: unknown;
+}
+
+/** Whether one parsed JSON-LD value is an object the keyword checks can read. */
+const isJsonLdNode = (
+  value: PageSnapshot["jsonld"][number]
+): value is JsonLdNode => typeof value === "object" && value !== null;
+
 /**
  * What's missing from one JSON-LD block.
  *
@@ -98,28 +110,24 @@ export const socialChecks: CheckModule = {
  * and each entry carries its own `@type` — so demanding `@type` on the root, or
  * `@context` on each entry, would flag perfectly valid structured data.
  */
-const jsonLdProblems = (node: unknown): string[] => {
-  if (typeof node !== "object" || node === null) {
+const jsonLdProblems = (node: PageSnapshot["jsonld"][number]): string[] => {
+  if (!isJsonLdNode(node)) {
     return ["it is not an object"];
   }
-  const record = node as Record<string, unknown>;
   const problems: string[] = [];
-  if (!record["@context"]) {
+  if (!node["@context"]) {
     problems.push("@context");
   }
 
-  const graph = record["@graph"];
+  const graph = node["@graph"];
   if (Array.isArray(graph)) {
     const untyped = graph.filter(
-      (entry) =>
-        typeof entry !== "object" ||
-        entry === null ||
-        !(entry as Record<string, unknown>)["@type"]
+      (entry) => !isJsonLdNode(entry) || !entry["@type"]
     ).length;
     if (untyped > 0) {
       problems.push(`@type on ${untyped} of its ${graph.length} @graph nodes`);
     }
-  } else if (!record["@type"]) {
+  } else if (!node["@type"]) {
     problems.push("@type");
   }
 

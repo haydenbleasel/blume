@@ -20,6 +20,28 @@ const NUMERIC_PREFIX = /^(?<order>\d+)[-_.]/u;
 const GROUP_FOLDER = /^\((?<label>.+)\)$/u;
 const WORD_SPLIT = /[-_]/u;
 
+/**
+ * Whether `route` is the section root `base` or nested beneath it. Requires a
+ * path boundary, so `/api-reference` is not under `/api`. The root `/` spans
+ * every route.
+ */
+export const isUnderPath = (route: string, base: string): boolean =>
+  base === "/" || route === base || route.startsWith(`${base}/`);
+
+/**
+ * Whether `tab` is the root tab of the tree rooted at `root` — the tab that
+ * spans the whole sidebar rather than one section. Tab paths and the root
+ * normally share one path space, so the root tab sits at `root` exactly (`/`,
+ * `/en`, `/docs`); in an archived version tree the root is versionized
+ * (`/v1.0`, `/docs/v1.0`) while tab paths stay in current-docs space, so the
+ * root tab is any tab the whole root sits under. The one definition shared by
+ * sidebar scoping, tab-section hoisting, and the header's current-tab state —
+ * consumers that disagree on which tab is the root tab prune an archived
+ * sidebar or highlight the wrong tab over it.
+ */
+export const isRootTab = (tab: NavTab, root: string): boolean =>
+  isUnderPath(root, tab.path);
+
 const humanize = (segment: string): string =>
   segment
     .replace(NUMERIC_PREFIX, "")
@@ -135,10 +157,13 @@ const ensureGroup = (
   return group;
 };
 
-const pageOrder = (
-  page: PageRecord,
-  filename: string
-): { order: number; orderIsAuthored: boolean } => {
+interface PageOrder {
+  order: number;
+  /** Whether the order came from the author (frontmatter or a rank prefix). */
+  orderIsAuthored: boolean;
+}
+
+const pageOrder = (page: PageRecord, filename: string): PageOrder => {
   if (page.meta.sidebar.order !== undefined) {
     return { order: page.meta.sidebar.order, orderIsAuthored: true };
   }
@@ -187,13 +212,15 @@ const applyFolderMeta = (
   folderMeta: Map<string, FolderMeta>,
   sharedMeta: Map<string, FolderMeta>,
   metaPrefix: string,
+  sharedMetaPrefix: string,
   indexDisplay: Map<string, SidebarDisplay>
 ): void => {
   // Locale-specific meta wins; a shared `meta.$.*` (keyed by the locale-stripped
-  // group path) applies to every locale otherwise.
+  // group path — version-prefixed inside a snapshot) applies to every locale
+  // otherwise.
   const meta =
     folderMeta.get(metaKey(group.path, metaPrefix)) ??
-    sharedMeta.get(group.path);
+    sharedMeta.get(metaKey(group.path, sharedMetaPrefix));
   // The group's own render mode, resolved index frontmatter first, then folder
   // meta; `toNavNode` falls back to the global mode. Applies to this group
   // only — nested subgroups resolve their own value through the same chain.
@@ -220,7 +247,14 @@ const applyFolderMeta = (
 
   for (const child of group.children) {
     if (child.kind === "group") {
-      applyFolderMeta(child, folderMeta, sharedMeta, metaPrefix, indexDisplay);
+      applyFolderMeta(
+        child,
+        folderMeta,
+        sharedMeta,
+        metaPrefix,
+        sharedMetaPrefix,
+        indexDisplay
+      );
     }
   }
 };
@@ -251,14 +285,15 @@ const indexTitleMismatchDiagnostic = (
   folderPath: string,
   folderMeta: Map<string, FolderMeta>,
   sharedMeta: Map<string, FolderMeta>,
-  metaPrefix: string
+  metaPrefix: string,
+  sharedMetaPrefix: string
 ): Diagnostic | undefined => {
   if (!page.meta.title || page.fallback || folderPath === "") {
     return undefined;
   }
   const meta =
     folderMeta.get(metaKey(folderPath, metaPrefix)) ??
-    sharedMeta.get(folderPath);
+    sharedMeta.get(metaKey(folderPath, sharedMetaPrefix));
   if (!meta?.title || meta.title === page.title) {
     return undefined;
   }
@@ -483,6 +518,7 @@ const buildFileSystemSidebar = (
   folderMeta: Map<string, FolderMeta>,
   sharedMeta: Map<string, FolderMeta>,
   metaPrefix: string,
+  sharedMetaPrefix: string,
   display: SidebarDisplay,
   tabPaths: Set<string>,
   diagnostics: Diagnostic[] = []
@@ -508,7 +544,8 @@ const buildFileSystemSidebar = (
         dirs.join("/"),
         folderMeta,
         sharedMeta,
-        metaPrefix
+        metaPrefix,
+        sharedMetaPrefix
       );
       if (diagnostic) {
         diagnostics.push(diagnostic);
@@ -567,7 +604,14 @@ const buildFileSystemSidebar = (
     });
   }
 
-  applyFolderMeta(root, folderMeta, sharedMeta, metaPrefix, indexDisplay);
+  applyFolderMeta(
+    root,
+    folderMeta,
+    sharedMeta,
+    metaPrefix,
+    sharedMetaPrefix,
+    indexDisplay
+  );
   sortNodes(root.children, diagnostics);
   hoistPages(root.children, display, true);
   hoistTabSections(root.children, tabPaths, display);
@@ -604,6 +648,10 @@ const routeForRef = (
   return byRoute.get(normalized)?.route ?? withBasePath(basePath, normalized);
 };
 
+/** An explicit-config sidebar item written as a bare page-ref string. */
+const isPageRef = (item: SidebarItemConfig): item is string =>
+  typeof item === "string";
+
 /**
  * Convert one non-group explicit-config sidebar item (string ref, `root`, or
  * `href`) to a nav node, or null to skip. Group items (`item.items`) are handled
@@ -614,7 +662,7 @@ const configItemToNode = (
   byRoute: Map<string, PageRecord>,
   basePath: string
 ): NavNode | null => {
-  if (typeof item === "string") {
+  if (isPageRef(item)) {
     const page = byRoute.get(normalizeRef(item));
     if (!page) {
       return null;
@@ -667,7 +715,7 @@ const buildConfigSidebar = (
 ): NavNode[] => {
   const nodes: NavNode[] = [];
   for (const item of items) {
-    if (typeof item !== "string" && item.items) {
+    if (!isPageRef(item) && item.items) {
       nodes.push({
         badge: item.badge,
         children: buildConfigSidebar(item.items, byRoute, display, basePath),
@@ -733,14 +781,18 @@ const withTabHrefs = (tabs: NavTab[], sidebar: NavNode[]): NavTab[] =>
   });
 
 /**
- * Apply the site base path to config-provided nav chrome. Config paths are
- * authored as if mounted at root, so the base is applied here (idempotently,
- * and only to internal paths — external URLs pass through). Content-derived
- * sidebar routes are already based via `page.route`. The based tab paths also
- * feed tab-scoping, so they must agree with the based content routes. With no
- * base, this is a pure pass-through — the arrays keep their exact authored
- * shape.
+ * Rebase config-provided nav chrome (featured links, selectors, tabs) under the
+ * site base path. Config paths are authored as if mounted at root, so the base
+ * is applied here (idempotently, and only to internal paths — external URLs
+ * pass through). With no base this is a pure pass-through — the arrays keep
+ * their exact authored shape.
  */
+interface NavChrome {
+  featured: FeaturedLink[];
+  selectors: NavSelector[];
+  tabs: NavTab[];
+}
+
 const rebaseNavChrome = (
   basePath: string,
   options: {
@@ -748,32 +800,38 @@ const rebaseNavChrome = (
     selectors?: NavSelector[];
     tabs?: NavTab[];
   }
-): { featured: FeaturedLink[]; selectors: NavSelector[]; tabs: NavTab[] } => {
+): NavChrome => {
+  const featured = options.featured ?? [];
+  const selectors = options.selectors ?? [];
+  const tabs = options.tabs ?? [];
+  if (!basePath) {
+    return { featured, selectors, tabs };
+  }
   const rebasePath = <T extends { path: string }>(item: T): T => ({
     ...item,
     path: withBasePath(basePath, item.path),
   });
-  const featured = basePath
-    ? (options.featured ?? []).map((link) => ({
-        ...link,
-        href: withBasePath(basePath, link.href),
-      }))
-    : (options.featured ?? []);
-  const selectors = basePath
-    ? (options.selectors ?? []).map((selector) => ({
-        ...selector,
-        items: selector.items.map(rebasePath),
-      }))
-    : (options.selectors ?? []);
-  const tabs = basePath
-    ? (options.tabs ?? []).map((tab) => ({
+  return {
+    featured: featured.map((link) => ({
+      ...link,
+      href: withBasePath(basePath, link.href),
+    })),
+    selectors: selectors.map((selector) => ({
+      ...selector,
+      items: selector.items.map(rebasePath),
+    })),
+    tabs: tabs.map((tab) => {
+      const rebased: NavTab = {
         ...tab,
-        ...(tab.href ? { href: withBasePath(basePath, tab.href) } : {}),
         items: tab.items?.map(rebasePath),
         path: withBasePath(basePath, tab.path),
-      }))
-    : (options.tabs ?? []);
-  return { featured, selectors, tabs };
+      };
+      if (tab.href) {
+        rebased.href = withBasePath(basePath, tab.href);
+      }
+      return rebased;
+    }),
+  };
 };
 
 /** Build the complete navigation model from pages, meta, and config. */
@@ -789,8 +847,18 @@ export const buildNavigation = (
     selectors?: NavSelector[];
     tabs?: NavTab[];
     sidebar?: SidebarItemConfig[];
-    /** Locale dir prefix for folder-meta lookup (`""` for the default locale). */
+    /**
+     * Folder-meta lookup prefix (`""` for the default locale of the current
+     * version): the version dir and/or locale dir hoisted in front of the
+     * group path, e.g. `fr`, `v1.0`, or `v1.0/fr`.
+     */
     metaPrefix?: string;
+    /**
+     * Prefix for shared `meta.$.*` lookups — the version dir inside a
+     * snapshot (`v1.0`), since shared meta is locale-agnostic but still
+     * version-specific. `""` for the current version.
+     */
+    sharedMetaPrefix?: string;
     /**
      * Resolve explicit-sidebar references against each page's locale-agnostic
      * `translationKey` instead of its localized `route`. Used under i18n so a
@@ -817,8 +885,12 @@ export const buildNavigation = (
   const basePath = options.basePath ?? "";
   const display = options.display ?? "flat";
   const metaPrefix = options.metaPrefix ?? "";
+  const sharedMetaPrefix = options.sharedMetaPrefix ?? "";
   const sharedFolderMeta = options.sharedFolderMeta ?? new Map();
 
+  // Content-derived sidebar routes are already based via `page.route`; the
+  // based tab paths also feed tab-scoping below, so they must agree with the
+  // based content routes.
   const { featured, selectors, tabs } = rebaseNavChrome(basePath, options);
   const byRoute = new Map(
     pages.map((page) => [
@@ -846,6 +918,9 @@ export const buildNavigation = (
   // prefix (`/docs`, `/fr`) and a bare `"/"` check would miss the match (or,
   // under a base, falsely scope a group named like the prefix). Carried on the
   // returned navigation so render-time scoping compares in the same space too.
+  // In a version snapshot the root arrives versionized (`/v1.0`) while tab
+  // paths stay in current-docs space, so root-tab checks use `isRootTab`
+  // containment, not equality.
   const rootTabPath = withBasePath(basePath, options.localizedRoot ?? "/");
 
   // Emitted here, before the sidebar-mode branch: an explicit config sidebar
@@ -877,9 +952,10 @@ export const buildNavigation = (
     options.folderMeta,
     sharedFolderMeta,
     metaPrefix,
+    sharedMetaPrefix,
     display,
     new Set(
-      tabs.flatMap((tab) => (tab.path === rootTabPath ? [] : [tab.path]))
+      tabs.flatMap((tab) => (isRootTab(tab, rootTabPath) ? [] : [tab.path]))
     ),
     diagnostics
   );

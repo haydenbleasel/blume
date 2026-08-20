@@ -8,6 +8,22 @@ import { sample } from "openapi-sampler";
  * values come from openapi-sampler, which is likewise browser-safe.
  */
 
+/** Any value a parsed OpenAPI document can hold: JSON, nested schemas included. */
+export type SpecValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | SpecValue[]
+  | { [key: string]: SpecValue };
+
+const isString = (value: SpecValue): value is string =>
+  typeof value === "string";
+
+const isNumber = (value: SpecValue): value is number =>
+  typeof value === "number";
+
 /** A permissive view of an OpenAPI 3.1 schema — only the fields we render. */
 export interface SchemaLike {
   $ref?: string;
@@ -18,11 +34,11 @@ export interface SchemaLike {
   properties?: Record<string, SchemaLike>;
   required?: string[];
   items?: SchemaLike;
-  enum?: unknown[];
-  const?: unknown;
-  default?: unknown;
-  example?: unknown;
-  examples?: unknown[];
+  enum?: SpecValue[];
+  const?: SpecValue;
+  default?: SpecValue;
+  example?: SpecValue;
+  examples?: SpecValue[];
   allOf?: SchemaLike[];
   oneOf?: SchemaLike[];
   anyOf?: SchemaLike[];
@@ -38,7 +54,7 @@ export interface SchemaLike {
   minItems?: number;
   maxItems?: number;
   pattern?: string;
-  [key: string]: unknown;
+  [key: string]: SpecValue;
 }
 
 /** A permissive view of an operation parameter — only the fields we render. */
@@ -50,8 +66,15 @@ export interface ParameterLike {
   required?: boolean;
   deprecated?: boolean;
   schema?: SchemaLike;
-  example?: unknown;
+  example?: SpecValue;
+  [key: string]: SpecValue;
 }
+
+/** The `components` object of a parsed spec: section name → named-node table. */
+export type ComponentsLike = Record<
+  string,
+  Record<string, SpecValue> | undefined
+>;
 
 const REF_PATTERN = /#\/components\/schemas\/(?<name>[^/]+)$/u;
 
@@ -65,16 +88,18 @@ const COMPONENT_REF = /#\/components\/(?<section>[^/]+)\/(?<name>[^/]+)$/u;
  */
 export const resolveComponentRef = <T extends { $ref?: string }>(
   node: T,
-  components: Record<string, unknown> | undefined,
+  components: ComponentsLike | undefined,
   section: string
 ): T => {
-  if (typeof node.$ref !== "string") {
+  if (!isString(node.$ref)) {
     return node;
   }
   const groups = COMPONENT_REF.exec(node.$ref)?.groups;
   if (groups?.section !== section) {
     return node;
   }
+  // SAFETY: a components section table stores nodes of that section's type,
+  // and callers always pair `section` with the matching `T`.
   const table = components?.[section] as Record<string, T> | undefined;
   return table?.[groups.name ?? ""] ?? node;
 };
@@ -88,7 +113,7 @@ export const resolveComponentRef = <T extends { $ref?: string }>(
 export const mergeParameters = (
   pathParameters: ParameterLike[] | undefined,
   operationParameters: ParameterLike[] | undefined,
-  components?: Record<string, unknown>
+  components?: ComponentsLike
 ): ParameterLike[] => {
   const merged = new Map<string, ParameterLike>();
   let position = 0;
@@ -118,7 +143,7 @@ export const resolveSchema = (
   if (!schema) {
     return {};
   }
-  if (typeof schema.$ref === "string") {
+  if (isString(schema.$ref)) {
     const name = REF_PATTERN.exec(schema.$ref)?.groups?.name;
     if (name && schemas[name]) {
       return schemas[name];
@@ -140,7 +165,7 @@ const nonNullTypes = (type: string | string[] | undefined): string[] => {
  * array items can't recurse forever.
  */
 export const typeLabel = (schema: SchemaLike): string => {
-  if (typeof schema.$ref === "string") {
+  if (isString(schema.$ref)) {
     return refName(schema.$ref);
   }
   if (schema.oneOf || schema.anyOf) {
@@ -177,11 +202,11 @@ export const constraints = (schema: SchemaLike): string[] => {
   ];
   for (const [key, label] of numeric) {
     const value = schema[key];
-    if (typeof value === "number") {
+    if (isNumber(value)) {
       out.push(`${label} ${value}`);
     }
   }
-  if (typeof schema.pattern === "string") {
+  if (isString(schema.pattern)) {
     out.push(`matches ${schema.pattern}`);
   }
   if (schema.default !== undefined) {
@@ -189,6 +214,12 @@ export const constraints = (schema: SchemaLike): string[] => {
   }
   return out;
 };
+
+/** The merged property list and required set a schema exposes. */
+export interface ObjectPropertySet {
+  properties: [string, SchemaLike][];
+  required: Set<string>;
+}
 
 /**
  * The object properties a schema exposes, merging `allOf` branches so an
@@ -198,7 +229,7 @@ export const constraints = (schema: SchemaLike): string[] => {
 export const objectProperties = (
   schema: SchemaLike,
   schemas: Record<string, SchemaLike>
-): { properties: [string, SchemaLike][]; required: Set<string> } => {
+): ObjectPropertySet => {
   const properties = new Map<string, SchemaLike>();
   const required = new Set<string>();
   // Cycles can only enter through `$ref`s (inline JSON can't self-nest), so
@@ -206,7 +237,7 @@ export const objectProperties = (
   const seen = new Set<string>();
 
   const collect = (node: SchemaLike): void => {
-    if (typeof node.$ref === "string") {
+    if (isString(node.$ref)) {
       if (seen.has(node.$ref)) {
         return;
       }
@@ -239,16 +270,18 @@ export const objectProperties = (
 export const exampleValue = (
   schema: SchemaLike | undefined,
   schemas: Record<string, SchemaLike>
-): unknown => {
+): SpecValue => {
   if (!schema) {
     return null;
   }
   try {
+    // SAFETY: SchemaLike structurally covers the JSONSchema7 fields the
+    // sampler reads, and the sampler only ever assembles JSON values.
     return sample(
       schema as Parameters<typeof sample>[0],
       { quiet: true, skipReadOnly: true },
       { components: { schemas } }
-    );
+    ) as SpecValue;
   } catch {
     // An unresolvable $ref or malformed schema is a spec problem the schema
     // tables already surface; a sample is best-effort.
@@ -257,5 +290,4 @@ export const exampleValue = (
 };
 
 /** Pretty-print a JSON value for an example/code block. */
-export const toJson = (value: unknown): string =>
-  JSON.stringify(value, null, 2);
+export const toJson = <T>(value: T): string => JSON.stringify(value, null, 2);

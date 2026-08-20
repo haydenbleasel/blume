@@ -12,9 +12,11 @@ const doc = "---\ntitle: Home\ncount: 2\n---\nbody text";
 
 // `safeLoad` was removed from js-yaml 4's types, but the runtime still ships a
 // stub that throws — that is exactly what crashes gray-matter's default engine.
-const removedSafeLoad = (
-  yaml as unknown as { safeLoad: (input: string) => object }
-).safeLoad;
+// SAFETY: js-yaml 4's module object carries a runtime `safeLoad` stub its types
+// no longer declare (hence the optional probe); the test below asserts the
+// stub exists and throws.
+const removedSafeLoad = (yaml as { safeLoad?: (input: string) => object })
+  .safeLoad as (input: string) => object;
 
 const dirs: string[] = [];
 
@@ -78,7 +80,7 @@ describe("frontmatter wrapper", () => {
     // gray-matter@4's default YAML engine is `yaml.safeLoad`, which was removed
     // in js-yaml 4 and now throws. Wiring that engine in explicitly reproduces
     // the reported `blume dev` crash in a workspace pinned to js-yaml 4...
-    expect(typeof removedSafeLoad).toBe("function");
+    expect(removedSafeLoad).toBeInstanceOf(Function);
     expect(() =>
       baseMatter(doc, { engines: { yaml: { parse: removedSafeLoad } } })
     ).toThrow(/safeLoad is removed/u);

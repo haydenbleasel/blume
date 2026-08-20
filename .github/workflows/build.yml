@@ -1,4 +1,4 @@
-name: CI
+name: Build
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  build-docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -17,14 +17,6 @@ jobs:
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile
-      - name: Lint and format
-        run: bun run check
-      - name: Typecheck
-        run: bun run typecheck
-      - name: Test
-        run: bun run test
-      - name: Check translations
-        run: cd apps/docs && bun run translate --check
       - name: Build docs
         # Google's CSS API occasionally references gstatic font files that
         # 404 mid-rollout, failing the build with CannotFetchFontFile. Retry

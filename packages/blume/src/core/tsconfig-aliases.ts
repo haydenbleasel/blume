@@ -30,16 +30,20 @@ const substituteConfigDir = (value: string, configDir: string): string =>
     ? join(configDir, value.slice(CONFIG_DIR_TEMPLATE.length))
     : value;
 
+/** Whether a `paths` fallback entry is a usable target (raw JSONC may lie). */
+const isPathTarget = (target: string | undefined): target is string =>
+  typeof target === "string";
+
 /** Convert one tsconfig `paths` mapping to a Vite alias, or null to skip. */
 const toAlias = (
   key: string,
-  value: unknown,
+  value: string | string[],
   baseDir: string,
   configDir: string
 ): { find: string; replacement: string } | null => {
   // tsconfig allows a fallback array; Vite aliases are 1:1, so take the first.
   const first = Array.isArray(value) ? value[0] : value;
-  if (typeof first !== "string") {
+  if (!isPathTarget(first)) {
     return null;
   }
   const find = key.endsWith("/*") ? key.slice(0, -2) : key;
@@ -86,12 +90,12 @@ export const resolveTsconfigAliases = (
     configDir,
     substituteConfigDir(options?.baseUrl ?? ".", configDir)
   );
-  const aliases: Record<string, string> = {};
+  const entries: [string, string][] = [];
   for (const [key, value] of Object.entries(paths)) {
     const alias = toAlias(key, value, baseDir, configDir);
     if (alias) {
-      aliases[alias.find] = alias.replacement;
+      entries.push([alias.find, alias.replacement]);
     }
   }
-  return aliases;
+  return Object.fromEntries(entries);
 };

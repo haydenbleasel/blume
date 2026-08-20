@@ -21,7 +21,11 @@ const CALLOUT_TYPES = new Set([
 ]);
 
 /** Friendly aliases for the canonical Callout types. */
-const ALIASES: Record<string, string> = {
+interface CalloutAliases {
+  [alias: string]: string;
+}
+
+const ALIASES: CalloutAliases = {
   caution: "warning",
   error: "danger",
   important: "note",
@@ -54,6 +58,8 @@ export const directiveToCalloutPlugin = () => ({
     let title = node.attributes?.title ?? undefined;
 
     // A leading `:::name[Label]` parses to a paragraph flagged `directiveLabel`.
+    // SAFETY: Satteri stamps `directiveLabel` on that paragraph's `data`; any
+    // other node reads undefined and fails the check.
     const labelIndex = children.findIndex(
       (child) =>
         child.type === "paragraph" &&

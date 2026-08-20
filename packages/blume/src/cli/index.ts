@@ -15,6 +15,7 @@ import { previewCommand } from "./commands/preview.ts";
 import { syncCommand } from "./commands/sync.ts";
 import { translateCommand } from "./commands/translate.ts";
 import { validateCommand } from "./commands/validate.ts";
+import { versionCommand } from "./commands/version.ts";
 import { loadEnvFiles } from "./env.ts";
 import { reportInternalError } from "./internal-error.ts";
 
@@ -39,6 +40,7 @@ const main = defineCommand({
     sync: syncCommand,
     translate: translateCommand,
     validate: validateCommand,
+    version: versionCommand,
   },
 });
 

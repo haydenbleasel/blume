@@ -19,7 +19,7 @@ export const MCP_TOOLS: McpToolMeta[] = [
   {
     annotations: READ_ONLY,
     description:
-      'Full-text search across the documentation. Returns matching pages with their title, route, content type, and a short excerpt; pass `contentTypes` to search only pages of certain types (e.g. `rfc`, `changelog`), and `filters` to require facet values the site declares per type (e.g. `{"status": "enforced"}`). Use this first to discover relevant pages, then `get_page` to read one in full.',
+      'Full-text search across the documentation. Returns matching pages with their title, route, content type, and a short excerpt; pass `contentTypes` to search only pages of certain types (e.g. `rfc`, `changelog`), `filters` to require facet values the site declares per type (e.g. `{"status": "enforced"}`), and `locale` to search one language. On a versioned site results default to the current docs — pass `version` to search an archived version (e.g. `"v1.0"`) or `"all"` for every version. Use this first to discover relevant pages, then `get_page` to read one in full.',
     name: "search_docs",
     title: "Search documentation",
   },
@@ -33,14 +33,14 @@ export const MCP_TOOLS: McpToolMeta[] = [
   {
     annotations: READ_ONLY,
     description:
-      "List every documentation page with its route, title, description, content type, and any declared facet values; pass `contentTypes` and/or `filters` to narrow the list. Useful for enumerating the docs, discovering the types and facets in use, or finding a page when search is too narrow.",
+      'List every documentation page with its route, title, description, content type, and any declared facet values; pass `contentTypes`, `filters`, and/or `locale` to narrow the list. On a versioned site the list defaults to the current docs — pass `version` for an archived version or `"all"`. Useful for enumerating the docs, discovering the types and facets in use, or finding a page when search is too narrow.',
     name: "list_pages",
     title: "List pages",
   },
   {
     annotations: READ_ONLY,
     description:
-      "Return the documentation navigation tree (header tabs and the sidebar hierarchy), reflecting how the docs are organized for readers.",
+      "Return the documentation navigation tree (header tabs and the sidebar hierarchy), reflecting how the docs are organized for readers. Pass `locale` for a language's tree and, on a versioned site, `version` for an archived snapshot's tree.",
     name: "get_navigation",
     title: "Get navigation",
   },

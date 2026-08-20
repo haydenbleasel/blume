@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 
 import { dirname, isAbsolute, join, relative } from "pathe";
 
+import type { AskRetrievalOptions } from "../ai/ask-context.ts";
 import { askBackendRuntimeDep } from "../ai/ask.ts";
 import type { AskBackend } from "../ai/ask.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
@@ -37,6 +38,8 @@ const hasWorkspacesField = (pkgPath: string): boolean => {
     return false;
   }
   try {
+    // SAFETY: parsed from the user's own package.json; only the presence of a
+    // `workspaces` field is read, so this loose shape is all the cast claims.
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
       workspaces?: unknown;
     };
@@ -71,16 +74,19 @@ const findWorkspaceRoot = (start: string): string => {
   }
 };
 
-const ADAPTER_IMPORTS: Record<string, string> = {
+type DeploymentAdapter = NonNullable<ResolvedConfig["deployment"]["adapter"]>;
+
+const ADAPTER_IMPORTS = {
   cloudflare: "@astrojs/cloudflare",
   netlify: "@astrojs/netlify",
   node: "@astrojs/node",
   vercel: "@astrojs/vercel",
-};
+} satisfies Record<DeploymentAdapter, string>;
 
-const ADAPTER_OPTIONS: Record<string, string> = {
-  node: '{ mode: "standalone" }',
-};
+/** Adapter constructor arguments, for the adapters that need any. */
+const ADAPTER_OPTIONS = new Map<DeploymentAdapter, string>([
+  ["node", '{ mode: "standalone" }'],
+]);
 
 const WRANGLER_CONFIG_FILES = [
   "wrangler.jsonc",
@@ -370,6 +376,12 @@ const renderImageOption = (config: ResolvedConfig): string =>
     ? `\n  image: ${JSON.stringify(config.image)},`
     : "";
 
+/** What `resolveOptimizeDeps` feeds the generated `optimizeDeps` block. */
+interface OptimizeDepsConfig {
+  optimizeDepsEntries: string[];
+  optimizeDepsInclude: string[];
+}
+
 /**
  * Startup-scan entry points and forced includes for the dev dep optimizer:
  * the Vite root is the generated runtime, so user pages, convention islands,
@@ -383,7 +395,7 @@ const resolveOptimizeDeps = (options: {
   context: ProjectContext;
   needsReact: boolean;
   reactCompilerPath: string | null | undefined;
-}): { optimizeDepsEntries: string[]; optimizeDepsInclude: string[] } => {
+}): OptimizeDepsConfig => {
   const { context } = options;
   const optimizeDepsEntries = [
     ...(context.pagesRoot ? [`${context.pagesRoot}/**/*.astro`] : []),
@@ -395,6 +407,11 @@ const resolveOptimizeDeps = (options: {
   const optimizeDepsInclude = [
     "blume > mermaid",
     "blume > epub-gen-memory/bundle",
+    // Astro's own client-router/prefetch virtual modules are deliberately NOT
+    // forced in here: they read Vite `define`-injected constants
+    // (__PREFETCH_PREFETCH_ALL__ and friends) that a pre-bundled copy loses,
+    // throwing ReferenceError on every page. Astro manages their optimization
+    // itself, without a mid-session reload.
     ...(options.needsReact && options.reactCompilerPath
       ? ["react/compiler-runtime"]
       : []),
@@ -474,7 +491,7 @@ export const astroConfigTemplate = (options: {
     if (deployment.adapter === "cloudflare") {
       return resolveCloudflareAdapterArgs(context);
     }
-    return ADAPTER_OPTIONS[deployment.adapter] ?? "";
+    return ADAPTER_OPTIONS.get(deployment.adapter) ?? "";
   })();
   // Vercel resolves its Build Output tree and its `@vercel/nft` dependency
   // trace against the Astro root, which for Blume is the hidden `.blume`
@@ -547,19 +564,23 @@ export const astroConfigTemplate = (options: {
               )}, fallbacks: ${JSON.stringify(
                 font.fallbacks
               )}, options: { variants: ${JSON.stringify(
-                font.variants.map((variant) => ({
-                  ...(variant.weight === undefined
-                    ? {}
-                    : { weight: variant.weight }),
-                  ...(variant.style === undefined
-                    ? {}
-                    : { style: variant.style }),
-                  src: [
-                    isAbsolute(variant.src)
-                      ? variant.src
-                      : join(context.root, variant.src),
-                  ],
-                }))
+                font.variants.map((variant) => {
+                  const face: Pick<typeof variant, "style" | "weight"> = {};
+                  if (variant.weight !== undefined) {
+                    face.weight = variant.weight;
+                  }
+                  if (variant.style !== undefined) {
+                    face.style = variant.style;
+                  }
+                  return {
+                    ...face,
+                    src: [
+                      isAbsolute(variant.src)
+                        ? variant.src
+                        : join(context.root, variant.src),
+                    ],
+                  };
+                })
               )} } }`
             : `{ provider: fontProviders.${font.provider}(), name: ${JSON.stringify(
                 font.name
@@ -679,6 +700,11 @@ ${userConfigSetup}export default defineConfig({
     },
   },
   devToolbar: { enabled: false },
+  // The layouts render Astro's <ClientRouter />, and its in-place swaps read
+  // from the prefetch cache — fetching every link on hover/viewport hides the
+  // request latency behind the user's intent, so most navigations swap
+  // instantly.
+  prefetch: { prefetchAll: true },
   vite: {
     plugins: [tailwindcss(), prerenderDepsPlugin(), serverAppResolvePlugin()],
     // Everything hydration can reach must be part of the dev dep optimizer's
@@ -872,17 +898,30 @@ export const collections = { docs${options.staged ? ", staged" : ""} };
 const ASK_FALLBACK_PROMPT =
   "You are a helpful documentation assistant. Answer using the project's documentation.";
 
+/** The `ai.ask` values the generated endpoint has to carry with it. */
+export interface AskEndpointOptions {
+  /** `ai.ask.instructions` — extra system-prompt text. */
+  instructions?: string;
+  /** `ai.ask.retrieval` — how much documentation each question carries. */
+  retrieval?: AskRetrievalOptions;
+}
+
 /**
  * Generate the Ask AI server endpoint (`.blume/src/pages/api/ask.ts`).
- * `instructions` (the `ai.ask.instructions` config) is appended to the
+ *
+ * `options.instructions` (the `ai.ask.instructions` config) is appended to the
  * built-in prompt on every path: the grounded prompt via `createAskContext`,
- * and the plain fallback here.
+ * and the plain fallback here. `options.retrieval` (the `ai.ask.retrieval`
+ * config) is forwarded to `createAskContext` on the grounded path, where it
+ * sizes retrieval. Both travel in one options object so a new call site can't
+ * silently drop one of them.
  */
 export const askEndpointTemplate = (
   backend: AskBackend,
   grounded: boolean,
-  instructions?: string
+  options?: AskEndpointOptions
 ): string => {
+  const instructions = options?.instructions;
   const fallbackPrompt = instructions
     ? `${ASK_FALLBACK_PROMPT}\n\n${instructions}`
     : ASK_FALLBACK_PROMPT;
@@ -918,9 +957,15 @@ export const askEndpointTemplate = (
       'import { createAskContext } from "blume/ai/ask-context.ts";',
       'import askData from "../../generated/ask-data.json";'
     );
-    const groundOptions = instructions
-      ? `, { instructions: ${JSON.stringify(instructions)} }`
-      : "";
+    const groundFields: string[] = [];
+    if (instructions) {
+      groundFields.push(`instructions: ${JSON.stringify(instructions)}`);
+    }
+    if (options?.retrieval) {
+      groundFields.push(`retrieval: ${JSON.stringify(options.retrieval)}`);
+    }
+    const groundOptions =
+      groundFields.length > 0 ? `, { ${groundFields.join(", ")} }` : "";
     setup += `\nconst ground = createAskContext(askData${groundOptions});\n`;
   }
   // Validate the client-supplied body and cap its size. The endpoint is
@@ -1084,7 +1129,7 @@ const SEARCH_BASE_IMPORT =
 /**
  * A client that loads a static `blume-search.json` index (Orama, FlexSearch).
  * `locale` (Orama only) is the site's `i18n.defaultLocale`, which selects a
- * word-segmenting tokenizer for languages written without spaces.
+ * word-segmenting tokenizer for every non-Latin script.
  */
 const staticSearchClient = (module: string, locale?: string): string =>
   `${SEARCH_CLIENT_HEADER}${searchClientImport(module)}${SEARCH_BASE_IMPORT}
@@ -1095,10 +1140,17 @@ export const createSearch = () => create({ indexUrl${
   } });
 `;
 
+/**
+ * Public credential fields baked into a hosted provider's generated client
+ * (Algolia/Orama Cloud/Typesense config values from `search.*`, all plain
+ * strings or numbers; `JSON.stringify` drops the absent ones).
+ */
+type HostedSearchCredentials = Record<string, string | number | undefined>;
+
 /** A client that passes public credentials straight to the provider SDK. */
 const hostedSearchClient = (
   module: string,
-  options: Record<string, unknown>
+  options: HostedSearchCredentials
 ): string =>
   `${SEARCH_CLIENT_HEADER}${searchClientImport(module)}
 export const createSearch = () => create(${JSON.stringify(options)});
@@ -1107,7 +1159,7 @@ export const createSearch = () => create(${JSON.stringify(options)});
 /** Build the per-provider config object the hosted client is created with. */
 const hostedSearchOptions = (
   search: ResolvedConfig["search"]
-): { module: string; options: Record<string, unknown> } | null => {
+): { module: string; options: HostedSearchCredentials } | null => {
   switch (search.provider) {
     case "algolia": {
       return { module: "algolia", options: { ...search.algolia } };
@@ -1414,7 +1466,9 @@ export const ALL: APIRoute = ({ request }) => handler(request);
 `;
 
 /** Generate a prerendered endpoint that serves a fixed JSON payload. */
-export const staticJsonEndpointTemplate = (payload: unknown): string =>
+export const staticJsonEndpointTemplate = <Payload extends object>(
+  payload: Payload
+): string =>
   `// Generated by Blume. Do not edit.
 export const prerender = true;
 
@@ -1455,7 +1509,8 @@ export function GET({ props }: { props: { section: string } }) {
 /** Generate the OG image endpoint (`.blume/src/pages/og/[...slug].png.ts`). */
 export const ogEndpointTemplate = (
   customRoutes: OgCustomRoute[] = [],
-  og: { families?: OgFontFamilies; fonts?: OgFont[] } = {}
+  og: { families?: OgFontFamilies; fonts?: OgFont[] } = {},
+  includeChangelog = false
 ): string =>
   `// Generated by Blume. Do not edit.
 import { renderOgImage } from "blume/og";
@@ -1494,6 +1549,13 @@ export function getStaticPaths() {
   }
   for (const route of data.routes) {
     add(route.path === "/" ? "index" : route.path.slice(1), route.title);
+  }${
+    includeChangelog
+      ? `
+  // The generated changelog index is not a content route, so it needs its own
+  // card. Added last: a custom page or content route owning /changelog wins.
+  add("changelog", data.ui.changelog?.title ?? "Changelog");`
+      : ""
   }
   return paths;
 }
@@ -1535,8 +1597,9 @@ export async function GET({ props }: { props: { title: string } }) {
  * live inside our shell. `dataImport` is the route-depth-aware relative path to
  * the generated data module the layout reads.
  */
-export const scalarReferenceTemplate = (options: {
-  configuration: Record<string, unknown>;
+export const scalarReferenceTemplate = <Configuration extends object>(options: {
+  /** Scalar options forwarded verbatim (spec/theme config plus the author's `scalar` escape hatch). */
+  configuration: Configuration;
   dataImport: string;
   noindex?: boolean;
   route: string;
@@ -1712,11 +1775,13 @@ export function getStaticPaths() {
       locale: route.locale,
       route: route.path,
       title: route.title,
+      version: route.version,
+      versionAlternates: route.versionAlternates,
     },
   }));
 }
 
-const { entryId, collection, route, title, indexable, editUrl, lastModified, locale, alternates, fallback } = Astro.props;
+const { entryId, collection, route, title, indexable, editUrl, lastModified, locale, alternates, fallback, version, versionAlternates } = Astro.props;
 const entry = await getEntry(collection as CollectionKey, entryId);
 if (!entry) {
   return new Response(null, { status: 404 });
@@ -1748,9 +1813,6 @@ const ogGenerated = !seo.image && Boolean(ogPath);
 const x = { ...data.config.x, ...(seo.x?.creator ? { creator: seo.x.creator } : {}) };
 
 const basedRoute = withBase(route);
-const canonical =
-  seo.canonical ??
-  (base ? \`\${base}\${basedRoute === "/" ? "" : encodeURI(basedRoute)}\` : null);
 
 // Locale resolution. With i18n on, pick the active locale's nav + dictionary,
 // build hreflang alternates, and derive the language-switcher targets.
@@ -1771,7 +1833,20 @@ const stripLocale = (path: string, codeArg: string) => {
   return prefix && path.startsWith(prefix) ? path.slice(prefix.length) || "/" : path;
 };
 
-const navigation = i18n ? (data.navigationByLocale[locale] ?? data.navigation) : data.navigation;
+// Version resolution. An archived page renders its snapshot's navigation tree,
+// points its canonical at the latest equivalent (unless configured otherwise),
+// and shows the old-version notice.
+const versionsConfig = data.config.versions;
+const archived = versionsConfig && version
+  ? (versionsConfig.archived.find((v) => v.id === version) ?? null)
+  : null;
+const latestVersionAlt = (versionAlternates ?? []).find((alt) => alt.version === "");
+
+const navigation = version
+  ? (data.navigationByVersion[version]?.[i18n ? locale : ""] ?? data.navigation)
+  : i18n
+    ? (data.navigationByLocale[locale] ?? data.navigation)
+    : data.navigation;
 const ui = i18n ? (data.uiByLocale[locale] ?? data.ui) : data.ui;
 const localeMeta = i18n ? i18n.locales.find((l) => l.code === locale) : null;
 const dir = localeMeta?.dir ?? "ltr";
@@ -1783,10 +1858,22 @@ const contentLocale =
 const contentDir = i18n
   ? (i18n.locales.find((l) => l.code === contentLocale)?.dir ?? "ltr")
   : "ltr";
-const absolute = (path: string) => {
-  const p = withBase(path);
-  return base + (p === "/" ? "" : p);
-};
+// The root route keeps its trailing slash (\`https://site/\`) so canonical and
+// hreflang URLs byte-match the sitemap's <loc> for the home page.
+const absolute = (path: string) => base + withBase(path);
+
+// An archived page defaults its canonical to the same page in the latest docs
+// when that page still exists — search engines treat the live page as
+// authoritative without deindexing version-only content. A page's own
+// \`seo.canonical\` always wins, and \`canonical: "self"\` keeps the default.
+const canonical =
+  seo.canonical ??
+  (archived && archived.canonical === "latest" && latestVersionAlt && base
+    ? absolute(latestVersionAlt.path)
+    : base
+      ? \`\${base}\${basedRoute === "/" ? "/" : encodeURI(basedRoute)}\`
+      : null);
+const effectiveNoindex = Boolean(seo.noindex) || (archived?.noindex ?? false);
 
 const localeAlternates =
   i18n && base
@@ -1809,6 +1896,72 @@ const localeSwitch = i18n
       };
     })
   : [];
+
+// Version switcher + old-version notice. The switcher auto-populates from the
+// versions config as a \`kind: "version"\` selector; a user-declared version
+// selector in \`navigation.selectors\` suppresses it (theirs renders instead).
+// Fallback version roots compose like real routes — \`{basePath}/{locale?}/{id}\`
+// (manifest \`versionAlternates\` paths arrive with the base already applied).
+const versionRootFor = (id: string) => {
+  const logical = id ? \`/\${id}\` : "/";
+  const localized = i18n ? localizeRoute(logical, locale) : logical;
+  const mount = data.config.basePath;
+  if (!mount) {
+    return localized;
+  }
+  return localized === "/" ? mount : \`\${mount}\${localized}\`;
+};
+const samePageSwitch = versionsConfig
+  ? versionsConfig.switcher.redirect === "same-page"
+  : true;
+const userHasVersionSelector = navigation.selectors.some(
+  (selector) => selector.kind === "version"
+);
+const versionSelector =
+  versionsConfig && !userHasVersionSelector
+    ? {
+        items: [
+          {
+            id: "",
+            label: versionsConfig.current.label,
+            tag: versionsConfig.current.badge,
+          },
+          ...versionsConfig.archived.map((v) => ({
+            id: v.id,
+            label: v.label ?? v.id,
+            tag: undefined,
+          })),
+        ].map((entry) => {
+          const alt = (versionAlternates ?? []).find(
+            (a) => a.version === entry.id
+          );
+          return {
+            label: entry.label,
+            path: samePageSwitch && alt ? alt.path : versionRootFor(entry.id),
+            ...(entry.tag ? { tag: entry.tag } : {}),
+          };
+        }),
+        kind: "version" as const,
+        label: ui.versions.switcher,
+      }
+    : null;
+
+const versionNotice =
+  archived && archived.banner !== false
+    ? {
+        latestHref: latestVersionAlt
+          ? latestVersionAlt.path
+          : versionRootFor(""),
+        latestLabel: ui.versions.latest,
+        message:
+          typeof archived.banner === "string"
+            ? archived.banner
+            : ui.versions.notice.replace(
+                "{version}",
+                archived.label ?? archived.id
+              ),
+      }
+    : null;
 
 // The whole page shell is overridable via \`layout.Layout\`; it receives the same
 // props as the built-in RootLayout, plus the \`layout\` map for its inner slots.
@@ -1834,6 +1987,9 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   localeAlternates={localeAlternates}
   xDefault={xDefault}
   localeSwitch={localeSwitch}
+  versionSelector={versionSelector}
+  versionNotice={versionNotice}
+  searchVersion={versionsConfig ? version : null}
   page={{ title: seo.title ?? title, description: seo.description ?? frontmatter.description, route }}
   headings={headings}
   toc={data.config.toc}
@@ -1856,7 +2012,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   pageType={frontmatter.type}
   published={frontmatter.date ?? frontmatter.changelog?.date ?? null}
   lastModified={lastModified}
-  noindex={seo.noindex}
+  noindex={effectiveNoindex}
   structuredDataEnabled={data.config.structuredData}
 >
   <h1>{title}</h1>
@@ -2028,6 +2184,12 @@ const base = data.config.site ? data.config.site.replace(/\\/$/, "") : null;
 const basedRoute = withBase("/changelog");
 const canonical = base ? base + basedRoute : null;
 
+// The generated OG card for this route (the /og endpoint emits it alongside
+// the content-route cards), absolutized like the catch-all's so crawlers get
+// a full URL when the site is known.
+const ogPath = data.config.og.enabled ? withBase("/og/changelog.png") : null;
+const ogImage = ogPath && base ? base + ogPath : ogPath;
+
 // The page chrome (h1, title, description) comes from the same translatable
 // \`changelog\` group as the reveal button; optional chaining tolerates a
 // not-yet-regenerated data snapshot from before these keys existed.
@@ -2035,7 +2197,10 @@ const changelogTitle = data.ui.changelog?.title ?? "Changelog";
 const changelogDescription =
   data.ui.changelog?.description ??
   "Product updates, new features, and fixes from every release.";
-const pageTitle = data.config.title + " " + changelogTitle;
+// The layout suffixes "- {site title}" itself, so the page title is just the
+// changelog's own name — prefixing the site title too would double it
+// ("Acme Changelog - Acme").
+const pageTitle = changelogTitle;
 
 const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
 ---
@@ -2067,7 +2232,8 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   fontCssVars={data.fontCssVars}
   searchEnabled={data.config.search.enabled}
   indexable={true}
-  ogImage={null}
+  ogImage={ogImage}
+  ogGenerated={Boolean(ogImage)}
   x={data.config.x}
   canonical={canonical}
   exportPdf={${options.exportPdf}}

@@ -285,28 +285,51 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     return clone.innerHTML;
   };
 
-  const root = document.querySelector("[data-blume-page-actions]");
-  if (root) {
+  const placeMenu = (details: HTMLDetailsElement) => {
+    const menu = details.querySelector<HTMLElement>("[data-blume-menu]");
+    const summary = details.querySelector("summary");
+    if (!(menu && summary)) {
+      return;
+    }
+    const rect = summary.getBoundingClientRect();
+    const margin = 8;
+    const flipUp =
+      rect.bottom + menu.offsetHeight + margin > window.innerHeight &&
+      rect.top - menu.offsetHeight - margin > 0;
+    menu.classList.toggle("top-full", !flipUp);
+    menu.classList.toggle("mt-1", !flipUp);
+    menu.classList.toggle("bottom-full", flipUp);
+    menu.classList.toggle("mb-1", flipUp);
+  };
+
+  // rAF-coalesced so a live resize drag re-reads layout once per frame, not
+  // once per event, while the open menu still tracks the viewport. Registered
+  // once at module scope (this bundle runs once per real page load) and
+  // querying live, because client-router swaps replace the menu elements.
+  window.addEventListener(
+    "resize",
+    rafThrottle(() => {
+      const open = document.querySelector<HTMLDetailsElement>(
+        "[data-blume-page-actions] details[open]"
+      );
+      if (open) {
+        placeMenu(open);
+      }
+    })
+  );
+
+  // Per-page setup, run on the initial load and again after every
+  // client-router swap: the swap rebuilds the actions menu from
+  // server-rendered markup, so every handler below binds to fresh elements.
+  const initPageActions = () => {
+    const root = document.querySelector("[data-blume-page-actions]");
+    if (!root) {
+      return;
+    }
     // The action dropdowns are native <details>. Make them behave like a proper
     // menu: only one open at a time, and flip above the trigger when opening
     // downward would run past the viewport bottom.
     const dropdowns = [...root.querySelectorAll<HTMLDetailsElement>("details")];
-    const placeMenu = (details: HTMLDetailsElement) => {
-      const menu = details.querySelector<HTMLElement>("[data-blume-menu]");
-      const summary = details.querySelector("summary");
-      if (!(menu && summary)) {
-        return;
-      }
-      const rect = summary.getBoundingClientRect();
-      const margin = 8;
-      const flipUp =
-        rect.bottom + menu.offsetHeight + margin > window.innerHeight &&
-        rect.top - menu.offsetHeight - margin > 0;
-      menu.classList.toggle("top-full", !flipUp);
-      menu.classList.toggle("mt-1", !flipUp);
-      menu.classList.toggle("bottom-full", flipUp);
-      menu.classList.toggle("mb-1", flipUp);
-    };
     for (const details of dropdowns) {
       details.addEventListener("toggle", () => {
         if (!details.open) {
@@ -320,17 +343,6 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
         placeMenu(details);
       });
     }
-    // rAF-coalesced so a live resize drag re-reads layout once per frame,
-    // not once per event, while the open menu still tracks the viewport.
-    window.addEventListener(
-      "resize",
-      rafThrottle(() => {
-        const open = dropdowns.find((details) => details.open);
-        if (open) {
-          placeMenu(open);
-        }
-      })
-    );
 
     // `data-md` is the base-less logical route; the raw-markdown endpoint is a
     // generated page route, so it's served under the deployment base like any
@@ -491,5 +503,8 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
         }
       }
     });
-  }
+  };
+
+  initPageActions();
+  document.addEventListener("astro:after-swap", initPageActions);
 </script>

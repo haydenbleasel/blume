@@ -232,13 +232,17 @@ const { config } = data;
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
   ogImage="/opengraph-image.png"
+  ogImageAlt="Acme — the fastest docs"
+  ogImageSize={{ width: 1200, height: 630 }}
   page={{ title: config.title }}
 >
   <!-- page content -->
 </PageLayout>
 ```
 
-変わるのはこのページだけで、他のすべてのルートは生成されたカードのままです — つまりこれが、ホームページだけに独自の共有画像を与える方法です。
+変わるのはこのページだけで、他のすべてのルートは生成されたカードのままです — つまりこれが、ホームページだけに独自の共有画像を与える方法です。生成されたカードは自身のサイズと代替テキストをクローラーに対して自動的に宣言します。独自の `ogImage` を使う場合は、共有カードが同じ扱いを受けられるよう `ogImageAlt` と `ogImageSize` を併せて渡してください。
+
+このページは schema.org の JSON-LD も出力します — ドキュメントページが持つのと同じ `WebSite` グラフなので、（多くの場合カスタムページである）ホームページだけが構造化データのない URL になることはありません。[`structuredData`](/docs/configuration/seo) の設定と同期させるには `structuredDataEnabled={config.structuredData}` を、特定のページだけ無効にするには `structuredDataEnabled={false}` を渡します。
 
 `page.title` はドキュメントタイトルとしてそのまま使われます（`- siteTitle` のサフィックスは付きません）。マーケティングページは通常、自前のタイトルを設定するためです。代わりにカスタムページへ完全なドキュメントのクローム — サイドバー、目次、すべて — を与えるには、生成されたページが使うレイアウトである `RootLayout` でラップします。必要な props は `blume:data` から直接取得できます:
 

@@ -82,6 +82,8 @@ const enumerateGithub = async (
   if (!res.ok) {
     throw new Error(`${treeUrl} -> ${res.status}`);
   }
+  // SAFETY: GitHub's git/trees endpoint returns this envelope; a missing or
+  // differently-typed field falls through the `?? []` and blob filters below.
   const body = (await res.json()) as {
     tree?: GithubTreeEntry[];
     truncated?: boolean;
@@ -198,6 +200,8 @@ export const mdxRemoteSource = (
             } catch (error) {
               skipped.push({
                 code: "BLUME_SOURCE_FETCH_FAILED",
+                // SAFETY: fetch and decode failures throw Error instances;
+                // only the message is read for the skip diagnostic.
                 message: `Source "${options.name}" skipped "${ref.ref}" (${(error as Error).message}); the rest were imported.`,
                 severity: "warning",
               });

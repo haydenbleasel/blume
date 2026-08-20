@@ -33,7 +33,11 @@ export interface ExampleDiscovery {
 }
 
 /** Example extensions mapped to the framework that renders them. */
-const FRAMEWORK_BY_EXT: Record<string, ExampleFramework> = {
+interface FrameworkByExtension {
+  [extension: string]: ExampleFramework;
+}
+
+const FRAMEWORK_BY_EXT: FrameworkByExtension = {
   astro: "astro",
   jsx: "react",
   svelte: "svelte",
@@ -62,7 +66,7 @@ const GLOB_MAGIC = /[!*?[\]{}]/u;
  * discovered files can be keyed relative to that prefix (e.g.
  * `registry/x/**\/examples/*` → `{ base: "registry/x", rest: "**\/examples/*" }`).
  */
-const splitGlobBase = (pattern: string): { base: string; rest: string } => {
+const splitGlobBase = (pattern: string) => {
   const segments = pattern.split("/");
   // Only called when the pattern contains glob magic (see the caller), and `/`
   // is never magic, so the magic char always lands in a segment — `findIndex`

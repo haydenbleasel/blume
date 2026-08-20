@@ -2,6 +2,7 @@ import { withBasePath } from "../../core/base-path.ts";
 import { absoluteUrl, siteRoot } from "../../core/site-url.ts";
 import { trimChar } from "../../core/trim.ts";
 import { MCP_TOOLS } from "./tools.ts";
+import type { McpToolMeta } from "./tools.ts";
 
 /** Inputs needed to describe the MCP server in discovery documents. */
 export interface McpDiscoveryInput {
@@ -27,9 +28,7 @@ const serverUrl = (input: McpDiscoveryInput): string => {
  * The `/.well-known/mcp.json` discovery document: the minimal pointer agents use
  * to find the server and its transport.
  */
-export const buildMcpDiscovery = (
-  input: McpDiscoveryInput
-): Record<string, unknown> => ({
+export const buildMcpDiscovery = (input: McpDiscoveryInput) => ({
   servers: [
     {
       name: input.name,
@@ -102,20 +101,32 @@ const HTTP_URL = /^https?:\/\//u;
  * excludes primitives for. Full input schemas are served live via
  * `tools/list`.
  */
-export const buildMcpServerCard = (
-  input: McpDiscoveryInput
-): Record<string, unknown> => {
+export interface McpServerCard {
+  $schema: string;
+  capabilities: { tools: { listChanged: boolean } };
+  description: string;
+  name: string;
+  /** Absolute endpoints only — present when a `site` is configured. */
+  remotes?: { type: string; url: string }[];
+  serverInfo: { name: string; version: string };
+  title: string;
+  tools: McpToolMeta[];
+  transport: string;
+  transports: { endpoint: string; type: string }[];
+  url: string;
+  version: string;
+  websiteUrl?: string;
+}
+
+export const buildMcpServerCard = (input: McpDiscoveryInput): McpServerCard => {
   const url = serverUrl(input);
-  return {
+  const card: McpServerCard = {
     $schema: SERVER_CARD_SCHEMA,
     capabilities: { tools: { listChanged: false } },
     description: truncate(
       `Model Context Protocol server for the ${input.name} documentation.`
     ),
     name: reverseDnsName(input),
-    ...(HTTP_URL.test(url)
-      ? { remotes: [{ type: "streamable-http", url }] }
-      : {}),
     serverInfo: { name: input.name, version: input.version },
     title: truncate(input.name),
     tools: MCP_TOOLS.map((tool) => ({
@@ -128,6 +139,12 @@ export const buildMcpServerCard = (
     transports: [{ endpoint: url, type: "streamable-http" }],
     url,
     version: input.version,
-    ...(input.site ? { websiteUrl: siteRoot(input.site) } : {}),
   };
+  if (HTTP_URL.test(url)) {
+    card.remotes = [{ type: "streamable-http", url }];
+  }
+  if (input.site) {
+    card.websiteUrl = siteRoot(input.site);
+  }
+  return card;
 };

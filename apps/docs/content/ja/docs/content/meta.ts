@@ -10,6 +10,7 @@ export default {
     "islands",
     "sources",
     "i18n",
+    "versioning",
   ],
   title: "コンテンツ",
 };

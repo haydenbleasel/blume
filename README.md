@@ -49,18 +49,22 @@ Blume works with any package manager and never requires you to set up Astro or T
 
 ## CLI
 
-| Command            | Description                                           |
-| ------------------ | ----------------------------------------------------- |
-| `blume init [dir]` | Scaffold a project (interactive by default).          |
-| `blume dev`        | Start the dev server with hot reload.                 |
-| `blume build`      | Build the static (or server) site.                    |
-| `blume preview`    | Preview the last build.                               |
-| `blume add <item>` | Install a source component from the registry.         |
-| `blume sync`       | Re-fetch remote content sources and regenerate.       |
-| `blume eject`      | Promote the runtime into a standalone Astro app.      |
-| `blume check`      | Type-check the docs site with `astro check`.          |
-| `blume validate`   | Validate internal, anchor, asset, and external links. |
-| `blume doctor`     | Diagnose config and content problems.                 |
+| Command | Description |
+| --- | --- |
+| `blume init [dir]` | Scaffold a project (interactive by default). |
+| `blume dev` | Start the dev server with hot reload. |
+| `blume build` | Build the static (or server) site. |
+| `blume preview` | Preview the last build. |
+| `blume add <item>` | Install a source component from the registry. |
+| `blume sync` | Re-fetch remote content sources and regenerate. |
+| `blume eject` | Promote the runtime into a standalone Astro app. |
+| `blume check` | Type-check the docs site with `astro check`. |
+| `blume validate` | Validate internal, anchor, asset, and external links. |
+| `blume doctor` | Diagnose config and content problems. |
+| `blume audit` | Audit the built site for SEO and health issues. |
+| `blume eval` | Test the docs: an agent answers your questions using only the documentation. |
+| `blume translate` | Translate docs into the configured locales with a local agent CLI. |
+| `blume version [id]` | Freeze the current docs as an archived version (no id lists configured versions). |
 
 See the [CLI reference](https://useblume.dev/docs/reference/cli) for every flag.
 

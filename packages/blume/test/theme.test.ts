@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { blumeConfigSchema } from "../src/core/schema.ts";
+import type { BlumeConfigInput } from "../src/core/schema.ts";
 import {
   examplesEntryTemplate,
   tailwindEntryTemplate,
@@ -9,7 +10,7 @@ import type { FontsConfig } from "../src/theme/fonts.ts";
 import {
   buildFontEntries,
   buildFontsCss,
-  configuredCssVars,
+  configuredFonts,
   slugifyFontName,
 } from "../src/theme/fonts.ts";
 import { hasIcon, resolveIcon } from "../src/theme/icons.ts";
@@ -19,7 +20,7 @@ import {
   resolveRadius,
 } from "../src/theme/palette.ts";
 
-const themeOf = (over: Record<string, unknown>) =>
+const themeOf = (over: BlumeConfigInput["theme"]) =>
   blumeConfigSchema.parse({ theme: over }).theme;
 
 describe("resolveAccent", () => {
@@ -173,6 +174,26 @@ describe("tailwindEntryTemplate", () => {
     const userAt = entry.indexOf(".prose { color: green; }");
     expect(configAt).toBeGreaterThan(-1);
     expect(userAt).toBeGreaterThan(configAt);
+  });
+
+  it("declares no cross-document view transitions (the client router owns navigation)", () => {
+    // Astro's <ClientRouter /> in the layouts drives page transitions — and
+    // ships its own reduced-motion guard. A `@view-transition` opt-in here
+    // would double-animate the full-load navigations the router hands back
+    // to the browser.
+    expect(entry).not.toContain("@view-transition");
+  });
+
+  it("bakes display-grade tracking into headings, not the font", () => {
+    // Any display font gets tightened heading tracking from the theme — the
+    // Inter default (and most text families) reads loose at heading sizes.
+    // -0.05em was matched visually against the old Inter Tight default.
+    expect(entry).toContain(`font-family: var(--font-display);
+    letter-spacing: -0.05em;`);
+    // Prose headings must not reset it — a `letter-spacing: 0` in the
+    // higher-specificity `.prose :where(h1…)` rule silently undoes the
+    // tracking on every docs page.
+    expect(entry).not.toContain("letter-spacing: 0;");
   });
 
   it("routes font tokens through overridable indirection variables", () => {
@@ -415,29 +436,79 @@ describe("buildFontsCss", () => {
   });
 });
 
-describe("configuredCssVars", () => {
-  it("lists the unique Astro font variables to preload", () => {
+describe("configuredFonts", () => {
+  it("dedupes shared families and unions their roles' preload weights", () => {
+    // Inter serves body (400/500) and display (500/600) → one entry, 400-600.
     expect(
-      configuredCssVars({ body: "inter", display: "inter", mono: "geist-mono" })
-    ).toStrictEqual(["--blume-ff-inter", "--blume-ff-geist-mono"]);
+      configuredFonts({ body: "inter", display: "inter", mono: "geist-mono" })
+    ).toStrictEqual([
+      { cssVariable: "--blume-ff-inter", preloadWeights: [400, 500, 600] },
+      { cssVariable: "--blume-ff-geist-mono", preloadWeights: [400] },
+    ]);
+  });
+
+  it("preloads all faces of a family missing the role's preferred weights", () => {
+    // Merriweather only ships 400/700 — neither display preference (500/600)
+    // exists, so both of its faces preload (they're what headings render in).
+    expect(configuredFonts({ display: "merriweather" })).toStrictEqual([
+      { cssVariable: "--blume-ff-merriweather", preloadWeights: [400, 700] },
+    ]);
+  });
+
+  it("keeps the preferred weights for variable ranges", () => {
+    expect(
+      configuredFonts({ body: { name: "Custom Var", weights: ["100..900"] } })
+    ).toStrictEqual([
+      { cssVariable: "--blume-ff-custom-var", preloadWeights: [400, 500] },
+    ]);
+  });
+
+  it("narrows local fonts to declared weights and trusts inferred ones", () => {
+    expect(
+      configuredFonts({
+        body: {
+          name: "Local Declared",
+          variants: [
+            { src: "fonts/regular.woff2", weight: 400 },
+            { src: "fonts/bold.woff2", weight: 700 },
+          ],
+        },
+        mono: {
+          name: "Local Inferred",
+          variants: [{ src: "fonts/mono.woff2" }],
+        },
+      })
+    ).toStrictEqual([
+      { cssVariable: "--blume-ff-local-declared", preloadWeights: [400] },
+      { cssVariable: "--blume-ff-local-inferred", preloadWeights: [400] },
+    ]);
+  });
+
+  it("skips unset roles and unknown slug strings", () => {
+    expect(configuredFonts({ body: "not-a-real-slug" })).toStrictEqual([]);
   });
 });
 
+/** A theme whose `fonts` was never set — what the builders see in that case. */
+interface FontlessTheme {
+  fonts?: FontsConfig;
+}
+
 describe("font builders without a fonts config", () => {
   // An unset `theme.fonts` arrives as undefined; all three builders no-op.
-  const absent: { fonts?: FontsConfig } = {};
+  const absent: FontlessTheme = {};
   it("returns no entries, css, or preload vars when fonts is undefined", () => {
     expect(buildFontEntries(absent.fonts)).toStrictEqual([]);
     expect(buildFontsCss(absent.fonts)).toBe("");
-    expect(configuredCssVars(absent.fonts)).toStrictEqual([]);
+    expect(configuredFonts(absent.fonts)).toStrictEqual([]);
   });
 });
 
 describe("theme.fonts schema", () => {
-  it("defaults to Inter Tight / Inter / IBM Plex Mono when omitted", () => {
+  it("defaults to Inter / Inter / IBM Plex Mono when omitted", () => {
     expect(themeOf({}).fonts).toStrictEqual({
       body: "inter",
-      display: "inter-tight",
+      display: "inter",
       mono: "ibm-plex-mono",
     });
   });
@@ -445,7 +516,7 @@ describe("theme.fonts schema", () => {
   it("merges an explicit role over the defaults", () => {
     expect(themeOf({ fonts: { body: "geist" } }).fonts).toStrictEqual({
       body: "geist",
-      display: "inter-tight",
+      display: "inter",
       mono: "ibm-plex-mono",
     });
   });

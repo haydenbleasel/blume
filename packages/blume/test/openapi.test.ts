@@ -17,7 +17,10 @@ import {
   toJson,
   typeLabel,
 } from "../src/components/openapi/helpers.ts";
-import type { SchemaLike } from "../src/components/openapi/helpers.ts";
+import type {
+  ParameterLike,
+  SchemaLike,
+} from "../src/components/openapi/helpers.ts";
 import { operationModel } from "../src/components/openapi/operation-model.ts";
 import {
   buildRequest,
@@ -29,6 +32,7 @@ import {
   schemeCarrier,
   schemeLabel,
 } from "../src/components/openapi/security.ts";
+import type { SecurityRequirementLike } from "../src/components/openapi/security.ts";
 import { sampleLanguages } from "../src/components/openapi/snippets.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
@@ -56,29 +60,72 @@ const ctx = (projectRoot: string) => ({
   projectRoot,
 });
 
-const SPEC_3_1 = {
-  components: {
-    schemas: {
-      Pet: {
-        properties: {
-          id: { format: "int64", type: "integer" },
-          name: { example: "doggie", type: "string" },
-          status: { enum: ["available", "sold"], type: "string" },
-          tags: { items: { $ref: "#/components/schemas/Tag" }, type: "array" },
-        },
-        required: ["name"],
-        type: "object",
-      },
-      Tag: {
-        // Self-referential to exercise the circular-ref guard.
-        properties: {
-          child: { $ref: "#/components/schemas/Tag" },
-          name: { type: "string" },
-        },
-        type: "object",
-      },
+/**
+ * The slice of an operation the path fixtures in this file exercise. Schemas
+ * use `SchemaLike` because Blume keeps `$ref` nodes inline, which the scalar
+ * `SchemaObject` union does not model.
+ */
+interface OperationFixture {
+  operationId?: string;
+  summary?: string;
+  tags?: string[];
+  parameters?: ParameterLike[];
+  requestBody?: {
+    content?: Record<string, { schema?: SchemaLike }>;
+    required?: boolean;
+  };
+  responses?: Record<
+    string,
+    { content?: Record<string, { schema?: SchemaLike }>; description?: string }
+  >;
+}
+
+/** A path item as fixtures declare it: real, or `null` for the malformed case. */
+type PathItemFixture = {
+  $ref?: string;
+  get?: OperationFixture;
+  post?: OperationFixture;
+} | null;
+
+/**
+ * Widen a partial spec fixture into the parsed-document type. Fixtures stay
+ * minimal — no `info`, sometimes a deliberately malformed path item — because
+ * extractOperations must harden against exactly that input.
+ */
+const asDocument = (
+  spec: Partial<Omit<ApiDocument, "components" | "paths">> & {
+    /** Component schemas as Blume renders them: `$ref` nodes kept inline. */
+    components?: { schemas?: Record<string, SchemaLike> };
+    paths?: Record<string, PathItemFixture>;
+  }
+): ApiDocument =>
+  // SAFETY: every Document field a fixture omits is optional at runtime, and
+  // the malformed entries (null path items) are the hardening cases under test.
+  spec as ApiDocument;
+
+const SPEC_SCHEMAS = {
+  Pet: {
+    properties: {
+      id: { format: "int64", type: "integer" },
+      name: { example: "doggie", type: "string" },
+      status: { enum: ["available", "sold"], type: "string" },
+      tags: { items: { $ref: "#/components/schemas/Tag" }, type: "array" },
     },
+    required: ["name"],
+    type: "object",
   },
+  Tag: {
+    // Self-referential to exercise the circular-ref guard.
+    properties: {
+      child: { $ref: "#/components/schemas/Tag" },
+      name: { type: "string" },
+    },
+    type: "object",
+  },
+} satisfies Record<string, SchemaLike>;
+
+const SPEC_3_1 = asDocument({
+  components: { schemas: SPEC_SCHEMAS },
   info: { description: "A pet store.", title: "Petstore", version: "1.0.0" },
   openapi: "3.1.0",
   paths: {
@@ -129,30 +176,46 @@ const SPEC_3_1 = {
     },
   },
   servers: [{ url: "https://api.test/v1" }],
-} as unknown as ApiDocument;
+});
 
-const tempSpec = async (contents: unknown): Promise<string> => {
+/** Spec-file contents to write to disk: a 3.x fixture or a legacy 2.0 one. */
+const tempSpec = async (
+  contents: Partial<ApiDocument> & { swagger?: string }
+): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), "blume-openapi-"));
   const file = join(dir, "spec.json");
   await writeFile(file, JSON.stringify(contents));
   return dir;
 };
 
+/**
+ * Wrap a request handler as a full `fetch`: Bun's `fetch` also carries a
+ * `preconnect` helper, so the stub borrows the real one (never called here).
+ */
+const asFetch = (
+  handler: (
+    input: string | URL | Request,
+    init?: RequestInit
+  ) => Promise<Response>
+): typeof fetch => Object.assign(handler, { preconnect: fetch.preconnect });
+
 /** A `fetch` stub that always resolves to the given response. */
 const respondWith = (response: Response): typeof fetch =>
-  (() => Promise.resolve(response)) as unknown as typeof fetch;
+  asFetch(() => Promise.resolve(response));
 
 // A `fetch` stub that yields queued responses (repeating the last), and records
 // how many times it was called plus the last init it received.
 const queued = (responses: Response[]) => {
   let count = 0;
   let lastInit: RequestInit | undefined;
-  const stub = ((_url: string, init?: RequestInit) => {
+  const stub = asFetch((_url, init) => {
     lastInit = init;
     const response = responses[Math.min(count, responses.length - 1)];
     count += 1;
-    return Promise.resolve(response);
-  }) as unknown as typeof fetch;
+    return response
+      ? Promise.resolve(response)
+      : Promise.reject(new Error("queued() needs at least one response"));
+  });
   return {
     get calls() {
       return count;
@@ -328,6 +391,8 @@ describe("references", () => {
     const config = blumeConfigSchema.parse({
       openapi: { enabled: true, spec: "spec.json" },
     });
+    // SAFETY: resolveSources only reads `root`, `contentRoot`, and `outDir`
+    // from the context; the other ProjectContext paths are never touched.
     const context = {
       contentRoot: "/p/docs",
       outDir: "/p/.blume",
@@ -368,14 +433,14 @@ describe("model.extractOperations", () => {
 
   it("warns on a $ref path item instead of silently dropping it", () => {
     const { operations, warnings } = extractOperations(
-      {
+      asDocument({
         openapi: "3.1.0",
         paths: {
           "/gone": null,
           "/pets": { $ref: "#/components/pathItems/pets" },
           "/x": { get: { operationId: "x" } },
         },
-      } as unknown as ApiDocument,
+      }),
       "/api"
     );
     // The empty item is skipped silently; only the $ref one is reported.
@@ -391,13 +456,13 @@ describe("model.extractOperations", () => {
 
   it("de-duplicates a repeated operationId across operations", () => {
     const { operations } = extractOperations(
-      {
+      asDocument({
         openapi: "3.1.0",
         paths: {
           "/a": { get: { operationId: "dup" } },
           "/b": { post: { operationId: "dup" } },
         },
-      } as unknown as ApiDocument,
+      }),
       "/api"
     );
     const keys = operations.map((op) => op.key);
@@ -407,11 +472,11 @@ describe("model.extractOperations", () => {
 
   it("carries tag descriptions from the document's top-level tags", () => {
     const { tags } = extractOperations(
-      {
+      asDocument({
         openapi: "3.1.0",
         paths: { "/x": { get: { operationId: "x", tags: ["pet"] } } },
         tags: [{ description: "Pet ops", name: "pet" }],
-      } as unknown as ApiDocument,
+      }),
       "/api"
     );
     expect(tags).toStrictEqual([
@@ -421,14 +486,14 @@ describe("model.extractOperations", () => {
 
   it("keeps distinct non-Latin tags on distinct letter-preserving slugs", () => {
     const { operations, tags } = extractOperations(
-      {
+      asDocument({
         openapi: "3.1.0",
         paths: {
           "/orders": { get: { operationId: "listOrders", tags: ["注文"] } },
           "/pets": { get: { operationId: "listPets", tags: ["ペット"] } },
           "/pets/{petId}": { get: { operationId: "getPet", tags: ["ペット"] } },
         },
-      } as unknown as ApiDocument,
+      }),
       "/api"
     );
     const byKey = new Map(operations.map((op) => [op.key, op]));
@@ -448,7 +513,7 @@ describe("model.extractOperations", () => {
   it("keeps diacritics in tag slugs so nav labels stay one word", () => {
     const nfdNinos = "Nin\u0303os";
     const { operations, tags } = extractOperations(
-      {
+      asDocument({
         openapi: "3.1.0",
         paths: {
           "/children": {
@@ -470,7 +535,7 @@ describe("model.extractOperations", () => {
             },
           },
         },
-      } as unknown as ApiDocument,
+      }),
       "/api"
     );
     const byKey = new Map(operations.map((op) => [op.key, op]));
@@ -495,14 +560,14 @@ describe("model.extractOperations", () => {
     // turning it into a hyphen re-creates the word-splitting bug this slug
     // policy exists to fix (the humanizer splits on hyphens).
     const { operations, tags } = extractOperations(
-      {
+      asDocument({
         openapi: "3.1.0",
         paths: {
           "/apps": {
             get: { operationId: "listApps", tags: ["نرم‌افزار"] },
           },
         },
-      } as unknown as ApiDocument,
+      }),
       "/api"
     );
     expect(operations[0]?.tagSlug).toBe("نرمافزار");
@@ -514,12 +579,12 @@ describe("model.extractOperations", () => {
     // leading-mark trim it would bypass the `operations` fallback and mint an
     // invisible route segment that glues onto the preceding `/` in URLs.
     const { operations, tags } = extractOperations(
-      {
+      asDocument({
         openapi: "3.1.0",
         paths: {
           "/a": { get: { operationId: "a", tags: ["̃"] } },
         },
-      } as unknown as ApiDocument,
+      }),
       "/api"
     );
     expect(operations[0]?.tagSlug).toBe("operations");
@@ -528,13 +593,13 @@ describe("model.extractOperations", () => {
 
   it("falls back when a tag has no letters or numbers", () => {
     const { operations, tags } = extractOperations(
-      {
+      asDocument({
         openapi: "3.1.0",
         paths: {
           "/a": { get: { operationId: "a", tags: ["!!!"] } },
           "/b": { get: { operationId: "b", tags: ["???"] } },
         },
-      } as unknown as ApiDocument,
+      }),
       "/api"
     );
     const byKey = new Map(operations.map((op) => [op.key, op]));
@@ -550,7 +615,9 @@ describe("model.extractOperations", () => {
 
   it("resolves an operation object out of its spec document", () => {
     const { operations } = extractOperations(SPEC_3_1, "/api");
-    const spec = { document: SPEC_3_1 } as unknown as ApiSpecData;
+    // SAFETY: operationObject only reads `spec.document`; the other
+    // ApiSpecData fields never matter to this lookup.
+    const spec = { document: SPEC_3_1 } as ApiSpecData;
     const addPet = operations.find((op) => op.key === "addpet");
     if (!addPet) {
       throw new Error("addpet operation missing");
@@ -643,8 +710,9 @@ describe("parse.parseSpec remote hardening", () => {
       );
       expect(document.info?.title).toBe("Remote");
       expect(stub.calls).toBe(2);
-      const headers = stub.lastInit?.headers as Record<string, string>;
-      expect(headers["user-agent"]).toContain("blume");
+      expect(new Headers(stub.lastInit?.headers).get("user-agent")).toContain(
+        "blume"
+      );
     } finally {
       globalThis.fetch = original;
     }
@@ -751,10 +819,10 @@ describe("parse.parseSpec remote hardening", () => {
   it("retries a thrown network error, then rethrows it", async () => {
     const original = globalThis.fetch;
     let calls = 0;
-    globalThis.fetch = (() => {
+    globalThis.fetch = asFetch(() => {
       calls += 1;
       return Promise.reject(new Error("ECONNRESET"));
-    }) as unknown as typeof fetch;
+    });
     try {
       await expect(
         parseSpec("https://api.test/openapi.json", "/")
@@ -880,6 +948,8 @@ describe("parse.parseSpec remote hardening", () => {
 
 describe("render-mdx", () => {
   const specData = (over: Partial<ApiSpecData> = {}): ApiSpecData =>
+    // SAFETY: render-mdx never reads `kind` — the only ApiSpecData field these
+    // defaults omit.
     ({
       codeSamples: [],
       description: "",
@@ -1206,6 +1276,8 @@ describe("render-mdx", () => {
       tag: "pet",
       tagSlug: "pet",
     };
+    // SAFETY: operationMdx always writes `seo.description` for an operation
+    // with a summary, which the fixture above declares.
     const { description } = operationMdx(specData(), op).data.seo as {
       description: string;
     };
@@ -1236,6 +1308,8 @@ describe("render-mdx", () => {
       tag: "pet",
       tagSlug: "pet",
     };
+    // SAFETY: operationMdx always writes `seo.description` for an operation
+    // with a summary, which the fixture above declares.
     const { description } = operationMdx(specData(), op).data.seo as {
       description: string;
     };
@@ -1260,6 +1334,8 @@ describe("render-mdx", () => {
       tag: "pet",
       tagSlug: "pet",
     };
+    // SAFETY: operationMdx always writes `seo.description` for an operation
+    // with a summary, which the fixture above declares.
     const { description } = operationMdx(specData(), op).data.seo as {
       description: string;
     };
@@ -1281,6 +1357,8 @@ describe("render-mdx", () => {
       tag: "x",
       tagSlug: "x",
     };
+    // SAFETY: operationMdx always writes `seo.description` for an operation
+    // with a summary, which the fixture above declares.
     const { description } = operationMdx(specData(), op).data.seo as {
       description: string;
     };
@@ -1310,7 +1388,7 @@ describe("render-mdx", () => {
   });
 
   it("renders one overview section per tag slug, not per tag name", () => {
-    const document = {
+    const document = asDocument({
       info: { title: "API", version: "1" },
       openapi: "3.1.0",
       paths: {
@@ -1321,7 +1399,7 @@ describe("render-mdx", () => {
         { description: "", name: "Store" },
         { description: "", name: "store" },
       ],
-    } as unknown as ApiDocument;
+    });
     const { operations, tags } = extractOperations(document, "/api");
     const page = overviewMdx(
       specData({
@@ -1738,10 +1816,7 @@ describe("source.openApiSource", () => {
   });
 });
 
-const schemas = (SPEC_3_1.components?.schemas ?? {}) as unknown as Record<
-  string,
-  SchemaLike
->;
+const schemas = SPEC_SCHEMAS;
 
 describe("helpers", () => {
   it("resolves refs and names them", () => {
@@ -1802,14 +1877,14 @@ describe("helpers", () => {
       items: { $ref: "#/components/schemas/Node" },
       type: "array",
     };
-    const cyclic: Record<string, SchemaLike> = {
+    const cyclic = {
       Chicken: { allOf: [{ $ref: "#/components/schemas/Egg" }] },
       Egg: {
         allOf: [{ $ref: "#/components/schemas/Chicken" }],
         properties: { id: { type: "string" } },
       },
       Node: node,
-    };
+    } satisfies Record<string, SchemaLike>;
     // Array-of-self labels by ref name instead of recursing forever.
     expect(typeLabel(node)).toBe("Node[]");
     expect(typeLabel({ $ref: "#/components/schemas/Node" })).toBe("Node");
@@ -1825,17 +1900,10 @@ describe("helpers", () => {
   });
 
   it("builds example values and guards circular refs", () => {
-    const pet = exampleValue(
-      { $ref: "#/components/schemas/Pet" },
-      schemas
-    ) as Record<string, unknown>;
-    expect(pet.name).toBe("doggie");
-    expect(pet.status).toBe("available");
+    const pet = exampleValue({ $ref: "#/components/schemas/Pet" }, schemas);
+    expect(pet).toMatchObject({ name: "doggie", status: "available" });
     // Tag is self-referential; the guard stops it resolving forever.
-    const tag = exampleValue(
-      { $ref: "#/components/schemas/Tag" },
-      schemas
-    ) as Record<string, unknown>;
+    const tag = exampleValue({ $ref: "#/components/schemas/Tag" }, schemas);
     expect(tag).toHaveProperty("name");
     expect(exampleValue({ type: "boolean" }, schemas)).toBe(true);
     expect(exampleValue({ format: "date-time", type: "string" }, schemas)).toBe(
@@ -2107,8 +2175,10 @@ describe("security", () => {
       "read:pets",
       "write:pets",
     ]);
+    // SAFETY: the scopes are deliberately a bare string — spec-invalid input
+    // the resolver must ignore instead of crashing on.
     const malformed = resolveSecurity(
-      [{ oauth: "read" }] as unknown as Record<string, string[]>[],
+      [{ oauth: "read" as string | string[] }] as SecurityRequirementLike[],
       SCHEMES
     );
     expect(malformed.alternatives[0]?.[0]?.scopes).toStrictEqual([]);

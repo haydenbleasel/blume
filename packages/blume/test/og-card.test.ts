@@ -22,6 +22,9 @@ const withStubbedFonts = async (
 ): Promise<void> => {
   const original = globalThis.fetch;
   const css2Requests: string[] = [];
+  // SAFETY: the font pipeline only calls fetch(url); fetch's static
+  // properties (e.g. Bun's preconnect) are never touched by the code under
+  // test.
   globalThis.fetch = ((input: RequestInfo | URL) => {
     const url = String(input instanceof Request ? input.url : input);
     if (url.includes("css2")) {
@@ -37,7 +40,7 @@ const withStubbedFonts = async (
     return Promise.resolve(
       new Response(SUBSET_WOFF2, { headers: { "Content-Type": "font/woff2" } })
     );
-  }) as unknown as typeof fetch;
+  }) as typeof fetch;
   try {
     await body(css2Requests);
   } finally {
@@ -75,6 +78,9 @@ const withStubbedGlyphFetch = async (
 ): Promise<void> => {
   const original = globalThis.fetch;
   const urls: string[] = [];
+  // SAFETY: the twemoji provider only calls fetch(url); fetch's static
+  // properties (e.g. Bun's preconnect) are never touched by the code under
+  // test.
   globalThis.fetch = ((input: RequestInfo | URL) => {
     urls.push(String(input));
     return Promise.resolve(
@@ -83,7 +89,7 @@ const withStubbedGlyphFetch = async (
         { headers: { "Content-Type": "image/svg+xml" } }
       )
     );
-  }) as unknown as typeof fetch;
+  }) as typeof fetch;
   try {
     await body(urls);
   } finally {

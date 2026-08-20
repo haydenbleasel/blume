@@ -18,6 +18,10 @@ export interface IslandDescriptor {
 export type ComponentOverride = ComponentReference | IslandDescriptor;
 
 /** User-authored component overrides, grouped by surface. */
+// oxlint-disable anti-slop/no-unsafe-dictionary-type -- `ComponentOverride` is untyped by
+// design: user configs pass imported components from any framework (React
+// functions, Svelte classes, Vue SFC objects), which share no structural type.
+// `resolveSlot` and the generated components map are the runtime boundary.
 export interface ComponentOverrides {
   /**
    * Interactive framework components made available in every `.mdx` page. Like
@@ -31,6 +35,7 @@ export interface ComponentOverrides {
   /** MDX component map overrides (`Callout`, `Card`, ...). */
   mdx?: Record<string, ComponentOverride>;
 }
+// oxlint-enable anti-slop/no-unsafe-dictionary-type
 
 /**
  * Identity helper for authoring `components.ts`. Provides type inference and a

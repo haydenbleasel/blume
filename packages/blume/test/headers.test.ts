@@ -1,28 +1,33 @@
 import { describe, expect, it } from "bun:test";
 
+import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
 import { buildNetlifyHeaders } from "../src/deploy/headers.ts";
 
+// A real zero-config parse, with the slices these tests vary layered on raw —
+// `base`/`basePath` stay unnormalized so the builder's own handling is tested.
 const configWith = (
   overrides: Partial<{
     base?: string;
     basePath: string;
     mcp: boolean;
     skills: string;
-    webBotAuthKeys: Record<string, unknown>[];
+    webBotAuthKeys: { kty: string }[];
   }>
-): ResolvedConfig =>
-  ({
+): ResolvedConfig => {
+  const base = blumeConfigSchema.parse({});
+  return {
+    ...base,
     ai: {
-      mcp: { enabled: overrides.mcp ?? false, route: "/mcp" },
+      ...base.ai,
+      mcp: { ...base.ai.mcp, enabled: overrides.mcp ?? false },
       skills: overrides.skills,
       webBotAuth: { keys: overrides.webBotAuthKeys ?? [] },
     },
-    asyncapi: { enabled: false, sources: [] },
     basePath: overrides.basePath ?? "",
-    deployment: { base: overrides.base },
-    openapi: { enabled: false, sources: [] },
-  }) as unknown as ResolvedConfig;
+    deployment: { ...base.deployment, base: overrides.base },
+  };
+};
 
 describe("buildNetlifyHeaders", () => {
   it("pins a UTF-8 Content-Type onto each raw endpoint extension", () => {

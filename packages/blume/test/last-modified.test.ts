@@ -8,6 +8,8 @@ import { dirname, join } from "pathe";
 
 import {
   gitLastModifiedTimes,
+  isShallowGitRepository,
+  lastModifiedShallowWarning,
   parseGitLog,
   resolveLastModifiedConfig,
 } from "../src/core/last-modified.ts";
@@ -17,10 +19,34 @@ import { scanProject } from "../src/core/project-graph.ts";
 const nul = String.fromCodePoint(0);
 const dateLine = (iso: string): string => `${nul}${iso}`;
 
+/**
+ * Env for fixture git commands, with the repo-locating GIT_* variables a parent
+ * git process exports to its hooks stripped out. Under the pre-commit hook in a
+ * linked worktree, git exports an absolute GIT_DIR, which overrides `-C`
+ * discovery — without this, the fixture's `add -A`/`commit` run against the
+ * real repository's branch instead of the temp repo.
+ */
+const GIT_LOCATION_VARS = new Set([
+  "GIT_COMMON_DIR",
+  "GIT_DIR",
+  "GIT_INDEX_FILE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_PREFIX",
+  "GIT_WORK_TREE",
+]);
+
+const fixtureGitEnv = (): NodeJS.ProcessEnv =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !GIT_LOCATION_VARS.has(key))
+  );
+
 const runGit = (root: string, args: string[]): void => {
   // Test fixture drives a real git repo; `git` is expected on PATH in CI/dev.
   // oxlint-disable-next-line sonarjs/no-os-command-from-path
-  execFileSync("git", ["-C", root, ...args], { stdio: "ignore" });
+  execFileSync("git", ["-C", root, ...args], {
+    env: fixtureGitEnv(),
+    stdio: "ignore",
+  });
 };
 
 const initRepo = (root: string): void => {
@@ -189,6 +215,33 @@ describe("gitLastModifiedTimes", () => {
     expect(times.has(untracked)).toBe(false);
   });
 
+  it("ignores a GIT_DIR inherited from a parent git process", async () => {
+    // Git hooks (husky pre-commit, post-merge) run with GIT_DIR exported; an
+    // inherited absolute GIT_DIR overrides `-C` discovery, so without the env
+    // sanitizing every call would read the parent's repository instead.
+    const root = await makeRepoDir();
+    const contentRoot = join(root, "docs");
+    const tracked = join(contentRoot, "index.md");
+    await mkdir(contentRoot, { recursive: true });
+    await writeFile(tracked, "# Home\n");
+    initRepo(root);
+    runGit(root, ["add", "-A"]);
+    runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add docs"]);
+
+    const previous = process.env.GIT_DIR;
+    process.env.GIT_DIR = join(root, "elsewhere", ".git");
+    try {
+      const times = gitLastModifiedTimes(root, [contentRoot], [tracked]);
+      expect(times.get(tracked)).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.GIT_DIR;
+      } else {
+        process.env.GIT_DIR = previous;
+      }
+    }
+  });
+
   it("returns an empty map outside a git repository", async () => {
     const root = await makeRepoDir();
     const times = gitLastModifiedTimes(
@@ -203,5 +256,66 @@ describe("gitLastModifiedTimes", () => {
     // An empty pathspec list would otherwise log the whole repository.
     const root = await makeRepoDir();
     expect(gitLastModifiedTimes(root, [], []).size).toBe(0);
+  });
+});
+
+describe("shallow clone detection", () => {
+  const dirs: string[] = [];
+
+  const makeRepoDir = async (): Promise<string> => {
+    const root = realpathSync(await mkdtemp(join(tmpdir(), "blume-shallow-")));
+    dirs.push(root);
+    return root;
+  };
+
+  // A full fixture repo plus a `--depth 1` clone of it. The `file://` URL is
+  // load-bearing: a plain-path local clone ignores `--depth` and stays full.
+  const makeShallowPair = async (): Promise<{
+    full: string;
+    shallow: string;
+  }> => {
+    const full = await makeRepoDir();
+    await writeFile(join(full, "index.md"), "# Home\n");
+    initRepo(full);
+    runGit(full, ["add", "-A"]);
+    runGit(full, ["-c", "commit.gpgsign=false", "commit", "-m", "one"]);
+    const shallow = join(await makeRepoDir(), "clone");
+    runGit(dirname(shallow), [
+      "clone",
+      "--depth",
+      "1",
+      `file://${full}`,
+      shallow,
+    ]);
+    return { full, shallow };
+  };
+
+  afterAll(async () => {
+    await Promise.all(
+      dirs.map((dir) => rm(dir, { force: true, recursive: true }))
+    );
+  });
+
+  it("tells shallow clones apart from full ones and non-repos", async () => {
+    const { full, shallow } = await makeShallowPair();
+    expect(isShallowGitRepository(shallow)).toBe(true);
+    expect(isShallowGitRepository(full)).toBe(false);
+    // Outside any repository the answer is false — there, no dates exist at
+    // all and the shallow hint would only mislead.
+    const bare = await makeRepoDir();
+    expect(isShallowGitRepository(bare)).toBe(false);
+  });
+
+  it("warns about undated pages only in a shallow clone", async () => {
+    const { full, shallow } = await makeShallowPair();
+    const warnings = lastModifiedShallowWarning(shallow, 3);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.code).toBe("BLUME_SHALLOW_GIT_HISTORY");
+    expect(warnings[0]?.severity).toBe("warning");
+    expect(warnings[0]?.message).toContain("3 page(s)");
+    expect(warnings[0]?.suggestion).toContain("VERCEL_DEEP_CLONE");
+    // Every page dated, or a full clone: nothing to warn about.
+    expect(lastModifiedShallowWarning(shallow, 0)).toHaveLength(0);
+    expect(lastModifiedShallowWarning(full, 3)).toHaveLength(0);
   });
 });

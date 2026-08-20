@@ -92,11 +92,13 @@ describe("customStaticRoutes", () => {
   });
 });
 
+// SAFETY: `hasGeneratedChangelog` reads only `config.content.sources` and each
+// page's contentType/route/meta visibility flags, which the fixture provides.
 const projectOf = (
   pages: {
     contentType: string;
     route: string;
-    meta?: Record<string, unknown>;
+    meta?: { draft: boolean; sidebar: { hidden: boolean } };
   }[],
   sources: { type: string }[] = []
 ): BlumeProject =>
@@ -108,7 +110,7 @@ const projectOf = (
         ...page,
       })),
     },
-  }) as unknown as BlumeProject;
+  }) as BlumeProject;
 
 describe("hasGeneratedChangelog", () => {
   it("is true when visible changelog entries exist", () => {

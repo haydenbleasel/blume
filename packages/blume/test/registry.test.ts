@@ -65,7 +65,14 @@ describe("eject", () => {
     // and the hosted MCP server.
     await writeFiles(root, {
       "blume.config.ts": `export default {
-        ai: { ask: { enabled: true }, mcp: { enabled: true } },
+        ai: {
+          ask: {
+            enabled: true,
+            instructions: "Answer in pirate speak.",
+            retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
+          },
+          mcp: { enabled: true },
+        },
         deployment: { site: "https://example.com" },
         openapi: { enabled: true, renderer: "scalar", spec: "openapi.json" },
         search: { mixedbread: { storeId: "store-1" }, provider: "mixedbread" },
@@ -108,6 +115,16 @@ describe("eject", () => {
     // Feature-gated endpoints: Ask AI, OG images, mixedbread search, the RSS
     // feed, and the OpenAPI reference page.
     expect(has("src/pages/api/ask.ts")).toBe(true);
+    // The custom `ai.ask.instructions` survive ejection in the endpoint's
+    // system prompt (they were previously dropped on this path), as do the
+    // configured `ai.ask.retrieval` sizes.
+    const ejectedAsk = readFileSync(
+      join(root, "src/pages/api/ask.ts"),
+      "utf-8"
+    );
+    expect(ejectedAsk).toContain("Answer in pirate speak.");
+    expect(ejectedAsk).toContain('"contextBudget":2500');
+    expect(ejectedAsk).toContain('"maxResults":3');
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/api/search.ts")).toBe(true);
     expect(has("src/pages/[section]/rss.xml.ts")).toBe(true);
@@ -264,12 +281,15 @@ describe("eject", () => {
     // The releases API returns no releases: the changelog index must still be
     // ejected so its route (and any nav tab pointing at it) does not 404.
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (() =>
-      Promise.resolve({
-        json: () => Promise.resolve([]),
-        ok: true,
-        status: 200,
-      } as unknown as Response)) as unknown as typeof fetch;
+    // SAFETY: the releases source only calls fetch(url) and reads ok/status/
+    // json off the real Response; fetch's static properties are never touched.
+    globalThis.fetch = ((_input: RequestInfo | URL) =>
+      Promise.resolve(
+        new Response("[]", {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        })
+      )) as typeof fetch;
     try {
       await eject(root);
     } finally {

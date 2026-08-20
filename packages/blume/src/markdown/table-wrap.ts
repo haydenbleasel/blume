@@ -15,10 +15,13 @@
  * containing any non-text content (an image, an icon) counts as non-empty.
  */
 
+/** The value shapes hast allows on an element's `properties`. */
+type HastPropertyValue = string | number | boolean | (string | number)[];
+
 /** A minimal hast node (avoids a hast type dependency). */
 interface HastNode {
   children?: HastNode[];
-  properties?: Record<string, unknown>;
+  properties?: Record<string, HastPropertyValue>;
   tagName?: string;
   type: string;
   value?: string;

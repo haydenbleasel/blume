@@ -23,6 +23,9 @@ export const mcpStdioCommand = defineCommand({
     // must go to stderr or the MCP client chokes on the stray line.
     let data: McpData;
     try {
+      // SAFETY: the snapshot is written by `blume eval` itself as
+      // JSON.stringify of an McpData; a hand-mangled file fails the parse and
+      // lands in the catch below.
       data = JSON.parse(await readFile(args.data, "utf-8")) as McpData;
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);

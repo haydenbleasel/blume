@@ -22,12 +22,12 @@ afterAll(async () => {
 const projectFixture = async (): Promise<BlumeProject> => {
   const root = await mkdtemp(join(tmpdir(), "blume-eval-run-"));
   dirs.push(root);
-  const files: Record<string, string> = {
+  const files = {
     "blume.config.ts": 'export default { title: "Test Docs" };',
     "docs/guides/install.md":
       "---\ntitle: Installation\ndescription: How to install\n---\n# Installation\n\nNode 22.12 or newer.\n",
     "docs/index.md": "---\ntitle: Home\n---\n# Home\n\nWelcome.\n",
-  };
+  } satisfies Record<string, string>;
   await Promise.all(
     Object.entries(files).map(async ([rel, content]) => {
       const abs = join(root, rel);

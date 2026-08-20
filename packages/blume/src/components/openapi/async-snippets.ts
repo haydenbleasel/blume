@@ -30,15 +30,13 @@ export interface MessageSample {
 }
 
 /** `host[:port]` split apart; MQTT tooling wants them as separate flags. */
-const hostParts = (
-  server?: AsyncApiServerObject
-): { host: string; port?: string } => {
+const hostParts = (server?: AsyncApiServerObject) => {
   const raw = server?.host ?? "localhost";
   const colon = raw.lastIndexOf(":");
   if (colon > 0 && /^\d+$/u.test(raw.slice(colon + 1))) {
     return { host: raw.slice(0, colon), port: raw.slice(colon + 1) };
   }
-  return { host: raw };
+  return { host: raw, port: undefined };
 };
 
 /** POSIX single-quote escaping, matching `snippets.ts`. */
@@ -124,7 +122,7 @@ export interface AsyncSampleLanguage {
   build: (sample: MessageSample) => string;
 }
 
-const TOOLS: Record<string, AsyncSampleLanguage> = {
+const TOOLS = {
   js: { build: webSocketSnippet, id: "js", label: "JavaScript", lang: "js" },
   kcat: { build: kcatSnippet, id: "kcat", label: "kcat", lang: "bash" },
   mosquitto: {
@@ -134,25 +132,27 @@ const TOOLS: Record<string, AsyncSampleLanguage> = {
     lang: "bash",
   },
   wscat: { build: wscatSnippet, id: "wscat", label: "wscat", lang: "bash" },
-};
+} satisfies Record<string, AsyncSampleLanguage>;
+
+type ToolId = keyof typeof TOOLS;
 
 /** The tools appropriate to each protocol binding, in display order. */
-const PROTOCOL_TOOLS: Record<string, string[]> = {
-  kafka: ["kcat"],
-  mqtt: ["mosquitto"],
-  ws: ["wscat", "js"],
-};
+const PROTOCOL_TOOLS = new Map<string, readonly ToolId[]>([
+  ["kafka", ["kcat"]],
+  ["mqtt", ["mosquitto"]],
+  ["ws", ["wscat", "js"]],
+]);
 
 /** Accepted spellings for configured `codeSamples` ids. */
-const ALIASES: Record<string, string> = {
-  javascript: "js",
-  kafkacat: "kcat",
-  mosquitto_pub: "mosquitto",
-  mosquitto_sub: "mosquitto",
-  node: "js",
-  typescript: "js",
-  websocket: "js",
-};
+const ALIASES = new Map<string, ToolId>([
+  ["javascript", "js"],
+  ["kafkacat", "kcat"],
+  ["mosquitto_pub", "mosquitto"],
+  ["mosquitto_sub", "mosquitto"],
+  ["node", "js"],
+  ["typescript", "js"],
+  ["websocket", "js"],
+]);
 
 /**
  * The sample tools to render for an operation. The protocol picks the
@@ -164,22 +164,23 @@ export const asyncSampleLanguages = (
   ids: string[],
   protocol?: string
 ): AsyncSampleLanguage[] => {
-  const candidates = PROTOCOL_TOOLS[protocol ?? ""] ?? [];
+  const candidates = PROTOCOL_TOOLS.get(protocol ?? "") ?? [];
   if (candidates.length === 0) {
     return [];
   }
   if (ids.length === 0) {
-    return candidates.map((id) => TOOLS[id] as AsyncSampleLanguage);
+    return candidates.map((id) => TOOLS[id]);
   }
   const chosen: AsyncSampleLanguage[] = [];
   const seen = new Set<string>();
   for (const raw of ids) {
     // Case-insensitive like `sampleLanguages` — the docs spell the tools
     // `WebSocket`/`mosquitto_pub`, so configured ids arrive in any casing.
-    const id = ALIASES[raw.toLowerCase()] ?? raw.toLowerCase();
-    if (candidates.includes(id) && !seen.has(id)) {
-      seen.add(id);
-      chosen.push(TOOLS[id] as AsyncSampleLanguage);
+    const id = ALIASES.get(raw.toLowerCase()) ?? raw.toLowerCase();
+    const match = candidates.find((candidate) => candidate === id);
+    if (match && !seen.has(match)) {
+      seen.add(match);
+      chosen.push(TOOLS[match]);
     }
   }
   return chosen;

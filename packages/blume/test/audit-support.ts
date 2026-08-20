@@ -64,12 +64,24 @@ interface ContextOptions {
   sources?: Map<string, string>;
   seo?: { robots?: boolean; sitemap?: boolean };
   configFile?: string;
+  /** Docs-versioning config, for the archived-canonical checks. */
+  versions?: {
+    archived: {
+      id: string;
+      canonical: "latest" | "self";
+      noindex: boolean;
+      banner: boolean | string;
+    }[];
+    current: { label: string };
+  };
 }
 
 /** A minimal AuditContext. Only the config fields the checks read are populated. */
 export const context = (options: ContextOptions = {}): AuditContext => {
   const pages = options.pages ?? [snapshot()];
   const redirects = options.redirects ?? [];
+  // SAFETY: only the config fields the checks read are populated (see above);
+  // the checks never touch the graph, manifest, or source machinery.
   const project = {
     config: {
       ai: { llmsTxt: options.llmsTxt ?? { enabled: true, openapi: true } },
@@ -84,9 +96,10 @@ export const context = (options: ContextOptions = {}): AuditContext => {
         robots: options.seo?.robots ?? true,
         sitemap: options.seo?.sitemap ?? true,
       },
+      versions: options.versions,
     },
     context: { configFile: options.configFile ?? null },
-  } as unknown as BlumeProject;
+  } as BlumeProject;
 
   const byUrl = new Map(pages.map((page) => [page.url, page]));
   return {

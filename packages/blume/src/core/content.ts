@@ -1,4 +1,4 @@
-import type { ResolvedI18nConfig } from "./schema.ts";
+import type { ResolvedI18nConfig, ResolvedVersionsConfig } from "./schema.ts";
 import { filesystemSource } from "./sources/filesystem.ts";
 import { normalizeEntry } from "./sources/normalize.ts";
 import type { Diagnostic, PageRecord } from "./types.ts";
@@ -24,6 +24,7 @@ export const discoverContent = async (options: {
   defaultType: string;
   basePath?: string;
   i18n?: ResolvedI18nConfig;
+  versions?: ResolvedVersionsConfig;
 }): Promise<{ pages: PageRecord[]; diagnostics: Diagnostic[] }> => {
   const source = filesystemSource({
     exclude: options.exclude,
@@ -43,6 +44,7 @@ export const discoverContent = async (options: {
       defaultType: options.defaultType,
       i18n: options.i18n,
       source: { name: source.name, prefix: source.prefix, staged: false },
+      versions: options.versions,
     });
     pages.push(...normalized.pages);
     diagnostics.push(...normalized.diagnostics);

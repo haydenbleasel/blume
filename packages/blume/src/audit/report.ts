@@ -9,26 +9,26 @@ import type { CheckId } from "./catalog.ts";
 import type { AuditResult } from "./run.ts";
 import type { AuditCategory, AuditTier } from "./types.ts";
 
-const SEVERITY_COLOR: Record<DiagnosticSeverity, ColorFunction> = {
+const SEVERITY_COLOR = {
   error: colors.red,
   info: colors.blue,
   warning: colors.yellow,
-};
+} satisfies Record<DiagnosticSeverity, ColorFunction>;
 
-const GLYPH: Record<DiagnosticSeverity, string> = {
+const GLYPH = {
   error: "✖",
   info: "ℹ",
   warning: "⚠",
-};
+} satisfies Record<DiagnosticSeverity, string>;
 
 /** How many affected pages to list before collapsing the rest. */
 const PREVIEW = 3;
 
-/** The tier a category belongs to, for the "skipped" line. */
-const TIER_FLAG: Partial<Record<AuditTier, string>> = {
-  external: "--external",
-  network: "--url <origin>",
-};
+/** The skippable tiers, each with the flag that runs it. */
+const TIER_FLAGS: { tier: AuditTier; flag: string }[] = [
+  { flag: "--external", tier: "external" },
+  { flag: "--url <origin>", tier: "network" },
+];
 
 interface CheckRollup {
   id: CheckId;
@@ -55,18 +55,21 @@ export const rollup = (diagnostics: Diagnostic[]): CheckRollup[] => {
     }
   }
 
-  const order: Record<DiagnosticSeverity, number> = {
+  const order = {
     error: 0,
     info: 2,
     warning: 1,
-  };
+  } satisfies Record<DiagnosticSeverity, number>;
   const checks = [...groups.entries()].map(([id, findings]) => {
-    const { category, severity, title } = checkMeta(id as CheckId);
+    // SAFETY: audit findings are only ever created through `finding()`, whose
+    // codes are the check catalog's ids.
+    const checkId = id as CheckId;
+    const { category, severity, title } = checkMeta(checkId);
     return {
       category,
       count: findings.length,
       findings,
-      id: id as CheckId,
+      id: checkId,
       severity,
       title,
     };
@@ -95,12 +98,10 @@ export const rollup = (diagnostics: Diagnostic[]): CheckRollup[] => {
 
 /** Categories that had no findings but were never run, and the flag that runs them. */
 const skippedTiers = (tiers: Record<AuditTier, boolean>): string[] =>
-  (Object.keys(TIER_FLAG) as AuditTier[])
-    .filter((tier) => !tiers[tier])
-    .map((tier) => {
-      const label = CHECKS.filter((check) => check.tier === tier).length;
-      return `  ${colors.dim(`⊘ ${tier.padEnd(12)} skipped — pass ${TIER_FLAG[tier]} (${label} checks)`)}`;
-    });
+  TIER_FLAGS.filter(({ tier }) => !tiers[tier]).map(({ flag, tier }) => {
+    const label = CHECKS.filter((check) => check.tier === tier).length;
+    return `  ${colors.dim(`⊘ ${tier.padEnd(12)} skipped — pass ${flag} (${label} checks)`)}`;
+  });
 
 /** How many checks actually ran, i.e. those whose tier was enabled. */
 const activeChecks = (tiers: Record<AuditTier, boolean>): number =>

@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "pathe";
 
 import { blumeConfigSchema } from "../src/core/schema.ts";
-import type { ResolvedConfig } from "../src/core/schema.ts";
+import type { BlumeConfigInput, ResolvedConfig } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 import {
   ADAPTER_OUTPUT_PATHS,
@@ -22,8 +22,9 @@ import {
   surfaceAdapterOutput,
 } from "../src/deploy/adapter-output.ts";
 
-const config = (deployment: Record<string, unknown> = {}): ResolvedConfig =>
-  blumeConfigSchema.parse({ deployment });
+const config = (
+  deployment: BlumeConfigInput["deployment"] = {}
+): ResolvedConfig => blumeConfigSchema.parse({ deployment });
 
 const context = (root: string): ProjectContext => ({
   componentsFile: null,
@@ -264,7 +265,12 @@ describe("surfaceAdapterOutput", () => {
 
 describe("readsHeaderFiles", () => {
   it("is true for every static build", () => {
-    for (const adapter of ["netlify", "cloudflare", "vercel", "node"]) {
+    for (const adapter of [
+      "netlify",
+      "cloudflare",
+      "vercel",
+      "node",
+    ] as const) {
       expect(
         readsHeaderFiles(config({ adapter, output: "static" }).deployment)
       ).toBe(true);

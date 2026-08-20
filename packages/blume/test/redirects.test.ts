@@ -52,6 +52,8 @@ describe("redirect emitters", () => {
     // The one spelling every platform consumer (redirect files, Cloudflare
     // worker-first exemptions) must share: both sides carry the full
     // `{deployment.base}{basePath}` stack.
+    // SAFETY: platformRedirects reads only basePath, deployment.base, and
+    // redirects; the rest of ResolvedConfig is irrelevant to this test.
     const config = {
       basePath: "/docs",
       deployment: { base: "/base" },
@@ -60,6 +62,7 @@ describe("redirect emitters", () => {
     expect(platformRedirects(config)).toStrictEqual(
       applyBaseToPlatformRedirects(redirects, "/docs", "/base")
     );
+    // SAFETY: same three fields as above — everything platformRedirects reads.
     const unbased = {
       basePath: "",
       deployment: {},

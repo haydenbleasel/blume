@@ -63,17 +63,20 @@ const features = [
   },
 ];
 
-// Tracks whichever feature block is nearest the viewport centre: dims the others
+// Tracks whichever feature block is nearest the viewport center: dims the others
 // and crossfades the sticky browser graphic to that feature's panel. A rAF-
 // throttled scroll handler (rather than IntersectionObserver) keeps it reliable;
-// with no JS every block stays legible and the first panel shows.
-const featuresScript = `(()=>{const r=document.querySelector("[data-blume-features]");if(!r)return;const items=[...r.querySelectorAll("[data-feature]")];if(!items.length)return;const panels=[...r.querySelectorAll("[data-panel]")];let raf=0,cur=-1;const update=()=>{raf=0;const mid=innerHeight/2;let best=0,bd=Infinity;items.forEach((it,j)=>{const b=it.getBoundingClientRect();const d=Math.abs(b.top+b.height/2-mid);if(d<bd){bd=d;best=j;}});if(best===cur)return;cur=best;items.forEach((it,j)=>{it.dataset.active=String(j===best);});panels.forEach((p,j)=>{p.dataset.active=String(j===best);});};const onScroll=()=>{if(!raf)raf=requestAnimationFrame(update);};addEventListener("scroll",onScroll,{passive:true});addEventListener("resize",onScroll,{passive:true});update();})();`;
+// with no JS every block stays legible and the first panel shows. The initial
+// highlight also goes through the rAF (measuring synchronously mid-parse forces
+// a reflow — Lighthouse flags it — while a rAF read lands where layout runs
+// anyway, still before first paint).
+const featuresScript = `(()=>{const r=document.querySelector("[data-blume-features]");if(!r)return;const items=[...r.querySelectorAll("[data-feature]")];if(!items.length)return;const panels=[...r.querySelectorAll("[data-panel]")];let raf=0,cur=-1;const update=()=>{raf=0;const mid=innerHeight/2;let best=0,bd=Infinity;items.forEach((it,j)=>{const b=it.getBoundingClientRect();const d=Math.abs(b.top+b.height/2-mid);if(d<bd){bd=d;best=j;}});if(best===cur)return;cur=best;items.forEach((it,j)=>{it.dataset.active=String(j===best);});panels.forEach((p,j)=>{p.dataset.active=String(j===best);});};const onScroll=()=>{if(!raf)raf=requestAnimationFrame(update);};addEventListener("scroll",onScroll,{passive:true});addEventListener("resize",onScroll,{passive:true});onScroll();})();`;
 ---
 
 <!-- Batteries included: one sticky browser window whose contents morph per feature (x.ai/cli-style) -->
 <section data-blume-features>
   <div class="mx-auto max-w-2xl text-center">
-    <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
+    <h2 class="font-medium text-3xl sm:text-4xl">
       Batteries included.
     </h2>
     <p class="mx-auto mt-4 max-w-lg text-balance text-muted-foreground">
@@ -109,7 +112,7 @@ const featuresScript = `(()=>{const r=document.querySelector("[data-blume-featur
                   set:html={feature.icon}
                 />
               </span>
-              <h3 class="mt-5 font-medium text-foreground text-xl tracking-tight sm:text-2xl">
+              <h3 class="mt-5 font-medium text-foreground text-xl sm:text-2xl">
                 {feature.title}
               </h3>
               <p class="mt-3 max-w-md text-muted-foreground leading-relaxed">

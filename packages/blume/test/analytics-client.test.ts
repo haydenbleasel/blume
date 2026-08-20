@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 
+import type { TrackProps } from "../src/components/layout/analytics-client.ts";
+
 // `track()` imports the official Vercel helper at module load, so the mock must
 // be registered before the dynamic import below.
-const vercelTrack = mock((_event: string, _props: unknown) => {
+const vercelTrack = mock((_event: string, _props: TrackProps) => {
   // no-op
 });
 mock.module("@vercel/analytics", () => ({ track: vercelTrack }));
@@ -10,21 +12,24 @@ mock.module("@vercel/analytics", () => ({ track: vercelTrack }));
 const { track } = await import("../src/components/layout/analytics-client.ts");
 
 interface WindowStub {
-  dispatchEvent: (event: Event) => boolean;
+  dispatchEvent: (event: CustomEvent) => boolean;
   gtag?: ReturnType<typeof mock>;
   plausible?: ReturnType<typeof mock>;
   posthog?: { capture?: ReturnType<typeof mock> };
 }
 
 const setWindow = (stub: WindowStub): void => {
-  (globalThis as { window?: unknown }).window = stub;
+  // SAFETY: tests run without a DOM, so `globalThis.window` is free for the
+  // stub, which carries just the members `track` reads.
+  (globalThis as { window?: WindowStub }).window = stub;
 };
 
 afterEach(() => {
   // Reset to `undefined` (not null): the code under test guards on
   // `typeof window === "undefined"`, so null would not restore SSR state.
+  // SAFETY: same globalThis escape hatch as `setWindow`, restoring SSR state.
   // oxlint-disable-next-line sonarjs/no-undefined-assignment
-  (globalThis as { window?: unknown }).window = undefined;
+  (globalThis as { window?: WindowStub }).window = undefined;
   vercelTrack.mockClear();
 });
 
@@ -49,7 +54,7 @@ describe("track", () => {
     });
     setWindow({
       dispatchEvent: (event) => {
-        dispatched.push(event as CustomEvent);
+        dispatched.push(event);
         return true;
       },
       gtag,
@@ -73,7 +78,7 @@ describe("track", () => {
     const dispatched: CustomEvent[] = [];
     setWindow({
       dispatchEvent: (event) => {
-        dispatched.push(event as CustomEvent);
+        dispatched.push(event);
         return true;
       },
     });

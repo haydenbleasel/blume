@@ -102,14 +102,14 @@ const LANGUAGES: SampleLanguage[] = [
   { build: pythonSnippet, id: "python", label: "Python", lang: "python" },
 ];
 
-const ALIASES: Record<string, string> = {
-  bash: "curl",
-  javascript: "js",
-  node: "js",
-  py: "python",
-  shell: "curl",
-  typescript: "js",
-};
+const ALIASES = new Map([
+  ["bash", "curl"],
+  ["javascript", "js"],
+  ["node", "js"],
+  ["py", "python"],
+  ["shell", "curl"],
+  ["typescript", "js"],
+]);
 
 /** The sample languages to render, resolved from config ids (unknown ids dropped). */
 export const sampleLanguages = (ids: string[]): SampleLanguage[] => {
@@ -118,7 +118,7 @@ export const sampleLanguages = (ids: string[]): SampleLanguage[] => {
   const out: SampleLanguage[] = [];
   const seen = new Set<string>();
   for (const raw of wanted) {
-    const id = ALIASES[raw.toLowerCase()] ?? raw.toLowerCase();
+    const id = ALIASES.get(raw.toLowerCase()) ?? raw.toLowerCase();
     const language = byId.get(id);
     if (language && !seen.has(id)) {
       seen.add(id);

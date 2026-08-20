@@ -25,15 +25,26 @@ import {
 import { buildContentGraph } from "../src/core/graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
-import type { AskAiConfig } from "../src/core/schema.ts";
-import type { PageRecord, RouteManifestEntry } from "../src/core/types.ts";
+import type { AskAiConfig, BlumeConfigInput } from "../src/core/schema.ts";
+import type {
+  BlumeManifest,
+  ContentGraph,
+  PageRecord,
+  ProjectContext,
+  RouteManifestEntry,
+} from "../src/core/types.ts";
+
+/** The `ai.ask` block as the config schema accepts it, pre-parse. */
+type AskConfigInput = NonNullable<NonNullable<BlumeConfigInput["ai"]>["ask"]>;
 
 /** Parse an `ai.ask` block through the full schema so defaults are applied. */
-const askConfig = (ask: Record<string, unknown>): AskAiConfig =>
+const askConfig = (ask: AskConfigInput): AskAiConfig =>
+  // SAFETY: an explicit `ask` block was just passed in, so the parsed config
+  // always carries `ai.ask`.
   blumeConfigSchema.parse({ ai: { ask } }).ai.ask as AskAiConfig;
 
 /** The runtime deps declared for a given `ai.ask` block (or default config). */
-const runtimeDeps = (ask?: Record<string, unknown>): string[] =>
+const runtimeDeps = (ask?: AskConfigInput): string[] =>
   runtimeDependencies({
     config: blumeConfigSchema.parse(ask ? { ai: { ask } } : {}),
     needsReact: false,
@@ -63,12 +74,14 @@ const makePage = (
   sourcePath: join(root, id),
   title,
   translationKey: route,
+  version: "",
+  versionKey: route,
   ...over,
 });
 
 const makeProject = (
   pages: PageRecord[],
-  config: Record<string, unknown> = {}
+  config: BlumeConfigInput = {}
 ): BlumeProject => {
   const parsed = blumeConfigSchema.parse({
     deployment: { site: "https://example.com/" },
@@ -76,26 +89,29 @@ const makeProject = (
     title: "Docs",
     ...config,
   });
-  return {
+  const routes: Partial<RouteManifestEntry>[] = pages.map((page) => ({
+    path: page.route,
+    sourcePath: page.sourcePath,
+  }));
+  const project: Partial<BlumeProject> = {
     config: parsed,
-    context: { root },
+    // SAFETY: the ai builders under test read only `root` from the context.
+    context: { root } as ProjectContext,
     graph: buildContentGraph(pages, {
       folderMeta: new Map(),
       i18n: parsed.i18n,
       navigation: parsed.navigation,
     }),
-    manifest: {
-      routes: pages.map((page) => ({
-        path: page.route,
-        sourcePath: page.sourcePath,
-      })),
-    },
-  } as unknown as BlumeProject;
+    // SAFETY: the ai builders read only each route's path and sourcePath.
+    manifest: { routes } as BlumeManifest,
+  };
+  // SAFETY: the ai builders touch only config, context, graph, and manifest.
+  return project as BlumeProject;
 };
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "blume-ai-"));
-  const files: Record<string, string> = {
+  const files = {
     "a.md": "---\ntitle: Alpha\n---\n# Alpha\n\nBody A.\n",
     "b.md": "---\ntitle: Beta\n---\n# Beta\n\nBody B.\n",
     "c.md": "---\ntitle: Gamma\n---\n# Gamma\n\nDraft body.\n",
@@ -295,9 +311,13 @@ describe("buildLlmsFiles — navigation structure", () => {
       makeProject(
         [
           makePage("a.md", "/a", "Alpha", { locale: "en" }),
+          // The helper defaults versionKey/translationKey to the route; both
+          // are locale-agnostic by contract, so override them here.
           makePage("a.md", "/fr/a", "Alpha FR", {
             locale: "fr",
             navPath: "a.md",
+            translationKey: "/a",
+            versionKey: "/a",
           }),
         ],
         {
@@ -446,7 +466,7 @@ describe("buildLlmsFiles — visibility and encoding", () => {
   });
 });
 
-const sitelessProject = (config: Record<string, unknown> = {}): BlumeProject =>
+const sitelessProject = (config: BlumeConfigInput = {}): BlumeProject =>
   makeProject([makePage("a.md", "/a", "Alpha", { description: "First" })], {
     deployment: {},
     description: undefined,
@@ -576,7 +596,7 @@ describe("component downleveling in agent surfaces", () => {
           Callout: ({ children }: { children: string }) => `NOTE: ${children}`,
         },
       },
-    }) as BlumeProject["config"];
+    });
     const raw = await buildRawMarkdown(customized);
     expect(raw["/t"]?.md).toContain("NOTE: Mind the gap.");
     const { full } = await buildLlmsFiles(customized);
@@ -732,6 +752,8 @@ describe("applyAgentVisibility", () => {
 
 /** A route manifest entry backed by one of the temp fixture files. */
 const askRoute = (over: Partial<RouteManifestEntry>): RouteManifestEntry =>
+  // SAFETY: buildAskData reads only the fields set here; the omitted manifest
+  // entry fields (alternates, collection, …) are never touched.
   ({
     contentType: "doc",
     draft: false,
@@ -745,26 +767,32 @@ const askRoute = (over: Partial<RouteManifestEntry>): RouteManifestEntry =>
     ...over,
   }) as RouteManifestEntry;
 
-const askDataProject = (): BlumeProject =>
-  ({
+const askDataProject = (): BlumeProject => {
+  const fixture: Partial<BlumeProject> = {
     config: blumeConfigSchema.parse({
       deployment: { site: "https://example.com/" },
       title: "Docs",
     }),
-    context: { root },
+    // SAFETY: buildAskData reads only `root` from the context.
+    context: { root } as ProjectContext,
+    // SAFETY: buildAskData reads only `graph.pages`.
     graph: {
       pages: [
         makePage("a.md", "/a", "Alpha", { description: "First" }),
         makePage("b.md", "/b", "Beta"),
       ],
-    },
+    } as ContentGraph,
+    // SAFETY: buildAskData reads only the manifest routes.
     manifest: {
       routes: [
         askRoute({ id: "a.md", path: "/a", title: "Alpha" }),
         askRoute({ id: "b.md", path: "/b", title: "Beta" }),
       ],
-    },
-  }) as unknown as BlumeProject;
+    } as BlumeManifest,
+  };
+  // SAFETY: buildAskData touches only config, context, graph, and manifest.
+  return fixture as BlumeProject;
+};
 
 describe("buildAskData", () => {
   it("indexes page bodies with locale and the deployment site", async () => {
@@ -792,10 +820,13 @@ describe("buildAskData", () => {
   });
 
   it("resolves <Visibility> for the agents audience", async () => {
-    const proj = {
+    const proj: Partial<BlumeProject> = {
       config: blumeConfigSchema.parse({ title: "Docs" }),
-      context: { root },
-      graph: { pages: [makePage("v.md", "/v", "Vis")] },
+      // SAFETY: buildAskData reads only `root` from the context.
+      context: { root } as ProjectContext,
+      // SAFETY: buildAskData reads only `graph.pages`.
+      graph: { pages: [makePage("v.md", "/v", "Vis")] } as ContentGraph,
+      // SAFETY: buildAskData reads only the manifest routes.
       manifest: {
         routes: [
           askRoute({
@@ -805,9 +836,10 @@ describe("buildAskData", () => {
             title: "Vis",
           }),
         ],
-      },
-    } as unknown as BlumeProject;
-    const data = await buildAskData(proj);
+      } as BlumeManifest,
+    };
+    // SAFETY: buildAskData touches only config, context, graph, and manifest.
+    const data = await buildAskData(proj as BlumeProject);
     const doc = data.documents.find((entry) => entry.route === "/v");
     expect(doc?.content).toContain("Agent-only body.");
     expect(doc?.content).not.toContain("Web-only body.");
@@ -840,6 +872,25 @@ const askData: AskData = {
   site: "https://example.com",
 };
 
+/** Four long, equally-matching pages, for the retrieval-size assertions. */
+const longAskData: AskData = {
+  documents: Array.from({ length: 4 }, (_, index) => ({
+    content: `Install guide ${index}. ${"Install the dev server and preview the docs. ".repeat(150)}`,
+    description: "How to install Blume",
+    locale: "",
+    route: `/guides/install-${index}`,
+    title: `Installation ${index}`,
+  })),
+  site: null,
+};
+
+/** The text between the `<docs>` markers — what the question actually carries. */
+const docsBlock = (system: string | undefined): string => {
+  const start = system?.indexOf("<docs>") ?? -1;
+  const end = system?.indexOf("</docs>") ?? -1;
+  return start === -1 || end === -1 ? "" : (system ?? "").slice(start + 6, end);
+};
+
 describe("createAskContext", () => {
   it("grounds the prompt in the retrieved page and asks the model to cite", async () => {
     const ground = createAskContext(askData);
@@ -870,6 +921,120 @@ describe("createAskContext", () => {
     expect(base).toBeGreaterThanOrEqual(0);
     expect(custom).toBeGreaterThan(base);
     expect(docs).toBeGreaterThan(custom);
+  });
+
+  it("keeps every retrieval size at its default when none are configured", async () => {
+    const ground = createAskContext(longAskData);
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    // Four matching pages, each cut to the 2000-character excerpt default and
+    // all of them inside the 10,000-character budget.
+    expect(injected.split("## ").length - 1).toBe(4);
+    expect(injected.length).toBeGreaterThan(7000);
+  });
+
+  it("caps the retrieved documents at `maxResults`", async () => {
+    const ground = createAskContext(longAskData, {
+      retrieval: { maxResults: 1 },
+    });
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    expect(injected.split("## ").length - 1).toBe(1);
+  });
+
+  it("caps each excerpt at `excerptChars`", async () => {
+    const ground = createAskContext(longAskData, {
+      retrieval: { excerptChars: 300, maxResults: 1 },
+    });
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    // 300 characters of body, plus the `## Title (/route)` heading and the
+    // ellipses marking the trimmed edges.
+    expect(injected.length).toBeLessThan(400);
+    expect(injected).toContain("install");
+  });
+
+  it("injects the page the reader is viewing on top of the `maxResults` hits", async () => {
+    const ground = createAskContext(
+      {
+        documents: [
+          ...longAskData.documents,
+          {
+            content: "Deploying to production.",
+            description: "How to deploy",
+            locale: "",
+            route: "/guides/deploy",
+            title: "Deploy",
+          },
+        ],
+        site: null,
+      },
+      { retrieval: { maxResults: 1 } }
+    );
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }], {
+        path: "/guides/deploy",
+      })
+    );
+    // The current page grounds first and doesn't count against `maxResults`,
+    // so up to `maxResults + 1` pages are injected (and citable).
+    expect(injected).toContain("the page the user is currently viewing");
+    expect(injected.split("## ").length - 1).toBe(2);
+  });
+
+  it("skips a page a small remaining budget would cut to a junk fragment", async () => {
+    const ground = createAskContext(longAskData, {
+      retrieval: { contextBudget: 2100 },
+    });
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    // The first excerpt leaves ~100 characters of budget — below the minimum
+    // useful excerpt, so no further long page gets a heading over a fragment.
+    expect(injected.split("## ").length - 1).toBe(1);
+  });
+
+  it("still injects a short page whole under a small remaining budget", async () => {
+    const ground = createAskContext(
+      {
+        documents: [
+          ...longAskData.documents,
+          {
+            content: "Install quickly with one command.",
+            description: "Quick install",
+            locale: "",
+            route: "/guides/quick",
+            title: "Quick install",
+          },
+        ],
+        site: null,
+      },
+      { retrieval: { contextBudget: 2100, maxResults: 5 } }
+    );
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }], {
+        path: "/guides/install-0",
+      })
+    );
+    // The current long page spends the budget down to ~100 characters: the
+    // other long pages are skipped, but the page that fits whole still lands.
+    expect(injected).toContain("Install quickly with one command.");
+    expect(injected.split("## ").length - 1).toBe(2);
+  });
+
+  it("caps the total injected text at `contextBudget`", async () => {
+    const ground = createAskContext(longAskData, {
+      retrieval: { contextBudget: 1000 },
+    });
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    // The first excerpt spends the whole budget, so no further page fits.
+    expect(injected.split("## ").length - 1).toBe(1);
+    expect(injected.length).toBeLessThan(1100);
   });
 
   it("returns undefined when there is no user message to ground on", async () => {
@@ -1013,6 +1178,17 @@ describe("createAskContext", () => {
 });
 
 describe("relevantExcerpt", () => {
+  it("keeps the window on the match when case mapping changes lengths", () => {
+    // Turkish İ lowercases to two characters ("i" + U+0307). Index math on a
+    // lowercased copy of the content would drift past the real position and
+    // slice a window that misses the matched region entirely.
+    const content = `${"İ".repeat(300)} The Config option lives here. ${"padding ".repeat(100)}`;
+    const excerpt = relevantExcerpt(content, "config", 200);
+    // Also exercises case-insensitive matching: the term is lowercase, the
+    // content capitalized.
+    expect(excerpt).toContain("Config option lives here");
+  });
+
   it("keeps the match in view when the window is narrower than the lead-in", () => {
     // A remaining context budget under EXCERPT_LEAD (160) shrinks the window
     // below the lead-in; the uncapped `best - 160` start used to end the slice
@@ -1053,15 +1229,18 @@ describe("relevantExcerpt", () => {
 
   it("falls back to regex term extraction without Intl.Segmenter", () => {
     const original = Intl.Segmenter;
-    // oxlint-disable-next-line no-explicit-any -- deliberate global stub
-    (Intl as any).Segmenter = undefined;
+    // SAFETY: deliberately unsetting the readonly global to exercise the
+    // regex fallback; it is restored in the finally block below.
+    (Intl as { Segmenter: typeof Intl.Segmenter | undefined }).Segmenter =
+      undefined;
     try {
       const content = `${"alpha ".repeat(120)}targetword closes the section. ${"tail ".repeat(60)}`;
       const excerpt = relevantExcerpt(content, "targetword", 100);
       expect(excerpt).toContain("targetword");
     } finally {
-      // oxlint-disable-next-line no-explicit-any -- deliberate global stub
-      (Intl as any).Segmenter = original;
+      // SAFETY: restoring the readonly global unset above.
+      (Intl as { Segmenter: typeof Intl.Segmenter | undefined }).Segmenter =
+        original;
     }
   });
 });

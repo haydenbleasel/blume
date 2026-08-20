@@ -5,12 +5,16 @@ import { withBase } from "../islands/base-path.ts";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
-import type { LocaleSwitchOption, Navigation } from "../../core/types.ts";
+import type {
+  LocaleSwitchOption,
+  Navigation,
+  NavSelector as NavSelectorConfig,
+} from "../../core/types.ts";
 import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
 import LanguageSwitcher from "./LanguageSwitcher.astro";
 import Logo from "./Logo.astro";
-import { activeTabForRoute } from "./nav-utils.ts";
+import { currentTabForRoute } from "./nav-utils.ts";
 import NavSelector from "./NavSelector.astro";
 import { resolveSlot } from "./overrides.ts";
 import Search from "./Search.astro";
@@ -50,8 +54,16 @@ interface Props {
   /** Localized chrome labels (nav toggle, sections, GitHub, theme toggle). */
   navStrings?: UIStrings["nav"];
   localeSwitch?: LocaleSwitchOption[];
+  /**
+   * Auto-populated version switcher, rendered ahead of the configured
+   * selectors. `null`/absent when versioning is off — or when the user
+   * declares their own `kind: "version"` selector, which then owns the UI.
+   */
+  versionSelector?: NavSelectorConfig | null;
   /** Active locale for per-language search filtering. */
   searchLocale?: string;
+  /** Viewed docs version for search filtering (`""` = current; `null`/absent = off). */
+  searchVersion?: string | null;
   /**
    * Layout-slot overrides forwarded from the root layout. The header honors
    * `Logo` and `Search` here so those pieces can be replaced without swapping
@@ -77,7 +89,9 @@ const {
   switcherStrings,
   navStrings,
   localeSwitch,
+  versionSelector,
   searchLocale,
+  searchVersion = null,
   layout = {},
 } = Astro.props;
 
@@ -94,7 +108,7 @@ const SearchSlot = resolveSlot(layout.Search, Search);
 // PageLayout) it's a tabs-only drawer the layout renders — so the button is also
 // needed whenever there are tabs to reveal.
 const showNavToggle = hasDrawer && (hasSidebar || navigation.tabs.length > 0);
-const activeTab = activeTabForRoute(navigation.tabs, route);
+const activeTab = currentTabForRoute(navigation.tabs, route, navigation.root);
 // Where the header's inline tab bar appears. With a sidebar it shares the `md`
 // breakpoint with the docs drawer; without one, the tabs-only drawer is the sole
 // mobile nav below `lg`, so the inline tabs wait until `lg` to avoid duplicating
@@ -168,6 +182,15 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
   }
   <div class="flex-1"></div>
   {
+    /* Right-aligned next to the language switcher: the spacer absorbs its
+       width, so pages without a version selector (blog, generated references)
+       keep the logo, tabs, and the rest of this cluster in place — no layout
+       shift when crossing into the docs. */
+    versionSelector && (
+      <NavSelector align="end" route={route} selector={versionSelector} />
+    )
+  }
+  {
     localeSwitch && localeSwitch.length > 1 && (
       <LanguageSwitcher
         label={switcherStrings?.label ?? "Language"}
@@ -184,6 +207,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
         navigation={navigation}
         popularPages={data.config.search.popular}
         strings={searchStrings}
+        version={searchVersion}
       />
     )
   }

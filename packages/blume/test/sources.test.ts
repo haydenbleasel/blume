@@ -53,25 +53,24 @@ const makeProject = async (files: Record<string, string>): Promise<string> => {
   return root;
 };
 
-/** A minimal Response-like for the injected fetch. */
-const ok = (text: string): Response =>
-  ({
-    ok: true,
-    status: 200,
-    text: () => Promise.resolve(text),
-  }) as unknown as Response;
-const okJson = (value: unknown): Response =>
-  ({
-    json: () => Promise.resolve(value),
-    ok: true,
-    status: 200,
-  }) as unknown as Response;
-const notFound = (): Response =>
-  ({
-    ok: false,
-    status: 404,
-    text: () => Promise.resolve(""),
-  }) as unknown as Response;
+/** Canned responses for the injected fetch. */
+const ok = (text: string): Response => new Response(text);
+
+/** The GitHub tree-listing shape the github-mode fixtures answer with. */
+interface TreeListing {
+  tree: { path: string; type: string }[];
+  truncated?: boolean;
+}
+
+const okJson = (value: TreeListing): Response => Response.json(value);
+const notFound = (): Response => new Response("", { status: 404 });
+
+// SAFETY: the sources under test invoke `fetchImpl` only as a plain
+// `(url, init)` call with string URLs; Bun's extra `fetch.preconnect` is
+// never touched.
+const asFetch = (
+  impl: (input: string | URL, init?: RequestInit) => Promise<Response>
+): typeof fetch => impl as typeof fetch;
 
 /**
  * Whether a mocked request is the repo tree listing (rather than a raw file
@@ -162,7 +161,7 @@ describe("filesystemSource", () => {
   });
 });
 
-const routeOf = (data: Record<string, unknown>, prefix?: string) =>
+const routeOf = (data: SourceEntry["data"], prefix?: string) =>
   normalizeEntry(
     { body: { format: "md", text: "# X\n" }, data, ref: "page.md" },
     {
@@ -324,6 +323,8 @@ describe("normalizeEntry", () => {
       root: "docs",
     });
     const { entries } = await source.load();
+    // SAFETY: the fixture above writes exactly one file under docs/, so load()
+    // yields exactly one entry.
     const entry = entries[0] as SourceEntry;
     const { pages } = normalizeEntry(entry, {
       defaultType: "doc",
@@ -383,7 +384,7 @@ describe("normalizeEntry", () => {
   });
 });
 
-const entryWith = (data: Record<string, unknown>): SourceEntry => ({
+const entryWith = (data: SourceEntry["data"]): SourceEntry => ({
   body: { format: "md", text: "# Page\n" },
   data,
   ref: "page.md",
@@ -585,17 +586,17 @@ describe("normalizeEntry with content.types frontmatter", () => {
 });
 
 describe("mdxRemoteSource (files mode)", () => {
-  const FILES: Record<string, string> = {
-    "guide.md": "---\ntitle: Guide\n---\n# Guide\n",
-    "intro.mdx": "---\ntitle: Intro\n---\n# Intro\n",
-    "notes.txt": "ignored\n",
-  };
+  const FILES = new Map([
+    ["guide.md", "---\ntitle: Guide\n---\n# Guide\n"],
+    ["intro.mdx", "---\ntitle: Intro\n---\n# Intro\n"],
+    ["notes.txt", "ignored\n"],
+  ]);
 
-  const fetchOk = ((input: string | URL): Promise<Response> => {
-    const url = typeof input === "string" ? input : input.toString();
-    const ref = url.split("/").pop() ?? "";
-    return Promise.resolve(FILES[ref] ? ok(FILES[ref]) : notFound());
-  }) as unknown as typeof fetch;
+  const fetchOk = asFetch((input) => {
+    const ref = input.toString().split("/").pop() ?? "";
+    const file = FILES.get(ref);
+    return Promise.resolve(file ? ok(file) : notFound());
+  });
 
   it("fetches included refs, strips frontmatter, and keeps the raw for staging", async () => {
     const cacheDir = join(await makeProject({}), ".cache");
@@ -639,8 +640,7 @@ describe("mdxRemoteSource (files mode)", () => {
       ctxFor(cacheDir)
     ).load();
 
-    const failing = (() =>
-      Promise.reject(new Error("network down"))) as unknown as typeof fetch;
+    const failing = asFetch(() => Promise.reject(new Error("network down")));
     const offline = mdxRemoteSource(
       { ...opts, fetchImpl: failing },
       ctxFor(cacheDir)
@@ -682,15 +682,14 @@ describe("mdxRemoteSource (files mode)", () => {
     const original = process.env.GITHUB_TOKEN;
     process.env.GITHUB_TOKEN = "t0ken";
     try {
-      const sent = new Map<string, Record<string, string>>();
-      const spying = ((
-        input: string | URL,
-        init?: RequestInit
-      ): Promise<Response> => {
-        const url = typeof input === "string" ? input : input.toString();
-        sent.set(url, (init?.headers ?? {}) as Record<string, string>);
+      const sent = new Map<string, string | undefined>();
+      const spying = asFetch((input, init) => {
+        sent.set(
+          input.toString(),
+          new Headers(init?.headers).get("authorization") ?? undefined
+        );
         return Promise.resolve(ok("---\ntitle: X\n---\n# X\n"));
-      }) as unknown as typeof fetch;
+      });
 
       const load = (url: string, cacheDir: string) =>
         mdxRemoteSource(
@@ -706,9 +705,7 @@ describe("mdxRemoteSource (files mode)", () => {
 
       const root = await makeProject({});
       await load("https://example.com/docs", join(root, ".c1"));
-      expect(
-        sent.get("https://example.com/docs/intro.mdx")?.authorization
-      ).toBeUndefined();
+      expect(sent.get("https://example.com/docs/intro.mdx")).toBeUndefined();
 
       await load(
         "https://raw.githubusercontent.com/o/r/main/docs",
@@ -716,12 +713,11 @@ describe("mdxRemoteSource (files mode)", () => {
       );
       expect(
         sent.get("https://raw.githubusercontent.com/o/r/main/docs/intro.mdx")
-          ?.authorization
       ).toBe("Bearer t0ken");
 
       // An unparsable base URL can't be host-checked, so no token is sent.
       await load("not-a-url", join(root, ".c3"));
-      expect(sent.get("not-a-url/intro.mdx")?.authorization).toBeUndefined();
+      expect(sent.get("not-a-url/intro.mdx")).toBeUndefined();
 
       // Without a token in the environment, even GitHub hosts get no header.
       delete process.env.GITHUB_TOKEN;
@@ -731,7 +727,6 @@ describe("mdxRemoteSource (files mode)", () => {
       );
       expect(
         sent.get("https://raw.githubusercontent.com/o/r/main/other/intro.mdx")
-          ?.authorization
       ).toBeUndefined();
     } finally {
       if (original === undefined) {
@@ -777,15 +772,15 @@ describe("mdxRemoteSource (github mode)", () => {
         { path: "README.md", type: "blob" },
       ],
     };
-    const fetchImpl = ((input: string | URL): Promise<Response> => {
-      const url = typeof input === "string" ? input : input.toString();
+    const fetchImpl = asFetch((input) => {
+      const url = input.toString();
       if (isTreeApi(url)) {
         return Promise.resolve(okJson(tree));
       }
       return Promise.resolve(
         ok(`---\ntitle: ${url.split("/").pop()}\n---\nbody\n`)
       );
-    }) as unknown as typeof fetch;
+    });
 
     const cacheDir = join(await makeProject({}), ".cache");
     const source = mdxRemoteSource(
@@ -812,12 +807,11 @@ describe("mdxRemoteSource (github mode)", () => {
       tree: [{ path: "docs/a.md", type: "blob" }],
       truncated: true,
     };
-    const fetchImpl = ((input: string | URL): Promise<Response> => {
-      const url = typeof input === "string" ? input : input.toString();
-      return isTreeApi(url)
+    const fetchImpl = asFetch((input) =>
+      isTreeApi(input.toString())
         ? Promise.resolve(okJson(tree))
-        : Promise.resolve(ok("---\ntitle: A\n---\nbody\n"));
-    }) as unknown as typeof fetch;
+        : Promise.resolve(ok("---\ntitle: A\n---\nbody\n"))
+    );
 
     const cacheDir = join(await makeProject({}), ".cache");
     const source = mdxRemoteSource(
@@ -1070,8 +1064,8 @@ describe("remote watch", () => {
     /* oxlint-enable sonarjs/publicly-writable-directories */
     expect(mdxRemoteSource(base, ctx).watch).toBeUndefined();
     expect(
-      typeof mdxRemoteSource({ ...base, pollInterval: 30 }, ctx).watch
-    ).toBe("function");
+      mdxRemoteSource({ ...base, pollInterval: 30 }, ctx).watch
+    ).toBeInstanceOf(Function);
   });
 
   it("serves the cache without fetching when refresh is false", async () => {
@@ -1089,8 +1083,9 @@ describe("remote watch", () => {
         },
       ])
     );
-    const failing = (() =>
-      Promise.reject(new Error("should not fetch"))) as unknown as typeof fetch;
+    const failing = asFetch(() =>
+      Promise.reject(new Error("should not fetch"))
+    );
     const source = mdxRemoteSource(
       {
         fetchImpl: failing,
@@ -1119,7 +1114,7 @@ describe("filesystemSource watch", () => {
       root: "docs",
     });
     const dispose = source.watch?.(noop);
-    expect(typeof dispose).toBe("function");
+    expect(dispose).toBeInstanceOf(Function);
     expect(() => dispose?.()).not.toThrow();
   });
 
@@ -1133,16 +1128,20 @@ describe("filesystemSource watch", () => {
       root: "missing",
     });
     const dispose = source.watch?.(noop);
-    expect(typeof dispose).toBe("function");
+    expect(dispose).toBeInstanceOf(Function);
     expect(() => dispose?.()).not.toThrow();
   });
 });
 
 describe("contentConfigTemplate", () => {
+  // SAFETY: contentConfigTemplate reads only `contentRoot` and `outDir` from
+  // the project context; the fixture provides both.
   const context = {
     contentRoot: "/p/docs",
     outDir: "/p/.blume",
   } as ProjectContext;
+  // SAFETY: the template reads only `content.include` off the config; `never`
+  // bridges the rest of ResolvedConfig for this two-field fixture.
   const config = { content: { include: ["**/*.{md,mdx}"] } } as never;
 
   it("emits only the docs collection without staged sources", () => {

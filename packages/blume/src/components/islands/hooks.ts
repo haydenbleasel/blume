@@ -29,7 +29,9 @@ const readClientData = (): BlumeClientData | null => {
   if (cachedData) {
     return cachedData;
   }
-  if (typeof document === "undefined") {
+  // `document` is undeclared on the server; probing `globalThis` avoids both
+  // the bare-reference ReferenceError and a `typeof` sniff.
+  if (!("document" in globalThis)) {
     return null;
   }
   const element = document.querySelector("#blume-client-data");
@@ -37,6 +39,8 @@ const readClientData = (): BlumeClientData | null => {
     return null;
   }
   try {
+    // SAFETY: the layout serialized this script tag's JSON from the same
+    // `BlumeClientData` snapshot this reads back.
     cachedData = JSON.parse(element.textContent) as BlumeClientData;
     return cachedData;
   } catch {

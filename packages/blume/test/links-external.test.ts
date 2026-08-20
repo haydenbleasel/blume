@@ -13,37 +13,39 @@ import type { ContentGraph, Diagnostic, PageLink } from "../src/core/types.ts";
 
 const link = (target: string): PageLink => ({ column: 1, line: 1, target });
 
-const graphWith = (links: PageLink[]): ContentGraph =>
-  ({
-    diagnostics: [],
-    navigation: {
-      featured: [],
-      selectors: [],
-      sidebar: [],
-      tabs: [],
+const graphWith = (links: PageLink[]): ContentGraph => ({
+  diagnostics: [],
+  navigation: {
+    featured: [],
+    selectors: [],
+    sidebar: [],
+    tabs: [],
+  },
+  navigationByLocale: {},
+  navigationByVersion: {},
+  pages: [
+    {
+      contentType: "doc",
+      format: "mdx",
+      groups: [],
+      headings: [],
+      id: "a.mdx",
+      links,
+      locale: "",
+      meta: pageMetaSchema.parse({}),
+      navPath: "a.mdx",
+      route: "/a",
+      segments: [],
+      source: { name: "filesystem", ref: "a.mdx" },
+      sourcePath: "/abs/a.mdx",
+      title: "A",
+      translationKey: "/a",
+      version: "",
+      versionKey: "/a",
     },
-    navigationByLocale: {},
-    pages: [
-      {
-        contentType: "doc",
-        format: "mdx",
-        groups: [],
-        headings: [],
-        id: "a.mdx",
-        links,
-        locale: "",
-        meta: pageMetaSchema.parse({}),
-        navPath: "a.mdx",
-        route: "/a",
-        segments: [],
-        source: { name: "filesystem", ref: "a.mdx" },
-        sourcePath: "/abs/a.mdx",
-        title: "A",
-        translationKey: "/a",
-      },
-    ],
-    routes: new Map([["/a", "a.mdx"]]),
-  }) as ContentGraph;
+  ],
+  routes: new Map([["/a", "a.mdx"]]),
+});
 
 const check = (links: PageLink[]): Promise<Diagnostic[]> =>
   validateLinks(graphWith(links), { checkExternal: true, publicDir: null });
@@ -73,18 +75,22 @@ const fetchMock = (input: RequestInfo | URL, init?: RequestInit) => {
       new Response(null, { status: method === "HEAD" ? 405 : 200 })
     );
   }
-  const status: Record<string, number> = {
-    "https://notfound.example": 404,
-    "https://ok.example": 200,
-    "https://server.example": 500,
-  };
-  return Promise.resolve(new Response(null, { status: status[url] ?? 200 }));
+  const statusByUrl = new Map([
+    ["https://notfound.example", 404],
+    ["https://ok.example", 200],
+    ["https://server.example", 500],
+  ]);
+  return Promise.resolve(
+    new Response(null, { status: statusByUrl.get(url) ?? 200 })
+  );
 };
 
 const originalFetch = globalThis.fetch;
 
 beforeAll(() => {
-  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  // SAFETY: the fake covers the (input, init) call `validateLinks` makes;
+  // fetch's static helpers are never touched by the probe.
+  globalThis.fetch = fetchMock as typeof fetch;
 });
 
 afterAll(() => {
@@ -145,10 +151,16 @@ describe("validateLinks — external link probing", () => {
     const realFetch = globalThis.fetch;
     // Fire the abort timer synchronously so the controller trips before fetch
     // settles, exercising the `setTimeout(() => controller.abort())` guard.
+    // SAFETY: the fake covers the (handler) call the probe's timeout makes;
+    // the wider setTimeout overloads are never exercised here.
     globalThis.setTimeout = ((handler: () => void) => {
       handler();
-      return 0 as unknown as ReturnType<typeof setTimeout>;
+      // A real no-op timer supplies the timer object the caller hands to
+      // clearTimeout.
+      return realSetTimeout(() => {}, 0);
     }) as typeof globalThis.setTimeout;
+    // SAFETY: the fake covers the (input, init) call the probe makes; fetch's
+    // static helpers are never touched.
     globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.signal?.aborted) {
         const error = new Error("aborted");
@@ -156,7 +168,7 @@ describe("validateLinks — external link probing", () => {
         return Promise.reject(error);
       }
       return Promise.resolve(new Response(null, { status: 200 }));
-    }) as unknown as typeof fetch;
+    }) as typeof fetch;
     try {
       const diagnostics = await check([link("https://hung.example")]);
       expect(byUrl(diagnostics, "hung.example")?.severity).toBe("warning");

@@ -5,6 +5,23 @@
  * Markdown text that flows through Blume's normal pipeline.
  */
 
+/**
+ * A field value on a Portable Text node: the arbitrary JSON the CMS query
+ * returned (custom blocks carry whatever fields the studio schema defines).
+ * Spans and mark defs appear as members so the block's typed fields conform
+ * to its index signature.
+ */
+export type PortableTextValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | PortableTextSpan
+  | PortableTextMarkDef
+  | PortableTextValue[]
+  | { [key: string]: PortableTextValue };
+
 /** A single Portable Text node (block, image, or a custom type). */
 export interface PortableTextBlock {
   _type: string;
@@ -14,7 +31,7 @@ export interface PortableTextBlock {
   level?: number;
   children?: PortableTextSpan[];
   markDefs?: PortableTextMarkDef[];
-  [key: string]: unknown;
+  [key: string]: PortableTextValue;
 }
 
 interface PortableTextSpan {
@@ -36,14 +53,14 @@ export interface PortableTextOptions {
   serializers?: Record<string, (block: PortableTextBlock) => string>;
 }
 
-const HEADING_STYLES: Record<string, string> = {
-  h1: "# ",
-  h2: "## ",
-  h3: "### ",
-  h4: "#### ",
-  h5: "##### ",
-  h6: "###### ",
-};
+const HEADING_STYLES = new Map([
+  ["h1", "# "],
+  ["h2", "## "],
+  ["h3", "### "],
+  ["h4", "#### "],
+  ["h5", "##### "],
+  ["h6", "###### "],
+]);
 
 // Markdown/raw-HTML structure characters. Portable Text spans are *plain
 // text* — formatting arrives as marks, never as syntax in the text — so a
@@ -108,6 +125,10 @@ const renderChildren = (block: PortableTextBlock): string => {
   return (block.children ?? []).map((span) => renderSpan(span, defs)).join("");
 };
 
+/** Whether an image block's `alt` field is usable alt text (CMS JSON may hold anything). */
+const isAltText = (value: PortableTextValue): value is string =>
+  typeof value === "string";
+
 const renderBlock = (
   block: PortableTextBlock,
   options: PortableTextOptions
@@ -118,7 +139,7 @@ const renderBlock = (
   }
   if (block._type === "image") {
     const url = options.imageUrl?.(block);
-    const alt = typeof block.alt === "string" ? block.alt : "";
+    const alt = isAltText(block.alt) ? block.alt : "";
     return url ? `![${alt}](${url})` : "";
   }
   if (block._type !== "block") {
@@ -134,7 +155,7 @@ const renderBlock = (
   if (block.style === "blockquote") {
     return `> ${inline}`;
   }
-  return `${HEADING_STYLES[block.style ?? "normal"] ?? ""}${inline}`;
+  return `${HEADING_STYLES.get(block.style ?? "normal") ?? ""}${inline}`;
 };
 
 /** Serialize a Portable Text array into a Markdown string. */

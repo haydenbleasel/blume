@@ -22,8 +22,8 @@ export interface AskPage {
 export interface AskData {
   /**
    * The site's `i18n.defaultLocale`, when i18n is configured. Selects a
-   * word-segmenting Orama tokenizer for languages written without spaces, so
-   * retrieval can match CJK/Thai content.
+   * word-segmenting Orama tokenizer for every non-Latin script, so retrieval
+   * can match CJK, Cyrillic, Greek, Hebrew, or Devanagari content.
    */
   defaultLocale?: string;
   documents: OramaDoc[];
@@ -36,6 +36,34 @@ const MAX_RESULTS = 6;
 const EXCERPT_CHARS = 2000;
 /** Overall cap on injected documentation characters. */
 const CONTEXT_BUDGET = 10_000;
+/**
+ * Smallest excerpt worth injecting. A long page pushed under a tiny residual
+ * budget would get a full `## Title (/route)` heading over a fragment of a few
+ * dozen characters — a section the model is invited to cite but that grounds
+ * nothing. Short pages that fit whole are still injected below this floor.
+ */
+const MIN_EXCERPT_CHARS = 200;
+
+/**
+ * How much retrieved documentation a question carries (the `ai.ask.retrieval`
+ * config). Every field falls back to the built-in default, so a partial object
+ * only changes what it names. Injected characters dominate time-to-first-token
+ * on a self-hosted backend, and the three knobs aren't interchangeable: the
+ * budget caps the total, `excerptChars` decides how deep into one long page the
+ * excerpt reaches, and `maxResults` decides how many pages retrieval adds (the
+ * page the reader is viewing is injected on top of them).
+ */
+export interface AskRetrievalOptions {
+  /** Overall cap on injected documentation characters. Defaults to `10000`. */
+  contextBudget?: number;
+  /** Characters kept per injected excerpt. Defaults to `2000`. */
+  excerptChars?: number;
+  /**
+   * Documents retrieved per question. Defaults to `6`. The current page is
+   * injected in addition when it isn't among the hits.
+   */
+  maxResults?: number;
+}
 /** Chars of lead-in kept before the matched region, for heading/sentence context. */
 const EXCERPT_LEAD = 160;
 
@@ -102,9 +130,13 @@ const TERM = /[\p{L}\p{M}\p{N}]+/gu;
  * window silently degrades to the head of the page. The regex fallback covers
  * runtimes without the segmenter and still handles spaced scripts correctly.
  */
+const hasSegmenter = (
+  segmenter: typeof Intl.Segmenter | undefined
+): segmenter is typeof Intl.Segmenter => typeof segmenter === "function";
+
 const segmentQuery = (query: string): string[] => {
   const lowered = query.normalize("NFC").toLowerCase();
-  if (typeof Intl.Segmenter !== "function") {
+  if (!hasSegmenter(Intl.Segmenter)) {
     return lowered.match(TERM) ?? [];
   }
   const pieces: string[] = [];
@@ -172,13 +204,14 @@ export const relevantExcerpt = (
     return `${prefix}${slice}${suffix}`;
   };
 
-  const lower = trimmed.toLowerCase();
+  // Case-insensitive matching via regex rather than `indexOf` on a lowercased
+  // copy: length-changing case mappings (Turkish İ → "i" + U+0307) would shift
+  // every index in the copy, sliding the excerpt window off the match. Terms
+  // come from TERM (letters, marks and digits only), so no regex escaping.
   const positions: number[] = [];
   for (const term of queryTerms(query)) {
-    let idx = lower.indexOf(term);
-    while (idx !== -1) {
-      positions.push(idx);
-      idx = lower.indexOf(term, idx + term.length);
+    for (const match of trimmed.matchAll(new RegExp(term, "giu"))) {
+      positions.push(match.index);
     }
   }
   // No query terms hit this doc — nothing to center on, so keep the head.
@@ -228,10 +261,13 @@ export const relevantExcerpt = (
  * the base instruction rather than replacing it: the base carries the
  * functional contract (answer only from the excerpts, cite pages as Markdown
  * links) that the panel's citation rendering depends on.
+ *
+ * `options.retrieval` (the `ai.ask.retrieval` config) sizes how much
+ * documentation each question carries; omitted fields keep today's defaults.
  */
 export const createAskContext = (
   data: AskData,
-  options?: { instructions?: string }
+  options?: { instructions?: string; retrieval?: AskRetrievalOptions }
 ): ((
   messages: AskMessage[],
   page?: AskPage
@@ -246,6 +282,9 @@ export const createAskContext = (
   const instruction = options?.instructions
     ? `${BASE_INSTRUCTION}\n\n${options.instructions}`
     : BASE_INSTRUCTION;
+  const maxResults = options?.retrieval?.maxResults ?? MAX_RESULTS;
+  const excerptChars = options?.retrieval?.excerptChars ?? EXCERPT_CHARS;
+  const contextBudget = options?.retrieval?.contextBudget ?? CONTEXT_BUDGET;
 
   return async (messages, page) => {
     const list = Array.isArray(messages) ? messages : [];
@@ -259,22 +298,27 @@ export const createAskContext = (
       ? byRoute.get(normalizeRoute(page.path))
       : undefined;
     const db = await index();
-    const hits = await queryOramaIndex(db, query, MAX_RESULTS, {
+    const hits = await queryOramaIndex(db, query, maxResults, {
       locale: current?.locale || undefined,
     });
 
     const seen = new Set<string>();
     const sections: string[] = [];
-    let budget = CONTEXT_BUDGET;
+    let budget = contextBudget;
     const push = (doc: OramaDoc, label: string) => {
       if (seen.has(doc.route) || budget <= 0) {
+        return;
+      }
+      // Skip a page that would be cut to a junk fragment: its excerpt is only
+      // useful when it either fits whole or gets at least the minimum window.
+      if (budget < MIN_EXCERPT_CHARS && doc.content.trim().length > budget) {
         return;
       }
       seen.add(doc.route);
       const body = relevantExcerpt(
         doc.content,
         query,
-        Math.min(EXCERPT_CHARS, budget)
+        Math.min(excerptChars, budget)
       );
       budget -= body.length;
       sections.push(`## ${doc.title} (${doc.route})${label}\n${body}`);

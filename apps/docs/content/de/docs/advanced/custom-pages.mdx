@@ -1,14 +1,14 @@
 ---
 title: Benutzerdefinierte Seiten
 description: >-
-  Binden Sie vollständig benutzerdefinierte .astro-Routen neben Ihrer Dokumentation ein und lesen Sie Konfiguration, Navigation und Inhalte Ihrer Website aus dem Modul blume:data.
+  Binde vollständig benutzerdefinierte .astro-Routen neben deiner Dokumentation ein und lies Konfiguration, Navigation und Inhalte deiner Website aus dem Modul blume:data.
 ---
 
-Der Großteil einer Blume-Website besteht aus Markdown, aber manchmal benötigen Sie eine Route, die _kein_ Dokument ist — eine Landingpage, eine Preisseite, einen handgebauten Blog- oder Changelog-Index oder ein interaktives Dashboard. Legen Sie eine `.astro`-Datei in Ihrem **pages**-Ordner ab, und Blume bindet sie als echte Route ein, direkt neben Ihren Inhalten.
+Der Großteil einer Blume-Website besteht aus Markdown, aber manchmal benötigst du eine Route, die _kein_ Dokument ist — eine Landingpage, eine Preisseite, einen handgebauten Blog- oder Changelog-Index oder ein interaktives Dashboard. Lege eine `.astro`-Datei in deinem **pages**-Ordner ab, und Blume bindet sie als echte Route ein, direkt neben deinen Inhalten.
 
 ## Eine Seite hinzufügen
 
-Erstellen Sie im Stammverzeichnis Ihres Projekts einen `pages/`-Ordner und fügen Sie eine `.astro`-Datei hinzu:
+Erstelle im Stammverzeichnis deines Projekts einen `pages/`-Ordner und füge eine `.astro`-Datei hinzu:
 
 ```astro pages/pricing.astro lineNumbers
 ---
@@ -33,11 +33,11 @@ Der Pfad jeder Datei innerhalb des pages-Ordners wird zu ihrer Route. `index` ve
 | `pages/blog/[slug].astro` | `/blog/:slug` |
 | `pages/changelog.astro`   | `/changelog`  |
 
-Eine benutzerdefinierte Seite **gewinnt** gegenüber einer generierten Route mit demselben Pfad. Fügt man beispielsweise `pages/changelog.astro` hinzu, ersetzt das Blumes [generierte Changelog-Zeitleiste](/docs/advanced/changelog) durch Ihre eigene.
+Eine benutzerdefinierte Seite **gewinnt** gegenüber einer generierten Route mit demselben Pfad. Fügt man beispielsweise `pages/changelog.astro` hinzu, ersetzt das Blumes [generierte Changelog-Zeitleiste](/docs/advanced/changelog) durch deine eigene.
 
 ## Website-Daten lesen
 
-Importieren Sie `blume:data`, um dieselbe aufgelöste Konfiguration, Navigation, Routen und Feeds zu lesen, die auch der Rest der Website verwendet:
+Importiere `blume:data`, um dieselbe aufgelöste Konfiguration, Navigation, Routen und Feeds zu lesen, die auch der Rest der Website verwendet:
 
 ```astro pages/all-pages.astro lineNumbers
 ---
@@ -58,7 +58,7 @@ import data from "blume:data";
 </ul>
 ```
 
-Innerhalb eines Blume-Projekts ist das Modul automatisch typisiert. Sie können die Struktur mit `import type { BlumeData } from "blume"` auch explizit einbinden — für typisierte Hilfsfunktionen, Props oder Ihre eigene tsconfig:
+Innerhalb eines Blume-Projekts ist das Modul automatisch typisiert. Du kannst die Struktur mit `import type { BlumeData } from "blume"` auch explizit einbinden — für typisierte Hilfsfunktionen, Props oder deine eigene tsconfig:
 
 ```ts
 import type { BlumeData, BlumeRoute } from "blume";
@@ -81,7 +81,7 @@ Das Modul stellt Folgendes bereit:
       type: "Navigation",
       required: true,
       description:
-        "Die aus Ihren Inhalten abgeleitete Seitenleiste, Tabs und Auswahlelemente (Standard-Locale).",
+        "Die aus deinen Inhalten abgeleitete Seitenleiste, Tabs und Auswahlelemente (Standard-Locale).",
     },
     navigationByLocale: {
       type: "Record<string, Navigation>",
@@ -121,7 +121,7 @@ Das Modul stellt Folgendes bereit:
   }}
 />
 
-`routes` enthält Seiten-Metadaten, aber kein Frontmatter wie `type` oder `date`. Um eine nach Inhaltstyp gefilterte Liste zu erstellen — einen Blog- oder Changelog-Index — kombinieren Sie es mit Astros `docs`-Inhaltssammlung, die das Frontmatter enthält:
+`routes` enthält Seiten-Metadaten, aber kein Frontmatter wie `type` oder `date`. Um eine nach Inhaltstyp gefilterte Liste zu erstellen — einen Blog- oder Changelog-Index — kombiniere es mit Astros `docs`-Inhaltssammlung, die das Frontmatter enthält:
 
 ```astro pages/blog/index.astro lineNumbers
 ---
@@ -154,7 +154,7 @@ const posts = (await getCollection("docs"))
 
 ## Laufzeit-Hilfsfunktionen
 
-`blume/runtime` bündelt die gängigen Datenmuster, sodass Sie nicht auf die Interna von `blume:data` zugreifen müssen.
+`blume/runtime` bündelt die gängigen Datenmuster, sodass du nicht auf die Interna von `blume:data` zugreifen musst.
 
 **`getBlumeCollection(data, query?)`** wählt Inhaltsrouten aus — gefiltert nach Sammlung, Locale oder Pfadpräfix, wobei Entwürfe und ausgeblendete Seiten ausgeschlossen und die Ergebnisse nach Pfad sortiert werden — genau das, was ein benutzerdefinierter Index braucht:
 
@@ -187,11 +187,11 @@ const [intro] = getBlumeCollection(data, { prefix: "/docs" });
 {intro && <BlumePage id={intro.entryId} />}
 ```
 
-Übergeben Sie `components`, um eigene Überschreibungen oder Islands hinzuzufügen (die in der generierten Laufzeitumgebung liegen und standardmäßig nicht importiert werden), und `collection`, um aus einer anderen Sammlung als `"docs"` zu lesen.
+Übergib `components`, um eigene Überschreibungen oder Islands hinzuzufügen (die in der generierten Laufzeitumgebung liegen und standardmäßig nicht importiert werden), und `collection`, um aus einer anderen Sammlung als `"docs"` zu lesen.
 
 ## Das Website-Layout verwenden
 
-`RootLayout` verleiht einer benutzerdefinierten Seite das komplette Dokumentations-Chrome — Kopfzeile, Seitenleiste, Suche, Inhaltsverzeichnis und Theme —, indem es sie in dasselbe dreispaltige Raster einbettet, das auch die generierten Seiten verwenden. Für eine Landing- oder Marketingseite steht dieses Raster im Weg, greifen Sie deshalb stattdessen zu **`PageLayout`**: Es liefert die Dokumenthülle, die Kopfzeile, das Theme und die Schriftarten und dann einen einzelnen `<slot />` über die volle Breite (keine Seitenleiste, kein Fließtext, kein Inhaltsverzeichnis). Ein optionaler `footer`-Slot wird nach `<main>` gerendert:
+`RootLayout` verleiht einer benutzerdefinierten Seite das komplette Dokumentations-Chrome — Kopfzeile, Seitenleiste, Suche, Inhaltsverzeichnis und Theme —, indem es sie in dasselbe dreispaltige Raster einbettet, das auch die generierten Seiten verwenden. Für eine Landing- oder Marketingseite steht dieses Raster im Weg, greif deshalb stattdessen zu **`PageLayout`**: Es liefert die Dokumenthülle, die Kopfzeile, das Theme und die Schriftarten und dann einen einzelnen `<slot />` über die volle Breite (keine Seitenleiste, kein Fließtext, kein Inhaltsverzeichnis). Ein optionaler `footer`-Slot wird nach `<main>` gerendert:
 
 ```astro pages/index.astro lineNumbers
 ---
@@ -223,24 +223,28 @@ const { config } = data;
 </PageLayout>
 ```
 
-Die Kopfzeile, die eine benutzerdefinierte Seite erhält, ist dieselbe wie bei den Dokumentationsseiten, sodass das darin enthaltene Chrome mitkommt: Suche, der Theme-Umschalter, der Sprachwechsler und — wenn [Ask AI](/docs/configuration/ai) konfiguriert ist — der Ask-AI-Auslöser. Nichts davon muss pro Seite eingerichtet werden. Übergeben Sie `askEnabled={false}`, um den Ask-Auslöser auf einer Seite wegzulassen und ihn überall sonst beizubehalten.
+Die Kopfzeile, die eine benutzerdefinierte Seite erhält, ist dieselbe wie bei den Dokumentationsseiten, sodass das darin enthaltene Chrome mitkommt: Suche, der Theme-Umschalter, der Sprachwechsler und — wenn [Ask AI](/docs/configuration/ai) konfiguriert ist — der Ask-AI-Auslöser. Nichts davon muss pro Seite eingerichtet werden. Übergib `askEnabled={false}`, um den Ask-Auslöser auf einer Seite wegzulassen und ihn überall sonst beizubehalten.
 
-Die Übergabe von `siteUrl` (und `ogEnabled`) leitet automatisch das `canonical` der Seite und ein generiertes `og:image` ab: Blume rendert für jede statische benutzerdefinierte Seite eine Open-Graph-Karte — einschließlich der Startseite, der am häufigsten geteilten URL —, ausgeliefert unter `/og/<route>.png` (`/og/index.png` für `/`). Die Startseiten-Karte verwendet den Website-Titel mit der Beschreibung als Kopfzeile; eine tiefer liegende Seite wird nach ihrem letzten Pfadsegment benannt. Setzen Sie `ogImage` oder `canonical` explizit, um eines von beiden zu überschreiben. `ogImage` erwartet einen wurzelrelativen Pfad — eine Datei in `public/`, die anhand von [`deployment.site`](/docs/deployment) zu der absoluten URL aufgelöst wird, die Crawler benötigen — oder eine externe URL, die unverändert durchgereicht wird:
+Die Übergabe von `siteUrl` (und `ogEnabled`) leitet automatisch das `canonical` der Seite und ein generiertes `og:image` ab: Blume rendert für jede statische benutzerdefinierte Seite eine Open-Graph-Karte — einschließlich der Startseite, der am häufigsten geteilten URL —, ausgeliefert unter `/og/<route>.png` (`/og/index.png` für `/`). Die Startseiten-Karte verwendet den Website-Titel mit der Beschreibung als Kopfzeile; eine tiefer liegende Seite wird nach ihrem letzten Pfadsegment benannt. Setze `ogImage` oder `canonical` explizit, um eines von beiden zu überschreiben. `ogImage` erwartet einen wurzelrelativen Pfad — eine Datei in `public/`, die anhand von [`deployment.site`](/docs/deployment) zu der absoluten URL aufgelöst wird, die Crawler benötigen — oder eine externe URL, die unverändert durchgereicht wird:
 
 ```astro pages/index.astro lineNumbers
 <PageLayout
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
   ogImage="/opengraph-image.png"
+  ogImageAlt="Acme — the fastest docs"
+  ogImageSize={{ width: 1200, height: 630 }}
   page={{ title: config.title }}
 >
   <!-- page content -->
 </PageLayout>
 ```
 
-Nur diese eine Seite ändert sich — jede andere Route behält ihre generierte Karte —, und so geben Sie allein der Startseite ein maßgeschneidertes Teilen-Bild.
+Nur diese eine Seite ändert sich — jede andere Route behält ihre generierte Karte —, und so gibst du allein der Startseite ein maßgeschneidertes Teilen-Bild. Die generierte Karte gibt ihre Größe und ihren Alternativtext von sich aus an Crawler weiter; übergib bei deinem eigenen `ogImage` zusätzlich `ogImageAlt` und `ogImageSize`, damit die Teilen-Karte dieselbe Behandlung erhält.
 
-`page.title` wird wortwörtlich als Dokumenttitel verwendet (ohne `- siteTitle`-Suffix), da Marketingseiten üblicherweise ihren eigenen festlegen. Um einer benutzerdefinierten Seite stattdessen das komplette Dokumentations-Chrome zu geben — Seitenleiste, Inhaltsverzeichnis und alles Weitere —, betten Sie sie in `RootLayout` ein, das Layout, das auch die generierten Seiten verwenden. Beziehen Sie die erforderlichen Props direkt aus `blume:data`:
+Die Seite gibt außerdem schema.org-JSON-LD aus — denselben `WebSite`-Graphen, den auch die Dokumentationsseiten mitführen, damit die Startseite (üblicherweise eine benutzerdefinierte Seite) nicht die eine URL ohne strukturierte Daten ist. Übergib `structuredDataEnabled={config.structuredData}`, um sie mit der [`structuredData`](/docs/configuration/seo)-Konfiguration synchron zu halten, oder `structuredDataEnabled={false}`, um sie für eine Seite abzuschalten.
+
+`page.title` wird wortwörtlich als Dokumenttitel verwendet (ohne `- siteTitle`-Suffix), da Marketingseiten üblicherweise ihren eigenen festlegen. Um einer benutzerdefinierten Seite stattdessen das komplette Dokumentations-Chrome zu geben — Seitenleiste, Inhaltsverzeichnis und alles Weitere —, bette sie in `RootLayout` ein, das Layout, das auch die generierten Seiten verwenden. Beziehe die erforderlichen Props direkt aus `blume:data`:
 
 ```astro pages/pricing.astro lineNumbers
 ---
@@ -264,14 +268,14 @@ import data from "blume:data";
 ```
 
 :::note
-`RootLayout` ist Teil der generierten Laufzeitumgebung, daher können sich seine Props zwischen Releases ändern. Wenn Sie ein Layout möchten, das vollständig Ihnen gehört, verwandelt [`blume eject`](/docs/configuration/customization#eject) `.blume/` in ein normales Astro-Projekt, das Ihnen uneingeschränkt gehört.
+`RootLayout` ist Teil der generierten Laufzeitumgebung, daher können sich seine Props zwischen Releases ändern. Wenn du ein Layout möchtest, das vollständig dir gehört, verwandelt [`blume eject`](/docs/configuration/customization#eject) `.blume/` in ein normales Astro-Projekt, das dir uneingeschränkt gehört.
 :::
 
 ## 404-Seite
 
 Blume liefert ab Werk eine standardmäßige **Nicht gefunden**-Seite mit: eine zentrierte „404“-Meldung, eingebettet in das Website-Chrome (Kopfzeile, Suche, Theme), die für jede nicht zugeordnete URL ausgeliefert wird. `blume build` schreibt sie nach `404.html`, was statische Hoster automatisch ausliefern, und `blume dev` zeigt sie für unbekannte Routen an.
 
-Um sie durch Ihre eigene zu ersetzen, fügen Sie eine `pages/404.astro` hinzu. Sie übernimmt die `/404`-Route genauso, wie `pages/changelog.astro` den Changelog übernimmt — Ihre Seite gewinnt, und die Standardseite entfällt. Bauen Sie sie wie jede andere benutzerdefinierte Seite, in `PageLayout` oder `RootLayout`:
+Um sie durch deine eigene zu ersetzen, füge eine `pages/404.astro` hinzu. Sie übernimmt die `/404`-Route genauso, wie `pages/changelog.astro` den Changelog übernimmt — deine Seite gewinnt, und die Standardseite entfällt. Bau sie wie jede andere benutzerdefinierte Seite, in `PageLayout` oder `RootLayout`:
 
 ```astro pages/404.astro lineNumbers
 ---
@@ -295,11 +299,11 @@ import data from "blume:data";
 </PageLayout>
 ```
 
-Um das Standarddesign beizubehalten, aber seine Formulierungen zu ändern — auch für andere Sprachen —, überschreiben Sie die `notFound`-[UI-Zeichenketten](/docs/content/i18n) (`title`, `description`, `home`) über `i18n.ui`.
+Um das Standarddesign beizubehalten, aber seine Formulierungen zu ändern — auch für andere Sprachen —, überschreibe die `notFound`-[UI-Zeichenketten](/docs/content/i18n) (`title`, `description`, `home`) über `i18n.ui`.
 
 ## Interaktive Seiten
 
-Benutzerdefinierte Seiten sind gewöhnliches Astro, sodass Sie React- (oder Framework-beliebige) [Islands](/docs/configuration/customization#interactive-islands) mit einer Hydratations-Direktive einbinden können. React wird automatisch aktiviert, sobald Ihr Projekt eine `.tsx`- oder `.jsx`-Datei enthält.
+Benutzerdefinierte Seiten sind gewöhnliches Astro, sodass du React- (oder Framework-beliebige) [Islands](/docs/configuration/customization#interactive-islands) mit einer Hydratations-Direktive einbinden kannst. React wird automatisch aktiviert, sobald dein Projekt eine `.tsx`- oder `.jsx`-Datei enthält.
 
 <CardGroup cols={2}>
   <Card title="Anpassung" href="/docs/configuration/customization" icon="file">

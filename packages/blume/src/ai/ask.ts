@@ -35,7 +35,16 @@ const OPENAI_COMPATIBLE = "openai-compatible";
 /** The AI SDK provider package the OpenAI-compatible providers install. */
 const OPENAI_COMPATIBLE_DEP = "@ai-sdk/openai-compatible";
 
-const ASK_PRESETS: Record<string, AskPreset> = {
+/**
+ * Connection presets keyed by provider name. Open-keyed on purpose: lookups
+ * use the configured `ai.ask.provider`, which includes values with no preset
+ * (the generic `openai-compatible`).
+ */
+interface AskPresetRegistry {
+  [provider: string]: AskPreset;
+}
+
+const ASK_PRESETS: AskPresetRegistry = {
   inkeep: {
     apiKeyEnv: "INKEEP_API_KEY",
     baseUrl: "https://api.inkeep.com/v1",

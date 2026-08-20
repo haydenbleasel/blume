@@ -185,6 +185,8 @@ export const devCommand = defineCommand({
         reportDiagnostics(next.diagnostics, root);
         showBlumeErrorOverlay(next.diagnostics);
       } catch (error) {
+        // SAFETY: regeneration failures come from the generator and Astro's
+        // server API, which raise Error instances; only the message is shown.
         logger.error(`Regeneration failed: ${(error as Error).message}`);
       }
     }, 80);

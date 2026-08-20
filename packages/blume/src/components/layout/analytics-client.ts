@@ -19,10 +19,15 @@ interface AnalyticsWindow {
 }
 
 export const track = (event: string, props: TrackProps): void => {
-  if (typeof window === "undefined") {
+  // Read through `globalThis` so an SSR/import-time call sees `undefined`
+  // instead of a bare-identifier ReferenceError.
+  const browserWindow = globalThis.window;
+  if (browserWindow === undefined) {
     return;
   }
-  const w = window as typeof window & AnalyticsWindow;
+  // SAFETY: AnalyticsWindow only adds optional provider globals, so any window
+  // satisfies the intersection; each provider is feature-checked before use.
+  const w = browserWindow as typeof browserWindow & AnalyticsWindow;
 
   // Vercel Web Analytics — self-gates to a no-op until `window.va` is set up.
   vercelTrack(event, props);
@@ -32,7 +37,5 @@ export const track = (event: string, props: TrackProps): void => {
   w.gtag?.("event", event, props);
   w.plausible?.(event, { props });
   // Universal hook for any other integration.
-  window.dispatchEvent(
-    new CustomEvent("blume:track", { detail: { event, props } })
-  );
+  w.dispatchEvent(new CustomEvent("blume:track", { detail: { event, props } }));
 };

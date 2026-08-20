@@ -135,8 +135,12 @@ describe("launchAgent", () => {
     expect(pointer).toMatch(
       /^Read .*prompt\.md and follow its instructions exactly\.$/u
     );
-    const [promptPath] = pointer.slice("Read ".length).split(" and follow");
-    expect(await readFile(promptPath as string, "utf-8")).toBe(prompt);
-    dirs.push(dirname(promptPath as string));
+    // `split` always yields at least one piece, so the default never applies —
+    // it only convinces the type system the path is a string.
+    const [promptPath = ""] = pointer
+      .slice("Read ".length)
+      .split(" and follow");
+    expect(await readFile(promptPath, "utf-8")).toBe(prompt);
+    dirs.push(dirname(promptPath));
   });
 });

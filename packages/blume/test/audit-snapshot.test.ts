@@ -184,6 +184,8 @@ describe("buildSnapshot", () => {
   });
 
   it("carries the source file through from the route manifest", () => {
+    // SAFETY: snap reads only the route's sourcePath; the other manifest
+    // fields never come into play here.
     const route = { sourcePath: "/docs/x.mdx" } as RouteManifestEntry;
     expect(snap(page("<main>x</main>"), route).source).toBe("/docs/x.mdx");
     expect(snap(page("<main>x</main>")).source).toBeUndefined();

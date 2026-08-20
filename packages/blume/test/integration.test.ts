@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import type { IncomingMessage, ServerResponse } from "node:http";
 
 import {
   blumeIntegration,
@@ -7,19 +6,49 @@ import {
 } from "../src/astro/integration.ts";
 import type { Diagnostic } from "../src/core/types.ts";
 
-type MiddlewareStack = { handle: unknown; route: string }[];
-
 interface OverlayPayload {
   err: { id?: string; message: string; plugin: string; stack: string };
   type: string;
 }
 
+/** The request fields the negotiation middleware reads (and the `url` it rewrites). */
+interface DevRequest {
+  headers: { accept?: string };
+  method: string;
+  url: string | undefined;
+}
+
+/** The response surface the middleware touches: header stamping only. */
+interface DevResponse {
+  setHeader: (name: string, value: string) => void;
+}
+
+type MiddlewareHandle = (
+  req: DevRequest,
+  res: DevResponse,
+  next: () => void
+) => void;
+
+type MiddlewareStack = { handle: MiddlewareHandle; route: string }[];
+
+/** The HMR channel a dev-server fixture exposes for the error overlay. */
+interface OverlayChannelStub {
+  send: (payload: OverlayPayload) => void;
+}
+
+interface DevServerStub {
+  hot?: OverlayChannelStub;
+  ws?: OverlayChannelStub;
+}
+
 /** Run `astro:server:setup` and return the resulting middleware stack. */
 const serverSetup = (
   options: Partial<Parameters<typeof blumeIntegration>[0]> = {},
-  server: Record<string, unknown> = {}
+  server: DevServerStub = {}
 ): MiddlewareStack => {
   const stack: MiddlewareStack = [];
+  // SAFETY: the hook only touches `server.middlewares.stack` and the ws/hot
+  // overlay channel, all of which the fixture provides.
   blumeIntegration({
     contentRoutes: [],
     pages: [],
@@ -30,33 +59,37 @@ const serverSetup = (
   return stack;
 };
 
-type MiddlewareHandle = (
-  req: IncomingMessage,
-  res: ServerResponse,
-  next: () => void
-) => void;
+/** The single middleware `astro:server:setup` registered. */
+const handleOf = (stack: MiddlewareStack): MiddlewareHandle =>
+  // SAFETY: the hook unshifts exactly one middleware into the empty fixture
+  // stack, so index 0 is always present.
+  stack[0]?.handle as MiddlewareHandle;
 
 /** The markdown-negotiation handle is the only middleware in the stack. */
 const markdownHandle = (
   contentRoutes: string[],
   base?: string
-): MiddlewareHandle =>
-  serverSetup({ base, contentRoutes })[0]?.handle as MiddlewareHandle;
+): MiddlewareHandle => handleOf(serverSetup({ base, contentRoutes }));
+
+/** Headers a handle stamped on the response. */
+interface CollectedHeaders {
+  [name: string]: string;
+}
 
 /** Run a handle against a bare GET/HEAD request; returns the headers it set. */
 const runHandle = (
   handle: MiddlewareHandle,
-  url: string,
+  url?: string,
   method = "GET"
-): Record<string, string> => {
-  const headers: Record<string, string> = {};
+): CollectedHeaders => {
+  const headers: CollectedHeaders = {};
   handle(
-    { headers: {}, method, url } as unknown as IncomingMessage,
+    { headers: {}, method, url },
     {
       setHeader: (key: string, value: string) => {
         headers[key] = value;
       },
-    } as unknown as ServerResponse,
+    },
     () => {
       // The middleware always chains; nothing to observe here.
     }
@@ -64,9 +97,17 @@ const runHandle = (
   return headers;
 };
 
+/** The route fields `astro:config:setup` injects for a user page. */
+interface InjectedPageRoute {
+  entrypoint: string;
+  pattern: string;
+  prerender: boolean;
+}
+
 describe("blumeIntegration astro:config:setup", () => {
   it("injects each user page route as a prerendered route", () => {
-    const injected: unknown[] = [];
+    const injected: InjectedPageRoute[] = [];
+    // SAFETY: the hook only calls `injectRoute`, which the fixture provides.
     blumeIntegration({
       contentRoutes: [],
       pages: [
@@ -74,7 +115,7 @@ describe("blumeIntegration astro:config:setup", () => {
         { entrypoint: "/abs/example.astro", pattern: "/examples/[slug]" },
       ],
     }).hooks["astro:config:setup"]?.({
-      injectRoute: (route: unknown) => injected.push(route),
+      injectRoute: (route: InjectedPageRoute) => injected.push(route),
     } as never);
 
     expect(injected).toEqual([
@@ -95,12 +136,12 @@ describe("blumeIntegration astro:config:setup", () => {
 describe("blumeIntegration markdown negotiation", () => {
   it("rewrites a content route to its .md variant when markdown is preferred", () => {
     const handle = markdownHandle(["/guide"]);
-    const req = {
+    const req: DevRequest = {
       headers: { accept: "text/markdown" },
       method: "GET",
       url: "/guide",
-    } as unknown as IncomingMessage;
-    const headers: Record<string, string> = {};
+    };
+    const headers: CollectedHeaders = {};
     let nexted = false;
     handle(
       req,
@@ -108,7 +149,7 @@ describe("blumeIntegration markdown negotiation", () => {
         setHeader: (key: string, value: string) => {
           headers[key] = value;
         },
-      } as unknown as ServerResponse,
+      },
       () => {
         nexted = true;
       }
@@ -121,11 +162,11 @@ describe("blumeIntegration markdown negotiation", () => {
 
   it("leaves the request untouched when the path is not a content route", () => {
     const handle = markdownHandle(["/guide"]);
-    const req = {
+    const req: DevRequest = {
       headers: { accept: "text/markdown" },
       method: "GET",
       url: "/not-a-page",
-    } as unknown as IncomingMessage;
+    };
     let headerSet = false;
     let nexted = false;
     handle(
@@ -134,7 +175,7 @@ describe("blumeIntegration markdown negotiation", () => {
         setHeader: () => {
           headerSet = true;
         },
-      } as unknown as ServerResponse,
+      },
       () => {
         nexted = true;
       }
@@ -147,11 +188,11 @@ describe("blumeIntegration markdown negotiation", () => {
 
   it("does not negotiate when the client does not prefer markdown", () => {
     const handle = markdownHandle(["/guide"]);
-    const req = {
+    const req: DevRequest = {
       headers: { accept: "text/html" },
       method: "GET",
       url: "/guide",
-    } as unknown as IncomingMessage;
+    };
     let headerSet = false;
     let nexted = false;
     handle(
@@ -160,7 +201,7 @@ describe("blumeIntegration markdown negotiation", () => {
         setHeader: () => {
           headerSet = true;
         },
-      } as unknown as ServerResponse,
+      },
       () => {
         nexted = true;
       }
@@ -176,8 +217,7 @@ describe("blumeIntegration homepage Link header", () => {
   const LINK = '</llms.txt>; rel="describedby"; type="text/plain"';
 
   const handleWith = (base?: string): MiddlewareHandle =>
-    serverSetup({ base, contentRoutes: ["/"], homeLinkHeader: LINK })[0]
-      ?.handle as MiddlewareHandle;
+    handleOf(serverSetup({ base, contentRoutes: ["/"], homeLinkHeader: LINK }));
 
   it("stamps the Link header on homepage requests only", () => {
     const handle = handleWith();
@@ -199,14 +239,11 @@ describe("blumeIntegration homepage Link header", () => {
     // Node types `IncomingMessage#url` as optional; a url-less request can
     // never be the homepage.
     const handle = handleWith();
-    expect(
-      runHandle(handle, undefined as unknown as string).Link
-    ).toBeUndefined();
+    expect(runHandle(handle).Link).toBeUndefined();
   });
 
   it("sends no Link header when none is configured", () => {
-    const handle = serverSetup({ contentRoutes: ["/"] })[0]
-      ?.handle as MiddlewareHandle;
+    const handle = handleOf(serverSetup({ contentRoutes: ["/"] }));
     expect(runHandle(handle, "/").Link).toBeUndefined();
   });
 });
@@ -218,8 +255,8 @@ describe("showBlumeErrorOverlay", () => {
       {},
       {
         ws: {
-          send: (p: unknown) => {
-            payload = p as OverlayPayload;
+          send: (p) => {
+            payload = p;
           },
         },
       }
@@ -256,8 +293,8 @@ describe("showBlumeErrorOverlay", () => {
       {
         // Vite 6+ exposes the HMR channel as `.hot`; the overlay falls back to it.
         hot: {
-          send: (p: unknown) => {
-            payload = p as OverlayPayload;
+          send: (p) => {
+            payload = p;
           },
         },
       }

@@ -4,6 +4,7 @@ import type {
   AsyncApiOperationObject,
   AsyncApiRefLike,
   AsyncApiServerObject,
+  AsyncApiSpecValue,
 } from "../../openapi/asyncapi.ts";
 import type { ParameterLike, SchemaLike } from "./helpers.ts";
 import { resolveComponentRef } from "./helpers.ts";
@@ -18,22 +19,21 @@ import { resolveComponentRef } from "./helpers.ts";
  */
 
 /** A permissive view of an AsyncAPI message — only the fields we render. */
-export interface AsyncApiMessageLike {
+export interface AsyncApiMessageLike extends AsyncApiRefLike {
   name?: string;
   title?: string;
   summary?: string;
   description?: string;
   contentType?: string;
-  payload?: SchemaLike;
-  headers?: SchemaLike;
+  payload?: AsyncApiSpecValue;
+  headers?: AsyncApiSpecValue;
   examples?: {
     name?: string;
     summary?: string;
-    payload?: unknown;
-    headers?: unknown;
+    payload?: AsyncApiSpecValue;
+    headers?: AsyncApiSpecValue;
   }[];
-  bindings?: Record<string, Record<string, unknown>>;
-  [key: string]: unknown;
+  bindings?: AsyncApiChannelObject["bindings"];
 }
 
 /** A message paired with its channel-map key (the fallback display name). */
@@ -42,8 +42,14 @@ export interface NamedMessage {
   message: AsyncApiMessageLike;
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
+const isObject = (
+  value: AsyncApiSpecValue
+): value is Record<string, AsyncApiSpecValue> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Permissive spec nodes may lie about declared string fields; verify first. */
+const isString = (value: AsyncApiSpecValue): value is string =>
+  typeof value === "string";
 
 /** Decode a JSON-pointer token: `user~1signedup` -> `user/signedup`. */
 const unescapePointer = (token: string): string =>
@@ -52,7 +58,7 @@ const unescapePointer = (token: string): string =>
 const CHANNEL_MESSAGE_REF =
   /^#\/channels\/(?<channel>.+)\/messages\/(?<name>[^/]+)$/u;
 
-type Components = Record<string, Record<string, unknown>> | undefined;
+type Components = AsyncApiDocument["components"];
 
 /** Resolve a channel-map message (possibly a components `$ref`) to its object. */
 const channelMessage = (
@@ -64,9 +70,12 @@ const channelMessage = (
   }
   const resolved = resolveComponentRef(raw, components, "messages");
   // Still a bare `$ref` after resolution means it pointed nowhere useful.
-  return typeof resolved.$ref === "string"
-    ? undefined
-    : (resolved as AsyncApiMessageLike);
+  if (isString(resolved.$ref)) {
+    return undefined;
+  }
+  // SAFETY: `resolved` is a plain message object; the permissive message view
+  // only narrows the fields the components render, all of them optional.
+  return resolved as AsyncApiMessageLike;
 };
 
 /**
@@ -81,12 +90,16 @@ export const operationMessages = (
   document: AsyncApiDocument
 ): NamedMessage[] => {
   const { components } = document;
-  const messageMap = isObject(channel?.messages) ? channel.messages : {};
+  const messageMap: Record<string, AsyncApiRefLike> = isObject(
+    channel?.messages
+  )
+    ? channel.messages
+    : {};
   const refs = operation?.messages;
   if (!Array.isArray(refs) || refs.length === 0) {
     const all: NamedMessage[] = [];
     for (const [key, raw] of Object.entries(messageMap)) {
-      const message = channelMessage(raw as AsyncApiRefLike, components);
+      const message = channelMessage(raw, components);
       if (message) {
         all.push({ key, message });
       }
@@ -98,17 +111,16 @@ export const operationMessages = (
     if (!isObject(ref)) {
       continue;
     }
-    const pointer =
-      typeof ref.$ref === "string"
-        ? CHANNEL_MESSAGE_REF.exec(ref.$ref)?.groups?.name
-        : undefined;
+    const pointer = isString(ref.$ref)
+      ? CHANNEL_MESSAGE_REF.exec(ref.$ref)?.groups?.name
+      : undefined;
     const key = pointer === undefined ? undefined : unescapePointer(pointer);
     // A channel-message pointer resolves through the channel map; anything
     // else (a components ref, an inline message) resolves directly.
     const message =
       key === undefined
         ? channelMessage(ref, components)
-        : channelMessage(messageMap[key] as AsyncApiRefLike, components);
+        : channelMessage(messageMap[key], components);
     if (message) {
       named.push({ key: key ?? message.name ?? "message", message });
     }
@@ -135,11 +147,11 @@ const JSON_SCHEMA_FORMAT =
  * otherwise (an Avro or Protobuf schema can't render as a schema table —
  * callers fall back to a note).
  */
-export const schemaOf = (value: unknown): SchemaLike | undefined => {
+export const schemaOf = (value: AsyncApiSpecValue): SchemaLike | undefined => {
   if (!isObject(value)) {
     return undefined;
   }
-  if (typeof value.schemaFormat === "string" && "schema" in value) {
+  if (isString(value.schemaFormat) && "schema" in value) {
     // Match the media type proper (parameters like `;version=…` stripped)
     // against the JSON-Schema-compatible formats AsyncAPI registers. A
     // substring test would misclassify e.g. Avro's `+json` encoding, whose
@@ -148,10 +160,15 @@ export const schemaOf = (value: unknown): SchemaLike | undefined => {
       .trim()
       .toLowerCase();
     const jsonish = JSON_SCHEMA_FORMAT.test(format);
-    return jsonish && isObject(value.schema)
-      ? (value.schema as SchemaLike)
-      : undefined;
+    if (jsonish && isObject(value.schema)) {
+      // SAFETY: a JSON-Schema-format schema object; the permissive SchemaLike
+      // view only narrows the fields the schema tables render, all optional.
+      return value.schema as SchemaLike;
+    }
+    return undefined;
   }
+  // SAFETY: a bare schema object; the permissive SchemaLike view only narrows
+  // the fields the schema tables render, all of them optional.
   return value as SchemaLike;
 };
 
@@ -159,6 +176,13 @@ export const schemaOf = (value: unknown): SchemaLike | undefined => {
 export const payloadSchema = (
   message: AsyncApiMessageLike
 ): SchemaLike | undefined => schemaOf(message.payload);
+
+/** The channel-parameter fields {@link channelParameters} lowers. */
+interface AsyncApiParameterLike extends AsyncApiRefLike {
+  description?: string;
+  default?: AsyncApiSpecValue;
+  enum?: AsyncApiSpecValue[];
+}
 
 /**
  * Channel parameters lowered into the shared parameter-table shape. AsyncAPI
@@ -170,12 +194,15 @@ export const channelParameters = (
   document: AsyncApiDocument
 ): ParameterLike[] => {
   const parameters: ParameterLike[] = [];
-  for (const [name, raw] of Object.entries(channel?.parameters ?? {})) {
+  const declared: Record<string, AsyncApiRefLike> = channel?.parameters ?? {};
+  for (const [name, raw] of Object.entries(declared)) {
     if (!isObject(raw)) {
       continue;
     }
+    // SAFETY: the permissive parameter view only narrows the fields lowered
+    // below; each one is runtime-checked before use.
     const parameter = resolveComponentRef(
-      raw as AsyncApiRefLike,
+      raw as AsyncApiParameterLike,
       document.components,
       "parameters"
     );
@@ -187,10 +214,9 @@ export const channelParameters = (
       schema.default = parameter.default;
     }
     parameters.push({
-      description:
-        typeof parameter.description === "string"
-          ? parameter.description
-          : undefined,
+      description: isString(parameter.description)
+        ? parameter.description
+        : undefined,
       in: "channel",
       name,
       required: true,
@@ -218,7 +244,7 @@ export const channelServers = (
   const servers: AsyncApiServerObject[] = [];
   for (const ref of refs) {
     const name = SERVER_REF.exec(
-      isObject(ref) && typeof ref.$ref === "string" ? ref.$ref : ""
+      isObject(ref) && isString(ref.$ref) ? ref.$ref : ""
     )?.groups?.name;
     const server = name === undefined ? undefined : all[unescapePointer(name)];
     if (isObject(server)) {
@@ -229,7 +255,7 @@ export const channelServers = (
 };
 
 /** Normalize protocol spellings onto the binding key they document. */
-const PROTOCOL_ALIASES: Record<string, string> = {
+const PROTOCOL_ALIASES = {
   "kafka-secure": "kafka",
   mqtt5: "mqtt",
   mqtts: "mqtt",
@@ -249,12 +275,15 @@ export const protocolOf = (
   const declared =
     Object.keys(operation?.bindings ?? {})[0] ??
     Object.keys(channel?.bindings ?? {})[0] ??
-    servers.find((server) => typeof server.protocol === "string")?.protocol;
-  if (typeof declared !== "string" || declared === "") {
+    servers.find((server) => isString(server.protocol))?.protocol;
+  if (!isString(declared) || declared === "") {
     return undefined;
   }
   const lower = declared.toLowerCase();
-  return PROTOCOL_ALIASES[lower] ?? lower;
+  // SAFETY: guarded by the `in` check, `lower` is one of the alias keys.
+  return lower in PROTOCOL_ALIASES
+    ? PROTOCOL_ALIASES[lower as keyof typeof PROTOCOL_ALIASES]
+    : lower;
 };
 
 /**
@@ -277,7 +306,7 @@ export const asyncApiSecurityEntries = (
       if (!isObject(entry)) {
         continue;
       }
-      if (typeof entry.$ref === "string") {
+      if (isString(entry.$ref)) {
         if (seen.has(entry.$ref)) {
           continue;
         }
@@ -301,7 +330,7 @@ export interface BindingGroup {
  * objects as nested schema tables and everything else as code.
  */
 export const bindingGroups = (
-  bindings?: Record<string, Record<string, unknown>>
+  bindings?: AsyncApiChannelObject["bindings"]
 ): BindingGroup[] => {
   const groups: BindingGroup[] = [];
   for (const [protocol, fields] of Object.entries(bindings ?? {})) {
