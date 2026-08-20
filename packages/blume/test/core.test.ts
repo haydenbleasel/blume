@@ -641,6 +641,37 @@ describe(extractHeadings, () => {
     ]);
   });
 
+  it("strips trailing markers and pins [#custom-id] slugs like the renderer", () => {
+    const body = [
+      "## Install [#setup]",
+      "## Internals [!toc]",
+      "## Examples [toc] [#demos]",
+    ].join("\n");
+    // Marker-stripped text, pinned ids verbatim; [!toc]/[toc] headings stay in
+    // the record — their ids exist on the rendered page, so links to them are
+    // valid anchors regardless of TOC visibility.
+    expect(extractHeadings(body)).toStrictEqual([
+      { depth: 2, slug: "setup", text: "Install" },
+      { depth: 2, slug: "internals", text: "Internals" },
+      { depth: 2, slug: "demos", text: "Examples" },
+    ]);
+  });
+
+  it("does not advance the slugger for a pinned id, like the renderer", () => {
+    const body = ["## Setup [#pin]", "## Setup"].join("\n");
+    expect(extractHeadings(body).map((h) => h.slug)).toStrictEqual([
+      "pin",
+      "setup",
+    ]);
+  });
+
+  it("strips markers from setext headings too", () => {
+    const body = ["Long title [#short]", "===="].join("\n");
+    expect(extractHeadings(body)).toStrictEqual([
+      { depth: 1, slug: "short", text: "Long title" },
+    ]);
+  });
+
   it("skips headings inside <Prompt> — its children render into a hidden node", () => {
     const body = [
       "# Title",

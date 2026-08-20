@@ -6,6 +6,7 @@ import { gfm } from "micromark-extension-gfm";
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
 import matter from "../core/frontmatter.ts";
+import { parseHeadingMarkers } from "../core/heading-markers.ts";
 import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readEntryText } from "../core/sources/read.ts";
@@ -105,6 +106,16 @@ const collectText = (node: Nodes, out: string[]): void => {
     }
     case "break": {
       out.push(" ");
+      return;
+    }
+    // Trailing heading markers (`[#custom-id]`, `[!toc]`, `[toc]`) are anchor
+    // metadata, not prose — strip them so they never pollute the index.
+    case "heading": {
+      const inner: string[] = [];
+      for (const child of node.children) {
+        collectText(child, inner);
+      }
+      out.push(parseHeadingMarkers(inner.join("").trimEnd()).text, " ");
       return;
     }
     default: {

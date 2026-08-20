@@ -77,21 +77,18 @@ const asShikiTransformer = (transformer: { name: string }): ShikiTransformer =>
 /**
  * Hast plugins enabled by config. Inline `` `code`{:lang} `` highlighting is
  * always on: it only fires on an explicit trailing `{:lang}` marker, so plain
- * inline code is untouched and there's nothing to opt out of. Self-linking
- * heading anchors (`<h2>`–`<h6>` wrapped in an `<a>` to their own id) are on
- * unless `markdown.headingAnchors` is `false`. Inline code runs first so the
- * anchor wrap re-refs already-highlighted code.
+ * inline code is untouched and there's nothing to opt out of. The heading
+ * plugin also always runs — it owns heading ids and the trailing markers
+ * (`[#custom-id]`, `[!toc]`, `[toc]`), which must parse regardless of config —
+ * while `markdown.headingAnchors: false` only turns off the self-linking
+ * anchor wrap on `<h2>`–`<h6>`. Inline code runs first so the anchor wrap
+ * re-refs already-highlighted code.
  */
-const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => {
-  const plugins: HastPlugin[] = [
-    asHastPlugin(inlineCodeHighlightPlugin(options.codeThemes)),
-    asHastPlugin(tableWrapPlugin()),
-  ];
-  if (options.headingAnchors !== false) {
-    plugins.push(asHastPlugin(headingAnchorPlugin()));
-  }
-  return plugins;
-};
+const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => [
+  asHastPlugin(inlineCodeHighlightPlugin(options.codeThemes)),
+  asHastPlugin(tableWrapPlugin()),
+  asHastPlugin(headingAnchorPlugin({ wrap: options.headingAnchors !== false })),
+];
 
 /**
  * Shiki transformers enabled by default for every code block. The four upstream

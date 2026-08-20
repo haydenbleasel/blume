@@ -73,6 +73,10 @@ Fumadocs icons are strings resolved by the repo's own `icon` handler in `loader(
 - **No equivalent — report:** `<DynamicCodeBlock>`, `<ImageZoom>` (Blume zooms content images by default), `<InlineTOC>`.
 - **Strip or convert every import** — not just `fumadocs-*`: `lucide-react` imports (icon JSX → string names), `next/image`/`next/link` (→ Markdown image/link), and local components. **Inventory `mdx-components.tsx` before deleting it** — components registered there are used import-free in MDX bodies; port or inline each usage first.
 
+## Headings
+
+Trailing heading markers — `[#custom-id]` (pinned anchor), `[!toc]` (hide from the TOC), `[toc]` (TOC-only entry) — use the same syntax in Blume. **Pass through unchanged.**
+
 ## Code fences
 
 - ` ```npm ` fences (Fumadocs' remark-npm accepts both) → ` ```package-install `.

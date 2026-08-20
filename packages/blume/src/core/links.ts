@@ -143,7 +143,10 @@ const checkAnchor = (
   site: LinkSite,
   ctx: LinkContext
 ): Diagnostic | null => {
-  if (ctx.anchors.get(route)?.has(fragment.toLowerCase())) {
+  const anchors = ctx.anchors.get(route);
+  // Exact first: a `[#custom-id]` pin may contain uppercase, which the
+  // lowercase fallback (lenient matching for slugger-generated ids) would miss.
+  if (anchors?.has(fragment) || anchors?.has(fragment.toLowerCase())) {
     return null;
   }
   return {

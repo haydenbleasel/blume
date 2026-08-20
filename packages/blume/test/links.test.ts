@@ -291,6 +291,25 @@ describe(validateLinks, () => {
     ]);
   });
 
+  it("accepts a case-sensitive [#custom-id] anchor exactly", async () => {
+    const target = makePage({
+      // A pinned id may carry uppercase, which the lowercase-lenient fallback
+      // for slugger-generated ids would miss.
+      headings: [heading("Install", "My-Anchor")],
+      id: "b.mdx",
+      route: "/b",
+    });
+    const diagnostics = await validate([
+      makePage({
+        id: "a.mdx",
+        links: [link("/b#My-Anchor")],
+        route: "/a",
+      }),
+      target,
+    ]);
+    expect(diagnostics).toHaveLength(0);
+  });
+
   it("accepts percent-encoded links to non-ASCII routes and anchors", async () => {
     const target = makePage({
       headings: [heading("Café", "café")],

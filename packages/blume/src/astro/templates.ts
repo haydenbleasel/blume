@@ -1786,7 +1786,15 @@ const entry = await getEntry(collection as CollectionKey, entryId);
 if (!entry) {
   return new Response(null, { status: 404 });
 }
-const { Content, headings } = await render(entry);
+const { Content, headings: allHeadings, remarkPluginFrontmatter } = await render(entry);
+// \`[!toc]\`-marked headings render on the page but stay out of the table of
+// contents; the heading plugin reports their slugs through the render's
+// frontmatter (see markdown/heading-anchors.ts).
+const tocHidden = new Set(remarkPluginFrontmatter?.__blumeTocHidden ?? []);
+const headings =
+  tocHidden.size > 0
+    ? allHeadings.filter((heading) => !tocHidden.has(heading.slug))
+    : allHeadings;
 const frontmatter = entry.data ?? {};
 
 const seo = frontmatter.seo ?? {};

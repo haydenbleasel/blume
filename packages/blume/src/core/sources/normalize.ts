@@ -5,6 +5,7 @@ import { extname } from "pathe";
 
 import { withBasePath } from "../base-path.ts";
 import { diagnosticsFromIssues, diagnosticsFromZod } from "../diagnostics.ts";
+import { parseHeadingMarkers } from "../heading-markers.ts";
 import { localePlacement, localizeRoute } from "../i18n.ts";
 import { pageMetaSchema } from "../schema.ts";
 import type { FrontmatterExtend, PageMeta } from "../schema.ts";
@@ -275,6 +276,24 @@ const finishPromptTag = (
  * collapses `--`; github-slugger keeps it) and resolves repeated headings the
  * same way (`setup`, `setup-1`).
  */
+/**
+ * A heading record from raw heading text: trailing markers stripped, exactly
+ * as the renderer strips them. A `[#custom-id]` pin becomes the slug verbatim
+ * and — matching the renderer, where a pre-existing id never advances the
+ * slugger — leaves auto-slug numbering untouched. `[!toc]`/`[toc]` headings
+ * stay in the record: their ids exist in the rendered page, so links to them
+ * are valid anchors regardless of TOC visibility.
+ */
+const toHeading = (
+  depth: number,
+  raw: string,
+  slugger: GithubSlugger
+): Heading => {
+  const markers = parseHeadingMarkers(raw);
+  const text = markers.text.trim();
+  return { depth, slug: markers.id ?? slugger.slug(text), text };
+};
+
 /** Scan one line for a heading, advancing the fence/paragraph state. */
 const scanHeadingLine = (
   line: string,
@@ -315,8 +334,7 @@ const scanHeadingLine = (
   const atx = line.match(ATX_HEADING);
   if (atx?.groups) {
     const depth = atx.groups.hashes?.length ?? 1;
-    const text = (atx.groups.text ?? "").trim();
-    headings.push({ depth, slug: slugger.slug(text), text });
+    headings.push(toHeading(depth, (atx.groups.text ?? "").trim(), slugger));
     state.paragraph = [];
     return;
   }
@@ -324,12 +342,8 @@ const scanHeadingLine = (
   if (setext?.groups && state.paragraph.length > 0) {
     // Setext wins over thematic break when it closes a paragraph (CommonMark);
     // a multi-line paragraph renders as one heading, soft breaks as spaces.
-    const text = state.paragraph.join(" ").trim();
-    headings.push({
-      depth: setext.groups.marker?.startsWith("=") ? 1 : 2,
-      slug: slugger.slug(text),
-      text,
-    });
+    const depth = setext.groups.marker?.startsWith("=") ? 1 : 2;
+    headings.push(toHeading(depth, state.paragraph.join(" ").trim(), slugger));
     state.paragraph = [];
     return;
   }

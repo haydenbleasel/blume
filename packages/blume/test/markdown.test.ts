@@ -555,6 +555,15 @@ const isString = (value: AnchorNode | string): value is string =>
 const textOf = (node: AnchorNode): string =>
   node.value ?? (node.children ?? []).map((child) => textOf(child)).join("");
 
+/** The text of a visitor's replacement node, or "" when it returned none. */
+const textOfResult = (result: AnchorNode | undefined): string =>
+  result ? textOf(result) : "";
+
+/** The frontmatter slice the heading plugin writes its hidden-TOC list to. */
+interface TestFrontmatter {
+  __blumeTocHidden?: string[];
+}
+
 describe("headingAnchorPlugin", () => {
   /** A hast context whose `setProperty` mutates the node so tests can assert. */
   const makeCtx = (): AnchorContext => ({
@@ -643,6 +652,170 @@ describe("headingAnchorPlugin", () => {
     const result = headingAnchorPlugin().element.visit(node, makeCtx());
     expect(result?.properties?.id).toBe("my-id");
     expect(result?.children?.[0]?.properties?.href).toBe("#my-id");
+  });
+
+  it("pins the anchor to a trailing [#custom-id] and strips the marker", () => {
+    const node = heading("h2", "Getting Started [#setup]");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.properties?.id).toBe("setup");
+    expect(result?.children?.[0]?.properties?.href).toBe("#setup");
+    expect(textOfResult(result)).toBe("Getting Started");
+  });
+
+  it("parses a marker in the trailing text after inline code", () => {
+    const code = {
+      children: [{ type: "text", value: "init" }],
+      tagName: "code",
+      type: "element",
+    };
+    const node = heading("h2", "Run ", code, " now [#run-it]");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.properties?.id).toBe("run-it");
+    expect(textOfResult(result)).toBe("Run init now");
+  });
+
+  it("ignores a marker that is not in a trailing text node", () => {
+    const em = {
+      children: [{ type: "text", value: "Hello [#id]" }],
+      tagName: "em",
+      type: "element",
+    };
+    const node = heading("h2", em);
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    // The bracket text stays prose, and the slug comes from the full text.
+    expect(result?.properties?.id).toBe("hello-id");
+    expect(textOfResult(result)).toBe("Hello [#id]");
+  });
+
+  it("does not advance the slugger for a [#custom-id] heading", () => {
+    const plugin = headingAnchorPlugin();
+    const ctx = makeCtx();
+    const pinned = plugin.element.visit(heading("h2", "Setup [#pin]"), ctx);
+    const auto = plugin.element.visit(heading("h2", "Setup"), ctx);
+    // Matching pre-existing-id semantics: the pin never consumed "setup".
+    expect(pinned?.properties?.id).toBe("pin");
+    expect(auto?.properties?.id).toBe("setup");
+  });
+
+  it("reports [!toc] heading slugs through the render's frontmatter", () => {
+    const ctx = makeCtx();
+    const plugin = headingAnchorPlugin();
+    const visible = plugin.element.visit(
+      heading("h2", "Internals [!toc]"),
+      ctx
+    );
+    plugin.element.visit(heading("h2", "Shown"), ctx);
+    // The heading itself renders normally — only the TOC list drops it.
+    expect(visible?.properties?.id).toBe("internals");
+    expect(visible?.children?.[0]?.properties?.href).toBe("#internals");
+    expect(ctx.data?.astro?.frontmatter?.__blumeTocHidden).toStrictEqual([
+      "internals",
+    ]);
+  });
+
+  it("records a [!toc] heading under its pinned id", () => {
+    const ctx = makeCtx();
+    headingAnchorPlugin().element.visit(
+      heading("h2", "Internals [!toc] [#guts]"),
+      ctx
+    );
+    expect(ctx.data?.astro?.frontmatter?.__blumeTocHidden).toStrictEqual([
+      "guts",
+    ]);
+  });
+
+  it("resets a stale hidden list when the frontmatter object is reused", () => {
+    const frontmatter: TestFrontmatter = {};
+    const ctxFor = (): AnchorContext => ({
+      data: { astro: { frontmatter } },
+      setProperty(node, key, value) {
+        node.properties = { ...node.properties, [key]: value };
+      },
+      textContent: textOf,
+    });
+    const plugin = headingAnchorPlugin();
+    plugin.element.visit(heading("h2", "Internals [!toc]"), ctxFor());
+    expect(frontmatter.__blumeTocHidden).toStrictEqual(["internals"]);
+    // A re-render of the same entry (dev HMR) shares the frontmatter object;
+    // the marker was removed, so the stale slug must not survive.
+    plugin.element.visit(heading("h2", "Internals"), ctxFor());
+    expect(frontmatter.__blumeTocHidden).toStrictEqual([]);
+  });
+
+  it("renders a [toc] heading as a hidden anchor target, never wrapped", () => {
+    const node = heading("h2", "Examples [toc]");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.tagName).toBe("h2");
+    expect(result?.properties?.id).toBe("examples");
+    expect(result?.properties?.className).toStrictEqual(["blume-toc-only"]);
+    expect(result?.children).toStrictEqual([
+      { type: "text", value: "Examples" },
+    ]);
+  });
+
+  it("appends the toc-only class to existing classes", () => {
+    const arrayed = {
+      ...heading("h2", "A [toc]"),
+      properties: { className: ["lead"] },
+    };
+    const fromArray = headingAnchorPlugin().element.visit(arrayed, makeCtx());
+    expect(fromArray?.properties?.className).toStrictEqual([
+      "lead",
+      "blume-toc-only",
+    ]);
+    const stringed = {
+      ...heading("h2", "B [toc]"),
+      properties: { className: "lead" },
+    };
+    const fromString = headingAnchorPlugin().element.visit(stringed, makeCtx());
+    expect(fromString?.properties?.className).toStrictEqual([
+      "lead",
+      "blume-toc-only",
+    ]);
+  });
+
+  it("leaves an already toc-only heading untouched on a re-visit", () => {
+    const ctx = makeCtx();
+    const plugin = headingAnchorPlugin();
+    const first = plugin.element.visit(heading("h2", "Examples [toc]"), ctx);
+    expect(first).toBeDefined();
+    const again = first && plugin.element.visit(first, ctx);
+    expect(again).toBeUndefined();
+    const asString = {
+      ...heading("h3", "String"),
+      properties: { className: "blume-toc-only", id: "s" },
+    };
+    expect(plugin.element.visit(asString, ctx)).toBeUndefined();
+  });
+
+  it("drops the marker text node when the heading is only a marker", () => {
+    const node = heading("h2", "[#bare]");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.properties?.id).toBe("bare");
+    expect(result?.children?.[0]?.children).toStrictEqual([]);
+  });
+
+  it("strips markers and assigns the pinned id even with wrapping off", () => {
+    const node = heading("h2", "Guide [#guide-id]");
+    const result = headingAnchorPlugin({ wrap: false }).element.visit(
+      node,
+      makeCtx()
+    );
+    expect(result?.tagName).toBe("h2");
+    expect(result?.properties?.id).toBe("guide-id");
+    expect(result?.children).toStrictEqual([{ type: "text", value: "Guide" }]);
+    // No anchor wrap: the children are the stripped text directly.
+    expect(textOfResult(result)).toBe("Guide");
+  });
+
+  it("only assigns ids when wrapping is off and no markers are present", () => {
+    const node = heading("h2", "Plain");
+    const result = headingAnchorPlugin({ wrap: false }).element.visit(
+      node,
+      makeCtx()
+    );
+    expect(result).toBeUndefined();
+    expect(node.properties.id).toBe("plain");
   });
 });
 
@@ -805,6 +978,48 @@ describe("markdown processors", () => {
     );
     expect(html).toContain("blume-inline-code");
     expect(html).toContain("blume-heading-anchor");
+  });
+
+  it("carries heading markers through a full .md render", async () => {
+    const renderer = await blumeMarkdownProcessor({}).createRenderer({});
+    const source = [
+      "## Install [#setup]",
+      "",
+      "## Internals [!toc]",
+      "",
+      "## Examples [toc]",
+    ].join("\n");
+    const { code, metadata } = await renderer.render(source);
+    // The pinned id lands on the heading and its self-link; the marker text
+    // never reaches the page.
+    expect(code).toContain('id="setup"');
+    expect(code).toContain('href="#setup"');
+    expect(code).not.toContain("[#setup]");
+    expect(code).not.toContain("[!toc]");
+    // The [toc]-only heading renders as a hidden anchor target, unwrapped.
+    expect(code).toContain("blume-toc-only");
+    expect(code).toContain('id="examples"');
+    // Satteri's TOC metadata adopts the stripped text and pinned slugs; the
+    // [!toc] slug travels via the frontmatter for the template to filter.
+    expect(metadata.headings).toStrictEqual([
+      { depth: 2, slug: "setup", text: "Install" },
+      { depth: 2, slug: "internals", text: "Internals" },
+      { depth: 2, slug: "examples", text: "Examples" },
+    ]);
+    expect(metadata.frontmatter.__blumeTocHidden).toStrictEqual(["internals"]);
+  });
+
+  it("carries heading markers through a full .mdx render", async () => {
+    const renderer = await blumeMdxProcessor({}).createRenderer({});
+    const { code, metadata } = await renderer.render(
+      "## Install [#setup]\n\n## Internals [!toc]"
+    );
+    expect(code).toContain('id="setup"');
+    expect(code).not.toContain("[#setup]");
+    expect(
+      metadata.headings.map((h: { slug: string }) => h.slug)
+    ).toStrictEqual(["setup", "internals"]);
+    expect(metadata.frontmatter.__blumeTocHidden).toStrictEqual(["internals"]);
   });
 });
 
