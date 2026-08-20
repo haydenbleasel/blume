@@ -1,4 +1,4 @@
-import { existsSync, watch as fsWatch } from "node:fs";
+import { existsSync, watch as fsWatch, statSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 
 import { basename, join, relative, resolve } from "pathe";
@@ -571,16 +571,21 @@ export const obsidianSource = (
   };
 
   const validate = (): void => {
-    if (!existsSync(vaultDir)) {
-      throw new BlumeError({
-        code: "BLUME_SOURCE_MISCONFIGURED",
-        file: vaultDir,
-        message: `Source "${options.name}" points at "${options.vault}", which does not exist.`,
-        severity: "error",
-        suggestion:
-          "Set `vault` to your Obsidian vault directory, relative to the project root.",
-      });
+    // `existsSync` alone also accepts a regular file, which `validate` would
+    // wave through and `load` would then fail on with a raw ENOTDIR.
+    const stats = statSync(vaultDir, { throwIfNoEntry: false });
+    if (stats?.isDirectory()) {
+      return;
     }
+    const problem = stats ? "is not a directory" : "does not exist";
+    throw new BlumeError({
+      code: "BLUME_SOURCE_MISCONFIGURED",
+      file: vaultDir,
+      message: `Source "${options.name}" points at "${options.vault}", which ${problem}.`,
+      severity: "error",
+      suggestion:
+        "Set `vault` to your Obsidian vault directory, relative to the project root.",
+    });
   };
 
   // Obsidian rewrites `.obsidian/workspace.json` as you move a pane; unfiltered,

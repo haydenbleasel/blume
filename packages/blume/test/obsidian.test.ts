@@ -417,6 +417,19 @@ describe("obsidianSource", () => {
     expect(diagnostics[1]?.message).toContain("missing heading");
   });
 
+  it("keeps the alias as the label when a link carries both heading and alias", async () => {
+    const root = await makeVault({
+      "Guide.md": "## Install\n\nSteps.\n",
+      "Links.md": "See [[Guide#Install|installation]].\n",
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    const links = entries.find((entry) => entry.ref === "Links.md");
+    // The heading capture stops at `|`, so the alias is the label and the
+    // anchor still resolves.
+    expect(links?.body.text).toContain("[installation](/guide#install)");
+    expect(diagnostics).toEqual([]);
+  });
+
   it("resolves a vault-relative path target, not just a bare note name", async () => {
     const root = await makeVault(BASIC);
     const { entries } = await sourceFor(root).load();
@@ -566,6 +579,15 @@ describe("obsidianSource", () => {
   it("validate() passes for a vault that exists", async () => {
     const root = await makeVault(BASIC);
     expect(() => sourceFor(root).validate?.()).not.toThrow();
+  });
+
+  it("validate() rejects a vault path that names a file", async () => {
+    const root = await makeVault({ "notes.md": "# A file\n" });
+    // `existsSync` is true for a regular file; without a directory check the
+    // failure surfaces later as a raw ENOTDIR from the walk.
+    expect(() => sourceFor(root, { vault: "notes.md" }).validate?.()).toThrow(
+      /is not a directory/u
+    );
   });
 
   it("validate() throws a pointed error naming the vault option", async () => {
