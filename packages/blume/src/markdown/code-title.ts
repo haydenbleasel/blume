@@ -9,6 +9,12 @@
  *   `data-line-numbers`; the theme renders a counter-driven line-number gutter.
  */
 
+import {
+  isLineRange,
+  QUOTED_ATTR,
+  RESERVED_META_KEYWORDS,
+} from "./fence-meta.ts";
+
 /** The slice of Shiki's transformer `this` context Blume reads. */
 interface CodeMetaContext {
   options: { meta?: { __raw?: string } };
@@ -25,27 +31,22 @@ export interface CodeTitleTransformer {
   pre: (this: CodeMetaContext, node: PreNode) => void;
 }
 
-// The body excludes only the delimiting quote, so `title="foo's file.ts"`
-// (an apostrophe inside double quotes) still matches. The left boundary stops
-// `subtitle="..."` (or any `*title=` attr) from reading as a title.
 const TITLE_ATTR = /(?:^|\s)title=(?:"(?<dq>[^"]*)"|'(?<sq>[^']*)')/u;
 const LINE_NUMBERS = /(?:^|\s)lineNumbers(?=\s|$)/u;
-// Any quoted `key="..."` attr — blanked before keyword/bare-token scans so a
-// quoted value can't leak tokens (`title="enable lineNumbers later"`).
-const QUOTED_ATTR = /[\w-]+=(?:"[^"]*"|'[^']*')/gu;
 
+// Quoted attrs are blanked before keyword/bare-token scans so a quoted value
+// can't leak tokens (`title="enable lineNumbers later"`).
 const withoutQuotedAttrs = (raw: string): string =>
   raw.replace(QUOTED_ATTR, " ");
 
 // The first bare token is the title (```ts blume.config.ts): a non-empty token
 // that isn't a Shiki line range (`{1,3-5}`), a `key=value` attr, or a reserved
-// `lineNumbers`/`twoslash`/`ts2js` keyword.
-const isTitleToken = (token: string): boolean => {
-  if (token.length === 0 || token.startsWith("{") || token.includes("=")) {
-    return false;
-  }
-  return token !== "lineNumbers" && token !== "twoslash" && token !== "ts2js";
-};
+// keyword.
+const isTitleToken = (token: string): boolean =>
+  token.length > 0 &&
+  !isLineRange(token) &&
+  !token.includes("=") &&
+  !RESERVED_META_KEYWORDS.has(token);
 
 const parseTitle = (raw: string | undefined): string | undefined => {
   if (!raw) {

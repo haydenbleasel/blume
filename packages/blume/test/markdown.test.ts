@@ -541,8 +541,9 @@ const tabs = (
 ) =>
   jsxFlowElement(
     "Tabs",
-    // hash off so picking a dialect can't clobber the page hash.
-    [jsxAttribute("hash", "false")],
+    // hash off so picking a dialect can't clobber the page hash; a dedicated
+    // sync key so pairs sync with each other but not with authored groups.
+    [jsxAttribute("hash", "false"), jsxAttribute("syncKey", "ts2js")],
     [
       jsxFlowElement(
         "Tab",
@@ -662,10 +663,213 @@ describe("ts2jsPlugin", () => {
     ).toBeUndefined();
   });
 
-  it("leaves twoslash fences alone", () => {
+  it("leaves twoslash fences alone, matching Shiki's raw-meta trigger", () => {
     expect(
       ts2js({ lang: "ts", meta: "ts2js twoslash", value: "const x = 1;" })
     ).toBeUndefined();
+    // Shiki's explicit twoslash trigger matches inside quoted attrs too, so a
+    // fence it will twoslash-render must never be split into tabs.
+    expect(
+      ts2js({
+        lang: "ts",
+        meta: 'ts2js title="the twoslash guide"',
+        value: "const x = 1;",
+      })
+    ).toBeUndefined();
+  });
+
+  it("accepts the long-form typescript language", () => {
+    const result = ts2js({
+      lang: "typescript",
+      meta: "ts2js",
+      value: "const n: number = 1;",
+    });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "typescript", meta: null, value: "const n: number = 1;" },
+        { lang: "js", meta: null, value: "const n = 1;" }
+      )
+    );
+  });
+
+  it("keeps an import the snippet never references in a value position", () => {
+    const value = [
+      'import { defineConfig } from "blume";',
+      "",
+      "const port: number = 3000;",
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          value: [
+            'import { defineConfig } from "blume";',
+            "",
+            "const port = 3000;",
+          ].join("\n"),
+        }
+      )
+    );
+  });
+
+  it("closes the gap an erased type-only import leaves", () => {
+    const value = [
+      'import { a } from "x";',
+      'import type { T } from "y";',
+      'import { b } from "z";',
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          value: ['import { a } from "x";', 'import { b } from "z";'].join(
+            "\n"
+          ),
+        }
+      )
+    );
+  });
+
+  it("drops a notation marker stranded by its erased line", () => {
+    const value = [
+      "const a = 1;",
+      "type A = string; // [!code highlight]",
+      "const b = 2;",
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        { lang: "js", meta: null, value: "const a = 1;\nconst b = 2;" }
+      )
+    );
+  });
+
+  it("drops an own-line notation marker whose target was erased", () => {
+    const value = [
+      "const a = 1;",
+      "// [!code highlight]",
+      "interface X {",
+      "  a: string;",
+      "}",
+      "const b = 2;",
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        { lang: "js", meta: null, value: "const a = 1;\nconst b = 2;" }
+      )
+    );
+  });
+
+  it("keeps notation markers whose lines survive", () => {
+    const value = "const a: number = 1; // [!code highlight]\nconst b = 2;";
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          value: "const a = 1; // [!code highlight]\nconst b = 2;",
+        }
+      )
+    );
+  });
+
+  it("drops a comment stranded by its erased code", () => {
+    const value = "type A = string; // the shape\nconst b = 2;";
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        { lang: "js", meta: null, value: "const b = 2;" }
+      )
+    );
+  });
+
+  it("leaves template literal interiors byte-exact", () => {
+    const value = [
+      "interface Q {",
+      "  x: string;",
+      "}",
+      "const sql = `SELECT *",
+      "",
+      "",
+      "",
+      "FROM users  ",
+      "WHERE x = 1  ;",
+      "`;",
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          // The erased interface at the top is trimmed away; the template's
+          // blank runs and trailing spaces are string content and survive.
+          value: [
+            "const sql = `SELECT *",
+            "",
+            "",
+            "",
+            "FROM users  ",
+            "WHERE x = 1  ;",
+            "`;",
+          ].join("\n"),
+        }
+      )
+    );
+  });
+
+  it("preserves CRLF line endings while collapsing erased runs", () => {
+    const value = [
+      "const a = 1;",
+      "",
+      "interface X {",
+      "  a: string;",
+      "}",
+      "",
+      "const b = 2;",
+    ].join("\r\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          value: ["const a = 1;", "", "const b = 2;"].join("\r\n"),
+        }
+      )
+    );
+  });
+
+  it("degrades to the authored fence when Sucrase fails to load, once", () => {
+    let calls = 0;
+    const plugin = ts2jsPlugin(() => {
+      calls += 1;
+      throw new Error("missing sucrase");
+    });
+    const node = {
+      lang: "ts",
+      meta: "ts2js",
+      type: "code",
+      value: "const n: number = 1;",
+    };
+    expect(captureReplacement((ctx) => plugin.code(node, ctx))).toBeUndefined();
+    expect(captureReplacement((ctx) => plugin.code(node, ctx))).toBeUndefined();
+    // The failed load is cached: later fences don't re-pay the require.
+    expect(calls).toBe(1);
   });
 
   it("keeps a types-only fence as-is instead of emitting an empty tab", () => {

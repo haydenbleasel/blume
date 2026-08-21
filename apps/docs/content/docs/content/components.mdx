@@ -71,6 +71,8 @@ Switch between equivalent content in place — language variants, OS-specific co
 
 Add `inline` to render borderless — a tab strip on a full-width rule with the content flowing beneath as prose — instead of the bordered box. Add `param` to sync the active tab to a URL query param instead of the hash, which makes the selection shareable: a link ending in `?install=windows` opens on the Windows tab. Each group syncs to its own `param`, so you can use several independent, deep-linkable groups on one page.
 
+Groups with same-titled tabs switch together — pick "macOS" in one and every group with a macOS tab follows. Add `syncKey` to scope that syncing: only groups sharing the same key switch together, so unrelated groups that happen to share a tab title stay independent.
+
 <Tabs inline param="install">
   <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
   <Tab title="Windows">Use winget to install the toolchain.</Tab>
