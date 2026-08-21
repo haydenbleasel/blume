@@ -70,9 +70,9 @@ Each source takes the same per-source controls as the [OpenAPI block](/docs/adva
 
 ## Try it playground
 
-Operation pages render an interactive panel: edit the request body (the query and variables), point it at your endpoint or a custom URL, and send — the code samples update live so what you copy is byte-for-byte what was sent. Disable it with `playground: false`.
+Query and mutation pages render an interactive panel: edit the request body (the query and variables), point it at your endpoint or a custom URL, and send — the code samples update live so what you copy is byte-for-byte what was sent. Disable it with `playground: false`. Subscription pages show the generated operation and an example event instead: subscriptions run over a stateful transport (WebSocket or SSE) that the playground's single HTTP `POST` can't speak.
 
-If your GraphQL API doesn't allow cross-origin requests from the docs site, route sends through a CORS proxy — a URL of your own, or `true` for the built-in `/_api-proxy` endpoint (which requires `deployment.output: "server"`). The built-in proxy only forwards to the configured `endpoint`'s origin:
+If your GraphQL API doesn't allow cross-origin requests from the docs site, route sends through a CORS proxy — a URL of your own, or `true` for the built-in `/_api-proxy` endpoint (which requires `deployment.output: "server"`). The built-in proxy only forwards to origins your documented specs declare — each configured GraphQL `endpoint`, plus any absolute `servers[].url` from a documented [OpenAPI spec](/docs/advanced/api-reference) — so a public docs deployment can't be aimed at other hosts. That makes `endpoint` required for a working proxy: without one, the proxy has no origin to allow for this reference and refuses every send (the build warns about this).
 
 ```ts blume.config.ts lineNumbers
 graphql: {

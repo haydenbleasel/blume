@@ -5,9 +5,10 @@ import { isOutputField } from "./graphql-helpers.ts";
 
 /**
  * The row list shared by every GraphQL member table: a type page's fields or
- * input fields, an operation page's arguments, and an enum's values (passed as
- * typeless rows). Types link to their pages via `routes`; a name with no page
- * (a built-in scalar) renders as plain text.
+ * input fields, and an operation page's arguments (enum values render their
+ * own simpler list in `GraphqlType.astro` — they carry no type). Types link
+ * to their pages via `routes`; a name with no page (a built-in scalar)
+ * renders as plain text.
  */
 interface Props {
   title: string;
@@ -17,8 +18,17 @@ interface Props {
 
 const { title, rows, routes } = Astro.props;
 
-/** Whether a type expression is non-null at the top level (required-ish). */
-const isRequired = (display: string): boolean => display.endsWith("!");
+/**
+ * Whether a value must be supplied by the caller: an argument or input field
+ * in a non-null position with no default. Output fields never take the badge
+ * — a response field isn't something the reader provides, and its `!` already
+ * shows in the type display — and a defaulted non-null argument is omittable
+ * per the GraphQL spec.
+ */
+const isRequired = (row: GraphqlFieldRow): boolean =>
+  !isOutputField(row) &&
+  row.type.display.endsWith("!") &&
+  row.default === undefined;
 ---
 
 {
@@ -53,7 +63,7 @@ const isRequired = (display: string): boolean => display.endsWith("!");
                     {row.type.display}
                   </span>
                 )}
-                {isRequired(row.type.display) && (
+                {isRequired(row) && (
                   <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
                     required
                   </span>

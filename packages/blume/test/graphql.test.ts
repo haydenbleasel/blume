@@ -13,6 +13,7 @@ import {
   exampleResponse,
   exampleVariables,
   GRAPHQL_ENDPOINT_PLACEHOLDER,
+  graphqlOperationRoutes,
   graphqlPlaygroundModel,
   graphqlRoutes,
   graphqlUsage,
@@ -618,6 +619,18 @@ describe("render-mdx (graphql)", () => {
       "AddPetInput input object type"
     );
   });
+
+  it("keeps kind badges off type pages and internal tokens out of search", () => {
+    // A type page's kind already heads its sidebar group ("Objects"), so an
+    // `OBJECT` badge would only repeat it — and the uppercased member kind is
+    // an internal token that must not leak into search tags on any GraphQL
+    // page.
+    const operation = operationMdx(spec, refFor(spec, "pets"));
+    expect(operation.data.search?.tags).toStrictEqual(["Queries"]);
+    const page = operationMdx(spec, refFor(spec, "pet-object"));
+    expect(page.data.sidebar).toStrictEqual({ label: "Pet" });
+    expect(page.data.search?.tags).toStrictEqual(["Objects"]);
+  });
 });
 
 describe("graphql-helpers", () => {
@@ -640,6 +653,19 @@ describe("graphql-helpers", () => {
     // the depth bound, and Pet.tags never appears (required argument).
     const owner = selections?.find((s) => s.name === "owner");
     expect(owner?.children?.map((s) => s.name)).toStrictEqual(["id", "name"]);
+  });
+
+  it("keeps fields whose required arguments carry defaults", () => {
+    // `size: Int! = 128` is omittable per the GraphQL spec — only a non-null
+    // argument with no default forces the field out of the example selection.
+    const doc = buildGraphqlDocument(
+      `type Query { pet: Pet }
+       type Pet { id: ID, photo(size: Int! = 128): String, tag(first: Int!): String }`
+    );
+    expect(selectionSet(doc, "Pet")?.map((s) => s.name)).toStrictEqual([
+      "id",
+      "photo",
+    ]);
   });
 
   it("selects __typename for unions and empty composites", () => {
@@ -698,6 +724,61 @@ describe("graphql-helpers", () => {
     });
     const legacy = graphqlRootField(document, refFor(spec, "legacy"));
     expect(exampleVariables(document, legacy ?? pets)).toBeUndefined();
+  });
+
+  it("samples non-null custom scalars and exhausted inputs as placeholders", () => {
+    // `null` would be rejected by any real server for `Date!` — the sample
+    // falls back to a placeholder string; a nullable position stays null, and
+    // so does the element of `[Date]!`, whose non-null wraps the list.
+    const doc = buildGraphqlDocument(
+      `type Query { byDate(when: Date!, maybe: Date, days: [Date!]!, sparse: [Date]!): String }
+       scalar Date`
+    );
+    const byDate = graphqlRootField(doc, {
+      ...refFor(spec, "pets"),
+      operationId: "byDate",
+    });
+    if (!byDate) {
+      throw new Error("fixture field missing");
+    }
+    expect(exampleVariables(doc, byDate)).toStrictEqual({
+      days: ["string"],
+      maybe: null,
+      sparse: [null],
+      when: "string",
+    });
+    // A required input nested past the depth bound samples as an empty
+    // object, not an invalid null.
+    const deep = buildGraphqlDocument(
+      `type Query { go(a: A!): String }
+       input A { b: B! } input B { c: C! } input C { d: D! } input D { x: Int }`
+    );
+    const go = graphqlRootField(deep, {
+      ...refFor(spec, "pets"),
+      operationId: "go",
+    });
+    if (!go) {
+      throw new Error("fixture field missing");
+    }
+    expect(exampleVariables(deep, go)).toStrictEqual({
+      a: { b: { c: { d: {} } } },
+    });
+  });
+
+  it("wraps nested lists to their full depth", () => {
+    const doc = buildGraphqlDocument(
+      "type Query { grid: [[Cell]] } type Cell { id: ID }"
+    );
+    const grid = graphqlRootField(doc, {
+      ...refFor(spec, "pets"),
+      operationId: "grid",
+    });
+    if (!grid) {
+      throw new Error("fixture field missing");
+    }
+    expect(exampleResponse(doc, grid)).toStrictEqual({
+      data: { grid: [[{ id: "id" }]] },
+    });
   });
 
   it("mirrors the selection set in the example response", () => {
@@ -778,6 +859,29 @@ describe("graphql-helpers", () => {
     expect(routes.get("String")).toBeUndefined();
   });
 
+  it("maps operation pages by kind and field, memoized per spec", () => {
+    const operations = graphqlOperationRoutes(spec);
+    expect(operations.get("query:pets")).toBe("/graphql/queries/pets");
+    expect(operations.get("mutation:addPet")).toBe("/graphql/mutations/addpet");
+    expect(operations.get("pets")).toBeUndefined();
+    // Both lookups derive from one walk of the spec, cached on the spec
+    // object — page renders must not recompute them.
+    expect(graphqlOperationRoutes(spec)).toBe(operations);
+    expect(graphqlRoutes(spec)).toBe(graphqlRoutes(spec));
+    // A ref with no operationId (possible on the shared ref shape) maps to
+    // neither table.
+    const anonymous = specData();
+    anonymous.operations.anon = {
+      ...refFor(anonymous, "pets"),
+      key: "anon",
+      operationId: undefined,
+    };
+    expect(graphqlOperationRoutes(anonymous).get("query:pets")).toBe(
+      "/graphql/queries/pets"
+    );
+    expect(graphqlOperationRoutes(anonymous).has("query:anon")).toBe(false);
+  });
+
   it("computes usage backlinks", () => {
     const usage = graphqlUsage(document, "Pet");
     expect(usage.operations).toStrictEqual([
@@ -795,6 +899,12 @@ describe("graphql-helpers", () => {
     expect(statusUsage.types).toContain("PetFilter");
     expect(statusUsage.types).toContain("AddPetInput");
     expect(statusUsage.types).not.toContain("PetStatus");
+    // A name nothing references (or that isn't a type at all) backlinks
+    // nothing rather than throwing.
+    expect(graphqlUsage(document, "Unreferenced")).toStrictEqual({
+      operations: [],
+      types: [],
+    });
   });
 
   it("narrows table rows to output fields", () => {

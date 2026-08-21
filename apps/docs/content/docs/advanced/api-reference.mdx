@@ -225,7 +225,7 @@ asyncapi: {
 ```
 
 :::note
-`playground.proxy` is OpenAPI-only. It forwards HTTP requests, and a WebSocket connect goes straight from the browser to the server named in the URL, so there's nothing for a proxy to sit in front of.
+`playground.proxy` doesn't apply to event operations. It forwards HTTP requests, and a WebSocket connect goes straight from the browser to the server named in the URL, so there's nothing for a proxy to sit in front of.
 :::
 
 The event composer collects no broker credentials. Each operation page's **Authorization** section documents what the broker expects, and a WebSocket connect carries only what's already in the URL. Nothing is persisted for event operations.

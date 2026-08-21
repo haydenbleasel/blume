@@ -347,7 +347,9 @@ describe("generateRuntime playground proxy endpoint", () => {
   it("allowlists a GraphQL endpoint's origin for the built-in proxy", async () => {
     // A GraphQL schema names no servers, so its configured live endpoint is
     // the origin the proxy must allow; a non-absolute endpoint contributes
-    // nothing rather than a junk allowlist entry.
+    // nothing rather than a junk allowlist entry — and because each spec's
+    // playground only ever targets its own endpoint, that source is warned
+    // about individually even though the pooled allowlist is non-empty.
     const root = await mkdtemp(join(tmpdir(), "blume-playground-gen-"));
     projectDirs.push(root);
     await writeFile(
@@ -379,8 +381,11 @@ describe("generateRuntime playground proxy endpoint", () => {
     expect(await readFile(endpoint, "utf-8")).toContain(
       'createPlaygroundProxyHandler(["https://gql.example.com"])'
     );
-    expect(
-      warnings.filter((warning) => warning.includes("playground.proxy"))
-    ).toStrictEqual([]);
+    const proxyWarnings = warnings.filter((warning) =>
+      warning.includes("playground.proxy")
+    );
+    expect(proxyWarnings).toHaveLength(1);
+    expect(proxyWarnings[0]).toContain("(/alt)");
+    expect(proxyWarnings[0]).toContain("refuse every request");
   }, 30_000);
 });

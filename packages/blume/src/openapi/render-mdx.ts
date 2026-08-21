@@ -5,6 +5,7 @@ import stringWidth from "string-width";
 
 import { columnsPrefix } from "../core/text-width.ts";
 import type { GraphqlMember } from "./graphql.ts";
+import { isGraphqlOperationKind } from "./graphql.ts";
 import type { ApiOperationRef, ApiSpecData } from "./model.ts";
 import type { ReferenceSource } from "./references.ts";
 
@@ -213,10 +214,12 @@ export const operationMdx = (
   >
 ): RenderedPage => {
   const method = operation.method.toUpperCase();
+  const graphql = spec.kind === "graphql";
   // A GraphQL page IS its field/type — `QUERY pets` would double the badge the
   // page already renders; the other kinds title an endpoint or channel action.
-  const fallbackTitle =
-    spec.kind === "graphql" ? operation.path : `${method} ${operation.path}`;
+  const fallbackTitle = graphql
+    ? operation.path
+    : `${method} ${operation.path}`;
   const title = operation.summary || fallbackTitle;
   // Skip the body description when it only repeats the summary (the `<h1>`) —
   // common in specs that set summary and description to the same string.
@@ -244,6 +247,18 @@ export const operationMdx = (
   if (reference?.noindex) {
     seo.noindex = true;
   }
+  const sidebar: RenderedPageData["sidebar"] = {
+    label: operation.summary || operation.path,
+  };
+  // GraphQL operation kinds badge like HTTP methods, but a type page's kind
+  // already heads its sidebar group ("Objects", "Enums", …) — an `OBJECT`
+  // badge on every row would only repeat it, so type pages get none. The
+  // uppercased method is likewise an internal token on GraphQL pages, so
+  // their search tags carry only the group name.
+  if (!graphql || isGraphqlOperationKind(operation.method)) {
+    sidebar.badge = method;
+  }
+  const tags = graphql ? [operation.tag] : [operation.tag, method];
   return {
     body: withDescription(
       description,
@@ -251,9 +266,9 @@ export const operationMdx = (
     ),
     data: {
       ...flags,
-      search: { ...searchFlags, tags: [operation.tag, method] },
+      search: { ...searchFlags, tags },
       seo,
-      sidebar: { badge: method, label: operation.summary || operation.path },
+      sidebar,
       title,
       // Signals the two-column API layout (request panel instead of the TOC).
       type: "openapi-operation",

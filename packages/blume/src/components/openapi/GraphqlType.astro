@@ -3,7 +3,11 @@ import type { GraphqlDocument } from "../../openapi/graphql.ts";
 import { graphqlTypeDef } from "../../openapi/graphql.ts";
 import type { ApiOperationRef, ApiSpecData } from "../../openapi/model.ts";
 import { withBase } from "../islands/base-path.ts";
-import { graphqlRoutes, graphqlUsage } from "./graphql-helpers.ts";
+import {
+  graphqlOperationRoutes,
+  graphqlRoutes,
+  graphqlUsage,
+} from "./graphql-helpers.ts";
 import GraphqlFieldsTable from "./GraphqlFieldsTable.astro";
 import MethodBadge from "./MethodBadge.astro";
 
@@ -35,12 +39,7 @@ const chips = (names: string[]): { name: string; route?: string }[] =>
   });
 
 const usage = type ? graphqlUsage(document, type.name) : { operations: [], types: [] };
-const operationRoutes = new Map(
-  Object.values(spec.operations).map((operation) => [
-    `${operation.method}:${operation.operationId ?? ""}`,
-    operation.route,
-  ])
-);
+const operationRoutes = graphqlOperationRoutes(spec);
 const usageOperations = usage.operations.map((operation) => {
   const linked: { label: string; kind: string; route?: string } = {
     kind: operation.kind,

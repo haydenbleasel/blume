@@ -329,17 +329,37 @@ export const hasScalarReferences = (config: ResolvedConfig): boolean =>
   resolveReferences(config).some((ref) => ref.renderer === "scalar");
 
 /**
- * Whether the built-in playground CORS proxy endpoint (`/_api-proxy`) must be
- * generated: some enabled Blume-rendered block's playground opted into it with
- * `proxy: true`. A proxy URL string points at an external service, and `false`
- * sends requests directly — neither needs the endpoint. Shared by the server
- * feature gate and the generator so the two can never disagree.
+ * The reference kinds whose enabled, Blume-rendered playground opted into the
+ * built-in CORS proxy with `proxy: true`. A proxy URL string points at an
+ * external service, and `false` sends requests directly — neither routes
+ * through the endpoint. The generator's per-spec allowlist diagnostics key on
+ * this, so it shares one definition with {@link needsPlaygroundProxy}.
  */
-export const needsPlaygroundProxy = (config: ResolvedConfig): boolean =>
-  (config.openapi.enabled &&
+export const builtinProxyKinds = (config: ResolvedConfig): ReferenceKind[] => {
+  const kinds: ReferenceKind[] = [];
+  if (
+    config.openapi.enabled &&
     config.openapi.renderer === "blume" &&
     config.openapi.playground.enabled &&
-    config.openapi.playground.proxy === true) ||
-  (config.graphql.enabled &&
+    config.openapi.playground.proxy === true
+  ) {
+    kinds.push("openapi");
+  }
+  if (
+    config.graphql.enabled &&
     config.graphql.playground.enabled &&
-    config.graphql.playground.proxy === true);
+    config.graphql.playground.proxy === true
+  ) {
+    kinds.push("graphql");
+  }
+  return kinds;
+};
+
+/**
+ * Whether the built-in playground CORS proxy endpoint (`/_api-proxy`) must be
+ * generated: some enabled Blume-rendered block's playground opted into it with
+ * `proxy: true`. Shared by the server feature gate and the generator so the
+ * two can never disagree.
+ */
+export const needsPlaygroundProxy = (config: ResolvedConfig): boolean =>
+  builtinProxyKinds(config).length > 0;

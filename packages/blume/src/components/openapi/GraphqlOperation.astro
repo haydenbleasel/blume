@@ -33,7 +33,9 @@ import Playground from "./Playground.astro";
  * type, a generated example query, live code samples, and the "Try it"
  * playground (the OpenAPI panel reused verbatim: a GraphQL call is a plain
  * POST whose JSON body carries the query and variables) — while named types
- * defer to `GraphqlType.astro`.
+ * defer to `GraphqlType.astro`. Subscriptions are the exception: they don't
+ * run over a plain POST, so their pages show the generated operation instead
+ * of the playground and HTTP samples.
  */
 interface Props {
   source: string;
@@ -53,32 +55,52 @@ const query =
     ? exampleQuery(document, field, ref.method as GraphqlOperationKind)
     : "";
 const variables = field ? exampleVariables(document, field) : undefined;
+// Subscriptions run over a stateful transport (WebSocket/SSE) that a standard
+// GraphQL server does not serve from a single-response POST — so, like
+// AsyncAPI's streaming operations, their pages get no playground and no HTTP
+// code samples; the generated operation itself is shown instead.
+const isSubscription = ref?.method === "subscription";
 const model =
-  spec && field ? graphqlPlaygroundModel(spec, query, variables) : null;
+  spec && field && !isSubscription
+    ? graphqlPlaygroundModel(spec, query, variables)
+    : null;
 const sample = model ? buildRequest(model, defaultValues(model)) : null;
 const languages = sampleLanguages(spec?.codeSamples ?? []);
 
+const highlight = (code: string, lang: string) =>
+  highlightCode(code, lang, { icons: false, themes: data.config.codeThemes });
 const requestPanels = sample
   ? await Promise.all(
       languages.map(async (language) => ({
-        html: await highlightCode(language.build(sample), language.lang, {
-          icons: false,
-          themes: data.config.codeThemes,
-        }),
+        html: await highlight(language.build(sample), language.lang),
         key: language.id,
         label: language.label,
         lang: language.id,
       }))
     )
   : [];
+const operationPanels =
+  field && isSubscription
+    ? [
+        { html: await highlight(query, "graphql"), key: "operation", label: "Operation" },
+        ...(variables
+          ? [
+              {
+                html: await highlight(JSON.stringify(variables, null, 2), "json"),
+                key: "variables",
+                label: "Variables",
+              },
+            ]
+          : []),
+      ]
+    : [];
 const responsePanels =
   field && spec
     ? [
         {
-          html: await highlightCode(
+          html: await highlight(
             JSON.stringify(exampleResponse(document, field), null, 2),
-            "json",
-            { icons: false, themes: data.config.codeThemes }
+            "json"
           ),
           key: "example",
           label: "Example",
@@ -149,9 +171,9 @@ const returnRoute = field ? routes.get(field.type.name) : undefined;
             )}
           </section>
         </div>
-        {sample && model && (
+        {((sample && model) || isSubscription) && (
           <div class="xl:sticky xl:top-24 xl:self-start" data-operation-panel>
-            {spec.playground.enabled && (
+            {sample && model && spec.playground.enabled && (
               <Playground
                 model={model}
                 operation={id}
@@ -160,7 +182,11 @@ const returnRoute = field ? routes.get(field.type.name) : undefined;
               />
             )}
             <div class="not-prose flex flex-col gap-6">
-              <PanelTabs copy heading="Request" panels={requestPanels} />
+              {isSubscription ? (
+                <PanelTabs copy heading="Operation" panels={operationPanels} />
+              ) : (
+                <PanelTabs copy heading="Request" panels={requestPanels} />
+              )}
               <PanelTabs heading="Response" panels={responsePanels} />
             </div>
           </div>

@@ -50,8 +50,9 @@ import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import { missingFontFiles, resolveOgFonts } from "../og/derive.ts";
 import type { DerivedOgFonts } from "../og/derive.ts";
 import { resolveOgLogo } from "../og/logo.ts";
-import type { OpenApiData } from "../openapi/model.ts";
+import type { ApiSpecData, OpenApiData } from "../openapi/model.ts";
 import {
+  builtinProxyKinds,
   hasScalarReferences,
   needsPlaygroundProxy,
   referenceRoutes,
@@ -1438,55 +1439,68 @@ const planPlaygroundProxy = (config: ResolvedConfig, srcDir: string) => ({
  * origin to allow and are skipped; AsyncAPI documents declare `servers` as a
  * map and contribute nothing (the proxy is OpenAPI-only).
  */
-const specOrigins = (data: OpenApiData): string[] => {
+const specOriginsOf = (spec: ApiSpecData): string[] => {
   const origins = new Set<string>();
-  for (const spec of Object.values(data)) {
-    // A GraphQL schema names no servers; its configured live endpoint is the
-    // one origin the playground targets.
-    if (spec.endpoint !== undefined) {
-      try {
-        origins.add(new URL(spec.endpoint).origin);
-      } catch {
-        // Not an absolute URL: nothing to allow.
-      }
-    }
-    // SAFETY: `document` is arbitrary parsed JSON; the assertion only names
-    // the optional `servers` shape, and every access below re-checks it —
-    // `Array.isArray(servers)` guards the list and `server.url ?? ""` the url.
-    const { servers } = spec.document as { servers?: { url?: string }[] };
-    for (const server of Array.isArray(servers) ? servers : []) {
-      const url = server.url ?? "";
-      // `new URL("https://{region}.api.example.com")` parses — the braces land
-      // in the hostname — so templated URLs need an explicit check or their
-      // junk literal becomes an allowlist entry no real request can match.
-      if (url.includes("{")) {
-        continue;
-      }
-      try {
-        origins.add(new URL(url).origin);
-      } catch {
-        // Not an absolute URL: nothing to allow.
-      }
+  // A GraphQL schema names no servers; its configured live endpoint is the
+  // one origin the playground targets.
+  if (spec.endpoint !== undefined) {
+    try {
+      origins.add(new URL(spec.endpoint).origin);
+    } catch {
+      // Not an absolute URL: nothing to allow.
     }
   }
-  return [...origins].toSorted();
+  // SAFETY: `document` is arbitrary parsed JSON; the assertion only names
+  // the optional `servers` shape, and every access below re-checks it —
+  // `Array.isArray(servers)` guards the list and `server.url ?? ""` the url.
+  const { servers } = spec.document as { servers?: { url?: string }[] };
+  for (const server of Array.isArray(servers) ? servers : []) {
+    const url = server.url ?? "";
+    // `new URL("https://{region}.api.example.com")` parses — the braces land
+    // in the hostname — so templated URLs need an explicit check or their
+    // junk literal becomes an allowlist entry no real request can match.
+    if (url.includes("{")) {
+      continue;
+    }
+    try {
+      origins.add(new URL(url).origin);
+    } catch {
+      // Not an absolute URL: nothing to allow.
+    }
+  }
+  return [...origins];
 };
 
+const specOrigins = (data: OpenApiData): string[] =>
+  [...new Set(Object.values(data).flatMap(specOriginsOf))].toSorted();
+
 /**
- * The build-time diagnostic for a proxy whose allowlist came out empty. The
- * allowlist comes solely from absolute `servers[].url` entries — relative and
- * templated ones carry no origin — and with none at all the endpoint would
- * 403 every playground send with nothing pointing the author at the spec.
+ * Build-time diagnostics for playground sends the built-in proxy would refuse.
+ * The baked-in allowlist pools every documented origin, but each spec's
+ * playground only ever targets that spec's own servers/endpoint — so a
+ * non-empty pool can still leave one spec's Send 403ing on every request.
+ * Hence the check is per spec: any spec routed through the built-in proxy
+ * whose own origins came out empty (no absolute `servers[].url`, no absolute
+ * GraphQL `endpoint`) gets a warning naming it.
  */
 const proxyAllowlistWarnings = (
-  enabled: boolean,
-  origins: string[]
-): string[] =>
-  enabled && origins.length === 0
-    ? [
-        "The playground proxy is enabled, but no OpenAPI spec declares an absolute servers[].url (relative and templated URLs carry no origin) and no GraphQL source sets an endpoint, so the proxy's allowlist is empty and it will refuse every request. Add an absolute server URL to the spec (or an `endpoint` to the graphql block), or point playground.proxy at an external proxy URL.",
-      ]
-    : [];
+  config: ResolvedConfig,
+  data: OpenApiData
+): string[] => {
+  const kinds = builtinProxyKinds(config);
+  const warnings: string[] = [];
+  for (const spec of Object.values(data)) {
+    if (!kinds.includes(spec.kind) || specOriginsOf(spec).length > 0) {
+      continue;
+    }
+    warnings.push(
+      spec.kind === "graphql"
+        ? `The "${spec.label}" GraphQL reference (${spec.route}) has playground.proxy: true, but no absolute endpoint is configured for it, so the built-in proxy has no origin to allow and will refuse every request its playground sends. Set the graphql block's (or the source's) \`endpoint\` to the live GraphQL URL, or point playground.proxy at an external proxy URL.`
+        : `The "${spec.label}" reference (${spec.route}) has playground.proxy: true, but its spec declares no absolute servers[].url (relative and templated URLs carry no origin), so the built-in proxy has no origin to allow and will refuse every request its playground sends. Add an absolute server URL to the spec, or point playground.proxy at an external proxy URL.`
+    );
+  }
+  return warnings;
+};
 
 /**
  * Write the Ask AI endpoint and, unless the backend runs its own retrieval
@@ -1733,8 +1747,9 @@ export const generateRuntime = async (
       pattern: playgroundProxy.pattern,
     });
   }
-  // Computed once: the endpoint template bakes it in below, and an empty list
-  // is worth a diagnostic — the proxy would refuse every request it gets.
+  // Computed once: the endpoint template bakes it in below. A spec that
+  // contributes no origin of its own gets a per-spec diagnostic
+  // (`proxyAllowlistWarnings`) — the proxy would refuse its every send.
   const proxyOrigins = specOrigins(openApiData);
 
   const hasStaged = staged.size > 0;
@@ -1995,7 +2010,7 @@ export const generateRuntime = async (
   // regenerated each run.
   const warnings: string[] = [
     ...(depsLinkWarning ? [depsLinkWarning] : []),
-    ...proxyAllowlistWarnings(playgroundProxy.enabled, proxyOrigins),
+    ...proxyAllowlistWarnings(config, openApiData),
     ...reactCompilerWarnings(config, needsReact, reactCompilerPath),
     ...mcp.warnings,
     ...islandDiscovery.warnings,
