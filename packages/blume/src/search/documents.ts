@@ -80,7 +80,7 @@ const INLINE_PARENTS = new Set([
 ]);
 
 interface PlainTextOptions {
-  includeFencedCodeBlocks?: boolean;
+  includeCodeBlocks?: boolean;
 }
 
 /** Fold one mdast node into the plain-text accumulator. */
@@ -90,10 +90,10 @@ const collectText = (
   options: PlainTextOptions
 ): void => {
   switch (node.type) {
-    // Fenced code is excluded from the plain index by default (ranking noise),
+    // Code blocks are excluded from the plain index by default (ranking noise),
     // but code-heavy docs can opt in without indexing Markdown markup too.
     case "code": {
-      if (options.includeFencedCodeBlocks) {
+      if (options.includeCodeBlocks) {
         out.push(node.value, " ");
       }
       return;
@@ -164,13 +164,13 @@ const extractSearchContent = (
   markdown: string,
   options?: {
     content?: SearchContentMode;
-    includeFencedCodeBlocks?: boolean;
+    includeCodeBlocks?: boolean;
   }
 ): string =>
   options?.content === "markdown"
     ? markdown.trim()
     : toPlainText(markdown, {
-        includeFencedCodeBlocks: options?.includeFencedCodeBlocks ?? false,
+        includeCodeBlocks: options?.includeCodeBlocks ?? false,
       });
 
 interface Crumbs {
@@ -243,7 +243,7 @@ export const buildSearchDocuments = async (
   options?: {
     includeWhenDisabled?: boolean;
     content?: SearchContentMode;
-    includeFencedCodeBlocks?: boolean;
+    includeCodeBlocks?: boolean;
     audience?: VisibilityAudience;
   }
 ): Promise<SearchDocument[]> => {

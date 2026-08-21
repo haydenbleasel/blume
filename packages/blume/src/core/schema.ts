@@ -693,7 +693,7 @@ const searchConfigSchema = z
     algolia: algoliaSearchSchema.optional(),
     indexing: z
       .strictObject({
-        includeFencedCodeBlocks: z.boolean().default(false),
+        includeCodeBlocks: z.boolean().default(false),
         includeHiddenPages: z.boolean().default(false),
       })
       .prefault({}),

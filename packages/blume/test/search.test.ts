@@ -225,7 +225,7 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("inlineCode");
     // Angle-bracket type params inside inline code survive the HTML strip.
     expect(doc?.content).toContain("Item");
-    // Fenced code blocks are removed entirely.
+    // Code blocks are removed entirely.
     expect(doc?.content).not.toContain("secret");
     expect(doc?.content).not.toContain("#");
     // A bare `<` in prose is not a tag opener: the HTML strip must not swallow
@@ -268,10 +268,10 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("# Heading");
   });
 
-  it("can include fenced code in the plain text index", async () => {
+  it("can include code blocks in the plain text index", async () => {
     const [doc] = await buildSearchDocuments(
       projectWith([page({ description: "Desc A", id: "a.md" })], [route({})]),
-      { includeFencedCodeBlocks: true }
+      { includeCodeBlocks: true }
     );
     expect(doc?.content).toContain("const secret = 1;");
     expect(doc?.content).not.toContain("```js");
