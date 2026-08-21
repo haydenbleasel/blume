@@ -34,6 +34,7 @@ import { satteriCollectHastText } from "@astrojs/markdown-satteri";
 import GithubSlugger from "github-slugger";
 
 import {
+  occupySlug,
   parseHeadingMarkers,
   TOC_HIDDEN_KEY,
 } from "../core/heading-markers.ts";
@@ -158,6 +159,14 @@ const stripMarkers = (node: HastNode): StrippedHeading => {
     markers.text === ""
       ? children.slice(0, -1)
       : [...children.slice(0, -1), { ...last, value: markers.text }];
+  // A heading that is nothing but markers (`## [toc]`) keeps them as literal
+  // text: with no heading text left there is nothing to annotate, and
+  // stripping would leave an invisible empty element with an empty id and a
+  // blank TOC entry. The scan-time scanner and the search extractor mirror
+  // this rule.
+  if (kept.length === 0) {
+    return none;
+  }
   return {
     children: kept,
     id: markers.id,
@@ -174,6 +183,9 @@ const slugFor = (
   stripped: StrippedHeading
 ): string => {
   if (stripped.id !== undefined) {
+    // Pinning occupies the id, so a later heading whose auto-slug collides
+    // disambiguates (`setup` → `setup-1`) instead of duplicating the anchor.
+    occupySlug(slugger, stripped.id);
     return stripped.id;
   }
   const existingId = node.properties?.id;

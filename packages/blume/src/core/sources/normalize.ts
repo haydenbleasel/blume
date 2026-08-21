@@ -5,7 +5,7 @@ import { extname } from "pathe";
 
 import { withBasePath } from "../base-path.ts";
 import { diagnosticsFromIssues, diagnosticsFromZod } from "../diagnostics.ts";
-import { parseHeadingMarkers } from "../heading-markers.ts";
+import { occupySlug, parseHeadingMarkers } from "../heading-markers.ts";
 import { localePlacement, localizeRoute } from "../i18n.ts";
 import { pageMetaSchema } from "../schema.ts";
 import type { FrontmatterExtend, PageMeta } from "../schema.ts";
@@ -279,10 +279,12 @@ const finishPromptTag = (
 /**
  * A heading record from raw heading text: trailing markers stripped, exactly
  * as the renderer strips them. A `[#custom-id]` pin becomes the slug verbatim
- * and — matching the renderer, where a pre-existing id never advances the
- * slugger — leaves auto-slug numbering untouched. `[!toc]`/`[toc]` headings
- * stay in the record: their ids exist in the rendered page, so links to them
- * are valid anchors regardless of TOC visibility.
+ * and — matching the renderer — occupies its id in the slugger, so a later
+ * heading whose auto-slug collides disambiguates (`setup` → `setup-1`).
+ * `[!toc]`/`[toc]` headings stay in the record: their ids exist in the
+ * rendered page, so links to them are valid anchors regardless of TOC
+ * visibility. A heading that is nothing but markers keeps them as literal
+ * text, mirroring the renderer.
  */
 const toHeading = (
   depth: number,
@@ -291,7 +293,14 @@ const toHeading = (
 ): Heading => {
   const markers = parseHeadingMarkers(raw);
   const text = markers.text.trim();
-  return { depth, slug: markers.id ?? slugger.slug(text), text };
+  if (text === "" && (markers.id !== undefined || markers.toc !== undefined)) {
+    return { depth, slug: slugger.slug(raw), text: raw };
+  }
+  if (markers.id !== undefined) {
+    occupySlug(slugger, markers.id);
+    return { depth, slug: markers.id, text };
+  }
+  return { depth, slug: slugger.slug(text), text };
 };
 
 /** Scan one line for a heading, advancing the fence/paragraph state. */

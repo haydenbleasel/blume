@@ -109,13 +109,25 @@ const collectText = (node: Nodes, out: string[]): void => {
       return;
     }
     // Trailing heading markers (`[#custom-id]`, `[!toc]`, `[toc]`) are anchor
-    // metadata, not prose — strip them so they never pollute the index.
+    // metadata, not prose — strip them so they never pollute the index. Only
+    // a marker that ends the heading's final plain-text child counts,
+    // mirroring the renderer: a heading ending in inline code or an image
+    // keeps its bracketed text on the page (so it stays searchable), and a
+    // heading that is nothing but markers renders them literally.
     case "heading": {
+      const last = node.children.at(-1);
+      const trailing = last?.type === "text" ? last : undefined;
       const inner: string[] = [];
-      for (const child of node.children) {
+      const kept = trailing ? node.children.slice(0, -1) : node.children;
+      for (const child of kept) {
         collectText(child, inner);
       }
-      out.push(parseHeadingMarkers(inner.join("").trimEnd()).text, " ");
+      if (trailing) {
+        const stripped = parseHeadingMarkers(trailing.value).text;
+        const literal = stripped === "" && node.children.length === 1;
+        inner.push(literal ? trailing.value : stripped);
+      }
+      out.push(inner.join("").trimEnd(), " ");
       return;
     }
     default: {

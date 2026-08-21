@@ -41,6 +41,7 @@ import {
   staticJsonEndpointTemplate,
 } from "../src/astro/templates.ts";
 import type { BlumeConfig } from "../src/core/config-input.ts";
+import { TOC_HIDDEN_KEY } from "../src/core/heading-markers.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 
@@ -117,6 +118,15 @@ describe("catchAllPageTemplate", () => {
   it("no longer imports the removed Warning component", () => {
     const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
     expect(out).not.toContain("Warning");
+  });
+
+  it("filters [!toc] slugs through the heading plugin's frontmatter key", () => {
+    const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
+    // The key is interpolated from the shared constant, so a rename cannot
+    // silently break the plugin → template contract; the Array.isArray guard
+    // keeps a `frontmatter.extend`-declared value from crashing the render.
+    expect(out).toContain(`remarkPluginFrontmatter?.${TOC_HIDDEN_KEY}`);
+    expect(out).toContain("Array.isArray(tocHiddenRaw)");
   });
 
   it("serializes the island-hooks snapshot only when React is enabled", () => {

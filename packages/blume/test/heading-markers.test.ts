@@ -1,6 +1,26 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseHeadingMarkers } from "../src/core/heading-markers.ts";
+import GithubSlugger from "github-slugger";
+
+import {
+  occupySlug,
+  parseHeadingMarkers,
+} from "../src/core/heading-markers.ts";
+
+describe("occupySlug", () => {
+  it("makes a later colliding auto-slug disambiguate", () => {
+    const slugger = new GithubSlugger();
+    occupySlug(slugger, "setup");
+    expect(slugger.slug("Setup")).toBe("setup-1");
+  });
+
+  it("leaves an already-taken id untouched", () => {
+    const slugger = new GithubSlugger();
+    expect(slugger.slug("Setup")).toBe("setup");
+    occupySlug(slugger, "setup");
+    expect(slugger.slug("Setup")).toBe("setup-1");
+  });
+});
 
 describe("parseHeadingMarkers", () => {
   it("returns text unchanged when there are no markers", () => {

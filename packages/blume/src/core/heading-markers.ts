@@ -11,12 +11,26 @@
  * anchor index `blume validate` checks against always agree.
  */
 
+import type GithubSlugger from "github-slugger";
+
 /**
  * Frontmatter key carrying the slugs of `[!toc]` headings out of a render. The
  * hast plugin pushes onto it and the generated page template reads it back via
  * `remarkPluginFrontmatter` to filter the TOC.
  */
 export const TOC_HIDDEN_KEY = "__blumeTocHidden";
+
+/**
+ * Register a pinned `[#id]` with the document slugger, the way
+ * `GithubSlugger#slug` registers the slugs it returns — so a later heading
+ * whose auto-slug collides disambiguates (`setup` → `setup-1`) instead of
+ * silently duplicating the anchor id. An id that is already taken is left
+ * untouched (the pin still uses it verbatim; duplicate pins are the author's
+ * explicit choice).
+ */
+export const occupySlug = (slugger: GithubSlugger, id: string): void => {
+  slugger.occurrences[id] ??= 0;
+};
 
 /** One trailing marker: `[#id]`, `[toc]`, or `[!toc]`, plus surrounding space. */
 const MARKER = /\s*\[(?:#(?<id>[^\s\]]+)|(?<hide>!)?toc)\]\s*$/u;

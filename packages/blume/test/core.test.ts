@@ -657,11 +657,25 @@ describe(extractHeadings, () => {
     ]);
   });
 
-  it("does not advance the slugger for a pinned id, like the renderer", () => {
+  it("occupies a pinned id so a colliding auto-slug disambiguates, like the renderer", () => {
+    const body = ["## Custom [#setup]", "## Setup"].join("\n");
+    expect(extractHeadings(body).map((h) => h.slug)).toStrictEqual([
+      "setup",
+      "setup-1",
+    ]);
+  });
+
+  it("pinning an id leaves unrelated auto-slug numbering untouched", () => {
     const body = ["## Setup [#pin]", "## Setup"].join("\n");
     expect(extractHeadings(body).map((h) => h.slug)).toStrictEqual([
       "pin",
       "setup",
+    ]);
+  });
+
+  it("keeps a marker-only heading literal, like the renderer", () => {
+    expect(extractHeadings("## [toc]")).toStrictEqual([
+      { depth: 2, slug: "toc", text: "[toc]" },
     ]);
   });
 

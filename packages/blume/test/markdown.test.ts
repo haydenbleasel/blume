@@ -687,12 +687,22 @@ describe("headingAnchorPlugin", () => {
     expect(textOfResult(result)).toBe("Hello [#id]");
   });
 
-  it("does not advance the slugger for a [#custom-id] heading", () => {
+  it("occupies a pinned [#custom-id] so a colliding auto-slug disambiguates", () => {
+    const plugin = headingAnchorPlugin();
+    const ctx = makeCtx();
+    const pinned = plugin.element.visit(heading("h2", "Custom [#setup]"), ctx);
+    const auto = plugin.element.visit(heading("h2", "Setup"), ctx);
+    // The pin took "setup", so the later heading steps to the next free id
+    // instead of rendering a duplicate DOM id.
+    expect(pinned?.properties?.id).toBe("setup");
+    expect(auto?.properties?.id).toBe("setup-1");
+  });
+
+  it("pinning an id leaves unrelated auto-slug numbering untouched", () => {
     const plugin = headingAnchorPlugin();
     const ctx = makeCtx();
     const pinned = plugin.element.visit(heading("h2", "Setup [#pin]"), ctx);
     const auto = plugin.element.visit(heading("h2", "Setup"), ctx);
-    // Matching pre-existing-id semantics: the pin never consumed "setup".
     expect(pinned?.properties?.id).toBe("pin");
     expect(auto?.properties?.id).toBe("setup");
   });
@@ -788,11 +798,34 @@ describe("headingAnchorPlugin", () => {
     expect(plugin.element.visit(asString, ctx)).toBeUndefined();
   });
 
-  it("drops the marker text node when the heading is only a marker", () => {
-    const node = heading("h2", "[#bare]");
+  it("keeps a marker-only heading literal", () => {
+    // With no heading text left to annotate, stripping would leave an
+    // invisible empty element with an empty id and a blank TOC row — so the
+    // marker stays ordinary prose.
+    const ctx = makeCtx();
+    const plugin = headingAnchorPlugin();
+    const bare = plugin.element.visit(heading("h2", "[#bare]"), ctx);
+    expect(bare?.properties?.id).toBe("bare");
+    expect(textOfResult(bare)).toBe("[#bare]");
+    const toc = plugin.element.visit(heading("h2", "[toc]"), ctx);
+    expect(toc?.properties?.className).toBeUndefined();
+    expect(textOfResult(toc)).toBe("[toc]");
+    const hide = plugin.element.visit(heading("h2", "[!toc]"), ctx);
+    expect(textOfResult(hide)).toBe("[!toc]");
+    expect(ctx.data?.astro?.frontmatter?.__blumeTocHidden).toStrictEqual([]);
+  });
+
+  it("strips a marker-only trailing text node when other children remain", () => {
+    const em = {
+      children: [{ type: "text", value: "Emphasis" }],
+      tagName: "em",
+      type: "element",
+    };
+    const node = heading("h2", em, " [toc]");
     const result = headingAnchorPlugin().element.visit(node, makeCtx());
-    expect(result?.properties?.id).toBe("bare");
-    expect(result?.children?.[0]?.children).toStrictEqual([]);
+    expect(result?.properties?.id).toBe("emphasis");
+    expect(result?.properties?.className).toStrictEqual(["blume-toc-only"]);
+    expect(textOfResult(result)).toBe("Emphasis");
   });
 
   it("strips markers and assigns the pinned id even with wrapping off", () => {
