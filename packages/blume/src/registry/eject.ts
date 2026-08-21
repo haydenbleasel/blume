@@ -537,7 +537,9 @@ export const eject = async (
   });
 
   if (servesStaticIndex(config.search.provider)) {
-    const documents = await buildSearchDocuments(project);
+    const documents = await buildSearchDocuments(project, {
+      includeCodeBlocks: config.search.indexing.includeCodeBlocks,
+    });
     files.push(
       {
         content: `${JSON.stringify(documents)}\n`,

@@ -40,7 +40,17 @@ Write `href` as if the site were mounted at the root — a `basePath` is applied
 
 ## What's indexed
 
-For every indexable page, Blume indexes its title, description, and body reduced to plain text — code blocks, images, and markup are stripped, so results stay relevant. The index is built from your source files, so it's identical in dev and production.
+For Orama, FlexSearch, Algolia, Orama Cloud, and Typesense, Blume indexes each page's title, description, and body reduced to plain text — code blocks, images, and markup are stripped, so results stay relevant. These indexes are built from your source files, so they're identical in dev and production.
+
+If your docs rely on code examples for searchable terms like options, methods, or error names, you can include code block contents in the source-file search indexes:
+
+```ts blume.config.ts lineNumbers
+search: {
+  indexing: {
+    includeCodeBlocks: true,
+  },
+},
+```
 
 On a [versioned](/docs/content/versioning) site, results default to the version being viewed, with an "All versions" toggle in the dialog footer (remembered per reader). Cross-version hits name their version on the row. Orama, FlexSearch, Algolia, and Typesense honor the scoping — hosted records carry a `version` facet, with the current docs uploaded as `"current"` — while Pagefind stays unscoped, matching its locale behavior.
 
