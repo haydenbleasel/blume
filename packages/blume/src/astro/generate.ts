@@ -1913,7 +1913,9 @@ export const generateRuntime = async (
 
   // Client-loaded providers (orama, flexsearch) ship a static index + endpoint.
   if (servesStaticIndex(config.search.provider)) {
-    const documents = await buildSearchDocuments(project);
+    const documents = await buildSearchDocuments(project, {
+      includeFencedCodeBlocks: config.search.indexing.includeFencedCodeBlocks,
+    });
     await write(
       join(srcDir, "generated", "search.json"),
       `${JSON.stringify(documents)}\n`

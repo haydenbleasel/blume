@@ -35,7 +35,12 @@ const BODY = [
   "A [reference link][ref] and 5 * 3 stars.\\",
   "after a hard break.",
   "",
+  "![Diagram alt that should not index](./diagram.png)",
+  "",
+  "![Reference image alt that should not index][diagram-ref]",
+  "",
   "[ref]: /elsewhere",
+  "[diagram-ref]: ./diagram-ref.png",
   "",
   '<Callout kind="warn">',
   "Callouts keep their inner prose indexed.",
@@ -241,6 +246,16 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("west");
   });
 
+  it("skips image alt text in the plain text index", async () => {
+    const [doc] = await buildSearchDocuments(
+      projectWith([page({ description: "Desc A", id: "a.md" })], [route({})])
+    );
+    expect(doc?.content).not.toContain("Diagram alt that should not index");
+    expect(doc?.content).not.toContain(
+      "Reference image alt that should not index"
+    );
+  });
+
   it("keeps Markdown and fenced code when content is 'markdown'", async () => {
     const [doc] = await buildSearchDocuments(
       projectWith([page({ description: "Desc A", id: "a.md" })], [route({})]),
@@ -251,6 +266,16 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("```js");
     // …along with heading marks and other Markdown structure.
     expect(doc?.content).toContain("# Heading");
+  });
+
+  it("can include fenced code in the plain text index", async () => {
+    const [doc] = await buildSearchDocuments(
+      projectWith([page({ description: "Desc A", id: "a.md" })], [route({})]),
+      { includeFencedCodeBlocks: true }
+    );
+    expect(doc?.content).toContain("const secret = 1;");
+    expect(doc?.content).not.toContain("```js");
+    expect(doc?.content).not.toContain("#");
   });
 
   it("gives a config-sidebar section's landing page its own section facet", async () => {

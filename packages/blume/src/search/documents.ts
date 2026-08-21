@@ -79,13 +79,26 @@ const INLINE_PARENTS = new Set([
   "strong",
 ]);
 
+interface PlainTextOptions {
+  includeFencedCodeBlocks?: boolean;
+}
+
 /** Fold one mdast node into the plain-text accumulator. */
-const collectText = (node: Nodes, out: string[]): void => {
+const collectText = (
+  node: Nodes,
+  out: string[],
+  options: PlainTextOptions
+): void => {
   switch (node.type) {
-    // Fenced code is excluded from the plain index (ranking noise) — the
-    // "markdown" extraction keeps it for Ask AI grounding — and image alt
-    // text was never indexed.
-    case "code":
+    // Fenced code is excluded from the plain index by default (ranking noise),
+    // but code-heavy docs can opt in without indexing Markdown markup too.
+    case "code": {
+      if (options.includeFencedCodeBlocks) {
+        out.push(node.value, " ");
+      }
+      return;
+    }
+    // Image alt text was never indexed.
     case "image":
     case "imageReference": {
       return;
@@ -117,7 +130,7 @@ const collectText = (node: Nodes, out: string[]): void => {
   }
   if ("children" in node) {
     for (const child of node.children) {
-      collectText(child, out);
+      collectText(child, out, options);
     }
     if (!INLINE_PARENTS.has(node.type)) {
       out.push(" ");
@@ -132,15 +145,33 @@ const collectText = (node: Nodes, out: string[]): void => {
  * reduce correctly. This feeds the client index *and* every hosted-provider
  * record, so anything lost here is a permanent search-quality loss.
  */
-const toPlainText = (markdown: string): string => {
+const toPlainText = (
+  markdown: string,
+  options: PlainTextOptions = {}
+): string => {
   const tree = fromMarkdown(markdown, {
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()],
   });
   const out: string[] = [];
-  collectText(tree, out);
+  collectText(tree, out, options);
   return out.join("").replaceAll(WHITESPACE, " ").trim();
 };
+
+type SearchContentMode = "markdown" | "plain";
+
+const extractSearchContent = (
+  markdown: string,
+  options?: {
+    content?: SearchContentMode;
+    includeFencedCodeBlocks?: boolean;
+  }
+): string =>
+  options?.content === "markdown"
+    ? markdown.trim()
+    : toPlainText(markdown, {
+        includeFencedCodeBlocks: options?.includeFencedCodeBlocks ?? false,
+      });
 
 interface Crumbs {
   breadcrumb: string[];
@@ -211,7 +242,8 @@ export const buildSearchDocuments = async (
   project: BlumeProject,
   options?: {
     includeWhenDisabled?: boolean;
-    content?: "markdown" | "plain";
+    content?: SearchContentMode;
+    includeFencedCodeBlocks?: boolean;
     audience?: VisibilityAudience;
   }
 ): Promise<SearchDocument[]> => {
@@ -256,8 +288,7 @@ export const buildSearchDocuments = async (
         source,
         options?.audience ?? "web"
       );
-      const body =
-        options?.content === "markdown" ? visible.trim() : toPlainText(visible);
+      const body = extractSearchContent(visible, options);
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       const facets = page ? pageFacets(page, project.config) : undefined;

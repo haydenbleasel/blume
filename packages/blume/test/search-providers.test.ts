@@ -87,6 +87,21 @@ describe("search config schema", () => {
     expect(blumeConfigSchema.parse({}).search.provider).toBe("orama");
   });
 
+  it("defaults to excluding fenced code blocks from the search index", () => {
+    expect(blumeConfigSchema.parse({}).search.indexing).toMatchObject({
+      includeFencedCodeBlocks: false,
+      includeHiddenPages: false,
+    });
+  });
+
+  it("accepts opting fenced code blocks into the search index", () => {
+    const config = parse({
+      indexing: { includeFencedCodeBlocks: true },
+      provider: "orama",
+    });
+    expect(config.search.indexing.includeFencedCodeBlocks).toBe(true);
+  });
+
   it("accepts the keyless providers without extra config", () => {
     expect(parse({ provider: "flexsearch" }).search.provider).toBe(
       "flexsearch"

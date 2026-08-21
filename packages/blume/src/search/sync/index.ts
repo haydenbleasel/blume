@@ -28,7 +28,11 @@ export const syncSearchProvider = async (
     return;
   }
 
-  const records = toSearchRecords(await buildSearchDocuments(project));
+  const records = toSearchRecords(
+    await buildSearchDocuments(project, {
+      includeFencedCodeBlocks: search.indexing.includeFencedCodeBlocks,
+    })
+  );
   reporter.start(`Syncing ${records.length} record(s) to ${search.provider}`);
 
   try {

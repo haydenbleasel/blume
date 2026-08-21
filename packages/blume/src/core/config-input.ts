@@ -603,6 +603,8 @@ export interface SearchConfig {
   algolia?: AlgoliaSearch;
   /** Indexing behavior. */
   indexing?: {
+    /** Include fenced code block contents in the search index. Defaults to `false`. */
+    includeFencedCodeBlocks?: boolean;
     /** Include pages marked `hidden` in the search index. Defaults to `false`. */
     includeHiddenPages?: boolean;
   };
