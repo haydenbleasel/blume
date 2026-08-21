@@ -64,9 +64,29 @@ export const parseGitLog = (output: string): Map<string, string> => {
 };
 
 /**
+ * The toplevel of the repository containing `root`, or null when git is
+ * unavailable or the project isn't a repo. Callers use it to decide which
+ * content roots a `git log` pathspec can cover at all — a root outside the
+ * repository would fail the log outright and can never yield dates.
+ */
+export const gitRepositoryRoot = (root: string): string | null => {
+  try {
+    return execFileSync(
+      // oxlint-disable-next-line sonarjs/no-os-command-from-path -- git is a required dev-tool dependency resolved from PATH
+      "git",
+      ["-C", root, "rev-parse", "--show-toplevel"],
+      // stderr silenced: outside a repository the probe fails by design.
+      { encoding: "utf-8", env: gitEnv(), stdio: ["ignore", "pipe", "ignore"] }
+    ).trim();
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Resolve each source file's last-modified date from git history, keyed by
  * absolute source path. Runs a single `git log` over the given content roots
- * (each filesystem source's own root, which may diverge from `content.root`)
+ * (each local source's own root, which may diverge from `content.root`)
  * and maps repo-root-relative paths back to the given absolute paths
  * (monorepo-safe via `rev-parse --show-toplevel`). Returns an empty map if git
  * is unavailable or the project isn't a repo — the feature then simply shows
@@ -85,13 +105,11 @@ export const gitLastModifiedTimes = (
   if (sourcePaths.length === 0 || contentRoots.length === 0) {
     return new Map();
   }
+  const gitRoot = gitRepositoryRoot(root);
+  if (gitRoot === null) {
+    return new Map();
+  }
   try {
-    const gitRoot = execFileSync(
-      // oxlint-disable-next-line sonarjs/no-os-command-from-path -- git is a required dev-tool dependency resolved from PATH
-      "git",
-      ["-C", root, "rev-parse", "--show-toplevel"],
-      { encoding: "utf-8", env: gitEnv() }
-    ).trim();
     const output = execFileSync(
       // oxlint-disable-next-line sonarjs/no-os-command-from-path -- git is a required dev-tool dependency resolved from PATH
       "git",

@@ -6,6 +6,7 @@ import { buildContentGraph } from "./graph.ts";
 import { i18nDiagnostics } from "./i18n.ts";
 import {
   gitLastModifiedTimes,
+  gitRepositoryRoot,
   lastModifiedShallowWarning,
   resolveLastModifiedConfig,
 } from "./last-modified.ts";
@@ -300,12 +301,17 @@ export const scanProject = async (
     const fsPaths = pages
       .map((page) => page.sourcePath)
       .filter((path): path is string => path !== undefined);
-    // The git pathspecs must cover where the pages actually live: each
-    // filesystem source's own root, which diverges from the global
-    // `content.root` when a source configures a non-default `root`.
-    const contentRoots = sources.flatMap((source) =>
-      source.staged || !source.contentRoot ? [] : [source.contentRoot]
-    );
+    // The git pathspecs must cover where the pages actually live: each local
+    // source's own on-disk root — a filesystem source's `root`, or a staged
+    // local source's tree (an Obsidian vault) — which diverges from the global
+    // `content.root`. A root outside the repository would fail the log outright
+    // and can never yield dates, so those are dropped up front.
+    const gitRoot = gitRepositoryRoot(context.root);
+    const contentRoots = sources
+      .flatMap((source) => (source.contentRoot ? [source.contentRoot] : []))
+      .filter(
+        (dir) => gitRoot !== null && !relative(gitRoot, dir).startsWith("..")
+      );
     const gitTimes = gitLastModifiedTimes(context.root, contentRoots, fsPaths);
     for (const page of pages) {
       if (!page.lastModified && page.sourcePath) {
@@ -314,8 +320,16 @@ export const scanProject = async (
     }
     // A shallow CI clone (Vercel, actions/checkout) silently drops most dates;
     // surface that instead of letting production diverge from local builds.
+    // Only pages the log could have dated count — a page outside every covered
+    // root stays undated no matter how deep the clone is, and the warning's
+    // suggested fix cannot help it.
     const undated = pages.filter(
-      (page) => page.sourcePath && !page.lastModified
+      (page) =>
+        page.sourcePath &&
+        !page.lastModified &&
+        contentRoots.some(
+          (dir) => !relative(dir, page.sourcePath ?? "").startsWith("..")
+        )
     ).length;
     lastModifiedWarnings.push(
       ...lastModifiedShallowWarning(context.root, undated)

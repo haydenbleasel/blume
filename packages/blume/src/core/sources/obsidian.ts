@@ -70,6 +70,22 @@ const isStringValue = (value: SourceEntry["data"][string]): value is string =>
   typeof value === "string";
 
 /**
+ * Obsidian's own default properties (the Properties UI writes the plural
+ * spellings; older vaults carry the singular ones). They are not Blume
+ * frontmatter — the strict meta schema would reject them and fail the build —
+ * so they are dropped when a note is lowered. `aliases` is dropped rather than
+ * resolved; alias link targets are not supported yet.
+ */
+const OBSIDIAN_NATIVE_KEYS = new Set([
+  "alias",
+  "aliases",
+  "cssclass",
+  "cssclasses",
+  "tag",
+  "tags",
+]);
+
+/**
  * A note's route input: its vault-relative path, slugged. Vault filenames are
  * prose (`Getting Started.md`) and `mapRoute` does not slug, so this does —
  * through {@link slugifyPath}, which keeps a non-Latin name routable.
@@ -148,26 +164,25 @@ const anchorsOf = (body: string): Map<string, string> => {
   return anchors;
 };
 
-/** Group notes by the bare name a `[[Wikilink]]` can address them with. */
-const byNoteName = (notes: ParsedNote[]): Map<string, ParsedNote[]> => {
-  const grouped = new Map<string, ParsedNote[]>();
-  for (const note of notes) {
-    const name = indexKey(basename(note.rel).replace(MARKDOWN_FILE, ""));
-    const claimed = grouped.get(name);
-    if (claimed) {
-      claimed.push(note);
-    } else {
-      grouped.set(name, [note]);
-    }
-  }
-  return grouped;
+/**
+ * Every path suffix a wikilink can address a note by: `docs/guides/Setup.md`
+ * yields `docs/guides/setup`, `guides/setup`, and `setup`. Obsidian's default
+ * "shortest path when possible" setting writes any of them into a link, so all
+ * of them must resolve.
+ */
+const suffixKeysOf = (rel: string): string[] => {
+  const segments = rel.replace(MARKDOWN_FILE, "").split("/");
+  return segments.map((_, from) => indexKey(segments.slice(from).join("/")));
 };
 
 /**
- * Obsidian addresses `[[Name]]` by note name, not by path; index each note under
- * its basename and under its full vault-relative path. A basename two notes
- * share resolves to the first in vault order and is reported — Obsidian
- * disambiguates by the linking note's location, which a rewrite cannot know.
+ * Obsidian addresses `[[Name]]` by note name, not only by path; index each note
+ * under every suffix of its vault-relative path, bare basename included. A key
+ * two notes share resolves to the first in vault order — Obsidian disambiguates
+ * by the linking note's location, which a rewrite cannot know — except that a
+ * note's exact full path always wins for its own key, the way Obsidian resolves
+ * a link as a path before a name. Only bare-name collisions are reported; a
+ * longer shared suffix is already the author's disambiguation.
  */
 const buildNoteIndex = (
   notes: ParsedNote[],
@@ -176,8 +191,8 @@ const buildNoteIndex = (
   bodyOf: (note: ParsedNote) => string
 ): NoteIndex => {
   const index = new Map<string, IndexedNote>();
-  // Memoized: the name loop and the path loop below both index most notes, and
-  // `anchorsOf` re-scans the whole body each time.
+  // Memoized: the suffix loop and the pairs loop below both index most notes,
+  // and `anchorsOf` re-scans the whole body each time.
   const entries = new Map<string, IndexedNote>();
   const indexed = (note: ParsedNote): IndexedNote => {
     const cached = entries.get(note.rel);
@@ -191,20 +206,30 @@ const buildNoteIndex = (
     entries.set(note.rel, built);
     return built;
   };
-  for (const [name, claimants] of byNoteName(notes)) {
-    const [first, ...rest] = claimants;
-    if (first === undefined) {
-      continue;
+  const claims = new Map<string, [ParsedNote, ...ParsedNote[]]>();
+  for (const note of notes) {
+    for (const key of suffixKeysOf(note.rel)) {
+      const claimed = claims.get(key);
+      if (claimed) {
+        claimed.push(note);
+      } else {
+        claims.set(key, [note]);
+      }
     }
-    if (rest.length > 0) {
+  }
+  for (const [key, claimants] of claims) {
+    const [first, ...rest] = claimants;
+    if (rest.length > 0 && !key.includes("/")) {
       unresolved.ambiguous.push(
-        `${name} (${claimants.map((note) => note.rel).join(", ")})`
+        `${key} (${claimants.map((note) => note.rel).join(", ")})`
       );
     }
-    index.set(name, indexed(first));
+    index.set(key, indexed(first));
   }
   const pairs = notes.map((note) => {
     const self = indexed(note);
+    // Set last, over any name or suffix claim another note holds on this key:
+    // an exact vault-relative path is never ambiguous.
     index.set(indexKey(note.rel.replace(MARKDOWN_FILE, "")), self);
     return { note, self };
   });
@@ -293,6 +318,13 @@ const transformChunk = (
         // SAFETY: the replacer's first argument is always the matched substring.
         return args[0] as string;
       }
+      // `#^block-id` names a block, not a heading. Blocks render with no
+      // anchor to land on, so the link goes to the page itself rather than
+      // warning about a heading that never existed. The caret never reaches
+      // the label — `[^id]` would read as a GFM footnote reference.
+      if (heading.startsWith("^")) {
+        return `[${groups.alias?.trim() || heading.slice(1)}](${self.href})`;
+      }
       const own = self.anchors.get(indexKey(heading));
       if (own === undefined) {
         unresolved.anchors.push(`#${heading}`);
@@ -307,6 +339,11 @@ const transformChunk = (
     }
     if (heading === undefined) {
       return `[${label}](${note.href})`;
+    }
+    // A block reference links to its note without an anchor; block ids are
+    // generated noise (`^a1b2c3`), so an unaliased one reads as the note name.
+    if (heading.startsWith("^")) {
+      return `[${groups.alias?.trim() || target}](${note.href})`;
     }
     const anchor = note.anchors.get(indexKey(heading));
     if (anchor === undefined) {
@@ -333,10 +370,14 @@ const transformProse = (
     )
     .join("");
 
+/** An indented code block's marker: four spaces or a tab (CommonMark 4.4). */
+const INDENTED_CODE = /^(?: {4}|\t)/u;
+
 /**
  * Transform an Obsidian body to Blume-ready Markdown: wikilinks become route
- * links and `%%comments%%` are stripped, while fenced and inline code pass
- * through so a note documenting the syntax survives. Callouts stay blockquotes.
+ * links and `%%comments%%` are stripped, while fenced, indented, and inline
+ * code pass through so a note documenting the syntax survives. Callouts stay
+ * blockquotes.
  */
 const transformBody = (
   body: string,
@@ -345,6 +386,12 @@ const transformBody = (
   unresolved: UnresolvedTargets
 ): string => {
   let fence: FenceState = null;
+  // An indented code block opens only after a blank line (CommonMark: it
+  // cannot interrupt a paragraph) and runs while lines stay indented or blank.
+  // A loose list's indented continuation paragraph is read as code too — the
+  // same over-approximation every line scanner here makes.
+  let afterBlank = true;
+  let indentedCode = false;
   const out: string[] = [];
   let prose: string[] = [];
   const flush = (): void => {
@@ -354,14 +401,47 @@ const transformBody = (
     }
   };
   for (const line of body.split("\n")) {
-    const next = nextFenceState(line, fence);
+    const blank = line.trim() === "";
+    if (fence === null && indentedCode) {
+      if (blank || INDENTED_CODE.test(line)) {
+        out.push(line);
+        afterBlank = blank;
+        continue;
+      }
+      indentedCode = false;
+    }
+    if (fence === null && afterBlank && !blank && INDENTED_CODE.test(line)) {
+      flush();
+      indentedCode = true;
+      out.push(line);
+      afterBlank = false;
+      continue;
+    }
+    // A line indented four or more spaces is never a fence delimiter — inside
+    // a fenced block it is content, outside one it is indented code or a
+    // continuation line — so it must not toggle the fence state.
+    const next: FenceState = INDENTED_CODE.test(line)
+      ? fence
+      : nextFenceState(line, fence);
     if (fence !== null || next !== null) {
       flush();
       fence = next;
       out.push(line);
+      afterBlank = blank;
+      continue;
+    }
+    if (blank) {
+      // A code span cannot cross a blank line (CommonMark 6.1), so each prose
+      // run flushes at one — a stray backtick stays confined to its paragraph
+      // instead of pairing with another paragraph's and swallowing the links
+      // between them.
+      flush();
+      out.push(line);
+      afterBlank = true;
       continue;
     }
     prose.push(line);
+    afterBlank = false;
   }
   flush();
   return out.join("\n");
@@ -394,8 +474,10 @@ const noteToEntry = (
 ): SourceEntry => {
   const { note } = pair;
   const title = titleFor(note.rel, note.data.title);
-  const merged =
-    title === undefined ? { ...note.data } : { ...note.data, title };
+  const data = Object.fromEntries(
+    Object.entries(note.data).filter(([key]) => !OBSIDIAN_NATIVE_KEYS.has(key))
+  );
+  const merged = title === undefined ? data : { ...data, title };
   const text = transformBody(note.content.trim(), index, pair.self, unresolved);
   const raw = matter.stringify(`${text}\n`, merged);
   return {
@@ -478,7 +560,7 @@ const unresolvedDiagnostics = (
   if (unresolved.ambiguous.length > 0) {
     diagnostics.push({
       code: "BLUME_WIKILINK_AMBIGUOUS",
-      message: `Source "${name}" found ${unresolved.ambiguous.length} note name(s) claimed by more than one file (${sample(unresolved.ambiguous)}); bare wikilinks to them resolve to the first in vault order.`,
+      message: `Source "${name}" found ${unresolved.ambiguous.length} note name(s) claimed by more than one file (${sample(unresolved.ambiguous)}); bare wikilinks to them resolve to a note whose full vault path is exactly that name, then to the first in vault order.`,
       severity: "warning",
       suggestion:
         "Rename one of the notes, or link to the full vault-relative path (`[[folder/Note]]`) so the target is unambiguous.",
@@ -611,6 +693,10 @@ export const obsidianSource = (
   };
 
   return {
+    // The vault is a real on-disk tree, so exposing it lets git last-modified
+    // bound its log pathspec to the notes. Folder-meta discovery still skips
+    // it — that scan is guarded on `staged`.
+    contentRoot: vaultDir,
     load,
     name: options.name,
     prefix: options.prefix,

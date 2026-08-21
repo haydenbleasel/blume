@@ -105,9 +105,12 @@ export interface ContentSource {
   /** Optional route prefix; the source's routes namespace under `/<prefix>/`. */
   readonly prefix?: string;
   /**
-   * Resolved on-disk root, set by filesystem-backed sources only. Drives
-   * folder-meta discovery (scan under this root) and the docs-collection base;
-   * omitted by remote/CMS/staged sources that have no local tree.
+   * Resolved on-disk root, set by sources whose entries live on disk. For
+   * filesystem sources it drives folder-meta discovery (scan under this root)
+   * and the docs-collection base; for staged local sources (an Obsidian
+   * vault) it only bounds the git last-modified pathspec — folder-meta
+   * discovery is guarded on `staged`. Omitted by remote/CMS sources that have
+   * no local tree.
    */
   readonly contentRoot?: string;
   /** Pull every entry. Called once per scan. */

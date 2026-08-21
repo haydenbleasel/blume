@@ -617,6 +617,183 @@ describe("obsidianSource", () => {
     });
     expect(() => stop?.()).not.toThrow();
   });
+
+  it("drops Obsidian's own default properties from the frontmatter", async () => {
+    const root = await makeVault({
+      "Note.md": lines(
+        "---",
+        "tags: [project]",
+        "aliases: [Setup]",
+        "cssclasses: [wide]",
+        "tag: legacy",
+        "alias: Old",
+        "cssclass: narrow",
+        "description: Kept.",
+        "---",
+        "",
+        "Body.",
+        ""
+      ),
+    });
+    const { entries } = await sourceFor(root).load();
+    // Obsidian's Properties UI writes these by default; the strict Blume meta
+    // schema would reject them and fail the build for any realistic vault.
+    expect(entries[0]?.data).toEqual({ description: "Kept.", title: "Note" });
+    expect(entries[0]?.raw).not.toContain("tags:");
+    expect(entries[0]?.raw).toContain("description: Kept.");
+  });
+
+  it("resolves a partial-path link, the shortest-path form Obsidian writes", async () => {
+    const root = await makeVault({
+      "Links.md": "See [[guides/Setup]].\n",
+      "docs/guides/Setup.md": "# Guide setup\n",
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    const links = entries.find((entry) => entry.ref === "Links.md");
+    // Obsidian's default "shortest path when possible" setting auto-writes
+    // this form; indexing only basenames and full paths would miss it.
+    expect(links?.body.text).toContain("(/docs/guides/setup)");
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("resolves a shared partial path to the first in vault order, silently", async () => {
+    const root = await makeVault({
+      "Links.md": "See [[notes/Intro]].\n",
+      "a/notes/Intro.md": "# A\n",
+      "b/notes/Intro.md": "# B\n",
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    const links = entries.find((entry) => entry.ref === "Links.md");
+    expect(links?.body.text).toContain("(/a/notes/intro)");
+    // Only the bare-name collision is reported; a longer shared suffix is
+    // already the author's disambiguation.
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.message).toContain("intro (");
+    expect(diagnostics[0]?.message).not.toContain("notes/intro (");
+  });
+
+  it("prefers an exact path match over vault order for a shared name", async () => {
+    const root = await makeVault({
+      "Guides/Setup.md": "# Guide setup\n",
+      "Links.md": "See [[Setup]].\n",
+      "setup.md": "# Root setup\n",
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    const links = entries.find((entry) => entry.ref === "Links.md");
+    // `Guides/Setup.md` sorts first, but the root note's full vault path is
+    // exactly `setup` — Obsidian resolves a link as a path before a name.
+    expect(links?.body.text).toContain("[Setup](/setup)");
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_WIKILINK_AMBIGUOUS");
+    expect(diagnostics[0]?.message).toContain("exactly that name");
+  });
+
+  it("links a block reference to its note without an anchor or warning", async () => {
+    const root = await makeVault({
+      "Links.md": "See [[Other#^a1b2c3]] and [[Other#^a1b2c3|the summary]].\n",
+      "Other.md": "Some text. ^a1b2c3\n",
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    const links = entries.find((entry) => entry.ref === "Links.md");
+    // Blocks render with no anchor to land on; the note link beats a spurious
+    // missing-heading warning, and the generated id never labels the link.
+    expect(links?.body.text).toContain("[Other](/other)");
+    expect(links?.body.text).toContain("[the summary](/other)");
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("links a same-note block reference to the note itself", async () => {
+    const root = await makeVault({
+      "Page.md":
+        "A key point. ^point\n\nSee [[#^point]] and [[#^point|that point]].\n",
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    // The caret never reaches the label — `[^point]` would read as a GFM
+    // footnote reference.
+    expect(entries[0]?.body.text).toContain("[point](/page)");
+    expect(entries[0]?.body.text).toContain("[that point](/page)");
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("does not pair stray backticks across a blank line", async () => {
+    const root = await makeVault({
+      "Notes.md": "# Notes\n",
+      "Sample.md": lines(
+        "A stray ` backtick.",
+        "",
+        "A real link to [[Notes]].",
+        "",
+        "Another stray ` later.",
+        ""
+      ),
+    });
+    const { entries } = await sourceFor(root).load();
+    const sample = entries.find((entry) => entry.ref === "Sample.md");
+    // A code span cannot cross a blank line (CommonMark 6.1); pairing these
+    // backticks would swallow the whole paragraph between them.
+    expect(sample?.body.text).toContain("[Notes](/notes)");
+  });
+
+  it("leaves an indented code block verbatim", async () => {
+    const root = await makeVault({
+      "Notes.md": "# Notes\n",
+      "Sample.md": lines(
+        "Prose first.",
+        "",
+        "    See [[Notes]] and %%hidden%% here",
+        "",
+        "\tstill code [[Notes]]",
+        "",
+        "Prose again: [[Notes]].",
+        ""
+      ),
+    });
+    const { entries } = await sourceFor(root).load();
+    const sample = entries.find((entry) => entry.ref === "Sample.md");
+    // Four spaces or a tab open an indented code block after a blank line, and
+    // blank lines inside it keep it open — the sample must ship untouched.
+    expect(sample?.body.text).toContain(
+      "    See [[Notes]] and %%hidden%% here"
+    );
+    expect(sample?.body.text).toContain("\tstill code [[Notes]]");
+    expect(sample?.body.text).toContain("Prose again: [Notes](/notes).");
+  });
+
+  it("does not let an indented fence marker toggle the fence state", async () => {
+    const root = await makeVault({
+      "Notes.md": "# Notes\n",
+      "Sample.md": lines("Prose.", "", "    ```", "", "After: [[Notes]].", ""),
+    });
+    const { entries } = await sourceFor(root).load();
+    const sample = entries.find((entry) => entry.ref === "Sample.md");
+    // A fence can be indented at most three spaces (CommonMark 4.5); four is
+    // an indented code block, and reading it as a fence would leave the rest
+    // of the note un-rewritten.
+    expect(sample?.body.text).toContain("After: [Notes](/notes).");
+  });
+
+  it("keeps an indented continuation line inside a paragraph as prose", async () => {
+    const root = await makeVault({
+      "Notes.md": "# Notes\n",
+      "Sample.md": lines(
+        "A paragraph line",
+        "    continued with [[Notes]].",
+        ""
+      ),
+    });
+    const { entries } = await sourceFor(root).load();
+    const sample = entries.find((entry) => entry.ref === "Sample.md");
+    // An indented code block cannot interrupt a paragraph (CommonMark 4.4);
+    // this is a continuation line and its link must still rewrite.
+    expect(sample?.body.text).toContain("continued with [Notes](/notes).");
+  });
+
+  it("exposes the vault as its content root for git last-modified", async () => {
+    const root = await makeVault(BASIC);
+    const source = sourceFor(root);
+    // Folder-meta discovery still skips it — that scan is guarded on `staged`.
+    expect(source.contentRoot).toBe(root);
+  });
 });
 
 describe("resolveSources (obsidian)", () => {

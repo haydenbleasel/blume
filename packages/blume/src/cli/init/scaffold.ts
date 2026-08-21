@@ -341,6 +341,16 @@ export const buildPlan = (
         .map((file) => ({ ...file, path: join(root, file.path) }))
     );
   }
+  // The obsidian snippet points at `vault/`; seed the directory with a first
+  // note so the scaffolded project passes the source's `validate()` and boots
+  // before the user has opened Obsidian at all.
+  if (answers.sources.includes("obsidian")) {
+    files.push({
+      content:
+        "# Welcome\n\nThis folder is read by Blume's `obsidian` source. Open it as a vault in Obsidian and write notes — `[[Wikilinks]]` become site links.\n",
+      path: join(root, "vault", "Welcome.md"),
+    });
+  }
   return files;
 };
 

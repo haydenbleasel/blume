@@ -313,6 +313,18 @@ describe("buildPlan", () => {
     expect(sdk).toContain("/proj/docs/installation.mdx");
   });
 
+  it("seeds a vault note when the obsidian source is selected", () => {
+    const paths = buildPlan(
+      "/proj",
+      answersWith({ sources: ["obsidian"] })
+    ).map((file) => file.path);
+    // The scaffolded config points at `vault/`; without the directory the
+    // fresh project fails the source's `validate()` on first `blume dev`.
+    expect(paths).toContain("/proj/vault/Welcome.md");
+    // No filesystem source selected, so no starter pages under the content dir.
+    expect(paths).not.toContain("/proj/docs/index.mdx");
+  });
+
   it("adds source SDK deps to the planned package.json", () => {
     const [pkg] = buildPlan(
       "/proj",
