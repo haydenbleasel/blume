@@ -2,12 +2,12 @@
 import type { GraphqlDocument } from "../../openapi/graphql.ts";
 import { graphqlTypeDef } from "../../openapi/graphql.ts";
 import type { ApiOperationRef, ApiSpecData } from "../../openapi/model.ts";
-import { withBase } from "../islands/base-path.ts";
 import {
   graphqlOperationRoutes,
   graphqlRoutes,
   graphqlUsage,
 } from "./graphql-helpers.ts";
+import GraphqlChip from "./GraphqlChip.astro";
 import GraphqlFieldsTable from "./GraphqlFieldsTable.astro";
 import MethodBadge from "./MethodBadge.astro";
 
@@ -26,34 +26,27 @@ const { spec, refOp } = Astro.props;
 const document = spec.document as GraphqlDocument;
 const type = graphqlTypeDef(document, refOp);
 const routes = graphqlRoutes(spec);
-
-/** A schema name rendered as a link when it has a page, plain text otherwise. */
-const chips = (names: string[]): { name: string; route?: string }[] =>
-  names.map((name) => {
-    const target: { name: string; route?: string } = { name };
-    const route = routes.get(name);
-    if (route !== undefined) {
-      target.route = route;
-    }
-    return target;
-  });
+const operationRoutes = graphqlOperationRoutes(spec);
 
 const usage = type ? graphqlUsage(document, type.name) : { operations: [], types: [] };
-const operationRoutes = graphqlOperationRoutes(spec);
-const usageOperations = usage.operations.map((operation) => {
-  const linked: { label: string; kind: string; route?: string } = {
-    kind: operation.kind,
-    label: operation.name,
-  };
-  const route = operationRoutes.get(`${operation.kind}:${operation.name}`);
-  if (route !== undefined) {
-    linked.route = route;
-  }
-  return linked;
-});
 
-const CHIP_LINK = "font-mono text-accent text-xs hover:underline";
-const CHIP_TEXT = "font-mono text-muted-foreground text-xs";
+// The chip sections a kind can render, empty ones dropped: `possibleTypes`
+// carries a union's members or an interface's implementers, so its heading
+// follows the kind.
+const sections = type
+  ? [
+      {
+        names: type.kind === "union" ? (type.possibleTypes ?? []) : [],
+        title: "Member types",
+      },
+      {
+        names: type.kind === "interface" ? (type.possibleTypes ?? []) : [],
+        title: "Implemented by",
+      },
+      { names: type.interfaces ?? [], title: "Implements" },
+    ].filter((section) => section.names.length > 0)
+  : [];
+
 const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
 ---
 
@@ -120,88 +113,39 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
           </div>
         </section>
       )}
-      {(type.kind === "union" ? chips(type.possibleTypes ?? []) : []).length >
-        0 && (
+      {sections.map((section) => (
         <section class="mt-6">
           <div aria-level="2" class={SECTION_HEADING} role="heading">
-            Member types
+            {section.title}
           </div>
           <div class="flex flex-wrap gap-2">
-            {chips(type.possibleTypes ?? []).map((member) =>
-              member.route ? (
-                <a class={CHIP_LINK} href={withBase(member.route)}>
-                  {member.name}
-                </a>
-              ) : (
-                <span class={CHIP_TEXT}>{member.name}</span>
-              )
-            )}
+            {section.names.map((name) => (
+              <GraphqlChip class="text-xs" name={name} route={routes.get(name)} />
+            ))}
           </div>
         </section>
-      )}
-      {type.kind === "interface" && (type.possibleTypes ?? []).length > 0 && (
-        <section class="mt-6">
-          <div aria-level="2" class={SECTION_HEADING} role="heading">
-            Implemented by
-          </div>
-          <div class="flex flex-wrap gap-2">
-            {chips(type.possibleTypes ?? []).map((member) =>
-              member.route ? (
-                <a class={CHIP_LINK} href={withBase(member.route)}>
-                  {member.name}
-                </a>
-              ) : (
-                <span class={CHIP_TEXT}>{member.name}</span>
-              )
-            )}
-          </div>
-        </section>
-      )}
-      {(type.interfaces ?? []).length > 0 && (
-        <section class="mt-6">
-          <div aria-level="2" class={SECTION_HEADING} role="heading">
-            Implements
-          </div>
-          <div class="flex flex-wrap gap-2">
-            {chips(type.interfaces ?? []).map((iface) =>
-              iface.route ? (
-                <a class={CHIP_LINK} href={withBase(iface.route)}>
-                  {iface.name}
-                </a>
-              ) : (
-                <span class={CHIP_TEXT}>{iface.name}</span>
-              )
-            )}
-          </div>
-        </section>
-      )}
-      {(usageOperations.length > 0 || usage.types.length > 0) && (
+      ))}
+      {(usage.operations.length > 0 || usage.types.length > 0) && (
         <section class="mt-6">
           <div aria-level="2" class={SECTION_HEADING} role="heading">
             Used by
           </div>
           <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            {usageOperations.map((operation) => (
+            {usage.operations.map((operation) => (
               <span class="inline-flex items-baseline gap-1 text-xs">
-                {operation.route ? (
-                  <a class={CHIP_LINK} href={withBase(operation.route)}>
-                    {operation.label}
-                  </a>
-                ) : (
-                  <span class={CHIP_TEXT}>{operation.label}</span>
-                )}
+                <GraphqlChip
+                  class="text-xs"
+                  name={operation.name}
+                  route={operationRoutes.get(
+                    `${operation.kind}:${operation.name}`
+                  )}
+                />
                 <span class="text-muted-foreground">{operation.kind}</span>
               </span>
             ))}
-            {chips(usage.types).map((used) =>
-              used.route ? (
-                <a class={CHIP_LINK} href={withBase(used.route)}>
-                  {used.name}
-                </a>
-              ) : (
-                <span class={CHIP_TEXT}>{used.name}</span>
-              )
-            )}
+            {usage.types.map((name) => (
+              <GraphqlChip class="text-xs" name={name} route={routes.get(name)} />
+            ))}
           </div>
         </section>
       )}

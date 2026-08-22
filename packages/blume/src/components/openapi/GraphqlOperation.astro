@@ -11,7 +11,6 @@ import {
   isGraphqlOperationKind,
 } from "../../openapi/graphql.ts";
 import { highlightCode } from "../../markdown/index.ts";
-import { withBase } from "../islands/base-path.ts";
 import {
   exampleQuery,
   exampleResponse,
@@ -20,7 +19,9 @@ import {
   graphqlRoutes,
 } from "./graphql-helpers.ts";
 import { buildRequest, defaultValues } from "./request.ts";
+import { languageSamplePanels } from "./sample-panels.ts";
 import { sampleLanguages } from "./snippets.ts";
+import GraphqlChip from "./GraphqlChip.astro";
 import GraphqlFieldsTable from "./GraphqlFieldsTable.astro";
 import GraphqlType from "./GraphqlType.astro";
 import MethodBadge from "./MethodBadge.astro";
@@ -70,14 +71,7 @@ const languages = sampleLanguages(spec?.codeSamples ?? []);
 const highlight = (code: string, lang: string) =>
   highlightCode(code, lang, { icons: false, themes: data.config.codeThemes });
 const requestPanels = sample
-  ? await Promise.all(
-      languages.map(async (language) => ({
-        html: await highlight(language.build(sample), language.lang),
-        key: language.id,
-        label: language.label,
-        lang: language.id,
-      }))
-    )
+  ? await languageSamplePanels(languages, sample, data.config.codeThemes)
   : [];
 const operationPanels =
   field && isSubscription
@@ -150,18 +144,11 @@ const returnRoute = field ? routes.get(field.type.name) : undefined;
               Returns
             </div>
             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              {returnRoute ? (
-                <a
-                  class="font-mono text-accent text-sm hover:underline"
-                  href={withBase(returnRoute)}
-                >
-                  {field.type.display}
-                </a>
-              ) : (
-                <code class="font-mono text-muted-foreground text-sm">
-                  {field.type.display}
-                </code>
-              )}
+              <GraphqlChip
+                class="text-sm"
+                name={field.type.display}
+                route={returnRoute}
+              />
             </div>
             {document.types[field.type.name]?.description && (
               <p

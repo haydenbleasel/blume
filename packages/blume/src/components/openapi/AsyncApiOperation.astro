@@ -18,6 +18,7 @@ import {
 } from "./async.ts";
 import type { MessageSample } from "./async-snippets.ts";
 import { asyncSampleLanguages } from "./async-snippets.ts";
+import { languageSamplePanels } from "./sample-panels.ts";
 import { buildMessage, defaultMessageValues } from "./message.ts";
 import { messageModel } from "./message-model.ts";
 import MessageComposer from "./MessageComposer.astro";
@@ -107,17 +108,7 @@ const sample: MessageSample | null = model
   : null;
 const languages = asyncSampleLanguages(spec?.codeSamples ?? [], protocol);
 const samplePanels = sample
-  ? await Promise.all(
-      languages.map(async (language) => ({
-        html: await highlightCode(language.build(sample), language.lang, {
-          icons: false,
-          themes: data.config.codeThemes,
-        }),
-        key: language.id,
-        label: language.label,
-        lang: language.id,
-      }))
-    )
+  ? await languageSamplePanels(languages, sample, data.config.codeThemes)
   : [];
 
 const operationBindings = bindingGroups(operation?.bindings);

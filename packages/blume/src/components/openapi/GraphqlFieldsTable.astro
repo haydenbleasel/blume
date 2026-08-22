@@ -1,7 +1,7 @@
 ---
-import { withBase } from "../islands/base-path.ts";
 import type { GraphqlFieldRow } from "./graphql-helpers.ts";
 import { isOutputField } from "./graphql-helpers.ts";
+import GraphqlChip from "./GraphqlChip.astro";
 
 /**
  * The row list shared by every GraphQL member table: a type page's fields or
@@ -51,18 +51,11 @@ const isRequired = (row: GraphqlFieldRow): boolean =>
                 <code class="font-mono text-foreground text-sm">
                   {row.name}
                 </code>
-                {route ? (
-                  <a
-                    class="font-mono text-accent text-xs hover:underline"
-                    href={withBase(route)}
-                  >
-                    {row.type.display}
-                  </a>
-                ) : (
-                  <span class="font-mono text-muted-foreground text-xs">
-                    {row.type.display}
-                  </span>
-                )}
+                <GraphqlChip
+                  class="text-xs"
+                  name={row.type.display}
+                  route={route}
+                />
                 {isRequired(row) && (
                   <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
                     required
@@ -96,28 +89,17 @@ const isRequired = (row: GraphqlFieldRow): boolean =>
               {args.length > 0 && (
                 <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
                   <span class="text-muted-foreground">Arguments:</span>
-                  {args.map((arg) => {
-                    const argRoute = routes.get(arg.type.name);
-                    return (
-                      <span class="inline-flex items-baseline gap-1">
-                        <code class="rounded bg-muted px-1 py-0.5 text-foreground">
-                          {arg.name}
-                        </code>
-                        {argRoute ? (
-                          <a
-                            class="font-mono text-accent hover:underline"
-                            href={withBase(argRoute)}
-                          >
-                            {arg.type.display}
-                          </a>
-                        ) : (
-                          <span class="font-mono text-muted-foreground">
-                            {arg.type.display}
-                          </span>
-                        )}
-                      </span>
-                    );
-                  })}
+                  {args.map((arg) => (
+                    <span class="inline-flex items-baseline gap-1">
+                      <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+                        {arg.name}
+                      </code>
+                      <GraphqlChip
+                        name={arg.type.display}
+                        route={routes.get(arg.type.name)}
+                      />
+                    </span>
+                  ))}
                 </div>
               )}
             </div>

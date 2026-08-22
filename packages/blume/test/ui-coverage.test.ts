@@ -637,11 +637,16 @@ describe("openapi playground sources", () => {
     // The playground client re-renders samples by [data-sample-lang]; the
     // attribute must ride the same element as the tab-switcher's data-panel,
     // and only request samples opt in (response/message panels pass no lang).
+    // The tagging itself lives in the shared panel builder every operation
+    // renderer uses (sample-panels.ts).
     expect(await componentSource("openapi/PanelTabs.astro")).toMatch(
       /data-panel=\{panel\.key\}\s+data-sample-lang=\{panel\.lang\}/u
     );
-    expect(await componentSource("openapi/RequestPanel.astro")).toContain(
+    expect(await componentSource("openapi/sample-panels.ts")).toContain(
       "lang: language.id"
+    );
+    expect(await componentSource("openapi/RequestPanel.astro")).toContain(
+      "languageSamplePanels"
     );
   });
 });
@@ -663,8 +668,9 @@ describe("asyncapi composer sources", () => {
   });
 
   it("tags each event-sample pane with its tool id for live sync", async () => {
+    // Via the shared panel builder — see the request-sample test above.
     expect(await componentSource("openapi/AsyncApiOperation.astro")).toContain(
-      "lang: language.id"
+      "languageSamplePanels"
     );
   });
 });
