@@ -75,7 +75,7 @@ Fumadocs icons are strings resolved by the repo's own `icon` handler in `loader(
 
 ## Headings
 
-Trailing heading markers — `[#custom-id]` (pinned anchor), `[!toc]` (hide from the TOC), `[toc]` (TOC-only entry) — use the same syntax in Blume. **Pass through unchanged.**
+Trailing heading markers — `[#custom-id]` (pinned anchor), `[!toc]` (hide from the TOC), `[toc]` (TOC-only entry) — use the same syntax in Blume. **Pass through unchanged.** One exception: Fumadocs' looser grammar accepts an id containing whitespace (`[#two words]`); Blume does not parse that as a marker, so rewrite such an id to a hyphenated one and update every link that targets it.
 
 ## Code fences
 
