@@ -130,6 +130,13 @@ const runPageItem = async (
   });
 
   const sourceText = await readFile(item.sourcePath, "utf-8");
+  if (item.verbatim) {
+    // A non-markdown include partial (code embed) has no prose to translate;
+    // it's copied unchanged so the locale tree's relative includes resolve.
+    await writeTextAtomic(item.targetPath, sourceText);
+    stampLedger(ledger, item.sourceRel, item.locale, hashSource(sourceText));
+    return done("translated");
+  }
   // SAFETY: `targets` maps every configured locale, and work items only carry
   // configured locale codes.
   const target = context.targets.get(item.locale) as LocaleConfig;

@@ -1262,6 +1262,10 @@ describe("contentConfigTemplate", () => {
     expect(out).toContain("const docs = defineCollection(");
     expect(out).not.toContain("const staged");
     expect(out).toContain("export const collections = { docs };");
+    // The include-aware digest wrapper rides the docs loader so `<include>`-
+    // bearing .md pages re-render instead of trusting the sync-time cache.
+    expect(out).toContain('import { withIncludeRefresh } from "blume/astro";');
+    expect(out).toContain("withIncludeRefresh(glob(");
   });
 
   it("adds a staged collection when staged sources materialize", () => {

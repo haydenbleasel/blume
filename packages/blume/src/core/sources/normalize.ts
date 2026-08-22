@@ -130,41 +130,42 @@ const mapRoute = (relativePath: string): MappedRoute => {
   return { groups, route, segments };
 };
 
-// CommonMark allows backtick *and* tilde fences. The scanners track which
-// delimiter opened the current fence (`null` when outside one) so a ``` line
-// inside a ~~~ block is content, not a toggle — see `nextFenceState`.
-const CODE_FENCE = /^(?<delimiter>```|~~~)/u;
+// CommonMark allows backtick *and* tilde fences, three or more characters
+// long. The scanners track which delimiter opened the current fence and how
+// long its run was (`null` when outside one), so a ``` line inside a ~~~
+// block — or inside a ````-delimited block (the wrapper `codeBlockLines`
+// emits around code that contains its own ``` fence) — is content, not a
+// toggle. See `nextFenceState`.
+const CODE_FENCE = /^(?<run>`{3,}|~{3,})/u;
 
-/** The fence delimiter opening the current code block, or null outside one. */
-export type FenceState = "```" | "~~~" | null;
+/** The open fence's delimiter char and run length, or null outside one. */
+export type FenceState = { delimiter: "`" | "~"; length: number } | null;
 
 /**
  * Advance the fenced-code state for one line: an opening fence records its
- * delimiter, only the matching delimiter closes it, and any other line leaves
- * the state untouched.
+ * delimiter and run length, only a run of the same character at least as long
+ * closes it (CommonMark), and any other line leaves the state untouched.
  */
 export const nextFenceState = (line: string, fence: FenceState): FenceState => {
   const trimmed = line.trimStart();
-  const delimiter = trimmed.match(CODE_FENCE)?.groups?.delimiter;
-  // The `delimiter` group matches exactly ``` or ~~~; comparing against both
-  // narrows it without a cast.
-  if (delimiter !== "```" && delimiter !== "~~~") {
+  const run = trimmed.match(CODE_FENCE)?.groups?.run;
+  if (run === undefined) {
     return fence;
   }
+  const delimiter = run.startsWith("`") ? ("`" as const) : ("~" as const);
   if (fence === null) {
     // A backtick fence's info string cannot itself contain a backtick
     // (CommonMark) — a line-leading ```inline``` span is a paragraph, and
     // opening a phantom fence on it would swallow every heading and link
     // after it. Tilde fences carry no such rule.
-    if (delimiter === "```") {
-      const run = trimmed.match(/^`+/u)?.[0].length ?? 0;
-      if (trimmed.slice(run).includes("`")) {
-        return fence;
-      }
+    if (delimiter === "`" && trimmed.slice(run.length).includes("`")) {
+      return fence;
     }
-    return delimiter;
+    return { delimiter, length: run.length };
   }
-  return fence === delimiter ? null : fence;
+  return fence.delimiter === delimiter && run.length >= fence.length
+    ? null
+    : fence;
 };
 // A closing hash sequence must be preceded by whitespace (CommonMark), so a
 // heading like `## What is C#` keeps its trailing `#`. Up to 3 leading spaces

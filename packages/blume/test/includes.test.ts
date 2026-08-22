@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 
@@ -8,15 +8,23 @@ import { dirname, join } from "pathe";
 import { buildRawMarkdown } from "../src/ai/markdown.ts";
 import { includeHmrPlugin } from "../src/astro/include-hmr.ts";
 import {
+  advanceHtmlCommentState,
+  buildIncludeGraph,
   expandIncludes,
   expandIncludeTarget,
   hasIncludeStatements,
+  parseIncludeLine,
   parseIncludeStatement,
 } from "../src/core/includes.ts";
 import { validateLinks } from "../src/core/links.ts";
 import { scanProject } from "../src/core/project-graph.ts";
-import { normalizeEntry } from "../src/core/sources/normalize.ts";
+import {
+  extractHeadings,
+  normalizeEntry,
+} from "../src/core/sources/normalize.ts";
 import { readExpandedEntryText } from "../src/core/sources/read.ts";
+import type { ContentSource } from "../src/core/sources/types.ts";
+import type { PageRecord } from "../src/core/types.ts";
 import { includePlugin } from "../src/markdown/include.ts";
 import { blumeMarkdownProcessor } from "../src/markdown/index.ts";
 import type { MdastNode } from "../src/markdown/mdast.ts";
@@ -86,6 +94,16 @@ describe("parseIncludeStatement", () => {
     expect(parseIncludeStatement("use <include> to embed")).toBeNull();
     expect(parseIncludeStatement("<include></include>")).toBeNull();
     expect(parseIncludeStatement("plain line")).toBeNull();
+  });
+
+  it("rejects an unclosed statement with a long space run in linear time", () => {
+    // The target's ends are pinned to non-space characters so the trailing
+    // run is consumed by one `\s*` alone — a lazy target overlapping it
+    // backtracked quadratically here (CodeQL js/polynomial-redos), taking
+    // seconds at this length; the suite would hang rather than pass.
+    expect(
+      parseIncludeStatement(`<include>!${" ".repeat(100_000)}`)
+    ).toBeNull();
   });
 });
 
@@ -322,6 +340,178 @@ describe("expandIncludes", () => {
       sourcePath: join(root, "page.md"),
     });
     expect(result.text).toContain("![pic](./pic.png)");
+  });
+
+  it("rejects a /-leading target that climbs above the content root", async () => {
+    const root = await fixture({
+      "docs/page.md": "unused",
+      "outside.md": "Secret.\n",
+    });
+    const result = await expandIncludes("<include>/../outside.md</include>\n", {
+      contentRoot: join(root, "docs"),
+      sourcePath: join(root, "docs", "page.md"),
+    });
+    expect(result.errors[0]?.code).toBe("BLUME_INCLUDE_OUTSIDE_ROOT");
+    expect(result.text).toContain("<include>/../outside.md</include>");
+    expect(result.text).not.toContain("Secret.");
+  });
+
+  it("accepts an in-root directory whose name starts with two dots", async () => {
+    const root = await fixture({
+      "docs/..archive/x.md": "Archived.\n",
+      "docs/page.md": "unused",
+    });
+    const result = await expandIncludes(
+      "<include>./..archive/x.md</include>\n",
+      {
+        contentRoot: join(root, "docs"),
+        sourcePath: join(root, "docs", "page.md"),
+      }
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.text).toContain("Archived.");
+  });
+
+  it("skips statements inside a multi-line HTML comment in .md", async () => {
+    const root = await fixture({ "page.md": "unused", "s.md": "Live.\n" });
+    const body =
+      "<!--\n<include>./s.md</include>\n-->\n\n<include>./s.md</include>\n";
+    const result = await expandIncludes(body, {
+      contentRoot: root,
+      sourcePath: join(root, "page.md"),
+    });
+    // The commented statement stays verbatim; the live one after the close
+    // still expands (comment state resumes correctly).
+    expect(result.text).toContain("<!--\n<include>./s.md</include>\n-->");
+    expect(result.text).toContain("Live.");
+  });
+
+  it("tracks several comment markers on one line", async () => {
+    const root = await fixture({ "page.md": "unused", "s.md": "Live.\n" });
+    const body =
+      "<!-- a --><!--\n<include>./s.md</include>\n-->\n\n<include>./s.md</include>\n";
+    const result = await expandIncludes(body, {
+      contentRoot: root,
+      sourcePath: join(root, "page.md"),
+    });
+    expect(result.text).toContain("\n<include>./s.md</include>\n-->");
+    expect(result.text).toContain("Live.");
+  });
+
+  it("skips statements inside a JSX comment in .mdx", async () => {
+    const root = await fixture({ "page.mdx": "unused", "s.mdx": "Live.\n" });
+    const body = "{/*\n<include>./s.mdx</include>\n*/}\n";
+    const result = await expandIncludes(body, {
+      contentRoot: root,
+      sourcePath: join(root, "page.mdx"),
+    });
+    expect(result.text).toBe(body);
+    // An HTML comment is not a comment in .mdx, so the same body under a
+    // `.md` source is what turns the skip on — the delimiters are per-format.
+    const mdResult = await expandIncludes(
+      "{/*\n<include>./s.mdx</include>\n*/}\n",
+      { contentRoot: root, sourcePath: join(root, "page.md") }
+    );
+    expect(mdResult.text).toContain("Live.");
+  });
+
+  it("skips an indented-code statement in .md but not in .mdx", async () => {
+    const root = await fixture({
+      "page.md": "unused",
+      "page.mdx": "unused",
+      "s.md": "Spliced.\n",
+    });
+    const body = "Example:\n\n    <include>./s.md</include>\n";
+    const mdResult = await expandIncludes(body, {
+      contentRoot: root,
+      sourcePath: join(root, "page.md"),
+    });
+    expect(mdResult.text).toBe(body);
+    // MDX has no indented code blocks; the statement is still JSX flow there.
+    const mdxResult = await expandIncludes(body, {
+      contentRoot: root,
+      sourcePath: join(root, "page.mdx"),
+    });
+    expect(mdxResult.text).toContain("Spliced.");
+  });
+
+  it("skips a .md statement a setext underline would fold into a heading", async () => {
+    const root = await fixture({ "page.md": "unused", "s.md": "Spliced.\n" });
+    const underlined = "<include>./s.md</include>\n---\n";
+    const result = await expandIncludes(underlined, {
+      contentRoot: root,
+      sourcePath: join(root, "page.md"),
+    });
+    expect(result.text).toBe(underlined);
+    // A blank line between them makes the `---` a thematic break again.
+    const broken = await expandIncludes("<include>./s.md</include>\n\n---\n", {
+      contentRoot: root,
+      sourcePath: join(root, "page.md"),
+    });
+    expect(broken.text).toContain("Spliced.");
+  });
+
+  it("does not advance comment state on lines inside fenced code", async () => {
+    const root = await fixture({ "page.md": "unused", "s.md": "Live.\n" });
+    const result = await expandIncludes(
+      "```html\n<!--\n```\n\n<include>./s.md</include>\n",
+      { contentRoot: root, sourcePath: join(root, "page.md") }
+    );
+    expect(result.text).toContain("Live.");
+  });
+});
+
+describe("parseIncludeLine", () => {
+  it("parses an unindented statement and rejects code indentation", () => {
+    expect(parseIncludeLine("  <include>./a.md</include>")).toEqual({
+      attributes: {},
+      target: "./a.md",
+    });
+    expect(parseIncludeLine("    <include>./a.md</include>")).toBeNull();
+    expect(parseIncludeLine("\t<include>./a.md</include>")).toBeNull();
+  });
+});
+
+describe("advanceHtmlCommentState", () => {
+  it("toggles per marker, left to right", () => {
+    expect(advanceHtmlCommentState("no markers", false)).toBe(false);
+    expect(advanceHtmlCommentState("<!--", false)).toBe(true);
+    expect(advanceHtmlCommentState("still inside", true)).toBe(true);
+    expect(advanceHtmlCommentState("-->", true)).toBe(false);
+    expect(advanceHtmlCommentState("<!-- x -->", false)).toBe(false);
+  });
+});
+
+describe("buildIncludeGraph", () => {
+  it("inverts page edges, deduping localized source paths", () => {
+    expect(
+      buildIncludeGraph([
+        { includes: ["/p/_a.md"], sourcePath: "/p/one.md" },
+        { includes: ["/p/_a.md"], sourcePath: "/p/one.md" },
+        { includes: ["/p/_a.md", "/p/_b.md"], sourcePath: "/p/two.md" },
+        { includes: ["/p/_a.md"] },
+        { sourcePath: "/p/three.md" },
+      ])
+    ).toEqual({
+      "/p/_a.md": ["/p/one.md", "/p/two.md"],
+      "/p/_b.md": ["/p/two.md"],
+    });
+  });
+});
+
+describe("fence run-length awareness", () => {
+  it("keeps a shorter inner run from closing a longer fence", () => {
+    // The 4-backtick wrapper `codeBlockLines` emits: everything inside stays
+    // fenced, so no phantom heading (or link/image mutation) escapes it.
+    expect(
+      extractHeadings("````md\n```\n# phantom\n```\n````\n# real")
+    ).toEqual([{ depth: 1, slug: "real", text: "real" }]);
+  });
+
+  it("closes a fence on an equal or longer run of the same delimiter", () => {
+    expect(extractHeadings("```\ncode\n`````\n# after")).toEqual([
+      { depth: 1, slug: "after", text: "after" },
+    ]);
   });
 });
 
@@ -563,6 +753,113 @@ describe("includePlugin", () => {
     expect(result.code).toContain("Spliced heading");
     expect(result.code).not.toContain("<include>");
   });
+
+  it("keeps a blockquoted statement verbatim — the scanner never sees it", async () => {
+    const root = await fixture({ "p.md": "u", "s.md": "Spliced.\n" });
+    const source = "> <include>./s.md</include>\n";
+    // The paragraph inside the blockquote starts after the `> ` marker; the
+    // widened full-line slice restores the marker, so no statement matches.
+    const start = source.indexOf("<include");
+    const { ctx, replaced } = fakeCtx({
+      fileURL: pathToFileURL(join(root, "p.md")),
+      source,
+    });
+    await includePlugin({ contentRoot: root }).paragraph(
+      {
+        position: {
+          end: { offset: source.indexOf("</include>") + "</include>".length },
+          start: { offset: start },
+        },
+        type: "paragraph",
+      },
+      ctx
+    );
+    expect(replaced).toEqual([]);
+  });
+
+  it("keeps a list-item statement verbatim through the real pipeline", async () => {
+    const root = await fixture({ "p.md": "u", "s.md": "Spliced body.\n" });
+    const processor = blumeMarkdownProcessor({ contentRoot: root });
+    const renderer = await processor.createRenderer({});
+    const result = await renderer.render(
+      "- <include>./s.md</include>\n\n> <include>./s.md</include>\n",
+      { fileURL: pathToFileURL(join(root, "p.md")) }
+    );
+    expect(result.code).not.toContain("Spliced body.");
+  });
+
+  it("keeps a comment-interior statement verbatim in a block html node", async () => {
+    const root = await fixture({ "p.md": "u", "s.md": "Spliced.\n" });
+    const { ctx, replaced } = fakeCtx({
+      fileURL: pathToFileURL(join(root, "p.md")),
+    });
+    const plugin = includePlugin({ contentRoot: root });
+    // Entirely commented out: nothing matches, nothing is replaced.
+    await plugin.html(
+      { type: "html", value: "<!--\n<include>./s.md</include>\n-->" },
+      ctx
+    );
+    expect(replaced).toEqual([]);
+    // A live statement line beside a commented one: only the live one splices.
+    await plugin.html(
+      {
+        type: "html",
+        value:
+          "<div>\n<include>./s.md</include>\n</div>\n<!--\n<include>./s.md</include>\n-->",
+      },
+      ctx
+    );
+    expect(replaced[0]?.raw).toBe(
+      "<div>\nSpliced.\n</div>\n<!--\n<include>./s.md</include>\n-->"
+    );
+  });
+
+  it("keeps an indented-code statement verbatim in .md visitors", async () => {
+    const root = await fixture({ "p.md": "u", "s.md": "Spliced.\n" });
+    const { ctx, replaced } = fakeCtx({
+      fileURL: pathToFileURL(join(root, "p.md")),
+    });
+    await includePlugin({ contentRoot: root }).html(
+      { type: "html", value: "<div>\n    <include>./s.md</include>\n</div>" },
+      ctx
+    );
+    expect(replaced).toEqual([]);
+  });
+
+  it("rejects a statement wrapped across lines in .mdx", async () => {
+    const root = await fixture({ "s.mdx": "Spliced.\n" });
+    const { ctx, replaced, reports } = fakeCtx({
+      fileURL: pathToFileURL(join(root, "p.mdx")),
+      text: "./s.mdx",
+    });
+    await includePlugin({ contentRoot: root }).mdxJsxFlowElement(
+      {
+        name: "include",
+        position: { end: { line: 3 }, start: { line: 1 } },
+        type: "mdxJsxFlowElement",
+      },
+      ctx
+    );
+    expect(replaced[0]?.raw).toContain("single line");
+    expect(reports).toHaveLength(1);
+  });
+
+  it("splices a single-line statement whose position is present", async () => {
+    const root = await fixture({ "p.mdx": "u", "s.mdx": "Spliced.\n" });
+    const { ctx, replaced } = fakeCtx({
+      fileURL: pathToFileURL(join(root, "p.mdx")),
+      text: "./s.mdx",
+    });
+    await includePlugin({ contentRoot: root }).mdxJsxFlowElement(
+      {
+        name: "include",
+        position: { end: { line: 2 }, start: { line: 2 } },
+        type: "mdxJsxFlowElement",
+      },
+      ctx
+    );
+    expect(replaced[0]?.raw).toBe("Spliced.");
+  });
 });
 
 /** A fake Vite dev server capturing invalidations and websocket sends. */
@@ -630,6 +927,25 @@ describe("includeHmrPlugin", () => {
     ).handleHotUpdate({ file: "/any", server });
     expect(result).toBeUndefined();
   });
+
+  it("bumps each includer's mtime so the content layer re-syncs it", async () => {
+    const root = await fixture({ "docs/a.md": "# A\n" });
+    const graphPath = join(root, "includes.json");
+    const partial = join(root, "docs", "_s.md");
+    const pageA = join(root, "docs", "a.md");
+    await writeFile(graphPath, JSON.stringify({ [partial]: [pageA] }));
+    // Rewind the page's mtime so the bump is observable even on coarse
+    // filesystem timestamp resolution.
+    const past = new Date(Date.now() - 60_000);
+    await utimes(pageA, past, past);
+    const { server } = fakeServer({});
+    await includeHmrPlugin(graphPath).handleHotUpdate({
+      file: partial,
+      server,
+    });
+    const after = await stat(pageA);
+    expect(after.mtimeMs).toBeGreaterThan(past.getTime());
+  });
 });
 
 describe("normalizeEntry with an expansion", () => {
@@ -656,6 +972,47 @@ describe("normalizeEntry with an expansion", () => {
       { column: 5, line: 5, target: "/x" },
       { column: 5, line: 2, target: "/y" },
     ]);
+  });
+});
+
+/** A content source stub for the expansion-gate tests. */
+const gateSource = (overrides: Partial<ContentSource>): ContentSource => ({
+  load: () => Promise.reject(new Error("unused")),
+  name: "cms",
+  staged: false,
+  ...overrides,
+});
+
+describe("readExpandedEntryText gates", () => {
+  it("mirrors the scan's expansion gate for staged and root-less sources", async () => {
+    const root = await fixture({ "s.md": "Spliced.\n" });
+    const raw = "<include>./s.md</include>\n";
+    await writeFile(join(root, "page.md"), raw);
+    // SAFETY: readExpandedEntryText touches only sourcePath and source.name.
+    const record = {
+      source: { name: "cms", ref: "page" },
+      sourcePath: join(root, "page.md"),
+    } as PageRecord;
+    // No matching source, a staged source, and a root-less source all pass
+    // the raw text through — the scan expanded none of them, so expanding
+    // here would splice text nothing validated.
+    expect(await readExpandedEntryText({ sources: [] }, record)).toBe(raw);
+    expect(
+      await readExpandedEntryText(
+        { sources: [gateSource({ contentRoot: root, staged: true })] },
+        record
+      )
+    ).toBe(raw);
+    expect(
+      await readExpandedEntryText({ sources: [gateSource({})] }, record)
+    ).toBe(raw);
+    // The filesystem shape still expands.
+    expect(
+      await readExpandedEntryText(
+        { sources: [gateSource({ contentRoot: root })] },
+        record
+      )
+    ).toContain("Spliced.");
   });
 });
 

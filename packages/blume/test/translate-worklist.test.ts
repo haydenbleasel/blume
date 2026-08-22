@@ -267,6 +267,138 @@ describe("computeWorkList", () => {
     expect(workList.untracked.map((entry) => entry.locale)).toEqual(["fr"]);
   });
 
+  it("queues include partials per locale tree under the dir parser", async () => {
+    const root = await fixture({
+      "blume.config.ts": CONFIG,
+      "docs/_snippets/example.ts": "export const x = 1;\n",
+      "docs/_snippets/tip.mdx": "Shared tip.\n",
+      "docs/guide.mdx": [
+        "---",
+        "title: Guide",
+        "---",
+        "<include>./_snippets/tip.mdx</include>",
+        "",
+        '<include lang="ts">./_snippets/example.ts</include>',
+        "",
+        "<include>./other.mdx</include>",
+        "",
+      ].join("\n"),
+      "docs/other.mdx": "---\ntitle: Other\n---\n# Other\n",
+    });
+    const project = await scan(root);
+    const workList = await computeWorkList(project, emptyLedger());
+    const partials = pageItems(workList.items).filter((item) =>
+      item.sourceRel.includes("_snippets")
+    );
+    // Markdown partials translate; the code embed copies verbatim — both must
+    // exist in each locale tree or the translated pages' includes break.
+    expect(
+      partials.map((item) => [
+        item.sourceRel,
+        item.locale,
+        item.status,
+        item.verbatim ?? false,
+      ])
+    ).toEqual([
+      ["docs/_snippets/example.ts", "de", "missing", true],
+      ["docs/_snippets/example.ts", "fr", "missing", true],
+      ["docs/_snippets/tip.mdx", "de", "missing", false],
+      ["docs/_snippets/tip.mdx", "fr", "missing", false],
+    ]);
+    expect(partials[0]?.targetRel).toBe("docs/de/_snippets/example.ts");
+    expect(partials[0]?.targetPath).toBe(
+      join(root, "docs/de/_snippets/example.ts")
+    );
+    // An included file that is itself a page translates as a page, once.
+    expect(
+      pageItems(workList.items).filter(
+        (item) => item.sourceRel === "docs/other.mdx"
+      )
+    ).toHaveLength(2);
+    expect(workList.knownSources.has("docs/_snippets/tip.mdx")).toBe(true);
+  });
+
+  it("adopts, counts, and re-queues existing partial translations", async () => {
+    const tip = "Shared tip.\n";
+    const root = await fixture({
+      "blume.config.ts": CONFIG,
+      "docs/_snippets/tip.mdx": tip,
+      "docs/de/_snippets/tip.mdx": "Geteilter Tipp.\n",
+      "docs/fr/_snippets/tip.mdx": "Astuce partagée.\n",
+      "docs/guide.mdx":
+        "---\ntitle: Guide\n---\n<include>./_snippets/tip.mdx</include>\n",
+    });
+    const project = await scan(root);
+    const ledger = emptyLedger();
+    const hash = hashSource(tip);
+    stampLedger(ledger, "docs/_snippets/tip.mdx", "de", hash);
+
+    // de is stamped current (up to date); fr exists unstamped (adopted).
+    const workList = await computeWorkList(project, ledger);
+    expect(workList.untracked).toContainEqual({
+      hash,
+      kind: "page",
+      locale: "fr",
+      sourceRel: "docs/_snippets/tip.mdx",
+    });
+    expect(
+      pageItems(workList.items).filter((item) =>
+        item.sourceRel.includes("_snippets")
+      )
+    ).toEqual([]);
+    expect(workList.upToDate).toBe(1);
+
+    // A drifted stamp re-queues the pair as stale.
+    stampLedger(ledger, "docs/_snippets/tip.mdx", "de", "drifted");
+    const drifted = await computeWorkList(project, ledger);
+    expect(
+      pageItems(drifted.items)
+        .filter((item) => item.sourceRel.includes("_snippets"))
+        .map((item) => [item.locale, item.status])
+    ).toEqual([["de", "stale"]]);
+
+    // --force promotes the unstamped fr pair instead of adopting it.
+    const forced = await computeWorkList(project, ledger, { force: true });
+    expect(
+      pageItems(forced.items)
+        .filter((item) => item.sourceRel.includes("_snippets"))
+        .map((item) => [item.locale, item.status])
+    ).toEqual([
+      ["de", "stale"],
+      ["fr", "stale"],
+    ]);
+  });
+
+  it("leaves partials alone under the dot parser", async () => {
+    const root = await fixture({
+      "blume.config.ts": `export default {
+  title: "Test",
+  i18n: {
+    defaultLocale: "en",
+    locales: [
+      { code: "en", label: "English" },
+      { code: "fr", label: "French" },
+    ],
+    parser: "dot",
+  },
+};
+`,
+      "docs/_snippets/tip.mdx": "Shared tip.\n",
+      "docs/guide.mdx":
+        "---\ntitle: Guide\n---\n<include>./_snippets/tip.mdx</include>\n",
+    });
+    const project = await scan(root);
+    const workList = await computeWorkList(project, emptyLedger());
+    // A dot-parser translation sits beside its source, so the shared partial
+    // already resolves — no per-locale copy is queued.
+    expect(
+      pageItems(workList.items).some((item) =>
+        item.sourceRel.includes("_snippets")
+      )
+    ).toBe(false);
+    expect(workList.knownSources.has("docs/_snippets/tip.mdx")).toBe(false);
+  });
+
   it("returns an empty work list when i18n is not configured", async () => {
     const root = await fixture({
       "blume.config.ts": 'export default { title: "Test" };\n',

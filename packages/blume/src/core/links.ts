@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 
-import { basename, dirname, join } from "pathe";
+import { basename, dirname, join, relative, resolve } from "pathe";
 
 import { stripBasePath, withBasePath } from "./base-path.ts";
 import {
@@ -36,6 +36,34 @@ interface LinkSite {
   file: string;
   line: number;
 }
+
+/**
+ * Message context for a link written inside an included partial whose verdict
+ * depends on *which* page splices it (relative paths resolve against the
+ * including page's route; bare anchors against its headings). Without it the
+ * same partial line can be reported broken while being valid from another
+ * includer — with no way to tell the reports apart.
+ */
+const includedBySuffix = (link: PageLink, page: PageRecord): string =>
+  link.file ? ` (included by ${basename(page.sourcePath ?? page.id)})` : "";
+
+/**
+ * Invert the include image rebase for display: expansion rewrote a partial's
+ * relative image target into the including page's directory so it resolves,
+ * but the diagnostic points at the partial — report the path the author
+ * actually wrote there, not the rebased one they never typed.
+ */
+const authoredImageTarget = (
+  target: string,
+  pagePath: string,
+  partialPath: string
+): string => {
+  const authored = relative(
+    dirname(partialPath),
+    resolve(dirname(pagePath), target)
+  );
+  return authored.startsWith(".") ? authored : `./${authored}`;
+};
 
 /** An external link occurrence queued for a network probe. */
 interface ExternalRef extends LinkSite {
@@ -141,7 +169,8 @@ const checkAnchor = (
   route: string,
   fragment: string,
   site: LinkSite,
-  ctx: LinkContext
+  ctx: LinkContext,
+  via = ""
 ): Diagnostic | null => {
   const anchors = ctx.anchors.get(route);
   // Exact first: a `[#custom-id]` pin may contain uppercase, which the
@@ -152,7 +181,7 @@ const checkAnchor = (
   return {
     ...site,
     code: "BLUME_BROKEN_ANCHOR",
-    message: `No heading on ${route} matches anchor #${fragment}.`,
+    message: `No heading on ${route} matches anchor #${fragment}${via}.`,
     severity: "warning",
   };
 };
@@ -164,7 +193,8 @@ const checkPathLink = (
   page: PageRecord,
   link: PageLink,
   site: LinkSite,
-  ctx: LinkContext
+  ctx: LinkContext,
+  via = ""
 ): LinkResult => {
   // Page routes carry the site-wide base; an absolute author path is written
   // as if mounted at root, so base it for the route lookup (idempotent — a
@@ -173,7 +203,7 @@ const checkPathLink = (
   // (e.g. `/releases/v1.0`) isn't misread as a missing asset.
   const route = toRoute(withBasePath(ctx.basePath, resolved));
   if (ctx.routes.has(route)) {
-    return fragment ? checkAnchor(route, fragment, site, ctx) : null;
+    return fragment ? checkAnchor(route, fragment, site, ctx, via) : null;
   }
   // A custom `.astro` page or generated route serves this path, but its
   // headings aren't indexed — accept any fragment rather than false-flag it.
@@ -206,10 +236,16 @@ const checkPathLink = (
       if (resolveRelativeImage(dirname(page.sourcePath), link.target)) {
         return null;
       }
+      // A partial-origin image was rebased into the page's directory for
+      // resolution but reports against the partial — cite the path as
+      // authored there, so file, path, and "next to" agree.
+      const authored = link.file
+        ? authoredImageTarget(link.target, page.sourcePath, link.file)
+        : link.target;
       return {
         ...site,
         code: "BLUME_BROKEN_ASSET",
-        message: `Image ${link.target} was not found next to ${basename(page.sourcePath)}.`,
+        message: `Image ${authored} was not found next to ${basename(link.file ?? page.sourcePath)}.`,
         severity: "warning",
         suggestion:
           "Add the file next to the page source or fix the reference.",
@@ -231,7 +267,7 @@ const checkPathLink = (
   return {
     ...site,
     code: "BLUME_BROKEN_LINK",
-    message: `Broken link to ${link.target}: no page resolves to ${route}.`,
+    message: `Broken link to ${link.target}${via}: no page resolves to ${route}.`,
     severity: "error",
     suggestion: "Check the path, or create the target page.",
   };
@@ -303,14 +339,19 @@ const classifyLink = (
   }
   rawPath = decodePercent(rawPath);
 
+  // A relative path (or a bare anchor) means something different from every
+  // including page; an absolute path means the same thing everywhere — so
+  // only includer-dependent targets carry the "included by" context, and
+  // identical absolute-target reports collapse in the final dedupe.
+  const via = rawPath.startsWith("/") ? "" : includedBySuffix(link, page);
   if (rawPath === "") {
-    return fragment ? checkAnchor(page.route, fragment, site, ctx) : null;
+    return fragment ? checkAnchor(page.route, fragment, site, ctx, via) : null;
   }
 
   const resolved = rawPath.startsWith("/")
     ? rawPath
     : resolveRelative(page.route, rawPath, isIndexPage(page));
-  return checkPathLink(resolved, fragment, page, link, site, ctx);
+  return checkPathLink(resolved, fragment, page, link, site, ctx, via);
 };
 
 /**
@@ -376,5 +417,22 @@ export const validateLinks = async (
     diagnostics.push(...(await checkExternalLinks(external)));
   }
 
-  return diagnostics;
+  // A partial spliced into several pages (or every locale of one) yields the
+  // same diagnostic once per including page record; byte-identical reports
+  // add noise without information, so only the first of each survives.
+  const seen = new Set<string>();
+  return diagnostics.filter((diagnostic) => {
+    const key = [
+      diagnostic.code,
+      diagnostic.file ?? "",
+      diagnostic.line ?? "",
+      diagnostic.column ?? "",
+      diagnostic.message,
+    ].join("\n");
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 };

@@ -36,9 +36,16 @@ const CONTENT_EXTENSIONS = new Set([".md", ".mdx"]);
  * attributes, then the target path as the element's text. Attribute values
  * accept both quote styles; a bare attribute (no `=`) is allowed so future
  * boolean flags parse rather than break the statement match.
+ *
+ * The target is anchored to non-space characters on both ends (rather than a
+ * lazy run trimmed by the following `\s*`): a lazy `[^<>]*?` overlapping that
+ * `\s*` backtracks quadratically on inputs like `<include>x` plus a long run
+ * of spaces with no closing tag (CodeQL js/polynomial-redos). With both ends
+ * pinned, a trailing space run is consumed by `\s*` alone and a failed match
+ * stays linear.
  */
 const INCLUDE_STATEMENT =
-  /^<include(?<attrs>(?:\s+[a-z][\w-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'))?)*)\s*>\s*(?<target>[^<>\s][^<>]*?)\s*<\/include\s*>$/u;
+  /^<include(?<attrs>(?:\s+[a-z][\w-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'))?)*)\s*>\s*(?<target>[^<>\s](?:[^<>]*[^<>\s])?)\s*<\/include\s*>$/u;
 
 /** One attribute within a statement's attrs run. */
 const INCLUDE_ATTRIBUTE =
@@ -50,6 +57,44 @@ const INCLUDE_ATTRIBUTE =
  */
 export const hasIncludeStatements = (text: string): boolean =>
   text.includes("<include");
+
+/** A line indented four spaces (or a tab) — an indented code block in `.md`,
+ * where the renderer shows a statement literally instead of splicing it. */
+const INDENTED_CODE = /^(?: {4}|\t)/u;
+
+/** A setext underline (`===`/`---`, up to 3 leading spaces): directly under a
+ * statement line it folds the statement into a heading instead of a splice. */
+const SETEXT_UNDERLINE = /^ {0,3}(?:=+|-+)\s*$/u;
+
+/** Comment delimiters per format: `.md` uses HTML comments, `.mdx` JSX ones. */
+const COMMENT_DELIMITERS = {
+  md: { close: "-->", open: "<!--" },
+  mdx: { close: "*/}", open: "{/*" },
+} as const;
+
+/**
+ * Advance the comment state across one line: each open/close marker toggles
+ * it, left to right. A line that *matches* a statement can't contain a marker
+ * (the statement regex spans the whole trimmed line), so per-line state at the
+ * line's start is all the statement scan needs.
+ */
+const advanceCommentState = (
+  line: string,
+  delimiters: { open: string; close: string },
+  inComment: boolean
+): boolean => {
+  let inside = inComment;
+  let cursor = 0;
+  for (;;) {
+    const marker = inside ? delimiters.close : delimiters.open;
+    const index = line.indexOf(marker, cursor);
+    if (index === -1) {
+      return inside;
+    }
+    inside = !inside;
+    cursor = index + marker.length;
+  }
+};
 
 /** The attributes an include statement supports. */
 export interface IncludeAttributes {
@@ -91,6 +136,25 @@ export const parseIncludeStatement = (
   return { attributes, target: match.groups.target ?? "" };
 };
 
+/**
+ * Parse one raw `.md` source line as an include statement, applying the
+ * line-level rules the renderer sees: a line indented like code (4 spaces or
+ * a tab) is an indented code block, shown literally rather than spliced. The
+ * render plugin's `.md` visitors share this so the two halves can't drift.
+ */
+export const parseIncludeLine = (line: string): IncludeStatement | null =>
+  INDENTED_CODE.test(line) ? null : parseIncludeStatement(line.trim());
+
+/**
+ * Advance the HTML comment state across one `.md` line — the render plugin's
+ * half of the comment rule (a statement inside `<!-- -->` never splices),
+ * sharing the same tracking the string-level scanner uses.
+ */
+export const advanceHtmlCommentState = (
+  line: string,
+  inComment: boolean
+): boolean => advanceCommentState(line, COMMENT_DELIMITERS.md, inComment);
+
 /** Provenance of one line of expanded output. */
 export interface LineOrigin {
   /** Absolute path of the file the line came from. */
@@ -131,11 +195,23 @@ const includeError = (
 ): Diagnostic => ({ code, file, line, message, severity: "error", suggestion });
 
 /**
+ * Whether `path` lies outside `root`. The relative path must be `..` itself or
+ * start with a `../` *segment* — a bare `.startsWith("..")` would also reject
+ * a legal in-root directory whose name begins with two dots (`..archive/`).
+ */
+const escapesRoot = (root: string, path: string): boolean => {
+  const rel = relative(root, path);
+  return rel === ".." || rel.startsWith("../");
+};
+
+/**
  * Resolve a statement's target to an absolute path, or an error when it can't
  * be resolved safely. `/`-leading targets resolve from the content root;
  * everything else resolves from the including file's directory. Targets must
  * stay within the content root — a partial outside it would be silently
- * dropped from version snapshots and ejects.
+ * dropped from version snapshots and ejects (and an escaping path could
+ * splice arbitrary files into published pages). Both branches enforce the
+ * bound: a root-relative target can still climb out through `..` segments.
  */
 const resolveIncludePath = (
   target: string,
@@ -155,10 +231,22 @@ const resolveIncludePath = (
         ),
       };
     }
-    return { path: join(ctx.contentRoot, target) };
+    const path = join(ctx.contentRoot, target);
+    if (escapesRoot(ctx.contentRoot, path)) {
+      return {
+        error: includeError(
+          "BLUME_INCLUDE_OUTSIDE_ROOT",
+          `Include target ${target} resolves outside the content root.`,
+          filePath,
+          line,
+          "Root-relative include paths resolve from the content root and cannot climb above it."
+        ),
+      };
+    }
+    return { path };
   }
   const path = resolve(dirname(filePath), target);
-  if (ctx.contentRoot && relative(ctx.contentRoot, path).startsWith("..")) {
+  if (ctx.contentRoot && escapesRoot(ctx.contentRoot, path)) {
     return {
       error: includeError(
         "BLUME_INCLUDE_OUTSIDE_ROOT",
@@ -349,9 +437,10 @@ const expandStatement = async (
 
 /**
  * Walk a document's lines, replacing each include statement (outside fenced
- * code) with the target's expanded lines. Statements that error stay verbatim
- * so downstream surfaces show what the author wrote; a blank line is padded
- * around each splice so a partial can't merge into an adjacent paragraph.
+ * code, comments, and — in `.md` — indented code blocks) with the target's
+ * expanded lines. Statements that error stay verbatim so downstream surfaces
+ * show what the author wrote; a blank line is padded around each splice so a
+ * partial can't merge into an adjacent paragraph.
  */
 const expandLines = async (
   body: string,
@@ -361,16 +450,44 @@ const expandLines = async (
   stack: readonly string[]
 ): Promise<ExpandedLines> => {
   const sourceLines = body.split("\n");
+  const isMdx = extname(filePath).toLowerCase() === ".mdx";
+  const delimiters = COMMENT_DELIMITERS[isMdx ? "mdx" : "md"];
 
-  // Pass 1: fence-aware statement detection per line.
+  // Pass 1: statement detection per line, tracking fenced code and comments —
+  // a commented-out statement never renders, so expanding it would leak the
+  // partial into search/mirror surfaces the page doesn't show. Indented code
+  // and setext underlines only exist in `.md` (MDX has neither, and an
+  // indented `<include>` there is still JSX flow the renderer splices).
   let fence: FenceState = null;
-  const statements = sourceLines.map((line) => {
+  let inComment = false;
+  const statements = sourceLines.map((line, index) => {
+    if (inComment) {
+      inComment = advanceCommentState(line, delimiters, true);
+      return null;
+    }
     const next = nextFenceState(line, fence);
     const inFence = fence !== null || next !== null;
     fence = next;
-    return !inFence && hasIncludeStatements(line)
+    if (inFence) {
+      return null;
+    }
+    inComment = advanceCommentState(line, delimiters, false);
+    if (inComment || !hasIncludeStatements(line)) {
+      return null;
+    }
+    const statement = isMdx
       ? parseIncludeStatement(line.trim())
-      : null;
+      : parseIncludeLine(line);
+    // A setext underline directly below folds the statement line into a
+    // heading — the renderer shows a heading, not a splice, so skip it.
+    if (
+      statement &&
+      !isMdx &&
+      SETEXT_UNDERLINE.test(sourceLines[index + 1] ?? "")
+    ) {
+      return null;
+    }
+    return statement;
   });
 
   // Pass 2: expand every statement concurrently — reads are independent, and
@@ -486,4 +603,30 @@ export const expandIncludeTarget = async (
   // Nested statements that errored stay verbatim inside the splice (matching
   // the string-level surfaces); they're reported so the render can warn.
   return { errors: ctx.errors, text: expanded.lines.join("\n") };
+};
+
+/**
+ * Invert the scan's page → included-partials edges into the partial →
+ * including-pages map `includeHmrPlugin` reads (`generated/includes.json`),
+ * so editing a partial invalidates every page that splices it. Localized
+ * pages share a source path, hence the dedupe. Shared by `generateRuntime`
+ * and `eject`, whose configs both wire the plugin at the same path.
+ */
+export const buildIncludeGraph = (
+  pages: { sourcePath?: string; includes?: string[] }[]
+) => {
+  const graph: Record<string, string[]> = {};
+  for (const page of pages) {
+    const { sourcePath } = page;
+    if (!sourcePath) {
+      continue;
+    }
+    for (const partial of page.includes ?? []) {
+      const includers = (graph[partial] ??= []);
+      if (!includers.includes(sourcePath)) {
+        includers.push(sourcePath);
+      }
+    }
+  }
+  return graph;
 };

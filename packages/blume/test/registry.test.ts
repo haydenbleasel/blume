@@ -106,6 +106,9 @@ describe("eject", () => {
     expect(has("src/content.config.ts")).toBe(true);
     expect(has("src/pages/[...slug].astro")).toBe(true);
     expect(has("src/generated/data.json")).toBe(true);
+    // The include graph the ejected astro.config's includeHmrPlugin reads —
+    // without it partial edits would silently serve stale pages post-eject.
+    expect(has("src/generated/includes.json")).toBe(true);
     // The island/example maps the catch-all imports, plus their live wrappers.
     expect(has("src/generated/islands.ts")).toBe(true);
     expect(has("src/generated/examples.ts")).toBe(true);

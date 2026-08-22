@@ -55,8 +55,16 @@ export const readExpandedEntryText = async (
   const source = ctx.sources?.find(
     (candidate) => candidate.name === page.source.name
   );
+  // Mirror the scan's expansion gate exactly (`!staged && contentRoot`): a
+  // staged/custom source's entries were never expanded at scan time, so no
+  // headings/links/diagnostics exist for the spliced content — expanding only
+  // here would splice text the rest of the pipeline never validated, with no
+  // content-root bound on resolution.
+  if (!source || source.staged || !source.contentRoot) {
+    return raw;
+  }
   const expansion = await expandIncludes(raw, {
-    contentRoot: source?.contentRoot,
+    contentRoot: source.contentRoot,
     sourcePath: page.sourcePath,
   });
   return expansion.text;

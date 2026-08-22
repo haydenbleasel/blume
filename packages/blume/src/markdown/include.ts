@@ -4,9 +4,10 @@ import { resolve } from "pathe";
 
 import type { IncludeStatement } from "../core/includes.ts";
 import {
+  advanceHtmlCommentState,
   expandIncludeTarget,
   hasIncludeStatements,
-  parseIncludeStatement,
+  parseIncludeLine,
 } from "../core/includes.ts";
 import type { MdastNode, MdastValue } from "./mdast.ts";
 
@@ -42,6 +43,10 @@ interface JsxAttributeNode {
 interface JsxFlowNode extends MdastNode {
   name?: string | null;
   attributes?: JsxAttributeNode[];
+  position?: {
+    start?: { line?: number };
+    end?: { line?: number };
+  };
 }
 
 /** The raw-HTML node slice (`.md` pages) the plugin reads. */
@@ -145,21 +150,30 @@ export const includePlugin = (options: IncludePluginOptions = {}) => {
     return expanded.text;
   };
 
-  /** Splice every statement line in a text block; `null` when none matched. */
+  /**
+   * Splice every statement line in a text block; `null` when none matched.
+   * Statement detection mirrors the string-level scanner's `.md` line rules
+   * (`parseIncludeLine`, HTML comment tracking) so the rendered page and the
+   * indexed/mirrored surfaces agree on which lines splice: a statement inside
+   * `<!-- -->` or indented like code stays verbatim on both sides.
+   */
   const spliceLines = async (
     node: MdastNode,
     text: string,
     ctx: IncludeVisitorContext
   ): Promise<string | null> => {
     let matched = false;
+    let inComment = false;
     const lines = await Promise.all(
-      text.split("\n").map(async (line) => {
-        const statement = parseIncludeStatement(line.trim());
+      text.split("\n").map((line) => {
+        const wasInComment = inComment;
+        inComment = advanceHtmlCommentState(line, inComment);
+        const statement = wasInComment ? null : parseIncludeLine(line);
         if (!statement) {
           return line;
         }
         matched = true;
-        return await splice(node, statement, ctx);
+        return splice(node, statement, ctx);
       })
     );
     return matched ? lines.join("\n") : null;
@@ -181,21 +195,46 @@ export const includePlugin = (options: IncludePluginOptions = {}) => {
       if (node.name !== "include") {
         return;
       }
+      // The string-level scanner (search, mirrors, llms-full.txt, the HMR
+      // graph) only recognizes single-line statements; a wrapped element
+      // would render content those surfaces never see, so reject it loudly
+      // instead of splicing it invisibly.
+      const start = node.position?.start?.line;
+      const end = node.position?.end?.line;
+      if (start !== undefined && end !== undefined && start !== end) {
+        const message =
+          "<include> must be written on a single line: <include>./path.mdx</include>.";
+        ctx.report({ message, node, severity: "warning" });
+        ctx.replaceNode(node, { raw: errorBlock(message) });
+        return;
+      }
       ctx.replaceNode(node, {
         raw: await splice(node, statementFromJsx(node, ctx), ctx),
       });
     },
     name: "blume-include",
+    // Positions are opt-in since satteri 0.10 (the parse skips the line index
+    // when no plugin reads them); both the paragraph slice recovery and the
+    // multi-line JSX rejection depend on them.
+    options: { position: true },
     async paragraph(node: PositionedNode, ctx: IncludeVisitorContext) {
       // `<include>` isn't a known block-level HTML tag, so in plain `.md` a
       // statement line parses as a paragraph of inline `html` + text nodes.
-      // Recover the raw text by position and splice the statement lines.
+      // Recover the raw text by position and splice the statement lines. The
+      // slice is widened to whole source lines so container markers the
+      // paragraph position excludes (a blockquote's `>`, a list item's `-`)
+      // stay visible — a statement inside those containers is not on a line
+      // of its own, and the string-level scanner never expands it, so
+      // splicing here would render content search and the mirrors never see.
       const start = node.position?.start?.offset;
       const end = node.position?.end?.offset;
       if (start === undefined || end === undefined) {
         return;
       }
-      const text = ctx.source.slice(start, end);
+      const lineStart = ctx.source.lastIndexOf("\n", start - 1) + 1;
+      const lineEndIndex = ctx.source.indexOf("\n", end);
+      const lineEnd = lineEndIndex === -1 ? ctx.source.length : lineEndIndex;
+      const text = ctx.source.slice(lineStart, lineEnd);
       if (!hasIncludeStatements(text)) {
         return;
       }

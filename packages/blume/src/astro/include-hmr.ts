@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, utimes } from "node:fs/promises";
 
 /**
  * Dev-server invalidation for `<include>` partials. A partial is not an Astro
@@ -54,11 +54,23 @@ export const includeHmrPlugin = (graphPath: string): IncludeHmrPlugin => ({
       return;
     }
     const { moduleGraph, ws } = ctx.server;
+    const now = new Date();
     for (const includer of includers) {
       for (const mod of moduleGraph.getModulesByFile(includer) ?? []) {
         // SAFETY: the module came out of this module graph; `never` only
         // reflects that the structural slice doesn't model the node type.
         moduleGraph.invalidateModule(mod as never);
+      }
+      // Plain `.md` pages have no Vite module: their HTML lives in the
+      // content-layer store, rendered at sync time. Bump the page's mtime so
+      // Astro's content watcher re-syncs it — the include-aware digest
+      // (`withIncludeRefresh`) then forces a fresh render that re-reads the
+      // edited partial.
+      try {
+        // oxlint-disable-next-line no-await-in-loop -- ordered per-page touch
+        await utimes(includer, now, now);
+      } catch {
+        // The page may have been deleted since the graph was written.
       }
     }
     ws.send({ type: "full-reload" });

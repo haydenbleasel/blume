@@ -36,6 +36,7 @@ import { BlumeError } from "../core/diagnostics.ts";
 import { writeTextAtomic } from "../core/fs-atomic.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import { resolveFallbackLocale } from "../core/i18n.ts";
+import { buildIncludeGraph } from "../core/includes.ts";
 import {
   validateNavTargets,
   validateSearchPopularIcons,
@@ -1625,31 +1626,6 @@ const assertFontFilesExist = (project: BlumeProject): void => {
       severity: "error",
     });
   }
-};
-
-/**
- * Invert the scan's page → included-partials edges into the partial →
- * including-pages map `includeHmrPlugin` reads (`generated/includes.json`),
- * so editing a partial invalidates every page that splices it. Localized
- * pages share a source path, hence the dedupe.
- */
-const buildIncludeGraph = (
-  pages: { sourcePath?: string; includes?: string[] }[]
-) => {
-  const graph: Record<string, string[]> = {};
-  for (const page of pages) {
-    const { sourcePath } = page;
-    if (!sourcePath) {
-      continue;
-    }
-    for (const partial of page.includes ?? []) {
-      const includers = (graph[partial] ??= []);
-      if (!includers.includes(sourcePath)) {
-        includers.push(sourcePath);
-      }
-    }
-  }
-  return graph;
 };
 
 /**
