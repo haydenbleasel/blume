@@ -48,8 +48,18 @@ export interface HeadingMarkers {
  * Split trailing markers off a heading's text. Only markers at the very end of
  * the heading count (mid-text brackets are ordinary prose); when a marker kind
  * repeats, the last one written wins.
+ *
+ * `isRefDefined` reports whether a link-reference definition exists for a
+ * bracket's label (`toc`, `!toc`, `#id`): a defined bracket is a CommonMark
+ * shortcut link, not a marker — the renderer sees a resolved `<a>` element
+ * there and strips nothing at or before it, so the parse stops the same way.
+ * The render-time hast plugin never passes it (resolved links are already
+ * elements by the time it runs); the raw-source scanner does.
  */
-export const parseHeadingMarkers = (text: string): HeadingMarkers => {
+export const parseHeadingMarkers = (
+  text: string,
+  isRefDefined?: (label: string) => boolean
+): HeadingMarkers => {
   let remaining = text;
   let id: string | undefined;
   let toc: HeadingMarkers["toc"];
@@ -58,6 +68,13 @@ export const parseHeadingMarkers = (text: string): HeadingMarkers => {
     match?.groups;
     match = MARKER.exec(remaining)
   ) {
+    const label =
+      match.groups.id === undefined
+        ? `${match.groups.hide ?? ""}toc`
+        : `#${match.groups.id}`;
+    if (isRefDefined?.(label)) {
+      break;
+    }
     remaining = remaining.slice(0, match.index);
     if (match.groups.id === undefined) {
       // Stripping runs right-to-left, so keeping the first capture of each

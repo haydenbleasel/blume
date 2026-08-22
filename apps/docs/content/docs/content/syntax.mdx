@@ -39,6 +39,8 @@ Two more trailing markers control how a heading appears in the table of contents
 ## Both markers together [toc] [#custom-id]
 ```
 
+Markers are always parsed — a heading that literally ends in marker-shaped text would be treated as marked. Backslash-escaping doesn't help (Markdown resolves `\[` to `[` before the marker parse runs); to show literal marker text at the end of a heading, wrap it in inline code: `` ## Using `[toc]` ``.
+
 ## Emphasis
 
 Inline formatting for stressing words, marking deletions, and showing code or keystrokes mid-sentence.

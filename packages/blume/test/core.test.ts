@@ -679,6 +679,48 @@ describe(extractHeadings, () => {
     ]);
   });
 
+  it("keeps a bracket with a matching link-reference definition, like CommonMark", () => {
+    // With a definition anywhere in the doc, the rendered heading ends in a
+    // shortcut reference link, not a marker — the bracket is heading text.
+    const body = ["## Overview [toc]", "", "[toc]: /url"].join("\n");
+    expect(extractHeadings(body)).toStrictEqual([
+      { depth: 2, slug: "overview-toc", text: "Overview [toc]" },
+    ]);
+  });
+
+  it("matches definition labels case-insensitively, ignoring fenced ones", () => {
+    const defined = ["## Overview [toc]", "", "[TOC]: /url"].join("\n");
+    expect(extractHeadings(defined)[0]?.slug).toBe("overview-toc");
+    const fenced = ["## Overview [toc]", "", "```", "[toc]: /url", "```"].join(
+      "\n"
+    );
+    expect(extractHeadings(fenced)[0]?.slug).toBe("overview");
+  });
+
+  it("stops at a defined bracket but still strips markers to its right", () => {
+    // The renderer's trailing text node is " [toc]", so that marker strips;
+    // `[#privacy]` resolves as a link and stays in the text and the slug.
+    const body = ["## X [#privacy] [toc]", "", "[#privacy]: /url"].join("\n");
+    expect(extractHeadings(body)[0]).toStrictEqual({
+      depth: 2,
+      slug: "x-privacy",
+      text: "X [#privacy]",
+    });
+  });
+
+  it("resolves backslash escapes before parsing markers, like the renderer", () => {
+    // CommonMark turns `\[` into `[` before the renderer ever sees the
+    // heading, so the marker still applies — there is no inline escape for
+    // markers; literal trailing bracket text needs inline code.
+    expect(extractHeadings("## Literal \\[toc]")).toStrictEqual([
+      { depth: 2, slug: "literal", text: "Literal" },
+    ]);
+    // Other escapes resolve too, keeping text and slug parity with the page.
+    expect(extractHeadings("## Q \\& A")).toStrictEqual([
+      { depth: 2, slug: "q--a", text: "Q & A" },
+    ]);
+  });
+
   it("strips markers from setext headings too", () => {
     const body = ["Long title [#short]", "===="].join("\n");
     expect(extractHeadings(body)).toStrictEqual([

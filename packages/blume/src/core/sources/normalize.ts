@@ -276,25 +276,61 @@ const finishPromptTag = (
  * collapses `--`; github-slugger keeps it) and resolves repeated headings the
  * same way (`setup`, `setup-1`).
  */
+// CommonMark's escapable ASCII punctuation. The renderer only ever sees
+// heading text *after* the Markdown parser has resolved backslash escapes, so
+// `\[toc]` reaches the hast as plain `[toc]` and the marker still applies;
+// resolving escapes here keeps the two pipelines identical (there is no
+// inline way to write a literal trailing marker — use inline code instead).
+const ESCAPED_PUNCTUATION = /\\(?<char>[!-/:-@[-`{-~])/gu;
+
+// A link-reference definition line: `[label]: /url`, up to 3 leading spaces.
+const REF_DEFINITION = /^ {0,3}\[(?<label>[^\]]+)\]:/u;
+
 /**
- * A heading record from raw heading text: trailing markers stripped, exactly
- * as the renderer strips them. A `[#custom-id]` pin becomes the slug verbatim
- * and — matching the renderer — occupies its id in the slugger, so a later
- * heading whose auto-slug collides disambiguates (`setup` → `setup-1`).
- * `[!toc]`/`[toc]` headings stay in the record: their ids exist in the
- * rendered page, so links to them are valid anchors regardless of TOC
- * visibility. A heading that is nothing but markers keeps them as literal
- * text, mirroring the renderer.
+ * The normalized labels of every link-reference definition in the body
+ * (outside fenced code). A trailing heading bracket whose label is defined is
+ * a CommonMark shortcut link, not a marker — the renderer leaves it in the
+ * heading as an `<a>`, so the marker parse must skip it too. Labels match
+ * case-insensitively with collapsed internal whitespace (CommonMark).
+ */
+const refDefinitionLabels = (lines: readonly string[]): Set<string> => {
+  const labels = new Set<string>();
+  let fence: FenceState = null;
+  for (const line of lines) {
+    const next = nextFenceState(line, fence);
+    if (fence !== null || next !== null) {
+      fence = next;
+      continue;
+    }
+    const label = line.match(REF_DEFINITION)?.groups?.label;
+    if (label !== undefined) {
+      labels.add(label.trim().replaceAll(/\s+/gu, " ").toLowerCase());
+    }
+  }
+  return labels;
+};
+
+/**
+ * A heading record from raw heading text: escapes resolved and trailing
+ * markers stripped, exactly as the renderer sees them. A `[#custom-id]` pin
+ * becomes the slug verbatim and — matching the renderer — occupies its id in
+ * the slugger, so a later heading whose auto-slug collides disambiguates
+ * (`setup` → `setup-1`). `[!toc]`/`[toc]` headings stay in the record: their
+ * ids exist in the rendered page, so links to them are valid anchors
+ * regardless of TOC visibility. A heading that is nothing but markers keeps
+ * them as literal text, mirroring the renderer.
  */
 const toHeading = (
   depth: number,
   raw: string,
-  slugger: GithubSlugger
+  slugger: GithubSlugger,
+  isRefDefined: (label: string) => boolean
 ): Heading => {
-  const markers = parseHeadingMarkers(raw);
+  const unescaped = raw.replaceAll(ESCAPED_PUNCTUATION, "$<char>");
+  const markers = parseHeadingMarkers(unescaped, isRefDefined);
   const text = markers.text.trim();
   if (text === "" && (markers.id !== undefined || markers.toc !== undefined)) {
-    return { depth, slug: slugger.slug(raw), text: raw };
+    return { depth, slug: slugger.slug(unescaped), text: unescaped };
   }
   if (markers.id !== undefined) {
     occupySlug(slugger, markers.id);
@@ -308,7 +344,8 @@ const scanHeadingLine = (
   line: string,
   state: HeadingScanState,
   slugger: GithubSlugger,
-  headings: Heading[]
+  headings: Heading[],
+  isRefDefined: (label: string) => boolean
 ): void => {
   const next = nextFenceState(line, state.fence);
   // Skip fence delimiter lines themselves and anything inside a fence. A fence
@@ -343,7 +380,9 @@ const scanHeadingLine = (
   const atx = line.match(ATX_HEADING);
   if (atx?.groups) {
     const depth = atx.groups.hashes?.length ?? 1;
-    headings.push(toHeading(depth, (atx.groups.text ?? "").trim(), slugger));
+    headings.push(
+      toHeading(depth, (atx.groups.text ?? "").trim(), slugger, isRefDefined)
+    );
     state.paragraph = [];
     return;
   }
@@ -352,7 +391,9 @@ const scanHeadingLine = (
     // Setext wins over thematic break when it closes a paragraph (CommonMark);
     // a multi-line paragraph renders as one heading, soft breaks as spaces.
     const depth = setext.groups.marker?.startsWith("=") ? 1 : 2;
-    headings.push(toHeading(depth, state.paragraph.join(" ").trim(), slugger));
+    headings.push(
+      toHeading(depth, state.paragraph.join(" ").trim(), slugger, isRefDefined)
+    );
     state.paragraph = [];
     return;
   }
@@ -377,8 +418,12 @@ export const extractHeadings = (body: string): Heading[] => {
     promptTag: false,
   };
 
-  for (const line of linesWithoutFrontMatter(body)) {
-    scanHeadingLine(line, state, slugger, headings);
+  const lines = linesWithoutFrontMatter(body);
+  const definedLabels = refDefinitionLabels(lines);
+  const isRefDefined = (label: string): boolean =>
+    definedLabels.has(label.toLowerCase());
+  for (const line of lines) {
+    scanHeadingLine(line, state, slugger, headings, isRefDefined);
   }
 
   return headings;
