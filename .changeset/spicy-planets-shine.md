@@ -1,5 +1,0 @@
----
-"blume": minor
----
-
-Content includes: `<include>./path.mdx</include>` splices another file into a page at build time — the same syntax Fumadocs ships, so migrated content works unchanged. Markdown/MDX targets are embedded as content (front matter stripped, nested includes with cycle detection, relative images rebased onto the including page); any other extension — or an explicit `lang` attribute — embeds the file as a fenced code block, with `meta` for the fence meta string. Paths resolve relative to the including file, or from the content root with a leading `/`. Spliced content flows through every surface: headings join the page's table of contents and anchor index, search indexes the included text, the `.md`/`.mdx` mirrors and llms-full.txt serve the expanded document, broken links inside a partial are reported against the partial file, and editing a partial in `blume dev` reloads the pages that include it. Underscore-prefixed files (`_snippets/`) are already excluded from routing, so partials need no configuration. Unresolvable statements surface as `BLUME_INCLUDE_NOT_FOUND`, `BLUME_INCLUDE_CYCLE`, and `BLUME_INCLUDE_OUTSIDE_ROOT` diagnostics.
