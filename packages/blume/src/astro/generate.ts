@@ -25,7 +25,10 @@ import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { validateUsedComponents } from "../core/component-diagnostics.ts";
 import { analyzeComponentOverrides } from "../core/component-overrides.ts";
-import { collectContentAssets } from "../core/content-assets.ts";
+import {
+  collectContentAssets,
+  rewriteRelativeImages,
+} from "../core/content-assets.ts";
 import type {
   BlumeBanner,
   BlumeData,
@@ -807,7 +810,19 @@ export const collectStaged = (project: BlumeProject): Map<string, string> => {
   const staged = new Map<string, string>();
   for (const page of project.graph.pages) {
     if (page.collection === "staged" && page.entryId && page.body) {
-      staged.set(page.entryId, page.body.text);
+      // A colocated `./image.png` reference resolves against `.blume/content`
+      // once the body is materialized there, where the file does not exist.
+      // Point it at the served original instead — the same rewrite the
+      // agent-facing Markdown gets.
+      const text = page.sourcePath
+        ? rewriteRelativeImages({
+            deployBase: project.config.deployment.base,
+            projectRoot: project.context.root,
+            source: page.body.text,
+            sourcePath: page.sourcePath,
+          })
+        : page.body.text;
+      staged.set(page.entryId, text);
     }
   }
   return staged;
@@ -1145,6 +1160,11 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       return null;
     }
     const rel = relative(context.root, sourcePath).split("\\").join("/");
+    // A source outside the project root (an out-of-tree Obsidian vault) has no
+    // in-repo path to edit; fabricating one yields a `../`-laden 404 link.
+    if (rel.startsWith("..")) {
+      return null;
+    }
     const editPath = github?.dir ? `${github.dir}/${rel}` : rel;
     return `${editBase}/${editPath}`;
   };

@@ -348,6 +348,21 @@ const notionSourceSchema = z.object({
 });
 
 /**
+ * An Obsidian vault, read in place. Wikilinks become route links and
+ * `%%comments%%` are stripped at load time, so the vault stays the source of
+ * truth — no export step and no generated notes in the repo.
+ */
+const obsidianSourceSchema = z.strictObject({
+  /** Vault folder names to skip at any depth, in addition to dot-folders. */
+  exclude: z.array(z.string()).optional(),
+  /** Namespaces the source's routes under `/<prefix>/`; e.g. `vault`. */
+  prefix: z.string().optional(),
+  type: z.literal("obsidian"),
+  /** Vault directory, absolute or relative to the project root. */
+  vault: z.string().min(1),
+});
+
+/**
  * A repo's GitHub Releases, materialized as `type: changelog` entries — release
  * notes become the changelog with no files to maintain. A private repo reads a
  * token from `GITHUB_TOKEN`; it is never inlined here.
@@ -396,6 +411,7 @@ const contentSourceSchema = z.discriminatedUnion("type", [
   githubReleasesSourceSchema,
   sanitySourceSchema,
   notionSourceSchema,
+  obsidianSourceSchema,
   customSourceSchema,
 ]);
 

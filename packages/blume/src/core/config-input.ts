@@ -234,6 +234,21 @@ export interface NotionSource {
 }
 
 /**
+ * An Obsidian vault, read in place. Wikilinks become route links and
+ * `%%comments%%` are stripped at load time, so the vault stays the source of
+ * truth — no export step and no generated notes in the repo.
+ */
+export interface ObsidianSource {
+  type: "obsidian";
+  /** Vault folder names to skip at any depth, in addition to dot-folders. */
+  exclude?: string[];
+  /** Namespaces this source's routes under `/<prefix>/`; e.g. `vault`. */
+  prefix?: string;
+  /** Vault directory, absolute or relative to the project root. */
+  vault: string;
+}
+
+/**
  * A user-provided {@link ContentSource} instance, passed straight through. This
  * is the extension point for adapters with custom serializers or any other
  * backend, without their SDKs touching core.
@@ -251,6 +266,7 @@ export type ContentSourceInput =
   | GithubReleasesSource
   | SanitySource
   | NotionSource
+  | ObsidianSource
   | CustomSource;
 
 /**

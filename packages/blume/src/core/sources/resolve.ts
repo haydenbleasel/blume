@@ -8,6 +8,7 @@ import { filesystemSource } from "./filesystem.ts";
 import { githubReleasesSource } from "./github-releases.ts";
 import { mdxRemoteSource } from "./mdx-remote.ts";
 import { notionSource } from "./notion.ts";
+import { obsidianSource } from "./obsidian.ts";
 import { sanitySource } from "./sanity.ts";
 import type { ContentSource, SourceContext } from "./types.ts";
 
@@ -93,6 +94,17 @@ const buildSource = (
         prefix: def.prefix,
         properties: def.properties,
         publishedValue: def.publishedValue,
+      },
+      sourceContext(context, name, runtime)
+    );
+  }
+  if (def.type === "obsidian") {
+    return obsidianSource(
+      {
+        exclude: def.exclude,
+        name,
+        prefix: def.prefix,
+        vault: def.vault,
       },
       sourceContext(context, name, runtime)
     );

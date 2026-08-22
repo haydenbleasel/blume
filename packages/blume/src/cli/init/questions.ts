@@ -111,6 +111,7 @@ export const collectAnswers = async (
     message: "Where does your content live?",
     options: [
       { hint: "Local .mdx files", label: "filesystem", value: "filesystem" },
+      { hint: "An Obsidian vault", label: "obsidian", value: "obsidian" },
       {
         hint: "Changelog from GitHub Releases",
         label: "github-releases",

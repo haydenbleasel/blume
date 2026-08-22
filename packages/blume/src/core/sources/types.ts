@@ -28,9 +28,15 @@ export interface SourceEntry {
    */
   raw?: string;
   /**
-   * Absolute filesystem path when the entry originates from disk. Populated by
-   * the filesystem adapter only; powers git last-modified and edit URLs and the
-   * `sourcePath` back-compat window. Omitted by remote/CMS adapters.
+   * Absolute filesystem path when the entry originates from disk. Set by any
+   * local-file adapter — the filesystem source, and staged local sources such
+   * as Obsidian, whose bodies are rewritten but whose notes are still real
+   * files. It gives diagnostics a path the author recognizes and lets relative
+   * image checks resolve next to the file. Omitted by remote/CMS adapters.
+   *
+   * It does *not* imply the entry renders through the docs glob collection —
+   * read `source.staged` for that — and git last-modified additionally needs
+   * the owning source to expose a `contentRoot` to bound the log's pathspec.
    */
   sourcePath?: string;
   /** Optional provenance for "edit this page". */
@@ -112,9 +118,12 @@ export interface ContentSource {
   /** Optional route prefix; the source's routes namespace under `/<prefix>/`. */
   readonly prefix?: string;
   /**
-   * Resolved on-disk root, set by filesystem-backed sources only. Drives
-   * folder-meta discovery (scan under this root) and the docs-collection base;
-   * omitted by remote/CMS/staged sources that have no local tree.
+   * Resolved on-disk root, set by sources whose entries live on disk. For
+   * filesystem sources it drives folder-meta discovery (scan under this root)
+   * and the docs-collection base; for staged local sources (an Obsidian
+   * vault) it only bounds the git last-modified pathspec — folder-meta
+   * discovery is guarded on `staged`. Omitted by remote/CMS sources that have
+   * no local tree.
    */
   readonly contentRoot?: string;
   /** Pull every entry. Called once per scan. */

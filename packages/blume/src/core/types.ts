@@ -109,7 +109,7 @@ export interface PageRecord {
   id: string;
   /** Provenance: the owning source's name and its source-local ref. */
   source: { name: string; ref: string };
-  /** Absolute source path. Populated by the filesystem adapter only (back-compat). */
+  /** Absolute source path. Populated by any local-file adapter (back-compat). */
   sourcePath?: string;
   /**
    * Renderable body captured at scan time. Set for staged (non-filesystem)
@@ -347,7 +347,7 @@ export interface RouteManifestEntry {
   /** Astro collection-relative entry id, passed to `getEntry`. */
   entryId: string;
   path: string;
-  /** Absolute source path; populated for filesystem entries only (back-compat). */
+  /** Absolute source path; populated for local-file entries only (back-compat). */
   sourcePath?: string;
   /** Adapter-supplied "edit this page" URL (non-filesystem sources). */
   editUrl?: string;

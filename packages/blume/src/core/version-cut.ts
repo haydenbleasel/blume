@@ -60,8 +60,9 @@ const buildRouteRewrites = (
   const { contentRoot } = project.context;
   const rewrites = new Map<string, string>();
   for (const page of project.graph.pages) {
-    // `sourcePath` is set by the filesystem adapter only, so its absence
-    // already excludes generated and remote pages.
+    // `sourcePath` marks a page backed by a local file, which excludes
+    // generated and remote pages; the content-root check below excludes local
+    // files that live outside the tree a version snapshot copies.
     const { sourcePath } = page;
     if (
       page.version !== "" ||

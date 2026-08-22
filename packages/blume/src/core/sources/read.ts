@@ -13,7 +13,7 @@ export interface EntryReadContext {
 /**
  * Read an entry's raw body text without assuming a filesystem path. Prefers the
  * body captured at scan time (staged sources), then the owning source's lazy
- * `read()`, then the back-compat `sourcePath` (filesystem). Returns `""` when an
+ * `read()`, then the back-compat `sourcePath` (any local file). Returns `""` when an
  * entry can't be resolved, so callers degrade gracefully.
  */
 export const readEntryText = async (

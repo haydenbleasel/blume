@@ -199,6 +199,24 @@ describe("collectStaged", () => {
     );
     expect(collectStaged(project).size).toBe(0);
   });
+
+  it("rewrites a staged note's colocated image to its served URL", async () => {
+    const root = await writeProject({
+      "blume.config.ts": `export default {
+  content: { sources: [{ type: "obsidian", vault: "vault" }] },
+};
+`,
+      "vault/Guide.md": "# Guide\n\n![chart](./chart.png)\n",
+      "vault/chart.png": "png-bytes",
+    });
+    const project = await scanProject(root);
+    const staged = collectStaged(project);
+    // The body materializes into `.blume/content`, where `./chart.png` does
+    // not exist — the reference must point at the served original instead.
+    expect(staged.get("obsidian/Guide.md")).toContain(
+      "![chart](/blume-assets/content/vault/chart.png)"
+    );
+  });
 });
 
 describe("buildRuntimeData", () => {
@@ -384,6 +402,37 @@ describe("buildRuntimeData", () => {
       { label: "Hand written", route: "/docs/guides/hand-written" },
       { label: "Blog", route: "https://example.com" },
     ]);
+  });
+
+  it("omits edit urls for pages sourced outside the project root", async () => {
+    const parent = await writeProject({
+      "site/blume.config.ts": `export default {
+  github: { owner: "acme", repo: "docs" },
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      { type: "obsidian", vault: "../vault" },
+    ],
+  },
+};
+`,
+      "site/docs/index.md": "# Home\n",
+      "vault/Note.md": "# Note\n",
+    });
+    const project = await scanProject(join(parent, "site"));
+    const data = JSON.parse(buildRuntimeData(project));
+    const home = data.routes.find(
+      (route: { path: string }) => route.path === "/"
+    );
+    const note = data.routes.find(
+      (route: { path: string }) => route.path === "/note"
+    );
+    expect(home.editUrl).toBe(
+      "https://github.com/acme/docs/edit/main/docs/index.md"
+    );
+    // An out-of-tree vault has no in-repo path to edit; a `../`-laden one
+    // would fabricate a GitHub 404.
+    expect(note.editUrl).toBeNull();
   });
 
   it("resolves github edit urls, repo url, banner, logo, mcp and og", async () => {
