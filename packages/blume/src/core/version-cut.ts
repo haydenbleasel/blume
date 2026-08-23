@@ -62,10 +62,14 @@ const buildRouteRewrites = (
   for (const page of project.graph.pages) {
     // `sourcePath` marks a page backed by a local file, which excludes
     // generated and remote pages; the content-root check below excludes local
-    // files that live outside the tree a version snapshot copies.
+    // files that live outside the tree a version snapshot copies. A staged
+    // page (an Obsidian note) is served from its source, not from the copied
+    // tree, so it keeps publishing as current even when its file sits under
+    // the content root.
     const { sourcePath } = page;
     if (
       page.version !== "" ||
+      page.collection === "staged" ||
       !sourcePath ||
       relative(contentRoot, sourcePath).startsWith("..")
     ) {

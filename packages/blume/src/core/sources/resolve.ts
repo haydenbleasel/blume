@@ -48,9 +48,22 @@ const sourceContext = (
   refresh: runtime.refresh ?? runtime.mode === "build",
 });
 
+/**
+ * Every frontmatter key a project declares beyond Blume's page meta — site-wide
+ * `frontmatter.extend` and each `content.types[*].frontmatter` — so a source
+ * that drops unknown keys keeps the ones `normalizeEntry` will accept.
+ */
+const declaredFrontmatterKeys = (config: ResolvedConfig): string[] => [
+  ...Object.keys(config.frontmatter.extend),
+  ...Object.values(config.content.types).flatMap((type) =>
+    Object.keys(type.frontmatter)
+  ),
+];
+
 const buildSource = (
   def: ContentSourceConfig,
   name: string,
+  config: ResolvedConfig,
   context: ProjectContext,
   runtime: SourceRuntime
 ): ContentSource => {
@@ -102,9 +115,12 @@ const buildSource = (
     return obsidianSource(
       {
         exclude: def.exclude,
+        frontmatterKeys: declaredFrontmatterKeys(config),
+        i18n: config.i18n,
         name,
         prefix: def.prefix,
         vault: def.vault,
+        versions: config.versions,
       },
       sourceContext(context, name, runtime)
     );
@@ -210,7 +226,7 @@ const contentSources = (
 
   const nameFor = uniqueNamer();
   return defs.map((def) =>
-    buildSource(def, nameFor(baseName(def)), context, runtime)
+    buildSource(def, nameFor(baseName(def)), config, context, runtime)
   );
 };
 

@@ -3,9 +3,11 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
+import { z } from "zod";
 
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { obsidianSource } from "../src/core/sources/obsidian.ts";
+import type { ObsidianSourceOptions } from "../src/core/sources/obsidian.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
 import type { SourceContext } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
@@ -35,15 +37,10 @@ const context = (projectRoot: string): SourceContext => ({
 /** A source rooted at `projectRoot`, reading the vault dir `vault`. */
 const sourceFor = (
   projectRoot: string,
-  options: { exclude?: string[]; prefix?: string; vault?: string } = {}
+  options: Omit<Partial<ObsidianSourceOptions>, "name"> = {}
 ) =>
   obsidianSource(
-    {
-      exclude: options.exclude,
-      name: "obsidian",
-      prefix: options.prefix,
-      vault: options.vault ?? ".",
-    },
+    { ...options, name: "obsidian", vault: options.vault ?? "." },
     context(projectRoot)
   );
 
@@ -95,9 +92,10 @@ describe("obsidianSource", () => {
   it("loads every note in the vault, skipping dot-dirs and non-markdown", async () => {
     const root = await makeVault(BASIC);
     const { entries } = await sourceFor(root).load();
+    // Folders list before notes, the way Obsidian's explorer orders a vault.
     expect(entries.map((entry) => entry.ref)).toEqual([
-      "Index.md",
       "guides/Getting Started.md",
+      "Index.md",
     ]);
   });
 
@@ -191,7 +189,9 @@ describe("obsidianSource", () => {
       "Page.md": "## Install\n\nSee [[#Nowhere]].\n",
     });
     const { entries, diagnostics } = await sourceFor(root).load();
-    expect(entries[0]?.body.text).toContain("See Nowhere.");
+    // The same rule as a missing heading in another note: the page link
+    // survives, only the anchor is dropped.
+    expect(entries[0]?.body.text).toContain("See [Nowhere](/page).");
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.message).toContain("#Nowhere");
   });
@@ -269,9 +269,11 @@ describe("obsidianSource", () => {
 
   it("read() refuses a ref that resolves outside the vault", async () => {
     const root = await makeVault(BASIC);
-    // No load has run, so the snapshot cannot vouch for the ref.
     await expect(
       sourceFor(root, { vault: "guides" }).read?.("../Index.md")
+    ).rejects.toThrow(/outside the vault/u);
+    await expect(
+      sourceFor(root, { vault: "guides" }).read?.(join(root, "Index.md"))
     ).rejects.toThrow(/outside the vault/u);
   });
 
@@ -342,17 +344,31 @@ describe("obsidianSource", () => {
 
   it("warns when one note name is claimed by two files, and takes the first", async () => {
     const root = await makeVault({
-      "Links.md": "See [[Setup]].\n",
-      "Setup.md": "# Root setup\n",
-      "guides/Setup.md": "# Guide setup\n",
+      "Links.md": "See [[Setup]] and [[setup]].\n",
+      "a/Setup.md": "# A setup\n",
+      "b/Setup.md": "# B setup\n",
     });
     const { entries, diagnostics } = await sourceFor(root).load();
     const links = entries.find((entry) => entry.ref === "Links.md");
-    expect(links?.body.text).toContain("[Setup](/setup)");
+    expect(links?.body.text).toContain("[Setup](/a/setup)");
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.code).toBe("BLUME_WIKILINK_AMBIGUOUS");
-    expect(diagnostics[0]?.message).toContain("Setup.md");
-    expect(diagnostics[0]?.message).toContain("guides/Setup.md");
+    // Two links, one colliding name.
+    expect(diagnostics[0]?.message).toContain("found 2 wikilink(s) to 1 note");
+    expect(diagnostics[0]?.message).toContain("a/Setup.md");
+    expect(diagnostics[0]?.message).toContain("b/Setup.md");
+  });
+
+  it("stays silent about a name collision no wikilink resolves through", async () => {
+    const root = await makeVault({
+      "Links.md": "See [[a/index]].\n",
+      "a/index.md": "# A\n",
+      "b/index.md": "# B\n",
+    });
+    // Two folder `index` notes are the documented route convention, not a
+    // problem — only a bare `[[index]]` would have to pick one.
+    const { diagnostics } = await sourceFor(root).load();
+    expect(diagnostics).toEqual([]);
   });
 
   it("resolves an ambiguous name unambiguously through its full path", async () => {
@@ -562,12 +578,15 @@ describe("obsidianSource", () => {
     expect(guide?.slug).toBe("guides/getting-started");
   });
 
-  it("read() serves the staged text after a load", async () => {
+  it("read() serves the note as written, before and after a load", async () => {
     const root = await makeVault(BASIC);
     const source = sourceFor(root);
     await source.load();
     const raw = await source.read?.("guides/Getting Started.md");
+    // The lowered body is what `load` stages; the lazy read is the file
+    // itself, like the filesystem source, with no second copy held in memory.
     expect(raw).toContain("title: Getting started");
+    expect(raw).toContain("Back to [[Index]].");
   });
 
   it("read() falls back to the file on disk before any load", async () => {
@@ -665,11 +684,9 @@ describe("obsidianSource", () => {
     const { entries, diagnostics } = await sourceFor(root).load();
     const links = entries.find((entry) => entry.ref === "Links.md");
     expect(links?.body.text).toContain("(/a/notes/intro)");
-    // Only the bare-name collision is reported; a longer shared suffix is
-    // already the author's disambiguation.
-    expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]?.message).toContain("intro (");
-    expect(diagnostics[0]?.message).not.toContain("notes/intro (");
+    // A longer shared suffix is already the author's disambiguation, and the
+    // bare `intro` collision is never linked, so nothing warns.
+    expect(diagnostics).toEqual([]);
   });
 
   it("prefers an exact path match over vault order for a shared name", async () => {
@@ -681,11 +698,10 @@ describe("obsidianSource", () => {
     const { entries, diagnostics } = await sourceFor(root).load();
     const links = entries.find((entry) => entry.ref === "Links.md");
     // `Guides/Setup.md` sorts first, but the root note's full vault path is
-    // exactly `setup` — Obsidian resolves a link as a path before a name.
+    // exactly `setup` — Obsidian resolves a link as a path before a name, so
+    // the link is not ambiguous and nothing warns.
     expect(links?.body.text).toContain("[Setup](/setup)");
-    expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]?.code).toBe("BLUME_WIKILINK_AMBIGUOUS");
-    expect(diagnostics[0]?.message).toContain("exactly that name");
+    expect(diagnostics).toEqual([]);
   });
 
   it("links a block reference to its note without an anchor or warning", async () => {
@@ -794,6 +810,233 @@ describe("obsidianSource", () => {
     // Folder-meta discovery still skips it — that scan is guarded on `staged`.
     expect(source.contentRoot).toBe(root);
   });
+
+  it("lists folders before notes, case-insensitively and numerically", async () => {
+    const root = await makeVault({
+      "Note 10.md": "# Ten\n",
+      "Note 2.md": "# Two\n",
+      "alpha.md": "# Alpha\n",
+      "zed/Inner.md": "# Inner\n",
+    });
+    const { entries } = await sourceFor(root).load();
+    // Obsidian's explorer order: subfolders first, then `Note 2` before
+    // `Note 10`, with `alpha` sorting by letter rather than by case.
+    expect(entries.map((entry) => entry.ref)).toEqual([
+      "zed/Inner.md",
+      "alpha.md",
+      "Note 2.md",
+      "Note 10.md",
+    ]);
+  });
+
+  it("skips the never-content directories every filesystem scan skips", async () => {
+    const root = await makeVault({
+      "Note.md": "# Note\n",
+      "dist/out.md": "# Built\n",
+      "node_modules/pkg/README.md": "# Dep\n",
+    });
+    // A vault rooted at the project must not publish dependency READMEs, and
+    // the scan must agree with the watcher about what is content.
+    const { entries } = await sourceFor(root).load();
+    expect(entries.map((entry) => entry.ref)).toEqual(["Note.md"]);
+  });
+
+  it("resolves the `[[Note.md]]` path form Obsidian also accepts", async () => {
+    const root = await makeVault({
+      "Links.md": "See [[Other.md]] and [[Other.md#Part]].\n",
+      "Other.md": "## Part\n",
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    const links = entries.find((entry) => entry.ref === "Links.md");
+    expect(links?.body.text).toContain("[Other.md](/other)");
+    expect(links?.body.text).toContain("[Part](/other#part)");
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("reads the escaped pipe Obsidian writes for an alias inside a table", async () => {
+    const root = await makeVault({
+      "Links.md": lines(
+        "| Note | Section |",
+        "| --- | --- |",
+        "| [[Other\\|the other]] | [[Other#Part\\|its part]] |",
+        ""
+      ),
+      "Other.md": "## Part\n",
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    const links = entries.find((entry) => entry.ref === "Links.md");
+    expect(links?.body.text).toContain("| [the other](/other) |");
+    expect(links?.body.text).toContain("| [its part](/other#part) |");
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("matches a heading link the way Obsidian writes it, formatting stripped", async () => {
+    const root = await makeVault({
+      "Links.md": lines(
+        "See [[Other#Bold heading]], [[Other#**Bold** heading]],",
+        "[[Other#Read the docs now]], [[Other#Use snake_case]].",
+        ""
+      ),
+      "Other.md": lines(
+        "## **Bold** heading",
+        "",
+        "## Read [the docs](/docs) `now`",
+        "",
+        "## Use _snake_case_",
+        ""
+      ),
+    });
+    const { entries, diagnostics } = await sourceFor(root).load();
+    const links = entries.find((entry) => entry.ref === "Links.md");
+    // Obsidian's autocomplete drops emphasis, code, and link syntax from the
+    // heading text — and that text is what the rendered id is slugged from.
+    expect(links?.body.text).toContain("[Bold heading](/other#bold-heading)");
+    expect(links?.body.text).toContain(
+      "[**Bold** heading](/other#bold-heading)"
+    );
+    expect(links?.body.text).toContain(
+      "[Read the docs now](/other#read-the-docsdocs-now)"
+    );
+    expect(links?.body.text).toContain(
+      "[Use snake_case](/other#use-_snake_case_)"
+    );
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("rewrites a wikilink in a loose list item's indented paragraph", async () => {
+    const root = await makeVault({
+      "Other.md": "# Other\n",
+      "Steps.md": lines(
+        "1. Step one",
+        "",
+        "    See [[Other]] for details.",
+        "",
+        "2. Step two",
+        "",
+        "Done.",
+        "",
+        "    [[Other]] here is indented code.",
+        ""
+      ),
+    });
+    const { entries } = await sourceFor(root).load();
+    const steps = entries.find((entry) => entry.ref === "Steps.md");
+    // Four spaces under a list item is the item's continuation paragraph
+    // (CommonMark 5.2), not an indented code block; after the list closes,
+    // the same indentation is code again.
+    expect(steps?.body.text).toContain("    See [Other](/other) for details.");
+    expect(steps?.body.text).toContain("    [[Other]] here is indented code.");
+  });
+
+  it("does not let an escaped backtick open a code span", async () => {
+    const root = await makeVault({
+      "Other.md": "# Other\n",
+      "Page.md": lines(
+        "Escaped \\` then `code [[Other]]` after, and \\\\`[[Other]]` too.",
+        ""
+      ),
+    });
+    const { entries } = await sourceFor(root).load();
+    const page = entries.find((entry) => entry.ref === "Page.md");
+    // `\`` is a literal backtick (CommonMark 2.4), so the span opens at the
+    // next one and the link inside stays verbatim; `\\` escapes only the
+    // backslash, so that backtick still opens a span.
+    expect(page?.body.text).toContain("`code [[Other]]`");
+    expect(page?.body.text).toContain("\\\\`[[Other]]`");
+  });
+
+  it("keeps a body that opens with a divider out of the frontmatter", async () => {
+    const root = await makeVault({
+      "Divider.md": lines(
+        "---",
+        "title: Divider",
+        "---",
+        "",
+        "---",
+        "",
+        "Intro: with a colon.",
+        "",
+        "## Section",
+        ""
+      ),
+    });
+    const { entries } = await sourceFor(root).load();
+    const [divider] = entries;
+    // Re-emitting the note must not re-parse the body as a second front
+    // matter block — js-yaml would throw on it, or swallow the intro.
+    expect(divider?.raw).toBe(
+      "---\ntitle: Divider\n---\n---\n\nIntro: with a colon.\n\n## Section\n"
+    );
+    expect(divider?.data).toEqual({ title: "Divider" });
+  });
+
+  it("keeps declared frontmatter keys and drops every other property", async () => {
+    const root = await makeVault({
+      "Daily.md": lines(
+        "---",
+        "title: Daily",
+        "status: draft",
+        "created: 2024-03-01",
+        "publish: true",
+        "tags: [a]",
+        "---",
+        "",
+        "Text.",
+        ""
+      ),
+    });
+    const { entries } = await sourceFor(root, {
+      frontmatterKeys: ["status", "tags"],
+    }).load();
+    // Blume's page meta and the project's declared keys survive; Templater
+    // dates, `publish`, Dataview fields and the rest would fail the strict
+    // schema and abort the build. Obsidian's own properties are dropped even
+    // when declared — they are not Blume frontmatter.
+    expect(entries[0]?.data).toEqual({ status: "draft", title: "Daily" });
+  });
+
+  it("places a localized note under its locale once, not twice", async () => {
+    const root = await makeVault({
+      "Guide.md": "See [[fr/Guide]].\n",
+      "fr/Guide.md": "Voir [[Guide]].\n",
+    });
+    const { i18n } = blumeConfigSchema.parse({
+      i18n: {
+        defaultLocale: "en",
+        locales: [
+          { code: "en", label: "English" },
+          { code: "fr", label: "Français" },
+        ],
+      },
+    });
+    const { entries } = await sourceFor(root, { i18n }).load();
+    const fr = entries.find((entry) => entry.ref === "fr/Guide.md");
+    const en = entries.find((entry) => entry.ref === "Guide.md");
+    // The slug is built from the locale-stripped path — `normalizeEntry`
+    // re-prefixes the locale itself, so a `fr/guide` slug would publish at
+    // `/fr/fr/guide`. Hrefs carry the locale the target publishes under.
+    expect(fr?.slug).toBe("guide");
+    expect(en?.body.text).toContain("[fr/Guide](/fr/guide)");
+    expect(fr?.body.text).toContain("[Guide](/guide)");
+  });
+
+  it("places a versioned note under its snapshot once, not twice", async () => {
+    const root = await makeVault({
+      "Guide.md": "See [[v1.0/Guide]].\n",
+      "v1.0/Guide.md": "See [[Guide]].\n",
+    });
+    const { versions } = blumeConfigSchema.parse({
+      versions: { archived: [{ id: "v1.0" }], current: { label: "v2.0" } },
+    });
+    const { entries } = await sourceFor(root, { versions }).load();
+    const old = entries.find((entry) => entry.ref === "v1.0/Guide.md");
+    const current = entries.find((entry) => entry.ref === "Guide.md");
+    // `slugifyPath` would turn `v1.0` into `v10`; the version directory is
+    // read off first and re-applied verbatim by the pipeline.
+    expect(old?.slug).toBe("guide");
+    expect(current?.body.text).toContain("[v1.0/Guide](/v1.0/guide)");
+    expect(old?.body.text).toContain("[Guide](/guide)");
+  });
 });
 
 describe("resolveSources (obsidian)", () => {
@@ -833,6 +1076,37 @@ describe("resolveSources (obsidian)", () => {
     const sources = resolveSources(config, projectContext, { mode: "build" });
     expect(sources[0]?.name).toBe("obsidian");
     expect(sources[0]?.prefix).toBeUndefined();
+  });
+
+  it("threads declared frontmatter keys and routing config into the source", async () => {
+    const root = await makeVault({
+      "fr/Guide.md":
+        "---\nowner: docs\nrfcOwner: core\nstatus: draft\n---\n\nBody.\n",
+    });
+    const config = blumeConfigSchema.parse({
+      content: {
+        sources: [{ type: "obsidian", vault: root }],
+        types: { rfc: { frontmatter: { rfcOwner: z.string() } } },
+      },
+      frontmatter: { extend: { owner: z.string() } },
+      i18n: {
+        defaultLocale: "en",
+        locales: [
+          { code: "en", label: "English" },
+          { code: "fr", label: "Français" },
+        ],
+      },
+    });
+    const sources = resolveSources(config, projectContext, { mode: "build" });
+    const loaded = await sources[0]?.load();
+    const [guide] = loaded?.entries ?? [];
+    // Site-wide and per-type declarations both survive; `status` does not.
+    expect(guide?.data).toEqual({
+      owner: "docs",
+      rfcOwner: "core",
+      title: "Guide",
+    });
+    expect(guide?.slug).toBe("guide");
   });
 
   it("rejects an empty vault path", () => {

@@ -274,6 +274,14 @@ describe("gitLastModifiedTimes", () => {
       /^\d{4}-\d{2}-\d{2}T/u
     );
     expect(gitLastModifiedTimes(root, [], [tracked])).toEqual(new Map());
+    // A caller that already resolved the repository root hands it in; `null`
+    // means it found none, and nothing is spawned for it.
+    expect(
+      gitLastModifiedTimes(root, [root], [tracked], gitRepositoryRoot(root))
+    ).toEqual(gitLastModifiedTimes(root, [root], [tracked]));
+    expect(gitLastModifiedTimes(root, [root], [tracked], null)).toEqual(
+      new Map()
+    );
   });
 
   it("reads the most recent commit date for a tracked file", async () => {

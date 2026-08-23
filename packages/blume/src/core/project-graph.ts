@@ -1,4 +1,4 @@
-import { relative } from "pathe";
+import { isAbsolute, relative } from "pathe";
 
 import { loadConfig } from "./config.ts";
 import { applyDeploymentEnv } from "./deployment-env.ts";
@@ -44,6 +44,15 @@ export interface ConfigOverrides {
 }
 
 /** Apply CLI config overrides onto a resolved config (returns a new object). */
+/**
+ * Whether `path` sits at or under `dir`. A relative result that is itself
+ * absolute means a different drive root on Windows, which is outside too.
+ */
+const isWithin = (dir: string, path: string): boolean => {
+  const rel = relative(dir, path);
+  return !(rel.startsWith("..") || isAbsolute(rel));
+};
+
 const applyConfigOverrides = (
   config: ResolvedConfig,
   overrides?: ConfigOverrides
@@ -309,10 +318,13 @@ export const scanProject = async (
     const gitRoot = gitRepositoryRoot(context.root);
     const contentRoots = sources
       .flatMap((source) => (source.contentRoot ? [source.contentRoot] : []))
-      .filter(
-        (dir) => gitRoot !== null && !relative(gitRoot, dir).startsWith("..")
-      );
-    const gitTimes = gitLastModifiedTimes(context.root, contentRoots, fsPaths);
+      .filter((dir) => gitRoot !== null && isWithin(gitRoot, dir));
+    const gitTimes = gitLastModifiedTimes(
+      context.root,
+      contentRoots,
+      fsPaths,
+      gitRoot
+    );
     for (const page of pages) {
       if (!page.lastModified && page.sourcePath) {
         page.lastModified = gitTimes.get(page.sourcePath);
@@ -327,9 +339,7 @@ export const scanProject = async (
       (page) =>
         page.sourcePath &&
         !page.lastModified &&
-        contentRoots.some(
-          (dir) => !relative(dir, page.sourcePath ?? "").startsWith("..")
-        )
+        contentRoots.some((dir) => isWithin(dir, page.sourcePath ?? ""))
     ).length;
     lastModifiedWarnings.push(
       ...lastModifiedShallowWarning(context.root, undated)

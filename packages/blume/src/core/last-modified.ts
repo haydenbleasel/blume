@@ -95,7 +95,8 @@ export const gitRepositoryRoot = (root: string): string | null => {
 export const gitLastModifiedTimes = (
   root: string,
   contentRoots: string[],
-  sourcePaths: string[]
+  sourcePaths: string[],
+  repositoryRoot?: string | null
 ): Map<string, string> => {
   // Nothing to date, or nowhere bounded to look — either way, don't pay for a
   // git scan. Both guards matter: `git log -- ` with no pathspec logs the
@@ -105,7 +106,10 @@ export const gitLastModifiedTimes = (
   if (sourcePaths.length === 0 || contentRoots.length === 0) {
     return new Map();
   }
-  const gitRoot = gitRepositoryRoot(root);
+  // The caller that bounded `contentRoots` already resolved the repo root;
+  // reuse it rather than spawning `rev-parse` a second time per scan.
+  const gitRoot =
+    repositoryRoot === undefined ? gitRepositoryRoot(root) : repositoryRoot;
   if (gitRoot === null) {
     return new Map();
   }

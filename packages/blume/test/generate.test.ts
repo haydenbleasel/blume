@@ -381,6 +381,40 @@ describe("buildRuntimeData", () => {
     expect(note.editUrl).toBeNull();
   });
 
+  it("resolves edit urls for a monorepo source above the project dir", async () => {
+    const parent = await writeProject({
+      "outside/Far.md": "# Far\n",
+      "repo/apps/site/blume.config.ts": `export default {
+  github: { owner: "acme", repo: "docs", dir: "apps/site" },
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      { type: "obsidian", vault: "../../notes" },
+      { type: "obsidian", vault: "../../../outside", prefix: "out" },
+    ],
+  },
+};
+`,
+      "repo/apps/site/docs/index.md": "# Home\n",
+      "repo/notes/Note.md": "# Note\n",
+    });
+    const project = await scanProject(join(parent, "repo", "apps", "site"));
+    const data = JSON.parse(buildRuntimeData(project));
+    const editUrl = (path: string): string | null =>
+      data.routes.find((route: { path: string }) => route.path === path)
+        .editUrl;
+    // `github.dir` places the project inside the repo, so a vault beside the
+    // app resolves to an in-repo path; one above the repo root still has
+    // nothing to edit.
+    expect(editUrl("/")).toBe(
+      "https://github.com/acme/docs/edit/main/apps/site/docs/index.md"
+    );
+    expect(editUrl("/note")).toBe(
+      "https://github.com/acme/docs/edit/main/notes/Note.md"
+    );
+    expect(editUrl("/out/far")).toBeNull();
+  });
+
   it("resolves github edit urls, repo url, banner, logo, mcp and og", async () => {
     const project = await scanProject(
       await writeProject({

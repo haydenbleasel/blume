@@ -42,6 +42,22 @@ describe("frontmatter wrapper", () => {
     expect(back.content.trim()).toBe("body text");
   });
 
+  it("stringify emits a string body verbatim, never re-parsing it", () => {
+    // gray-matter runs `matter()` over a string body first, so a body that
+    // opens with a `---` divider would read as a second front matter block:
+    // js-yaml throws on `Intro: with a colon` or swallows it into the header.
+    const body = "---\n\nIntro: with a colon.\n\n## Section\n";
+    const out = matter.stringify(body, { title: "Divider" });
+    expect(out).toBe(`---\ntitle: Divider\n---\n${body}`);
+    expect(() =>
+      matter.stringify("---\ntitle: Not YAML: [\n", { title: "T" })
+    ).not.toThrow();
+    // An object body still passes straight through.
+    expect(matter.stringify({ content: "plain\n" }, { title: "T" })).toBe(
+      "---\ntitle: T\n---\nplain\n"
+    );
+  });
+
   it("treats empty front matter as an empty object", () => {
     expect(matter("---\n---\nbody").data).toEqual({});
   });

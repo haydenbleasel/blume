@@ -1,11 +1,17 @@
 import { existsSync, watch as fsWatch, statSync } from "node:fs";
+import type { Dirent } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 
-import { basename, join, relative, resolve } from "pathe";
+import GithubSlugger from "github-slugger";
+import { basename, isAbsolute, join, relative, resolve } from "pathe";
 
 import { BlumeError } from "../diagnostics.ts";
 import matter from "../frontmatter.ts";
+import { localePlacement, localizeRoute } from "../i18n.ts";
+import { pageMetaSchema } from "../schema.ts";
+import type { ResolvedI18nConfig, ResolvedVersionsConfig } from "../schema.ts";
 import type { Diagnostic } from "../types.ts";
+import { detectVersionRef, versionizeRoute } from "../versions.ts";
 import { hashText } from "./cache.ts";
 import type { FenceState } from "./normalize.ts";
 import {
@@ -21,28 +27,54 @@ import type {
   SourceEntry,
   SourceLoadResult,
 } from "./types.ts";
-import { BLUME_WATCH_IGNORE_DIRS, ignoringWatchListener } from "./watch.ts";
+import { BLUME_IGNORE_DIRS, ignoringWatchListener } from "./watch.ts";
 
 /** Options for the built-in Obsidian vault source. */
 export interface ObsidianSourceOptions {
   /** Vault folder names to skip at any depth, in addition to dot-folders. */
   exclude?: string[];
+  /**
+   * Frontmatter keys the project declares beyond Blume's page meta
+   * (`frontmatter.extend` and every `content.types[*].frontmatter`). Any other
+   * Obsidian property is dropped when a note is lowered, since the strict meta
+   * schema would reject it and fail the build.
+   */
+  frontmatterKeys?: readonly string[];
+  /** The project's i18n config, when locale directories place vault notes. */
+  i18n?: ResolvedI18nConfig;
   /** Stable source name; namespaces ids and diagnostics. */
   name: string;
   /** Namespaces the source's routes under `/<prefix>/`; e.g. `vault`. */
   prefix?: string;
   /** Vault directory, absolute or relative to `projectRoot`. */
   vault: string;
+  /** The project's versions config, when snapshot directories hold notes. */
+  versions?: ResolvedVersionsConfig;
 }
 
 const MARKDOWN_FILE = /\.md$/iu;
 /** `%%comment%%` on a single line; multi-line comments are not stripped yet. */
 const OBSIDIAN_COMMENT = /%%.*?%%/gu;
-/** `[[target]]`, `[[target|alias]]`, `[[target#heading]]`, `![[embed]]`. */
+/**
+ * `[[target]]`, `[[target|alias]]`, `[[target#heading]]`, `![[embed]]`. The
+ * target and heading are lazy so the `\|` Obsidian writes for an alias inside
+ * a table cell (a bare `|` would end the cell) is read as the alias separator
+ * rather than as a backslash ending the target.
+ */
 const WIKILINK =
-  /(?<embed>!)?\[\[(?<target>[^\]|#\n]*)(?:#(?<heading>[^\]|\n]+))?(?:\|(?<alias>[^\]\n]+))?\]\]/gu;
+  /(?<embed>!)?\[\[(?<target>[^\]|#\n]*?)(?:#(?<heading>[^\]|\n]+?))?(?:\\?\|(?<alias>[^\]\n]+))?\]\]/gu;
 /** Obsidian's own metadata dir; never content, and rewritten as you edit. */
 const OBSIDIAN_CONFIG_DIR = ".obsidian";
+
+/** Where a note lands once the locale and version directories are read off. */
+interface Placement {
+  /** The locale the note publishes in (`""` without i18n). */
+  locale: string;
+  /** The ref with its version and locale directories stripped. */
+  navPath: string;
+  /** The version snapshot the note belongs to (`""` for current). */
+  version: string;
+}
 
 /** A vault note, read and split into frontmatter and body. */
 interface ParsedNote {
@@ -50,6 +82,7 @@ interface ParsedNote {
   /** The note body, frontmatter stripped and otherwise untouched. */
   content: string;
   data: SourceEntry["data"];
+  placement: Placement;
   /** Vault-relative path, e.g. `guides/Getting Started.md`. */
   rel: string;
 }
@@ -62,6 +95,26 @@ interface ParsedNote {
 const indexKey = (value: string): string =>
   value.normalize("NFC").toLowerCase();
 
+/** A Markdown link or image, reduced to its text by {@link headingKey}. */
+const INLINE_LINK = /!?\[(?<text>[^\]]*)\]\([^)]*\)/gu;
+/**
+ * Inline formatting Obsidian drops when it autocompletes a heading link:
+ * emphasis and strikethrough marks, code-span backticks, and an `_` that opens
+ * or closes a word (one inside `snake_case` is text).
+ */
+const INLINE_MARKS = /[*~`]+|(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])/gu;
+
+/**
+ * The key a heading is indexed and looked up under: its text with inline
+ * Markdown stripped, because Obsidian writes `[[Note#Bold heading]]` for a
+ * `## **Bold** heading` — and because that is the text the rendered id is
+ * slugged from.
+ */
+const headingKey = (text: string): string =>
+  indexKey(
+    text.replaceAll(INLINE_LINK, "$<text>").replaceAll(INLINE_MARKS, "")
+  );
+
 /** Leading and trailing slashes, which name no route segment. */
 const EDGE_SLASHES = /^\/+|\/+$/gu;
 
@@ -72,9 +125,9 @@ const isStringValue = (value: SourceEntry["data"][string]): value is string =>
 /**
  * Obsidian's own default properties (the Properties UI writes the plural
  * spellings; older vaults carry the singular ones). They are not Blume
- * frontmatter — the strict meta schema would reject them and fail the build —
- * so they are dropped when a note is lowered. `aliases` is dropped rather than
- * resolved; alias link targets are not supported yet.
+ * frontmatter, so they are dropped even when a project happens to declare a
+ * key of the same name. `aliases` is dropped rather than resolved; alias link
+ * targets are not supported yet.
  */
 const OBSIDIAN_NATIVE_KEYS = new Set([
   "alias",
@@ -85,41 +138,85 @@ const OBSIDIAN_NATIVE_KEYS = new Set([
   "tags",
 ]);
 
+/** Every key Blume's page meta schema accepts. */
+const PAGE_META_KEYS = new Set<string>(pageMetaSchema.keyof().options);
+
 /**
- * A note's route input: its vault-relative path, slugged. Vault filenames are
- * prose (`Getting Started.md`) and `mapRoute` does not slug, so this does —
- * through {@link slugifyPath}, which keeps a non-Latin name routable.
+ * A note's route input: its locale- and version-stripped path, slugged. Vault
+ * filenames are prose (`Getting Started.md`) and `mapRoute` does not slug, so
+ * this does — through {@link slugifyPath}, which keeps a non-Latin name
+ * routable.
  */
-const entrySlugFor = (rel: string): string =>
-  slugifyPath(rel.replace(MARKDOWN_FILE, ""));
+const entrySlugFor = (navPath: string): string =>
+  slugifyPath(navPath.replace(MARKDOWN_FILE, ""));
+
+/**
+ * Read a locale directory and a version directory off a vault path the way
+ * `normalizeEntry` reads them off the ref: version outermost, then locale.
+ * The slug is built from what remains, so the pipeline's own re-prefixing
+ * does not stack a second `fr/` or `v1.0/` onto the route.
+ */
+const placementOf = (
+  rel: string,
+  options: Pick<ObsidianSourceOptions, "i18n" | "versions">
+): Placement => {
+  const { version, rest } = options.versions
+    ? detectVersionRef(rel, options.versions)
+    : { rest: rel, version: "" };
+  const { navPath, locales } = options.i18n
+    ? localePlacement(rest, ".md", options.i18n)
+    : { locales: [""], navPath: rest };
+  return { locale: locales[0] ?? "", navPath, version };
+};
 
 /**
  * The route a note publishes at, prefix included — the href a `[[Wikilink]]` to
- * it must produce. Mirrors `normalizeEntry`'s precedence and prefixing so the
- * two cannot disagree.
+ * it must produce. Mirrors `normalizeEntry`'s precedence, prefixing, version
+ * and locale placement so the two cannot disagree. `deployment.base` is left
+ * off: the Markdown pipeline prefixes every root-absolute link at render time.
  */
-const routeFor = (note: ParsedNote, prefix: string | undefined): string => {
+const routeFor = (
+  note: ParsedNote,
+  options: Pick<ObsidianSourceOptions, "i18n" | "prefix" | "versions">
+): string => {
+  const { locale, navPath, version } = note.placement;
   const slugInput = isStringValue(note.data.slug)
     ? note.data.slug
-    : entrySlugFor(note.rel);
-  // `normalizeEntry` trims the slug's edge slashes and falls back to the ref
-  // when nothing survives; a `slug: "/"` must route by path in both places.
+    : entrySlugFor(navPath);
+  // `normalizeEntry` trims the slug's edge slashes and falls back to the
+  // locale-stripped ref when nothing survives; a `slug: "/"` must route by
+  // path in both places.
   const slug = slugInput.replaceAll(EDGE_SLASHES, "");
-  const routeInput = slug ? `${slug}.md` : note.rel;
-  return mapRoute(withPrefix(prefix, routeInput)).route;
+  const routeInput = slug ? `${slug}.md` : navPath;
+  const logical = versionizeRoute(
+    mapRoute(withPrefix(options.prefix, routeInput)).route,
+    version
+  );
+  return options.i18n ? localizeRoute(logical, locale, options.i18n) : logical;
 };
 
 /** One note as the wikilink index knows it: where it routes, and its anchors. */
 interface IndexedNote {
-  /** Anchor id per heading, keyed by {@link indexKey}. */
+  /** Anchor id per heading, keyed by {@link headingKey}. */
   anchors: Map<string, string>;
   /** The note's route, prefix included. */
   href: string;
 }
 
+/** The wikilink lookup table. */
+interface LinkIndex {
+  /**
+   * Bare note names claimed by more than one file, keyed by {@link indexKey},
+   * with the diagnostic text naming the claimants. A name some note owns as
+   * its exact vault path is not here — Obsidian resolves a path before a name.
+   */
+  ambiguous: Map<string, string>;
+  notes: Map<string, IndexedNote>;
+}
+
 /** Dead or ambiguous wikilink targets, accumulated across one load. */
 interface UnresolvedTargets {
-  /** Note names claimed by more than one file, with the files that claim them. */
+  /** Bare names a wikilink resolved through a collision, with the claimants. */
   ambiguous: string[];
   /** `Note#Heading` targets whose note exists but whose heading does not. */
   anchors: string[];
@@ -135,34 +232,16 @@ interface IndexedPair {
 
 /** The wikilink lookup table, plus each note's own entry in it. */
 interface NoteIndex {
-  index: Map<string, IndexedNote>;
+  index: LinkIndex;
   pairs: IndexedPair[];
 }
 
-/** A fresh accumulator for a pass whose findings are not reported. */
+/** A fresh accumulator. */
 const noTargets = (): UnresolvedTargets => ({
   ambiguous: [],
   anchors: [],
   notes: [],
 });
-
-/**
- * Heading text to the anchor id the renderer will emit, via the same
- * {@link extractHeadings} the manifest uses. Reads the rendered body, not the
- * authored one, so a heading Blume rewrote is indexed by what ships.
- */
-const anchorsOf = (body: string): Map<string, string> => {
-  const anchors = new Map<string, string>();
-  for (const heading of extractHeadings(body)) {
-    const key = indexKey(heading.text);
-    // Obsidian points a repeated-heading link at the first match; the slugger
-    // has already disambiguated the later ones (`setup-1`).
-    if (!anchors.has(key)) {
-      anchors.set(key, heading.slug);
-    }
-  }
-  return anchors;
-};
 
 /**
  * Every path suffix a wikilink can address a note by: `docs/guides/Setup.md`
@@ -175,69 +254,41 @@ const suffixKeysOf = (rel: string): string[] => {
   return segments.map((_, from) => indexKey(segments.slice(from).join("/")));
 };
 
-/**
- * Obsidian addresses `[[Name]]` by note name, not only by path; index each note
- * under every suffix of its vault-relative path, bare basename included. A key
- * two notes share resolves to the first in vault order — Obsidian disambiguates
- * by the linking note's location, which a rewrite cannot know — except that a
- * note's exact full path always wins for its own key, the way Obsidian resolves
- * a link as a path before a name. Only bare-name collisions are reported; a
- * longer shared suffix is already the author's disambiguation.
- */
-const buildNoteIndex = (
-  notes: ParsedNote[],
-  prefix: string | undefined,
-  unresolved: UnresolvedTargets,
-  bodyOf: (note: ParsedNote) => string
-): NoteIndex => {
-  const index = new Map<string, IndexedNote>();
-  // Memoized: the suffix loop and the pairs loop below both index most notes,
-  // and `anchorsOf` re-scans the whole body each time.
-  const entries = new Map<string, IndexedNote>();
-  const indexed = (note: ParsedNote): IndexedNote => {
-    const cached = entries.get(note.rel);
-    if (cached) {
-      return cached;
-    }
-    const built: IndexedNote = {
-      anchors: anchorsOf(bodyOf(note)),
-      href: routeFor(note, prefix),
-    };
-    entries.set(note.rel, built);
-    return built;
-  };
-  const claims = new Map<string, [ParsedNote, ...ParsedNote[]]>();
-  for (const note of notes) {
-    for (const key of suffixKeysOf(note.rel)) {
-      const claimed = claims.get(key);
-      if (claimed) {
-        claimed.push(note);
-      } else {
-        claims.set(key, [note]);
-      }
-    }
+/** Every run of backticks — the only delimiter a code span has. */
+const BACKTICK_RUN = /`+/gu;
+
+/** A run of backticks: where it starts and how many. */
+interface BacktickRun {
+  at: number;
+  length: number;
+}
+
+/** Whether the character at `at` sits behind an odd number of backslashes. */
+const isEscaped = (text: string, at: number): boolean => {
+  let backslashes = 0;
+  for (let i = at - 1; i >= 0 && text[i] === "\\"; i -= 1) {
+    backslashes += 1;
   }
-  for (const [key, claimants] of claims) {
-    const [first, ...rest] = claimants;
-    if (rest.length > 0 && !key.includes("/")) {
-      unresolved.ambiguous.push(
-        `${key} (${claimants.map((note) => note.rel).join(", ")})`
-      );
-    }
-    index.set(key, indexed(first));
-  }
-  const pairs = notes.map((note) => {
-    const self = indexed(note);
-    // Set last, over any name or suffix claim another note holds on this key:
-    // an exact vault-relative path is never ambiguous.
-    index.set(indexKey(note.rel.replace(MARKDOWN_FILE, "")), self);
-    return { note, self };
-  });
-  return { index, pairs };
+  return backslashes % 2 === 1;
 };
 
-/** Every run of backticks on a line — the only delimiter a code span has. */
-const BACKTICK_RUN = /`+/gu;
+/**
+ * The backtick runs that can delimit a code span. A backslash escapes the one
+ * backtick after it (CommonMark 2.4), so an escaped run loses its first tick
+ * — and drops out entirely when that was its only one.
+ */
+const backtickRuns = (text: string): BacktickRun[] => {
+  const runs: BacktickRun[] = [];
+  for (const match of text.matchAll(BACKTICK_RUN)) {
+    const escaped = isEscaped(text, match.index);
+    const at = escaped ? match.index + 1 : match.index;
+    const length = escaped ? match[0].length - 1 : match[0].length;
+    if (length > 0) {
+      runs.push({ at, length });
+    }
+  }
+  return runs;
+};
 
 /** One piece of a line: literal code, or prose open to rewriting. */
 interface LineChunk {
@@ -247,12 +298,12 @@ interface LineChunk {
 
 /** The index of the next backtick run of exactly `length`, or -1. */
 const closerAfter = (
-  runs: RegExpExecArray[],
+  runs: BacktickRun[],
   from: number,
   length: number
 ): number => {
   for (let i = from; i < runs.length; i += 1) {
-    if (runs[i]?.[0].length === length) {
+    if (runs[i]?.length === length) {
       return i;
     }
   }
@@ -267,19 +318,19 @@ const closerAfter = (
  * closer is literal text.
  */
 const splitCodeSpans = (text: string): LineChunk[] => {
-  const runs = [...text.matchAll(BACKTICK_RUN)];
+  const runs = backtickRuns(text);
   const chunks: LineChunk[] = [];
   let cursor = 0;
   let i = 0;
   while (i < runs.length) {
-    const length = runs[i]?.[0].length ?? 0;
-    const at = runs[i]?.index ?? 0;
+    const length = runs[i]?.length ?? 0;
+    const at = runs[i]?.at ?? 0;
     const close = closerAfter(runs, i + 1, length);
     if (close === -1) {
       i += 1;
       continue;
     }
-    const end = (runs[close]?.index ?? 0) + length;
+    const end = (runs[close]?.at ?? 0) + length;
     chunks.push(
       { code: false, text: text.slice(cursor, at) },
       { code: true, text: text.slice(at, end) }
@@ -294,7 +345,7 @@ const splitCodeSpans = (text: string): LineChunk[] => {
 /** Rewrite one chunk's wikilinks and strip single-line comments. */
 const transformChunk = (
   chunk: string,
-  index: Map<string, IndexedNote>,
+  index: LinkIndex,
   self: IndexedNote,
   unresolved: UnresolvedTargets
 ): string =>
@@ -325,17 +376,26 @@ const transformChunk = (
       if (heading.startsWith("^")) {
         return `[${groups.alias?.trim() || heading.slice(1)}](${self.href})`;
       }
-      const own = self.anchors.get(indexKey(heading));
+      const own = self.anchors.get(headingKey(heading));
       if (own === undefined) {
+        // Same rule as a missing heading in another note: keep the page link,
+        // drop only the anchor.
         unresolved.anchors.push(`#${heading}`);
-        return label;
+        return `[${label}](${self.href})`;
       }
       return `[${label}](${self.href}#${own})`;
     }
-    const note = index.get(indexKey(target));
+    // `[[Note.md]]` is the path form Obsidian also accepts; the index is keyed
+    // without the extension.
+    const key = indexKey(target.replace(MARKDOWN_FILE, ""));
+    const note = index.notes.get(key);
     if (note === undefined) {
       unresolved.notes.push(target);
       return label;
+    }
+    const clash = index.ambiguous.get(key);
+    if (clash !== undefined) {
+      unresolved.ambiguous.push(clash);
     }
     if (heading === undefined) {
       return `[${label}](${note.href})`;
@@ -345,7 +405,7 @@ const transformChunk = (
     if (heading.startsWith("^")) {
       return `[${groups.alias?.trim() || target}](${note.href})`;
     }
-    const anchor = note.anchors.get(indexKey(heading));
+    const anchor = note.anchors.get(headingKey(heading));
     if (anchor === undefined) {
       // The note is real, so keep the link and drop only the anchor — landing
       // on the page beats degrading the whole link to plain text.
@@ -358,7 +418,7 @@ const transformChunk = (
 /** Rewrite a line, leaving inline code spans (`` `[[x]]` ``) verbatim. */
 const transformProse = (
   text: string,
-  index: Map<string, IndexedNote>,
+  index: LinkIndex,
   self: IndexedNote,
   unresolved: UnresolvedTargets
 ): string =>
@@ -370,8 +430,108 @@ const transformProse = (
     )
     .join("");
 
+/**
+ * Fill a note's anchors: the id the renderer emits for each heading, keyed by
+ * {@link headingKey}. The slug comes from the heading as it ships — wikilinks
+ * rewritten, comments stripped — through a fresh per-document
+ * `github-slugger`, exactly how {@link extractHeadings} fills the manifest
+ * from the staged body. A link inside a heading is rewritten here before the
+ * other notes' anchors are known, so its own anchor is left off; that only
+ * moves the manifest id of a heading that itself holds a heading link, which
+ * the docs already flag as unaddressable.
+ */
+const fillAnchors = (pair: IndexedPair, index: LinkIndex): void => {
+  const slugger = new GithubSlugger();
+  for (const heading of extractHeadings(pair.note.content)) {
+    // Trimmed like the ATX text the manifest scan slugs: a stripped trailing
+    // comment must not leave a dangling `-`.
+    const text = transformProse(
+      heading.text,
+      index,
+      pair.self,
+      noTargets()
+    ).trim();
+    const slug = slugger.slug(text);
+    const key = headingKey(text);
+    // Obsidian points a repeated-heading link at the first match; the slugger
+    // has already disambiguated the later ones (`setup-1`).
+    if (!pair.self.anchors.has(key)) {
+      pair.self.anchors.set(key, slug);
+    }
+  }
+};
+
+/**
+ * Obsidian addresses `[[Name]]` by note name, not only by path; index each note
+ * under every suffix of its vault-relative path, bare basename included. A key
+ * two notes share resolves to the first in vault order — Obsidian disambiguates
+ * by the linking note's location, which a rewrite cannot know — except that a
+ * note's exact full path always wins for its own key, the way Obsidian resolves
+ * a link as a path before a name. Only a bare-name collision is recorded, and
+ * only so a link that actually resolves through it can warn; a longer shared
+ * suffix is already the author's disambiguation.
+ */
+const buildLinkIndex = (
+  notes: ParsedNote[],
+  options: Pick<ObsidianSourceOptions, "i18n" | "prefix" | "versions">
+): NoteIndex => {
+  const entries = new Map<string, IndexedNote>();
+  const indexed = (note: ParsedNote): IndexedNote => {
+    const cached = entries.get(note.rel);
+    if (cached) {
+      return cached;
+    }
+    const built: IndexedNote = {
+      anchors: new Map(),
+      href: routeFor(note, options),
+    };
+    entries.set(note.rel, built);
+    return built;
+  };
+  const claims = new Map<string, [ParsedNote, ...ParsedNote[]]>();
+  for (const note of notes) {
+    for (const key of suffixKeysOf(note.rel)) {
+      const claimed = claims.get(key);
+      if (claimed) {
+        claimed.push(note);
+      } else {
+        claims.set(key, [note]);
+      }
+    }
+  }
+  const exactKeys = new Set(
+    notes.map((note) => indexKey(note.rel.replace(MARKDOWN_FILE, "")))
+  );
+  const index: LinkIndex = { ambiguous: new Map(), notes: new Map() };
+  for (const [key, claimants] of claims) {
+    const [first, ...rest] = claimants;
+    if (rest.length > 0 && !key.includes("/") && !exactKeys.has(key)) {
+      index.ambiguous.set(
+        key,
+        `${key} (${claimants.map((note) => note.rel).join(", ")})`
+      );
+    }
+    index.notes.set(key, indexed(first));
+  }
+  const pairs = notes.map((note) => {
+    const self = indexed(note);
+    // Set last, over any name or suffix claim another note holds on this key:
+    // an exact vault-relative path is never ambiguous.
+    index.notes.set(indexKey(note.rel.replace(MARKDOWN_FILE, "")), self);
+    return { note, self };
+  });
+  // Anchors need every href in place (a heading may hold a wikilink), so they
+  // fill in after the routes.
+  for (const pair of pairs) {
+    fillAnchors(pair, index);
+  }
+  return { index, pairs };
+};
+
 /** An indented code block's marker: four spaces or a tab (CommonMark 4.4). */
 const INDENTED_CODE = /^(?: {4}|\t)/u;
+/** A list item opener (CommonMark 5.2), which makes later indentation prose. */
+const LIST_ITEM = /^ {0,3}(?:[-+*]|\d{1,9}[.)])(?: |$)/u;
 
 /**
  * Transform an Obsidian body to Blume-ready Markdown: wikilinks become route
@@ -381,17 +541,18 @@ const INDENTED_CODE = /^(?: {4}|\t)/u;
  */
 const transformBody = (
   body: string,
-  index: Map<string, IndexedNote>,
+  index: LinkIndex,
   self: IndexedNote,
   unresolved: UnresolvedTargets
 ): string => {
   let fence: FenceState = null;
   // An indented code block opens only after a blank line (CommonMark: it
-  // cannot interrupt a paragraph) and runs while lines stay indented or blank.
-  // A loose list's indented continuation paragraph is read as code too — the
-  // same over-approximation every line scanner here makes.
+  // cannot interrupt a paragraph) and outside a list (a loose item's indented
+  // continuation paragraph is prose), then runs while lines stay indented or
+  // blank. A list stays open until a non-indented line that is not an item.
   let afterBlank = true;
   let indentedCode = false;
+  let inList = false;
   const out: string[] = [];
   let prose: string[] = [];
   const flush = (): void => {
@@ -410,7 +571,19 @@ const transformBody = (
       }
       indentedCode = false;
     }
-    if (fence === null && afterBlank && !blank && INDENTED_CODE.test(line)) {
+    if (!blank) {
+      if (LIST_ITEM.test(line)) {
+        inList = true;
+      } else if (!line.startsWith(" ") && !line.startsWith("\t")) {
+        inList = false;
+      }
+    }
+    if (
+      fence === null &&
+      afterBlank &&
+      !(blank || inList) &&
+      INDENTED_CODE.test(line)
+    ) {
       flush();
       indentedCode = true;
       out.push(line);
@@ -465,17 +638,25 @@ const titleFor = (
 
 /**
  * Lower one vault note to a staged Markdown entry, keyed by the same route
- * input {@link routeFor} used when rewriting links to it.
+ * input {@link routeFor} used when rewriting links to it. Frontmatter keeps
+ * what Blume's page meta accepts plus what the project declares; every other
+ * Obsidian property (Dataview fields, Templater dates, `publish`, …) is
+ * dropped rather than failing the strict schema.
  */
 const noteToEntry = (
   pair: IndexedPair,
-  index: Map<string, IndexedNote>,
+  index: LinkIndex,
+  keep: ReadonlySet<string>,
   unresolved: UnresolvedTargets
 ): SourceEntry => {
   const { note } = pair;
   const title = titleFor(note.rel, note.data.title);
   const data = Object.fromEntries(
-    Object.entries(note.data).filter(([key]) => !OBSIDIAN_NATIVE_KEYS.has(key))
+    Object.entries(note.data).filter(
+      ([key]) =>
+        !OBSIDIAN_NATIVE_KEYS.has(key) &&
+        (PAGE_META_KEYS.has(key) || keep.has(key))
+    )
   );
   const merged = title === undefined ? data : { ...data, title };
   const text = transformBody(note.content.trim(), index, pair.self, unresolved);
@@ -486,7 +667,7 @@ const noteToEntry = (
     hash: hashText(raw),
     raw,
     ref: note.rel,
-    slug: entrySlugFor(note.rel),
+    slug: entrySlugFor(note.placement.navPath),
     sourcePath: note.absPath,
   };
 };
@@ -499,12 +680,19 @@ const noteToEntry = (
  */
 const readNote = async (
   vaultDir: string,
-  rel: string
+  rel: string,
+  options: Pick<ObsidianSourceOptions, "i18n" | "versions">
 ): Promise<ParsedNote | null> => {
   const absPath = join(vaultDir, rel);
   try {
     const { content, data } = matter(await readFile(absPath, "utf-8"));
-    return { absPath, content, data, rel };
+    return {
+      absPath,
+      content,
+      data,
+      placement: placementOf(rel, options),
+      rel,
+    };
   } catch (error) {
     // SAFETY: a rejected `readFile` always yields a Node system error, whose
     // `code` is the only field read here.
@@ -515,15 +703,25 @@ const readNote = async (
   }
 };
 
+/**
+ * Vault order, the way Obsidian's file explorer lists a folder: subfolders
+ * first, then notes, each case-insensitively and numeric-aware (`Note 2`
+ * before `Note 10`), with a code-point tiebreak so the order is total.
+ */
+const byVaultOrder = (a: Dirent, b: Dirent): number =>
+  Number(b.isDirectory()) - Number(a.isDirectory()) ||
+  a.name.localeCompare(b.name, "en", { numeric: true, sensitivity: "base" }) ||
+  (a.name < b.name ? -1 : 1);
+
 /** Recursively list vault-relative `.md` paths, skipping dot/excluded dirs. */
 const walkVault = async (
   dir: string,
   root: string,
-  exclude: Set<string>
+  exclude: ReadonlySet<string>
 ): Promise<string[]> => {
   const found: string[] = [];
   const entries = await readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
+  for (const entry of entries.toSorted(byVaultOrder)) {
     if (entry.name.startsWith(".") || exclude.has(entry.name)) {
       continue;
     }
@@ -535,7 +733,7 @@ const walkVault = async (
       found.push(relative(root, full));
     }
   }
-  return found.toSorted();
+  return found;
 };
 
 /** The first few dead targets, deduplicated, for a diagnostic message. */
@@ -558,9 +756,10 @@ const unresolvedDiagnostics = (
     });
   }
   if (unresolved.ambiguous.length > 0) {
+    const names = new Set(unresolved.ambiguous).size;
     diagnostics.push({
       code: "BLUME_WIKILINK_AMBIGUOUS",
-      message: `Source "${name}" found ${unresolved.ambiguous.length} note name(s) claimed by more than one file (${sample(unresolved.ambiguous)}); bare wikilinks to them resolve to a note whose full vault path is exactly that name, then to the first in vault order.`,
+      message: `Source "${name}" found ${unresolved.ambiguous.length} wikilink(s) to ${names} note name(s) claimed by more than one file (${sample(unresolved.ambiguous)}); each resolves to the first note in vault order.`,
       severity: "warning",
       suggestion:
         "Rename one of the notes, or link to the full vault-relative path (`[[folder/Note]]`) so the target is unambiguous.",
@@ -592,55 +791,40 @@ export const obsidianSource = (
   ctx: SourceContext
 ): ContentSource => {
   const vaultDir = resolve(ctx.projectRoot, options.vault);
-  const exclude = new Set(options.exclude);
-  let snapshot = new Map<string, SourceEntry>();
+  // The never-content directories every filesystem scan skips, so a vault
+  // rooted at the project (`vault: "."`) doesn't publish dependency READMEs
+  // or build output — and so the scan and the watcher agree on what is
+  // content.
+  const exclude = new Set([...BLUME_IGNORE_DIRS, ...(options.exclude ?? [])]);
+  const keep = new Set(options.frontmatterKeys);
 
   const load = async (): Promise<SourceLoadResult> => {
     const files = await walkVault(vaultDir, vaultDir, exclude);
-    const read = await Promise.all(files.map((rel) => readNote(vaultDir, rel)));
+    const read = await Promise.all(
+      files.map((rel) => readNote(vaultDir, rel, options))
+    );
     const notes = read.filter((note): note is ParsedNote => note !== null);
     // Resolving `[[Note#H]]` needs the target's route and headings, so every
-    // note is parsed first. Headings come from the rendered body and rendering
-    // needs the index, so the rewrite runs twice: the first pass settles each
-    // heading's final text, the second has real anchors and produces what ships.
-    const routesOnly = buildNoteIndex(
-      notes,
-      options.prefix,
-      noTargets(),
-      () => ""
-    );
-    const rendered = new Map(
-      routesOnly.pairs.map(({ note, self }) => [
-        note.rel,
-        transformBody(note.content.trim(), routesOnly.index, self, noTargets()),
-      ])
-    );
+    // note is parsed and indexed before any body is rewritten.
+    const { index, pairs } = buildLinkIndex(notes, options);
     const unresolved = noTargets();
-    const built = buildNoteIndex(
-      notes,
-      options.prefix,
-      unresolved,
-      (note) => rendered.get(note.rel) ?? note.content
+    const entries = pairs.map((pair) =>
+      noteToEntry(pair, index, keep, unresolved)
     );
-    const entries = built.pairs.map((pair) =>
-      noteToEntry(pair, built.index, unresolved)
-    );
-    snapshot = new Map(entries.map((entry) => [entry.ref, entry]));
     return {
       diagnostics: unresolvedDiagnostics(options.name, unresolved),
       entries,
     };
   };
 
+  // The note as written, for the SPI's lazy read. The lowered body is what
+  // `load` stages, and the pipeline reads that copy; this serves the vault
+  // file itself, the way the filesystem source does, without pinning a second
+  // copy of every note for the life of a dev server.
   const read = async (ref: string): Promise<string> => {
-    const cached = snapshot.get(ref);
-    if (cached) {
-      return cached.raw ?? cached.body.text;
-    }
-    // A public SPI method reached before `load` filled the snapshot: the ref
-    // is not yet known to be one of ours.
     const absPath = resolve(vaultDir, ref);
-    if (relative(vaultDir, absPath).startsWith("..")) {
+    const rel = relative(vaultDir, absPath);
+    if (rel.startsWith("..") || isAbsolute(rel)) {
       throw new BlumeError({
         code: "BLUME_SOURCE_MISCONFIGURED",
         file: absPath,
@@ -672,11 +856,7 @@ export const obsidianSource = (
 
   // Obsidian rewrites `.obsidian/workspace.json` as you move a pane; unfiltered,
   // every such write re-triggers a full rescan. See {@link ignoringWatchListener}.
-  const watchIgnoreDirs = new Set([
-    ...BLUME_WATCH_IGNORE_DIRS,
-    OBSIDIAN_CONFIG_DIR,
-    ...exclude,
-  ]);
+  const watchIgnoreDirs = new Set([...exclude, OBSIDIAN_CONFIG_DIR]);
 
   const watch = (onChange: () => void): (() => void) => {
     if (!existsSync(vaultDir)) {

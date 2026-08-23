@@ -14,7 +14,15 @@ import { pathToFileURL } from "node:url";
 
 import { imageSize } from "image-size";
 import pMap from "p-map";
-import { basename, dirname, join, normalize, relative, resolve } from "pathe";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+  resolve,
+} from "pathe";
 import { glob } from "tinyglobby";
 
 import { buildAskData } from "../ai/ask-data.ts";
@@ -1154,12 +1162,14 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       return null;
     }
     const rel = relative(context.root, sourcePath).split("\\").join("/");
-    // A source outside the project root (an out-of-tree Obsidian vault) has no
-    // in-repo path to edit; fabricating one yields a `../`-laden 404 link.
-    if (rel.startsWith("..")) {
+    // The edit path is repo-relative: `github.dir` places the project inside
+    // the repo, so a source above the project dir (a monorepo vault beside the
+    // docs app) still resolves to an in-repo file. A path that escapes the
+    // repo itself has nothing to edit — fabricating one yields a 404 link.
+    const editPath = normalize(github?.dir ? join(github.dir, rel) : rel);
+    if (editPath.startsWith("..") || isAbsolute(editPath)) {
       return null;
     }
-    const editPath = github?.dir ? `${github.dir}/${rel}` : rel;
     return `${editBase}/${editPath}`;
   };
 

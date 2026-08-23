@@ -109,11 +109,20 @@ const matter = Object.assign(
   {
     read: (filepath: ReadArgs[0], options?: ReadArgs[1]) =>
       baseMatter.read(filepath, withYamlEngine(options)),
+    // A string is the body to emit, not a document to parse: gray-matter
+    // would otherwise run `matter()` over it, and a body that opens with a
+    // `---` divider reads as a second front matter block — js-yaml either
+    // throws or swallows the opening paragraph into the YAML header.
     stringify: (
       file: StringifyArgs[0],
       data: StringifyArgs[1],
       options?: StringifyArgs[2]
-    ): string => baseMatter.stringify(file, data, withYamlEngine(options)),
+    ): string =>
+      baseMatter.stringify(
+        isStringInput(file) ? { content: file } : file,
+        data,
+        withYamlEngine(options)
+      ),
   }
 );
 
