@@ -62,6 +62,11 @@ export default defineConfig({
     owner: "haydenbleasel",
     repo: "blume",
   },
+  graphql: {
+    enabled: true,
+    endpoint: "https://petstore.example.com/graphql",
+    spec: "./specs/schema.graphql",
+  },
   i18n: {
     defaultLocale: "en",
     fallbackLocale: "en",
@@ -86,6 +91,7 @@ export default defineConfig({
     tabs: [
       { label: "Docs", path: "/docs" },
       { label: "API", path: "/api" },
+      { label: "GraphQL", path: "/graphql" },
       { label: "Events", path: "/events" },
       { label: "Blog", path: "/blog" },
       { label: "Changelog", path: "/changelog" },

@@ -15,9 +15,14 @@ const { source } = Astro.props;
 const spec = specs[source];
 
 // OpenAPI declares `servers` as an array of URLs; AsyncAPI as a named map of
-// host/protocol/pathname. Both flatten into one list of address chips.
+// host/protocol/pathname; a GraphQL schema names no server, so its configured
+// live endpoint stands in. All flatten into one list of address chips.
 const addresses: string[] = [];
-if (spec?.kind === "asyncapi") {
+if (spec?.kind === "graphql") {
+  if (spec.endpoint) {
+    addresses.push(spec.endpoint);
+  }
+} else if (spec?.kind === "asyncapi") {
   const servers = (spec.document as AsyncApiDocument).servers ?? {};
   for (const server of Object.values(servers)) {
     if (server?.host) {
@@ -38,7 +43,12 @@ if (spec?.kind === "asyncapi") {
     }
   }
 }
-const addressLabel = spec?.kind === "asyncapi" ? "Servers" : "Base URL";
+let addressLabel = "Base URL";
+if (spec?.kind === "asyncapi") {
+  addressLabel = "Servers";
+} else if (spec?.kind === "graphql") {
+  addressLabel = "Endpoint";
+}
 ---
 
 {

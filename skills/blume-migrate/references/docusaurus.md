@@ -31,6 +31,7 @@ Read `themeConfig`, `presets`, and `plugins`:
 | `themeConfig.algolia` | drop — Blume ships built-in search (Orama); remove the Algolia dep |
 | `@docusaurus/plugin-client-redirects` | **static `redirects: [{from, to}]` arrays convert 1:1** to Blume `redirects` (a `from` array = one entry per item); only `createRedirects` functions are truly dynamic → host rules |
 | `@docusaurus/theme-mermaid` | delete the dep — ` ```mermaid ` renders natively (in `.mdx`) |
+| GraphQL doc generators (`@graphql-markdown/docusaurus`, `@edno/docusaurus2-graphql-doc-generator`) | delete the plugin **and its generated pages** — point the top-level `graphql: { enabled: true, spec, endpoint }` at the schema instead (see SKILL.md "GraphQL") |
 | `remark-math` + `rehype-katex` | delete — block `$$…$$` renders in `.mdx` with no config (no `markdown.math` field exists); **inline `$…$` is not supported** — convert or drop (report) |
 | Multi-instance docs plugins (`plugin-content-docs` with `id`) | one folder (and usually one `navigation.tabs` entry) per instance |
 

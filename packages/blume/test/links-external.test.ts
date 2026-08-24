@@ -11,7 +11,13 @@ import { validateLinks } from "../src/core/links.ts";
 import { pageMetaSchema } from "../src/core/schema.ts";
 import type { ContentGraph, Diagnostic, PageLink } from "../src/core/types.ts";
 
-const link = (target: string): PageLink => ({ column: 1, line: 1, target });
+// Distinct occurrences sit on distinct lines in a real document; the dedupe
+// in `validateLinks` treats same-position same-message reports as one.
+const link = (target: string, line = 1): PageLink => ({
+  column: 1,
+  line,
+  target,
+});
 
 const graphWith = (links: PageLink[]): ContentGraph => ({
   diagnostics: [],
@@ -140,7 +146,7 @@ describe("validateLinks — external link probing", () => {
   it("probes each unique URL once but reports every occurrence", async () => {
     const diagnostics = await check([
       link("https://notfound.example"),
-      link("https://notfound.example"),
+      link("https://notfound.example", 2),
     ]);
     expect(diagnostics).toHaveLength(2);
     expect(calls).toHaveLength(1);

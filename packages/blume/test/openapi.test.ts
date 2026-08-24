@@ -26,6 +26,7 @@ import {
   buildRequest,
   defaultValues,
 } from "../src/components/openapi/request.ts";
+import { languageSamplePanels } from "../src/components/openapi/sample-panels.ts";
 import {
   effectiveSecurity,
   resolveSecurity,
@@ -2070,6 +2071,26 @@ describe("snippets", () => {
     expect(curl).toContain('curl -X POST "https://api.test/v1/pet/7');
     expect(js).toContain("await fetch(");
     expect(python).toContain("import requests");
+  });
+
+  it("renders one highlighted panel per sample language", async () => {
+    // The panel builder every operation renderer shares (OpenAPI, AsyncAPI,
+    // GraphQL): key/lang carry the config id, label the display name.
+    const sample = {
+      body: '{"query":"{ ping }"}',
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+      url: "https://api.test/graphql",
+    };
+    const panels = await languageSamplePanels(
+      sampleLanguages(["curl", "js"]),
+      sample,
+      { dark: "github-dark", light: "github-light" }
+    );
+    expect(panels.map((panel) => panel.key)).toStrictEqual(["curl", "js"]);
+    expect(panels[0]?.label).toBe("cURL");
+    expect(panels[0]?.lang).toBe("curl");
+    expect(panels[0]?.html).toContain("astro-code");
   });
 
   it("keeps code samples correct on hostile example values", () => {

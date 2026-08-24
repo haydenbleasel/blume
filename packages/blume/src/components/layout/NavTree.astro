@@ -45,18 +45,22 @@ const n = { ...EN_UI.nav, ...strings };
 const badgeBase =
   "shrink-0 rounded-full px-1.5 py-0.5 font-medium text-[0.65rem] leading-none";
 const badgeClass = `${badgeBase} bg-muted text-muted-foreground`;
-// HTTP-method and AsyncAPI-action badges (from a reference's sidebar) are
-// color-coded to match MethodBadge; every other badge keeps the neutral style.
+// HTTP-method, AsyncAPI-action, and GraphQL operation-kind badges (from a
+// reference's sidebar) are color-coded to match MethodBadge; every other
+// badge keeps the neutral style.
 const METHOD_BADGE: Record<string, string> = {
   DELETE: "bg-red-500/15 text-red-700 dark:text-red-300",
   GET: "bg-green-500/15 text-green-700 dark:text-green-300",
   HEAD: "bg-muted text-muted-foreground",
+  MUTATION: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   OPTIONS: "bg-muted text-muted-foreground",
   PATCH: "bg-yellow-500/20 text-yellow-800 dark:text-yellow-300",
   POST: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   PUT: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  QUERY: "bg-green-500/15 text-green-700 dark:text-green-300",
   RECEIVE: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
   SEND: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  SUBSCRIPTION: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
 };
 const badgeClassFor = (badge: string): string => {
   const method = METHOD_BADGE[badge.toUpperCase()];

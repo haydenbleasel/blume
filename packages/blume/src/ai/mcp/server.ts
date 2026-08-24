@@ -3,7 +3,10 @@ import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import {
   CallToolRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
+  McpError,
+  ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
@@ -33,6 +36,12 @@ const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_LIMIT = 20;
 /** Excerpt length when a page has no description. */
 const EXCERPT_LENGTH = 200;
+/** Every page resource is the page's agent Markdown. */
+const RESOURCE_MIME_TYPE = "text/markdown";
+/** The MCP spec's JSON-RPC code for an unknown resource URI. */
+const RESOURCE_NOT_FOUND = -32_002;
+/** URI scheme for page resources when no `deployment.site` is configured. */
+const LOCAL_RESOURCE_SCHEME = "blume:";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Headers":
@@ -191,6 +200,15 @@ interface SearchHitPayload {
   version?: string;
 }
 
+/** One `resources/list` entry: a page served as `text/markdown`. */
+interface PageResource {
+  description?: string;
+  mimeType: string;
+  name: string;
+  title: string;
+  uri: string;
+}
+
 /** One `list_pages` entry; `version` only appears on versioned sites. */
 interface PageListingPayload {
   contentType: string;
@@ -288,6 +306,26 @@ const urlFor = (route: string, data: McpData): string => {
   return data.site ? absoluteUrl(data.site, path) : path;
 };
 
+/**
+ * A page's resource URI. Resource URIs must be absolute, so this is the page's
+ * served URL when a site is configured (the same URL `search_docs` and
+ * `list_pages` emit, so an agent can hand either back to `resources/read`),
+ * and a `blume:` URI carrying the based route otherwise.
+ */
+const resourceUri = (route: string, data: McpData): string =>
+  data.site
+    ? urlFor(route, data)
+    : `${LOCAL_RESOURCE_SCHEME}${withBasePath(data.base, route)}`;
+
+/** The `pages` key a resource URI (either form, or a bare route) names. */
+const resourceRoute = (uri: string, data: McpData): string =>
+  normalizeRoute(
+    uri.startsWith(LOCAL_RESOURCE_SCHEME)
+      ? uri.slice(LOCAL_RESOURCE_SCHEME.length)
+      : uri,
+    data
+  );
+
 /** A hit's excerpt: its description, else the head of its content with an
  * ellipsis only when something was actually cut off. */
 const excerptFor = (doc: OramaDoc): string => {
@@ -331,9 +369,10 @@ export const buildServer = (
   data: McpData,
   index: OramaIndexProvider
 ): Server => {
+  const capabilities = { resources: {}, tools: {} };
   const serverOptions: ServerOptions = data.instructions
-    ? { capabilities: { tools: {} }, instructions: data.instructions }
-    : { capabilities: { tools: {} } };
+    ? { capabilities, instructions: data.instructions }
+    : { capabilities };
   const server = new Server(
     { name: data.name, version: data.version },
     serverOptions
@@ -342,6 +381,39 @@ export const buildServer = (
   server.setRequestHandler(ListToolsRequestSchema, () => ({
     tools: TOOL_DEFINITIONS,
   }));
+
+  // Every page doubles as a resource, so a client that attaches context by
+  // URI (rather than calling tools) can browse and read the docs too. The
+  // list is the same route set `list_pages` returns; reading one serves the
+  // same agent Markdown `get_page` does.
+  server.setRequestHandler(ListResourcesRequestSchema, () => ({
+    resources: data.routes.map((route) => {
+      const resource: PageResource = {
+        mimeType: RESOURCE_MIME_TYPE,
+        name: route.title,
+        title: route.title,
+        uri: resourceUri(route.route, data),
+      };
+      if (route.description) {
+        resource.description = route.description;
+      }
+      return resource;
+    }),
+  }));
+
+  server.setRequestHandler(ReadResourceRequestSchema, (request) => {
+    const { uri } = request.params;
+    const markdown = data.pages[resourceRoute(uri, data)];
+    if (markdown === undefined) {
+      throw new McpError(
+        RESOURCE_NOT_FOUND,
+        `No page found at "${uri}". Use resources/list or list_pages to find valid URIs.`
+      );
+    }
+    return {
+      contents: [{ mimeType: RESOURCE_MIME_TYPE, text: markdown, uri }],
+    };
+  });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { arguments: args = {}, name } = request.params;

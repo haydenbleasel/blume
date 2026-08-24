@@ -6,9 +6,10 @@ import { gfm } from "micromark-extension-gfm";
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
 import matter from "../core/frontmatter.ts";
+import { parseHeadingMarkers } from "../core/heading-markers.ts";
 import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
-import { readEntryText } from "../core/sources/read.ts";
+import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode } from "../core/types.ts";
 import { pageFacets } from "./facets.ts";
 
@@ -105,6 +106,28 @@ const collectText = (node: Nodes, out: string[]): void => {
     }
     case "break": {
       out.push(" ");
+      return;
+    }
+    // Trailing heading markers (`[#custom-id]`, `[!toc]`, `[toc]`) are anchor
+    // metadata, not prose — strip them so they never pollute the index. Only
+    // a marker that ends the heading's final plain-text child counts,
+    // mirroring the renderer: a heading ending in inline code or an image
+    // keeps its bracketed text on the page (so it stays searchable), and a
+    // heading that is nothing but markers renders them literally.
+    case "heading": {
+      const last = node.children.at(-1);
+      const trailing = last?.type === "text" ? last : undefined;
+      const inner: string[] = [];
+      const kept = trailing ? node.children.slice(0, -1) : node.children;
+      for (const child of kept) {
+        collectText(child, inner);
+      }
+      if (trailing) {
+        const stripped = parseHeadingMarkers(trailing.value).text;
+        const literal = stripped === "" && node.children.length === 1;
+        inner.push(literal ? trailing.value : stripped);
+      }
+      out.push(inner.join("").trimEnd(), " ");
       return;
     }
     default: {
@@ -250,7 +273,7 @@ export const buildSearchDocuments = async (
   return await Promise.all(
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
-      const raw = page ? await readEntryText(project, page) : "";
+      const raw = page ? await readExpandedEntryText(project, page) : "";
       const source = raw ? matter(raw).content : "";
       const visible = applyAudienceVisibility(
         source,

@@ -16,6 +16,7 @@ import {
 } from "./security.ts";
 import { sampleLanguages } from "./snippets.ts";
 import AsyncApiOperation from "./AsyncApiOperation.astro";
+import GraphqlOperation from "./GraphqlOperation.astro";
 import Authorization from "./Authorization.astro";
 import MethodBadge from "./MethodBadge.astro";
 import ParametersTable from "./ParametersTable.astro";
@@ -60,9 +61,11 @@ interface FullOperation {
 const { source, id } = Astro.props;
 const spec = specs[source];
 const ref = spec?.operations[id];
-// The AsyncAPI front-end renders its own body; the lookups below are
-// OpenAPI-shaped (paths, request/response) and resolve to nothing for it.
+// The AsyncAPI and GraphQL front-ends render their own bodies; the lookups
+// below are OpenAPI-shaped (paths, request/response) and resolve to nothing
+// for them.
 const isAsyncApi = spec?.kind === "asyncapi";
+const isGraphql = spec?.kind === "graphql";
 
 const doc = (spec?.document ?? {}) as {
   paths?: Record<
@@ -126,6 +129,8 @@ const languages = sampleLanguages(spec?.codeSamples ?? []);
 {
   isAsyncApi ? (
     <AsyncApiOperation id={id} source={source} />
+  ) : isGraphql ? (
+    <GraphqlOperation id={id} source={source} />
   ) : !(spec && ref && operation) ? (
     <div class="text-muted-foreground">This API operation could not be found.</div>
   ) : (

@@ -19,6 +19,13 @@ interface Props {
    */
   param?: string;
   sync?: boolean;
+  /**
+   * Sync tab selection only with other groups sharing the same key. Groups
+   * without a key form one page-wide pool (the default); keyed groups — like
+   * the generated ts2js dialect pairs — sync among themselves, so picking a
+   * tab there can't drag along an authored group with a same-titled tab.
+   */
+  syncKey?: string;
 }
 
 const {
@@ -29,6 +36,7 @@ const {
   inline = false,
   param,
   sync = true,
+  syncKey,
 } = Astro.props;
 
 // MDX string attributes (`hash="false"` from generated markup) must read as
@@ -52,6 +60,7 @@ const useDropdown = dropdown && !inline;
   data-hash={hashEnabled ? "true" : "false"}
   data-param={param}
   data-sync={sync ? "true" : "false"}
+  data-sync-key={syncKey}
 >
   <div
     class:list={[
@@ -116,9 +125,12 @@ const useDropdown = dropdown && !inline;
 
     connectedCallback() {
       const list = this.querySelector<HTMLElement>("[data-blume-tablist]");
+      // Nested groups (a generated ts2js pair inside a CodeGroup, say) own
+      // their panels; adopting a descendant group's panels here would leave
+      // both groups toggling the same elements.
       let panels = Array.from(
         this.querySelectorAll<HTMLElement>("[data-blume-tab-panel]")
-      );
+      ).filter((panel) => panel.closest("blume-tabs") === this);
       // CodeGroup passes raw code fences instead of <Tab> elements, so adopt
       // the content wrapper's direct code blocks as panels. The tab label comes
       // from each block's title (the text after the language in the fence).
@@ -251,7 +263,10 @@ const useDropdown = dropdown && !inline;
       if (sync && this.#syncEnabled()) {
         document.dispatchEvent(
           new CustomEvent(SYNC_EVENT, {
-            detail: { title: panelTitle(activePanel, index) },
+            detail: {
+              key: this.#syncKey(),
+              title: panelTitle(activePanel, index),
+            },
           })
         );
       }
@@ -339,6 +354,10 @@ const useDropdown = dropdown && !inline;
       return this.dataset.sync !== "false";
     }
 
+    #syncKey() {
+      return this.dataset.syncKey ?? "";
+    }
+
     #hashEnabled() {
       return this.dataset.hash !== "false";
     }
@@ -358,9 +377,12 @@ const useDropdown = dropdown && !inline;
     }
 
     #sync = (event: Event) => {
-      const title = (event as CustomEvent<{ title?: string }>).detail?.title;
-      if (title) {
-        this.activateByTitle(title, false);
+      const detail = (event as CustomEvent<{ key?: string; title?: string }>)
+        .detail;
+      // Only same-key groups sync: keyless groups form one page-wide pool,
+      // keyed groups (generated dialect pairs) their own.
+      if (detail?.title && (detail.key ?? "") === this.#syncKey()) {
+        this.activateByTitle(detail.title, false);
       }
     };
 

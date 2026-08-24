@@ -35,6 +35,7 @@ import {
   toPackageCommands,
 } from "../src/markdown/package-commands.ts";
 import { packageInstallPlugin } from "../src/markdown/package-install.ts";
+import { ts2jsPlugin } from "../src/markdown/ts2js.ts";
 
 /** Run a plugin visitor and capture the node it replaces, if any. */
 const captureReplacement = (
@@ -232,6 +233,10 @@ describe(codeTitleTransformer, () => {
 
   it("does not treat the twoslash keyword as a title", () => {
     expect(metaAttrs("twoslash").dataTitle).toBeUndefined();
+  });
+
+  it("does not treat the ts2js keyword as a title", () => {
+    expect(metaAttrs("ts2js").dataTitle).toBeUndefined();
   });
 
   it("ignores line ranges and leaves plain blocks bare", () => {
@@ -519,6 +524,367 @@ describe("packageInstallPlugin", () => {
   });
 });
 
+/** Run the ts2js plugin over a fence and capture the replacement, if any. */
+const ts2js = (node: {
+  lang?: string | null;
+  meta?: string | null;
+  value: string;
+}) =>
+  captureReplacement((ctx) =>
+    ts2jsPlugin().code({ type: "code", ...node }, ctx)
+  );
+
+/** The expected TypeScript/JavaScript tab pair. */
+const tabs = (
+  ts: { lang: string; meta: string | null; value: string },
+  js: { lang: string; meta: string | null; value: string }
+) =>
+  jsxFlowElement(
+    "Tabs",
+    // hash off so picking a dialect can't clobber the page hash; a dedicated
+    // sync key so pairs sync with each other but not with authored groups.
+    [jsxAttribute("hash", "false"), jsxAttribute("syncKey", "ts2js")],
+    [
+      jsxFlowElement(
+        "Tab",
+        [jsxAttribute("title", "TypeScript")],
+        [codeBlock(ts.lang, ts.value, ts.meta)]
+      ),
+      jsxFlowElement(
+        "Tab",
+        [jsxAttribute("title", "JavaScript")],
+        [codeBlock(js.lang, js.value, js.meta)]
+      ),
+    ]
+  );
+
+describe("ts2jsPlugin", () => {
+  it("expands a marked ts fence into TypeScript/JavaScript tabs", () => {
+    const result = ts2js({
+      lang: "ts",
+      meta: "ts2js",
+      value: 'const greeting: string = "hi";',
+    });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value: 'const greeting: string = "hi";' },
+        { lang: "js", meta: null, value: 'const greeting = "hi";' }
+      )
+    );
+  });
+
+  it("preserves formatting, JSX, and comments; elides type-only imports", () => {
+    const value = [
+      'import { type ReactNode, useState } from "react";',
+      "",
+      "interface Props {",
+      "  children: ReactNode;",
+      "}",
+      "",
+      "// toggles [!code highlight]",
+      "export function Wrap({ children }: Props) {",
+      "  const [open, setOpen] = useState<boolean>(false);",
+      "",
+      "  return <div data-open={open}>{children}</div>;",
+      "}",
+    ].join("\n");
+    const result = ts2js({ lang: "tsx", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "tsx", meta: null, value },
+        {
+          lang: "jsx",
+          meta: null,
+          value: [
+            'import { useState } from "react";',
+            "",
+            "// toggles [!code highlight]",
+            "export function Wrap({ children }) {",
+            "  const [open, setOpen] = useState(false);",
+            "",
+            "  return <div data-open={open}>{children}</div>;",
+            "}",
+          ].join("\n"),
+        }
+      )
+    );
+  });
+
+  it("cleans up the space an erased trailing type operator leaves", () => {
+    const result = ts2js({
+      lang: "ts",
+      meta: "ts2js",
+      value: "const pair = [1, 2] as const;",
+    });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value: "const pair = [1, 2] as const;" },
+        { lang: "js", meta: null, value: "const pair = [1, 2];" }
+      )
+    );
+  });
+
+  it("keeps titles on both tabs but drops line ranges from the JavaScript tab", () => {
+    const result = ts2js({
+      lang: "ts",
+      meta: 'ts2js title="demo.ts" {1-2} lineNumbers',
+      value: "const n: number = 1;",
+    });
+    expect(result).toStrictEqual(
+      tabs(
+        {
+          lang: "ts",
+          meta: 'title="demo.ts" {1-2} lineNumbers',
+          value: "const n: number = 1;",
+        },
+        {
+          lang: "js",
+          meta: 'title="demo.ts" lineNumbers',
+          value: "const n = 1;",
+        }
+      )
+    );
+  });
+
+  it("ignores fences in other languages", () => {
+    expect(ts2js({ lang: "js", meta: "ts2js", value: "1;" })).toBeUndefined();
+  });
+
+  it("ignores unmarked fences and keywords inside quoted attributes", () => {
+    expect(
+      ts2js({ lang: "ts", value: "const x: number = 1;" })
+    ).toBeUndefined();
+    expect(
+      ts2js({
+        lang: "ts",
+        meta: 'title="enable ts2js later"',
+        value: "const x: number = 1;",
+      })
+    ).toBeUndefined();
+  });
+
+  it("leaves twoslash fences alone, matching Shiki's raw-meta trigger", () => {
+    expect(
+      ts2js({ lang: "ts", meta: "ts2js twoslash", value: "const x = 1;" })
+    ).toBeUndefined();
+    // Shiki's explicit twoslash trigger matches inside quoted attrs too, so a
+    // fence it will twoslash-render must never be split into tabs.
+    expect(
+      ts2js({
+        lang: "ts",
+        meta: 'ts2js title="the twoslash guide"',
+        value: "const x = 1;",
+      })
+    ).toBeUndefined();
+  });
+
+  it("accepts the long-form typescript language", () => {
+    const result = ts2js({
+      lang: "typescript",
+      meta: "ts2js",
+      value: "const n: number = 1;",
+    });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "typescript", meta: null, value: "const n: number = 1;" },
+        { lang: "js", meta: null, value: "const n = 1;" }
+      )
+    );
+  });
+
+  it("keeps an import the snippet never references in a value position", () => {
+    const value = [
+      'import { defineConfig } from "blume";',
+      "",
+      "const port: number = 3000;",
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          value: [
+            'import { defineConfig } from "blume";',
+            "",
+            "const port = 3000;",
+          ].join("\n"),
+        }
+      )
+    );
+  });
+
+  it("closes the gap an erased type-only import leaves", () => {
+    const value = [
+      'import { a } from "x";',
+      'import type { T } from "y";',
+      'import { b } from "z";',
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          value: ['import { a } from "x";', 'import { b } from "z";'].join(
+            "\n"
+          ),
+        }
+      )
+    );
+  });
+
+  it("drops a notation marker stranded by its erased line", () => {
+    const value = [
+      "const a = 1;",
+      "type A = string; // [!code highlight]",
+      "const b = 2;",
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        { lang: "js", meta: null, value: "const a = 1;\nconst b = 2;" }
+      )
+    );
+  });
+
+  it("drops an own-line notation marker whose target was erased", () => {
+    const value = [
+      "const a = 1;",
+      "// [!code highlight]",
+      "interface X {",
+      "  a: string;",
+      "}",
+      "const b = 2;",
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        { lang: "js", meta: null, value: "const a = 1;\nconst b = 2;" }
+      )
+    );
+  });
+
+  it("keeps notation markers whose lines survive", () => {
+    const value = "const a: number = 1; // [!code highlight]\nconst b = 2;";
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          value: "const a = 1; // [!code highlight]\nconst b = 2;",
+        }
+      )
+    );
+  });
+
+  it("drops a comment stranded by its erased code", () => {
+    const value = "type A = string; // the shape\nconst b = 2;";
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        { lang: "js", meta: null, value: "const b = 2;" }
+      )
+    );
+  });
+
+  it("leaves template literal interiors byte-exact", () => {
+    const value = [
+      "interface Q {",
+      "  x: string;",
+      "}",
+      "const sql = `SELECT *",
+      "",
+      "",
+      "",
+      "FROM users  ",
+      "WHERE x = 1  ;",
+      "`;",
+    ].join("\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          // The erased interface at the top is trimmed away; the template's
+          // blank runs and trailing spaces are string content and survive.
+          value: [
+            "const sql = `SELECT *",
+            "",
+            "",
+            "",
+            "FROM users  ",
+            "WHERE x = 1  ;",
+            "`;",
+          ].join("\n"),
+        }
+      )
+    );
+  });
+
+  it("preserves CRLF line endings while collapsing erased runs", () => {
+    const value = [
+      "const a = 1;",
+      "",
+      "interface X {",
+      "  a: string;",
+      "}",
+      "",
+      "const b = 2;",
+    ].join("\r\n");
+    const result = ts2js({ lang: "ts", meta: "ts2js", value });
+    expect(result).toStrictEqual(
+      tabs(
+        { lang: "ts", meta: null, value },
+        {
+          lang: "js",
+          meta: null,
+          value: ["const a = 1;", "", "const b = 2;"].join("\r\n"),
+        }
+      )
+    );
+  });
+
+  it("degrades to the authored fence when Sucrase fails to load, once", () => {
+    let calls = 0;
+    const plugin = ts2jsPlugin(() => {
+      calls += 1;
+      throw new Error("missing sucrase");
+    });
+    const node = {
+      lang: "ts",
+      meta: "ts2js",
+      type: "code",
+      value: "const n: number = 1;",
+    };
+    expect(captureReplacement((ctx) => plugin.code(node, ctx))).toBeUndefined();
+    expect(captureReplacement((ctx) => plugin.code(node, ctx))).toBeUndefined();
+    // The failed load is cached: later fences don't re-pay the require.
+    expect(calls).toBe(1);
+  });
+
+  it("keeps a types-only fence as-is instead of emitting an empty tab", () => {
+    expect(
+      ts2js({ lang: "ts", meta: "ts2js", value: "type Id = string;" })
+    ).toBeUndefined();
+  });
+
+  it("keeps a fence Sucrase can't parse as-is", () => {
+    expect(
+      ts2js({ lang: "ts", meta: "ts2js", value: "const = <<<" })
+    ).toBeUndefined();
+  });
+});
+
 describe("mathPlugin", () => {
   it("rewrites block math into a display <Math> element", () => {
     const node = { type: "math", value: "a^2 + b^2" };
@@ -554,6 +920,15 @@ const isString = (value: AnchorNode | string): value is string =>
 /** Recursively read a node's text, like Satteri's `textContent`. */
 const textOf = (node: AnchorNode): string =>
   node.value ?? (node.children ?? []).map((child) => textOf(child)).join("");
+
+/** The text of a visitor's replacement node, or "" when it returned none. */
+const textOfResult = (result: AnchorNode | undefined): string =>
+  result ? textOf(result) : "";
+
+/** The frontmatter slice the heading plugin writes its hidden-TOC list to. */
+interface TestFrontmatter {
+  __blumeTocHidden?: string[];
+}
 
 describe("headingAnchorPlugin", () => {
   /** A hast context whose `setProperty` mutates the node so tests can assert. */
@@ -643,6 +1018,203 @@ describe("headingAnchorPlugin", () => {
     const result = headingAnchorPlugin().element.visit(node, makeCtx());
     expect(result?.properties?.id).toBe("my-id");
     expect(result?.children?.[0]?.properties?.href).toBe("#my-id");
+  });
+
+  it("pins the anchor to a trailing [#custom-id] and strips the marker", () => {
+    const node = heading("h2", "Getting Started [#setup]");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.properties?.id).toBe("setup");
+    expect(result?.children?.[0]?.properties?.href).toBe("#setup");
+    expect(textOfResult(result)).toBe("Getting Started");
+  });
+
+  it("parses a marker in the trailing text after inline code", () => {
+    const code = {
+      children: [{ type: "text", value: "init" }],
+      tagName: "code",
+      type: "element",
+    };
+    const node = heading("h2", "Run ", code, " now [#run-it]");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.properties?.id).toBe("run-it");
+    expect(textOfResult(result)).toBe("Run init now");
+  });
+
+  it("ignores a marker that is not in a trailing text node", () => {
+    const em = {
+      children: [{ type: "text", value: "Hello [#id]" }],
+      tagName: "em",
+      type: "element",
+    };
+    const node = heading("h2", em);
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    // The bracket text stays prose, and the slug comes from the full text.
+    expect(result?.properties?.id).toBe("hello-id");
+    expect(textOfResult(result)).toBe("Hello [#id]");
+  });
+
+  it("occupies a pinned [#custom-id] so a colliding auto-slug disambiguates", () => {
+    const plugin = headingAnchorPlugin();
+    const ctx = makeCtx();
+    const pinned = plugin.element.visit(heading("h2", "Custom [#setup]"), ctx);
+    const auto = plugin.element.visit(heading("h2", "Setup"), ctx);
+    // The pin took "setup", so the later heading steps to the next free id
+    // instead of rendering a duplicate DOM id.
+    expect(pinned?.properties?.id).toBe("setup");
+    expect(auto?.properties?.id).toBe("setup-1");
+  });
+
+  it("pinning an id leaves unrelated auto-slug numbering untouched", () => {
+    const plugin = headingAnchorPlugin();
+    const ctx = makeCtx();
+    const pinned = plugin.element.visit(heading("h2", "Setup [#pin]"), ctx);
+    const auto = plugin.element.visit(heading("h2", "Setup"), ctx);
+    expect(pinned?.properties?.id).toBe("pin");
+    expect(auto?.properties?.id).toBe("setup");
+  });
+
+  it("reports [!toc] heading slugs through the render's frontmatter", () => {
+    const ctx = makeCtx();
+    const plugin = headingAnchorPlugin();
+    const visible = plugin.element.visit(
+      heading("h2", "Internals [!toc]"),
+      ctx
+    );
+    plugin.element.visit(heading("h2", "Shown"), ctx);
+    // The heading itself renders normally — only the TOC list drops it.
+    expect(visible?.properties?.id).toBe("internals");
+    expect(visible?.children?.[0]?.properties?.href).toBe("#internals");
+    expect(ctx.data?.astro?.frontmatter?.__blumeTocHidden).toStrictEqual([
+      "internals",
+    ]);
+  });
+
+  it("records a [!toc] heading under its pinned id", () => {
+    const ctx = makeCtx();
+    headingAnchorPlugin().element.visit(
+      heading("h2", "Internals [!toc] [#guts]"),
+      ctx
+    );
+    expect(ctx.data?.astro?.frontmatter?.__blumeTocHidden).toStrictEqual([
+      "guts",
+    ]);
+  });
+
+  it("resets a stale hidden list when the frontmatter object is reused", () => {
+    const frontmatter: TestFrontmatter = {};
+    const ctxFor = (): AnchorContext => ({
+      data: { astro: { frontmatter } },
+      setProperty(node, key, value) {
+        node.properties = { ...node.properties, [key]: value };
+      },
+      textContent: textOf,
+    });
+    const plugin = headingAnchorPlugin();
+    plugin.element.visit(heading("h2", "Internals [!toc]"), ctxFor());
+    expect(frontmatter.__blumeTocHidden).toStrictEqual(["internals"]);
+    // A re-render of the same entry (dev HMR) shares the frontmatter object;
+    // the marker was removed, so the stale slug must not survive.
+    plugin.element.visit(heading("h2", "Internals"), ctxFor());
+    expect(frontmatter.__blumeTocHidden).toStrictEqual([]);
+  });
+
+  it("renders a [toc] heading as a hidden anchor target, never wrapped", () => {
+    const node = heading("h2", "Examples [toc]");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.tagName).toBe("h2");
+    expect(result?.properties?.id).toBe("examples");
+    expect(result?.properties?.className).toStrictEqual(["blume-toc-only"]);
+    expect(result?.children).toStrictEqual([
+      { type: "text", value: "Examples" },
+    ]);
+  });
+
+  it("appends the toc-only class to existing classes", () => {
+    const arrayed = {
+      ...heading("h2", "A [toc]"),
+      properties: { className: ["lead"] },
+    };
+    const fromArray = headingAnchorPlugin().element.visit(arrayed, makeCtx());
+    expect(fromArray?.properties?.className).toStrictEqual([
+      "lead",
+      "blume-toc-only",
+    ]);
+    const stringed = {
+      ...heading("h2", "B [toc]"),
+      properties: { className: "lead" },
+    };
+    const fromString = headingAnchorPlugin().element.visit(stringed, makeCtx());
+    expect(fromString?.properties?.className).toStrictEqual([
+      "lead",
+      "blume-toc-only",
+    ]);
+  });
+
+  it("leaves an already toc-only heading untouched on a re-visit", () => {
+    const ctx = makeCtx();
+    const plugin = headingAnchorPlugin();
+    const first = plugin.element.visit(heading("h2", "Examples [toc]"), ctx);
+    expect(first).toBeDefined();
+    const again = first && plugin.element.visit(first, ctx);
+    expect(again).toBeUndefined();
+    const asString = {
+      ...heading("h3", "String"),
+      properties: { className: "blume-toc-only", id: "s" },
+    };
+    expect(plugin.element.visit(asString, ctx)).toBeUndefined();
+  });
+
+  it("keeps a marker-only heading literal", () => {
+    // With no heading text left to annotate, stripping would leave an
+    // invisible empty element with an empty id and a blank TOC row — so the
+    // marker stays ordinary prose.
+    const ctx = makeCtx();
+    const plugin = headingAnchorPlugin();
+    const bare = plugin.element.visit(heading("h2", "[#bare]"), ctx);
+    expect(bare?.properties?.id).toBe("bare");
+    expect(textOfResult(bare)).toBe("[#bare]");
+    const toc = plugin.element.visit(heading("h2", "[toc]"), ctx);
+    expect(toc?.properties?.className).toBeUndefined();
+    expect(textOfResult(toc)).toBe("[toc]");
+    const hide = plugin.element.visit(heading("h2", "[!toc]"), ctx);
+    expect(textOfResult(hide)).toBe("[!toc]");
+    expect(ctx.data?.astro?.frontmatter?.__blumeTocHidden).toStrictEqual([]);
+  });
+
+  it("strips a marker-only trailing text node when other children remain", () => {
+    const em = {
+      children: [{ type: "text", value: "Emphasis" }],
+      tagName: "em",
+      type: "element",
+    };
+    const node = heading("h2", em, " [toc]");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.properties?.id).toBe("emphasis");
+    expect(result?.properties?.className).toStrictEqual(["blume-toc-only"]);
+    expect(textOfResult(result)).toBe("Emphasis");
+  });
+
+  it("strips markers and assigns the pinned id even with wrapping off", () => {
+    const node = heading("h2", "Guide [#guide-id]");
+    const result = headingAnchorPlugin({ wrap: false }).element.visit(
+      node,
+      makeCtx()
+    );
+    expect(result?.tagName).toBe("h2");
+    expect(result?.properties?.id).toBe("guide-id");
+    expect(result?.children).toStrictEqual([{ type: "text", value: "Guide" }]);
+    // No anchor wrap: the children are the stripped text directly.
+    expect(textOfResult(result)).toBe("Guide");
+  });
+
+  it("only assigns ids when wrapping is off and no markers are present", () => {
+    const node = heading("h2", "Plain");
+    const result = headingAnchorPlugin({ wrap: false }).element.visit(
+      node,
+      makeCtx()
+    );
+    expect(result).toBeUndefined();
+    expect(node.properties.id).toBe("plain");
   });
 });
 
@@ -805,6 +1377,48 @@ describe("markdown processors", () => {
     );
     expect(html).toContain("blume-inline-code");
     expect(html).toContain("blume-heading-anchor");
+  });
+
+  it("carries heading markers through a full .md render", async () => {
+    const renderer = await blumeMarkdownProcessor({}).createRenderer({});
+    const source = [
+      "## Install [#setup]",
+      "",
+      "## Internals [!toc]",
+      "",
+      "## Examples [toc]",
+    ].join("\n");
+    const { code, metadata } = await renderer.render(source);
+    // The pinned id lands on the heading and its self-link; the marker text
+    // never reaches the page.
+    expect(code).toContain('id="setup"');
+    expect(code).toContain('href="#setup"');
+    expect(code).not.toContain("[#setup]");
+    expect(code).not.toContain("[!toc]");
+    // The [toc]-only heading renders as a hidden anchor target, unwrapped.
+    expect(code).toContain("blume-toc-only");
+    expect(code).toContain('id="examples"');
+    // Satteri's TOC metadata adopts the stripped text and pinned slugs; the
+    // [!toc] slug travels via the frontmatter for the template to filter.
+    expect(metadata.headings).toStrictEqual([
+      { depth: 2, slug: "setup", text: "Install" },
+      { depth: 2, slug: "internals", text: "Internals" },
+      { depth: 2, slug: "examples", text: "Examples" },
+    ]);
+    expect(metadata.frontmatter.__blumeTocHidden).toStrictEqual(["internals"]);
+  });
+
+  it("carries heading markers through a full .mdx render", async () => {
+    const renderer = await blumeMdxProcessor({}).createRenderer({});
+    const { code, metadata } = await renderer.render(
+      "## Install [#setup]\n\n## Internals [!toc]"
+    );
+    expect(code).toContain('id="setup"');
+    expect(code).not.toContain("[#setup]");
+    expect(
+      metadata.headings.map((h: { slug: string }) => h.slug)
+    ).toStrictEqual(["setup", "internals"]);
+    expect(metadata.frontmatter.__blumeTocHidden).toStrictEqual(["internals"]);
   });
 });
 

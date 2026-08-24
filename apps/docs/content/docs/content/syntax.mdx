@@ -17,6 +17,30 @@ Structure a page with headings. Blume renders your frontmatter `title` as the pa
 #### Detail
 ```
 
+### Custom anchors
+
+Anchor ids are generated from the heading text, so a reworded heading gets a new anchor. Append `[#custom-id]` to pin the anchor instead — the marker never renders, and links keep working no matter how the heading reads. Pinned anchors also stay identical across [translated locales](/docs/content/i18n), where auto-generated ids would otherwise differ per language.
+
+```md
+## Getting started [#setup]
+```
+
+Link to it as `/page#setup`. The syntax matches Fumadocs, so migrated content works verbatim.
+
+### Table of contents markers
+
+Two more trailing markers control how a heading appears in the table of contents. `[!toc]` keeps a heading on the page but out of the TOC; `[toc]` does the reverse — the heading shows only in the TOC, as an invisible anchor target, which is useful for labeling sections built from components rather than prose. Markers chain in any order.
+
+```md
+## Appears on the page only [!toc]
+
+## Appears in the TOC only [toc]
+
+## Both markers together [toc] [#custom-id]
+```
+
+Markers are always parsed — a heading that literally ends in marker-shaped text would be treated as marked. Backslash-escaping doesn't help (Markdown resolves `\[` to `[` before the marker parse runs); to show literal marker text at the end of a heading, wrap it in inline code: `` ## Using `[toc]` ``.
+
 ## Emphasis
 
 Inline formatting for stressing words, marking deletions, and showing code or keystrokes mid-sentence.
@@ -284,6 +308,42 @@ config.title;
 //     ^?
 ```
 ````
+
+### TypeScript and JavaScript tabs
+
+Mark a `ts` or `tsx` block `ts2js` to render it as a tab pair: your TypeScript alongside an auto-generated JavaScript variant, so you maintain one snippet and readers pick their dialect. The conversion strips type syntax and type-only imports while keeping your formatting, comments, and JSX exactly as written — and tabs sync, so choosing JavaScript once switches every pair on the page. Like diagrams and math, this is an MDX-only feature — in a `.md` file the block renders as a plain TypeScript fence.
+
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+
+````md
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+````
+
+Other fence meta composes: a `title="..."` shows on both tabs, while `{1,4-5}` line ranges apply only to the TypeScript tab (line numbers shift once types are gone). The one exception is `twoslash` — hover types can't carry over to generated code, so a fence marked both stays a plain Twoslash block.
 
 :::note
 Hide the language icons or wrap long lines instead of scrolling with `markdown: { code: { icons: false, wrap: true } }` in `blume.config.ts`.

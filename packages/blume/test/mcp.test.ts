@@ -91,16 +91,30 @@ interface ToolArguments {
   route?: string;
 }
 
-interface RpcParams {
+interface ToolCallParams {
   arguments?: ToolArguments;
   name: string;
 }
 
+interface ResourceParams {
+  uri: string;
+}
+
+type RpcParams = ResourceParams | ToolCallParams;
+
 interface RpcBody {
-  error?: { message: string };
+  error?: { code?: number; message: string };
   result?: {
     content?: { text: string }[];
+    contents?: { mimeType?: string; text?: string; uri: string }[];
     isError?: boolean;
+    resources?: {
+      description?: string;
+      mimeType?: string;
+      name: string;
+      title?: string;
+      uri: string;
+    }[];
     tools?: { name: string }[];
   };
 }
@@ -1363,7 +1377,10 @@ describe("discovery documents", () => {
   it("carries initialize-shaped compat fields for older scanners", () => {
     const card = buildMcpServerCard(input);
     expect(card.serverInfo).toEqual({ name: "Test Docs", version: "0.0.0" });
-    expect(card.capabilities).toEqual({ tools: { listChanged: false } });
+    expect(card.capabilities).toEqual({
+      resources: { listChanged: false, subscribe: false },
+      tools: { listChanged: false },
+    });
     expect(card.transports).toEqual([
       { endpoint: "https://docs.example.com/mcp", type: "streamable-http" },
     ]);
@@ -1601,5 +1618,151 @@ export default { content: { types: { rfc: { facets: ["status"], frontmatter: { s
 
     const data = await buildMcpData(project);
     expect(data.defaultLocale).toBe("ja");
+  });
+});
+
+describe("MCP resources", () => {
+  it("advertises the resources capability on initialize", async () => {
+    const response = await handler(
+      new Request("https://docs.example.com/mcp", {
+        body: JSON.stringify({
+          id: 1,
+          jsonrpc: "2.0",
+          method: "initialize",
+          params: {
+            capabilities: {},
+            clientInfo: { name: "probe", version: "0" },
+            protocolVersion: "2025-03-26",
+          },
+        }),
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      })
+    );
+    const body: {
+      result?: { capabilities?: { resources?: object; tools?: object } };
+    } = await response.json();
+    expect(Object.keys(body.result?.capabilities ?? {}).toSorted()).toEqual([
+      "resources",
+      "tools",
+    ]);
+  });
+
+  it("lists one text/markdown resource per page at its served URL", async () => {
+    const body = await rpc("resources/list");
+    expect(body.result?.resources).toEqual([
+      {
+        description: "How to install Blume",
+        mimeType: "text/markdown",
+        name: "Installation",
+        title: "Installation",
+        uri: "https://docs.example.com/guides/install",
+      },
+      {
+        description: "Configuration reference",
+        mimeType: "text/markdown",
+        name: "Configuration",
+        title: "Configuration",
+        uri: "https://docs.example.com/guides/config",
+      },
+    ]);
+  });
+
+  it("reads a resource by its listed URI", async () => {
+    const body = await rpc("resources/read", {
+      uri: "https://docs.example.com/guides/install",
+    });
+    expect(body.result?.contents).toEqual([
+      {
+        mimeType: "text/markdown",
+        text: "---\ntitle: Installation\n---\n# Installation\n\nInstall it.",
+        uri: "https://docs.example.com/guides/install",
+      },
+    ]);
+  });
+
+  it("accepts a bare route or a .md mirror URL as the URI", async () => {
+    for (const uri of [
+      "/guides/config",
+      "https://docs.example.com/guides/config.md",
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- sequential reads keep the assertions readable
+      const body = await rpc("resources/read", { uri });
+      expect(body.result?.contents?.[0]?.text).toContain("# Configuration");
+      expect(body.result?.contents?.[0]?.uri).toBe(uri);
+    }
+  });
+
+  it("answers an unknown URI with the spec's resource-not-found code", async () => {
+    const body = await rpc("resources/read", {
+      uri: "https://docs.example.com/nope",
+    });
+    expect(body.error?.code).toBe(-32_002);
+    expect(body.error?.message).toContain(
+      'No page found at "https://docs.example.com/nope"'
+    );
+    expect(body.error?.message).toContain("resources/list");
+  });
+
+  it("falls back to blume: URIs when no site is configured", async () => {
+    const local = createMcpFetchHandler({ ...DATA, base: "/docs", site: null });
+    const call = async (method: string, params?: ResourceParams) => {
+      const response = await local(
+        new Request("http://localhost/mcp", {
+          body: JSON.stringify({ id: 1, jsonrpc: "2.0", method, params }),
+          headers: {
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+          },
+          method: "POST",
+        })
+      );
+      const body: RpcBody = await response.json();
+      return body;
+    };
+    const listed = await call("resources/list");
+    expect(listed.result?.resources?.map((resource) => resource.uri)).toEqual([
+      "blume:/docs/guides/install",
+      "blume:/docs/guides/config",
+    ]);
+    // The based route round-trips: the scheme comes off, then the base.
+    const read = await call("resources/read", {
+      uri: "blume:/docs/guides/install",
+    });
+    expect(read.result?.contents?.[0]?.text).toContain("# Installation");
+    expect(read.result?.contents?.[0]?.uri).toBe("blume:/docs/guides/install");
+  });
+
+  it("omits description from a resource whose page has none", async () => {
+    const bare = createMcpFetchHandler({
+      ...DATA,
+      routes: DATA.routes
+        .slice(0, 1)
+        .map((route) => ({ ...route, description: undefined })),
+    });
+    const response = await bare(
+      new Request("https://docs.example.com/mcp", {
+        body: JSON.stringify({
+          id: 1,
+          jsonrpc: "2.0",
+          method: "resources/list",
+        }),
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      })
+    );
+    const body: RpcBody = await response.json();
+    expect(body.result?.resources?.[0]).toEqual({
+      mimeType: "text/markdown",
+      name: "Installation",
+      title: "Installation",
+      uri: "https://docs.example.com/guides/install",
+    });
   });
 });

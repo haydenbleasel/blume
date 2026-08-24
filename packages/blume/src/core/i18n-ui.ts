@@ -107,6 +107,12 @@ const uiStringsObject = z.object({
         .string()
         .default("We couldn't find the page you're looking for."),
       home: z.string().default("Back to home"),
+      /** Label of the llms.txt link on the 404 page. */
+      llms: z.string().default("Docs index for AI agents (llms.txt)"),
+      /** Label of the sitemap link on the 404 page. */
+      sitemap: z.string().default("Sitemap"),
+      /** Heading over the recovery links (sections, sitemap, llms.txt). */
+      suggestions: z.string().default("Where to look next"),
       title: z.string().default("Page not found"),
     })
     .prefault({}),

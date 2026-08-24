@@ -150,6 +150,43 @@ const claudeRunner = (
 };
 
 describe("runTranslate pages", () => {
+  it("copies a verbatim partial without invoking the agent", async () => {
+    const root = await scratch();
+    const code = "export const x = 1;\n";
+    const sourcePath = join(root, "docs/_snippets/example.ts");
+    await mkdir(dirname(sourcePath), { recursive: true });
+    await writeFile(sourcePath, code);
+    const item: PageWorkItem = {
+      kind: "page",
+      locale: "fr",
+      sourcePath,
+      sourceRel: "docs/_snippets/example.ts",
+      status: "missing",
+      targetPath: join(root, "docs/fr/_snippets/example.ts"),
+      targetRel: "docs/fr/_snippets/example.ts",
+      verbatim: true,
+    };
+    const ledger = emptyLedger();
+    const { calls, run } = claudeRunner([]);
+
+    const result = await runTranslate({
+      agent: "claude",
+      ledger,
+      project: project(root),
+      run,
+      workList: workListOf([item]),
+    });
+
+    expect(result.counts).toEqual({ failed: 0, partial: 0, translated: 1 });
+    expect(calls).toEqual([]);
+    expect(
+      await readFile(join(root, "docs/fr/_snippets/example.ts"), "utf-8")
+    ).toBe(code);
+    expect(ledger.files["docs/_snippets/example.ts"]).toEqual({
+      fr: hashSource(code),
+    });
+  });
+
   it("writes, stamps, aggregates cost, and orders progress events", async () => {
     const root = await scratch();
     const items = [await pageItem(root, "a"), await pageItem(root, "b")];

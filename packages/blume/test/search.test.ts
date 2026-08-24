@@ -241,6 +241,60 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("west");
   });
 
+  it("strips trailing heading markers from the plain-text index", async () => {
+    await writeFile(
+      join(root, "markers.md"),
+      [
+        "# Guide",
+        "",
+        "## Install [#setup]",
+        "",
+        "## Internals [!toc]",
+        "",
+        "Body prose.",
+        "",
+      ].join("\n")
+    );
+    const [doc] = await buildSearchDocuments(
+      projectWith(
+        [page({ id: "markers.md" })],
+        [route({ id: "markers.md", sourcePath: join(root, "markers.md") })]
+      )
+    );
+    // Anchor metadata, not prose: the marker text must never be searchable.
+    expect(doc?.content).toContain("Install");
+    expect(doc?.content).toContain("Internals");
+    expect(doc?.content).not.toContain("[#setup]");
+    expect(doc?.content).not.toContain("[!toc]");
+  });
+
+  it("keeps bracketed heading text that renders on the page searchable", async () => {
+    await writeFile(
+      join(root, "literal.md"),
+      [
+        "# Guide",
+        "",
+        "## Using `[toc]`",
+        "",
+        "## [#bare]",
+        "",
+        "Body prose.",
+        "",
+      ].join("\n")
+    );
+    const [doc] = await buildSearchDocuments(
+      projectWith(
+        [page({ id: "literal.md" })],
+        [route({ id: "literal.md", sourcePath: join(root, "literal.md") })]
+      )
+    );
+    // Mirroring the renderer: a marker only counts when it ends the heading's
+    // final plain-text child, so inline code stays searchable, and a
+    // marker-only heading renders (and indexes) literally.
+    expect(doc?.content).toContain("Using [toc]");
+    expect(doc?.content).toContain("[#bare]");
+  });
+
   it("keeps Markdown and fenced code when content is 'markdown'", async () => {
     const [doc] = await buildSearchDocuments(
       projectWith([page({ description: "Desc A", id: "a.md" })], [route({})]),

@@ -53,10 +53,14 @@ export const jsxTextElement = (
   children: MdastValue[] = []
 ) => ({ attributes, children, name, type: "mdxJsxTextElement" });
 
-/** Build a fenced code block node. */
-export const codeBlock = (lang: string, value: string) => ({
+/** Build a fenced code block node, optionally with a fence-meta string. */
+export const codeBlock = (
+  lang: string,
+  value: string,
+  meta: string | null = null
+) => ({
   lang,
-  meta: null,
+  meta,
   type: "code",
   value,
 });

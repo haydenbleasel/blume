@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { rewriteRelativeImages } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
-import { readEntryText } from "../core/sources/read.ts";
+import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { RouteManifestEntry } from "../core/types.ts";
 import {
   downlevelComponents,
@@ -65,7 +65,7 @@ export const buildRawMarkdown = async (
   const readRoute = async (route: RouteManifestEntry): Promise<string> => {
     const page = pageById.get(route.id);
     if (page) {
-      return await readEntryText(project, page);
+      return await readExpandedEntryText(project, page);
     }
     return route.sourcePath ? await readFile(route.sourcePath, "utf-8") : "";
   };

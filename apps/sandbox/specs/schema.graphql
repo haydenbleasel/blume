@@ -1,0 +1,83 @@
+"""
+The Petstore GraphQL API — the same store as the REST reference, queryable.
+"""
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+type Query {
+  "List pets in the store, newest first."
+  pets(limit: Int = 10, sort: SortOrder = ASC, filter: PetFilter): [Pet!]!
+  "Look up a single pet."
+  pet(id: ID!): Pet
+  "Search pets and owners by name."
+  search(term: String!): SearchResult
+  "The store's former inventory endpoint."
+  inventory: String @deprecated(reason: "Use pets.")
+}
+
+type Mutation {
+  "Add a pet to the store."
+  addPet(input: AddPetInput!): Pet!
+}
+
+type Subscription {
+  "Fires whenever a pet is added."
+  petAdded: Pet!
+}
+
+"A pet in the store."
+type Pet implements Node {
+  id: ID!
+  "The pet's display name."
+  name: String!
+  status: PetStatus
+  owner: Owner
+  "When the pet was born."
+  bornAt: Date
+}
+
+"A pet owner."
+type Owner {
+  id: ID!
+  name: String
+  pets: [Pet!]!
+}
+
+"An entity with a globally unique id."
+interface Node {
+  id: ID!
+}
+
+"A pet or an owner, from name search."
+union SearchResult = Pet | Owner
+
+enum SortOrder {
+  ASC
+  DESC
+}
+
+"Adoption status."
+enum PetStatus {
+  "Ready to adopt."
+  AVAILABLE
+  PENDING
+  SOLD @deprecated(reason: "No longer tracked.")
+}
+
+"Filters for the pets query."
+input PetFilter {
+  status: PetStatus = AVAILABLE
+  "Match against the pet's name."
+  name: String
+}
+
+input AddPetInput {
+  name: String!
+  status: PetStatus
+}
+
+"An RFC 3339 calendar date."
+scalar Date @specifiedBy(url: "https://datatracker.ietf.org/doc/html/rfc3339")

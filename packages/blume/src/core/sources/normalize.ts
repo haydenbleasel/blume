@@ -5,6 +5,7 @@ import { extname } from "pathe";
 
 import { withBasePath } from "../base-path.ts";
 import { diagnosticsFromIssues, diagnosticsFromZod } from "../diagnostics.ts";
+import { occupySlug, parseHeadingMarkers } from "../heading-markers.ts";
 import { localePlacement, localizeRoute } from "../i18n.ts";
 import { pageMetaSchema } from "../schema.ts";
 import type { FrontmatterExtend, PageMeta } from "../schema.ts";
@@ -135,41 +136,42 @@ export const mapRoute = (relativePath: string): MappedRoute => {
   return { groups, route, segments };
 };
 
-// CommonMark allows backtick *and* tilde fences. The scanners track which
-// delimiter opened the current fence (`null` when outside one) so a ``` line
-// inside a ~~~ block is content, not a toggle — see `nextFenceState`.
-const CODE_FENCE = /^(?<delimiter>```|~~~)/u;
+// CommonMark allows backtick *and* tilde fences, three or more characters
+// long. The scanners track which delimiter opened the current fence and how
+// long its run was (`null` when outside one), so a ``` line inside a ~~~
+// block — or inside a ````-delimited block (the wrapper `codeBlockLines`
+// emits around code that contains its own ``` fence) — is content, not a
+// toggle. See `nextFenceState`.
+const CODE_FENCE = /^(?<run>`{3,}|~{3,})/u;
 
-/** The fence delimiter opening the current code block, or null outside one. */
-export type FenceState = "```" | "~~~" | null;
+/** The open fence's delimiter char and run length, or null outside one. */
+export type FenceState = { delimiter: "`" | "~"; length: number } | null;
 
 /**
  * Advance the fenced-code state for one line: an opening fence records its
- * delimiter, only the matching delimiter closes it, and any other line leaves
- * the state untouched.
+ * delimiter and run length, only a run of the same character at least as long
+ * closes it (CommonMark), and any other line leaves the state untouched.
  */
 export const nextFenceState = (line: string, fence: FenceState): FenceState => {
   const trimmed = line.trimStart();
-  const delimiter = trimmed.match(CODE_FENCE)?.groups?.delimiter;
-  // The `delimiter` group matches exactly ``` or ~~~; comparing against both
-  // narrows it without a cast.
-  if (delimiter !== "```" && delimiter !== "~~~") {
+  const run = trimmed.match(CODE_FENCE)?.groups?.run;
+  if (run === undefined) {
     return fence;
   }
+  const delimiter = run.startsWith("`") ? ("`" as const) : ("~" as const);
   if (fence === null) {
     // A backtick fence's info string cannot itself contain a backtick
     // (CommonMark) — a line-leading ```inline``` span is a paragraph, and
     // opening a phantom fence on it would swallow every heading and link
     // after it. Tilde fences carry no such rule.
-    if (delimiter === "```") {
-      const run = trimmed.match(/^`+/u)?.[0].length ?? 0;
-      if (trimmed.slice(run).includes("`")) {
-        return fence;
-      }
+    if (delimiter === "`" && trimmed.slice(run.length).includes("`")) {
+      return fence;
     }
-    return delimiter;
+    return { delimiter, length: run.length };
   }
-  return fence === delimiter ? null : fence;
+  return fence.delimiter === delimiter && run.length >= fence.length
+    ? null
+    : fence;
 };
 // A closing hash sequence must be preceded by whitespace (CommonMark), so a
 // heading like `## What is C#` keeps its trailing `#`. Up to 3 leading spaces
@@ -281,12 +283,76 @@ const finishPromptTag = (
  * collapses `--`; github-slugger keeps it) and resolves repeated headings the
  * same way (`setup`, `setup-1`).
  */
+// CommonMark's escapable ASCII punctuation. The renderer only ever sees
+// heading text *after* the Markdown parser has resolved backslash escapes, so
+// `\[toc]` reaches the hast as plain `[toc]` and the marker still applies;
+// resolving escapes here keeps the two pipelines identical (there is no
+// inline way to write a literal trailing marker — use inline code instead).
+const ESCAPED_PUNCTUATION = /\\(?<char>[!-/:-@[-`{-~])/gu;
+
+// A link-reference definition line: `[label]: /url`, up to 3 leading spaces.
+const REF_DEFINITION = /^ {0,3}\[(?<label>[^\]]+)\]:/u;
+
+/**
+ * The normalized labels of every link-reference definition in the body
+ * (outside fenced code). A trailing heading bracket whose label is defined is
+ * a CommonMark shortcut link, not a marker — the renderer leaves it in the
+ * heading as an `<a>`, so the marker parse must skip it too. Labels match
+ * case-insensitively with collapsed internal whitespace (CommonMark).
+ */
+const refDefinitionLabels = (lines: readonly string[]): Set<string> => {
+  const labels = new Set<string>();
+  let fence: FenceState = null;
+  for (const line of lines) {
+    const next = nextFenceState(line, fence);
+    if (fence !== null || next !== null) {
+      fence = next;
+      continue;
+    }
+    const label = line.match(REF_DEFINITION)?.groups?.label;
+    if (label !== undefined) {
+      labels.add(label.trim().replaceAll(/\s+/gu, " ").toLowerCase());
+    }
+  }
+  return labels;
+};
+
+/**
+ * A heading record from raw heading text: escapes resolved and trailing
+ * markers stripped, exactly as the renderer sees them. A `[#custom-id]` pin
+ * becomes the slug verbatim and — matching the renderer — occupies its id in
+ * the slugger, so a later heading whose auto-slug collides disambiguates
+ * (`setup` → `setup-1`). `[!toc]`/`[toc]` headings stay in the record: their
+ * ids exist in the rendered page, so links to them are valid anchors
+ * regardless of TOC visibility. A heading that is nothing but markers keeps
+ * them as literal text, mirroring the renderer.
+ */
+const toHeading = (
+  depth: number,
+  raw: string,
+  slugger: GithubSlugger,
+  isRefDefined: (label: string) => boolean
+): Heading => {
+  const unescaped = raw.replaceAll(ESCAPED_PUNCTUATION, "$<char>");
+  const markers = parseHeadingMarkers(unescaped, isRefDefined);
+  const text = markers.text.trim();
+  if (text === "" && (markers.id !== undefined || markers.toc !== undefined)) {
+    return { depth, slug: slugger.slug(unescaped), text: unescaped };
+  }
+  if (markers.id !== undefined) {
+    occupySlug(slugger, markers.id);
+    return { depth, slug: markers.id, text };
+  }
+  return { depth, slug: slugger.slug(text), text };
+};
+
 /** Scan one line for a heading, advancing the fence/paragraph state. */
 const scanHeadingLine = (
   line: string,
   state: HeadingScanState,
   slugger: GithubSlugger,
-  headings: Heading[]
+  headings: Heading[],
+  isRefDefined: (label: string) => boolean
 ): void => {
   const next = nextFenceState(line, state.fence);
   // Skip fence delimiter lines themselves and anything inside a fence. A fence
@@ -321,8 +387,9 @@ const scanHeadingLine = (
   const atx = line.match(ATX_HEADING);
   if (atx?.groups) {
     const depth = atx.groups.hashes?.length ?? 1;
-    const text = (atx.groups.text ?? "").trim();
-    headings.push({ depth, slug: slugger.slug(text), text });
+    headings.push(
+      toHeading(depth, (atx.groups.text ?? "").trim(), slugger, isRefDefined)
+    );
     state.paragraph = [];
     return;
   }
@@ -330,12 +397,10 @@ const scanHeadingLine = (
   if (setext?.groups && state.paragraph.length > 0) {
     // Setext wins over thematic break when it closes a paragraph (CommonMark);
     // a multi-line paragraph renders as one heading, soft breaks as spaces.
-    const text = state.paragraph.join(" ").trim();
-    headings.push({
-      depth: setext.groups.marker?.startsWith("=") ? 1 : 2,
-      slug: slugger.slug(text),
-      text,
-    });
+    const depth = setext.groups.marker?.startsWith("=") ? 1 : 2;
+    headings.push(
+      toHeading(depth, state.paragraph.join(" ").trim(), slugger, isRefDefined)
+    );
     state.paragraph = [];
     return;
   }
@@ -360,8 +425,12 @@ export const extractHeadings = (body: string): Heading[] => {
     promptTag: false,
   };
 
-  for (const line of linesWithoutFrontMatter(body)) {
-    scanHeadingLine(line, state, slugger, headings);
+  const lines = linesWithoutFrontMatter(body);
+  const definedLabels = refDefinitionLabels(lines);
+  const isRefDefined = (label: string): boolean =>
+    definedLabels.has(label.toLowerCase());
+  for (const line of lines) {
+    scanHeadingLine(line, state, slugger, headings, isRefDefined);
   }
 
   return headings;
@@ -516,8 +585,58 @@ export const extractComponentTags = (body: string): string[] => {
  * extracted from the stripped body, but diagnostics point into the raw
  * document — recorded lines must shift by this offset to match it.
  */
-const strippedLineOffset = (raw: string | undefined, body: string): number =>
+export const strippedLineOffset = (
+  raw: string | undefined,
+  body: string
+): number =>
   raw ? Math.max(0, raw.split("\n").length - body.split("\n").length) : 0;
+
+/**
+ * Map links extracted from include-expanded text back to the file and raw
+ * line each expanded line came from, so a broken link inside a partial is
+ * reported against the partial. Links whose origin is the page's own source
+ * carry no `file` override (origins already hold raw-file lines).
+ */
+const remapExpandedLinks = (
+  links: PageLink[],
+  origins: { file: string; line: number }[],
+  sourcePath: string | undefined
+): PageLink[] =>
+  links.map((link) => {
+    const origin = origins[link.line - 1];
+    if (!origin) {
+      return link;
+    }
+    const remapped: PageLink = { ...link, line: origin.line };
+    if (origin.file !== sourcePath) {
+      remapped.file = origin.file;
+    }
+    return remapped;
+  });
+
+/** The entry's transitively included files, when the scan expanded any. */
+const entryIncludes = (entry: SourceEntry): string[] | undefined =>
+  entry.expanded && entry.expanded.includes.length > 0
+    ? entry.expanded.includes
+    : undefined;
+
+/**
+ * Extract an entry's links for validation. When the scan expanded includes,
+ * extraction runs over the expanded text (origins already hold raw-file
+ * lines); otherwise over the stripped body, shifted by the stripped front
+ * matter block's height.
+ */
+const entryLinks = (entry: SourceEntry): PageLink[] =>
+  entry.expanded
+    ? remapExpandedLinks(
+        extractLinks(entry.expanded.text),
+        entry.expanded.origins,
+        entry.sourcePath
+      )
+    : extractLinks(
+        entry.body.text,
+        strippedLineOffset(entry.raw, entry.body.text)
+      );
 
 const deriveTitle = (
   meta: PageMeta,
@@ -767,14 +886,18 @@ export const normalizeEntry = (
   // version-specific for free.
   const { segments, groups, route: versionKey } = mapRoute(routeInput);
   const logicalRoute = versionizeRoute(versionKey, version);
-  const headings = extractHeadings(entry.body.text);
+  // Extraction runs on the include-expanded body when the scan expanded one,
+  // so a partial's headings anchor-index and TOC under every including page
+  // and its components register for the runtime import map.
+  const bodyText = entry.expanded?.text ?? entry.body.text;
+  const headings = extractHeadings(bodyText);
   const { staged } = ctx.source;
 
   const base = {
     body: staged ? { format, text: entry.raw ?? entry.body.text } : undefined,
     collection: staged ? "staged" : undefined,
     componentsUsed:
-      format === "mdx" ? extractComponentTags(entry.body.text) : undefined,
+      format === "mdx" ? extractComponentTags(bodyText) : undefined,
     contentType: meta.type ?? ctx.defaultType,
     custom: parsed.custom,
     description: meta.description,
@@ -784,11 +907,9 @@ export const normalizeEntry = (
     groups,
     headings,
     id: `${ctx.source.name}:${entry.ref}`,
+    includes: entryIncludes(entry),
     lastModified: meta.lastModified ?? entry.lastModified,
-    links: extractLinks(
-      entry.body.text,
-      strippedLineOffset(entry.raw, entry.body.text)
-    ),
+    links: entryLinks(entry),
     meta,
     navPath,
     segments,

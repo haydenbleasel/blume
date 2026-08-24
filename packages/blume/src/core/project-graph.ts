@@ -4,6 +4,7 @@ import { loadConfig } from "./config.ts";
 import { applyDeploymentEnv } from "./deployment-env.ts";
 import { buildContentGraph } from "./graph.ts";
 import { i18nDiagnostics } from "./i18n.ts";
+import { expandIncludes, hasIncludeStatements } from "./includes.ts";
 import {
   gitLastModifiedTimes,
   gitRepositoryRoot,
@@ -15,7 +16,7 @@ import { discoverFolderMeta } from "./meta.ts";
 import type { FolderMetaSource } from "./meta.ts";
 import { resolveProjectContext } from "./project.ts";
 import type { ResolvedConfig } from "./schema.ts";
-import { normalizeEntry } from "./sources/normalize.ts";
+import { normalizeEntry, strippedLineOffset } from "./sources/normalize.ts";
 import { resolveDocsCollection, resolveSources } from "./sources/resolve.ts";
 import type { ContentSource, SourceLoadResult } from "./sources/types.ts";
 import type {
@@ -278,6 +279,32 @@ export const scanProject = async (
     }),
   ]);
 
+  // Expand `<include>` statements before normalization, so heading/link/
+  // component extraction sees the spliced content every render surface shows.
+  // Filesystem entries only: includes resolve as filesystem paths bounded by
+  // the owning source's content root. Unresolvable statements stay verbatim
+  // and surface as error diagnostics here.
+  const includeDiagnostics: Diagnostic[] = [];
+  await Promise.all(
+    loaded.flatMap(({ source, entries }) => {
+      if (source.staged || !source.contentRoot) {
+        return [];
+      }
+      return entries.map(async (entry) => {
+        if (!entry.sourcePath || !hasIncludeStatements(entry.body.text)) {
+          return;
+        }
+        const expansion = await expandIncludes(entry.body.text, {
+          contentRoot: source.contentRoot,
+          lineOffset: strippedLineOffset(entry.raw, entry.body.text),
+          sourcePath: entry.sourcePath,
+        });
+        entry.expanded = expansion;
+        includeDiagnostics.push(...expansion.errors);
+      });
+    })
+  );
+
   // Folder meta contributed by the sources themselves (the OpenAPI source
   // labels each tag directory with the spec's own tag name). It applies to
   // every locale, so it merges into the shared map — beneath user-authored
@@ -368,6 +395,7 @@ export const scanProject = async (
     context,
     diagnostics: [
       ...contentDiagnostics,
+      ...includeDiagnostics,
       ...folderMeta.diagnostics,
       ...entryIdDiagnostics(pages, resolveDocsCollection(config, context).base),
       ...graph.diagnostics,

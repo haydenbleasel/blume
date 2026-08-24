@@ -45,6 +45,19 @@ export interface SourceEntry {
   lastModified?: string;
   /** Content hash for cache invalidation / HMR; adapter-computed when cheap. */
   hash?: string;
+  /**
+   * The body with `<include>` statements expanded, set by the scan's expansion
+   * pass (filesystem entries whose body contains a statement). `normalizeEntry`
+   * extracts headings/links/components from this text so a partial's content
+   * counts toward the including page, with `origins` mapping each expanded
+   * line back to the file and raw line it came from for diagnostics.
+   */
+  expanded?: {
+    text: string;
+    origins: { file: string; line: number }[];
+    /** Absolute paths of every file included, transitively. */
+    includes: string[];
+  };
 }
 
 /** The result of a single `ContentSource.load()` call. */

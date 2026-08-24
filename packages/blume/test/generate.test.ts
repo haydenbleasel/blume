@@ -252,7 +252,60 @@ describe("buildRuntimeData", () => {
     expect(data.config.discovery).toStrictEqual({
       agentReadability: true,
       llmsTxt: true,
+      sitemap: false,
     });
+  });
+
+  it("serializes the JSON-LD identity, null when neither node is configured", async () => {
+    const plain = JSON.parse(
+      buildRuntimeData(
+        await scanProject(await writeProject({ "docs/index.md": "# Home\n" }))
+      )
+    );
+    expect(plain.config.identity).toBeNull();
+
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  seo: {
+    organization: { email: "hello@example.com", logo: "/logo.svg" },
+    software: { license: "MIT", price: 0 },
+  },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.identity).toStrictEqual({
+      organization: {
+        contactType: "customer support",
+        email: "hello@example.com",
+        logo: "/logo.svg",
+        sameAs: [],
+      },
+      software: {
+        applicationCategory: "DeveloperApplication",
+        license: "MIT",
+        price: 0,
+        priceCurrency: "USD",
+        sameAs: [],
+      },
+    });
+  });
+
+  it("flags the sitemap for the 404 page only when a site makes one possible", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  deployment: { site: "https://docs.example.com" },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    const data = JSON.parse(buildRuntimeData(project));
+    expect(data.config.discovery.sitemap).toBe(true);
   });
 
   it("carries discovery opt-outs into runtime data", async () => {
@@ -270,6 +323,7 @@ describe("buildRuntimeData", () => {
     expect(data.config.discovery).toStrictEqual({
       agentReadability: false,
       llmsTxt: false,
+      sitemap: false,
     });
   });
 
@@ -987,6 +1041,37 @@ describe("generateRuntime", () => {
     expect(generated).toContain('"../blume.config.ts"');
     expect(generated).toMatch(/Blume config source SHA-256: [a-f0-9]{64}/u);
     expect(generated).not.toContain("must-not-leak");
+  });
+
+  it("writes the include graph for dev-server partial invalidation", async () => {
+    const root = await writeProject({
+      "docs/_snippets/shared.mdx": "## Shared\n",
+      "docs/a.mdx": "# A\n\n<include>./_snippets/shared.mdx</include>\n",
+      "docs/b.mdx": "# B\n\n<include>./_snippets/shared.mdx</include>\n",
+      "docs/index.md": "# Home\n",
+    });
+    const project = await scanProject(root);
+    await generateRuntime(project);
+    // SAFETY: the file under test was just written by `generateRuntime`,
+    // which serializes exactly this shape.
+    const graph = JSON.parse(
+      await readFile(
+        join(project.context.outDir, "src", "generated", "includes.json"),
+        "utf-8"
+      )
+    ) as Record<string, string[]>;
+    const partial = join(root, "docs", "_snippets", "shared.mdx");
+    expect(graph[partial]?.toSorted()).toEqual([
+      join(root, "docs", "a.mdx"),
+      join(root, "docs", "b.mdx"),
+    ]);
+    // The generated config wires the HMR plugin at that graph path.
+    const config = await readFile(
+      join(project.context.outDir, "astro.config.mjs"),
+      "utf-8"
+    );
+    expect(config).toContain("includeHmrPlugin(");
+    expect(config).toContain("includes.json");
   });
 
   it("rewrites generated config when integration source changes", async () => {

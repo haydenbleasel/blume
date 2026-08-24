@@ -44,6 +44,7 @@ import {
   searchEndpointTemplate,
   staticJsonEndpointTemplate,
 } from "../astro/templates.ts";
+import { buildIncludeGraph } from "../core/includes.ts";
 import { packageRoot } from "../core/package-root.ts";
 import { scanProject } from "../core/project-graph.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
@@ -383,6 +384,7 @@ export const eject = async (
       content: astroConfigTemplate({
         askPath: "./src/generated/Ask.astro",
         config,
+        contentRoot: relContext.contentRoot,
         contentRoutes: project.manifest.routes.map((route) => route.path),
         context: relContext,
         dataPath: "./src/generated/data.json",
@@ -484,6 +486,15 @@ export const eject = async (
     {
       content: `${JSON.stringify(rawMarkdown)}\n`,
       path: join(genDir, "raw-markdown.json"),
+    },
+    {
+      // The partial → including-pages map behind `includeHmrPlugin`, which the
+      // ejected astro.config wires at this exact path — without the file every
+      // hot update's read would silently no-op and partial edits would serve
+      // stale pages. A snapshot like the rest of `src/generated`: the ejected
+      // app owns (and may regenerate or prune) it.
+      content: `${JSON.stringify(buildIncludeGraph(project.graph.pages))}\n`,
+      path: join(genDir, "includes.json"),
     },
     {
       content: rawMarkdownEndpointTemplate("md"),

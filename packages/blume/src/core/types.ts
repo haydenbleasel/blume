@@ -66,6 +66,10 @@ export interface PageLink {
   line: number;
   /** 1-based column of the target within the line. */
   column: number;
+  /** Absolute path of the file the link was written in, when that isn't the
+   * page's own source — a link inside an included partial. Diagnostics point
+   * here so authors fix the partial, not the page that spliced it. */
+  file?: string;
 }
 
 /**
@@ -181,6 +185,9 @@ export interface PageRecord {
   componentsUsed?: string[];
   /** Resolved "last updated" ISO date, when the feature is enabled. */
   lastModified?: string;
+  /** Absolute paths of files this page `<include>`s, transitively. Drives the
+   * dev-server invalidation edge from a partial to the pages that splice it. */
+  includes?: string[];
 }
 
 /** A node in the generated navigation tree. */

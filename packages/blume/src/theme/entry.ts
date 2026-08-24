@@ -311,6 +311,18 @@ ${THEME_MAPPING}
   opacity: 1;
 }
 
+/* A [toc]-marked heading exists only for the table of contents: it stays in
+   the flow as a zero-height, invisible anchor target so its TOC entry (and any
+   deep link) still has somewhere to scroll to, without rendering on the page. */
+.prose :where(.blume-toc-only) {
+  border: 0;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  visibility: hidden;
+}
+
 .prose :where(h2:first-child) {
   border-top: 0;
   padding-top: 0;

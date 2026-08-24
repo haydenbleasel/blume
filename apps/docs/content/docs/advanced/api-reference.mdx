@@ -12,7 +12,7 @@ openapi: {
 }
 ```
 
-That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically.
+That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically. Documenting a GraphQL API instead? See the [GraphQL reference](/docs/advanced/graphql).
 
 The reference doesn't add a header tab on its own. To surface it, point a [navigation tab](/docs/content/navigation#tabs) at its route — this also scopes the operations sidebar for the native renderer:
 
@@ -225,7 +225,7 @@ asyncapi: {
 ```
 
 :::note
-`playground.proxy` is OpenAPI-only. It forwards HTTP requests, and a WebSocket connect goes straight from the browser to the server named in the URL, so there's nothing for a proxy to sit in front of.
+`playground.proxy` doesn't apply to event operations. It forwards HTTP requests, and a WebSocket connect goes straight from the browser to the server named in the URL, so there's nothing for a proxy to sit in front of.
 :::
 
 The event composer collects no broker credentials. Each operation page's **Authorization** section documents what the broker expects, and a WebSocket connect carries only what's already in the URL. Nothing is persisted for event operations.

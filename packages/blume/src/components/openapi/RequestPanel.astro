@@ -3,6 +3,7 @@ import data from "blume:data";
 
 import { highlightCode } from "../../markdown/index.ts";
 import { exampleValue, type SchemaLike, toJson } from "./helpers.ts";
+import { languageSamplePanels } from "./sample-panels.ts";
 import PanelTabs from "./PanelTabs.astro";
 import type { RequestSample, SampleLanguage } from "./snippets.ts";
 
@@ -25,16 +26,10 @@ interface Props {
 
 const { sample, languages, responses, schemas } = Astro.props;
 
-const requestPanels = await Promise.all(
-  languages.map(async (language) => ({
-    html: await highlightCode(language.build(sample), language.lang, {
-      icons: false,
-      themes: data.config.codeThemes,
-    }),
-    key: language.id,
-    label: language.label,
-    lang: language.id,
-  }))
+const requestPanels = await languageSamplePanels(
+  languages,
+  sample,
+  data.config.codeThemes
 );
 
 const responsePanels = await Promise.all(

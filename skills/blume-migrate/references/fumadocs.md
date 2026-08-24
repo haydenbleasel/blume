@@ -73,6 +73,10 @@ Fumadocs icons are strings resolved by the repo's own `icon` handler in `loader(
 - **No equivalent — report:** `<DynamicCodeBlock>`, `<ImageZoom>` (Blume zooms content images by default), `<InlineTOC>`.
 - **Strip or convert every import** — not just `fumadocs-*`: `lucide-react` imports (icon JSX → string names), `next/image`/`next/link` (→ Markdown image/link), and local components. **Inventory `mdx-components.tsx` before deleting it** — components registered there are used import-free in MDX bodies; port or inline each usage first.
 
+## Headings
+
+Trailing heading markers — `[#custom-id]` (pinned anchor), `[!toc]` (hide from the TOC), `[toc]` (TOC-only entry) — use the same syntax in Blume. **Pass through unchanged.** One exception: Fumadocs' looser grammar accepts an id containing whitespace (`[#two words]`); Blume does not parse that as a marker, so rewrite such an id to a hyphenated one and update every link that targets it.
+
 ## Code fences
 
 - ` ```npm ` fences (Fumadocs' remark-npm accepts both) → ` ```package-install `.
@@ -82,13 +86,17 @@ Fumadocs icons are strings resolved by the repo's own `icon` handler in `loader(
 
 `fumadocs-openapi` writes **generated MDX stubs into the content tree** (`generateFiles()` output: pages containing `<APIPage>`/`<OpenAPIPage>` with `_openapi` frontmatter), plus `lib/openapi.ts` (`createOpenAPI`) and a generate script. Treat these exactly like Mintlify endpoint stubs: **delete the generated pages**, point `openapi: { enabled: true, sources: [{ spec }] }` at the spec (vendor it locally), add a `navigation.tabs` entry for the reference route, and remove `fumadocs-openapi`, `lib/openapi.ts`, and the generate script. Keep hand-written conceptual pages (intro/auth) under the reference route.
 
+## GraphQL
+
+`@fumadocs/graphql` works differently from the OpenAPI flow: **no stub files** — pages are virtual, served through the Loader API. The artifacts to harvest and tear down: `lib/graphql.ts` (`createGraphQL()` — read its `input` for the schema and any per-source routes/labels), the `graphql.staticSource()`/`graphql.loaderPlugin()` wiring in the source config, the `GraphQLPage` component (`createGraphQLPage()`, usually `components/api-page.tsx` — read its playground `endpoint`), and the `@fumadocs/graphql/css/preset.css` import. Map to the top-level `graphql: { enabled: true, spec, endpoint }` block (see SKILL.md "GraphQL"): SDL files/text and introspection results carry over as `spec` (vendor a URL input locally); a programmatic `GraphQLSchema` instance must be printed to SDL and committed (report); the `createGraphQLPage` playground endpoint becomes `endpoint`. Blume groups routes the same way (`<route>/queries/<field>`, `<route>/objects/<type>`), but slugs are re-derived — rewrite inbound links and let `blume validate` catch strays. Then remove `@fumadocs/graphql`, the two lib/component files, and the CSS import. Since there are no generated pages, there is nothing to delete from the content tree — but keep any hand-written conceptual pages under the reference route.
+
 ## i18n
 
 A `loader({ i18n })` setup (locale-suffixed files or locale dirs) → Blume `i18n: { defaultLocale, locales: [{ code, label }] }`. Locale **directories** match Blume's `dir` parser as-is; locale **file suffixes** (`page.cn.mdx`) need restructuring into locale folders. Report whichever transform you apply.
 
 ## Package.json & teardown
 
-Repoint scripts (`dev`→`blume dev`, `build`→`blume build`, `start`→`blume preview`), remove the `fumadocs-*` deps and the host framework's deps (`next`, `react-router`, `@tanstack/*`…), add `blume`. Safe to delete after harvesting (see above for what to read first): `source.config.*`, `mdx-components.tsx`, the app/route dir, and host-framework config (`next.config.*`, `next-env.d.ts`, the `next` tsconfig plugin — or the React Router/TanStack equivalents).
+Repoint scripts (`dev`→`blume dev`, `build`→`blume build`, `start`→`blume preview`), remove the `fumadocs-*`/`@fumadocs/*` deps and the host framework's deps (`next`, `react-router`, `@tanstack/*`…), add `blume`. Safe to delete after harvesting (see above for what to read first): `source.config.*`, `mdx-components.tsx`, the app/route dir, and host-framework config (`next.config.*`, `next-env.d.ts`, the `next` tsconfig plugin — or the React Router/TanStack equivalents).
 
 ## Dropped — report these
 

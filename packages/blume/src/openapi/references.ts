@@ -14,7 +14,7 @@ export { normalizeRoute } from "../core/base-path.ts";
  * imports so `core` can depend on it without a cycle.
  */
 
-export type ReferenceKind = "openapi" | "asyncapi";
+export type ReferenceKind = "openapi" | "asyncapi" | "graphql";
 
 /** Who renders a reference: Blume's own UI, or the embedded Scalar SPA. */
 export type ReferenceRenderer = "blume" | "scalar";
@@ -56,6 +56,11 @@ export interface ReferenceSource {
   noindex: boolean;
   /** Local path or `http(s)` URL, verbatim from config. */
   spec: string;
+  /**
+   * URL of the live GraphQL endpoint the playground and code samples target
+   * (GraphQL only — a schema, unlike an OpenAPI document, names no server).
+   */
+  endpoint?: string;
   /** Per-block Scalar theme name override, if any (Scalar renderer only). */
   theme?: string;
   /**
@@ -109,19 +114,32 @@ export const slugify = (text: string): string =>
 const routeSlug = (route: string): string =>
   slugify(trimChar(route, "/")) || "reference";
 
-type Block = ResolvedConfig["openapi"] | ResolvedConfig["asyncapi"];
+/**
+ * The structural shape all three reference blocks (`openapi`, `asyncapi`,
+ * `graphql`) share. `endpoint` exists only on the GraphQL block and its
+ * sources; `scalar`/`theme` only on the Scalar-capable kinds — optional here
+ * so one resolver serves every block.
+ */
+interface Block {
+  enabled: boolean;
+  endpoint?: string;
+  route: string;
+  scalar?: ResolvedConfig["openapi"]["scalar"];
+  sources: {
+    endpoint?: string;
+    includeInLlms: boolean;
+    includeInSearch: boolean;
+    label?: string;
+    noindex: boolean;
+    route?: string;
+    spec: string;
+  }[];
+  spec?: string;
+  theme?: string;
+}
 
 /** A spec is a single source (`spec` shorthand prepended to any `sources`). */
-const sourcesOf = (
-  block: Block
-): {
-  includeInLlms: boolean;
-  includeInSearch: boolean;
-  label?: string;
-  noindex: boolean;
-  route?: string;
-  spec: string;
-}[] => {
+const sourcesOf = (block: Block): Block["sources"] => {
   const sources = [...block.sources];
   if (block.spec) {
     sources.unshift({
@@ -163,7 +181,7 @@ const referencesFor = (
       route = normalizeRoute(`${base}/${suffix || index + 1}`);
     }
 
-    return {
+    const reference: ReferenceSource = {
       basePath,
       display,
       includeInLlms: source.includeInLlms,
@@ -178,6 +196,13 @@ const referencesFor = (
       spec: source.spec,
       theme: block.theme,
     };
+    // Per-source endpoint wins; the block-level one is the shared default
+    // (the common single-schema case pairs it with the `spec` shorthand).
+    const endpoint = source.endpoint ?? block.endpoint;
+    if (endpoint !== undefined) {
+      reference.endpoint = endpoint;
+    }
+    return reference;
   });
 };
 
@@ -209,6 +234,21 @@ export const resolveReferences = (
       codeSamples: config.asyncapi.codeSamples,
       expandSchemas: config.asyncapi.expandSchemas,
       playground: config.asyncapi.playground,
+    },
+    config.basePath
+  ),
+  // GraphQL is always Blume-rendered — Scalar's embedded SPA reads OpenAPI
+  // documents only, so the block declares no `renderer` opt-out (nor the
+  // schema-row `expandSchemas` toggle; GraphQL field tables have no nesting).
+  ...referencesFor(
+    "graphql",
+    config.graphql,
+    "GraphQL",
+    "blume",
+    {
+      codeSamples: config.graphql.codeSamples,
+      expandSchemas: false,
+      playground: config.graphql.playground,
     },
     config.basePath
   ),
@@ -287,3 +327,39 @@ export const blumeReferences = (config: ResolvedConfig): ReferenceSource[] => {
 /** Whether any reference is Scalar-rendered (gates the `@scalar/astro` dep + pages). */
 export const hasScalarReferences = (config: ResolvedConfig): boolean =>
   resolveReferences(config).some((ref) => ref.renderer === "scalar");
+
+/**
+ * The reference kinds whose enabled, Blume-rendered playground opted into the
+ * built-in CORS proxy with `proxy: true`. A proxy URL string points at an
+ * external service, and `false` sends requests directly — neither routes
+ * through the endpoint. The generator's per-spec allowlist diagnostics key on
+ * this, so it shares one definition with {@link needsPlaygroundProxy}.
+ */
+export const builtinProxyKinds = (config: ResolvedConfig): ReferenceKind[] => {
+  const kinds: ReferenceKind[] = [];
+  if (
+    config.openapi.enabled &&
+    config.openapi.renderer === "blume" &&
+    config.openapi.playground.enabled &&
+    config.openapi.playground.proxy === true
+  ) {
+    kinds.push("openapi");
+  }
+  if (
+    config.graphql.enabled &&
+    config.graphql.playground.enabled &&
+    config.graphql.playground.proxy === true
+  ) {
+    kinds.push("graphql");
+  }
+  return kinds;
+};
+
+/**
+ * Whether the built-in playground CORS proxy endpoint (`/_api-proxy`) must be
+ * generated: some enabled Blume-rendered block's playground opted into it with
+ * `proxy: true`. Shared by the server feature gate and the generator so the
+ * two can never disagree.
+ */
+export const needsPlaygroundProxy = (config: ResolvedConfig): boolean =>
+  builtinProxyKinds(config).length > 0;
