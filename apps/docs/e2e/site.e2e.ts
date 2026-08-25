@@ -84,9 +84,13 @@ test.describe("page actions", () => {
     await page.locator("#blume-content h1").click();
     await expect(open).toHaveCount(0);
 
+    // Focus moves into the panel first, so the assertion below proves Escape
+    // restored it rather than just observing the click that opened the menu.
     await dropdown.locator("summary").click();
     await expect(open).toHaveCount(1);
+    await dropdown.locator("[data-blume-menu] :is(a, button)").first().focus();
     await page.keyboard.press("Escape");
     await expect(open).toHaveCount(0);
+    await expect(dropdown.locator("summary")).toBeFocused();
   });
 });
