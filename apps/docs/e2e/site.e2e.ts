@@ -88,7 +88,11 @@ test.describe("page actions", () => {
     // restored it rather than just observing the click that opened the menu.
     await dropdown.locator("summary").click();
     await expect(open).toHaveCount(1);
-    await dropdown.locator("[data-blume-menu] :is(a, button)").first().focus();
+    const menuItem = dropdown
+      .locator("[data-blume-menu] :is(a, button)")
+      .first();
+    await menuItem.focus();
+    await expect(menuItem).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(open).toHaveCount(0);
     await expect(dropdown.locator("summary")).toBeFocused();
