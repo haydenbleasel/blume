@@ -329,6 +329,11 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     menu.classList.toggle("mb-1", flipUp);
   };
 
+  const openDropdown = () =>
+    document.querySelector<HTMLDetailsElement>(
+      "[data-blume-page-actions] details[open]"
+    );
+
   // rAF-coalesced so a live resize drag re-reads layout once per frame, not
   // once per event, while the open menu still tracks the viewport. Registered
   // once at module scope (this bundle runs once per real page load) and
@@ -336,14 +341,41 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
   window.addEventListener(
     "resize",
     rafThrottle(() => {
-      const open = document.querySelector<HTMLDetailsElement>(
-        "[data-blume-page-actions] details[open]"
-      );
+      const open = openDropdown();
       if (open) {
         placeMenu(open);
       }
     })
   );
+
+  // A native <details> only closes when its own summary is clicked, so an open
+  // panel would linger over the page. Dismiss it like a real menu: any pointer
+  // press outside the open dropdown closes it. Registered at module scope for
+  // the same reason as the resize handler above.
+  document.addEventListener("pointerdown", (event) => {
+    const open = openDropdown();
+    if (!open) {
+      return;
+    }
+    const target = event.target;
+    if (target instanceof Node && open.contains(target)) {
+      return;
+    }
+    open.open = false;
+  });
+
+  // Escape closes the menu and returns focus to the trigger that opened it.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+    const open = openDropdown();
+    if (!open) {
+      return;
+    }
+    open.open = false;
+    open.querySelector<HTMLElement>("summary")?.focus();
+  });
 
   // Per-page setup, run on the initial load and again after every
   // client-router swap: the swap rebuilds the actions menu from

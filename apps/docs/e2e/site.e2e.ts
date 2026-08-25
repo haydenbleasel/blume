@@ -69,3 +69,24 @@ test.describe("custom pages", () => {
     await expect(page.locator("header").first()).toBeVisible();
   });
 });
+
+test.describe("page actions", () => {
+  test("dropdowns close on an outside click and on Escape", async ({
+    page,
+  }) => {
+    await page.goto("/docs/quickstart");
+    const actions = page.locator("[data-blume-page-actions]");
+    const dropdown = actions.locator("details").first();
+    const open = actions.locator("details[open]");
+
+    await dropdown.locator("summary").click();
+    await expect(open).toHaveCount(1);
+    await page.locator("#blume-content h1").click();
+    await expect(open).toHaveCount(0);
+
+    await dropdown.locator("summary").click();
+    await expect(open).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(open).toHaveCount(0);
+  });
+});
