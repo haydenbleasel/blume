@@ -20,6 +20,7 @@ import { buildManifest } from "../src/core/manifest.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { BlumeConfigInput, PageMetaInput } from "../src/core/schema.ts";
+import { extractExplicitAnchors } from "../src/core/sources/normalize.ts";
 import type {
   ContentGraph,
   PageRecord,
@@ -498,6 +499,12 @@ describe(slugify, () => {
 });
 
 describe(extractHeadings, () => {
+  it("uses curly explicit ids without exposing their markers", () => {
+    expect(extractHeadings("## Record model {#record-model}")).toStrictEqual([
+      { depth: 2, slug: "record-model", text: "Record model" },
+    ]);
+  });
+
   it("extracts headings and skips fenced code", () => {
     const body = ["# Title", "```", "## Not a heading", "```", "## Real"].join(
       "\n"
@@ -794,6 +801,22 @@ describe(extractHeadings, () => {
       "## Real",
     ].join("\n");
     expect(extractHeadings(body).map((h) => h.text)).toStrictEqual(["Real"]);
+  });
+});
+
+describe(extractExplicitAnchors, () => {
+  it("collects raw HTML ids outside fenced examples", () => {
+    const body = [
+      '<a id="restart-abandonment"></a>',
+      "```html",
+      '<span id="example-only"></span>',
+      "```",
+      "<div id='details'>Details</div>",
+    ].join("\n");
+    expect(extractExplicitAnchors(body)).toStrictEqual([
+      "restart-abandonment",
+      "details",
+    ]);
   });
 });
 

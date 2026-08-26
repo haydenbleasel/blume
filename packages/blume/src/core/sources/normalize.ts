@@ -430,6 +430,28 @@ export const extractHeadings = (body: string): Heading[] => {
   return headings;
 };
 
+/** Raw HTML `id` targets that fragment links may address outside headings. */
+export const extractExplicitAnchors = (body: string): string[] => {
+  const anchors: string[] = [];
+  let fence: FenceState = null;
+  const pattern =
+    /<[A-Za-z][^>]*\sid=(?<quote>["'])(?<id>[^"']+)\k<quote>[^>]*>/gu;
+  for (const line of linesWithoutFrontMatter(body)) {
+    const next = nextFenceState(line, fence);
+    if (fence !== null || next !== null) {
+      fence = next;
+      continue;
+    }
+    for (const match of line.matchAll(pattern)) {
+      const id = match.groups?.id;
+      if (id) {
+        anchors.push(id);
+      }
+    }
+  }
+  return anchors;
+};
+
 // The label admits one level of nested brackets so an image-wrapped link
 // (`[![alt](/img.png)](/target)`) matches as the *outer* link — with a flat
 // `[^\]]*` label the match stopped at the image's `]` and the outer target was
@@ -880,6 +902,7 @@ export const normalizeEntry = (
   const { staged } = ctx.source;
 
   const base = {
+    anchors: extractExplicitAnchors(bodyText),
     body: staged ? { format, text: entry.raw ?? entry.body.text } : undefined,
     collection: staged ? "staged" : undefined,
     componentsUsed:

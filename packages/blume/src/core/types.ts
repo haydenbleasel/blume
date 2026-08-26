@@ -177,6 +177,8 @@ export interface PageRecord {
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- values are outputs of arbitrary user-supplied zod schemas (transforms included), so no narrower type exists
   custom?: Record<string, unknown>;
   headings: Heading[];
+  /** Raw HTML element ids that fragment links may address outside headings. */
+  anchors?: string[];
   /** Whether the file is `.md`/`.mdx`. */
   format: "md" | "mdx";
   /** Internal/asset links discovered in the page (for validation). */

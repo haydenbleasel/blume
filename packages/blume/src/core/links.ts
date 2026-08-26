@@ -158,7 +158,10 @@ const buildAnchorIndex = (pages: PageRecord[]): Map<string, Set<string>> => {
   for (const page of pages) {
     anchors.set(
       page.route,
-      new Set(page.headings.map((heading) => heading.slug))
+      new Set([
+        ...page.headings.map((heading) => heading.slug),
+        ...(page.anchors ?? []),
+      ])
     );
   }
   return anchors;
@@ -181,7 +184,7 @@ const checkAnchor = (
   return {
     ...site,
     code: "BLUME_BROKEN_ANCHOR",
-    message: `No heading on ${route} matches anchor #${fragment}${via}.`,
+    message: `No anchor target on ${route} matches #${fragment}${via}.`,
     severity: "warning",
   };
 };

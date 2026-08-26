@@ -32,8 +32,9 @@ export const occupySlug = (slugger: GithubSlugger, id: string): void => {
   slugger.occurrences[id] ??= 0;
 };
 
-/** One trailing marker: `[#id]`, `[toc]`, or `[!toc]`, plus surrounding space. */
-const MARKER = /\s*\[(?:#(?<id>[^\s\]]+)|(?<hide>!)?toc)\]\s*$/u;
+/** One trailing marker: `[#id]`, `{#id}`, `[toc]`, or `[!toc]`. */
+const MARKER =
+  /\s*(?:\{#(?<curlyId>[^\s}]+)\}|\[(?:#(?<id>[^\s\]]+)|(?<hide>!)?toc)\])\s*$/u;
 
 export interface HeadingMarkers {
   /** Author-pinned anchor id from `[#id]`, used verbatim (never re-slugged). */
@@ -68,20 +69,21 @@ export const parseHeadingMarkers = (
     match?.groups;
     match = MARKER.exec(remaining)
   ) {
+    const explicitId = match.groups.curlyId ?? match.groups.id;
     const label =
-      match.groups.id === undefined
+      explicitId === undefined
         ? `${match.groups.hide ?? ""}toc`
-        : `#${match.groups.id}`;
-    if (isRefDefined?.(label)) {
+        : `#${explicitId}`;
+    if (match.groups.curlyId === undefined && isRefDefined?.(label)) {
       break;
     }
     remaining = remaining.slice(0, match.index);
-    if (match.groups.id === undefined) {
+    if (explicitId === undefined) {
       // Stripping runs right-to-left, so keeping the first capture of each
       // kind makes the rightmost occurrence win.
       toc ??= match.groups.hide === undefined ? "only" : "hide";
     } else {
-      id ??= match.groups.id;
+      id ??= explicitId;
     }
   }
   return { id, text: remaining, toc };

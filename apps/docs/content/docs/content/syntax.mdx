@@ -19,7 +19,7 @@ Structure a page with headings. Blume renders your frontmatter `title` as the pa
 
 ### Custom anchors
 
-Anchor ids are generated from the heading text, so a reworded heading gets a new anchor. Append `[#custom-id]` to pin the anchor instead — the marker never renders, and links keep working no matter how the heading reads. Pinned anchors also stay identical across [translated locales](/docs/content/i18n), where auto-generated ids would otherwise differ per language.
+Anchor ids are generated from the heading text, so a reworded heading gets a new anchor. Append `[#custom-id]` to pin the anchor instead — the marker never renders, and links keep working no matter how the heading reads. The `{#custom-id}` form used by several Markdown specification toolchains is accepted as an equivalent. Pinned anchors also stay identical across [translated locales](/docs/content/i18n), where auto-generated ids would otherwise differ per language.
 
 ```md
 ## Getting started [#setup]
