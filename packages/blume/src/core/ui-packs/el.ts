@@ -21,7 +21,7 @@ export const el: UIStringsOverride = {
     openIn: "Άνοιγμα στο {name}",
     openInChat: "Άνοιγμα στη συνομιλία",
     openInChatPrompt:
-      "Διαβάστε το {url} για να μπορώ να κάνω ερωτήσεις για αυτήν τη σελίδα.",
+      "Διαβάστε το {url} για να μπορώ να κάνω ερωτήσεις για αυτή τη σελίδα.",
     scrollToTop: "Επιστροφή στην κορυφή",
   },
   ask: {

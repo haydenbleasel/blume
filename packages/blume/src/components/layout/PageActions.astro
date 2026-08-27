@@ -387,7 +387,7 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     // Replacer function, not a string: a URL may contain `$`, which a string
     // replacement would interpret as a substitution pattern.
     const query = encodeURIComponent(
-      promptTemplate.replace("{url}", () => absolute)
+      promptTemplate.replaceAll("{url}", () => absolute)
     );
 
     for (const link of root.querySelectorAll("[data-open-in]")) {

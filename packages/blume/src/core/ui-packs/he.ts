@@ -20,7 +20,7 @@ export const he: UIStringsOverride = {
     generating: "מייצר…",
     openIn: "פתח ב-{name}",
     openInChat: "פתח בצ'אט",
-    openInChatPrompt: "קרא את {url} כדי שאוכל לשאול שאלות על הדף הזה.",
+    openInChatPrompt: "קרא את {url} כדי שאוכל לשאול שאלות על העמוד הזה.",
     scrollToTop: "חזרה למעלה",
   },
   ask: {
