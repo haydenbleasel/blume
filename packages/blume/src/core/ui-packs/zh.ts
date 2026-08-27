@@ -20,6 +20,7 @@ export const zh: UIStringsOverride = {
     generating: "生成中…",
     openIn: "在 {name} 中打开",
     openInChat: "在聊天中打开",
+    openInChatPrompt: "请阅读 {url}，以便我就此页面提问。",
     scrollToTop: "回到顶部",
   },
   ask: {

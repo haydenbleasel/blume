@@ -95,6 +95,7 @@ const menuRowClass =
 <div
   class="mt-8 space-y-0.5 border-border border-t pt-4"
   data-blume-page-actions
+  data-i18n-chat-prompt={a.openInChatPrompt}
   data-i18n-copied={a.copied}
   data-i18n-generating={a.generating}
   data-mcp-name={mcpName ?? undefined}
@@ -379,9 +380,14 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     const copiedLabel = root.getAttribute("data-i18n-copied") || "Copied!";
     const generatingLabel =
       root.getAttribute("data-i18n-generating") || "Generating…";
+    const promptTemplate =
+      root.getAttribute("data-i18n-chat-prompt") ||
+      "Read {url} so I can ask you questions about this page.";
     const absolute = new URL(md, location.origin).href;
+    // Replacer function, not a string: a URL may contain `$`, which a string
+    // replacement would interpret as a substitution pattern.
     const query = encodeURIComponent(
-      `Read ${absolute} so I can ask you questions about this page.`
+      promptTemplate.replace("{url}", () => absolute)
     );
 
     for (const link of root.querySelectorAll("[data-open-in]")) {

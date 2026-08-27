@@ -20,6 +20,7 @@ export const sr: UIStringsOverride = {
     generating: "Генерисање…",
     openIn: "Отвори у {name}",
     openInChat: "Отвори у ћаскању",
+    openInChatPrompt: "Прочитајте {url} — постављаћу питања о овој страници.",
     scrollToTop: "Назад на врх",
   },
   ask: {

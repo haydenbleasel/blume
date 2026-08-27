@@ -20,6 +20,7 @@ export const th: UIStringsOverride = {
     generating: "กำลังสร้าง…",
     openIn: "เปิดใน {name}",
     openInChat: "เปิดในแชท",
+    openInChatPrompt: "อ่าน {url} เพื่อให้ฉันถามคำถามเกี่ยวกับหน้านี้ได้",
     scrollToTop: "กลับไปด้านบน",
   },
   ask: {

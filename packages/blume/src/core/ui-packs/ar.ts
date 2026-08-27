@@ -20,6 +20,7 @@ export const ar: UIStringsOverride = {
     generating: "جارٍ الإنشاء…",
     openIn: "فتح في {name}",
     openInChat: "فتح في المحادثة",
+    openInChatPrompt: "اقرأ {url} حتى أتمكن من طرح أسئلة حول هذه الصفحة.",
     scrollToTop: "العودة إلى الأعلى",
   },
   ask: {

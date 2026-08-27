@@ -20,6 +20,8 @@ export const de: UIStringsOverride = {
     generating: "Wird generiert…",
     openIn: "In {name} öffnen",
     openInChat: "Im Chat öffnen",
+    openInChatPrompt:
+      "Lies {url}, damit ich dir Fragen zu dieser Seite stellen kann.",
     scrollToTop: "Nach oben scrollen",
   },
   ask: {

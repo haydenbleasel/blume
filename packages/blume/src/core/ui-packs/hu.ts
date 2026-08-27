@@ -20,6 +20,8 @@ export const hu: UIStringsOverride = {
     generating: "Generálás…",
     openIn: "Megnyitás itt: {name}",
     openInChat: "Megnyitás a csevegésben",
+    openInChatPrompt:
+      "Olvasd el a következőt: {url}, hogy kérdéseket tehessek fel erről az oldalról.",
     scrollToTop: "Vissza a tetejére",
   },
   ask: {

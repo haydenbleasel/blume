@@ -20,6 +20,7 @@ export const bn: UIStringsOverride = {
     generating: "তৈরি হচ্ছে…",
     openIn: "{name}-এ খুলুন",
     openInChat: "চ্যাটে খুলুন",
+    openInChatPrompt: "{url} পড়ুন, যাতে আমি এই পৃষ্ঠা সম্পর্কে প্রশ্ন করতে পারি।",
     scrollToTop: "উপরে যান",
   },
   ask: {

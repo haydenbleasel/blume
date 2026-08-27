@@ -31,6 +31,11 @@ const uiStringsObject = z.object({
       // `{name}` is replaced with the provider's brand name at render time.
       openIn: z.string().default("Open in {name}"),
       openInChat: z.string().default("Open in chat"),
+      // The prompt handed to the chat provider; `{url}` is replaced with the
+      // page's raw-Markdown URL at load time.
+      openInChatPrompt: z
+        .string()
+        .default("Read {url} so I can ask you questions about this page."),
       scrollToTop: z.string().default("Scroll to top"),
     })
     .prefault({}),

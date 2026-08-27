@@ -20,6 +20,7 @@ export const fa: UIStringsOverride = {
     generating: "در حال تولید…",
     openIn: "باز کردن در {name}",
     openInChat: "باز کردن در گفتگو",
+    openInChatPrompt: "{url} را بخوانید تا بتوانم درباره این صفحه سؤال بپرسم.",
     scrollToTop: "بازگشت به بالا",
   },
   ask: {

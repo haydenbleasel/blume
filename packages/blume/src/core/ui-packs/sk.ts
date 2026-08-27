@@ -20,6 +20,7 @@ export const sk: UIStringsOverride = {
     generating: "Generovanie…",
     openIn: "Otvoriť v {name}",
     openInChat: "Otvoriť v chate",
+    openInChatPrompt: "Prečítajte si {url} — budem sa pýtať na túto stránku.",
     scrollToTop: "Späť nahor",
   },
   ask: {
