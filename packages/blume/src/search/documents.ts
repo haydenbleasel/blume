@@ -1,8 +1,6 @@
 import type { Nodes } from "mdast";
-import { fromMarkdown } from "mdast-util-from-markdown";
-import { gfmFromMarkdown } from "mdast-util-gfm";
-import { gfm } from "micromark-extension-gfm";
-import { mdxToMdast } from "satteri";
+import { markdownToMdast, mdxToMdast } from "satteri";
+import type { MdxJsxAttributeUnion } from "satteri";
 
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
@@ -13,7 +11,7 @@ import type { BlumeProject } from "../core/project-graph.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode, PageRecord } from "../core/types.ts";
 import { parseCodeTitle } from "../markdown/code-title.ts";
-import { MDX_FEATURES } from "../markdown/features.ts";
+import { MARKDOWN_FEATURES, MDX_FEATURES } from "../markdown/features.ts";
 import { pageFacets } from "./facets.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
@@ -86,11 +84,14 @@ const INLINE_PARENTS = new Set([
   "superscript",
 ]);
 
-// Nodes that never render as prose: image alt text was never indexed, and
-// MDX expressions (`{props.x}`) and ESM (`export const meta`) are code.
+// Nodes that never render as prose: image alt text was never indexed, MDX
+// expressions (`{props.x}`) and ESM (`export const meta`) are code, and math
+// is LaTeX source rendered by KaTeX, not searchable words.
 const NON_PROSE = new Set<Nodes["type"]>([
   "image",
   "imageReference",
+  "inlineMath",
+  "math",
   "mdxFlowExpression",
   "mdxTextExpression",
   "mdxjsEsm",
@@ -102,9 +103,15 @@ interface PlainTextOptions {
 
 type PageFormat = PageRecord["format"];
 
+// Front matter is already off (core/frontmatter.ts) by the time a body gets
+// here, so a body that opens with a `---` divider must read as a thematic
+// break rather than a second front matter block.
+const MD_PARSE = { features: { ...MARKDOWN_FEATURES, frontmatter: false } };
+const MDX_PARSE = { features: { ...MDX_FEATURES, frontmatter: false } };
+
 const parseMdx = (markdown: string): Nodes | undefined => {
   try {
-    return mdxToMdast(markdown, { features: MDX_FEATURES });
+    return mdxToMdast(markdown, MDX_PARSE);
   } catch {
     return undefined;
   }
@@ -115,17 +122,15 @@ const parseMdx = (markdown: string): Nodes | undefined => {
  * the MDX grammar with the renderer's feature set, so components become
  * `mdxJsx*` nodes whose children — prose and fences, however they're indented
  * — walk like top-level content, and `:::` directives and `$$` math parse as
- * such; CommonMark would instead fold a tight component into one html node and
- * read its indented children as an indented code block. MDX rejects some input
- * Blume otherwise tolerates (HTML comments, an unclosed tag), so a failed
- * parse falls back to CommonMark rather than dropping the page from the index.
+ * such; Markdown would instead fold a tight component into one html node and
+ * read its indented children as an indented code block. A page the MDX
+ * grammar rejects (an HTML comment, an unclosed tag) fails to render too, so
+ * rather than fail the whole index for one broken page it is read as Markdown
+ * — a rough but searchable reduction until the author fixes the page.
  */
 const parseMarkdown = (markdown: string, format: PageFormat): Nodes =>
   (format === "mdx" ? parseMdx(markdown) : undefined) ??
-  fromMarkdown(markdown, {
-    extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
-  });
+  markdownToMdast(markdown, MD_PARSE);
 
 // Fenced code is excluded from the plain index by default (ranking noise) —
 // the "markdown" extraction keeps it for Ask AI grounding. Code-heavy docs opt
@@ -146,6 +151,29 @@ const collectCode = (
   }
   out.push(node.value, " ");
 };
+
+// A component's string props are its visible text — a Card's `title` and
+// `description`, a Tab's `title` — so they index like prose; expression props
+// (`type={{ … }}`) are code and stay out.
+const collectJsxAttributes = (
+  attributes: MdxJsxAttributeUnion[],
+  out: string[]
+): void => {
+  for (const attribute of attributes) {
+    if (
+      attribute.type === "mdxJsxAttribute" &&
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the value is satteri's `string | ValueExpression` union; the string literal is the domain value
+      typeof attribute.value === "string"
+    ) {
+      out.push(attribute.value, " ");
+    }
+  }
+};
+
+// Block boundaries separate words; so does an empty inline element (`<br />`,
+// a self-closing icon), which otherwise fuses its neighbors.
+const separatesWords = (node: Extract<Nodes, { children: unknown }>): boolean =>
+  !INLINE_PARENTS.has(node.type) || node.children.length === 0;
 
 /** Fold one mdast node into the plain-text accumulator. */
 const collectText = (
@@ -209,11 +237,14 @@ const collectText = (
     out.push(node.value);
     return;
   }
+  if ("attributes" in node && Array.isArray(node.attributes)) {
+    collectJsxAttributes(node.attributes, out);
+  }
   if ("children" in node) {
     for (const child of node.children) {
       collectText(child, out, options);
     }
-    if (!INLINE_PARENTS.has(node.type)) {
+    if (separatesWords(node)) {
       out.push(" ");
     }
   }

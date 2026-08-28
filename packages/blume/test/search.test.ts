@@ -24,6 +24,8 @@ const BODY = [
   "",
   "A generic `Array<Item>` stays searchable.",
   "",
+  "Energy is E=mc^2^ here.",
+  "",
   "Requests cost < 5 credits each. Retries are billed separately.",
   "",
   "> Note: quota resets at midnight.",
@@ -121,6 +123,16 @@ const CODE_BODY = [
   "",
   "Press <Kbd>k</Kbd> to open {props.count} results.",
   "",
+  "Press Enter<br />then wait.",
+  "",
+  // Formatter-wrapped card: its string props are the visible text.
+  "<Card",
+  '  title="Rate limits"',
+  '  description="How quotas work"',
+  '  href="/limits"',
+  "  meta={{ weight: 2 }}",
+  "/>",
+  "",
   ":::note[Heads up]",
   "Directive prose survives.",
   ":::",
@@ -135,7 +147,10 @@ const CODE_BODY = [
   "",
 ].join("\n");
 
-/** MDX rejects HTML comments; the extractor must fall back, not drop the page. */
+/**
+ * MDX rejects HTML comments (so does the renderer); the extractor must fall
+ * back to a Markdown reading, not drop the page.
+ */
 const COMMENT_BODY = [
   "---",
   "title: D",
@@ -166,12 +181,28 @@ const VIS_BODY = [
   "",
 ].join("\n");
 
+/** A body that opens with a divider once the real front matter is stripped. */
+const DIVIDER_BODY = [
+  "---",
+  "title: E",
+  "---",
+  "---",
+  "",
+  "After the divider **bold** [intro](/x).",
+  "",
+  "---",
+  "",
+  "More text.",
+  "",
+].join("\n");
+
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "blume-search-"));
   await writeFile(join(root, "a.md"), BODY);
   await writeFile(join(root, "vis.md"), VIS_BODY);
   await writeFile(join(root, "code.mdx"), CODE_BODY);
   await writeFile(join(root, "comment.mdx"), COMMENT_BODY);
+  await writeFile(join(root, "divider.mdx"), DIVIDER_BODY);
 });
 
 afterAll(async () => {
@@ -289,6 +320,8 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("inlineCode");
     // Angle-bracket type params inside inline code survive the HTML strip.
     expect(doc?.content).toContain("Item");
+    // `.md` pages parse with the renderer's features: superscript is text.
+    expect(doc?.content).toContain("E=mc2 here");
     // Code blocks are removed entirely.
     expect(doc?.content).not.toContain("secret");
     expect(doc?.content).not.toContain("#");
@@ -409,7 +442,13 @@ describe("buildSearchDocuments", () => {
       // sub/superscript stay attached to their word.
       expect(doc?.content).toContain("Heads up Directive prose survives");
       expect(doc?.content).not.toContain(":::");
+      expect(doc?.content).not.toContain("x_i");
       expect(doc?.content).toContain("H2O costs $5");
+      // An empty inline element still separates words.
+      expect(doc?.content).toContain("Press Enter then wait");
+      // String props are visible text; expression props are code.
+      expect(doc?.content).toContain("Rate limits How quotas work");
+      expect(doc?.content).not.toContain("weight");
       expect(doc?.content).not.toContain("props.count");
       expect(doc?.content).not.toContain("draft");
       expect(doc?.content).not.toContain("<Step");
@@ -445,9 +484,15 @@ describe("buildSearchDocuments", () => {
       expect(doc?.content).not.toContain("<Step");
     });
 
-    it("falls back to CommonMark when MDX rejects the page", async () => {
+    it("falls back to a Markdown reading when MDX rejects the page", async () => {
       const [doc] = await buildSearchDocuments(mdxProject("comment.mdx"));
       expect(doc?.content).toContain("Fallback prose survives");
+    });
+
+    it("reads a leading `---` as a divider, not front matter", async () => {
+      const [doc] = await buildSearchDocuments(mdxProject("divider.mdx"));
+      expect(doc?.content).toContain("After the divider bold intro. More text");
+      expect(doc?.content).not.toContain("**");
     });
   });
 

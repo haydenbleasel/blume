@@ -52,7 +52,7 @@ search: {
 },
 ```
 
-Each fence's body and title (`blume.config.ts` above) become searchable; the language and fence markers don't. The option has no effect on Pagefind or Mixedbread. Expect the index to grow with your fenced content — the client index ships to every reader, hosted providers cap record size (Algolia rejects the sync batch when one page's record exceeds its plan's limit, leaving the previous index live), and a hit inside a fence shows flattened code in the result excerpt.
+Each fence's body and title (`blume.config.ts` above) become searchable; the language and fence markers don't. On `.mdx` pages the index also reads prose inside components and their string props (a Card's `title` and `description`), while expressions stay out. The option has no effect on Pagefind or Mixedbread. Expect the index to grow with your fenced content — the client index ships to every reader, hosted providers cap record size (Algolia rejects the sync batch when one page's record exceeds its plan's limit, leaving the previous index live), and a hit inside a fence shows flattened code in the result excerpt.
 
 On a [versioned](/docs/content/versioning) site, results default to the version being viewed, with an "All versions" toggle in the dialog footer (remembered per reader). Cross-version hits name their version on the row. Orama, FlexSearch, Algolia, and Typesense honor the scoping — hosted records carry a `version` facet, with the current docs uploaded as `"current"` — while Pagefind stays unscoped, matching its locale behavior.
 
