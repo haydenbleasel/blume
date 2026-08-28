@@ -21,7 +21,7 @@ export const ko: UIStringsOverride = {
     openIn: "{name}에서 열기",
     openInChat: "채팅에서 열기",
     openInChatPrompt:
-      "{url}을(를) 읽어 주세요. 이 페이지에 대해 질문하겠습니다.",
+      "{url} 페이지를 읽어 주세요. 이 페이지에 대해 질문하겠습니다.",
     scrollToTop: "맨 위로",
   },
   ask: {

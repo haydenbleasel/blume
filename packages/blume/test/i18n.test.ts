@@ -1049,6 +1049,13 @@ describe("UI dictionaries", () => {
         pack.actions?.openInChatPrompt,
         `pack "${code}" openInChatPrompt misses {url}`
       ).toContain("{url}");
+      // The URL must sit on a token boundary: a particle or full-width comma
+      // glued onto it (`{url}을`, `{url}，`) can be swallowed into the URL by
+      // the chat provider's link detection.
+      expect(
+        pack.actions?.openInChatPrompt,
+        `pack "${code}" openInChatPrompt glues text onto {url}`
+      ).toMatch(/\{url\}(?:$|[\s,.])/u);
     }
   });
 
