@@ -23,9 +23,16 @@
 
 const OPEN_DROPDOWN = "details[data-blume-dropdown][open]";
 
-/** The dropdown currently open, if any. At most one is open at a time. */
-const openDropdown = (): HTMLDetailsElement | null =>
-  document.querySelector<HTMLDetailsElement>(OPEN_DROPDOWN);
+/**
+ * Every dropdown currently open. Each component group keeps itself to one
+ * open panel, but a page holds several groups (the header selectors and the
+ * page actions), and a browser that doesn't focus a `<summary>` on click lets
+ * a keyboard-opened panel join a pointer-opened one — so the dismissal rules
+ * apply to all of them, never just the first in DOM order.
+ */
+const openDropdowns = (): HTMLDetailsElement[] => [
+  ...document.querySelectorAll<HTMLDetailsElement>(OPEN_DROPDOWN),
+];
 
 /**
  * Close `open`. `restoreFocus` moves focus back to its trigger, which a
@@ -44,11 +51,11 @@ const isInside = (
 ): boolean => target instanceof Node && dropdown.contains(target);
 
 const onPointerDown = (event: PointerEvent): void => {
-  const open = openDropdown();
-  if (!open || isInside(open, event.target)) {
-    return;
+  for (const open of openDropdowns()) {
+    if (!isInside(open, event.target)) {
+      dismiss(open, false);
+    }
   }
-  dismiss(open, false);
 };
 
 const onKeyDown = (event: KeyboardEvent): void => {
@@ -63,36 +70,35 @@ const onKeyDown = (event: KeyboardEvent): void => {
   if (event.target instanceof Element && event.target.closest("dialog")) {
     return;
   }
-  const open = openDropdown();
-  if (!open) {
-    return;
-  }
-  // Only a keypress that originated inside the panel gets its focus returned
-  // to the trigger; yanking focus from an unrelated control the user had
+  // Only a keypress that originated inside a panel gets its focus returned
+  // to that trigger; yanking focus from an unrelated control the user had
   // moved on to would be a surprise.
-  dismiss(open, isInside(open, event.target));
+  for (const open of openDropdowns()) {
+    dismiss(open, isInside(open, event.target));
+  }
 };
 
 const onFocusOut = (event: FocusEvent): void => {
-  const open = openDropdown();
-  // A null `relatedTarget` means focus went nowhere focusable (a click on
-  // plain content, the panel being hidden, the window blurring) — the pointer
-  // and blur legs own those, and closing here would hide a panel item before
-  // its own click lands in browsers that don't focus buttons on press.
+  // Only focus *leaving a panel* counts: a move between two unrelated controls
+  // (a dialog handing focus back to its trigger, say) must not close a panel
+  // that never held focus. And a null `relatedTarget` means focus went
+  // nowhere focusable (a click on plain content, the panel being hidden, the
+  // window blurring) — the pointer and blur legs own those, and closing here
+  // would hide a panel item before its own click lands in browsers that
+  // don't focus buttons on press.
   const { relatedTarget } = event;
-  if (
-    !open ||
-    !(relatedTarget instanceof Node) ||
-    open.contains(relatedTarget)
-  ) {
+  if (!(relatedTarget instanceof Node)) {
     return;
   }
-  dismiss(open, false);
+  for (const open of openDropdowns()) {
+    if (isInside(open, event.target) && !open.contains(relatedTarget)) {
+      dismiss(open, false);
+    }
+  }
 };
 
 const onWindowBlur = (): void => {
-  const open = openDropdown();
-  if (open) {
+  for (const open of openDropdowns()) {
     dismiss(open, false);
   }
 };

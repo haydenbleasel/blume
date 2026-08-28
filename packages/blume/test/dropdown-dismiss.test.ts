@@ -15,18 +15,20 @@ import {
  * restored afterwards so later test files see the environment they expect.
  */
 
-/** A minimal element: tag, tree, `<details>` open state, focus tracking. */
+/** A minimal element: tag, attributes, tree, `<details>` open state, focus. */
 class FakeEl {
+  attributes = new Set<string>();
   children: FakeEl[] = [];
   focused = false;
   open = false;
   parent: FakeEl | null = null;
   tag: string;
-  dropdown: boolean;
 
-  constructor(tag: string, dropdown = false) {
+  constructor(tag: string, ...attributes: string[]) {
     this.tag = tag;
-    this.dropdown = dropdown;
+    for (const name of attributes) {
+      this.attributes.add(name);
+    }
   }
 
   append(...nodes: FakeEl[]): this {
@@ -52,16 +54,33 @@ class FakeEl {
     return this.parent?.closest(tag) ?? null;
   }
 
-  /** Only the two selectors the module issues. */
-  querySelector(selector: string): FakeEl | null {
-    if (selector === "summary") {
-      return this.descendants().find((node) => node.tag === "summary") ?? null;
+  /**
+   * Tag plus ANDed presence clauses, the shape of the selectors the module
+   * issues. `[open]` reads the live `open` state so the fixture answers the
+   * real `details[data-blume-dropdown][open]` — and would answer a regressed
+   * `details[open]` with the plain collapsible that precedes the dropdowns.
+   */
+  matches(selector: string): boolean {
+    const [tag] = /^[a-z-]+/u.exec(selector) ?? [];
+    if (tag && this.tag !== tag) {
+      return false;
     }
-    return (
-      this.descendants().find(
-        (node) => node.tag === "details" && node.dropdown && node.open
-      ) ?? null
-    );
+    for (const clause of selector.matchAll(/\[(?<name>[^\]]+)\]/gu)) {
+      const name = clause.groups?.name ?? "";
+      const present = name === "open" ? this.open : this.attributes.has(name);
+      if (!present) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  querySelectorAll(selector: string): FakeEl[] {
+    return this.descendants().filter((node) => node.matches(selector));
+  }
+
+  querySelector(selector: string): FakeEl | null {
+    return this.querySelectorAll(selector)[0] ?? null;
   }
 
   focus(): void {
@@ -79,53 +98,61 @@ interface FakeEvent {
 
 type Listener = (event: FakeEvent) => void;
 
-const documentListeners = new Map<string, Listener>();
-const windowListeners = new Map<string, Listener>();
+/** Every registration kept, so a duplicate `addEventListener` is visible. */
+const documentListeners = new Map<string, Listener[]>();
+const windowListeners = new Map<string, Listener[]>();
 
-// The tree: body > [dialog > input, article > link, dropdown(details > summary, div > button)]
+const register =
+  (store: Map<string, Listener[]>) => (type: string, listener: Listener) => {
+    store.set(type, [...(store.get(type) ?? []), listener]);
+  };
+
+// The tree, in DOM order:
+//   body > dialog > input
+//        > article > collapsible(details[open]) > a
+//        > header(details[data-blume-dropdown]) > summary, div > a
+//        > actions(details[data-blume-dropdown]) > summary, div > button
 const body = new FakeEl("body");
 const dialog = new FakeEl("dialog");
 const searchInput = new FakeEl("input");
 dialog.append(searchInput);
 const article = new FakeEl("article");
-const link = new FakeEl("a");
-article.append(link);
-const dropdown = new FakeEl("details", true);
-const summary = new FakeEl("summary");
-const panel = new FakeEl("div");
-const item = new FakeEl("button");
-panel.append(item);
-dropdown.append(summary, panel);
-// A second, non-dropdown <details> (a collapsible in the article) must never
-// be treated as the open menu.
+// A plain open <details> (a collapsible in the article) precedes the dropdowns
+// so a lookup that dropped the `data-blume-dropdown` clause would find it.
 const collapsible = new FakeEl("details");
 collapsible.open = true;
-body.append(dialog, article, dropdown, collapsible);
+const link = new FakeEl("a");
+article.append(collapsible, link);
+const header = new FakeEl("details", "data-blume-dropdown");
+const headerSummary = new FakeEl("summary");
+const headerItem = new FakeEl("a");
+header.append(headerSummary, new FakeEl("div").append(headerItem));
+const actions = new FakeEl("details", "data-blume-dropdown");
+const actionsSummary = new FakeEl("summary");
+const actionsItem = new FakeEl("button");
+actions.append(actionsSummary, new FakeEl("div").append(actionsItem));
+body.append(dialog, article, header, actions);
 
 const fakeDocument = {
-  addEventListener: (type: string, listener: Listener) => {
-    documentListeners.set(type, listener);
-  },
-  querySelector: (selector: string) => body.querySelector(selector),
+  addEventListener: register(documentListeners),
+  querySelectorAll: (selector: string) => body.querySelectorAll(selector),
 };
-const fakeWindow = {
-  addEventListener: (type: string, listener: Listener) => {
-    windowListeners.set(type, listener);
-  },
-};
+const fakeWindow = { addEventListener: register(windowListeners) };
 
 const fire = (
   where: "document" | "window",
   type: string,
   event: FakeEvent = {}
 ): void => {
-  const listener = (
+  const listeners = (
     where === "document" ? documentListeners : windowListeners
   ).get(type);
-  if (!listener) {
+  if (!listeners?.length) {
     throw new Error(`no ${where} listener for ${type}`);
   }
-  listener(event);
+  for (const listener of listeners) {
+    listener(event);
+  }
 };
 
 const saved = new Map(
@@ -165,124 +192,152 @@ afterAll(() => {
   }
 });
 
+// Each case starts with the page-actions dropdown open and the header one
+// closed; the "several open" cases open the header one themselves.
 beforeEach(() => {
-  dropdown.open = true;
-  summary.focused = false;
+  actions.open = true;
+  header.open = false;
+  actionsSummary.focused = false;
+  headerSummary.focused = false;
 });
 
 describe("installDropdownDismiss", () => {
   it("registers each listener once, even when several components install", () => {
     installDropdownDismiss();
     installDropdownDismiss();
-    expect([...documentListeners.keys()].toSorted()).toEqual([
-      "focusout",
-      "keydown",
-      "pointerdown",
+    expect(
+      [...documentListeners].map(([type, list]) => [type, list.length])
+    ).toEqual([
+      ["pointerdown", 1],
+      ["keydown", 1],
+      ["focusout", 1],
     ]);
-    expect([...windowListeners.keys()]).toEqual(["blur"]);
+    expect(
+      [...windowListeners].map(([type, list]) => [type, list.length])
+    ).toEqual([["blur", 1]]);
   });
 });
 
 describe("pointerdown", () => {
   it("closes the open dropdown on a press outside it", () => {
     fire("document", "pointerdown", { target: link });
-    expect(dropdown.open).toBe(false);
-    expect(summary.focused).toBe(false);
+    expect(actions.open).toBe(false);
+    expect(actionsSummary.focused).toBe(false);
   });
 
   it("leaves the dropdown open on a press inside it", () => {
-    fire("document", "pointerdown", { target: item });
-    expect(dropdown.open).toBe(true);
-    fire("document", "pointerdown", { target: summary });
-    expect(dropdown.open).toBe(true);
+    fire("document", "pointerdown", { target: actionsItem });
+    expect(actions.open).toBe(true);
+    fire("document", "pointerdown", { target: actionsSummary });
+    expect(actions.open).toBe(true);
   });
 
   it("closes on a press whose target is not a node", () => {
     fire("document", "pointerdown", { target: null });
-    expect(dropdown.open).toBe(false);
+    expect(actions.open).toBe(false);
   });
 
-  it("does nothing when no dropdown is open", () => {
-    dropdown.open = false;
+  it("never touches a plain <details> collapsible", () => {
+    actions.open = false;
     fire("document", "pointerdown", { target: link });
-    expect(dropdown.open).toBe(false);
     expect(collapsible.open).toBe(true);
+  });
+
+  it("closes every open dropdown except the one pressed", () => {
+    header.open = true;
+    fire("document", "pointerdown", { target: headerItem });
+    expect(header.open).toBe(true);
+    expect(actions.open).toBe(false);
   });
 });
 
 describe("keydown", () => {
   it("ignores keys other than Escape", () => {
-    fire("document", "keydown", { key: "Enter", target: item });
-    expect(dropdown.open).toBe(true);
+    fire("document", "keydown", { key: "Enter", target: actionsItem });
+    expect(actions.open).toBe(true);
   });
 
   it("ignores an IME composition cancel", () => {
     fire("document", "keydown", {
       isComposing: true,
       key: "Escape",
-      target: item,
+      target: actionsItem,
     });
-    expect(dropdown.open).toBe(true);
+    expect(actions.open).toBe(true);
   });
 
   it("leaves a dropdown under a modal dialog alone", () => {
     fire("document", "keydown", { key: "Escape", target: searchInput });
-    expect(dropdown.open).toBe(true);
-    expect(summary.focused).toBe(false);
+    expect(actions.open).toBe(true);
+    expect(actionsSummary.focused).toBe(false);
   });
 
   it("closes and returns focus to the trigger when Escape came from inside", () => {
-    fire("document", "keydown", { key: "Escape", target: item });
-    expect(dropdown.open).toBe(false);
-    expect(summary.focused).toBe(true);
+    fire("document", "keydown", { key: "Escape", target: actionsItem });
+    expect(actions.open).toBe(false);
+    expect(actionsSummary.focused).toBe(true);
   });
 
   it("closes without moving focus when Escape came from elsewhere", () => {
     fire("document", "keydown", { key: "Escape", target: link });
-    expect(dropdown.open).toBe(false);
-    expect(summary.focused).toBe(false);
+    expect(actions.open).toBe(false);
+    expect(actionsSummary.focused).toBe(false);
   });
 
-  it("does nothing when no dropdown is open", () => {
-    dropdown.open = false;
-    fire("document", "keydown", { key: "Escape", target: link });
-    expect(summary.focused).toBe(false);
+  it("closes every open dropdown, restoring focus only to the one Escape came from", () => {
+    header.open = true;
+    fire("document", "keydown", { key: "Escape", target: headerItem });
+    expect(header.open).toBe(false);
+    expect(actions.open).toBe(false);
+    expect(headerSummary.focused).toBe(true);
+    expect(actionsSummary.focused).toBe(false);
   });
 });
 
 describe("focusout", () => {
-  it("closes when focus moves to an element outside the dropdown", () => {
-    fire("document", "focusout", { relatedTarget: link, target: item });
-    expect(dropdown.open).toBe(false);
-    expect(summary.focused).toBe(false);
+  it("closes when focus leaves the dropdown for an element outside it", () => {
+    fire("document", "focusout", { relatedTarget: link, target: actionsItem });
+    expect(actions.open).toBe(false);
+    expect(actionsSummary.focused).toBe(false);
   });
 
   it("stays open while focus moves within the dropdown", () => {
-    fire("document", "focusout", { relatedTarget: item, target: summary });
-    expect(dropdown.open).toBe(true);
+    fire("document", "focusout", {
+      relatedTarget: actionsItem,
+      target: actionsSummary,
+    });
+    expect(actions.open).toBe(true);
   });
 
   it("stays open when focus goes nowhere focusable", () => {
-    fire("document", "focusout", { relatedTarget: null, target: item });
-    expect(dropdown.open).toBe(true);
+    fire("document", "focusout", { relatedTarget: null, target: actionsItem });
+    expect(actions.open).toBe(true);
   });
 
-  it("does nothing when no dropdown is open", () => {
-    dropdown.open = false;
-    fire("document", "focusout", { relatedTarget: link, target: item });
-    expect(dropdown.open).toBe(false);
+  it("stays open when focus moves between elements outside it", () => {
+    fire("document", "focusout", { relatedTarget: link, target: searchInput });
+    expect(actions.open).toBe(true);
+  });
+
+  it("closes only the dropdown focus left", () => {
+    header.open = true;
+    fire("document", "focusout", { relatedTarget: link, target: headerItem });
+    expect(header.open).toBe(false);
+    expect(actions.open).toBe(true);
   });
 });
 
 describe("window blur", () => {
-  it("closes the open dropdown", () => {
+  it("closes every open dropdown", () => {
+    header.open = true;
     fire("window", "blur");
-    expect(dropdown.open).toBe(false);
-    expect(summary.focused).toBe(false);
+    expect(header.open).toBe(false);
+    expect(actions.open).toBe(false);
+    expect(actionsSummary.focused).toBe(false);
   });
 
-  it("does nothing when no dropdown is open", () => {
-    dropdown.open = false;
+  it("never touches a plain <details> collapsible", () => {
+    actions.open = false;
     fire("window", "blur");
     expect(collapsible.open).toBe(true);
   });
