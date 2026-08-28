@@ -1294,7 +1294,8 @@ export interface GithubConfig {
    * REST API base, for a `<GithubInfo>` card against an Enterprise instance.
    * Derived from `host` when unset: `api.github.com` for github.com, an `api.`
    * subdomain for an Enterprise Cloud data-residency tenant, and `/api/v3` for
-   * Enterprise Server.
+   * Enterprise Server. Must be an HTTP(S) URL, and is reduced to an origin plus
+   * its path — the repository route is appended to it.
    */
   api?: string;
   /** Default branch. Defaults to `main`. */

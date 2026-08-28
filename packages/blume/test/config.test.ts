@@ -120,6 +120,16 @@ describe("loadConfig", () => {
     expect(result.config.github?.host).toBe("https://acme.ghe.com");
   });
 
+  it("reduces github.api to an origin and path", async () => {
+    // The lookup appends `/repos/{owner}/{repo}` as a string, so a query would
+    // swallow that route and a fragment would drop it from the request.
+    const dir = await makeDir(
+      'export default { github: { api: "https://user:pass@ghe.acme.com/api/v3/?x=1#f", owner: "acme", repo: "docs" } };'
+    );
+    const result = await loadConfig(dir);
+    expect(result.config.github?.api).toBe("https://ghe.acme.com/api/v3");
+  });
+
   it("rejects a non-array integrations value", async () => {
     const dir = await makeDir('export default { integrations: "probe" };');
     const error = await loadError(dir);

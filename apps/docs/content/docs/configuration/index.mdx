@@ -286,7 +286,7 @@ github: {
 | `branch` | `"main"` | Branch that edit links point at. |
 | `dir` | — | Path from the repo root to the project root (for monorepos). |
 | `host` | `"https://github.com"` | Origin of the GitHub instance, for Enterprise installations. Must be HTTP(S); normalized to its origin. |
-| `api` | derived from `host` | REST API base, for `<GithubInfo>` against an Enterprise instance. |
+| `api` | derived from `host` | REST API base, for `<GithubInfo>` against an Enterprise instance. Must be HTTP(S); normalized to an origin and path. |
 
 ### GitHub Enterprise
 

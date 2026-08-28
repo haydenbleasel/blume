@@ -1489,9 +1489,21 @@ const githubOriginSchema = z
   .url({ protocol: /^https?$/u })
   .transform((value) => new URL(value).origin);
 
+/**
+ * A REST API base: an origin plus an optional path, since Enterprise Server
+ * serves the API from `/api/v3`. Anything past the path is dropped for the same
+ * reason the host is reduced — `/repos/{owner}/{repo}` is appended as a string,
+ * so a query would swallow the route and a fragment would strip it from the
+ * request entirely, leaving a lookup that silently returns the wrong thing.
+ */
+const githubApiSchema = z.url({ protocol: /^https?$/u }).transform((value) => {
+  const { origin, pathname } = new URL(value);
+  return `${origin}${pathname}`.replace(/\/+$/u, "");
+});
+
 const githubConfigSchema = z.strictObject({
   /** REST API base. Derived from `host` when unset. */
-  api: z.url({ protocol: /^https?$/u }).optional(),
+  api: githubApiSchema.optional(),
   branch: z.string().default("main"),
   /** Path from the repo root to the project root (for monorepos). */
   dir: z.string().optional(),
