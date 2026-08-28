@@ -117,6 +117,8 @@ The **Open in chat** action opens the current page in an AI assistant — v0, Ch
 
 Like Copy as Markdown, it needs no setup. The assistant fetches the page over its public URL, so it works as soon as the page is deployed.
 
+The prompt is part of the [UI dictionary](/docs/content/i18n#translated-ui) (`actions.openInChatPrompt`), so localized sites send it in their language, and `i18n.ui` can override the wording — keep the `{url}` placeholder, which is replaced with the page's raw-Markdown URL.
+
 To tailor the action, set `ai.openInChat`. `false` hides it entirely, and an array of provider keys — `"v0"`, `"chatgpt"`, `"claude"`, `"t3"`, `"scira"`, `"cursor"` — shows just those providers, in the order you list them:
 
 ```ts blume.config.ts lineNumbers

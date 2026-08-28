@@ -20,6 +20,8 @@ export const tr: UIStringsOverride = {
     generating: "Oluşturuluyor…",
     openIn: "{name} içinde aç",
     openInChat: "Sohbette aç",
+    openInChatPrompt:
+      "Bu sayfa hakkında sorular sorabilmem için {url} adresini okuyun.",
     scrollToTop: "Başa dön",
   },
   ask: {

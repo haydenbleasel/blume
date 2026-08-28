@@ -20,6 +20,8 @@ export const ru: UIStringsOverride = {
     generating: "Генерация…",
     openIn: "Открыть в {name}",
     openInChat: "Открыть в чате",
+    openInChatPrompt:
+      "Прочитайте {url} — я буду задавать вопросы об этой странице.",
     scrollToTop: "Наверх",
   },
   ask: {

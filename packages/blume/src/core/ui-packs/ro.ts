@@ -20,6 +20,8 @@ export const ro: UIStringsOverride = {
     generating: "Se generează…",
     openIn: "Deschide în {name}",
     openInChat: "Deschide în chat",
+    openInChatPrompt:
+      "Citește {url} ca să îți pot pune întrebări despre această pagină.",
     scrollToTop: "Sus de tot",
   },
   ask: {

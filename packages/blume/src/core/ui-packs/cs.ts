@@ -20,6 +20,7 @@ export const cs: UIStringsOverride = {
     generating: "Generování…",
     openIn: "Otevřít v {name}",
     openInChat: "Otevřít v chatu",
+    openInChatPrompt: "Přečtěte si {url}, ať se mohu ptát na tuto stránku.",
     scrollToTop: "Zpět nahoru",
   },
   ask: {

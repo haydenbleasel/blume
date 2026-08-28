@@ -20,6 +20,8 @@ export const ptBR: UIStringsOverride = {
     generating: "Gerando…",
     openIn: "Abrir em {name}",
     openInChat: "Abrir no chat",
+    openInChatPrompt:
+      "Leia {url} para que eu possa fazer perguntas sobre esta página.",
     scrollToTop: "Voltar ao topo",
   },
   ask: {

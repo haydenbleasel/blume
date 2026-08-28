@@ -20,6 +20,7 @@ export const zhTW: UIStringsOverride = {
     generating: "產生中…",
     openIn: "在 {name} 中開啟",
     openInChat: "在聊天中開啟",
+    openInChatPrompt: "請閱讀 {url} 以便我針對此頁面提問。",
     scrollToTop: "回到頂部",
   },
   ask: {

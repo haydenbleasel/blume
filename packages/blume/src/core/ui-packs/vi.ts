@@ -20,6 +20,7 @@ export const vi: UIStringsOverride = {
     generating: "Đang tạo…",
     openIn: "Mở trong {name}",
     openInChat: "Mở trong trò chuyện",
+    openInChatPrompt: "Hãy đọc {url} để tôi có thể đặt câu hỏi về trang này.",
     scrollToTop: "Lên đầu trang",
   },
   ask: {

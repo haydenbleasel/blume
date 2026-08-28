@@ -20,6 +20,8 @@ export const ja: UIStringsOverride = {
     generating: "生成中…",
     openIn: "{name} で開く",
     openInChat: "チャットで開く",
+    openInChatPrompt:
+      "{url} を読んで、このページについての質問に答えられるようにしてください。",
     scrollToTop: "トップに戻る",
   },
   ask: {

@@ -20,6 +20,7 @@ export const fi: UIStringsOverride = {
     generating: "Luodaan…",
     openIn: "Avaa sovelluksessa {name}",
     openInChat: "Avaa keskustelussa",
+    openInChatPrompt: "Lue {url}, jotta voin kysyä kysymyksiä tästä sivusta.",
     scrollToTop: "Takaisin ylös",
   },
   ask: {

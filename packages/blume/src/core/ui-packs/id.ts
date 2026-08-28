@@ -20,6 +20,8 @@ export const id: UIStringsOverride = {
     generating: "Menghasilkan…",
     openIn: "Buka di {name}",
     openInChat: "Buka di obrolan",
+    openInChatPrompt:
+      "Baca {url} agar saya bisa mengajukan pertanyaan tentang halaman ini.",
     scrollToTop: "Kembali ke atas",
   },
   ask: {

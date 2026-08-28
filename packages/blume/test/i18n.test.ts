@@ -1027,6 +1027,38 @@ describe("UI dictionaries", () => {
     }
   });
 
+  it("localizes the open-in-chat prompt in every shipped pack", () => {
+    // Formerly hardcoded English in PageActions' client script; now
+    // dictionary-driven so localized sites hand the chat a localized prompt.
+    // Parameterized: `{url}` is replaced with the page's raw-Markdown URL at
+    // load time, so every translation must carry the placeholder.
+    expect(EN_UI.actions.openInChatPrompt).toBe(
+      "Read {url} so I can ask you questions about this page."
+    );
+    const ja = resolveUIStrings("ja", { defaultLocale: "en" });
+    expect(ja.actions.openInChatPrompt).toContain("{url}");
+    expect(ja.actions.openInChatPrompt).not.toBe(
+      EN_UI.actions.openInChatPrompt
+    );
+    for (const [code, pack] of Object.entries(UI_PACKS)) {
+      expect(
+        pack.actions?.openInChatPrompt,
+        `pack "${code}" misses actions.openInChatPrompt`
+      ).toBeTruthy();
+      expect(
+        pack.actions?.openInChatPrompt,
+        `pack "${code}" openInChatPrompt misses {url}`
+      ).toContain("{url}");
+      // The URL must sit on a token boundary: a particle or full-width comma
+      // glued onto it (`{url}을`, `{url}，`) can be swallowed into the URL by
+      // the chat provider's link detection.
+      expect(
+        pack.actions?.openInChatPrompt,
+        `pack "${code}" openInChatPrompt glues text onto {url}`
+      ).toMatch(/\{url\}(?:$|[\s,.])/u);
+    }
+  });
+
   it("applies a shipped pack for a translated locale", () => {
     const dict = resolveUIStrings("fr", { defaultLocale: "en" });
     expect(dict.search.button).toBe("Rechercher");
