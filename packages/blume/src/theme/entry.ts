@@ -37,7 +37,10 @@ const TOKEN_DEFAULTS = `:root {
   --blume-background-image-size: cover;
   --blume-foreground: oklch(0.145 0 0);
   --blume-muted: oklch(0.965 0 0);
-  --blume-muted-foreground: oklch(0.54 0 0);
+  /* 5.28:1 on the page background. The headroom over 4.5:1 is the point: muted
+     text is 14px body copy routinely set on a tinted surface (callouts, badges,
+     panels), and each tint costs a few tenths. */
+  --blume-muted-foreground: oklch(0.53 0 0);
   --blume-border: oklch(0.88 0.006 260 / 0.72);
   --blume-accent: oklch(0.145 0 0);
   --blume-accent-foreground: oklch(1 0 0);

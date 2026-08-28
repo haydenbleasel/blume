@@ -9,6 +9,7 @@ import type {
 import type {
   Diagnostic,
   FeaturedLink,
+  HeaderAction,
   NavNode,
   Navigation,
   NavSelector,
@@ -788,6 +789,8 @@ const withTabHrefs = (tabs: NavTab[], sidebar: NavNode[]): NavTab[] =>
  * their exact authored shape.
  */
 interface NavChrome {
+  actions: HeaderAction[];
+  cta: HeaderAction | null;
   featured: FeaturedLink[];
   selectors: NavSelector[];
   tabs: NavTab[];
@@ -796,26 +799,33 @@ interface NavChrome {
 const rebaseNavChrome = (
   basePath: string,
   options: {
+    actions?: HeaderAction[];
+    cta?: HeaderAction | null;
     featured?: FeaturedLink[];
     selectors?: NavSelector[];
     tabs?: NavTab[];
   }
 ): NavChrome => {
+  const actions = options.actions ?? [];
+  const cta = options.cta ?? null;
   const featured = options.featured ?? [];
   const selectors = options.selectors ?? [];
   const tabs = options.tabs ?? [];
   if (!basePath) {
-    return { featured, selectors, tabs };
+    return { actions, cta, featured, selectors, tabs };
   }
+  const rebaseHref = <T extends { href: string }>(item: T): T => ({
+    ...item,
+    href: withBasePath(basePath, item.href),
+  });
   const rebasePath = <T extends { path: string }>(item: T): T => ({
     ...item,
     path: withBasePath(basePath, item.path),
   });
   return {
-    featured: featured.map((link) => ({
-      ...link,
-      href: withBasePath(basePath, link.href),
-    })),
+    actions: actions.map(rebaseHref),
+    cta: cta ? rebaseHref(cta) : null,
+    featured: featured.map(rebaseHref),
     selectors: selectors.map((selector) => ({
       ...selector,
       items: selector.items.map(rebasePath),
@@ -838,8 +848,12 @@ const rebaseNavChrome = (
 export const buildNavigation = (
   pages: PageRecord[],
   options: {
+    /** Plain links in the header, left of the icon buttons. */
+    actions?: HeaderAction[];
     /** Site-wide route mount point (`""` or `/seg`); applied to config paths. */
     basePath?: string;
+    /** The single primary call to action in the header. */
+    cta?: HeaderAction | null;
     folderMeta: Map<string, FolderMeta>;
     /** Global display mode for every sidebar group (default `flat`). */
     display?: SidebarDisplay;
@@ -891,7 +905,10 @@ export const buildNavigation = (
   // Content-derived sidebar routes are already based via `page.route`; the
   // based tab paths also feed tab-scoping below, so they must agree with the
   // based content routes.
-  const { featured, selectors, tabs } = rebaseNavChrome(basePath, options);
+  const { actions, cta, featured, selectors, tabs } = rebaseNavChrome(
+    basePath,
+    options
+  );
   const byRoute = new Map(
     pages.map((page) => [
       options.refByLogical ? page.translationKey : page.route,
@@ -939,6 +956,8 @@ export const buildNavigation = (
       basePath
     );
     return {
+      actions,
+      cta,
       featured,
       root: rootTabPath,
       selectors,
@@ -960,6 +979,8 @@ export const buildNavigation = (
     diagnostics
   );
   return {
+    actions,
+    cta,
     featured,
     root: rootTabPath,
     selectors,

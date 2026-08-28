@@ -109,7 +109,7 @@ export interface PageRecord {
   id: string;
   /** Provenance: the owning source's name and its source-local ref. */
   source: { name: string; ref: string };
-  /** Absolute source path. Populated by the filesystem adapter only (back-compat). */
+  /** Absolute source path. Populated by any local-file adapter (back-compat). */
   sourcePath?: string;
   /**
    * Renderable body captured at scan time. Set for staged (non-filesystem)
@@ -177,6 +177,12 @@ export interface PageRecord {
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- values are outputs of arbitrary user-supplied zod schemas (transforms included), so no narrower type exists
   custom?: Record<string, unknown>;
   headings: Heading[];
+  /**
+   * Raw HTML element ids (`<a id="…">`) outside headings, deduplicated —
+   * fragment-link targets `blume validate` accepts alongside heading slugs.
+   */
+  anchors: string[];
+
   /** Whether the file is `.md`/`.mdx`. */
   format: "md" | "mdx";
   /** Internal/asset links discovered in the page (for validation). */
@@ -273,6 +279,12 @@ export interface FeaturedLink {
   icon?: string;
 }
 
+/** A plain header link, or the header's single call to action. */
+export interface HeaderAction {
+  href: string;
+  label: string;
+}
+
 /** The complete navigation model derived from the content graph. */
 export interface Navigation {
   tabs: NavTab[];
@@ -288,6 +300,10 @@ export interface Navigation {
    * graphs; treat as `/`.
    */
   root?: string;
+  /** Plain links in the header, left of the icon buttons. */
+  actions?: HeaderAction[];
+  /** The single primary call to action in the header. */
+  cta?: HeaderAction | null;
   /** Pinned links shown above the sidebar sections, unscoped by tab. */
   featured: FeaturedLink[];
   /** Repo URL for the header link, or null when hidden (`navigation.repo`). */
@@ -347,7 +363,7 @@ export interface RouteManifestEntry {
   /** Astro collection-relative entry id, passed to `getEntry`. */
   entryId: string;
   path: string;
-  /** Absolute source path; populated for filesystem entries only (back-compat). */
+  /** Absolute source path; populated for local-file entries only (back-compat). */
   sourcePath?: string;
   /** Adapter-supplied "edit this page" URL (non-filesystem sources). */
   editUrl?: string;

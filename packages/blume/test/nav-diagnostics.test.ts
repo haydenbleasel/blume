@@ -240,6 +240,37 @@ describe("validateNavTargets", () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.message).toContain("/missing");
   });
+
+  it("checks header actions and the cta like featured links", () => {
+    const result = validateNavTargets(
+      nav({
+        actions: [
+          { href: "https://x.dev/status", label: "Status" },
+          { href: "/missing-action", label: "Missing" },
+        ],
+        cta: { href: "/missing-cta", label: "Sign up" },
+      }),
+      new Set(["/docs"])
+    );
+    expect(result.map((d) => d.message)).toEqual([
+      expect.stringContaining("/missing-action"),
+      expect.stringContaining("/missing-cta"),
+    ]);
+  });
+
+  it("treats a protocol-relative href as external everywhere", () => {
+    // `//host/path` starts with a slash but names a host; the localizer and
+    // the base rebase already leave it alone, so the check must too.
+    const result = validateNavTargets(
+      nav({
+        actions: [{ href: "//cdn.x.dev/status", label: "Status" }],
+        cta: { href: "//cdn.x.dev/signup", label: "Sign up" },
+        featured: [{ href: "//cdn.x.dev/changelog", label: "Changelog" }],
+      }),
+      new Set(["/docs"])
+    );
+    expect(result).toEqual([]);
+  });
 });
 
 describe("validateNavStructure", () => {

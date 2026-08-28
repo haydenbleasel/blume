@@ -82,6 +82,16 @@ describe("loadConfig", () => {
     expect(isFunction(integration?.hooks["astro:config:setup"])).toBe(true);
   });
 
+  it("rejects a navigation.repo string that is not an absolute URL", async () => {
+    // A forgotten scheme (`github.com/acme`) would render as a page-relative
+    // link that 404s from every page, so it fails at config time instead.
+    const dir = await makeDir(
+      'export default { navigation: { repo: "github.com/acme" } };'
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+  });
+
   it("rejects a non-array integrations value", async () => {
     const dir = await makeDir('export default { integrations: "probe" };');
     const error = await loadError(dir);

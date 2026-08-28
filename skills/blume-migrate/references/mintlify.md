@@ -94,7 +94,9 @@ Mintlify's `navigation` object (`tabs`/`anchors`/`dropdowns`/`products`/`version
   Call this trade out explicitly in the migration report; don't silently pick one. **The scoping is bidirectional:** on the root/landing route Blume _hides_ every tab folder and lists only untabbed top-level pages — so a Mintlify home whose single sidebar showed everything becomes a lean root list plus one sidebar per tab. That's automatic; don't try to exclude tab folders from the root by hand.
 
 - **`dropdowns`/`products`/`versions`** → `navigation.selectors` (`{ kind, label, items: [{ label, path, icon?, description?, tag? }] }`). Use `kind` `dropdown`/`product`/`version` accordingly.
-- **`anchors` / `navigation.global.anchors` / `navbar.links`** (persistent header links — Blog, Changelog, Community, Contact/Support) → **`navigation.featured`** (`{ label, href, icon? }`). These pin to the **top of the sidebar, above every section, on every route** (not tab-scoped) — the right home for Mintlify's always-visible utility links. An external `href` opens in a new tab; an internal one (`/contact`) is build-time validated against your pages. Convert the FontAwesome `icon` to Lucide as usual. (This replaces the old "drop and report" for anchors.) The `navbar.primary` **CTA button** has no featured equivalent — see Dropped.
+- **`anchors` / `navigation.global.anchors`** (persistent sidebar-top links — Blog, Changelog, Community, Contact/Support) → **`navigation.featured`** (`{ label, href, icon? }`). These pin to the **top of the sidebar, above every section, on every route** (not tab-scoped) — the right home for Mintlify's always-visible utility links. An external `href` opens in a new tab; an internal one (`/contact`) is build-time validated against your pages. Convert the FontAwesome `icon` to Lucide as usual. (This replaces the old "drop and report" for anchors.)
+- **`navbar.links`** (plain header links — Log in, Status, Support) → **`navigation.actions`** (`[{ label, href }]`), rendered in the header left of the icon buttons. A GitHub link → the `github` config (or `navigation.repo` as a URL when the docs repo is private) instead. Header links hide on phones; a link that must survive there belongs in `featured`.
+- **`navbar.primary`** (the header **CTA button** — "Get Started"/"Sign Up", `type: "button"`) → **`navigation.cta`** (`{ label, href }`, singular: Blume renders exactly one filled button). A `type: "github"` primary → the `github` config instead. A route the docs don't serve (the product's own `/signup`) must be an absolute URL, or it raises `BLUME_NAV_MISSING_PAGE`.
 - **`languages`** → `i18n`, not a selector (see below).
 - Only fall back to an explicit `navigation.sidebar` for a shape the filesystem genuinely can't express.
 
@@ -149,7 +151,6 @@ Mintlify serves every top-level dir (e.g. `/images`) at the site root. Blume ser
 
 ## Dropped — report these
 
-- **`navbar.primary`** (the prominent header **CTA button**, e.g. "Get Started"/"Sign Up") → no button equivalent; re-add via `navigation.tabs`, a `navigation.featured` link, or a Header override. (Plain `navbar.links` and `anchors` map to `navigation.featured` — see Navigation above, not here.)
 - **`footer.socials`** → suggest the `github` config, or a Footer override.
 - **Per-language banners** (`navigation.languages[].banner`) → no equivalent.
 - **Dynamic redirects** (`:slug*`/`:id` params) → can't be static path-to-path; move to host rules (`_redirects`, `vercel.json`).

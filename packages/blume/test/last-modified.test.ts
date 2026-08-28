@@ -8,6 +8,7 @@ import { dirname, join } from "pathe";
 
 import {
   gitLastModifiedTimes,
+  gitRepositoryRoot,
   isShallowGitRepository,
   lastModifiedShallowWarning,
   parseGitLog,
@@ -174,6 +175,69 @@ describe("scanProject lastModified", () => {
       /^\d{4}-\d{2}-\d{2}T/u
     );
   });
+
+  it("dates vault notes from a staged obsidian source", async () => {
+    // The vault is a real on-disk tree, so its root must join the git pathspec
+    // even though the source is staged — otherwise every vault page stays
+    // undated no matter how deep the clone is.
+    const root = realpathSync(
+      await makeProject({
+        "blume.config.ts": [
+          "export default {",
+          '  content: { sources: [{ type: "obsidian", vault: "vault" }] },',
+          "  lastModified: true,",
+          "};",
+          "",
+        ].join("\n"),
+        "vault/Draft.md": "# Draft\n",
+        "vault/Welcome.md": "# Welcome\n",
+      })
+    );
+    initRepo(root);
+    // `Draft.md` stays untracked: an undated page beside a dated one drives
+    // the undated count down the covered-roots path.
+    runGit(root, ["add", "vault/Welcome.md"]);
+    runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add vault"]);
+
+    const project = await scanProject(root);
+    const welcome = project.manifest.routes.find(
+      (route) => route.path === "/welcome"
+    );
+    const draft = project.manifest.routes.find(
+      (route) => route.path === "/draft"
+    );
+    expect(welcome?.lastModified).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
+    expect(draft?.lastModified).toBeUndefined();
+  });
+});
+
+describe("gitRepositoryRoot", () => {
+  const dirs: string[] = [];
+
+  const makeDir = async (): Promise<string> => {
+    const root = realpathSync(await mkdtemp(join(tmpdir(), "blume-gitroot-")));
+    dirs.push(root);
+    return root;
+  };
+
+  afterAll(async () => {
+    await Promise.all(
+      dirs.map((dir) => rm(dir, { force: true, recursive: true }))
+    );
+  });
+
+  it("finds the toplevel of the repository containing root", async () => {
+    const root = await makeDir();
+    initRepo(root);
+    const nested = join(root, "docs");
+    await mkdir(nested, { recursive: true });
+    expect(gitRepositoryRoot(nested)).toBe(root);
+  });
+
+  it("is null outside a repository", async () => {
+    const root = await makeDir();
+    expect(gitRepositoryRoot(root)).toBeNull();
+  });
 });
 
 describe("gitLastModifiedTimes", () => {
@@ -190,6 +254,33 @@ describe("gitLastModifiedTimes", () => {
   afterAll(async () => {
     await Promise.all(
       dirs.map((dir) => rm(dir, { force: true, recursive: true }))
+    );
+  });
+
+  it("skips the scan when no content root bounds the pathspec", async () => {
+    // An all-staged project contributes no content root, yet its entries can
+    // still carry a `sourcePath`. Without the guard, `git log -- ` runs with an
+    // empty pathspec and logs the entire repository — which in this fixture
+    // would happily date the tracked file. An empty map proves the scan was
+    // skipped, not merely that git failed.
+    const root = await makeRepoDir();
+    const tracked = join(root, "note.md");
+    await writeFile(tracked, "# Note\n");
+    initRepo(root);
+    runGit(root, ["add", "-A"]);
+    runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add note"]);
+
+    expect(gitLastModifiedTimes(root, [root], [tracked]).get(tracked)).toMatch(
+      /^\d{4}-\d{2}-\d{2}T/u
+    );
+    expect(gitLastModifiedTimes(root, [], [tracked])).toEqual(new Map());
+    // A caller that already resolved the repository root hands it in; `null`
+    // means it found none, and nothing is spawned for it.
+    expect(
+      gitLastModifiedTimes(root, [root], [tracked], gitRepositoryRoot(root))
+    ).toEqual(gitLastModifiedTimes(root, [root], [tracked]));
+    expect(gitLastModifiedTimes(root, [root], [tracked], null)).toEqual(
+      new Map()
     );
   });
 
@@ -240,6 +331,25 @@ describe("gitLastModifiedTimes", () => {
         process.env.GIT_DIR = previous;
       }
     }
+  });
+
+  it("returns an empty map when the log fails on an out-of-repo root", async () => {
+    // Callers filter these out, but the function still defends itself: a
+    // pathspec outside the repository makes `git log` fail outright.
+    const root = await makeRepoDir();
+    const tracked = join(root, "note.md");
+    await writeFile(tracked, "# Note\n");
+    initRepo(root);
+    runGit(root, ["add", "-A"]);
+    runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add note"]);
+
+    const outside = await makeRepoDir();
+    const times = gitLastModifiedTimes(
+      root,
+      [join(outside, "vault")],
+      [tracked]
+    );
+    expect(times.size).toBe(0);
   });
 
   it("returns an empty map outside a git repository", async () => {

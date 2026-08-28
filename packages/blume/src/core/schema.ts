@@ -348,6 +348,21 @@ const notionSourceSchema = z.object({
 });
 
 /**
+ * An Obsidian vault, read in place. Wikilinks become route links and
+ * `%%comments%%` are stripped at load time, so the vault stays the source of
+ * truth — no export step and no generated notes in the repo.
+ */
+const obsidianSourceSchema = z.strictObject({
+  /** Vault folder names to skip at any depth, in addition to dot-folders. */
+  exclude: z.array(z.string()).optional(),
+  /** Namespaces the source's routes under `/<prefix>/`; e.g. `vault`. */
+  prefix: z.string().optional(),
+  type: z.literal("obsidian"),
+  /** Vault directory, absolute or relative to the project root. */
+  vault: z.string().min(1),
+});
+
+/**
  * A repo's GitHub Releases, materialized as `type: changelog` entries — release
  * notes become the changelog with no files to maintain. A private repo reads a
  * token from `GITHUB_TOKEN`; it is never inlined here.
@@ -396,6 +411,7 @@ const contentSourceSchema = z.discriminatedUnion("type", [
   githubReleasesSourceSchema,
   sanitySourceSchema,
   notionSourceSchema,
+  obsidianSourceSchema,
   customSourceSchema,
 ]);
 
@@ -966,11 +982,37 @@ const featuredLinkSchema = z.strictObject({
   label: z.string(),
 });
 
+/**
+ * A header link: a plain one (`Log in`, `Status`), or the single call to
+ * action. Same shape as a featured link minus the icon — the header row is
+ * text, not iconography.
+ */
+const headerActionSchema = z.strictObject({
+  href: z.string(),
+  label: z.string(),
+});
+
 const navigationConfigSchema = z.strictObject({
+  /** Plain links in the header, left of the icon buttons. */
+  actions: z.array(headerActionSchema).default([]),
+  /**
+   * The one primary call to action in the header, as a filled button.
+   *
+   * Singular on purpose: a docs header has room for exactly one thing a
+   * reader is being asked to do, a row of buttons asks for nothing, and
+   * `featured` already takes the secondary links.
+   */
+  cta: headerActionSchema.optional(),
   /** Pinned links shown above the generated sidebar sections. */
   featured: z.array(featuredLinkSchema).default([]),
-  /** Show a GitHub repo link in the header (requires `github` configured). */
-  repo: z.boolean().default(true),
+  /**
+   * The GitHub link in the header. `true` derives it from `github`, `false`
+   * hides it, and an absolute URL points it anywhere on GitHub — an
+   * organization, say, when the docs repo itself is private and `github` has
+   * to stay unset. The mark stays the GitHub one, so a URL elsewhere belongs in
+   * `actions`.
+   */
+  repo: z.union([z.boolean(), z.url()]).default(true),
   selectors: z.array(navSelectorSchema).default([]),
   /**
    * Sidebar behavior. `display` sets how every group renders (a group in an

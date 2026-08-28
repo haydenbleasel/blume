@@ -43,6 +43,45 @@ export default defineConfig({
 
 If two sources resolve to the same route, Blume reports a `BLUME_DUPLICATE_ROUTE` build error — give each source a distinct `prefix`.
 
+## Obsidian
+
+The built-in `obsidian` source reads an [Obsidian](https://obsidian.md) vault in place. There is no export step and nothing generated into your repo: the vault stays the source of truth, and Blume lowers Obsidian's dialect to Markdown as it loads.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "obsidian",
+        prefix: "notes",
+        vault: "vault",
+        // Vault folder names to skip at any depth, on top of dot-folders
+        exclude: ["Templates", "Daily"],
+      },
+    ],
+  },
+});
+```
+
+`[[Wikilinks]]` become route links, addressed by note name across the whole vault rather than by path, the way Obsidian addresses notes. Custom link text (`[[Note|label]]`), heading anchors (`[[Note#Install]]`), full paths (`[[folder/Note]]` and `[[folder/Note.md]]`), the partial paths Obsidian's default "shortest path when possible" setting writes (`[[guides/Note]]`), and the `[[Note\|label]]` form Obsidian writes inside a table cell all work, and a note that sets `slug` in its frontmatter is linked at the route that slug publishes. When two notes share a name, a note whose full vault path is exactly that name wins — Obsidian resolves a link as a path before a name — then the first in vault order (folders before notes, case-insensitively, like Obsidian's file explorer). Blume warns only when a wikilink actually resolves through such a collision; write a longer path to disambiguate. A block reference (`[[Note#^id]]`) links to its note without an anchor: blocks render with no id to land on. A heading anchor resolves against the target note's real headings, matched the way Obsidian's autocomplete writes them (with `**bold**`, `` `code` ``, and link syntax stripped) and slugged by the same `extractHeadings` pass that fills the page manifest — so a link to `#Install` lands on the heading rather than on an id no page emits. `[[#Install]]` addresses a heading in the note you are writing. A link to a heading that doesn't exist keeps the page link, drops the anchor, and warns.
+
+Frontmatter keeps what Blume's [page schema](/docs/reference/frontmatter) accepts plus any key you declare in [`frontmatter.extend`](/docs/reference/frontmatter#custom-keys) (or, for notes of that `type`, a content type's `frontmatter`); every other Obsidian property — Dataview fields, Templater dates, `publish`, and Obsidian's own `tags`, `aliases`, and `cssclasses` — is dropped when a note is lowered, so a vault written with the Properties UI builds without frontmatter errors. `aliases` is dropped rather than resolved — alias link targets are not supported yet. A relative Markdown image beside a note (`![chart](./chart.png)`) is served from the vault, and when the vault lives inside your git repository, vault pages get git-derived ["Last updated" dates](/docs/configuration#last-modified) like any other page. "Edit this page" links resolve through `github.dir`, so a vault that sits beside the docs app in a monorepo still links to its file; a vault outside the repository gets no link.
+
+Locale directories and version snapshots inside the vault are read the same way the filesystem source reads them: `fr/Note.md` publishes under `/fr/` with [i18n](/docs/content/i18n) configured, `v1.0/Note.md` under `/v1.0/` with [versions](/docs/content/versioning), and wikilinks to those notes point at the route each one publishes.
+
+:::note
+A heading that itself contains a link gets its manifest anchor from the heading's Markdown and its rendered `id` from its text content. The two differ for that heading, so a wikilink to it may land on the page rather than on the section.
+:::
+
+A link to an `index` note lands on its folder's route rather than a phantom `/index`. **An unresolved wikilink degrades to plain text with a build warning instead of failing the build**, so a vault mid-refactor still publishes. Single-line `%%comments%%` are stripped, a wikilink inside an HTML comment (`<!-- [[Draft]] -->`) is left alone since Obsidian hides it too, and a note with no `title` in its frontmatter is titled by its filename — the same rule Obsidian itself applies. An `index` note is the one exception: it names a route rather than a note, so its title falls through to Blume's usual derivation (first heading, then the humanized segment). Fenced, indented, and inline code passes through verbatim, so a note documenting the syntax survives.
+
+Dot-folders are skipped, including Obsidian's own `.obsidian` config directory and `.trash` — which the dev watcher also ignores, so moving a pane in the app or deleting a note to the trash doesn't rebuild your site. Editing a note does. The directories no content scan reads (`node_modules`, `dist`, `.git`, …) are skipped too, so a vault rooted at the project itself doesn't publish dependency READMEs. Symlinks inside the vault are followed, the way the filesystem source follows them, so a shared folder linked into the vault publishes with it. A vault that sits inside `content.root` must be excluded from the filesystem source (`exclude: ["vault/**"]`); `blume version cut` then leaves it out of the snapshot, since the vault keeps publishing its own notes as current.
+
+Not yet lowered: callouts (`> [!note]`) render as plain blockquotes, embeds (`![[image.png]]`) pass through untouched, multi-line `%%comments%%` are left in place, and there is no backlink graph.
+
 ## Remote MDX
 
 The built-in `mdx-remote` source fetches raw `.md`/`.mdx` over HTTP. Enumerate files either from a GitHub repo subtree (`github`) or explicitly against a raw base URL (`url` + `files`):
@@ -194,3 +233,5 @@ export default defineConfig({
 ```
 
 A source normalizes its native shape (Portable Text, Notion blocks, remote HTML) to Markdown/MDX text, so the same components and markdown features apply no matter where a page comes from.
+
+A custom source that reads local files should set `sourcePath` on each entry and `contentRoot` on the source itself. `sourcePath` names the file in diagnostics and resolves relative images beside it; `contentRoot` bounds the git `log` that dates pages, so without it the source's pages get no git-derived ["Last updated" date](/docs/configuration#last-modified).

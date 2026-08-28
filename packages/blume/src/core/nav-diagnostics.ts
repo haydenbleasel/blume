@@ -1,5 +1,6 @@
 import { isAssetIcon } from "../theme/icon-kind.ts";
 import { hasIcon } from "../theme/icons.ts";
+import { isInternalPath } from "./base-path.ts";
 import type { Diagnostic, NavNode, Navigation, PageRecord } from "./types.ts";
 
 /**
@@ -120,12 +121,20 @@ export const validateNavTargets = (
       label: link.label,
       path: link.href,
     })),
+    ...(navigation.actions ?? []).map((action) => ({
+      label: action.label,
+      path: action.href,
+    })),
+    ...(navigation.cta
+      ? [{ label: navigation.cta.label, path: navigation.cta.href }]
+      : []),
   ];
   const diagnostics: Diagnostic[] = [];
   const seen = new Set<string>();
   for (const { label, path } of targets) {
-    // Only internal, non-anchor paths can be checked against routes.
-    if (!path.startsWith("/") || path.startsWith("/#") || seen.has(path)) {
+    // Only internal, non-anchor paths can be checked against routes. A
+    // protocol-relative `//host/path` is external despite its leading slash.
+    if (!isInternalPath(path) || path.startsWith("/#") || seen.has(path)) {
       continue;
     }
     if (!resolvesToPages(routes, path.split("#")[0] ?? path)) {

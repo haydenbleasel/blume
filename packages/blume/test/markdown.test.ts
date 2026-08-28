@@ -1028,6 +1028,14 @@ describe("headingAnchorPlugin", () => {
     expect(textOfResult(result)).toBe("Getting Started");
   });
 
+  it("pins the anchor to a trailing {#custom-id} and strips the marker", () => {
+    const node = heading("h2", "Record model {#record-model}");
+    const result = headingAnchorPlugin().element.visit(node, makeCtx());
+    expect(result?.properties?.id).toBe("record-model");
+    expect(result?.children?.[0]?.properties?.href).toBe("#record-model");
+    expect(textOfResult(result)).toBe("Record model");
+  });
+
   it("parses a marker in the trailing text after inline code", () => {
     const code = {
       children: [{ type: "text", value: "init" }],

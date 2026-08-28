@@ -50,8 +50,9 @@ import type { Diagnostic } from "./types.ts";
  *   custom `ContentSource`). Omit `sources` and the top-level `root` becomes one
  *   implicit filesystem source.
  * - `navigation` — sidebar, header `tabs`, `selectors` (version/language/product
- *   switchers), pinned `featured` links, and the `repo` link toggle. Omit
- *   `sidebar` to generate it from the content tree.
+ *   switchers), pinned `featured` links, header `actions` and the one `cta`,
+ *   and the `repo` link (a toggle, or a URL). Omit `sidebar` to generate it
+ *   from the content tree.
  * - `redirects` — `{ from, to, status }` rules (301 by default).
  * - `github` — `{ owner, repo, branch, dir }`, powering "Edit this page" links
  *   and the header repo link.

@@ -34,6 +34,7 @@ const heading = (text: string, slug: string): Heading => ({
 const makePage = (
   over: Pick<PageRecord, "id" | "route"> & Partial<PageRecord>
 ): PageRecord => ({
+  anchors: [],
   contentType: "doc",
   format: "mdx",
   groups: [],
@@ -308,6 +309,18 @@ describe(validateLinks, () => {
         route: "/a",
       }),
       target,
+    ]);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("accepts a fragment that only a raw HTML id on the target provides", async () => {
+    const diagnostics = await validate([
+      makePage({
+        id: "a.mdx",
+        links: [link("/b#restart-abandonment")],
+        route: "/a",
+      }),
+      makePage({ anchors: ["restart-abandonment"], id: "b.mdx", route: "/b" }),
     ]);
     expect(diagnostics).toHaveLength(0);
   });

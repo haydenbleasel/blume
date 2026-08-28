@@ -6,6 +6,7 @@ import { dirname, join } from "pathe";
 
 import { buildLlmsFiles } from "../src/ai/llms.ts";
 import {
+  isExternalUrl,
   isInternalPath,
   normalizeBasePath,
   normalizeRoute,
@@ -58,6 +59,20 @@ describe("isInternalPath", () => {
     expect(isInternalPath("mailto:a@b.c")).toBe(false);
     expect(isInternalPath("#anchor")).toBe(false);
     expect(isInternalPath("relative/path")).toBe(false);
+  });
+});
+
+describe("isExternalUrl", () => {
+  it("opens http(s) and protocol-relative URLs in a new tab, nothing else", () => {
+    expect(isExternalUrl("https://x.com")).toBe(true);
+    expect(isExternalUrl("HTTP://x.com")).toBe(true);
+    expect(isExternalUrl("//host/path")).toBe(true);
+    // Other schemes hand off to another application; `_blank` would only open
+    // an empty tab beside it.
+    expect(isExternalUrl("mailto:a@b.c")).toBe(false);
+    expect(isExternalUrl("tel:+1555")).toBe(false);
+    expect(isExternalUrl("/x")).toBe(false);
+    expect(isExternalUrl("#anchor")).toBe(false);
   });
 });
 
@@ -296,6 +311,7 @@ const makePage = (
   links: PageLink[],
   navPath: string
 ): PageRecord => ({
+  anchors: [],
   contentType: "doc",
   format: "mdx",
   groups: [],

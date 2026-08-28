@@ -142,8 +142,13 @@ const buildLocaleNavigation = (
   // header tab points to its in-locale route (e.g. `/docs` -> `/fr/docs`);
   // external paths pass through. Selectors are left alone: a language
   // selector's items intentionally target specific locales.
+  // `//host/path` is protocol-relative — an external URL that happens to start
+  // with a slash, so it must not pick up a locale prefix. `withBasePath` draws
+  // the same line for the same reason.
   const localizePath = (path: string): string =>
-    path.startsWith("/") ? localizeRoute(path, code, i18n) : path;
+    path.startsWith("/") && !path.startsWith("//")
+      ? localizeRoute(path, code, i18n)
+      : path;
   const tabs = resolveTabLabels(
     options.navigation.tabs,
     code,
@@ -178,17 +183,22 @@ const buildLocaleNavigation = (
   // version dir is hoisted in front (`v1.0/fr`), matching `discoverFolderMeta`.
   const localeDir =
     i18n.parser === "dir" && code !== i18n.defaultLocale ? code : "";
+  // Internal featured and header hrefs are localized like tab paths — a pinned
+  // `/changelog` link rendered on `/fr/…` pages must stay inside the reader's
+  // locale, not kick them back to the default one.
+  const localizeHref = <T extends { href: string }>(item: T): T => ({
+    ...item,
+    href: localizePath(item.href),
+  });
+  const { actions, cta, featured } = options.navigation;
+
   return buildNavigation(localePages, {
+    actions: actions?.map(localizeHref),
     basePath: options.basePath ?? "",
+    cta: cta ? localizeHref(cta) : null,
     diagnostics,
     display: options.navigation.sidebar.display,
-    // Internal featured hrefs are localized like tab paths — a pinned
-    // `/changelog` link rendered on `/fr/…` pages must stay inside the
-    // reader's locale, not kick them back to the default one.
-    featured: options.navigation.featured?.map((link) => ({
-      ...link,
-      href: localizePath(link.href),
-    })),
+    featured: featured?.map(localizeHref),
     folderMeta: options.folderMeta,
     // The localized tree root ("/" for the hidden default, "/fr" otherwise;
     // "/fr/v1.0" inside a snapshot): the tab pointing here spans the whole
@@ -283,7 +293,9 @@ const buildVersionNavigation = (
   }
   return {
     "": buildNavigation(versionPages, {
+      actions: options.navigation.actions,
       basePath: options.basePath ?? "",
+      cta: options.navigation.cta,
       diagnostics,
       display: options.navigation.sidebar.display,
       featured: options.navigation.featured,
@@ -328,7 +340,9 @@ export const buildContentGraph = (
     ));
   } else {
     navigation = buildNavigation(currentPages, {
+      actions: options.navigation.actions,
       basePath: options.basePath ?? "",
+      cta: options.navigation.cta,
       diagnostics,
       display: options.navigation.sidebar.display,
       featured: options.navigation.featured,

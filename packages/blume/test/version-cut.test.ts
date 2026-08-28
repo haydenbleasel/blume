@@ -212,6 +212,34 @@ describe("cutVersion", () => {
     expect(french).toContain("[X](/fr/v1.0/guides/x)");
   });
 
+  it("leaves a staged source's pages alone even when its files sit under the content root", async () => {
+    const root = await makeProject({
+      "blume.config.ts": `export default {
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs", exclude: ["vault/**"] },
+      { type: "obsidian", vault: "docs/vault" },
+    ],
+  },
+  versions: { archived: [], current: { label: "v2.0" } },
+};
+`,
+      "docs/index.mdx": "---\ntitle: Home\n---\n# Home\n\n[Note](/note)\n",
+      "docs/vault/Note.md": "# Note\n\n[[Note]]\n",
+    });
+    const result = await cutVersion(root, "v1.0");
+    // The vault note is served from the vault, not from the snapshot copy,
+    // so it keeps publishing as current: a link to it is not versionized.
+    const home = await readFile(join(root, "docs/v1.0/index.mdx"), "utf-8");
+    expect(home).toContain("[Note](/note)");
+    expect(result.rewritten).toEqual([]);
+    // Nor is the vault copied: the filesystem source's root-anchored
+    // `vault/**` exclude would not match `v1.0/vault/**`, and the snapshot
+    // would publish the raw note — wikilink intact — as a page of its own.
+    expect(existsSync(join(root, "docs/v1.0/vault"))).toBe(false);
+    expect(result.copied).toBe(1);
+  });
+
   it("falls back to an archived-entry snippet when the config resists surgery", async () => {
     const root = await makeProject({
       // The archived array is computed, so there is no `archived: [` literal

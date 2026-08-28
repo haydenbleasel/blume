@@ -11,6 +11,7 @@ import {
   isGraphqlOperationKind,
 } from "../../openapi/graphql.ts";
 import { highlightCode } from "../../markdown/index.ts";
+import { DEPRECATED_LABEL_CLASS } from "../colors.ts";
 import {
   exampleQuery,
   exampleResponse,
@@ -118,7 +119,7 @@ const returnRoute = field ? routes.get(field.type.name) : undefined;
           {field.name}
         </code>
         {field.deprecationReason !== undefined && (
-          <span class="font-medium text-[0.625rem] text-orange-600 uppercase tracking-wide dark:text-orange-400">
+          <span class={DEPRECATED_LABEL_CLASS}>
             deprecated
           </span>
         )}

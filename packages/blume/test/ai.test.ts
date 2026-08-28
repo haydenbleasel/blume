@@ -63,6 +63,7 @@ const makePage = (
   title: string,
   over: Partial<PageRecord> = {}
 ): PageRecord => ({
+  anchors: [],
   contentType: "doc",
   format: "md",
   groups: [],
@@ -1010,6 +1011,60 @@ describe("buildAskData", () => {
     expect(doc?.content).toContain(
       '<Visibility for="web">Sample markup.</Visibility>'
     );
+  });
+
+  it("downlevels components, like every other agent-facing surface", async () => {
+    const proj: Partial<BlumeProject> = {
+      config: blumeConfigSchema.parse({ title: "Docs" }),
+      // SAFETY: buildAskData reads only `root` from the context.
+      context: { root } as ProjectContext,
+      // SAFETY: buildAskData reads only `graph.pages`.
+      graph: { pages: [makePage("t.md", "/t", "Table")] } as ContentGraph,
+      // SAFETY: buildAskData reads only the manifest routes.
+      manifest: {
+        routes: [
+          askRoute({
+            id: "t.md",
+            path: "/t",
+            sourcePath: join(root, "t.md"),
+            title: "Table",
+          }),
+        ],
+      } as BlumeManifest,
+    };
+    // SAFETY: buildAskData touches only config, context, graph, and manifest.
+    const data = await buildAskData(proj as BlumeProject);
+    const doc = data.documents.find((entry) => entry.route === "/t");
+    expect(doc?.content).toContain("> **Warning**");
+    expect(doc?.content).toContain("Mind the gap.");
+    expect(doc?.content).not.toContain("<Callout");
+  });
+
+  it("puts the page's front matter in scope for prop expressions", async () => {
+    const proj: Partial<BlumeProject> = {
+      config: blumeConfigSchema.parse({ title: "Docs" }),
+      // SAFETY: buildAskData reads only `root` from the context.
+      context: { root } as ProjectContext,
+      // SAFETY: buildAskData reads only `graph.pages`.
+      graph: { pages: [makePage("f.md", "/f", "Lifecycle")] } as ContentGraph,
+      // SAFETY: buildAskData reads only the manifest routes.
+      manifest: {
+        routes: [
+          askRoute({
+            id: "f.md",
+            path: "/f",
+            sourcePath: join(root, "f.md"),
+            title: "Lifecycle",
+          }),
+        ],
+      } as BlumeManifest,
+    };
+    // SAFETY: buildAskData touches only config, context, graph, and manifest.
+    const data = await buildAskData(proj as BlumeProject);
+    const doc = data.documents.find((entry) => entry.route === "/f");
+    // `title={frontmatter.status}` resolves because the body is downleveled
+    // where the front matter it was stripped from is still in scope.
+    expect(doc?.content).toContain("> **retracted**");
   });
 });
 

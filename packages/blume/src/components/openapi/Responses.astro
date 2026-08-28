@@ -1,4 +1,5 @@
 ---
+import { statusColor } from "../colors.ts";
 import type { SchemaLike } from "./helpers.ts";
 import SchemaTable from "./SchemaTable.astro";
 
@@ -18,22 +19,6 @@ interface Props {
 }
 
 const { responses, schemas, expandAll = false } = Astro.props;
-
-const statusColor = (status: string): string => {
-  if (status.startsWith("2")) {
-    return "bg-green-500/15 text-green-700 dark:text-green-300";
-  }
-  if (status.startsWith("3")) {
-    return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
-  }
-  if (status.startsWith("4")) {
-    return "bg-orange-500/15 text-orange-700 dark:text-orange-300";
-  }
-  if (status.startsWith("5")) {
-    return "bg-red-500/15 text-red-700 dark:text-red-300";
-  }
-  return "bg-muted text-muted-foreground";
-};
 
 const items = Object.entries(responses);
 ---

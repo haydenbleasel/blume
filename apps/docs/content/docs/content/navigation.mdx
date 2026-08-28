@@ -240,6 +240,21 @@ navigation: {
 
 Each item is a page route (a string), a group (`label` + `items`), or a link (`label` + `href`). Groups can nest, override the global [`display` mode](#display-modes), and start `collapsed`.
 
+## Header actions
+
+`navigation.actions` puts plain links in the header, left of the icon buttons, and `navigation.cta` is the one filled button:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  actions: [{ href: "/changelog", label: "Changelog" }],
+  cta: { href: "https://example.com/signup", label: "Start free" },
+}
+```
+
+`cta` is singular on purpose — a docs header has room for exactly one thing a reader is being asked to do, and a row of buttons asks for nothing. Secondary links belong in `actions`, or in [`featured`](#featured-links) if they should sit with the sidebar instead.
+
+An `http(s)` or protocol-relative href opens in a new tab; a route stays in the tab, and is validated against your pages at build time like a `featured` link — so a page served by another app on the same host (`/signup` on the product, say) should be written as an absolute URL. `actions` are hidden below the `sm` breakpoint, where the header has room for the logo and the navigation toggle and nothing else. `cta` hides there too, except on a page with no navigation toggle — a landing page on `PageLayout` with no tabs — where it stays, since nothing else can surface it on a phone.
+
 ## Repository link
 
 When you set [`github`](/docs/configuration) in your config, Blume shows a GitHub icon in the header — beside the theme toggle — that links to your repository. It's on by default; hide it with `navigation.repo`:
@@ -251,6 +266,16 @@ navigation: {
 ```
 
 The link only appears when `github` is configured, so projects without a repo are unaffected either way.
+
+`repo` also takes an absolute URL, which points the header mark anywhere on GitHub:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  repo: "https://github.com/acme",
+}
+```
+
+That's for a project whose docs repo is private. `github` drives the per-page edit link, the header mark and the [agent manifest](/docs/configuration/ai)'s repository together, so such a project has to leave `github` unset — and a URL is what lets it still show a mark pointing somewhere public. The icon stays the GitHub mark, so a link to another host belongs in [`actions`](#header-actions).
 
 ## Breadcrumbs and pagination
 

@@ -63,6 +63,17 @@ export const isInternalPath = (target: string): boolean =>
   target.startsWith("/") && !target.startsWith("//");
 
 /**
+ * Whether a rendered link should open in a new tab: an absolute http(s) URL or
+ * a protocol-relative one (`//host/path`). Other schemes (`mailto:`, `tel:`)
+ * also leave the site but hand off to another application, where a `_blank`
+ * target only opens an empty tab beside it. The one predicate behind every
+ * chrome link, so a header action and a sidebar featured link treat the same
+ * href alike.
+ */
+export const isExternalUrl = (target: string): boolean =>
+  /^https?:\/\//iu.test(target) || target.startsWith("//");
+
+/**
  * Idempotently prepend `basePath` to a root-relative route. A route already
  * equal to or nested under the base is returned unchanged, so authors who write
  * the base by hand (`/docs/x`) aren't double-prefixed to `/docs/docs/x`.

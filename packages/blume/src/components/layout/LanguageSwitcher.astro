@@ -20,7 +20,7 @@ const menuRowClass =
 
 {
   options.length > 1 && (
-    <details class="group relative">
+    <details class="group relative" data-blume-dropdown>
       <summary
         aria-label={label}
         class={`${iconButton} list-none [&::-webkit-details-marker]:hidden`}
@@ -56,3 +56,11 @@ const menuRowClass =
     </details>
   )
 }
+
+<script>
+  import { installDropdownDismiss } from "../dropdown-dismiss.ts";
+
+  // Outside-click / Escape / focus-out dismissal, shared with the nav
+  // selectors and the page actions.
+  installDropdownDismiss();
+</script>

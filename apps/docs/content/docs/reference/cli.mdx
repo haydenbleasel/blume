@@ -122,7 +122,8 @@ Without a project `tsconfig.json`, only the generated runtime is checked.
 `blume validate` checks every link discovered in your content:
 
 - **Internal page links** (`/guides/intro`, `./sibling`) must resolve to a real page — broken ones are reported as errors.
-- **Anchor links** (`#section`, `/guides/intro#setup`) must match a heading on the target page — misses are warnings.
+- **Anchor links** (`#section`, `/guides/intro#setup`) must match an anchor on the target page — a heading's id (generated or [pinned](/docs/content/syntax#custom-anchors)) or a raw HTML element's `id` attribute — with misses reported as warnings. Ids inside code blocks, inline code, HTML comments, and `<Prompt>` blocks don't count.
+
 - **Asset links** are checked where the file lives: an absolute path (`/logo.png`) against the `public/` directory, a relative image embed (`![](./diagram.png)`) against the page's own folder. A plain link to a relative path still resolves as a site route — only image embeds go through the image pipeline.
 - **External links** are only checked with `--external` (off by default since it requires the network); dead links (404/410/unreachable) are errors, while rate-limited or transient responses (403/429/5xx/timeout) are warnings.
 

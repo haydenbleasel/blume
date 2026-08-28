@@ -20,6 +20,7 @@ import { buildManifest } from "../src/core/manifest.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
 import type { BlumeConfigInput, PageMetaInput } from "../src/core/schema.ts";
+import { scanBody } from "../src/core/sources/normalize.ts";
 import type {
   ContentGraph,
   PageRecord,
@@ -47,6 +48,7 @@ const buildSitemap = (project: BlumeProject): string | null =>
 const manyPages = (count: number): PageRecord[] => {
   const meta = pageMetaSchema.parse({});
   return Array.from({ length: count }, (_, index) => ({
+    anchors: [],
     contentType: "doc",
     format: "mdx" as const,
     groups: [],
@@ -73,6 +75,7 @@ const chunkUrls = (xml: string): number => xml.split("<url>").length - 1;
 const makePage = (
   over: Pick<PageRecord, "id" | "route" | "title"> & Partial<PageRecord>
 ): PageRecord => ({
+  anchors: [],
   contentType: "doc",
   format: "mdx",
   groups: [],
@@ -498,6 +501,12 @@ describe(slugify, () => {
 });
 
 describe(extractHeadings, () => {
+  it("uses curly explicit ids without exposing their markers", () => {
+    expect(extractHeadings("## Record model {#record-model}")).toStrictEqual([
+      { depth: 2, slug: "record-model", text: "Record model" },
+    ]);
+  });
+
   it("extracts headings and skips fenced code", () => {
     const body = ["# Title", "```", "## Not a heading", "```", "## Real"].join(
       "\n"
@@ -794,6 +803,79 @@ describe(extractHeadings, () => {
       "## Real",
     ].join("\n");
     expect(extractHeadings(body).map((h) => h.text)).toStrictEqual(["Real"]);
+  });
+});
+
+describe(scanBody, () => {
+  it("collects raw HTML ids outside fenced examples, deduplicated", () => {
+    const body = [
+      '<a id="restart-abandonment"></a>',
+      "```html",
+      '<span id="example-only"></span>',
+      "```",
+      "<div id='details'>Details</div>",
+      '<div id="details">Again</div>',
+    ].join("\n");
+    expect(scanBody(body).anchors).toStrictEqual([
+      "restart-abandonment",
+      "details",
+    ]);
+  });
+
+  it("ignores ids that never reach the DOM", () => {
+    const body = [
+      'Use `<a id="documented"></a>` to make anchors.',
+      '<!-- <a id="commented"></a> -->',
+      "<!--",
+      '<a id="multi-line-comment"></a>',
+      "-->",
+      // A capitalized tag is a component: its `id` is a prop, not a DOM id.
+      '<YouTube id="aqz-KE-bpKQ" title="x" />',
+      "<Prompt>",
+      '<a id="hidden"></a>',
+      "</Prompt>",
+      '<p data-id="attribute-suffix">x</p>',
+    ].join("\n");
+    expect(scanBody(body).anchors).toStrictEqual([]);
+  });
+
+  it("matches wrapped tags and unquoted or JSX-quoted ids", () => {
+    const body = [
+      "<div",
+      '  id="install"',
+      '  class="x"',
+      ">",
+      "<a id=plain></a>",
+      '<section id={"expr"}>',
+    ].join("\n");
+    expect(scanBody(body).anchors).toStrictEqual(["install", "plain", "expr"]);
+  });
+
+  it("records unescaped {#id} markers with their body line", () => {
+    const body = [
+      "---",
+      "title: x",
+      "---",
+      "## A {#a}",
+      "",
+      "B {#b}",
+      "---",
+      // Escaped braces are the same marker but compile in .mdx — not recorded.
+      "## C \\{#c\\}",
+      "## D {#d} [toc]",
+      "```",
+      "## E {#e}",
+      "```",
+      "## {#f}",
+    ].join("\n");
+    const scan = scanBody(body);
+    expect(scan.curlyMarkers).toStrictEqual([
+      { id: "a", line: 4 },
+      { id: "b", line: 6 },
+      { id: "d", line: 9 },
+      { id: "f", line: 13 },
+    ]);
+    expect(scan.headings.map((h) => h.slug)).toContain("c");
   });
 });
 

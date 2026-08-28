@@ -8,6 +8,7 @@ import { filesystemSource } from "./filesystem.ts";
 import { githubReleasesSource } from "./github-releases.ts";
 import { mdxRemoteSource } from "./mdx-remote.ts";
 import { notionSource } from "./notion.ts";
+import { obsidianSource } from "./obsidian.ts";
 import { sanitySource } from "./sanity.ts";
 import type { ContentSource, SourceContext } from "./types.ts";
 
@@ -47,9 +48,25 @@ const sourceContext = (
   refresh: runtime.refresh ?? runtime.mode === "build",
 });
 
+/**
+ * The frontmatter keys each content type declares (`content.types[*].frontmatter`),
+ * keyed by type — so a source that drops unknown keys keeps, per note, exactly
+ * the ones `normalizeEntry` will accept for that note's type.
+ */
+const typeFrontmatterKeys = (
+  config: ResolvedConfig
+): Record<string, string[]> =>
+  Object.fromEntries(
+    Object.entries(config.content.types).map(([type, def]) => [
+      type,
+      Object.keys(def.frontmatter),
+    ])
+  );
+
 const buildSource = (
   def: ContentSourceConfig,
   name: string,
+  config: ResolvedConfig,
   context: ProjectContext,
   runtime: SourceRuntime
 ): ContentSource => {
@@ -93,6 +110,22 @@ const buildSource = (
         prefix: def.prefix,
         properties: def.properties,
         publishedValue: def.publishedValue,
+      },
+      sourceContext(context, name, runtime)
+    );
+  }
+  if (def.type === "obsidian") {
+    return obsidianSource(
+      {
+        defaultType: config.content.defaultType,
+        exclude: def.exclude,
+        frontmatterKeys: Object.keys(config.frontmatter.extend),
+        i18n: config.i18n,
+        name,
+        prefix: def.prefix,
+        typeFrontmatterKeys: typeFrontmatterKeys(config),
+        vault: def.vault,
+        versions: config.versions,
       },
       sourceContext(context, name, runtime)
     );
@@ -198,7 +231,7 @@ const contentSources = (
 
   const nameFor = uniqueNamer();
   return defs.map((def) =>
-    buildSource(def, nameFor(baseName(def)), context, runtime)
+    buildSource(def, nameFor(baseName(def)), config, context, runtime)
   );
 };
 

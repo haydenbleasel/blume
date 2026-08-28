@@ -15,6 +15,7 @@ export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
 /** The content-source kinds `init` can scaffold a config block for. */
 export const SOURCE_KINDS = [
   "filesystem",
+  "obsidian",
   "github-releases",
   "notion",
   "sanity",
@@ -209,8 +210,12 @@ export const titleize = (raw: string): string => {
         .join(" ");
 };
 
-/** True when any selected source is remote (everything except `filesystem`). */
-const hasRemoteSource = (sources: SourceKind[]): boolean =>
+/**
+ * True when any selected source needs an explicit `content.sources` array —
+ * everything except `filesystem`, which is what the implicit default already
+ * desugars to.
+ */
+const needsExplicitSources = (sources: SourceKind[]): boolean =>
   sources.some((source) => source !== "filesystem");
 
 /**
@@ -239,6 +244,14 @@ const SOURCE_SNIPPETS = {
         database: "your-database-id",
         prefix: "notion",
       },`,
+  obsidian: `      // An Obsidian vault, read in place. No export step, and no
+      // generated notes in your repo. Point \`vault\` at your vault directory,
+      // relative to this config file.
+      {
+        type: "obsidian",
+        vault: "vault",
+        prefix: "notes",
+      },`,
   sanity: `      // Documents from a Sanity dataset. Private datasets read SANITY_TOKEN
       // from the environment.
       {
@@ -258,7 +271,7 @@ const SOURCE_SNIPPETS = {
 const contentBlockFor = (answers: InitAnswers): string => {
   const sources =
     answers.sources.length === 0 ? ["filesystem" as const] : answers.sources;
-  if (!hasRemoteSource(sources)) {
+  if (!needsExplicitSources(sources)) {
     return answers.contentDir === "docs"
       ? ""
       : `
@@ -267,7 +280,7 @@ const contentBlockFor = (answers: InitAnswers): string => {
   },`;
   }
   // Explicit sources replace the implicit filesystem desugar, so the local
-  // content dir must be listed alongside the remote sources to stay included.
+  // content dir must be listed alongside the other sources to stay included.
   const entries = SOURCE_KINDS.filter((kind) => sources.includes(kind)).map(
     (kind) =>
       kind === "filesystem"
@@ -327,6 +340,16 @@ export const buildPlan = (
         .files(answers.contentDir)
         .map((file) => ({ ...file, path: join(root, file.path) }))
     );
+  }
+  // The obsidian snippet points at `vault/`; seed the directory with a first
+  // note so the scaffolded project passes the source's `validate()` and boots
+  // before the user has opened Obsidian at all.
+  if (answers.sources.includes("obsidian")) {
+    files.push({
+      content:
+        "# Welcome\n\nThis folder is read by Blume's `obsidian` source. Open it as a vault in Obsidian and write notes — `[[Wikilinks]]` become site links.\n",
+      path: join(root, "vault", "Welcome.md"),
+    });
   }
   return files;
 };

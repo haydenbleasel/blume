@@ -32,7 +32,7 @@ For each `_meta` entry (`key` = slug, value = string title or `{ title, type, di
 | `display: "hidden"` | frontmatter `sidebar.hidden: true` |
 | `type: "separator"` | drop → recreate as a `(Group)/` folder / `meta.ts` boundary if needed |
 | `type: "menu"` (navbar dropdown) | drop → recreate via `navigation.selectors` if wanted |
-| `href` (external link) | **`navigation.featured`** (`{ label, href, icon? }` — pinned above the sidebar on every route); only drop deep-nested ones (report) |
+| `href` (external link) | root-level → **`navigation.actions`** (`[{ label, href }]`, plain header links, matching Nextra's navbar placement) or **`navigation.featured`** (`{ label, href, icon? }` — pinned above the sidebar on every route, survives on phones); only drop deep-nested ones (report) |
 | `type: "page"` (subfolder, not root) | drop (only root → tabs) |
 | `theme: { collapsed }` on a folder | `meta.ts` `collapsed` |
 | `theme: { layout: "full" \| sidebar: false \| … }` | drop (report — no per-page layout switches) |

@@ -18,7 +18,8 @@ Read `themeConfig`, `presets`, and `plugins`:
 | `tagline` | `description` |
 | `themeConfig.navbar.title` / `.logo` | `title` / `logo` (move the image into `public/`) |
 | `themeConfig.navbar.items` (doc items) | `navigation.tabs` (for section links) |
-| `themeConfig.navbar.items` (external/utility links — Blog, GitHub, Discord…) | **`navigation.featured`** (`{ label, href, icon? }`, pinned above the sidebar on every route); the GitHub link → the `github` config instead |
+| `themeConfig.navbar.items` (external/utility links — Blog, Discord…) | **`navigation.actions`** (`[{ label, href }]`, plain header links) to keep them in the header, or **`navigation.featured`** (`{ label, href, icon? }`, pinned above the sidebar on every route) if they should survive on phones; the GitHub link → the `github` config instead |
+| `themeConfig.navbar.items` (a `className`-styled button — "Get started", "Sign up") | **`navigation.cta`** (`{ label, href }`, the header's one filled button; a route the docs don't serve must be an absolute URL) |
 | `themeConfig.colorMode.defaultMode` | `theme.mode` (`respectPrefersColorScheme: true` → `"system"`) |
 | `themeConfig.prism.theme` / `.darkTheme` | `markdown.codeBlocks.theme: { light, dark }` (map Prism theme names to Shiki themes, e.g. `github`/`github-dark`) |
 | `themeConfig.metadata` / `themeConfig.image` | per-page `seo` frontmatter / `seo.og`; report what doesn't fit |

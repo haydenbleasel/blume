@@ -350,6 +350,63 @@ describe("normalizeEntry", () => {
     ]);
   });
 
+  it("reports an unescaped {#id} heading marker in an .mdx page at its raw line", () => {
+    const { pages, diagnostics } = normalizeEntry(
+      {
+        body: { format: "mdx", text: "\n## Record model {#record-model}\n" },
+        data: {},
+        raw: "---\ntitle: X\n---\n\n## Record model {#record-model}\n",
+        ref: "x.mdx",
+        sourcePath: "/abs/x.mdx",
+      },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    // The scan still pins the id; the diagnostic is what says it won't compile.
+    expect(pages[0]?.headings.map((h) => h.slug)).toStrictEqual([
+      "record-model",
+    ]);
+    expect(diagnostics).toStrictEqual([
+      {
+        code: "BLUME_MDX_CURLY_ANCHOR",
+        file: "/abs/x.mdx",
+        line: 5,
+        message:
+          "`{#record-model}` is a JSX expression in .mdx, so this page fails to compile.",
+        severity: "error",
+        suggestion:
+          "Write `[#record-model]` or escape it as `\\{#record-model\\}` — both pin the same anchor in .md and .mdx.",
+      },
+    ]);
+  });
+
+  it("accepts {#id} in .md pages and the escaped form in .mdx", () => {
+    const md = normalizeEntry(
+      { body: { format: "md", text: "## A {#a}\n" }, data: {}, ref: "a.md" },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    const escaped = normalizeEntry(
+      {
+        body: { format: "mdx", text: "## A \\{#a\\}\n" },
+        data: {},
+        ref: "a.mdx",
+      },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    expect(md.diagnostics).toStrictEqual([]);
+    expect(escaped.diagnostics).toStrictEqual([]);
+    expect(md.pages[0]?.headings[0]?.slug).toBe("a");
+    expect(escaped.pages[0]?.headings[0]?.slug).toBe("a");
+  });
+
+  it("names a path-less remote .mdx entry by source and ref in the {#id} diagnostic", () => {
+    const { diagnostics } = normalizeEntry(
+      { body: { format: "mdx", text: "## A {#a}\n" }, data: {}, ref: "a.mdx" },
+      { defaultType: "doc", source: { name: "cms", staged: false } }
+    );
+    expect(diagnostics[0]?.file).toBe("cms:a.mdx");
+    expect(diagnostics[0]?.line).toBe(1);
+  });
+
   it("reports a diagnostic for invalid frontmatter", () => {
     const { pages, diagnostics } = normalizeEntry(
       {

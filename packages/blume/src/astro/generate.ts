@@ -14,7 +14,15 @@ import { pathToFileURL } from "node:url";
 
 import { imageSize } from "image-size";
 import pMap from "p-map";
-import { basename, dirname, join, normalize, relative, resolve } from "pathe";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+  resolve,
+} from "pathe";
 import { glob } from "tinyglobby";
 
 import { buildAskData } from "../ai/ask-data.ts";
@@ -25,7 +33,10 @@ import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { validateUsedComponents } from "../core/component-diagnostics.ts";
 import { analyzeComponentOverrides } from "../core/component-overrides.ts";
-import { collectContentAssets } from "../core/content-assets.ts";
+import {
+  collectContentAssets,
+  rewriteRelativeImages,
+} from "../core/content-assets.ts";
 import type {
   BlumeBanner,
   BlumeData,
@@ -807,7 +818,19 @@ export const collectStaged = (project: BlumeProject): Map<string, string> => {
   const staged = new Map<string, string>();
   for (const page of project.graph.pages) {
     if (page.collection === "staged" && page.entryId && page.body) {
-      staged.set(page.entryId, page.body.text);
+      // A colocated `./image.png` reference resolves against `.blume/content`
+      // once the body is materialized there, where the file does not exist.
+      // Point it at the served original instead — the same rewrite the
+      // agent-facing Markdown gets.
+      const text = page.sourcePath
+        ? rewriteRelativeImages({
+            deployBase: project.config.deployment.base,
+            projectRoot: project.context.root,
+            source: page.body.text,
+            sourcePath: page.sourcePath,
+          })
+        : page.body.text;
+      staged.set(page.entryId, text);
     }
   }
   return staged;
@@ -879,6 +902,22 @@ const readLogoSvg = (
 /** Narrows a config union's string shorthand from its object form. */
 const isStringShorthand = <T>(value: T | string): value is string =>
   typeof value === "string";
+
+/**
+ * The URL behind the header's repo mark. A string is used as-is: `github`
+ * drives the per-page edit link, the header mark and the manifest's
+ * `repository` together, so a project whose docs repo is private has to unset
+ * all three, and would otherwise have no way to point the mark at anything.
+ */
+const headerRepoUrl = (
+  repo: boolean | string,
+  derived: string | null
+): string | null => {
+  if (isStringShorthand(repo)) {
+    return repo;
+  }
+  return repo ? derived : null;
+};
 
 /**
  * Resolve the configured logo. A single SVG is read and inlined so a
@@ -1145,7 +1184,18 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       return null;
     }
     const rel = relative(context.root, sourcePath).split("\\").join("/");
-    const editPath = github?.dir ? `${github.dir}/${rel}` : rel;
+    // The edit path is repo-relative: `github.dir` places the project inside
+    // the repo, so a source above the project dir (a monorepo vault beside the
+    // docs app) still resolves to an in-repo file. A path that escapes the
+    // repo itself has nothing to edit — fabricating one yields a 404 link.
+    // `dir` is a bare string in the schema, so a leading slash (`/apps/docs`)
+    // is trimmed rather than read as an absolute path — which would drop the
+    // link from every page of a site that has always written it that way.
+    const editDir = (github?.dir ?? "").replaceAll(/^\/+|\/+$/gu, "");
+    const editPath = normalize(editDir ? join(editDir, rel) : rel);
+    if (editPath.startsWith("..") || isAbsolute(editPath)) {
+      return null;
+    }
     return `${editBase}/${editPath}`;
   };
 
@@ -1154,9 +1204,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
   // Resolve the header repo link per locale. API references no longer add a tab
   // automatically — authors point a `navigation.tabs` entry at the reference
   // route to surface it (see `referenceRoutes`).
+  const markUrl = headerRepoUrl(config.navigation.repo, repoUrl);
   const withRepoUrl = (nav: Navigation): Navigation => ({
     ...nav,
-    repoUrl: config.navigation.repo && repoUrl ? repoUrl : null,
+    repoUrl: markUrl,
   });
 
   // Resolved UI dictionaries: one per locale under i18n, English baseline
@@ -1185,6 +1236,8 @@ export const buildRuntimeData = (project: BlumeProject): string => {
           code,
           withRepoUrl(
             graph.navigationByLocale[code] ?? {
+              actions: [],
+              cta: null,
               featured: [],
               selectors: [],
               sidebar: [],

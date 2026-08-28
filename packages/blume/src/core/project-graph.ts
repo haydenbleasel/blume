@@ -1,4 +1,4 @@
-import { relative } from "pathe";
+import { isAbsolute, relative } from "pathe";
 
 import { loadConfig } from "./config.ts";
 import { applyDeploymentEnv } from "./deployment-env.ts";
@@ -7,6 +7,7 @@ import { i18nDiagnostics } from "./i18n.ts";
 import { expandIncludes, hasIncludeStatements } from "./includes.ts";
 import {
   gitLastModifiedTimes,
+  gitRepositoryRoot,
   lastModifiedShallowWarning,
   resolveLastModifiedConfig,
 } from "./last-modified.ts";
@@ -42,6 +43,15 @@ export interface ConfigOverrides {
   /** Override `deployment.output` (`blume build --output`). */
   output?: ResolvedConfig["deployment"]["output"];
 }
+
+/**
+ * Whether `path` sits at or under `dir`. A relative result that is itself
+ * absolute means a different drive root on Windows, which is outside too.
+ */
+export const isWithin = (dir: string, path: string): boolean => {
+  const rel = relative(dir, path);
+  return !(rel.startsWith("..") || isAbsolute(rel));
+};
 
 /** Apply CLI config overrides onto a resolved config (returns a new object). */
 const applyConfigOverrides = (
@@ -327,13 +337,21 @@ export const scanProject = async (
     const fsPaths = pages
       .map((page) => page.sourcePath)
       .filter((path): path is string => path !== undefined);
-    // The git pathspecs must cover where the pages actually live: each
-    // filesystem source's own root, which diverges from the global
-    // `content.root` when a source configures a non-default `root`.
-    const contentRoots = sources.flatMap((source) =>
-      source.staged || !source.contentRoot ? [] : [source.contentRoot]
+    // The git pathspecs must cover where the pages actually live: each local
+    // source's own on-disk root — a filesystem source's `root`, or a staged
+    // local source's tree (an Obsidian vault) — which diverges from the global
+    // `content.root`. A root outside the repository would fail the log outright
+    // and can never yield dates, so those are dropped up front.
+    const gitRoot = gitRepositoryRoot(context.root);
+    const contentRoots = sources
+      .flatMap((source) => (source.contentRoot ? [source.contentRoot] : []))
+      .filter((dir) => gitRoot !== null && isWithin(gitRoot, dir));
+    const gitTimes = gitLastModifiedTimes(
+      context.root,
+      contentRoots,
+      fsPaths,
+      gitRoot
     );
-    const gitTimes = gitLastModifiedTimes(context.root, contentRoots, fsPaths);
     for (const page of pages) {
       if (!page.lastModified && page.sourcePath) {
         page.lastModified = gitTimes.get(page.sourcePath);
@@ -341,8 +359,14 @@ export const scanProject = async (
     }
     // A shallow CI clone (Vercel, actions/checkout) silently drops most dates;
     // surface that instead of letting production diverge from local builds.
+    // Only pages the log could have dated count — a page outside every covered
+    // root stays undated no matter how deep the clone is, and the warning's
+    // suggested fix cannot help it.
     const undated = pages.filter(
-      (page) => page.sourcePath && !page.lastModified
+      (page) =>
+        page.sourcePath &&
+        !page.lastModified &&
+        contentRoots.some((dir) => isWithin(dir, page.sourcePath ?? ""))
     ).length;
     lastModifiedWarnings.push(
       ...lastModifiedShallowWarning(context.root, undated)

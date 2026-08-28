@@ -10,7 +10,8 @@ import type { AskData } from "./ask-context.ts";
  * content is kept as Markdown so grounding sees fenced code examples — the model
  * answers "what does the config look like?" from the docs instead of declining.
  * The reader is an AI agent, so `<Visibility>` resolves for the agents audience
- * (web-only content removed, agents-only unwrapped), matching llms-full.txt.
+ * (web-only content removed, agents-only unwrapped) and components downlevel to
+ * Markdown, both matching llms-full.txt.
  */
 export const buildAskData = async (project: BlumeProject): Promise<AskData> => {
   const documents = await buildSearchDocuments(project, {

@@ -39,25 +39,40 @@ test("the skip link is the first focusable element", async ({ page }) => {
   expect(focused).toMatch(/skip to content/iu);
 });
 
-/** Contrast on real article content (excluding code, whose syntax colors are
- * theme-defined) must meet AA in both themes. */
+/**
+ * Contrast on real article content and the sidebar must meet AA in both
+ * themes. Left out, as design decisions this gate can't blanket-AA: syntax
+ * tokens (`pre` and `<blume-diff>` blocks) and brand-accent text and fills
+ * (`text-accent`, `bg-accent`).
+ */
 const contentContrast = (page: Page) =>
   new AxeBuilder({ page })
     .include("main")
+    .include("[data-blume-nav-drawer]")
     .exclude("pre")
+    .exclude("blume-diff")
+    .exclude(".text-accent")
+    .exclude(".bg-accent")
     .withRules(["color-contrast"])
     .analyze();
 
-test("content text meets AA contrast in light and dark", async ({ page }) => {
-  await page.goto("/docs/quickstart");
-  const light = await contentContrast(page);
-  expect(light.violations, "light mode").toEqual([]);
+// The components page renders every `<Badge>` variant, typed cards, and
+// callouts — the tinted labels whose light-mode values are hand-tuned to the
+// AA bar — so a regression in one of those tables fails here.
+for (const path of ["/docs/quickstart", "/docs/content/components"]) {
+  test(`text meets AA contrast in light and dark on ${path}`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    const light = await contentContrast(page);
+    expect(light.violations, "light mode").toEqual([]);
 
-  await page.locator("[data-blume-theme-toggle]").first().click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  const dark = await contentContrast(page);
-  expect(dark.violations, "dark mode").toEqual([]);
-});
+    await page.locator("[data-blume-theme-toggle]").first().click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    const dark = await contentContrast(page);
+    expect(dark.violations, "dark mode").toEqual([]);
+  });
+}
 
 test("renders under reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });

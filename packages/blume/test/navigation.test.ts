@@ -16,6 +16,7 @@ const page = (
   sidebar: PageMetaInput["sidebar"] = {},
   draft = false
 ): PageRecord => ({
+  anchors: [],
   contentType: "doc",
   format: "mdx",
   groups: [],
@@ -42,6 +43,7 @@ const changelogPage = (
   title: string,
   date: string
 ): PageRecord => ({
+  anchors: [],
   contentType: "changelog",
   format: "md",
   groups: [],
@@ -798,6 +800,7 @@ describe("buildNavigation — index title / folder meta title diagnostics", () =
     buildNavigation(
       [
         {
+          anchors: [],
           contentType: "doc",
           format: "mdx",
           groups: [],

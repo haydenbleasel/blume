@@ -24,6 +24,7 @@ import {
 import { buildStructuredData, toIso } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
 import { withBase } from "../islands/base-path.ts";
+import { isExternalUrl } from "../../core/base-path.ts";
 import Analytics from "./Analytics.astro";
 import WebMcp from "./WebMcp.astro";
 import Banner from "./Banner.astro";
@@ -581,7 +582,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
             >
               <ul class="m-0 list-none p-0">
                 {navigation.featured.map((link) => {
-                  const external = /^https?:\/\//u.test(link.href);
+                  const external = isExternalUrl(link.href);
                   return (
                     <li>
                       <a

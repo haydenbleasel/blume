@@ -2,6 +2,7 @@
 import Ask from "blume:ask";
 import data from "blume:data";
 import { withBase } from "../islands/base-path.ts";
+import { isExternalUrl } from "../../core/base-path.ts";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
@@ -120,6 +121,19 @@ const tabsNavClass = hasSidebar
 const iconButton =
   "inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
+// Header links: plain actions are secondary and hide below `sm`, where the
+// header has room for the logo and the drawer toggle and nothing else. The one
+// call to action hides there too — but only when a drawer toggle is actually
+// competing for the space. A page with no drawer (a PageLayout landing page
+// with no tabs) has nowhere else to surface it, so it stays. `withBase` passes
+// external, protocol-relative and fragment hrefs through untouched.
+const actionClass =
+  "hidden rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground sm:inline-flex";
+const ctaClass = [
+  showNavToggle ? "hidden sm:inline-flex" : "inline-flex",
+  "items-center gap-1 rounded-full bg-accent px-3.5 py-1.5 font-medium text-accent-foreground text-sm transition-opacity hover:opacity-90",
+].join(" ");
+
 // Delegated handlers for the theme toggle, mobile nav drawer, and banner
 // dismiss. Living with the header means every page that renders it — docs pages
 // and custom pages alike — gets identical behavior from one source.
@@ -212,6 +226,36 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
     )
   }
   <div class="flex items-center gap-2">
+    {
+      /* Plain links first, then the one filled button: the reader's eye lands
+         on the button because nothing beside it competes. */
+      (navigation.actions ?? []).map((action) => {
+        const external = isExternalUrl(action.href);
+        return (
+          <a
+            class={actionClass}
+            href={withBase(action.href)}
+            rel={external ? "noreferrer" : undefined}
+            target={external ? "_blank" : undefined}
+          >
+            {action.label}
+          </a>
+        );
+      })
+    }
+    {
+      navigation.cta && (
+        <a
+          class={ctaClass}
+          href={withBase(navigation.cta.href)}
+          rel={isExternalUrl(navigation.cta.href) ? "noreferrer" : undefined}
+          target={isExternalUrl(navigation.cta.href) ? "_blank" : undefined}
+        >
+          {navigation.cta.label}
+          <Icon name="chevron-right" size={14} />
+        </a>
+      )
+    }
     {
       navigation.repoUrl && (
         <a

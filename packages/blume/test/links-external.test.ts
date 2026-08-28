@@ -31,6 +31,7 @@ const graphWith = (links: PageLink[]): ContentGraph => ({
   navigationByVersion: {},
   pages: [
     {
+      anchors: [],
       contentType: "doc",
       format: "mdx",
       groups: [],

@@ -2,6 +2,11 @@ import type { Nodes } from "mdast";
 import { markdownToMdast, mdxToMdast } from "satteri";
 import type { MdxJsxAttributeUnion } from "satteri";
 
+import {
+  downlevelComponents,
+  exampleComponentSerializers,
+} from "../ai/component-markdown.ts";
+import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
 import matter from "../core/frontmatter.ts";
@@ -207,7 +212,9 @@ const collectText = (
       out.push(" ");
       return;
     }
-    // Trailing heading markers (`[#custom-id]`, `[!toc]`, `[toc]`) are anchor
+    // Trailing heading markers (`[#custom-id]`, `{#custom-id}`, `[!toc]`,
+    // `[toc]`) are anchor
+
     // metadata, not prose — strip them so they never pollute the index. Only
     // a marker that ends the heading's final plain-text child counts,
     // mirroring the renderer: a heading ending in inline code or an image
@@ -319,20 +326,29 @@ interface BuildOptions {
   audience?: VisibilityAudience;
 }
 
-/** Read a page's body (front matter off) and reduce it per the extraction options. */
+/**
+ * Read a page's body and reduce it per the extraction options: the
+ * `"markdown"` body is agent-facing, so its components are downleveled (with
+ * the page's front matter in scope for prop expressions); the plain body is
+ * parsed and walked to searchable text.
+ */
 const pageBody = async (
   project: BlumeProject,
   page: PageRecord | undefined,
   options: Pick<BuildOptions, "audience" | "content"> | undefined,
+  components: Record<string, ComponentMarkdown> | undefined,
   plain: PlainTextOptions
 ): Promise<string> => {
   if (!page) {
     return "";
   }
-  const source = matter(await readExpandedEntryText(project, page)).content;
-  const visible = applyAudienceVisibility(source, options?.audience ?? "web");
+  const parsed = matter(await readExpandedEntryText(project, page));
+  const visible = applyAudienceVisibility(
+    parsed.content,
+    options?.audience ?? "web"
+  );
   return options?.content === "markdown"
-    ? visible.trim()
+    ? downlevelComponents(visible.trim(), components, parsed.data)
     : toPlainText(visible, page.format, plain);
 };
 
@@ -349,6 +365,11 @@ const pageBody = async (
  * searchable text; `"markdown"` keeps the body's Markdown — code blocks, lists,
  * headings — for Ask AI grounding, where fenced examples are often the answer
  * and stripping them makes the model unable to cite content the docs do contain.
+ * The `"markdown"` body is agent-facing, so components are downleveled with the
+ * same serializers the `.md` mirror, llms-full.txt and MCP `get_page` use: a
+ * page whose body is a `<CardGroup>` of `<Card>`s is prose to a reader and bare
+ * JSX to anything reading the source, and section landing pages are exactly
+ * that shape.
  *
  * `audience` resolves `<Visibility>` blocks before extraction: `"web"`
  * (default) keeps web-only content and drops agents-only blocks — the site
@@ -399,10 +420,22 @@ export const buildSearchDocuments = async (
     return page ? contentIndexable(page, project.config) : false;
   });
 
+  // Serializers for the "markdown" extraction, layered the way
+  // `buildRawMarkdown` layers them: examples first, so a user
+  // `markdownComponents` entry of the same name still wins. Built once —
+  // `downlevelComponents` rebuilds its registry per call otherwise.
+  const components =
+    options?.content === "markdown"
+      ? {
+          ...exampleComponentSerializers(project.examples ?? {}),
+          ...project.config.ai.markdownComponents,
+        }
+      : undefined;
+
   return await Promise.all(
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
-      const body = await pageBody(project, page, options, plain);
+      const body = await pageBody(project, page, options, components, plain);
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       const facets = page ? pageFacets(page, project.config) : undefined;
