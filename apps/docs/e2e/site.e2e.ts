@@ -70,8 +70,8 @@ test.describe("custom pages", () => {
   });
 });
 
-test.describe("page actions", () => {
-  test("dropdowns close on an outside click and on Escape", async ({
+test.describe("dropdowns", () => {
+  test("page actions close on an outside click and on Escape", async ({
     page,
   }) => {
     await page.goto("/docs/quickstart");
@@ -96,5 +96,39 @@ test.describe("page actions", () => {
     await page.keyboard.press("Escape");
     await expect(open).toHaveCount(0);
     await expect(dropdown.locator("summary")).toBeFocused();
+  });
+
+  test("page actions close when keyboard focus leaves the panel", async ({
+    page,
+  }) => {
+    await page.goto("/docs/quickstart");
+    const actions = page.locator("[data-blume-page-actions]");
+    const dropdown = actions.locator("details").first();
+    const open = actions.locator("details[open]");
+
+    await dropdown.locator("summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(open).toHaveCount(1);
+    // From the last item, one more Tab leaves the panel out its far side.
+    const lastItem = dropdown
+      .locator("[data-blume-menu] :is(a, button)")
+      .last();
+    await lastItem.focus();
+    await expect(lastItem).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(open).toHaveCount(0);
+  });
+
+  test("the header language switcher closes on an outside click", async ({
+    page,
+  }) => {
+    await page.goto("/docs/quickstart");
+    const switcher = page
+      .locator("header details[data-blume-dropdown]")
+      .first();
+    await switcher.locator("summary").click();
+    await expect(switcher).toHaveAttribute("open");
+    await page.locator("#blume-content h1").click();
+    await expect(switcher).not.toHaveAttribute("open");
   });
 });

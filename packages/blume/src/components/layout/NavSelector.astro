@@ -2,8 +2,9 @@
 import { withBase } from "../islands/base-path.ts";
 // A top-level navigation selector: a dropdown that switches
 // between partitions of the site — a product, a version, or any grouped set of
-// destinations (`navigation.selectors` in the config). Zero-JS, built on
-// <details>/<summary> like the language switcher.
+// destinations (`navigation.selectors` in the config). Built on
+// <details>/<summary> like the language switcher; the only script is the
+// shared light-dismiss so an open panel doesn't linger over the page.
 import type { NavSelector } from "../../core/types.ts";
 import Icon from "../Icon.astro";
 import { isUnderPath } from "../../core/navigation.ts";
@@ -40,7 +41,7 @@ const menuRowClass =
 
 {
   selector.items.length > 0 && (
-    <details class="group relative">
+    <details class="group relative" data-blume-dropdown>
       <summary
         aria-label={selector.label}
         class={`${iconButton} list-none [&::-webkit-details-marker]:hidden`}
@@ -85,3 +86,11 @@ const menuRowClass =
     </details>
   )
 }
+
+<script>
+  import { installDropdownDismiss } from "../dropdown-dismiss.ts";
+
+  // Outside-click / Escape / focus-out dismissal, shared with the language
+  // switcher and the page actions.
+  installDropdownDismiss();
+</script>

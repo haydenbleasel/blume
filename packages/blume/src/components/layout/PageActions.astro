@@ -122,7 +122,7 @@ const menuRowClass =
 
   {
     (exportPdf || exportEpub) && (
-      <details class="group relative">
+      <details class="group relative" data-blume-dropdown>
         <summary
           class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
         >
@@ -159,7 +159,7 @@ const menuRowClass =
 
   {
     providers.length > 0 && (
-      <details class="group relative">
+      <details class="group relative" data-blume-dropdown>
         <summary
           class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
         >
@@ -199,7 +199,7 @@ const menuRowClass =
 
   {
     mcpUrl && (
-      <details class="group relative">
+      <details class="group relative" data-blume-dropdown>
         <summary
           class={`${rowClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
         >
@@ -252,6 +252,7 @@ const menuRowClass =
 
 <script>
   import { copyText, flashLabel } from "../copy-feedback.ts";
+  import { installDropdownDismiss } from "../dropdown-dismiss.ts";
   import { prefixBase } from "../islands/base-path.ts";
   import { rafThrottle } from "../raf-throttle.ts";
 
@@ -348,34 +349,9 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     })
   );
 
-  // A native <details> only closes when its own summary is clicked, so an open
-  // panel would linger over the page. Dismiss it like a real menu: any pointer
-  // press outside the open dropdown closes it. Registered at module scope for
-  // the same reason as the resize handler above.
-  document.addEventListener("pointerdown", (event) => {
-    const open = openDropdown();
-    if (!open) {
-      return;
-    }
-    const target = event.target;
-    if (target instanceof Node && open.contains(target)) {
-      return;
-    }
-    open.open = false;
-  });
-
-  // Escape closes the menu and returns focus to the trigger that opened it.
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") {
-      return;
-    }
-    const open = openDropdown();
-    if (!open) {
-      return;
-    }
-    open.open = false;
-    open.querySelector<HTMLElement>("summary")?.focus();
-  });
+  // Outside-click / Escape / focus-out dismissal is the shared <details>
+  // dropdown behavior (also the header language switcher and nav selectors).
+  installDropdownDismiss();
 
   // Per-page setup, run on the initial load and again after every
   // client-router swap: the swap rebuilds the actions menu from
