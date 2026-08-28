@@ -8,7 +8,11 @@ import { diagnosticsFromIssues, diagnosticsFromZod } from "../diagnostics.ts";
 import { occupySlug, parseHeadingMarkers } from "../heading-markers.ts";
 import { localePlacement, localizeRoute } from "../i18n.ts";
 import { pageMetaSchema } from "../schema.ts";
-import type { FrontmatterExtend, PageMeta } from "../schema.ts";
+import type {
+  FrontmatterExtend,
+  PageMeta,
+  ResolvedI18nConfig,
+} from "../schema.ts";
 import type { Diagnostic, Heading, PageLink, PageRecord } from "../types.ts";
 import { detectVersionRef, versionizeRoute } from "../versions.ts";
 import type { NormalizeContext, SourceEntry } from "./types.ts";
@@ -105,20 +109,18 @@ const addRouteSegment = (
 };
 
 /** URL + nav metadata mapped from one content-root-relative path. */
-export interface MappedRoute {
+interface MappedRoute {
   segments: string[];
   groups: string[];
   route: string;
 }
 
 /**
- * Convert a content-root-relative path into URL + nav metadata.
- *
- * Exported because a source that rewrites cross-note links must predict the
- * route this pipeline will assign — the Obsidian source turns `[[Note]]` into a
- * real href, and any second derivation of a route is a second answer.
+ * Convert a content-root-relative path into URL + nav metadata. Not exported:
+ * a source that needs to predict a route goes through
+ * {@link resolveEntryRoute}, so there is exactly one derivation.
  */
-export const mapRoute = (relativePath: string): MappedRoute => {
+const mapRoute = (relativePath: string): MappedRoute => {
   const withoutExt = relativePath.slice(
     0,
     relativePath.length - extname(relativePath).length
@@ -659,21 +661,122 @@ const trimSlashes = (value: string): string =>
   value.replaceAll(/^\/+|\/+$/gu, "");
 
 /** Whether a raw frontmatter value is a string (e.g. the `type` override). */
-const isStringValue = (value: SourceEntry["data"][string]): value is string =>
-  typeof value === "string";
+export const isStringValue = (
+  value: SourceEntry["data"][string]
+): value is string => typeof value === "string";
 
-/**
- * Mount a source-relative path under the source's route prefix. Exported
- * alongside {@link mapRoute} so a link-rewriting source composes the prefix the
- * same way this pipeline does, slashes and all.
- */
-export const withPrefix = (
-  prefix: string | undefined,
-  path: string
-): string => {
+/** Mount a source-relative path under the source's route prefix. */
+const withPrefix = (prefix: string | undefined, path: string): string => {
   const clean = prefix ? trimSlashes(prefix) : "";
   return clean ? `${clean}/${path}` : path;
 };
+
+/** What a route resolution needs from the owning source and the config. */
+export type RouteContext = Pick<NormalizeContext, "i18n" | "versions"> & {
+  /** The source's route prefix (`NormalizeContext["source"]["prefix"]`). */
+  prefix?: string;
+};
+
+/** Where an entry's ref places it once its directories are read off. */
+export interface EntryPlacement {
+  /**
+   * The locale codes the entry publishes in: `[""]` without i18n, one code for
+   * a placed file, every configured code for a shared `$` file.
+   */
+  locales: string[];
+  /** The ref with its version and locale directories stripped, prefix-less. */
+  navPath: string;
+  /** The version snapshot the entry belongs to (`""` for current). */
+  version: string;
+}
+
+/**
+ * Read the version and locale directories off an entry's ref. The version is
+ * detected first: a snapshot directory is outermost on disk
+ * (`v1.0/fr/page.mdx`), so the locale parser must see a version-stripped ref.
+ * The current version is `""` and lives at the root. Locale placement comes
+ * from the ref (a leading dir, or a filename suffix under the `dot` parser),
+ * never the slug — the slug is the logical, locale-agnostic path within a
+ * locale. A shared `$` file maps to every locale; a source without i18n
+ * placement maps to one.
+ */
+export const placeEntryRef = (
+  ref: string,
+  ext: string,
+  ctx: Pick<RouteContext, "i18n" | "versions">
+): EntryPlacement => {
+  const { version, rest } = ctx.versions
+    ? detectVersionRef(ref, ctx.versions)
+    : { rest: ref, version: "" };
+  const { navPath, locales } = ctx.i18n
+    ? localePlacement(rest, ext, ctx.i18n)
+    : { locales: [""], navPath: rest };
+  return { locales, navPath, version };
+};
+
+/** Everything `normalizeEntry` derives from an entry's ref and slug. */
+export interface EntryRoute extends Pick<
+  EntryPlacement,
+  "locales" | "version"
+> {
+  groups: string[];
+  /**
+   * The version-prefixed, locale-agnostic route — the translation key. Pass it
+   * through {@link localizedRoute} for the route one locale publishes at.
+   */
+  logicalRoute: string;
+  /** The prefixed, locale- and version-stripped nav path. */
+  navPath: string;
+  segments: string[];
+  /** The version-agnostic mapped route. */
+  versionKey: string;
+}
+
+/**
+ * The canonical route resolution, shared by {@link normalizeEntry} and any
+ * source that must predict the route an entry will publish at — the Obsidian
+ * source turns `[[Note]]` into a real href, and a second derivation of a route
+ * is a second answer.
+ *
+ * A frontmatter `slug` wins, then the adapter-supplied `entry.slug` (the typed
+ * SPI's "logical route input; defaults to ref if omitted"), then the ref. The
+ * extension is re-appended so `mapRoute`'s extname strip can't eat a dotted
+ * slug segment (`v1.2`). A slug that trims to nothing falls back. The version
+ * prefixes the mapped route *after* `mapRoute` runs: the mapped route is the
+ * version-agnostic key, the config id is prepended verbatim (never
+ * numeric-prefix-stripped), a frontmatter `slug` gets versionized so snapshots
+ * can't collide with the live page, and `translationKey` becomes
+ * version-specific for free. `basePath` is not applied here — it is outermost,
+ * after locale prefixing — so the result reads `{locale?}/{prefix?}/…`.
+ */
+export const resolveEntryRoute = (
+  entry: Pick<SourceEntry, "ref" | "slug">,
+  ext: string,
+  frontmatterSlug: string | undefined,
+  ctx: RouteContext
+): EntryRoute => {
+  const { locales, navPath, version } = placeEntryRef(entry.ref, ext, ctx);
+  const slugInput = frontmatterSlug ?? entry.slug;
+  const slug = slugInput ? trimSlashes(slugInput) : "";
+  const routeInput = withPrefix(ctx.prefix, slug ? `${slug}${ext}` : navPath);
+  const { segments, groups, route: versionKey } = mapRoute(routeInput);
+  return {
+    groups,
+    locales,
+    logicalRoute: versionizeRoute(versionKey, version),
+    navPath: withPrefix(ctx.prefix, navPath),
+    segments,
+    version,
+    versionKey,
+  };
+};
+
+/** The route a logical route publishes at in one locale, base path excluded. */
+export const localizedRoute = (
+  logicalRoute: string,
+  locale: string,
+  i18n: ResolvedI18nConfig | undefined
+): string => (i18n ? localizeRoute(logicalRoute, locale, i18n) : logicalRoute);
 
 /** A custom-key validation failure, lowered to a joinable diagnostic path. */
 interface CustomKeyIssue {
@@ -850,42 +953,19 @@ export const normalizeEntry = (
     meta.seo.noindex = true;
   }
 
-  // The version is detected first: a snapshot directory is outermost on disk
-  // (`v1.0/fr/page.mdx`), so the locale parser and route mapping must see a
-  // version-stripped ref. The current version is `""` and lives at the root.
-  const { versions } = ctx;
-  const { version, rest: versionlessRef } = versions
-    ? detectVersionRef(entry.ref, versions)
-    : { rest: entry.ref, version: "" };
-
-  // Locale and the locale-stripped nav path come from the entry's ref (a leading
-  // dir, or a filename suffix under the `dot` parser), not the slug — the slug is
-  // the logical, locale-agnostic path within a locale. A shared `$` file maps to
-  // every locale. Remote/CMS sources without i18n placement map to one locale.
-  const { i18n } = ctx;
-  const { navPath: rawNavPath, locales } = i18n
-    ? localePlacement(versionlessRef, ext, i18n)
-    : { locales: [""], navPath: versionlessRef };
-
-  const navPath = withPrefix(ctx.source.prefix, rawNavPath);
-  // Frontmatter `slug` wins, then the adapter-supplied `entry.slug` (the typed
-  // SPI's "logical route input; defaults to ref if omitted"), then the ref.
-  // The extension is re-appended so mapRoute's extname strip can't eat a
-  // dotted slug segment (`v1.2`). A slug that trims to nothing falls back.
-  const slugInput = meta.slug ?? entry.slug;
-  const slug = slugInput ? trimSlashes(slugInput) : "";
-  const routeInput = withPrefix(
-    ctx.source.prefix,
-    slug ? `${slug}${ext}` : rawNavPath
-  );
-
-  // The version prefixes the mapped route *after* `mapRoute` runs: the mapped
-  // route is the version-agnostic key, the config id is prepended verbatim
-  // (never numeric-prefix-stripped), a frontmatter `slug` gets versionized so
-  // snapshots can't collide with the live page, and `translationKey` becomes
-  // version-specific for free.
-  const { segments, groups, route: versionKey } = mapRoute(routeInput);
-  const logicalRoute = versionizeRoute(versionKey, version);
+  const {
+    groups,
+    locales,
+    logicalRoute,
+    navPath,
+    segments,
+    version,
+    versionKey,
+  } = resolveEntryRoute(entry, ext, meta.slug, {
+    i18n: ctx.i18n,
+    prefix: ctx.source.prefix,
+    versions: ctx.versions,
+  });
   // Extraction runs on the include-expanded body when the scan expanded one,
   // so a partial's headings anchor-index and TOC under every including page
   // and its components register for the runtime import map.
@@ -931,7 +1011,7 @@ export const normalizeEntry = (
     locale,
     route: withBasePath(
       ctx.basePath ?? "",
-      i18n ? localizeRoute(logicalRoute, locale, i18n) : logicalRoute
+      localizedRoute(logicalRoute, locale, ctx.i18n)
     ),
   }));
 

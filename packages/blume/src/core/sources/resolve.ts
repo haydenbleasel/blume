@@ -49,16 +49,19 @@ const sourceContext = (
 });
 
 /**
- * Every frontmatter key a project declares beyond Blume's page meta — site-wide
- * `frontmatter.extend` and each `content.types[*].frontmatter` — so a source
- * that drops unknown keys keeps the ones `normalizeEntry` will accept.
+ * The frontmatter keys each content type declares (`content.types[*].frontmatter`),
+ * keyed by type — so a source that drops unknown keys keeps, per note, exactly
+ * the ones `normalizeEntry` will accept for that note's type.
  */
-const declaredFrontmatterKeys = (config: ResolvedConfig): string[] => [
-  ...Object.keys(config.frontmatter.extend),
-  ...Object.values(config.content.types).flatMap((type) =>
-    Object.keys(type.frontmatter)
-  ),
-];
+const typeFrontmatterKeys = (
+  config: ResolvedConfig
+): Record<string, string[]> =>
+  Object.fromEntries(
+    Object.entries(config.content.types).map(([type, def]) => [
+      type,
+      Object.keys(def.frontmatter),
+    ])
+  );
 
 const buildSource = (
   def: ContentSourceConfig,
@@ -114,11 +117,13 @@ const buildSource = (
   if (def.type === "obsidian") {
     return obsidianSource(
       {
+        defaultType: config.content.defaultType,
         exclude: def.exclude,
-        frontmatterKeys: declaredFrontmatterKeys(config),
+        frontmatterKeys: Object.keys(config.frontmatter.extend),
         i18n: config.i18n,
         name,
         prefix: def.prefix,
+        typeFrontmatterKeys: typeFrontmatterKeys(config),
         vault: def.vault,
         versions: config.versions,
       },

@@ -233,6 +233,11 @@ describe("cutVersion", () => {
     const home = await readFile(join(root, "docs/v1.0/index.mdx"), "utf-8");
     expect(home).toContain("[Note](/note)");
     expect(result.rewritten).toEqual([]);
+    // Nor is the vault copied: the filesystem source's root-anchored
+    // `vault/**` exclude would not match `v1.0/vault/**`, and the snapshot
+    // would publish the raw note — wikilink intact — as a page of its own.
+    expect(existsSync(join(root, "docs/v1.0/vault"))).toBe(false);
+    expect(result.copied).toBe(1);
   });
 
   it("falls back to an archived-entry snippet when the config resists surgery", async () => {

@@ -73,6 +73,25 @@ describe("ignoringWatchListener", () => {
     expect(calls).toBe(1);
   });
 
+  it("honors a segment predicate alongside the ignore set", () => {
+    let calls = 0;
+    const listener = ignoringWatchListener(
+      () => {
+        calls += 1;
+      },
+      ["dist"],
+      (segment) => segment.startsWith(".")
+    );
+
+    // An Obsidian vault skips every dot-name — `.trash/`, plugin caches —
+    // not a fixed list, so the walk's rule is handed to the watcher as is.
+    listener("change", ".trash/Old note.md");
+    listener("change", "notes/.smart-env/cache.json");
+    listener("change", "dist/index.html");
+    listener("change", "notes/Real note.md");
+    expect(calls).toBe(1);
+  });
+
   it("always ships the loop-critical dirs in its default set", () => {
     expect(BLUME_WATCH_IGNORE_DIRS).toContain(".blume");
     expect(BLUME_WATCH_IGNORE_DIRS).toContain(".blume-verify");

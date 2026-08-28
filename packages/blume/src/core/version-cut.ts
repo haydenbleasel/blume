@@ -7,7 +7,7 @@ import { stripBasePath } from "./base-path.ts";
 import { writeTextAtomic } from "./fs-atomic.ts";
 import { localizeRoute } from "./i18n.ts";
 import type { BlumeProject } from "./project-graph.ts";
-import { scanProject } from "./project-graph.ts";
+import { isWithin, scanProject } from "./project-graph.ts";
 import { VERSION_ID } from "./schema.ts";
 import { nextFenceState } from "./sources/normalize.ts";
 import type { FenceState } from "./sources/normalize.ts";
@@ -245,6 +245,18 @@ export const cutVersion = async (
     "node_modules",
     ...(project.config.versions?.archived.map((version) => version.id) ?? []),
   ]);
+  // Another local source's tree under the content root — an Obsidian vault the
+  // filesystem source excludes — is that source's to publish. Copying it would
+  // republish its raw notes (wikilinks and `%%comments%%` intact) as
+  // filesystem pages of the snapshot, while the source itself keeps serving
+  // them as current.
+  const foreignRoots = project.sources
+    .flatMap((source) =>
+      source.staged && source.contentRoot ? [source.contentRoot] : []
+    )
+    .filter((tree) => isWithin(contentRoot, tree));
+  const isForeign = (path: string): boolean =>
+    foreignRoots.some((tree) => isWithin(tree, path));
   const entries = await readdir(contentRoot, { withFileTypes: true });
   let copied = 0;
   await Promise.all(
@@ -257,6 +269,7 @@ export const cutVersion = async (
         return;
       }
       await cp(join(contentRoot, entry.name), join(dir, entry.name), {
+        filter: (source) => !isForeign(source),
         recursive: true,
       });
     })

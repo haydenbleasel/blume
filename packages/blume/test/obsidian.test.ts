@@ -267,6 +267,103 @@ describe("obsidianSource", () => {
     await expect(sourceFor(root).load()).rejects.toThrow();
   });
 
+  it("follows a symlinked folder into the vault, like the filesystem source", async () => {
+    const shared = await makeVault({ "Linked.md": "# Linked\n" });
+    const root = await makeVault({ "Note.md": "See [[Linked]].\n" });
+    await symlink(shared, join(root, "shared"));
+    // A dangling directory link is neither a folder nor a note: skipped.
+    await symlink(join(root, "gone"), join(root, "missing"));
+    const { diagnostics, entries } = await sourceFor(root).load();
+    const note = entries.find((entry) => entry.ref === "Note.md");
+    // `Dirent.isDirectory()` is false for a symlink, which silently dropped
+    // the folder and reported every link into it as a missing note.
+    expect(entries.map((entry) => entry.ref)).toEqual([
+      "shared/Linked.md",
+      "Note.md",
+    ]);
+    expect(note?.body.text).toContain("See [Linked](/shared/linked).");
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("leaves a wikilink inside an HTML comment alone, without warning", async () => {
+    const root = await makeVault({
+      "Note.md": lines(
+        "Visible [[Real]] and <!-- hidden [[Draft]] --> after.",
+        "An unclosed <!-- opener is text, so [[Real]] still rewrites.",
+        "A span `<!-- [[Real]]` is code, and [[Real]] outside it is not.",
+        ""
+      ),
+      "Real.md": "# Real\n",
+    });
+    const { diagnostics, entries } = await sourceFor(root).load();
+    const note = entries.find((entry) => entry.ref === "Note.md");
+    // Obsidian hides the comment in reading view; a reader never sees the
+    // link, so a build warning about it would name a problem that isn't one.
+    expect(note?.body.text).toContain(
+      "Visible [Real](/real) and <!-- hidden [[Draft]] --> after."
+    );
+    expect(note?.body.text).toContain(
+      "An unclosed <!-- opener is text, so [Real](/real) still rewrites."
+    );
+    expect(note?.body.text).toContain(
+      "A span `<!-- [[Real]]` is code, and [Real](/real) outside it is not."
+    );
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("reads a bracketed wikilink as a literal bracket around the link", async () => {
+    const root = await makeVault({
+      "Note.md": "Compare [[[Real]]] here.\n",
+      "Real.md": "# Real\n",
+    });
+    const { diagnostics, entries } = await sourceFor(root).load();
+    const note = entries.find((entry) => entry.ref === "Note.md");
+    // Obsidian renders `[`, the link, `]`; the target was read as `[Real`.
+    expect(note?.body.text).toContain("Compare [[Real](/real)] here.");
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("honors a pinned heading id and the collision it forces", async () => {
+    const root = await makeVault({
+      "Note.md": lines("First [[Target#Install]], then [[Target#Setup]].", ""),
+      "Target.md": lines("## Install [#setup]", "", "## Setup", ""),
+    });
+    const { entries } = await sourceFor(root).load();
+    const note = entries.find((entry) => entry.ref === "Note.md");
+    // The renderer emits `setup` for the pinned heading and `setup-1` for the
+    // one whose auto-slug it displaced; re-slugging the text gave `install`
+    // (an id no page emits) and `setup` (the wrong heading).
+    expect(note?.body.text).toContain(
+      "First [Install](/target#setup), then [Setup](/target#setup-1)."
+    );
+  });
+
+  it("leaves a fence inside a list item verbatim", async () => {
+    const root = await makeVault({
+      "Note.md": lines(
+        "1. Step one",
+        "",
+        "    ```js",
+        '    const a = "[[Target]]"; %%todo%%',
+        "",
+        '    const b = "[[Target|x]]";',
+        "    ```",
+        "",
+        "Then [[Target]].",
+        ""
+      ),
+      "Target.md": "# Target\n",
+    });
+    const { entries } = await sourceFor(root).load();
+    const note = entries.find((entry) => entry.ref === "Note.md");
+    // The item's content indent puts the fence four spaces deep, where a
+    // fence outside a list can never sit; CommonMark still reads it as fenced
+    // code, so its wikilinks and comment are content.
+    expect(note?.body.text).toContain('    const a = "[[Target]]"; %%todo%%');
+    expect(note?.body.text).toContain('    const b = "[[Target|x]]";');
+    expect(note?.body.text).toContain("Then [Target](/target).");
+  });
+
   it("read() refuses a ref that resolves outside the vault", async () => {
     const root = await makeVault(BASIC);
     await expect(
@@ -1037,6 +1134,57 @@ describe("obsidianSource", () => {
     expect(current?.body.text).toContain("[v1.0/Guide](/v1.0/guide)");
     expect(old?.body.text).toContain("[Guide](/guide)");
   });
+
+  it("links a shared note in the linking note's own locale", async () => {
+    const root = await makeVault({
+      "Guide.md": "See [[Shared.$|Shared]] and [[Only]].\n",
+      "Only.md": "# Only\n",
+      "Shared.$.md": "Back to [[Guide]].\n",
+      "fr/Guide.md": "Voir [[Shared.$|Shared]] et [[Only]].\n",
+    });
+    const { i18n } = blumeConfigSchema.parse({
+      i18n: {
+        defaultLocale: "en",
+        // French first: the first configured locale is not the default one.
+        locales: [
+          { code: "fr", label: "Français" },
+          { code: "en", label: "English" },
+        ],
+      },
+    });
+    const { entries } = await sourceFor(root, { i18n }).load();
+    const en = entries.find((entry) => entry.ref === "Guide.md");
+    const fr = entries.find((entry) => entry.ref === "fr/Guide.md");
+    const shared = entries.find((entry) => entry.ref === "Shared.$.md");
+    // `Shared.$.md` publishes in every locale, so each guide links to its
+    // own copy — not to whichever locale happens to be configured first. A
+    // note that publishes in one locale is linked there from anywhere.
+    expect(en?.body.text).toContain("See [Shared](/shared) and [Only](/only).");
+    expect(fr?.body.text).toContain(
+      "Voir [Shared](/fr/shared) et [Only](/only)."
+    );
+    // A shared note has no single locale of its own; a target that publishes
+    // in one locale is still linked there.
+    expect(shared?.body.text).toContain("Back to [Guide](/guide).");
+  });
+
+  it("keeps a per-type frontmatter key only on notes of that type", async () => {
+    const root = await makeVault({
+      "Doc.md": "---\nrfcOwner: core\n---\n\nBody.\n",
+      "Rfc.md": "---\ntype: rfc\nrfcOwner: core\n---\n\nBody.\n",
+    });
+    const { entries } = await sourceFor(root, {
+      defaultType: "doc",
+      typeFrontmatterKeys: { rfc: ["rfcOwner"] },
+    }).load();
+    const doc = entries.find((entry) => entry.ref === "Doc.md");
+    const rfc = entries.find((entry) => entry.ref === "Rfc.md");
+    // The meta parse carves out only the entry's own type's keys; a key
+    // declared for another type would reach the strict page schema and drop
+    // the note — the failure the allowlist exists to prevent.
+    expect(doc?.data).toEqual({ title: "Doc" });
+    expect(rfc?.data).toEqual({ rfcOwner: "core", title: "Rfc", type: "rfc" });
+  });
 });
 
 describe("resolveSources (obsidian)", () => {
@@ -1081,7 +1229,7 @@ describe("resolveSources (obsidian)", () => {
   it("threads declared frontmatter keys and routing config into the source", async () => {
     const root = await makeVault({
       "fr/Guide.md":
-        "---\nowner: docs\nrfcOwner: core\nstatus: draft\n---\n\nBody.\n",
+        "---\ntype: rfc\nowner: docs\nrfcOwner: core\nstatus: draft\n---\n\nBody.\n",
     });
     const config = blumeConfigSchema.parse({
       content: {
@@ -1100,11 +1248,13 @@ describe("resolveSources (obsidian)", () => {
     const sources = resolveSources(config, projectContext, { mode: "build" });
     const loaded = await sources[0]?.load();
     const [guide] = loaded?.entries ?? [];
-    // Site-wide and per-type declarations both survive; `status` does not.
+    // Site-wide and the note's own type's declarations survive; `status`
+    // does not.
     expect(guide?.data).toEqual({
       owner: "docs",
       rfcOwner: "core",
       title: "Guide",
+      type: "rfc",
     });
     expect(guide?.slug).toBe("guide");
   });

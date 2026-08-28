@@ -59,19 +59,24 @@ export const excludeDirSegments = (patterns: readonly string[]): string[] =>
 
 /**
  * Build a recursive-watch listener that fires `onChange` for content changes but
- * ignores events whose path crosses an ignored directory segment. A missing
- * `filename` — rare; the platform couldn't name the changed path — falls through
- * to `onChange` rather than silently dropping a real edit. Exported for testing.
+ * ignores events whose path crosses an ignored directory segment — one in
+ * `ignoreDirs`, or one `ignoreSegment` rejects, for a scan whose skip rule is
+ * a shape (every dot-name) rather than a list. A missing `filename` — rare;
+ * the platform couldn't name the changed path — falls through to `onChange`
+ * rather than silently dropping a real edit. Exported for testing.
  */
 export const ignoringWatchListener = (
   onChange: () => void,
-  ignoreDirs: Iterable<string> = BLUME_WATCH_IGNORE_DIRS
+  ignoreDirs: Iterable<string> = BLUME_WATCH_IGNORE_DIRS,
+  ignoreSegment: (segment: string) => boolean = () => false
 ): WatchListener<string> => {
   const ignore = new Set(ignoreDirs);
   return (_event, filename) => {
     if (
       filename !== null &&
-      filename.split(/[/\\]/u).some((segment) => ignore.has(segment))
+      filename
+        .split(/[/\\]/u)
+        .some((segment) => ignore.has(segment) || ignoreSegment(segment))
     ) {
       return;
     }

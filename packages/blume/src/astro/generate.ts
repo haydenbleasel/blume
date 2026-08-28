@@ -1172,7 +1172,11 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     // the repo, so a source above the project dir (a monorepo vault beside the
     // docs app) still resolves to an in-repo file. A path that escapes the
     // repo itself has nothing to edit — fabricating one yields a 404 link.
-    const editPath = normalize(github?.dir ? join(github.dir, rel) : rel);
+    // `dir` is a bare string in the schema, so a leading slash (`/apps/docs`)
+    // is trimmed rather than read as an absolute path — which would drop the
+    // link from every page of a site that has always written it that way.
+    const editDir = (github?.dir ?? "").replaceAll(/^\/+|\/+$/gu, "");
+    const editPath = normalize(editDir ? join(editDir, rel) : rel);
     if (editPath.startsWith("..") || isAbsolute(editPath)) {
       return null;
     }

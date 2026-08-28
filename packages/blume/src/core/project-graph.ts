@@ -44,16 +44,16 @@ export interface ConfigOverrides {
   output?: ResolvedConfig["deployment"]["output"];
 }
 
-/** Apply CLI config overrides onto a resolved config (returns a new object). */
 /**
  * Whether `path` sits at or under `dir`. A relative result that is itself
  * absolute means a different drive root on Windows, which is outside too.
  */
-const isWithin = (dir: string, path: string): boolean => {
+export const isWithin = (dir: string, path: string): boolean => {
   const rel = relative(dir, path);
   return !(rel.startsWith("..") || isAbsolute(rel));
 };
 
+/** Apply CLI config overrides onto a resolved config (returns a new object). */
 const applyConfigOverrides = (
   config: ResolvedConfig,
   overrides?: ConfigOverrides

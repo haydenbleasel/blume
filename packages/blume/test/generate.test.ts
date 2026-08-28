@@ -469,6 +469,27 @@ describe("buildRuntimeData", () => {
     expect(editUrl("/out/far")).toBeNull();
   });
 
+  it("keeps edit urls when github.dir is written with a leading slash", async () => {
+    const root = await writeProject({
+      "blume.config.ts": `export default {
+  github: { owner: "acme", repo: "docs", dir: "/apps/site/" },
+};
+`,
+      "docs/index.md": "# Home\n",
+    });
+    const project = await scanProject(root);
+    const data = JSON.parse(buildRuntimeData(project));
+    const home = data.routes.find(
+      (route: { path: string }) => route.path === "/"
+    );
+    // `dir` is a bare string in the schema. Reading `/apps/site` as absolute
+    // would drop the link from every page of a site that has always written
+    // it that way, with no diagnostic; the edge slashes are trimmed instead.
+    expect(home.editUrl).toBe(
+      "https://github.com/acme/docs/edit/main/apps/site/docs/index.md"
+    );
+  });
+
   it("resolves github edit urls, repo url, banner, logo, mcp and og", async () => {
     const project = await scanProject(
       await writeProject({
