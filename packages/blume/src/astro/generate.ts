@@ -56,6 +56,7 @@ import { packageRoot } from "../core/package-root.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { resolveDocsCollection } from "../core/sources/resolve.ts";
+import { trimChar } from "../core/trim.ts";
 import { resolveTsconfigAliases } from "../core/tsconfig-aliases.ts";
 import type { Diagnostic, Navigation } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
@@ -1191,7 +1192,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     // `dir` is a bare string in the schema, so a leading slash (`/apps/docs`)
     // is trimmed rather than read as an absolute path — which would drop the
     // link from every page of a site that has always written it that way.
-    const editDir = (github?.dir ?? "").replaceAll(/^\/+|\/+$/gu, "");
+    const editDir = trimChar(github?.dir ?? "", "/");
     const editPath = normalize(editDir ? join(editDir, rel) : rel);
     if (editPath.startsWith("..") || isAbsolute(editPath)) {
       return null;

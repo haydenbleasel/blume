@@ -13,6 +13,7 @@ import type {
   PageMeta,
   ResolvedI18nConfig,
 } from "../schema.ts";
+import { trimChar } from "../trim.ts";
 import type { Diagnostic, Heading, PageLink, PageRecord } from "../types.ts";
 import { detectVersionRef, versionizeRoute } from "../versions.ts";
 import type { NormalizeContext, SourceEntry } from "./types.ts";
@@ -534,7 +535,10 @@ export const scanBody = (body: string): BodyScan => {
   }
 
   const anchors = new Set<string>();
-  const markup = state.anchorLines.join("\n").replaceAll(HTML_COMMENT, "");
+  // Replaced with a space rather than removed: dropping a comment outright
+  // can splice its neighbors into a new `<!--` (`<!-<!-- x -->->`), and a
+  // space keeps a tag from fusing with an `id=` that only a comment separated.
+  const markup = state.anchorLines.join("\n").replaceAll(HTML_COMMENT, " ");
   for (const match of markup.matchAll(HTML_ID)) {
     const id = match.groups?.quoted ?? match.groups?.jsx ?? match.groups?.bare;
     if (id !== undefined) {
@@ -796,8 +800,7 @@ const deriveTitle = (
 };
 
 /** Strip habitual leading/trailing slashes (`/getting-started`, `guides/`). */
-const trimSlashes = (value: string): string =>
-  value.replaceAll(/^\/+|\/+$/gu, "");
+const trimSlashes = (value: string): string => trimChar(value, "/");
 
 /** Whether a raw frontmatter value is a string (e.g. the `type` override). */
 export const isStringValue = (

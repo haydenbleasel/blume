@@ -5,6 +5,7 @@ import { diagnosticsFromZod } from "./diagnostics.ts";
 import { createModuleLoader } from "./load-module.ts";
 import { folderMetaSchema } from "./schema.ts";
 import type { FolderMeta } from "./schema.ts";
+import { trimChar } from "./trim.ts";
 import type { Diagnostic } from "./types.ts";
 
 const META_FILES = [
@@ -50,7 +51,7 @@ export interface FolderMetaSource {
  * source keys to `docs/provider`, exactly the group path navigation builds.
  */
 const metaKeyFor = (prefix: string | undefined, dir: string): string => {
-  const clean = prefix ? prefix.replaceAll(/^\/+|\/+$/gu, "") : "";
+  const clean = prefix ? trimChar(prefix, "/") : "";
   if (!clean) {
     return dir;
   }

@@ -839,6 +839,19 @@ describe(scanBody, () => {
     expect(scanBody(body).anchors).toStrictEqual([]);
   });
 
+  it("never lets a stripped comment splice its neighbors into new markup", () => {
+    const body = [
+      // Only the inner comment is complete; stripping it must leave the
+      // real anchor after it intact.
+      "<!-<!-- x -->->",
+      '<a id="after-splice"></a>',
+      // A comment is the only thing separating the tag from its attribute:
+      // it must read as a separator, not fuse into `<divid=`.
+      '<div<!-- gap -->id="separated"></div>',
+    ].join("\n");
+    expect(scanBody(body).anchors).toStrictEqual(["after-splice", "separated"]);
+  });
+
   it("matches wrapped tags and unquoted or JSX-quoted ids", () => {
     const body = [
       "<div",
