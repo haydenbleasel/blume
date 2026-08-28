@@ -604,7 +604,11 @@ export interface SearchConfig {
   algolia?: AlgoliaSearch;
   /** Indexing behavior. */
   indexing?: {
-    /** Include code block contents in the search index. Defaults to `false`. */
+    /**
+     * Index fenced code (body and title) in the source-built search indexes —
+     * the client index, hosted syncs, and the MCP `search_docs` index.
+     * Defaults to `false`; Pagefind and Mixedbread index code regardless.
+     */
     includeCodeBlocks?: boolean;
     /** Include pages marked `hidden` in the search index. Defaults to `false`. */
     includeHiddenPages?: boolean;

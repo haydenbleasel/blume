@@ -48,7 +48,8 @@ const isTitleToken = (token: string): boolean =>
   !token.includes("=") &&
   !RESERVED_META_KEYWORDS.has(token);
 
-const parseTitle = (raw: string | undefined): string | undefined => {
+/** The title a fence's meta string promotes to `data-title`, if any. */
+export const parseCodeTitle = (raw: string | undefined): string | undefined => {
   if (!raw) {
     return undefined;
   }
@@ -74,7 +75,7 @@ export const codeTitleTransformer = (): CodeTitleTransformer => ({
   name: "blume:code-meta",
   pre(node) {
     const raw = this.options.meta?.__raw;
-    const title = parseTitle(raw);
+    const title = parseCodeTitle(raw);
     if (title) {
       node.properties.dataTitle = title;
     }

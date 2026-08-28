@@ -11,6 +11,7 @@ import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode } from "../core/types.ts";
+import { parseCodeTitle } from "../markdown/code-title.ts";
 import { pageFacets } from "./facets.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
@@ -81,8 +82,54 @@ const INLINE_PARENTS = new Set([
 ]);
 
 interface PlainTextOptions {
-  includeCodeBlocks?: boolean;
+  includeCodeBlocks: boolean;
 }
+
+const parseMarkdown = (markdown: string): Nodes =>
+  fromMarkdown(markdown, {
+    extensions: [gfm()],
+    mdastExtensions: [gfmFromMarkdown()],
+  });
+
+// Fenced code is excluded from the plain index by default (ranking noise) —
+// the "markdown" extraction keeps it for Ask AI grounding. Code-heavy docs opt
+// in via `search.indexing.includeCodeBlocks`, which indexes the fence body and
+// its rendered title (```ts blume.config.ts) but never the fence markers,
+// language, or other meta keywords.
+const collectCode = (
+  node: Extract<Nodes, { type: "code" }>,
+  out: string[],
+  options: PlainTextOptions
+): void => {
+  if (!options.includeCodeBlocks) {
+    return;
+  }
+  const title = parseCodeTitle(node.meta ?? undefined);
+  if (title) {
+    out.push(title, " ");
+  }
+  out.push(node.value, " ");
+};
+
+// A raw-HTML/JSX run. CommonMark parses a block-level `<Callout>` with no
+// blank lines as ONE html node holding all its inner prose, so the node can't
+// just be dropped — strip the tag-shaped runs, then walk what's left as
+// Markdown so a fence nested tightly inside a component (`<Tab>` around a
+// ```bash block) honors `includeCodeBlocks` like a top-level one. Each strip
+// that changes the text shortens it, so the re-walk terminates.
+const collectHtml = (
+  node: Extract<Nodes, { type: "html" }>,
+  out: string[],
+  options: PlainTextOptions
+): void => {
+  const stripped = node.value.replaceAll(HTML_OR_JSX, " ");
+  if (stripped === node.value) {
+    out.push(stripped);
+    return;
+  }
+  // oxlint-disable-next-line no-use-before-define -- mutual recursion: the re-walk of a component's body goes back through the node dispatcher
+  collectText(parseMarkdown(stripped), out, options);
+};
 
 /** Fold one mdast node into the plain-text accumulator. */
 const collectText = (
@@ -91,12 +138,8 @@ const collectText = (
   options: PlainTextOptions
 ): void => {
   switch (node.type) {
-    // Code blocks are excluded from the plain index by default (ranking noise),
-    // but code-heavy docs can opt in without indexing Markdown markup too.
     case "code": {
-      if (options.includeCodeBlocks) {
-        out.push(node.value, " ");
-      }
+      collectCode(node, out, options);
       return;
     }
     // Image alt text was never indexed.
@@ -110,11 +153,8 @@ const collectText = (
       out.push(node.value);
       return;
     }
-    // A raw-HTML/JSX run. CommonMark parses a block-level `<Callout>` with no
-    // blank lines as ONE html node holding all its inner prose, so the node
-    // can't just be dropped — strip the tag-shaped runs and keep the text.
     case "html": {
-      out.push(node.value.replaceAll(HTML_OR_JSX, " "));
+      collectHtml(node, out, options);
       return;
     }
     case "break": {
@@ -168,33 +208,11 @@ const collectText = (
  * reduce correctly. This feeds the client index *and* every hosted-provider
  * record, so anything lost here is a permanent search-quality loss.
  */
-const toPlainText = (
-  markdown: string,
-  options: PlainTextOptions = {}
-): string => {
-  const tree = fromMarkdown(markdown, {
-    extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
-  });
+const toPlainText = (markdown: string, options: PlainTextOptions): string => {
   const out: string[] = [];
-  collectText(tree, out, options);
+  collectText(parseMarkdown(markdown), out, options);
   return out.join("").replaceAll(WHITESPACE, " ").trim();
 };
-
-type SearchContentMode = "markdown" | "plain";
-
-const extractSearchContent = (
-  markdown: string,
-  options?: {
-    content?: SearchContentMode;
-    includeCodeBlocks?: boolean;
-  }
-): string =>
-  options?.content === "markdown"
-    ? markdown.trim()
-    : toPlainText(markdown, {
-        includeCodeBlocks: options?.includeCodeBlocks ?? false,
-      });
 
 interface Crumbs {
   breadcrumb: string[];
@@ -260,17 +278,24 @@ const buildCrumbIndex = (sidebar: NavNode[]): Map<string, Crumbs> => {
  * (default) keeps web-only content and drops agents-only blocks — the site
  * search and hosted syncs must not surface content the page hides — while
  * `"agents"` mirrors llms-full.txt/MCP `get_page` (web removed, agents kept).
+ *
+ * Whether fenced code joins the plain extraction is site-wide policy, read
+ * from `search.indexing.includeCodeBlocks` here rather than threaded by each
+ * caller, so the client index, hosted syncs, eject, and the MCP `search_docs`
+ * index can't drift apart.
  */
 export const buildSearchDocuments = async (
   project: BlumeProject,
   options?: {
     includeWhenDisabled?: boolean;
-    content?: SearchContentMode;
-    includeCodeBlocks?: boolean;
+    content?: "markdown" | "plain";
     audience?: VisibilityAudience;
   }
 ): Promise<SearchDocument[]> => {
   const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
+  const plain: PlainTextOptions = {
+    includeCodeBlocks: project.config.search.indexing.includeCodeBlocks,
+  };
 
   // Build the crumb index from every locale's sidebar (their nodes carry
   // locale-prefixed routes), so localized pages get the right section/breadcrumb.
@@ -311,7 +336,10 @@ export const buildSearchDocuments = async (
         source,
         options?.audience ?? "web"
       );
-      const body = extractSearchContent(visible, options);
+      const body =
+        options?.content === "markdown"
+          ? visible.trim()
+          : toPlainText(visible, plain);
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       const facets = page ? pageFacets(page, project.config) : undefined;

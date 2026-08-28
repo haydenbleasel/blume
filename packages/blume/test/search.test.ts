@@ -74,15 +74,44 @@ const route = (over: Partial<RouteManifestEntry>): RouteManifestEntry =>
 
 const projectWith = (
   pages: PageRecord[],
-  routes: RouteManifestEntry[]
+  routes: RouteManifestEntry[],
+  config: z.input<typeof blumeConfigSchema> = {}
 ): BlumeProject =>
   // SAFETY: `buildSearchDocuments` reads only `config`, `graph.pages`, and
   // `manifest.routes` from the project.
   ({
-    config: blumeConfigSchema.parse({}),
+    config: blumeConfigSchema.parse(config),
     graph: { pages },
     manifest: { routes },
   }) as BlumeProject;
+
+/** Fences in the shapes real docs use: titled, and nested tightly in JSX. */
+const CODE_BODY = [
+  "---",
+  "title: C",
+  "---",
+  "# Setup",
+  "",
+  "Prose before.",
+  "",
+  "```ts blume.config.ts lineNumbers",
+  "export const retryPolicy = 1;",
+  "```",
+  "",
+  // No blank lines around the fence: CommonMark folds the whole component
+  // into one html node, so the fence never reaches the `code` case directly.
+  '<Tab title="npm">',
+  "```bash",
+  "npm install blume",
+  "```",
+  "</Tab>",
+  "",
+  // An html block whose opener never closes on its line has no tag-shaped run
+  // to strip, so it is indexed verbatim.
+  "<div",
+  "unterminated opener text",
+  "",
+].join("\n");
 
 const VIS_BODY = [
   "---",
@@ -108,6 +137,7 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "blume-search-"));
   await writeFile(join(root, "a.md"), BODY);
   await writeFile(join(root, "vis.md"), VIS_BODY);
+  await writeFile(join(root, "code.md"), CODE_BODY);
 });
 
 afterAll(async () => {
@@ -322,14 +352,40 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("# Heading");
   });
 
-  it("can include code blocks in the plain text index", async () => {
-    const [doc] = await buildSearchDocuments(
-      projectWith([page({ description: "Desc A", id: "a.md" })], [route({})]),
-      { includeCodeBlocks: true }
-    );
-    expect(doc?.content).toContain("const secret = 1;");
-    expect(doc?.content).not.toContain("```js");
-    expect(doc?.content).not.toContain("#");
+  describe("search.indexing.includeCodeBlocks", () => {
+    const codeProject = (includeCodeBlocks: boolean) =>
+      projectWith(
+        [page({ id: "code.md" })],
+        [route({ id: "code.md", sourcePath: join(root, "code.md") })],
+        { search: { indexing: { includeCodeBlocks } } }
+      );
+
+    it("strips fences everywhere by default, even nested tightly in JSX", async () => {
+      const [doc] = await buildSearchDocuments(codeProject(false));
+      expect(doc?.content).toContain("Prose before");
+      expect(doc?.content).not.toContain("retryPolicy");
+      expect(doc?.content).not.toContain("blume.config.ts");
+      // The tight `<Tab>` wrapper is one html node; its fence must still be
+      // recognized as code rather than indexed as raw text.
+      expect(doc?.content).not.toContain("npm install blume");
+      expect(doc?.content).not.toContain("```");
+      expect(doc?.content).not.toContain("<Tab");
+      expect(doc?.content).toContain("unterminated opener text");
+    });
+
+    it("indexes fence bodies and titles when opted in via config", async () => {
+      const [doc] = await buildSearchDocuments(codeProject(true));
+      expect(doc?.content).toContain("export const retryPolicy = 1;");
+      // The rendered title is searchable; the language, `lineNumbers`, and
+      // fence markers are not.
+      expect(doc?.content).toContain("blume.config.ts");
+      expect(doc?.content).not.toContain("lineNumbers");
+      expect(doc?.content).not.toContain("```");
+      expect(doc?.content).not.toMatch(/(?:^|\s)ts(?:\s|$)/u);
+      expect(doc?.content).toContain("npm install blume");
+      expect(doc?.content).not.toContain("bash");
+      expect(doc?.content).not.toContain("<Tab");
+    });
   });
 
   it("gives a config-sidebar section's landing page its own section facet", async () => {
