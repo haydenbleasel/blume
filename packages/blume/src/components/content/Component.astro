@@ -10,6 +10,10 @@
 // examples are all supported. The source is highlighted with the same Shiki
 // setup as ordinary code fences.
 import data from "blume:data";
+import {
+  CODE_PADDING_BLOCK_REM,
+  FLUSH_CODE_PADDING_TOP_REM,
+} from "../../theme/code-block-padding.ts";
 
 import { highlightCode } from "../../markdown/index.ts";
 import { withBase } from "../islands/base-path.ts";
@@ -58,7 +62,12 @@ const codeHtml = entry
 // whose collapse to the measured height no transition could hide. No-JS
 // readers aren't hurt by the cap, since the source scrolls at any height.
 const LINE_PX = 21;
-const PADDING_PX = 36;
+const REM_PX = 16;
+// The pre's vertical padding, from the same constants the theme emits: the
+// copy-button strip on top (the pane is a flush block inside tabs) and the
+// plain inset below. The tab panel and the pre carry no border of their own.
+const PADDING_PX =
+  (FLUSH_CODE_PADDING_TOP_REM + CODE_PADDING_BLOCK_REM) * REM_PX;
 const ESTIMATE_MAX_PX = 400;
 // The floor also clamps the measured height client-side; it rides along on the
 // iframe as `data-blume-min-pane` so the script and this estimate can't drift.

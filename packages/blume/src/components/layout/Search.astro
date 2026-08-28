@@ -117,8 +117,17 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       data-blume-search-grid
     >
       <div class="flex min-h-0 flex-col md:border-border md:border-e">
+        {/* The cap shows two full rows of pills plus most of a third as the
+            scroll cue: pills are 26px (PILL_BASE below: text-xs, py-1, 1px
+            border — change that string and this cap together) on a 32px pitch
+            (gap-1.5) below the row's py-2, so their tops sit at 8, 40 and 72
+            inside the 91px scrollport 5.75rem leaves after border-b — the
+            third row shows 19px of its pills, a recognizable cut rather than
+            a sliver of rounded caps. Pills never wrap (whitespace-nowrap), so
+            the arithmetic holds for long section labels; one wider than the
+            column is clipped rather than growing a horizontal bar. */}
         <div
-          class="flex flex-wrap gap-1.5 border-border border-b px-3 py-2"
+          class="flex max-h-[5.75rem] flex-wrap gap-1.5 overflow-x-hidden overflow-y-auto overscroll-contain border-border border-b px-3 py-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
           data-blume-search-filters
           hidden
         >
@@ -235,7 +244,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
     const MARK =
       "[&_mark]:rounded-sm [&_mark]:bg-accent/25 [&_mark]:text-inherit";
     const PILL_BASE =
-      "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium text-xs transition-colors";
+      "inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 font-medium text-xs transition-colors";
     const PILL_ON = "border-transparent bg-foreground text-background";
     const PILL_OFF = "border-border text-muted-foreground hover:text-foreground";
 
@@ -280,6 +289,8 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       selectables: Selectable[] = [];
       selectedIndex = -1;
       activeSection: string | null = null;
+      /** The section pill for `activeSection` in the current filter row. */
+      activePill: HTMLElement | undefined;
       renderGeneration = 0;
       /** Monotonic id source for option rows (aria-activedescendant). */
       optionSeq = 0;
@@ -629,6 +640,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       }
 
       renderFilters(sections: { count: number; label: string }[]) {
+        this.activePill = undefined;
         if (sections.length < 2) {
           this.filters.hidden = true;
           this.filters.replaceChildren();
@@ -639,9 +651,15 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         const total = sections.reduce((sum, s) => sum + s.count, 0);
         this.filters.appendChild(this.createPill(this.allMsg, total, null));
         for (const section of sections) {
-          this.filters.appendChild(
-            this.createPill(section.label, section.count, section.label)
+          const pill = this.createPill(
+            section.label,
+            section.count,
+            section.label
           );
+          this.filters.appendChild(pill);
+          if (section.label === this.activeSection) {
+            this.activePill = pill;
+          }
         }
       }
 
@@ -649,6 +667,9 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         const button = document.createElement("button");
         button.type = "button";
         const active = this.activeSection === value;
+        // A filter chip is a toggle whose only visual state is color; the
+        // pressed state gives assistive tech the same information.
+        button.setAttribute("aria-pressed", String(active));
         button.className = `${PILL_BASE} ${active ? PILL_ON : PILL_OFF}`;
         button.innerHTML = `${escapeHtml(label)} <span class="opacity-60">${count}</span>`;
         button.addEventListener("click", () => {
@@ -769,6 +790,17 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
           this.input.removeAttribute("aria-activedescendant");
           this.clearPreview();
         }
+        // The filter row is height-capped and scrolls. Pills sit in the pool's
+        // first-seen order and sections drop out as the query narrows, so the
+        // active pill can move rows between renders — and the row's scrollTop
+        // survives replaceChildren — so without this the reader can be looking
+        // at filtered results with no highlighted pill in view. Only a section
+        // pill: with "All" selected every render (each keystroke, each resolved
+        // search) would otherwise snap a row the reader scrolled back to the
+        // top, moving the pill they were about to click. Issued here, after
+        // the results are in the DOM, so it shares one layout flush with
+        // selectIndex instead of forcing a second one mid-render.
+        this.activePill?.scrollIntoView({ block: "nearest" });
       }
 
       selectIndex(index: number) {

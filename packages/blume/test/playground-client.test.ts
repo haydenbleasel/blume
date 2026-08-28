@@ -498,6 +498,34 @@ describe("send + response rendering", () => {
     expect(must(pre).textContent).toBe('{\n  "ok": true,\n  "n": 1\n}');
   });
 
+  it("scrolls an overflowing panel, never the document, to reveal the response", async () => {
+    const fixture = createFixture(deepModel());
+    init(fixture);
+    const scrolls: ScrollToOptions[] = [];
+    // At xl the panel is a viewport-capped scroller; the response region sits
+    // partly below its fold.
+    const panel = must(fixture.response.closest("[data-operation-panel]"));
+    Object.assign(panel, {
+      clientHeight: 400,
+      getBoundingClientRect: () => ({ bottom: 400, top: 0 }),
+      scrollBy: (options: ScrollToOptions) => scrolls.push(options),
+      scrollHeight: 900,
+    });
+    Object.assign(fixture.response, {
+      getBoundingClientRect: () => ({ bottom: 650, top: 500 }),
+    });
+    await clickSend(fixture);
+    // "nearest": the smaller of the two moves that bring the region inside.
+    expect(scrolls).toEqual([{ top: 250 }]);
+
+    // Already in view: nothing moves.
+    Object.assign(fixture.response, {
+      getBoundingClientRect: () => ({ bottom: 300, top: 100 }),
+    });
+    await clickSend(fixture);
+    expect(scrolls).toHaveLength(1);
+  });
+
   it("renders non-JSON bodies verbatim, HTTP errors like any response", async () => {
     const fixture = createFixture(bearerModel());
     init(fixture);

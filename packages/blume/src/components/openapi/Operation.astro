@@ -25,6 +25,7 @@ import Playground from "./Playground.astro";
 import RequestBody from "./RequestBody.astro";
 import RequestPanel from "./RequestPanel.astro";
 import Responses from "./Responses.astro";
+import OperationPanel from "./OperationPanel.astro";
 
 interface Props {
   source: string;
@@ -167,7 +168,7 @@ const languages = sampleLanguages(spec?.codeSamples ?? []);
           )}
         </div>
         {sample && model && (
-          <div class="xl:sticky xl:top-24 xl:self-start" data-operation-panel>
+          <OperationPanel>
             {spec.playground.enabled && (
               <Playground
                 model={model}
@@ -182,7 +183,7 @@ const languages = sampleLanguages(spec?.codeSamples ?? []);
               sample={sample}
               schemas={schemas}
             />
-          </div>
+          </OperationPanel>
         )}
       </div>
     </div>

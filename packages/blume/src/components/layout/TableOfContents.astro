@@ -31,7 +31,10 @@ const { headings, title, variant } = Astro.props;
       <blume-toc class="block">
         <ul class="m-0 list-none border-border border-t p-2">
           {headings.map((heading) => (
-            <li style={`padding-inline-start:${(heading.depth - 2) * 0.75}rem`}>
+            <li
+              data-depth={heading.depth}
+              style={`padding-inline-start:${(heading.depth - 2) * 0.75}rem`}
+            >
               <a
                 class="block rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:text-foreground aria-[current=location]:font-medium aria-[current=location]:text-foreground"
                 href={`#${heading.slug}`}
@@ -52,7 +55,10 @@ const { headings, title, variant } = Astro.props;
       <blume-toc class="block">
         <ul class="m-0 list-none p-0">
           {headings.map((heading) => (
-            <li style={`padding-inline-start:${(heading.depth - 2) * 0.75}rem`}>
+            <li
+              data-depth={heading.depth}
+              style={`padding-inline-start:${(heading.depth - 2) * 0.75}rem`}
+            >
               <a
                 class="block py-1.5 text-muted-foreground transition-colors hover:text-foreground aria-[current=location]:font-medium aria-[current=location]:text-foreground"
                 href={`#${heading.slug}`}

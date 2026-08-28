@@ -28,6 +28,7 @@ import GraphqlType from "./GraphqlType.astro";
 import MethodBadge from "./MethodBadge.astro";
 import PanelTabs from "./PanelTabs.astro";
 import Playground from "./Playground.astro";
+import OperationPanel from "./OperationPanel.astro";
 
 /**
  * The GraphQL front-end of the reference page, dispatched from
@@ -160,7 +161,7 @@ const returnRoute = field ? routes.get(field.type.name) : undefined;
           </section>
         </div>
         {((sample && model) || isSubscription) && (
-          <div class="xl:sticky xl:top-24 xl:self-start" data-operation-panel>
+          <OperationPanel>
             {sample && model && spec.playground.enabled && (
               <Playground
                 model={model}
@@ -177,7 +178,7 @@ const returnRoute = field ? routes.get(field.type.name) : undefined;
               )}
               <PanelTabs heading="Response" panels={responsePanels} />
             </div>
-          </div>
+          </OperationPanel>
         )}
       </div>
     </div>

@@ -1,3 +1,8 @@
+import {
+  CODE_PADDING_BLOCK_REM,
+  FLUSH_CODE_PADDING_TOP_REM,
+} from "./code-block-padding.ts";
+
 interface TailwindEntryOptions {
   /**
    * Globs to scan for utility classes. Typically the Blume package source and
@@ -255,19 +260,26 @@ ${THEME_MAPPING}
   color: var(--blume-muted-foreground);
   font-size: 0.875rem;
   line-height: 1.7;
+  /* An unbreakable run — an API permission, a broker list, a bare URL used as
+     its own link text, an OpenAPI operation title of the form
+     \`METHOD /very/long/{path}\`, a module-qualified name in a generated
+     reference — paints past the content column, and nothing between the
+     paragraph and the viewport clips it, so it lands in the document's scroll
+     width and drags the page sideways on a phone. Inherited, so headings and
+     inline code are covered too; the only re-declarations below are the
+     opt-in code-wrap mode and Twoslash, which want different values.
+     \`break-word\` and not \`anywhere\`: only \`anywhere\` reduces min-content,
+     which is what sizes \`table-layout: auto\` columns, so it would resize
+     every table on the site. The flip side is that a token in a table cell
+     still never breaks — the column grows to fit it — so wide tables rely on
+     the .blume-table-scroll wrapper, not on this. */
+  overflow-wrap: break-word;
 }
 
 /* No letter-spacing here: prose headings inherit the base h1-h6 rule's
    display tracking, same as headings outside the prose column. */
 .prose :where(h1, h2, h3, h4) {
   font-weight: 500;
-}
-
-/* A heading can carry one long unbreakable token — an OpenAPI operation's title
-   is \`METHOD /very/long/{path}\` when the spec sets no summary — which would run
-   off the content column. Break it across lines instead of overflowing. */
-.prose :where(h1, h2, h3, h4, h5, h6) {
-  overflow-wrap: break-word;
 }
 
 .prose :where(h1) {
@@ -369,7 +381,7 @@ ${THEME_MAPPING}
   line-height: 1.55;
   margin: 1.5rem 0;
   overflow-x: auto;
-  padding: 1rem 0;
+  padding: ${CODE_PADDING_BLOCK_REM}rem 0;
   position: relative;
 }
 
@@ -549,7 +561,6 @@ blume-diff {
    never matches (a cell is not its own descendant). */
 .prose :where(td, th) > code,
 .prose :where(td, th) :not(pre) > code {
-  overflow-wrap: break-word;
   white-space: normal;
 }
 
@@ -593,9 +604,33 @@ blume-tabs [data-blume-tab-content] > pre {
   margin: 0;
 }
 
+/* These contexts drop the language bar (\`::before\` is cleared below), so the
+   bar's padding goes with it and the block keeps the plain inset. Unscoped on
+   purpose: <CodeBlock> wraps its pre in its own \`.prose\` below the component
+   chrome, so without this a titled block on a page with no prose column
+   (PageLayout) would keep the 3.75rem bar padding under a cleared bar. */
 blume-tabs pre[data-language],
 .not-prose pre[data-language] {
-  padding-top: 1rem;
+  padding-top: ${CODE_PADDING_BLOCK_REM}rem;
+}
+
+/* Room for the copy button. The docs layout injects it into every \`.prose pre\`
+   — absolutely positioned against the pre's border box, 1.875rem tall, at
+   \`top-2.5\` in the flush contexts above and \`top-2\` elsewhere — and it is
+   unconditional, so wherever no language bar exists to hold it, it painted
+   over the first line of code: any line long enough to reach the button's
+   strip (a curl invocation, an install command, an import path) went under
+   it. Keyed on the attribute the docs layout stamps on <body>, so the strip
+   only appears where the injector runs (PageLayout pages run none), and on
+   \`.astro-code\` so the playground's response pre — created after the
+   injector ran, never given a button — keeps its plain inset. The first
+   selector is the injector's own flush predicate; the second covers the
+   remaining bar-less case, an untitled <CodeBlock> in plain prose. API panel
+   blocks match, but their own !important padding wins and they hide the
+   injected button. */
+[data-blume-code-copy] :is(blume-tabs, .not-prose) pre.astro-code,
+[data-blume-code-copy] .prose pre.astro-code:not([data-language]) {
+  padding-top: ${FLUSH_CODE_PADDING_TOP_REM}rem;
 }
 
 blume-tabs pre[data-language]::before,

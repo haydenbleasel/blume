@@ -1,0 +1,43 @@
+---
+/**
+ * The API reference's sample panel: the right-hand column of an operation
+ * page holding the playground and the request/response examples. OpenAPI,
+ * AsyncAPI and GraphQL operation pages share it, so the layout lives here
+ * once. It stays utility classes rather than a theme rule on purpose: an
+ * ejected site freezes its generated app.css but keeps pulling components from
+ * node_modules through its `@source` glob, so utilities survive a blume
+ * upgrade there and a theme rule would not.
+ *
+ * At xl the panel sits beside the docs column and sticks below the 4rem header
+ * with the same 2rem gap the content keeps. It is bounded to the viewport with
+ * its own scroll region: a grid item's sticky containing block is its row, and
+ * the row is as tall as its tallest item, so a long request schema on the left
+ * would otherwise pin the panel with everything below the fold unreachable
+ * until the left column ended. The tradeoff runs the other way when the left
+ * column is the short one — the row is then only as tall as the capped panel
+ * and the overhang is reached by scrolling the panel, not the page. No
+ * overscroll containment, like the sidebar and table of contents: once the
+ * panel reaches its end, wheel input chains to the page. The scrollbar matches
+ * theirs, the end padding keeps it off the Request card's edge, and the stable
+ * gutter stops a bar appearing at the cap ("Try it" opening, a tab switch)
+ * from narrowing the content on classic-scrollbar platforms.
+ *
+ * The 0.25rem inset (`pt-1 ps-1 pb-1`) keeps the global focus ring — 2px
+ * outline, 2px offset — on the first child, the playground's `<summary>` at
+ * the scroller's origin, inside the padding box where it can paint; the
+ * negative margins pull the box back so the content still aligns with the left
+ * column, and the sticky offset (`top-24` less the inset) and the viewport cap
+ * (`7.5rem` less the inset) are adjusted by the same amount. The end side
+ * uses the same trick at 1rem (`-me-4 pe-4`): the box spills into the page
+ * gutter (`<main>` keeps `xl:px-10`), so the scrollbar and the reserved gutter
+ * live there, off the Request card's edge, and with overlay scrollbars the
+ * cards keep the column's full 28rem; a classic bar costs its own width.
+ */
+---
+
+<div
+  class="xl:-ms-1 xl:-mt-1 xl:-me-4 xl:sticky xl:top-[5.75rem] xl:max-h-[calc(100dvh-7.25rem)] xl:overflow-y-auto xl:scrollbar-thin xl:scrollbar-thumb-border xl:scrollbar-track-transparent xl:[scrollbar-gutter:stable] xl:pt-1 xl:ps-1 xl:pb-1 xl:pe-4"
+  data-operation-panel
+>
+  <slot />
+</div>

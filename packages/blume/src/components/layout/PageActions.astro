@@ -24,6 +24,12 @@ interface Props {
   openInChat?: readonly OpenInChatProvider[];
   /** Localized action labels. */
   strings?: UIStrings["actions"];
+  /**
+   * Draw the top rule and spacing that separate the block from the table of
+   * contents above it. The rail passes `false` when no contents rendered, so
+   * the block does not open an otherwise empty column with a divider.
+   */
+  divider?: boolean;
 }
 
 const {
@@ -35,6 +41,7 @@ const {
   mcpName,
   openInChat,
   strings,
+  divider = true,
 } = Astro.props;
 // Merge over the English defaults so a label missing from a translation (or from
 // a not-yet-regenerated snapshot) still renders instead of coming out blank.
@@ -93,7 +100,7 @@ const menuRowClass =
 ---
 
 <div
-  class="mt-8 space-y-0.5 border-border border-t pt-4"
+  class:list={["space-y-0.5", divider && "mt-8 border-border border-t pt-4"]}
   data-blume-page-actions
   data-i18n-chat-prompt={a.openInChatPrompt}
   data-i18n-copied={a.copied}

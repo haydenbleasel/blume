@@ -297,6 +297,9 @@ const tocHeadings =
   toc.enabled && showToc
     ? headings.filter((h) => h.depth >= toc.minLevel && h.depth <= toc.maxLevel)
     : [];
+// One predicate for both the outline and the page-actions divider under it,
+// so the rail cannot draw a rule under contents that were never rendered.
+const hasToc = tocHeadings.length > 0;
 let gridClass =
   "lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
 if (isBare) {
@@ -527,6 +530,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
   </head>
   <body
     class="bg-background font-sans text-foreground antialiased"
+    data-blume-code-copy=""
     data-blume-code-wrap={codeWrap ? "" : undefined}
     data-blume-image-zoom={imageZoom ? "" : undefined}
     data-i18n-copied={actionStrings.copied}
@@ -683,11 +687,15 @@ const bannerKey = banner?.dismissible ? banner.key : null;
           strings={navStrings}
           wide={isApiOperation}
         />
-        <TableOfContentsSlot
-          headings={tocHeadings}
-          title={strings.toc.title}
-          variant="mobile"
-        />
+        {
+          hasToc && (
+            <TableOfContentsSlot
+              headings={tocHeadings}
+              title={strings.toc.title}
+              variant="mobile"
+            />
+          )
+        }
         <PageHeaderSlot headings={tocHeadings} page={page} route={page.route} />
         <article class:list={[articleClass]} dir={contentDir}>
           <slot />
@@ -718,12 +726,15 @@ const bannerKey = banner?.dismissible ? banner.key : null;
             class="sticky top-16 hidden h-[calc(100dvh-4rem)] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent overflow-y-auto px-4 pt-6 pb-10 text-sm xl:block"
             data-blume-toc
           >
-            <TableOfContentsSlot
-              headings={tocHeadings}
-              title={strings.toc.title}
-              variant="desktop"
-            />
+            {hasToc && (
+              <TableOfContentsSlot
+                headings={tocHeadings}
+                title={strings.toc.title}
+                variant="desktop"
+              />
+            )}
             <PageActions
+              divider={hasToc}
               editUrl={editUrl}
               exportEpub={exportEpub}
               exportPdf={exportPdf}
