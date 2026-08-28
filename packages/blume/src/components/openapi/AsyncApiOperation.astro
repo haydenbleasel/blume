@@ -17,6 +17,7 @@ import {
   schemaOf,
 } from "./async.ts";
 import type { MessageSample } from "./async-snippets.ts";
+import { DEPRECATED_LABEL_CLASS } from "../colors.ts";
 import { asyncSampleLanguages } from "./async-snippets.ts";
 import { languageSamplePanels } from "./sample-panels.ts";
 import { buildMessage, defaultMessageValues } from "./message.ts";
@@ -126,7 +127,7 @@ const channelBindings = bindingGroups(channel?.bindings);
           {ref.path}
         </code>
         {ref.deprecated && (
-          <span class="font-medium text-[0.625rem] text-orange-600 uppercase tracking-wide dark:text-orange-400">
+          <span class={DEPRECATED_LABEL_CLASS}>
             deprecated
           </span>
         )}

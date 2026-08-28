@@ -1,4 +1,9 @@
 ---
+import {
+  ADMONITION_ICON,
+  ADMONITION_ICON_CLASS,
+  admonitionType,
+} from "../colors.ts";
 import Icon from "../Icon.astro";
 import { withBase } from "../islands/base-path.ts";
 import { contentHref } from "./base-href.ts";
@@ -22,33 +27,20 @@ const external = href?.startsWith("http");
 const isHorizontal = horizontal === true || horizontal === "true";
 const showArrow =
   href && arrow === undefined ? external : arrow === true || arrow === "true";
-const iconByType = {
-  check: "circle-check",
-  danger: "circle-x",
-  info: "info",
-  note: "info",
-  tip: "lightbulb",
-  warning: "triangle-alert",
-};
-const iconClass = {
-  check: "text-green-600 dark:text-green-400",
-  danger: "text-red-600 dark:text-red-400",
-  info: "text-blue-600 dark:text-blue-400",
-  note: "text-muted-foreground/70",
-  tip: "text-accent",
-  warning: "text-amber-600 dark:text-amber-400",
-};
-const iconName = icon ?? (type ? iconByType[type] : undefined);
+// The typed icon shares Callout's table (and its contrast rule); the surface
+// tints are Card's own, a shade lighter than a callout's.
+const kind = type ? admonitionType(type) : undefined;
+const iconName = icon ?? (kind ? ADMONITION_ICON[kind] : undefined);
 const variantClass = {
-  check: "border-green-500/30 bg-green-500/10",
   danger: "border-red-500/30 bg-red-500/10",
   info: "border-blue-500/30 bg-blue-500/10",
   note: "border-border bg-muted/40",
+  success: "border-green-500/30 bg-green-500/10",
   // 6% for the same reason as Callout: the accent defaults to near black, and
   // muted body text on a 10% black tint misses WCAG AA.
   tip: "border-accent/30 bg-accent/6",
   warning: "border-amber-500/30 bg-amber-500/10",
-}[type ?? "note"];
+}[kind ?? "note"];
 ---
 
 <Tag
@@ -77,7 +69,7 @@ const variantClass = {
   <div class="p-5">
   {
     iconName && (
-      <div class:list={["mb-2.5", color ? "" : type ? iconClass[type] : "text-accent"]}>
+      <div class:list={["mb-2.5", color ? "" : kind ? ADMONITION_ICON_CLASS[kind] : "text-accent"]}>
         <Icon color={color} name={iconName} size={20} />
       </div>
     )

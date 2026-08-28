@@ -14,6 +14,7 @@ import {
   type SecurityRequirementLike,
   type SecuritySchemeLike,
 } from "./security.ts";
+import { DEPRECATED_LABEL_CLASS } from "../colors.ts";
 import { sampleLanguages } from "./snippets.ts";
 import AsyncApiOperation from "./AsyncApiOperation.astro";
 import GraphqlOperation from "./GraphqlOperation.astro";
@@ -141,7 +142,7 @@ const languages = sampleLanguages(spec?.codeSamples ?? []);
           {ref.path}
         </code>
         {operation.deprecated && (
-          <span class="font-medium text-[0.625rem] text-orange-600 uppercase tracking-wide dark:text-orange-400">
+          <span class={DEPRECATED_LABEL_CLASS}>
             deprecated
           </span>
         )}

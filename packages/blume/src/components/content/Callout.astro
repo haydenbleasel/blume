@@ -1,36 +1,24 @@
 ---
+import {
+  ADMONITION_ICON,
+  ADMONITION_ICON_CLASS,
+  type AdmonitionType,
+  admonitionType,
+} from "../colors.ts";
 import Icon from "../Icon.astro";
 
-type CalloutType =
-  | "info"
-  | "note"
-  | "tip"
-  | "success"
-  | "check"
-  | "warning"
-  | "danger";
-
 interface Props {
-  type?: CalloutType;
+  type?: AdmonitionType | "check";
   title?: string;
   icon?: unknown;
   color?: string;
 }
 
 const { color, icon, type = "info", title } = Astro.props;
+// `check` is an alias of `success`; fold it once so the tables need one row.
+const kind = admonitionType(type);
 
-const iconByType: Record<CalloutType, string> = {
-  check: "circle-check",
-  danger: "circle-x",
-  info: "info",
-  note: "info",
-  success: "circle-check",
-  tip: "lightbulb",
-  warning: "triangle-alert",
-};
-
-const variantClass: Record<CalloutType, string> = {
-  check: "border-green-500/25 bg-green-500/10",
+const variantClass: Record<AdmonitionType, string> = {
   danger: "border-red-500/25 bg-red-500/10",
   info: "border-blue-500/25 bg-blue-500/10",
   note: "border-border bg-muted",
@@ -42,27 +30,18 @@ const variantClass: Record<CalloutType, string> = {
   tip: "border-accent/25 bg-accent/6",
   warning: "border-amber-500/25 bg-amber-500/10",
 };
-
-const iconClass: Record<CalloutType, string> = {
-  check: "text-green-600 dark:text-green-400",
-  danger: "text-red-600 dark:text-red-400",
-  info: "text-blue-600 dark:text-blue-400",
-  note: "text-muted-foreground/70",
-  success: "text-green-600 dark:text-green-400",
-  tip: "text-accent",
-  warning: "text-amber-600 dark:text-amber-400",
-};
 ---
 
 <aside
   class:list={[
     "not-prose my-5 flex flex-row items-start gap-2 rounded-blume border px-4 py-3 font-sans text-muted-foreground text-sm leading-6 [&_a]:underline [&_a]:decoration-current/50 [&_code]:font-mono",
-    color ? "bg-background" : variantClass[type],
+    color ? "bg-background" : variantClass[kind],
   ]}
+  data-blume-callout={kind}
   style={color ? `border:1px solid ${color};color:${color}` : undefined}
 >
-  <span class:list={["mt-0.5 shrink-0", color ? "" : iconClass[type]]}>
-    <Icon color={color} icon={icon ?? iconByType[type]} size={16} />
+  <span class:list={["mt-0.5 shrink-0", color ? "" : ADMONITION_ICON_CLASS[kind]]}>
+    <Icon color={color} icon={icon ?? ADMONITION_ICON[kind]} size={16} />
   </span>
   {/* The global prose rule leaks a 1rem margin onto these paragraphs/lists even
       though the callout is not-prose; with a title the body isn't the first

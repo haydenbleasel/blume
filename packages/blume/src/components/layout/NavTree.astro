@@ -2,6 +2,7 @@
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { NavNode } from "../../core/types.ts";
+import { methodColor } from "../colors.ts";
 import Icon from "../Icon.astro";
 import { withBase } from "../islands/base-path.ts";
 import Self from "./NavTree.astro";
@@ -44,28 +45,11 @@ const n = { ...EN_UI.nav, ...strings };
 
 const badgeBase =
   "shrink-0 rounded-full px-1.5 py-0.5 font-medium text-[0.65rem] leading-none";
-const badgeClass = `${badgeBase} bg-muted text-muted-foreground`;
 // HTTP-method, AsyncAPI-action, and GraphQL operation-kind badges (from a
-// reference's sidebar) are color-coded to match MethodBadge; every other
-// badge keeps the neutral style.
-const METHOD_BADGE: Record<string, string> = {
-  DELETE: "bg-red-500/15 text-red-700 dark:text-red-300",
-  GET: "bg-green-500/15 text-green-700 dark:text-green-300",
-  HEAD: "bg-muted text-muted-foreground",
-  MUTATION: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  OPTIONS: "bg-muted text-muted-foreground",
-  PATCH: "bg-yellow-500/20 text-yellow-800 dark:text-yellow-300",
-  POST: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  PUT: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-  QUERY: "bg-green-500/15 text-green-700 dark:text-green-300",
-  RECEIVE: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
-  SEND: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  SUBSCRIPTION: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-};
-const badgeClassFor = (badge: string): string => {
-  const method = METHOD_BADGE[badge.toUpperCase()];
-  return method ? `${badgeBase} ${method}` : badgeClass;
-};
+// reference's sidebar) share MethodBadge's table; every other badge falls
+// through to the same neutral style.
+const badgeClassFor = (badge: string): string =>
+  `${badgeBase} ${methodColor(badge)}`;
 const deprecatedClass =
   "shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-medium text-[0.65rem] text-amber-700 leading-none dark:text-amber-300";
 
