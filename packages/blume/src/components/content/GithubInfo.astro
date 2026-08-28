@@ -20,17 +20,21 @@ interface Props {
   token?: string;
 }
 
-// The resolved config exposes the repo as `repoUrl`, not `github`; parse the
-// owner/repo back out so <GithubInfo /> can default to the configured repo.
-const repoMatch = data.config.repoUrl?.match(
-  /github\.com\/(?<owner>[^/]+)\/(?<repo>[^/]+)/u
-);
-const owner = Astro.props.owner ?? repoMatch?.groups?.owner;
-const repo = Astro.props.repo ?? repoMatch?.groups?.repo;
+// `data.config.github` carries the configured repo's coordinates, so the card
+// defaults to it and addresses the right instance — an Enterprise host serves
+// both the link and the API from somewhere other than github.com. Explicit
+// `owner`/`repo` props are read against that same instance; with no `github`
+// configured at all, they fall back to the public one.
+const configured = data.config.github;
+const owner = Astro.props.owner ?? configured?.owner;
+const repo = Astro.props.repo ?? configured?.repo;
 const token = Astro.props.token ?? process.env.GITHUB_TOKEN;
+const host = configured?.host ?? "https://github.com";
 
 const info =
-  owner && repo ? await fetchRepositoryInfo({ owner, repo, token }) : null;
+  owner && repo
+    ? await fetchRepositoryInfo({ baseUrl: configured?.api, owner, repo, token })
+    : null;
 
 // Compact notation matches GitHub's own counts (e.g. 1.2k, 34.5k).
 const numbers = new Intl.NumberFormat("en", {
@@ -46,7 +50,7 @@ const statIcon =
   owner && repo && (
     <a
       class="not-prose my-6 flex flex-col gap-2 rounded-blume border border-border p-4 no-underline! transition-colors hover:border-foreground/30 hover:bg-muted/40"
-      href={`https://github.com/${owner}/${repo}`}
+      href={`${host}/${owner}/${repo}`}
       rel="noreferrer"
       target="_blank"
     >

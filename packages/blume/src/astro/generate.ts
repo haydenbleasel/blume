@@ -45,6 +45,11 @@ import type {
 } from "../core/data.ts";
 import { BlumeError } from "../core/diagnostics.ts";
 import { writeTextAtomic } from "../core/fs-atomic.ts";
+import {
+  apiUrl as githubApiUrl,
+  editBaseUrl as githubEditBaseUrl,
+  repoUrl as githubRepoUrl,
+} from "../core/github.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import { resolveFallbackLocale } from "../core/i18n.ts";
 import { buildIncludeGraph } from "../core/includes.ts";
@@ -1169,14 +1174,29 @@ const resolveOgDescription = (config: ResolvedConfig): string | undefined => {
   return configured ?? config.description;
 };
 
+/**
+ * Repo coordinates for content components. `host` and the derived `api` ride
+ * along so a card on an Enterprise site links and queries that instance rather
+ * than the public one.
+ */
+const resolveGithubData = (
+  github: ResolvedConfig["github"]
+): BlumeData["config"]["github"] =>
+  github
+    ? {
+        api: githubApiUrl(github),
+        host: github.host,
+        owner: github.owner,
+        repo: github.repo,
+      }
+    : null;
+
 /** Serialize the content graph into the data module the runtime consumes. */
 export const buildRuntimeData = (project: BlumeProject): string => {
   const { config, context, graph, manifest } = project;
   const { github } = config;
-  const repoUrl = github
-    ? `https://github.com/${github.owner}/${github.repo}`
-    : null;
-  const editBase = github ? `${repoUrl}/edit/${github.branch}` : null;
+  const repoUrl = github ? githubRepoUrl(github) : null;
+  const editBase = github ? githubEditBaseUrl(github) : null;
   const logo = resolveLogo(project);
   const ogLogo = resolveOgMark(project, logo?.svg);
 
@@ -1273,6 +1293,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       },
       favicon: resolveFavicon(project),
       feedback: config.feedback,
+      github: resolveGithubData(github),
       i18n: i18n
         ? {
             defaultLocale: i18n.defaultLocale,

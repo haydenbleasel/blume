@@ -1530,10 +1530,11 @@ export function getStaticPaths() {
   return paths;
 }
 
-// Footer branding shared by every card. The repo slug reuses the header link
-// URL; the site text (host plus deployment base) is resolved at generate time.
-const repoSlug = data.config.repoUrl
-  ? data.config.repoUrl.split("github.com/")[1]
+// Footer branding shared by every card. The slug comes from the configured
+// repo rather than the URL, so an Enterprise host reads the same as github.com;
+// the site text (host plus deployment base) is resolved at generate time.
+const repoSlug = data.config.github
+  ? \`\${data.config.github.owner}/\${data.config.github.repo}\`
   : undefined;
 
 export async function GET({ props }: { props: { title: string } }) {

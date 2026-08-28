@@ -136,6 +136,13 @@ export interface BlumeDataConfig {
   discovery: { agentReadability: boolean; llmsTxt: boolean; sitemap: boolean };
   favicon: BlumeFavicon;
   feedback: boolean;
+  /**
+   * Repo coordinates for content components that address the API or build
+   * their own repo links (`<GithubInfo>`, the OG card's footer slug), carrying
+   * `host`/`api` so an Enterprise instance is reachable; `null` when `github`
+   * is unset. The plain repository URL stays on `repoUrl`.
+   */
+  github: { api: string; host: string; owner: string; repo: string } | null;
   i18n: BlumeDataI18n | null;
   /**
    * Site identity for JSON-LD (`seo.organization`, `seo.software`), read by

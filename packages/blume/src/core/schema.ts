@@ -1479,9 +1479,13 @@ const seoConfigSchema = z.strictObject({
 });
 
 const githubConfigSchema = z.strictObject({
+  /** REST API base. Derived from `host` when unset. */
+  api: z.url().optional(),
   branch: z.string().default("main"),
   /** Path from the repo root to the project root (for monorepos). */
   dir: z.string().optional(),
+  /** Origin of the GitHub instance, for Enterprise installations. */
+  host: z.url().default("https://github.com"),
   owner: z.string(),
   repo: z.string(),
 });

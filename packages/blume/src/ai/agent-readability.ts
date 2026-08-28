@@ -1,4 +1,5 @@
 import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import { repoUrl } from "../core/github.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ContentSignalPolicy, ContentSignals } from "../core/schema.ts";
 import { absoluteUrl } from "../core/site-url.ts";
@@ -175,7 +176,7 @@ export const buildAgentReadability = (
     manifest.contentUsage = usage;
   }
   if (config.github) {
-    manifest.repository = `https://github.com/${config.github.owner}/${config.github.repo}`;
+    manifest.repository = repoUrl(config.github);
   }
 
   return manifest;
