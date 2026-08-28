@@ -52,10 +52,14 @@ const BODY = [
   "",
 ].join("\n");
 
-// SAFETY: `buildSearchDocuments` reads only a page's id, sourcePath, and the
-// meta fields a test sets; the remaining PageRecord fields are unused here.
+// SAFETY: `buildSearchDocuments` reads only a page's id, sourcePath, format,
+// and the meta fields a test sets; the remaining PageRecord fields are unused.
 const page = (over: Partial<PageRecord> & Pick<PageRecord, "id">): PageRecord =>
-  ({ sourcePath: join(root, over.id), ...over }) as PageRecord;
+  ({
+    format: over.id.endsWith(".mdx") ? "mdx" : "md",
+    sourcePath: join(root, over.id),
+    ...over,
+  }) as PageRecord;
 
 // SAFETY: the document builder reads only the manifest-route fields listed
 // below; the rest of RouteManifestEntry is unused by these tests.
@@ -85,7 +89,12 @@ const projectWith = (
     manifest: { routes },
   }) as BlumeProject;
 
-/** Fences in the shapes real docs use: titled, and nested tightly in JSX. */
+/**
+ * An MDX page in the shape real docs take: a titled top-level fence, prose and
+ * a fence indented inside nested components, inline JSX, an expression, and
+ * an ESM export. CommonMark would fold each component into one html node and
+ * read its indented children as an indented code block.
+ */
 const CODE_BODY = [
   "---",
   "title: C",
@@ -98,18 +107,42 @@ const CODE_BODY = [
   "export const retryPolicy = 1;",
   "```",
   "",
-  // No blank lines around the fence: CommonMark folds the whole component
-  // into one html node, so the fence never reaches the `code` case directly.
-  '<Tab title="npm">',
-  "```bash",
-  "npm install blume",
-  "```",
-  "</Tab>",
+  "<Steps>",
+  '  <Step title="Install">',
+  "    Run the installer with npm.",
   "",
-  // An html block whose opener never closes on its line has no tag-shaped run
-  // to strip, so it is indexed verbatim.
-  "<div",
-  "unterminated opener text",
+  "    ```bash",
+  "    npm install blume",
+  "",
+  "    npm run dev",
+  "    ```",
+  "  </Step>",
+  "</Steps>",
+  "",
+  "Press <Kbd>k</Kbd> to open {props.count} results.",
+  "",
+  ":::note[Heads up]",
+  "Directive prose survives.",
+  ":::",
+  "",
+  "$$",
+  "\\sum_{i=1}^n x_i",
+  "$$",
+  "",
+  "H~2~O costs $5.",
+  "",
+  "export const meta = { draft: false };",
+  "",
+].join("\n");
+
+/** MDX rejects HTML comments; the extractor must fall back, not drop the page. */
+const COMMENT_BODY = [
+  "---",
+  "title: D",
+  "---",
+  "<!-- editors: keep this list sorted -->",
+  "",
+  "Fallback prose survives.",
   "",
 ].join("\n");
 
@@ -137,7 +170,8 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "blume-search-"));
   await writeFile(join(root, "a.md"), BODY);
   await writeFile(join(root, "vis.md"), VIS_BODY);
-  await writeFile(join(root, "code.md"), CODE_BODY);
+  await writeFile(join(root, "code.mdx"), CODE_BODY);
+  await writeFile(join(root, "comment.mdx"), COMMENT_BODY);
 });
 
 afterAll(async () => {
@@ -352,29 +386,51 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("# Heading");
   });
 
-  describe("search.indexing.includeCodeBlocks", () => {
-    const codeProject = (includeCodeBlocks: boolean) =>
+  describe("MDX pages", () => {
+    const mdxProject = (
+      id: string,
+      config: z.input<typeof blumeConfigSchema> = {}
+    ) =>
       projectWith(
-        [page({ id: "code.md" })],
-        [route({ id: "code.md", sourcePath: join(root, "code.md") })],
-        { search: { indexing: { includeCodeBlocks } } }
+        [page({ id })],
+        [route({ id, sourcePath: join(root, id) })],
+        config
       );
 
-    it("strips fences everywhere by default, even nested tightly in JSX", async () => {
-      const [doc] = await buildSearchDocuments(codeProject(false));
+    it("indexes prose inside components, however indented, and skips JSX/ESM", async () => {
+      const [doc] = await buildSearchDocuments(mdxProject("code.mdx"));
       expect(doc?.content).toContain("Prose before");
-      expect(doc?.content).not.toContain("retryPolicy");
-      expect(doc?.content).not.toContain("blume.config.ts");
-      // The tight `<Tab>` wrapper is one html node; its fence must still be
-      // recognized as code rather than indexed as raw text.
-      expect(doc?.content).not.toContain("npm install blume");
-      expect(doc?.content).not.toContain("```");
-      expect(doc?.content).not.toContain("<Tab");
-      expect(doc?.content).toContain("unterminated opener text");
+      expect(doc?.content).toContain("Run the installer with npm");
+      // Inline JSX keeps its text without a space break; expressions and ESM
+      // are code, not prose.
+      expect(doc?.content).toContain("Press k to open results");
+      // The renderer's feature set applies: directives and block math parse
+      // (a `{…}` inside `$$` would otherwise fail the MDX parse), and
+      // sub/superscript stay attached to their word.
+      expect(doc?.content).toContain("Heads up Directive prose survives");
+      expect(doc?.content).not.toContain(":::");
+      expect(doc?.content).toContain("H2O costs $5");
+      expect(doc?.content).not.toContain("props.count");
+      expect(doc?.content).not.toContain("draft");
+      expect(doc?.content).not.toContain("<Step");
+      expect(doc?.content).not.toContain("title=");
     });
 
-    it("indexes fence bodies and titles when opted in via config", async () => {
-      const [doc] = await buildSearchDocuments(codeProject(true));
+    it("strips fences everywhere by default, including inside components", async () => {
+      const [doc] = await buildSearchDocuments(mdxProject("code.mdx"));
+      expect(doc?.content).not.toContain("retryPolicy");
+      expect(doc?.content).not.toContain("blume.config.ts");
+      expect(doc?.content).not.toContain("npm install blume");
+      expect(doc?.content).not.toContain("npm run dev");
+      expect(doc?.content).not.toContain("```");
+    });
+
+    it("indexes fence bodies and titles when search.indexing.includeCodeBlocks is set", async () => {
+      const [doc] = await buildSearchDocuments(
+        mdxProject("code.mdx", {
+          search: { indexing: { includeCodeBlocks: true } },
+        })
+      );
       expect(doc?.content).toContain("export const retryPolicy = 1;");
       // The rendered title is searchable; the language, `lineNumbers`, and
       // fence markers are not.
@@ -382,9 +438,16 @@ describe("buildSearchDocuments", () => {
       expect(doc?.content).not.toContain("lineNumbers");
       expect(doc?.content).not.toContain("```");
       expect(doc?.content).not.toMatch(/(?:^|\s)ts(?:\s|$)/u);
-      expect(doc?.content).toContain("npm install blume");
+      // An indented fence inside a component (blank line and all) is one
+      // block, indexed like a top-level one.
+      expect(doc?.content).toContain("npm install blume npm run dev");
       expect(doc?.content).not.toContain("bash");
-      expect(doc?.content).not.toContain("<Tab");
+      expect(doc?.content).not.toContain("<Step");
+    });
+
+    it("falls back to CommonMark when MDX rejects the page", async () => {
+      const [doc] = await buildSearchDocuments(mdxProject("comment.mdx"));
+      expect(doc?.content).toContain("Fallback prose survives");
     });
   });
 

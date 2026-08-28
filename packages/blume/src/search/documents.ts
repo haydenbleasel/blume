@@ -2,6 +2,7 @@ import type { Nodes } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
+import { mdxToMdast } from "satteri";
 
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
@@ -10,8 +11,9 @@ import { parseHeadingMarkers } from "../core/heading-markers.ts";
 import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
-import type { NavNode } from "../core/types.ts";
+import type { NavNode, PageRecord } from "../core/types.ts";
 import { parseCodeTitle } from "../markdown/code-title.ts";
+import { MDX_FEATURES } from "../markdown/features.ts";
 import { pageFacets } from "./facets.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
@@ -78,14 +80,48 @@ const INLINE_PARENTS = new Set([
   "footnoteReference",
   "link",
   "linkReference",
+  "mdxJsxTextElement",
   "strong",
+  "subscript",
+  "superscript",
+]);
+
+// Nodes that never render as prose: image alt text was never indexed, and
+// MDX expressions (`{props.x}`) and ESM (`export const meta`) are code.
+const NON_PROSE = new Set<Nodes["type"]>([
+  "image",
+  "imageReference",
+  "mdxFlowExpression",
+  "mdxTextExpression",
+  "mdxjsEsm",
 ]);
 
 interface PlainTextOptions {
   includeCodeBlocks: boolean;
 }
 
-const parseMarkdown = (markdown: string): Nodes =>
+type PageFormat = PageRecord["format"];
+
+const parseMdx = (markdown: string): Nodes | undefined => {
+  try {
+    return mdxToMdast(markdown, { features: MDX_FEATURES });
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Parse a page body the way the renderer reads it. `.mdx` pages go through
+ * the MDX grammar with the renderer's feature set, so components become
+ * `mdxJsx*` nodes whose children — prose and fences, however they're indented
+ * — walk like top-level content, and `:::` directives and `$$` math parse as
+ * such; CommonMark would instead fold a tight component into one html node and
+ * read its indented children as an indented code block. MDX rejects some input
+ * Blume otherwise tolerates (HTML comments, an unclosed tag), so a failed
+ * parse falls back to CommonMark rather than dropping the page from the index.
+ */
+const parseMarkdown = (markdown: string, format: PageFormat): Nodes =>
+  (format === "mdx" ? parseMdx(markdown) : undefined) ??
   fromMarkdown(markdown, {
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()],
@@ -111,40 +147,18 @@ const collectCode = (
   out.push(node.value, " ");
 };
 
-// A raw-HTML/JSX run. CommonMark parses a block-level `<Callout>` with no
-// blank lines as ONE html node holding all its inner prose, so the node can't
-// just be dropped — strip the tag-shaped runs, then walk what's left as
-// Markdown so a fence nested tightly inside a component (`<Tab>` around a
-// ```bash block) honors `includeCodeBlocks` like a top-level one. Each strip
-// that changes the text shortens it, so the re-walk terminates.
-const collectHtml = (
-  node: Extract<Nodes, { type: "html" }>,
-  out: string[],
-  options: PlainTextOptions
-): void => {
-  const stripped = node.value.replaceAll(HTML_OR_JSX, " ");
-  if (stripped === node.value) {
-    out.push(stripped);
-    return;
-  }
-  // oxlint-disable-next-line no-use-before-define -- mutual recursion: the re-walk of a component's body goes back through the node dispatcher
-  collectText(parseMarkdown(stripped), out, options);
-};
-
 /** Fold one mdast node into the plain-text accumulator. */
 const collectText = (
   node: Nodes,
   out: string[],
   options: PlainTextOptions
 ): void => {
+  if (NON_PROSE.has(node.type)) {
+    return;
+  }
   switch (node.type) {
     case "code": {
       collectCode(node, out, options);
-      return;
-    }
-    // Image alt text was never indexed.
-    case "image":
-    case "imageReference": {
       return;
     }
     // Inline code is kept verbatim — `Array<T>` is a type parameter, not a
@@ -153,8 +167,12 @@ const collectText = (
       out.push(node.value);
       return;
     }
+    // A raw-HTML run. In a `.md` page (or an `.mdx` page MDX couldn't parse)
+    // CommonMark folds a block-level `<Callout>` with no blank lines into ONE
+    // html node holding all its inner prose, so the node can't just be
+    // dropped — strip the tag-shaped runs and keep the text.
     case "html": {
-      collectHtml(node, out, options);
+      out.push(node.value.replaceAll(HTML_OR_JSX, " "));
       return;
     }
     case "break": {
@@ -208,9 +226,13 @@ const collectText = (
  * reduce correctly. This feeds the client index *and* every hosted-provider
  * record, so anything lost here is a permanent search-quality loss.
  */
-const toPlainText = (markdown: string, options: PlainTextOptions): string => {
+const toPlainText = (
+  markdown: string,
+  format: PageFormat,
+  options: PlainTextOptions
+): string => {
   const out: string[] = [];
-  collectText(parseMarkdown(markdown), out, options);
+  collectText(parseMarkdown(markdown, format), out, options);
   return out.join("").replaceAll(WHITESPACE, " ").trim();
 };
 
@@ -260,6 +282,29 @@ const buildCrumbIndex = (sidebar: NavNode[]): Map<string, Crumbs> => {
   return index;
 };
 
+interface BuildOptions {
+  includeWhenDisabled?: boolean;
+  content?: "markdown" | "plain";
+  audience?: VisibilityAudience;
+}
+
+/** Read a page's body (front matter off) and reduce it per the extraction options. */
+const pageBody = async (
+  project: BlumeProject,
+  page: PageRecord | undefined,
+  options: Pick<BuildOptions, "audience" | "content"> | undefined,
+  plain: PlainTextOptions
+): Promise<string> => {
+  if (!page) {
+    return "";
+  }
+  const source = matter(await readExpandedEntryText(project, page)).content;
+  const visible = applyAudienceVisibility(source, options?.audience ?? "web");
+  return options?.content === "markdown"
+    ? visible.trim()
+    : toPlainText(visible, page.format, plain);
+};
+
 /**
  * Build search documents from the content graph. Only indexable pages are
  * included (per the route manifest), and content comes from the source files,
@@ -286,11 +331,7 @@ const buildCrumbIndex = (sidebar: NavNode[]): Map<string, Crumbs> => {
  */
 export const buildSearchDocuments = async (
   project: BlumeProject,
-  options?: {
-    includeWhenDisabled?: boolean;
-    content?: "markdown" | "plain";
-    audience?: VisibilityAudience;
-  }
+  options?: BuildOptions
 ): Promise<SearchDocument[]> => {
   const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
   const plain: PlainTextOptions = {
@@ -330,16 +371,7 @@ export const buildSearchDocuments = async (
   return await Promise.all(
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
-      const raw = page ? await readExpandedEntryText(project, page) : "";
-      const source = raw ? matter(raw).content : "";
-      const visible = applyAudienceVisibility(
-        source,
-        options?.audience ?? "web"
-      );
-      const body =
-        options?.content === "markdown"
-          ? visible.trim()
-          : toPlainText(visible, plain);
+      const body = await pageBody(project, page, options, plain);
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       const facets = page ? pageFacets(page, project.config) : undefined;

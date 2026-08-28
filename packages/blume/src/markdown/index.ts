@@ -12,6 +12,7 @@ import { codeToHtml } from "shiki";
 import { baseLinksPlugin } from "./base-links.ts";
 import { codeTitleTransformer } from "./code-title.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
+import { MARKDOWN_FEATURES, MDX_FEATURES } from "./features.ts";
 import { headingAnchorPlugin } from "./heading-anchors.ts";
 import { includePlugin } from "./include.ts";
 import { inlineCodeHighlightPlugin } from "./inline-code.ts";
@@ -248,8 +249,6 @@ export const highlightCode = async (
  * frontmatter, and smart punctuation are already on; this adds superscript
  * (`^text^`) and subscript (`~text~`), which render to native `<sup>`/`<sub>`.
  */
-const FEATURES = { subscript: true, superscript: true };
-
 /** Options shared by both processors. */
 export interface BlumeMarkdownOptions {
   /**
@@ -308,7 +307,7 @@ const blumeIncludePlugin = (options: BlumeMarkdownOptions): MdastPlugin =>
 /** Sätteri processor for plain `.md`, with Blume's curated feature set. */
 export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
   satteri({
-    features: { ...FEATURES },
+    features: { ...MARKDOWN_FEATURES },
     hastPlugins: blumeHastPlugins(options),
     mdastPlugins: [
       blumeIncludePlugin(options),
@@ -337,12 +336,7 @@ export type BlumeMdxOptions = BlumeMarkdownOptions;
  */
 export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
   satteri({
-    features: {
-      ...FEATURES,
-      directive: true,
-      // Block-only: `$$…$$` parses, a bare `$` stays literal text.
-      math: { singleDollarTextMath: false },
-    },
+    features: { ...MDX_FEATURES },
     hastPlugins: blumeHastPlugins(options),
     mdastPlugins: [
       blumeIncludePlugin(options),
