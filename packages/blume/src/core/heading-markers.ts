@@ -3,7 +3,12 @@
  * verbatim: `## Heading [#custom-id]` pins the anchor id, `## Heading [!toc]`
  * keeps the heading on the page but out of the table of contents, and
  * `## Heading [toc]` shows it only in the table of contents. Markers chain in
- * any order (`## Heading [toc] [#id]`).
+ * any order (`## Heading [toc] [#id]`). The `{#id}` pin of Pandoc, kramdown,
+ * and Markdown-based specification toolchains is accepted as an equivalent of
+ * `[#id]` — in `.md` verbatim, in `.mdx` only as the escape `\{#id\}` (a bare
+ * `{…}` there is a JSX expression; the scan-time scanner reports one as
+ * `BLUME_MDX_CURLY_ANCHOR`). Both pipelines resolve escapes before parsing
+ * markers, so the escaped and bare spellings reach this parser identically.
  *
  * Both heading pipelines share this parser — the render-time hast plugin
  * (`markdown/heading-anchors.ts`) and the scan-time source scanner
@@ -37,7 +42,7 @@ const MARKER =
   /\s*(?:\{#(?<curlyId>[^\s}]+)\}|\[(?:#(?<id>[^\s\]]+)|(?<hide>!)?toc)\])\s*$/u;
 
 export interface HeadingMarkers {
-  /** Author-pinned anchor id from `[#id]`, used verbatim (never re-slugged). */
+  /** Author-pinned anchor id from `[#id]` or `{#id}`, used verbatim (never re-slugged). */
   id?: string;
   /** The heading text with every trailing marker stripped. */
   text: string;
@@ -74,6 +79,7 @@ export const parseHeadingMarkers = (
       explicitId === undefined
         ? `${match.groups.hide ?? ""}toc`
         : `#${explicitId}`;
+    // A `{#id}` is never a shortcut link, whatever the definitions say.
     if (match.groups.curlyId === undefined && isRefDefined?.(label)) {
       break;
     }

@@ -160,7 +160,7 @@ const buildAnchorIndex = (pages: PageRecord[]): Map<string, Set<string>> => {
       page.route,
       new Set([
         ...page.headings.map((heading) => heading.slug),
-        ...(page.anchors ?? []),
+        ...page.anchors,
       ])
     );
   }

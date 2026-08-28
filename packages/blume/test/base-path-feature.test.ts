@@ -296,6 +296,7 @@ const makePage = (
   links: PageLink[],
   navPath: string
 ): PageRecord => ({
+  anchors: [],
   contentType: "doc",
   format: "mdx",
   groups: [],

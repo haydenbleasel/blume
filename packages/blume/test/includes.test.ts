@@ -973,6 +973,50 @@ describe("normalizeEntry with an expansion", () => {
       { column: 5, line: 2, target: "/y" },
     ]);
   });
+
+  it("reports a partial's {#id} marker against the partial when the page is .mdx", () => {
+    const { diagnostics } = normalizeEntry(
+      {
+        body: { format: "mdx", text: "# X\n" },
+        data: {},
+        expanded: {
+          includes: ["/abs/_partials/model.md"],
+          // Line 1 came from the partial, line 2 from the page itself, and
+          // line 3 has no mapping and passes through as a page line.
+          origins: [
+            { file: "/abs/_partials/model.md", line: 3 },
+            { file: "/abs/page.mdx", line: 9 },
+          ],
+          text: "## A {#a}\n## B {#b}\n## C {#c}",
+        },
+        ref: "page.mdx",
+        sourcePath: "/abs/page.mdx",
+      },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    expect(
+      diagnostics.map(({ file, line, message }) => ({ file, line, message }))
+    ).toStrictEqual([
+      {
+        file: "/abs/_partials/model.md",
+        line: 3,
+        message:
+          "`{#a}` is a JSX expression once this partial is included in /abs/page.mdx (.mdx), so that page fails to compile.",
+      },
+      {
+        file: "/abs/page.mdx",
+        line: 9,
+        message:
+          "`{#b}` is a JSX expression in .mdx, so this page fails to compile.",
+      },
+      {
+        file: "/abs/page.mdx",
+        line: 3,
+        message:
+          "`{#c}` is a JSX expression in .mdx, so this page fails to compile.",
+      },
+    ]);
+  });
 });
 
 /** A content source stub for the expansion-gate tests. */

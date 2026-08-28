@@ -108,7 +108,9 @@ const collectText = (node: Nodes, out: string[]): void => {
       out.push(" ");
       return;
     }
-    // Trailing heading markers (`[#custom-id]`, `[!toc]`, `[toc]`) are anchor
+    // Trailing heading markers (`[#custom-id]`, `{#custom-id}`, `[!toc]`,
+    // `[toc]`) are anchor
+
     // metadata, not prose — strip them so they never pollute the index. Only
     // a marker that ends the heading's final plain-text child counts,
     // mirroring the renderer: a heading ending in inline code or an image

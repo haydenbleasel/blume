@@ -2,8 +2,9 @@
  * Heading ids, trailing markers, and self-linking anchors. A Satteri hast
  * plugin runs after Markdown is turned into hast and, for every heading:
  *
- * - parses Fumadocs-style trailing markers (`[#custom-id]`, `[!toc]`, `[toc]`
+ * - parses trailing markers (`[#custom-id]`, `{#custom-id}`, `[!toc]`, `[toc]`
  *   — see `core/heading-markers.ts`) and strips them from the rendered text;
+
  * - assigns the anchor `id` (the `[#custom-id]` pin, else a `github-slugger`
  *   slug of the marker-free text);
  * - wraps `<h2>`–`<h6>` content in an `<a href="#slug">` so a reader can click

@@ -19,13 +19,21 @@ Structure a page with headings. Blume renders your frontmatter `title` as the pa
 
 ### Custom anchors
 
-Anchor ids are generated from the heading text, so a reworded heading gets a new anchor. Append `[#custom-id]` to pin the anchor instead — the marker never renders, and links keep working no matter how the heading reads. The `{#custom-id}` form used by several Markdown specification toolchains is accepted as an equivalent. Pinned anchors also stay identical across [translated locales](/docs/content/i18n), where auto-generated ids would otherwise differ per language.
+Anchor ids are generated from the heading text, so a reworded heading gets a new anchor. Append `[#custom-id]` to pin the anchor instead — the marker never renders, and links keep working no matter how the heading reads. Pinned anchors also stay identical across [translated locales](/docs/content/i18n), where auto-generated ids would otherwise differ per language.
 
 ```md
 ## Getting started [#setup]
 ```
 
 Link to it as `/page#setup`. The syntax matches Fumadocs, so migrated content works verbatim.
+
+The `{#custom-id}` form used by Pandoc, kramdown, and Markdown-based specification toolchains is accepted as an equivalent in `.md` files. In `.mdx`, a bare `{…}` is a JSX expression and the page fails to compile — `blume check` reports the marker as `BLUME_MDX_CURLY_ANCHOR` — so write `[#custom-id]` there, or escape the braces. The escaped form pins the same anchor in both formats, which makes it the right spelling for a partial that `.mdx` pages [include](/docs/content/includes):
+
+```md
+## Getting started \{#setup\}
+```
+
+Fragment links can also target a raw HTML element with an `id` (`<a id="setup"></a>`); `blume validate` accepts those alongside heading anchors.
 
 ### Table of contents markers
 

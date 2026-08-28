@@ -200,35 +200,80 @@ const PROMPT_OPEN = /^<Prompt(?![\w-])/u;
 const PROMPT_CLOSE = /<\/Prompt>/u;
 
 /**
- * The body lines, minus a leading front matter block. Bodies from the
- * normalize pipeline are already frontmatter-stripped, but `extractHeadings`
- * also runs on raw documents — where a leading `---` block (closed by `---` or
- * `...`) is front matter, not a thematic break whose closing `---` would
- * underline the last metadata line into a phantom setext heading.
+ * The body lines, minus a leading front matter block, plus the height of the
+ * block that was dropped (`offset`) so line numbers can be reported against
+ * the whole body. Bodies from the normalize pipeline are already
+ * frontmatter-stripped, but `scanBody` also runs on raw documents — where a
+ * leading `---` block (closed by `---` or `...`) is front matter, not a
+ * thematic break whose closing `---` would underline the last metadata line
+ * into a phantom setext heading.
  */
-const linesWithoutFrontMatter = (body: string): string[] => {
+const linesWithoutFrontMatter = (body: string) => {
   const lines = body.split("\n");
   if (!/^-{3}\s*$/u.test(lines[0] ?? "")) {
-    return lines;
+    return { lines, offset: 0 };
   }
   // A blank line directly after the dashes means the body *opens* with a
   // thematic break, not front matter — YAML metadata starts on the very next
   // line. Treating it as an unclosed block ate everything up to the next
   // `---`/`...` line of an already-stripped body.
   if ((lines[1] ?? "").trim() === "") {
-    return lines;
+    return { lines, offset: 0 };
   }
   const close = lines.findIndex(
     (line, index) => index > 0 && FRONT_MATTER_CLOSE.test(line)
   );
-  return close === -1 ? lines : lines.slice(close + 1);
+  return close === -1
+    ? { lines, offset: 0 }
+    : { lines: lines.slice(close + 1), offset: close + 1 };
 };
+
+// A trailing `{#id}` heading marker written without a backslash escape. Both
+// pipelines resolve escapes before parsing markers (see `ESCAPED_PUNCTUATION`),
+// so `\{#id\}` is the same marker — and the only spelling that survives the
+// MDX parser, where a bare `{…}` is a JSX expression and `#id` is not a valid
+// one (`Could not parse expression with acorn`). Further bracket markers may
+// follow the brace (`{#id} [toc]`), nothing else.
+const BARE_CURLY_MARKER =
+  /(?<!\\)\{#(?<id>[^\s}]+)\}(?:\s*\[(?:#[^\s\]]+|!?toc)\])*\s*$/u;
+
+// A raw HTML element carrying an `id` — `<a id="…">`, `<section id='…'>`,
+// the unquoted `<a id=plain>`, or the JSX spelling `<div id={"…"}>` — whose
+// element is a fragment-link target outside headings. Lowercase tags only: a
+// capitalized `<YouTube id="…">` is a component prop, not a DOM id (the
+// `JSX_OPEN` split below). `[^<>]` bounds the attribute run, so a wrapped tag
+// (`<div\n  id="x"\n>`) still matches while a long tag-free line can't
+// backtrack quadratically, and the run never reaches into a neighboring tag.
+const HTML_ID =
+  /<[a-z][a-z0-9-]*(?:\s[^<>]*?)?\sid=(?:(?<quote>["'])(?<quoted>[^"'<>]+)\k<quote>|\{(?<jsxQuote>["'])(?<jsx>[^"'<>]+)\k<jsxQuote>\}|(?<bare>[^\s"'=<>`{}]+))/gu;
+// Commented-out markup renders nothing; matched across lines once the
+// scannable lines are joined back together.
+const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
+export const INLINE_CODE = /`[^`]*`/gu;
+
+/** A heading whose trailing `{#id}` marker is unescaped — see `BARE_CURLY_MARKER`. */
+export interface CurlyMarker {
+  id: string;
+  /** 1-based line of the heading (a setext heading's first text line) in the body. */
+  line: number;
+}
 
 /** Scanner state: the open fence plus the paragraph lines accumulated so far. */
 interface HeadingScanState {
+  /**
+   * Lines eligible to hold an HTML `id` — outside fences and `<Prompt>`
+   * regions, inline code masked — collected for one `HTML_ID` pass at the
+   * end so a tag wrapped over several lines still matches.
+   */
+  anchorLines: string[];
+  curlyMarkers: CurlyMarker[];
   fence: FenceState;
+  /** 1-based body line of the line being scanned. */
+  line: number;
   /** Consecutive paragraph lines — the candidate text for a setext underline. */
   paragraph: string[];
+  /** Body line of the first line in `paragraph`. */
+  paragraphStart: number;
   /** Nesting depth inside `<Prompt>...</Prompt>` — 0 when outside one. */
   promptDepth: number;
   /** True inside a multi-line `<Prompt` opening tag, awaiting its `>`. */
@@ -340,6 +385,62 @@ const toHeading = (
   return { depth, slug: slugger.slug(text), text };
 };
 
+/** Record a heading's unescaped trailing `{#id}` so `.mdx` pages can be warned. */
+const noteCurlyMarker = (
+  text: string,
+  line: number,
+  state: HeadingScanState
+): void => {
+  const id = text.match(BARE_CURLY_MARKER)?.groups?.id;
+  if (id !== undefined) {
+    state.curlyMarkers.push({ id, line });
+  }
+};
+
+/** Scan a line outside fences and prompts: an anchor host, a heading, or prose. */
+const scanContentLine = (
+  line: string,
+  state: HeadingScanState,
+  slugger: GithubSlugger,
+  headings: Heading[],
+  isRefDefined: (label: string) => boolean
+): void => {
+  // Inline code is masked so a documented `<a id="…">` isn't an anchor.
+  state.anchorLines.push(line.replaceAll(INLINE_CODE, ""));
+  const atx = line.match(ATX_HEADING);
+  if (atx?.groups) {
+    const depth = atx.groups.hashes?.length ?? 1;
+    const text = (atx.groups.text ?? "").trim();
+    headings.push(toHeading(depth, text, slugger, isRefDefined));
+    noteCurlyMarker(text, state.line, state);
+    state.paragraph = [];
+    return;
+  }
+  const setext = line.match(SETEXT_UNDERLINE);
+  if (setext?.groups && state.paragraph.length > 0) {
+    // Setext wins over thematic break when it closes a paragraph (CommonMark);
+    // a multi-line paragraph renders as one heading, soft breaks as spaces.
+    const depth = setext.groups.marker?.startsWith("=") ? 1 : 2;
+    const text = state.paragraph.join(" ").trim();
+    headings.push(toHeading(depth, text, slugger, isRefDefined));
+    noteCurlyMarker(text, state.paragraphStart, state);
+    state.paragraph = [];
+    return;
+  }
+  if (
+    line.trim() === "" ||
+    THEMATIC_BREAK.test(line) ||
+    PARAGRAPH_INTERRUPT.test(line)
+  ) {
+    state.paragraph = [];
+    return;
+  }
+  if (state.paragraph.length === 0) {
+    state.paragraphStart = state.line;
+  }
+  state.paragraph.push(line.trim());
+};
+
 /** Scan one line for a heading, advancing the fence/paragraph state. */
 const scanHeadingLine = (
   line: string,
@@ -378,79 +479,64 @@ const scanHeadingLine = (
     state.paragraph = [];
     return;
   }
-  const atx = line.match(ATX_HEADING);
-  if (atx?.groups) {
-    const depth = atx.groups.hashes?.length ?? 1;
-    headings.push(
-      toHeading(depth, (atx.groups.text ?? "").trim(), slugger, isRefDefined)
-    );
-    state.paragraph = [];
-    return;
-  }
-  const setext = line.match(SETEXT_UNDERLINE);
-  if (setext?.groups && state.paragraph.length > 0) {
-    // Setext wins over thematic break when it closes a paragraph (CommonMark);
-    // a multi-line paragraph renders as one heading, soft breaks as spaces.
-    const depth = setext.groups.marker?.startsWith("=") ? 1 : 2;
-    headings.push(
-      toHeading(depth, state.paragraph.join(" ").trim(), slugger, isRefDefined)
-    );
-    state.paragraph = [];
-    return;
-  }
-  if (
-    line.trim() === "" ||
-    THEMATIC_BREAK.test(line) ||
-    PARAGRAPH_INTERRUPT.test(line)
-  ) {
-    state.paragraph = [];
-    return;
-  }
-  state.paragraph.push(line.trim());
+  scanContentLine(line, state, slugger, headings, isRefDefined);
 };
 
-export const extractHeadings = (body: string): Heading[] => {
+/** Everything one walk over a body yields for the anchor index. */
+export interface BodyScan {
+  /**
+   * Raw HTML element ids (`<a id="…">`) outside headings, fences, inline
+   * code, comments, and `<Prompt>` regions — fragment-link targets that
+   * `blume validate` accepts alongside heading slugs. Deduplicated, in
+   * document order.
+   */
+  anchors: string[];
+  /** Headings whose trailing `{#id}` marker is unescaped, for `.mdx` pages. */
+  curlyMarkers: CurlyMarker[];
+  headings: Heading[];
+}
+
+/**
+ * Scan a body for its headings, explicit HTML anchors, and unescaped `{#id}`
+ * markers in one fence-aware walk (the same walk `extractHeadings` exposes for
+ * headings alone).
+ */
+export const scanBody = (body: string): BodyScan => {
   const headings: Heading[] = [];
   const slugger = new GithubSlugger();
   const state: HeadingScanState = {
+    anchorLines: [],
+    curlyMarkers: [],
     fence: null,
+    line: 0,
     paragraph: [],
+    paragraphStart: 0,
     promptDepth: 0,
     promptTag: false,
   };
 
-  const lines = linesWithoutFrontMatter(body);
+  const { lines, offset } = linesWithoutFrontMatter(body);
   const definedLabels = refDefinitionLabels(lines);
   const isRefDefined = (label: string): boolean =>
     definedLabels.has(label.toLowerCase());
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
+    state.line = index + offset + 1;
     scanHeadingLine(line, state, slugger, headings, isRefDefined);
   }
 
-  return headings;
-};
-
-/** Raw HTML `id` targets that fragment links may address outside headings. */
-export const extractExplicitAnchors = (body: string): string[] => {
-  const anchors: string[] = [];
-  let fence: FenceState = null;
-  const pattern =
-    /<[A-Za-z][^>]*\sid=(?<quote>["'])(?<id>[^"']+)\k<quote>[^>]*>/gu;
-  for (const line of linesWithoutFrontMatter(body)) {
-    const next = nextFenceState(line, fence);
-    if (fence !== null || next !== null) {
-      fence = next;
-      continue;
-    }
-    for (const match of line.matchAll(pattern)) {
-      const id = match.groups?.id;
-      if (id) {
-        anchors.push(id);
-      }
+  const anchors = new Set<string>();
+  const markup = state.anchorLines.join("\n").replaceAll(HTML_COMMENT, "");
+  for (const match of markup.matchAll(HTML_ID)) {
+    const id = match.groups?.quoted ?? match.groups?.jsx ?? match.groups?.bare;
+    if (id !== undefined) {
+      anchors.add(id);
     }
   }
-  return anchors;
+  return { anchors: [...anchors], curlyMarkers: state.curlyMarkers, headings };
 };
+
+export const extractHeadings = (body: string): Heading[] =>
+  scanBody(body).headings;
 
 // The label admits one level of nested brackets so an image-wrapped link
 // (`[![alt](/img.png)](/target)`) matches as the *outer* link — with a flat
@@ -463,7 +549,6 @@ const MD_LINK =
 // link of its own before labels admitted nesting, and still should be.
 export const MD_IMAGE =
   /!\[[^\]]*\]\((?<target>(?:[^()\s]|\([^()\s]*\))+)(?<title>\s+"[^"]*")?\)/gu;
-export const INLINE_CODE = /`[^`]*`/gu;
 
 /** Column (0-based, within `matched`) where a link/image match's target starts. */
 export const targetOffsetIn = (
@@ -653,6 +738,37 @@ const entryLinks = (entry: SourceEntry): PageLink[] =>
         entry.body.text,
         strippedLineOffset(entry.raw, entry.body.text)
       );
+
+/**
+ * Diagnostics for `{#id}` heading markers in an `.mdx` page. The MDX parser
+ * reads a bare `{…}` as a JSX expression, so the page fails to compile —
+ * reported here, at the marker's source line, instead of as a raw acorn error
+ * at render time. An included `.md` partial is spliced into the including
+ * page and parsed in *its* format (see `markdown/include.ts`), so a partial's
+ * markers count too and are reported against the partial via the expansion's
+ * origins. `.md` pages render the marker as text and get no diagnostic.
+ */
+const curlyMarkerDiagnostics = (
+  entry: SourceEntry,
+  markers: CurlyMarker[],
+  sourceName: string
+): Diagnostic[] =>
+  markers.map(({ id, line }) => {
+    const origin = entry.expanded?.origins[line - 1];
+    const page = entry.sourcePath ?? `${sourceName}:${entry.ref}`;
+    const inPartial = origin !== undefined && origin.file !== entry.sourcePath;
+    return {
+      code: "BLUME_MDX_CURLY_ANCHOR",
+      file: origin?.file ?? page,
+      line:
+        origin?.line ?? line + strippedLineOffset(entry.raw, entry.body.text),
+      message: inPartial
+        ? `\`{#${id}}\` is a JSX expression once this partial is included in ${page} (.mdx), so that page fails to compile.`
+        : `\`{#${id}}\` is a JSX expression in .mdx, so this page fails to compile.`,
+      severity: "error",
+      suggestion: `Write \`[#${id}]\` or escape it as \`\\{#${id}\\}\` — both pin the same anchor in .md and .mdx.`,
+    };
+  });
 
 const deriveTitle = (
   meta: PageMeta,
@@ -898,11 +1014,11 @@ export const normalizeEntry = (
   // so a partial's headings anchor-index and TOC under every including page
   // and its components register for the runtime import map.
   const bodyText = entry.expanded?.text ?? entry.body.text;
-  const headings = extractHeadings(bodyText);
+  const { anchors, curlyMarkers, headings } = scanBody(bodyText);
   const { staged } = ctx.source;
 
   const base = {
-    anchors: extractExplicitAnchors(bodyText),
+    anchors,
     body: staged ? { format, text: entry.raw ?? entry.body.text } : undefined,
     collection: staged ? "staged" : undefined,
     componentsUsed:
@@ -944,5 +1060,11 @@ export const normalizeEntry = (
     ),
   }));
 
-  return { diagnostics: [], pages };
+  return {
+    diagnostics:
+      format === "mdx"
+        ? curlyMarkerDiagnostics(entry, curlyMarkers, ctx.source.name)
+        : [],
+    pages,
+  };
 };
