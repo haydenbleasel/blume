@@ -48,6 +48,8 @@ const BODY = [
   "Callouts keep their inner prose indexed.",
   "</Callout>",
   "",
+  "Right after the callout.",
+  "",
   "| Region | Latency |",
   "| ------ | ------- |",
   "| west   | 40ms    |",
@@ -130,8 +132,11 @@ const CODE_BODY = [
   '  title="Rate limits"',
   '  description="How quotas work"',
   '  href="/limits"',
+  '  icon="rocket"',
   "  meta={{ weight: 2 }}",
   "/>",
+  "",
+  "This is re:abbr[al]ly inline.",
   "",
   ":::note[Heads up]",
   "Directive prose survives.",
@@ -311,36 +316,39 @@ describe("buildSearchDocuments", () => {
     const [doc] = await buildSearchDocuments(
       projectWith([page({ description: "Desc A", id: "a.md" })], [route({})])
     );
+    const content = doc?.content ?? "";
     expect(doc?.title).toBe("A");
     expect(doc?.description).toBe("Desc A");
-    expect(doc?.content).toContain("Heading");
-    expect(doc?.content).toContain("bold");
+    expect(content).toContain("Heading");
+    expect(content).toContain("bold");
     // Link text is kept while the URL is dropped.
-    expect(doc?.content).toContain("link");
-    expect(doc?.content).toContain("inlineCode");
+    expect(content).toContain("link");
+    expect(content).toContain("inlineCode");
     // Angle-bracket type params inside inline code survive the HTML strip.
-    expect(doc?.content).toContain("Item");
+    expect(content).toContain("Item");
     // `.md` pages parse with the renderer's features: superscript is text.
-    expect(doc?.content).toContain("E=mc2 here");
+    expect(content).toContain("E=mc2 here");
     // Code blocks are removed entirely.
-    expect(doc?.content).not.toContain("secret");
-    expect(doc?.content).not.toContain("#");
+    expect(content).not.toContain("secret");
+    expect(content).not.toContain("#");
     // A bare `<` in prose is not a tag opener: the HTML strip must not swallow
     // everything from it to the next `>` (here, a blockquote a paragraph later).
-    expect(doc?.content).toContain("5 credits each");
-    expect(doc?.content).toContain("Retries are billed separately");
-    expect(doc?.content).toContain("quota resets at midnight");
+    expect(content).toContain("5 credits each");
+    expect(content).toContain("Retries are billed separately");
+    expect(content).toContain("quota resets at midnight");
     // Reference-style link text is kept; its definition URL is dropped.
-    expect(doc?.content).toContain("reference link");
-    expect(doc?.content).not.toContain("/elsewhere");
+    expect(content).toContain("reference link");
+    expect(content).not.toContain("/elsewhere");
     // Literal asterisks in prose are text, not emphasis to strip.
-    expect(doc?.content).toContain("5 * 3 stars");
+    expect(content).toContain("5 * 3 stars");
     // A block-level JSX component is one CommonMark html node: its tags go,
     // its inner prose stays indexed.
-    expect(doc?.content).toContain("Callouts keep their inner prose indexed");
-    expect(doc?.content).not.toContain("<Callout");
+    expect(content).toContain("Callouts keep their inner prose indexed");
+    expect(content).not.toContain("<Callout");
+    // The html block ends a word: the next paragraph doesn't fuse onto it.
+    expect(content).toContain("indexed. Right after the callout");
     // GFM table cells are text.
-    expect(doc?.content).toContain("west");
+    expect(content).toContain("west");
   });
 
   it("skips image alt text in the plain text index", async () => {
@@ -446,9 +454,13 @@ describe("buildSearchDocuments", () => {
       expect(doc?.content).toContain("H2O costs $5");
       // An empty inline element still separates words.
       expect(doc?.content).toContain("Press Enter then wait");
-      // String props are visible text; expression props are code.
+      // Text props are visible; hrefs, icons, and expression props are not.
       expect(doc?.content).toContain("Rate limits How quotas work");
+      expect(doc?.content).not.toContain("/limits");
+      expect(doc?.content).not.toContain("rocket");
       expect(doc?.content).not.toContain("weight");
+      // An inline directive is part of its word.
+      expect(doc?.content).toContain("This is really inline");
       expect(doc?.content).not.toContain("props.count");
       expect(doc?.content).not.toContain("draft");
       expect(doc?.content).not.toContain("<Step");
@@ -487,6 +499,9 @@ describe("buildSearchDocuments", () => {
     it("falls back to a Markdown reading when MDX rejects the page", async () => {
       const [doc] = await buildSearchDocuments(mdxProject("comment.mdx"));
       expect(doc?.content).toContain("Fallback prose survives");
+      // The author note that broke the MDX parse is still not searchable.
+      expect(doc?.content).not.toContain("keep this list sorted");
+      expect(doc?.content).not.toContain("<!--");
     });
 
     it("reads a leading `---` as a divider, not front matter", async () => {

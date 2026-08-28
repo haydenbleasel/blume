@@ -72,6 +72,8 @@ export interface SearchRecord {
 // kept; the surrounding Markdown is walked as a tree, so a bare `<` in prose
 // ("costs < 5 credits") is ordinary text and never at risk.
 const HTML_OR_JSX = /<\/?[a-zA-Z][^\n<>]*>|<\/?>/gu;
+// Author notes never render, so they must never be searchable.
+const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
 const WHITESPACE = /\s+/gu;
 
 // Parents whose children are inline: no separator is inserted after them, or
@@ -87,6 +89,7 @@ const INLINE_PARENTS = new Set([
   "strong",
   "subscript",
   "superscript",
+  "textDirective",
 ]);
 
 // Nodes that never render as prose: image alt text was never indexed, MDX
@@ -150,6 +153,8 @@ const collectCode = (
   if (!options.includeCodeBlocks) {
     return;
   }
+  // A fence is a block: keep it apart from the words on either side.
+  out.push(" ");
   const title = parseCodeTitle(node.meta ?? undefined);
   if (title) {
     out.push(title, " ");
@@ -157,9 +162,12 @@ const collectCode = (
   out.push(node.value, " ");
 };
 
-// A component's string props are its visible text — a Card's `title` and
-// `description`, a Tab's `title` — so they index like prose; expression props
-// (`type={{ … }}`) are code and stay out.
+// Props whose name marks them as visible text — a Card's `title` and
+// `description`, a Tab's `title`, a figure's `caption`. Everything else on a
+// component (`href`, `icon`, `type`, `src`, a `code` sample) is a value the
+// page doesn't show as words, and expression props (`type={{ … }}`) are code.
+const TEXT_PROPS = new Set(["caption", "description", "label", "title"]);
+
 const collectJsxAttributes = (
   attributes: MdxJsxAttributeUnion[],
   out: string[]
@@ -167,6 +175,7 @@ const collectJsxAttributes = (
   for (const attribute of attributes) {
     if (
       attribute.type === "mdxJsxAttribute" &&
+      TEXT_PROPS.has(attribute.name) &&
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the value is satteri's `string | ValueExpression` union; the string literal is the domain value
       typeof attribute.value === "string"
     ) {
@@ -205,7 +214,10 @@ const collectText = (
     // html node holding all its inner prose, so the node can't just be
     // dropped — strip the tag-shaped runs and keep the text.
     case "html": {
-      out.push(node.value.replaceAll(HTML_OR_JSX, " "));
+      out.push(
+        node.value.replaceAll(HTML_COMMENT, " ").replaceAll(HTML_OR_JSX, " "),
+        " "
+      );
       return;
     }
     case "break": {
