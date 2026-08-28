@@ -2,6 +2,15 @@ import { defineConfig } from "blume";
 
 export default defineConfig({
   ai: {
+    llmsTxt: {
+      details: [
+        "## When to use Blume",
+        "",
+        "Reach for Blume when a project needs a documentation site from Markdown or MDX with no app code to maintain: product docs, API references (OpenAPI, AsyncAPI, GraphQL), changelogs, blogs, and multi-language or versioned docs. Drop files in a `content/` folder and run the `blume` CLI — it generates and drives the Astro site, search, OG images, and the agent-facing surface (llms.txt, Markdown mirrors, an MCP server, agent skills) for you.",
+        "",
+        "Install the CLI from npm (`npm install blume`, package: https://www.npmjs.com/package/blume), then `blume init` to scaffold, `blume dev` to preview, `blume build` to ship, and `blume eject` to turn the hidden project into a standalone Astro app. The `blume` agent skill below covers configuration and authoring; `blume-migrate` ports an existing Mintlify, Docusaurus, Fumadocs, Nextra, or Starlight site.",
+      ].join("\n"),
+    },
     mcp: {
       enabled: true,
     },
@@ -77,6 +86,24 @@ export default defineConfig({
   },
   seo: {
     og: { titles: { "/cli": "CLI" } },
+    organization: {
+      logo: "/logo.svg",
+      name: "Blume",
+      sameAs: [
+        "https://github.com/haydenbleasel/blume",
+        "https://www.npmjs.com/package/blume",
+        "https://x.com/haydenbleasel",
+      ],
+    },
+    software: {
+      license: "https://opensource.org/license/mit",
+      operatingSystem: "Node.js 22+",
+      price: 0,
+      sameAs: [
+        "https://www.npmjs.com/package/blume",
+        "https://github.com/haydenbleasel/blume",
+      ],
+    },
     x: { creator: "@haydenbleasel", handle: "@haydenbleasel" },
   },
   theme: {

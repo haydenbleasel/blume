@@ -16,10 +16,12 @@ import type {
 
 const link = (target: string): PageLink => ({ column: 1, line: 1, target });
 
-const image = (target: string): PageLink => ({
+// Distinct references sit on distinct lines in a real document; the dedupe in
+// `validateLinks` treats same-position same-message reports as one.
+const image = (target: string, line = 1): PageLink => ({
   column: 1,
   image: true,
-  line: 1,
+  line,
   target,
 });
 
@@ -291,6 +293,25 @@ describe(validateLinks, () => {
     ]);
   });
 
+  it("accepts a case-sensitive [#custom-id] anchor exactly", async () => {
+    const target = makePage({
+      // A pinned id may carry uppercase, which the lowercase-lenient fallback
+      // for slugger-generated ids would miss.
+      headings: [heading("Install", "My-Anchor")],
+      id: "b.mdx",
+      route: "/b",
+    });
+    const diagnostics = await validate([
+      makePage({
+        id: "a.mdx",
+        links: [link("/b#My-Anchor")],
+        route: "/a",
+      }),
+      target,
+    ]);
+    expect(diagnostics).toHaveLength(0);
+  });
+
   it("accepts percent-encoded links to non-ASCII routes and anchors", async () => {
     const target = makePage({
       headings: [heading("Café", "café")],
@@ -462,6 +483,24 @@ describe("validateLinks — assets against a public dir", () => {
       sourcePath: join(contentDir, "guides", "a.mdx"),
     });
 
+  it("reports a partial's missing colocated image as the author wrote it", async () => {
+    // Expansion rebased the partial's `./diagram.png` into the including
+    // page's directory; the diagnostic must invert that so the file, the
+    // path, and the "next to" phrasing all describe the partial.
+    const partial = join(contentDir, "_snippets", "tip.mdx");
+    const diagnostics = await validateWithPublic([
+      guidePage([
+        { ...image("../_snippets/diagram.png"), file: partial },
+        { ...image("../assets/up.png", 2), file: partial },
+      ]),
+    ]);
+    expect(diagnostics.map((d) => d.message)).toStrictEqual([
+      "Image ./diagram.png was not found next to tip.mdx.",
+      "Image ../assets/up.png was not found next to tip.mdx.",
+    ]);
+    expect(diagnostics.every((d) => d.file === partial)).toBe(true);
+  });
+
   it("accepts a colocated image embed that exists next to the page source", async () => {
     // A relative image embed never reaches `public/` — Astro's pipeline emits
     // it to `_astro/` from beside the content — so probing the public dir
@@ -493,7 +532,7 @@ describe("validateLinks — assets against a public dir", () => {
     const diagnostics = await validateWithPublic([
       guidePage([
         image("./screenshot.png?v=2"),
-        image("./screenshot.png#frag"),
+        image("./screenshot.png#frag", 2),
       ]),
     ]);
     expect(diagnostics.map((d) => d.code)).toStrictEqual([
@@ -549,5 +588,78 @@ describe("validateLinks — assets against a public dir", () => {
     expect(diagnostics.map((d) => d.code)).toStrictEqual([
       "BLUME_BROKEN_ASSET",
     ]);
+  });
+});
+
+describe("validateLinks — partial-origin links", () => {
+  const partial = "/abs/_snippets/s.mdx";
+
+  it("dedupes byte-identical diagnostics from every including page", async () => {
+    // The same broken absolute link in one partial, spliced by two pages:
+    // the verdict is includer-independent, so one report carries it.
+    const partialLink: PageLink = {
+      column: 3,
+      file: partial,
+      line: 2,
+      target: "/nope",
+    };
+    const diagnostics = await validate([
+      makePage({ id: "a.mdx", links: [{ ...partialLink }], route: "/a" }),
+      makePage({ id: "b.mdx", links: [{ ...partialLink }], route: "/b" }),
+    ]);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.file).toBe(partial);
+    expect(diagnostics[0]?.message).not.toContain("included by");
+  });
+
+  it("names the including page when a relative link's verdict depends on it", async () => {
+    // `./setup` resolves from each includer's own route: valid from the
+    // top-level page, broken from the nested one — so the report must say
+    // which splice broke.
+    const relativeLink: PageLink = {
+      column: 1,
+      file: partial,
+      line: 1,
+      target: "./setup",
+    };
+    const diagnostics = await validate([
+      makePage({ id: "setup.mdx", route: "/setup" }),
+      makePage({ id: "a.mdx", links: [{ ...relativeLink }], route: "/a" }),
+      makePage({
+        id: "deep/b.mdx",
+        links: [{ ...relativeLink }],
+        route: "/deep/b",
+      }),
+    ]);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.file).toBe(partial);
+    expect(diagnostics[0]?.message).toContain("(included by b.mdx)");
+  });
+
+  it("names the including page for a partial's broken bare anchor", async () => {
+    const anchorLink: PageLink = {
+      column: 1,
+      file: partial,
+      line: 4,
+      target: "#missing",
+    };
+    const diagnostics = await validate([
+      makePage({ id: "a.mdx", links: [{ ...anchorLink }], route: "/a" }),
+    ]);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_BROKEN_ANCHOR");
+    expect(diagnostics[0]?.message).toContain("(included by a.mdx)");
+  });
+
+  it("keeps page-authored diagnostics free of includer context", async () => {
+    const diagnostics = await validate([
+      makePage({
+        id: "a.mdx",
+        links: [{ column: 1, line: 1, target: "./gone" }],
+        route: "/a",
+      }),
+    ]);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.message).not.toContain("included by");
   });
 });

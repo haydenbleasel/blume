@@ -1,3 +1,4 @@
+import type { StructuredDataIdentity } from "../seo/jsonld.ts";
 import type { FontHead } from "../theme/fonts.ts";
 import type { UIStrings } from "./i18n-ui.ts";
 import type { ResolvedConfig, SearchProvider } from "./schema.ts";
@@ -128,12 +129,20 @@ export interface BlumeDataConfig {
    * Which agent-discovery resources exist for the layout to advertise in every
    * page's `<head>` (`seo.agentReadability`, `ai.llmsTxt.enabled`) — the HTML
    * counterpart of the homepage-only HTTP `Link` header, for agents that enter
-   * on a deep page (see `ai/link-headers.ts`).
+   * on a deep page (see `ai/link-headers.ts`). `sitemap` (`seo.sitemap` with a
+   * `deployment.site`, the condition under which one is emitted) feeds the
+   * 404 page's recovery links rather than the head.
    */
-  discovery: { agentReadability: boolean; llmsTxt: boolean };
+  discovery: { agentReadability: boolean; llmsTxt: boolean; sitemap: boolean };
   favicon: BlumeFavicon;
   feedback: boolean;
   i18n: BlumeDataI18n | null;
+  /**
+   * Site identity for JSON-LD (`seo.organization`, `seo.software`), read by
+   * the layouts straight from the snapshot so custom pages get it without
+   * threading a prop; `null` when neither is configured.
+   */
+  identity: StructuredDataIdentity | null;
   /** `markdown.imageZoom`: click-to-zoom content images. */
   imageZoom: boolean;
   logo: BlumeLogo | null;

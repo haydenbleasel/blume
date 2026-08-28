@@ -11,6 +11,8 @@ import type {
 import type { Diagnostic } from "../core/types.ts";
 import { extractAsyncApiOperations } from "./asyncapi.ts";
 import type { AsyncApiDocument } from "./asyncapi.ts";
+import { extractGraphqlOperations } from "./graphql.ts";
+import type { GraphqlDocument } from "./graphql.ts";
 import { extractOperations } from "./model.ts";
 import type {
   ApiDocument,
@@ -19,7 +21,12 @@ import type {
   ApiTagRef,
   OpenApiData,
 } from "./model.ts";
-import { InvalidSpecError, parseAsyncApiSpec, parseSpec } from "./parse.ts";
+import {
+  InvalidSpecError,
+  parseAsyncApiSpec,
+  parseGraphqlSpec,
+  parseSpec,
+} from "./parse.ts";
 import type { ReferenceSource } from "./references.ts";
 import { operationMdx, overviewMdx } from "./render-mdx.ts";
 import type { RenderedPage } from "./render-mdx.ts";
@@ -50,6 +57,62 @@ export const isOpenApiSource = (
 
 /** Route (`/reference/pet/add-pet`) to a staged content ref, without extension. */
 const routeToRef = (route: string): string => route.replace(/^\/+/u, "");
+
+/** Human label per spec kind, so one kind's failure never reads as another's. */
+const KIND_LABELS = {
+  asyncapi: "AsyncAPI",
+  graphql: "GraphQL",
+  openapi: "OpenAPI",
+} satisfies Record<ReferenceSource["kind"], string>;
+
+/** Diagnostic-code prefix per spec kind. */
+const CODE_PREFIXES = {
+  asyncapi: "BLUME_ASYNCAPI",
+  graphql: "BLUME_GRAPHQL",
+  openapi: "BLUME_OPENAPI",
+} satisfies Record<ReferenceSource["kind"], string>;
+
+/**
+ * Parse-level warning code per kind: an offline cache fallback for any kind,
+ * plus lossy 2.x→3.0 conversion notes for AsyncAPI — hence the broader codes
+ * there and for GraphQL (OpenAPI keeps its historical one).
+ */
+const SPEC_WARNING_CODES = {
+  asyncapi: "BLUME_ASYNCAPI_SPEC_WARNING",
+  graphql: "BLUME_GRAPHQL_SPEC_WARNING",
+  openapi: "BLUME_OPENAPI_STALE",
+} satisfies Record<ReferenceSource["kind"], string>;
+
+/**
+ * Extract-level skip code per kind. OpenAPI keeps its historical code (the
+ * only extract warning it emits is the unresolved $ref path item); the
+ * GraphQL extractor currently skips nothing, so its code is reserved.
+ */
+const SKIPPED_CODES = {
+  asyncapi: "BLUME_ASYNCAPI_SKIPPED_OPERATION",
+  graphql: "BLUME_GRAPHQL_SKIPPED",
+  openapi: "BLUME_OPENAPI_REF_PATH_ITEM",
+} satisfies Record<ReferenceSource["kind"], string>;
+
+/** `_EMPTY` diagnostic suggestion per kind. */
+const EMPTY_SUGGESTIONS = {
+  asyncapi:
+    "Check the spec points at an AsyncAPI document with `channels` and `operations`.",
+  graphql:
+    "Check the spec points at a GraphQL schema (SDL or introspection JSON) whose root types declare fields.",
+  openapi:
+    "Check the spec points at an OpenAPI document with operations under `paths`.",
+} satisfies Record<ReferenceSource["kind"], string>;
+
+/** `_UNAVAILABLE` suggestion for a readable-but-invalid spec, per kind. */
+const INVALID_SUGGESTIONS = {
+  asyncapi:
+    "Point the spec at an AsyncAPI document (a YAML or JSON file with an object at the top level).",
+  graphql:
+    "Point the spec at a GraphQL schema — SDL text or an introspection JSON result.",
+  openapi:
+    "Point the spec at an OpenAPI document (a YAML or JSON file with an object at the top level).",
+} satisfies Record<ReferenceSource["kind"], string>;
 
 const toEntry = (rendered: RenderedPage, ref: string): SourceEntry => {
   const raw = matter.stringify(`${rendered.body}\n`, rendered.data);
@@ -122,7 +185,7 @@ interface LoadedSpec {
 
 /** One parsed spec, whichever front-end read it — the kind dispatch seam. */
 interface ParsedReference {
-  document: ApiDocument | AsyncApiDocument;
+  document: ApiDocument | AsyncApiDocument | GraphqlDocument;
   warnings: string[];
   operations: ApiOperationRef[];
   tags: ApiTagRef[];
@@ -141,6 +204,21 @@ const parseReference = async (
       options
     );
     const extracted = extractAsyncApiOperations(document, reference.route);
+    return {
+      document,
+      extractWarnings: extracted.warnings,
+      operations: extracted.operations,
+      tags: extracted.tags,
+      warnings,
+    };
+  }
+  if (reference.kind === "graphql") {
+    const { document, warnings } = await parseGraphqlSpec(
+      reference.spec,
+      ctx.projectRoot,
+      options
+    );
+    const extracted = extractGraphqlOperations(document, reference.route);
     return {
       document,
       extractWarnings: extracted.warnings,
@@ -175,9 +253,8 @@ export const openApiSource = (
   ): Promise<LoadedSpec | Diagnostic> => {
     // Human label and diagnostic-code prefix for the spec's kind, so an
     // AsyncAPI failure never reads as an OpenAPI one.
-    const kindLabel = reference.kind === "asyncapi" ? "AsyncAPI" : "OpenAPI";
-    const codePrefix =
-      reference.kind === "asyncapi" ? "BLUME_ASYNCAPI" : "BLUME_OPENAPI";
+    const kindLabel = KIND_LABELS[reference.kind];
+    const codePrefix = CODE_PREFIXES[reference.kind];
     try {
       const { document, warnings, operations, tags, extractWarnings } =
         await parseReference(reference, ctx);
@@ -221,26 +298,20 @@ export const openApiSource = (
         title: info.title ?? reference.label,
         version: info.version ?? "",
       };
+      // Only GraphQL references carry a live endpoint (a schema names no
+      // server); assigned separately so the key stays absent otherwise.
+      if (reference.endpoint !== undefined) {
+        spec.endpoint = reference.endpoint;
+      }
       return {
         diagnostics: [
           ...warnings.map((message) => ({
-            // Parse-level notes: an offline cache fallback for either kind,
-            // plus lossy 2.x→3.0 conversion notes for AsyncAPI — hence the
-            // broader code on that side (OpenAPI keeps its historical one).
-            code:
-              reference.kind === "asyncapi"
-                ? "BLUME_ASYNCAPI_SPEC_WARNING"
-                : "BLUME_OPENAPI_STALE",
+            code: SPEC_WARNING_CODES[reference.kind],
             message,
             severity: "warning" as const,
           })),
           ...extractWarnings.map((message) => ({
-            // OpenAPI keeps its historical code (the only extract warning it
-            // emits is the unresolved $ref path item).
-            code:
-              reference.kind === "asyncapi"
-                ? "BLUME_ASYNCAPI_SKIPPED_OPERATION"
-                : "BLUME_OPENAPI_REF_PATH_ITEM",
+            code: SKIPPED_CODES[reference.kind],
             message: `In ${kindLabel} spec "${reference.spec}": ${message}`,
             severity: "warning" as const,
           })),
@@ -253,10 +324,7 @@ export const openApiSource = (
                   code: `${codePrefix}_EMPTY`,
                   message: `${kindLabel} spec "${reference.spec}" for ${reference.route} declares no operations; its API reference is empty.`,
                   severity: "warning" as const,
-                  suggestion:
-                    reference.kind === "asyncapi"
-                      ? "Check the spec points at an AsyncAPI document with `channels` and `operations`."
-                      : "Check the spec points at an OpenAPI document with operations under `paths`.",
+                  suggestion: EMPTY_SUGGESTIONS[reference.kind],
                 },
               ]
             : []),
@@ -280,7 +348,7 @@ export const openApiSource = (
         // only point at reachability for actual fetch/read failures.
         suggestion:
           error instanceof InvalidSpecError
-            ? `Point the spec at ${reference.kind === "asyncapi" ? "an AsyncAPI" : "an OpenAPI"} document (a YAML or JSON file with an object at the top level).`
+            ? INVALID_SUGGESTIONS[reference.kind]
             : "Check the spec URL/path is reachable from the build environment; behind a proxy, set HTTP(S)_PROXY.",
       };
     }

@@ -41,6 +41,7 @@ import {
   staticJsonEndpointTemplate,
 } from "../src/astro/templates.ts";
 import type { BlumeConfig } from "../src/core/config-input.ts";
+import { TOC_HIDDEN_KEY } from "../src/core/heading-markers.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 
@@ -117,6 +118,15 @@ describe("catchAllPageTemplate", () => {
   it("no longer imports the removed Warning component", () => {
     const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
     expect(out).not.toContain("Warning");
+  });
+
+  it("filters [!toc] slugs through the heading plugin's frontmatter key", () => {
+    const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
+    // The key is interpolated from the shared constant, so a rename cannot
+    // silently break the plugin → template contract; the Array.isArray guard
+    // keeps a `frontmatter.extend`-declared value from crashing the render.
+    expect(out).toContain(`remarkPluginFrontmatter?.${TOC_HIDDEN_KEY}`);
+    expect(out).toContain("Array.isArray(tocHiddenRaw)");
   });
 
   it("serializes the island-hooks snapshot only when React is enabled", () => {
@@ -519,6 +529,29 @@ describe("notFoundPageTemplate", () => {
     expect(out).toContain("{nf.home}");
   });
 
+  it("offers recovery links: every tab, then the sitemap and llms.txt when they exist", () => {
+    const out = notFoundPageTemplate();
+    // Tabs link to their resolved target (a section without an index page
+    // resolves to its first page), falling back to the section path.
+    expect(out).toContain(
+      "...data.navigation.tabs.map((tab) => ({\n    href: withBase(tab.href ?? tab.path),\n    label: tab.label,\n  }))"
+    );
+    expect(out).toContain(
+      '...(data.config.discovery.sitemap\n    ? [{ href: withBase("/sitemap.xml"), label: nf.sitemap }]\n    : [])'
+    );
+    expect(out).toContain(
+      '...(data.config.discovery.llmsTxt\n    ? [{ href: withBase("/llms.txt"), label: nf.llms }]\n    : [])'
+    );
+    // Rendered as a labeled nav under its own heading, and skipped entirely
+    // when nothing is linkable.
+    expect(out).toContain("suggestions.length > 0 && (");
+    expect(out).toContain(
+      '<nav aria-label={nf.suggestions} class="mt-8 text-sm">'
+    );
+    expect(out).toContain("{nf.suggestions}</h2>");
+    expect(out).toContain("{suggestions.map((link) => (");
+  });
+
   it("routes the home link through withBase, like the catch-all", () => {
     const out = notFoundPageTemplate();
     expect(out).toContain(
@@ -675,11 +708,16 @@ describe("astroConfigTemplate", () => {
     expect(out).not.toContain('import react from "@astrojs/react"');
     expect(out).toContain("blumeIntegration(");
     // The prerender dep-link plugin is wired into the Vite config so isolated
-    // linkers can resolve externalized deps when generating static pages.
+    // linkers can resolve externalized deps when generating static pages, and
+    // the include-HMR plugin turns a partial edit into an invalidation of the
+    // pages that splice it.
     expect(out).toContain(
-      'import { blumeIntegration, prerenderDepsPlugin } from "blume/astro"'
+      'import { blumeIntegration, includeHmrPlugin, prerenderDepsPlugin } from "blume/astro"'
     );
     expect(out).toContain("prerenderDepsPlugin()");
+    expect(out).toContain(
+      'includeHmrPlugin("/p/.blume/src/generated/includes.json")'
+    );
     // The client router's in-place swaps read from the prefetch cache, so
     // every link prefetches on hover/viewport to hide the request latency
     // behind user intent.
@@ -1247,6 +1285,10 @@ describe("contentConfigTemplate", () => {
     expect(out).toContain("const docs = defineCollection(");
     expect(out).not.toContain("const staged");
     expect(out).toContain("export const collections = { docs };");
+    // The include-aware digest wrapper rides the docs loader so `<include>`-
+    // bearing .md pages re-render instead of trusting the sync-time cache.
+    expect(out).toContain('import { withIncludeRefresh } from "blume/astro";');
+    expect(out).toContain("withIncludeRefresh(glob(");
   });
 
   it("adds a staged collection when staged sources materialize", () => {

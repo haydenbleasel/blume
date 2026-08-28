@@ -10,6 +10,8 @@ import { isAbsolute, join } from "pathe";
 import { hashText } from "../core/sources/cache.ts";
 import type { AsyncApiDocument } from "./asyncapi.ts";
 import { normalizeAsyncApiDocument } from "./asyncapi.ts";
+import { buildGraphqlDocument } from "./graphql-build.ts";
+import type { GraphqlDocument } from "./graphql.ts";
 import type { ApiDocument } from "./model.ts";
 
 /**
@@ -392,4 +394,36 @@ export const parseAsyncApiSpec = async (
     );
   }
   return { document: normalizeAsyncApiDocument(document), warnings };
+};
+
+export interface ParsedGraphqlSpec {
+  document: GraphqlDocument;
+  warnings: string[];
+}
+
+/**
+ * Read and lower a GraphQL schema — SDL text or an introspection JSON result —
+ * to the serializable document the reference renders from; the GraphQL mirror
+ * of {@link parseSpec}. Error semantics match the other kinds: an unreadable
+ * spec throws the read/fetch error, while readable-but-invalid schema text
+ * (SDL syntax errors, validation failures, JSON that isn't an introspection
+ * result) throws {@link InvalidSpecError} so callers suggest fixing the file
+ * rather than checking reachability.
+ */
+export const parseGraphqlSpec = async (
+  spec: string,
+  root: string,
+  options: SpecFetchOptions = {}
+): Promise<ParsedGraphqlSpec> => {
+  const { text, warnings } = await readSpecText(spec, root, options);
+  try {
+    return { document: buildGraphqlDocument(text), warnings };
+  } catch (error) {
+    // SAFETY: `graphql`-js throws GraphQLError (an Error) for syntax and
+    // validation failures, and `buildGraphqlDocument` throws plain Errors for
+    // non-introspection JSON; only the message is surfaced.
+    throw new InvalidSpecError(
+      `${spec} is not a valid GraphQL schema (${(error as Error).message.trim()})`
+    );
+  }
 };

@@ -247,6 +247,33 @@ Each page includes:
 
 URLs are absolute when `deployment.site` is set. Pages marked `seo.noindex` are skipped.
 
+### Site identity
+
+The WebSite node says a site exists; it doesn't say _what_ it is or _who_ runs it — which is what AI agents read JSON-LD for before they recommend or cite you. Two optional blocks fill that in, both needing `deployment.site` (the nodes carry absolute identifiers):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  organization: {
+    name: "Acme", // defaults to the site title
+    email: "hello@acme.com",
+    telephone: "+1 555 0100",
+    address: { addressLocality: "Sydney", addressCountry: "AU" },
+    logo: "/logo.svg",
+    sameAs: ["https://github.com/acme", "https://x.com/acme"],
+  },
+  software: {
+    license: "MIT",
+    operatingSystem: "Node.js 22+",
+    price: 0, // emitted as an Offer; 0 marks it free
+    sameAs: ["https://www.npmjs.com/package/acme"],
+  },
+}
+```
+
+`organization` adds an **Organization** node to every page — the WebSite and article nodes cite it as `publisher` — with the email and telephone as a `ContactPoint` (`contactType` defaults to `"customer support"`) and the address as a `PostalAddress`, the two fields business-verification checks look for. `name` and `url` default to the site's; a root-relative `logo` is absolutized like any page URL.
+
+`software` adds a **SoftwareApplication** node to the homepage: the product's name and description (defaulting to the site's), `applicationCategory` (default `"DeveloperApplication"`), operating system, license, an `Offer` when `price` is set, and the registry or repository URLs in `sameAs`. Pass `software: true` to take every default. The organization, when configured, is cited as its `publisher`.
+
 ## Sitemap
 
 Blume writes a `sitemap.xml` of every indexable page at build time. It needs an absolute [`deployment.site`](/docs/deployment) and lists every page except drafts, hidden, and `noindex` pages. On a [versioned](/docs/content/versioning) site, archived pages whose canonical points at their live equivalent are left out too — the live page is the one to index. On by default:

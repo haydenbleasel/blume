@@ -1,0 +1,464 @@
+import type {
+  GraphqlDocument,
+  GraphqlField,
+  GraphqlInputValue,
+  GraphqlOperationKind,
+  GraphqlTypeRef,
+} from "../../openapi/graphql.ts";
+import {
+  GRAPHQL_OPERATION_KINDS,
+  isGraphqlOperationKind,
+} from "../../openapi/graphql.ts";
+import type { ApiSpecData } from "../../openapi/model.ts";
+import type { SpecValue } from "./helpers.ts";
+import type { PlaygroundModel } from "./request.ts";
+
+/**
+ * Build-time logic behind the GraphQL reference pages: the generated example
+ * operation (a valid, bounded-depth query with a variable per argument), its
+ * example variables and response, the shared playground/request model, and the
+ * usage backlinks. Everything here works off the serializable
+ * `GraphqlDocument` — no `graphql`-js — so none of it can drag the parser
+ * into the runtime.
+ */
+
+/**
+ * Stands in for the live endpoint when the config sets none, so the samples
+ * and playground render a complete request the reader edits instead of a
+ * URL-less fragment.
+ */
+export const GRAPHQL_ENDPOINT_PLACEHOLDER =
+  "https://your-api.example.com/graphql";
+
+/** How deep a generated selection set descends into nested object fields. */
+const SELECTION_DEPTH = 2;
+
+/** How deep example variables descend into nested input objects. */
+const VARIABLE_DEPTH = 3;
+
+/** Example values for the spec-defined scalars. */
+const SCALAR_SAMPLES = new Map<string, SpecValue>([
+  ["Boolean", true],
+  ["Float", 0],
+  ["ID", "id"],
+  ["Int", 0],
+  ["String", "string"],
+]);
+
+/** A generated example object (variables, response data). */
+export interface GraphqlSampleObject {
+  [key: string]: SpecValue;
+}
+
+/** One field of a generated selection set. */
+export interface GraphqlSelection {
+  name: string;
+  /** The field's declared type (absent on the `__typename` meta field). */
+  type?: GraphqlTypeRef;
+  /** Sub-selection for composite fields; absent on leaves. */
+  children?: GraphqlSelection[];
+}
+
+/** Whether selecting this named type requires a sub-selection. */
+const isComposite = (document: GraphqlDocument, name: string): boolean => {
+  const kind = document.types[name]?.kind;
+  return kind === "object" || kind === "interface" || kind === "union";
+};
+
+/**
+ * A valid selection set for a composite type, or undefined for leaves: every
+ * scalar/enum field, plus nested composites while `depth` allows. A composite
+ * with nothing selectable at this depth falls back to `__typename`, which is
+ * legal on any composite — the set must never come out empty.
+ */
+export const selectionSet = (
+  document: GraphqlDocument,
+  typeName: string,
+  depth: number = SELECTION_DEPTH
+): GraphqlSelection[] | undefined => {
+  const type = document.types[typeName];
+  if (!(type && isComposite(document, typeName))) {
+    return undefined;
+  }
+  if (type.kind === "union") {
+    return [{ name: "__typename" }];
+  }
+  const selections: GraphqlSelection[] = [];
+  for (const field of type.fields ?? []) {
+    // A field with an argument that must be supplied — non-null and no
+    // default — can't ride an example selection; there is nothing valid to
+    // fill it with inline. A defaulted non-null argument is omittable.
+    if (
+      field.args.some(
+        (arg) => arg.type.display.endsWith("!") && arg.default === undefined
+      )
+    ) {
+      continue;
+    }
+    if (isComposite(document, field.type.name)) {
+      if (depth > 1) {
+        selections.push({
+          children: selectionSet(document, field.type.name, depth - 1),
+          name: field.name,
+          type: field.type,
+        });
+      }
+      continue;
+    }
+    selections.push({ name: field.name, type: field.type });
+  }
+  return selections.length > 0 ? selections : [{ name: "__typename" }];
+};
+
+const INDENT = "  ";
+
+const printSelections = (
+  selections: GraphqlSelection[],
+  level: number
+): string =>
+  selections
+    .map((selection) => {
+      const pad = INDENT.repeat(level);
+      return selection.children
+        ? `${pad}${selection.name} {\n${printSelections(selection.children, level + 1)}\n${pad}}`
+        : `${pad}${selection.name}`;
+    })
+    .join("\n");
+
+/**
+ * A complete, valid example operation for one root field: one variable per
+ * argument (typed off the schema), and a bounded-depth selection set over the
+ * return type.
+ */
+export const exampleQuery = (
+  document: GraphqlDocument,
+  field: GraphqlField,
+  kind: GraphqlOperationKind
+): string => {
+  const name = field.name.charAt(0).toUpperCase() + field.name.slice(1);
+  const variables = field.args
+    .map((arg) => `$${arg.name}: ${arg.type.display}`)
+    .join(", ");
+  const args = field.args.map((arg) => `${arg.name}: $${arg.name}`).join(", ");
+  const head = `${kind} ${name}${variables ? `(${variables})` : ""}`;
+  const call = `${field.name}${args ? `(${args})` : ""}`;
+  const selections = selectionSet(document, field.type.name);
+  const body = selections
+    ? `${INDENT}${call} {\n${printSelections(selections, 2)}\n${INDENT}}`
+    : `${INDENT}${call}`;
+  return `${head} {\n${body}\n}`;
+};
+
+/**
+ * Wrap a sample in one array per list layer of the type expression, so a
+ * nested-list field (`[[Cell]]`) samples with the same nesting a real server
+ * returns. `[` can only come from list wrappers — it never appears in a type
+ * name — so counting occurrences is exact.
+ */
+const wrapLists = (display: string, value: SpecValue): SpecValue => {
+  let wrapped = value;
+  for (let lists = display.split("[").length - 1; lists > 0; lists -= 1) {
+    wrapped = [wrapped];
+  }
+  return wrapped;
+};
+
+/**
+ * Whether the named type sits in a non-null position of the expression —
+ * `Date!` or the element of `[Date!]`, but not `[Date]!`, whose outer
+ * non-null wraps the list, not the name.
+ */
+const namedNonNull = (ref: GraphqlTypeRef): boolean =>
+  ref.display.includes(`${ref.name}!`);
+
+/**
+ * An example value for a type expression: scalar/enum samples at the leaves,
+ * nested objects for input types while `depth` allows, and one array wrapper
+ * per list layer. A custom scalar or a depth-exhausted input samples as null
+ * only where null is legal — in a non-null position they fall back to a
+ * placeholder (a string / an empty object) so the example variables stay
+ * valid against the schema.
+ */
+const sampleForRef = (
+  document: GraphqlDocument,
+  ref: GraphqlTypeRef,
+  depth: number
+): SpecValue => {
+  let named: SpecValue = SCALAR_SAMPLES.get(ref.name) ?? null;
+  const type = document.types[ref.name];
+  if (type?.kind === "enum") {
+    named = type.enumValues?.[0]?.name ?? null;
+  } else if (type?.kind === "input" && depth > 0) {
+    named = Object.fromEntries(
+      (type.inputFields ?? []).map((field) => [
+        field.name,
+        sampleForRef(document, field.type, depth - 1),
+      ])
+    );
+  } else if (type?.kind === "input") {
+    named = namedNonNull(ref) ? {} : null;
+  } else if (named === null && namedNonNull(ref)) {
+    named = "string";
+  }
+  return wrapLists(ref.display, named);
+};
+
+/** Example `variables` for a root field's arguments; undefined when it has none. */
+export const exampleVariables = (
+  document: GraphqlDocument,
+  field: GraphqlField
+): GraphqlSampleObject | undefined =>
+  field.args.length > 0
+    ? Object.fromEntries(
+        field.args.map((arg) => [
+          arg.name,
+          sampleForRef(document, arg.type, VARIABLE_DEPTH),
+        ])
+      )
+    : undefined;
+
+/** The example value one selection produces, mirroring the generated query. */
+const responseForSelections = (
+  document: GraphqlDocument,
+  typeName: string,
+  selections: GraphqlSelection[]
+): GraphqlSampleObject => {
+  const out: GraphqlSampleObject = {};
+  for (const selection of selections) {
+    if (selection.name === "__typename") {
+      // A union's example names its first member; other composites name
+      // themselves.
+      out.__typename = document.types[typeName]?.possibleTypes?.[0] ?? typeName;
+      continue;
+    }
+    // SAFETY: every non-`__typename` selection is built with its field type.
+    const ref = selection.type as GraphqlTypeRef;
+    if (selection.children) {
+      const nested = responseForSelections(
+        document,
+        ref.name,
+        selection.children
+      );
+      out[selection.name] = wrapLists(ref.display, nested);
+    } else {
+      out[selection.name] = sampleForRef(document, ref, 0);
+    }
+  }
+  return out;
+};
+
+/** The example response envelope: `data` keyed by the root field. */
+export interface GraphqlExampleResponse {
+  data: GraphqlSampleObject;
+}
+
+/**
+ * An example response envelope for the generated query — the same selection
+ * set, so the response shows exactly the fields the query asks for.
+ */
+export const exampleResponse = (
+  document: GraphqlDocument,
+  field: GraphqlField
+): GraphqlExampleResponse => {
+  const selections = selectionSet(document, field.type.name);
+  const data: GraphqlSampleObject = {};
+  if (selections) {
+    const value = responseForSelections(document, field.type.name, selections);
+    data[field.name] = wrapLists(field.type.display, value);
+  } else {
+    data[field.name] = sampleForRef(document, field.type, 0);
+  }
+  return { data };
+};
+
+/**
+ * The playground/request model for one GraphQL operation: a plain POST whose
+ * JSON body carries the query and variables. Reusing `PlaygroundModel` means
+ * the OpenAPI playground UI, its client module, and `buildRequest` all work
+ * unchanged — the samples show byte-for-byte what the Send button transmits.
+ */
+export const graphqlPlaygroundModel = (
+  spec: ApiSpecData,
+  query: string,
+  variables?: GraphqlSampleObject
+): PlaygroundModel => ({
+  auth: [],
+  authOptional: true,
+  body: {
+    contentType: "application/json",
+    example: JSON.stringify(
+      variables === undefined ? { query } : { query, variables },
+      null,
+      2
+    ),
+    schema: {
+      properties: { query: { type: "string" }, variables: { type: "object" } },
+      required: ["query"],
+      type: "object",
+    },
+  },
+  method: "POST",
+  params: [],
+  path: "",
+  servers: [spec.endpoint ?? GRAPHQL_ENDPOINT_PLACEHOLDER],
+});
+
+/**
+ * Route lookups derived from a spec's full operation list. Each page render
+ * would otherwise rebuild them from scratch — O(pages × operations) across a
+ * build — so they memoize on the spec object, which the `blume:openapi` data
+ * module instantiates once per process.
+ */
+interface GraphqlRouteMaps {
+  /** Operation-page routes keyed `kind:fieldName`. */
+  operations: Map<string, string>;
+  /** Type-page routes keyed by schema name. */
+  types: Map<string, string>;
+}
+
+const routeMapsCache = new WeakMap<ApiSpecData, GraphqlRouteMaps>();
+
+const routeMaps = (spec: ApiSpecData): GraphqlRouteMaps => {
+  let maps = routeMapsCache.get(spec);
+  if (!maps) {
+    maps = { operations: new Map(), types: new Map() };
+    for (const ref of Object.values(spec.operations)) {
+      if (ref.operationId === undefined) {
+        continue;
+      }
+      if (isGraphqlOperationKind(ref.method)) {
+        maps.operations.set(`${ref.method}:${ref.operationId}`, ref.route);
+      } else {
+        // Type pages keyed by bare name: a root field named like a type must
+        // not shadow it.
+        maps.types.set(ref.operationId, ref.route);
+      }
+    }
+    routeMapsCache.set(spec, maps);
+  }
+  return maps;
+};
+
+/**
+ * Routes for every type page of a spec, keyed by its schema name — the link
+ * table type references resolve against (a name with no page, like a built-in
+ * scalar, renders as plain text).
+ */
+export const graphqlRoutes = (spec: ApiSpecData): Map<string, string> =>
+  routeMaps(spec).types;
+
+/**
+ * Routes for the operation pages, keyed `kind:fieldName` — the link table the
+ * "Used by" backlinks resolve against.
+ */
+export const graphqlOperationRoutes = (
+  spec: ApiSpecData
+): Map<string, string> => routeMaps(spec).operations;
+
+/** Where one named type is used across the schema. */
+export interface GraphqlUsage {
+  /** Root fields whose return type or arguments mention the type. */
+  operations: { kind: GraphqlOperationKind; name: string }[];
+  /** Named types whose fields, arguments, or members mention the type. */
+  types: string[];
+}
+
+/** The names a field mentions: its own type plus each argument's type. */
+const fieldMentionNames = (field: GraphqlField): Set<string> => {
+  const names = new Set([field.type.name]);
+  for (const arg of field.args) {
+    names.add(arg.type.name);
+  }
+  return names;
+};
+
+const usageFor = (
+  index: Map<string, GraphqlUsage>,
+  name: string
+): GraphqlUsage => {
+  let usage = index.get(name);
+  if (!usage) {
+    usage = { operations: [], types: [] };
+    index.set(name, usage);
+  }
+  return usage;
+};
+
+// Computing one type's backlinks means walking every type's every field and
+// argument, so per-page computation would be quadratic across the build; the
+// whole reverse index costs the same single walk and memoizes on the document
+// object the `blume:openapi` data module instantiates once per process.
+const usageCache = new WeakMap<GraphqlDocument, Map<string, GraphqlUsage>>();
+
+const usageIndex = (document: GraphqlDocument): Map<string, GraphqlUsage> => {
+  const cached = usageCache.get(document);
+  if (cached) {
+    return cached;
+  }
+  const index = new Map<string, GraphqlUsage>();
+  const rootNames = new Map<string, GraphqlOperationKind>();
+  for (const kind of GRAPHQL_OPERATION_KINDS) {
+    const name = document.roots[kind];
+    if (name !== undefined) {
+      rootNames.set(name, kind);
+    }
+  }
+  for (const type of Object.values(document.types)) {
+    const rootKind = rootNames.get(type.name);
+    if (rootKind !== undefined) {
+      for (const field of type.fields ?? []) {
+        for (const name of fieldMentionNames(field)) {
+          // Self-references never backlink (`name !== type.name`, here and
+          // below) — a type page must not list itself as its own user.
+          if (name !== type.name) {
+            usageFor(index, name).operations.push({
+              kind: rootKind,
+              name: field.name,
+            });
+          }
+        }
+      }
+      continue;
+    }
+    const mentioned = new Set<string>();
+    for (const field of type.fields ?? []) {
+      for (const name of fieldMentionNames(field)) {
+        mentioned.add(name);
+      }
+    }
+    for (const input of type.inputFields ?? []) {
+      mentioned.add(input.type.name);
+    }
+    if (type.kind === "union") {
+      for (const member of type.possibleTypes ?? []) {
+        mentioned.add(member);
+      }
+    }
+    for (const name of mentioned) {
+      if (name !== type.name) {
+        usageFor(index, name).types.push(type.name);
+      }
+    }
+  }
+  usageCache.set(document, index);
+  return index;
+};
+
+/**
+ * Usage backlinks for one type page: the operations that return or accept it,
+ * and the other types that reference it (fields, input fields, union
+ * membership). Root types are folded into `operations` — their fields are the
+ * operation pages.
+ */
+export const graphqlUsage = (
+  document: GraphqlDocument,
+  target: string
+): GraphqlUsage =>
+  usageIndex(document).get(target) ?? { operations: [], types: [] };
+
+/** The row shapes the fields table renders: output fields or input values. */
+export type GraphqlFieldRow = GraphqlField | GraphqlInputValue;
+
+/** Narrow a table row to an output field (with arguments). */
+export const isOutputField = (row: GraphqlFieldRow): row is GraphqlField =>
+  "args" in row;

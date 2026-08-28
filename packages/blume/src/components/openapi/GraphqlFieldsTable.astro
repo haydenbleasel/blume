@@ -1,0 +1,111 @@
+---
+import type { GraphqlFieldRow } from "./graphql-helpers.ts";
+import { isOutputField } from "./graphql-helpers.ts";
+import GraphqlChip from "./GraphqlChip.astro";
+
+/**
+ * The row list shared by every GraphQL member table: a type page's fields or
+ * input fields, and an operation page's arguments (enum values render their
+ * own simpler list in `GraphqlType.astro` — they carry no type). Types link
+ * to their pages via `routes`; a name with no page (a built-in scalar)
+ * renders as plain text.
+ */
+interface Props {
+  title: string;
+  rows: GraphqlFieldRow[];
+  routes: Map<string, string>;
+}
+
+const { title, rows, routes } = Astro.props;
+
+/**
+ * Whether a value must be supplied by the caller: an argument or input field
+ * in a non-null position with no default. Output fields never take the badge
+ * — a response field isn't something the reader provides, and its `!` already
+ * shows in the type display — and a defaulted non-null argument is omittable
+ * per the GraphQL spec.
+ */
+const isRequired = (row: GraphqlFieldRow): boolean =>
+  !isOutputField(row) &&
+  row.type.display.endsWith("!") &&
+  row.default === undefined;
+---
+
+{
+  rows.length > 0 && (
+    <section class="mt-6">
+      <div
+        aria-level="2"
+        class="mb-2 font-semibold text-foreground text-sm"
+        role="heading"
+      >
+        {title}
+      </div>
+      <div class="not-prose rounded-blume border border-border px-4">
+        {rows.map((row) => {
+          const route = routes.get(row.type.name);
+          const args = isOutputField(row) ? row.args : [];
+          return (
+            <div class="border-border border-t py-3 first:border-t-0">
+              <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <code class="font-mono text-foreground text-sm">
+                  {row.name}
+                </code>
+                <GraphqlChip
+                  class="text-xs"
+                  name={row.type.display}
+                  route={route}
+                />
+                {isRequired(row) && (
+                  <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
+                    required
+                  </span>
+                )}
+                {row.deprecationReason !== undefined && (
+                  <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
+                    deprecated
+                  </span>
+                )}
+              </div>
+              {row.description && (
+                <div
+                  class="mt-1 text-muted-foreground text-sm"
+                  set:text={row.description}
+                />
+              )}
+              {"default" in row && row.default !== undefined && (
+                <div class="mt-1 text-muted-foreground text-xs">
+                  Default:{" "}
+                  <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+                    {row.default}
+                  </code>
+                </div>
+              )}
+              {row.deprecationReason && (
+                <div class="mt-1 text-muted-foreground text-xs">
+                  Deprecated: <span set:text={row.deprecationReason} />
+                </div>
+              )}
+              {args.length > 0 && (
+                <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
+                  <span class="text-muted-foreground">Arguments:</span>
+                  {args.map((arg) => (
+                    <span class="inline-flex items-baseline gap-1">
+                      <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+                        {arg.name}
+                      </code>
+                      <GraphqlChip
+                        name={arg.type.display}
+                        route={routes.get(arg.type.name)}
+                      />
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  )
+}

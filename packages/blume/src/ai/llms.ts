@@ -3,13 +3,16 @@ import { rewriteRelativeImages } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
-import { readEntryText } from "../core/sources/read.ts";
+import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode, Navigation, PageRecord } from "../core/types.ts";
 import { buildRssFeeds } from "../deploy/rss.ts";
+import { API_CATALOG_PATH, hasApiCatalog } from "./api-catalog.ts";
 import {
   downlevelComponents,
   exampleComponentSerializers,
 } from "./component-markdown.ts";
+import { AGENT_SKILLS_DIR, AGENT_SKILLS_INDEX_PATH } from "./skills.ts";
+import type { SkillArtifact } from "./skills.ts";
 import { applyAgentVisibility } from "./visibility.ts";
 
 // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top —
@@ -19,6 +22,65 @@ import { applyAgentVisibility } from "./visibility.ts";
 const pageUrl = (route: string, site?: string, base = ""): string => {
   const path = withBasePath(base, route);
   return encodeURI(site ? absoluteUrl(site, path) : path);
+};
+
+/** Inputs only the build has: the published skills, collected once per build. */
+export interface LlmsIndexOptions {
+  /**
+   * The Agent Skills the build publishes under `/.well-known/agent-skills/`,
+   * listed in their own section with each skill's description — which is
+   * where a skill says when to use it. Absent (empty) for the homepage
+   * Markdown mirror, which is synthesized before the skills are collected.
+   */
+  skills?: readonly SkillArtifact[];
+}
+
+/** A skill description on one line — SKILL.md frontmatter may wrap it. */
+const oneLine = (text: string): string => text.replaceAll(/\s+/gu, " ").trim();
+
+/**
+ * The "Agent resources" section: every machine-readable artifact the site
+ * publishes, so an agent that only reads llms.txt still finds the full
+ * Markdown dump, the per-page Markdown mirrors, the MCP server, the skills
+ * index, the API catalog, the readability manifest, and the sitemap. The
+ * same artifact set `agent-readability.json` indexes, in prose an agent can
+ * act on without a second fetch.
+ */
+const agentResourceLines = (project: BlumeProject): string[] => {
+  const { config } = project;
+  const { site } = config.deployment;
+  const url = (path: string): string =>
+    pageUrl(path, site, normalizeBasePath(config.deployment.base));
+  const lines = [
+    `- [llms-full.txt](${url("/llms-full.txt")}): The full Markdown of every page in one file.`,
+    `- [Page Markdown](${url("/index.md")}): Append \`.md\` to any page URL to fetch that page as raw Markdown.`,
+  ];
+  if (config.ai.mcp.enabled) {
+    lines.push(
+      `- [MCP server](${url(config.ai.mcp.route)}): Streamable HTTP Model Context Protocol server with search_docs, get_page, list_pages, and get_navigation tools, plus every page as a resource. Discovery document: ${url("/.well-known/mcp.json")}`
+    );
+  }
+  if (config.ai.skills) {
+    lines.push(
+      `- [Agent skills](${url(AGENT_SKILLS_INDEX_PATH)}): Agent Skills discovery index of the skills this site publishes.`
+    );
+  }
+  if (hasApiCatalog(config)) {
+    lines.push(
+      `- [API catalog](${url(API_CATALOG_PATH)}): RFC 9727 linkset of the APIs documented here.`
+    );
+  }
+  if (config.seo.agentReadability) {
+    lines.push(
+      `- [agent-readability.json](${url("/agent-readability.json")}): Manifest of every agent-facing artifact on this site.`
+    );
+  }
+  if (site && config.seo.sitemap) {
+    lines.push(
+      `- [Sitemap](${url("/sitemap.xml")}): Every indexable page URL with its last-modified date.`
+    );
+  }
+  return lines;
 };
 
 // Drafts, hidden, and ordinary `noindex` pages are excluded. Generated API
@@ -88,7 +150,10 @@ const indexedNavigations = (
  * Also serves as the homepage's synthesized Markdown mirror when the home
  * route is a landing page (see `buildRawMarkdown`).
  */
-export const buildLlmsIndex = (project: BlumeProject): string => {
+export const buildLlmsIndex = (
+  project: BlumeProject,
+  options: LlmsIndexOptions = {}
+): string => {
   const { config } = project;
   const { site } = config.deployment;
   const base = normalizeBasePath(config.deployment.base);
@@ -187,10 +252,31 @@ export const buildLlmsIndex = (project: BlumeProject): string => {
     );
   }
 
+  // The published skills, each with its description — the one place a skill
+  // states when an agent should reach for it.
+  const skills = options.skills ?? [];
+  if (skills.length > 0) {
+    blocks.push(
+      "## Agent skills",
+      skills
+        .map(
+          (skill) =>
+            `- [${skill.name}](${pageUrl(`${AGENT_SKILLS_DIR}/${skill.path}`, site, base)}): ${oneLine(skill.description)}`
+        )
+        .join("\n")
+    );
+  }
+
+  blocks.push("## Agent resources", agentResourceLines(project).join("\n"));
+
   const header = config.description
     ? `# ${config.title}\n\n> ${config.description}`
     : `# ${config.title}`;
-  return `${[header, ...blocks].join("\n\n")}\n`;
+  // `details` is the llms.txt spec's free-form block between the summary and
+  // the file sections — "when to use this" guidance in the site's own words.
+  const { details } = config.ai.llmsTxt;
+  const lead = details ? `${header}\n\n${details}` : header;
+  return `${[lead, ...blocks].join("\n\n")}\n`;
 };
 
 /** Build `llms-full.txt`: the full Markdown body of every current-docs page. */
@@ -208,7 +294,7 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
 
   const sections = await Promise.all(
     pages.map(async (page) => {
-      let raw = await readEntryText(project, page);
+      let raw = await readExpandedEntryText(project, page);
       // Colocated `./image.png` references resolve to nothing for a reader of
       // llms-full.txt; point them at the served originals instead.
       if (page.sourcePath) {
@@ -246,8 +332,9 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
 
 /** Build both LLM text artifacts for a project. */
 export const buildLlmsFiles = async (
-  project: BlumeProject
+  project: BlumeProject,
+  options: LlmsIndexOptions = {}
 ): Promise<{ index: string; full: string }> => ({
   full: await buildFull(project),
-  index: buildLlmsIndex(project),
+  index: buildLlmsIndex(project, options),
 });

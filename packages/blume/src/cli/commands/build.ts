@@ -25,6 +25,7 @@ import {
   buildSkillsIndex,
   collectSkills,
 } from "../../ai/skills.ts";
+import type { SkillArtifact } from "../../ai/skills.ts";
 import {
   buildSignaturesDirectory,
   SIGNATURES_DIRECTORY_PATH,
@@ -46,6 +47,11 @@ import {
   injectWorkerNegotiation,
   NEGOTIATION_WORKER_FILE,
 } from "../../deploy/cloudflare-negotiation.ts";
+import {
+  auditVercelFunctions,
+  blumeDependencyNames,
+  functionBundleVerdict,
+} from "../../deploy/function-bundle.ts";
 import { buildNetlifyHeaders } from "../../deploy/headers.ts";
 import {
   buildNetlifyRedirects,
@@ -195,29 +201,29 @@ export const emitHeaderFiles = async (
 };
 
 /**
- * Publish the configured Agent Skills: copy each skill artifact under
- * `.well-known/agent-skills/` and emit the discovery index. A user-shipped
- * `public/.well-known/agent-skills/index.json` takes over the whole surface,
- * matching every other generated artifact.
+ * Collect the Agent Skills `ai.skills` publishes, once per build, so both the
+ * skills surface and llms.txt (which lists them) read the same set. Empty
+ * when the feature is off, the directory is missing, nothing in it is
+ * publishable (each with a warning), or a user-shipped
+ * `public/.well-known/agent-skills/index.json` already owns the surface.
  */
-const emitAgentSkills = async (
+const collectConfiguredSkills = async (
   project: BlumeProject,
   distDir: string
-): Promise<void> => {
+): Promise<SkillArtifact[]> => {
   const configured = project.config.ai.skills;
   if (!configured) {
-    return;
+    return [];
   }
   const dir = resolve(project.context.root, configured);
   if (!existsSync(dir)) {
     logger.warn(
       `ai.skills points at "${configured}" (${dir}), which does not exist; no skills published.`
     );
-    return;
+    return [];
   }
-  const outDir = join(distDir, AGENT_SKILLS_DIR.slice(1));
-  if (existsSync(join(outDir, "index.json"))) {
-    return;
+  if (existsSync(join(distDir, AGENT_SKILLS_DIR.slice(1), "index.json"))) {
+    return [];
   }
   const { skills, warnings } = await collectSkills(dir);
   for (const warning of warnings) {
@@ -225,8 +231,26 @@ const emitAgentSkills = async (
   }
   if (skills.length === 0) {
     logger.warn(`ai.skills: no publishable skills found in "${configured}".`);
+  }
+  return skills;
+};
+
+/**
+ * Publish the collected Agent Skills: copy each skill artifact under
+ * `.well-known/agent-skills/` and emit the discovery index. A user-shipped
+ * `public/.well-known/agent-skills/index.json` takes over the whole surface
+ * (the collector returns nothing then), matching every other generated
+ * artifact.
+ */
+const emitAgentSkills = async (
+  project: BlumeProject,
+  distDir: string,
+  skills: readonly SkillArtifact[]
+): Promise<void> => {
+  if (skills.length === 0) {
     return;
   }
+  const outDir = join(distDir, AGENT_SKILLS_DIR.slice(1));
   await Promise.all(
     skills.map(async (skill) => {
       const target = join(outDir, skill.path);
@@ -327,6 +351,38 @@ const emitVercelNegotiation = async (
   logger.success(
     "Wired Accept: text/markdown negotiation into the Vercel routing config"
   );
+};
+
+/**
+ * Refuse to ship a Vercel function bundle that would crash at runtime: a bare
+ * import the adapter's dependency trace silently dropped (see
+ * `deploy/function-bundle.ts`). A missing package that is one of Blume's own
+ * dependencies is fatal — the generated runtime imports it, so every request
+ * would die; a project's own external import is reported as a warning and left
+ * to the author.
+ */
+const checkVercelFunctionBundles = async (
+  outputDir: string,
+  root: string
+): Promise<void> => {
+  const audits = await auditVercelFunctions(outputDir);
+  if (audits.length === 0) {
+    return;
+  }
+  const own = blumeDependencyNames();
+  let fatal = false;
+  for (const audit of audits) {
+    const verdict = functionBundleVerdict(audit, root, own);
+    if (verdict.fatal) {
+      fatal = true;
+      logger.error(verdict.message);
+    } else {
+      logger.warn(verdict.message);
+    }
+  }
+  if (fatal) {
+    process.exit(1);
+  }
 };
 
 const warnCloudflareNegotiationSkipped = (): void =>
@@ -559,7 +615,8 @@ export const isolatedStaticDir = (
  */
 const publishLlmsFiles = async (
   project: BlumeProject,
-  distDir: string
+  distDir: string,
+  skills: readonly SkillArtifact[]
 ): Promise<void> => {
   const indexPath = join(distDir, "llms.txt");
   const fullPath = join(distDir, "llms-full.txt");
@@ -568,7 +625,7 @@ const publishLlmsFiles = async (
   if (!(writeIndex || writeFull)) {
     return;
   }
-  const { index, full } = await buildLlmsFiles(project);
+  const { index, full } = await buildLlmsFiles(project, { skills });
   const writes: Promise<void>[] = [];
   if (writeIndex) {
     writes.push(writeFile(indexPath, index, "utf-8"));
@@ -613,8 +670,10 @@ const publishBuildArtifacts = async (
     warn: (message) => logger.warn(message),
   });
 
+  // Collected once: llms.txt lists the skills the build publishes below.
+  const skills = await collectConfiguredSkills(project, distDir);
   if (project.config.ai.llmsTxt.enabled) {
-    await publishLlmsFiles(project, distDir);
+    await publishLlmsFiles(project, distDir, skills);
   }
 
   // A user's own public/ file (copied into dist by Astro) always wins.
@@ -652,7 +711,7 @@ const publishBuildArtifacts = async (
   }
 
   await emitWellKnownFiles(project.config, distDir);
-  await emitAgentSkills(project, distDir);
+  await emitAgentSkills(project, distDir, skills);
 
   await emitRedirectFiles(project.config, distDir);
   await emitHeaderFiles(project, distDir);
@@ -798,6 +857,15 @@ export const buildCommand = defineCommand({
     // 100` exiting 0 without measuring anything would be a silent false pass
     // in CI.
     if (runtimeDir) {
+      if (
+        project.config.deployment.output === "server" &&
+        project.config.deployment.adapter === "vercel"
+      ) {
+        await checkVercelFunctionBundles(
+          isolatedOutputDir(project.config, project.context),
+          root
+        );
+      }
       await runClientAssetChecks(
         isolatedStaticDir(project.config, project.context),
         args
@@ -831,6 +899,7 @@ export const buildCommand = defineCommand({
     }
 
     if (project.config.deployment.output === "server" && adapter === "vercel") {
+      await checkVercelFunctionBundles(join(root, ".vercel", "output"), root);
       await emitVercelNegotiation(project, markdownRoutePaths(project), root);
     }
 

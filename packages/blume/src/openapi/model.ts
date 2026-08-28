@@ -1,6 +1,9 @@
 import type { Document, OperationObject } from "@scalar/openapi-types/3.1";
 
 import type { AsyncApiAction, AsyncApiDocument } from "./asyncapi.ts";
+// Type-only, so the import can't cycle at runtime (graphql.ts imports the
+// collector from here).
+import type { GraphqlDocument, GraphqlMember } from "./graphql.ts";
 import type { ReferenceKind } from "./references.ts";
 import { slugify } from "./references.ts";
 
@@ -53,9 +56,15 @@ export const operationKey = (
 export interface ApiOperationRef {
   /** Stable key, unique within a spec; matches the MDX `<Operation id>`. */
   key: string;
-  /** HTTP method (OpenAPI) or `send`/`receive` action (AsyncAPI). */
-  method: HttpMethod | AsyncApiAction;
-  /** Templated path, e.g. `/pets/{id}` — or the channel address (AsyncAPI). */
+  /**
+   * HTTP method (OpenAPI), `send`/`receive` action (AsyncAPI), or the member
+   * kind — a root-field operation kind or a named-type kind (GraphQL).
+   */
+  method: HttpMethod | AsyncApiAction | GraphqlMember;
+  /**
+   * Templated path, e.g. `/pets/{id}` — the channel address (AsyncAPI), or
+   * the root field / type name (GraphQL).
+   */
   path: string;
   /** Full site route for this operation's page, e.g. `/reference/pet/add-pet`. */
   route: string;
@@ -90,7 +99,12 @@ export interface ApiSpecData {
   title: string;
   version: string;
   description: string;
-  document: ApiDocument | AsyncApiDocument;
+  document: ApiDocument | AsyncApiDocument | GraphqlDocument;
+  /**
+   * URL of the live GraphQL endpoint the playground and code samples target
+   * (GraphQL only; OpenAPI documents carry their servers in the document).
+   */
+  endpoint?: string;
   /** Operations keyed by {@link ApiOperationRef.key}. */
   operations: Record<string, ApiOperationRef>;
   tags: ApiTagRef[];

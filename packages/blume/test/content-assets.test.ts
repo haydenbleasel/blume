@@ -163,12 +163,13 @@ describe("collectContentAssets", () => {
     await writeFile(pagePath, "![p](./photo.png)\n![m](./missing.png)");
     const files = await collectContentAssets({
       context: { root },
+      graph: { pages: [] },
       manifest: {
         routes: [
-          { sourcePath: pagePath },
-          { sourcePath: page2 },
-          { sourcePath: join(root, "docs", "gone.md") },
-          {},
+          { id: "p1", sourcePath: pagePath },
+          { id: "p2", sourcePath: page2 },
+          { id: "p3", sourcePath: join(root, "docs", "gone.md") },
+          { id: "p4" },
         ],
       },
     });

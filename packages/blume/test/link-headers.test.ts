@@ -26,6 +26,7 @@ const configWith = (
     asyncapi: { enabled: false, sources: [] },
     basePath: "",
     deployment: { base: overrides.base },
+    graphql: { enabled: false, sources: [] },
     openapi: { enabled: false, sources: [] },
     seo: { agentReadability: overrides.agentReadability ?? true },
   });

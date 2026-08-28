@@ -17,6 +17,30 @@ Structure a page with headings. Blume renders your frontmatter `title` as the pa
 #### Detail
 ```
 
+### Custom anchors
+
+Anchor ids are generated from the heading text, so a reworded heading gets a new anchor. Append `[#custom-id]` to pin the anchor instead — the marker never renders, and links keep working no matter how the heading reads. Pinned anchors also stay identical across [translated locales](/docs/content/i18n), where auto-generated ids would otherwise differ per language.
+
+```md
+## Getting started [#setup]
+```
+
+Link to it as `/page#setup`. The syntax matches Fumadocs, so migrated content works verbatim.
+
+### Table of contents markers
+
+Two more trailing markers control how a heading appears in the table of contents. `[!toc]` keeps a heading on the page but out of the TOC; `[toc]` does the reverse — the heading shows only in the TOC, as an invisible anchor target, which is useful for labeling sections built from components rather than prose. Markers chain in any order.
+
+```md
+## Appears on the page only [!toc]
+
+## Appears in the TOC only [toc]
+
+## Both markers together [toc] [#custom-id]
+```
+
+Markers are always parsed — a heading that literally ends in marker-shaped text would be treated as marked. Backslash-escaping doesn't help (Markdown resolves `\[` to `[` before the marker parse runs); to show literal marker text at the end of a heading, wrap it in inline code: `` ## Using `[toc]` ``.
+
 ## Emphasis
 
 Inline formatting for stressing words, marking deletions, and showing code or keystrokes mid-sentence.

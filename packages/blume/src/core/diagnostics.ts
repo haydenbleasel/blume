@@ -25,6 +25,7 @@ const DOCS_DEPLOYMENT = "/docs/deployment";
 const DOCS_REFERENCE_CLI = "/docs/reference/cli";
 const DOCS_CONTENT_SOURCES = "/docs/content/sources";
 const DOCS_CONTENT_NAVIGATION = "/docs/content/navigation";
+const DOCS_CONTENT_INCLUDES = "/docs/content/includes";
 
 /** Diagnostic code → the docs page that explains it. */
 const DOCS_PATHS = new Map(
@@ -42,6 +43,9 @@ const DOCS_PATHS = new Map(
     BLUME_DUPLICATE_ROUTE: DOCS_CONTENT_NAVIGATION,
     BLUME_DUPLICATE_SIDEBAR_ORDER: DOCS_CONTENT_NAVIGATION,
     BLUME_FRONTMATTER_INVALID: "/docs/reference/frontmatter",
+    BLUME_INCLUDE_CYCLE: DOCS_CONTENT_INCLUDES,
+    BLUME_INCLUDE_NOT_FOUND: DOCS_CONTENT_INCLUDES,
+    BLUME_INCLUDE_OUTSIDE_ROOT: DOCS_CONTENT_INCLUDES,
     BLUME_META_INVALID: "/docs/content/meta",
     BLUME_META_LOAD_FAILED: "/docs/content/meta",
     BLUME_MISSING_SECRET: DOCS_DEPLOYMENT,

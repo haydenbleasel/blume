@@ -103,7 +103,10 @@ const HTTP_URL = /^https?:\/\//u;
  */
 export interface McpServerCard {
   $schema: string;
-  capabilities: { tools: { listChanged: boolean } };
+  capabilities: {
+    resources: { listChanged: boolean; subscribe: boolean };
+    tools: { listChanged: boolean };
+  };
   description: string;
   name: string;
   /** Absolute endpoints only — present when a `site` is configured. */
@@ -122,7 +125,12 @@ export const buildMcpServerCard = (input: McpDiscoveryInput): McpServerCard => {
   const url = serverUrl(input);
   const card: McpServerCard = {
     $schema: SERVER_CARD_SCHEMA,
-    capabilities: { tools: { listChanged: false } },
+    // Resources mirror the page list (one `text/markdown` resource per page);
+    // a rebuilt site replaces the server wholesale, so nothing changes live.
+    capabilities: {
+      resources: { listChanged: false, subscribe: false },
+      tools: { listChanged: false },
+    },
     description: truncate(
       `Model Context Protocol server for the ${input.name} documentation.`
     ),

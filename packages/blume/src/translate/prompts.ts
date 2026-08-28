@@ -65,6 +65,7 @@ Rules:
 - Translate the prose: headings, paragraphs, list items, table cells, admonitions, and image alt text.
 - In the YAML frontmatter, translate ONLY the values of these keys: ${KEY_LIST}. Copy every other frontmatter key and value exactly as written.
 - Never translate or alter: code blocks, inline code, import/export statements, JSX/MDX component names and their attributes, URLs, link targets, HTML tags, or frontmatter keys.
+- A heading may end with bracketed anchor markers: \`[#some-id]\`, \`[!toc]\`, or \`[toc]\`. Copy every marker exactly as written, in the same position at the end of the translated heading — never translate, reorder, or drop a marker, and never change the id inside \`[#...]\` (anchors must stay identical across languages).
 - Preserve the document structure exactly: the same headings, the same lists and tables, and the same number of code fences.${styleRule}${previousRule}
 - Output ONLY the complete translated file. Do not wrap it in a code fence. Do not add commentary before or after it.
 ${previousSection}

@@ -13,6 +13,7 @@ import { baseLinksPlugin } from "./base-links.ts";
 import { codeTitleTransformer } from "./code-title.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
 import { headingAnchorPlugin } from "./heading-anchors.ts";
+import { includePlugin } from "./include.ts";
 import { inlineCodeHighlightPlugin } from "./inline-code.ts";
 import { languageIconTransformer } from "./language-icon.ts";
 import { mathPlugin } from "./math.ts";
@@ -39,6 +40,7 @@ export {
 } from "./code-title.ts";
 export { calloutTypeFor } from "./directives.ts";
 export { headingAnchorPlugin } from "./heading-anchors.ts";
+export { includePlugin } from "./include.ts";
 export { mermaidPlugin } from "./mermaid.ts";
 export { packageInstallPlugin } from "./package-install.ts";
 export { ts2jsPlugin } from "./ts2js.ts";
@@ -79,21 +81,18 @@ const asShikiTransformer = (transformer: { name: string }): ShikiTransformer =>
 /**
  * Hast plugins enabled by config. Inline `` `code`{:lang} `` highlighting is
  * always on: it only fires on an explicit trailing `{:lang}` marker, so plain
- * inline code is untouched and there's nothing to opt out of. Self-linking
- * heading anchors (`<h2>`–`<h6>` wrapped in an `<a>` to their own id) are on
- * unless `markdown.headingAnchors` is `false`. Inline code runs first so the
- * anchor wrap re-refs already-highlighted code.
+ * inline code is untouched and there's nothing to opt out of. The heading
+ * plugin also always runs — it owns heading ids and the trailing markers
+ * (`[#custom-id]`, `[!toc]`, `[toc]`), which must parse regardless of config —
+ * while `markdown.headingAnchors: false` only turns off the self-linking
+ * anchor wrap on `<h2>`–`<h6>`. Inline code runs first so the anchor wrap
+ * re-refs already-highlighted code.
  */
-const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => {
-  const plugins: HastPlugin[] = [
-    asHastPlugin(inlineCodeHighlightPlugin(options.codeThemes)),
-    asHastPlugin(tableWrapPlugin()),
-  ];
-  if (options.headingAnchors !== false) {
-    plugins.push(asHastPlugin(headingAnchorPlugin()));
-  }
-  return plugins;
-};
+const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => [
+  asHastPlugin(inlineCodeHighlightPlugin(options.codeThemes)),
+  asHastPlugin(tableWrapPlugin()),
+  asHastPlugin(headingAnchorPlugin({ wrap: options.headingAnchors !== false })),
+];
 
 /**
  * Shiki transformers enabled by default for every code block. The four upstream
@@ -275,12 +274,17 @@ export interface BlumeMarkdownOptions {
    * `basePath` link isn't double-prefixed (see `withComposedBasePath`).
    */
   deployBase?: string;
+  /**
+   * The docs content root, bounding `<include>` target resolution (and
+   * anchoring `/`-leading include paths). When unset, relative includes still
+   * resolve from the including file.
+   */
+  contentRoot?: string;
 }
 
 /**
- * MDAST plugins that apply to both `.md` and `.mdx`. Currently just the
- * base-path link rewrite, added only when a `basePath` or `deployBase` is
- * configured.
+ * MDAST plugins that apply to both `.md` and `.mdx`: the base-path link
+ * rewrite (added only when a `basePath` or `deployBase` is configured).
  */
 const blumeSharedMdastPlugins = (
   options: BlumeMarkdownOptions
@@ -293,12 +297,23 @@ const blumeSharedMdastPlugins = (
       ]
     : [];
 
+/**
+ * The `<include>` splice. Always first: its mutations apply before the next
+ * plugin runs, so spliced content flows through the rest of the chain
+ * (callouts, mermaid, math, base links) like inline content.
+ */
+const blumeIncludePlugin = (options: BlumeMarkdownOptions): MdastPlugin =>
+  asMdastPlugin(includePlugin({ contentRoot: options.contentRoot }));
+
 /** Sätteri processor for plain `.md`, with Blume's curated feature set. */
 export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
   satteri({
     features: { ...FEATURES },
     hastPlugins: blumeHastPlugins(options),
-    mdastPlugins: blumeSharedMdastPlugins(options),
+    mdastPlugins: [
+      blumeIncludePlugin(options),
+      ...blumeSharedMdastPlugins(options),
+    ],
   });
 
 export type BlumeMdxOptions = BlumeMarkdownOptions;
@@ -330,6 +345,7 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
     },
     hastPlugins: blumeHastPlugins(options),
     mdastPlugins: [
+      blumeIncludePlugin(options),
       asMdastPlugin(packageInstallPlugin()),
       asMdastPlugin(ts2jsPlugin()),
       asMdastPlugin(directiveToCalloutPlugin()),

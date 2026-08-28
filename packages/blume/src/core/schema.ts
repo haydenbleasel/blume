@@ -795,6 +795,20 @@ const askEndpointSchema = z
     }
   );
 
+/** The object form of `ai.llmsTxt`; a bare boolean normalizes onto it. */
+const llmsTxtObjectSchema = z.strictObject({
+  /**
+   * Markdown inserted after the title and summary, before the page sections:
+   * the llms.txt spec's "details" slot. The place to tell agents when to use
+   * the product and how to call it; trimmed, and dropped when blank.
+   */
+  details: z.string().trim().min(1).optional(),
+  enabled: z.boolean().default(true),
+  openapi: z.boolean().default(true),
+});
+
+type LlmsTxtResolved = z.output<typeof llmsTxtObjectSchema>;
+
 const aiConfigSchema = z.strictObject({
   ask: z
     .strictObject({
@@ -858,19 +872,16 @@ const aiConfigSchema = z.strictObject({
   /**
    * `llms.txt`/`llms-full.txt` emission. A bare boolean toggles it; the object
    * form adds `openapi: false` to keep generated API reference pages out of
-   * both files (e.g. when the configured spec is example content).
+   * both files (e.g. when the configured spec is example content) and
+   * `details`, free-form Markdown placed after the summary — the llms.txt
+   * spec's details block, where a site tells agents when to reach for it.
    */
   llmsTxt: z
-    .union([
-      z.boolean(),
-      z.strictObject({
-        enabled: z.boolean().default(true),
-        openapi: z.boolean().default(true),
-      }),
-    ])
+    .union([z.boolean(), llmsTxtObjectSchema])
     .default(true)
-    .transform((value) =>
-      isBoolean(value) ? { enabled: value, openapi: true } : value
+    .transform(
+      (value): LlmsTxtResolved =>
+        isBoolean(value) ? { enabled: value, openapi: true } : value
     ),
   // Serializers for the agent-facing Markdown downlevel (the `.md` mirror,
   // llms-full.txt, MCP get_page), keyed by JSX name. Functions live here —
@@ -1347,6 +1358,50 @@ const contentSignalsSchema = z
     return value;
   });
 
+/** A schema.org `PostalAddress`, any part of which may be given. */
+const postalAddressSchema = z.strictObject({
+  addressCountry: z.string().optional(),
+  addressLocality: z.string().optional(),
+  addressRegion: z.string().optional(),
+  postalCode: z.string().optional(),
+  streetAddress: z.string().optional(),
+});
+
+/**
+ * `seo.organization`: the organization behind the site, emitted on every page
+ * as a schema.org `Organization` node (see `seo/jsonld.ts`). Name and URL
+ * default to the site's; contact details become a `ContactPoint`, the address
+ * a `PostalAddress` — what agents check to verify a business.
+ */
+const organizationConfigSchema = z.strictObject({
+  address: postalAddressSchema.optional(),
+  contactType: z.string().default("customer support"),
+  email: z.email().optional(),
+  logo: z.string().optional(),
+  name: z.string().optional(),
+  sameAs: z.array(z.url()).default([]),
+  telephone: z.string().optional(),
+  url: z.url().optional(),
+});
+
+/**
+ * `seo.software`: the product the site documents, emitted on the homepage as
+ * a schema.org `SoftwareApplication` node. `true` takes every default (name
+ * and description from the site, category `DeveloperApplication`).
+ */
+const softwareConfigSchema = z.strictObject({
+  applicationCategory: z.string().default("DeveloperApplication"),
+  description: z.string().optional(),
+  license: z.string().optional(),
+  name: z.string().optional(),
+  operatingSystem: z.string().optional(),
+  price: z.union([z.number().nonnegative(), z.string()]).optional(),
+  priceCurrency: z.string().default("USD"),
+  sameAs: z.array(z.url()).default([]),
+});
+
+type SoftwareResolved = z.output<typeof softwareConfigSchema>;
+
 /** Discoverability features: OG images, feeds, sitemap, structured data. */
 const seoConfigSchema = z.strictObject({
   /**
@@ -1358,11 +1413,23 @@ const seoConfigSchema = z.strictObject({
   /** robots.txt `Content-Signal` usage declaration (on by default). */
   contentSignals: contentSignalsSchema.prefault(true),
   og: ogConfigSchema.default({}),
+  /** The organization behind the site, as an `Organization` JSON-LD node. */
+  organization: organizationConfigSchema.optional(),
   /** Generate robots.txt (with a Sitemap reference when available). */
   robots: z.boolean().default(true),
   rss: rssConfigSchema.prefault({}),
   /** Generate sitemap.xml (requires deployment.site). */
   sitemap: z.boolean().default(true),
+  /** The documented product, as a homepage `SoftwareApplication` node. */
+  software: z
+    .union([z.boolean(), softwareConfigSchema])
+    .optional()
+    .transform((value): SoftwareResolved | undefined => {
+      if (value === true) {
+        return softwareConfigSchema.parse({});
+      }
+      return value === false ? undefined : value;
+    }),
   /** Emit schema.org JSON-LD in each page's <head>. */
   structuredData: z.boolean().default(true),
   /** X (Twitter) account attribution for share cards. */
@@ -1578,9 +1645,33 @@ export type OpenApiSource = z.input<typeof openapiSourceSchema>;
 const scalarConfigSchema = z.record(z.string(), z.unknown()).optional();
 
 /**
- * The shared shape of both API-reference blocks — only the mount route and
+ * The interactive "Try it" panel on operation pages (Blume renderer). On by
+ * default; `false` hides it. The object form keeps it on and sets `proxy`,
+ * the CORS escape hatch the Send button routes requests through: a proxy URL,
+ * or `true` for the built-in `/_api-proxy` endpoint (which requires
+ * `deployment.output: "server"`). Booleans normalize to the object shape so
+ * consumers read `{ enabled, proxy }` directly. `proxy` applies to the
+ * HTTP-posting playgrounds (OpenAPI, GraphQL) — an event composer's WebSocket
+ * connect is direct. One schema for every reference block, so the
+ * normalization can never drift between them.
+ */
+const playgroundConfigSchema = z
+  .union([
+    z.boolean(),
+    z.strictObject({
+      enabled: z.boolean().default(true),
+      proxy: z.union([z.boolean(), z.string()]).default(false),
+    }),
+  ])
+  .default(true)
+  .transform((value) =>
+    isBoolean(value) ? { enabled: value, proxy: false } : value
+  );
+
+/**
+ * The shared shape of the API-reference blocks — only the mount route and
  * code-sample defaults differ per spec kind, so each block declares just
- * those.
+ * those (the GraphQL block derives from this via omit/extend below).
  */
 const referenceConfigSchema = (defaults: {
   codeSamples: string[];
@@ -1592,27 +1683,8 @@ const referenceConfigSchema = (defaults: {
     enabled: z.boolean().default(false),
     /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
     expandSchemas: z.boolean().default(false),
-    /**
-     * The interactive "Try it" panel on operation pages (Blume renderer). On by
-     * default; `false` hides it. The object form keeps it on and sets `proxy`,
-     * the CORS escape hatch the OpenAPI Send button routes requests through: a
-     * proxy URL, or `true` for the built-in `/_api-proxy` endpoint (which
-     * requires `deployment.output: "server"`). Booleans normalize to the object
-     * shape so consumers read `{ enabled, proxy }` directly. `proxy` is
-     * OpenAPI-only — an event composer's WebSocket connect is direct.
-     */
-    playground: z
-      .union([
-        z.boolean(),
-        z.strictObject({
-          enabled: z.boolean().default(true),
-          proxy: z.union([z.boolean(), z.string()]).default(false),
-        }),
-      ])
-      .default(true)
-      .transform((value) =>
-        isBoolean(value) ? { enabled: value, proxy: false } : value
-      ),
+    /** The "Try it" panel; see {@link playgroundConfigSchema}. */
+    playground: playgroundConfigSchema,
     /** Who renders the reference: Blume's own UI, or the embedded Scalar SPA. */
     renderer: z.enum(["blume", "scalar"]).default("blume"),
     /** Where the reference mounts. */
@@ -1651,6 +1723,43 @@ const asyncapiConfigSchema = referenceConfigSchema({
   codeSamples: [],
   route: "/events",
 });
+
+/**
+ * A single GraphQL schema rendered by the reference. `spec` is a local path or
+ * an `http(s)` URL to SDL text or an introspection JSON result; `endpoint` is
+ * the live GraphQL API URL the playground and code samples target (a schema,
+ * unlike an OpenAPI document, names no server).
+ */
+const graphqlSourceSchema = openapiSourceSchema.extend({
+  /** URL of the live GraphQL endpoint (playground + code samples). */
+  endpoint: z.string().optional(),
+});
+
+export type GraphqlSource = z.input<typeof graphqlSourceSchema>;
+
+/**
+ * GraphQL reference. Blume lowers the schema (SDL or introspection JSON) to
+ * one real page per root field — grouped as Queries/Mutations/Subscriptions —
+ * plus one page per named type (Objects, Input Objects, Enums, Interfaces,
+ * Unions, Scalars), all included in the sidebar, search, llms.txt, and OG.
+ * Always Blume-rendered: the Scalar SPA reads OpenAPI documents only, so the
+ * block declares no `renderer`/`scalar`/`theme` escape hatches.
+ */
+const graphqlConfigSchema = referenceConfigSchema({
+  codeSamples: ["curl", "js", "python"],
+  route: "/graphql",
+})
+  // No `renderer`/`scalar`/`theme` escape hatches (the Scalar SPA reads
+  // OpenAPI documents only) and no `expandSchemas` (GraphQL field tables have
+  // no nesting) — everything else, the playground normalization included, is
+  // the shared reference shape.
+  .omit({ expandSchemas: true, renderer: true, scalar: true, theme: true })
+  .extend({
+    /** Default live endpoint URL for every source (per-source `endpoint` wins). */
+    endpoint: z.string().optional(),
+    /** One or more schemas; each renders on its own route by default. */
+    sources: z.array(graphqlSourceSchema).default([]),
+  });
 
 /**
  * Opt-in custom frontmatter keys. `extend` maps each extra key a project's
@@ -1737,6 +1846,7 @@ export const blumeConfigSchema = z
     /** Opt-in custom frontmatter keys, validated by user-supplied schemas. */
     frontmatter: frontmatterConfigSchema.prefault({}),
     github: githubConfigSchema.optional(),
+    graphql: graphqlConfigSchema.prefault({}),
     i18n: i18nConfigSchema.optional(),
     image: imageConfigSchema.prefault({}),
     integrations: z.array(z.custom<AstroIntegration>()).default([]),

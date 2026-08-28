@@ -172,12 +172,114 @@ describe("buildLlmsFiles — index", () => {
     expect(index).toContain("# Docs");
     expect(index).toContain("> Desc");
     expect(index).toContain("## Docs");
-    const links = index.split("\n").filter((line) => line.startsWith("- ["));
+    // Page links only — the trailing "Agent resources" section has its own.
+    const pages = index.split("## Agent resources")[0] ?? "";
+    const links = pages.split("\n").filter((line) => line.startsWith("- ["));
     expect(links).toStrictEqual([
       "- [Alpha](https://example.com/a): First",
       "- [Beta](https://example.com/b)",
     ]);
     expect(index).not.toContain("Gamma");
+  });
+
+  it("places ai.llmsTxt.details between the summary and the sections", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject([makePage("a.md", "/a", "Alpha")], {
+        ai: {
+          llmsTxt: {
+            details: "## When to use Docs\n\nReach for Docs when you ship.",
+          },
+        },
+      })
+    );
+    expect(
+      index.startsWith(
+        "# Docs\n\n> Desc\n\n## When to use Docs\n\nReach for Docs when you ship.\n\n## Docs\n"
+      )
+    ).toBe(true);
+  });
+
+  it("omits the details block when none is configured", async () => {
+    const { index } = await buildLlmsFiles(project());
+    expect(index.startsWith("# Docs\n\n> Desc\n\n## Docs\n")).toBe(true);
+  });
+});
+
+/** The lines of an llms.txt index's trailing "Agent resources" section. */
+const agentResources = (index: string): string[] =>
+  (index.split("## Agent resources\n\n")[1] ?? "").trimEnd().split("\n");
+
+describe("buildLlmsFiles — agent resources", () => {
+  it("always lists llms-full.txt and the per-page Markdown mirror, plus the sitemap when a site is set", async () => {
+    const { index } = await buildLlmsFiles(project());
+    expect(agentResources(index)).toStrictEqual([
+      "- [llms-full.txt](https://example.com/llms-full.txt): The full Markdown of every page in one file.",
+      "- [Page Markdown](https://example.com/index.md): Append `.md` to any page URL to fetch that page as raw Markdown.",
+      "- [agent-readability.json](https://example.com/agent-readability.json): Manifest of every agent-facing artifact on this site.",
+      "- [Sitemap](https://example.com/sitemap.xml): Every indexable page URL with its last-modified date.",
+    ]);
+  });
+
+  it("adds the MCP server, skills index, and API catalog when configured, and drops disabled artifacts", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject([makePage("a.md", "/a", "Alpha")], {
+        ai: { mcp: { enabled: true, route: "/docs-mcp" }, skills: "./skills" },
+        deployment: { output: "server", site: "https://example.com/" },
+        seo: { agentReadability: false, sitemap: false },
+      })
+    );
+    expect(agentResources(index)).toStrictEqual([
+      "- [llms-full.txt](https://example.com/llms-full.txt): The full Markdown of every page in one file.",
+      "- [Page Markdown](https://example.com/index.md): Append `.md` to any page URL to fetch that page as raw Markdown.",
+      "- [MCP server](https://example.com/docs-mcp): Streamable HTTP Model Context Protocol server with search_docs, get_page, list_pages, and get_navigation tools, plus every page as a resource. Discovery document: https://example.com/.well-known/mcp.json",
+      "- [Agent skills](https://example.com/.well-known/agent-skills/index.json): Agent Skills discovery index of the skills this site publishes.",
+      "- [API catalog](https://example.com/.well-known/api-catalog): RFC 9727 linkset of the APIs documented here.",
+    ]);
+  });
+
+  it("keeps links root-relative under deployment.base without a site, and skips the sitemap", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject([makePage("a.md", "/a", "Alpha")], {
+        deployment: { base: "/docs" },
+      })
+    );
+    const lines = agentResources(index);
+    expect(lines[0]).toBe(
+      "- [llms-full.txt](/docs/llms-full.txt): The full Markdown of every page in one file."
+    );
+    expect(lines.some((line) => line.includes("sitemap.xml"))).toBe(false);
+  });
+
+  it("lists the published skills with their (one-line) descriptions", async () => {
+    const { index } = await buildLlmsFiles(project(), {
+      skills: [
+        {
+          content: new Uint8Array(),
+          description:
+            "Build docs with Docs.\n  Use when a project depends on `docs`.",
+          digest: "sha256:0",
+          name: "docs",
+          path: "docs/SKILL.md",
+          type: "skill-md",
+        },
+        {
+          content: new Uint8Array(),
+          description: "Migrate a site.",
+          digest: "sha256:1",
+          name: "docs-migrate",
+          path: "docs-migrate.tar.gz",
+          type: "archive",
+        },
+      ],
+    });
+    expect(index).toContain(
+      "## Agent skills\n\n- [docs](https://example.com/.well-known/agent-skills/docs/SKILL.md): Build docs with Docs. Use when a project depends on `docs`.\n- [docs-migrate](https://example.com/.well-known/agent-skills/docs-migrate.tar.gz): Migrate a site.\n\n## Agent resources"
+    );
+  });
+
+  it("has no skills section when none are passed", async () => {
+    const { index } = await buildLlmsFiles(project(), { skills: [] });
+    expect(index).not.toContain("## Agent skills");
   });
 });
 
@@ -425,6 +527,21 @@ describe("ai.llmsTxt schema", () => {
       blumeConfigSchema.parse({ ai: { llmsTxt: { openapi: false } } }).ai
         .llmsTxt
     ).toStrictEqual({ enabled: true, openapi: false });
+  });
+
+  it("keeps a trimmed details block and rejects a blank one", () => {
+    expect(
+      blumeConfigSchema.parse({
+        ai: { llmsTxt: { details: "  ## When to use\n\nNow.  " } },
+      }).ai.llmsTxt
+    ).toStrictEqual({
+      details: "## When to use\n\nNow.",
+      enabled: true,
+      openapi: true,
+    });
+    expect(() =>
+      blumeConfigSchema.parse({ ai: { llmsTxt: { details: "   " } } })
+    ).toThrow();
   });
 });
 

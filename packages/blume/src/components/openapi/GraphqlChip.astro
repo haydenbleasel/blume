@@ -1,0 +1,33 @@
+---
+import { withBase } from "../islands/base-path.ts";
+
+/**
+ * A schema name (or full type display like `[Pet!]!`) rendered as a link when
+ * the named type has a reference page, plain muted text otherwise — the one
+ * chip every GraphQL component uses for type and operation names. `class`
+ * carries sizing (`text-xs`, `text-sm`); some containers set the size
+ * themselves and pass none.
+ */
+interface Props {
+  name: string;
+  route?: string;
+  class?: string;
+}
+
+const { name, route, class: className } = Astro.props;
+---
+
+{
+  route ? (
+    <a
+      class:list={["font-mono text-accent hover:underline", className]}
+      href={withBase(route)}
+    >
+      {name}
+    </a>
+  ) : (
+    <span class:list={["font-mono text-muted-foreground", className]}>
+      {name}
+    </span>
+  )
+}
