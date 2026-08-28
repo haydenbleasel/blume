@@ -3,6 +3,7 @@ import { mdxToMdast } from "satteri";
 
 import { parseYouTubeId } from "../components/content/youtube.ts";
 import type { ExampleLookup } from "../core/types.ts";
+import { MDX_FEATURES } from "../markdown/features.ts";
 
 /**
  * Downlevel Blume's MDX components to plain Markdown for agent-facing output
@@ -26,7 +27,8 @@ interface Offset {
   offset: number;
 }
 
-interface MdastNode {
+/** The structural slice of an mdast node the downlevel walk reads. */
+export interface MdastNode {
   attributes?: MdxAttribute[];
   children?: MdastNode[];
   name?: string;
@@ -525,11 +527,21 @@ const componentHint = (registry: Record<string, ComponentMarkdown>): RegExp =>
 const BUILT_IN_HINT = componentHint(SERIALIZERS);
 
 /** One downlevel pass's inputs: the source, registry, and page metadata. */
-interface Walk {
+/** What a downlevel walk needs: the serializers, the page's front matter, and the source its nodes were parsed from. */
+export interface DownlevelWalk {
   frontmatter: Record<string, EvaluatedValue> | undefined;
   registry: Record<string, ComponentMarkdown>;
   source: string;
 }
+type Walk = DownlevelWalk;
+
+/** The serializer registry for a site: built-ins under a user's `ai.markdownComponents`. */
+export const componentRegistry = (
+  components?: Record<string, ComponentMarkdown>
+): Record<string, ComponentMarkdown> =>
+  components && Object.keys(components).length > 0
+    ? { ...SERIALIZERS, ...components }
+    : SERIALIZERS;
 
 /**
  * A source slice as Markdown: the verbatim `[start, end)` range with any
@@ -626,26 +638,38 @@ const serializeElement = (
  * doesn't descend into it; when a serializer declines, the walk continues
  * inside so nested serializable components still convert.
  */
+/**
+ * Downlevel one parsed component to the Markdown its serializer emits, or
+ * `null` when the node isn't a component, has no serializer, or its
+ * serializer declines. `walk.source` must be the text `node` was parsed from.
+ */
+export const downlevelComponentNode = (
+  node: MdastNode,
+  walk: DownlevelWalk
+): string | null => {
+  const serializer =
+    node.type === "mdxJsxFlowElement" && node.name
+      ? walk.registry[node.name]
+      : undefined;
+  return serializer && hasOffsets(node)
+    ? serializeElement(serializer, walk, node)
+    : null;
+};
+
 const collectSplices = (
   walk: Walk,
   nodes: MdastNode[],
   out: Splice[]
 ): void => {
   for (const node of nodes) {
-    const serializer =
-      node.type === "mdxJsxFlowElement" && node.name
-        ? walk.registry[node.name]
-        : undefined;
-    if (serializer && hasOffsets(node)) {
-      const text = serializeElement(serializer, walk, node);
-      if (text !== null) {
-        out.push({
-          end: node.position.end.offset,
-          start: node.position.start.offset,
-          text,
-        });
-        continue;
-      }
+    const text = hasOffsets(node) ? downlevelComponentNode(node, walk) : null;
+    if (text !== null && hasOffsets(node)) {
+      out.push({
+        end: node.position.end.offset,
+        start: node.position.start.offset,
+        text,
+      });
+      continue;
     }
     collectSplices(walk, node.children ?? [], out);
   }
@@ -670,9 +694,9 @@ export const downlevelComponents = (
   components?: Record<string, ComponentMarkdown>,
   frontmatter?: Record<string, EvaluatedValue>
 ): string => {
-  const custom = components && Object.keys(components).length > 0;
-  const registry = custom ? { ...SERIALIZERS, ...components } : SERIALIZERS;
-  const hint = custom ? componentHint(registry) : BUILT_IN_HINT;
+  const registry = componentRegistry(components);
+  const hint =
+    registry === SERIALIZERS ? BUILT_IN_HINT : componentHint(registry);
   if (!hint.test(source)) {
     return source;
   }
@@ -680,7 +704,7 @@ export const downlevelComponents = (
   try {
     // SAFETY: MdastNode is a structural subset of Satteri's mdast output —
     // every node carries `type`, and the walk reads only optional fields.
-    tree = mdxToMdast(source) as MdastNode;
+    tree = mdxToMdast(source, { features: MDX_FEATURES }) as MdastNode;
   } catch {
     return source;
   }

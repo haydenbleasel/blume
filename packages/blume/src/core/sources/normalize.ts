@@ -255,8 +255,9 @@ const BARE_CURLY_MARKER =
 const HTML_ID =
   /<[a-z][a-z0-9-]*(?:\s[^<>]*?)?\sid=(?:(?<quote>["'])(?<quoted>[^"'<>]+)\k<quote>|\{(?<jsxQuote>["'])(?<jsx>[^"'<>]+)\k<jsxQuote>\}|(?<bare>[^\s"'=<>`{}]+))/gu;
 // Commented-out markup renders nothing; matched across lines once the
-// scannable lines are joined back together.
-const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
+// scannable lines are joined back together. Shared with the search
+// extractor so both agree on what a comment is.
+export const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
 export const INLINE_CODE = /`[^`]*`/gu;
 
 /** A heading whose trailing `{#id}` marker is unescaped — see `BARE_CURLY_MARKER`. */

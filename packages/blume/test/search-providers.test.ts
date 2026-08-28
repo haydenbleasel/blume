@@ -87,6 +87,21 @@ describe("search config schema", () => {
     expect(blumeConfigSchema.parse({}).search.provider).toBe("orama");
   });
 
+  it("defaults to excluding code blocks from the search index", () => {
+    expect(blumeConfigSchema.parse({}).search.indexing).toMatchObject({
+      includeCodeBlocks: false,
+      includeHiddenPages: false,
+    });
+  });
+
+  it("accepts opting code blocks into the search index", () => {
+    const config = parse({
+      indexing: { includeCodeBlocks: true },
+      provider: "orama",
+    });
+    expect(config.search.indexing.includeCodeBlocks).toBe(true);
+  });
+
   it("accepts the keyless providers without extra config", () => {
     expect(parse({ provider: "flexsearch" }).search.provider).toBe(
       "flexsearch"

@@ -24,6 +24,8 @@ const BODY = [
   "",
   "A generic `Array<Item>` stays searchable.",
   "",
+  "Energy is E=mc^2^ here.",
+  "",
   "Requests cost < 5 credits each. Retries are billed separately.",
   "",
   "> Note: quota resets at midnight.",
@@ -35,11 +37,18 @@ const BODY = [
   "A [reference link][ref] and 5 * 3 stars.\\",
   "after a hard break.",
   "",
+  "![Diagram alt that should not index](./diagram.png)",
+  "",
+  "![Reference image alt that should not index][diagram-ref]",
+  "",
   "[ref]: /elsewhere",
+  "[diagram-ref]: ./diagram-ref.png",
   "",
   '<Callout kind="warn">',
   "Callouts keep their inner prose indexed.",
   "</Callout>",
+  "",
+  "Right after the callout.",
   "",
   "| Region | Latency |",
   "| ------ | ------- |",
@@ -47,10 +56,14 @@ const BODY = [
   "",
 ].join("\n");
 
-// SAFETY: `buildSearchDocuments` reads only a page's id, sourcePath, and the
-// meta fields a test sets; the remaining PageRecord fields are unused here.
+// SAFETY: `buildSearchDocuments` reads only a page's id, sourcePath, format,
+// and the meta fields a test sets; the remaining PageRecord fields are unused.
 const page = (over: Partial<PageRecord> & Pick<PageRecord, "id">): PageRecord =>
-  ({ sourcePath: join(root, over.id), ...over }) as PageRecord;
+  ({
+    format: over.id.endsWith(".mdx") ? "mdx" : "md",
+    sourcePath: join(root, over.id),
+    ...over,
+  }) as PageRecord;
 
 // SAFETY: the document builder reads only the manifest-route fields listed
 // below; the rest of RouteManifestEntry is unused by these tests.
@@ -69,15 +82,91 @@ const route = (over: Partial<RouteManifestEntry>): RouteManifestEntry =>
 
 const projectWith = (
   pages: PageRecord[],
-  routes: RouteManifestEntry[]
+  routes: RouteManifestEntry[],
+  config: z.input<typeof blumeConfigSchema> = {}
 ): BlumeProject =>
   // SAFETY: `buildSearchDocuments` reads only `config`, `graph.pages`, and
   // `manifest.routes` from the project.
   ({
-    config: blumeConfigSchema.parse({}),
+    config: blumeConfigSchema.parse(config),
     graph: { pages },
     manifest: { routes },
   }) as BlumeProject;
+
+/**
+ * An MDX page in the shape real docs take: a titled top-level fence, prose and
+ * a fence indented inside nested components, inline JSX, an expression, and
+ * an ESM export. CommonMark would fold each component into one html node and
+ * read its indented children as an indented code block.
+ */
+const CODE_BODY = [
+  "---",
+  "title: C",
+  "---",
+  "# Setup",
+  "",
+  "Prose before.",
+  "",
+  "```ts blume.config.ts lineNumbers",
+  "export const retryPolicy = 1;",
+  "```",
+  "",
+  "<Steps>",
+  '  <Step title="Install">',
+  "    Run the installer with npm.",
+  "",
+  "    ```bash",
+  "    npm install blume",
+  "",
+  "    npm run dev",
+  "    ```",
+  "  </Step>",
+  "</Steps>",
+  "",
+  "Press <Kbd>k</Kbd> to open {props.count} results.",
+  "",
+  "Press Enter<br />then wait.",
+  "",
+  // Formatter-wrapped card: downleveled to the text it shows.
+  "<Card",
+  '  title="Rate limits"',
+  '  href="/limits"',
+  '  icon="rocket"',
+  '  cta="Read the quota guide"',
+  "  meta={{ weight: 2 }}",
+  "/>",
+  "",
+  '<TypeTable type={{ retries: { type: "number", description: "Attempts before failing." } }} />',
+  "",
+  "This is re:abbr[al]ly inline.",
+  "",
+  ":::note[Heads up]",
+  "Directive prose survives.",
+  ":::",
+  "",
+  "$$",
+  "\\sum_{i=1}^n x_i",
+  "$$",
+  "",
+  "H~2~O costs $5.",
+  "",
+  "export const meta = { draft: false };",
+  "",
+].join("\n");
+
+/**
+ * MDX rejects HTML comments (so does the renderer): the page has no body to
+ * index, but its title and description still make it findable.
+ */
+const COMMENT_BODY = [
+  "---",
+  "title: D",
+  "---",
+  "<!-- editors: keep this list sorted -->",
+  "",
+  "Fallback prose survives.",
+  "",
+].join("\n");
 
 const VIS_BODY = [
   "---",
@@ -99,10 +188,28 @@ const VIS_BODY = [
   "",
 ].join("\n");
 
+/** A body that opens with a divider once the real front matter is stripped. */
+const DIVIDER_BODY = [
+  "---",
+  "title: E",
+  "---",
+  "---",
+  "",
+  "After the divider **bold** [intro](/x).",
+  "",
+  "---",
+  "",
+  "More text.",
+  "",
+].join("\n");
+
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "blume-search-"));
   await writeFile(join(root, "a.md"), BODY);
   await writeFile(join(root, "vis.md"), VIS_BODY);
+  await writeFile(join(root, "code.mdx"), CODE_BODY);
+  await writeFile(join(root, "comment.mdx"), COMMENT_BODY);
+  await writeFile(join(root, "divider.mdx"), DIVIDER_BODY);
 });
 
 afterAll(async () => {
@@ -211,34 +318,49 @@ describe("buildSearchDocuments", () => {
     const [doc] = await buildSearchDocuments(
       projectWith([page({ description: "Desc A", id: "a.md" })], [route({})])
     );
+    const content = doc?.content ?? "";
     expect(doc?.title).toBe("A");
     expect(doc?.description).toBe("Desc A");
-    expect(doc?.content).toContain("Heading");
-    expect(doc?.content).toContain("bold");
+    expect(content).toContain("Heading");
+    expect(content).toContain("bold");
     // Link text is kept while the URL is dropped.
-    expect(doc?.content).toContain("link");
-    expect(doc?.content).toContain("inlineCode");
+    expect(content).toContain("link");
+    expect(content).toContain("inlineCode");
     // Angle-bracket type params inside inline code survive the HTML strip.
-    expect(doc?.content).toContain("Item");
-    // Fenced code blocks are removed entirely.
-    expect(doc?.content).not.toContain("secret");
-    expect(doc?.content).not.toContain("#");
+    expect(content).toContain("Item");
+    // `.md` pages parse with the renderer's features: superscript is text.
+    expect(content).toContain("E=mc2 here");
+    // Code blocks are removed entirely.
+    expect(content).not.toContain("secret");
+    expect(content).not.toContain("#");
     // A bare `<` in prose is not a tag opener: the HTML strip must not swallow
     // everything from it to the next `>` (here, a blockquote a paragraph later).
-    expect(doc?.content).toContain("5 credits each");
-    expect(doc?.content).toContain("Retries are billed separately");
-    expect(doc?.content).toContain("quota resets at midnight");
+    expect(content).toContain("5 credits each");
+    expect(content).toContain("Retries are billed separately");
+    expect(content).toContain("quota resets at midnight");
     // Reference-style link text is kept; its definition URL is dropped.
-    expect(doc?.content).toContain("reference link");
-    expect(doc?.content).not.toContain("/elsewhere");
+    expect(content).toContain("reference link");
+    expect(content).not.toContain("/elsewhere");
     // Literal asterisks in prose are text, not emphasis to strip.
-    expect(doc?.content).toContain("5 * 3 stars");
+    expect(content).toContain("5 * 3 stars");
     // A block-level JSX component is one CommonMark html node: its tags go,
     // its inner prose stays indexed.
-    expect(doc?.content).toContain("Callouts keep their inner prose indexed");
-    expect(doc?.content).not.toContain("<Callout");
+    expect(content).toContain("Callouts keep their inner prose indexed");
+    expect(content).not.toContain("<Callout");
+    // The html block ends a word: the next paragraph doesn't fuse onto it.
+    expect(content).toContain("indexed. Right after the callout");
     // GFM table cells are text.
-    expect(doc?.content).toContain("west");
+    expect(content).toContain("west");
+  });
+
+  it("skips image alt text in the plain text index", async () => {
+    const [doc] = await buildSearchDocuments(
+      projectWith([page({ description: "Desc A", id: "a.md" })], [route({})])
+    );
+    expect(doc?.content).not.toContain("Diagram alt that should not index");
+    expect(doc?.content).not.toContain(
+      "Reference image alt that should not index"
+    );
   });
 
   it("strips trailing heading markers from the plain-text index", async () => {
@@ -305,6 +427,91 @@ describe("buildSearchDocuments", () => {
     expect(doc?.content).toContain("```js");
     // …along with heading marks and other Markdown structure.
     expect(doc?.content).toContain("# Heading");
+  });
+
+  describe("MDX pages", () => {
+    const mdxProject = (
+      id: string,
+      config: z.input<typeof blumeConfigSchema> = {}
+    ) =>
+      projectWith(
+        [page({ id })],
+        [route({ id, sourcePath: join(root, id) })],
+        config
+      );
+
+    it("indexes prose inside components, however indented, and skips JSX/ESM", async () => {
+      const [doc] = await buildSearchDocuments(mdxProject("code.mdx"));
+      expect(doc?.content).toContain("Prose before");
+      expect(doc?.content).toContain("Run the installer with npm");
+      // Inline JSX keeps its text without a space break; expressions and ESM
+      // are code, not prose.
+      expect(doc?.content).toContain("Press k to open results");
+      // The renderer's feature set applies: directives and block math parse
+      // (a `{…}` inside `$$` would otherwise fail the MDX parse), and
+      // sub/superscript stay attached to their word.
+      expect(doc?.content).toContain("Heads up Directive prose survives");
+      expect(doc?.content).not.toContain(":::");
+      expect(doc?.content).not.toContain("x_i");
+      expect(doc?.content).toContain("H2O costs $5");
+      // An empty inline element still separates words.
+      expect(doc?.content).toContain("Press Enter then wait");
+      // Components downlevel to the text they show: a Card's title and call
+      // to action, a TypeTable's descriptions — not hrefs, icons, or props.
+      expect(doc?.content).toContain("Rate limits");
+      expect(doc?.content).toContain("Read the quota guide");
+      expect(doc?.content).toContain("Attempts before failing");
+      expect(doc?.content).not.toContain("/limits");
+      expect(doc?.content).not.toContain("rocket");
+      expect(doc?.content).not.toContain("weight");
+      // An inline directive is part of its word.
+      expect(doc?.content).toContain("This is really inline");
+      expect(doc?.content).not.toContain("props.count");
+      expect(doc?.content).not.toContain("draft");
+      expect(doc?.content).not.toContain("<Step");
+      expect(doc?.content).not.toContain("title=");
+    });
+
+    it("strips fences everywhere by default, including inside components", async () => {
+      const [doc] = await buildSearchDocuments(mdxProject("code.mdx"));
+      expect(doc?.content).not.toContain("retryPolicy");
+      expect(doc?.content).not.toContain("blume.config.ts");
+      expect(doc?.content).not.toContain("npm install blume");
+      expect(doc?.content).not.toContain("npm run dev");
+      expect(doc?.content).not.toContain("```");
+    });
+
+    it("indexes fence bodies and titles when search.indexing.includeCodeBlocks is set", async () => {
+      const [doc] = await buildSearchDocuments(
+        mdxProject("code.mdx", {
+          search: { indexing: { includeCodeBlocks: true } },
+        })
+      );
+      expect(doc?.content).toContain("export const retryPolicy = 1;");
+      // The rendered title is searchable; the language, `lineNumbers`, and
+      // fence markers are not.
+      expect(doc?.content).toContain("blume.config.ts");
+      expect(doc?.content).not.toContain("lineNumbers");
+      expect(doc?.content).not.toContain("```");
+      expect(doc?.content).not.toMatch(/(?:^|\s)ts(?:\s|$)/u);
+      // An indented fence inside a component (blank line and all) is one
+      // block, indexed like a top-level one.
+      expect(doc?.content).toContain("npm install blume npm run dev");
+      expect(doc?.content).not.toContain("bash");
+      expect(doc?.content).not.toContain("<Step");
+    });
+
+    it("indexes a page MDX rejects by title only, never its raw source", async () => {
+      const [doc] = await buildSearchDocuments(mdxProject("comment.mdx"));
+      expect(doc?.title).toBe("A");
+      expect(doc?.content).toBe("");
+    });
+
+    it("reads a leading `---` as a divider, not front matter", async () => {
+      const [doc] = await buildSearchDocuments(mdxProject("divider.mdx"));
+      expect(doc?.content).toContain("After the divider bold intro. More text");
+      expect(doc?.content).not.toContain("**");
+    });
   });
 
   it("gives a config-sidebar section's landing page its own section facet", async () => {

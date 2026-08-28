@@ -1,11 +1,16 @@
 import type { Nodes } from "mdast";
-import { fromMarkdown } from "mdast-util-from-markdown";
-import { gfmFromMarkdown } from "mdast-util-gfm";
-import { gfm } from "micromark-extension-gfm";
+import { markdownToMdast, mdxToMdast } from "satteri";
 
 import {
+  componentRegistry,
+  downlevelComponentNode,
   downlevelComponents,
   exampleComponentSerializers,
+} from "../ai/component-markdown.ts";
+import type {
+  ComponentMarkdown,
+  DownlevelWalk,
+  MdastNode as DownlevelNode,
 } from "../ai/component-markdown.ts";
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
@@ -13,8 +18,11 @@ import matter from "../core/frontmatter.ts";
 import { parseHeadingMarkers } from "../core/heading-markers.ts";
 import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
+import { HTML_COMMENT } from "../core/sources/normalize.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
-import type { NavNode } from "../core/types.ts";
+import type { NavNode, PageRecord } from "../core/types.ts";
+import { parseCodeTitle } from "../markdown/code-title.ts";
+import { MARKDOWN_FEATURES, MDX_FEATURES } from "../markdown/features.ts";
 import { pageFacets } from "./facets.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
@@ -81,19 +89,117 @@ const INLINE_PARENTS = new Set([
   "footnoteReference",
   "link",
   "linkReference",
+  "mdxJsxTextElement",
   "strong",
+  "subscript",
+  "superscript",
+  "textDirective",
 ]);
 
+// Nodes that never render as prose: image alt text was never indexed, MDX
+// expressions (`{props.x}`) and ESM (`export const meta`) are code, and math
+// is LaTeX source rendered by KaTeX, not searchable words.
+const NON_PROSE = new Set<Nodes["type"]>([
+  "image",
+  "imageReference",
+  "inlineMath",
+  "math",
+  "mdxFlowExpression",
+  "mdxTextExpression",
+  "mdxjsEsm",
+]);
+
+type PageFormat = PageRecord["format"];
+
+/** What the plain-text walk carries: the code-block policy and the downlevel context. */
+interface Walk {
+  includeCodeBlocks: boolean;
+  downlevel: DownlevelWalk;
+}
+
+// Front matter is already off (core/frontmatter.ts) by the time a body gets
+// here, so a body that opens with a `---` divider must read as a thematic
+// break rather than a second front matter block.
+const MD_PARSE = { features: { ...MARKDOWN_FEATURES, frontmatter: false } };
+const MDX_PARSE = { features: { ...MDX_FEATURES, frontmatter: false } };
+
+const parseMdx = (markdown: string): Nodes | undefined => {
+  try {
+    return mdxToMdast(markdown, MDX_PARSE);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Parse a page body the way the renderer reads it. `.mdx` pages go through
+ * the MDX grammar with the renderer's feature set, so components become
+ * `mdxJsx*` nodes whose children — prose and fences, however they're indented
+ * — walk like top-level content, and `:::` directives and `$$` math parse as
+ * such; Markdown would instead fold a tight component into one html node and
+ * read its indented children as an indented code block. A page the MDX
+ * grammar rejects (an HTML comment, an unclosed tag) fails to render too, so
+ * it has no body to index: reading it as Markdown instead would put its ESM,
+ * expressions, and raw tags in the index as prose.
+ */
+const parseMarkdown = (
+  markdown: string,
+  format: PageFormat
+): Nodes | undefined =>
+  format === "mdx" ? parseMdx(markdown) : markdownToMdast(markdown, MD_PARSE);
+
+// Fenced code is excluded from the plain index by default (ranking noise) —
+// the "markdown" extraction keeps it for Ask AI grounding. Code-heavy docs opt
+// in via `search.indexing.includeCodeBlocks`, which indexes the fence body and
+// its rendered title (```ts blume.config.ts) but never the fence markers,
+// language, or other meta keywords.
+const collectCode = (
+  node: Extract<Nodes, { type: "code" }>,
+  out: string[],
+  walk: Walk
+): void => {
+  if (!walk.includeCodeBlocks) {
+    return;
+  }
+  const title = parseCodeTitle(node.meta ?? undefined);
+  if (title) {
+    out.push(title, " ");
+  }
+  // The trailing space keeps the fence apart from what follows it.
+  out.push(node.value, " ");
+};
+
+// Block boundaries separate words; so does an empty inline element (`<br />`,
+// a self-closing icon), which otherwise fuses its neighbors.
+const separatesWords = (node: Extract<Nodes, { children: unknown }>): boolean =>
+  !INLINE_PARENTS.has(node.type) || node.children.length === 0;
+
 /** Fold one mdast node into the plain-text accumulator. */
-const collectText = (node: Nodes, out: string[]): void => {
+const collectText = (node: Nodes, out: string[], walk: Walk): void => {
+  if (NON_PROSE.has(node.type)) {
+    return;
+  }
   switch (node.type) {
-    // Fenced code is excluded from the plain index (ranking noise) — the
-    // "markdown" extraction keeps it for Ask AI grounding — and image alt
-    // text was never indexed.
-    case "code":
-    case "image":
-    case "imageReference": {
+    case "code": {
+      collectCode(node, out, walk);
       return;
+    }
+    // A component with a serializer indexes as the text the page shows —
+    // a Card's title and call to action, a TypeTable's descriptions — read
+    // from the Markdown the serializer emits (its contract is Markdown, not
+    // MDX). One without a serializer walks its children like any block.
+    case "mdxJsxFlowElement": {
+      // SAFETY: DownlevelNode is a structural subset of Satteri's mdast
+      // output — the walk checks for offsets before reading them.
+      const text = downlevelComponentNode(
+        node as DownlevelNode,
+        walk.downlevel
+      );
+      if (text !== null) {
+        collectText(markdownToMdast(text, MD_PARSE), out, walk);
+        return;
+      }
+      break;
     }
     // Inline code is kept verbatim — `Array<T>` is a type parameter, not a
     // tag, and its tokens must stay searchable.
@@ -101,11 +207,15 @@ const collectText = (node: Nodes, out: string[]): void => {
       out.push(node.value);
       return;
     }
-    // A raw-HTML/JSX run. CommonMark parses a block-level `<Callout>` with no
-    // blank lines as ONE html node holding all its inner prose, so the node
-    // can't just be dropped — strip the tag-shaped runs and keep the text.
+    // A raw-HTML run. In a `.md` page (or an `.mdx` page MDX couldn't parse)
+    // CommonMark folds a block-level `<Callout>` with no blank lines into ONE
+    // html node holding all its inner prose, so the node can't just be
+    // dropped — strip the tag-shaped runs and keep the text.
     case "html": {
-      out.push(node.value.replaceAll(HTML_OR_JSX, " "));
+      out.push(
+        node.value.replaceAll(HTML_COMMENT, " ").replaceAll(HTML_OR_JSX, " "),
+        " "
+      );
       return;
     }
     case "break": {
@@ -126,7 +236,7 @@ const collectText = (node: Nodes, out: string[]): void => {
       const inner: string[] = [];
       const kept = trailing ? node.children.slice(0, -1) : node.children;
       for (const child of kept) {
-        collectText(child, inner);
+        collectText(child, inner, walk);
       }
       if (trailing) {
         const stripped = parseHeadingMarkers(trailing.value).text;
@@ -146,9 +256,9 @@ const collectText = (node: Nodes, out: string[]): void => {
   }
   if ("children" in node) {
     for (const child of node.children) {
-      collectText(child, out);
+      collectText(child, out, walk);
     }
-    if (!INLINE_PARENTS.has(node.type)) {
+    if (separatesWords(node)) {
       out.push(" ");
     }
   }
@@ -161,13 +271,17 @@ const collectText = (node: Nodes, out: string[]): void => {
  * reduce correctly. This feeds the client index *and* every hosted-provider
  * record, so anything lost here is a permanent search-quality loss.
  */
-const toPlainText = (markdown: string): string => {
-  const tree = fromMarkdown(markdown, {
-    extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
-  });
+const toPlainText = (
+  markdown: string,
+  format: PageFormat,
+  walk: Walk
+): string => {
+  const tree = parseMarkdown(markdown, format);
+  if (!tree) {
+    return "";
+  }
   const out: string[] = [];
-  collectText(tree, out);
+  collectText(tree, out, walk);
   return out.join("").replaceAll(WHITESPACE, " ").trim();
 };
 
@@ -217,6 +331,47 @@ const buildCrumbIndex = (sidebar: NavNode[]): Map<string, Crumbs> => {
   return index;
 };
 
+interface BuildOptions {
+  includeWhenDisabled?: boolean;
+  content?: "markdown" | "plain";
+  audience?: VisibilityAudience;
+}
+
+/**
+ * Read a page's body and reduce it per the extraction options. The
+ * `"markdown"` body is agent-facing, so its components are downleveled in the
+ * source with the serializers every agent surface uses (front matter in scope
+ * for prop expressions). The plain body is parsed as written and walked, with
+ * the same serializers applied per component on the way, so the index reads a
+ * `<Card>` or `<TypeTable>` as the text it shows.
+ */
+const pageBody = async (
+  project: BlumeProject,
+  page: PageRecord | undefined,
+  options: Pick<BuildOptions, "audience" | "content"> | undefined,
+  components: Record<string, ComponentMarkdown>
+): Promise<string> => {
+  if (!page) {
+    return "";
+  }
+  const parsed = matter(await readExpandedEntryText(project, page));
+  const visible = applyAudienceVisibility(
+    parsed.content,
+    options?.audience ?? "web"
+  );
+  if (options?.content === "markdown") {
+    return downlevelComponents(visible.trim(), components, parsed.data);
+  }
+  return toPlainText(visible, page.format, {
+    downlevel: {
+      frontmatter: parsed.data,
+      registry: componentRegistry(components),
+      source: visible,
+    },
+    includeCodeBlocks: project.config.search.indexing.includeCodeBlocks,
+  });
+};
+
 /**
  * Build search documents from the content graph. Only indexable pages are
  * included (per the route manifest), and content comes from the source files,
@@ -240,14 +395,15 @@ const buildCrumbIndex = (sidebar: NavNode[]): Map<string, Crumbs> => {
  * (default) keeps web-only content and drops agents-only blocks — the site
  * search and hosted syncs must not surface content the page hides — while
  * `"agents"` mirrors llms-full.txt/MCP `get_page` (web removed, agents kept).
+ *
+ * Whether fenced code joins the plain extraction is site-wide policy, read
+ * from `search.indexing.includeCodeBlocks` here rather than threaded by each
+ * caller, so the client index, hosted syncs, eject, and the MCP `search_docs`
+ * index can't drift apart.
  */
 export const buildSearchDocuments = async (
   project: BlumeProject,
-  options?: {
-    includeWhenDisabled?: boolean;
-    content?: "markdown" | "plain";
-    audience?: VisibilityAudience;
-  }
+  options?: BuildOptions
 ): Promise<SearchDocument[]> => {
   const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
 
@@ -281,31 +437,19 @@ export const buildSearchDocuments = async (
     return page ? contentIndexable(page, project.config) : false;
   });
 
-  // Serializers for the "markdown" extraction, layered the way
-  // `buildRawMarkdown` layers them: examples first, so a user
-  // `markdownComponents` entry of the same name still wins. Built once —
-  // `downlevelComponents` rebuilds its registry per call otherwise.
-  const components =
-    options?.content === "markdown"
-      ? {
-          ...exampleComponentSerializers(project.examples ?? {}),
-          ...project.config.ai.markdownComponents,
-        }
-      : undefined;
+  // Serializers for downleveling, layered the way `buildRawMarkdown` layers
+  // them: examples first, so a user `markdownComponents` entry of the same
+  // name still wins. Built once — `downlevelComponents` rebuilds its registry
+  // per call otherwise.
+  const components = {
+    ...exampleComponentSerializers(project.examples ?? {}),
+    ...project.config.ai.markdownComponents,
+  };
 
   return await Promise.all(
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
-      const raw = page ? await readExpandedEntryText(project, page) : "";
-      const parsed = matter(raw);
-      const visible = applyAudienceVisibility(
-        parsed.content,
-        options?.audience ?? "web"
-      );
-      const body =
-        options?.content === "markdown"
-          ? downlevelComponents(visible.trim(), components, parsed.data)
-          : toPlainText(visible);
+      const body = await pageBody(project, page, options, components);
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       const facets = page ? pageFacets(page, project.config) : undefined;
