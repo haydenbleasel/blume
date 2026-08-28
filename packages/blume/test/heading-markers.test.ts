@@ -39,6 +39,14 @@ describe("parseHeadingMarkers", () => {
     });
   });
 
+  it("accepts the trailing {#id} form used by published specifications", () => {
+    expect(parseHeadingMarkers("Record model {#record-model}")).toStrictEqual({
+      id: "record-model",
+      text: "Record model",
+      toc: undefined,
+    });
+  });
+
   it("keeps a custom id's casing (never re-slugged)", () => {
     expect(parseHeadingMarkers("Install [#My-Anchor]").id).toBe("My-Anchor");
   });

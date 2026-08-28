@@ -63,6 +63,7 @@ const makePage = (
   title: string,
   over: Partial<PageRecord> = {}
 ): PageRecord => ({
+  anchors: [],
   contentType: "doc",
   format: "md",
   groups: [],

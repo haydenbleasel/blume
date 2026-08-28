@@ -177,6 +177,12 @@ export interface PageRecord {
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- values are outputs of arbitrary user-supplied zod schemas (transforms included), so no narrower type exists
   custom?: Record<string, unknown>;
   headings: Heading[];
+  /**
+   * Raw HTML element ids (`<a id="…">`) outside headings, deduplicated —
+   * fragment-link targets `blume validate` accepts alongside heading slugs.
+   */
+  anchors: string[];
+
   /** Whether the file is `.md`/`.mdx`. */
   format: "md" | "mdx";
   /** Internal/asset links discovered in the page (for validation). */

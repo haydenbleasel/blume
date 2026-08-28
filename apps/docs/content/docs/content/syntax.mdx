@@ -27,6 +27,14 @@ Anchor ids are generated from the heading text, so a reworded heading gets a new
 
 Link to it as `/page#setup`. The syntax matches Fumadocs, so migrated content works verbatim.
 
+The `{#custom-id}` form used by Pandoc, kramdown, and Markdown-based specification toolchains is accepted as an equivalent in `.md` files. In `.mdx`, a bare `{…}` is a JSX expression and the page fails to compile — `blume check` reports the marker as `BLUME_MDX_CURLY_ANCHOR` — so write `[#custom-id]` there, or escape the braces. The escaped form pins the same anchor in both formats, which makes it the right spelling for a partial that `.mdx` pages [include](/docs/content/includes):
+
+```md
+## Getting started \{#setup\}
+```
+
+Fragment links can also target a raw HTML element with an `id` (`<a id="setup"></a>`); `blume validate` accepts those alongside heading anchors.
+
 ### Table of contents markers
 
 Two more trailing markers control how a heading appears in the table of contents. `[!toc]` keeps a heading on the page but out of the TOC; `[toc]` does the reverse — the heading shows only in the TOC, as an invisible anchor target, which is useful for labeling sections built from components rather than prose. Markers chain in any order.
