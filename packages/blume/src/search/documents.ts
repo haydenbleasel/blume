@@ -1,18 +1,24 @@
 import type { Nodes } from "mdast";
 import { markdownToMdast, mdxToMdast } from "satteri";
-import type { MdxJsxAttributeUnion } from "satteri";
 
 import {
+  componentRegistry,
+  downlevelComponentNode,
   downlevelComponents,
   exampleComponentSerializers,
 } from "../ai/component-markdown.ts";
-import type { ComponentMarkdown } from "../ai/component-markdown.ts";
+import type {
+  ComponentMarkdown,
+  DownlevelWalk,
+  MdastNode as DownlevelNode,
+} from "../ai/component-markdown.ts";
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
 import matter from "../core/frontmatter.ts";
 import { parseHeadingMarkers } from "../core/heading-markers.ts";
 import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
+import { HTML_COMMENT } from "../core/sources/normalize.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode, PageRecord } from "../core/types.ts";
 import { parseCodeTitle } from "../markdown/code-title.ts";
@@ -72,8 +78,6 @@ export interface SearchRecord {
 // kept; the surrounding Markdown is walked as a tree, so a bare `<` in prose
 // ("costs < 5 credits") is ordinary text and never at risk.
 const HTML_OR_JSX = /<\/?[a-zA-Z][^\n<>]*>|<\/?>/gu;
-// Author notes never render, so they must never be searchable.
-const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
 const WHITESPACE = /\s+/gu;
 
 // Parents whose children are inline: no separator is inserted after them, or
@@ -105,11 +109,13 @@ const NON_PROSE = new Set<Nodes["type"]>([
   "mdxjsEsm",
 ]);
 
-interface PlainTextOptions {
-  includeCodeBlocks: boolean;
-}
-
 type PageFormat = PageRecord["format"];
+
+/** What the plain-text walk carries: the code-block policy and the downlevel context. */
+interface Walk {
+  includeCodeBlocks: boolean;
+  downlevel: DownlevelWalk;
+}
 
 // Front matter is already off (core/frontmatter.ts) by the time a body gets
 // here, so a body that opens with a `---` divider must read as a thematic
@@ -133,12 +139,14 @@ const parseMdx = (markdown: string): Nodes | undefined => {
  * such; Markdown would instead fold a tight component into one html node and
  * read its indented children as an indented code block. A page the MDX
  * grammar rejects (an HTML comment, an unclosed tag) fails to render too, so
- * rather than fail the whole index for one broken page it is read as Markdown
- * — a rough but searchable reduction until the author fixes the page.
+ * it has no body to index: reading it as Markdown instead would put its ESM,
+ * expressions, and raw tags in the index as prose.
  */
-const parseMarkdown = (markdown: string, format: PageFormat): Nodes =>
-  (format === "mdx" ? parseMdx(markdown) : undefined) ??
-  markdownToMdast(markdown, MD_PARSE);
+const parseMarkdown = (
+  markdown: string,
+  format: PageFormat
+): Nodes | undefined =>
+  format === "mdx" ? parseMdx(markdown) : markdownToMdast(markdown, MD_PARSE);
 
 // Fenced code is excluded from the plain index by default (ranking noise) —
 // the "markdown" extraction keeps it for Ask AI grounding. Code-heavy docs opt
@@ -148,40 +156,17 @@ const parseMarkdown = (markdown: string, format: PageFormat): Nodes =>
 const collectCode = (
   node: Extract<Nodes, { type: "code" }>,
   out: string[],
-  options: PlainTextOptions
+  walk: Walk
 ): void => {
-  if (!options.includeCodeBlocks) {
+  if (!walk.includeCodeBlocks) {
     return;
   }
-  // A fence is a block: keep it apart from the words on either side.
-  out.push(" ");
   const title = parseCodeTitle(node.meta ?? undefined);
   if (title) {
     out.push(title, " ");
   }
+  // The trailing space keeps the fence apart from what follows it.
   out.push(node.value, " ");
-};
-
-// Props whose name marks them as visible text — a Card's `title` and
-// `description`, a Tab's `title`, a figure's `caption`. Everything else on a
-// component (`href`, `icon`, `type`, `src`, a `code` sample) is a value the
-// page doesn't show as words, and expression props (`type={{ … }}`) are code.
-const TEXT_PROPS = new Set(["caption", "description", "label", "title"]);
-
-const collectJsxAttributes = (
-  attributes: MdxJsxAttributeUnion[],
-  out: string[]
-): void => {
-  for (const attribute of attributes) {
-    if (
-      attribute.type === "mdxJsxAttribute" &&
-      TEXT_PROPS.has(attribute.name) &&
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the value is satteri's `string | ValueExpression` union; the string literal is the domain value
-      typeof attribute.value === "string"
-    ) {
-      out.push(attribute.value, " ");
-    }
-  }
 };
 
 // Block boundaries separate words; so does an empty inline element (`<br />`,
@@ -190,18 +175,31 @@ const separatesWords = (node: Extract<Nodes, { children: unknown }>): boolean =>
   !INLINE_PARENTS.has(node.type) || node.children.length === 0;
 
 /** Fold one mdast node into the plain-text accumulator. */
-const collectText = (
-  node: Nodes,
-  out: string[],
-  options: PlainTextOptions
-): void => {
+const collectText = (node: Nodes, out: string[], walk: Walk): void => {
   if (NON_PROSE.has(node.type)) {
     return;
   }
   switch (node.type) {
     case "code": {
-      collectCode(node, out, options);
+      collectCode(node, out, walk);
       return;
+    }
+    // A component with a serializer indexes as the text the page shows —
+    // a Card's title and call to action, a TypeTable's descriptions — read
+    // from the Markdown the serializer emits (its contract is Markdown, not
+    // MDX). One without a serializer walks its children like any block.
+    case "mdxJsxFlowElement": {
+      // SAFETY: DownlevelNode is a structural subset of Satteri's mdast
+      // output — the walk checks for offsets before reading them.
+      const text = downlevelComponentNode(
+        node as DownlevelNode,
+        walk.downlevel
+      );
+      if (text !== null) {
+        collectText(markdownToMdast(text, MD_PARSE), out, walk);
+        return;
+      }
+      break;
     }
     // Inline code is kept verbatim — `Array<T>` is a type parameter, not a
     // tag, and its tokens must stay searchable.
@@ -238,7 +236,7 @@ const collectText = (
       const inner: string[] = [];
       const kept = trailing ? node.children.slice(0, -1) : node.children;
       for (const child of kept) {
-        collectText(child, inner, options);
+        collectText(child, inner, walk);
       }
       if (trailing) {
         const stripped = parseHeadingMarkers(trailing.value).text;
@@ -256,12 +254,9 @@ const collectText = (
     out.push(node.value);
     return;
   }
-  if ("attributes" in node && Array.isArray(node.attributes)) {
-    collectJsxAttributes(node.attributes, out);
-  }
   if ("children" in node) {
     for (const child of node.children) {
-      collectText(child, out, options);
+      collectText(child, out, walk);
     }
     if (separatesWords(node)) {
       out.push(" ");
@@ -279,10 +274,14 @@ const collectText = (
 const toPlainText = (
   markdown: string,
   format: PageFormat,
-  options: PlainTextOptions
+  walk: Walk
 ): string => {
+  const tree = parseMarkdown(markdown, format);
+  if (!tree) {
+    return "";
+  }
   const out: string[] = [];
-  collectText(parseMarkdown(markdown, format), out, options);
+  collectText(tree, out, walk);
   return out.join("").replaceAll(WHITESPACE, " ").trim();
 };
 
@@ -339,17 +338,18 @@ interface BuildOptions {
 }
 
 /**
- * Read a page's body and reduce it per the extraction options: the
- * `"markdown"` body is agent-facing, so its components are downleveled (with
- * the page's front matter in scope for prop expressions); the plain body is
- * parsed and walked to searchable text.
+ * Read a page's body and reduce it per the extraction options. The
+ * `"markdown"` body is agent-facing, so its components are downleveled in the
+ * source with the serializers every agent surface uses (front matter in scope
+ * for prop expressions). The plain body is parsed as written and walked, with
+ * the same serializers applied per component on the way, so the index reads a
+ * `<Card>` or `<TypeTable>` as the text it shows.
  */
 const pageBody = async (
   project: BlumeProject,
   page: PageRecord | undefined,
   options: Pick<BuildOptions, "audience" | "content"> | undefined,
-  components: Record<string, ComponentMarkdown> | undefined,
-  plain: PlainTextOptions
+  components: Record<string, ComponentMarkdown>
 ): Promise<string> => {
   if (!page) {
     return "";
@@ -359,9 +359,17 @@ const pageBody = async (
     parsed.content,
     options?.audience ?? "web"
   );
-  return options?.content === "markdown"
-    ? downlevelComponents(visible.trim(), components, parsed.data)
-    : toPlainText(visible, page.format, plain);
+  if (options?.content === "markdown") {
+    return downlevelComponents(visible.trim(), components, parsed.data);
+  }
+  return toPlainText(visible, page.format, {
+    downlevel: {
+      frontmatter: parsed.data,
+      registry: componentRegistry(components),
+      source: visible,
+    },
+    includeCodeBlocks: project.config.search.indexing.includeCodeBlocks,
+  });
 };
 
 /**
@@ -398,9 +406,6 @@ export const buildSearchDocuments = async (
   options?: BuildOptions
 ): Promise<SearchDocument[]> => {
   const pageById = new Map(project.graph.pages.map((page) => [page.id, page]));
-  const plain: PlainTextOptions = {
-    includeCodeBlocks: project.config.search.indexing.includeCodeBlocks,
-  };
 
   // Build the crumb index from every locale's sidebar (their nodes carry
   // locale-prefixed routes), so localized pages get the right section/breadcrumb.
@@ -432,22 +437,19 @@ export const buildSearchDocuments = async (
     return page ? contentIndexable(page, project.config) : false;
   });
 
-  // Serializers for the "markdown" extraction, layered the way
-  // `buildRawMarkdown` layers them: examples first, so a user
-  // `markdownComponents` entry of the same name still wins. Built once —
-  // `downlevelComponents` rebuilds its registry per call otherwise.
-  const components =
-    options?.content === "markdown"
-      ? {
-          ...exampleComponentSerializers(project.examples ?? {}),
-          ...project.config.ai.markdownComponents,
-        }
-      : undefined;
+  // Serializers for downleveling, layered the way `buildRawMarkdown` layers
+  // them: examples first, so a user `markdownComponents` entry of the same
+  // name still wins. Built once — `downlevelComponents` rebuilds its registry
+  // per call otherwise.
+  const components = {
+    ...exampleComponentSerializers(project.examples ?? {}),
+    ...project.config.ai.markdownComponents,
+  };
 
   return await Promise.all(
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
-      const body = await pageBody(project, page, options, components, plain);
+      const body = await pageBody(project, page, options, components);
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       const facets = page ? pageFacets(page, project.config) : undefined;

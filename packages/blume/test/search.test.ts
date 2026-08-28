@@ -127,14 +127,16 @@ const CODE_BODY = [
   "",
   "Press Enter<br />then wait.",
   "",
-  // Formatter-wrapped card: its string props are the visible text.
+  // Formatter-wrapped card: downleveled to the text it shows.
   "<Card",
   '  title="Rate limits"',
-  '  description="How quotas work"',
   '  href="/limits"',
   '  icon="rocket"',
+  '  cta="Read the quota guide"',
   "  meta={{ weight: 2 }}",
   "/>",
+  "",
+  '<TypeTable type={{ retries: { type: "number", description: "Attempts before failing." } }} />',
   "",
   "This is re:abbr[al]ly inline.",
   "",
@@ -153,8 +155,8 @@ const CODE_BODY = [
 ].join("\n");
 
 /**
- * MDX rejects HTML comments (so does the renderer); the extractor must fall
- * back to a Markdown reading, not drop the page.
+ * MDX rejects HTML comments (so does the renderer): the page has no body to
+ * index, but its title and description still make it findable.
  */
 const COMMENT_BODY = [
   "---",
@@ -454,8 +456,11 @@ describe("buildSearchDocuments", () => {
       expect(doc?.content).toContain("H2O costs $5");
       // An empty inline element still separates words.
       expect(doc?.content).toContain("Press Enter then wait");
-      // Text props are visible; hrefs, icons, and expression props are not.
-      expect(doc?.content).toContain("Rate limits How quotas work");
+      // Components downlevel to the text they show: a Card's title and call
+      // to action, a TypeTable's descriptions — not hrefs, icons, or props.
+      expect(doc?.content).toContain("Rate limits");
+      expect(doc?.content).toContain("Read the quota guide");
+      expect(doc?.content).toContain("Attempts before failing");
       expect(doc?.content).not.toContain("/limits");
       expect(doc?.content).not.toContain("rocket");
       expect(doc?.content).not.toContain("weight");
@@ -496,12 +501,10 @@ describe("buildSearchDocuments", () => {
       expect(doc?.content).not.toContain("<Step");
     });
 
-    it("falls back to a Markdown reading when MDX rejects the page", async () => {
+    it("indexes a page MDX rejects by title only, never its raw source", async () => {
       const [doc] = await buildSearchDocuments(mdxProject("comment.mdx"));
-      expect(doc?.content).toContain("Fallback prose survives");
-      // The author note that broke the MDX parse is still not searchable.
-      expect(doc?.content).not.toContain("keep this list sorted");
-      expect(doc?.content).not.toContain("<!--");
+      expect(doc?.title).toBe("A");
+      expect(doc?.content).toBe("");
     });
 
     it("reads a leading `---` as a divider, not front matter", async () => {
