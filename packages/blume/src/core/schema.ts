@@ -1478,14 +1478,25 @@ const seoConfigSchema = z.strictObject({
   x: xConfigSchema.default({}),
 });
 
+/**
+ * The GitHub instance's origin, normalized. Repo, edit, and API URLs are all
+ * built by appending to this, so it is reduced to a bare origin: a trailing
+ * slash would double the separator, and a path, query, fragment, or embedded
+ * credentials would land in the middle of every generated link. Restricting
+ * the protocol keeps a `javascript:` URL out of the header mark's `href`.
+ */
+const githubOriginSchema = z
+  .url({ protocol: /^https?$/u })
+  .transform((value) => new URL(value).origin);
+
 const githubConfigSchema = z.strictObject({
   /** REST API base. Derived from `host` when unset. */
-  api: z.url().optional(),
+  api: z.url({ protocol: /^https?$/u }).optional(),
   branch: z.string().default("main"),
   /** Path from the repo root to the project root (for monorepos). */
   dir: z.string().optional(),
   /** Origin of the GitHub instance, for Enterprise installations. */
-  host: z.url().default("https://github.com"),
+  host: githubOriginSchema.default("https://github.com"),
   owner: z.string(),
   repo: z.string(),
 });

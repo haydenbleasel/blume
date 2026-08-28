@@ -92,6 +92,34 @@ describe("loadConfig", () => {
     expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
   });
 
+  it("rejects a github.host that is not http(s)", async () => {
+    // The host lands in the header mark's `href`, so a `javascript:` URL would
+    // become a script link on every page.
+    const dir = await makeDir(
+      'export default { github: { host: "javascript:alert(1)", owner: "acme", repo: "docs" } };'
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+  });
+
+  it("rejects a github.api that is not http(s)", async () => {
+    const dir = await makeDir(
+      'export default { github: { api: "ftp://acme.com", owner: "acme", repo: "docs" } };'
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+  });
+
+  it("reduces github.host to a bare origin", async () => {
+    // Repo, edit, and API URLs are all built by appending to the host, so a
+    // path, credentials, or a trailing slash would land mid-link.
+    const dir = await makeDir(
+      'export default { github: { host: "https://user:pass@acme.ghe.com/gh/?q=1#f", owner: "acme", repo: "docs" } };'
+    );
+    const result = await loadConfig(dir);
+    expect(result.config.github?.host).toBe("https://acme.ghe.com");
+  });
+
   it("rejects a non-array integrations value", async () => {
     const dir = await makeDir('export default { integrations: "probe" };');
     const error = await loadError(dir);

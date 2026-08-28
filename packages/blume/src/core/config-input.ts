@@ -1305,7 +1305,9 @@ export interface GithubConfig {
    * Origin of the GitHub instance the repo lives on. Defaults to
    * `https://github.com`; set it to an Enterprise host (for example
    * `https://github.acme.com` or `https://acme.ghe.com`) so the header link,
-   * edit links, and the agent manifest point at that instance.
+   * edit links, and the agent manifest point at that instance. Must be an
+   * HTTP(S) URL, and is reduced to its origin — every repo URL is built by
+   * appending to it.
    */
   host?: string;
   /** Repository owner (user or org). */

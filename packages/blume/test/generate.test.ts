@@ -583,6 +583,26 @@ describe("buildRuntimeData", () => {
     expect(note.editUrl).toBeNull();
   });
 
+  it("normalizes an enterprise host to its origin", async () => {
+    const root = await writeProject({
+      "blume.config.ts": `export default {
+  github: {
+    host: "https://acme.ghe.com/",
+    owner: "acme",
+    repo: "docs",
+  },
+};
+`,
+      "docs/index.md": "# Home\n",
+    });
+    const project = await scanProject(root);
+    const data = JSON.parse(buildRuntimeData(project));
+    // A trailing slash would double the separator in every link built by
+    // appending to the raw host — the <GithubInfo> card's href among them.
+    expect(data.config.github.host).toBe("https://acme.ghe.com");
+    expect(data.config.repoUrl).toBe("https://acme.ghe.com/acme/docs");
+  });
+
   it("points repo, edit, and api urls at an enterprise host", async () => {
     const root = await writeProject({
       "blume.config.ts": `export default {

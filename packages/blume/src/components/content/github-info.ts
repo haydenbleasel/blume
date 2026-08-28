@@ -30,7 +30,10 @@ const load = async (
 ): Promise<RepositoryInfo | null> => {
   const { baseUrl = DEFAULT_BASE_URL, owner, repo, token } = options;
   const headers = new Headers({ Accept: "application/vnd.github+json" });
-  if (token) {
+  // An Enterprise instance can be configured on plain HTTP; a bearer token is
+  // never worth putting on the wire in cleartext, so it is dropped rather than
+  // sent. The request still goes out — a public repo's counts render either way.
+  if (token && new URL(baseUrl).protocol === "https:") {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
