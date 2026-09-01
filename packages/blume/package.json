@@ -135,7 +135,7 @@
     "semver": "^7.8.5",
     "sharp": "^0.35.3",
     "shiki": "^4.2.0",
-    "simple-icons": "^13.0.0",
+    "simple-icons": "^16.29.0",
     "string-width": "^8.1.0",
     "sucrase": "^3.35.1",
     "tailwindcss": "^4.3.3",
