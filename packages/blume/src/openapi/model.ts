@@ -42,13 +42,32 @@ export type HttpMethod = (typeof HTTP_METHODS)[number];
 /** Group used for operations that declare no tag. */
 const UNTAGGED = "Operations";
 
+/** A lower-case letter or digit followed by a capital: `addPet`, `v2List`. */
+const CASE_BOUNDARY = /(?<before>[\p{Ll}\p{N}])(?<capital>\p{Lu})/gu;
+/** The last capital of an acronym before a capitalized word: `HTTPResponse`. */
+const ACRONYM_BOUNDARY = /(?<acronym>\p{Lu})(?<word>\p{Lu}\p{Ll})/gu;
+
+/**
+ * Hyphenate an identifier's word boundaries before slugifying, so a camelCase
+ * `operationId` keeps its words in the URL (`getHTTPResponse` ->
+ * `get-http-response`) instead of collapsing once `slugify` lowercases it.
+ * OpenAPI generators reuse operation ids as SDK method names, so camelCase is
+ * the norm there; GraphQL field and type names and AsyncAPI operation ids go
+ * through the same rule so every spec kind derives routes alike. An id that
+ * is already kebab-case has no boundaries to split and passes through as is.
+ */
+const splitIdentifier = (identifier: string): string =>
+  identifier
+    .replace(CASE_BOUNDARY, "$<before>-$<capital>")
+    .replace(ACRONYM_BOUNDARY, "$<acronym>-$<word>");
+
 /** A stable, URL-safe key for an operation: its `operationId`, else method+path. */
 export const operationKey = (
   method: string,
   path: string,
   operationId?: string
 ): string => {
-  const fromId = operationId ? slugify(operationId) : "";
+  const fromId = operationId ? slugify(splitIdentifier(operationId)) : "";
   return fromId || slugify(`${method}-${path}`);
 };
 

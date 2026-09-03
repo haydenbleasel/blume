@@ -1,0 +1,5 @@
+---
+"blume": patch
+---
+
+Keep camelCase word boundaries in API reference operation routes. An `operationId` went through the generic slugger, which lowercases before it replaces non-slug characters, so `processSlackInteraction` collapsed to `/reference/integrations/processslackinteraction`. Operation ids are usually camelCase because OpenAPI generators reuse them as SDK method names, and renaming them just to get readable URLs couples SDK naming to presentation. The key now hyphenates the boundaries first: a lower-case letter or digit followed by a capital, and the last capital of an acronym before a capitalized word, so `processSlackInteraction` becomes `process-slack-interaction` and `getHTTPResponse` becomes `get-http-response`. Already kebab-case ids and the method-plus-path fallback are unchanged. GraphQL field and type names and AsyncAPI operation ids derive their routes through the same key, so a GraphQL `addPet` mutation moves from `/graphql/mutations/addpet` to `/graphql/mutations/add-pet` and an AsyncAPI `publishUserSignedup` operation from `publishusersignedup` to `publish-user-signedup`.

@@ -276,14 +276,14 @@ describe("asyncapi.extractAsyncApiOperations", () => {
     expect(warnings).toStrictEqual([]);
     expect(operations).toHaveLength(2);
 
-    const signup = operations.find((op) => op.key === "publishusersignedup");
+    const signup = operations.find((op) => op.key === "publish-user-signedup");
     expect(signup).toMatchObject({
       channelId: "userSignedup",
       deprecated: false,
       method: "receive",
       operationId: "publishUserSignedup",
       path: "user/signedup",
-      route: "/events/users/publishusersignedup",
+      route: "/events/users/publish-user-signedup",
       summary: "User signed up",
       tag: "Users",
       tagSlug: "users",
@@ -291,11 +291,11 @@ describe("asyncapi.extractAsyncApiOperations", () => {
 
     // Untagged: groups under the channel address; null address falls back to
     // the channel id.
-    const ping = operations.find((op) => op.key === "pingop");
+    const ping = operations.find((op) => op.key === "ping-op");
     expect(ping).toMatchObject({
       method: "send",
       path: "ping",
-      route: "/events/ping/pingop",
+      route: "/events/ping/ping-op",
       tag: "ping",
     });
 
@@ -865,11 +865,11 @@ describe("render-mdx for AsyncAPI operations", () => {
       channelId: "userSignedup",
       deprecated: false,
       description: "",
-      key: "pingop",
+      key: "ping-op",
       method: "send",
       operationId: "pingOp",
       path: "user/signedup",
-      route: "/events/ping/pingop",
+      route: "/events/ping/ping-op",
       summary: "",
       tag: "ping",
       tagSlug: "ping",
@@ -885,7 +885,7 @@ describe("render-mdx for AsyncAPI operations", () => {
       label: "user/signedup",
     });
     expect(page.data.search).toStrictEqual({ tags: ["ping", "SEND"] });
-    expect(page.body).toBe('<Operation source="events" id="pingop" />');
+    expect(page.body).toBe('<Operation source="events" id="ping-op" />');
   });
 });
 
@@ -897,8 +897,8 @@ describe("source.openApiSource with AsyncAPI references", () => {
     expect(diagnostics).toStrictEqual([]);
     // 2 operations + 1 overview index.
     expect(entries.map((entry) => entry.ref)).toStrictEqual([
-      "events/ping/pingop.mdx",
-      "events/users/publishusersignedup.mdx",
+      "events/ping/ping-op.mdx",
+      "events/users/publish-user-signedup.mdx",
       "events/index.mdx",
     ]);
     expect(folderMeta).toStrictEqual({
@@ -909,8 +909,8 @@ describe("source.openApiSource with AsyncAPI references", () => {
     expect(data.events?.kind).toBe("asyncapi");
     expect(data.events?.title).toBe("Events");
     expect(data.events?.version).toBe("2.0.0");
-    expect(data.events?.operations.publishusersignedup?.route).toBe(
-      "/events/users/publishusersignedup"
+    expect(data.events?.operations["publish-user-signedup"]?.route).toBe(
+      "/events/users/publish-user-signedup"
     );
     await rm(dir, { force: true, recursive: true });
   });

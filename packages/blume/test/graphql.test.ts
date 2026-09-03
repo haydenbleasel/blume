@@ -274,7 +274,7 @@ describe("graphql.extractGraphqlOperations", () => {
     const addPet = extracted.operations.find(
       (op) => op.operationId === "addPet"
     );
-    expect(addPet?.route).toBe("/graphql/mutations/addpet");
+    expect(addPet?.route).toBe("/graphql/mutations/add-pet");
   });
 
   it("marks deprecated root fields", () => {
@@ -345,7 +345,7 @@ describe("graphql lookups", () => {
     // A ref whose operation kind has no root type resolves to nothing.
     expect(
       graphqlRootField(buildGraphqlDocument("type Query { ping: String }"), {
-        ...refFor(spec, "petadded"),
+        ...refFor(spec, "pet-added"),
       })
     ).toBeUndefined();
     expect(
@@ -614,7 +614,7 @@ describe("render-mdx (graphql)", () => {
     expect(page.data.seo.description).toBe(
       "A pet in the store. Reference for the Pet object type in the GraphQL API."
     );
-    const input = operationMdx(spec, refFor(spec, "addpetinput"));
+    const input = operationMdx(spec, refFor(spec, "add-pet-input"));
     expect(input.data.seo.description).toContain(
       "AddPetInput input object type"
     );
@@ -853,7 +853,7 @@ describe("graphql-helpers", () => {
   it("maps type names to their page routes", () => {
     const routes = graphqlRoutes(spec);
     expect(routes.get("Pet")).toBe("/graphql/objects/pet-object");
-    expect(routes.get("PetStatus")).toBe("/graphql/enums/petstatus");
+    expect(routes.get("PetStatus")).toBe("/graphql/enums/pet-status");
     // Root fields never claim a type-name slot; built-ins have no page.
     expect(routes.get("pets")).toBeUndefined();
     expect(routes.get("String")).toBeUndefined();
@@ -862,7 +862,9 @@ describe("graphql-helpers", () => {
   it("maps operation pages by kind and field, memoized per spec", () => {
     const operations = graphqlOperationRoutes(spec);
     expect(operations.get("query:pets")).toBe("/graphql/queries/pets");
-    expect(operations.get("mutation:addPet")).toBe("/graphql/mutations/addpet");
+    expect(operations.get("mutation:addPet")).toBe(
+      "/graphql/mutations/add-pet"
+    );
     expect(operations.get("pets")).toBeUndefined();
     // Both lookups derive from one walk of the spec, cached on the spec
     // object — page renders must not recompute them.

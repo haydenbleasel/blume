@@ -414,8 +414,8 @@ describe("model.extractOperations", () => {
     const byKey = new Map(operations.map((op) => [op.key, op]));
     expect(operations).toHaveLength(3);
     expect(warnings).toStrictEqual([]);
-    expect(byKey.get("addpet")?.route).toBe("/api/pet/addpet");
-    expect(byKey.get("addpet")?.method).toBe("post");
+    expect(byKey.get("add-pet")?.route).toBe("/api/pet/add-pet");
+    expect(byKey.get("add-pet")?.method).toBe("post");
     expect(tags.map((tag) => tag.slug)).toContain("pet");
     // Untagged operation falls back to the "Operations" group.
     const ping = operations.find((op) => op.path === "/ping");
@@ -428,8 +428,8 @@ describe("model.extractOperations", () => {
     for (const operation of operations) {
       expect(operation.route.startsWith("//")).toBe(false);
     }
-    const addPet = operations.find((op) => op.key === "addpet");
-    expect(addPet?.route).toBe("/pet/addpet");
+    const addPet = operations.find((op) => op.key === "add-pet");
+    expect(addPet?.route).toBe("/pet/add-pet");
   });
 
   it("warns on a $ref path item instead of silently dropping it", () => {
@@ -452,7 +452,35 @@ describe("model.extractOperations", () => {
 
   it("derives an operation key from method+path when operationId is absent", () => {
     expect(operationKey("get", "/pets/{id}")).toBe("get-pets-id");
-    expect(operationKey("get", "/pets", "listPets")).toBe("listpets");
+    expect(operationKey("get", "/pets", "listPets")).toBe("list-pets");
+  });
+
+  it("keeps camelCase operationId word boundaries in the key", () => {
+    expect(operationKey("post", "/x", "processSlackInteraction")).toBe(
+      "process-slack-interaction"
+    );
+    expect(operationKey("post", "/x", "createCareerApplication")).toBe(
+      "create-career-application"
+    );
+    // The last capital of an acronym starts the next word.
+    expect(operationKey("get", "/x", "getHTTPResponse")).toBe(
+      "get-http-response"
+    );
+    expect(operationKey("get", "/x", "HTMLParser")).toBe("html-parser");
+    // A digit ends a word too; a bare pair of capitals is one acronym.
+    expect(operationKey("get", "/x", "v2ListUsers")).toBe("v2-list-users");
+    expect(operationKey("get", "/x", "getS3Bucket")).toBe("get-s3-bucket");
+    expect(operationKey("get", "/x", "getDB")).toBe("get-db");
+  });
+
+  it("passes an already kebab-case or snake_case operationId through", () => {
+    expect(operationKey("get", "/x", "get-pet")).toBe("get-pet");
+    expect(operationKey("get", "/x", "get_pet")).toBe("get-pet");
+    expect(operationKey("get", "/x", "listpets")).toBe("listpets");
+  });
+
+  it("falls back to method+path when the operationId slugifies to nothing", () => {
+    expect(operationKey("get", "/pets", "!!!")).toBe("get-pets");
   });
 
   it("de-duplicates a repeated operationId across operations", () => {
@@ -498,11 +526,11 @@ describe("model.extractOperations", () => {
       "/api"
     );
     const byKey = new Map(operations.map((op) => [op.key, op]));
-    expect(byKey.get("listorders")?.tagSlug).toBe("注文");
-    expect(byKey.get("listpets")?.tagSlug).toBe("ペット");
-    expect(byKey.get("listorders")?.route).toBe("/api/注文/listorders");
-    expect(byKey.get("listpets")?.route).toBe("/api/ペット/listpets");
-    expect(byKey.get("getpet")?.tagSlug).toBe("ペット");
+    expect(byKey.get("list-orders")?.tagSlug).toBe("注文");
+    expect(byKey.get("list-pets")?.tagSlug).toBe("ペット");
+    expect(byKey.get("list-orders")?.route).toBe("/api/注文/list-orders");
+    expect(byKey.get("list-pets")?.route).toBe("/api/ペット/list-pets");
+    expect(byKey.get("get-pet")?.tagSlug).toBe("ペット");
     expect(
       tags.map((tag) => ({ name: tag.name, slug: tag.slug }))
     ).toStrictEqual([
@@ -540,13 +568,13 @@ describe("model.extractOperations", () => {
       "/api"
     );
     const byKey = new Map(operations.map((op) => [op.key, op]));
-    expect(byKey.get("listchildren")?.tagSlug).toBe("niños");
+    expect(byKey.get("list-children")?.tagSlug).toBe("niños");
     // The NFD spelling normalizes onto the same slug as the NFC tag; the two
     // are still distinct tag *names*, so the collision suffix keeps their
     // routes apart visibly instead of minting a byte-distinct, pixel-identical
     // twin slug.
-    expect(byKey.get("listnfdchildren")?.tagSlug).toBe("niños-2");
-    expect(byKey.get("listsizes")?.tagSlug).toBe("größe");
+    expect(byKey.get("list-nfd-children")?.tagSlug).toBe("niños-2");
+    expect(byKey.get("list-sizes")?.tagSlug).toBe("größe");
     expect(
       tags.map((tag) => ({ name: tag.name, slug: tag.slug }))
     ).toStrictEqual([
@@ -619,9 +647,9 @@ describe("model.extractOperations", () => {
     // SAFETY: operationObject only reads `spec.document`; the other
     // ApiSpecData fields never matter to this lookup.
     const spec = { document: SPEC_3_1 } as ApiSpecData;
-    const addPet = operations.find((op) => op.key === "addpet");
+    const addPet = operations.find((op) => op.key === "add-pet");
     if (!addPet) {
-      throw new Error("addpet operation missing");
+      throw new Error("add-pet operation missing");
     }
     expect(operationObject(spec, addPet)?.summary).toBe("Add a pet");
     expect(
@@ -969,9 +997,9 @@ describe("render-mdx", () => {
 
   it("renders an operation page with searchable frontmatter and a component body", () => {
     const { operations } = extractOperations(SPEC_3_1, "/api");
-    const addPet = operations.find((op) => op.key === "addpet");
+    const addPet = operations.find((op) => op.key === "add-pet");
     if (!addPet) {
-      throw new Error("addpet operation missing");
+      throw new Error("add-pet operation missing");
     }
     const page = operationMdx(specData(), addPet);
     expect(page.data.title).toBe("Add a pet");
@@ -983,14 +1011,14 @@ describe("render-mdx", () => {
     expect(page.data.type).toBe("openapi-operation");
     // No description on this operation, so the body is just the component.
     expect(page.data).not.toHaveProperty("description");
-    expect(page.body).toBe('<Operation source="api" id="addpet" />');
+    expect(page.body).toBe('<Operation source="api" id="add-pet" />');
   });
 
   it("applies a reference source's indexing controls to every generated page", () => {
     const { operations } = extractOperations(SPEC_3_1, "/api");
-    const addPet = operations.find((op) => op.key === "addpet");
+    const addPet = operations.find((op) => op.key === "add-pet");
     if (!addPet) {
-      throw new Error("addpet operation missing");
+      throw new Error("add-pet operation missing");
     }
     const reference = {
       includeInLlms: false,
@@ -1519,7 +1547,7 @@ describe("source.openApiSource", () => {
     // 3 operations + 1 overview index.
     expect(entries).toHaveLength(4);
     const refs = entries.map((entry) => entry.ref);
-    expect(refs).toContain("api/pet/addpet.mdx");
+    expect(refs).toContain("api/pet/add-pet.mdx");
     expect(refs.at(-1)).toBe("api/index.mdx");
     // Each tag directory is labeled with the spec's own tag name, so the
     // sidebar group renders the authored casing instead of a re-humanized slug.
@@ -1530,7 +1558,7 @@ describe("source.openApiSource", () => {
 
     const data = source.openApiData();
     expect(data.api?.title).toBe("Petstore");
-    expect(Object.keys(data.api?.operations ?? {})).toContain("addpet");
+    expect(Object.keys(data.api?.operations ?? {})).toContain("add-pet");
     await rm(dir, { force: true, recursive: true });
   });
 
@@ -1555,10 +1583,10 @@ describe("source.openApiSource", () => {
     const { entries } = await source.load();
     // The content pipeline mounts staged entries under `basePath` itself, so
     // the refs stay base-less...
-    expect(entries.map((entry) => entry.ref)).toContain("api/pet/addpet.mdx");
+    expect(entries.map((entry) => entry.ref)).toContain("api/pet/add-pet.mdx");
     // ...but the routes components link to carry it, matching the served URLs.
-    expect(source.openApiData().api?.operations.addpet?.route).toBe(
-      "/docs/api/pet/addpet"
+    expect(source.openApiData().api?.operations["add-pet"]?.route).toBe(
+      "/docs/api/pet/add-pet"
     );
     await rm(dir, { force: true, recursive: true });
   });
