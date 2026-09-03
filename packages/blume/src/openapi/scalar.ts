@@ -32,22 +32,16 @@ const referencePagePath = (route: string): string => {
   return `${segments === "" ? "index" : segments}.astro`;
 };
 
-const darkModeConfig = (mode: ResolvedConfig["theme"]["mode"]) => {
-  if (mode === "dark") {
-    return { darkMode: true };
-  }
-  if (mode === "light") {
-    return { darkMode: false };
-  }
-  // "system": leave Scalar to follow the OS preference.
-  return {};
-};
-
 /**
  * Map Blume's theme onto Scalar's. An explicit `theme` name wins; otherwise we
  * keep Scalar's default theme and layer Blume's accent/radius on top via
  * `customCss`. Scalar re-injects `customCss` after its bundled theme, so these
  * variables reliably override the defaults. Best-effort, not pixel-exact.
+ *
+ * Light/dark is not decided here: the page's `data-theme` (stored preference,
+ * else the configured mode, else the OS) is only known in the browser, so
+ * `ReferenceLayout` pins Scalar's color mode to it at mount and keeps the two
+ * in step afterwards (`SCALAR_THEME_INIT_SCRIPT`).
  */
 const themeConfiguration = (config: ResolvedConfig, override?: string) => {
   if (override) {
@@ -57,7 +51,6 @@ const themeConfiguration = (config: ResolvedConfig, override?: string) => {
   const radius = resolveRadius(config.theme);
   return {
     customCss: `:root,.light-mode,.dark-mode{--scalar-color-accent:${accent.light};--scalar-radius:${radius};}.dark-mode{--scalar-color-accent:${accent.dark};}`,
-    ...darkModeConfig(config.theme.mode),
   };
 };
 

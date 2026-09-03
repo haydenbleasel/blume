@@ -24,7 +24,10 @@ const tempDir = async (prefix: string): Promise<string> => {
 };
 
 describe("scalar reference builder", () => {
-  it("maps the dark theme mode onto Scalar's darkMode flag", async () => {
+  it("leaves light/dark to the page's theme sync instead of Scalar's darkMode flag", async () => {
+    // The stored preference is only known in the browser, so the layout pins
+    // Scalar's color mode to `data-theme` at mount; a build-time `darkMode`
+    // would only ever restate the configured default.
     const config = blumeConfigSchema.parse({
       openapi: {
         enabled: true,
@@ -38,24 +41,8 @@ describe("scalar reference builder", () => {
       contentRoutes: new Set(),
       root: "/r",
     });
-    expect(files[0]?.content).toContain('"darkMode": true');
-  });
-
-  it("maps the light theme mode onto Scalar's darkMode flag", async () => {
-    const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/openapi.json",
-      },
-      theme: { mode: "light" },
-    });
-    const { files } = await buildReferenceFiles({
-      config,
-      contentRoutes: new Set(),
-      root: "/r",
-    });
-    expect(files[0]?.content).toContain('"darkMode": false');
+    expect(files[0]?.content).toContain('"customCss"');
+    expect(files[0]?.content).not.toContain("darkMode");
   });
 
   it("passes an explicit Scalar theme name straight through", async () => {

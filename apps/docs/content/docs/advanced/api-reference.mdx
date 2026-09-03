@@ -165,7 +165,7 @@ openapi: {
 }
 ```
 
-A Scalar-rendered reference is a self-contained embed on its own route — it doesn't weave into Blume's sidebar, search, or `llms.txt`, and Blume's [`playground`](#try-it-playground) config doesn't apply to it. Scalar brings its own request client, which calls your **target API directly from the browser** (the `playground.proxy` route isn't available here), so the API must allow cross-origin requests from the docs site (`Access-Control-Allow-Origin`). `theme` applies to the Scalar renderer only.
+A Scalar-rendered reference is a self-contained embed on its own route — it doesn't weave into Blume's sidebar, search, or `llms.txt`, and Blume's [`playground`](#try-it-playground) config doesn't apply to it. It does follow Blume's light/dark toggle: the embed is pinned to the page's theme when it mounts and switches with it, so Scalar's own theme switch is hidden (set `scalar.forceDarkModeState` or `scalar.darkMode` to hand color mode back to Scalar). Scalar brings its own request client, which calls your **target API directly from the browser** (the `playground.proxy` route isn't available here), so the API must allow cross-origin requests from the docs site (`Access-Control-Allow-Origin`). `theme` applies to the Scalar renderer only.
 
 ### Passing Scalar options
 

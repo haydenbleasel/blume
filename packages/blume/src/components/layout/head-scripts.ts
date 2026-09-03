@@ -44,6 +44,25 @@
 export const THEME_INIT_SCRIPT = `(()=>{const m=document.currentScript?.dataset.mode??"system";const apply=()=>{const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);};apply();document.addEventListener("astro:before-swap",(e)=>{const t=document.documentElement.dataset.theme;if(t){e.newDocument.documentElement.dataset.theme=t;}});document.addEventListener("astro:after-swap",apply);})();`;
 
 /**
+ * Keep an embedded Scalar reference on Blume's theme. Scalar picks its own
+ * color mode — its \`forceDarkModeState\` option, else the \`colorMode\` key its
+ * own toggle writes to localStorage, else the OS setting — and never looks at
+ * \`data-theme\`. A reader whose Blume preference disagrees with their OS (a
+ * browser that reports dark to \`prefers-color-scheme\` while the docs are set
+ * to light, say) got a light navbar over a dark reference.
+ *
+ * Runs inline right after the reference's mount container, before Scalar's
+ * client module executes: it rewrites the container's \`data-configuration\` to
+ * force the current theme, which also hides Scalar's own toggle. Scalar reads
+ * that override once at mount and keys its styles off \`dark-mode\`/\`light-mode\`
+ * classes on \`<body>\`, so later flips of Blume's toggle are mirrored onto
+ * those classes directly. A container whose author already set
+ * \`forceDarkModeState\` or \`darkMode\` through the \`scalar\` escape hatch is left
+ * to Scalar, per the contract that author options win.
+ */
+export const SCALAR_THEME_INIT_SCRIPT = `(()=>{const d=document.documentElement;const mode=()=>d.dataset.theme==="dark"?"dark":"light";let pinned=0;for(const el of document.querySelectorAll("[data-scalar-client]")){let c;try{c=JSON.parse(el.dataset.configuration||"{}");}catch{continue;}if("forceDarkModeState" in c||"darkMode" in c){continue;}c.forceDarkModeState=mode();el.dataset.configuration=JSON.stringify(c);pinned+=1;}if(!pinned){return;}new MutationObserver(()=>{const dark=mode()==="dark";document.body.classList.toggle("dark-mode",dark);document.body.classList.toggle("light-mode",!dark);}).observe(d,{attributes:true,attributeFilter:["data-theme"]});})();`;
+
+/**
  * Hide a previously-dismissed banner before it can flash in — and again after
  * every client-router swap, which wipes the `<html>` marker attribute.
  *

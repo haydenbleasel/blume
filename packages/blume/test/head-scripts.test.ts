@@ -3,7 +3,10 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { THEME_INIT_SCRIPT } from "../src/components/layout/head-scripts.ts";
+import {
+  SCALAR_THEME_INIT_SCRIPT,
+  THEME_INIT_SCRIPT,
+} from "../src/components/layout/head-scripts.ts";
 
 type Listener = (event: { newDocument: FakeDocument }) => void;
 
@@ -106,5 +109,154 @@ describe("THEME_INIT_SCRIPT", () => {
     const incoming = fakeDocument();
     document.dispatch("astro:before-swap", { newDocument: incoming });
     expect(incoming.documentElement.dataset.theme).toBeUndefined();
+  });
+});
+
+interface ClassList {
+  classes: Set<string>;
+  toggle: (name: string, force: boolean) => void;
+}
+
+interface ScalarContainer {
+  dataset: { configuration?: string };
+}
+
+interface ScalarDocument {
+  documentElement: { dataset: { theme?: string } };
+  body: { classList: ClassList };
+  querySelectorAll: (selector: string) => ScalarContainer[];
+}
+
+type ThemeRoot = ScalarDocument["documentElement"];
+
+interface Observation {
+  target: ThemeRoot;
+  options: { attributes: boolean; attributeFilter: string[] };
+  fire: () => void;
+}
+
+const classList = (initial: string[]): ClassList => {
+  const classes = new Set(initial);
+  return {
+    classes,
+    toggle: (name, force) => {
+      if (force) {
+        classes.add(name);
+      } else {
+        classes.delete(name);
+      }
+    },
+  };
+};
+
+const scalarDocument = (input: {
+  theme: string;
+  containers: ScalarContainer[];
+}): ScalarDocument => ({
+  body: { classList: classList(["light-mode"]) },
+  documentElement: { dataset: { theme: input.theme } },
+  querySelectorAll: (selector) =>
+    selector === "[data-scalar-client]" ? input.containers : [],
+});
+
+// Same throwaway-module trick as the theme script, with a MutationObserver
+// stand-in that records what it was asked to watch and lets a test fire it.
+const runScalarThemeScript = async (
+  document: ScalarDocument
+): Promise<Observation[]> => {
+  const observations: Observation[] = [];
+  class FakeMutationObserver {
+    private readonly handler: () => void;
+    constructor(handler: () => void) {
+      this.handler = handler;
+    }
+    observe(
+      target: ThemeRoot,
+      options: { attributes: boolean; attributeFilter: string[] }
+    ) {
+      observations.push({ fire: () => this.handler(), options, target });
+    }
+  }
+  Object.assign(globalThis, {
+    MutationObserver: FakeMutationObserver,
+    document,
+  });
+  const dir = await mkdtemp(path.join(tmpdir(), "blume-head-scripts-"));
+  runs += 1;
+  const file = path.join(dir, `scalar-theme-${runs}.js`);
+  await writeFile(file, SCALAR_THEME_INIT_SCRIPT);
+  await import(file);
+  Reflect.deleteProperty(globalThis, "MutationObserver");
+  return observations;
+};
+
+describe("SCALAR_THEME_INIT_SCRIPT", () => {
+  test("pins Scalar's color mode to the page theme before it mounts", async () => {
+    const container: ScalarContainer = {
+      dataset: { configuration: '{"content":"openapi: 3.1.0"}' },
+    };
+    const document = scalarDocument({ containers: [container], theme: "dark" });
+    const observations = await runScalarThemeScript(document);
+    expect(JSON.parse(container.dataset.configuration ?? "")).toEqual({
+      content: "openapi: 3.1.0",
+      forceDarkModeState: "dark",
+    });
+    expect(observations).toHaveLength(1);
+    expect(observations[0]?.target).toBe(document.documentElement);
+    expect(observations[0]?.options).toEqual({
+      attributeFilter: ["data-theme"],
+      attributes: true,
+    });
+  });
+
+  test("mirrors later toggles onto Scalar's body classes", async () => {
+    const container: ScalarContainer = { dataset: { configuration: "{}" } };
+    const document = scalarDocument({
+      containers: [container],
+      theme: "light",
+    });
+    const [observation] = await runScalarThemeScript(document);
+    expect(JSON.parse(container.dataset.configuration ?? "")).toEqual({
+      forceDarkModeState: "light",
+    });
+
+    document.documentElement.dataset.theme = "dark";
+    observation?.fire();
+    expect([...document.body.classList.classes]).toEqual(["dark-mode"]);
+
+    document.documentElement.dataset.theme = "light";
+    observation?.fire();
+    expect([...document.body.classList.classes]).toEqual(["light-mode"]);
+  });
+
+  test("treats a missing configuration as empty and an unset theme as light", async () => {
+    const container: ScalarContainer = { dataset: {} };
+    const document = scalarDocument({ containers: [container], theme: "" });
+    Reflect.deleteProperty(document.documentElement.dataset, "theme");
+    await runScalarThemeScript(document);
+    expect(JSON.parse(container.dataset.configuration ?? "")).toEqual({
+      forceDarkModeState: "light",
+    });
+  });
+
+  test("leaves a container the author already pinned to Scalar", async () => {
+    // `scalar` escape-hatch options win over Blume's derived config, so an
+    // explicit color mode keeps Scalar's own toggle and persistence.
+    const forced: ScalarContainer = {
+      dataset: { configuration: '{"forceDarkModeState":"dark"}' },
+    };
+    const initial: ScalarContainer = {
+      dataset: { configuration: '{"darkMode":true}' },
+    };
+    const broken: ScalarContainer = { dataset: { configuration: "{nope" } };
+    const document = scalarDocument({
+      containers: [forced, initial, broken],
+      theme: "light",
+    });
+    const observations = await runScalarThemeScript(document);
+    expect(forced.dataset.configuration).toBe('{"forceDarkModeState":"dark"}');
+    expect(initial.dataset.configuration).toBe('{"darkMode":true}');
+    expect(broken.dataset.configuration).toBe("{nope");
+    expect(observations).toHaveLength(0);
   });
 });

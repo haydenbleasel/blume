@@ -10,7 +10,11 @@ import WebMcp from "./WebMcp.astro";
 import Banner from "./Banner.astro";
 import Favicon from "./Favicon.astro";
 import Fonts from "./Fonts.astro";
-import { BANNER_INIT_SCRIPT, THEME_INIT_SCRIPT } from "./head-scripts.ts";
+import {
+  BANNER_INIT_SCRIPT,
+  SCALAR_THEME_INIT_SCRIPT,
+  THEME_INIT_SCRIPT,
+} from "./head-scripts.ts";
 import Header from "./Header.astro";
 
 // A minimal shell for the Scalar API/AsyncAPI reference: Blume's banner + navbar
@@ -129,6 +133,7 @@ const bannerKey = banner?.dismissible ? banner.key : null;
       id="blume-content"
     >
       <slot />
+      <script is:inline set:html={SCALAR_THEME_INIT_SCRIPT} />
     </div>
     <WebMcp />
   </body>
