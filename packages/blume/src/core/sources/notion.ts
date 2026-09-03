@@ -70,11 +70,21 @@ interface NotionList<T> {
   next_cursor: string | null;
 }
 
-/** The slice of `@notionhq/client` this adapter relies on (so it's mockable). */
+/**
+ * The slice of `@notionhq/client` (v5+) this adapter relies on, so it's
+ * mockable. Since API version 2025-09-03 a database's rows live in a data
+ * source: `databases.retrieve` names the data sources and
+ * `dataSources.query` pages through one of them.
+ */
 export interface NotionClientLike {
   databases: {
+    retrieve: (args: { database_id: string }) => Promise<{
+      data_sources: { id: string; name: string }[];
+    }>;
+  };
+  dataSources: {
     query: (args: {
-      database_id: string;
+      data_source_id: string;
       start_cursor?: string;
     }) => Promise<NotionList<NotionPage>>;
   };
@@ -319,10 +329,14 @@ export const notionSource = (
     }
     let Client: new (config: { auth?: string }) => NotionClientLike;
     try {
+      // The module is widened first because the SDK's response unions are
+      // broader than the NotionClientLike slice, so a direct assertion is
+      // rejected as non-overlapping.
+      const sdk: unknown = await import("@notionhq/client");
       // SAFETY: `@notionhq/client` exports a `Client` class constructable with
       // an `auth` token whose instances cover the NotionClientLike slice; the
       // local type keeps the SDK mockable without importing its types.
-      ({ Client } = (await import("@notionhq/client")) as {
+      ({ Client } = sdk as {
         Client: new (config: { auth?: string }) => NotionClientLike;
       });
     } catch {
@@ -511,15 +525,35 @@ export const notionSource = (
     };
   };
 
+  // A database's rows live in its data source (API 2025-09-03). Blume reads
+  // the first one, which is the only one a database created in Notion has.
+  const resolveDataSource = async (
+    client: NotionClientLike
+  ): Promise<string> => {
+    const database = await notionCall(() =>
+      client.databases.retrieve({ database_id: options.database })
+    );
+    const [dataSource] = database.data_sources;
+    if (!dataSource) {
+      throw new BlumeError({
+        code: "BLUME_SOURCE_MISCONFIGURED",
+        message: `Source "${options.name}": Notion database "${options.database}" has no data source to read pages from.`,
+        severity: "error",
+      });
+    }
+    return dataSource.id;
+  };
+
   // Hoisted out of `load` so the retry closure doesn't nest past the linter's
-  // 4-level limit (source factory → queryDatabase → notionCall callback).
-  const queryDatabase = (
+  // 4-level limit (source factory → queryDataSource → notionCall callback).
+  const queryDataSource = (
     client: NotionClientLike,
+    dataSourceId: string,
     cursor?: string
   ): Promise<NotionList<NotionPage>> =>
     notionCall(() =>
-      client.databases.query({
-        database_id: options.database,
+      client.dataSources.query({
+        data_source_id: dataSourceId,
         start_cursor: cursor,
       })
     );
@@ -533,8 +567,9 @@ export const notionSource = (
       cache,
       async () => {
         const client = await resolveClient();
+        const dataSourceId = await resolveDataSource(client);
         const pages = await collectAll((cursor) =>
-          queryDatabase(client, cursor)
+          queryDataSource(client, dataSourceId, cursor)
         );
         const built = await Promise.all(
           pages.map((page) => toEntry(client, page))

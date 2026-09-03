@@ -163,7 +163,7 @@ A read token for a private dataset comes from the `SANITY_TOKEN` environment var
 
 ## Notion
 
-The built-in `notion` source turns a Notion database into a collection: each row becomes a page, its properties become frontmatter, and its block tree becomes MDX. Callouts, toggles, columns, and code blocks map to the matching Blume components. `@notionhq/client` is an optional peer dependency.
+The built-in `notion` source turns a Notion database into a collection: each row becomes a page, its properties become frontmatter, and its block tree becomes MDX. Callouts, toggles, columns, and code blocks map to the matching Blume components. `@notionhq/client` (v5 or later) is an optional peer dependency; Blume reads the database through its first data source.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";

@@ -154,6 +154,13 @@ const BLOCKS = {
 // arbitrary string lookups without widening the fixture's inferred shape.
 const blockLists = new Map(Object.entries(BLOCKS));
 
+// v5 reads a database's rows through its data source: `databases.retrieve`
+// names it, `dataSources.query` pages it.
+const databases: NotionClientLike["databases"] = {
+  retrieve: () =>
+    Promise.resolve({ data_sources: [{ id: "ds1", name: "Handbook" }] }),
+};
+
 const client = (): NotionClientLike => ({
   blocks: {
     children: {
@@ -165,7 +172,7 @@ const client = (): NotionClientLike => ({
         }),
     },
   },
-  databases: {
+  dataSources: {
     query: () =>
       Promise.resolve({
         has_more: false,
@@ -173,6 +180,7 @@ const client = (): NotionClientLike => ({
         results: [PAGE],
       }),
   },
+  databases,
 });
 
 // `typeof fetch` carries the `preconnect` namespace member, so the stub borrows
@@ -215,7 +223,7 @@ describe("notionSource", () => {
     let calls = 0;
     const flaky = {
       ...client(),
-      databases: {
+      dataSources: {
         query: () => {
           calls += 1;
           if (calls === 1) {
@@ -233,6 +241,7 @@ describe("notionSource", () => {
           });
         },
       },
+      databases,
     } satisfies NotionClientLike;
 
     const source = notionSource(
@@ -248,7 +257,7 @@ describe("notionSource", () => {
     let calls = 0;
     const broken = {
       ...client(),
-      databases: {
+      dataSources: {
         query: () => {
           calls += 1;
           return Promise.reject(
@@ -256,6 +265,7 @@ describe("notionSource", () => {
           );
         },
       },
+      databases,
     } satisfies NotionClientLike;
 
     const source = notionSource(
@@ -301,7 +311,7 @@ describe("notionSource", () => {
     let calls = 0;
     const dynamic = {
       ...client(),
-      databases: {
+      dataSources: {
         query: () => {
           calls += 1;
           return Promise.resolve({
@@ -319,6 +329,7 @@ describe("notionSource", () => {
           });
         },
       },
+      databases,
     } satisfies NotionClientLike;
     const source = notionSource(
       {
@@ -355,7 +366,7 @@ describe("notionSource", () => {
   it("maps a non-published status to draft", async () => {
     const draftClient = {
       ...client(),
-      databases: {
+      dataSources: {
         query: () =>
           Promise.resolve({
             has_more: false,
@@ -371,6 +382,7 @@ describe("notionSource", () => {
             ],
           }),
       },
+      databases,
     } satisfies NotionClientLike;
     const source = notionSource(
       {
@@ -401,7 +413,7 @@ describe("notionSource", () => {
     const clientWith = (properties: Record<string, PropertyFixture>) =>
       ({
         ...client(),
-        databases: {
+        dataSources: {
           query: () =>
             Promise.resolve({
               has_more: false,
@@ -409,6 +421,7 @@ describe("notionSource", () => {
               results: [{ ...PAGE, properties }],
             }),
         },
+        databases,
       }) satisfies NotionClientLike;
     const loadDraft = async (properties: Record<string, PropertyFixture>) => {
       const source = notionSource(
@@ -507,7 +520,7 @@ describe("notionSource (block + property edge cases)", () => {
           }),
       },
     },
-    databases: {
+    dataSources: {
       query: () =>
         Promise.resolve({
           has_more: false,
@@ -515,6 +528,7 @@ describe("notionSource (block + property edge cases)", () => {
           results: [richPage],
         }),
     },
+    databases,
   });
 
   it("renders every leaf block type and inline annotation", async () => {
@@ -635,7 +649,7 @@ describe("notionSource (request pacing)", () => {
           },
         },
       },
-      databases: {
+      dataSources: {
         query: () =>
           Promise.resolve({
             has_more: false,
@@ -645,6 +659,7 @@ describe("notionSource (request pacing)", () => {
             ),
           }),
       },
+      databases,
     };
   };
 
@@ -713,5 +728,58 @@ describe("resolveSources (notion)", () => {
     const sources = resolveSources(config, context, { mode: "build" });
     expect(sources[0]?.name).toBe("handbook");
     expect(sources[0]?.staged).toBe(true);
+  });
+});
+
+describe("notionSource data sources", () => {
+  it("reads the database through its first data source", async () => {
+    const calls: string[] = [];
+    const tracking: NotionClientLike = {
+      ...client(),
+      dataSources: {
+        query: ({ data_source_id }) => {
+          calls.push(`query:${data_source_id}`);
+          return Promise.resolve({
+            has_more: false,
+            next_cursor: null,
+            results: [PAGE],
+          });
+        },
+      },
+      databases: {
+        retrieve: ({ database_id }) => {
+          calls.push(`retrieve:${database_id}`);
+          return Promise.resolve({
+            data_sources: [
+              { id: "ds-first", name: "Handbook" },
+              { id: "ds-second", name: "Archive" },
+            ],
+          });
+        },
+      },
+    };
+    const source = notionSource(
+      { client: tracking, database: "db1", fetchImpl, name: "handbook" },
+      await ctxFor()
+    );
+    const { entries } = await source.load();
+    expect(entries).toHaveLength(1);
+    expect(calls).toEqual(["retrieve:db1", "query:ds-first"]);
+  });
+
+  it("fails clearly when the database has no data source", async () => {
+    const empty: NotionClientLike = {
+      ...client(),
+      databases: { retrieve: () => Promise.resolve({ data_sources: [] }) },
+    };
+    const source = notionSource(
+      { client: empty, database: "db1", fetchImpl, name: "handbook" },
+      await ctxFor()
+    );
+    const failure = source.load();
+    await expect(failure).rejects.toMatchObject({
+      diagnostic: { code: "BLUME_SOURCE_FETCH_FAILED" },
+    });
+    await expect(failure).rejects.toThrow(/no data source/u);
   });
 });
