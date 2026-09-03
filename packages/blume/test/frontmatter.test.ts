@@ -3,18 +3,19 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import baseMatter from "gray-matter";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import { join } from "pathe";
 
 import matter from "../src/core/frontmatter.ts";
 
 const doc = "---\ntitle: Home\ncount: 2\n---\nbody text";
 
-// `safeLoad` was removed from js-yaml 4's types, but the runtime still ships a
-// stub that throws — that is exactly what crashes gray-matter's default engine.
-// SAFETY: js-yaml 4's module object carries a runtime `safeLoad` stub its types
-// no longer declare (hence the optional probe); the test below asserts the
-// stub exists and throws.
+// gray-matter's default engine calls `yaml.safeLoad`, which js-yaml 4 replaced
+// with a throwing stub and js-yaml 5 dropped entirely. Handing the installed
+// module's `safeLoad` to gray-matter reproduces the crash a consumer hits when
+// their install hoists a modern js-yaml under gray-matter.
+// SAFETY: js-yaml 5's module object has no `safeLoad` (hence the optional
+// probe); the tests below assert exactly that and that gray-matter then fails.
 const removedSafeLoad = (yaml as { safeLoad?: (input: string) => object })
   .safeLoad as (input: string) => object;
 
@@ -92,16 +93,16 @@ describe("frontmatter wrapper", () => {
     expect(matter("---\n").content).toBe("---\n");
   });
 
-  it("avoids the js-yaml 4 `safeLoad` removal that crashes gray-matter's default engine", () => {
-    // gray-matter@4's default YAML engine is `yaml.safeLoad`, which was removed
-    // in js-yaml 4 and now throws. Wiring that engine in explicitly reproduces
-    // the reported `blume dev` crash in a workspace pinned to js-yaml 4...
-    expect(removedSafeLoad).toBeInstanceOf(Function);
+  it("avoids the removed js-yaml `safeLoad` that crashes gray-matter's default engine", () => {
+    // gray-matter@4's default YAML engine is `yaml.safeLoad`, which modern
+    // js-yaml no longer provides. Wiring that engine in explicitly reproduces
+    // the reported `blume dev` crash in a workspace that hoists js-yaml...
+    expect(removedSafeLoad).toBeUndefined();
     expect(() =>
       baseMatter(doc, { engines: { yaml: { parse: removedSafeLoad } } })
-    ).toThrow(/safeLoad is removed/u);
+    ).toThrow(/yaml\.parse/u);
 
-    // ...while the wrapper supplies `load`/`dump`, which exist in js-yaml 3 and 4.
+    // ...while the wrapper supplies Blume's own `load`/`dump`.
     expect(matter(doc).data).toEqual({ count: 2, title: "Home" });
   });
 
@@ -124,6 +125,6 @@ describe("frontmatter wrapper", () => {
     // the bare `matter()` call: the broken engine surfaces its own error.
     expect(() =>
       matter.read(file, { engines: { yaml: { parse: removedSafeLoad } } })
-    ).toThrow(/safeLoad is removed/u);
+    ).toThrow(/yaml\.parse/u);
   });
 });

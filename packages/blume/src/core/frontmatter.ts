@@ -1,13 +1,15 @@
 import baseMatter from "gray-matter";
 import { dump, load } from "js-yaml";
 
+import { YAML_SCHEMA } from "./yaml.ts";
+
 // gray-matter@4 binds js-yaml 3's `safeLoad`/`safeDump` as its default YAML
-// engine. In a workspace that pins js-yaml to v4 — where those functions were
-// removed — parsing front matter throws "Function yaml.safeLoad is removed in
-// js-yaml 4." Every Blume front-matter call routes through this `matter`
-// wrapper, which supplies an explicit engine built on `load`/`dump`. Both exist
-// in js-yaml 3 and 4, so Blume is immune to whichever version the consumer's
-// install resolves for gray-matter.
+// engine. In a workspace that resolves a newer js-yaml for gray-matter — v4
+// replaced those functions with throwing stubs, v5 dropped them — parsing
+// front matter throws "Function yaml.safeLoad is removed in js-yaml 4." Every
+// Blume front-matter call routes through this `matter` wrapper, which supplies
+// an explicit engine built on Blume's own `load`/`dump`, so Blume is immune to
+// whichever version the consumer's install resolves for gray-matter.
 
 type MatterInput = Parameters<typeof baseMatter>[0];
 type MatterOptions = Parameters<typeof baseMatter>[1];
@@ -22,7 +24,8 @@ const yamlEngine = {
   // block is a YAML mapping, and js-yaml returns a scalar only for degenerate
   // input, which gray-matter treats the same way its bundled engine's output
   // is treated.
-  parse: (input: string): object => (load(input) ?? {}) as object,
+  parse: (input: string): object =>
+    (load(input, { schema: YAML_SCHEMA }) ?? {}) as object,
   stringify: (data: FrontMatterData): string => dump(data),
 };
 

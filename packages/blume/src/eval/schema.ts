@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { load } from "js-yaml";
 import { z } from "zod";
 
+import { YAML_SCHEMA } from "../core/yaml.ts";
+
 /** Question ids are kebab-case slugs so they read well in reports and CI logs. */
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 
@@ -90,7 +92,7 @@ export const loadEvalsFile = async (
 
   let parsed: unknown;
   try {
-    parsed = load(raw);
+    parsed = load(raw, { schema: YAML_SCHEMA });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new EvalsFileError(path, `Invalid YAML in ${path}: ${detail}`);
