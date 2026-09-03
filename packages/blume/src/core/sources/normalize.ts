@@ -344,8 +344,14 @@ const ESCAPED_PUNCTUATION = /\\(?<char>[!-/:-@[-`{-~])/gu;
 // list-item containers (`> [label]: /url`, `- [label]: /url`) — a definition
 // nested in either still defines the label document-wide. `rest` is whatever
 // follows the colon on the same line.
+//
+// Every container iteration begins with its marker and ends with the
+// whitespace that follows it, so a whitespace run belongs to exactly one
+// iteration. Letting an iteration start with optional whitespace as well
+// gave each run two homes and backtracked exponentially on `>\t>\t>…` and
+// `*\t\t*\t\t*…` lines (CodeQL js/redos).
 const REF_DEFINITION =
-  /^(?:[ \t]*(?:>[ \t]*|(?:[-*+]|\d{1,9}[.)])[ \t]+))* {0,3}\[(?<label>[^\]]+)\]:[ \t]*(?<rest>.*)$/u;
+  /^(?: {0,3}|[ \t]*(?:(?:>|(?:[-*+]|\d{1,9}[.)])[ \t])[ \t]*)+)\[(?<label>[^\]]+)\]:[ \t]*(?<rest>.*)$/u;
 
 /**
  * The normalized labels of every link-reference definition in the body

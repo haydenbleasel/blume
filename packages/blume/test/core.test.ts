@@ -740,6 +740,21 @@ describe(extractHeadings, () => {
     }
   });
 
+  it("rejects a long run of nested containers in linear time", () => {
+    // Each container iteration owns the whitespace after its marker, so a
+    // `>\t>\t>…` or `*\t\t*\t\t*…` line that never reaches a `[label]:`
+    // fails in one pass — an iteration that could also *start* with
+    // whitespace backtracked exponentially here (CodeQL js/redos); the suite
+    // would hang rather than pass.
+    for (const containers of [
+      `>${"\t>".repeat(10_000)}!`,
+      `*${"\t\t*".repeat(10_000)}!`,
+    ]) {
+      const body = ["## Overview [toc]", "", containers].join("\n");
+      expect(extractHeadings(body)[0]?.slug).toBe("overview");
+    }
+  });
+
   it("ignores a bracket-colon line that isn't a valid definition", () => {
     // No destination on the line or the next: paragraph text, not a
     // definition, so the heading's bracket is still a marker.
