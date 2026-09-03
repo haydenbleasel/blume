@@ -22,7 +22,7 @@
     "bump-deps": "npx npm-check-updates -u --deep && bun i"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.27.0",
+    "@changesets/cli": "^3.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@orama/orama": "^3.1.18",
     "astro": "^7.2.3",
