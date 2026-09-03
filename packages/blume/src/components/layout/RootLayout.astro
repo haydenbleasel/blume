@@ -13,6 +13,15 @@ import type {
   NavSelector as NavSelectorType,
 } from "../../core/types.ts";
 import "blume:theme";
+// medium-zoom's default build injects its stylesheet into <head> as a bare
+// <style> the moment the module evaluates — once per document. The client
+// router's head swap drops every non-persisted head element on the first
+// navigation, and the cached module never re-injects, so the zoom cursor
+// vanished and `close()` hung forever waiting for a `transitionend` its
+// (now absent) transition rule never fires. Importing the stylesheet here
+// puts it in the page CSS the router carries across swaps; the script below
+// loads the `pure` build, which ships no injection.
+import "medium-zoom/dist/style.css";
 import { ClientRouter } from "astro:transitions";
 import type { FontHead } from "../../theme/fonts.ts";
 import type { ComponentOverride } from "../../core/define-components.ts";
@@ -924,7 +933,9 @@ const bannerKey = banner?.dismissible ? banner.key : null;
           if (zoomTargets.length > 0) {
             // Lazy: pages without a zoomable image never load the library,
             // matching how mermaid is only fetched on pages with a diagram.
-            const { default: mediumZoom } = await import("medium-zoom");
+            const { default: mediumZoom } = await import(
+              "medium-zoom/dist/pure"
+            );
             mediumZoom(zoomTargets, {
               background:
                 "color-mix(in oklab, var(--color-background) 80%, transparent)",
@@ -941,7 +952,9 @@ const bannerKey = banner?.dismissible ? banner.key : null;
     </script>
     <style is:global>
       /* medium-zoom ships no z-index; lift the lightbox above the chrome
-         (header/sidebar) the way the previous z-[100] overlay sat. */
+         (header/sidebar) the way the previous z-[100] overlay sat. Its own
+         rules come from the `medium-zoom/dist/style.css` import in the
+         frontmatter, not runtime injection. */
       .medium-zoom-overlay {
         backdrop-filter: blur(4px);
         z-index: 100;
@@ -950,8 +963,8 @@ const bannerKey = banner?.dismissible ? banner.key : null;
         z-index: 101;
       }
       @media (prefers-reduced-motion: reduce) {
-        /* html prefix outranks the library's injected rules regardless of
-           insertion order; its transition declarations carry !important. */
+        /* html prefix outranks the library's rules regardless of sheet
+           order; its transition declarations carry !important. */
         html .medium-zoom-image,
         html .medium-zoom-overlay {
           transition: none !important;

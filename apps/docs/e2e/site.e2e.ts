@@ -13,6 +13,27 @@ test.describe("navigation", () => {
     await link.click();
     await expect(page).toHaveURL(/\/docs\/quickstart/u);
   });
+
+  test("the image-zoom stylesheet survives a client-router swap", async ({
+    page,
+  }) => {
+    // medium-zoom's own rules must ship in the page CSS the router re-renders
+    // on every navigation, not in a runtime-injected <style> the head swap
+    // throws away — otherwise the zoom cursor vanishes and a zoomed image can
+    // never close after the first in-page navigation. Neither page here has a
+    // zoomable image, so the library never runs: the rule can only be present
+    // if it came with the page.
+    await page.goto("/docs");
+    await page.locator("nav a[href='/docs/quickstart']").first().click();
+    await expect(page).toHaveURL(/\/docs\/quickstart/u);
+    const cursor = await page.evaluate(() => {
+      const image = document.createElement("img");
+      image.className = "medium-zoom-image";
+      document.body.append(image);
+      return getComputedStyle(image).cursor;
+    });
+    expect(cursor).toBe("zoom-in");
+  });
 });
 
 test.describe("theme toggle", () => {
