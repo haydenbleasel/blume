@@ -143,6 +143,48 @@ describe("resolveTsconfigAliases", () => {
     expect(resolveTsconfigAliases(root)).toEqual({});
   });
 
+  it("keeps the entry's own paths when its `extends` is missing, like tsc", async () => {
+    // tsc reports TS6053 for the missing base but still applies the options
+    // the entry config declares itself.
+    await writeConfig(
+      JSON.stringify({
+        compilerOptions: { paths: { "@/*": ["./src/*"] } },
+        extends: "./missing-base",
+      })
+    );
+
+    expect(resolveTsconfigAliases(root)).toEqual({ "@": join(root, "src") });
+  });
+
+  it("anchors inherited relative paths on the declaring config, like tsc", async () => {
+    await mkdir(join(root, "config"), { recursive: true });
+    await writeFile(
+      join(root, "config", "base.json"),
+      JSON.stringify({ compilerOptions: { paths: { "@/*": ["./src/*"] } } }),
+      "utf-8"
+    );
+    await writeConfig(JSON.stringify({ extends: "./config/base.json" }));
+
+    // No baseUrl: tsc resolves `./src/*` relative to config/base.json.
+    expect(resolveTsconfigAliases(root)).toEqual({
+      "@": join(root, "config", "src"),
+    });
+  });
+
+  it("substitutes the configDir template in baseUrl", async () => {
+    // oxlint-disable-next-line no-template-curly-in-string -- tsconfig syntax
+    const baseUrl = "${configDir}/base";
+    await writeConfig(
+      JSON.stringify({
+        compilerOptions: { baseUrl, paths: { "@/*": ["./src/*"] } },
+      })
+    );
+
+    expect(resolveTsconfigAliases(root)).toEqual({
+      "@": join(root, "base", "src"),
+    });
+  });
+
   it("guards against a tsconfig that extends itself", async () => {
     await writeConfig(JSON.stringify({ extends: "./tsconfig.json" }));
     expect(resolveTsconfigAliases(root)).toEqual({});
@@ -184,6 +226,26 @@ describe("resolveTsconfigAliases", () => {
     expect(
       aliases["@"]?.endsWith(join("node_modules", "@tsconfig", "base", "src"))
     ).toBe(true);
+  });
+
+  it("rejects a bare `extends` whose package only has a main, like tsc", async () => {
+    await mkdir(join(root, "node_modules", "tscfg"), { recursive: true });
+    await writeFile(
+      join(root, "node_modules", "tscfg", "package.json"),
+      JSON.stringify({ main: "./base.json", name: "tscfg" }),
+      "utf-8"
+    );
+    await writeFile(
+      join(root, "node_modules", "tscfg", "base.json"),
+      JSON.stringify({ compilerOptions: { paths: { "~/*": ["./lib/*"] } } }),
+      "utf-8"
+    );
+    // With no `tscfg/tsconfig.json` and no `tsconfig` field, tsc reports
+    // TS6053 "File 'tscfg' not found" — it does not fall back to resolving a
+    // JSON config through the package `main`.
+    await writeConfig(JSON.stringify({ extends: "tscfg" }));
+
+    expect(resolveTsconfigAliases(root)).toEqual({});
   });
 
   it("returns {} when a bare `extends` can't be resolved", async () => {

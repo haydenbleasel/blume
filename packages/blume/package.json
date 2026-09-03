@@ -100,7 +100,6 @@
     "dotenv": "^17.4.2",
     "epub-gen-memory": "^1.1.2",
     "fast-xml-parser": "^5.10.1",
-    "get-tsconfig": "5.0.0-beta.4",
     "github-slugger": "^2.0.0",
     "graphql": "^17.0.2",
     "gray-matter": "^4.0.3",
