@@ -14,7 +14,7 @@
     "upgrade": "remotion upgrade"
   },
   "dependencies": {
-    "@remotion/cli": "4.0.501",
+    "@remotion/cli": "4.0.518",
     "@remotion/google-fonts": "^4.0.501",
     "@remotion/tailwind-v4": "4.0.501",
     "class-variance-authority": "^0.7.1",
