@@ -201,7 +201,7 @@
         "tw-animate-css": "^1.4.0",
       },
       "devDependencies": {
-        "@remotion/eslint-config-flat": "4.0.501",
+        "@remotion/eslint-config-flat": "4.0.518",
         "@types/react": "19.2.18",
         "@types/web": "0.0.166",
         "eslint": "10.8.0",
@@ -774,7 +774,7 @@
 
     "@remotion/drag-and-drop": ["@remotion/drag-and-drop@4.0.501", "", {}, "sha512-vJcUwNbowfU/fC2ubj/TSrNZgga+BFubxzX+K4SDAsi4PqQm5vBtwOgvG3xZDEjL1Nu1SiBSJ3C1UqvoLOqwQw=="],
 
-    "@remotion/eslint-config-flat": ["@remotion/eslint-config-flat@4.0.501", "", { "dependencies": { "typescript-eslint": "8.21.0" }, "peerDependencies": { "eslint": ">=9" } }, "sha512-TZT1ETrOewqFatsbo3r6U84/1VxkOf/FzjhuWet9VqTogAUGdJJQESEzX/sa375gdKGQ6Piwl56NKa2JZVLwOA=="],
+    "@remotion/eslint-config-flat": ["@remotion/eslint-config-flat@4.0.518", "", { "dependencies": { "typescript-eslint": "8.21.0" }, "peerDependencies": { "eslint": ">=9" } }, "sha512-B+i8xyY/Ld7EIT8nLZSVpPFT/XzDhwK43M1lFiuA+MUHYjpWTi8PIYp0Jm3axt/yd+AWXEMu1K8datF5m8HbZA=="],
 
     "@remotion/google-fonts": ["@remotion/google-fonts@4.0.507", "", { "dependencies": { "remotion": "4.0.507" } }, "sha512-PuNm8skWh8haY8YLpD6WZm34O8ElQ9llt+lgAniF49tIaYWDUvdBPQYZEuAeVbGBtZaiRjcpwEDIb9rQgj2/TQ=="],
 
