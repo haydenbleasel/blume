@@ -573,6 +573,8 @@ const remoteFontSchema = z.strictObject({
   provider: z
     .enum(["google", "fontsource", "bunny", "fontshare"])
     .default("google"),
+  /** Character subsets to load; defaults to `latin` plus the locales' scripts. */
+  subsets: z.array(z.string().min(1)).nonempty().optional(),
   weights: z
     .array(
       z.union([z.number().int().positive(), z.string().regex(/^\d+\.\.\d+$/u)])

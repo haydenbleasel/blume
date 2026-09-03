@@ -2,7 +2,8 @@
 // Emits the optimized @font-face declarations + preload links for each
 // configured font (Astro's Fonts API). Renders nothing when no fonts are set;
 // the CSS variables match the astro.config `fonts:` entries. Preloads are
-// narrowed to the weights above-the-fold text renders in (see
+// narrowed to the weights above-the-fold text renders in and, for providers
+// that split faces by subset, to the subsets the site's locales need (see
 // `theme/fonts.ts`); a bare string entry — an older generated template — keeps
 // the previous preload-everything behavior.
 import { Font } from "astro:assets";
@@ -14,16 +15,22 @@ interface Props {
 
 const { cssVars } = Astro.props;
 
+/** The preload filters for one head entry: every weight × every subset. */
+const preloadFilters = (head: FontHead) =>
+  head.preloadWeights.flatMap((weight) =>
+    head.preloadSubsets
+      ? head.preloadSubsets.map((subset) => ({
+          style: "normal" as const,
+          subset,
+          weight,
+        }))
+      : [{ style: "normal" as const, weight }]
+  );
+
 const entries = cssVars.map((value) =>
   typeof value === "string"
     ? { cssVariable: value, preload: true as const }
-    : {
-        cssVariable: value.cssVariable,
-        preload: value.preloadWeights.map((weight) => ({
-          style: "normal" as const,
-          weight,
-        })),
-      }
+    : { cssVariable: value.cssVariable, preload: preloadFilters(value) }
 );
 ---
 

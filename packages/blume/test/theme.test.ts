@@ -11,6 +11,7 @@ import {
   buildFontEntries,
   buildFontsCss,
   configuredFonts,
+  localeFontSubsets,
   slugifyFontName,
 } from "../src/theme/fonts.ts";
 import { hasIcon, resolveIcon } from "../src/theme/icons.ts";
@@ -281,6 +282,7 @@ describe("buildFontEntries", () => {
       kind: "remote",
       name: "IBM Plex Mono",
       provider: "google",
+      subsets: ["latin"],
       weights: [400, 500, 600],
     });
   });
@@ -309,6 +311,7 @@ describe("buildFontEntries", () => {
       kind: "remote",
       name: "Noto Sans JP",
       provider: "google",
+      subsets: ["latin"],
       weights: [400, 500, 600, 700],
     });
   });
@@ -328,6 +331,7 @@ describe("buildFontEntries", () => {
       kind: "remote",
       name: "Supreme",
       provider: "fontsource",
+      subsets: ["latin"],
       weights: [400, "100..900"],
     });
   });
@@ -393,6 +397,75 @@ describe("buildFontEntries", () => {
       })
     ).toThrow(/conflicts/u);
   });
+
+  it("loads the subsets the configured locales need", () => {
+    const [entry] = buildFontEntries({ body: "inter" }, ["en", "vi"]);
+    expect(entry).toMatchObject({
+      name: "Inter",
+      subsets: ["latin", "vietnamese"],
+    });
+  });
+
+  it("keeps a remote family's own subsets over the locale default", () => {
+    const [entry] = buildFontEntries(
+      { body: { name: "Noto Sans JP", subsets: ["japanese", "latin"] } },
+      ["vi"]
+    );
+    expect(entry).toMatchObject({ subsets: ["japanese", "latin"] });
+  });
+
+  it("unions subsets when roles share a family with different subsets", () => {
+    const entries = buildFontEntries({
+      body: { name: "Inter", subsets: ["latin", "greek"] },
+      display: { name: "Inter", subsets: ["latin", "cyrillic"] },
+    });
+    expect(entries).toHaveLength(1);
+    // Roles resolve display-first, so display's subsets lead the union.
+    expect(entries[0]).toMatchObject({
+      subsets: ["latin", "cyrillic", "greek"],
+    });
+  });
+});
+
+describe("localeFontSubsets", () => {
+  it("defaults to latin alone with no locales or Latin-1 languages", () => {
+    expect(localeFontSubsets([])).toStrictEqual(["latin"]);
+    expect(localeFontSubsets(["en", "fr", "de", "es"])).toStrictEqual([
+      "latin",
+    ]);
+  });
+
+  it("adds each locale's script in Google's listing order", () => {
+    expect(localeFontSubsets(["el", "vi", "ru", "pl"])).toStrictEqual([
+      "latin",
+      "latin-ext",
+      "vietnamese",
+      "cyrillic",
+      "greek",
+    ]);
+    expect(localeFontSubsets(["kk"])).toStrictEqual([
+      "latin",
+      "cyrillic",
+      "cyrillic-ext",
+    ]);
+  });
+
+  it("reads script subtags and ignores region and case", () => {
+    expect(localeFontSubsets(["az-Cyrl"])).toStrictEqual([
+      "latin",
+      "latin-ext",
+      "cyrillic",
+    ]);
+    expect(localeFontSubsets(["sr-Latn-RS"])).toStrictEqual([
+      "latin",
+      "latin-ext",
+      "cyrillic",
+    ]);
+    expect(localeFontSubsets(["VI", "pt-BR"])).toStrictEqual([
+      "latin",
+      "vietnamese",
+    ]);
+  });
 });
 
 describe("buildFontsCss", () => {
@@ -442,8 +515,16 @@ describe("configuredFonts", () => {
     expect(
       configuredFonts({ body: "inter", display: "inter", mono: "geist-mono" })
     ).toStrictEqual([
-      { cssVariable: "--blume-ff-inter", preloadWeights: [400, 500, 600] },
-      { cssVariable: "--blume-ff-geist-mono", preloadWeights: [400] },
+      {
+        cssVariable: "--blume-ff-inter",
+        preloadSubsets: ["latin"],
+        preloadWeights: [400, 500, 600],
+      },
+      {
+        cssVariable: "--blume-ff-geist-mono",
+        preloadSubsets: ["latin"],
+        preloadWeights: [400],
+      },
     ]);
   });
 
@@ -451,7 +532,11 @@ describe("configuredFonts", () => {
     // Merriweather only ships 400/700 — neither display preference (500/600)
     // exists, so both of its faces preload (they're what headings render in).
     expect(configuredFonts({ display: "merriweather" })).toStrictEqual([
-      { cssVariable: "--blume-ff-merriweather", preloadWeights: [400, 700] },
+      {
+        cssVariable: "--blume-ff-merriweather",
+        preloadSubsets: ["latin"],
+        preloadWeights: [400, 700],
+      },
     ]);
   });
 
@@ -459,7 +544,11 @@ describe("configuredFonts", () => {
     expect(
       configuredFonts({ body: { name: "Custom Var", weights: ["100..900"] } })
     ).toStrictEqual([
-      { cssVariable: "--blume-ff-custom-var", preloadWeights: [400, 500] },
+      {
+        cssVariable: "--blume-ff-custom-var",
+        preloadSubsets: ["latin"],
+        preloadWeights: [400, 500],
+      },
     ]);
   });
 
@@ -486,6 +575,33 @@ describe("configuredFonts", () => {
 
   it("skips unset roles and unknown slug strings", () => {
     expect(configuredFonts({ body: "not-a-real-slug" })).toStrictEqual([]);
+  });
+
+  it("preloads the locale-derived subsets for subset-split providers", () => {
+    expect(configuredFonts({ body: "inter" }, ["vi"])).toStrictEqual([
+      {
+        cssVariable: "--blume-ff-inter",
+        preloadSubsets: ["latin", "vietnamese"],
+        preloadWeights: [400, 500],
+      },
+    ]);
+  });
+
+  it("unions subsets across roles and skips the filter for Fontshare", () => {
+    expect(
+      configuredFonts({
+        body: { name: "Inter", subsets: ["latin", "greek"] },
+        display: { name: "Inter", subsets: ["latin", "cyrillic"] },
+        mono: { name: "JetBrains Mono", provider: "fontshare" },
+      })
+    ).toStrictEqual([
+      {
+        cssVariable: "--blume-ff-inter",
+        preloadSubsets: ["latin", "cyrillic", "greek"],
+        preloadWeights: [400, 500, 600],
+      },
+      { cssVariable: "--blume-ff-jetbrains-mono", preloadWeights: [400] },
+    ]);
   });
 });
 
@@ -538,6 +654,24 @@ describe("theme.fonts schema", () => {
       provider: "google",
       weights: [400, 700],
     });
+  });
+
+  it("keeps a remote family's subsets and rejects an empty list", () => {
+    const theme = themeOf({
+      fonts: {
+        body: { name: "Be Vietnam Pro", subsets: ["latin", "vietnamese"] },
+      },
+    });
+    expect(theme.fonts.body).toStrictEqual({
+      name: "Be Vietnam Pro",
+      provider: "google",
+      subsets: ["latin", "vietnamese"],
+    });
+    expect(
+      blumeConfigSchema.safeParse({
+        theme: { fonts: { body: { name: "Be Vietnam Pro", subsets: [] } } },
+      }).success
+    ).toBeFalsy();
   });
 
   it("accepts a local family with variants", () => {

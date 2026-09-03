@@ -105,7 +105,24 @@ theme: {
 - **`name`** — the family name exactly as the provider lists it.
 - **`provider`** — where the family comes from: `google` (default), `fontsource`, `bunny`, or `fontshare`.
 - **`weights`** — the weights to load, as numbers or a variable range like `"100..900"`. Defaults to `[400, 500, 600, 700]`.
+- **`subsets`** — the character subsets to load, by the provider's names (`latin`, `latin-ext`, `vietnamese`, `cyrillic`, `greek`, …). Defaults to `latin` plus whatever your configured locales need — see below.
 - **`fallback`** — the system stack shown while the font loads and for missing glyphs: `sans`, `serif`, or `mono`. Defaults to `mono` for the mono role and `sans` otherwise.
+
+#### Subsets and locales
+
+Google, Bunny, and Fontsource split each family into per-script subsets, and only the subsets you load get a `@font-face`. Blume derives the list from your [`i18n.locales`](/docs/content/i18n): a site with Vietnamese, Polish, Russian, or Greek locales loads `vietnamese`, `latin-ext`, `cyrillic`, or `greek` alongside `latin`, so diacritics and non-Latin letters render in your chosen font instead of the system fallback. Sites without an `i18n` block, or with only Latin-1 languages, load `latin` alone. Browsers download a subset only when a page uses its characters, and preloads follow the same list.
+
+Set `subsets` on a family to override the derived list — say, for a single-locale site whose content still needs a script its locale doesn't imply:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    body: { name: "Be Vietnam Pro", subsets: ["latin", "vietnamese"] },
+  },
+}
+```
+
+Curated slugs like `inter` follow the locale-derived list; use the object form to pin subsets for those families too.
 
 #### Local font files
 

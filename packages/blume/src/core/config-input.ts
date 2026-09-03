@@ -511,6 +511,11 @@ export interface RemoteFontInput {
   name: string;
   /** Which provider serves the family. Defaults to `google`. */
   provider?: "google" | "fontsource" | "bunny" | "fontshare";
+  /**
+   * Character subsets to load (`"latin"`, `"vietnamese"`, `"cyrillic"`, …).
+   * Defaults to `latin` plus whatever the configured locales need.
+   */
+  subsets?: string[];
   /** Weights (or variable ranges like `"100..900"`) to load. Defaults to `[400, 500, 600, 700]`. */
   weights?: (number | string)[];
 }

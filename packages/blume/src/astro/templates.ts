@@ -17,7 +17,7 @@ import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
 import type { OgFont, OgFontFamilies } from "../og/card.ts";
 import { hasScalarReferences } from "../openapi/references.ts";
 import { searchProviderMeta } from "../search/providers.ts";
-import { buildFontEntries } from "../theme/fonts.ts";
+import { buildFontEntries, fontLocaleCodes } from "../theme/fonts.ts";
 import type { ExampleSpec } from "./examples.ts";
 import type { BlumePageRoute } from "./integration.ts";
 import type { IslandSpec } from "./islands.ts";
@@ -525,7 +525,12 @@ export const astroConfigTemplate = (options: {
   // `fontProviders` is only imported when at least one font is configured.
   // Local variant sources are emitted as absolute paths (the Astro root is
   // `.blume/`, not the user's project, so root-relative paths would miss).
-  const fontEntries = buildFontEntries(config.theme.fonts);
+  // Subsets follow the configured locales (a Vietnamese site loads the
+  // `vietnamese` faces) unless a family pins its own.
+  const fontEntries = buildFontEntries(
+    config.theme.fonts,
+    fontLocaleCodes(config.i18n)
+  );
   const fontsOption = fontEntries.length
     ? `\n  fonts: [${fontEntries
         .map((font) =>
@@ -561,6 +566,8 @@ export const astroConfigTemplate = (options: {
                 font.cssVariable
               )}, weights: ${JSON.stringify(
                 font.weights
+              )}, subsets: ${JSON.stringify(
+                font.subsets
               )}, fallbacks: ${JSON.stringify(font.fallbacks)} }`
         )
         .join(", ")}],`

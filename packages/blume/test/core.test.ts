@@ -405,6 +405,40 @@ describe("astro config template", () => {
     );
   });
 
+  it("emits latin-only subsets for a single-locale site", () => {
+    const output = configTemplate(blumeConfigSchema.parse({}));
+    expect(output).toContain('subsets: ["latin"]');
+    expect(output).not.toContain("vietnamese");
+  });
+
+  it("derives font subsets from the configured locales", () => {
+    const output = configTemplate(
+      blumeConfigSchema.parse({
+        i18n: {
+          defaultLocale: "vi",
+          locales: [
+            { code: "vi", label: "Tiếng Việt" },
+            { code: "en", label: "English" },
+          ],
+        },
+      })
+    );
+    expect(output).toContain('subsets: ["latin","vietnamese"]');
+  });
+
+  it("keeps a remote family's pinned subsets", () => {
+    const output = configTemplate(
+      blumeConfigSchema.parse({
+        theme: {
+          fonts: { body: { name: "Noto Sans JP", subsets: ["japanese"] } },
+        },
+      })
+    );
+    expect(output).toContain(
+      'name: "Noto Sans JP", cssVariable: "--blume-ff-noto-sans-jp", weights: [400,500,600,700], subsets: ["japanese"]'
+    );
+  });
+
   it("emits non-Google remote providers by name", () => {
     const output = configTemplate(
       blumeConfigSchema.parse({
