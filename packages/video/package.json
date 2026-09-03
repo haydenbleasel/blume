@@ -22,7 +22,7 @@
     "culori": "^4.0.2",
     "lucide-react": "^1.22.0",
     "react": "19.2.8",
-    "react-dom": "19.2.3",
+    "react-dom": "19.2.8",
     "remotion": "4.0.501",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "4.3.3",
