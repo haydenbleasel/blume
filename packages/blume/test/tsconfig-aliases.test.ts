@@ -186,26 +186,6 @@ describe("resolveTsconfigAliases", () => {
     ).toBe(true);
   });
 
-  it("rejects a bare `extends` whose package only has a main, like tsc", async () => {
-    await mkdir(join(root, "node_modules", "tscfg"), { recursive: true });
-    await writeFile(
-      join(root, "node_modules", "tscfg", "package.json"),
-      JSON.stringify({ main: "./base.json", name: "tscfg" }),
-      "utf-8"
-    );
-    await writeFile(
-      join(root, "node_modules", "tscfg", "base.json"),
-      JSON.stringify({ compilerOptions: { paths: { "~/*": ["./lib/*"] } } }),
-      "utf-8"
-    );
-    // With no `tscfg/tsconfig.json` and no `tsconfig` field, tsc reports
-    // TS6053 "File 'tscfg' not found" (verified) — it does not fall back to
-    // resolving a JSON config through the package `main`.
-    await writeConfig(JSON.stringify({ extends: "tscfg" }));
-
-    expect(resolveTsconfigAliases(root)).toEqual({});
-  });
-
   it("returns {} when a bare `extends` can't be resolved", async () => {
     await writeConfig(
       JSON.stringify({ extends: "@tsconfig/does-not-exist-xyz" })

@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 
-import { parseTsconfig } from "get-tsconfig";
+import { readTsconfig } from "get-tsconfig";
 import { dirname, join, resolve } from "pathe";
 
 /**
@@ -72,9 +72,9 @@ export const resolveTsconfigAliases = (
   if (!entry) {
     return {};
   }
-  let options: ReturnType<typeof parseTsconfig>["compilerOptions"];
+  let options: ReturnType<typeof readTsconfig>["config"]["compilerOptions"];
   try {
-    options = parseTsconfig(entry).compilerOptions;
+    options = readTsconfig(entry).config.compilerOptions;
   } catch {
     // Unparseable config or unresolvable extends: no aliases, as before.
     return {};
