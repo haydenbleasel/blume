@@ -38,7 +38,7 @@ Links de fragmento também podem apontar para um elemento HTML puro com um `id` 
 
 ### Marcadores do índice
 
-Outros dois marcadores finais controlam como um título aparece no índice. `[!toc]` mantém o título na página, mas fora do índice; `[toc]` faz o contrário — o título aparece apenas no índice, como um alvo de âncora invisível, o que é útil para rotular seções construídas com componentes em vez de prosa. Os marcadores podem ser encadeados em qualquer ordem.
+Outros dois marcadores finais controlam como um título aparece no índice. `[!toc]` mantém o título na página, mas fora do índice; `[toc]` faz o contrário — o título aparece apenas no índice, como um alvo de âncora invisível, o que é útil para rotular seções construídas com componentes em vez de prosa. Os marcadores podem ser encadeados em qualquer ordem. Uma exceção, herdada do CommonMark: um colchete final cujo rótulo tenha uma definição de referência de link em qualquer lugar da página (`[toc]: /url`) é um link de referência abreviado, não um marcador, e permanece no texto do título.
 
 ```md
 ## Appears on the page only [!toc]
@@ -611,7 +611,7 @@ $$
 ```
 
 :::note
-A matemática funciona apenas em bloco e está ativa automaticamente — escreva `$$…$$` e ela é renderizada; não escreva nenhuma e a folha de estilo do KaTeX nunca é enviada. Não existe matemática inline com `$…$`: um `$` isolado (moeda, variáveis de shell, código) é sempre mantido como texto literal, então não há delimitador para escapar nem configuração para alternar. A matemática é um recurso exclusivo do MDX.
+A matemática funciona apenas em bloco e está ativa automaticamente — escreva `$$…$$` e ela é renderizada; não escreva nenhuma e a folha de estilo do KaTeX nunca é enviada. Não existe matemática inline com `$…$`: um `$` isolado (moeda, variáveis de shell, código) é sempre mantido como texto literal, então não há delimitador para escapar nem configuração para alternar. A matemática é um recurso exclusivo do MDX. Os nomes de classe dentro da marcação renderizada (`.katex-html`, `.katex-base`, …) são internos do próprio KaTeX, não um contrato de estilização que o Blume mantém — eles podem mudar quando o KaTeX for atualizado, então mire no wrapper `.katex-display` para estilos personalizados.
 :::
 
 ## Pontuação inteligente

@@ -38,7 +38,7 @@ Fragment-Links können auch auf ein rohes HTML-Element mit einer `id` zeigen (`<
 
 ### Inhaltsverzeichnis-Marker
 
-Zwei weitere nachgestellte Marker steuern, wie eine Überschrift im Inhaltsverzeichnis erscheint. `[!toc]` behält eine Überschrift auf der Seite, hält sie aber aus dem Inhaltsverzeichnis heraus; `[toc]` macht das Gegenteil — die Überschrift erscheint nur im Inhaltsverzeichnis, als unsichtbares Ankerziel, was nützlich ist, um Abschnitte zu beschriften, die aus Komponenten statt aus Fließtext aufgebaut sind. Marker lassen sich in beliebiger Reihenfolge aneinanderreihen.
+Zwei weitere nachgestellte Marker steuern, wie eine Überschrift im Inhaltsverzeichnis erscheint. `[!toc]` behält eine Überschrift auf der Seite, hält sie aber aus dem Inhaltsverzeichnis heraus; `[toc]` macht das Gegenteil — die Überschrift erscheint nur im Inhaltsverzeichnis, als unsichtbares Ankerziel, was nützlich ist, um Abschnitte zu beschriften, die aus Komponenten statt aus Fließtext aufgebaut sind. Marker lassen sich in beliebiger Reihenfolge aneinanderreihen. Eine Ausnahme, geerbt von CommonMark: Eine nachgestellte Klammer, deren Label irgendwo auf der Seite eine Link-Referenzdefinition besitzt (`[toc]: /url`), ist ein Shortcut-Referenzlink und kein Marker — sie bleibt im Überschriftentext stehen.
 
 ```md
 ## Appears on the page only [!toc]
@@ -611,7 +611,7 @@ $$
 ```
 
 :::note
-Mathematik gibt es nur als Block und sie ist automatisch aktiv — schreibe `$$…$$` und es wird gerendert; schreibst du keine, wird das Stylesheet von KaTeX nie ausgeliefert. Inline-Mathematik mit `$…$` gibt es nicht: Ein einzelnes `$` (Währung, Shell-Variablen, Code) bleibt immer wörtlicher Text, es gibt also kein Trennzeichen zu escapen und keine Einstellung zum Umschalten. Mathematik ist eine reine MDX-Funktion.
+Mathematik gibt es nur als Block und sie ist automatisch aktiv — schreibe `$$…$$` und es wird gerendert; schreibst du keine, wird das Stylesheet von KaTeX nie ausgeliefert. Inline-Mathematik mit `$…$` gibt es nicht: Ein einzelnes `$` (Währung, Shell-Variablen, Code) bleibt immer wörtlicher Text, es gibt also kein Trennzeichen zu escapen und keine Einstellung zum Umschalten. Mathematik ist eine reine MDX-Funktion. Die Klassennamen im gerenderten Markup (`.katex-html`, `.katex-base`, …) sind KaTeX-eigene Interna und kein Styling-Vertrag, den Blume pflegt — sie können sich bei einem KaTeX-Upgrade ändern, ziele für eigene Styles also auf den `.katex-display`-Wrapper.
 :::
 
 ## Intelligente Interpunktion
