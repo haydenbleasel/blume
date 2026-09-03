@@ -285,6 +285,30 @@ github: {
 | `repo` | — | Repository name. |
 | `branch` | `"main"` | Branch that edit links point at. |
 | `dir` | — | Path from the repo root to the project root (for monorepos). |
+| `host` | `"https://github.com"` | Origin of the GitHub instance, for Enterprise installations. Must be HTTP(S); normalized to its origin. |
+| `api` | derived from `host` | REST API base, for `<GithubInfo>` against an Enterprise instance. Must be HTTP(S); normalized to an origin and path. |
+
+### GitHub Enterprise
+
+Docs whose repository lives on a GitHub Enterprise instance set `host`, and every repo-derived link — the header mark, edit links, the agent manifest — points at that instance instead of the public site:
+
+```ts blume.config.ts lineNumbers
+github: {
+  host: "https://github.acme.com",
+  owner: "acme",
+  repo: "docs",
+}
+```
+
+The REST API base that [`<GithubInfo>`](/docs/content/components) queries is derived from `host`: an Enterprise Cloud tenant with data residency (`acme.ghe.com`) is served from its `api.` subdomain, and any other host is treated as Enterprise Server (`/api/v3`). Set `api` explicitly when your instance sits somewhere else.
+
+:::warning
+An instance reachable only over plain HTTP still renders its counts, but `GITHUB_TOKEN` is withheld from the request rather than sent in cleartext — so a private repo's card comes back without them.
+:::
+
+:::note
+`host` covers links Blume derives from `github`. To point only the header mark somewhere else — an organization, say, when the docs repo itself is private — use [`navigation.repo`](/docs/content/navigation#repository-link) with an absolute URL.
+:::
 
 ## Last modified
 

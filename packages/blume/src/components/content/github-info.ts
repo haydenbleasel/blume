@@ -7,6 +7,8 @@
  * than throwing, so a card never breaks the build when the API is unreachable.
  */
 
+import { PUBLIC_API_URL } from "../../core/github.ts";
+
 export interface RepositoryInfo {
   description: string | null;
   forks: number;
@@ -20,18 +22,31 @@ export interface FetchRepositoryOptions {
   token?: string;
 }
 
-const DEFAULT_BASE_URL = "https://api.github.com";
-
 /** In-process dedupe so the same repo is fetched once per build. */
 const cache = new Map<string, Promise<RepositoryInfo | null>>();
+
+/** Cleartext bases already warned about, so a site of cards logs once. */
+const warnedCleartext = new Set<string>();
 
 const load = async (
   options: FetchRepositoryOptions
 ): Promise<RepositoryInfo | null> => {
-  const { baseUrl = DEFAULT_BASE_URL, owner, repo, token } = options;
+  const { baseUrl = PUBLIC_API_URL, owner, repo, token } = options;
   const headers = new Headers({ Accept: "application/vnd.github+json" });
+  // An Enterprise instance can be configured on plain HTTP; a bearer token is
+  // never worth putting on the wire in cleartext, so it is dropped rather than
+  // sent. The request still goes out — a public repo's counts render either way
+  // — but a private repo's card comes back bare, which looks exactly like a
+  // network failure, so say why once per base.
   if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+    if (new URL(baseUrl).protocol === "https:") {
+      headers.set("Authorization", `Bearer ${token}`);
+    } else if (!warnedCleartext.has(baseUrl)) {
+      warnedCleartext.add(baseUrl);
+      console.warn(
+        `[blume] <GithubInfo> is not sending its token to ${baseUrl}: the API base is plain HTTP, so the bearer token would travel in cleartext. Counts for a private repository will be missing; serve the API over https to authenticate.`
+      );
+    }
   }
 
   const response = await fetch(`${baseUrl}/repos/${owner}/${repo}`, {
@@ -69,7 +84,7 @@ const loadSafe = async (
 export const fetchRepositoryInfo = (
   options: FetchRepositoryOptions
 ): Promise<RepositoryInfo | null> => {
-  const key = `${options.baseUrl ?? DEFAULT_BASE_URL}/${options.owner}/${options.repo}`;
+  const key = `${options.baseUrl ?? PUBLIC_API_URL}/${options.owner}/${options.repo}`;
   const existing = cache.get(key);
   if (existing) {
     return existing;

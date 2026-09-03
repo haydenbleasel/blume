@@ -11,17 +11,16 @@ const repoUrl = config.repoUrl;
 const docsHref = "/docs";
 const chevronRight = glyph("chevron-right");
 
-// Latest GitHub release for the hero badge, resolved at build time. Falls back
-// to 0.0.0 when there's no release — or the API is unreachable/rate-limited — so
-// the build never fails on a network hiccup.
-const repoMatch = repoUrl?.match(
-  /github\.com\/(?<owner>[^/]+)\/(?<repo>[^/]+?)(?:\.git)?\/?$/u
-);
+// Latest GitHub release for the hero badge, resolved at build time from the
+// configured repo (`data.config.github` carries the owner, repo, and API base).
+// Falls back to 0.0.0 when there's no release — or the API is unreachable or
+// rate-limited — so the build never fails on a network hiccup.
+const github = config.github;
 let latestVersion = "0.0.0";
-if (repoMatch?.groups) {
+if (github) {
   try {
     const response = await fetch(
-      `https://api.github.com/repos/${repoMatch.groups.owner}/${repoMatch.groups.repo}/releases/latest`,
+      `${github.api}/repos/${github.owner}/${github.repo}/releases/latest`,
       {
         headers: {
           Accept: "application/vnd.github+json",

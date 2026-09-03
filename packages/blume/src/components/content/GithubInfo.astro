@@ -3,6 +3,7 @@
 // at build time (no client JS). Pass `owner`/`repo`, or omit them to use the
 // repo from blume.config. A `GITHUB_TOKEN` env var lifts the API rate limit.
 // If the API is unreachable the card still renders, just without counts.
+import { apiUrl, PUBLIC_HOST_URL } from "../../core/github.ts";
 import { resolveIcon } from "../../theme/icons.ts";
 import data from "blume:data";
 import { GITHUB_MARK } from "../github-mark.ts";
@@ -15,22 +16,40 @@ const starIcon = resolveIcon("star")?.body ?? "";
 const forkIcon = resolveIcon("git-fork")?.body ?? "";
 
 interface Props {
+  /**
+   * Origin of the GitHub instance the card's repo lives on. Defaults to the
+   * configured `github.host`, so a card on an Enterprise site reads that
+   * instance; set it to point one card elsewhere — `https://github.com` for a
+   * public project from an Enterprise-hosted docs site, say. The REST base is
+   * derived from it the same way `github.api` is derived from `github.host`.
+   */
+  host?: string;
   owner?: string;
   repo?: string;
   token?: string;
 }
 
-// The resolved config exposes the repo as `repoUrl`, not `github`; parse the
-// owner/repo back out so <GithubInfo /> can default to the configured repo.
-const repoMatch = data.config.repoUrl?.match(
-  /github\.com\/(?<owner>[^/]+)\/(?<repo>[^/]+)/u
-);
-const owner = Astro.props.owner ?? repoMatch?.groups?.owner;
-const repo = Astro.props.repo ?? repoMatch?.groups?.repo;
+// `data.config.github` carries the configured repo's coordinates, so the card
+// defaults to it and addresses the right instance — an Enterprise host serves
+// both the link and the API from somewhere other than github.com. Explicit
+// `owner`/`repo` props are read against that same instance unless `host`
+// points them somewhere else; with no `github` configured at all, they fall
+// back to the public one.
+const configured = data.config.github;
+const owner = Astro.props.owner ?? configured?.owner;
+const repo = Astro.props.repo ?? configured?.repo;
 const token = Astro.props.token ?? process.env.GITHUB_TOKEN;
+// A `host` prop is reduced to its origin, as the config field is, so a
+// trailing slash or a path never lands mid-link.
+const host = Astro.props.host
+  ? new URL(Astro.props.host).origin
+  : (configured?.host ?? PUBLIC_HOST_URL);
+const baseUrl = Astro.props.host ? apiUrl({ host }) : configured?.api;
 
 const info =
-  owner && repo ? await fetchRepositoryInfo({ owner, repo, token }) : null;
+  owner && repo
+    ? await fetchRepositoryInfo({ baseUrl, owner, repo, token })
+    : null;
 
 // Compact notation matches GitHub's own counts (e.g. 1.2k, 34.5k).
 const numbers = new Intl.NumberFormat("en", {
@@ -46,7 +65,7 @@ const statIcon =
   owner && repo && (
     <a
       class="not-prose my-6 flex flex-col gap-2 rounded-blume border border-border p-4 no-underline! transition-colors hover:border-foreground/30 hover:bg-muted/40"
-      href={`https://github.com/${owner}/${repo}`}
+      href={`${host}/${owner}/${repo}`}
       rel="noreferrer"
       target="_blank"
     >

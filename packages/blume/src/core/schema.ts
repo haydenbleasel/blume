@@ -7,11 +7,21 @@ import { normalizeRoute } from "../openapi/references.ts";
 import { normalizeXHandle } from "../seo/x-handle.ts";
 import { FONT_SLUGS, isFontSlug } from "../theme/fonts.ts";
 import { normalizeBasePath } from "./base-path.ts";
+import { PUBLIC_HOST_URL } from "./github.ts";
 import { uiLocaleOverridesSchema } from "./i18n-ui.ts";
 import { openInChatProviders } from "./open-in-chat.ts";
 import type { ContentSource } from "./sources/types.ts";
 import { isStandardSchema } from "./standard-schema.ts";
 import type { StandardSchema } from "./standard-schema.ts";
+import { trimEnd } from "./trim.ts";
+
+/**
+ * An absolute HTTP(S) URL, for any field that lands verbatim in an `href` —
+ * the header repo mark, the GitHub instance origin. Zod's bare `z.url()` also
+ * admits `javascript:` and `data:`, which would render as a script link on
+ * every page.
+ */
+const httpUrlSchema = z.url({ protocol: /^https?$/u });
 
 /**
  * Public Blume schemas.
@@ -1012,7 +1022,7 @@ const navigationConfigSchema = z.strictObject({
    * to stay unset. The mark stays the GitHub one, so a URL elsewhere belongs in
    * `actions`.
    */
-  repo: z.union([z.boolean(), z.url()]).default(true),
+  repo: z.union([z.boolean(), httpUrlSchema]).default(true),
   selectors: z.array(navSelectorSchema).default([]),
   /**
    * Sidebar behavior. `display` sets how every group renders (a group in an
@@ -1478,10 +1488,36 @@ const seoConfigSchema = z.strictObject({
   x: xConfigSchema.default({}),
 });
 
+/**
+ * The GitHub instance's origin, normalized. Repo, edit, and API URLs are all
+ * built by appending to this, so it is reduced to a bare origin: a trailing
+ * slash would double the separator, and a path, query, fragment, or embedded
+ * credentials would land in the middle of every generated link.
+ */
+const githubOriginSchema = httpUrlSchema.transform(
+  (value) => new URL(value).origin
+);
+
+/**
+ * A REST API base: an origin plus an optional path, since Enterprise Server
+ * serves the API from `/api/v3`. Anything past the path is dropped for the same
+ * reason the host is reduced — `/repos/{owner}/{repo}` is appended as a string,
+ * so a query would swallow the route and a fragment would strip it from the
+ * request entirely, leaving a lookup that silently returns the wrong thing.
+ */
+const githubApiSchema = httpUrlSchema.transform((value) => {
+  const { origin, pathname } = new URL(value);
+  return trimEnd(`${origin}${pathname}`, "/");
+});
+
 const githubConfigSchema = z.strictObject({
+  /** REST API base. Derived from `host` when unset. */
+  api: githubApiSchema.optional(),
   branch: z.string().default("main"),
   /** Path from the repo root to the project root (for monorepos). */
   dir: z.string().optional(),
+  /** Origin of the GitHub instance, for Enterprise installations. */
+  host: githubOriginSchema.default(PUBLIC_HOST_URL),
   owner: z.string(),
   repo: z.string(),
 });

@@ -1290,10 +1290,27 @@ export interface SeoConfig {
 
 /** Source repository, powering "Edit this page" links and the header repo link. */
 export interface GithubConfig {
+  /**
+   * REST API base, for a `<GithubInfo>` card against an Enterprise instance.
+   * Derived from `host` when unset: `api.github.com` for github.com, an `api.`
+   * subdomain for an Enterprise Cloud data-residency tenant, and `/api/v3` for
+   * Enterprise Server. Must be an HTTP(S) URL, and is reduced to an origin plus
+   * its path — the repository route is appended to it.
+   */
+  api?: string;
   /** Default branch. Defaults to `main`. */
   branch?: string;
   /** Path from the repo root to the project root (for monorepos). */
   dir?: string;
+  /**
+   * Origin of the GitHub instance the repo lives on. Defaults to
+   * `https://github.com`; set it to an Enterprise host (for example
+   * `https://github.acme.com` or `https://acme.ghe.com`) so the header link,
+   * edit links, and the agent manifest point at that instance. Must be an
+   * HTTP(S) URL, and is reduced to its origin — every repo URL is built by
+   * appending to it.
+   */
+  host?: string;
   /** Repository owner (user or org). */
   owner: string;
   /** Repository name. */

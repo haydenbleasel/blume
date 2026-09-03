@@ -583,6 +583,57 @@ describe("buildRuntimeData", () => {
     expect(note.editUrl).toBeNull();
   });
 
+  it("normalizes an enterprise host to its origin", async () => {
+    const root = await writeProject({
+      "blume.config.ts": `export default {
+  github: {
+    host: "https://acme.ghe.com/",
+    owner: "acme",
+    repo: "docs",
+  },
+};
+`,
+      "docs/index.md": "# Home\n",
+    });
+    const project = await scanProject(root);
+    const data = JSON.parse(buildRuntimeData(project));
+    // A trailing slash would double the separator in every link built by
+    // appending to the raw host — the <GithubInfo> card's href among them.
+    expect(data.config.github.host).toBe("https://acme.ghe.com");
+    expect(data.config.repoUrl).toBe("https://acme.ghe.com/acme/docs");
+  });
+
+  it("points repo, edit, and api urls at an enterprise host", async () => {
+    const root = await writeProject({
+      "blume.config.ts": `export default {
+  github: {
+    host: "https://acme.ghe.com",
+    owner: "acme",
+    repo: "docs",
+  },
+};
+`,
+      "docs/index.md": "# Home\n",
+    });
+    const project = await scanProject(root);
+    const data = JSON.parse(buildRuntimeData(project));
+    const home = data.routes.find(
+      (route: { path: string }) => route.path === "/"
+    );
+    expect(data.config.repoUrl).toBe("https://acme.ghe.com/acme/docs");
+    expect(home.editUrl).toBe(
+      "https://acme.ghe.com/acme/docs/edit/main/docs/index.md"
+    );
+    // A data-residency tenant serves its API from an `api.` subdomain, so the
+    // <GithubInfo> card would otherwise query the public one and find nothing.
+    expect(data.config.github).toStrictEqual({
+      api: "https://api.acme.ghe.com",
+      host: "https://acme.ghe.com",
+      owner: "acme",
+      repo: "docs",
+    });
+  });
+
   it("resolves edit urls for a monorepo source above the project dir", async () => {
     const parent = await writeProject({
       "outside/Far.md": "# Far\n",
