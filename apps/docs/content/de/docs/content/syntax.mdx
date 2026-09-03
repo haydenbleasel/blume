@@ -18,6 +18,38 @@ Gliedere eine Seite mit Überschriften. Blume rendert den `title` aus deinem Fro
 #### Detail
 ```
 
+### Eigene Anker
+
+Anker-IDs werden aus dem Überschriftentext erzeugt, eine umformulierte Überschrift bekommt also einen neuen Anker. Hänge stattdessen `[#custom-id]` an, um den Anker festzunageln — der Marker wird nie gerendert, und Links funktionieren weiter, egal wie die Überschrift lautet. Festgenagelte Anker bleiben außerdem über [übersetzte Locales](/docs/content/i18n) hinweg identisch, wo automatisch erzeugte IDs sonst je Sprache abweichen würden.
+
+```md
+## Getting started [#setup]
+```
+
+Verlinke darauf als `/page#setup`. Die Syntax entspricht der von Fumadocs, migrierte Inhalte funktionieren also wortwörtlich.
+
+Die von Pandoc, kramdown und Markdown-basierten Spezifikations-Toolchains verwendete Form `{#custom-id}` wird in `.md`-Dateien als gleichwertig akzeptiert. In `.mdx` ist ein nacktes `{…}` ein JSX-Ausdruck und die Seite lässt sich nicht kompilieren — `blume check` meldet den Marker als `BLUME_MDX_CURLY_ANCHOR` —, schreibe dort also `[#custom-id]` oder escape die geschweiften Klammern. Die escapte Form nagelt in beiden Formaten denselben Anker fest, was sie zur richtigen Schreibweise für ein Partial macht, das `.mdx`-Seiten [einbinden](/docs/content/includes):
+
+```md
+## Getting started \{#setup\}
+```
+
+Fragment-Links können auch auf ein rohes HTML-Element mit einer `id` zeigen (`<a id="setup"></a>`); `blume validate` akzeptiert diese neben Überschriften-Ankern.
+
+### Inhaltsverzeichnis-Marker
+
+Zwei weitere nachgestellte Marker steuern, wie eine Überschrift im Inhaltsverzeichnis erscheint. `[!toc]` behält eine Überschrift auf der Seite, hält sie aber aus dem Inhaltsverzeichnis heraus; `[toc]` macht das Gegenteil — die Überschrift erscheint nur im Inhaltsverzeichnis, als unsichtbares Ankerziel, was nützlich ist, um Abschnitte zu beschriften, die aus Komponenten statt aus Fließtext aufgebaut sind. Marker lassen sich in beliebiger Reihenfolge aneinanderreihen.
+
+```md
+## Appears on the page only [!toc]
+
+## Appears in the TOC only [toc]
+
+## Both markers together [toc] [#custom-id]
+```
+
+Marker werden immer geparst — eine Überschrift, die wörtlich auf markerförmigen Text endet, würde als markiert behandelt. Escapen mit Backslash hilft nicht (Markdown löst `\[` zu `[` auf, bevor der Marker-Parse läuft); um wörtlichen Marker-Text am Ende einer Überschrift zu zeigen, packe ihn in Inline-Code: `` ## Using `[toc]` ``.
+
 ## Betonung
 
 Inline-Formatierung, um Wörter hervorzuheben, Löschungen zu kennzeichnen und Code oder Tastenanschläge mitten im Satz zu zeigen.
@@ -285,6 +317,42 @@ config.title;
 //     ^?
 ```
 ````
+
+### TypeScript- und JavaScript-Tabs
+
+Markiere einen `ts`- oder `tsx`-Block mit `ts2js`, um ihn als Tab-Paar zu rendern: dein TypeScript neben einer automatisch erzeugten JavaScript-Variante — so pflegst du ein einziges Snippet und Leser wählen ihren Dialekt. Die Umwandlung entfernt Typ-Syntax und reine Typ-Imports, behält deine Formatierung, Kommentare und JSX aber exakt so bei, wie du sie geschrieben hast — und die Tabs sind synchronisiert, sodass eine einmalige Wahl von JavaScript jedes Paar auf der Seite umschaltet. Wie Diagramme und Mathematik ist dies eine reine MDX-Funktion — in einer `.md`-Datei rendert der Block als schlichter TypeScript-Fence.
+
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+
+````md
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+````
+
+Weitere Fence-Metaangaben lassen sich kombinieren: Ein `title="..."` erscheint auf beiden Tabs, während `{1,4-5}`-Zeilenbereiche nur für den TypeScript-Tab gelten (die Zeilennummern verschieben sich, sobald die Typen weg sind). Die einzige Ausnahme ist `twoslash` — Hover-Typen lassen sich nicht auf generierten Code übertragen, daher bleibt ein Fence, der beides trägt, ein schlichter Twoslash-Block.
 
 :::note
 Blende die Sprachsymbole aus oder lasse lange Zeilen umbrechen statt scrollen — mit `markdown: { code: { icons: false, wrap: true } }` in `blume.config.ts`.

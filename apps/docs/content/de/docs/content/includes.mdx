@@ -1,0 +1,69 @@
+---
+title: Includes
+description: >-
+  Inhalte seitenübergreifend wiederverwenden — füge gemeinsam genutzte Markdown-, MDX- oder Code-Dateien mit der Include-Syntax in jede Seite ein.
+---
+
+Schreibe ein Snippet einmal und füge es in jede beliebige Seite ein. Eine `<include>`-Anweisung in einer eigenen Zeile bettet zur Build-Zeit eine andere Datei ein, so als wäre deren Inhalt direkt dort geschrieben worden — Überschriften werden Teil des Inhaltsverzeichnisses der Seite, Text wird von der Suche indexiert, und der Inhalt erscheint im `.md`-Spiegel der Seite sowie in llms-full.txt.
+
+```mdx
+<include>./_snippets/prerequisites.mdx</include>
+```
+
+Der Pfad wird relativ zur einbindenden Datei aufgelöst. Pfade, die mit `/` beginnen, werden ab deinem Content-Root aufgelöst, sodass tief verschachtelte Seiten gemeinsame Snippets ohne `../../..`-Ketten referenzieren können:
+
+```mdx
+<include>/_snippets/prerequisites.mdx</include>
+```
+
+Die Syntax entspricht der Include-Syntax von Fumadocs, sodass migrierte Inhalte unverändert funktionieren.
+
+Hier siehst du es live — der folgende Hinweis stammt aus einem gemeinsam genutzten Snippet:
+
+<include>../_snippets/include-demo.mdx</include>
+
+## Partials
+
+Jede Datei, deren Name (oder Ordner) mit einem Unterstrich beginnt, ist standardmäßig von Routing, Navigation, Suche und Sitemaps ausgeschlossen — diese Konvention ist der natürliche Ort für gemeinsam genutzte Snippets:
+
+```text
+docs/
+  _snippets/
+    prerequisites.mdx
+    cli-flags.md
+  guides/
+    quickstart.mdx   ← <include>../_snippets/prerequisites.mdx</include>
+  index.mdx
+```
+
+Ein Partial ist eine ganz normale Markdown- oder MDX-Datei. Sein Frontmatter wird beim Einfügen entfernt (das Frontmatter der einbindenden Seite gewinnt), und alles andere — Hinweise, Code-Blöcke, Komponenten, Mathematik — wird genau so gerendert wie inline. Partials können andere Partials einbinden; ein zirkulärer Include wird als Fehler gemeldet.
+
+Relative Bildreferenzen innerhalb eines Partials funktionieren weiterhin: Sie werden auf die einbindende Seite umgerechnet, sodass ein neben dem Partial liegendes `![diagram](./diagram.png)` überall aufgelöst wird, wo das Partial eingefügt wird.
+
+Wenn du ein Partial bearbeitest, während `blume dev` läuft, wird jede Seite neu geladen, die es einbindet.
+
+## Code-Dateien einbinden
+
+Ein Ziel, das nicht `.md`/`.mdx` ist, wird als umschlossener Code-Block eingebettet, wobei die Sprache aus der Dateiendung abgeleitet wird. Verwende `lang`, um die Sprache zu überschreiben (oder um eine Markdown-Datei als Quelltext anzuzeigen, statt sie einzufügen), und `meta`, um einen Fence-Meta-String wie einen Titel zu übergeben:
+
+```mdx
+<include>./examples/config.ts</include>
+
+<include lang="ts" meta='title="blume.config.ts"'>
+  ../blume.config.ts
+</include>
+
+<include lang="mdx">./_snippets/prerequisites.mdx</include>
+```
+
+## Regeln und Diagnosen
+
+Include-Anweisungen müssen in einer eigenen Zeile stehen — sie sind block-level, nicht inline. Anweisungen innerhalb von umschlossenen Code-Blöcken bleiben unangetastet, sodass du die Syntax selbst dokumentieren kannst (so wie diese Seite es tut).
+
+Ziele müssen innerhalb deines Content-Roots liegen: Eine Datei außerhalb davon würde in Versions-Snapshots und ausgeworfenen Projekten stillschweigend fehlen, deshalb meldet `blume` `BLUME_INCLUDE_OUTSIDE_ROOT`, statt sie einzufügen. Ein nicht existierendes Ziel ergibt `BLUME_INCLUDE_NOT_FOUND`, und eine Schleife von Includes ergibt `BLUME_INCLUDE_CYCLE` — alle drei lassen `blume build` fehlschlagen (übergib `--no-strict`, um trotzdem zu bauen) und tauchen in `blume validate` auf.
+
+Defekte Links innerhalb eines Partials werden der Partial-Datei zugeordnet, nicht den Seiten, die sie einfügen — so behebst du sie dort, wo sie leben.
+
+:::note
+Partials werden über alle Sprachen hinweg gemeinsam genutzt und nicht von `blume translate` übersetzt — halte Partials sprachneutral (Code, Tabellen, Diagramme), oder erstelle Partials pro Sprache und binde sie aus den Seiten der jeweiligen Sprache ein.
+:::

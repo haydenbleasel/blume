@@ -106,7 +106,24 @@ theme: {
 - **`name`** — der Familienname exakt so, wie der Anbieter ihn führt.
 - **`provider`** — woher die Familie stammt: `google` (Standard), `fontsource`, `bunny` oder `fontshare`.
 - **`weights`** — die zu ladenden Schriftschnitte, als Zahlen oder als variabler Bereich wie `"100..900"`. Standard ist `[400, 500, 600, 700]`.
+- **`subsets`** — die zu ladenden Zeichen-Subsets, mit den Namen des Anbieters (`latin`, `latin-ext`, `vietnamese`, `cyrillic`, `greek`, …). Standard ist `latin` plus alles, was deine konfigurierten Locales brauchen — siehe unten.
 - **`fallback`** — der System-Stack, der während des Ladens der Schrift und für fehlende Glyphen angezeigt wird: `sans`, `serif` oder `mono`. Standard ist `mono` für die Mono-Rolle und andernfalls `sans`.
+
+#### Subsets und Locales
+
+Google, Bunny und Fontsource teilen jede Familie in Subsets je Schriftsystem auf, und nur die Subsets, die du lädst, bekommen eine `@font-face`. Blume leitet die Liste aus deinen [`i18n.locales`](/docs/content/i18n) ab: Eine Website mit vietnamesischen, polnischen, russischen oder griechischen Locales lädt `vietnamese`, `latin-ext`, `cyrillic` oder `greek` zusätzlich zu `latin`, sodass diakritische Zeichen und nicht-lateinische Buchstaben in deiner gewählten Schrift statt im System-Fallback erscheinen. Websites ohne `i18n`-Block oder mit ausschließlich Latin-1-Sprachen laden nur `latin`. Browser laden ein Subset erst herunter, wenn eine Seite dessen Zeichen verwendet, und Preloads folgen derselben Liste.
+
+Setze `subsets` bei einer Familie, um die abgeleitete Liste zu überschreiben — etwa bei einer Website mit nur einer Locale, deren Inhalt trotzdem ein Schriftsystem braucht, das ihre Locale nicht nahelegt:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    body: { name: "Be Vietnam Pro", subsets: ["latin", "vietnamese"] },
+  },
+}
+```
+
+Kuratierte Slugs wie `inter` folgen der aus den Locales abgeleiteten Liste; verwende die Objektform, um auch für diese Familien Subsets festzulegen.
 
 #### Lokale Schriftdateien
 

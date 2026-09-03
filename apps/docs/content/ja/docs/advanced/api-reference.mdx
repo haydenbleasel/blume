@@ -13,7 +13,7 @@ openapi: {
 }
 ```
 
-これでリファレンスが `/reference`（概要ページ）にマウントされ、各操作は `/reference/<tag>/<operation>` に配置されます。`spec` は `http(s)` の URL か、プロジェクト内のローカルファイルへのパスのいずれかです。Blume は [Scalar の OpenAPI パーサー](https://github.com/scalar/scalar)で解析します — Swagger 2.0 および OpenAPI 3.0 の仕様は自動的に 3.1 へアップグレードされます。
+これでリファレンスが `/reference`（概要ページ）にマウントされ、各操作は `/reference/<tag>/<operation>` に配置されます。`spec` は `http(s)` の URL か、プロジェクト内のローカルファイルへのパスのいずれかです。Blume は [Scalar の OpenAPI パーサー](https://github.com/scalar/scalar)で解析します — Swagger 2.0 および OpenAPI 3.0 の仕様は自動的に 3.1 へアップグレードされます。代わりに GraphQL API をドキュメント化しますか？ [GraphQL リファレンス](/docs/advanced/graphql)をご覧ください。
 
 リファレンスはそれ自体ではヘッダータブを追加しません。表に出すには、[ナビゲーションタブ](/docs/content/navigation#tabs)をそのルートに向けてください — これによりネイティブレンダラーの操作サイドバーのスコープも設定されます。
 
@@ -166,7 +166,7 @@ openapi: {
 }
 ```
 
-Scalar でレンダリングされたリファレンスは、独自のルート上にある自己完結型の埋め込みです — Blume のサイドバー、検索、`llms.txt` には組み込まれず、Blume の [`playground`](#try-it-プレイグラウンド) 設定も適用されません。Scalar は独自のリクエストクライアントを備えており、**ブラウザーから対象の API を直接**呼び出す（`playground.proxy` のルートはここでは利用できません）ため、API はドキュメントサイトからのクロスオリジンリクエストを許可する必要があります（`Access-Control-Allow-Origin`）。`theme` は Scalar レンダラーにのみ適用されます。
+Scalar でレンダリングされたリファレンスは、独自のルート上にある自己完結型の埋め込みです — Blume のサイドバー、検索、`llms.txt` には組み込まれず、Blume の [`playground`](#try-it-プレイグラウンド) 設定も適用されません。ただし Blume のライト/ダークの切り替えには従います。埋め込みはマウント時にページのテーマに固定され、それに合わせて切り替わるため、Scalar 自身のテーマ切り替えは非表示になります（カラーモードを Scalar 側に戻すには `scalar.forceDarkModeState` または `scalar.darkMode` を設定してください）。Scalar は独自のリクエストクライアントを備えており、**ブラウザーから対象の API を直接**呼び出す（`playground.proxy` のルートはここでは利用できません）ため、API はドキュメントサイトからのクロスオリジンリクエストを許可する必要があります（`Access-Control-Allow-Origin`）。`theme` は Scalar レンダラーにのみ適用されます。
 
 ### Scalar のオプションを渡す
 
@@ -226,7 +226,7 @@ asyncapi: {
 ```
 
 :::note
-`playground.proxy` は OpenAPI 専用です。これは HTTP リクエストを転送するものであり、WebSocket の接続はブラウザーから URL に指定されたサーバーへ直接向かうため、プロキシが前段に入る対象がありません。
+`playground.proxy` はイベント操作には適用されません。これは HTTP リクエストを転送するものであり、WebSocket の接続はブラウザーから URL に指定されたサーバーへ直接向かうため、プロキシが前段に入る対象がありません。
 :::
 
 イベントのコンポーザーはブローカーの資格情報を一切収集しません。各操作ページの**認可**セクションはブローカーが要求する内容を説明し、WebSocket の接続は URL にすでに含まれているものだけを伝えます。イベント操作では何も永続化されません。

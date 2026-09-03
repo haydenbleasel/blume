@@ -34,6 +34,22 @@ ai: {
 }
 ```
 
+A forma de objeto também aceita `details`: Markdown colocado logo depois do título e do resumo no `llms.txt`, antes das seções de páginas — o bloco livre de "details" da [especificação do llms.txt](https://llmstxt.org). É o lugar para dizer aos agentes _quando_ recorrer ao seu produto e como chamá-lo, algo que scanners de prontidão procuram explicitamente; um comando de instalação e o nome do pacote também cabem aqui:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  llmsTxt: {
+    details: [
+      "## When to use Acme",
+      "",
+      "Reach for Acme when a project needs hosted feature flags. Install the CLI with `npm install -g acme`; the API reference below covers every endpoint.",
+    ].join("\n"),
+  },
+}
+```
+
+O `llms.txt` termina com duas seções geradas que não precisam de configuração. **Agent skills** lista cada skill publicada por meio de [`ai.skills`](#skills-discovery) com a descrição dela (onde uma skill diz quando deve ser usada). **Agent resources** traz links para todo artefato legível por máquinas que o build emite — `llms-full.txt`, o espelho de [Markdown bruto](#raw-markdown) por página, o [servidor MCP](#mcp-server) e seu documento de descoberta, o índice de skills, o [catálogo de API](#api-catalog), o [`agent-readability.json`](#agent-readability) e o [sitemap](/docs/configuration/seo#sitemap) — cada um só quando existe, para que um agente que não lê nada além do `llms.txt` ainda encontre a superfície inteira.
+
 Para manter uma página individual fora dos dois arquivos, defina `ai.exclude` no frontmatter dela:
 
 ```mdx
@@ -60,7 +76,7 @@ Adicione `.md` ou `.mdx` à URL de qualquer página para buscar seu código-font
 
 As rotas aninhadas funcionam do mesmo jeito (`/content/syntax.md`), e a página inicial é servida em `/index.md`.
 
-A variante `.md` _reduz_ os componentes a Markdown simples para consumidores que não conseguem interpretar JSX: `<TypeTable>` vira uma tabela Markdown, `<Callout>` uma citação rotulada, `<Steps>` uma lista ordenada, `<Tabs>` seções com rótulos em negrito e `<YouTube>` um link. As props são avaliadas com o `frontmatter` da página no escopo, então uma prop como `title={frontmatter.status}` resolve para o mesmo valor que a página renderizada mostra. Tudo que não puder ser convertido fielmente — um componente personalizado ou uma prop calculada a partir de um import — é deixado como está, e a marcação de componentes dentro de blocos de código cercados nunca é tocada. A mesma conversão se aplica ao `llms-full.txt` e à ferramenta `get_page` do servidor MCP, para que toda superfície voltada a agentes leia Markdown limpo. Quando quiser o código-fonte não transformado, use a variante `.mdx`.
+A variante `.md` _reduz_ os componentes a Markdown simples para consumidores que não conseguem interpretar JSX: `<TypeTable>` vira uma tabela Markdown, `<Callout>` uma citação rotulada, `<Steps>` uma lista ordenada, `<Tabs>` seções com rótulos em negrito, `<Card>` seu título como um link acima do corpo (e `<CardGroup>` os cards que ele contém) e `<YouTube>` um link. As props são avaliadas com o `frontmatter` da página no escopo, então uma prop como `title={frontmatter.status}` resolve para o mesmo valor que a página renderizada mostra. Tudo que não puder ser convertido fielmente — um componente personalizado ou uma prop calculada a partir de um import — é deixado como está, e a marcação de componentes dentro de blocos de código cercados nunca é tocada. A mesma conversão se aplica ao `llms-full.txt` e à ferramenta `get_page` do servidor MCP, para que toda superfície voltada a agentes leia Markdown limpo. Quando quiser o código-fonte não transformado, use a variante `.mdx`.
 
 ### Negociação de conteúdo
 
@@ -86,7 +102,7 @@ export default defineConfig({
 });
 ```
 
-Para componentes de contêiner, `childComponents("Name")` extrai os filhos diretos por tag — do mesmo jeito que o serializador integrado de `<Steps>` coleta seus itens `<Step>`. Uma entrada com o mesmo nome substitui um serializador integrado, então você pode reformular como `<Callout>` é reduzido — ou retornar `null` para deixá-lo de fora por completo.
+Para componentes de contêiner, `childComponents("Name")` extrai os filhos diretos por tag — do mesmo jeito que o serializador integrado de `<Steps>` coleta seus itens `<Step>` — e `childBlocks()` retorna todos os filhos diretos em ordem, componentes e prosa igualmente, cada um já reduzido a um bloco de Markdown (o serializador integrado de `<CardGroup>` é só esses blocos unidos por linhas em branco). Uma entrada com o mesmo nome substitui um serializador integrado, então você pode reformular como `<Callout>` é reduzido — ou retornar `null` para deixá-lo de fora por completo.
 
 Os serializadores moram no `blume.config.ts`, não no `components.tsx`: o arquivo de configuração é executado em tempo de build, enquanto o arquivo de componentes é apenas analisado estaticamente (ele pode importar arquivos `.astro`, que não podem rodar fora do build do site). Seus componentes em si continuam registrados no `components.tsx` exatamente como antes — `markdownComponents` só adiciona a forma Markdown deles voltada a agentes.
 
@@ -101,6 +117,8 @@ A ação **Abrir no chat** abre a página atual em um assistente de IA — v0, C
 > Leia `https://your-site/this-page.md` para que eu possa te fazer perguntas sobre esta página.
 
 Assim como Copiar como Markdown, não precisa de configuração. O assistente busca a página pela URL pública dela, então funciona assim que a página estiver publicada.
+
+O prompt faz parte do [dicionário de interface](/docs/content/i18n#translated-ui) (`actions.openInChatPrompt`), então sites localizados o enviam no idioma deles, e `i18n.ui` pode sobrescrever o texto — mantenha o placeholder `{url}`, que é substituído pela URL do Markdown bruto da página.
 
 Para ajustar a ação, defina `ai.openInChat`. `false` a esconde por completo, e um array de chaves de provedor — `"v0"`, `"chatgpt"`, `"claude"`, `"t3"`, `"scira"`, `"cursor"` — mostra apenas esses provedores, na ordem em que você os listar:
 
@@ -307,7 +325,7 @@ ai: {
 | `name` | título | Nome do servidor mostrado aos clientes (por padrão, o título). |
 | `instructions` | — | Dica de sistema opcional passada aos agentes que se conectam. |
 
-O servidor expõe ferramentas somente leitura — `search_docs`, `get_page`, `list_pages` e `get_navigation` — e publica documentos de descoberta em `/.well-known/mcp.json` e `/.well-known/mcp/server-card.json`. O cartão do servidor segue o esquema da extensão Server Card [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) (`name` em DNS reverso, endpoints de transporte `remotes`), com campos de compatibilidade no formato do initialize (`serverInfo`, `capabilities`, `transports`) para scanners construídos com base na revisão anterior da proposta. O menu **Conectar ao MCP** de cada página oferece instalação de copiar e usar para Claude Code, Cursor, VS Code e Codex (mostrado assim que [`deployment.site`](/docs/deployment) estiver definido).
+O servidor expõe ferramentas somente leitura — `search_docs`, `get_page`, `list_pages` e `get_navigation` — e cada página como um recurso MCP (`resources/list` enumera as páginas nas URLs em que são servidas com o tipo `text/markdown`; `resources/read` retorna o Markdown da página voltado a agentes, a mesma saída de `get_page`), para que clientes que anexam contexto por URI possam navegar pela documentação sem chamar uma ferramenta. Ele publica documentos de descoberta em `/.well-known/mcp.json` e `/.well-known/mcp/server-card.json`. O cartão do servidor segue o esquema da extensão Server Card [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) (`name` em DNS reverso, endpoints de transporte `remotes`), com campos de compatibilidade no formato do initialize (`serverInfo`, `capabilities`, `transports`) para scanners construídos com base na revisão anterior da proposta. O menu **Conectar ao MCP** de cada página oferece instalação de copiar e usar para Claude Code, Cursor, VS Code e Codex (mostrado assim que [`deployment.site`](/docs/deployment) estiver definido).
 
 `search_docs` roda seu próprio índice de texto completo, então funciona independentemente do seu provedor de [busca](/docs/configuration/search) — e mesmo quando a busca está definida como `none`. O servidor MCP é um recurso separado da busca na página.
 

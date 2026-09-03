@@ -13,7 +13,7 @@ openapi: {
 }
 ```
 
-Isso monta a referência em `/reference` (uma página de visão geral) com cada operação em `/reference/<tag>/<operation>`. O `spec` é uma URL `http(s)` ou um caminho para um arquivo local no seu projeto. O Blume o analisa com o [parser OpenAPI do Scalar](https://github.com/scalar/scalar) — especificações Swagger 2.0 e OpenAPI 3.0 são atualizadas para 3.1 automaticamente.
+Isso monta a referência em `/reference` (uma página de visão geral) com cada operação em `/reference/<tag>/<operation>`. O `spec` é uma URL `http(s)` ou um caminho para um arquivo local no seu projeto. O Blume o analisa com o [parser OpenAPI do Scalar](https://github.com/scalar/scalar) — especificações Swagger 2.0 e OpenAPI 3.0 são atualizadas para 3.1 automaticamente. Está documentando uma API GraphQL? Veja a [referência GraphQL](/docs/advanced/graphql).
 
 A referência não adiciona uma aba de cabeçalho por conta própria. Para exibi-la, aponte uma [aba de navegação](/docs/content/navigation#tabs) para sua rota — isso também delimita a barra lateral de operações para o renderizador nativo:
 
@@ -166,7 +166,7 @@ openapi: {
 }
 ```
 
-Uma referência renderizada pelo Scalar é uma incorporação autocontida em sua própria rota — ela não se integra à barra lateral, à busca ou ao `llms.txt` do Blume, e a configuração [`playground`](#playground-try-it) do Blume não se aplica a ela. O Scalar traz seu próprio cliente de requisições, que chama sua **API de destino diretamente do navegador** (a rota `playground.proxy` não está disponível aqui), então a API precisa permitir requisições de origem cruzada a partir do site de documentação (`Access-Control-Allow-Origin`). `theme` se aplica apenas ao renderizador Scalar.
+Uma referência renderizada pelo Scalar é uma incorporação autocontida em sua própria rota — ela não se integra à barra lateral, à busca ou ao `llms.txt` do Blume, e a configuração [`playground`](#playground-try-it) do Blume não se aplica a ela. O que ela segue é o alternador claro/escuro do Blume: a incorporação é fixada no tema da página quando é montada e muda junto com ele, então o alternador de tema do próprio Scalar fica oculto (defina `scalar.forceDarkModeState` ou `scalar.darkMode` para devolver o controle do modo de cor ao Scalar). O Scalar traz seu próprio cliente de requisições, que chama sua **API de destino diretamente do navegador** (a rota `playground.proxy` não está disponível aqui), então a API precisa permitir requisições de origem cruzada a partir do site de documentação (`Access-Control-Allow-Origin`). `theme` se aplica apenas ao renderizador Scalar.
 
 ### Passando opções do Scalar
 
@@ -226,7 +226,7 @@ asyncapi: {
 ```
 
 :::note
-`playground.proxy` é exclusivo do OpenAPI. Ele encaminha requisições HTTP, e uma conexão WebSocket vai direto do navegador para o servidor nomeado na URL, então não há nada na frente de que um proxy possa ficar.
+`playground.proxy` não se aplica a operações de evento. Ele encaminha requisições HTTP, e uma conexão WebSocket vai direto do navegador para o servidor nomeado na URL, então não há nada na frente de que um proxy possa ficar.
 :::
 
 O compositor de eventos não coleta credenciais de broker. A seção **Authorization** de cada página de operação documenta o que o broker espera, e uma conexão WebSocket carrega apenas o que já está na URL. Nada é persistido para operações de evento.

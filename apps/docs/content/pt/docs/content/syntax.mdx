@@ -18,6 +18,38 @@ Estruture uma página com títulos. O Blume renderiza o `title` do frontmatter c
 #### Detail
 ```
 
+### Âncoras personalizadas
+
+Os ids das âncoras são gerados a partir do texto do título, então um título reescrito ganha uma âncora nova. Acrescente `[#custom-id]` para fixar a âncora — o marcador nunca é renderizado, e os links continuam funcionando independentemente de como o título estiver escrito. Âncoras fixadas também permanecem idênticas entre [locales traduzidos](/docs/content/i18n), onde ids gerados automaticamente seriam diferentes em cada idioma.
+
+```md
+## Getting started [#setup]
+```
+
+Crie um link para ela como `/page#setup`. A sintaxe é igual à do Fumadocs, então conteúdo migrado funciona sem alterações.
+
+A forma `{#custom-id}`, usada pelo Pandoc, pelo kramdown e por toolchains de especificação baseadas em Markdown, é aceita como equivalente em arquivos `.md`. No `.mdx`, um `{…}` solto é uma expressão JSX e a página não compila — o `blume check` reporta o marcador como `BLUME_MDX_CURLY_ANCHOR` — então escreva `[#custom-id]` ali, ou escape as chaves. A forma escapada fixa a mesma âncora nos dois formatos, o que a torna a grafia certa para um partial que páginas `.mdx` [incluem](/docs/content/includes):
+
+```md
+## Getting started \{#setup\}
+```
+
+Links de fragmento também podem apontar para um elemento HTML puro com um `id` (`<a id="setup"></a>`); o `blume validate` aceita esses casos junto com as âncoras de título.
+
+### Marcadores do índice
+
+Outros dois marcadores finais controlam como um título aparece no índice. `[!toc]` mantém o título na página, mas fora do índice; `[toc]` faz o contrário — o título aparece apenas no índice, como um alvo de âncora invisível, o que é útil para rotular seções construídas com componentes em vez de prosa. Os marcadores podem ser encadeados em qualquer ordem.
+
+```md
+## Appears on the page only [!toc]
+
+## Appears in the TOC only [toc]
+
+## Both markers together [toc] [#custom-id]
+```
+
+Os marcadores são sempre interpretados — um título que termine literalmente com um texto no formato de marcador seria tratado como marcado. Escapar com barra invertida não ajuda (o Markdown resolve `\[` para `[` antes de a análise do marcador rodar); para exibir o texto literal de um marcador no fim de um título, coloque-o em código inline: `` ## Using `[toc]` ``.
+
 ## Ênfase
 
 Formatação inline para enfatizar palavras, marcar exclusões e mostrar código ou teclas no meio da frase.
@@ -285,6 +317,42 @@ config.title;
 //     ^?
 ```
 ````
+
+### Abas de TypeScript e JavaScript
+
+Marque um bloco `ts` ou `tsx` com `ts2js` para renderizá-lo como um par de abas: seu TypeScript ao lado de uma variante JavaScript gerada automaticamente, para que você mantenha um único trecho e os leitores escolham seu dialeto. A conversão remove a sintaxe de tipos e os imports somente de tipos, mantendo sua formatação, seus comentários e o JSX exatamente como você escreveu — e as abas são sincronizadas, então escolher JavaScript uma vez troca todos os pares da página. Como os diagramas e a matemática, este é um recurso exclusivo do MDX — em um arquivo `.md` o bloco é renderizado como uma cerca de código TypeScript comum.
+
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+
+````md
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+````
+
+Outros metadados da cerca se combinam: um `title="..."` aparece nas duas abas, enquanto intervalos de linha `{1,4-5}` se aplicam apenas à aba TypeScript (os números das linhas mudam quando os tipos somem). A única exceção é `twoslash` — os tipos exibidos ao passar o cursor não podem ser transferidos para o código gerado, então uma cerca marcada com os dois continua sendo um bloco Twoslash comum.
 
 :::note
 Oculte os ícones de linguagem ou quebre linhas longas em vez de rolar com `markdown: { code: { icons: false, wrap: true } }` no `blume.config.ts`.

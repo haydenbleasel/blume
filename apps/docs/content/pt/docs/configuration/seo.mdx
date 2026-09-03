@@ -248,6 +248,33 @@ Cada página inclui:
 
 As URLs são absolutas quando `deployment.site` está definido. Páginas marcadas com `seo.noindex` são ignoradas.
 
+### Identidade do site
+
+O nó WebSite diz que um site existe; ele não diz _o que_ ele é nem _quem_ o mantém — que é justamente o que os agentes de IA leem no JSON-LD antes de recomendar ou citar você. Dois blocos opcionais preenchem essa lacuna, ambos precisando de `deployment.site` (os nós carregam identificadores absolutos):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  organization: {
+    name: "Acme", // defaults to the site title
+    email: "hello@acme.com",
+    telephone: "+1 555 0100",
+    address: { addressLocality: "Sydney", addressCountry: "AU" },
+    logo: "/logo.svg",
+    sameAs: ["https://github.com/acme", "https://x.com/acme"],
+  },
+  software: {
+    license: "MIT",
+    operatingSystem: "Node.js 22+",
+    price: 0, // emitted as an Offer; 0 marks it free
+    sameAs: ["https://www.npmjs.com/package/acme"],
+  },
+}
+```
+
+`organization` adiciona um nó **Organization** a cada página — os nós WebSite e de artigo o citam como `publisher` — com o e-mail e o telefone como um `ContactPoint` (`contactType` assume `"customer support"` por padrão) e o endereço como um `PostalAddress`, os dois campos que as verificações de negócio procuram. `name` e `url` assumem os do site por padrão; um `logo` relativo à raiz é convertido em absoluto como qualquer URL de página.
+
+`software` adiciona um nó **SoftwareApplication** à página inicial: o nome e a descrição do produto (assumindo os do site por padrão), `applicationCategory` (padrão `"DeveloperApplication"`), sistema operacional, licença, um `Offer` quando `price` está definido, e as URLs de registro ou repositório em `sameAs`. Passe `software: true` para aceitar todos os padrões. A organização, quando configurada, é citada como seu `publisher`.
+
 ## Sitemap
 
 O Blume escreve um `sitemap.xml` com todas as páginas indexáveis no momento do build. Ele precisa de um [`deployment.site`](/docs/deployment) absoluto e lista todas as páginas, exceto rascunhos, ocultas e páginas com `noindex`. Em um site [versionado](/docs/content/versioning), as páginas arquivadas cujo canônico aponta para o equivalente em produção também ficam de fora — a página em produção é a que deve ser indexada. Ativado por padrão:

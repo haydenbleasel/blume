@@ -123,7 +123,8 @@ Ohne eine `tsconfig.json` im Projekt wird nur die generierte Laufzeitumgebung ge
 `blume validate` prüft jeden in deinen Inhalten gefundenen Link:
 
 - **Interne Seitenlinks** (`/guides/intro`, `./sibling`) müssen auf eine echte Seite verweisen — defekte werden als Fehler gemeldet.
-- **Ankerlinks** (`#section`, `/guides/intro#setup`) müssen einer Überschrift auf der Zielseite entsprechen — Fehlschläge sind Warnungen.
+- **Ankerlinks** (`#section`, `/guides/intro#setup`) müssen einem Anker auf der Zielseite entsprechen — der id einer Überschrift (generiert oder [festgelegt](/docs/content/syntax#custom-anchors)) oder dem `id`-Attribut eines reinen HTML-Elements —, wobei Fehlschläge als Warnungen gemeldet werden. Ids in Codeblöcken, Inline-Code, HTML-Kommentaren und `<Prompt>`-Blöcken zählen nicht.
+
 - **Asset-Links** werden dort geprüft, wo die Datei liegt: ein absoluter Pfad (`/logo.png`) gegen das Verzeichnis `public/`, eine relative Bildeinbindung (`![](./diagram.png)`) gegen den Ordner der Seite selbst. Ein einfacher Link auf einen relativen Pfad wird weiterhin als Site-Route aufgelöst — nur Bildeinbindungen durchlaufen die Bildpipeline.
 - **Externe Links** werden nur mit `--external` geprüft (standardmäßig aus, da dies das Netzwerk erfordert); tote Links (404/410/nicht erreichbar) sind Fehler, während ratenbegrenzte oder vorübergehende Antworten (403/429/5xx/Timeout) Warnungen sind.
 

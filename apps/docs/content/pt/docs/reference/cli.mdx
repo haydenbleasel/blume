@@ -123,7 +123,8 @@ Sem um `tsconfig.json` no projeto, apenas o runtime gerado é verificado.
 O `blume validate` verifica todos os links descobertos no seu conteúdo:
 
 - **Links internos de páginas** (`/guides/intro`, `./sibling`) precisam resolver para uma página real — os que estiverem quebrados são reportados como erros.
-- **Links de âncora** (`#section`, `/guides/intro#setup`) precisam corresponder a um cabeçalho na página de destino — as falhas são avisos.
+- **Links de âncora** (`#section`, `/guides/intro#setup`) precisam corresponder a uma âncora na página de destino — o id de um cabeçalho (gerado ou [fixado](/docs/content/syntax#custom-anchors)) ou o atributo `id` de um elemento HTML puro — e as falhas são reportadas como avisos. Ids dentro de blocos de código, código inline, comentários HTML e blocos `<Prompt>` não contam.
+
 - **Links de assets** são verificados onde o arquivo fica: um caminho absoluto (`/logo.png`) em relação ao diretório `public/`, uma imagem incorporada com caminho relativo (`![](./diagram.png)`) em relação à pasta da própria página. Um link simples para um caminho relativo continua resolvendo como uma rota do site — apenas imagens incorporadas passam pelo pipeline de imagens.
 - **Links externos** só são verificados com `--external` (desativado por padrão, já que requer rede); links mortos (404/410/inacessíveis) são erros, enquanto respostas com limite de taxa ou transitórias (403/429/5xx/timeout) são avisos.
 

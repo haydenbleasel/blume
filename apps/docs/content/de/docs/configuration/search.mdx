@@ -43,7 +43,19 @@ Schreibe `href` so, als wäre die Website im Stammverzeichnis eingehängt — ei
 
 ## Was indexiert wird
 
-Für jede indexierbare Seite indexiert Blume ihren Titel, ihre Beschreibung und den auf reinen Text reduzierten Fließtext — Codeblöcke, Bilder und Markup werden entfernt, damit die Ergebnisse relevant bleiben. Der Index wird aus deinen Quelldateien erstellt und ist daher in der Entwicklung und in der Produktion identisch.
+Für Orama, FlexSearch, Algolia, Orama Cloud und Typesense — sowie für das `search_docs`-Tool des MCP-Servers — indexiert Blume den Titel, die Beschreibung und den auf reinen Text reduzierten Fließtext jeder Seite: Codeblöcke, Bilder und Markup werden entfernt, damit die Ergebnisse relevant bleiben. Diese Indizes werden aus deinen Quelldateien erstellt und sind daher in der Entwicklung und in der Produktion identisch. Pagefind indexiert stattdessen das gebaute HTML, und Mixedbread synchronisiert dein rohes Markdown, sodass beide immer auch Code durchsuchen.
+
+Wenn deine Doku bei durchsuchbaren Begriffen wie Optionen, Methoden oder Fehlernamen auf Codebeispiele setzt, nimm eingefassten Code ausdrücklich in die quellbasierten Indizes auf:
+
+```ts blume.config.ts lineNumbers
+search: {
+  indexing: {
+    includeCodeBlocks: true,
+  },
+},
+```
+
+Der Inhalt und der Titel jedes Code-Fences (`blume.config.ts` oben) werden durchsuchbar; die Sprache und die Fence-Marker nicht. Auf `.mdx`-Seiten liest der Index Komponenten als den Text, den sie anzeigen — den Titel einer Card, das Label eines Tab, die Beschreibungen einer TypeTable — und nutzt dabei dieselben Serializer wie die [Agent-Oberflächen](/docs/configuration/ai), sodass ein `ai.markdownComponents`-Eintrag auch deine eigenen Komponenten abdeckt. Auf Pagefind oder Mixedbread hat die Option keine Wirkung. Rechne damit, dass der Index mit deinen eingefassten Inhalten wächst — der Client-Index wird an jeden Leser ausgeliefert, gehostete Anbieter begrenzen die Datensatzgröße (Algolia weist den Synchronisierungs-Batch zurück, wenn der Datensatz einer Seite das Limit deines Tarifs überschreitet, und der bisherige Index bleibt aktiv), und ein Treffer innerhalb eines Fences zeigt im Ergebnisauszug flach dargestellten Code.
 
 Auf einer [versionierten](/docs/content/versioning) Website beziehen sich die Ergebnisse standardmäßig auf die gerade angesehene Version, mit einem „Alle Versionen“-Schalter in der Fußzeile des Dialogs (der pro Leser gemerkt wird). Treffer aus anderen Versionen nennen ihre Version in der Zeile. Orama, FlexSearch, Algolia und Typesense berücksichtigen diese Eingrenzung — gehostete Datensätze tragen eine `version`-Facette, wobei die aktuelle Doku als `"current"` hochgeladen wird —, während Pagefind ohne Eingrenzung bleibt, passend zu seinem Verhalten bei Sprachen.
 

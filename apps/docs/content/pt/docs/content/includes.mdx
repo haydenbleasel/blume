@@ -1,0 +1,69 @@
+---
+title: Includes
+description: >-
+  Reutilize conteúdo entre páginas — insira arquivos Markdown, MDX ou de código compartilhados em qualquer página com a sintaxe de include.
+---
+
+Escreva um trecho uma vez e insira ele em qualquer página. Uma instrução `<include>` em sua própria linha embute outro arquivo no momento do build, como se o conteúdo estivesse escrito ali mesmo — os títulos entram no sumário da página, o texto é indexado pela busca, e o conteúdo aparece no espelho `.md` da página e no llms-full.txt.
+
+```mdx
+<include>./_snippets/prerequisites.mdx</include>
+```
+
+O caminho é resolvido em relação ao arquivo que faz o include. Caminhos que começam com `/` são resolvidos a partir da raiz do seu conteúdo, então páginas em níveis profundos podem referenciar trechos compartilhados sem cadeias de `../../..`:
+
+```mdx
+<include>/_snippets/prerequisites.mdx</include>
+```
+
+A sintaxe é igual à do Fumadocs, então conteúdo migrado funciona sem alterações.
+
+Veja funcionando na prática — este próximo destaque vem de um trecho compartilhado:
+
+<include>../_snippets/include-demo.mdx</include>
+
+## Parciais
+
+Qualquer arquivo cujo nome (ou pasta) comece com underscore fica excluído do roteamento, da navegação, da busca e dos sitemaps por padrão — essa convenção é o lar natural dos trechos compartilhados:
+
+```text
+docs/
+  _snippets/
+    prerequisites.mdx
+    cli-flags.md
+  guides/
+    quickstart.mdx   ← <include>../_snippets/prerequisites.mdx</include>
+  index.mdx
+```
+
+Uma parcial é um arquivo Markdown ou MDX normal. O front matter dela é removido na inserção (o front matter da página que faz o include prevalece), e todo o resto — destaques, blocos de código, componentes, fórmulas matemáticas — é renderizado exatamente como seria inline. Parciais podem incluir outras parciais; um include circular é reportado como erro.
+
+Referências relativas a imagens dentro de uma parcial continuam funcionando: elas são rebaseadas para a página que faz o include, então um `![diagrama](./diagram.png)` colocado ao lado da parcial é resolvido onde quer que a parcial seja inserida.
+
+Editar uma parcial enquanto o `blume dev` está rodando recarrega todas as páginas que a incluem.
+
+## Incluindo arquivos de código
+
+Um alvo que não seja `.md`/`.mdx` é embutido como um bloco de código cercado, com a linguagem inferida da extensão. Use `lang` para sobrescrever a linguagem (ou para mostrar um arquivo Markdown como código-fonte em vez de inseri-lo), e `meta` para passar uma string de meta da cerca, como um título:
+
+```mdx
+<include>./examples/config.ts</include>
+
+<include lang="ts" meta='title="blume.config.ts"'>
+  ../blume.config.ts
+</include>
+
+<include lang="mdx">./_snippets/prerequisites.mdx</include>
+```
+
+## Regras e diagnósticos
+
+Instruções de include precisam ocupar a própria linha — elas são de nível de bloco, não inline. Instruções dentro de blocos de código cercados são ignoradas, então você pode documentar a própria sintaxe (como esta página faz).
+
+Os alvos precisam estar dentro da raiz do seu conteúdo: um arquivo fora dela ficaria silenciosamente ausente dos snapshots de versão e de projetos ejetados, então o `blume` reporta `BLUME_INCLUDE_OUTSIDE_ROOT` em vez de inseri-lo. Um alvo que não existe gera `BLUME_INCLUDE_NOT_FOUND`, e um laço de includes gera `BLUME_INCLUDE_CYCLE` — os três fazem o `blume build` falhar (passe `--no-strict` para buildar mesmo assim) e aparecem no `blume validate`.
+
+Links quebrados dentro de uma parcial são reportados no arquivo da parcial, não nas páginas que a inserem, então você corrige onde eles realmente vivem.
+
+:::note
+Parciais são compartilhadas entre os idiomas e não são traduzidas pelo `blume translate` — mantenha as parciais neutras em relação ao idioma (código, tabelas, diagramas), ou crie parciais por idioma e inclua elas a partir das páginas de cada idioma.
+:::

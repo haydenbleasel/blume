@@ -34,6 +34,22 @@ ai: {
 }
 ```
 
+Die Objektform akzeptiert außerdem `details`: Markdown, das in `llms.txt` direkt nach Titel und Zusammenfassung steht, vor den Seitenabschnitten — der freiformige "details"-Block der [llms.txt-Spezifikation](https://llmstxt.org). Hier ist der Ort, um Agents zu sagen, _wann_ sie zu deinem Produkt greifen sollen und wie sie es aufrufen, wonach Readiness-Scanner ausdrücklich suchen; ein Installationsbefehl und der Paketname gehören ebenfalls hierher:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  llmsTxt: {
+    details: [
+      "## When to use Acme",
+      "",
+      "Reach for Acme when a project needs hosted feature flags. Install the CLI with `npm install -g acme`; the API reference below covers every endpoint.",
+    ].join("\n"),
+  },
+}
+```
+
+`llms.txt` schließt mit zwei generierten Abschnitten, die keinerlei Konfiguration benötigen. **Agent skills** listet jeden über [`ai.skills`](#skills-discovery) veröffentlichten Skill samt seiner Beschreibung auf (dort sagt ein Skill, wann er zu verwenden ist). **Agent resources** verlinkt jedes maschinenlesbare Artefakt, das der Build erzeugt — `llms-full.txt`, den seitenweisen [Roh-Markdown](#raw-markdown)-Spiegel, den [MCP-Server](#mcp-server) und sein Discovery-Dokument, den Skills-Index, den [API-Katalog](#api-catalog), [`agent-readability.json`](#agent-readability) und die [Sitemap](/docs/configuration/seo#sitemap) — jeweils nur dann, wenn es existiert, sodass ein Agent, der nichts als `llms.txt` liest, dennoch die gesamte Oberfläche findet.
+
 Um eine einzelne Seite aus beiden Dateien herauszuhalten, setze `ai.exclude` in deren Frontmatter:
 
 ```mdx
@@ -60,7 +76,7 @@ Hänge `.md` oder `.mdx` an die URL einer beliebigen Seite an, um deren rohe Mar
 
 Verschachtelte Routen funktionieren genauso (`/content/syntax.md`), und die Startseite wird unter `/index.md` ausgeliefert.
 
-Die `.md`-Variante _reduziert_ Komponenten auf reines Markdown für Konsumenten, die kein JSX interpretieren können: `<TypeTable>` wird zu einer Markdown-Tabelle, `<Callout>` zu einem beschrifteten Blockzitat, `<Steps>` zu einer nummerierten Liste, `<Tabs>` zu fett beschrifteten Abschnitten und `<YouTube>` zu einem Link. Props werden mit dem `frontmatter` der Seite im Gültigkeitsbereich ausgewertet, sodass ein Prop wie `title={frontmatter.status}` denselben Wert ergibt, den die gerenderte Seite anzeigt. Alles, was sich nicht originalgetreu umwandeln lässt — eine eigene Komponente oder ein aus einem Import berechnetes Prop — bleibt unverändert, und Komponenten-Markup innerhalb von Code-Blöcken wird nie angetastet. Dieselbe Umwandlung gilt für `llms-full.txt` und das `get_page`-Tool des MCP-Servers, sodass jede an Agents gerichtete Oberfläche sauberes Markdown liefert. Wenn du die untransformierte Quelle möchtest, verwende die `.mdx`-Variante.
+Die `.md`-Variante _reduziert_ Komponenten auf reines Markdown für Konsumenten, die kein JSX interpretieren können: `<TypeTable>` wird zu einer Markdown-Tabelle, `<Callout>` zu einem beschrifteten Blockzitat, `<Steps>` zu einer nummerierten Liste, `<Tabs>` zu fett beschrifteten Abschnitten, `<Card>` zu seinem Titel als Link über seinem Rumpf (und `<CardGroup>` zu den Karten, die sie enthält) und `<YouTube>` zu einem Link. Props werden mit dem `frontmatter` der Seite im Gültigkeitsbereich ausgewertet, sodass ein Prop wie `title={frontmatter.status}` denselben Wert ergibt, den die gerenderte Seite anzeigt. Alles, was sich nicht originalgetreu umwandeln lässt — eine eigene Komponente oder ein aus einem Import berechnetes Prop — bleibt unverändert, und Komponenten-Markup innerhalb von Code-Blöcken wird nie angetastet. Dieselbe Umwandlung gilt für `llms-full.txt` und das `get_page`-Tool des MCP-Servers, sodass jede an Agents gerichtete Oberfläche sauberes Markdown liefert. Wenn du die untransformierte Quelle möchtest, verwende die `.mdx`-Variante.
 
 ### Content Negotiation
 
@@ -86,7 +102,7 @@ export default defineConfig({
 });
 ```
 
-Für Container-Komponenten extrahiert `childComponents("Name")` direkte Kinder anhand des Tags — genauso, wie der eingebaute `<Steps>`-Serializer seine `<Step>`-Elemente sammelt. Ein gleichnamiger Eintrag ersetzt einen eingebauten Serializer, sodass du umgestalten kannst, wie `<Callout>` heruntergestuft wird — oder `null` zurückgeben, um eine Komponente vollständig auszunehmen.
+Für Container-Komponenten extrahiert `childComponents("Name")` direkte Kinder anhand des Tags — genauso, wie der eingebaute `<Steps>`-Serializer seine `<Step>`-Elemente sammelt —, und `childBlocks()` gibt jedes direkte Kind der Reihe nach zurück, Komponenten wie Prosa, jeweils bereits auf einen Markdown-Block heruntergestuft (der eingebaute `<CardGroup>`-Serializer ist einfach nur diese Blöcke, durch Leerzeilen verbunden). Ein gleichnamiger Eintrag ersetzt einen eingebauten Serializer, sodass du umgestalten kannst, wie `<Callout>` heruntergestuft wird — oder `null` zurückgeben, um eine Komponente vollständig auszunehmen.
 
 Serializer leben in `blume.config.ts`, nicht in `components.tsx`: Die Konfigurationsdatei wird zur Build-Zeit ausgeführt, während die Komponentendatei nur statisch analysiert wird (sie darf `.astro`-Dateien importieren, die außerhalb des Website-Builds nicht laufen können). Deine Komponenten selbst bleiben genau wie zuvor in `components.tsx` registriert — `markdownComponents` ergänzt lediglich deren an Agents gerichtete Markdown-Form.
 
@@ -101,6 +117,8 @@ Die Aktion **Im Chat öffnen** öffnet die aktuelle Seite in einem KI-Assistente
 > Read `https://your-site/this-page.md` so I can ask you questions about this page.
 
 Wie "Als Markdown kopieren" erfordert dies keine Einrichtung. Der Assistent ruft die Seite über ihre öffentliche URL ab, es funktioniert also, sobald die Seite bereitgestellt ist.
+
+Der Prompt ist Teil des [UI-Wörterbuchs](/docs/content/i18n#translated-ui) (`actions.openInChatPrompt`), sodass lokalisierte Websites ihn in ihrer Sprache senden, und `i18n.ui` kann den Wortlaut überschreiben — behalte dabei den Platzhalter `{url}`, der durch die Roh-Markdown-URL der Seite ersetzt wird.
 
 Um die Aktion anzupassen, setze `ai.openInChat`. `false` blendet sie vollständig aus, und ein Array von Anbieter-Schlüsseln — `"v0"`, `"chatgpt"`, `"claude"`, `"t3"`, `"scira"`, `"cursor"` — zeigt genau diese Anbieter, in der Reihenfolge, in der du sie aufführst:
 
@@ -307,7 +325,7 @@ ai: {
 | `name` | Titel | Clients angezeigter Servername (Standard: Titel). |
 | `instructions` | — | Optionaler System-Hinweis für verbindende Agents. |
 
-Der Server stellt schreibgeschützte Tools bereit — `search_docs`, `get_page`, `list_pages` und `get_navigation` — und veröffentlicht Discovery-Dokumente unter `/.well-known/mcp.json` und `/.well-known/mcp/server-card.json`. Die Server Card folgt dem Server-Card-Erweiterungsschema [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) (Reverse-DNS-`name`, `remotes`-Transport-Endpunkte), mit initialize-förmigen Kompatibilitätsfeldern (`serverInfo`, `capabilities`, `transports`) für Scanner, die gegen die frühere Revision des Vorschlags gebaut wurden. Das Menü **Mit MCP verbinden** jeder Seite bietet eine Kopieren-und-loslegen-Installation für Claude Code, Cursor, VS Code und Codex (angezeigt, sobald [`deployment.site`](/docs/deployment) gesetzt ist).
+Der Server stellt schreibgeschützte Tools bereit — `search_docs`, `get_page`, `list_pages` und `get_navigation` — sowie jede Seite als MCP-Ressource (`resources/list` zählt die Seiten unter ihren ausgelieferten URLs mit dem Typ `text/markdown` auf; `resources/read` gibt das Agent-Markdown der Seite zurück, dieselbe Ausgabe wie `get_page`), sodass Clients, die Kontext per URI anhängen, die Dokumentation durchstöbern können, ohne ein Tool aufzurufen. Er veröffentlicht Discovery-Dokumente unter `/.well-known/mcp.json` und `/.well-known/mcp/server-card.json`. Die Server Card folgt dem Server-Card-Erweiterungsschema [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) (Reverse-DNS-`name`, `remotes`-Transport-Endpunkte), mit initialize-förmigen Kompatibilitätsfeldern (`serverInfo`, `capabilities`, `transports`) für Scanner, die gegen die frühere Revision des Vorschlags gebaut wurden. Das Menü **Mit MCP verbinden** jeder Seite bietet eine Kopieren-und-loslegen-Installation für Claude Code, Cursor, VS Code und Codex (angezeigt, sobald [`deployment.site`](/docs/deployment) gesetzt ist).
 
 `search_docs` betreibt seinen eigenen Volltextindex und funktioniert damit unabhängig von deinem [Such](/docs/configuration/search)-Anbieter — und sogar, wenn die Suche auf `none` gesetzt ist. Der MCP-Server ist eine von der Suche auf der Seite getrennte Funktion.
 

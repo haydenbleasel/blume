@@ -44,6 +44,45 @@ export default defineConfig({
 
 Wenn zwei Quellen dieselbe Route auflösen, meldet Blume den Build-Fehler `BLUME_DUPLICATE_ROUTE` – gib jeder Quelle ein eigenes `prefix`.
 
+## Obsidian
+
+Die eingebaute Quelle `obsidian` liest einen [Obsidian](https://obsidian.md)-Vault direkt an Ort und Stelle. Es gibt keinen Exportschritt, und es wird nichts in dein Repository generiert: Der Vault bleibt die Quelle der Wahrheit, und Blume überführt Obsidians Dialekt beim Laden nach Markdown.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "obsidian",
+        prefix: "notes",
+        vault: "vault",
+        // Vault folder names to skip at any depth, on top of dot-folders
+        exclude: ["Templates", "Daily"],
+      },
+    ],
+  },
+});
+```
+
+`[[Wikilinks]]` werden zu Route-Links, die – so wie Obsidian Notizen adressiert – über den Notiznamen im gesamten Vault statt über einen Pfad aufgelöst werden. Eigener Linktext (`[[Note|label]]`), Überschriften-Anker (`[[Note#Install]]`), vollständige Pfade (`[[folder/Note]]` und `[[folder/Note.md]]`), die Teilpfade, die Obsidians Standardeinstellung „Kürzester Pfad, wenn möglich“ schreibt (`[[guides/Note]]`), und die Form `[[Note\|label]]`, die Obsidian innerhalb einer Tabellenzelle schreibt, funktionieren alle; und eine Notiz, die `slug` in ihrem Frontmatter setzt, wird unter der Route verlinkt, die dieser Slug veröffentlicht. Wenn zwei Notizen denselben Namen haben, gewinnt eine Notiz, deren vollständiger Vault-Pfad genau diesem Namen entspricht – Obsidian löst einen Link zuerst als Pfad und dann als Namen auf –, danach die erste in Vault-Reihenfolge (Ordner vor Notizen, ohne Beachtung der Groß-/Kleinschreibung, wie in Obsidians Dateiexplorer). Blume warnt nur, wenn ein Wikilink tatsächlich über eine solche Kollision aufgelöst wird; schreibe einen längeren Pfad, um die Mehrdeutigkeit aufzulösen. Eine Blockreferenz (`[[Note#^id]]`) verlinkt auf ihre Notiz ohne Anker: Blöcke werden ohne id gerendert, auf der man landen könnte. Ein Überschriften-Anker wird gegen die echten Überschriften der Zielnotiz aufgelöst, abgeglichen so, wie Obsidians Autovervollständigung sie schreibt (ohne `**bold**`, `` `code` `` und Link-Syntax), und mit demselben `extractHeadings`-Durchlauf zu einem Slug gemacht, der auch das Seiten-Manifest füllt – ein Link auf `#Install` landet also auf der Überschrift statt auf einer id, die keine Seite ausgibt. `[[#Install]]` adressiert eine Überschrift in der Notiz, die du gerade schreibst. Ein Link auf eine Überschrift, die nicht existiert, behält den Seitenlink, verwirft den Anker und warnt.
+
+Das Frontmatter behält, was Blumes [Seitenschema](/docs/reference/frontmatter) akzeptiert, plus jeden Schlüssel, den du in [`frontmatter.extend`](/docs/reference/frontmatter#custom-keys) deklarierst (oder, für Notizen dieses `type`, im `frontmatter` eines Inhaltstyps); jede andere Obsidian-Eigenschaft – Dataview-Felder, Templater-Daten, `publish` sowie Obsidians eigene `tags`, `aliases` und `cssclasses` – wird beim Überführen einer Notiz verworfen, sodass ein mit der Properties-Oberfläche geschriebener Vault ohne Frontmatter-Fehler baut. `aliases` wird verworfen statt aufgelöst – Alias-Linkziele werden noch nicht unterstützt. Ein relatives Markdown-Bild neben einer Notiz (`![chart](./chart.png)`) wird aus dem Vault ausgeliefert, und wenn der Vault innerhalb deines Git-Repositorys liegt, erhalten Vault-Seiten wie jede andere Seite aus Git abgeleitete [„Zuletzt aktualisiert“-Daten](/docs/configuration#last-modified). „Diese Seite bearbeiten“-Links werden über `github.dir` aufgelöst, sodass ein Vault, der in einem Monorepo neben der Dokumentations-App liegt, weiterhin auf seine Datei verlinkt; ein Vault außerhalb des Repositorys bekommt keinen Link.
+
+Locale-Verzeichnisse und Versions-Snapshots innerhalb des Vaults werden genauso gelesen, wie die Dateisystemquelle sie liest: `fr/Note.md` wird bei konfiguriertem [i18n](/docs/content/i18n) unter `/fr/` veröffentlicht, `v1.0/Note.md` bei [Versionen](/docs/content/versioning) unter `/v1.0/`, und Wikilinks auf diese Notizen zeigen auf die Route, die die jeweilige Notiz veröffentlicht.
+
+:::note
+Eine Überschrift, die selbst einen Link enthält, erhält ihren Manifest-Anker aus dem Markdown der Überschrift und ihre gerenderte `id` aus ihrem Textinhalt. Für diese Überschrift unterscheiden sich beide, sodass ein Wikilink darauf eventuell auf der Seite statt im Abschnitt landet.
+:::
+
+Ein Link auf eine `index`-Notiz landet auf der Route ihres Ordners statt auf einem Phantom-`/index`. **Ein nicht auflösbarer Wikilink wird zu einfachem Text mit einer Build-Warnung abgestuft, statt den Build fehlschlagen zu lassen**, sodass ein Vault mitten im Refactoring weiterhin veröffentlicht wird. Einzeilige `%%comments%%` werden entfernt, ein Wikilink innerhalb eines HTML-Kommentars (`<!-- [[Draft]] -->`) bleibt unangetastet, da Obsidian ihn ebenfalls verbirgt, und eine Notiz ohne `title` im Frontmatter erhält ihren Dateinamen als Titel – dieselbe Regel, die auch Obsidian selbst anwendet. Eine `index`-Notiz ist die einzige Ausnahme: Sie benennt eine Route statt einer Notiz, daher fällt ihr Titel auf Blumes übliche Herleitung zurück (erste Überschrift, dann das lesbar gemachte Segment). Code in Fences, eingerückter Code und Inline-Code werden wortwörtlich durchgereicht, sodass eine Notiz, die die Syntax dokumentiert, erhalten bleibt.
+
+Punkt-Ordner werden übersprungen, einschließlich Obsidians eigenem Konfigurationsverzeichnis `.obsidian` und `.trash` – das der Dev-Watcher ebenfalls ignoriert, sodass das Verschieben eines Panels in der App oder das Löschen einer Notiz in den Papierkorb deine Website nicht neu baut. Das Bearbeiten einer Notiz schon. Die Verzeichnisse, die kein Inhaltsscan liest (`node_modules`, `dist`, `.git`, …), werden ebenfalls übersprungen, sodass ein Vault, der im Projekt selbst wurzelt, keine READMEs von Abhängigkeiten veröffentlicht. Symlinks innerhalb des Vaults werden verfolgt, so wie die Dateisystemquelle sie verfolgt, sodass ein in den Vault verlinkter geteilter Ordner mit ihm veröffentlicht wird. Ein Vault, der innerhalb von `content.root` liegt, muss von der Dateisystemquelle ausgeschlossen werden (`exclude: ["vault/**"]`); `blume version cut` lässt ihn dann aus dem Snapshot heraus, da der Vault seine eigenen Notizen weiterhin als aktuell veröffentlicht.
+
+Noch nicht überführt: Callouts (`> [!note]`) werden als einfache Blockzitate gerendert, Einbettungen (`![[image.png]]`) werden unverändert durchgereicht, mehrzeilige `%%comments%%` bleiben stehen, und es gibt keinen Backlink-Graphen.
+
 ## Entferntes MDX
 
 Die eingebaute Quelle `mdx-remote` lädt rohe `.md`/`.mdx`-Dateien über HTTP. Zähle die Dateien entweder über einen Teilbaum eines GitHub-Repositorys (`github`) oder explizit gegenüber einer Raw-Basis-URL (`url` + `files`) auf:
@@ -125,7 +164,7 @@ Ein Lesetoken für ein privates Dataset stammt aus der Umgebungsvariable `SANITY
 
 ## Notion
 
-Die eingebaute Quelle `notion` verwandelt eine Notion-Datenbank in eine Sammlung: Jede Zeile wird zu einer Seite, ihre Eigenschaften werden zu Frontmatter und ihr Blockbaum wird zu MDX. Callouts, Toggles, Spalten und Codeblöcke werden auf die passenden Blume-Komponenten abgebildet. `@notionhq/client` ist eine optionale Peer-Abhängigkeit.
+Die eingebaute Quelle `notion` verwandelt eine Notion-Datenbank in eine Sammlung: Jede Zeile wird zu einer Seite, ihre Eigenschaften werden zu Frontmatter und ihr Blockbaum wird zu MDX. Callouts, Toggles, Spalten und Codeblöcke werden auf die passenden Blume-Komponenten abgebildet. `@notionhq/client` (v5 oder neuer) ist eine optionale Peer-Abhängigkeit; Blume liest die Datenbank über ihre erste Datenquelle.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -195,3 +234,5 @@ export default defineConfig({
 ```
 
 Eine Quelle normalisiert ihre native Form (Portable Text, Notion-Blöcke, entferntes HTML) zu Markdown-/MDX-Text, sodass dieselben Komponenten und Markdown-Funktionen gelten, ganz gleich, woher eine Seite stammt.
+
+Eine eigene Quelle, die lokale Dateien liest, sollte an jedem Eintrag `sourcePath` und an der Quelle selbst `contentRoot` setzen. `sourcePath` benennt die Datei in Diagnosemeldungen und löst relative Bilder daneben auf; `contentRoot` grenzt das `log` von Git ein, das Seiten datiert – ohne die Option erhalten die Seiten der Quelle also kein aus Git abgeleitetes [„Zuletzt aktualisiert“-Datum](/docs/configuration#last-modified).

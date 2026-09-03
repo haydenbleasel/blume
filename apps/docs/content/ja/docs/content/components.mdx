@@ -76,6 +76,8 @@ Blume には、アクセシブルでテーマ設定可能なコンポーネン�
 
 `inline` を追加すると、枠線付きのボックスではなく、ボーダーレスで描画されます — 全幅の罫線上にタブストリップが並び、コンテンツはその下に本文として流れます。`param` を追加すると、アクティブなタブがハッシュではなく URL のクエリパラメータに同期され、選択状態を共有できるようになります。`?install=windows` で終わるリンクを開くと Windows タブが表示されます。各グループはそれぞれ独自の `param` に同期するため、1 ページ内に独立してディープリンク可能なグループを複数配置できます。
 
+同じタイトルのタブを持つグループは連動して切り替わります — 1 つのグループで「macOS」を選ぶと、macOS タブを持つすべてのグループがそれに追従します。`syncKey` を追加すると、その連動の範囲を限定できます。同じキーを共有するグループだけが連動して切り替わるため、たまたまタブのタイトルが一致しただけの無関係なグループは独立したままになります。
+
 <Tabs inline param="install">
   <Tab title="macOS">Homebrew を使ってツールチェーンをインストールします。</Tab>
   <Tab title="Windows">winget を使ってツールチェーンをインストールします。</Tab>
@@ -559,6 +561,8 @@ export interface ButtonProps {
 
 GitHub リポジトリへのリンクを、最新のスター数とフォーク数とともに表示するカードです。カウントはビルド時に取得され — クライアント JavaScript は不要 — API に到達できない場合でもカードは描画されます。`owner` と `repo` を渡すか、省略して `blume.config` のリポジトリを使用します。API のレート制限を緩和するには、環境変数 `GITHUB_TOKEN` を設定してください。
 
+このカードはインスタンスを [`github.host`](/docs/configuration#github-enterprise) から読み取ります。そのため Enterprise でホストされているサイトでは、明示的に指定した `owner` / `repo` もそのインスタンスを参照します。特定のカードだけ別の場所を指すようにするには `host` を渡します — 例えば Enterprise のサイトから公開プロジェクトを示す場合などです。REST のベースは、`github.host` の場合と同じ方法でそこから導出されます。
+
 <GithubInfo owner="haydenbleasel" repo="blume" />
 
 ```astro lineNumbers
@@ -567,6 +571,9 @@ GitHub リポジトリへのリンクを、最新のスター数とフォーク�
 
 <!-- Or point it at any repository -->
 <GithubInfo owner="haydenbleasel" repo="blume" />
+
+<!-- Or at a repository on another instance -->
+<GithubInfo host="https://github.com" owner="haydenbleasel" repo="blume" />
 ```
 
 ## Component

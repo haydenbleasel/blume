@@ -44,6 +44,45 @@ export default defineConfig({
 
 Se duas fontes resolverem para a mesma rota, o Blume reporta um erro de build `BLUME_DUPLICATE_ROUTE` — dê a cada fonte um `prefix` distinto.
 
+## Obsidian
+
+A fonte integrada `obsidian` lê um vault do [Obsidian](https://obsidian.md) no lugar onde ele está. Não há etapa de exportação nem nada gerado dentro do seu repositório: o vault continua sendo a fonte da verdade, e o Blume reduz o dialeto do Obsidian a Markdown conforme carrega.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+
+export default defineConfig({
+  content: {
+    sources: [
+      { type: "filesystem", root: "docs" },
+      {
+        type: "obsidian",
+        prefix: "notes",
+        vault: "vault",
+        // Vault folder names to skip at any depth, on top of dot-folders
+        exclude: ["Templates", "Daily"],
+      },
+    ],
+  },
+});
+```
+
+Os `[[Wikilinks]]` viram links de rota, endereçados pelo nome da nota em todo o vault em vez de pelo caminho, do jeito que o Obsidian endereça as notas. Texto de link personalizado (`[[Note|label]]`), âncoras de cabeçalho (`[[Note#Install]]`), caminhos completos (`[[folder/Note]]` e `[[folder/Note.md]]`), os caminhos parciais que a configuração padrão "shortest path when possible" do Obsidian escreve (`[[guides/Note]]`) e a forma `[[Note\|label]]` que o Obsidian escreve dentro de uma célula de tabela — tudo funciona; e uma nota que define `slug` no frontmatter é linkada na rota que esse slug publica. Quando duas notas compartilham um nome, vence a nota cujo caminho completo no vault é exatamente esse nome — o Obsidian resolve um link como caminho antes de resolver como nome — e depois a primeira na ordem do vault (pastas antes de notas, sem diferenciar maiúsculas de minúsculas, como o explorador de arquivos do Obsidian). O Blume avisa apenas quando um wikilink de fato é resolvido por meio de uma colisão dessas; escreva um caminho mais longo para desambiguar. Uma referência de bloco (`[[Note#^id]]`) leva à nota dela sem âncora: os blocos são renderizados sem id em que aterrissar. Uma âncora de cabeçalho é resolvida contra os cabeçalhos reais da nota de destino, correspondidos do jeito que o autocomplete do Obsidian os escreve (com `**bold**`, `` `code` `` e sintaxe de link removidos) e convertidos em slug pela mesma passagem `extractHeadings` que preenche o manifesto da página — de modo que um link para `#Install` cai no cabeçalho, e não em um id que nenhuma página emite. `[[#Install]]` endereça um cabeçalho na própria nota que você está escrevendo. Um link para um cabeçalho que não existe mantém o link da página, descarta a âncora e emite um aviso.
+
+O frontmatter mantém o que o [esquema de página](/docs/reference/frontmatter) do Blume aceita, mais qualquer chave que você declare em [`frontmatter.extend`](/docs/reference/frontmatter#custom-keys) (ou, para notas daquele `type`, o `frontmatter` de um tipo de conteúdo); toda outra propriedade do Obsidian — campos do Dataview, datas do Templater, `publish` e os próprios `tags`, `aliases` e `cssclasses` do Obsidian — é descartada quando uma nota é reduzida, então um vault escrito com a UI de Properties compila sem erros de frontmatter. `aliases` é descartado em vez de resolvido — alvos de link por alias ainda não são suportados. Uma imagem Markdown relativa ao lado de uma nota (`![chart](./chart.png)`) é servida a partir do vault e, quando o vault fica dentro do seu repositório git, as páginas do vault ganham [datas de "Última atualização"](/docs/configuration#last-modified) derivadas do git, como qualquer outra página. Os links de "Editar esta página" são resolvidos por meio de `github.dir`, então um vault que fica ao lado do app de documentação em um monorepo ainda linka para o arquivo dele; um vault fora do repositório não recebe link.
+
+Diretórios de idioma e snapshots de versão dentro do vault são lidos do mesmo jeito que a fonte de sistema de arquivos os lê: `fr/Note.md` publica sob `/fr/` com [i18n](/docs/content/i18n) configurado, `v1.0/Note.md` sob `/v1.0/` com [versões](/docs/content/versioning), e wikilinks para essas notas apontam para a rota que cada uma publica.
+
+:::note
+Um cabeçalho que contém um link recebe sua âncora de manifesto a partir do Markdown do cabeçalho e seu `id` renderizado a partir do conteúdo de texto. Os dois divergem nesse cabeçalho, então um wikilink para ele pode cair na página em vez de na seção.
+:::
+
+Um link para uma nota `index` cai na rota da pasta dela, em vez de em um `/index` fantasma. **Um wikilink não resolvido degrada para texto simples com um aviso de build, em vez de quebrar o build**, então um vault no meio de uma refatoração ainda publica. `%%comments%%` de uma única linha são removidos, um wikilink dentro de um comentário HTML (`<!-- [[Draft]] -->`) é deixado em paz, já que o Obsidian também o esconde, e uma nota sem `title` no frontmatter é intitulada pelo nome do arquivo — a mesma regra que o próprio Obsidian aplica. Uma nota `index` é a única exceção: ela nomeia uma rota, e não uma nota, então o título dela recai na derivação usual do Blume (primeiro cabeçalho, depois o segmento humanizado). Código em blocos cercados, indentado e inline passa literalmente, então uma nota que documenta a sintaxe sobrevive.
+
+Pastas que começam com ponto são ignoradas, incluindo o próprio diretório de configuração `.obsidian` do Obsidian e a `.trash` — que o watcher de desenvolvimento também ignora, então mover um painel no app ou mandar uma nota para a lixeira não refaz o build do seu site. Editar uma nota, sim. Os diretórios que nenhuma varredura de conteúdo lê (`node_modules`, `dist`, `.git`, …) também são ignorados, então um vault com raiz no próprio projeto não publica os READMEs das dependências. Symlinks dentro do vault são seguidos, do mesmo jeito que a fonte de sistema de arquivos os segue, então uma pasta compartilhada linkada no vault é publicada junto. Um vault que fica dentro de `content.root` precisa ser excluído da fonte de sistema de arquivos (`exclude: ["vault/**"]`); o `blume version cut` então o deixa de fora do snapshot, já que o vault continua publicando as próprias notas como atuais.
+
+Ainda não reduzidos: callouts (`> [!note]`) são renderizados como blockquotes simples, embeds (`![[image.png]]`) passam intocados, `%%comments%%` de várias linhas são deixados no lugar e não há grafo de backlinks.
+
 ## MDX remoto
 
 A fonte integrada `mdx-remote` busca arquivos `.md`/`.mdx` brutos via HTTP. Enumere os arquivos a partir de uma subárvore de um repositório do GitHub (`github`) ou explicitamente contra uma URL base bruta (`url` + `files`):
@@ -125,7 +164,7 @@ Um token de leitura para um dataset privado vem da variável de ambiente `SANITY
 
 ## Notion
 
-A fonte integrada `notion` transforma um banco de dados do Notion em uma coleção: cada linha vira uma página, suas propriedades viram frontmatter e sua árvore de blocos vira MDX. Callouts, toggles, colunas e blocos de código são mapeados para os componentes correspondentes do Blume. `@notionhq/client` é uma dependência peer opcional.
+A fonte integrada `notion` transforma um banco de dados do Notion em uma coleção: cada linha vira uma página, suas propriedades viram frontmatter e sua árvore de blocos vira MDX. Callouts, toggles, colunas e blocos de código são mapeados para os componentes correspondentes do Blume. O `@notionhq/client` (v5 ou posterior) é uma dependência peer opcional; o Blume lê o banco de dados por meio da primeira fonte de dados dele.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -195,3 +234,5 @@ export default defineConfig({
 ```
 
 Uma fonte normaliza seu formato nativo (Portable Text, blocos do Notion, HTML remoto) para texto Markdown/MDX, de modo que os mesmos componentes e recursos de markdown se aplicam, não importa de onde uma página venha.
+
+Uma fonte personalizada que lê arquivos locais deve definir `sourcePath` em cada entrada e `contentRoot` na própria fonte. O `sourcePath` nomeia o arquivo nos diagnósticos e resolve as imagens relativas ao lado dele; o `contentRoot` delimita o `log` do git que data as páginas, então sem ele as páginas da fonte não recebem [data de "Última atualização"](/docs/configuration#last-modified) derivada do git.

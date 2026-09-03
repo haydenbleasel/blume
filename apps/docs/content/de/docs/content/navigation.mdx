@@ -243,6 +243,21 @@ navigation: {
 
 Jeder Eintrag ist eine Seitenroute (eine Zeichenkette), eine Gruppe (`label` + `items`) oder ein Link (`label` + `href`). Gruppen können verschachtelt werden, den globalen [`display`-Modus](#display-modes) überschreiben und `collapsed` starten.
 
+## Header-Aktionen
+
+`navigation.actions` platziert schlichte Links im Header, links neben den Symbol-Buttons, und `navigation.cta` ist der eine gefüllte Button:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  actions: [{ href: "/changelog", label: "Changelog" }],
+  cta: { href: "https://example.com/signup", label: "Start free" },
+}
+```
+
+`cta` ist mit Absicht Singular – ein Doku-Header hat Platz für genau eine Sache, zu der Lesende aufgefordert werden, und eine Reihe von Buttons fordert zu gar nichts auf. Sekundäre Links gehören in `actions` – oder in [`featured`](#featured-links), wenn sie stattdessen bei der Seitenleiste sitzen sollen.
+
+Ein `http(s)`- oder protokollrelatives href öffnet sich in einem neuen Tab; eine Route bleibt im Tab und wird – wie ein `featured`-Link – zur Build-Zeit gegen deine Seiten geprüft. Eine Seite, die von einer anderen App auf demselben Host ausgeliefert wird (etwa `/signup` auf dem Produkt), solltest du daher als absolute URL schreiben. `actions` werden unterhalb des `sm`-Breakpoints ausgeblendet, wo der Header nur noch Platz für das Logo und den Navigations-Umschalter hat. `cta` wird dort ebenfalls ausgeblendet – außer auf einer Seite ohne Navigations-Umschalter, etwa einer Landing-Page mit `PageLayout` ohne Tabs, wo er bleibt, da ihn auf einem Smartphone sonst nichts sichtbar machen kann.
+
 ## Repository-Link
 
 Wenn du [`github`](/docs/configuration) in deiner Konfiguration setzt, zeigt Blume ein GitHub-Symbol im Header – neben dem Theme-Umschalter –, das auf dein Repository verlinkt. Es ist standardmäßig aktiviert; blende es mit `navigation.repo` aus:
@@ -254,6 +269,16 @@ navigation: {
 ```
 
 Der Link erscheint nur, wenn `github` konfiguriert ist, sodass Projekte ohne Repository so oder so nicht betroffen sind.
+
+`repo` nimmt außerdem eine absolute URL entgegen, die das Zeichen im Header auf einen beliebigen Ort auf GitHub verweisen lässt:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  repo: "https://github.com/acme",
+}
+```
+
+Das ist für ein Projekt gedacht, dessen Doku-Repository privat ist. `github` steuert den Bearbeiten-Link pro Seite, das Zeichen im Header und das Repository im [Agenten-Manifest](/docs/configuration/ai) gemeinsam, sodass ein solches Projekt `github` ungesetzt lassen muss – und eine URL sorgt dafür, dass trotzdem ein Zeichen angezeigt wird, das auf etwas Öffentliches verweist. Das Symbol bleibt das GitHub-Zeichen, ein Link auf einen anderen Host gehört daher in [`actions`](#header-actions).
 
 ## Breadcrumbs und Seitennavigation
 

@@ -248,6 +248,33 @@ Jede Seite enthält:
 
 URLs sind absolut, wenn `deployment.site` gesetzt ist. Seiten, die mit `seo.noindex` markiert sind, werden übersprungen.
 
+### Identität der Site
+
+Der WebSite-Knoten sagt, dass eine Site existiert; er sagt nicht, _was_ sie ist oder _wer_ sie betreibt – und genau dafür lesen KI-Agents JSON-LD, bevor sie dich empfehlen oder zitieren. Zwei optionale Blöcke füllen das aus, beide benötigen `deployment.site` (die Knoten tragen absolute Bezeichner):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  organization: {
+    name: "Acme", // defaults to the site title
+    email: "hello@acme.com",
+    telephone: "+1 555 0100",
+    address: { addressLocality: "Sydney", addressCountry: "AU" },
+    logo: "/logo.svg",
+    sameAs: ["https://github.com/acme", "https://x.com/acme"],
+  },
+  software: {
+    license: "MIT",
+    operatingSystem: "Node.js 22+",
+    price: 0, // emitted as an Offer; 0 marks it free
+    sameAs: ["https://www.npmjs.com/package/acme"],
+  },
+}
+```
+
+`organization` fügt jeder Seite einen **Organization**-Knoten hinzu – der WebSite-Knoten und die Artikel-Knoten führen ihn als `publisher` – mit E-Mail und Telefonnummer als `ContactPoint` (`contactType` ist standardmäßig `"customer support"`) und der Adresse als `PostalAddress`, den beiden Feldern, nach denen Prüfungen zur Unternehmensverifizierung suchen. `name` und `url` übernehmen standardmäßig die Werte der Site; ein wurzelrelatives `logo` wird wie jede Seiten-URL absolut gemacht.
+
+`software` fügt der Startseite einen **SoftwareApplication**-Knoten hinzu: Name und Beschreibung des Produkts (ersatzweise die der Site), `applicationCategory` (Standard `"DeveloperApplication"`), Betriebssystem, Lizenz, ein `Offer`, wenn `price` gesetzt ist, und die Registry- oder Repository-URLs in `sameAs`. Übergib `software: true`, um alle Standardwerte zu übernehmen. Die Organisation wird, sofern konfiguriert, als dessen `publisher` geführt.
+
 ## Sitemap
 
 Blume schreibt zur Build-Zeit eine `sitemap.xml` mit jeder indexierbaren Seite. Sie benötigt ein absolutes [`deployment.site`](/docs/deployment) und listet jede Seite auf, außer Entwürfen, versteckten und `noindex`-Seiten. Auf einer [versionierten](/docs/content/versioning) Site bleiben außerdem archivierte Seiten außen vor, deren Canonical auf ihre aktuelle Entsprechung zeigt – die aktuelle Seite ist die, die indexiert werden soll. Standardmäßig aktiviert:

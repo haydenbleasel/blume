@@ -72,6 +72,8 @@ Wechsle an Ort und Stelle zwischen gleichwertigen Inhalten – Sprachvarianten, 
 
 Füge `inline` hinzu, um randlos zu rendern – eine Tab-Leiste auf einer Linie über die volle Breite, mit dem Inhalt, der darunter als Fließtext folgt – statt der umrandeten Box. Füge `param` hinzu, um den aktiven Tab statt mit dem Hash mit einem URL-Query-Parameter zu synchronisieren; das macht die Auswahl teilbar: Ein Link, der auf `?install=windows` endet, öffnet den Windows-Tab. Jede Gruppe synchronisiert sich mit ihrem eigenen `param`, sodass du mehrere unabhängige, direkt verlinkbare Gruppen auf einer Seite verwenden kannst.
 
+Gruppen mit gleichnamigen Tabs wechseln gemeinsam – wähle in einer „macOS“, und jede Gruppe mit einem macOS-Tab zieht nach. Füge `syncKey` hinzu, um diese Synchronisierung einzugrenzen: Nur Gruppen mit demselben Schlüssel wechseln gemeinsam, sodass unabhängige Gruppen, die zufällig einen Tab-Titel teilen, eigenständig bleiben.
+
 <Tabs inline param="install">
   <Tab title="macOS">Nutze Homebrew, um die Toolchain zu installieren.</Tab>
   <Tab title="Windows">Nutze winget, um die Toolchain zu installieren.</Tab>
@@ -547,6 +549,8 @@ export interface ButtonProps {
 
 Eine Karte, die auf ein GitHub-Repository verlinkt und dessen aktuelle Stern- und Fork-Zahlen anzeigt. Die Zahlen werden zur Build-Zeit abgerufen – kein Client-JavaScript – und die Karte wird auch dann gerendert, wenn die API nicht erreichbar ist. Übergib `owner` und `repo` oder lass beides weg, um das Repository aus deiner `blume.config` zu verwenden. Setze eine Umgebungsvariable `GITHUB_TOKEN`, um das API-Ratenlimit anzuheben.
 
+Die Karte liest die Instanz aus [`github.host`](/docs/configuration#github-enterprise), sodass auf einer Enterprise-gehosteten Website auch explizite `owner`/`repo` diese Instanz adressieren. Übergib `host`, um eine einzelne Karte woanders hinzurichten – etwa auf ein öffentliches Projekt von einer Enterprise-Website aus; die REST-Basis wird davon genauso abgeleitet wie von `github.host`.
+
 <GithubInfo owner="haydenbleasel" repo="blume" />
 
 ```astro lineNumbers
@@ -555,6 +559,9 @@ Eine Karte, die auf ein GitHub-Repository verlinkt und dessen aktuelle Stern- un
 
 <!-- Or point it at any repository -->
 <GithubInfo owner="haydenbleasel" repo="blume" />
+
+<!-- Or at a repository on another instance -->
+<GithubInfo host="https://github.com" owner="haydenbleasel" repo="blume" />
 ```
 
 ## Component

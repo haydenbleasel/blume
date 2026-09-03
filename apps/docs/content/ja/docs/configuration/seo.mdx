@@ -247,6 +247,33 @@ seo: {
 
 `deployment.site` が設定されている場合、URL は絶対 URL になります。`seo.noindex` が指定されたページはスキップされます。
 
+### サイトのアイデンティティ
+
+WebSite ノードはサイトが存在することを示すだけで、それが*何*であるか、*誰*が運営しているかは示しません。しかし AI エージェントは、あなたを推薦したり引用したりする前に、まさにそれを知るために JSON-LD を読みます。2 つのオプションブロックがそれを補います。どちらも `deployment.site` を必要とします（これらのノードは絶対識別子を持つためです）。
+
+```ts blume.config.ts lineNumbers
+seo: {
+  organization: {
+    name: "Acme", // defaults to the site title
+    email: "hello@acme.com",
+    telephone: "+1 555 0100",
+    address: { addressLocality: "Sydney", addressCountry: "AU" },
+    logo: "/logo.svg",
+    sameAs: ["https://github.com/acme", "https://x.com/acme"],
+  },
+  software: {
+    license: "MIT",
+    operatingSystem: "Node.js 22+",
+    price: 0, // emitted as an Offer; 0 marks it free
+    sameAs: ["https://www.npmjs.com/package/acme"],
+  },
+}
+```
+
+`organization` はすべてのページに **Organization** ノードを追加します。WebSite ノードと article ノードはこれを `publisher` として参照します。メールアドレスと電話番号は `ContactPoint`（`contactType` のデフォルトは `"customer support"`）として、住所は `PostalAddress` として出力されます。この 2 つのフィールドは事業者確認のチェックが探すものです。`name` と `url` はサイトのものがデフォルトになり、ルート相対の `logo` は他のページ URL と同様に絶対 URL 化されます。
+
+`software` はホームページに **SoftwareApplication** ノードを追加します。製品の名前と説明（デフォルトはサイトのもの）、`applicationCategory`（デフォルトは `"DeveloperApplication"`）、オペレーティングシステム、ライセンス、`price` が設定されている場合は `Offer`、そして `sameAs` に含めるレジストリまたはリポジトリの URL です。`software: true` を渡すとすべてデフォルトが採用されます。organization が設定されている場合は、その `publisher` として参照されます。
+
 ## サイトマップ
 
 Blume はビルド時に、インデックス可能なすべてのページを含む `sitemap.xml` を書き出します。絶対 URL の [`deployment.site`](/docs/deployment) が必要で、下書き、非表示、`noindex` のページを除くすべてのページを一覧します。[バージョン管理](/docs/content/versioning)されたサイトでは、canonical が公開中の同等ページを指しているアーカイブ済みのページも除外されます。インデックスすべきなのは公開中のページだからです。デフォルトで有効です。

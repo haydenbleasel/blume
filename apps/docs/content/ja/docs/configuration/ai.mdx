@@ -34,6 +34,22 @@ ai: {
 }
 ```
 
+オブジェクト形式は `details` も受け付けます。これは `llms.txt` のタイトルと要約の直後、ページセクションの前に配置される Markdown で、[llms.txt 仕様](https://llmstxt.org)における自由形式の「details」ブロックです。読みやすさをスキャンするツールが明示的に探す箇所でもあり、*どんなときに*あなたの製品を使うべきか、どう呼び出すのかをエージェントに伝える場所です。インストールコマンドやパッケージ名もここに書きます。
+
+```ts blume.config.ts lineNumbers
+ai: {
+  llmsTxt: {
+    details: [
+      "## When to use Acme",
+      "",
+      "Reach for Acme when a project needs hosted feature flags. Install the CLI with `npm install -g acme`; the API reference below covers every endpoint.",
+    ].join("\n"),
+  },
+}
+```
+
+`llms.txt` は、設定不要で生成される 2 つのセクションで締めくくられます。**Agent skills** は [`ai.skills`](#skills-discovery) を通じて公開された各スキルを、その説明（スキルがいつ使うべきかを述べている箇所）とともに列挙します。**Agent resources** は、ビルドが出力するあらゆる機械可読の成果物へのリンクを並べます。`llms-full.txt`、ページごとの[生の Markdown](#raw-markdown) ミラー、[MCP サーバー](#mcp-server)とそのディスカバリー文書、スキル索引、[API カタログ](#api-catalog)、[`agent-readability.json`](#agent-readability)、[サイトマップ](/docs/configuration/seo#sitemap)で、いずれも存在する場合にのみ含まれます。そのため `llms.txt` しか読まないエージェントでも、この面のすべてを見つけられます。
+
 個々のページを両方のファイルから除外するには、そのページのフロントマターで `ai.exclude` を設定します。
 
 ```mdx
@@ -60,7 +76,7 @@ ai:
 
 ネストされたルートも同様に動作し（`/content/syntax.md`）、ホームページは `/index.md` で配信されます。
 
-`.md` 版は、JSX を解釈できない利用者のためにコンポーネントをプレーンな Markdown へ*ダウンレベル*します。`<TypeTable>` は Markdown のテーブルに、`<Callout>` はラベル付き引用に、`<Steps>` は順序付きリストに、`<Tabs>` は太字ラベルのセクションに、`<YouTube>` はリンクになります。props はページの `frontmatter` をスコープに入れて評価されるため、`title={frontmatter.status}` のような prop はレンダリングされたページと同じ値に解決されます。忠実に変換できないもの（カスタムコンポーネントや、import から算出される prop）はそのまま残され、フェンス付きコードブロック内のコンポーネントのマークアップには一切手を加えません。同じ変換は `llms-full.txt` と MCP サーバーの `get_page` ツールにも適用されるため、エージェントに向けたあらゆる面がきれいな Markdown として読めます。変換前のソースが必要なときは `.mdx` 版を使ってください。
+`.md` 版は、JSX を解釈できない利用者のためにコンポーネントをプレーンな Markdown へ*ダウンレベル*します。`<TypeTable>` は Markdown のテーブルに、`<Callout>` はラベル付き引用に、`<Steps>` は順序付きリストに、`<Tabs>` は太字ラベルのセクションに、`<Card>` は本文の上にタイトルをリンクとして置いたものに（`<CardGroup>` はそれが保持するカード群に）、`<YouTube>` はリンクになります。props はページの `frontmatter` をスコープに入れて評価されるため、`title={frontmatter.status}` のような prop はレンダリングされたページと同じ値に解決されます。忠実に変換できないもの（カスタムコンポーネントや、import から算出される prop）はそのまま残され、フェンス付きコードブロック内のコンポーネントのマークアップには一切手を加えません。同じ変換は `llms-full.txt` と MCP サーバーの `get_page` ツールにも適用されるため、エージェントに向けたあらゆる面がきれいな Markdown として読めます。変換前のソースが必要なときは `.mdx` 版を使ってください。
 
 ### コンテントネゴシエーション
 
@@ -86,7 +102,7 @@ export default defineConfig({
 });
 ```
 
-コンテナー系のコンポーネントでは、`childComponents("Name")` がタグごとに直下の子要素を抽出します。組み込みの `<Steps>` シリアライザーが `<Step>` 項目を集めるのと同じ仕組みです。同名のエントリーは組み込みシリアライザーを置き換えるため、`<Callout>` のダウンレベルの見え方を作り替えたり、`null` を返して完全にオプトアウトしたりできます。
+コンテナー系のコンポーネントでは、`childComponents("Name")` がタグごとに直下の子要素を抽出します。組み込みの `<Steps>` シリアライザーが `<Step>` 項目を集めるのと同じ仕組みです。また `childBlocks()` は、コンポーネントか散文かを問わず直下のすべての子要素を順番に返し、それぞれはすでに Markdown のブロックへダウンレベル済みです（組み込みの `<CardGroup>` シリアライザーは、そのブロック群を空行で連結しているだけです）。同名のエントリーは組み込みシリアライザーを置き換えるため、`<Callout>` のダウンレベルの見え方を作り替えたり、`null` を返して完全にオプトアウトしたりできます。
 
 シリアライザーは `components.tsx` ではなく `blume.config.ts` に置きます。設定ファイルはビルド時に実行されますが、コンポーネントファイルは静的に解析されるだけだからです（`.astro` ファイルを import する可能性があり、それはサイトのビルド外では実行できません）。コンポーネント自体はこれまでどおり `components.tsx` に登録したままです。`markdownComponents` は、そのエージェント向けの Markdown 表現を追加するだけです。
 
@@ -101,6 +117,8 @@ export default defineConfig({
 > Read `https://your-site/this-page.md` so I can ask you questions about this page.
 
 Copy as Markdown と同様、セットアップは不要です。アシスタントは公開 URL 経由でページを取得するため、ページがデプロイされればすぐに機能します。
+
+このプロンプトは [UI 辞書](/docs/content/i18n#translated-ui)の一部（`actions.openInChatPrompt`）なので、ローカライズされたサイトはその言語で送信し、`i18n.ui` で文言を上書きできます。`{url}` プレースホルダーはそのまま残してください。ページの生の Markdown の URL に置き換えられます。
 
 このアクションを調整するには `ai.openInChat` を設定します。`false` にすると完全に非表示になり、プロバイダーキーの配列（`"v0"`、`"chatgpt"`、`"claude"`、`"t3"`、`"scira"`、`"cursor"`）を指定すると、列挙した順序でそれらのプロバイダーだけが表示されます。
 
@@ -307,7 +325,7 @@ ai: {
 | `name` | title | クライアントに表示されるサーバー名（既定はタイトル）。 |
 | `instructions` | — | 接続するエージェントに渡す任意のシステムヒント。 |
 
-サーバーは読み取り専用のツール（`search_docs`、`get_page`、`list_pages`、`get_navigation`）を公開し、`/.well-known/mcp.json` と `/.well-known/mcp/server-card.json` にディスカバリー文書を公開します。サーバーカードは [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) の Server Card 拡張スキーマ（逆引き DNS 形式の `name`、`remotes` トランスポートエンドポイント）に従い、提案の以前の版に合わせて作られたスキャナー向けに initialize 形式の互換フィールド（`serverInfo`、`capabilities`、`transports`）も備えています。各ページの **Connect to MCP** メニューでは、Claude Code、Cursor、VS Code、Codex 向けにコピーしてすぐ使えるインストール手順を提供します（[`deployment.site`](/docs/deployment) を設定すると表示されます）。
+サーバーは読み取り専用のツール（`search_docs`、`get_page`、`list_pages`、`get_navigation`）と、すべてのページを MCP リソースとして公開します（`resources/list` は配信 URL でページを `text/markdown` タイプとともに列挙し、`resources/read` はそのページのエージェント向け Markdown、つまり `get_page` と同じ出力を返します）。そのため、URI でコンテキストを添付するクライアントは、ツールを呼び出さずにドキュメントを閲覧できます。さらに `/.well-known/mcp.json` と `/.well-known/mcp/server-card.json` にディスカバリー文書を公開します。サーバーカードは [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) の Server Card 拡張スキーマ（逆引き DNS 形式の `name`、`remotes` トランスポートエンドポイント）に従い、提案の以前の版に合わせて作られたスキャナー向けに initialize 形式の互換フィールド（`serverInfo`、`capabilities`、`transports`）も備えています。各ページの **Connect to MCP** メニューでは、Claude Code、Cursor、VS Code、Codex 向けにコピーしてすぐ使えるインストール手順を提供します（[`deployment.site`](/docs/deployment) を設定すると表示されます）。
 
 `search_docs` は独自の全文インデックスで動作するため、[検索](/docs/configuration/search)プロバイダーに関係なく（検索が `none` に設定されていても）機能します。MCP サーバーはページ内検索とは別の機能です。
 

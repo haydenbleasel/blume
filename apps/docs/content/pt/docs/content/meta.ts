@@ -6,6 +6,7 @@ export default {
     "navigation",
     "meta",
     "syntax",
+    "includes",
     "components",
     "islands",
     "sources",

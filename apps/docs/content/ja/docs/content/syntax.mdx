@@ -18,6 +18,38 @@ Blume は、標準的な Markdown と MDX を、厳選された GitHub Flavored 
 #### Detail
 ```
 
+### カスタムアンカー
+
+アンカーの id は見出しのテキストから生成されるため、見出しの文言を変えると新しいアンカーになります。代わりにアンカーを固定するには `[#custom-id]` を末尾に付けます — このマーカーはレンダリングされず、見出しの文言がどうなってもリンクは機能し続けます。固定したアンカーは[翻訳されたロケール](/docs/content/i18n)間でも同一のまま保たれます。自動生成された id では言語ごとに異なってしまうためです。
+
+```md
+## Getting started [#setup]
+```
+
+`/page#setup` としてリンクします。この構文は Fumadocs と一致するため、移行したコンテンツはそのまま動作します。
+
+Pandoc、kramdown、および Markdown ベースの仕様策定ツールチェーンで使われる `{#custom-id}` 形式は、`.md` ファイルでは同等のものとして受け付けられます。`.mdx` では、裸の `{…}` は JSX 式となりページのコンパイルに失敗します — `blume check` はこのマーカーを `BLUME_MDX_CURLY_ANCHOR` として報告します — そのため、そこでは `[#custom-id]` と書くか、波括弧をエスケープしてください。エスケープした形式はどちらのフォーマットでも同じアンカーを固定するため、`.mdx` ページが[インクルード](/docs/content/includes)するパーシャルにはこの書き方が適しています：
+
+```md
+## Getting started \{#setup\}
+```
+
+フラグメントリンクは、`id` を持つ生の HTML 要素（`<a id="setup"></a>`）を対象にすることもできます。`blume validate` は見出しアンカーと並んでそれらも受け付けます。
+
+### 目次マーカー
+
+さらに 2 つの末尾マーカーが、見出しを目次にどう表示するかを制御します。`[!toc]` は見出しをページ上に残しつつ目次からは除外します。`[toc]` はその逆で、見出しは目次にのみ表示され、ページ上では不可視のアンカーターゲットになります — 散文ではなくコンポーネントで構成されたセクションにラベルを付けるのに便利です。マーカーは任意の順序で連結できます。
+
+```md
+## Appears on the page only [!toc]
+
+## Appears in the TOC only [toc]
+
+## Both markers together [toc] [#custom-id]
+```
+
+マーカーは常に解析されます — 文字どおりマーカーの形をしたテキストで終わる見出しは、マーカー付きとして扱われます。バックスラッシュによるエスケープは役に立ちません（マーカーの解析が走る前に、Markdown が `\[` を `[` に解決するためです）。見出しの末尾にマーカーそのものの文字列を表示するには、インラインコードで囲んでください：`` ## Using `[toc]` ``。
+
 ## 強調
 
 単語を強調したり、削除を示したり、文中でコードやキー入力を表示したりするためのインライン書式です。
@@ -285,6 +317,42 @@ config.title;
 //     ^?
 ```
 ````
+
+### TypeScript と JavaScript のタブ
+
+`ts` または `tsx` のブロックに `ts2js` を付けると、タブの組としてレンダリングされます：あなたの TypeScript と、自動生成された JavaScript 版が並ぶので、スニペットは 1 つだけ保守すれば、読者は自分の方言を選べます。変換では型構文と型のみのインポートが取り除かれ、書式・コメント・JSX は書いたとおりに保たれます — さらにタブは同期するため、一度 JavaScript を選ぶとページ上のすべての組が切り替わります。図表や数式と同様に、これは MDX 専用の機能です — `.md` ファイルではこのブロックは通常の TypeScript フェンスとしてレンダリングされます。
+
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+
+````md
+```ts ts2js
+import { defineConfig } from "blume";
+
+interface Author {
+  name: string;
+}
+
+const author: Author = { name: "Hayden" };
+
+export default defineConfig({
+  title: `${author.name}'s docs`,
+});
+```
+````
+
+その他のフェンスのメタ情報も組み合わせられます：`title="..."` は両方のタブに表示され、`{1,4-5}` の行範囲は TypeScript のタブにのみ適用されます（型がなくなると行番号がずれるためです）。唯一の例外は `twoslash` です — ホバー時の型は生成されたコードには引き継げないため、両方を付けたフェンスは通常の Twoslash ブロックのままになります。
 
 :::note
 言語アイコンを非表示にしたり、長い行をスクロールさせる代わりに折り返したりするには、`blume.config.ts` で `markdown: { code: { icons: false, wrap: true } }` を指定します。

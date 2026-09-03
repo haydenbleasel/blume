@@ -285,6 +285,30 @@ github: {
 | `repo` | — | リポジトリ名。 |
 | `branch` | `"main"` | 編集リンクが指すブランチ。 |
 | `dir` | — | リポジトリルートからプロジェクトルートまでのパス（モノレポ向け）。 |
+| `host` | `"https://github.com"` | Enterprise 環境向けの、GitHub インスタンスのオリジン。HTTP(S) である必要があり、オリジンに正規化されます。 |
+| `api` | `host` から導出 | Enterprise インスタンスに対して `<GithubInfo>` を使うための REST API のベース。HTTP(S) である必要があり、オリジンとパスに正規化されます。 |
+
+### GitHub Enterprise
+
+リポジトリが GitHub Enterprise インスタンスにあるドキュメントでは `host` を設定します。すると、リポジトリから導出されるすべてのリンク — ヘッダーのマーク、編集リンク、エージェントマニフェスト — が、公開サイトではなくそのインスタンスを指すようになります:
+
+```ts blume.config.ts lineNumbers
+github: {
+  host: "https://github.acme.com",
+  owner: "acme",
+  repo: "docs",
+}
+```
+
+[`<GithubInfo>`](/docs/content/components) が問い合わせる REST API のベースは `host` から導出されます。データレジデンシーを備えた Enterprise Cloud テナント（`acme.ghe.com`）はその `api.` サブドメインから配信され、それ以外のホストは Enterprise Server（`/api/v3`）として扱われます。インスタンスがそれ以外の場所にある場合は、`api` を明示的に設定してください。
+
+:::warning
+プレーンな HTTP でしか到達できないインスタンスでもカウントは描画されますが、`GITHUB_TOKEN` は平文で送信される代わりにリクエストから除外されます。そのため、プライベートリポジトリのカードはカウントなしで返ってきます。
+:::
+
+:::note
+`host` は Blume が `github` から導出するリンクに適用されます。ヘッダーのマークだけを別の場所 — 例えばドキュメントのリポジトリ自体がプライベートな場合の組織ページなど — に向けたい場合は、絶対 URL を指定した [`navigation.repo`](/docs/content/navigation#repository-link) を使ってください。
+:::
 
 ## 最終更新日
 

@@ -242,6 +242,21 @@ navigation: {
 
 各項目は、ページのルート（文字列）、グループ（`label` + `items`）、またはリンク（`label` + `href`）です。グループは入れ子にでき、グローバルな [`display` モード](#display-modes)を上書きでき、`collapsed` の状態から始めることもできます。
 
+## ヘッダーアクション
+
+`navigation.actions` はヘッダーのアイコンボタンの左側に素のリンクを配置し、`navigation.cta` は唯一の塗りつぶしボタンです。
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  actions: [{ href: "/changelog", label: "Changelog" }],
+  cta: { href: "https://example.com/signup", label: "Start free" },
+}
+```
+
+`cta` が単数なのは意図的です — ドキュメントのヘッダーには、読者に求める行動をちょうど 1 つ置く余地しかなく、ボタンが並んでいては何も求めていないのと同じです。二次的なリンクは `actions` に、あるいはサイドバー側に置きたい場合は [`featured`](#featured-links) に含めてください。
+
+`http(s)` またはプロトコル相対の href は新しいタブで開きます。ルートは同じタブに留まり、`featured` リンクと同様にビルド時にページと照合されます — そのため、同じホスト上の別アプリが配信するページ（たとえば製品側の `/signup`）は絶対 URL として書いてください。`actions` は `sm` ブレークポイント未満では非表示になります。そこではヘッダーにロゴとナビゲーションのトグルを置く余地しかないためです。`cta` もそこでは非表示になりますが、ナビゲーションのトグルがないページ — タブのない `PageLayout` のランディングページ — では、スマートフォンで他にそれを表示する手段がないため、そのまま残ります。
+
 ## リポジトリリンク
 
 設定で [`github`](/docs/configuration) を指定すると、Blume はヘッダーの — テーマ切り替えの隣に — リポジトリへリンクする GitHub アイコンを表示します。デフォルトで有効で、`navigation.repo` で非表示にできます。
@@ -253,6 +268,16 @@ navigation: {
 ```
 
 このリンクは `github` が設定されている場合にのみ表示されるため、リポジトリのないプロジェクトはいずれにせよ影響を受けません。
+
+`repo` は絶対 URL も受け取ることができ、ヘッダーのマークを GitHub 上の任意の場所へ向けられます。
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  repo: "https://github.com/acme",
+}
+```
+
+これはドキュメントのリポジトリが非公開のプロジェクト向けです。`github` はページごとの編集リンク、ヘッダーのマーク、[エージェントマニフェスト](/docs/configuration/ai)のリポジトリをまとめて制御するため、そうしたプロジェクトは `github` を未設定のままにするしかありません — そして URL があれば、公開されたどこかを指すマークを引き続き表示できます。アイコンは GitHub のマークのままなので、別のホストへのリンクは [`actions`](#header-actions) に置いてください。
 
 ## パンくずリストとページネーション
 

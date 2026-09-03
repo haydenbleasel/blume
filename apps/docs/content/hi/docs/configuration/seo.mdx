@@ -248,6 +248,33 @@ seo: {
 
 जब `deployment.site` सेट होता है तो URL निरपेक्ष होते हैं। `seo.noindex` से चिह्नित पेज छोड़ दिए जाते हैं।
 
+### साइट पहचान
+
+WebSite नोड यह बताता है कि कोई साइट मौजूद है; यह नहीं बताता कि वह _क्या_ है या उसे _कौन_ चलाता है — और AI एजेंट आपकी अनुशंसा या उद्धरण देने से पहले JSON-LD इसी के लिए पढ़ते हैं। दो वैकल्पिक ब्लॉक इसकी पूर्ति करते हैं, और दोनों के लिए `deployment.site` चाहिए (ये नोड निरपेक्ष पहचानकर्ता धारण करते हैं):
+
+```ts blume.config.ts lineNumbers
+seo: {
+  organization: {
+    name: "Acme", // defaults to the site title
+    email: "hello@acme.com",
+    telephone: "+1 555 0100",
+    address: { addressLocality: "Sydney", addressCountry: "AU" },
+    logo: "/logo.svg",
+    sameAs: ["https://github.com/acme", "https://x.com/acme"],
+  },
+  software: {
+    license: "MIT",
+    operatingSystem: "Node.js 22+",
+    price: 0, // emitted as an Offer; 0 marks it free
+    sameAs: ["https://www.npmjs.com/package/acme"],
+  },
+}
+```
+
+`organization` हर पेज में एक **Organization** नोड जोड़ता है — WebSite और article नोड उसे `publisher` के रूप में उद्धृत करते हैं — जिसमें ईमेल और टेलीफ़ोन एक `ContactPoint` के रूप में (`contactType` डिफ़ॉल्ट रूप से `"customer support"`) और पता एक `PostalAddress` के रूप में रहता है, यानी वे दो फ़ील्ड जिन्हें व्यवसाय-सत्यापन जाँचें खोजती हैं। `name` और `url` डिफ़ॉल्ट रूप से साइट के होते हैं; रूट-सापेक्ष `logo` को किसी भी पेज URL की तरह निरपेक्ष बना दिया जाता है।
+
+`software` होमपेज में एक **SoftwareApplication** नोड जोड़ता है: उत्पाद का नाम और विवरण (डिफ़ॉल्ट रूप से साइट के), `applicationCategory` (डिफ़ॉल्ट `"DeveloperApplication"`), ऑपरेटिंग सिस्टम, लाइसेंस, `price` सेट होने पर एक `Offer`, और `sameAs` में रजिस्ट्री या रिपॉज़िटरी URL। हर डिफ़ॉल्ट अपनाने के लिए `software: true` पास करें। कॉन्फ़िगर किए जाने पर संगठन को उसके `publisher` के रूप में उद्धृत किया जाता है।
+
 ## साइटमैप
 
 Blume बिल्ड समय पर हर इंडेक्स-योग्य पेज का `sitemap.xml` लिखता है। इसके लिए निरपेक्ष [`deployment.site`](/docs/deployment) चाहिए और यह ड्राफ़्ट, छिपे हुए तथा `noindex` पेजों को छोड़कर हर पेज सूचीबद्ध करता है। किसी [संस्करणित](/docs/content/versioning) साइट पर, वे संग्रहीत पेज भी छोड़ दिए जाते हैं जिनका कैनोनिकल उनके लाइव समकक्ष की ओर इशारा करता है — इंडेक्स किया जाने वाला पेज लाइव पेज ही है। डिफ़ॉल्ट रूप से चालू:

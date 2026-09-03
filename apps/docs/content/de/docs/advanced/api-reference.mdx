@@ -13,7 +13,7 @@ openapi: {
 }
 ```
 
-Damit wird die Referenz unter `/reference` eingebunden (eine Übersichtsseite), wobei jede Operation unter `/reference/<tag>/<operation>` liegt. Die `spec` ist entweder eine `http(s)`-URL oder ein Pfad zu einer lokalen Datei in deinem Projekt. Blume parst sie mit [Scalars OpenAPI-Parser](https://github.com/scalar/scalar) – Swagger-2.0- und OpenAPI-3.0-Spezifikationen werden automatisch auf 3.1 aktualisiert.
+Damit wird die Referenz unter `/reference` eingebunden (eine Übersichtsseite), wobei jede Operation unter `/reference/<tag>/<operation>` liegt. Die `spec` ist entweder eine `http(s)`-URL oder ein Pfad zu einer lokalen Datei in deinem Projekt. Blume parst sie mit [Scalars OpenAPI-Parser](https://github.com/scalar/scalar) – Swagger-2.0- und OpenAPI-3.0-Spezifikationen werden automatisch auf 3.1 aktualisiert. Du dokumentierst stattdessen eine GraphQL-API? Sieh dir die [GraphQL-Referenz](/docs/advanced/graphql) an.
 
 Die Referenz fügt nicht von sich aus einen Header-Tab hinzu. Um sie sichtbar zu machen, richte einen [Navigations-Tab](/docs/content/navigation#tabs) auf ihre Route aus – dadurch wird auch die Operations-Seitenleiste für den nativen Renderer eingegrenzt:
 
@@ -166,7 +166,7 @@ openapi: {
 }
 ```
 
-Eine von Scalar gerenderte Referenz ist ein eigenständiges Embed auf einer eigenen Route – sie fügt sich nicht in Blumes Seitenleiste, Suche oder `llms.txt` ein, und Blumes [`playground`](#try-it-playground)-Konfiguration gilt für sie nicht. Scalar bringt einen eigenen Request-Client mit, der deine **Ziel-API direkt aus dem Browser** aufruft (die Route `playground.proxy` steht hier nicht zur Verfügung), daher muss die API Cross-Origin-Anfragen von der Doku-Website zulassen (`Access-Control-Allow-Origin`). `theme` gilt nur für den Scalar-Renderer.
+Eine von Scalar gerenderte Referenz ist ein eigenständiges Embed auf einer eigenen Route – sie fügt sich nicht in Blumes Seitenleiste, Suche oder `llms.txt` ein, und Blumes [`playground`](#try-it-playground)-Konfiguration gilt für sie nicht. Blumes Hell-/Dunkel-Umschalter folgt sie allerdings sehr wohl: Das Embed wird beim Einbinden auf das Theme der Seite festgelegt und wechselt mit ihm mit, sodass Scalars eigener Theme-Umschalter ausgeblendet wird (setze `scalar.forceDarkModeState` oder `scalar.darkMode`, um den Farbmodus wieder an Scalar zu übergeben). Scalar bringt einen eigenen Request-Client mit, der deine **Ziel-API direkt aus dem Browser** aufruft (die Route `playground.proxy` steht hier nicht zur Verfügung), daher muss die API Cross-Origin-Anfragen von der Doku-Website zulassen (`Access-Control-Allow-Origin`). `theme` gilt nur für den Scalar-Renderer.
 
 ### Scalar-Optionen übergeben
 
@@ -226,7 +226,7 @@ asyncapi: {
 ```
 
 :::note
-`playground.proxy` gibt es nur für OpenAPI. Er leitet HTTP-Anfragen weiter, und eine WebSocket-Verbindung geht direkt aus dem Browser an den in der URL genannten Server – es gibt also nichts, wovor sich ein Proxy setzen könnte.
+`playground.proxy` gilt nicht für Event-Operationen. Er leitet HTTP-Anfragen weiter, und eine WebSocket-Verbindung geht direkt aus dem Browser an den in der URL genannten Server – es gibt also nichts, wovor sich ein Proxy setzen könnte.
 :::
 
 Der Event-Composer sammelt keine Broker-Anmeldeinformationen. Der Abschnitt **Authorization** jeder Operationsseite dokumentiert, was der Broker erwartet, und eine WebSocket-Verbindung überträgt nur das, was ohnehin schon in der URL steht. Für Event-Operationen wird nichts gespeichert.

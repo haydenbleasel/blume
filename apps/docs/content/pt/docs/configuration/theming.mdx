@@ -106,7 +106,24 @@ theme: {
 - **`name`** — o nome da família exatamente como o provedor o lista.
 - **`provider`** — de onde vem a família: `google` (padrão), `fontsource`, `bunny` ou `fontshare`.
 - **`weights`** — os pesos a carregar, como números ou um intervalo variável como `"100..900"`. O padrão é `[400, 500, 600, 700]`.
+- **`subsets`** — os subconjuntos de caracteres a carregar, pelos nomes do provedor (`latin`, `latin-ext`, `vietnamese`, `cyrillic`, `greek`, …). O padrão é `latin` mais o que os idiomas configurados precisarem — veja abaixo.
 - **`fallback`** — a pilha de fontes do sistema exibida enquanto a fonte carrega e para glifos ausentes: `sans`, `serif` ou `mono`. O padrão é `mono` para a função mono e `sans` nos demais casos.
+
+#### Subconjuntos e idiomas
+
+Google, Bunny e Fontsource dividem cada família em subconjuntos por sistema de escrita, e apenas os subconjuntos que você carrega recebem um `@font-face`. O Blume deriva a lista a partir do seu [`i18n.locales`](/docs/content/i18n): um site com idiomas vietnamita, polonês, russo ou grego carrega `vietnamese`, `latin-ext`, `cyrillic` ou `greek` junto com `latin`, para que diacríticos e letras não latinas sejam renderizados na fonte escolhida em vez do fallback do sistema. Sites sem um bloco `i18n`, ou apenas com idiomas Latin-1, carregam somente `latin`. Os navegadores baixam um subconjunto apenas quando uma página usa seus caracteres, e os preloads seguem a mesma lista.
+
+Defina `subsets` em uma família para sobrescrever a lista derivada — digamos, para um site de um único idioma cujo conteúdo ainda precisa de um sistema de escrita que o idioma não implica:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  fonts: {
+    body: { name: "Be Vietnam Pro", subsets: ["latin", "vietnamese"] },
+  },
+}
+```
+
+Slugs selecionados como `inter` seguem a lista derivada dos idiomas; use a forma de objeto para fixar subconjuntos nessas famílias também.
 
 #### Arquivos de fonte locais
 

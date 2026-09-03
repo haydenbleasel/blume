@@ -2,6 +2,13 @@
 // and rerun the translation instead of editing this copy.
 export default {
   order: 5,
-  pages: ["skills", "custom-pages", "changelog", "blog", "api-reference"],
-  title: "高度な設定",
+  pages: [
+    "skills",
+    "custom-pages",
+    "changelog",
+    "blog",
+    "api-reference",
+    "graphql",
+  ],
+  title: "応用",
 };

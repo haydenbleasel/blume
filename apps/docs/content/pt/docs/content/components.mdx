@@ -74,6 +74,8 @@ Alterne entre conteúdos equivalentes no mesmo lugar — variantes de linguagem,
 
 Adicione `inline` para renderizar sem bordas — uma faixa de abas sobre uma linha de largura total, com o conteúdo fluindo abaixo como texto corrido — em vez da caixa com borda. Adicione `param` para sincronizar a aba ativa com um parâmetro de consulta na URL em vez do hash, o que torna a seleção compartilhável: um link terminando em `?install=windows` abre na aba Windows. Cada grupo sincroniza com seu próprio `param`, então você pode usar vários grupos independentes e endereçáveis por link em uma mesma página.
 
+Grupos com abas de mesmo título alternam juntos — escolha “macOS” em um e todos os grupos com uma aba macOS acompanham. Adicione `syncKey` para delimitar essa sincronização: apenas os grupos que compartilham a mesma chave alternam juntos, então grupos não relacionados que por acaso tenham um título de aba em comum permanecem independentes.
+
 <Tabs inline param="install">
   <Tab title="macOS">Use o Homebrew para instalar o toolchain.</Tab>
   <Tab title="Windows">Use o winget para instalar o toolchain.</Tab>
@@ -548,6 +550,8 @@ export interface ButtonProps {
 
 Um card com link para um repositório do GitHub com suas contagens de estrelas e forks em tempo real. As contagens são buscadas no momento do build — sem JavaScript no cliente — e o card continua sendo renderizado se a API estiver inacessível. Passe `owner` e `repo`, ou omita-os para usar o repositório do seu `blume.config`. Defina uma variável de ambiente `GITHUB_TOKEN` para elevar o limite de requisições da API.
 
+O card lê a instância a partir de [`github.host`](/docs/configuration#github-enterprise), então, em um site hospedado no Enterprise, `owner`/`repo` explícitos também apontam para essa instância. Passe `host` para direcionar um card para outro lugar — um projeto público a partir de um site Enterprise, por exemplo; a base REST é derivada dele da mesma forma que a partir de `github.host`.
+
 <GithubInfo owner="haydenbleasel" repo="blume" />
 
 ```astro lineNumbers
@@ -556,6 +560,9 @@ Um card com link para um repositório do GitHub com suas contagens de estrelas e
 
 <!-- Or point it at any repository -->
 <GithubInfo owner="haydenbleasel" repo="blume" />
+
+<!-- Or at a repository on another instance -->
+<GithubInfo host="https://github.com" owner="haydenbleasel" repo="blume" />
 ```
 
 ## Component

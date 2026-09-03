@@ -1,12 +1,12 @@
 ---
-title: Ficheiro de configuração
+title: Arquivo de configuração
 description: >-
-  Todas as opções em blume.config.ts, desde os metadados do site e as fontes de conteúdo até às ligações que conduzem a cada guia de configuração de funcionalidade.
+  Todas as opções em blume.config.ts, desde os metadados do site e as fontes de conteúdo até os links que levam a cada guia de configuração de funcionalidade.
 sidebar:
   label: blume.config.ts
 ---
 
-O Blume lê o `blume.config.ts` a partir da raiz do teu projeto. Envolve a tua configuração em `defineConfig` para obteres preenchimento automático e verificação de tipos — todos os campos são opcionais, com um valor predefinido sensato.
+O Blume lê o `blume.config.ts` a partir da raiz do seu projeto. Envolva sua configuração em `defineConfig` para ter preenchimento automático e verificação de tipos — todos os campos são opcionais, com um valor padrão sensato.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -19,7 +19,7 @@ export default defineConfig({
 
 ## Um exemplo completo
 
-Um exemplo mais abrangente que aborda as opções mais comuns (consulta o guia de cada funcionalidade para as restantes):
+Um exemplo mais abrangente que aborda as opções mais comuns (consulte o guia de cada funcionalidade para as demais):
 
 ```ts blume.config.ts lineNumbers
 import sitemap from "@astrojs/sitemap";
@@ -95,22 +95,22 @@ export default defineConfig({
 
 ## Site
 
-| Opção | Predefinição | Descrição |
+| Opção | Padrão | Descrição |
 | --- | --- | --- |
-| `title` | `"Documentation"` | Nome do site — apresentado no cabeçalho, nos títulos das páginas e nos cartões OG. |
-| `description` | — | Meta descrição predefinida, usada para SEO e OG. |
-| `logo` | — | Marca gráfica e/ou logótipo textual apresentado no cabeçalho. |
+| `title` | `"Documentation"` | Nome do site — exibido no cabeçalho, nos títulos das páginas e nos cards OG. |
+| `description` | — | Meta descrição padrão, usada para SEO e OG. |
+| `logo` | — | Marca gráfica e/ou logotipo textual exibido no cabeçalho. |
 | `banner` | — | Barra de anúncios para todo o site, acima do cabeçalho. |
 
-### Logótipo
+### Logotipo
 
-Aponta o `logo` para um SVG e o Blume incorpora-o em linha, para que um logótipo com `currentColor` acompanhe automaticamente o tema claro e escuro:
+Aponte o `logo` para um SVG e o Blume o incorpora inline, para que um logotipo com `currentColor` acompanhe automaticamente o tema claro e escuro:
 
 ```ts blume.config.ts
 logo: "/logo.svg",
 ```
 
-O SVG pode estar na raiz do teu projeto ou em `public/`. A marca é composta por um símbolo (`image`) mais um logótipo textual (`text`); a forma de objeto permite-te defini-los de forma independente:
+O SVG pode ficar na raiz do seu projeto ou em `public/`. A marca é composta por um símbolo (`image`) mais um logotipo textual (`text`); a forma de objeto permite defini-los de forma independente:
 
 ```ts blume.config.ts lineNumbers
 logo: {
@@ -120,17 +120,17 @@ logo: {
 },
 ```
 
-`image` aceita o mesmo valor que a forma abreviada — um único caminho, ou `{ light, dark, alt }` para artes separadas para claro/escuro (as imagens raster têm de estar em `public/`).
+`image` aceita o mesmo valor que a forma abreviada — um único caminho, ou `{ light, dark, alt }` para artes separadas para claro/escuro (as imagens raster precisam ficar em `public/`).
 
-`text` controla o logótipo textual independentemente do símbolo:
+`text` controla o logotipo textual independentemente do símbolo:
 
-- **Omite `text`** e a marca usa o `title` do teu site (a predefinição).
-- **Define `text: ""`** para mostrar apenas o símbolo — útil quando a imagem do logótipo já inclui o logótipo textual.
-- **Define `text` sem `image`** para um logótipo apenas de texto.
+- **Omita `text`** e a marca usa o `title` do seu site (o padrão).
+- **Defina `text: ""`** para mostrar apenas o símbolo — útil quando a imagem do logotipo já inclui o logotipo textual.
+- **Defina `text` sem `image`** para um logotipo apenas de texto.
 
 ### Favicon
 
-Não existe uma opção de favicon — o Blume deteta um automaticamente pelo nome do ficheiro, tal como o Next.js faz. Coloca um ficheiro `icon` ou `favicon` (`.svg`, `.png` ou `.ico`) na raiz do teu projeto ou no diretório `public/` e ele passa a ser o ícone do separador do browser:
+Não existe uma opção de favicon — o Blume detecta um automaticamente pelo nome do arquivo, como o Next.js faz. Coloque um arquivo `icon` ou `favicon` (`.svg`, `.png` ou `.ico`) na raiz do seu projeto ou no diretório `public/` e ele vira o ícone da aba do navegador:
 
 ```
 my-docs/
@@ -139,9 +139,9 @@ my-docs/
 └─ docs/
 ```
 
-O SVG prevalece sobre o PNG, que prevalece sobre o ICO quando existem vários, e um ficheiro em `public/` é preferido a um na raiz. Se o Blume não encontrar nenhum ícone, recorre à sua própria marca.
+O SVG prevalece sobre o PNG, que prevalece sobre o ICO quando há vários, e um arquivo em `public/` é preferido a um na raiz. Se o Blume não encontrar nenhum ícone, ele recorre à sua própria marca.
 
-Uma marca escura desaparece contra a interface escura do browser, por isso podes fornecer um segundo ficheiro para o modo escuro. Acrescenta um ficheiro irmão `-dark` ao teu ficheiro de ícone — o mesmo nome e o mesmo diretório, com `-dark` antes da extensão (`icon.png` → `icon-dark.png`) — e o Blume emite ambos os ícones atrás de uma media query `prefers-color-scheme`, além de uma tag clara simples para browsers e crawlers que ignoram media queries em ícones:
+Uma marca escura desaparece contra a interface escura do navegador, então você pode fornecer um segundo arquivo para o modo escuro. Adicione um arquivo irmão `-dark` ao seu arquivo de ícone — o mesmo nome e o mesmo diretório, com `-dark` antes da extensão (`icon.png` → `icon-dark.png`) — e o Blume emite os dois ícones atrás de uma media query `prefers-color-scheme`, além de uma tag clara simples para navegadores e crawlers que ignoram media queries em ícones:
 
 ```
 my-docs/
@@ -151,11 +151,11 @@ my-docs/
 └─ docs/
 ```
 
-Só o irmão do ícone que o Blume escolheu é usado — um ficheiro `-dark` com um nome diferente continua ignorado, pelo que um ficheiro sem relação não pode emparelhar-se com a tua marca por acidente. O ficheiro escuro é opcional; com apenas um ícone, o Blume emite uma única tag como antes. A marca de recurso do próprio Blume inclui ambas as variantes.
+Só o irmão do ícone que o Blume escolheu é usado — um arquivo `-dark` com um nome diferente continua ignorado, então um arquivo sem relação não pode se emparelhar com a sua marca por acidente. O arquivo escuro é opcional; com apenas um ícone, o Blume emite uma única tag como antes. A marca de fallback do próprio Blume inclui as duas variantes.
 
 ### Ícone Apple touch
 
-O ícone que o iOS usa quando alguém adiciona o teu site ao ecrã principal é detetado da mesma forma. Coloca um ficheiro `apple-icon` (`.png`, `.jpg` ou `.jpeg`) — ou um `apple-touch-icon.png`, o nome que a maioria dos geradores de favicons produz — na raiz do teu projeto ou no diretório `public/` e o Blume trata de configurar `<link rel="apple-touch-icon">` por ti. Não há predefinição; se não for encontrado nenhum ficheiro, não é emitida nenhuma tag.
+O ícone que o iOS usa quando alguém adiciona seu site à tela de início é detectado da mesma forma. Coloque um arquivo `apple-icon` (`.png`, `.jpg` ou `.jpeg`) — ou um `apple-touch-icon.png`, o nome que a maioria dos geradores de favicons produz — na raiz do seu projeto ou no diretório `public/` e o Blume cuida de configurar `<link rel="apple-touch-icon">` para você. Não há padrão; se nenhum arquivo for encontrado, nenhuma tag é emitida.
 
 ```
 my-docs/
@@ -164,11 +164,11 @@ my-docs/
 └─ docs/
 ```
 
-Coloca o ficheiro em `public/` em vez de na raiz do projeto: o iOS ignora o URI de dados incorporado que o Blume usa para um ícone ao nível da raiz, pelo que só um ficheiro em `public/` (servido em `/apple-icon.png`) chega de forma fiável ao ecrã principal. Ao contrário do favicon, aqui não existe um irmão `-dark` — o iOS ignora media queries nos ícones do ecrã principal, pelo que uma variante escura nunca poderia ser servida.
+Coloque o arquivo em `public/` em vez da raiz do projeto: o iOS ignora o URI de dados incorporado que o Blume usa para um ícone no nível da raiz, então só um arquivo em `public/` (servido em `/apple-icon.png`) chega de forma confiável à tela de início. Diferentemente do favicon, aqui não existe um irmão `-dark` — o iOS ignora media queries nos ícones da tela de início, então uma variante escura nunca poderia ser servida.
 
 ### Faixa
 
-Mostra uma barra de anúncios para todo o site acima do cabeçalho. Passa uma string, ou um objeto com uma ligação e um botão para dispensar:
+Mostre uma barra de anúncios para todo o site acima do cabeçalho. Passe uma string, ou um objeto com um link e um botão para dispensar:
 
 ```ts blume.config.ts
 banner: "Docs are in beta — expect changes.",
@@ -183,11 +183,11 @@ banner: {
 },
 ```
 
-Quando `dismissible` está ativo, a barra mostra um botão de fechar e permanece oculta para esse visitante a partir daí. A chave de dispensa assume por predefinição o texto do conteúdo, pelo que editar a mensagem faz a faixa reaparecer; define um `id` estável para a manter dispensada entre edições.
+Quando `dismissible` está ativo, a barra mostra um botão de fechar e permanece oculta para aquele visitante daí em diante. A chave de dispensa assume por padrão o texto do conteúdo, então editar a mensagem faz a faixa reaparecer; defina um `id` estável para mantê-la dispensada entre edições.
 
 ## Conteúdo
 
-Onde vive o teu conteúdo e como o Blume o descobre. Consulta [Páginas](/docs/content) para saberes como os ficheiros se tornam rotas.
+Onde seu conteúdo fica e como o Blume o descobre. Consulte [Páginas](/docs/content) para saber como os arquivos viram rotas.
 
 ```ts blume.config.ts lineNumbers
 content: {
@@ -195,22 +195,22 @@ content: {
 }
 ```
 
-| Opção | Predefinição | Descrição |
+| Opção | Padrão | Descrição |
 | --- | --- | --- |
 | `root` | `"docs"` | Pasta que o Blume analisa em busca de conteúdo. |
-| `include` | `["**/*.{md,mdx}"]` | Globs que correspondem a ficheiros de conteúdo. |
-| `exclude` | `["**/_*", "**/.*"]` | Globs a ignorar (ficheiros com underscore e com ponto). |
+| `include` | `["**/*.{md,mdx}"]` | Globs que correspondem a arquivos de conteúdo. |
+| `exclude` | `["**/_*", "**/.*"]` | Globs a ignorar (arquivos com underscore e com ponto). |
 | `pages` | `"pages"` | Pasta para páginas `.astro` personalizadas. |
 | `defaultType` | `"doc"` | `type` de página usado quando o frontmatter o omite. |
-| `types` | `{}` | Definições de conteúdo por tipo — chaves de frontmatter personalizadas limitadas às páginas de um `type`. Consulta [Frontmatter](#frontmatter). |
+| `types` | `{}` | Definições de conteúdo por tipo — chaves de frontmatter personalizadas restritas às páginas de um `type`. Consulte [Frontmatter](#frontmatter). |
 
-Os recursos estáticos vivem em `public/` — um ficheiro em `public/logo.png` é servido em `/logo.png`, pelo que uma referência como `![](/images/create.png)` é resolvida a partir de `public/images/create.png`. As imagens referenciadas por **caminho relativo** (`![](./diagram.png)`) vivem antes junto ao teu conteúdo e são [otimizadas no momento da compilação](/docs/content/syntax#links-and-images).
+Os recursos estáticos ficam em `public/` — um arquivo em `public/logo.png` é servido em `/logo.png`, então uma referência como `![](/images/create.png)` é resolvida a partir de `public/images/create.png`. As imagens referenciadas por **caminho relativo** (`![](./diagram.png)`) ficam junto ao seu conteúdo e são [otimizadas no momento da build](/docs/content/syntax#links-and-images).
 
 ## Imagens
 
-As imagens locais referenciadas por caminho relativo são otimizadas automaticamente no momento da compilação — comprimidas, convertidas para WebP e com atributos `width`/`height` intrínsecos, para que o layout não se desloque enquanto carregam. Não há nada a configurar; consulta [Ligações e imagens](/docs/content/syntax#links-and-images) para orientações de escrita.
+As imagens locais referenciadas por caminho relativo são otimizadas automaticamente no momento da build — comprimidas, convertidas para WebP e com atributos `width`/`height` intrínsecos, para que o layout não se desloque enquanto elas carregam. Não há nada a configurar; consulte [Links e imagens](/docs/content/syntax#links-and-images) para orientações de escrita.
 
-As imagens remotas são servidas sem alterações por predefinição. Para que o Blume também as descarregue e otimize no momento da compilação, autoriza os seus hosts:
+As imagens remotas são servidas sem alterações por padrão. Para que o Blume também as baixe e otimize no momento da build, autorize seus hosts:
 
 ```ts blume.config.ts lineNumbers
 image: {
@@ -219,14 +219,14 @@ image: {
 }
 ```
 
-| Opção | Predefinição | Descrição |
+| Opção | Padrão | Descrição |
 | --- | --- | --- |
 | `domains` | `[]` | Nomes de host cujas imagens remotas podem ser otimizadas. |
 | `remotePatterns` | `[]` | Autorização baseada em padrões (`protocol`, `hostname`, `port`, `pathname`); os nomes de host aceitam os wildcards `*.` (um nível) e `**.` (qualquer profundidade). |
 
 ## Frontmatter
 
-O frontmatter das páginas é validado de forma estrita — uma chave desconhecida faz falhar a compilação, pelo que os erros de escrita são detetados cedo. Para incluíres metadados específicos do projeto (um responsável, uma data de revisão), declara as chaves adicionais em `frontmatter.extend`, cada uma mapeada para um schema que forneces:
+O frontmatter das páginas é validado de forma estrita — uma chave desconhecida faz a build falhar, então os erros de digitação são detectados cedo. Para levar metadados específicos do projeto (um responsável, uma data de revisão), declare as chaves adicionais em `frontmatter.extend`, cada uma mapeada para um schema que você fornece:
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -242,9 +242,9 @@ export default defineConfig({
 });
 ```
 
-Funciona com qualquer biblioteca [Standard Schema](https://standardschema.dev) — Zod (qualquer que seja a versão que o teu projeto instale), Valibot, ArkType. As chaves fora da extensão continuam validadas de forma estrita, pelo que a deteção de erros de escrita mantém-se inalterada. Consulta [Chaves personalizadas](/docs/reference/frontmatter#custom-keys) para a semântica de validação.
+Funciona com qualquer biblioteca [Standard Schema](https://standardschema.dev) — Zod (qualquer que seja a versão que seu projeto instale), Valibot, ArkType. As chaves fora da extensão continuam validadas de forma estrita, então a detecção de erros de digitação segue inalterada. Consulte [Chaves personalizadas](/docs/reference/frontmatter#custom-keys) para a semântica de validação.
 
-As chaves em `extend` aplicam-se a todo o site. Para exigires chaves apenas em páginas de um tipo de conteúdo — o `status` de um RFC, o `service` de um runbook — declara-as antes por tipo em `content.types`:
+As chaves em `extend` valem para todo o site. Para exigir chaves apenas em páginas de um tipo de conteúdo — o `status` de um RFC, o `service` de um runbook — declare-as por tipo em `content.types`:
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -265,13 +265,13 @@ export default defineConfig({
 });
 ```
 
-Uma chave pode ser declarada para todo o site ou por tipo, não ambos. Consulta [Chaves por tipo](/docs/reference/frontmatter#per-type-keys) para saberes como o âmbito é resolvido.
+Uma chave pode ser declarada para todo o site ou por tipo, não os dois. Consulte [Chaves por tipo](/docs/reference/frontmatter#per-type-keys) para saber como o escopo é resolvido.
 
-`facets` indica as chaves personalizadas cujos valores se tornam metadados filtráveis: acompanham os documentos de pesquisa (`blume-search.json` e o índice MCP), e as [ferramentas MCP](/docs/configuration/ai#mcp-server) aceitam um input `filters` que faz correspondência com elas, para que um agente possa obter, por exemplo, apenas os RFCs com estado `enforced` no domínio `architecture`. Cada faceta tem de ser uma chave personalizada declarada — por tipo ou para todo o site — e apenas os valores do tipo string (ou números/booleanos convertidos em string) funcionam como facetas.
+`facets` indica as chaves personalizadas cujos valores viram metadados filtráveis: elas acompanham os documentos de busca (`blume-search.json` e o índice MCP), e as [ferramentas MCP](/docs/configuration/ai#mcp-server) aceitam um input `filters` que faz correspondência com elas, para que um agente possa obter, por exemplo, apenas os RFCs com status `enforced` no domínio `architecture`. Cada faceta precisa ser uma chave personalizada declarada — por tipo ou para todo o site — e apenas os valores do tipo string (ou números/booleanos convertidos em string) funcionam como facetas.
 
 ## GitHub
 
-Aponta o Blume para o teu repositório com `github`. É o que alimenta a [ligação para o repositório](/docs/content/navigation#repository-link) no cabeçalho e as [ações de página](/docs/content/navigation#page-actions) **Editar no GitHub** e **Enviar feedback**:
+Aponte o Blume para o seu repositório com `github`. É o que alimenta o [link para o repositório](/docs/content/navigation#repository-link) no cabeçalho e as [ações de página](/docs/content/navigation#page-actions) **Editar no GitHub** e **Enviar feedback**:
 
 ```ts blume.config.ts lineNumbers
 github: {
@@ -280,16 +280,40 @@ github: {
 }
 ```
 
-| Opção | Predefinição | Descrição |
+| Opção | Padrão | Descrição |
 | --- | --- | --- |
-| `owner` | — | Conta ou organização do GitHub proprietária do repositório. |
+| `owner` | — | Conta ou organização do GitHub dona do repositório. |
 | `repo` | — | Nome do repositório. |
-| `branch` | `"main"` | Branch para onde apontam as ligações de edição. |
-| `dir` | — | Caminho da raiz do repositório até à raiz do projeto (para monorepos). |
+| `branch` | `"main"` | Branch para onde os links de edição apontam. |
+| `dir` | — | Caminho da raiz do repositório até a raiz do projeto (para monorepos). |
+| `host` | `"https://github.com"` | Origem da instância do GitHub, para instalações Enterprise. Precisa ser HTTP(S); normalizada para sua origem. |
+| `api` | derivado de `host` | Base da API REST, para o `<GithubInfo>` em uma instância Enterprise. Precisa ser HTTP(S); normalizada para uma origem e um caminho. |
+
+### GitHub Enterprise
+
+Docs cujo repositório fica em uma instância do GitHub Enterprise definem `host`, e todo link derivado do repositório — a marca do cabeçalho, os links de edição, o manifesto do agente — aponta para essa instância em vez do site público:
+
+```ts blume.config.ts lineNumbers
+github: {
+  host: "https://github.acme.com",
+  owner: "acme",
+  repo: "docs",
+}
+```
+
+A base da API REST que o [`<GithubInfo>`](/docs/content/components) consulta é derivada de `host`: um tenant do Enterprise Cloud com residência de dados (`acme.ghe.com`) é servido a partir do seu subdomínio `api.`, e qualquer outro host é tratado como Enterprise Server (`/api/v3`). Defina `api` explicitamente quando sua instância estiver em outro lugar.
+
+:::warning
+Uma instância acessível apenas por HTTP simples ainda renderiza suas contagens, mas o `GITHUB_TOKEN` é omitido da requisição em vez de ser enviado em texto puro — então o card de um repositório privado volta sem elas.
+:::
+
+:::note
+`host` cobre os links que o Blume deriva de `github`. Para apontar só a marca do cabeçalho para outro lugar — uma organização, digamos, quando o próprio repositório das docs é privado — use [`navigation.repo`](/docs/content/navigation#repository-link) com uma URL absoluta.
+:::
 
 ## Última modificação
 
-Mostra uma linha "Última atualização em …" no fundo de cada página. Desativado por predefinição; define `lastModified` como `true` para derivar a data de cada página a partir do respetivo histórico do git:
+Mostre uma linha "Última atualização em …" no rodapé de cada página. Desativado por padrão; defina `lastModified` como `true` para derivar a data de cada página do respectivo histórico do git:
 
 ```ts blume.config.ts
 lastModified: true,
@@ -297,12 +321,12 @@ lastModified: true,
 
 | Valor | Descrição |
 | --- | --- |
-| `false` | Desativado (predefinição). |
-| `true` | Lê a data a partir do histórico do git (datas dos commits). |
+| `false` | Desativado (padrão). |
+| `true` | Lê a data do histórico do git (datas dos commits). |
 | `{ type: "git" }` | O mesmo que `true`, escrito explicitamente. |
 | `{ type: "frontmatter" }` | Nunca executa o git — usa apenas o campo `lastModified` do frontmatter. |
 
-A fonte git lê o commit mais recente que tocou em cada ficheiro, pelo que funciona em qualquer repositório git — incluindo monorepos — e precisa do histórico do repositório no momento da compilação. As plataformas de CI costumam fazer checkout de um clone superficial, o que descarta silenciosamente a maioria das datas (a compilação avisa com `BLUME_SHALLOW_GIT_HISTORY` quando isso acontece): na Vercel, define a variável de ambiente `VERCEL_DEEP_CLONE=true`; com o `actions/checkout`, define `fetch-depth: 0`. O `lastModified` do frontmatter da própria página prevalece sempre, o que é útil para fixar uma data ou para ficheiros que ainda não foram commitados:
+A fonte git lê o commit mais recente que tocou em cada arquivo, então funciona em qualquer repositório git — incluindo monorepos — e precisa do histórico do repositório no momento da build. As plataformas de CI costumam fazer checkout de um clone raso, o que descarta silenciosamente a maioria das datas (a build avisa com `BLUME_SHALLOW_GIT_HISTORY` quando isso acontece): na Vercel, defina a variável de ambiente `VERCEL_DEEP_CLONE=true`; com o `actions/checkout`, defina `fetch-depth: 0`. O `lastModified` do frontmatter da própria página sempre prevalece, o que é útil para fixar uma data ou para arquivos que ainda não foram commitados:
 
 ```mdx page.mdx
 ---
@@ -311,17 +335,17 @@ lastModified: 2026-06-20
 ---
 ```
 
-Quando ativada, a data é também emitida como `dateModified` de schema.org nos dados estruturados da página.
+Quando ativada, a data também é emitida como `dateModified` do schema.org nos dados estruturados da página.
 
 ## Formato de data
 
-Tanto a marca de "Última atualização" como a cronologia do [changelog](/docs/advanced/changelog) apresentam as suas datas através do mesmo `dateFormat`, para que se leiam de igual forma. As datas são sempre apresentadas na localização do site; o `dateFormat` controla o _formato_. Por predefinição usa a forma longa (`July 21, 2026`, `2026年7月21日`):
+Tanto a marca de "Última atualização" quanto a linha do tempo do [changelog](/docs/advanced/changelog) exibem suas datas através do mesmo `dateFormat`, para que elas sejam lidas do mesmo jeito. As datas são sempre exibidas no locale do site; o `dateFormat` controla o _formato_. Por padrão ele usa a forma longa (`July 21, 2026`, `2026年7月21日`):
 
 ```ts blume.config.ts
 dateFormat: { dateStyle: "long" },
 ```
 
-`dateFormat` é passado diretamente para as opções de [`Intl.DateTimeFormat`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat). Usa uma predefinição `dateStyle` para escolher um comprimento:
+`dateFormat` é repassado diretamente para as opções de [`Intl.DateTimeFormat`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat). Use um preset `dateStyle` para escolher um comprimento:
 
 ```ts blume.config.ts
 dateFormat: { dateStyle: "medium" },
@@ -337,12 +361,12 @@ dateFormat: { year: "numeric", month: "2-digit", day: "2-digit" },
 | --- | --- |
 | `dateStyle` | Comprimento predefinido: `"full"`, `"long"`, `"medium"` ou `"short"`. Não pode ser combinado com os campos de componentes. |
 | `weekday`, `era`, `year`, `month`, `day` | Componentes individuais, p. ex. `year: "numeric"`, `month: "2-digit"`. |
-| `timeZone` | Fuso horário IANA. Por predefinição é `UTC`, para que uma data se leia da mesma forma independentemente de onde o site é compilado. |
+| `timeZone` | Fuso horário IANA. Por padrão é `UTC`, para que uma data seja lida da mesma forma independentemente de onde o site é buildado. |
 | `calendar`, `numberingSystem` | Sistema de calendário (p. ex. `"japanese"`) e sistema de numeração (p. ex. `"arab"`). |
 
 ## SEO
 
-Imagens Open Graph, feeds RSS e dados estruturados JSON-LD, agrupados em `seo`. Consulta o [guia de SEO](/docs/configuration/seo) para metadados, substituições no frontmatter e a referência completa.
+Imagens Open Graph, feeds RSS e dados estruturados JSON-LD, agrupados em `seo`. Consulte o [guia de SEO](/docs/configuration/seo) para metadados, substituições no frontmatter e a referência completa.
 
 ```ts blume.config.ts lineNumbers
 seo: {
@@ -354,21 +378,21 @@ seo: {
 }
 ```
 
-| Opção | Predefinição | Descrição |
+| Opção | Padrão | Descrição |
 | --- | --- | --- |
-| `og.enabled` | automático | Imagens Open Graph por página — ativas quando um URL do site está definido. |
-| `rss.enabled` | `true` | Cria feeds para conteúdos de blogue e de changelog. |
+| `og.enabled` | automático | Imagens Open Graph por página — ativas quando uma URL do site está definida. |
+| `rss.enabled` | `true` | Cria feeds para conteúdos de blog e de changelog. |
 | `rss.types` | `["blog", "changelog"]` | Tipos de conteúdo que recebem cada um um feed. |
 | `rss.limit` | `50` | Número máximo de itens por feed. |
 | `sitemap` | `true` | Gera o sitemap.xml (precisa de deployment.site). |
-| `robots` | `true` | Gera o robots.txt com uma ligação para o Sitemap. |
-| `structuredData` | `true` | Emite JSON-LD de schema.org no head de cada página. |
+| `robots` | `true` | Gera o robots.txt com um link para o Sitemap. |
+| `structuredData` | `true` | Emite JSON-LD do schema.org no head de cada página. |
 
-Estes funcionam melhor com um [`deployment.site`](/docs/deployment) absoluto, para URLs completos.
+Eles funcionam melhor com um [`deployment.site`](/docs/deployment) absoluto, para URLs completas.
 
-## Índice da página
+## Sumário da página
 
-O esquema "nesta página" está ativo por predefinição e lista os cabeçalhos `H2`–`H3`. Desativa-o, ou altera o intervalo de cabeçalhos, com `toc`:
+O esquema "nesta página" está ativo por padrão e lista os títulos `H2`–`H3`. Desative-o, ou altere o intervalo de títulos, com `toc`:
 
 ```ts blume.config.ts
 export default defineConfig({
@@ -376,7 +400,7 @@ export default defineConfig({
 });
 ```
 
-Ou, em alternativa, restringe o intervalo de cabeçalhos:
+Ou, em vez disso, restrinja o intervalo de títulos:
 
 ```ts blume.config.ts
 export default defineConfig({
@@ -386,32 +410,30 @@ export default defineConfig({
 
 ## Opções de funcionalidades
 
-Cada uma delas tem o seu próprio guia. O campo de configuração é o ponto de entrada:
+Cada uma delas tem seu próprio guia. O campo de configuração é o ponto de entrada:
 
 | Campo | O que configura | Guia |
 | --- | --- | --- |
-| `theme` | Cor de destaque, raio dos cantos, tipos de letra, modo claro/escuro | [Temas](/docs/configuration/theming) |
-| `navigation` | Barra lateral explícita e separadores do cabeçalho | [Navegação](/docs/content/navigation) |
-| `search` | Fornecedor (Orama, Pagefind, Algolia, entre outros) e indexação | [Pesquisa](/docs/configuration/search) |
-| `markdown` | Opções de renderização de Markdown — blocos de código, âncoras de cabeçalhos, zoom em imagens | [Sintaxe](/docs/content/syntax) |
-| `ai` | `llms.txt`, Ask AI e o servidor MCP alojado para agentes de programação | [IA](/docs/configuration/ai) |
-| `analytics` | Vercel, PostHog e scripts personalizados | [Análises](/docs/configuration/analytics) |
+| `theme` | Cor de destaque, raio dos cantos, fontes, modo claro/escuro | [Temas](/docs/configuration/theming) |
+| `navigation` | Barra lateral explícita e abas do cabeçalho | [Navegação](/docs/content/navigation) |
+| `search` | Provedor (Orama, Pagefind, Algolia, entre outros) e indexação | [Busca](/docs/configuration/search) |
+| `markdown` | Opções de renderização de Markdown — blocos de código, âncoras de títulos, zoom em imagens | [Sintaxe](/docs/content/syntax) |
+| `ai` | `llms.txt`, Ask AI e o servidor MCP hospedado para agentes de programação | [IA](/docs/configuration/ai) |
+| `analytics` | Vercel, PostHog e scripts personalizados | [Analytics](/docs/configuration/analytics) |
 | `seo` | Metadados, imagens OG, feeds, dados estruturados | [SEO](/docs/configuration/seo) |
-| `deployment` | Modo de saída, adaptador e URL do site | [Implementação](/docs/deployment) |
-| `redirects` | Redirecionamentos permanentes e temporários | [Implementação](/docs/deployment#redirects) |
-| `integrations` | Integrações do Astro acrescentadas depois das integradas do Blume | [Personalização](/docs/configuration/customization#astro-integrations) |
+| `deployment` | Modo de saída, adaptador e URL do site | [Deploy](/docs/deployment) |
+| `redirects` | Redirecionamentos permanentes e temporários | [Deploy](/docs/deployment#redirects) |
+| `integrations` | Integrações do Astro adicionadas depois das integradas do Blume | [Personalização](/docs/configuration/customization#astro-integrations) |
 
 ## Precedência
 
-As definições são resolvidas da prioridade mais baixa para a mais alta, para que só tenhas de substituir o que precisas:
+As configurações são resolvidas da prioridade mais baixa para a mais alta, então você só precisa substituir o que quiser:
 
 <Steps>
-  <Step title="Predefinições do Blume">
-    Um valor predefinido sensato para cada campo.
-  </Step>
-  <Step title="blume.config.ts">A configuração de todo o teu projeto.</Step>
+  <Step title="Padrões do Blume">Um valor padrão sensato para cada campo.</Step>
+  <Step title="blume.config.ts">A configuração de todo o seu projeto.</Step>
   <Step title="Meta da pasta">
-    [`meta.ts`](/docs/content/meta) para o título e a ordenação de uma secção.
+    [`meta.ts`](/docs/content/meta) para o título e a ordenação de uma seção.
   </Step>
   <Step title="Frontmatter da página">
     As substituições por página prevalecem.

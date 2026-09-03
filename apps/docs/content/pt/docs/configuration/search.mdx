@@ -42,7 +42,19 @@ Escreva o `href` como se o site estivesse montado na raiz — um `basePath` é a
 
 ## O que é indexado
 
-Para cada página indexável, o Blume indexa seu título, sua descrição e o corpo reduzido a texto simples — blocos de código, imagens e marcação são removidos, para que os resultados permaneçam relevantes. O índice é construído a partir dos seus arquivos-fonte, então é idêntico em desenvolvimento e em produção.
+Para Orama, FlexSearch, Algolia, Orama Cloud e Typesense — e para a ferramenta `search_docs` do servidor MCP —, o Blume indexa o título, a descrição e o corpo de cada página reduzido a texto simples: blocos de código, imagens e marcação são removidos, para que os resultados permaneçam relevantes. Esses índices são construídos a partir dos seus arquivos-fonte, então são idênticos em desenvolvimento e em produção. Já o Pagefind indexa o HTML compilado, e o Mixedbread sincroniza seu Markdown bruto, então ambos sempre buscam no código.
+
+Se a sua documentação depende de exemplos de código para termos pesquisáveis como opções, métodos ou nomes de erros, ative os blocos de código cercados nos índices construídos a partir da fonte:
+
+```ts blume.config.ts lineNumbers
+search: {
+  indexing: {
+    includeCodeBlocks: true,
+  },
+},
+```
+
+O corpo e o título de cada bloco cercado (`blume.config.ts`, acima) se tornam pesquisáveis; a linguagem e os marcadores do bloco, não. Em páginas `.mdx`, o índice lê os componentes como o texto que eles exibem — o título de um Card, o rótulo de uma Tab, as descrições de uma TypeTable — usando os mesmos serializadores das [superfícies de agente](/docs/configuration/ai), então uma entrada em `ai.markdownComponents` cobre também os seus próprios componentes. A opção não tem efeito no Pagefind nem no Mixedbread. Espere que o índice cresça junto com o conteúdo cercado — o índice do cliente é enviado a todos os leitores, os provedores hospedados limitam o tamanho do registro (o Algolia rejeita o lote de sincronização quando o registro de uma página excede o limite do seu plano, mantendo o índice anterior no ar) e uma correspondência dentro de um bloco cercado exibe o código achatado no trecho do resultado.
 
 Em um site com [versionamento](/docs/content/versioning), os resultados ficam restritos por padrão à versão que está sendo visualizada, com um botão "Todas as versões" no rodapé do diálogo (memorizado por leitor). As correspondências de outras versões indicam sua versão na linha. Orama, FlexSearch, Algolia e Typesense respeitam esse escopo — os registros hospedados carregam uma faceta `version`, com a documentação atual enviada como `"current"` — enquanto o Pagefind permanece sem escopo, seguindo o mesmo comportamento que tem com idiomas.
 

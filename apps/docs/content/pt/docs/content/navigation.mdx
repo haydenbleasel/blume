@@ -242,6 +242,21 @@ navigation: {
 
 Cada item é uma rota de página (uma string), um grupo (`label` + `items`) ou um link (`label` + `href`). Grupos podem ser aninhados, substituir o [modo `display`](#display-modes) global e começar `collapsed`.
 
+## Ações do cabeçalho
+
+`navigation.actions` coloca links simples no cabeçalho, à esquerda dos botões de ícone, e `navigation.cta` é o único botão preenchido:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  actions: [{ href: "/changelog", label: "Changelog" }],
+  cta: { href: "https://example.com/signup", label: "Start free" },
+}
+```
+
+`cta` é singular de propósito — um cabeçalho de documentação tem espaço para exatamente uma coisa que se pede ao leitor que faça, e uma fileira de botões não pede nada. Links secundários pertencem a `actions`, ou a [`featured`](#featured-links) se devem ficar junto à barra lateral.
+
+Um href `http(s)` ou relativo ao protocolo abre em uma nova aba; uma rota permanece na aba e é validada contra as suas páginas no momento da build, como um link `featured` — então uma página servida por outro app no mesmo host (`/signup` no produto, digamos) deve ser escrita como uma URL absoluta. As `actions` ficam ocultas abaixo do breakpoint `sm`, onde o cabeçalho tem espaço para o logo e o alternador de navegação e nada mais. O `cta` também se oculta ali, exceto em uma página sem alternador de navegação — uma landing page em `PageLayout` sem abas — onde ele permanece, já que nada mais pode exibi-lo em um celular.
+
 ## Link do repositório
 
 Quando você define [`github`](/docs/configuration) na sua configuração, o Blume mostra um ícone do GitHub no cabeçalho — ao lado do alternador de tema — que leva ao seu repositório. Ele vem ativado por padrão; oculte-o com `navigation.repo`:
@@ -253,6 +268,16 @@ navigation: {
 ```
 
 O link só aparece quando `github` está configurado, então projetos sem repositório não são afetados de nenhuma forma.
+
+`repo` também aceita uma URL absoluta, que aponta a marca do cabeçalho para qualquer lugar no GitHub:
+
+```ts blume.config.ts lineNumbers
+navigation: {
+  repo: "https://github.com/acme",
+}
+```
+
+Isso é para um projeto cujo repositório de documentação é privado. O `github` controla junto o link de edição de cada página, a marca do cabeçalho e o repositório do [manifesto de agente](/docs/configuration/ai), então um projeto assim precisa deixar `github` sem definir — e uma URL é o que permite que ele ainda exiba uma marca apontando para algo público. O ícone continua sendo a marca do GitHub, então um link para outro host pertence a [`actions`](#header-actions).
 
 ## Trilhas de navegação e paginação
 

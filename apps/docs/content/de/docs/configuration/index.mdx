@@ -286,6 +286,30 @@ github: {
 | `repo` | — | Name des Repositorys. |
 | `branch` | `"main"` | Branch, auf den die Bearbeitungslinks verweisen. |
 | `dir` | — | Pfad vom Repository-Stammverzeichnis zum Projektstammverzeichnis (für Monorepos). |
+| `host` | `"https://github.com"` | Origin der GitHub-Instanz, für Enterprise-Installationen. Muss HTTP(S) sein; wird auf ihren Origin normalisiert. |
+| `api` | aus `host` abgeleitet | REST-API-Basis, für `<GithubInfo>` gegen eine Enterprise-Instanz. Muss HTTP(S) sein; wird auf einen Origin und Pfad normalisiert. |
+
+### GitHub Enterprise
+
+Dokumentationen, deren Repository auf einer GitHub-Enterprise-Instanz liegt, setzen `host`, und jeder aus dem Repository abgeleitete Link — die Bildmarke im Header, Bearbeitungslinks, das Agenten-Manifest — verweist dann auf diese Instanz statt auf die öffentliche Website:
+
+```ts blume.config.ts lineNumbers
+github: {
+  host: "https://github.acme.com",
+  owner: "acme",
+  repo: "docs",
+}
+```
+
+Die REST-API-Basis, die [`<GithubInfo>`](/docs/content/components) abfragt, wird aus `host` abgeleitet: Ein Enterprise-Cloud-Tenant mit Datenresidenz (`acme.ghe.com`) wird über seine `api.`-Subdomain ausgeliefert, und jeder andere Host wird als Enterprise Server behandelt (`/api/v3`). Setze `api` explizit, wenn deine Instanz woanders liegt.
+
+:::warning
+Eine Instanz, die nur über einfaches HTTP erreichbar ist, rendert ihre Zahlen weiterhin, aber `GITHUB_TOKEN` wird von der Anfrage zurückgehalten, statt im Klartext gesendet zu werden — die Karte eines privaten Repositorys kommt also ohne sie zurück.
+:::
+
+:::note
+`host` deckt Links ab, die Blume aus `github` ableitet. Um nur die Bildmarke im Header woanders hinzuleiten — etwa auf eine Organisation, wenn das Docs-Repository selbst privat ist — verwende [`navigation.repo`](/docs/content/navigation#repository-link) mit einer absoluten URL.
+:::
 
 ## Zuletzt geändert
 
