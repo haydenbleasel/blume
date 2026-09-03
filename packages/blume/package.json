@@ -154,7 +154,7 @@
     "@notionhq/client": "^2.2.15",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@oramacloud/client": "^2.1.0",
-    "@sanity/client": "^7.25.0",
+    "@sanity/client": "^8.4.0",
     "@types/cross-spawn": "^6.0.6",
     "@types/html-escaper": "^3.0.4",
     "@types/js-yaml": "^4.0.9",
@@ -180,7 +180,7 @@
     "@notionhq/client": "^2.2.15",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@oramacloud/client": "^2.1.0",
-    "@sanity/client": "^6.21.0 || ^7.0.0",
+    "@sanity/client": "^6.21.0 || ^7.0.0 || ^8.0.0",
     "algoliasearch": "^5.55.0",
     "flexsearch": "^0.8.0",
     "typesense": "^3.0.0"
