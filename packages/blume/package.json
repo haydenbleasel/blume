@@ -151,7 +151,7 @@
   "devDependencies": {
     "@ai-sdk/openai-compatible": "^3.0.0",
     "@mixedbread/sdk": "^0.76.0",
-    "@notionhq/client": "^2.2.15",
+    "@notionhq/client": "^5.26.0",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@oramacloud/client": "^2.1.0",
     "@sanity/client": "^8.4.0",
@@ -176,7 +176,7 @@
     "@astrojs/svelte": "^9.0.0",
     "@astrojs/vue": "^7.0.0",
     "@mixedbread/sdk": "^0.76.0",
-    "@notionhq/client": "^2.2.15",
+    "@notionhq/client": "^5.0.0",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@oramacloud/client": "^2.1.0",
     "@sanity/client": "^6.21.0 || ^7.0.0 || ^8.0.0",
