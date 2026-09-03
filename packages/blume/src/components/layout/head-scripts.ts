@@ -29,9 +29,19 @@
  * and again after every client-router swap, which resets `<html>` attributes to
  * the incoming page's server-rendered (theme-less) set.
  *
+ * Re-applying on `astro:after-swap` alone is too late for CSS transitions: the
+ * router's `swapRootAttributes` drops `data-theme`, then its scroll restoration
+ * (`scrollTo`) forces a style flush before `after-swap` fires, so every
+ * `transition-colors` element in the new body gets a light-theme computed
+ * style and animates to dark once the attribute returns. `astro:before-swap`
+ * therefore stamps the current theme onto the incoming document's root, so the
+ * attribute swap carries it over and the theme never drops in the first place;
+ * the `after-swap` re-apply stays as the fallback that also picks up a
+ * preference changed in another tab.
+ *
  * Reads `data-mode` — `"system" | "light" | "dark"`.
  */
-export const THEME_INIT_SCRIPT = `(()=>{const m=document.currentScript?.dataset.mode??"system";const apply=()=>{const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);};apply();document.addEventListener("astro:after-swap",apply);})();`;
+export const THEME_INIT_SCRIPT = `(()=>{const m=document.currentScript?.dataset.mode??"system";const apply=()=>{const s=localStorage.getItem("blume-theme");const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s??(m==="system"?sys:m);};apply();document.addEventListener("astro:before-swap",(e)=>{const t=document.documentElement.dataset.theme;if(t){e.newDocument.documentElement.dataset.theme=t;}});document.addEventListener("astro:after-swap",apply);})();`;
 
 /**
  * Hide a previously-dismissed banner before it can flash in — and again after
