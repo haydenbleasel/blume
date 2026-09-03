@@ -300,7 +300,9 @@ export const graphqlPlaygroundModel = (
   method: "POST",
   params: [],
   path: "",
-  servers: [spec.endpoint ?? GRAPHQL_ENDPOINT_PLACEHOLDER],
+  // `||`, not `??`: an empty `endpoint: ""` would otherwise survive into the
+  // playground and every code sample as a request to an empty URL.
+  servers: [spec.endpoint || GRAPHQL_ENDPOINT_PLACEHOLDER],
 });
 
 /**

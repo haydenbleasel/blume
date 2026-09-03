@@ -731,6 +731,30 @@ describe(extractHeadings, () => {
     ]);
   });
 
+  it("finds a definition nested in a block quote or list item", () => {
+    // A definition inside a container still defines the label document-wide
+    // — the renderer resolves the heading's bracket as a link either way.
+    for (const prefix of ["> ", "- ", "* ", "1. ", "> 1) "]) {
+      const body = ["## Overview [toc]", "", `${prefix}[toc]: /url`].join("\n");
+      expect(extractHeadings(body)[0]?.slug).toBe("overview-toc");
+    }
+  });
+
+  it("ignores a bracket-colon line that isn't a valid definition", () => {
+    // No destination on the line or the next: paragraph text, not a
+    // definition, so the heading's bracket is still a marker.
+    const bare = ["## Overview [toc]", "", "[toc]:"].join("\n");
+    expect(extractHeadings(bare)[0]?.slug).toBe("overview");
+    const trailing = ["## Overview [toc]", "", "[toc]:", ""].join("\n");
+    expect(extractHeadings(trailing)[0]?.slug).toBe("overview");
+    // A whitespace-only label defines nothing.
+    const blank = ["## Overview [toc]", "", "[ ]: /url"].join("\n");
+    expect(extractHeadings(blank)[0]?.slug).toBe("overview");
+    // CommonMark lets the destination wrap onto the following line.
+    const wrapped = ["## Overview [toc]", "", "[toc]:", "/url"].join("\n");
+    expect(extractHeadings(wrapped)[0]?.slug).toBe("overview-toc");
+  });
+
   it("matches definition labels case-insensitively, ignoring fenced ones", () => {
     const defined = ["## Overview [toc]", "", "[TOC]: /url"].join("\n");
     expect(extractHeadings(defined)[0]?.slug).toBe("overview-toc");

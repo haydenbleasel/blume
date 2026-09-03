@@ -625,11 +625,15 @@ blume-tabs pre[data-language],
    \`.astro-code\` so the playground's response pre — created after the
    injector ran, never given a button — keeps its plain inset. The first
    selector is the injector's own flush predicate; the second covers the
-   remaining bar-less case, an untitled <CodeBlock> in plain prose. API panel
-   blocks match, but their own !important padding wins and they hide the
-   injected button. */
+   remaining bar-less Shiki case, an untitled <CodeBlock> in plain prose, from
+   first paint. The third covers a raw \`<pre><code>\` written in prose — no
+   \`.astro-code\`, no language bar, but the injector gives it a button all
+   the same — keyed on that injected button, which is exactly what separates
+   it from the playground's pre. API panel blocks match, but their own
+   !important padding wins and they hide the injected button. */
 [data-blume-code-copy] :is(blume-tabs, .not-prose) pre.astro-code,
-[data-blume-code-copy] .prose pre.astro-code:not([data-language]) {
+[data-blume-code-copy] .prose pre.astro-code:not([data-language]),
+[data-blume-code-copy] .prose pre:not([data-language]):has(> [data-blume-copy]) {
   padding-top: ${FLUSH_CODE_PADDING_TOP_REM}rem;
 }
 

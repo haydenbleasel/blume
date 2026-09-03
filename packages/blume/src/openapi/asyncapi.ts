@@ -157,8 +157,11 @@ const inlineComponentRefs = (document: AsyncApiDocument): void => {
       const resolved = isObject(table)
         ? table[unescapePointer(groups.name ?? "")]
         : undefined;
+      // A shallow copy per alias: trait merging mutates its node in place
+      // (fields written, `traits` deleted), and two entries pointing at the
+      // same component — or the component table itself — must not share it.
       if (isObject(resolved) && !isString(resolved.$ref)) {
-        map[id] = resolved;
+        map[id] = { ...resolved };
       }
     }
   }

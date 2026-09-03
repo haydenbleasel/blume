@@ -4,7 +4,7 @@ description: >-
   Friere Snapshots deiner Docs pro Release ein – mit Versionsumschalter, Canonical-auf-Latest-SEO, versionsbezogener Suche und einer versionsbewussten Agent-Oberfläche.
 ---
 
-Blume versioniert deine Docs so, wie Releases tatsächlich funktionieren: Die aktuelle Dokumentation liegt im Wurzelverzeichnis deiner Inhalte mit sauberen, präfixfreien URLs, und jede vergangene Version ist ein eingefrorener Snapshot in einem eigenen Ordner. Erstelle einen Snapshot, wenn du ausliefertst, und Blume verkabelt den Umschalter, den Hinweis auf die „alte Version", das Scoping der Suche, SEO und die Agent-Oberfläche für dich. Es ist opt-in: Ohne einen `versions`-Block ändert sich nichts.
+Blume versioniert deine Docs so, wie Releases tatsächlich funktionieren: Die aktuelle Dokumentation liegt im Wurzelverzeichnis deiner Inhalte mit sauberen, präfixfreien URLs, und jede vergangene Version ist ein eingefrorener Snapshot in einem eigenen Ordner. Erstelle einen Snapshot, wenn du ausliefertst, und Blume verkabelt den Umschalter, den Hinweis auf die „alte Version“, das Scoping der Suche, SEO und die Agent-Oberfläche für dich. Es ist opt-in: Ohne einen `versions`-Block ändert sich nichts.
 
 ## Aktivieren
 
@@ -49,13 +49,16 @@ docs/
 
 Mit konfigurierten Versionen erhält der Header automatisch ein Versions-Dropdown. Beim Wechseln landest du auf derselben Seite in der Zielversion, sofern sie existiert, und andernfalls im Wurzelverzeichnis dieser Version (setze `switcher.redirect: "root"`, um immer im Wurzelverzeichnis zu landen). Wenn du in [`navigation.selectors`](/docs/content/navigation#selectors) einen eigenen Selektor mit `kind: "version"` deklarierst, ersetzt dieser den automatischen.
 
-Jede archivierte Seite zeigt außerdem einen nicht ausblendbaren Hinweis mit einem „Zur neuesten Version"-Link, der auf das aktuelle Gegenstück der Seite verweist. Passe ihn pro Version an oder deaktiviere ihn:
+Jede archivierte Seite zeigt außerdem einen nicht ausblendbaren Hinweis mit einem „Zur neuesten Version“-Link, der auf das aktuelle Gegenstück der Seite verweist. Passe ihn pro Version an oder deaktiviere ihn:
 
 ```ts blume.config.ts
-archived: [
-  { id: "v1.0", banner: "These docs cover the 1.x SDK." },
-  { id: "v0.9", banner: false },
-];
+versions: {
+  current: { label: "v2.0" },
+  archived: [
+    { id: "v1.0", banner: "These docs cover the 1.x SDK." },
+    { id: "v0.9", banner: false },
+  ],
+}
 ```
 
 ## SEO
@@ -65,18 +68,21 @@ Alte Docs sind die Lieblingsfalle von Suchmaschinen: Die veraltete Seite rankt b
 Pro Version kannst du eine andere Behandlung wählen:
 
 ```ts blume.config.ts
-archived: [
-  { id: "v1.0" }, // canonical → latest (default)
-  { id: "v0.9", canonical: "self" }, // every page authoritative
-  { id: "v0.8", noindex: true }, // deindexed entirely
-];
+versions: {
+  current: { label: "v2.0" },
+  archived: [
+    { id: "v1.0" }, // canonical → latest (default)
+    { id: "v0.9", canonical: "self" }, // every page authoritative
+    { id: "v0.8", noindex: true }, // deindexed entirely
+  ],
+}
 ```
 
 Die Sitemap zieht mit: Archivierte Seiten, deren Canonical auf ein aktuelles Gegenstück zeigt, werden weggelassen, `noindex`-Versionen fallen vollständig weg, und versionsspezifische Seiten bleiben gelistet. Das eigene `seo.canonical`-Frontmatter einer Seite gewinnt immer.
 
 ## Suche
 
-Der Suchdialog begrenzt die Ergebnisse auf die gerade betrachtete Version, mit einem „Alle Versionen"-Umschalter (pro Leser gespeichert) neben dem für die Sprache. Versionsübergreifende Treffer nennen ihre Version in der Ergebniszeile. Orama (die Standardoption), FlexSearch, Algolia und Typesense berücksichtigen das Scoping alle – gehostete Datensätze tragen eine `version`-Facette, wobei die aktuellen Docs als `"current"` hochgeladen werden –, während Pagefind ungescopt bleibt, passend zu seinem Verhalten bei Sprachen.
+Der Suchdialog begrenzt die Ergebnisse auf die gerade betrachtete Version, mit einem „Alle Versionen“-Umschalter (pro Leser gespeichert) neben dem für die Sprache. Versionsübergreifende Treffer nennen ihre Version in der Ergebniszeile. Orama (die Standardoption), FlexSearch, Algolia und Typesense berücksichtigen das Scoping alle – gehostete Datensätze tragen eine `version`-Facette, wobei die aktuellen Docs als `"current"` hochgeladen werden –, während Pagefind ungescopt bleibt, passend zu seinem Verhalten bei Sprachen.
 
 ## Agents
 

@@ -24,7 +24,7 @@ blume translate  3 item(s) · 2 locale(s) · Claude Code
 
 Blume besitzt die Pipeline; der Agent übersetzt nur Text. Für jede Datei, die Arbeit erfordert, baut Blume einen Übersetzungs-Prompt, führt die Agent-CLI headless mit deaktivierten Datei-, Shell- und Web-Tools aus, validiert die Struktur der Antwort und schreibt die Zieldatei selbst – [Claude Code](https://claude.com/claude-code) mit `--claude` oder [Codex](https://developers.openai.com/codex/cli) mit `--codex`. Blume hält keine API-Schlüssel und ruft selbst kein Modell auf.
 
-Jeder validierte Schreibvorgang wird in `blume.translations.json` im Projektstammverzeichnis festgehalten: für jede Quelldatei und Locale ein Hash der Quelle zum Zeitpunkt der Übersetzung. **Committe diese Datei.** So erkennt ein erneuter Lauf den Unterschied zwischen „bereits übersetzt" und „übersetzt, aber die Quelle hat sich seitdem geändert" – und genau das macht die CI-Schranke möglich.
+Jeder validierte Schreibvorgang wird in `blume.translations.json` im Projektstammverzeichnis festgehalten: für jede Quelldatei und Locale ein Hash der Quelle zum Zeitpunkt der Übersetzung. **Committe diese Datei.** So erkennt ein erneuter Lauf den Unterschied zwischen „bereits übersetzt“ und „übersetzt, aber die Quelle hat sich seitdem geändert“ – und genau das macht die CI-Schranke möglich.
 
 Das Ledger wird nach jeder fertiggestellten Datei geschrieben, sodass beim Abbrechen eines langen Laufs (Strg+C) höchstens die gerade laufenden Übersetzungen verloren gehen – der nächste Lauf macht dort weiter, wo du aufgehört hast. Standardmäßig laufen 4 Dateien gleichzeitig; erhöhe den Wert mit `--concurrency`, wenn deine Maschine und die Rate Limits des Agenten es zulassen.
 

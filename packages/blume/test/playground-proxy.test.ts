@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { once } from "node:events";
 
 import { createPlaygroundProxyHandler } from "../src/openapi/proxy.ts";
 
@@ -335,6 +336,24 @@ describe("createPlaygroundProxyHandler", () => {
     expect(response.status).toBe(502);
     expect(await errorJson(response)).toStrictEqual({
       error: "getaddrinfo ENOTFOUND api.example",
+    });
+  });
+
+  it("gives up on an upstream that never answers, as a 502", async () => {
+    // The client's own 30 s abort never reaches the server-side fetch, so
+    // without a deadline here the request would hold a server slot for as
+    // long as the platform allowed. The upstream stub resolves only through
+    // the handler's signal — the way a real fetch honors `signal`.
+    const hanging = asFetch(async (_input, init) => {
+      const signal = must(init?.signal);
+      await once(signal, "abort");
+      throw signal.reason;
+    });
+    const handler = createPlaygroundProxyHandler(ORIGINS, hanging, 10);
+    const response = await handler(proxyRequest("https://api.example/slow"));
+    expect(response.status).toBe(502);
+    expect(await errorJson(response)).toStrictEqual({
+      error: "Upstream https://api.example/slow did not respond within 10ms.",
     });
   });
 });

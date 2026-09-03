@@ -219,6 +219,13 @@ describe(codeTitleTransformer, () => {
     expect(metaAttrs(`title='say "hi".ts'`).dataTitle).toBe('say "hi".ts');
   });
 
+  it("keeps a spaced line range whole instead of promoting its tail", () => {
+    // Shiki accepts whitespace inside the braces; split on whitespace, the
+    // `3-5}` fragment used to surface as a bare token and become the title.
+    expect(metaAttrs("{1, 3-5} file.ts").dataTitle).toBe("file.ts");
+    expect(metaAttrs("{1, 3-5}").dataTitle).toBeUndefined();
+  });
+
   it("sets data-line-numbers and keeps the title", () => {
     const attrs = metaAttrs("file.ts lineNumbers");
     expect(attrs.dataTitle).toBe("file.ts");

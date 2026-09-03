@@ -28,7 +28,7 @@ blume eval  3 question(s) · Claude Code
 Jede Frage durchläuft zwei Agent-Sitzungen und nutzt dabei eine Agent-CLI, die du bereits installiert hast – standardmäßig [Claude Code](https://claude.com/claude-code) oder [Codex](https://developers.openai.com/codex/cli) mit `--agent codex`. Blume hält keine API-Schlüssel vor und ruft selbst kein Modell auf.
 
 1. **Der Reader** beantwortet die Frage _ausschließlich_ anhand deiner Dokumentation. Er läuft in einem leeren Verzeichnis, seine Datei-, Shell- und Web-Tools sind deaktiviert, und er ist mit einem privaten [MCP-Server](/docs/configuration/ai) verbunden, der deine Dokumentation bereitstellt – dieselben `search_docs`/`get_page`-Tools, die ein echter Agent gegen deine veröffentlichte Website verwendet. Er kann dein Repository nicht lesen und erlebt die Dokumentation daher genau wie ein neuer Nutzer: Was nicht geschrieben steht, existiert nicht.
-2. **Der Judge** bewertet die Antwort anhand der von dir aufgeführten Fakten, ganz ohne Tools. Umschreibungen bestehen; ein fehlender oder widersprochener Fakt fällt durch – und ebenso „die Dokumentation sagt dazu nichts".
+2. **Der Judge** bewertet die Antwort anhand der von dir aufgeführten Fakten, ganz ohne Tools. Umschreibungen bestehen; ein fehlender oder widersprochener Fakt fällt durch – und ebenso „die Dokumentation sagt dazu nichts“.
 
 Der MCP-Snapshot wird direkt aus deinen Content-Quellen erstellt, sodass du `blume build` nicht vorher ausführen musst und nichts irgendwohin deployed oder hochgeladen wird.
 
@@ -70,7 +70,7 @@ questions:
 - `routes` benennt die Seite(n), die die Frage beantworten sollten. Ein Fehlschlag wird im Bericht dann der Quelldatei dieser Seite zugeordnet; ein Hinweis, der zu keiner Seite mehr passt, wird gemeldet statt stillschweigend verworfen.
 - `severity: warning` behält eine Frage im Bericht, ohne die CI fehlschlagen zu lassen; `skip: true` lässt eine Frage komplett aussetzen.
 
-Schreibe Fragen, die deine Nutzer tatsächlich stellen – die aus Support-Threads, GitHub-Issues und Onboarding-Gesprächen. Die besten Evals codieren ein Versprechen deiner Dokumentation („Deployments ohne Konfiguration") als Frage, die bricht, sobald ein PR das Versprechen bricht.
+Schreibe Fragen, die deine Nutzer tatsächlich stellen – die aus Support-Threads, GitHub-Issues und Onboarding-Gesprächen. Die besten Evals codieren ein Versprechen deiner Dokumentation („Deployments ohne Konfiguration“) als Frage, die bricht, sobald ein PR das Versprechen bricht.
 
 ## CI zum Fehlschlagen bringen
 

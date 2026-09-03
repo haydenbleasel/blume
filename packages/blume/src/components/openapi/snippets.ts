@@ -46,38 +46,19 @@ const fetchSnippet = (sample: RequestSample): string => {
     options.push(`  headers: {\n${headers}\n  }`);
   }
   if (sample.body) {
-    // `bodyValue` mirrors the body only when it parses as JSON. Mid-edit text
-    // that doesn't can't be inlined as a JS expression — a string literal of
-    // the raw text keeps the snippet syntactically valid and byte-identical
-    // to what the live send transmits.
-    options.push(
-      sample.bodyValue === undefined
-        ? `  body: ${JSON.stringify(sample.body)}`
-        : `  body: JSON.stringify(${sample.body})`
-    );
+    // Always the raw editor text as a string literal, never re-read as a JS
+    // expression: the sample must send byte-for-byte what the live request
+    // sends, and an object literal doesn't round-trip every valid JSON
+    // document — `{"__proto__":{"x":1}}` sets a prototype instead of a key,
+    // and an id past 2^53 loses digits through a JS number. The string
+    // literal also stays syntactically valid while the editor holds mid-edit
+    // text that isn't JSON yet.
+    options.push(`  body: ${JSON.stringify(sample.body)}`);
   }
   return `const response = await fetch("${sample.url}", {\n${options.join(
     ",\n"
   )}\n});`;
 };
-
-// Split-with-capture: odd segments are JSON string literals, kept verbatim so
-// a string *value* containing the words true/false/null isn't rewritten.
-const JSON_STRING = /(?<literal>"(?:\\.|[^"\\])*")/gu;
-
-/** Turn a JSON literal into an equivalent Python literal (`true` -> `True`). */
-const toPython = (json: string): string =>
-  json
-    .split(JSON_STRING)
-    .map((part, index) =>
-      index % 2 === 1
-        ? part
-        : part
-            .replaceAll(/\btrue\b/gu, "True")
-            .replaceAll(/\bfalse\b/gu, "False")
-            .replaceAll(/\bnull\b/gu, "None")
-    )
-    .join("");
 
 const pythonSnippet = (sample: RequestSample): string => {
   const args = [`    "${sample.url}"`];
@@ -89,14 +70,11 @@ const pythonSnippet = (sample: RequestSample): string => {
     args.push(`    headers={\n${headers}\n    }`);
   }
   if (sample.body) {
-    // Same rule as the fetch snippet: only valid JSON rewrites into a Python
-    // literal for `json=`; anything else travels as a raw string via `data=`
-    // (JSON string escapes are a subset of Python's, so the literal is valid).
-    args.push(
-      sample.bodyValue === undefined
-        ? `    data=${JSON.stringify(sample.body)}`
-        : `    json=${toPython(sample.body)}`
-    );
+    // Same rule as the fetch snippet: the raw text travels as a string via
+    // `data=` (JSON string escapes are a subset of Python's, so the literal is
+    // valid) rather than a `json=` dict — a Python literal re-serializes
+    // `1e400` as `Infinity` and would otherwise diverge from the live send.
+    args.push(`    data=${JSON.stringify(sample.body)}`);
   }
   return `import requests\n\nresponse = requests.${sample.method.toLowerCase()}(\n${args.join(
     ",\n"

@@ -969,6 +969,10 @@ export const obsidianSource = (
   // copy of every note for the life of a dev server.
   const read = async (ref: string): Promise<string> => {
     const absPath = resolve(vaultDir, ref);
+    // Lexical containment only — `..` and sibling paths are refused, but a
+    // symlink inside the vault is followed wherever it points, the way
+    // `walkVault` and the filesystem source follow theirs. Vault symlinks are
+    // the author's own and are trusted; the Obsidian source docs say so.
     const rel = relative(vaultDir, absPath);
     if (rel.startsWith("..") || isAbsolute(rel)) {
       throw new BlumeError({

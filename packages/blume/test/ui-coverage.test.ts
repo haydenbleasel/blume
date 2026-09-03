@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { join } from "pathe";
 
@@ -466,7 +467,9 @@ const layoutSource = (name: string): Promise<string> =>
  * lazy panel's loader script.
  */
 const astroImportersOf = async (component: string): Promise<string[]> => {
-  const srcRoot = new URL("../src/", import.meta.url).pathname;
+  // A real path, not `URL.pathname`: that keeps percent-encoding (a space in
+  // the checkout path) and isn't a native path on Windows.
+  const srcRoot = fileURLToPath(new URL("../src/", import.meta.url));
   const importPattern = new RegExp(
     String.raw`from\s+"[^"]*${component}\.astro"`,
     "u"

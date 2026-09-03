@@ -51,6 +51,15 @@ const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
 /** Hops followed before giving up, matching fetch's own redirect limit. */
 const MAX_REDIRECTS = 20;
 
+/**
+ * Deadline for the whole upstream exchange, redirects included. The
+ * playground client aborts its own request after 30 s, but that never
+ * reaches the server-side fetch: without a deadline here, a documented API
+ * that accepts the connection and never answers would hold a server request
+ * slot until the platform killed it. Matches the client's limit.
+ */
+const UPSTREAM_TIMEOUT_MS = 30_000;
+
 /** A 400 the playground client can render verbatim. */
 const badRequest = (error: string): Response =>
   Response.json({ error }, { status: 400 });
@@ -96,6 +105,8 @@ const followUpstream = async (args: {
   /** Hops already followed; the chain is bounded by {@link MAX_REDIRECTS}. */
   hop: number;
   method: string;
+  /** One deadline shared by every hop, so a redirect chain can't extend it. */
+  signal: AbortSignal;
   url: URL;
 }): Promise<Response> => {
   const response = await args.fetchImpl(args.url, {
@@ -103,6 +114,7 @@ const followUpstream = async (args: {
     headers: args.headers,
     method: args.method,
     redirect: "manual",
+    signal: args.signal,
   });
   const location = REDIRECT_STATUS.has(response.status)
     ? response.headers.get("location")
@@ -151,10 +163,15 @@ const followUpstream = async (args: {
  * Loopback and private addresses need no separate rule: they are reachable only
  * when a spec documents them, which is exactly the local-API case that must
  * keep working.
+ *
+ * `timeoutMs` bounds the upstream exchange (see {@link UPSTREAM_TIMEOUT_MS});
+ * an upstream that doesn't answer in time is the same 502 as an unreachable
+ * one. Injectable so tests don't wait out the real deadline.
  */
 export const createPlaygroundProxyHandler = (
   origins: readonly string[],
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs = UPSTREAM_TIMEOUT_MS
 ) => {
   const allowed = new Set(origins);
   return async (request: Request): Promise<Response> => {
@@ -192,14 +209,22 @@ export const createPlaygroundProxyHandler = (
         headers: filterHeaders(request.headers, REQUEST_DROP),
         hop: 0,
         method: request.method,
+        signal: AbortSignal.timeout(timeoutMs),
         url: parsed,
       });
     } catch (error) {
-      // SAFETY: followUpstream itself only throws `new Error(...)`, and a
-      // failed fetch rejects with a TypeError per spec — both are Errors
-      // carrying `.message`.
+      // SAFETY: followUpstream itself only throws `new Error(...)`, a failed
+      // fetch rejects with a TypeError per spec, and a timed-out one with a
+      // `TimeoutError` DOMException — all Errors carrying `.name` and
+      // `.message`.
+      const { name, message } = error as Error;
       return Response.json(
-        { error: (error as Error).message },
+        {
+          error:
+            name === "TimeoutError"
+              ? `Upstream ${parsed.href} did not respond within ${timeoutMs}ms.`
+              : message,
+        },
         { status: 502 }
       );
     }

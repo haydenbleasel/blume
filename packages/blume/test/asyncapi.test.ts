@@ -379,6 +379,38 @@ describe("asyncapi.extractAsyncApiOperations", () => {
     expect(warnings[0]).toContain('"dangling" is a reference');
   });
 
+  it("gives each alias of a component its own copy before traits merge", () => {
+    // Two operations reusing one component: trait merging writes into its
+    // node and deletes `traits`, so a shared object would leak the first
+    // alias's merge into the second and strip the component table entry.
+    const document = normalizeAsyncApiDocument({
+      channels: { c: { address: "topic" } },
+      components: {
+        operationTraits: { kafka: { bindings: { kafka: { groupId: "g" } } } },
+        operations: {
+          publish: {
+            action: "send",
+            channel: { $ref: "#/channels/c" },
+            traits: [{ $ref: "#/components/operationTraits/kafka" }],
+          },
+        },
+      },
+      operations: {
+        first: { $ref: "#/components/operations/publish" },
+        second: { $ref: "#/components/operations/publish" },
+      },
+    });
+    const first = document.operations?.first;
+    const second = document.operations?.second;
+    expect(first).not.toBe(second);
+    expect(first).toMatchObject({ bindings: { kafka: { groupId: "g" } } });
+    expect(second).toMatchObject({ bindings: { kafka: { groupId: "g" } } });
+    // The component itself is untouched: still carrying its traits.
+    expect(document.components?.operations?.publish).toMatchObject({
+      traits: [{ $ref: "#/components/operationTraits/kafka" }],
+    });
+  });
+
   it("falls back to action + address for an id that slugifies to nothing", () => {
     const document = {
       channels: { c: { address: "topic" } },

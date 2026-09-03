@@ -52,10 +52,13 @@ Com as versões configuradas, o cabeçalho ganha um dropdown de versão automati
 Toda página arquivada também mostra um aviso não dispensável com um link "Ir para a mais recente" apontando para o equivalente vivo da página. Personalize ou desative por versão:
 
 ```ts blume.config.ts
-archived: [
-  { id: "v1.0", banner: "These docs cover the 1.x SDK." },
-  { id: "v0.9", banner: false },
-];
+versions: {
+  current: { label: "v2.0" },
+  archived: [
+    { id: "v1.0", banner: "These docs cover the 1.x SDK." },
+    { id: "v0.9", banner: false },
+  ],
+}
 ```
 
 ## SEO
@@ -65,11 +68,14 @@ Docs antigos são a armadilha favorita dos mecanismos de busca: a página desatu
 Por versão, você pode escolher um tratamento diferente:
 
 ```ts blume.config.ts
-archived: [
-  { id: "v1.0" }, // canonical → latest (default)
-  { id: "v0.9", canonical: "self" }, // every page authoritative
-  { id: "v0.8", noindex: true }, // deindexed entirely
-];
+versions: {
+  current: { label: "v2.0" },
+  archived: [
+    { id: "v1.0" }, // canonical → latest (default)
+    { id: "v0.9", canonical: "self" }, // every page authoritative
+    { id: "v0.8", noindex: true }, // deindexed entirely
+  ],
+}
 ```
 
 O sitemap segue a mesma lógica: páginas arquivadas cujo canônico aponta para um equivalente vivo ficam de fora, versões com `noindex` ficam de fora por completo, e páginas exclusivas de uma versão continuam listadas. O frontmatter `seo.canonical` da própria página sempre vence.

@@ -68,13 +68,17 @@ const LATIN_SCRIPT = "Latn";
 /**
  * Parse a locale tag, tolerating the legacy forms that reach here from
  * hand-written config: underscores (`ru_RU`), POSIX suffixes (`ja_JP.UTF-8`,
- * `zh_TW@Big5`), and extlang tags ICU rejects (`zh-cmn-Hans`). `Intl.Locale`
- * throws on all of these, so a failed parse retries with the primary language
- * subtag alone — enough to resolve the script, which is all that gates the
- * tokenizer. Returns `undefined` when even that subtag is unparseable.
+ * `zh_TW@Big5`), and extlang tags ICU rejects (`zh-cmn-Hans`). The POSIX
+ * codeset/modifier suffix is dropped first — it carries no BCP 47 meaning,
+ * and dropping it keeps an explicit script subtag in play: `az_Cyrl.UTF-8`
+ * must resolve to `Cyrl`, not fall back to `az` and maximize to Latin.
+ * `Intl.Locale` still throws on extlang forms, so a failed parse retries with
+ * the primary language subtag alone — enough to resolve the script, which is
+ * all that gates the tokenizer. Returns `undefined` when even that subtag is
+ * unparseable.
  */
 const parseLocale = (tag: string): Intl.Locale | undefined => {
-  const hyphenated = tag.replaceAll("_", "-");
+  const hyphenated = tag.replace(/[.@].*$/u, "").replaceAll("_", "-");
   try {
     return new Intl.Locale(hyphenated);
   } catch {

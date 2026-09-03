@@ -1102,6 +1102,21 @@ const longAskData: AskData = {
   site: null,
 };
 
+/**
+ * More matching pages than the default `maxResults` admits, each short enough
+ * that the context budget can never be what cuts the list.
+ */
+const manyAskData: AskData = {
+  documents: Array.from({ length: 7 }, (_, index) => ({
+    content: `Install guide ${index}. Install the dev server and preview the docs.`,
+    description: "How to install Blume",
+    locale: "",
+    route: `/guides/install-${index}`,
+    title: `Installation ${index}`,
+  })),
+  site: null,
+};
+
 /** The text between the `<docs>` markers — what the question actually carries. */
 const docsBlock = (system: string | undefined): string => {
   const start = system?.indexOf("<docs>") ?? -1;
@@ -1150,6 +1165,16 @@ describe("createAskContext", () => {
     // all of them inside the 10,000-character budget.
     expect(injected.split("## ").length - 1).toBe(4);
     expect(injected.length).toBeGreaterThan(7000);
+  });
+
+  it("admits six pages by default", async () => {
+    // Seven short matching pages: exactly the default `maxResults` are
+    // injected, and the budget (far from exhausted) can't be what cut it.
+    const ground = createAskContext(manyAskData);
+    const injected = docsBlock(
+      await ground([{ content: "install guide", role: "user" }])
+    );
+    expect(injected.split("## ").length - 1).toBe(6);
   });
 
   it("caps the retrieved documents at `maxResults`", async () => {

@@ -37,7 +37,7 @@ Fragment links can also target a raw HTML element with an `id` (`<a id="setup"><
 
 ### Table of contents markers
 
-Two more trailing markers control how a heading appears in the table of contents. `[!toc]` keeps a heading on the page but out of the TOC; `[toc]` does the reverse — the heading shows only in the TOC, as an invisible anchor target, which is useful for labeling sections built from components rather than prose. Markers chain in any order.
+Two more trailing markers control how a heading appears in the table of contents. `[!toc]` keeps a heading on the page but out of the TOC; `[toc]` does the reverse — the heading shows only in the TOC, as an invisible anchor target, which is useful for labeling sections built from components rather than prose. Markers chain in any order. One exception, inherited from CommonMark: a trailing bracket whose label has a link-reference definition anywhere on the page (`[toc]: /url`) is a shortcut reference link, not a marker, and stays in the heading text.
 
 ```md
 ## Appears on the page only [!toc]
@@ -610,7 +610,7 @@ $$
 ```
 
 :::note
-Math is block-only and on automatically — write `$$…$$` and it renders; write none and KaTeX's stylesheet never ships. There's no inline `$…$` math: a lone `$` (currency, shell variables, code) is always left as literal text, so there's no delimiter to escape and no setting to toggle. Math is an MDX-only feature.
+Math is block-only and on automatically — write `$$…$$` and it renders; write none and KaTeX's stylesheet never ships. There's no inline `$…$` math: a lone `$` (currency, shell variables, code) is always left as literal text, so there's no delimiter to escape and no setting to toggle. Math is an MDX-only feature. The class names inside the rendered markup (`.katex-html`, `.katex-base`, …) are KaTeX's own internals, not a styling contract Blume maintains — they can change when KaTeX upgrades, so target the `.katex-display` wrapper for custom styles.
 :::
 
 ## Smart punctuation

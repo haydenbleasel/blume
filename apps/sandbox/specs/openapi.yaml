@@ -26,12 +26,15 @@ paths:
           description: Page number, starting at 1.
           schema:
             type: integer
+            minimum: 1
             default: 1
         - name: limit
           in: query
           description: Page size, capped at 100.
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
             default: 20
       responses:
         "200":
@@ -40,6 +43,7 @@ paths:
             application/json:
               schema:
                 type: array
+                maxItems: 100
                 items:
                   $ref: "#/components/schemas/Order"
     post:

@@ -52,10 +52,13 @@ docs/
 प्रत्येक संग्रहीत पृष्ठ पर एक न हटाई जा सकने वाली सूचना भी दिखती है, जिसमें "नवीनतम पर जाएँ" लिंक उस पृष्ठ के लाइव समकक्ष की ओर संकेत करता है। इसे प्रति संस्करण अनुकूलित या निष्क्रिय करें:
 
 ```ts blume.config.ts
-archived: [
-  { id: "v1.0", banner: "These docs cover the 1.x SDK." },
-  { id: "v0.9", banner: false },
-];
+versions: {
+  current: { label: "v2.0" },
+  archived: [
+    { id: "v1.0", banner: "These docs cover the 1.x SDK." },
+    { id: "v0.9", banner: false },
+  ],
+}
 ```
 
 ## SEO
@@ -65,11 +68,14 @@ archived: [
 प्रति संस्करण आप एक भिन्न व्यवहार चुन सकते हैं:
 
 ```ts blume.config.ts
-archived: [
-  { id: "v1.0" }, // canonical → latest (default)
-  { id: "v0.9", canonical: "self" }, // every page authoritative
-  { id: "v0.8", noindex: true }, // deindexed entirely
-];
+versions: {
+  current: { label: "v2.0" },
+  archived: [
+    { id: "v1.0" }, // canonical → latest (default)
+    { id: "v0.9", canonical: "self" }, // every page authoritative
+    { id: "v0.8", noindex: true }, // deindexed entirely
+  ],
+}
 ```
 
 साइटमैप भी यही अनुसरण करता है: वे संग्रहीत पृष्ठ जिनका कैनोनिकल किसी लाइव समकक्ष की ओर संकेत करता है, छोड़ दिए जाते हैं, `noindex` संस्करण पूरी तरह छोड़ दिए जाते हैं, और केवल-संस्करण पृष्ठ सूचीबद्ध रहते हैं। किसी पृष्ठ का अपना `seo.canonical` फ़्रंटमैटर हमेशा प्रभावी रहता है।

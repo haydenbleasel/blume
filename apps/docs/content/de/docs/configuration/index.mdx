@@ -313,7 +313,7 @@ Eine Instanz, die nur über einfaches HTTP erreichbar ist, rendert ihre Zahlen w
 
 ## Zuletzt geändert
 
-Zeige am Ende jeder Seite eine Zeile „Zuletzt aktualisiert am …" an. Standardmäßig deaktiviert; setze `lastModified` auf `true`, um das Datum jeder Seite aus ihrer Git-Historie abzuleiten:
+Zeige am Ende jeder Seite eine Zeile „Zuletzt aktualisiert am …“ an. Standardmäßig deaktiviert; setze `lastModified` auf `true`, um das Datum jeder Seite aus ihrer Git-Historie abzuleiten:
 
 ```ts blume.config.ts
 lastModified: true,
@@ -339,7 +339,7 @@ Ist die Funktion aktiviert, wird das Datum außerdem als schema.org-`dateModifie
 
 ## Datumsformat
 
-Sowohl der Stempel „Zuletzt aktualisiert" als auch die Zeitleiste des [Changelogs](/docs/advanced/changelog) rendern ihre Daten über dasselbe `dateFormat`, damit sie sich gleich lesen. Daten werden immer in der Sprache der Website gerendert; `dateFormat` steuert die _Form_. Standardmäßig wird die lange Form verwendet (`21. Juli 2026`, `2026年7月21日`):
+Sowohl der Stempel „Zuletzt aktualisiert“ als auch die Zeitleiste des [Changelogs](/docs/advanced/changelog) rendern ihre Daten über dasselbe `dateFormat`, damit sie sich gleich lesen. Daten werden immer in der Sprache der Website gerendert; `dateFormat` steuert die _Form_. Standardmäßig wird die lange Form verwendet (`21. Juli 2026`, `2026年7月21日`):
 
 ```ts blume.config.ts
 dateFormat: { dateStyle: "long" },
@@ -392,7 +392,7 @@ Diese Funktionen entfalten ihre volle Wirkung mit einer absoluten [`deployment.s
 
 ## Inhaltsverzeichnis
 
-Die Gliederung „Auf dieser Seite" ist standardmäßig aktiviert und listet `H2`–`H3`-Überschriften auf. Schalte sie mit `toc` ab oder ändere den Überschriftenbereich:
+Die Gliederung „Auf dieser Seite“ ist standardmäßig aktiviert und listet `H2`–`H3`-Überschriften auf. Schalte sie mit `toc` ab oder ändere den Überschriftenbereich:
 
 ```ts blume.config.ts
 export default defineConfig({

@@ -11,6 +11,7 @@
 
 import {
   isLineRange,
+  metaTokens,
   QUOTED_ATTR,
   RESERVED_META_KEYWORDS,
 } from "./fence-meta.ts";
@@ -64,7 +65,10 @@ export const parseCodeTitle = (raw: string | undefined): string | undefined => {
   if (attrTitle) {
     return attrTitle;
   }
-  return withoutQuotedAttrs(raw).trim().split(/\s+/u).find(isTitleToken);
+  // The shared tokenizer keeps a quoted attr (rejected below by its `=`) and
+  // a spaced line range (`{1, 3-5}`) whole, so neither can shed a fragment
+  // that reads as a bare title.
+  return metaTokens(raw).find(isTitleToken);
 };
 
 const hasLineNumbers = (raw: string | undefined): boolean =>

@@ -2134,17 +2134,40 @@ describe("snippets", () => {
     );
     // The apostrophe must not terminate the shell's single-quoted -d value.
     expect(curl).toContain(String.raw`it'\''s true`);
-    // Keyword rewriting applies outside JSON strings only — the *value*
-    // "it's true" keeps its lowercase true.
-    expect(python).toContain('"note": "it\'s true"');
-    expect(python).toContain('"active": True');
-    expect(python).toContain('"tags": None');
+    // The Python sample carries the raw text as a string, apostrophe and JSON
+    // keywords untouched — never a rewritten dict literal.
+    expect(python).toContain(`data=${JSON.stringify(sample.body)}`);
+    expect(python).not.toContain("json=");
+    expect(python).not.toContain("True");
+  });
+
+  it("sends the raw body text even when it parses as JSON", () => {
+    // A valid document a JS object literal wouldn't round-trip: `__proto__`
+    // becomes a prototype rather than a key, and an id past 2^53 loses digits
+    // through a JS number. The sample must send exactly what the live request
+    // sends, so the raw text goes out as a string literal regardless of the
+    // `bodyValue` mirror.
+    const body = '{"__proto__": {"x": 1}, "id": 12345678901234567890}';
+    const sample = {
+      body,
+      bodyValue: JSON.parse(body),
+      headers: {},
+      method: "POST",
+      url: "https://api.test/v1/pet",
+    };
+    const [js, python] = sampleLanguages(["js", "python"]).map((language) =>
+      language.build(sample)
+    );
+    expect(js).toContain(`body: ${JSON.stringify(body)}`);
+    expect(js).not.toContain("JSON.stringify(");
+    expect(python).toContain(`data=${JSON.stringify(body)}`);
+    expect(python).not.toContain("json=");
   });
 
   it("keeps JS and Python samples syntactically valid mid-edit", () => {
     // While the body editor holds invalid JSON (no `bodyValue` mirror), the
-    // raw text can't be inlined as a JS/Python expression — it travels as a
-    // string literal instead, matching what the live send transmits.
+    // raw text can't be inlined as a JS/Python expression anyway — it travels
+    // as a string literal, matching what the live send transmits.
     const sample = {
       body: '{"count": 2',
       headers: {},

@@ -863,6 +863,27 @@ describe("orama index helpers", () => {
     expect(extlangHits.length).toBe(1);
   });
 
+  it("keeps an explicit script subtag through a POSIX suffix", async () => {
+    // `az_Cyrl.UTF-8` used to fall all the way back to `az`, which maximizes
+    // to Latin: segmentation stayed off and Cyrillic content produced no
+    // tokens. The mirror case, `sr_Latn.UTF-8`, maximized to Cyrillic and
+    // segmented Latin text it didn't need to.
+    const cyrillic = {
+      content: "Ахтарыш көйләмәләрен үзгәртегез.",
+      description: "",
+      locale: "az",
+      route: "/az",
+      title: "X",
+    };
+    const azCyrl = await buildOramaIndex([cyrillic], "az_Cyrl.UTF-8");
+    expect(azCyrl.tokenizer?.language).toBe("az");
+    const hits = await queryOramaIndex(azCyrl, "көйләмәләрен", 5);
+    expect(hits.length).toBe(1);
+    // Latin script keeps Orama's stock tokenizer.
+    const srLatn = await buildOramaIndex([cyrillic], "sr_Latn.UTF-8");
+    expect(srLatn.tokenizer?.language).toBe("english");
+  });
+
   it("bigrams Han-script languages beyond ja and zh, like Cantonese", async () => {
     // The writing system, not the language subtag, carries the compound
     // convention: `yue` maximizes to Hant and needs bigrams — and the strict

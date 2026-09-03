@@ -4,7 +4,6 @@
   "include": [".blume/.astro/types.d.ts", ".blume/src/env.d.ts", "**/*"],
   "exclude": [
     "dist",
-    "examples",
     ".blume/src/pages",
     ".blume/src/generated",
     ".blume/cache"

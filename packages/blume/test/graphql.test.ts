@@ -848,6 +848,12 @@ describe("graphql-helpers", () => {
     const bare = graphqlPlaygroundModel(specData(), query);
     expect(bare.servers).toStrictEqual([GRAPHQL_ENDPOINT_PLACEHOLDER]);
     expect(JSON.parse(bare.body?.example ?? "")).toStrictEqual({ query });
+    // An empty endpoint is as absent as an omitted one — never an empty URL.
+    const empty = graphqlPlaygroundModel(
+      { ...specData(), endpoint: "" },
+      query
+    );
+    expect(empty.servers).toStrictEqual([GRAPHQL_ENDPOINT_PLACEHOLDER]);
   });
 
   it("maps type names to their page routes", () => {

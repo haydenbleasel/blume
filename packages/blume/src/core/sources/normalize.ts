@@ -339,8 +339,13 @@ const finishPromptTag = (
 // inline way to write a literal trailing marker — use inline code instead).
 const ESCAPED_PUNCTUATION = /\\(?<char>[!-/:-@[-`{-~])/gu;
 
-// A link-reference definition line: `[label]: /url`, up to 3 leading spaces.
-const REF_DEFINITION = /^ {0,3}\[(?<label>[^\]]+)\]:/u;
+// The start of a link-reference definition, as the renderer accepts it:
+// `[label]:` after up to 3 leading spaces, optionally inside block-quote or
+// list-item containers (`> [label]: /url`, `- [label]: /url`) — a definition
+// nested in either still defines the label document-wide. `rest` is whatever
+// follows the colon on the same line.
+const REF_DEFINITION =
+  /^(?:[ \t]*(?:>[ \t]*|(?:[-*+]|\d{1,9}[.)])[ \t]+))* {0,3}\[(?<label>[^\]]+)\]:[ \t]*(?<rest>.*)$/u;
 
 /**
  * The normalized labels of every link-reference definition in the body
@@ -348,20 +353,32 @@ const REF_DEFINITION = /^ {0,3}\[(?<label>[^\]]+)\]:/u;
  * a CommonMark shortcut link, not a marker — the renderer leaves it in the
  * heading as an `<a>`, so the marker parse must skip it too. Labels match
  * case-insensitively with collapsed internal whitespace (CommonMark).
+ *
+ * Only a *valid* definition defines a label: the label must contain a
+ * non-whitespace character, and a destination must follow — on the same line
+ * or, as CommonMark allows, alone on the next. A bare `[toc]:` with nothing
+ * after it is paragraph text, and the renderer still treats the heading's
+ * `[toc]` as literal — which Blume reads as a marker — so it must not be
+ * recorded here.
  */
 const refDefinitionLabels = (lines: readonly string[]): Set<string> => {
   const labels = new Set<string>();
   let fence: FenceState = null;
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const next = nextFenceState(line, fence);
     if (fence !== null || next !== null) {
       fence = next;
       continue;
     }
-    const label = line.match(REF_DEFINITION)?.groups?.label;
-    if (label !== undefined) {
-      labels.add(label.trim().replaceAll(/\s+/gu, " ").toLowerCase());
+    const groups = line.match(REF_DEFINITION)?.groups;
+    if (groups?.label === undefined || groups.label.trim() === "") {
+      continue;
     }
+    const destination = groups.rest ?? "";
+    if (destination === "" && (lines[index + 1] ?? "").trim() === "") {
+      continue;
+    }
+    labels.add(groups.label.trim().replaceAll(/\s+/gu, " ").toLowerCase());
   }
   return labels;
 };

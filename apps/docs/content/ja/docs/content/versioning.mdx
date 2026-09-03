@@ -49,13 +49,16 @@ docs/
 
 バージョンを設定すると、ヘッダーにバージョンのドロップダウンが自動的に追加されます。切り替え時には、対象バージョンに同じページが存在すればそのページに、存在しなければそのバージョンのルートに遷移します（常にルートに遷移させるには `switcher.redirect: "root"` を設定します）。[`navigation.selectors`](/docs/content/navigation#selectors) で独自の `kind: "version"` セレクターを宣言した場合は、そちらが自動生成のものを置き換えます。
 
-アーカイブ済みのすべてのページには、そのページのライブ版へのリンクを含む「最新版へ移動」の通知も表示されます（非表示にはできません）。バージョンごとにカスタマイズまたは無効化できます:
+アーカイブ済みのすべてのページには、そのページのライブ版へのリンクを含む「最新版へ移動」の通知もデフォルトで表示されます（読者が閉じることはできません）。バージョンごとにカスタマイズまたは無効化できます:
 
 ```ts blume.config.ts
-archived: [
-  { id: "v1.0", banner: "These docs cover the 1.x SDK." },
-  { id: "v0.9", banner: false },
-];
+versions: {
+  current: { label: "v2.0" },
+  archived: [
+    { id: "v1.0", banner: "These docs cover the 1.x SDK." },
+    { id: "v0.9", banner: false },
+  ],
+}
 ```
 
 ## SEO
@@ -65,11 +68,14 @@ archived: [
 バージョンごとに異なる扱いを選択できます:
 
 ```ts blume.config.ts
-archived: [
-  { id: "v1.0" }, // canonical → latest (default)
-  { id: "v0.9", canonical: "self" }, // every page authoritative
-  { id: "v0.8", noindex: true }, // deindexed entirely
-];
+versions: {
+  current: { label: "v2.0" },
+  archived: [
+    { id: "v1.0" }, // canonical → latest (default)
+    { id: "v0.9", canonical: "self" }, // every page authoritative
+    { id: "v0.8", noindex: true }, // deindexed entirely
+  ],
+}
 ```
 
 サイトマップもこれに従います。正規 URL がライブの対応ページを指しているアーカイブ済みページは除外され、`noindex` のバージョンは丸ごと除外され、そのバージョンにしかないページは掲載されたままになります。ページ自身の `seo.canonical` フロントマターは常に優先されます。
