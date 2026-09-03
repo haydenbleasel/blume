@@ -5,6 +5,7 @@ import { gfm } from "micromark-extension-gfm";
 import stringWidth from "string-width";
 
 import matter from "../frontmatter.ts";
+import { PUBLIC_API_URL } from "../github.ts";
 import { columnsPrefix } from "../text-width.ts";
 import {
   hashText,
@@ -55,7 +56,6 @@ interface GithubRelease {
   tag_name: string;
 }
 
-const DEFAULT_BASE_URL = "https://api.github.com";
 const DEFAULT_LIMIT = 100;
 const PER_PAGE = 100;
 
@@ -203,7 +203,7 @@ export const githubReleasesSource = (
   ctx: SourceContext
 ): ContentSource => {
   const doFetch = options.fetchImpl ?? globalThis.fetch;
-  const base = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/u, "");
+  const base = (options.baseUrl ?? PUBLIC_API_URL).replace(/\/$/u, "");
   const max = options.limit ?? DEFAULT_LIMIT;
   const cache = snapshotCache(ctx.cacheDir);
   let snapshot = new Map<string, SourceEntry>();

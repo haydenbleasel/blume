@@ -25,7 +25,7 @@ Read `themeConfig`, `presets`, and `plugins`:
 | `themeConfig.metadata` / `themeConfig.image` | per-page `seo` frontmatter / `seo.og`; report what doesn't fit |
 | `url` + `baseUrl` | **`url` → drop** (`deployment.site` auto-detects); `baseUrl` (when not `/`) → `deployment.base` |
 | preset `docs.routeBasePath` — **including the default!** | Docusaurus serves docs at **`/docs/…` by default**; the "map only declared fields" rule does **not** apply here because the _URLs_ are load-bearing. Either keep them with top-level **`basePath: "/docs"`** (invisible to the sidebar), or intentionally move to root and emit a `redirects` entry per page. Decide explicitly and say which. (`routeBasePath: '/'` = docs-only mode — nothing to do.) |
-| preset `docs.editUrl` | `github` (owner/repo/branch; a path after the branch → `github.dir`) |
+| preset `docs.editUrl` | `github` (owner/repo/branch; a path after the branch → `github.dir`; **an origin other than `https://github.com` → `github.host`** — a GitHub Enterprise repo's edit links and header mark point at the public site without it) |
 | `themeConfig.footer` | drop → Footer override (`defineComponents` layout slot) |
 | `themeConfig.announcementBar` | `banner` (`{ content, dismissible, id }` — `isCloseable` → `dismissible`; colors drop) |
 | `i18n.locales` / `defaultLocale` | `i18n` — translated files live at `i18n/<locale>/docusaurus-plugin-content-docs/current/…`; move them to `<locale>/…` under `content.root` |

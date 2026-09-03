@@ -54,8 +54,9 @@ import type { Diagnostic } from "./types.ts";
  *   and the `repo` link (a toggle, or a URL). Omit `sidebar` to generate it
  *   from the content tree.
  * - `redirects` — `{ from, to, status }` rules (301 by default).
- * - `github` — `{ owner, repo, branch, dir }`, powering "Edit this page" links
- *   and the header repo link.
+ * - `github` — `{ owner, repo, branch, dir, host, api }`, powering "Edit this
+ *   page" links and the header repo link; `host` points them at a GitHub
+ *   Enterprise instance, `api` overrides the REST base derived from it.
  *
  * **Appearance**
  * - `theme` — `accent` color, `fonts` (curated slugs, any provider family, or

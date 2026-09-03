@@ -22,7 +22,7 @@ Keep content where it is — set `content.root: "src/content/docs"`.
 | `logo.replacesTitle` | `logo: { text: "" }` (renders the mark alone) |
 | `favicon` | copy the file into `public/` (drop the config field — Blume auto-detects) |
 | `social` (array of `{ label, icon, href }`; pre-0.33 legacy: `{ github: url }` object) | derive **`github: { owner, repo }`** from the GitHub entry; other socials drop (report) |
-| `editLink.baseUrl` (`…/edit/<branch>/<subdir?>`) | `github: { owner, repo, branch }` — **and any repo sub-path after the branch → `github.dir`** (a docs-in-subfolder repo breaks every edit link without it) |
+| `editLink.baseUrl` (`…/edit/<branch>/<subdir?>`) | `github: { owner, repo, branch }` — **and any repo sub-path after the branch → `github.dir`** (a docs-in-subfolder repo breaks every edit link without it); **an origin other than `https://github.com` → `github.host`** (a GitHub Enterprise repo otherwise links to the public site) |
 | `sidebar` (array) | filesystem nav / `navigation.sidebar` (see below) |
 | `tableOfContents` (`false` or `{ minHeadingLevel, maxHeadingLevel }`) | `toc` — identical shape, 1:1 |
 | `markdown.headingLinks: false` | `markdown.headingAnchors: false` |

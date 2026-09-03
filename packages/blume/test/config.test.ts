@@ -102,6 +102,15 @@ describe("loadConfig", () => {
     expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
   });
 
+  it("rejects a navigation.repo URL that is not http(s)", async () => {
+    // Same sink as `github.host`: the header mark's `href`.
+    const dir = await makeDir(
+      'export default { navigation: { repo: "javascript:alert(1)" } };'
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+  });
+
   it("rejects a github.api that is not http(s)", async () => {
     const dir = await makeDir(
       'export default { github: { api: "ftp://acme.com", owner: "acme", repo: "docs" } };'

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, spyOn } from "bun:test";
 
 import { fetchRepositoryInfo } from "../src/components/content/github-info.ts";
 
@@ -68,6 +68,40 @@ describe(fetchRepositoryInfo, () => {
     // An Enterprise instance can be configured on plain HTTP; the counts are
     // still worth fetching, the bearer token is not worth transmitting.
     expect(await authHeaderFor("http://ghe.internal/api/v3")).toBeNull();
+  });
+
+  it("warns once per cleartext base when a token is withheld", async () => {
+    // A private repo's card comes back bare either way; without a line in the
+    // build log that is indistinguishable from a network failure.
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      globalThis.fetch = asFetch(() =>
+        Promise.resolve(
+          Response.json({
+            description: null,
+            forks_count: 0,
+            stargazers_count: 0,
+          })
+        )
+      );
+      const base = "http://ghe.warned/api/v3";
+      await fetchRepositoryInfo({
+        baseUrl: base,
+        owner: "acme",
+        repo: "a",
+        token: "secret",
+      });
+      await fetchRepositoryInfo({
+        baseUrl: base,
+        owner: "acme",
+        repo: "b",
+        token: "secret",
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain(base);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("returns null on a non-ok response instead of throwing", async () => {

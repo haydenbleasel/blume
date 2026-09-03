@@ -1,21 +1,19 @@
 import { describe, expect, it } from "bun:test";
 
-import { apiUrl, editBaseUrl, repoSlug, repoUrl } from "../src/core/github.ts";
+import { apiUrl, editBaseUrl, repoUrl } from "../src/core/github.ts";
 import type { GithubTarget } from "../src/core/github.ts";
 
-/** A resolved `github` block; `host`/`branch` carry their schema defaults. */
+/**
+ * A resolved `github` block; `host`/`branch` carry their schema defaults. The
+ * schema hands these over already normalized (a bare origin, no trailing
+ * slash), so the fixtures here are shaped the way the type can actually carry.
+ */
 const target = (overrides: Partial<GithubTarget> = {}): GithubTarget => ({
   branch: "main",
   host: "https://github.com",
   owner: "acme",
   repo: "docs",
   ...overrides,
-});
-
-describe(repoSlug, () => {
-  it("joins owner and repo without an origin", () => {
-    expect(repoSlug(target())).toBe("acme/docs");
-  });
 });
 
 describe(repoUrl, () => {
@@ -25,12 +23,6 @@ describe(repoUrl, () => {
 
   it("builds against an enterprise host", () => {
     expect(repoUrl(target({ host: "https://github.acme.com" }))).toBe(
-      "https://github.acme.com/acme/docs"
-    );
-  });
-
-  it("does not double the separator when the host has a trailing slash", () => {
-    expect(repoUrl(target({ host: "https://github.acme.com/" }))).toBe(
       "https://github.acme.com/acme/docs"
     );
   });
@@ -55,9 +47,25 @@ describe(apiUrl, () => {
     expect(apiUrl(target())).toBe("https://api.github.com");
   });
 
+  it("maps a github.com subdomain to the public API too", () => {
+    // `www.github.com` is a spelling of the public site, not an Enterprise
+    // Server; deriving `/api/v3` from it would 404 every card.
+    expect(apiUrl(target({ host: "https://www.github.com" }))).toBe(
+      "https://api.github.com"
+    );
+  });
+
   it("maps a data-residency tenant to its api subdomain", () => {
     expect(apiUrl(target({ host: "https://acme.ghe.com" }))).toBe(
       "https://api.acme.ghe.com"
+    );
+  });
+
+  it("keeps a non-default port on the api subdomain", () => {
+    // The origin carries the port, so the API base must too — otherwise the
+    // card queries a different endpoint than the one the links use.
+    expect(apiUrl(target({ host: "https://acme.ghe.com:8443" }))).toBe(
+      "https://api.acme.ghe.com:8443"
     );
   });
 
@@ -71,7 +79,7 @@ describe(apiUrl, () => {
     expect(
       apiUrl(
         target({
-          api: "https://ghe.acme.com/api/v3/",
+          api: "https://ghe.acme.com/api/v3",
           host: "https://acme.com",
         })
       )
