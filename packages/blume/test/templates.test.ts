@@ -545,11 +545,10 @@ describe("notFoundPageTemplate", () => {
     // Rendered as a labeled nav under its own heading, and skipped entirely
     // when nothing is linkable.
     expect(out).toContain("suggestions.length > 0 && (");
-    expect(out).toContain(
-      '<nav aria-label={nf.suggestions} class="mt-8 text-sm">'
-    );
-    expect(out).toContain("{nf.suggestions}</h2>");
+    expect(out).toContain("<nav aria-label={nf.suggestions}");
+    expect(out).toContain("{nf.suggestions}\n          </h2>");
     expect(out).toContain("{suggestions.map((link) => (");
+    expect(out).toContain("<span>{link.label}</span>");
   });
 
   it("routes the home link through withBase, like the catch-all", () => {
