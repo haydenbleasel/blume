@@ -368,6 +368,12 @@ export interface RouteManifestEntry {
   /** Adapter-supplied "edit this page" URL (non-filesystem sources). */
   editUrl?: string;
   title: string;
+  /**
+   * The page's meta description as the head renders it: `seo.description`
+   * over the front matter `description`. Feeds the generated OG card's
+   * subtitle, so a shared link's image and its `og:description` agree.
+   */
+  description?: string;
   contentType: string;
   hidden: boolean;
   draft: boolean;

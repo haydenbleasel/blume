@@ -513,7 +513,8 @@ export const eject = async (
   if (config.seo.og.enabled) {
     files.push({
       content: ogEndpointTemplate(
-        customOgRoutes(pages, config.title, config.seo.og.titles)
+        customOgRoutes(pages, config.title, config.seo.og.titles),
+        { pageDescriptions: config.seo.og.description !== false }
       ),
       path: join(srcDir, "pages", "og", "[...slug].png.ts"),
     });

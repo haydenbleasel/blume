@@ -81,7 +81,7 @@ export interface OgCardOptions {
   accent?: string;
   /** Brand/site name shown in the top-left lockup. */
   brand?: string;
-  /** Muted subtitle under the headline (usually the site description). */
+  /** Muted subtitle under the headline (the page description, else the site's). */
   description?: string;
   /**
    * Inlined SVG markup of the configured logo, painted into the brand

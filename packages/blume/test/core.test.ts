@@ -1057,6 +1057,43 @@ describe("manifest indexability", () => {
   });
 });
 
+describe("manifest descriptions", () => {
+  // SAFETY: buildManifest reads only contentRoot and root from the context.
+  const context = { contentRoot: "/c", root: "/r" } as ProjectContext;
+
+  it("carries the page description, with seo.description taking precedence", () => {
+    const config = blumeConfigSchema.parse({});
+    const pages = [
+      makePage({
+        description: "Front matter lede",
+        id: "a.mdx",
+        route: "/a",
+        title: "A",
+      }),
+      makePage({
+        description: "Front matter lede",
+        id: "b.mdx",
+        meta: pageMetaSchema.parse({ seo: { description: "Meta summary" } }),
+        route: "/b",
+        title: "B",
+      }),
+      makePage({ id: "c.mdx", route: "/c", title: "C" }),
+    ];
+    const graph = buildContentGraph(pages, {
+      folderMeta: new Map(),
+      navigation: config.navigation,
+    });
+    const manifest = buildManifest({ config, context, graph });
+    const byPath = new Map(
+      manifest.routes.map((route) => [route.path, route.description])
+    );
+    expect(byPath.get("/a")).toBe("Front matter lede");
+    // The head emits seo.description over description; the card follows it.
+    expect(byPath.get("/b")).toBe("Meta summary");
+    expect(byPath.get("/c")).toBeUndefined();
+  });
+});
+
 describe("nav utilities", () => {
   const sidebar = [
     { kind: "page" as const, label: "Home", pageId: "i", route: "/" },

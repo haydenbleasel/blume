@@ -64,7 +64,8 @@ afterAll(async () => {
 const FILES = {
   "docs/fr/guides/quickstart.mdx": "---\ntitle: Démarrage\n---\n# Démarrage\n",
   "docs/fr/index.mdx": "---\ntitle: Accueil\n---\n# Accueil\n",
-  "docs/guides/only-en.mdx": "---\ntitle: Only EN\n---\n# Only EN\n",
+  "docs/guides/only-en.mdx":
+    "---\ntitle: Only EN\ndescription: English only\n---\n# Only EN\n",
   "docs/guides/quickstart.mdx": "---\ntitle: Quickstart\n---\n# Quickstart\n",
   "docs/index.mdx": "---\ntitle: Home\n---\n# Home\n",
 };
@@ -913,6 +914,8 @@ describe("manifest alternates and fallback", () => {
     expect(fallback?.fallback).toBe(true);
     expect(fallback?.locale).toBe("fr");
     expect(fallback?.source.ref).toBe("guides/only-en.mdx");
+    // The fallback renders the English entry, so its OG card describes it too.
+    expect(fallback?.description).toBe("English only");
     expect(fallback?.indexable).toBe(false);
   });
 

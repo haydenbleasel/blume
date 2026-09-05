@@ -1656,9 +1656,17 @@ describe("static endpoint templates", () => {
     // base) — deriving it here from `data.config.site` dropped the base (#139).
     expect(endpoint).toContain("site: data.config.og.site");
     expect(endpoint).not.toContain("siteHost");
-    // The subtitle honors the seo.og.description override, so it must read
-    // the resolved og value, not the raw site description.
-    expect(endpoint).toContain("description: data.config.og.description");
+    // The subtitle is the page's own description, falling back to the
+    // resolved og value (which honors the seo.og.description override), not
+    // the raw site description.
+    expect(endpoint).toContain(
+      "description: props.description ?? data.config.og.description"
+    );
+    expect(endpoint).toContain("route.description");
+    // Custom pages have no known description at generate time.
+    expect(endpoint).toContain("add(route.slug, route.title, null)");
+    // Page descriptions are on unless seo.og.description is false.
+    expect(endpoint).toContain("const pageDescriptions = true;");
     // An unannotated `const customRoutes = []` is an implicit any[] under a
     // strict tsconfig, failing `blume check` on the generated file (#91).
     expect(endpoint).toContain(
@@ -1673,10 +1681,22 @@ describe("static endpoint templates", () => {
     expect(endpoint).not.toContain("data.config.og.fonts");
   });
 
+  it("hides page descriptions when seo.og.description is false", () => {
+    const endpoint = ogEndpointTemplate([], { pageDescriptions: false });
+    expect(endpoint).toContain("const pageDescriptions = false;");
+    // The gate is applied when paths are collected, so GET stays uniform.
+    expect(endpoint).toContain(
+      "props: { title, description: pageDescriptions ? description : null }"
+    );
+    expect(ogEndpointTemplate([], { pageDescriptions: true })).toContain(
+      "const pageDescriptions = true;"
+    );
+  });
+
   it("adds the changelog index card only when the index is generated", () => {
     const withIndex = ogEndpointTemplate([], {}, true);
     expect(withIndex).toContain(
-      'add("changelog", data.ui.changelog?.title ?? "Changelog");'
+      'add(\n    "changelog",\n    data.ui.changelog?.title ?? "Changelog",\n    data.ui.changelog?.description ?? null\n  );'
     );
     // Without the generated index there is no /changelog page to card.
     expect(ogEndpointTemplate()).not.toContain('add("changelog"');

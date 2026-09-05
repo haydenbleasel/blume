@@ -78,6 +78,11 @@ export interface BlumeRoute {
   alternates: RouteAlternate[];
   /** Astro collection the entry renders through (`"docs"` | `"staged"`). */
   collection: string;
+  /**
+   * Meta description as the page head renders it (`seo.description` over the
+   * front matter `description`), or `null` when the page declares neither.
+   */
+  description: string | null;
   draft: boolean;
   /** "Edit this page" URL, or `null` when no repo/source provides one. */
   editUrl: string | null;
@@ -161,7 +166,11 @@ export interface BlumeDataConfig {
    * kept out of this snapshot, which pages serialize into HTML.
    */
   og: {
-    /** Card subtitle: `seo.og.description` (`false` omits it) over the site description. */
+    /**
+     * Site-wide card subtitle: `seo.og.description` (`false` omits it) over
+     * the site description. A page with its own description shows that
+     * instead; this is the fallback for pages without one.
+     */
     description?: string;
     enabled: boolean;
     /** Inlined SVG brand mark; `false` renders the card without any mark. */

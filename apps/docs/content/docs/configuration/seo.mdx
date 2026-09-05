@@ -125,7 +125,7 @@ seo: {
 }
 ```
 
-By default, each card is derived from your content and theme — the **page title** as the headline, your **site title** as the eyebrow, and your theme **accent** for the mark. Images are served at `/og/<slug>.png`, mirroring each route, and are prerendered as static files even in server mode:
+By default, each card is derived from your content and theme — the **page title** as the headline, the **page description** as the subtitle (the same text as its `og:description`, so `seo.description` wins over `description`), your **site title** as the eyebrow, and your theme **accent** for the mark. Images are served at `/og/<slug>.png`, mirroring each route, and are prerendered as static files even in server mode:
 
 | Page route          | Image URL                  |
 | ------------------- | -------------------------- |
@@ -151,13 +151,13 @@ Emoji in a page title or site title render as [Twemoji](https://github.com/jdeck
 
 ### Show, hide, or override card layers
 
-Beyond the headline, the card carries three optional layers: the **brand mark** in the top-left (your logo, or an accent tile with the site title's initial), the **subtitle** under the headline (your site `description`), and a **footer** with your repo slug (from `github`) and the site's URL — the deployment site's host plus [`deployment.base`](/docs/deployment#subpath-deploys), so a GitHub Pages project site reads `user.github.io/repo`. Override any of them with a string of your own, or hide one with `false`:
+Beyond the headline, the card carries three optional layers: the **brand mark** in the top-left (your logo, or an accent tile with the site title's initial), the **subtitle** under the headline (the page `description`, or your site `description` for pages without one), and a **footer** with your repo slug (from `github`) and the site's URL — the deployment site's host plus [`deployment.base`](/docs/deployment#subpath-deploys), so a GitHub Pages project site reads `user.github.io/repo`. Override any of them with a string of your own, or hide one with `false`:
 
 ```ts blume.config.ts lineNumbers
 seo: {
   og: {
     site: "docs.acme.com", // footer URL text, or false to hide it
-    description: false, // hide the subtitle; a string overrides it
+    description: false, // hide the subtitle on every card; a string replaces the site fallback
     logo: false, // no brand mark at all — not even the initial tile
   },
 }

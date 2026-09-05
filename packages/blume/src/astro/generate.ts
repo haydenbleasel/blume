@@ -1169,7 +1169,11 @@ const resolveOgSite = (config: ResolvedConfig): string | undefined => {
     : undefined;
 };
 
-/** The OG card's subtitle: `seo.og.description` (`false` omits it) over the site description. */
+/**
+ * The OG card's site-wide subtitle: `seo.og.description` (`false` omits it)
+ * over the site description. The generated endpoint prefers a page's own
+ * description and falls back to this.
+ */
 const resolveOgDescription = (config: ResolvedConfig): string | undefined => {
   const configured = config.seo.og.description;
   if (configured === false) {
@@ -1390,6 +1394,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     routes: manifest.routes.map((route) => ({
       alternates: route.alternates,
       collection: route.collection,
+      description: route.description ?? null,
       draft: route.draft,
       editUrl: route.editUrl ?? editUrlFor(route.sourcePath),
       entryId: route.entryId,
@@ -1996,7 +2001,14 @@ export const generateRuntime = async (
   if (config.seo.og.enabled) {
     await write(
       join(srcDir, "pages", "og", "[...slug].png.ts"),
-      ogEndpointTemplate(ogRoutes, projectOgFonts(project), changelogIndex)
+      ogEndpointTemplate(
+        ogRoutes,
+        {
+          ...projectOgFonts(project),
+          pageDescriptions: config.seo.og.description !== false,
+        },
+        changelogIndex
+      )
     );
   }
 

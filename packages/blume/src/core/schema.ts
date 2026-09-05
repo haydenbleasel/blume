@@ -1332,8 +1332,9 @@ const ogFontSchema = z.union([
 
 const ogConfigSchema = z.strictObject({
   /**
-   * Card subtitle. Defaults to the site description; a string overrides it,
-   * `false` renders the card without one.
+   * Site-wide card subtitle, shown on pages without their own description.
+   * Defaults to the site description; a string overrides it, `false` renders
+   * every card without a subtitle (page descriptions included).
    */
   description: z.union([z.string(), z.literal(false)]).optional(),
   /**
