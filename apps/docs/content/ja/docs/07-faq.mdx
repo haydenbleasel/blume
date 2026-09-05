@@ -87,14 +87,14 @@ Regenerate the project with blume dev.
 
 `:::` フェンスに直接隣接する改行を保持するように oxfmt にパッチを当てます。Blume は自身のリポジトリでも同じ修正を配布しており、どんなプロジェクトにも適用できます。
 
-1. パッチを `patches/oxfmt@0.61.0.patch` として保存します:
+1. パッチを `patches/oxfmt@0.66.0.patch` として保存します:
 
-   ```diff patches/oxfmt@0.61.0.patch
-   diff --git a/dist/markdown-ZuiQU4Xe.js b/dist/markdown-ZuiQU4Xe.js
-   index 566b9e6d27f36061d64b93736e238e871e1ee2b2..82d0595acc010807c2939fc4a1717dde887a8555 100644
-   --- a/dist/markdown-ZuiQU4Xe.js
-   +++ b/dist/markdown-ZuiQU4Xe.js
-   @@ -4875,7 +4875,43 @@ function lu(e, t, r) {
+   ```diff patches/oxfmt@0.66.0.patch
+   diff --git a/dist/markdown-BgZGxhM2.js b/dist/markdown-BgZGxhM2.js
+   index 859231f9387a50df16419bc22b5268c4e446ddbc..dcc0ffda6f71adb27a03e3918a3db6fc7a58ffe9 100644
+   --- a/dist/markdown-BgZGxhM2.js
+   +++ b/dist/markdown-BgZGxhM2.js
+   @@ -4872,7 +4872,43 @@ function lu(e, t, r) {
     		case "sentence": return Oh(e, r);
     		case "word": return t.parser !== "mdx" ? zh(e, t) : Uh(e);
     		case "whitespace": {
@@ -146,7 +146,7 @@ Regenerate the project with blume dev.
    ```json package.json
    {
      "patchedDependencies": {
-       "oxfmt@0.61.0": "patches/oxfmt@0.61.0.patch"
+       "oxfmt@0.66.0": "patches/oxfmt@0.66.0.patch"
      }
    }
    ```

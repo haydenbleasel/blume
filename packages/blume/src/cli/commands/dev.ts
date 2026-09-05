@@ -219,7 +219,9 @@ export const devCommand = defineCommand({
     }).on("all", regenerate);
     const disposers = [
       ...project.sources.map((source) => source.watch?.(regenerate)),
-      () => void projectWatcher.close(),
+      () => {
+        void projectWatcher.close();
+      },
     ].filter((dispose) => dispose !== undefined);
 
     const shutdown = async () => {

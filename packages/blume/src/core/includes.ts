@@ -622,7 +622,8 @@ export const buildIncludeGraph = (
       continue;
     }
     for (const partial of page.includes ?? []) {
-      const includers = (graph[partial] ??= []);
+      const includers = graph[partial] ?? [];
+      graph[partial] = includers;
       if (!includers.includes(sourcePath)) {
         includers.push(sourcePath);
       }

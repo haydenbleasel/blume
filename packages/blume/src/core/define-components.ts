@@ -4,6 +4,7 @@ import type { HydrationMode } from "./schema.ts";
  * A reference to a component. Either an imported component (preferred, for type
  * safety) or a string path resolved relative to the project root.
  */
+// oxlint-disable-next-line anti-slop/no-unknown-type-aliases -- deliberately untyped: user configs pass imported components from any framework (React functions, Svelte classes, Vue SFC objects), which share no structural type
 export type ComponentReference = unknown | string;
 
 /** An interactive component plus its hydration strategy. */
@@ -15,6 +16,7 @@ export interface IslandDescriptor {
 }
 
 /** A component override: a static component or a hydrated island. */
+// oxlint-disable-next-line anti-slop/no-unknown-type-aliases -- inherits the untyped `ComponentReference` above
 export type ComponentOverride = ComponentReference | IslandDescriptor;
 
 /** User-authored component overrides, grouped by surface. */

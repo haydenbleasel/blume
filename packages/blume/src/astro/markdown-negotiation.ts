@@ -29,7 +29,7 @@ const parseAccept = (accept: string): AcceptEntry[] =>
 
 /**
  * Whether the client explicitly prefers Markdown over HTML. Browsers never send
- * `text/markdown`, so an ordinary page request (`text/html`, `*​/*`) is false.
+ * `text/markdown`, so an ordinary page request (`text/html` or the catch-all wildcard) is false.
  */
 export const prefersMarkdown = (accept: string | null | undefined): boolean => {
   if (!accept) {

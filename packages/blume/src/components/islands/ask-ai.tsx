@@ -176,7 +176,7 @@ const AskAI = ({
   useEffect(() => {
     // The initial null→body flip is deliberate (there is no body during SSR);
     // it is the same one-time post-mount cascade the old `mounted` flag had.
-    // oxlint-disable-next-line react/react-compiler -- deliberate post-mount portal-target initialization
+    // oxlint-disable-next-line react/react-compiler, react/set-state-in-effect -- deliberate post-mount portal-target initialization
     setPortalTarget(document.body);
     const onSwap = () => setPortalTarget(document.body);
     document.addEventListener("astro:after-swap", onSwap);
@@ -263,6 +263,7 @@ const AskAI = ({
     if (open && portalTarget) {
       document.body.dataset.blumeAsk = "open";
     }
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- see above
   }, [open, portalTarget]);
 
   // Below the desktop dock breakpoint the open panel is a full-width overlay,
@@ -328,12 +329,14 @@ const AskAI = ({
     // portalTarget: each swap installs a new <body>, so the sweep and its
     // observer must re-run against the new children (the old ones are
     // detached).
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- see above
   }, [open, portalTarget]);
 
   // Keep the newest message in view as it streams in — and after a swap, when
   // the re-portaled panel's scroll container is reborn at the top.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- both deps are triggers, not values read here: re-run per streamed message and per re-portaled panel
   }, [messages, portalTarget]);
 
   const runQuestion = (raw: string) => {

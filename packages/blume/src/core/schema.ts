@@ -907,9 +907,8 @@ const aiConfigSchema = z.strictObject({
   llmsTxt: z
     .union([z.boolean(), llmsTxtObjectSchema])
     .default(true)
-    .transform(
-      (value): LlmsTxtResolved =>
-        isBoolean(value) ? { enabled: value, openapi: true } : value
+    .transform((value): LlmsTxtResolved =>
+      isBoolean(value) ? { enabled: value, openapi: true } : value
     ),
   // Serializers for the agent-facing Markdown downlevel (the `.md` mirror,
   // llms-full.txt, MCP get_page), keyed by JSX name. Functions live here —

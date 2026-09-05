@@ -57,7 +57,7 @@ const useClientData = (): BlumeClientData | null => {
   // Intentional post-mount hydration guard: `null` on the server and first
   // client render so hydration matches, then the snapshot once mounted. The
   // extra render is required; do not seed the initial value from the DOM.
-  // oxlint-disable-next-line react/react-compiler, react-doctor/no-initialize-state -- deliberate SSR hydration guard
+  // oxlint-disable-next-line react/react-compiler, react/set-state-in-effect, react-doctor/no-initialize-state -- deliberate SSR hydration guard
   useEffect(() => setData(readClientData()), []);
   return data;
 };
@@ -109,6 +109,7 @@ export const useSearch = (): UseSearch => {
     // Before the lazy client import: the first search's heaviest phase is
     // creating the provider client (index download), and it must show loading.
     setLoading(true);
+    // oxlint-disable-next-line react/todo -- React Compiler cannot lower try/finally; the hook stays manually memoized above
     try {
       if (!searchFn.current) {
         const { createSearch } = await import("blume:search-client");
@@ -250,6 +251,7 @@ export const useAskAI = (options: UseAskAIOptions = {}): UseAskAI => {
           assistant.content = errorMessage;
           setMessages([...history, { ...assistant }]);
         }
+        // oxlint-disable-next-line react/todo -- React Compiler cannot lower try/finally; the hook stays manually memoized above
       } finally {
         if (live()) {
           setLoading(false);
