@@ -11,6 +11,7 @@ export const sr: UIStringsOverride = {
     copyClaudeCode: "Копирај Claude Code команду",
     copyCode: "Копирај код",
     copyCodex: "Копирај Codex команду",
+    copyFailed: "Копирање није успело",
     copyMarkdown: "Копирај као Markdown",
     copyServerUrl: "Копирај URL сервера",
     edit: "Уреди на GitHub-у",

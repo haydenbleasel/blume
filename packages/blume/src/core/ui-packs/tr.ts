@@ -11,6 +11,7 @@ export const tr: UIStringsOverride = {
     copyClaudeCode: "Claude Code komutunu kopyala",
     copyCode: "Kodu kopyala",
     copyCodex: "Codex komutunu kopyala",
+    copyFailed: "Kopyalama başarısız oldu",
     copyMarkdown: "Markdown olarak kopyala",
     copyServerUrl: "Sunucu URL'sini kopyala",
     edit: "GitHub'da düzenle",

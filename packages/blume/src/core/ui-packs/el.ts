@@ -11,6 +11,7 @@ export const el: UIStringsOverride = {
     copyClaudeCode: "Αντιγραφή εντολής Claude Code",
     copyCode: "Αντιγραφή κώδικα",
     copyCodex: "Αντιγραφή εντολής Codex",
+    copyFailed: "Η αντιγραφή απέτυχε",
     copyMarkdown: "Αντιγραφή ως Markdown",
     copyServerUrl: "Αντιγραφή URL διακομιστή",
     edit: "Επεξεργασία στο GitHub",

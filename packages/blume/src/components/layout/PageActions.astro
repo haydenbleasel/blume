@@ -104,6 +104,7 @@ const menuRowClass =
   data-blume-page-actions
   data-i18n-chat-prompt={a.openInChatPrompt}
   data-i18n-copied={a.copied}
+  data-i18n-copy-failed={a.copyFailed}
   data-i18n-generating={a.generating}
   data-mcp-name={mcpName ?? undefined}
   data-mcp-url={mcpUrl ?? undefined}
@@ -393,6 +394,8 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     const mdRoute = root.getAttribute("data-md") ?? "";
     const md = prefixBase(import.meta.env.BASE_URL, mdRoute);
     const copiedLabel = root.getAttribute("data-i18n-copied") || "Copied!";
+    const copyFailedLabel =
+      root.getAttribute("data-i18n-copy-failed") || "Copy failed";
     const generatingLabel =
       root.getAttribute("data-i18n-generating") || "Generating…";
     // Always stamped: the frontmatter merges `EN_UI.actions` under any
@@ -444,8 +447,9 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
         );
 
       const copy = async (value: string, el: Element | null) => {
-        if ((await copyText(value)) && el instanceof HTMLElement) {
-          flashLabel(el, copiedLabel);
+        const copied = await copyText(value);
+        if (el instanceof HTMLElement) {
+          flashLabel(el, copied ? copiedLabel : copyFailedLabel);
         }
       };
       root
@@ -475,20 +479,22 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     root
       .querySelector("[data-blume-copy-page]")
       ?.addEventListener("click", async () => {
+        let copied = false;
         try {
           const response = await fetch(md);
           if (!response.ok) {
             throw new Error(`Fetching ${md} failed (${response.status})`);
           }
-          if (
-            (await copyText(await response.text())) &&
-            label instanceof HTMLElement
-          ) {
-            flashLabel(label, copiedLabel);
-          }
+          copied = await copyText(await response.text());
         } catch (error) {
-          // Clipboard or fetch unavailable; don't flash "Copied!" untruthfully.
           console.error("[blume] Copy as Markdown failed", error);
+        }
+        // Never flash "Copied!" untruthfully — but never stay silent either:
+        // a reader in an in-app browser or on a denied clipboard prompt must
+        // see that nothing landed on the clipboard. `copyText` has already
+        // tried the legacy copy command by the time it reports `false`.
+        if (label instanceof HTMLElement) {
+          flashLabel(label, copied ? copiedLabel : copyFailedLabel);
         }
       });
 

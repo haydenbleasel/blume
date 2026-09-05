@@ -995,6 +995,20 @@ describe("UI dictionaries", () => {
     }
   });
 
+  it("localizes the copy-failed label in every shipped pack", () => {
+    // Shown when the clipboard write and the legacy copy command both fail,
+    // so the failure is visible instead of a silent dead button.
+    expect(EN_UI.actions.copyFailed).toBe("Copy failed");
+    const de = resolveUIStrings("de", { defaultLocale: "en" });
+    expect(de.actions.copyFailed).toBe("Kopieren fehlgeschlagen");
+    for (const [code, pack] of Object.entries(UI_PACKS)) {
+      expect(
+        pack.actions?.copyFailed,
+        `pack "${code}" misses actions.copyFailed`
+      ).toBeTruthy();
+    }
+  });
+
   it("localizes the landmark labels and changelog chrome in every shipped pack", () => {
     // Formerly hardcoded English: the breadcrumb/pagination nav landmarks, the
     // search section-filter "All" pill, and the generated changelog index's

@@ -11,6 +11,7 @@ export const vi: UIStringsOverride = {
     copyClaudeCode: "Sao chép lệnh Claude Code",
     copyCode: "Sao chép mã",
     copyCodex: "Sao chép lệnh Codex",
+    copyFailed: "Sao chép thất bại",
     copyMarkdown: "Sao chép dưới dạng Markdown",
     copyServerUrl: "Sao chép URL máy chủ",
     edit: "Chỉnh sửa trên GitHub",

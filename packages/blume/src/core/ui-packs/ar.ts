@@ -11,6 +11,7 @@ export const ar: UIStringsOverride = {
     copyClaudeCode: "نسخ أمر Claude Code",
     copyCode: "نسخ الكود",
     copyCodex: "نسخ أمر Codex",
+    copyFailed: "فشل النسخ",
     copyMarkdown: "نسخ بصيغة Markdown",
     copyServerUrl: "نسخ عنوان URL للخادم",
     edit: "التعديل على GitHub",

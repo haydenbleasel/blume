@@ -11,6 +11,7 @@ export const ro: UIStringsOverride = {
     copyClaudeCode: "Copiază comanda Claude Code",
     copyCode: "Copiază codul",
     copyCodex: "Copiază comanda Codex",
+    copyFailed: "Copierea a eșuat",
     copyMarkdown: "Copiază ca Markdown",
     copyServerUrl: "Copiază URL-ul serverului",
     edit: "Editează pe GitHub",

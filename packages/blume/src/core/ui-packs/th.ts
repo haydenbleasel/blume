@@ -11,6 +11,7 @@ export const th: UIStringsOverride = {
     copyClaudeCode: "คัดลอกคำสั่ง Claude Code",
     copyCode: "คัดลอกโค้ด",
     copyCodex: "คัดลอกคำสั่ง Codex",
+    copyFailed: "คัดลอกไม่สำเร็จ",
     copyMarkdown: "คัดลอกเป็น Markdown",
     copyServerUrl: "คัดลอก URL ของเซิร์ฟเวอร์",
     edit: "แก้ไขบน GitHub",

@@ -11,6 +11,7 @@ export const zhTW: UIStringsOverride = {
     copyClaudeCode: "複製 Claude Code 指令",
     copyCode: "複製程式碼",
     copyCodex: "複製 Codex 指令",
+    copyFailed: "複製失敗",
     copyMarkdown: "複製為 Markdown",
     copyServerUrl: "複製伺服器 URL",
     edit: "在 GitHub 上編輯",

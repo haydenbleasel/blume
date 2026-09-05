@@ -11,6 +11,7 @@ export const ko: UIStringsOverride = {
     copyClaudeCode: "Claude Code 명령 복사",
     copyCode: "코드 복사",
     copyCodex: "Codex 명령 복사",
+    copyFailed: "복사 실패",
     copyMarkdown: "Markdown으로 복사",
     copyServerUrl: "서버 URL 복사",
     edit: "GitHub에서 편집",

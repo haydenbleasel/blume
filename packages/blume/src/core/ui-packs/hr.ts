@@ -11,6 +11,7 @@ export const hr: UIStringsOverride = {
     copyClaudeCode: "Kopiraj naredbu Claude Code",
     copyCode: "Kopiraj kôd",
     copyCodex: "Kopiraj naredbu Codex",
+    copyFailed: "Kopiranje nije uspjelo",
     copyMarkdown: "Kopiraj kao Markdown",
     copyServerUrl: "Kopiraj URL poslužitelja",
     edit: "Uredi na GitHubu",

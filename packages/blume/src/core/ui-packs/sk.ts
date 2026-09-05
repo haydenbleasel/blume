@@ -11,6 +11,7 @@ export const sk: UIStringsOverride = {
     copyClaudeCode: "Kopírovať príkaz Claude Code",
     copyCode: "Kopírovať kód",
     copyCodex: "Kopírovať príkaz Codex",
+    copyFailed: "Kopírovanie zlyhalo",
     copyMarkdown: "Kopírovať ako Markdown",
     copyServerUrl: "Kopírovať URL servera",
     edit: "Upraviť na GitHube",

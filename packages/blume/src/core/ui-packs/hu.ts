@@ -11,6 +11,7 @@ export const hu: UIStringsOverride = {
     copyClaudeCode: "Claude Code parancs másolása",
     copyCode: "Kód másolása",
     copyCodex: "Codex parancs másolása",
+    copyFailed: "A másolás nem sikerült",
     copyMarkdown: "Másolás Markdownként",
     copyServerUrl: "Szerver URL másolása",
     edit: "Szerkesztés a GitHubon",

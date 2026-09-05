@@ -11,6 +11,7 @@ export const fi: UIStringsOverride = {
     copyClaudeCode: "Kopioi Claude Code -komento",
     copyCode: "Kopioi koodi",
     copyCodex: "Kopioi Codex-komento",
+    copyFailed: "Kopiointi epäonnistui",
     copyMarkdown: "Kopioi Markdownina",
     copyServerUrl: "Kopioi palvelimen URL",
     edit: "Muokkaa GitHubissa",

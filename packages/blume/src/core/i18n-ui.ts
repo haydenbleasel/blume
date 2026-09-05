@@ -21,6 +21,7 @@ const uiStringsObject = z.object({
       copyClaudeCode: z.string().default("Copy Claude Code command"),
       copyCode: z.string().default("Copy code"),
       copyCodex: z.string().default("Copy Codex command"),
+      copyFailed: z.string().default("Copy failed"),
       copyMarkdown: z.string().default("Copy as Markdown"),
       copyServerUrl: z.string().default("Copy server URL"),
       edit: z.string().default("Edit on GitHub"),

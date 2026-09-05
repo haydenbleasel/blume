@@ -11,6 +11,7 @@ export const ja: UIStringsOverride = {
     copyClaudeCode: "Claude Code コマンドをコピー",
     copyCode: "コードをコピー",
     copyCodex: "Codex コマンドをコピー",
+    copyFailed: "コピーに失敗しました",
     copyMarkdown: "Markdown としてコピー",
     copyServerUrl: "サーバー URL をコピー",
     edit: "GitHub で編集",

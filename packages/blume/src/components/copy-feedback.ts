@@ -35,16 +35,53 @@ export const announceCopied = (message: string): void => {
 };
 
 /**
- * Copy `text` to the clipboard. Returns whether the write succeeded; failures
- * (insecure context, permissions) are swallowed so callers can simply skip
- * their confirmation.
+ * The legacy copy path: select `text` in an off-screen textarea and run the
+ * `copy` editing command. It needs no clipboard permission, only the user
+ * activation the click already provides, so it covers the places the async
+ * Clipboard API doesn't reach — in-app browsers and WebViews that ship no
+ * `navigator.clipboard`, insecure origins, and a denied permission prompt.
+ */
+const copyViaCommand = (text: string): boolean => {
+  const previous = document.activeElement;
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.setAttribute("aria-hidden", "true");
+  // Off-screen rather than `display: none`: hidden controls can't be selected.
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "-9999px";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    // Some engines throw instead of returning false; either way it failed.
+  }
+  textarea.remove();
+  // `select()` moved focus to the textarea; put it back on the button so a
+  // keyboard user isn't dropped at the top of the document.
+  if (previous instanceof HTMLElement) {
+    previous.focus();
+  }
+  return copied;
+};
+
+/**
+ * Copy `text` to the clipboard. Returns whether the write succeeded. The async
+ * Clipboard API is tried first; when it is missing (in-app browsers, insecure
+ * contexts) or rejects (a denied permission), the legacy `copy` command is
+ * tried before giving up, so callers only see `false` when nothing worked and
+ * can show a failure instead of silently doing nothing.
  */
 export const copyText = async (text: string): Promise<boolean> => {
   try {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
-    return false;
+    return copyViaCommand(text);
   }
 };
 

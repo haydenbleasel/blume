@@ -11,6 +11,7 @@ export const bn: UIStringsOverride = {
     copyClaudeCode: "Claude Code কমান্ড অনুলিপি করুন",
     copyCode: "কোড অনুলিপি করুন",
     copyCodex: "Codex কমান্ড অনুলিপি করুন",
+    copyFailed: "অনুলিপি ব্যর্থ হয়েছে",
     copyMarkdown: "Markdown হিসেবে অনুলিপি করুন",
     copyServerUrl: "সার্ভার URL অনুলিপি করুন",
     edit: "GitHub-এ সম্পাদনা করুন",

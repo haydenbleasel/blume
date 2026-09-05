@@ -11,6 +11,7 @@ export const bg: UIStringsOverride = {
     copyClaudeCode: "Копирай командата на Claude Code",
     copyCode: "Копирай кода",
     copyCodex: "Копирай командата на Codex",
+    copyFailed: "Копирането не бе успешно",
     copyMarkdown: "Копирай като Markdown",
     copyServerUrl: "Копирай URL на сървъра",
     edit: "Редактирай в GitHub",

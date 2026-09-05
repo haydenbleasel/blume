@@ -11,6 +11,7 @@ export const fa: UIStringsOverride = {
     copyClaudeCode: "کپی دستور Claude Code",
     copyCode: "کپی کد",
     copyCodex: "کپی دستور Codex",
+    copyFailed: "کپی ناموفق بود",
     copyMarkdown: "کپی به‌صورت Markdown",
     copyServerUrl: "کپی نشانی سرور",
     edit: "ویرایش در GitHub",

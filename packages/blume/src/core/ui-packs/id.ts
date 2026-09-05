@@ -11,6 +11,7 @@ export const id: UIStringsOverride = {
     copyClaudeCode: "Salin perintah Claude Code",
     copyCode: "Salin kode",
     copyCodex: "Salin perintah Codex",
+    copyFailed: "Gagal menyalin",
     copyMarkdown: "Salin sebagai Markdown",
     copyServerUrl: "Salin URL server",
     edit: "Edit di GitHub",

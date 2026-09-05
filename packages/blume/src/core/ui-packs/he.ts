@@ -11,6 +11,7 @@ export const he: UIStringsOverride = {
     copyClaudeCode: "העתק פקודת Claude Code",
     copyCode: "העתק קוד",
     copyCodex: "העתק פקודת Codex",
+    copyFailed: "ההעתקה נכשלה",
     copyMarkdown: "העתק כ-Markdown",
     copyServerUrl: "העתק כתובת URL של השרת",
     edit: "ערוך ב-GitHub",

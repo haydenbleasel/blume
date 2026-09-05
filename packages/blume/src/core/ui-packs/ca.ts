@@ -11,6 +11,7 @@ export const ca: UIStringsOverride = {
     copyClaudeCode: "Copia l'ordre de Claude Code",
     copyCode: "Copia el codi",
     copyCodex: "Copia l'ordre de Codex",
+    copyFailed: "No s'ha pogut copiar",
     copyMarkdown: "Copia com a Markdown",
     copyServerUrl: "Copia l'URL del servidor",
     edit: "Edita a GitHub",
