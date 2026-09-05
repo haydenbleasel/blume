@@ -8,6 +8,7 @@ import { join } from "pathe";
 import { resolveAskBackend } from "../src/ai/ask.ts";
 import type { ExampleSpec } from "../src/astro/examples.ts";
 import type { IslandSpec } from "../src/astro/islands.ts";
+import { RUNTIME_MODULE_FILES } from "../src/astro/runtime-modules.ts";
 import {
   askComponentTemplate,
   askEndpointTemplate,
@@ -49,10 +50,8 @@ import type { ProjectContext } from "../src/core/types.ts";
 const config = blumeConfigSchema.parse({});
 
 const ASK_PATH = "/p/.blume/src/generated/Ask.astro";
-const DATA_PATH = "/p/.blume/src/generated/data.json";
 const EXAMPLES_PATH = "/p/.blume/src/generated/examples.ts";
 const EXAMPLES_THEME_PATH = "/p/.blume/src/generated/examples.css";
-const OPENAPI_PATH = "/p/.blume/src/generated/openapi.json";
 const SEARCH_CLIENT_PATH = "/p/.blume/src/generated/search-client.ts";
 const THEME_PATH = "/p/.blume/src/generated/app.css";
 
@@ -705,7 +704,6 @@ describe("astroConfigTemplate", () => {
       config: configured,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       integrationBridge: {
@@ -713,7 +711,6 @@ describe("astroConfigTemplate", () => {
         sourceHash: "a".repeat(64),
       },
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -743,11 +740,9 @@ describe("astroConfigTemplate", () => {
       config,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -760,13 +755,20 @@ describe("astroConfigTemplate", () => {
     expect(out).not.toContain('import react from "@astrojs/react"');
     expect(out).toContain("blumeIntegration(");
     // The prerender dep-link plugin is wired into the Vite config so isolated
-    // linkers can resolve externalized deps when generating static pages, and
-    // the include-HMR plugin turns a partial edit into an invalidation of the
-    // pages that splice it.
+    // linkers can resolve externalized deps when generating static pages, the
+    // include-HMR plugin turns a partial edit into an invalidation of the
+    // pages that splice it, and the runtime-modules plugin serves the data
+    // snapshots (`blume:data`, the search index, …) from memory.
     expect(out).toContain(
-      'import { blumeIntegration, includeHmrPlugin, prerenderDepsPlugin } from "blume/astro"'
+      'import { blumeIntegration, includeHmrPlugin, prerenderDepsPlugin, runtimeModulesPlugin } from "blume/astro"'
     );
     expect(out).toContain("prerenderDepsPlugin()");
+    expect(out).toContain("plugins: [runtimeModulesPlugin(), tailwindcss()");
+    // In-memory modules need no file aliases — only the file-backed ids keep
+    // one.
+    expect(out).not.toContain('"blume:data":');
+    expect(out).not.toContain('"blume:openapi":');
+    expect(out).toContain('"blume:ask": "/p/.blume/src/generated/Ask.astro"');
     expect(out).toContain(
       'includeHmrPlugin("/p/.blume/src/generated/includes.json")'
     );
@@ -839,13 +841,11 @@ describe("astroConfigTemplate", () => {
       config: serverConfig,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: true,
       needsSvelte: true,
       needsVue: true,
-      openapiPath: OPENAPI_PATH,
       pages: [{ entrypoint: "/p/pages/x.astro", pattern: "/x" }],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -884,11 +884,9 @@ describe("astroConfigTemplate", () => {
       config: basedConfig,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -911,11 +909,9 @@ describe("astroConfigTemplate", () => {
       config: basedConfig,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -939,11 +935,9 @@ describe("astroConfigTemplate", () => {
       config,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: true,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       reactCompilerPath: compilerPath,
       searchClientPath: SEARCH_CLIENT_PATH,
@@ -965,11 +959,9 @@ describe("astroConfigTemplate", () => {
       config,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: true,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -992,11 +984,9 @@ describe("astroConfigTemplate", () => {
       config: cloudflareConfig,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1016,11 +1006,9 @@ describe("astroConfigTemplate", () => {
       config: cloudflareConfig,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1041,11 +1029,9 @@ describe("astroConfigTemplate", () => {
       config: nodeConfig,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1072,11 +1058,9 @@ describe("astroConfigTemplate", () => {
           outDir: join(root, ".blume"),
           root,
         }),
-        dataPath: DATA_PATH,
         examplesPath: EXAMPLES_PATH,
         examplesThemePath: EXAMPLES_THEME_PATH,
         needsReact: false,
-        openapiPath: OPENAPI_PATH,
         pages: [],
         searchClientPath: SEARCH_CLIENT_PATH,
         themePath: THEME_PATH,
@@ -1109,11 +1093,9 @@ describe("astroConfigTemplate", () => {
           outDir: root,
           root,
         }),
-        dataPath: DATA_PATH,
         examplesPath: EXAMPLES_PATH,
         examplesThemePath: EXAMPLES_THEME_PATH,
         needsReact: false,
-        openapiPath: OPENAPI_PATH,
         pages: [],
         searchClientPath: SEARCH_CLIENT_PATH,
         themePath: THEME_PATH,
@@ -1133,11 +1115,9 @@ describe("astroConfigTemplate", () => {
       config: vercelConfig,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1159,11 +1139,9 @@ describe("astroConfigTemplate", () => {
       }),
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1190,11 +1168,9 @@ describe("astroConfigTemplate", () => {
         distDir: "/p/.blume-verify/dist",
         outDir: "/p/.blume-verify",
       }),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1214,11 +1190,9 @@ describe("astroConfigTemplate", () => {
       }),
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1234,11 +1208,9 @@ describe("astroConfigTemplate", () => {
       config,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1258,11 +1230,9 @@ describe("astroConfigTemplate", () => {
       config,
       contentRoutes: [],
       context: context({ pagesRoot: "/p/pages" }),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1302,11 +1272,9 @@ describe("astroConfigTemplate workspace root", () => {
         outDir: join(root, ".blume"),
         root,
       }),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1573,12 +1541,13 @@ describe("scalarReferenceTemplate", () => {
   it("mounts a Scalar reference inside the Blume layout", () => {
     const out = scalarReferenceTemplate({
       configuration: { url: "https://api/spec.json" },
-      dataImport: "../generated/data.json",
       route: "/reference",
       title: "API",
     });
     expect(out).toContain("ScalarComponent");
-    expect(out).toContain('import data from "../generated/data.json"');
+    // The page data comes from the in-memory runtime module, whatever depth
+    // the reference route sits at.
+    expect(out).toContain('import data from "blume:data"');
     expect(out).toContain('route={"/reference"}');
     expect(out).toContain('"url": "https://api/spec.json"');
     expect(out).toContain("noindex={false}");
@@ -1587,7 +1556,6 @@ describe("scalarReferenceTemplate", () => {
   it("passes crawler exclusion to the reference layout", () => {
     const out = scalarReferenceTemplate({
       configuration: { url: "https://api/spec.json" },
-      dataImport: "../generated/data.json",
       noindex: true,
       route: "/reference",
       title: "API",
@@ -1598,7 +1566,6 @@ describe("scalarReferenceTemplate", () => {
   it("forwards the localized UI dictionary to the layout", () => {
     const out = scalarReferenceTemplate({
       configuration: { url: "https://api/spec.json" },
-      dataImport: "../generated/data.json",
       route: "/reference",
       title: "API",
     });
@@ -1608,7 +1575,6 @@ describe("scalarReferenceTemplate", () => {
   it("passes the default locale's lang/dir to the reference shell", () => {
     const out = scalarReferenceTemplate({
       configuration: { url: "https://api/spec.json" },
-      dataImport: "../generated/data.json",
       route: "/reference",
       title: "API",
     });
@@ -1627,23 +1593,13 @@ describe("mcp templates", () => {
     expect(mcpPageFile("/api/mcp/")).toBe("api/mcp.ts");
   });
 
-  it("imports the data snapshot at the route's depth", () => {
-    expect(mcpEndpointTemplate("/mcp")).toContain(
-      'import data from "../generated/mcp-data.json"'
-    );
-    expect(mcpEndpointTemplate("/api/mcp")).toContain(
-      'import data from "../../generated/mcp-data.json"'
-    );
-  });
-
-  it("asserts the snapshot back to McpData at the JSON boundary", () => {
-    // JSON imports widen literal kinds (e.g. NavNode's "page") to string, so
-    // the endpoint must cast or `blume check` fails on the generated file.
-    const out = mcpEndpointTemplate("/mcp");
-    expect(out).toContain(
-      'import type { McpData } from "blume/ai/mcp/data.ts"'
-    );
-    expect(out).toContain("createMcpFetchHandler(data as McpData)");
+  it("imports the data snapshot from the runtime module", () => {
+    // The module is declared as `McpData` in env.d.ts, so no cast is needed
+    // at the boundary — the id is the same at any route depth.
+    const out = mcpEndpointTemplate();
+    expect(out).toContain('import data from "blume:mcp-data"');
+    expect(out).toContain("createMcpFetchHandler(data)");
+    expect(out).not.toContain("generated/");
   });
 
   it("serializes a fixed payload for the discovery endpoint", () => {
@@ -1680,7 +1636,7 @@ describe("playgroundProxyTemplate", () => {
 describe("static endpoint templates", () => {
   it("serves the static search index", () => {
     expect(searchEndpointTemplate()).toContain(
-      'import documents from "../generated/search.json"'
+      'import documents from "blume:search-index"'
     );
   });
 
@@ -1794,6 +1750,45 @@ describe("env / package / tsconfig templates", () => {
     expect(envTemplate()).toContain('declare module "blume:ask"');
   });
 
+  it("aliases the runtime data modules to files for an ejected project", () => {
+    // Eject has no CLI to publish the modules in memory, so every id points
+    // at the JSON snapshot eject writes, and the in-memory plugin stays out.
+    const out = astroConfigTemplate({
+      askPath: "./src/generated/Ask.astro",
+      config,
+      contentRoutes: [],
+      context: context(),
+      examplesPath: "./src/generated/examples.ts",
+      examplesThemePath: "./src/generated/examples.css",
+      generatedModulesDir: "./src/generated",
+      needsReact: false,
+      pages: [],
+      searchClientPath: "./src/generated/search-client.ts",
+      themePath: "./src/generated/app.css",
+    });
+    for (const [id, file] of RUNTIME_MODULE_FILES) {
+      expect(out).toContain(
+        `${JSON.stringify(id)}: ${JSON.stringify(`./src/generated/${file}`)}`
+      );
+    }
+    expect(out).not.toContain("runtimeModulesPlugin");
+    expect(out).toContain(
+      'import { blumeIntegration, includeHmrPlugin, prerenderDepsPlugin } from "blume/astro"'
+    );
+  });
+
+  it("declares every runtime data module the generated pages import", () => {
+    const out = envTemplate();
+    for (const id of RUNTIME_MODULE_FILES.keys()) {
+      expect(out).toContain(`declare module ${JSON.stringify(id)}`);
+    }
+    // Typed at the boundary so the endpoints need no casts under `blume check`.
+    expect(out).toContain('import("blume/ai/mcp/data.ts").McpData');
+    expect(out).toContain(
+      'import("blume/search/documents.ts").SearchDocument[]'
+    );
+  });
+
   it("emits an empty dependency map by default", () => {
     expect(runtimePackageTemplate()).toContain('"dependencies": {}');
   });
@@ -1817,11 +1812,9 @@ describe("astroConfigTemplate image config", () => {
       config: parsed,
       contentRoutes: [],
       context: context(),
-      dataPath: DATA_PATH,
       examplesPath: EXAMPLES_PATH,
       examplesThemePath: EXAMPLES_THEME_PATH,
       needsReact: false,
-      openapiPath: OPENAPI_PATH,
       pages: [],
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
@@ -1850,9 +1843,7 @@ describe("contentAssetsEndpointTemplate", () => {
 
   it("prerenders and reads the generated content-asset map", () => {
     expect(out).toContain("export const prerender = true;");
-    expect(out).toContain(
-      'import assets from "../../generated/content-assets.json"'
-    );
+    expect(out).toContain('import assets from "blume:content-assets"');
   });
 
   it("bakes in the staged remote-assets directory", () => {

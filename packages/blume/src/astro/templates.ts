@@ -22,6 +22,7 @@ import type { ExampleSpec } from "./examples.ts";
 import type { BlumePageRoute } from "./integration.ts";
 import type { IslandSpec } from "./islands.ts";
 import type { OgCustomRoute } from "./pages.ts";
+import { RUNTIME_MODULE_FILES } from "./runtime-modules.ts";
 
 const WORKSPACE_MARKERS = [
   ".git",
@@ -394,6 +395,40 @@ const resolveOptimizeDeps = (options: {
   return { optimizeDepsEntries, optimizeDepsInclude };
 };
 
+/**
+ * How the generated config reaches the runtime data modules (`blume:data`,
+ * the search index, …): served from memory by `runtimeModulesPlugin` in the
+ * hidden runtime, or aliased to JSON files under `generatedModulesDir` for an
+ * ejected project, which has no CLI to publish them (see `runtime-modules.ts`).
+ */
+interface RuntimeModuleWiring {
+  /** `resolve.alias` entries (one per module), empty in the in-memory form. */
+  aliasLines: string;
+  /** Extra `blume/astro` imports the wiring needs. */
+  imports: string[];
+  /** Leading `vite.plugins` entry, empty in the file-alias form. */
+  pluginEntry: string;
+}
+
+const renderRuntimeModuleWiring = (
+  generatedModulesDir: string | undefined
+): RuntimeModuleWiring => {
+  if (generatedModulesDir === undefined) {
+    return {
+      aliasLines: "",
+      imports: ["runtimeModulesPlugin"],
+      pluginEntry: "runtimeModulesPlugin(), ",
+    };
+  }
+  const aliasLines = [...RUNTIME_MODULE_FILES]
+    .map(
+      ([id, file]) =>
+        `\n        ${JSON.stringify(id)}: ${JSON.stringify(`${generatedModulesDir}/${file}`)},`
+    )
+    .join("");
+  return { aliasLines, imports: [], pluginEntry: "" };
+};
+
 export const astroConfigTemplate = (options: {
   context: ProjectContext;
   config: ResolvedConfig;
@@ -404,13 +439,18 @@ export const astroConfigTemplate = (options: {
   contentRoutes: string[];
   /** The generated Ask trigger (`blume:ask`); renders nothing when Ask is off. */
   askPath: string;
-  dataPath: string;
   examplesPath: string;
   /** The example-preview Tailwind entry (`blume:examples-theme`). */
   examplesThemePath: string;
   themePath: string;
   searchClientPath: string;
-  openapiPath: string;
+  /**
+   * Where the runtime data modules (`blume:data`, the search index, …) live as
+   * JSON files, for a project with no CLI to publish them in memory (eject):
+   * each id is aliased to its file under this directory. Absent, the modules
+   * are served from memory by `runtimeModulesPlugin` — the hidden runtime.
+   */
+  generatedModulesDir?: string;
   /**
    * Absolute path to `babel-plugin-react-compiler` when the React Compiler is
    * enabled (resolved from Blume's package root by the caller); null/absent
@@ -427,17 +467,22 @@ export const astroConfigTemplate = (options: {
   /** Bridge used to load configured integrations without serializing them. */
   integrationBridge?: IntegrationBridgeOptions;
 }): string => {
-  const { context, config, needsReact, pages, dataPath, themePath } = options;
+  const { context, config, needsReact, pages, themePath } = options;
   const {
     askPath,
     contentRoutes,
     examplesPath,
     examplesThemePath,
+    generatedModulesDir,
     needsSvelte,
     needsVue,
-    openapiPath,
     searchClientPath,
   } = options;
+  const {
+    aliasLines: runtimeModuleAliasLines,
+    imports: runtimeModuleImports,
+    pluginEntry: runtimeModulesPluginEntry,
+  } = renderRuntimeModuleWiring(generatedModulesDir);
   const { deployment } = config;
   const userAliasLines = renderUserAliases(options.aliases);
   const server = deployment.output === "server";
@@ -588,6 +633,7 @@ export const astroConfigTemplate = (options: {
     "blumeIntegration",
     "includeHmrPlugin",
     "prerenderDepsPlugin",
+    ...runtimeModuleImports,
     ...(adapterOption.includes("withAdapterRoot") ? ["withAdapterRoot"] : []),
   ];
   const blumeImport = `import { ${blumeImports.join(", ")} } from "blume/astro";\n`;
@@ -684,7 +730,7 @@ ${userConfigSetup}export default defineConfig({
   // instantly.
   prefetch: { prefetchAll: true },
   vite: {
-    plugins: [tailwindcss(), includeHmrPlugin(${JSON.stringify(
+    plugins: [${runtimeModulesPluginEntry}tailwindcss(), includeHmrPlugin(${JSON.stringify(
       `${context.outDir}/src/generated/includes.json`
     )}), prerenderDepsPlugin()],
     // Everything hydration can reach must be part of the dev dep optimizer's
@@ -733,12 +779,10 @@ ${userConfigSetup}export default defineConfig({
     resolve: {
       alias: {
         "blume:ask": ${JSON.stringify(askPath)},
-        "blume:data": ${JSON.stringify(dataPath)},
         "blume:examples": ${JSON.stringify(examplesPath)},
         "blume:examples-theme": ${JSON.stringify(examplesThemePath)},
-        "blume:openapi": ${JSON.stringify(openapiPath)},
         "blume:search-client": ${JSON.stringify(searchClientPath)},
-        "blume:theme": ${JSON.stringify(themePath)},${userAliasLines}
+        "blume:theme": ${JSON.stringify(themePath)},${runtimeModuleAliasLines}${userAliasLines}
       },
     },
     server: {
@@ -932,7 +976,7 @@ export const askEndpointTemplate = (
   if (grounded) {
     imports.push(
       'import { createAskContext } from "blume/ai/ask-context.ts";',
-      'import askData from "../../generated/ask-data.json";'
+      'import askData from "blume:ask-data";'
     );
     const groundFields: string[] = [];
     if (instructions) {
@@ -1080,7 +1124,7 @@ const { strings } = Astro.props;
 /** Generate the static search index endpoint (`/blume-search.json`). */
 export const searchEndpointTemplate = (): string =>
   `// Generated by Blume. Do not edit.
-import documents from "../generated/search.json";
+import documents from "blume:search-index";
 
 export const prerender = true;
 
@@ -1258,7 +1302,7 @@ export const POST: APIRoute = async ({ request }) => {
  */
 export const rawMarkdownEndpointTemplate = (kind: "md" | "mdx"): string =>
   `// Generated by Blume. Do not edit.
-import raw from "../generated/raw-markdown.json";
+import raw from "blume:raw-markdown";
 
 export const prerender = true;
 
@@ -1308,7 +1352,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { APIRoute } from "astro";
-import assets from "../../generated/content-assets.json";
+import assets from "blume:content-assets";
 
 export const prerender = true;
 
@@ -1400,22 +1444,18 @@ export const mcpPageFile = (route: string): string =>
  * generated data snapshot. Runs server-side (no prerender) so agents can query
  * the docs over Streamable HTTP.
  */
-export const mcpEndpointTemplate = (route: string): string => {
-  const clean = trimChar(route, "/");
-  const up = "../".repeat(clean.split("/").length);
-  return `// Generated by Blume. Do not edit.
+export const mcpEndpointTemplate = (): string =>
+  `// Generated by Blume. Do not edit.
 import type { APIRoute } from "astro";
 import { createMcpFetchHandler } from "blume/ai/mcp/server.ts";
-import type { McpData } from "blume/ai/mcp/data.ts";
-import data from "${up}generated/mcp-data.json";
+import data from "blume:mcp-data";
 
 export const prerender = false;
 
-const handler = createMcpFetchHandler(data as McpData);
+const handler = createMcpFetchHandler(data);
 
 export const ALL: APIRoute = ({ request }) => handler(request);
 `;
-};
 
 /**
  * Generate the playground's CORS proxy endpoint
@@ -1464,7 +1504,7 @@ export function GET() {
  */
 export const rssEndpointTemplate = (): string =>
   `// Generated by Blume. Do not edit.
-import feeds from "../../generated/rss.json";
+import feeds from "blume:rss";
 
 export const prerender = true;
 
@@ -1605,13 +1645,11 @@ export async function GET({ props }: { props: CardProps }) {
  * but mounted inside Blume's {@link ReferenceLayout} so the page keeps Blume's
  * navbar on top. `renderMode: "client"` mounts the reference into a container
  * element (rather than emitting a full HTML document), which is what lets it
- * live inside our shell. `dataImport` is the route-depth-aware relative path to
- * the generated data module the layout reads.
+ * live inside our shell.
  */
 export const scalarReferenceTemplate = <Configuration extends object>(options: {
   /** Scalar options forwarded verbatim (spec/theme config plus the author's `scalar` escape hatch). */
   configuration: Configuration;
-  dataImport: string;
   noindex?: boolean;
   route: string;
   title: string;
@@ -1620,7 +1658,7 @@ export const scalarReferenceTemplate = <Configuration extends object>(options: {
 // Generated by Blume. Do not edit.
 import { ScalarComponent } from "@scalar/astro";
 import ReferenceLayout from "blume/components/layout/ReferenceLayout.astro";
-import data from ${JSON.stringify(options.dataImport)};
+import data from "blume:data";
 
 export const prerender = true;
 
@@ -2791,6 +2829,36 @@ declare module "blume:ask" {
 declare module "blume:data" {
   const data: import("blume").BlumeData;
   export default data;
+}
+
+declare module "blume:ask-data" {
+  const askData: import("blume/ai/ask-context.ts").AskData;
+  export default askData;
+}
+
+declare module "blume:content-assets" {
+  const assets: Record<string, string>;
+  export default assets;
+}
+
+declare module "blume:mcp-data" {
+  const data: import("blume/ai/mcp/data.ts").McpData;
+  export default data;
+}
+
+declare module "blume:raw-markdown" {
+  const raw: Record<string, import("blume/ai/markdown.ts").RawMarkdownEntry>;
+  export default raw;
+}
+
+declare module "blume:rss" {
+  const feeds: Record<string, string>;
+  export default feeds;
+}
+
+declare module "blume:search-index" {
+  const documents: import("blume/search/documents.ts").SearchDocument[];
+  export default documents;
 }
 
 declare module "blume:examples" {

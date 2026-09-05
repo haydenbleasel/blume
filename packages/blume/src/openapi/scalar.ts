@@ -144,9 +144,6 @@ export const buildReferenceFiles = async (options: {
       warnings.push(spec.warning);
     }
     const pagePath = referencePagePath(ref.route);
-    // Relative path from the page back to src/generated/data.json: a page one
-    // directory deep (api/events.astro) needs an extra "../".
-    const depth = pagePath.split("/").length - 1;
     files.push({
       content: scalarReferenceTemplate({
         configuration: {
@@ -157,7 +154,6 @@ export const buildReferenceFiles = async (options: {
           // hideTestRequestButton, orderSchemaPropertiesBy, and the rest).
           ...ref.scalar,
         },
-        dataImport: `${"../".repeat(depth + 1)}generated/data.json`,
         noindex: ref.noindex,
         route: ref.route,
         title: ref.label,

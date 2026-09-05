@@ -108,6 +108,8 @@ import {
   hasGeneratedChangelog,
   routeIsTaken,
 } from "./pages.ts";
+import { publishRuntimeModules } from "./runtime-modules.ts";
+import type { RuntimeModuleId } from "./runtime-modules.ts";
 import {
   askComponentTemplate,
   askEndpointTemplate,
@@ -1499,16 +1501,24 @@ const planMcp = (
   };
 };
 
-/** Write the MCP data snapshot, server endpoint, and discovery documents. */
+/** A pass's runtime data modules, published together once every writer ran. */
+type RuntimeModules = Map<RuntimeModuleId, string>;
+
+/**
+ * Publish the MCP data snapshot (`blume:mcp-data`) and write the server
+ * endpoint and discovery documents.
+ */
 const writeMcpFiles = async (
   project: BlumeProject,
   plan: McpPlan,
-  write: (path: string, content: string) => Promise<boolean>
+  write: (path: string, content: string) => Promise<boolean>,
+  modules: RuntimeModules
 ): Promise<void> => {
   if (!plan.enabled) {
     return;
   }
   const data = await buildMcpData(project);
+  modules.set("blume:mcp-data", JSON.stringify(data));
   const discoveryInput = {
     base: data.base,
     name: data.name,
@@ -1518,12 +1528,8 @@ const writeMcpFiles = async (
   };
   await Promise.all([
     write(
-      join(plan.srcDir, "generated", "mcp-data.json"),
-      `${JSON.stringify(data)}\n`
-    ),
-    write(
       join(plan.srcDir, "pages", mcpPageFile(plan.route)),
-      mcpEndpointTemplate(plan.route)
+      mcpEndpointTemplate()
     ),
     write(
       join(plan.dir, "discovery.ts"),
@@ -1632,7 +1638,8 @@ const proxyAllowlistWarnings = (
 const writeAskFiles = async (
   project: BlumeProject,
   srcDir: string,
-  write: (path: string, content: string) => Promise<boolean>
+  write: (path: string, content: string) => Promise<boolean>,
+  modules: RuntimeModules
 ): Promise<void> => {
   const { ask } = project.config.ai;
   if (!(ask?.enabled && !ask.endpoint)) {
@@ -1640,10 +1647,7 @@ const writeAskFiles = async (
   }
   const grounded = ask.provider !== "inkeep";
   if (grounded) {
-    await write(
-      join(srcDir, "generated", "ask-data.json"),
-      `${JSON.stringify(await buildAskData(project))}\n`
-    );
+    modules.set("blume:ask-data", JSON.stringify(await buildAskData(project)));
   }
   await write(
     join(srcDir, "pages", "api", "ask.ts"),
@@ -1766,12 +1770,10 @@ export const generateRuntime = async (
   const srcDir = join(out, "src");
   const generatedDir = join(srcDir, "generated");
   const askPath = join(srcDir, "generated", "Ask.astro");
-  const dataPath = join(srcDir, "generated", "data.json");
   const themePath = join(srcDir, "generated", "app.css");
   const searchClientPath = join(srcDir, "generated", "search-client.ts");
   const examplesPath = join(srcDir, "generated", "examples.ts");
   const examplesThemePath = join(srcDir, "generated", "examples.css");
-  const openapiPath = join(srcDir, "generated", "openapi.json");
 
   // Record every file this pass writes so orphans (from a now-disabled feature)
   // can be pruned afterwards. `write` wraps the atomic writer and tracks paths.
@@ -1780,6 +1782,11 @@ export const generateRuntime = async (
     written.add(normalize(path));
     return writeIfChanged(path, content);
   };
+  // The data snapshots the generated pages import (`blume:data`, the search
+  // index, …) are collected here and published in memory at the end of the
+  // pass — see `runtime-modules.ts`. An id a feature leaves unset is
+  // unpublished, the in-memory counterpart of `pruneOrphans`.
+  const modules: RuntimeModules = new Map();
 
   const depsLinkWarning = await ensureDepsLink(out);
 
@@ -1902,14 +1909,12 @@ export const generateRuntime = async (
           contentRoot: docsCollection.base,
           contentRoutes: markdownRoutePaths(project),
           context,
-          dataPath,
           examplesPath,
           examplesThemePath,
           integrationBridge,
           needsReact,
           needsSvelte,
           needsVue,
-          openapiPath,
           pages,
           reactCompilerPath,
           searchClientPath,
@@ -2021,8 +2026,8 @@ export const generateRuntime = async (
         )
       )
     ),
-    writeAskFiles(project, srcDir, write),
-    writeMcpFiles(project, mcp, write),
+    writeAskFiles(project, srcDir, write, modules),
+    writeMcpFiles(project, mcp, write, modules),
     playgroundProxy.enabled
       ? write(playgroundProxy.entrypoint, playgroundProxyTemplate(proxyOrigins))
       : Promise.resolve(false),
@@ -2076,10 +2081,7 @@ export const generateRuntime = async (
   // Client-loaded providers (orama, flexsearch) ship a static index + endpoint.
   if (servesStaticIndex(config.search.provider)) {
     const documents = await buildSearchDocuments(project);
-    await write(
-      join(srcDir, "generated", "search.json"),
-      `${JSON.stringify(documents)}\n`
-    );
+    modules.set("blume:search-index", JSON.stringify(documents));
     await write(
       join(srcDir, "pages", "blume-search.json.ts"),
       searchEndpointTemplate()
@@ -2103,15 +2105,13 @@ export const generateRuntime = async (
   );
 
   const rawMarkdown = await buildRawMarkdown(project);
+  modules.set("blume:raw-markdown", JSON.stringify(rawMarkdown));
   // The originals behind the rewritten `/blume-assets/content/…` references in
   // the agent-facing Markdown, plus the endpoint that serves them (and the
   // remote-source assets materialized under `.blume/public/blume-assets`).
   const contentAssets = await collectContentAssets(project);
+  modules.set("blume:content-assets", JSON.stringify(contentAssets));
   await Promise.all([
-    write(
-      join(srcDir, "generated", "raw-markdown.json"),
-      `${JSON.stringify(rawMarkdown)}\n`
-    ),
     write(
       join(srcDir, "pages", "[...slug].md.ts"),
       rawMarkdownEndpointTemplate("md")
@@ -2119,10 +2119,6 @@ export const generateRuntime = async (
     write(
       join(srcDir, "pages", "[...slug].mdx.ts"),
       rawMarkdownEndpointTemplate("mdx")
-    ),
-    write(
-      join(srcDir, "generated", "content-assets.json"),
-      `${JSON.stringify(contentAssets)}\n`
     ),
     write(
       join(srcDir, "pages", "blume-assets", "[...asset].ts"),
@@ -2139,16 +2135,11 @@ export const generateRuntime = async (
     const feedXml = Object.fromEntries(
       feeds.map((feed) => [feed.type, renderRssFeed(feed)])
     );
-    await Promise.all([
-      write(
-        join(srcDir, "generated", "rss.json"),
-        `${JSON.stringify(feedXml)}\n`
-      ),
-      write(
-        join(srcDir, "pages", "[section]", "rss.xml.ts"),
-        rssEndpointTemplate()
-      ),
-    ]);
+    modules.set("blume:rss", JSON.stringify(feedXml));
+    await write(
+      join(srcDir, "pages", "[section]", "rss.xml.ts"),
+      rssEndpointTemplate()
+    );
   }
 
   // Scalar-rendered API/AsyncAPI reference pages (`renderer: "scalar"`). One
@@ -2223,16 +2214,16 @@ export const generateRuntime = async (
     );
   }
 
-  // `openapi.json` (the `blume:openapi` alias) is always written — even as `{}`
-  // — so the alias resolves whether or not a reference is enabled; the specs
-  // were parsed during the scan, so this is just serialization.
+  // `blume:openapi` is always published — even as `{}` — so the import resolves
+  // whether or not a reference is enabled; the specs were parsed during the
+  // scan, so this is just serialization. `blume:data` is the page data every
+  // layout reads. Neither is "structural" for Astro; publishing hot-reloads.
+  modules.set("blume:data", buildRuntimeData(project));
+  modules.set("blume:openapi", JSON.stringify(openApiData));
   // These write to distinct trees and never read one another, so they batch.
-  // `data.json`/`openapi.json` and the manifest are not "structural" for Astro;
-  // they hot-reload. `writeStagedContent` owns the `.blume/content` tree (its
-  // own pruning), outside `.blume/src`, so a removed remote entry doesn't linger.
+  // `writeStagedContent` owns the `.blume/content` tree (its own pruning),
+  // outside `.blume/src`, so a removed remote entry doesn't linger.
   await Promise.all([
-    write(join(srcDir, "generated", "data.json"), buildRuntimeData(project)),
-    write(openapiPath, `${JSON.stringify(openApiData)}\n`),
     write(
       join(out, "blume.manifest.json"),
       `${JSON.stringify(project.manifest, null, 2)}\n`
@@ -2243,6 +2234,11 @@ export const generateRuntime = async (
   // Remove anything under `.blume/src` this pass didn't write — e.g. an Ask AI
   // endpoint left behind after the feature was switched off.
   await pruneOrphans(srcDir, written);
+
+  // Publish last, once every page that imports a module is on disk: a live
+  // dev server invalidates the changed modules and reloads the browser against
+  // the finished tree, never a half-written one.
+  publishRuntimeModules(modules);
 
   return { structuralChange: structural.some(Boolean), warnings };
 };

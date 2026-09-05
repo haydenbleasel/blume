@@ -209,7 +209,7 @@ const mcpFiles = async (
       path: join(genDir, "mcp-data.json"),
     },
     {
-      content: mcpEndpointTemplate(route),
+      content: mcpEndpointTemplate(),
       path: join(srcDir, "pages", mcpPageFile(route)),
     },
     {
@@ -402,9 +402,11 @@ export const eject = async (
         contentRoot: relContext.contentRoot,
         contentRoutes: project.manifest.routes.map((route) => route.path),
         context: relContext,
-        dataPath: "./src/generated/data.json",
         examplesPath: "./src/generated/examples.ts",
         examplesThemePath: "./src/generated/examples.css",
+        // No CLI publishes the runtime data modules in memory after eject, so
+        // the config aliases each to the JSON snapshot written below.
+        generatedModulesDir: "./src/generated",
         integrationBridge: ejectIntegrationBridge(
           config,
           root,
@@ -413,7 +415,6 @@ export const eject = async (
         needsReact,
         needsSvelte,
         needsVue,
-        openapiPath: "./src/generated/openapi.json",
         pages: relPages,
         searchClientPath: "./src/generated/search-client.ts",
         themePath: "./src/generated/app.css",

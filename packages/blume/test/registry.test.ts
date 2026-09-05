@@ -106,6 +106,16 @@ describe("eject", () => {
     expect(has("src/content.config.ts")).toBe(true);
     expect(has("src/pages/[...slug].astro")).toBe(true);
     expect(has("src/generated/data.json")).toBe(true);
+    // The runtime data modules stay files after eject (no CLI publishes them
+    // in memory), aliased from the ejected config to the snapshots it writes.
+    const ejectedConfig = readFileSync(join(root, "astro.config.mjs"), "utf-8");
+    expect(ejectedConfig).toContain(
+      '"blume:data": "./src/generated/data.json"'
+    );
+    expect(ejectedConfig).toContain(
+      '"blume:mcp-data": "./src/generated/mcp-data.json"'
+    );
+    expect(ejectedConfig).not.toContain("runtimeModulesPlugin");
     // The include graph the ejected astro.config's includeHmrPlugin reads —
     // without it partial edits would silently serve stale pages post-eject.
     expect(has("src/generated/includes.json")).toBe(true);

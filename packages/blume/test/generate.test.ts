@@ -28,6 +28,10 @@ import {
   sameRealDir,
   searchProviderWarnings,
 } from "../src/astro/generate.ts";
+import {
+  readRuntimeModule,
+  RUNTIME_MODULE_FILES,
+} from "../src/astro/runtime-modules.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
@@ -1390,29 +1394,38 @@ describe("generateRuntime", () => {
 
     // Feature-gated files.
     expect(has("src/pages/api/ask.ts")).toBe(true);
-    expect(has("src/generated/ask-data.json")).toBe(true);
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/changelog.astro")).toBe(true);
     expect(has("src/pages/404.astro")).toBe(true);
     expect(has("src/pages/404.md.ts")).toBe(true);
     expect(has("src/pages/blume-search.json.ts")).toBe(true);
-    expect(has("src/generated/search.json")).toBe(true);
     expect(has("src/pages/[section]/rss.xml.ts")).toBe(true);
-    expect(has("src/generated/rss.json")).toBe(true);
     expect(has("src/pages/mcp.ts")).toBe(true);
     expect(has("src/blume-mcp/discovery.ts")).toBe(true);
     expect(has("src/blume-mcp/server-card.ts")).toBe(true);
-    expect(has("src/generated/mcp-data.json")).toBe(true);
     expect(has("src/pages/reference.astro")).toBe(true);
-    expect(has("src/generated/openapi.json")).toBe(true);
     expect(has("src/generated/islands/Counter.astro")).toBe(true);
     expect(has("src/generated/examples.ts")).toBe(true);
     expect(has("src/generated/examples/demo.astro")).toBe(true);
     // The isolated preview frame: its Tailwind entry and per-example route.
     expect(has("src/generated/examples.css")).toBe(true);
     expect(has("src/pages/blume-examples/[...path].astro")).toBe(true);
-    expect(has("src/generated/data.json")).toBe(true);
     expect(has("blume.manifest.json")).toBe(true);
+
+    // The data snapshots are published in memory, never written: every
+    // feature's module is present and valid JSON, and no JSON lands under
+    // `src/generated`.
+    for (const id of RUNTIME_MODULE_FILES.keys()) {
+      const text = readRuntimeModule(id);
+      expect(text).toBeDefined();
+      expect(() => JSON.parse(text ?? "")).not.toThrow();
+    }
+    expect(JSON.parse(readRuntimeModule("blume:data") ?? "")).toHaveProperty(
+      "routes"
+    );
+    for (const file of RUNTIME_MODULE_FILES.values()) {
+      expect(has(`src/generated/${file}`)).toBe(false);
+    }
     // ensureDepsLink symlinked the package's node_modules into .blume.
     expect(has("node_modules")).toBe(true);
 
@@ -1700,8 +1713,8 @@ describe("generateRuntime", () => {
       "utf-8"
     );
     expect(client).toContain("api/search");
-    // A server provider ships no static index.
-    expect(existsSync(join(out, "src/generated/search.json"))).toBe(false);
+    // A server provider ships no static index — the module is unpublished.
+    expect(readRuntimeModule("blume:search-index")).toBeUndefined();
   });
 
   it("warns when Vue/Svelte islands lack their Astro integration", async () => {
