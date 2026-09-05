@@ -260,7 +260,7 @@ const menuRowClass =
 </div>
 
 <script>
-  import { copyText, flashLabel } from "../copy-feedback.ts";
+  import { copyDeferredText, copyText, flashLabel } from "../copy-feedback.ts";
   import { installDropdownDismiss } from "../dropdown-dismiss.ts";
   import { prefixBase } from "../islands/base-path.ts";
   import { rafThrottle } from "../raf-throttle.ts";
@@ -481,18 +481,23 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
       ?.addEventListener("click", async () => {
         let copied = false;
         try {
-          const response = await fetch(md);
-          if (!response.ok) {
-            throw new Error(`Fetching ${md} failed (${response.status})`);
-          }
-          copied = await copyText(await response.text());
+          // The Markdown is fetched on click; the deferred write keeps the
+          // clipboard call inside the click's user activation (Safari and
+          // Firefox reject a write issued after an `await`).
+          copied = await copyDeferredText(async () => {
+            const response = await fetch(md);
+            if (!response.ok) {
+              throw new Error(`Fetching ${md} failed (${response.status})`);
+            }
+            return response.text();
+          });
         } catch (error) {
           console.error("[blume] Copy as Markdown failed", error);
         }
         // Never flash "Copied!" untruthfully — but never stay silent either:
         // a reader in an in-app browser or on a denied clipboard prompt must
-        // see that nothing landed on the clipboard. `copyText` has already
-        // tried the legacy copy command by the time it reports `false`.
+        // see that nothing landed on the clipboard. The legacy copy command
+        // has already been tried by the time the helper reports `false`.
         if (label instanceof HTMLElement) {
           flashLabel(label, copied ? copiedLabel : copyFailedLabel);
         }

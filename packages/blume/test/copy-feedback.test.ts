@@ -29,18 +29,28 @@ class FakeEl {
   style: Record<string, string> = {};
   textContent = "";
   value = "";
+  /** The `[start, end]` of the last `setSelectionRange` call. */
+  selection: [number, number] | null = null;
+  /** Where this element was appended, kept after `remove()` for assertions. */
+  hostedBy: FakeEl | null = null;
   append(child: FakeEl): void {
     child.isConnected = true;
     child.parent = this;
+    child.hostedBy = this;
     this.children.push(child);
   }
   focus(): void {
     this.focusCount += 1;
     setActive(this);
   }
+  get parentElement(): FakeEl | null {
+    return this.parent;
+  }
   remove(): void {
     this.isConnected = false;
-    this.parent?.children.splice(this.parent.children.indexOf(this), 1);
+    if (this.parent) {
+      this.parent.children = this.parent.children.filter((c) => c !== this);
+    }
     this.parent = null;
   }
   select(): void {
@@ -48,6 +58,9 @@ class FakeEl {
   }
   setAttribute(name: string, value: string): void {
     this.attributes.set(name, value);
+  }
+  setSelectionRange(start: number, end: number): void {
+    this.selection = [start, end];
   }
 }
 
@@ -57,12 +70,20 @@ body.isConnected = true;
 let execCommand: "throws" | boolean = true;
 /** The text selected when the copy command last ran. */
 let execSelection: string | null = null;
+/** Every textarea the fallback created, so a test can see where it went. */
+const textareas: FakeEl[] = [];
 const fakeDocument = {
   get activeElement(): FakeEl | null {
     return activeElement;
   },
   body,
-  createElement: (_tag: string): FakeEl => new FakeEl(),
+  createElement: (tag: string): FakeEl => {
+    const el = new FakeEl();
+    if (tag === "textarea") {
+      textareas.push(el);
+    }
+    return el;
+  },
   execCommand: (_command: string): boolean => {
     if (execCommand === "throws") {
       throw new Error("copy is not supported");
@@ -167,7 +188,12 @@ describe("copyText", () => {
   it("falls back to the copy command when the clipboard API rejects", async () => {
     clipboardFails = true;
     execCommand = true;
+    // The button sits inside a light-dismissed menu panel: the scratch
+    // textarea must land beside it, so the focus move `select()` makes never
+    // leaves the panel (which would close the menu mid-click).
+    const panel = new FakeEl();
     const button = new FakeEl();
+    panel.append(button);
     activeElement = button;
     const before = body.children.length;
     expect(await copyText("fallback")).toBe(true);
@@ -176,8 +202,25 @@ describe("copyText", () => {
     // gone again, and focus is back on the element that had it.
     expect(execSelection).toBe("fallback");
     expect(body.children.length).toBe(before);
+    expect(panel.children).toStrictEqual([button]);
+    const textarea = textareas.at(-1);
+    expect(textarea?.hostedBy).toBe(panel);
+    expect(textarea?.parent).toBeNull();
+    expect(textarea?.selection).toStrictEqual([0, "fallback".length]);
     expect(activeElement).toBe(button);
     expect(button.focusCount).toBe(1);
+  });
+
+  it("hosts the scratch textarea on <body> when nothing has focus", async () => {
+    clipboardFails = true;
+    execCommand = true;
+    activeElement = null;
+    const before = body.children.length;
+    expect(await copyText("unfocused")).toBe(true);
+    clipboardFails = false;
+    expect(execSelection).toBe("unfocused");
+    expect(body.children.length).toBe(before);
+    expect(textareas.at(-1)?.hostedBy).toBe(body);
   });
 
   it("falls back when navigator.clipboard is missing entirely", async () => {

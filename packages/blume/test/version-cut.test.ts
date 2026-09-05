@@ -114,6 +114,30 @@ describe("insertArchivedVersion", () => {
     );
   });
 
+  it("keeps a CRLF config's line endings when inserting", async () => {
+    const root = await makeProject({
+      "blume.config.ts": [
+        "export default {",
+        "  versions: {",
+        "    archived: [",
+        '      { id: "v1.0" },',
+        "    ],",
+        '    current: { label: "v2.0" },',
+        "  },",
+        "};",
+        "",
+      ].join("\r\n"),
+    });
+    const path = join(root, "blume.config.ts");
+    expect(await insertArchivedVersion(path, "v2.0")).toBe(true);
+    const text = await readFile(path, "utf-8");
+    expect(text).toContain(
+      'archived: [\r\n      { id: "v2.0" },\r\n      { id: "v1.0" },'
+    );
+    // No lone LF was introduced.
+    expect(text.replaceAll("\r\n", "")).not.toContain("\n");
+  });
+
   it("inserts inline into an inline array", async () => {
     const root = await makeProject({ "blume.config.ts": VERSIONED_CONFIG });
     const path = join(root, "blume.config.ts");

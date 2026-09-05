@@ -177,12 +177,14 @@ export const insertArchivedVersion = async (
   const indent = text.slice(lineStart).match(/^\s*/u)?.[0] ?? "";
   const rest = text.slice(insertAt);
   // Match the array's authored shape: empty stays bare, an inline array gets
-  // an inline entry, a multiline array gets its own indented line.
+  // an inline entry, a multiline array gets its own indented line — on the
+  // file's own line ending, so a CRLF config doesn't gain a lone LF.
+  const eol = /^\r?\n/u.exec(rest)?.[0];
   let entry: string;
   if (rest.trimStart().startsWith("]")) {
     entry = `{ id: "${id}" }`;
-  } else if (rest.startsWith("\n")) {
-    entry = `\n${indent}  { id: "${id}" },`;
+  } else if (eol) {
+    entry = `${eol}${indent}  { id: "${id}" },`;
   } else {
     entry = `{ id: "${id}" }, `;
   }

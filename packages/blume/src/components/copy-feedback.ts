@@ -3,13 +3,14 @@
  * blocks, page actions, color swatches, prompts, API panels, Ask AI). One
  * implementation owns the invariants each site used to hand-roll:
  *
- * - the clipboard write is guarded, and nothing flashes on failure — a
- *   confirmation must never lie;
+ * - the clipboard write is guarded and a confirmation must never lie: a
+ *   site either shows nothing on failure or (the page actions) shows a
+ *   failure label, but never a false "Copied";
  * - repeat copies restart the hold instead of stacking timers, so the copied
  *   state never reverts early after a double-click;
- * - every successful copy is announced to a shared polite live region, so the
- *   confirmation is audible, not just visual (previously only the code-block
- *   button announced).
+ * - every flash is announced to a shared polite live region, so the
+ *   confirmation — or the failure — is audible, not just visual (previously
+ *   only the code-block button announced).
  */
 
 /** How long the copied confirmation holds before reverting. */
@@ -52,8 +53,19 @@ const copyViaCommand = (text: string): boolean => {
   textarea.style.top = "0";
   textarea.style.left = "-9999px";
   textarea.style.opacity = "0";
-  document.body.append(textarea);
+  // Beside the focused control, not on `<body>`: `select()` moves focus to the
+  // textarea, and a copy button inside a light-dismissed `<details>` menu (the
+  // MCP actions) would otherwise see focus leave the panel — closing the menu
+  // mid-click and hiding the label the outcome is about to flash on.
+  const host =
+    previous instanceof HTMLElement && previous.parentElement
+      ? previous.parentElement
+      : document.body;
+  host.append(textarea);
   textarea.select();
+  // iOS WebKit has been known to ignore `select()` on a readonly textarea;
+  // an explicit range covers it (the same belt-and-braces clipboard.js uses).
+  textarea.setSelectionRange(0, text.length);
   let copied = false;
   try {
     copied = document.execCommand("copy");
@@ -83,6 +95,41 @@ export const copyText = async (text: string): Promise<boolean> => {
   } catch {
     return copyViaCommand(text);
   }
+};
+
+/**
+ * Copy text that still has to be loaded — the page's Markdown mirror, fetched
+ * on click. Safari and Firefox only honor a clipboard write issued inside the
+ * click's own task: awaiting the load first lands the write outside the user
+ * activation, so `writeText` rejects and the legacy command returns `false`
+ * even though the clipboard is perfectly available. `ClipboardItem` accepts a
+ * promise for its payload, so the write is issued synchronously with the
+ * load still in flight and the activation intact. Engines without it (or a
+ * write that rejects for any reason, a failed load included) fall back to the
+ * awaited {@link copyText}, which is what Chrome's longer activation window
+ * already tolerated. A load failure still throws, so the caller can report
+ * it rather than a clipboard problem.
+ */
+export const copyDeferredText = async (
+  load: () => Promise<string>
+): Promise<boolean> => {
+  const text = load();
+  if ("ClipboardItem" in globalThis) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/plain": text.then(
+            (value) => new Blob([value], { type: "text/plain" })
+          ),
+        }),
+      ]);
+      return true;
+    } catch {
+      // Fall through to the awaited write; if the load itself failed, the
+      // `await` below rethrows that error for the caller.
+    }
+  }
+  return copyText(await text);
 };
 
 /**
