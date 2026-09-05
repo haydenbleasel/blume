@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import pMap from "p-map";
-import { join, relative } from "pathe";
+import { isAbsolute, join, relative } from "pathe";
 import { glob } from "tinyglobby";
 
 import type { ExampleLookup } from "../core/types.ts";
@@ -28,6 +28,11 @@ export interface ExampleSpec {
 }
 
 export interface ExampleDiscovery {
+  /**
+   * Absolute directory the examples were discovered under: the configured
+   * `examples.source` (or a glob's static prefix) resolved against the root.
+   */
+  dir: string;
   examples: ExampleSpec[];
   warnings: string[];
 }
@@ -55,6 +60,28 @@ const DEFAULT_EXAMPLE_GLOB = "**/*.{astro,jsx,svelte,tsx,vue}";
 
 /** Ceiling on concurrent example-file reads; unbounded fan-out risks EMFILE. */
 const READ_CONCURRENCY = 16;
+
+/**
+ * Files the preview-frame Tailwind entry scans for utility classes, appended
+ * to each directory from `exampleScanRoots`.
+ */
+export const EXAMPLE_SCAN_GLOB = "**/*.{astro,jsx,svelte,ts,tsx,vue}";
+
+/**
+ * Directories the `<Component />` preview sheet scans for utility classes:
+ * the project root, plus the examples directory when it lives outside the
+ * root (a sibling workspace package, say). Tailwind's `@source` is a file
+ * glob, not an import graph, so an out-of-root examples directory would
+ * otherwise contribute no utilities and previews would render half-styled.
+ */
+export const exampleScanRoots = (
+  root: string,
+  examplesDir: string
+): string[] => {
+  const path = relative(root, examplesDir);
+  const outside = path.startsWith("..") || isAbsolute(path);
+  return outside ? [root, examplesDir] : [root];
+};
 
 // Glob magic that turns `examples` from a plain directory into a pattern. `()`,
 // `@`, and `+` are excluded so literal path segments (npm scopes, parens) keep
@@ -153,7 +180,7 @@ export const discoverExamples = async (
     collectExample(file, sources[index] ?? "");
   }
 
-  return { examples, warnings };
+  return { dir, examples, warnings };
 };
 
 /**

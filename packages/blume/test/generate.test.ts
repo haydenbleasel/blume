@@ -11,7 +11,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
-import { dirname, join, normalize } from "pathe";
+import { dirname, join, normalize, relative } from "pathe";
 
 import {
   askProviderWarnings,
@@ -93,16 +93,23 @@ afterAll(async () => {
   );
 });
 
-const writeProject = async (files: Record<string, string>): Promise<string> => {
-  const root = await mkdtemp(join(tmpdir(), "blume-gen-"));
-  projectDirs.push(root);
+const writeTree = async (
+  base: string,
+  files: Record<string, string>
+): Promise<void> => {
   await Promise.all(
     Object.entries(files).map(async ([rel, content]) => {
-      const abs = join(root, rel);
+      const abs = join(base, rel);
       await mkdir(dirname(abs), { recursive: true });
       await writeFile(abs, content, "utf-8");
     })
   );
+};
+
+const writeProject = async (files: Record<string, string>): Promise<string> => {
+  const root = await mkdtemp(join(tmpdir(), "blume-gen-"));
+  projectDirs.push(root);
+  await writeTree(root, files);
   return root;
 };
 
@@ -1505,6 +1512,58 @@ describe("generateRuntime", () => {
     );
     expect(sheet).toContain("--primary: hotpink;");
     expect(result.warnings.some((w) => w.includes("examples.css"))).toBe(false);
+  });
+
+  it("scans an out-of-root examples directory and re-roots user @source paths", async () => {
+    // A workspace: the docs app is the project root and the components it
+    // previews live in a sibling package. Tailwind's `@source` is a file glob,
+    // not an import graph, so classes used only over there were never scanned
+    // and previews rendered half-styled.
+    const workspace = await mkdtemp(join(tmpdir(), "blume-gen-ws-"));
+    projectDirs.push(workspace);
+    const root = join(workspace, "apps", "docs");
+    await writeTree(workspace, {
+      "apps/docs/blume.config.ts": `export default {
+  examples: {
+    css: "../../packages/ui/examples/theme.css",
+    source: "../../packages/ui/examples",
+  },
+};
+`,
+      "apps/docs/docs/index.md": "# Home\n",
+      "apps/docs/theme.css":
+        '@source "../../packages/ui/src";\n@source not "./ignored";\n',
+      "packages/ui/examples/demo.tsx":
+        'export default function Demo() { return <div className="w-px" />; }\n',
+      "packages/ui/examples/theme.css":
+        '@source "../src";\n@source "/abs/kept";\n@source inline("underline");\n',
+    });
+    const project = await scanProject(root);
+    const out = project.context.outDir;
+    await generateRuntime(project);
+
+    const generated = join(out, "src/generated");
+    const glob = "**/*.{astro,jsx,svelte,ts,tsx,vue}";
+    const uiSrc = relative(generated, join(workspace, "packages/ui/src"));
+    const examplesSheet = await readFile(
+      join(generated, "examples.css"),
+      "utf-8"
+    );
+    // The examples directory joins the root in the preview sheet's scan.
+    expect(examplesSheet).toContain(`@source "${root}/${glob}";`);
+    expect(examplesSheet).toContain(
+      `@source "${join(workspace, "packages/ui/examples")}/${glob}";`
+    );
+    // Relative @source paths resolve from the user's file, not from .blume/;
+    // absolute and inline sources pass through.
+    expect(examplesSheet).toContain(`@source "${uiSrc}";`);
+    expect(examplesSheet).toContain('@source "/abs/kept";');
+    expect(examplesSheet).toContain('@source inline("underline");');
+    const appSheet = await readFile(join(generated, "app.css"), "utf-8");
+    expect(appSheet).toContain(`@source "${uiSrc}";`);
+    expect(appSheet).toContain(
+      `@source not "${relative(generated, join(root, "ignored"))}";`
+    );
   });
 
   it("warns when the configured examples.css is missing", async () => {

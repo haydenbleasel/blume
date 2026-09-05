@@ -20,6 +20,7 @@ import {
   resolveAccent,
   resolveRadius,
 } from "../src/theme/palette.ts";
+import { rebaseSourceDirectives } from "../src/theme/sources.ts";
 
 const themeOf = (over: BlumeConfigInput["theme"]) =>
   blumeConfigSchema.parse({ theme: over }).theme;
@@ -759,5 +760,45 @@ describe("resolveIcon (Lucide-only)", () => {
     // lookup maps and crash the build with a TypeError deep in resolution.
     expect(resolveIcon("constructor:github")).toBeNull();
     expect(hasIcon("constructor:nope")).toBeFalsy();
+  });
+});
+
+describe("rebaseSourceDirectives", () => {
+  // A workspace: theme.css sits in the docs app, the generated entry three
+  // levels below it under .blume/src/generated.
+  const options = {
+    from: "/ws/apps/docs/theme.css",
+    to: "/ws/apps/docs/.blume/src/generated",
+  };
+
+  it("re-roots relative paths from the user's file to the generated entry", () => {
+    expect(
+      rebaseSourceDirectives('@source "../../packages/ui";', options)
+    ).toBe('@source "../../../../../packages/ui";');
+    expect(rebaseSourceDirectives("@source './src';", options)).toBe(
+      "@source '../../../src';"
+    );
+  });
+
+  it("keeps the `not` modifier", () => {
+    expect(
+      rebaseSourceDirectives('@source not "../../packages/ui/dist";', options)
+    ).toBe('@source not "../../../../../packages/ui/dist";');
+  });
+
+  it("leaves absolute paths and inline sources untouched", () => {
+    expect(rebaseSourceDirectives('@source "/abs/pkg";', options)).toBe(
+      '@source "/abs/pkg";'
+    );
+    expect(
+      rebaseSourceDirectives('@source inline("underline");', options)
+    ).toBe('@source inline("underline");');
+  });
+
+  it("leaves the rest of the stylesheet alone", () => {
+    const css = `:root {\n  --primary: hotpink;\n}\n@source "../../packages/ui";\n@theme inline {\n  --color-primary: var(--primary);\n}\n`;
+    expect(rebaseSourceDirectives(css, options)).toBe(
+      `:root {\n  --primary: hotpink;\n}\n@source "../../../../../packages/ui";\n@theme inline {\n  --color-primary: var(--primary);\n}\n`
+    );
   });
 });

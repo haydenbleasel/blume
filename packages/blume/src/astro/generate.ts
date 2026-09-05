@@ -91,10 +91,16 @@ import {
   fontLocaleCodes,
 } from "../theme/fonts.ts";
 import { buildThemeCss } from "../theme/palette.ts";
+import { rebaseSourceDirectives } from "../theme/sources.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
 import { planComponentSlots } from "./component-slots.ts";
 import type { ComponentSlotPlan } from "./component-slots.ts";
-import { discoverExamples, exampleMarkdownLookup } from "./examples.ts";
+import {
+  EXAMPLE_SCAN_GLOB,
+  discoverExamples,
+  exampleMarkdownLookup,
+  exampleScanRoots,
+} from "./examples.ts";
 import { discoverIslands } from "./islands.ts";
 import {
   customOgRoutes,
@@ -712,6 +718,21 @@ const readOptional = async (path: string | null): Promise<string> => {
   } catch {
     return "";
   }
+};
+
+/**
+ * Read a user stylesheet (`theme.css`, `examples.css`) that gets inlined into
+ * a generated Tailwind entry under `outputDir`, re-rooting its relative
+ * `@source` paths so they still resolve from where the author wrote them.
+ */
+const readUserCss = async (
+  file: string | null,
+  outputDir: string
+): Promise<string> => {
+  const css = await readOptional(file);
+  return file
+    ? rebaseSourceDirectives(css, { from: file, to: outputDir })
+    : css;
 };
 
 /** Heuristically detect whether the project uses React islands. */
@@ -1738,6 +1759,7 @@ export const generateRuntime = async (
   assertFontFilesExist(project);
   const out = context.outDir;
   const srcDir = join(out, "src");
+  const generatedDir = join(srcDir, "generated");
   const askPath = join(srcDir, "generated", "Ask.astro");
   const dataPath = join(srcDir, "generated", "data.json");
   const themePath = join(srcDir, "generated", "app.css");
@@ -1781,8 +1803,8 @@ export const generateRuntime = async (
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(context.root),
     detectUsesMath(context.root, staged.values()),
-    readOptional(context.themeFile),
-    readOptional(examplesCssFile(context.root, config)),
+    readUserCss(context.themeFile, generatedDir),
+    readUserCss(examplesCssFile(context.root, config), generatedDir),
     loadIntegrationBridge(config, context),
     discoverIslands(context.root),
     discoverExamples(context.root, config.examples.source),
@@ -1930,13 +1952,16 @@ export const generateRuntime = async (
         exampleMapTemplate(exampleDiscovery.examples, config.basePath)
       ),
       // The isolated Tailwind entry for `<Component />` preview frames: only
-      // example files (and the project sources they import) are scanned, so
-      // the docs theme never reaches a preview.
+      // the project (and an out-of-root examples directory) is scanned, so the
+      // docs theme never reaches a preview. Anything further afield — a sibling
+      // package the examples import — is the user's `@source` in examples.css.
       write(
         examplesThemePath,
         examplesEntryTemplate({
           configTokens: buildThemeCss(config.theme),
-          sources: [`${context.root}/**/*.{astro,jsx,svelte,ts,tsx,vue}`],
+          sources: exampleScanRoots(context.root, exampleDiscovery.dir).map(
+            (dir) => `${dir}/${EXAMPLE_SCAN_GLOB}`
+          ),
           userCss: userExamplesCss,
         })
       ),

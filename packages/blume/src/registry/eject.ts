@@ -9,7 +9,12 @@ import { buildRawMarkdown } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
 import { planComponentSlots } from "../astro/component-slots.ts";
-import { discoverExamples, exampleMarkdownLookup } from "../astro/examples.ts";
+import {
+  EXAMPLE_SCAN_GLOB,
+  discoverExamples,
+  exampleMarkdownLookup,
+  exampleScanRoots,
+} from "../astro/examples.ts";
 import {
   buildRuntimeData,
   collectStaged,
@@ -61,6 +66,7 @@ import {
   tailwindEntryTemplate,
 } from "../theme/entry.ts";
 import { buildThemeCss } from "../theme/palette.ts";
+import { rebaseSourceDirectives } from "../theme/sources.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
 
 const toPosix = (path: string): string => path.split("\\").join("/");
@@ -251,13 +257,21 @@ const changelogFiles = (
 };
 
 /** Contents of the configured `examples.css`, or `""` when unset/absent. */
-const readExamplesCss = (
-  root: string,
-  css: string | undefined
-): Promise<string> =>
-  css && existsSync(join(root, css))
-    ? readFile(join(root, css), "utf-8")
-    : Promise.resolve("");
+/**
+ * Read a user stylesheet that eject inlines into a generated entry under
+ * `genDir`, re-rooting its relative `@source` paths from the user's file.
+ * Resolves to an empty string when the file is unset or absent.
+ */
+const readUserCss = async (
+  file: string | null,
+  genDir: string
+): Promise<string> => {
+  if (!(file && existsSync(file))) {
+    return "";
+  }
+  const css = await readFile(file, "utf-8");
+  return rebaseSourceDirectives(css, { from: file, to: genDir });
+};
 
 /**
  * The per-example preview route `<Component />` iframes embed, nested under
@@ -331,10 +345,11 @@ export const eject = async (
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(root),
     detectUsesMath(root),
-    context.themeFile
-      ? readFile(context.themeFile, "utf-8")
-      : Promise.resolve(""),
-    readExamplesCss(root, config.examples.css),
+    readUserCss(context.themeFile, genDir),
+    readUserCss(
+      config.examples.css ? join(root, config.examples.css) : null,
+      genDir
+    ),
     buildRawMarkdown(project),
     discoverIslands(root),
   ]);
@@ -452,7 +467,9 @@ export const eject = async (
       // Relative sources keep the ejected app portable.
       content: examplesEntryTemplate({
         configTokens: buildThemeCss(config.theme),
-        sources: ["../../**/*.{astro,jsx,svelte,ts,tsx,vue}"],
+        sources: exampleScanRoots(root, examples.dir).map(
+          (dir) => `${relative(genDir, dir)}/${EXAMPLE_SCAN_GLOB}`
+        ),
         userCss: userExamplesCss,
       }),
       path: join(genDir, "examples.css"),

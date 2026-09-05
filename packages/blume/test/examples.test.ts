@@ -7,6 +7,7 @@ import { dirname, join } from "pathe";
 import {
   discoverExamples,
   exampleMarkdownLookup,
+  exampleScanRoots,
 } from "../src/astro/examples.ts";
 
 let root: string;
@@ -116,9 +117,12 @@ describe("discoverExamples", () => {
     const fromDefault = await discoverExamples(reg);
     expect(fromDefault.examples).toHaveLength(0);
 
-    const map = byPath(await discoverExamples(reg, "registry/files-sdk"));
+    const discovery = await discoverExamples(reg, "registry/files-sdk");
+    const map = byPath(discovery);
     expect(map.has("file-list/basic")).toBe(true);
     expect(map.get("file-list/basic")?.framework).toBe("react");
+    // The resolved directory is exposed so the preview sheet can scan it.
+    expect(discovery.dir).toBe(join(reg, "registry/files-sdk"));
 
     await rm(reg, { force: true, recursive: true });
   });
@@ -136,9 +140,13 @@ describe("discoverExamples", () => {
     await writeFile(source, "export function FileList() {}");
     await writeFile(example, "export default function Basic() {}");
 
-    const map = byPath(
-      await discoverExamples(reg, "registry/files-sdk/**/examples/*")
+    const discovery = await discoverExamples(
+      reg,
+      "registry/files-sdk/**/examples/*"
     );
+    const map = byPath(discovery);
+    // The glob's static prefix is the directory the examples are keyed under.
+    expect(discovery.dir).toBe(join(reg, "registry/files-sdk"));
     // The example is addressable, keyed relative to `registry/files-sdk`.
     expect(map.has("file-list/examples/file-list-basic")).toBe(true);
     // The colocated source (no default export to wrap) isn't swept in.
@@ -175,5 +183,24 @@ describe("exampleMarkdownLookup", () => {
     });
     expect(lookup.counter?.lang).toBe("tsx");
     expect(Object.keys(lookup)).toHaveLength(examples.length);
+  });
+});
+
+describe("exampleScanRoots", () => {
+  it("scans only the root when the examples directory is inside it", () => {
+    expect(exampleScanRoots("/ws/apps/docs", "/ws/apps/docs/examples")).toEqual(
+      ["/ws/apps/docs"]
+    );
+    expect(exampleScanRoots("/ws/apps/docs", "/ws/apps/docs")).toEqual([
+      "/ws/apps/docs",
+    ]);
+  });
+
+  it("adds an examples directory that lives outside the root", () => {
+    // A sibling workspace package: Tailwind's `@source` is a glob, so without
+    // this the package's classes never reach the preview sheet.
+    expect(
+      exampleScanRoots("/ws/apps/docs", "/ws/packages/ui/examples")
+    ).toEqual(["/ws/apps/docs", "/ws/packages/ui/examples"]);
   });
 });

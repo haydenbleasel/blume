@@ -206,6 +206,12 @@ Drop a `theme.css` in your project root to override any design token. It's the l
 
 Set a token under `:root` for light mode and under `:root[data-theme="dark"]` for dark mode. Color tokens have distinct built-in dark values declared at the dark selector's higher specificity, so a `:root`-only override of `--blume-accent`, `--blume-background`, and friends applies to light mode only — declare the dark block too when both modes should change.
 
+`theme.css` is inlined into the site's Tailwind entry, so Tailwind directives work in it too. The one to know for a monorepo is `@source`: Blume scans your project for utility classes, and a page that imports components from a sibling workspace package needs that package scanned as well. Point at it relative to `theme.css` — the standard Tailwind rule — and Blume carries the path into the generated sheet:
+
+```css theme.css lineNumbers
+@source "../../packages/ui/src";
+```
+
 ### Design tokens
 
 | Token                       | Controls                                  |

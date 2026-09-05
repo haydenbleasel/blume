@@ -302,6 +302,41 @@ describe("eject", () => {
     expect(existsSync(join(root, "src/pages/changelog.astro"))).toBe(true);
   });
 
+  it("scans an out-of-root examples directory and re-roots user @source paths", async () => {
+    // A workspace: the docs app ejects while its examples and the components
+    // they import live in a sibling package. The ejected sheets stay portable
+    // (relative globs) yet still reach that package.
+    const workspace = await mkdtemp(join(tmpdir(), "blume-eject-ws-"));
+    ejectDirs.push(workspace);
+    const root = join(workspace, "apps", "docs");
+    await writeFiles(workspace, {
+      "apps/docs/blume.config.ts": `export default {
+        examples: {
+          css: "../../packages/ui/examples/theme.css",
+          source: "../../packages/ui/examples",
+        },
+      };\n`,
+      "apps/docs/docs/index.md": "---\ntitle: Home\n---\n# Home\n",
+      "apps/docs/theme.css": '@source "../../packages/ui/src";\n',
+      "packages/ui/examples/demo.tsx":
+        "export default function Demo() { return null; }\n",
+      "packages/ui/examples/theme.css": '@source "../src";\n',
+    });
+
+    await eject(root);
+
+    const genDir = join(root, "src/generated");
+    const glob = "**/*.{astro,jsx,svelte,ts,tsx,vue}";
+    const examplesSheet = readFileSync(join(genDir, "examples.css"), "utf-8");
+    expect(examplesSheet).toContain(`@source "../../${glob}";`);
+    expect(examplesSheet).toContain(
+      `@source "../../../../packages/ui/examples/${glob}";`
+    );
+    expect(examplesSheet).toContain('@source "../../../../packages/ui/src";');
+    const appSheet = readFileSync(join(genDir, "app.css"), "utf-8");
+    expect(appSheet).toContain('@source "../../../../packages/ui/src";');
+  });
+
   it("keeps a custom pages/404.astro instead of the default", async () => {
     const root = await mkdtemp(join(tmpdir(), "blume-eject-"));
     ejectDirs.push(root);
