@@ -334,12 +334,18 @@ const emitVercelNegotiation = async (
   // endpoint stamps it on dev/server-rendered responses itself.
   const rawMarkdown = await buildRawMarkdown(project);
   const home = rawMarkdown["/"];
+  // The Markdown 404 routes point at the prerendered `404.md`; only wire them
+  // when the build actually emitted it (a project that owns `/404` gets none).
+  const notFoundMarkdown = existsSync(
+    join(root, ".vercel", "output", "static", "404.md")
+  );
   const injected = injectNegotiationRoutes(
     await readFile(configPath, "utf-8"),
     routePaths,
     buildHomeLinkHeader(config, routePaths),
     overrides,
-    home ? markdownTokenCount(agentMarkdown(home)) : undefined
+    home ? markdownTokenCount(agentMarkdown(home)) : undefined,
+    notFoundMarkdown
   );
   if (injected === null) {
     logger.warn(

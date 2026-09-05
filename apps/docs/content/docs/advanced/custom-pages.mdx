@@ -272,7 +272,9 @@ import data from "blume:data";
 
 ## 404 page
 
-Blume ships a default **not found** page out of the box: a centered "404" message wrapped in the site chrome (header, search, theme), served for any unmatched URL. `blume build` writes it to `404.html`, which static hosts serve automatically, and `blume dev` shows it for unknown routes.
+Blume ships a default **not found** page out of the box: a centered "404" message wrapped in the site chrome (header, search, theme), served for any unmatched URL. `blume build` writes it to `404.html`, which static hosts serve automatically, and `blume dev` shows it for unknown routes. Under the message, a **Where to look next** list links every top-level section plus the `sitemap.xml` and [`llms.txt`](/docs/configuration/ai#llmstxt) indexes when they exist, so a reader — or an agent that followed a stale URL — has a way back.
+
+The page also has a Markdown twin at `/404.md` with the same recovery links (absolute URLs once [`deployment.site`](/docs/deployment) is set). On a [Vercel server build](/docs/deployment#server-rendering), a request for a missing page that sends [`Accept: text/markdown`](/docs/configuration/ai#content-negotiation), or asks for a `.md` URL no page backs, gets that Markdown body with the `404` status instead of the HTML shell — so an agent never has to parse a page of chrome to learn where to go next.
 
 To replace it with your own, add a `pages/404.astro`. It owns the `/404` route the same way `pages/changelog.astro` takes over the changelog — your page wins and the default is dropped. Build it like any other custom page, in `PageLayout` or `RootLayout`:
 

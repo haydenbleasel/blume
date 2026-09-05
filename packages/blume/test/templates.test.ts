@@ -26,6 +26,7 @@ import {
   mcpEndpointTemplate,
   mcpPageFile,
   mixedbreadSearchEndpointTemplate,
+  notFoundMarkdownTemplate,
   notFoundPageTemplate,
   ogEndpointTemplate,
   playgroundProxyTemplate,
@@ -566,6 +567,58 @@ describe("notFoundPageTemplate", () => {
     expect(out).toContain("locale={htmlLang}");
     expect(out).toContain("dir={dir}");
     expect(out).toContain("ui={data.ui}");
+  });
+});
+
+describe("notFoundMarkdownTemplate", () => {
+  it("is a prerendered endpoint serving Markdown with a token estimate", () => {
+    const out = notFoundMarkdownTemplate();
+    expect(out).toContain("export const prerender = true;");
+    expect(out).toContain("export function GET()");
+    expect(out).toContain('"Content-Type": "text/markdown; charset=utf-8"');
+    expect(out).toContain(
+      '"x-markdown-tokens": String(Math.ceil(body.length / 4))'
+    );
+  });
+
+  it("renders the translatable notFound copy as a Markdown document", () => {
+    const out = notFoundMarkdownTemplate();
+    expect(out).toContain("const nf = data.ui.notFound;");
+    expect(out).toContain('"# " + nf.title');
+    expect(out).toContain("nf.description");
+    expect(out).toContain('"## " + nf.suggestions');
+    expect(out).toContain(
+      '...links.map((link) => "- [" + link.label + "](" + link.href + ")")'
+    );
+    expect(out).toContain('].join("\\n");');
+  });
+
+  it("offers the same recovery set as the HTML page, home first", () => {
+    const out = notFoundMarkdownTemplate();
+    expect(out).toContain('{ href: href("/"), label: nf.home }');
+    expect(out).toContain(
+      "...data.navigation.tabs.map((tab) => ({\n    href: href(tab.href ?? tab.path),\n    label: tab.label,\n  }))"
+    );
+    expect(out).toContain(
+      '...(data.config.discovery.sitemap\n    ? [{ href: href("/sitemap.xml"), label: nf.sitemap }]\n    : [])'
+    );
+    expect(out).toContain(
+      '...(data.config.discovery.llmsTxt\n    ? [{ href: href("/llms.txt"), label: nf.llms }]\n    : [])'
+    );
+  });
+
+  it("makes internal links absolute when the site is known, leaving external hrefs alone", () => {
+    const out = notFoundMarkdownTemplate();
+    expect(out).toContain(
+      'import { withBase } from "blume/components/islands/base-path.ts"'
+    );
+    expect(out).toContain(
+      'import { absoluteUrl } from "blume/core/site-url.ts"'
+    );
+    expect(out).toContain("const based = withBase(path);");
+    expect(out).toContain(
+      'return data.config.site && based.startsWith("/") && !based.startsWith("//")\n    ? absoluteUrl(data.config.site, based)\n    : based;'
+    );
   });
 });
 

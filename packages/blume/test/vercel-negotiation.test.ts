@@ -372,6 +372,104 @@ describe("injectNegotiationRoutes", () => {
     }
   });
 
+  it("splices the Markdown 404 routes right before the adapter's /404.html fallback", () => {
+    const injected = injectNegotiationRoutes(
+      JSON.stringify(baseConfig),
+      ["/docs/a"],
+      null,
+      undefined,
+      undefined,
+      true
+    );
+    const config = JSON.parse(injected ?? "");
+    const routes: {
+      dest?: string;
+      handle?: string;
+      has?: { key: string; type: string; value: string }[];
+      headers?: Record<string, string>;
+      src?: string;
+      status?: number;
+    }[] = config.routes;
+    const fallbackIndex = routes.findIndex(
+      (route) => route.dest === "/404.html"
+    );
+    expect(fallbackIndex).toBeGreaterThan(0);
+    // Miss phase (after handle:filesystem), after the server routes, and
+    // immediately ahead of the HTML fallback.
+    const filesystemIndex = routes.findIndex(
+      (route) => route.handle === "filesystem"
+    );
+    const serverIndex = routes.findIndex((route) => route.dest === "_render");
+    expect(routes[fallbackIndex - 2]).toStrictEqual({
+      dest: "/404.md",
+      has: [
+        { key: "accept", type: "header", value: ACCEPT_MARKDOWN_HEADER_VALUE },
+      ],
+      headers: { vary: "Accept" },
+      src: "^/.*$",
+      status: 404,
+    });
+    expect(routes[fallbackIndex - 1]).toStrictEqual({
+      dest: "/404.md",
+      src: "^/.*\\.mdx?$",
+      status: 404,
+    });
+    expect(fallbackIndex - 2).toBeGreaterThan(serverIndex);
+    expect(serverIndex).toBeGreaterThan(filesystemIndex);
+    // The `.md` route catches raw-mirror URLs without a page, not pages.
+    const mdSrc = new RegExp(routes[fallbackIndex - 1]?.src ?? "", "u");
+    expect(mdSrc.test("/docs/missing.md")).toBe(true);
+    expect(mdSrc.test("/docs/missing.mdx")).toBe(true);
+    expect(mdSrc.test("/docs/missing")).toBe(false);
+    expect(mdSrc.test("/logo.png")).toBe(false);
+  });
+
+  it("leaves the Markdown 404 out by default and when no HTML fallback exists", () => {
+    const withoutFlag = injectNegotiationRoutes(JSON.stringify(baseConfig), [
+      "/docs/a",
+    ]);
+    expect(withoutFlag).not.toContain("/404.md");
+
+    const noFallback = {
+      routes: baseConfig.routes.filter((route) => route.status !== 404),
+      version: 3,
+    };
+    const injected = injectNegotiationRoutes(
+      JSON.stringify(noFallback),
+      ["/docs/a"],
+      null,
+      undefined,
+      undefined,
+      true
+    );
+    expect(injected).not.toBeNull();
+    expect(injected).not.toContain("/404.md");
+  });
+
+  it("re-injects the Markdown 404 routes idempotently", () => {
+    const once = injectNegotiationRoutes(
+      JSON.stringify(baseConfig),
+      ["/docs/a"],
+      null,
+      undefined,
+      undefined,
+      true
+    );
+    const twice = injectNegotiationRoutes(
+      once ?? "",
+      ["/docs/a"],
+      null,
+      undefined,
+      undefined,
+      true
+    );
+    expect(twice).toBe(once ?? "");
+    expect((once ?? "").match(/\/404\.md/gu)).toHaveLength(2);
+    // Dropping the flag on a re-injection removes them again.
+    const dropped = injectNegotiationRoutes(once ?? "", ["/docs/a"]);
+    expect(dropped).not.toContain("/404.md");
+  });
+
   it("returns null when there is nowhere to splice", () => {
     expect(injectNegotiationRoutes("not json", ["/docs/a"])).toBeNull();
     expect(injectNegotiationRoutes("{}", ["/docs/a"])).toBeNull();

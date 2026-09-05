@@ -9,6 +9,9 @@
  * into it so a content-page request that prefers `text/markdown` is rewritten
  * (not redirected) to the page's prerendered `.md` mirror — the deployed
  * counterpart of the dev-server rewrite in `astro/markdown-negotiation.ts`.
+ * The same routing config also answers a *missing* page: a request that
+ * prefers Markdown (or asks for a `.md` URL no page backs) gets the
+ * prerendered Markdown 404 body with the 404 status, instead of the HTML shell.
  */
 
 /**
@@ -48,6 +51,32 @@ const ACCEPT_MARKDOWN_CONDITION: VercelRoute["has"] = [
 ];
 
 const VARY_ACCEPT = { vary: "Accept" };
+
+/** Where the prerendered Markdown 404 (`pages/404.md.ts`) lands. */
+const NOT_FOUND_MARKDOWN_DEST = "/404.md";
+
+/** The adapter's own not-found fallback — the anchor the Markdown 404 precedes. */
+const NOT_FOUND_HTML_DEST = "/404.html";
+
+/**
+ * Miss-phase routes that answer a missing page with the Markdown 404 body: any
+ * path when the client prefers Markdown, and any `.md`/`.mdx` URL (a request
+ * for a raw-Markdown mirror that has no page wants Markdown back, not the HTML
+ * shell). Both keep the 404 status. Spliced immediately before the adapter's
+ * `/404.html` fallback, so they run after every server route (the MCP
+ * endpoint, server islands, images) has had its turn and never hijack a
+ * request one of those would have answered.
+ */
+const NOT_FOUND_MARKDOWN_ROUTES: readonly VercelRoute[] = [
+  {
+    dest: NOT_FOUND_MARKDOWN_DEST,
+    has: ACCEPT_MARKDOWN_CONDITION,
+    headers: VARY_ACCEPT,
+    src: "^/.*$",
+    status: 404,
+  },
+  { dest: NOT_FOUND_MARKDOWN_DEST, src: "^/.*\\.mdx?$", status: 404 },
+];
 
 /**
  * Vercel rejects route `src` patterns longer than 4096 characters, so route
@@ -186,12 +215,14 @@ export const TRAILING_SLASH_REDIRECT: VercelRoute = {
  * user-authored route of that identical shape would be semantically equal to
  * the one re-added); the homepage `Link` route by its three-field
  * continue-with-link shape (the Build Output config is adapter-generated, so
- * no user-authored route competes in this file).
+ * no user-authored route competes in this file); the Markdown 404 routes by
+ * their `/404.md` destination.
  */
 const isNegotiationRoute = (route: VercelRoute): boolean =>
   route.has?.some(
     (condition) => condition.value === ACCEPT_MARKDOWN_HEADER_VALUE
   ) === true ||
+  (route.dest === NOT_FOUND_MARKDOWN_DEST && route.status === 404) ||
   (route.continue === true &&
     route.headers?.vary === "Accept" &&
     isString(route.src) &&
@@ -213,17 +244,21 @@ const isNegotiationRoute = (route: VercelRoute): boolean =>
  * platform's mechanism for extensionless static files (e.g. the Web Bot Auth
  * signature directory). The trailing-slash 308 redirect is always spliced in
  * alongside, so slashed duplicates of every page collapse onto the canonical
- * slashless URL. Returns the updated JSON text (tab-indented, like the
- * adapter's own output), or `null` when there is nowhere safe to splice: an
- * unparsable config, no `routes` array, or no `handle: "filesystem"` marker
- * to anchor the splice.
+ * slashless URL. With `notFoundMarkdown` (the build emitted `404.md`), the
+ * Markdown 404 routes go into the miss phase right before the adapter's
+ * `/404.html` fallback — and nowhere when that fallback is absent, since a
+ * `dest` with no file behind it would serve nothing. Returns the updated JSON
+ * text (tab-indented, like the adapter's own output), or `null` when there is
+ * nowhere safe to splice: an unparsable config, no `routes` array, or no
+ * `handle: "filesystem"` marker to anchor the splice.
  */
 export const injectNegotiationRoutes = (
   configText: string,
   routePaths: readonly string[],
   homeLinkHeader?: string | null,
   contentTypeOverrides?: Record<string, string>,
-  homeTokens?: number
+  homeTokens?: number,
+  notFoundMarkdown = false
 ): string | null => {
   const overrideEntries = Object.entries(contentTypeOverrides ?? {});
   let config: {
@@ -272,6 +307,14 @@ export const injectNegotiationRoutes = (
     ...rewriteRoutes,
     TRAILING_SLASH_REDIRECT
   );
+  if (notFoundMarkdown) {
+    const fallbackIndex = routes.findIndex(
+      (route) => route.status === 404 && route.dest === NOT_FOUND_HTML_DEST
+    );
+    if (fallbackIndex !== -1) {
+      routes.splice(fallbackIndex, 0, ...NOT_FOUND_MARKDOWN_ROUTES);
+    }
+  }
   config.routes = routes;
   return `${JSON.stringify(config, null, "\t")}\n`;
 };

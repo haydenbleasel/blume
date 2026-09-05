@@ -126,6 +126,7 @@ import {
   mcpEndpointTemplate,
   mcpPageFile,
   mixedbreadSearchEndpointTemplate,
+  notFoundMarkdownTemplate,
   notFoundPageTemplate,
   ogEndpointTemplate,
   playgroundProxyTemplate,
@@ -1655,10 +1656,11 @@ const writeAskFiles = async (
 
 /**
  * Write the default 404 page at Astro's reserved `src/pages/404.astro` path so
- * static builds emit `dist/404.html`. Skipped when the project already owns
- * `/404` (a custom `pages/404.astro` or a `404.md` content page), letting it be
- * fully overridden without a route collision; `pruneOrphans` then removes any
- * previously-generated copy.
+ * static builds emit `dist/404.html`, plus its Markdown twin at `404.md.ts`
+ * (`dist/404.md`) for agents that ask a missing URL for Markdown. Both are
+ * skipped when the project already owns `/404` (a custom `pages/404.astro` or
+ * a `404.md` content page), letting it be fully overridden without a route
+ * collision; `pruneOrphans` then removes any previously-generated copies.
  */
 const writeNotFoundPage = async (
   write: (path: string, content: string) => Promise<boolean>,
@@ -1669,7 +1671,10 @@ const writeNotFoundPage = async (
   if (routeIsTaken(pages, contentPages, "/404")) {
     return;
   }
-  await write(join(srcDir, "pages", "404.astro"), notFoundPageTemplate());
+  await Promise.all([
+    write(join(srcDir, "pages", "404.astro"), notFoundPageTemplate()),
+    write(join(srcDir, "pages", "404.md.ts"), notFoundMarkdownTemplate()),
+  ]);
 };
 
 /**
