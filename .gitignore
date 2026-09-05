@@ -33,3 +33,6 @@ playwright-report/
 build/
 out/
 .remotion/
+
+# Claude Code isolated worktrees (EnterWorktree)
+.claude/worktrees/

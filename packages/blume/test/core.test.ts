@@ -1832,6 +1832,7 @@ describe("api reference (scalar)", () => {
         // to be.
         // oxlint-disable-next-line sonarjs/no-undefined-assignment
         scalar: undefined,
+        seoDescriptionSuffix: true,
         slug: "reference",
         spec: "https://example.com/openapi.json",
         // oxlint-disable-next-line sonarjs/no-undefined-assignment

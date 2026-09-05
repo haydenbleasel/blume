@@ -1709,6 +1709,14 @@ const openapiSourceSchema = z.strictObject({
   noindex: z.boolean().default(false),
   /** Per-source route; defaults to the block's `route` (or a derived path). */
   route: z.string().optional(),
+  /**
+   * Append the English "Reference for the … endpoint in the … API." sentence
+   * to every generated operation page's meta description. On by default, so
+   * terse specs still ship distinct, snippet-length descriptions; set to
+   * `false` on a non-English site to describe pages with the spec's own prose
+   * alone (falling back to the page title when an operation has none).
+   */
+  seoDescriptionSuffix: z.boolean().default(true),
   /** Local path or `http(s)` URL to the spec. */
   spec: z.string(),
 });

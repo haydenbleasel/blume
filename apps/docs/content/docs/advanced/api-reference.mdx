@@ -139,6 +139,15 @@ openapi: {
 - `includeInLlms: false` keeps them out of both `llms.txt` files.
 - `noindex: true` adds crawler noindex metadata and removes the pages from the sitemap.
 
+Each operation page's meta description is the operation's own `description` (or `summary`), followed by a generated sentence naming the endpoint — "Reference for the `GET /pets` endpoint in the Petstore API." — so a spec of terse one-line summaries still ships a distinct, snippet-length description per page. That sentence is English. On a site whose spec prose is written in another language, set `seoDescriptionSuffix: false` on the source to drop it and describe each page with the authored prose alone; an operation with neither a `description` nor a `summary` falls back to its title (`GET /pets`), so no page ships an empty description:
+
+```ts blume.config.ts lineNumbers
+openapi: {
+  enabled: true,
+  sources: [{ spec: "./openapi.de.json", seoDescriptionSuffix: false }],
+}
+```
+
 With the [Scalar renderer](#the-scalar-renderer), only `noindex` applies — a Scalar-rendered reference already sits outside Blume's search and `llms.txt`, so the two `include*` settings have nothing to act on there.
 
 ## Authorization
@@ -202,7 +211,7 @@ AsyncAPI **2.x specs are normalized to 3.x automatically** with the official Asy
 
 Code samples are **protocol-aware**, keyed off the operation's binding (or its servers' protocol): `wscat` and a browser `WebSocket` snippet for WebSockets, `kcat` for Kafka, `mosquitto_pub`/`mosquitto_sub` for MQTT. `codeSamples` filters that set, the same way it picks languages on the `openapi` block; a protocol without a supported tool renders the message payload example alone rather than a fabricated client.
 
-Everything documented above carries over, [`playground`](#try-it-for-events) included: `route`, `sources` with `label`/`route`, `expandSchemas`, the [per-source indexing](#per-source-indexing) flags, and search indexing by operation summary and tag.
+Everything documented above carries over, [`playground`](#try-it-for-events) included: `route`, `sources` with `label`/`route`, `expandSchemas`, the [per-source indexing](#per-source-indexing) flags (`seoDescriptionSuffix` too — the generated sentence names the channel and action instead of an endpoint), and search indexing by operation summary and tag.
 
 Setting `renderer: "scalar"` opts back into the embedded Scalar SPA, where — as with OpenAPI — only `noindex` applies. Scalar has no AsyncAPI playground of its own; its embed auto-detects the document type and renders channels, operations, messages, and a Models section, so that swap trades the composer away.
 

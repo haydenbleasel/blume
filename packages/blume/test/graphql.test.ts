@@ -528,6 +528,7 @@ const reference = (spec: string, overrides: { endpoint?: string } = {}) => ({
   noindex: false,
   renderer: "blume" as const,
   route: "/graphql",
+  seoDescriptionSuffix: true,
   slug: "graphql",
   spec,
   ...overrides,
@@ -618,6 +619,21 @@ describe("render-mdx (graphql)", () => {
     expect(input.data.seo.description).toContain(
       "AddPetInput input object type"
     );
+    // The opt-out drops the generated sentence for GraphQL pages too, whose
+    // no-prose fallback is the bare field or type name the page is titled by.
+    const off = {
+      includeInLlms: true,
+      includeInSearch: true,
+      noindex: false,
+      seoDescriptionSuffix: false,
+    };
+    expect(
+      operationMdx(spec, refFor(spec, "pets"), off).data.seo
+    ).toStrictEqual({ description: "List pets." });
+    const bare = { ...refFor(spec, "pets"), description: "", summary: "" };
+    expect(operationMdx(spec, bare, off).data.seo).toStrictEqual({
+      description: "pets",
+    });
   });
 
   it("keeps kind badges off type pages and internal tokens out of search", () => {

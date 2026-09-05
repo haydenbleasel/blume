@@ -54,6 +54,7 @@ const indexedReference = {
   includeInLlms: true,
   includeInSearch: true,
   noindex: false,
+  seoDescriptionSuffix: true,
 } as const;
 
 const asyncReference = {

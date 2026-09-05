@@ -119,6 +119,7 @@ const referenceWith = (
   noindex: false,
   renderer: "blume" as const,
   route: `/${slug}`,
+  seoDescriptionSuffix: true,
   slug,
   spec: "spec.json",
 });

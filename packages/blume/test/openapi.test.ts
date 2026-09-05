@@ -304,6 +304,7 @@ describe("references", () => {
             includeInLlms: false,
             includeInSearch: false,
             noindex: true,
+            seoDescriptionSuffix: false,
             spec: "platform.json",
           },
         ],
@@ -313,6 +314,7 @@ describe("references", () => {
       includeInLlms: false,
       includeInSearch: false,
       noindex: true,
+      seoDescriptionSuffix: false,
     });
   });
 
@@ -1024,6 +1026,7 @@ describe("render-mdx", () => {
       includeInLlms: false,
       includeInSearch: false,
       noindex: true,
+      seoDescriptionSuffix: true,
     };
     const operation = operationMdx(specData(), addPet, reference);
     const overview = overviewMdx(specData(), reference);
@@ -1292,6 +1295,38 @@ describe("render-mdx", () => {
     expect(page.data).not.toHaveProperty("description");
   });
 
+  it("describes operations with the spec's prose alone when the suffix is off", () => {
+    const op = {
+      deprecated: false,
+      description: "Löscht ein **Haustier** aus dem Bestand.",
+      key: "op",
+      method: "delete" as const,
+      operationId: "op",
+      path: "/pet/{petId}",
+      route: "/api/pet/op",
+      summary: "Haustier löschen",
+      tag: "pet",
+      tagSlug: "pet",
+    };
+    const reference = {
+      includeInLlms: true,
+      includeInSearch: true,
+      noindex: false,
+      seoDescriptionSuffix: false,
+    };
+    // A non-English site opts out so its metadata isn't half German, half
+    // generated English; the prose still flattens to plain text.
+    expect(
+      operationMdx(specData({ title: "Petstore" }), op, reference).data.seo
+    ).toStrictEqual({ description: "Löscht ein Haustier aus dem Bestand." });
+    // No prose at all: the language-neutral title stands in, so the page never
+    // ships an empty description (which the audit would report as missing).
+    const bare = { ...op, description: "", summary: "" };
+    expect(
+      operationMdx(specData({ title: "Petstore" }), bare, reference).data.seo
+    ).toStrictEqual({ description: "DELETE /pet/{petId}" });
+  });
+
   it("flattens markdown prose into the meta description and caps its length", () => {
     const op = {
       deprecated: false,
@@ -1520,6 +1555,7 @@ describe("source.openApiSource", () => {
     includeInLlms: true,
     includeInSearch: true,
     noindex: false,
+    seoDescriptionSuffix: true,
   } as const;
 
   it("emits one entry per operation plus an overview, and exposes parsed data", async () => {

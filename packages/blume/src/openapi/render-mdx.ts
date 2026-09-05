@@ -174,12 +174,23 @@ const GRAPHQL_MEMBER_PHRASES = {
 /**
  * The spec's own prose for the operation, followed by the endpoint it documents
  * — so every operation page carries a distinct, self-describing meta
- * description even when the spec's summaries are terse.
+ * description even when the spec's summaries are terse. With the suffix
+ * switched off (`seoDescriptionSuffix: false`, for sites whose prose isn't
+ * English) the description is the prose alone, or the page `title` — a
+ * language-neutral `GET /pets`, channel, or field name — when the operation
+ * has no prose at all, so no page ships an empty description.
  */
 const operationDescription = (
   spec: ApiSpecData,
-  operation: ApiOperationRef
+  operation: ApiOperationRef,
+  options: { suffix: boolean; title: string }
 ): string => {
+  if (!options.suffix) {
+    return clip(
+      plainProse(operation.description || operation.summary) || options.title,
+      META_DESCRIPTION_MAX
+    );
+  }
   // AsyncAPI operations act on a channel, not an HTTP endpoint; GraphQL pages
   // document a root field or a named type.
   let suffix: string;
@@ -210,7 +221,7 @@ export const operationMdx = (
   operation: ApiOperationRef,
   reference?: Pick<
     ReferenceSource,
-    "includeInLlms" | "includeInSearch" | "noindex"
+    "includeInLlms" | "includeInSearch" | "noindex" | "seoDescriptionSuffix"
   >
 ): RenderedPage => {
   const method = operation.method.toUpperCase();
@@ -242,7 +253,10 @@ export const operationMdx = (
     searchFlags.exclude = true;
   }
   const seo: RenderedPageData["seo"] = {
-    description: operationDescription(spec, operation),
+    description: operationDescription(spec, operation, {
+      suffix: reference?.seoDescriptionSuffix !== false,
+      title,
+    }),
   };
   if (reference?.noindex) {
     seo.noindex = true;

@@ -54,6 +54,11 @@ export interface ReferenceSource {
   includeInSearch: boolean;
   /** Whether generated pages emit noindex metadata and stay out of the sitemap. */
   noindex: boolean;
+  /**
+   * Whether operation meta descriptions end with the generated English
+   * "Reference for …" sentence, or carry the spec's own prose alone.
+   */
+  seoDescriptionSuffix: boolean;
   /** Local path or `http(s)` URL, verbatim from config. */
   spec: string;
   /**
@@ -132,6 +137,7 @@ interface Block {
     label?: string;
     noindex: boolean;
     route?: string;
+    seoDescriptionSuffix: boolean;
     spec: string;
   }[];
   spec?: string;
@@ -146,6 +152,7 @@ const sourcesOf = (block: Block): Block["sources"] => {
       includeInLlms: true,
       includeInSearch: true,
       noindex: false,
+      seoDescriptionSuffix: true,
       spec: block.spec,
     });
   }
@@ -192,6 +199,7 @@ const referencesFor = (
       renderer,
       route,
       scalar: block.scalar,
+      seoDescriptionSuffix: source.seoDescriptionSuffix,
       slug: routeSlug(route),
       spec: source.spec,
       theme: block.theme,
