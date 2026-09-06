@@ -1,5 +1,11 @@
 # blume
 
+## 1.6.2
+
+### Patch Changes
+
+- abd8daf: Every site now serves a read-only **JSON docs API** — the REST twin of the MCP tools, over the same page snapshot — described by an OpenAPI 3.1 document at `/openapi.json`. `/api/docs/pages.json` lists every page with its route, title, description, content type, locale, facets, and the URLs of its rendered, Markdown, and JSON forms; `/api/docs/pages/{route}.json` returns one page as JSON with its agent Markdown; `/api/docs/navigation.json` returns the navigation tree. All three are prerendered, so static sites serve them as files. Under server output, `/api/docs/search?q=` runs the same full-text search as the MCP `search_docs` tool, with the same `limit`, `contentTypes`, `locale`, `version`, and `filters[key]` scoping, and any `/api/…` URL no endpoint answers gets a 404 problem document instead of the HTML page. Errors everywhere are RFC 9457 problem details (`application/problem+json`) with a stable `code`, a `detail`, and a `resolution` hint. The OpenAPI document is generated per build from config — one `operationId`, typed parameters, and response schemas per operation — and also documents the `.md` mirrors, `llms.txt`, `llms-full.txt`, `agent-readability.json`, and the MCP endpoint, so function-calling frameworks that ingest OpenAPI get the same reach an MCP client has. It's linked from the RFC 9727 API catalog, `agent-readability.json`, `llms.txt`, and the homepage `Link` header as `rel="service-desc"`. The default 404 page gains a JSON twin at `/404.json` alongside its Markdown one, wired into Vercel server builds for requests that send `Accept: application/json` or ask for a `.json` URL no file backs. Set `ai.api: false` to publish none of it; a `public/openapi.json` you ship yourself takes over that route.
+
 ## 1.6.1
 
 ### Patch Changes
