@@ -111,6 +111,8 @@ const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
 }
 
 <script>
+  import { rafThrottle } from "../raf-throttle.ts";
+
   // Preview frames measure their rendered example and report the height (see
   // `examplesPageTemplate`). One listener serves every <Component> on the
   // page; the sender is matched to its iframe through `event.source`. The
