@@ -12,8 +12,10 @@ export default defineConfig({
   extends: [core, react, antiSlop],
   ignorePatterns: [
     ...(core.ignorePatterns ?? []),
-    // Astro components are linted by `astro check`, not oxlint, which misparses
-    // single-file `.astro` syntax (template + frontmatter).
+    // oxlint misparses single-file `.astro` syntax (template + frontmatter).
+    // Nothing else gates the package's components either: `tsgo` never sees
+    // `.astro`, and the docs app's `blume check` only reaches its own files.
+    // Review `<script>` blocks by hand — a bare identifier there ships.
     "**/*.astro",
     // Blume's generated runtime is an implementation detail.
     "**/.blume",

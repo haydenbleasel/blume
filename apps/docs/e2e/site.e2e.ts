@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.describe("navigation", () => {
   test("home renders and links into the docs", async ({ page }) => {
@@ -81,6 +81,28 @@ test.describe("content components", () => {
     await page.goto("/docs/content/components");
     const tabs = page.locator("blume-tabs").first();
     await expect(tabs).toBeAttached();
+  });
+
+  test("example previews size their panes from the frame's report", async ({
+    page,
+  }) => {
+    await page.goto("/docs/content/components");
+    const frame = page.locator("iframe[data-blume-example-frame]").first();
+    // Lazy-loaded: the frame only fetches once it nears the viewport.
+    await frame.scrollIntoViewIfNeeded();
+    // The docs page stamps the frame when its height report arrives, so this
+    // proves the whole loop — frame observer → postMessage → listener —
+    // rather than just the markup.
+    await expect(frame).toHaveAttribute("data-blume-reported-height", /^\d+$/u);
+    const panels = frame
+      .locator("xpath=ancestor::blume-tabs[1]")
+      .locator("[data-blume-tab-panel]");
+    await expect(panels).toHaveCount(2);
+    const heights = await panels.evaluateAll((elements) =>
+      elements.map((element) => element.style.height)
+    );
+    expect(heights[0]).toMatch(/^\d+px$/u);
+    expect(heights[1]).toBe(heights[0]);
   });
 });
 

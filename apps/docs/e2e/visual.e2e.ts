@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 /**
  * Visual-regression baselines. Opt-in (they need per-OS PNG baselines committed,

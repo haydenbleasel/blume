@@ -14,6 +14,7 @@ import { CODE_PADDING_BLOCK_REM } from "../../theme/code-block-padding.ts";
 
 import { highlightCode } from "../../markdown/index.ts";
 import { withBase } from "../islands/base-path.ts";
+import { EXAMPLE_PANE_MIN_PX } from "./example-pane.ts";
 import Tab from "./Tab.astro";
 import Tabs from "./Tabs.astro";
 // Generated per project; resolves to an empty map when there are no examples.
@@ -53,9 +54,9 @@ const codeHtml = entry
 // only the initial SSR/no-JS height: once the frame loads it reports its
 // rendered height (see the script below) and both panes follow it, so
 // previews fit the example — including ones that grow or shrink after load.
-// The measured height is never ceilinged — the code tab scrolls inside
-// whatever height it's given (`pre.blume-source`) — but the estimate is:
-// a long source would otherwise render a thousands-of-pixels placeholder
+// The measured height is never ceilinged by the script — the code tab scrolls
+// inside whatever height it's given (`pre.blume-source`) — but the estimate
+// is: a long source would otherwise render a thousands-of-pixels placeholder
 // whose collapse to the measured height no transition could hide. No-JS
 // readers aren't hurt by the cap, since the source scrolls at any height.
 const LINE_PX = 21;
@@ -65,18 +66,33 @@ const REM_PX = 16;
 // language bar). The tab panel and the pre carry no border of their own.
 const PADDING_PX = 2 * CODE_PADDING_BLOCK_REM * REM_PX;
 const ESTIMATE_MAX_PX = 400;
-// The floor also clamps the measured height client-side; it rides along on the
-// iframe as `data-blume-min-pane` so the script and this estimate can't drift.
-const MIN_PANE_PX = 288;
 const lineCount = entry ? entry.code.replace(/\n+$/u, "").split("\n").length : 0;
 const paneHeight = Math.min(
   ESTIMATE_MAX_PX,
-  Math.max(MIN_PANE_PX, lineCount * LINE_PX + PADDING_PX)
+  Math.max(EXAMPLE_PANE_MIN_PX, lineCount * LINE_PX + PADDING_PX)
 );
 const paneStyle = `height:${paneHeight}px`;
 // Animate the settle from the estimate to the measured height so the lazy
 // frame's load doesn't snap the layout.
-const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
+//
+// `max-h-lvh` refuses growth beyond the viewport. An example that sizes itself
+// to the frame's viewport (h-screen/100svh) tracks whatever height the script
+// sets, so each report would come back as the pane height plus the frame
+// padding — unbounded growth. Capping at the viewport parks that cycle: once
+// the pane reaches it, the frame's content stops changing size and the
+// observer goes quiet. Genuinely tall examples scroll inside the frame past
+// this point, which a taller-than-screen pane wouldn't have spared them
+// anyway. It's a CSS cap rather than a clamp in the script so it follows the
+// window on its own — a pane capped by a small viewport grows back when the
+// window does, with no resize listener — and it's the *large* viewport unit
+// on purpose: `lvh` holds still while a mobile browser's toolbar collapses
+// and expands during scroll, where `innerHeight` (and `svh`/`dvh`) move by
+// the toolbar's height on every direction change and would animate the pane
+// under the reader's finger. `max-height` isn't transitioned, so the cap
+// applies instantly during a live resize drag instead of retargeting the
+// settle tween every frame.
+const paneClass =
+  "max-h-lvh motion-safe:transition-[height] motion-safe:duration-200";
 ---
 
 {
@@ -92,7 +108,6 @@ const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
         <iframe
           class="h-full w-full"
           data-blume-example-frame
-          data-blume-min-pane={MIN_PANE_PX}
           loading="lazy"
           src={previewSrc}
           title={`Preview of ${path}`}
@@ -111,77 +126,61 @@ const paneClass = "motion-safe:transition-[height] motion-safe:duration-200";
 }
 
 <script>
-  import { rafThrottle } from "../raf-throttle.ts";
+  import { EXAMPLE_PANE_MIN_PX } from "./example-pane.ts";
 
   // Preview frames measure their rendered example and report the height (see
   // `examplesPageTemplate`). One listener serves every <Component> on the
   // page; the sender is matched to its iframe through `event.source`. The
   // measured height replaces the server's line-count estimate on both tab
   // panels together, preserving the shared-height invariant that keeps
-  // Preview/Code toggles from shifting the layout. The floor comes from the
-  // iframe's `data-blume-min-pane` (written next to the server estimate) so
-  // there is one source of truth for it.
+  // Preview/Code toggles from shifting the layout. The viewport cap is CSS
+  // (`max-h-lvh` on the panels — see the frontmatter), so the script only
+  // applies the floor.
+  const HEIGHT_REPORT = "blume:example-height";
+  const HEIGHT_REQUEST = "blume:example-height-request";
 
-  // Refuse growth beyond the viewport. An example that sizes itself to the
-  // frame's viewport (h-screen/100svh) tracks whatever height this listener
-  // sets, so each report would come back as the pane height plus the frame
-  // padding — unbounded growth. Clamping to the viewport parks that cycle:
-  // once the pane reaches it, the frame's content stops changing size and
-  // the observer goes quiet. Genuinely tall examples scroll inside the
-  // frame past this point, which a taller-than-screen pane wouldn't have
-  // spared them anyway.
-  const applyMeasuredHeight = (frame: HTMLIFrameElement) => {
-    const tabs = frame.closest("blume-tabs");
-    const reported = Number(frame.dataset.blumeReportedHeight);
-    if (!tabs || !Number.isFinite(reported)) {
+  const frames = () =>
+    document.querySelectorAll<HTMLIFrameElement>(
+      "iframe[data-blume-example-frame]"
+    );
+
+  window.addEventListener("message", (event) => {
+    if (
+      event.origin !== window.location.origin ||
+      event.data?.type !== HEIGHT_REPORT ||
+      !Number.isFinite(event.data.height)
+    ) {
       return;
     }
-    const height = `${Math.max(
-      Number(frame.dataset.blumeMinPane) || 0,
-      Math.min(reported, window.innerHeight)
-    )}px`;
+    const frame = Array.from(frames()).find(
+      (candidate) => candidate.contentWindow === event.source
+    );
+    const tabs = frame?.closest("blume-tabs");
+    if (!frame || !tabs) {
+      return;
+    }
+    // Recorded on the frame as a marker that its report arrived (the e2e
+    // suite asserts on it); the panels carry the applied height.
+    frame.dataset.blumeReportedHeight = String(event.data.height);
+    const height = `${Math.max(EXAMPLE_PANE_MIN_PX, event.data.height)}px`;
     for (const panel of tabs.querySelectorAll<HTMLElement>(
       "[data-blume-tab-panel]"
     )) {
       panel.style.height = height;
     }
-  };
-
-  window.addEventListener("message", (event) => {
-    if (
-      event.origin !== window.location.origin ||
-      event.data?.type !== "blume:example-height" ||
-      !Number.isFinite(event.data.height)
-    ) {
-      return;
-    }
-    const frames = document.querySelectorAll<HTMLIFrameElement>(
-      "iframe[data-blume-example-frame]"
-    );
-    const frame = Array.from(frames).find(
-      (candidate) => candidate.contentWindow === event.source
-    );
-    if (!frame) {
-      return;
-    }
-    // Keep the raw report around so the viewport clamp can be recomputed
-    // when the window resizes, not only when the frame next reports.
-    frame.dataset.blumeReportedHeight = String(event.data.height);
-    applyMeasuredHeight(frame);
   });
 
-  // A pane capped by a small viewport would otherwise stay small after the
-  // window grows: the frame's content stopped changing size, so its observer
-  // has nothing new to report. rAF-coalesced so a live resize drag runs the
-  // read-then-write pass once per frame, not once per event.
-  window.addEventListener(
-    "resize",
-    rafThrottle(() => {
-      for (const frame of document.querySelectorAll<HTMLIFrameElement>(
-        "iframe[data-blume-example-frame][data-blume-reported-height]"
-      )) {
-        applyMeasuredHeight(frame);
-      }
-    })
-  );
+  // A frame reports once its observer first fires, and nothing re-sends it.
+  // Whether this module runs before that report depends on how the bundle
+  // ships it (inlined in the document, or as a fetched chunk when it shares
+  // code with another script) and on the client router's swap timing, so
+  // don't rely on winning the race: ask every frame that's already loaded to
+  // report again. A frame still loading ignores the ping (it lands on the
+  // initial blank document) and reports on its own once it renders.
+  for (const frame of frames()) {
+    frame.contentWindow?.postMessage(
+      { type: HEIGHT_REQUEST },
+      window.location.origin
+    );
+  }
 </script>

@@ -345,6 +345,13 @@ describe("examplesPageTemplate", () => {
     expect(out).toContain("<div data-blume-example");
     expect(out).toContain("ResizeObserver");
     expect(out).toContain('type: "blume:example-height"');
+    // The docs page pings loaded frames when its listener registers; the
+    // frame must answer, and only to its own parent on the docs origin.
+    expect(out).toContain(
+      'event.data?.type === "blume:example-height-request"'
+    );
+    expect(out).toContain("event.source === window.parent");
+    expect(out).toContain("event.origin === window.location.origin");
     // The body padding folded into the report is read from the live value,
     // not hardcoded — a root font-size override in the user's examples.css
     // must not skew the report.

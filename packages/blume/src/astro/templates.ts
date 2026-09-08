@@ -2912,7 +2912,9 @@ ${entries}
  * (`blume:example-height` via postMessage) so the docs page can size the
  * preview pane to the content instead of guessing from the source line count.
  * A ResizeObserver keeps the report live, so examples that grow or shrink
- * after load (chat threads, accordions) stay in sync.
+ * after load (chat threads, accordions) stay in sync, and the frame re-reports
+ * on request (`blume:example-height-request`) so a report posted before the
+ * docs page's listener registered isn't lost.
  */
 export const examplesPageTemplate = (): string =>
   `---
@@ -2991,7 +2993,7 @@ const Example = entry.Component;
         const bodyStyle = getComputedStyle(document.body);
         const paddingPx =
           parseFloat(bodyStyle.paddingTop) + parseFloat(bodyStyle.paddingBottom);
-        new ResizeObserver(() => {
+        const report = () => {
           window.parent.postMessage(
             {
               height:
@@ -3000,7 +3002,19 @@ const Example = entry.Component;
             },
             window.location.origin
           );
-        }).observe(wrapper);
+        };
+        new ResizeObserver(report).observe(wrapper);
+        // The parent asks for a fresh report when its listener comes up, in
+        // case the first one above was posted before anyone was listening.
+        window.addEventListener("message", (event) => {
+          if (
+            event.source === window.parent &&
+            event.origin === window.location.origin &&
+            event.data?.type === "blume:example-height-request"
+          ) {
+            report();
+          }
+        });
       })();
     </script>
   </body>

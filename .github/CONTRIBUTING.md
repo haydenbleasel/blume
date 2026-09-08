@@ -67,7 +67,7 @@ The generated catch-all page imports shipped components from `blume/...`, the ge
 
 - Components are styled with Tailwind v4 utilities (via `@tailwindcss/vite` in the generated runtime) — no hand-written CSS files. Design tokens live as `--blume-*` variables mapped into Tailwind's theme; the typography plugin styles MDX content (`prose`). Users never configure Tailwind themselves.
 - Code style is enforced by [Ultracite](https://github.com/haydenbleasel/ultracite) (oxlint + oxfmt). Use arrow function expressions, sorted object keys, and `u`-flag regular expressions with named groups.
-- `.astro` files are not linted by oxlint (it misparses single-file `.astro` syntax); they are type-checked by `astro check` instead. Astro components use PascalCase.
+- `.astro` files are not linted by oxlint (it misparses single-file `.astro` syntax), and nothing type-checks the package's components yet: `tsgo` never sees `.astro`, and the docs app's `blume check` only covers its own files. Review `<script>` blocks by hand — a bare identifier there ships as a runtime `ReferenceError`. Astro components use PascalCase.
 - Tests run on Bun's `bun:test` runner, so the Vitest lint preset is intentionally not extended.
 - Generated runtime files (`.blume/`) are excluded from linting and formatting.
 

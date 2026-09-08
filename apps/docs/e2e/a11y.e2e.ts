@@ -1,6 +1,7 @@
 import { AxeBuilder } from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 /**
  * Serious/critical structural WCAG 2 A/AA violations on a page. `color-contrast`
