@@ -94,15 +94,25 @@ test.describe("content components", () => {
     // proves the whole loop — frame observer → postMessage → listener —
     // rather than just the markup.
     await expect(frame).toHaveAttribute("data-blume-reported-height", /^\d+$/u);
-    const panels = frame
-      .locator("xpath=ancestor::blume-tabs[1]")
-      .locator("[data-blume-tab-panel]");
-    await expect(panels).toHaveCount(2);
-    const heights = await panels.evaluateAll((elements) =>
-      elements.map((element) => element.style.height)
-    );
-    expect(heights[0]).toMatch(/^\d+px$/u);
-    expect(heights[1]).toBe(heights[0]);
+    // Read the report and the panel heights in one round trip: the frame's
+    // observer can re-report between two separate reads and split them.
+    const { heights, reported } = await frame.evaluate((element) => ({
+      heights: Array.from(
+        element
+          .closest("blume-tabs")
+          ?.querySelectorAll<HTMLElement>("[data-blume-tab-panel]") ?? [],
+        (panel) => panel.style.height
+      ),
+      reported: Number(element.dataset.blumeReportedHeight),
+    }));
+    // The script floors the report at `EXAMPLE_PANE_MIN_PX` (288px, see
+    // `example-pane.ts`) and writes the result to both panels — so the height
+    // must be the clamped report, not merely a pair of equal SSR estimates.
+    const EXAMPLE_PANE_MIN_PX = 288;
+    expect(heights).toEqual([
+      `${Math.max(EXAMPLE_PANE_MIN_PX, reported)}px`,
+      `${Math.max(EXAMPLE_PANE_MIN_PX, reported)}px`,
+    ]);
   });
 });
 
