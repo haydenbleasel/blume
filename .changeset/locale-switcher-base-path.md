@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-Fix the language switcher's fallback target under a `basePath`. A switcher entry for a locale with no real translation derives its href by stripping the page's own locale from its route and re-adding the target locale, but `route` arrives with the base path already applied (`/docs/ja/reference`) while locale prefixes are base-less (`/ja`) — so the strip matched nothing and the re-add produced a second prefix, linking `/docs/ja/reference` at `/ja/docs/ja/reference`, `/ko/docs/ja/reference` and so on. None of those routes are built, so every affected entry was a dead link, and an audit that follows them reported the page as linking to broken routes. The route is now moved into base-less space before the locale is swapped and the base is re-applied to the result, using the same helpers the manifest composes real routes with. This affects any locale without a real translation of the page: a partially translated hand-written page for its missing locales, and, most visibly, a generated OpenAPI or GraphQL reference under a base path for every locale but its own.
