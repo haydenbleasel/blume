@@ -384,7 +384,7 @@ flowchart LR
 ```
 ````
 
-Diagrams render on the client, so this is an MDX-only feature, and the Mermaid library loads only on pages that include one. The rest of this section is a gallery of common types — see the [Mermaid docs](https://mermaid.js.org/intro/) for the full list.
+Diagrams render on the client, so this is an MDX-only feature, and the Mermaid library loads only on pages that include one. Diagrams use Mermaid's dagre layout and classic look by default; opt a single diagram into another layout or look through Mermaid front matter (a `config:` block with `layout: elk` or `look: neo`), and the ELK engine loads only for diagrams that ask for it. The rest of this section is a gallery of common types — see the [Mermaid docs](https://mermaid.js.org/intro/) for the full list.
 
 ### Flowchart
 

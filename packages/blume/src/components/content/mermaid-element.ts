@@ -42,6 +42,14 @@ class BlumeMermaid extends HTMLElement {
       const token = this.#renderToken;
       const mermaid = await loadMermaid();
       mermaid.initialize({
+        // Mermaid 12 defaults to the bundled ELK layout and the "neo" look,
+        // which re-lays out and restyles every existing diagram and pulls a
+        // ~1.4 MB ELK chunk onto any page with a flowchart. Pin the previous
+        // defaults so diagrams keep rendering as authored; a diagram opts
+        // into ELK or neo through its own front matter (`config: { layout:
+        // elk }`), which outranks these initialize() values.
+        layout: "dagre",
+        look: "classic",
         securityLevel: "strict",
         startOnLoad: false,
         theme: prefersDark() ? "dark" : "default",
