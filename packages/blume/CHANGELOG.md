@@ -1,5 +1,24 @@
 # blume
 
+## 1.6.5
+
+### Patch Changes
+
+- 9753355: Render a spec `description` as the Markdown it is. An OpenAPI description is Markdown by specification, but schema properties, parameters, request bodies, responses, authorization schemes, AsyncAPI messages and every GraphQL description — field, enum value and operation return type — printed it as plain text — so a spec generated from code docstrings showed its own `**asterisks**` and backticks, a numbered list rendered as one long line, and because HTML collapses newlines every paragraph ran together into a single wall of text. The operation description on the same page never had this problem, because it is emitted into the MDX body and goes through the full pipeline; the two rendered side by side is what made it obvious. Descriptions now render through `marked` — synchronous, already a dependency, and already how the Ask AI island renders model Markdown — since the full pipeline is async and built for whole documents while these are thousands of short strings per build.
+  
+  Only a link the author clearly meant becomes an anchor: written as a link, to an absolute URL, a root-relative path, a fragment or a `mailto:`. Everything else keeps its raw source text, because a description is often prose that was never Markdown. GFM autolinks bare URLs, `www.` hosts and email addresses, and spec descriptions are full of example hosts (`https://myorg.my.salesforce.com`, `www.yourstore.myshopify.com`) that turned into links to hosts nobody should visit; worse, regex and format notation reads as link syntax — Debezium's column-list wording `schemaName[.]tableName[.](columnName1|columnName2)` is literally `[text](href)`, which both produced a broken link and deleted the notation, since the link text is only `.`. An image is held to the same policy. Raw HTML is escaped rather than passed through, for the same reason the Ask AI island runs its Markdown through DOMPurify: this is data lifted out of a file and interpolated into the page.
+  
+  A GFM table in a description is wrapped in the same scroll frame the body pipeline gives every other table, because `set:html` bypasses the plugin that would have done it and a description sits in a narrower column than the body.
+  
+  Styling lives in one style block on a single class rather than in per-element utilities. Written as utilities it repeated the same ~620 characters on every description, which on a large reference page is 1.5 MB of identical class attributes and enough to push pages past Googlebot's 2 MB crawl limit; `blume audit` flags that as an indexability error.
+- dd32b7b: Add `analytics.cloudflare` for Cloudflare Web Analytics. Pass the site token from the dashboard's JS snippet — `analytics: { cloudflare: { token } }` — and Blume renders the beacon tag, the same way `posthog` takes a key. Until now the beacon meant hand-writing a `scripts` entry with the beacon URL and a JSON `data-cf-beacon` attribute.
+  
+  This is for sites Cloudflare doesn't proxy. A proxied zone with automatic Web Analytics on already injects the beacon at the edge and should leave the option unset, or every pageview is counted twice; the analytics docs now spell out that distinction.
+- 597d824: Give a reference row room for what it holds. The row was scaled for a one-line description — 4px between the property name and its description, 8px before the disclosure, 12px of row padding — but a description is a block, so at 4px it sat closer to the label above it than its own paragraphs sat to each other. That inversion is what made a dense reference page read as a wall rather than as rows, and the disclosure below it touched the next row's divider. Every component that draws a reference row now shares one scale: 8px between a row's own lines, 12px before a disclosure, 16px of row padding. Measured on one operation page, the gap between two properties goes from 25px to 33px.
+  
+  Table cells gain the same treatment for the same reason. At 0.5rem of block padding against a line-height near 1.7, a cell whose content wrapped put more space between its own two lines than between itself and the next row. The inline padding is unchanged on purpose: widening it comes out of column width in a capped article, and on one corpus it pushed cells that fit on two lines onto three, spending the space it had just bought.
+- b03b43f: Update dependencies: Mermaid 12, React 19.3, Zod 4.6, `ai` 7.0.99, `@pierre/diffs` 1.4.2, and the latest patch releases of the remaining runtime dependencies. Mermaid 12 makes the ELK layout and the "neo" look its defaults; Blume pins the previous dagre layout and classic look so existing diagrams render as before and the ELK engine only downloads for diagrams that opt in through their own front matter.
+
 ## 1.6.4
 
 ### Patch Changes
