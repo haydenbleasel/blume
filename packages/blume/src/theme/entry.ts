@@ -560,9 +560,16 @@ blume-diff {
 /* Restore inner padding on every cell. Typography zeroes the first/last cell's
    inline padding so a borderless table aligns to the prose margin; inside the
    framed wrapper that leaves edge text touching the border. The :is() selector
-   outweighs Typography's :where()-scoped rules so the outer columns get it too. */
+   outweighs Typography's :where()-scoped rules so the outer columns get it too.
+
+   The block padding is 0.75rem against a table line-height near 1.7: at 0.5rem a
+   cell whose content wrapped put MORE space between its own two lines than
+   between itself and the next row, so a table of wrapping cells read as one
+   block rather than as rows. The inline padding stays where it was, deliberately
+   — widening it comes out of column width in a capped article, and on one corpus
+   that pushed cells fitting on two lines onto three. */
 .blume-table-scroll :is(th, td) {
-  padding: 0.5rem 0.75rem;
+  padding: 0.75rem;
 }
 /* Keep column labels on one line so a two-word header does not wrap into a
    ragged stack; the table just scrolls a little wider instead. Body cells keep

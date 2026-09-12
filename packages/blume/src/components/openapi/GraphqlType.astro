@@ -87,7 +87,7 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
           </div>
           <div class="rounded-blume border border-border px-4">
             {(type.enumValues ?? []).map((value) => (
-              <div class="border-border border-t py-3 first:border-t-0">
+              <div class="border-border border-t py-4 first:border-t-0">
                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <code class="font-mono text-foreground text-sm">
                     {value.name}
@@ -99,10 +99,10 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
                   )}
                 </div>
                 {value.description && (
-                  <Description class="mt-1 text-muted-foreground text-sm" text={value.description} />
+                  <Description class="mt-2 text-muted-foreground text-sm" text={value.description} />
                 )}
                 {value.deprecationReason && (
-                  <div class="mt-1 text-muted-foreground text-xs">
+                  <div class="mt-2 text-muted-foreground text-xs">
                     Deprecated: <span set:text={value.deprecationReason} />
                   </div>
                 )}

@@ -47,7 +47,7 @@ const isRequired = (row: GraphqlFieldRow): boolean =>
           const route = routes.get(row.type.name);
           const args = isOutputField(row) ? row.args : [];
           return (
-            <div class="border-border border-t py-3 first:border-t-0">
+            <div class="border-border border-t py-4 first:border-t-0">
               <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <code class="font-mono text-foreground text-sm">
                   {row.name}
@@ -69,10 +69,10 @@ const isRequired = (row: GraphqlFieldRow): boolean =>
                 )}
               </div>
               {row.description && (
-                <Description class="mt-1 text-muted-foreground text-sm" text={row.description} />
+                <Description class="mt-2 text-muted-foreground text-sm" text={row.description} />
               )}
               {"default" in row && row.default !== undefined && (
-                <div class="mt-1 text-muted-foreground text-xs">
+                <div class="mt-2 text-muted-foreground text-xs">
                   Default:{" "}
                   <code class="rounded bg-muted px-1 py-0.5 text-foreground">
                     {row.default}
@@ -80,7 +80,7 @@ const isRequired = (row: GraphqlFieldRow): boolean =>
                 </div>
               )}
               {row.deprecationReason && (
-                <div class="mt-1 text-muted-foreground text-xs">
+                <div class="mt-2 text-muted-foreground text-xs">
                   Deprecated: <span set:text={row.deprecationReason} />
                 </div>
               )}

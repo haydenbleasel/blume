@@ -39,7 +39,7 @@ const { security } = Astro.props;
             {alternative.map((resolved) => {
               const carrier = schemeCarrier(resolved);
               return (
-                <div class="border-border border-t py-3 first:border-t-0">
+                <div class="border-border border-t py-4 first:border-t-0">
                   <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <code class="font-mono text-foreground text-sm">
                       {carrier?.name ?? resolved.key}
@@ -55,10 +55,10 @@ const { security } = Astro.props;
                     )}
                   </div>
                   {resolved.scheme?.description && (
-                    <Description class="mt-1 text-muted-foreground text-sm" text={resolved.scheme.description} />
+                    <Description class="mt-2 text-muted-foreground text-sm" text={resolved.scheme.description} />
                   )}
                   {resolved.scopes.length > 0 && (
-                    <div class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                    <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
                       <span class="text-muted-foreground">Scopes:</span>
                       {resolved.scopes.map((scope) => (
                         <code class="rounded bg-muted px-1 py-0.5 text-foreground">

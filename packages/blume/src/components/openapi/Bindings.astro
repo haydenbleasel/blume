@@ -54,13 +54,13 @@ const isSchemaish = (value: unknown): value is SchemaLike => {
       </div>
       {groups.map((group) => (
         <div class="not-prose mb-3 rounded-blume border border-border px-4 last:mb-0">
-          <div class="flex items-baseline gap-2 border-border py-3">
+          <div class="flex items-baseline gap-2 border-border py-4">
             <code class="font-mono font-semibold text-foreground text-sm">
               {group.protocol}
             </code>
           </div>
           {group.rows.map((row) => (
-            <div class="border-border border-t py-3">
+            <div class="border-border border-t py-4">
               <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <code class="font-mono text-foreground text-sm">{row.name}</code>
                 {!isSchemaish(row.value) && (

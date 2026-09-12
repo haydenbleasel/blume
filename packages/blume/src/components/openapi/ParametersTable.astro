@@ -55,7 +55,7 @@ const groups = SECTIONS.map((section) => ({
           const limits = constraints(resolved);
           const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
           return (
-            <div class="border-border border-t py-3 first:border-t-0">
+            <div class="border-border border-t py-4 first:border-t-0">
               <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <code class="font-mono text-foreground text-sm">{param.name}</code>
                 <span class="text-muted-foreground text-xs">{type}</span>
@@ -71,15 +71,15 @@ const groups = SECTIONS.map((section) => ({
                 )}
               </div>
               {param.description && (
-                <Description class="mt-1 text-muted-foreground text-sm" text={param.description} />
+                <Description class="mt-2 text-muted-foreground text-sm" text={param.description} />
               )}
               {limits.length > 0 && (
-                <div class="mt-1 text-muted-foreground text-xs">
+                <div class="mt-2 text-muted-foreground text-xs">
                   {limits.join(" · ")}
                 </div>
               )}
               {enumValues && (
-                <div class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
                   <span class="text-muted-foreground">Allowed:</span>
                   {enumValues.map((value) => (
                     <code class="rounded bg-muted px-1 py-0.5 text-foreground">

@@ -55,7 +55,11 @@ const expandable =
   !circular && (hasObjectShape(resolved) || Boolean(items && hasObjectShape(items)));
 ---
 
-<div class="border-border border-t py-3 first:border-t-0 last:pb-0">
+{/* The row's vertical scale is 8 / 12 / 16px, and every other reference table copies it. A
+    description is a block of Markdown, not a line: at 4px it sat closer to the label above it
+    than its own paragraphs sat to each other, and the disclosure below it touched the next row's
+    divider. Each step separates a bigger unit than the one before. */}
+<div class="border-border border-t py-4 first:border-t-0 last:pb-0">
   <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
     <code class="font-mono text-foreground text-sm">{name}</code>
     <span class="text-muted-foreground text-xs"
@@ -78,17 +82,17 @@ const expandable =
   </div>
   {
     description && (
-      <Description class="mt-1 text-muted-foreground text-sm" text={description} />
+      <Description class="mt-2 text-muted-foreground text-sm" text={description} />
     )
   }
   {
     limits.length > 0 && (
-      <div class="mt-1 text-muted-foreground text-xs">{limits.join(" · ")}</div>
+      <div class="mt-2 text-muted-foreground text-xs">{limits.join(" · ")}</div>
     )
   }
   {
     enumValues && (
-      <div class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+      <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
         <span class="text-muted-foreground">Allowed:</span>
         {enumValues.map((value) => (
           <code class="rounded bg-muted px-1 py-0.5 text-foreground">
@@ -100,12 +104,12 @@ const expandable =
   }
   {
     expandable && (
-      <details class="mt-2" open={expandAll}>
+      <details class="mt-3" open={expandAll}>
         <summary class="cursor-pointer select-none text-accent text-xs hover:underline">
           <span class="[details[open]>summary_&]:hidden">Show properties</span>
           <span class="hidden [details[open]>summary_&]:inline">Hide properties</span>
         </summary>
-        <div class="mt-2 border-border border-l pl-4">
+        <div class="mt-3 border-border border-l pl-4">
           <SchemaTable
             schema={schema}
             schemas={schemas}
