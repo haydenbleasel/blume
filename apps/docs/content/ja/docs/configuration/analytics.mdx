@@ -1,10 +1,10 @@
 ---
 title: アナリティクス
 description: >-
-  ファーストパーティのウェブアナリティクス — Vercel Web Analytics、PostHog、または任意のカスタムスクリプト — を blume.config.ts から設定できます。
+  ファーストパーティのウェブアナリティクス — Vercel Web Analytics、Cloudflare Web Analytics、PostHog、または任意のカスタムスクリプト — を blume.config.ts から設定できます。
 ---
 
-Blume は `blume.config.ts` の単一の `analytics` ブロックからアナリティクスを注入します。Vercel Web Analytics と PostHog はファーストクラスでサポートされ、`scripts` というエスケープハッチによって他のあらゆるプロバイダー（Plausible、Fathom、Google Analytics、Umami など）に対応できます。
+Blume は `blume.config.ts` の単一の `analytics` ブロックからアナリティクスを注入します。Vercel Web Analytics、Cloudflare Web Analytics、PostHog はファーストクラスでサポートされ、`scripts` というエスケープハッチによって他のあらゆるプロバイダー（Plausible、Fathom、Google Analytics、Umami など）に対応できます。
 
 アナリティクスが読み込まれるのは**本番ビルドのみ**です。スクリプトは `blume build` によって出力され、`blume dev` では決して出力されません。そのため、ローカルのトラフィックがダッシュボードに届くことはなく、別途「開発用」プロジェクトを用意する必要もありません。
 
@@ -23,6 +23,24 @@ analytics: {
 ```
 
 キーは不要です — スクリプトはデプロイ先のプロジェクトにレポートします。これは `/_vercel/insights` エンドポイントが存在する Vercel のデプロイでのみデータを収集します。
+
+## Cloudflare Web Analytics
+
+[Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/) には 2 つのセットアップ方法があり、設定が必要なのはそのうち一方だけです。
+
+**プロキシされたゾーン（自動セットアップ）。** Cloudflare がサイトを配信している場合（カスタムドメインを持つ Worker、Pages、またはオレンジ色の雲が有効になっている任意のゾーン）は、Cloudflare ダッシュボードでそのゾーンの Web Analytics を有効にするだけで完了です。Cloudflare がエッジでビーコンを注入するため、`analytics.cloudflare` は設定しないでください。併せて設定すると、すべてのページビューが二重にカウントされます。
+
+**その他のホスト（手動セットアップ）。** Cloudflare がプロキシしていないサイトの場合は、ダッシュボードの Web Analytics でサイトを追加し、表示される JS スニペットからトークン（`data-cf-beacon` 内の `token`）をコピーして、ここに指定してください。Blume はスニペットと同じビーコンタグをレンダリングします。
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  cloudflare: {
+    token: "0123456789abcdef0123456789abcdef",
+  },
+}
+```
+
+トークンはブラウザに配信しても安全です — サイトを識別するだけのものです。ビーコンは履歴の変更を自動的に追跡するため、クライアントルーターによるナビゲーションも追加の設定なしでカウントされます。
 
 ## PostHog
 
@@ -73,6 +91,7 @@ analytics: {
 | オプション | デフォルト | 説明 |
 | --- | --- | --- |
 | `vercel` | `false` | Vercel Web Analytics を追加します（Vercel のデプロイのみ）。 |
+| `cloudflare.token` | — | Cloudflare Web Analytics のサイトトークン（手動セットアップ）。設定するとビーコンが有効になります。 |
 | `posthog.key` | — | PostHog のプロジェクト API キー。設定すると PostHog が有効になります。 |
 | `posthog.host` | `https://us.i.posthog.com` | PostHog の取り込みホスト（EU Cloud またはセルフホスト）。 |
 | `scripts[].src` | — | 外部スクリプトの URL。`content` とは排他的です。 |

@@ -385,7 +385,7 @@ flowchart LR
 ```
 ````
 
-Os diagramas são renderizados no cliente, então este é um recurso exclusivo do MDX, e a biblioteca Mermaid é carregada apenas em páginas que incluem um. O restante desta seção é uma galeria de tipos comuns — veja a [documentação do Mermaid](https://mermaid.js.org/intro/) para a lista completa.
+Os diagramas são renderizados no cliente, então este é um recurso exclusivo do MDX, e a biblioteca Mermaid é carregada apenas em páginas que incluem um. Por padrão, os diagramas usam o layout dagre e o visual clássico do Mermaid; ative outro layout ou visual em um único diagrama pelo front matter do Mermaid (um bloco `config:` com `layout: elk` ou `look: neo`), e o motor ELK é carregado apenas para os diagramas que o solicitarem. O restante desta seção é uma galeria de tipos comuns — veja a [documentação do Mermaid](https://mermaid.js.org/intro/) para a lista completa.
 
 ### Fluxograma [#flowchart]
 

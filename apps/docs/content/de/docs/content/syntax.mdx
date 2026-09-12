@@ -385,7 +385,7 @@ flowchart LR
 ```
 ````
 
-Diagramme werden im Client gerendert, daher ist dies eine reine MDX-Funktion, und die Mermaid-Bibliothek wird nur auf Seiten geladen, die eines enthalten. Der Rest dieses Abschnitts ist eine Galerie gängiger Typen — die vollständige Liste findest du in der [Mermaid-Dokumentation](https://mermaid.js.org/intro/).
+Diagramme werden im Client gerendert, daher ist dies eine reine MDX-Funktion, und die Mermaid-Bibliothek wird nur auf Seiten geladen, die eines enthalten. Diagramme verwenden standardmäßig das dagre-Layout und den klassischen Look von Mermaid; über Mermaid-Frontmatter (einen `config:`-Block mit `layout: elk` oder `look: neo`) stellst du ein einzelnes Diagramm auf ein anderes Layout oder einen anderen Look um, und die ELK-Engine wird nur für Diagramme geladen, die sie anfordern. Der Rest dieses Abschnitts ist eine Galerie gängiger Typen — die vollständige Liste findest du in der [Mermaid-Dokumentation](https://mermaid.js.org/intro/).
 
 ### Flussdiagramm [#flowchart]
 

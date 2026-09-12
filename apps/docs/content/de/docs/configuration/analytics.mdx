@@ -1,10 +1,10 @@
 ---
 title: Analytics
 description: >-
-  First-Party-Webanalyse — Vercel Web Analytics, PostHog oder ein beliebiges eigenes Skript — eingerichtet über blume.config.ts.
+  First-Party-Webanalyse — Vercel Web Analytics, Cloudflare Web Analytics, PostHog oder ein beliebiges eigenes Skript — eingerichtet über blume.config.ts.
 ---
 
-Blume bindet Analytics für dich über einen einzigen `analytics`-Block in `blume.config.ts` ein. Vercel Web Analytics und PostHog werden erstklassig unterstützt, und eine `scripts`-Ausweichlösung deckt alle anderen Anbieter ab — Plausible, Fathom, Google Analytics, Umami und den Rest.
+Blume bindet Analytics für dich über einen einzigen `analytics`-Block in `blume.config.ts` ein. Vercel Web Analytics, Cloudflare Web Analytics und PostHog werden erstklassig unterstützt, und eine `scripts`-Ausweichlösung deckt alle anderen Anbieter ab — Plausible, Fathom, Google Analytics, Umami und den Rest.
 
 Analytics wird **nur in Produktions-Builds** geladen. Die Skripte werden von `blume build` ausgegeben, niemals von `blume dev`, sodass lokaler Traffic nie in deinen Dashboards landet und du kein separates „Entwicklungs“-Projekt brauchst.
 
@@ -23,6 +23,24 @@ analytics: {
 ```
 
 Es werden keine Schlüssel benötigt — das Skript meldet an das Projekt, unter dem es deployt ist. Daten werden nur bei Vercel-Deployments erfasst, wo der Endpunkt `/_vercel/insights` existiert.
+
+## Cloudflare Web Analytics
+
+Für [Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/) gibt es zwei Einrichtungsvarianten, und nur eine davon braucht Konfiguration.
+
+**Proxy-Zone (automatische Einrichtung).** Wenn Cloudflare deine Website ausliefert — ein Worker mit eigener Domain, Pages oder eine beliebige Zone mit aktivierter orangefarbener Wolke —, aktiviere Web Analytics für die Zone im Cloudflare-Dashboard, und das war’s. Cloudflare bindet den Beacon am Edge ein, also lass `analytics.cloudflare` ungesetzt; würdest du es zusätzlich konfigurieren, würde jeder Seitenaufruf doppelt gezählt.
+
+**Jeder andere Host (manuelle Einrichtung).** Für eine Website, die Cloudflare nicht per Proxy ausliefert, füge die Website im Dashboard unter Web Analytics hinzu, kopiere den Token aus dem JS-Snippet, das du dort erhältst (den `token` innerhalb von `data-cf-beacon`), und übergib ihn hier. Blume rendert dasselbe Beacon-Tag wie das Snippet.
+
+```ts blume.config.ts lineNumbers
+analytics: {
+  cloudflare: {
+    token: "0123456789abcdef0123456789abcdef",
+  },
+}
+```
+
+Der Token kann gefahrlos an den Browser ausgeliefert werden — er identifiziert nur die Website. Der Beacon verfolgt Änderungen am Verlauf selbstständig, sodass Navigationen über den Client-Router ohne zusätzliche Einrichtung gezählt werden.
 
 ## PostHog
 
@@ -73,6 +91,7 @@ analytics: {
 | Option | Standard | Beschreibung |
 | --- | --- | --- |
 | `vercel` | `false` | Vercel Web Analytics hinzufügen (nur bei Vercel-Deployments). |
+| `cloudflare.token` | — | Site-Token für Cloudflare Web Analytics (manuelle Einrichtung). Aktiviert den Beacon, wenn gesetzt. |
 | `posthog.key` | — | PostHog-Projekt-API-Schlüssel. Aktiviert PostHog, wenn gesetzt. |
 | `posthog.host` | `https://us.i.posthog.com` | PostHog-Ingestion-Host (EU Cloud oder selbst gehostet). |
 | `scripts[].src` | — | URL des externen Skripts. Schließt sich mit `content` gegenseitig aus. |
