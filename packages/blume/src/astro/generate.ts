@@ -324,10 +324,35 @@ export const blumeDepsDir = (pkgDir: string = packageRoot()): string | null => {
 };
 
 /**
- * Point `link` at Blume's dependency directory via a `node_modules` junction,
- * replacing a stale junction we own and leaving a real directory untouched.
+ * Create `link` as a directory symlink to `target`, falling back to a junction.
  *
- * `lstat`, not `existsSync`, so a broken junction (target since moved) is still
+ * The type only matters on Windows, and there a junction is the wrong first
+ * choice: Windows can't follow a *relative* symlink reached through a
+ * junction (it resolves the relative target against the junction-side path,
+ * so it lands outside the store and every lookup is ENOENT), and Bun's
+ * isolated linker writes exactly those into Blume's dependency directory
+ * whenever it holds symlink privilege. A directory symlink traverses them
+ * fine. Without that privilege (no Developer Mode, non-admin shell) creating
+ * one fails, so fall back to a junction — and in that session the installer
+ * had no privilege either, so the deps are absolute junctions a junction can
+ * follow. Exported for testing.
+ */
+export const symlinkDir = async (
+  target: string,
+  link: string
+): Promise<void> => {
+  try {
+    await symlink(target, link, "dir");
+  } catch {
+    await symlink(target, link, "junction");
+  }
+};
+
+/**
+ * Point `link` at Blume's dependency directory via a `node_modules` link,
+ * replacing a stale link we own and leaving a real directory untouched.
+ *
+ * `lstat`, not `existsSync`, so a broken link (target since moved) is still
  * detected — `existsSync` follows the link and reports a dangling one as absent.
  */
 const linkDepsJunction = async (
@@ -358,7 +383,7 @@ const linkDepsJunction = async (
     await rm(link, { force: true });
   }
   await mkdir(dirname(link), { recursive: true });
-  await symlink(depsDir, link, "junction");
+  await symlinkDir(depsDir, link);
 };
 
 /** Read the `version` field of a `package.json`, or null when unreadable. */

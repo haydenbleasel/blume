@@ -20,6 +20,7 @@ import {
   blumeDepsDir,
   ensureDepsLink,
   prerenderDepsPlugin,
+  symlinkDir,
 } from "../src/astro/generate.ts";
 
 // `ensureDepsLink` proves out by making Astro resolvable from `.blume/`. We
@@ -121,6 +122,33 @@ const npmSplitFixture = async (): Promise<{
   await mkdir(outDir, { recursive: true });
   return { nestedDeps, outDir, pkgDir };
 };
+
+describe("symlinkDir", () => {
+  it("creates a directory link that resolves the target", async () => {
+    const target = join(root, "target");
+    await fakePackage(target, "astro");
+    const link = join(root, "link");
+
+    await symlinkDir(target, link);
+
+    const stats = await lstat(link);
+    expect(stats.isSymbolicLink()).toBe(true);
+    expect(await readlink(link)).toBe(target);
+    expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
+  });
+
+  it("surfaces the error when the junction fallback fails too", async () => {
+    // A directory symlink is tried first (Windows needs symlink privilege for
+    // it); when that fails, a junction is tried. Both fail on an occupied
+    // path, so the junction attempt's error is what reaches the caller.
+    const link = join(root, "taken");
+    await writeFile(link, "", "utf-8");
+
+    await expect(symlinkDir(join(root, "target"), link)).rejects.toMatchObject({
+      code: "EEXIST",
+    });
+  });
+});
 
 describe("blumeDepsDir", () => {
   it("finds deps nested under the package (workspace source layout)", async () => {
