@@ -52,3 +52,38 @@ jobs:
             sleep 15
           done
           exit 1
+
+  # Same build on Windows, so a path, symlink or shell assumption that only
+  # holds on POSIX shows up here instead of in a user's terminal. The retry
+  # step runs under Git Bash (`shell: bash`), which windows-latest ships,
+  # so it can stay byte-for-byte the same as the Linux one above.
+  build-docs-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - uses: actions/cache@v6
+        name: Restore build caches
+        with:
+          path: |
+            apps/docs/.blume/.cache/astro
+            apps/docs/node_modules/.cache/blume/og
+          key: ${{ runner.os }}-blume-build-cache-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-blume-build-cache-
+
+      - name: Build docs
+        shell: bash
+        run: |
+          cd apps/docs
+          for attempt in 1 2 3; do
+            bun run build 2>&1 | tee build.log && exit 0
+            grep -q "CannotFetchFontFile" build.log || exit 1
+            echo "Font CDN 404 on attempt ${attempt}; clearing font cache and retrying"
+            rm -rf .blume/.cache/astro/fonts
+            sleep 15
+          done
+          exit 1
