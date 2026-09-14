@@ -87,3 +87,31 @@ jobs:
             sleep 15
           done
           exit 1
+
+      - name: Diagnose (temporary)
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          cd apps/docs
+          echo "== .blume"; ls -la .blume | head -30
+          echo "== .blume/node_modules/@astrojs"; ls -la .blume/node_modules/@astrojs 2>&1 | head
+          echo "== pkg jsons"; ls .blume/node_modules/astro/package.json .blume/node_modules/@astrojs/mdx/package.json 2>&1
+          echo "== blume deps"; ls -la ../../packages/blume/node_modules/astro ../../packages/blume/node_modules/@astrojs/mdx 2>&1 | head
+          echo "== root astro"; ls -la ../../node_modules/astro 2>&1 | head -3
+          echo "== config head"; head -20 .blume/astro.config.mjs
+          echo "== node resolve from .blume"
+          (cd .blume && node --input-type=module -e "console.log(import.meta.resolve('@astrojs/mdx')); console.log(import.meta.resolve('astro'))" 2>&1)
+          echo "== resolver internals"
+          cat > diag.ts <<'TS'
+          import { lstatSync, readlinkSync, realpathSync } from "node:fs";
+          import { blumeDepsDir, ensureDepsLink } from "../../packages/blume/src/astro/generate.ts";
+          import { packageRoot } from "../../packages/blume/src/core/package-root.ts";
+          console.log("packageRoot", packageRoot());
+          console.log("blumeDepsDir", blumeDepsDir());
+          const link = `${process.cwd()}/.blume/node_modules`;
+          try { const s = lstatSync(link); console.log("link isSymbolicLink", s.isSymbolicLink(), "readlink", readlinkSync(link), "realpath", realpathSync(link)); } catch (e) { console.log("link lstat failed", String(e)); }
+          console.log("ensureDepsLink", await ensureDepsLink(`${process.cwd()}/.blume`));
+          try { const s = lstatSync(link); console.log("after: isSymbolicLink", s.isSymbolicLink(), "readlink", readlinkSync(link), "realpath", realpathSync(link)); } catch (e) { console.log("after: lstat failed", String(e)); }
+          TS
+          bun diag.ts
