@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { existsSync } from "node:fs";
+import * as fsPromises from "node:fs/promises";
 import {
   lstat,
   mkdir,
@@ -131,6 +132,41 @@ describe("symlinkDir", () => {
 
     await symlinkDir(target, link);
 
+    const stats = await lstat(link);
+    expect(stats.isSymbolicLink()).toBe(true);
+    expect(await readlink(link)).toBe(target);
+    expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
+  });
+
+  it("falls back to a junction when a directory symlink can't be created", async () => {
+    // Windows without symlink privilege: the "dir" attempt fails with EPERM
+    // and the junction attempt must still yield a working link. On POSIX the
+    // two calls are the same syscall, so the first is made to fail here.
+    const target = join(root, "target");
+    await fakePackage(target, "astro");
+    const link = join(root, "link");
+    const realSymlink = fsPromises.symlink;
+    const types: string[] = [];
+    const spy = spyOn(fsPromises, "symlink").mockImplementation(
+      (symlinkTarget, path, type) => {
+        types.push(String(type));
+        if (type === "dir") {
+          return Promise.reject(
+            Object.assign(new Error("EPERM: operation not permitted"), {
+              code: "EPERM",
+            })
+          );
+        }
+        return realSymlink(symlinkTarget, path, type);
+      }
+    );
+    try {
+      await symlinkDir(target, link);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(types).toEqual(["dir", "junction"]);
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
     expect(await readlink(link)).toBe(target);
