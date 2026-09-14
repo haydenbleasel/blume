@@ -94,24 +94,74 @@ jobs:
         run: |
           set +e
           cd apps/docs
-          echo "== .blume"; ls -la .blume | head -30
-          echo "== .blume/node_modules/@astrojs"; ls -la .blume/node_modules/@astrojs 2>&1 | head
-          echo "== pkg jsons"; ls .blume/node_modules/astro/package.json .blume/node_modules/@astrojs/mdx/package.json 2>&1
-          echo "== blume deps"; ls -la ../../packages/blume/node_modules/astro ../../packages/blume/node_modules/@astrojs/mdx 2>&1 | head
-          echo "== root astro"; ls -la ../../node_modules/astro 2>&1 | head -3
-          echo "== config head"; head -20 .blume/astro.config.mjs
-          echo "== node resolve from .blume"
-          (cd .blume && node --input-type=module -e "console.log(import.meta.resolve('@astrojs/mdx')); console.log(import.meta.resolve('astro'))" 2>&1)
-          echo "== resolver internals"
-          cat > diag.ts <<'TS'
-          import { lstatSync, readlinkSync, realpathSync } from "node:fs";
-          import { blumeDepsDir, ensureDepsLink } from "../../packages/blume/src/astro/generate.ts";
-          import { packageRoot } from "../../packages/blume/src/core/package-root.ts";
-          console.log("packageRoot", packageRoot());
-          console.log("blumeDepsDir", blumeDepsDir());
-          const link = `${process.cwd()}/.blume/node_modules`;
-          try { const s = lstatSync(link); console.log("link isSymbolicLink", s.isSymbolicLink(), "readlink", readlinkSync(link), "realpath", realpathSync(link)); } catch (e) { console.log("link lstat failed", String(e)); }
-          console.log("ensureDepsLink", await ensureDepsLink(`${process.cwd()}/.blume`));
-          try { const s = lstatSync(link); console.log("after: isSymbolicLink", s.isSymbolicLink(), "readlink", readlinkSync(link), "realpath", realpathSync(link)); } catch (e) { console.log("after: lstat failed", String(e)); }
-          TS
-          bun diag.ts
+          cat > diag.mjs <<'JS'
+          import { statSync, lstatSync, readlinkSync, symlinkSync, realpathSync, mkdirSync, rmSync, readdirSync, writeFileSync } from "node:fs";
+          import { execSync } from "node:child_process";
+          import { resolve } from "node:path";
+          import { pathToFileURL } from "node:url";
+          const cwd = process.cwd();
+          const repo = resolve(cwd, "../..");
+          const deps = resolve(repo, "packages/blume/node_modules");
+          const probe = (label, p) => {
+            try { const s = statSync(p); console.log("OK ", label, "isDir", s.isDirectory()); }
+            catch (e) { console.log("ERR", label, e.code); }
+          };
+          const sh = (cmd) => { try { console.log(execSync(cmd, { stdio: ["ignore", "pipe", "pipe"] }).toString()); } catch (e) { console.log("cmd failed", cmd, e.message); } };
+          console.log("== link kinds");
+          for (const p of [resolve(cwd, ".blume/node_modules"), resolve(deps, "astro"), resolve(deps, "@astrojs/mdx"), resolve(repo, "node_modules/astro"), resolve(cwd, "node_modules/blume")]) {
+            try { const s = lstatSync(p); console.log(p, "symlink:", s.isSymbolicLink(), s.isSymbolicLink() ? "->" + readlinkSync(p) : ""); } catch (e) { console.log(p, "lstat ERR", e.code); }
+          }
+          sh(`cmd /c dir "${resolve(cwd, ".blume")}"`);
+          sh(`cmd /c dir "${resolve(deps, "@astrojs")}"`);
+          console.log("== stat probes");
+          probe("junction dir itself", resolve(cwd, ".blume/node_modules"));
+          probe("junction -> real subdir @astrojs", resolve(cwd, ".blume/node_modules/@astrojs"));
+          probe("junction -> relsymlink astro", resolve(cwd, ".blume/node_modules/astro"));
+          probe("junction -> relsymlink @astrojs/mdx", resolve(cwd, ".blume/node_modules/@astrojs/mdx"));
+          probe("junction -> relsymlink @astrojs/mdx/package.json", resolve(cwd, ".blume/node_modules/@astrojs/mdx/package.json"));
+          probe("direct relsymlink astro", resolve(deps, "astro"));
+          probe("direct relsymlink @astrojs/mdx", resolve(deps, "@astrojs/mdx"));
+          console.log("== candidate A: dir symlink instead of junction");
+          const symDir = resolve(cwd, ".blume/nm-symlink");
+          rmSync(symDir, { force: true, recursive: false });
+          try { symlinkSync(deps, symDir, "dir"); probe("dirsymlink -> relsymlink @astrojs/mdx", resolve(symDir, "@astrojs/mdx")); } catch (e) { console.log("dir symlink create ERR", e.code, e.message); }
+          console.log("== candidate B: per-package junctions to realpath");
+          const nm2 = resolve(cwd, ".blume/nm2");
+          rmSync(nm2, { force: true, recursive: true });
+          let count = 0;
+          for (const entry of readdirSync(deps)) {
+            if (entry.startsWith(".")) continue;
+            const src = resolve(deps, entry);
+            if (entry.startsWith("@")) {
+              mkdirSync(resolve(nm2, entry), { recursive: true });
+              for (const sub of readdirSync(src)) {
+                try { symlinkSync(realpathSync(resolve(src, sub)), resolve(nm2, entry, sub), "junction"); count++; } catch (e) { console.log("junction ERR", entry, sub, e.code); }
+              }
+            } else {
+              mkdirSync(nm2, { recursive: true });
+              try { symlinkSync(realpathSync(src), resolve(nm2, entry), "junction"); count++; } catch (e) { console.log("junction ERR", entry, e.code); }
+            }
+          }
+          console.log("created", count, "package junctions");
+          probe("pkg junction @astrojs/mdx/package.json", resolve(nm2, "@astrojs/mdx/package.json"));
+          probe("pkg junction astro/package.json", resolve(nm2, "astro/package.json"));
+          try { const m = await import(pathToFileURL(resolve(nm2, "@astrojs/mdx/dist/index.js")).href); console.log("OK  import mdx via pkg junction:", typeof m.default); } catch (e) { console.log("ERR import mdx via pkg junction:", e.message); }
+          try { const m = await import(pathToFileURL(resolve(nm2, "astro/dist/core/config/index.js")).href); console.log("OK  import astro/config via pkg junction:", Object.keys(m).length, "exports"); } catch (e) { console.log("ERR import astro via pkg junction:", e.message); }
+          console.log("== resolve from a file inside nm2");
+          const probeDir = resolve(cwd, ".blume/probe");
+          mkdirSync(probeDir, { recursive: true });
+          rmSync(resolve(probeDir, "node_modules"), { force: true, recursive: true });
+          symlinkSync(nm2, resolve(probeDir, "node_modules"), "junction");
+          writeFileSync(resolve(probeDir, "x.mjs"), "import mdx from '@astrojs/mdx'; import { defineConfig } from 'astro/config'; console.log('OK  bare imports via junction->pkg-junctions', typeof mdx, typeof defineConfig);");
+          try { await import(pathToFileURL(resolve(probeDir, "x.mjs")).href); } catch (e) { console.log("ERR bare imports via junction->pkg-junctions:", e.message); }
+          rmSync(resolve(probeDir, "node_modules"), { force: true, recursive: true });
+          mkdirSync(resolve(probeDir, "node_modules"), { recursive: true });
+          for (const entry of readdirSync(nm2)) {
+            const src = resolve(nm2, entry);
+            if (entry.startsWith("@")) { mkdirSync(resolve(probeDir, "node_modules", entry), { recursive: true }); for (const sub of readdirSync(src)) symlinkSync(readlinkSync(resolve(src, sub)), resolve(probeDir, "node_modules", entry, sub), "junction"); }
+            else symlinkSync(readlinkSync(src), resolve(probeDir, "node_modules", entry), "junction");
+          }
+          writeFileSync(resolve(probeDir, "y.mjs"), "import mdx from '@astrojs/mdx'; import { defineConfig } from 'astro/config'; console.log('OK  bare imports via real dir of pkg-junctions', typeof mdx, typeof defineConfig);");
+          try { await import(pathToFileURL(resolve(probeDir, "y.mjs")).href); } catch (e) { console.log("ERR bare imports via real dir of pkg-junctions:", e.message); }
+          JS
+          node diag.mjs 2>&1
