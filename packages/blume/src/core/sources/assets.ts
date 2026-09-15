@@ -6,6 +6,12 @@ import type { Diagnostic } from "../types.ts";
 import { hashText } from "./cache.ts";
 
 const MD_IMAGE = /!\[(?<alt>[^\]]*)\]\((?<url>[^)\s]+)\)/gu;
+// A `<video>` tag's `src`, split so the rewrite can swap the URL and keep the
+// surrounding attributes untouched. Notion's uploaded videos arrive as signed,
+// expiring URLs exactly like its images, so they rot the same way. `[^>]`
+// bounds the attribute run to a single tag.
+const HTML_VIDEO_SRC =
+  /(?<open><video\b[^>]*?\ssrc=")(?<url>[^"]+)(?<close>")/gu;
 const REMOTE = /^https?:\/\//u;
 const SAFE_EXT = /^\.[a-z0-9]+$/iu;
 const CODE_FENCE_BLOCK =
@@ -22,18 +28,22 @@ export interface AssetContext {
   fetchImpl?: typeof fetch;
 }
 
-/** Pick a file extension from a URL, defaulting to `.png`. */
-const extFor = (url: string): string => {
+/** Pick a file extension from a URL, falling back to the media's default. */
+const extFor = (url: string, fallback: string): string => {
   const clean = url.split("?")[0] ?? url;
   const ext = extname(clean);
-  return SAFE_EXT.test(ext) ? ext.toLowerCase() : ".png";
+  return SAFE_EXT.test(ext) ? ext.toLowerCase() : fallback;
 };
 
+const IMAGE_EXT = ".png";
+const VIDEO_EXT = ".mp4";
+
 /**
- * Download remote images referenced in a Markdown body into the asset dir and
- * rewrite their `src` to the local public path. Remote CMS URLs (notably
- * Notion's signed, expiring links) would otherwise rot a static build. Assets
- * are content-addressed by URL hash, so repeated builds are stable and deduped.
+ * Download remote media referenced in a Markdown body into the asset dir and
+ * rewrite the reference to the local public path. Markdown images and the
+ * `src` of a `<video>` tag are both covered. Remote CMS URLs (notably Notion's
+ * signed, expiring links) would otherwise rot a static build. Assets are
+ * content-addressed by URL hash, so repeated builds are stable and deduped.
  */
 export const materializeAssets = async (
   markdown: string,
@@ -51,17 +61,23 @@ export const materializeAssets = async (
     return `\u0000blume-fence-${fences.length - 1}\u0000`;
   });
 
-  const urls = new Set<string>();
-  for (const match of masked.matchAll(MD_IMAGE)) {
-    const url = match.groups?.url;
-    if (url && REMOTE.test(url)) {
-      urls.add(url);
+  // URL -> the extension to use when the URL's path carries none, so a video
+  // that 404s the `.png` guess still lands under a playable name.
+  const urls = new Map<string, string>();
+  const collect = (pattern: RegExp, fallbackExt: string): void => {
+    for (const match of masked.matchAll(pattern)) {
+      const url = match.groups?.url;
+      if (url && REMOTE.test(url) && !urls.has(url)) {
+        urls.set(url, fallbackExt);
+      }
     }
-  }
+  };
+  collect(MD_IMAGE, IMAGE_EXT);
+  collect(HTML_VIDEO_SRC, VIDEO_EXT);
 
   const rewrites = new Map<string, string>();
   await Promise.all(
-    [...urls].map(async (url) => {
+    [...urls].map(async ([url, fallbackExt]) => {
       try {
         const res = await doFetch(url);
         if (!res.ok) {
@@ -73,7 +89,7 @@ export const materializeAssets = async (
         // hashing it would mint a new file each refresh and re-dirty the
         // content digest. Two real assets sharing scheme+host+path and
         // differing only in query are rare enough to accept colliding.
-        const file = `${hashText(url.split("?")[0] ?? url)}${extFor(url)}`;
+        const file = `${hashText(url.split("?")[0] ?? url)}${extFor(url, fallbackExt)}`;
         await mkdir(ctx.assetsDir, { recursive: true });
         await writeFile(join(ctx.assetsDir, file), bytes);
         rewrites.set(url, `${ctx.assetsBaseUrl}/${file}`);
@@ -93,6 +109,10 @@ export const materializeAssets = async (
     .replaceAll(MD_IMAGE, (match, alt, url) => {
       const local = rewrites.get(url);
       return local ? `![${alt}](${local})` : match;
+    })
+    .replaceAll(HTML_VIDEO_SRC, (match, open, url, close) => {
+      const local = rewrites.get(url);
+      return local ? `${open}${local}${close}` : match;
     })
     .replaceAll(FENCE_TOKEN, (token, index) => fences[Number(index)] ?? token);
 

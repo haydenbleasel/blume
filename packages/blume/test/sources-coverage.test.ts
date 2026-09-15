@@ -469,6 +469,90 @@ describe("materializeAssets: signed-url stability", () => {
   });
 });
 
+describe("materializeAssets: video sources", () => {
+  it("materializes a <video> src and leaves the other attributes intact", async () => {
+    const fetchImpl = asFetch(() =>
+      Promise.resolve(new Response(new ArrayBuffer(4)))
+    );
+    const dir = await tempDir();
+    const { markdown } = await materializeAssets(
+      '<video controls src="https://notion.so/signed/clip.mp4?X-Amz=1" />',
+      { assetsBaseUrl: "/assets", assetsDir: join(dir, "assets"), fetchImpl }
+    );
+    expect(markdown).toContain('<video controls src="/assets/');
+    expect(markdown).toEndWith('" />');
+    expect(markdown).not.toContain("notion.so/signed");
+    expect(markdown).toContain(".mp4");
+  });
+
+  it("names an extension-less video url .mp4 rather than .png", async () => {
+    const fetchImpl = asFetch(() =>
+      Promise.resolve(new Response(new ArrayBuffer(4)))
+    );
+    const dir = await tempDir();
+    const { markdown } = await materializeAssets(
+      '<video controls src="https://cdn.example.com/stream?id=9" />',
+      { assetsBaseUrl: "/assets", assetsDir: join(dir, "assets"), fetchImpl }
+    );
+    expect(markdown).toContain(".mp4");
+    expect(markdown).not.toContain(".png");
+  });
+
+  it("keeps the original src when the video download fails", async () => {
+    const fetchImpl = asFetch(() => Promise.resolve(notOk(404)));
+    const dir = await tempDir();
+    const { diagnostics, markdown } = await materializeAssets(
+      '<video controls src="https://cdn.example.com/a.mp4" />',
+      { assetsBaseUrl: "/assets", assetsDir: join(dir, "assets"), fetchImpl }
+    );
+    expect(diagnostics[0]?.code).toBe("BLUME_ASSET_FETCH_FAILED");
+    expect(markdown).toContain('src="https://cdn.example.com/a.mp4"');
+  });
+
+  it("never downloads a video url inside a code fence", async () => {
+    const fetched: string[] = [];
+    const fetchImpl = asFetch((input) => {
+      fetched.push(String(input));
+      return Promise.resolve(new Response(new ArrayBuffer(4)));
+    });
+    const dir = await tempDir();
+    const body = [
+      '<video controls src="https://cdn.example.com/real.mp4" />',
+      "",
+      "```mdx",
+      '<video controls src="https://cdn.example.com/sample.mp4" />',
+      "```",
+      "",
+    ].join("\n");
+    const { markdown } = await materializeAssets(body, {
+      assetsBaseUrl: "/assets",
+      assetsDir: join(dir, "assets"),
+      fetchImpl,
+    });
+    expect(fetched).toStrictEqual(["https://cdn.example.com/real.mp4"]);
+    expect(markdown).toContain(
+      '<video controls src="https://cdn.example.com/sample.mp4" />'
+    );
+  });
+
+  it("downloads a url shared by an image and a video only once", async () => {
+    const fetched: string[] = [];
+    const fetchImpl = asFetch((input) => {
+      fetched.push(String(input));
+      return Promise.resolve(new Response(new ArrayBuffer(4)));
+    });
+    const dir = await tempDir();
+    const url = "https://cdn.example.com/poster.png";
+    const { markdown } = await materializeAssets(
+      `![poster](${url})\n\n<video controls src="${url}" />`,
+      { assetsBaseUrl: "/assets", assetsDir: join(dir, "assets"), fetchImpl }
+    );
+    expect(fetched).toStrictEqual([url]);
+    expect(markdown).toContain("![poster](/assets/");
+    expect(markdown).toContain('<video controls src="/assets/');
+  });
+});
+
 describe("materializeAssets: fenced code", () => {
   it("never downloads or rewrites an image url inside a code fence", async () => {
     const fetched: string[] = [];

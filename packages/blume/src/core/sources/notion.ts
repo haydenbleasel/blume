@@ -3,6 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import pLimit from "p-limit";
 import { join } from "pathe";
 
+import { parseYouTubeId } from "../../components/content/youtube.ts";
 import { BlumeError } from "../diagnostics.ts";
 import matter from "../frontmatter.ts";
 import type { Diagnostic } from "../types.ts";
@@ -250,6 +251,33 @@ const LIST_BLOCKS = new Set([
 const isListItem = (block: NotionBlock | undefined): boolean =>
   block !== undefined && LIST_BLOCKS.has(block.type);
 
+/**
+ * Render a Notion `video` block. Kept out of `renderLeaf`'s switch so that
+ * function stays under the complexity limit.
+ */
+const renderVideo = (data: NotionBlockPayload): string => {
+  const url = data.external?.url ?? data.file?.url;
+  if (!url) {
+    return "";
+  }
+  const caption = richToMarkdown(data.caption);
+  // A YouTube link pasted into Notion becomes a `video` block holding an
+  // external URL. That URL is a watch page, not a media file, so it has to
+  // become the embed component — a `<video src>` pointing at it plays nothing,
+  // and `materializeAssets` would download the HTML page.
+  if (parseYouTubeId(url)) {
+    const title = caption ? ` title=${JSON.stringify(caption)}` : "";
+    return `<YouTube${title} url=${JSON.stringify(url)} />`;
+  }
+  // Everything else (a Notion upload, or a direct link to a media file) is a
+  // real video file: `materializeAssets` rewrites the `src`, which matters most
+  // for uploads, whose Notion URLs are signed and expire.
+  const video = `<video controls src=${JSON.stringify(url)} />`;
+  return caption
+    ? `<Frame caption=${JSON.stringify(caption)}>\n${video}\n</Frame>`
+    : video;
+};
+
 /** Render a leaf (non-container) block to Markdown, or null for containers. */
 const renderLeaf = (block: NotionBlock): string | null => {
   const data = payloadOf(block) ?? {};
@@ -288,6 +316,9 @@ const renderLeaf = (block: NotionBlock): string | null => {
     case "image": {
       const url = data.external?.url ?? data.file?.url;
       return url ? `![${richToMarkdown(data.caption)}](${url})` : "";
+    }
+    case "video": {
+      return renderVideo(data);
     }
     default: {
       return null;

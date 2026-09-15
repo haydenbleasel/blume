@@ -163,7 +163,7 @@ A read token for a private dataset comes from the `SANITY_TOKEN` environment var
 
 ## Notion
 
-The built-in `notion` source turns a Notion database into a collection: each row becomes a page, its properties become frontmatter, and its block tree becomes MDX. Callouts, toggles, columns, and code blocks map to the matching Blume components. `@notionhq/client` (v5 or later) is an optional peer dependency; Blume reads the database through its first data source.
+The built-in `notion` source turns a Notion database into a collection: each row becomes a page, its properties become frontmatter, and its block tree becomes MDX. Callouts, toggles, columns, and code blocks map to the matching Blume components. Video blocks become a `<YouTube>` embed when they hold a YouTube link, and a `<video>` player otherwise. `@notionhq/client` (v5 or later) is an optional peer dependency; Blume reads the database through its first data source.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -185,7 +185,7 @@ export default defineConfig({
 });
 ```
 
-The integration token comes from the `NOTION_TOKEN` environment variable (share the database with your integration). By default every page is imported; set `publishedValue` to make the `Status` property a publish gate — any other value then maps to `draft: true`, which production builds drop. **Notion image URLs are signed and expire**, so the adapter downloads them at build time into the site's assets and rewrites the references — a CMS image never rots a static build. API calls are paced through a small request pool (3 at a time, matching Notion's per-integration rate limit) so databases with hundreds of pages import without tripping `429` responses; set `concurrency` on the source to tune it.
+The integration token comes from the `NOTION_TOKEN` environment variable (share the database with your integration). By default every page is imported; set `publishedValue` to make the `Status` property a publish gate — any other value then maps to `draft: true`, which production builds drop. **Notion image and video URLs are signed and expire**, so the adapter downloads them at build time into the site's assets and rewrites the references — a CMS asset never rots a static build. API calls are paced through a small request pool (3 at a time, matching Notion's per-integration rate limit) so databases with hundreds of pages import without tripping `429` responses; set `concurrency` on the source to tune it.
 
 ## Preview and sync
 
