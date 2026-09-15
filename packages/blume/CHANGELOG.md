@@ -1,5 +1,22 @@
 # blume
 
+## 1.7.0
+
+### Minor Changes
+
+- 78aadc8: Bundle Mermaid and the EPUB generator only for sites that use them. Both were dynamic imports, so they never loaded on a page that didn't need them, but they were still built on every `blume build` — over 3 MB of client chunks (ELK, Cytoscape, KaTeX, every diagram type) that most sites never serve, and most of the client build's memory. The generated runtime now decides at generation time whether any page has a mermaid fence and whether `export.epub` is on, and leaves the libraries out of the module graph otherwise; the dev server also stops pre-bundling them for sites that don't need them.
+- 51eb2ac: Leave collapsed sidebar sections out of the page. In `group` and `page` display modes, a section that isn't open on the current page no longer ships its rows in that page's HTML; the empty disclosure or panel fetches a prerendered fragment on first open (prefetched on hover or focus, and kept for the visit), so a large site's pages carry only the open section instead of every section on every page. Group ids are now stable across tab-scoped views of the sidebar.
+
+### Patch Changes
+
+- ede3c94: Cache rendered OG cards between builds. Each card is stored under `node_modules/.cache/blume/og`, keyed by everything that decides its pixels (title, description, branding, palette, fonts, and the Blume version), so a rebuild renders only the cards whose inputs changed and reads the rest back from disk. The build log reports how many cards were reused, and cards no page asks for any more are pruned after each build.
+- a43c1d9: Paint code-block language icons from the theme instead of inlining an SVG in every block. A block now carries `data-icon="<slug>"` and the theme masks the brand path onto it, with one rule per language the site's Markdown uses, so a page with twenty TypeScript blocks no longer repeats the same 1 kB logo twenty times. Set icons rendered by the Icon component are deduplicated the same way, through a per-page sprite.
+- 7b7d585: Prerender pages concurrently. The build now renders up to eight pages at once (one per available CPU below that), so the main thread renders the next page while a page's OG card renders on a native thread and its HTML is written to disk, instead of idling behind each page's off-thread work. A 1,400-page site's route generation phase runs in roughly half the time.
+- 903eec0: Render the sidebar's group rows (collapsible summaries, flat headings, drill-in buttons, and the links inside them) through theme utility classes, as page rows already are, so a sidebar with many groups adds a few dozen bytes per group to every page instead of several hundred.
+- 7b7d585: Shrink the sidebar's per-page cost. Every page's HTML carries the whole sidebar, so on a large site the sidebar was most of every page: each row now renders as a single theme utility class (`blume-nav-link`) instead of a dozen Tailwind classes, a bare row drops its inner spans, and groups that don't contain the current page are rendered once per build and reused across pages. A 1,400-page site's pages go from about 570 kB to under 190 kB each, and the build's HTML output shrinks and renders accordingly.
+- 4005c27: Load the curated Google fonts that ship as variable fonts (every preset except IBM Plex Mono, IBM Plex Serif, and Space Mono) as one weight range, so each page declares one `@font-face` per style instead of one per weight — the same font files, a quarter of the inline font CSS. A configured `"100..900"` range now reaches Astro in the form it understands; it previously loaded nothing for that weight.
+- 071e35d: Fix `blume dev` and `blume build` failing on Windows with `Cannot find module '@astrojs/mdx'` under Bun's isolated linker. The hidden runtime's `node_modules` link is now a directory symlink (falling back to a junction where symlinks need elevated privileges), because Windows can't follow the relative symlinks Bun writes into Blume's dependency directory when they're reached through a junction.
+
 ## 1.6.6
 
 ### Patch Changes
