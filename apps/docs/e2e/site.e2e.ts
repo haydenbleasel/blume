@@ -60,12 +60,18 @@ test.describe("mobile sidebar", () => {
 test.describe("search", () => {
   test("opens the search dialog and accepts a query", async ({ page }) => {
     await page.goto("/docs");
+    await page.evaluate(() => window.scrollTo({ top: 300 }));
+    const scrollY = await page.evaluate(() => window.scrollY);
     await page.locator("[data-blume-search-open]").first().click();
     const dialog = page.locator("[data-blume-search-dialog]");
     await expect(dialog).toBeVisible();
+    await expect(page.locator("html")).toHaveCSS("overflow", "hidden");
+    await page.mouse.wheel(0, 500);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
     await page.locator("[data-blume-search-input]").fill("quickstart");
     await expect(dialog).toContainText(/quickstart/iu);
     await page.keyboard.press("Escape");
+    await expect(page.locator("html")).toHaveCSS("overflow", "visible");
   });
 });
 

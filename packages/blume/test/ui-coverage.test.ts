@@ -612,6 +612,15 @@ describe("layout chrome sources", () => {
     expect(source).toMatch(
       /async open\(\) \{[^}]*if \(this\.dialog\.open\) \{\s*return;/u
     );
+    // A modal search owns the page scroll lock for its entire lifetime, then
+    // restores any lock that another surface (such as mobile navigation) had.
+    expect(source).toContain('root.style.overflow = "hidden";');
+    expect(source).toContain(
+      'this.dialog.addEventListener("close", () => this.unlockPageScroll());'
+    );
+    expect(source).toContain(
+      "document.documentElement.style.overflow = this.#previousRootOverflow;"
+    );
   });
 
   it("localizes the search section-filter All pill", async () => {
