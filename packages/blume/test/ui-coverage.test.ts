@@ -619,10 +619,10 @@ describe("layout chrome sources", () => {
       'this.dialog.addEventListener("close", () => this.unlockPageScroll());'
     );
     expect(source).toContain(
-      'document.documentElement.setAttribute("data-blume-search-open", "");'
+      'document.documentElement.setAttribute("data-blume-search-dialog-open", "");'
     );
     expect(source).toContain(
-      'document.documentElement.removeAttribute("data-blume-search-open");'
+      'document.documentElement.removeAttribute("data-blume-search-dialog-open");'
     );
     const header = await layoutSource("Header.astro");
     expect(header).not.toContain("d.style.overflow");
@@ -633,9 +633,10 @@ describe("layout chrome sources", () => {
       userTheme: "",
     });
     expect(css).toContain(
-      "html:where([data-blume-nav-open], [data-blume-search-open])"
+      "html:where([data-blume-nav-open], [data-blume-search-dialog-open])"
     );
     expect(css).toContain("overflow: hidden !important;");
+    expect(css).toContain("scrollbar-gutter: stable;");
   });
 
   it("localizes the search section-filter All pill", async () => {

@@ -502,11 +502,11 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       }
 
       lockPageScroll() {
-        document.documentElement.setAttribute("data-blume-search-open", "");
+        document.documentElement.setAttribute("data-blume-search-dialog-open", "");
       }
 
       unlockPageScroll() {
-        document.documentElement.removeAttribute("data-blume-search-open");
+        document.documentElement.removeAttribute("data-blume-search-dialog-open");
       }
 
       onKeydown(event: KeyboardEvent) {

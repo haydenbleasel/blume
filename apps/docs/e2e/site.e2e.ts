@@ -71,17 +71,27 @@ test.describe("mobile sidebar", () => {
 test.describe("search", () => {
   test("opens the search dialog and accepts a query", async ({ page }) => {
     await page.goto("/docs");
-    await page.evaluate(() => window.scrollTo({ top: 300 }));
-    const scrollY = await page.evaluate(() => window.scrollY);
-    await page.locator("[data-blume-search-open]").first().click();
+    await page.evaluate(() =>
+      window.scrollTo({ behavior: "instant", top: 300 })
+    );
+    // Playwright's `click` scrolls the sticky header button into view first,
+    // which resets the document to the top and would mask the lock. Dispatch
+    // the click instead so the scroll position survives the open.
+    await page.locator("button[data-blume-search-open]").dispatchEvent("click");
     const dialog = page.locator("[data-blume-search-dialog]");
     await expect(dialog).toBeVisible();
     await expect(page.locator("html")).toHaveCSS("overflow", "hidden");
     await page.mouse.wheel(0, 500);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(300);
     await page.locator("[data-blume-search-input]").fill("quickstart");
     await expect(dialog).toContainText(/quickstart/iu);
+    // Chrome's search input consumes the first Escape to clear the query, so
+    // the dialog (and the lock) only release on the second.
     await page.keyboard.press("Escape");
+    await expect(page.locator("[data-blume-search-input]")).toHaveValue("");
+    await expect(page.locator("html")).toHaveCSS("overflow", "hidden");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
     await expect(page.locator("html")).toHaveCSS("overflow", "visible");
   });
 });
