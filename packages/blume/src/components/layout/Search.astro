@@ -312,10 +312,6 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       versioned = false;
       version = "";
       allVersions = false;
-      // Search can open while another surface (the mobile navigation drawer)
-      // already owns the root overflow lock. Restore the exact inline value we
-      // inherited instead of blindly clearing it when the dialog closes.
-      #previousRootOverflow: string | null = null;
 
       // Document-level, so it outlives this element unless removed: each
       // client-router swap rebuilds the header (and this element with it), and
@@ -506,20 +502,11 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       }
 
       lockPageScroll() {
-        if (this.#previousRootOverflow !== null) {
-          return;
-        }
-        const root = document.documentElement;
-        this.#previousRootOverflow = root.style.overflow;
-        root.style.overflow = "hidden";
+        document.documentElement.setAttribute("data-blume-search-open", "");
       }
 
       unlockPageScroll() {
-        if (this.#previousRootOverflow === null) {
-          return;
-        }
-        document.documentElement.style.overflow = this.#previousRootOverflow;
-        this.#previousRootOverflow = null;
+        document.documentElement.removeAttribute("data-blume-search-open");
       }
 
       onKeydown(event: KeyboardEvent) {

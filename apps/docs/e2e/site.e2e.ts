@@ -54,6 +54,17 @@ test.describe("mobile sidebar", () => {
     const html = page.locator("html");
     await page.locator("[data-blume-nav-toggle]").first().click();
     await expect(html).toHaveAttribute("data-blume-nav-open", "");
+    await expect(html).toHaveCSS("overflow", "hidden");
+
+    // Search and the drawer independently own the page lock. When resizing
+    // closes the drawer, search must keep the page locked until it also closes.
+    await page.keyboard.press("Control+k");
+    await expect(page.locator("[data-blume-search-dialog]")).toBeVisible();
+    await page.setViewportSize({ height: 800, width: 1280 });
+    await expect(html).not.toHaveAttribute("data-blume-nav-open", "");
+    await expect(html).toHaveCSS("overflow", "hidden");
+    await page.keyboard.press("Escape");
+    await expect(html).toHaveCSS("overflow", "visible");
   });
 });
 
