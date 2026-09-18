@@ -1,5 +1,15 @@
 # blume
 
+## 1.7.1
+
+### Patch Changes
+
+- f52d4b7: Add `ai.ask.headers` to send static request headers to the Ask AI provider on every backend (gateway, OpenRouter, and the OpenAI-compatible providers), so a shared LLM backend can identify the caller without an external endpoint or an eject.
+- b9645bf: Render callouts, steps, and every other Blume component inside changelog entries on the `/changelog` index. The index rendered each entry's MDX body without the component map the docs pages use, so a `:::info` directive or `<Steps>` in a release note failed the build (and the dev route) with "Expected component `Callout` to be defined".
+- c25c859: Prevent the page behind the search dialog from scrolling while Command K search is open, and restore any existing page scroll lock when search closes.
+- 39f683c: Fix the grouped sidebar 404ing its deferred section fragments in `blume dev` on sites whose default locale is unprefixed (`i18n.hideDefaultLocalePrefix`, the default). Astro's i18n routing rejects any page URL that carries the default locale's code as a segment, so `/blume-nav/current/de/…` never resolved for a site with `defaultLocale: "de"`; those fragments now live under `default`, the same way the locale's pages drop the prefix.
+- 2575166: Import video blocks from Notion pages. A video block previously rendered as an `unsupported Notion block` comment, so neither uploaded videos nor pasted YouTube links appeared in the output. A YouTube link now becomes a `<YouTube>` embed, and any other video becomes a `<video>` player whose source is downloaded at build time — Notion's uploaded-file URLs are signed and expire, so they would otherwise rot the build. Downloads stream to disk through a shared concurrency gate with a timeout, a file already on disk is reused instead of fetched again, an extension-less asset is named by the response's media type, and a video link that answers with a web page (a Vimeo or Loom URL) is reported as a warning rather than written out as a broken player. String props the adapter writes (captions, toggle titles) use JSX expression form, so a double quote in a Notion caption no longer breaks the page.
+
 ## 1.7.0
 
 ### Minor Changes
