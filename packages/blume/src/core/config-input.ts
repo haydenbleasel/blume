@@ -744,11 +744,12 @@ export interface AskConfig {
   provider?: AskProvider;
   /**
    * How much the model reasons before answering, from `"none"` to `"xhigh"`.
-   * Forwarded to the AI SDK, which maps it to each provider's own control
-   * (OpenAI's `reasoning_effort`, for example). The model has to support the
-   * level — OpenAI rejects one a model doesn't offer — and only a provider
-   * without reasoning at all ignores it with a warning. Omitted keeps the
-   * model's default.
+   * Sent as the backend's own reasoning-effort control: the AI SDK's
+   * `reasoning` option on the gateway, `reasoning.effort` on OpenRouter, and
+   * `reasoning_effort` on OpenAI-compatible endpoints. The model has to
+   * support the level — OpenAI rejects one a model doesn't offer — and the
+   * endpoint has to accept the parameter; Inkeep has no reasoning control,
+   * so the field is rejected there. Omitted keeps the model's default.
    * `"none"` is the fastest and cheapest for grounded docs Q&A, where the
    * retrieved excerpts carry the answer.
    */

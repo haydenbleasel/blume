@@ -2055,6 +2055,19 @@ describe("ai.ask schema", () => {
     ).toThrow(/ai\.ask\.baseUrl is required/u);
   });
 
+  it("rejects reasoning on the inkeep provider", () => {
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: { ask: { enabled: true, provider: "inkeep", reasoning: "none" } },
+      })
+    ).toThrow(/ai\.ask\.reasoning is not supported/u);
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: { ask: { enabled: true, provider: "inkeep" } },
+      })
+    ).not.toThrow();
+  });
+
   it("accepts openai-compatible with a baseUrl", () => {
     expect(() =>
       blumeConfigSchema.parse({

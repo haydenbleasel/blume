@@ -1222,7 +1222,7 @@ describe("buildRuntimeData", () => {
 
 const KITCHEN_SINK = {
   "blume.config.ts": `export default {
-  ai: { ask: { enabled: true, reasoning: "none" }, mcp: { enabled: true } },
+  ai: { ask: { enabled: true }, mcp: { enabled: true } },
   deployment: { site: "https://example.com" },
   export: true,
   github: { dir: "site", owner: "acme", repo: "docs" },
@@ -1379,6 +1379,24 @@ describe("generateRuntime", () => {
     expect(generateRuntime(project)).rejects.toThrow(/ghost\.woff2/u);
   });
 
+  it("forwards ai.ask.reasoning to the generated Ask route", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  ai: { ask: { enabled: true, reasoning: "none" } },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    await generateRuntime(project);
+    const route = await readFile(
+      join(project.context.outDir, "src", "pages", "api", "ask.ts"),
+      "utf-8"
+    );
+    expect(route).toContain('reasoning: "none",');
+  });
+
   it("writes the full runtime for a feature-rich project", async () => {
     const project = await scanProject(await writeProject(KITCHEN_SINK));
     const out = project.context.outDir;
@@ -1396,10 +1414,6 @@ describe("generateRuntime", () => {
 
     // Feature-gated files.
     expect(has("src/pages/api/ask.ts")).toBe(true);
-    // The `ai.ask.reasoning` level reaches the generated route.
-    expect(
-      await readFile(join(out, "src/pages/api/ask.ts"), "utf-8")
-    ).toContain('reasoning: "none",');
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/changelog.astro")).toBe(true);
     expect(has("src/pages/404.astro")).toBe(true);

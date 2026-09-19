@@ -1042,7 +1042,10 @@ const ASK_FALLBACK_PROMPT =
 export interface AskEndpointOptions {
   /** `ai.ask.instructions` — extra system-prompt text. */
   instructions?: string;
-  /** `ai.ask.reasoning` — how much the model reasons before answering. */
+  /**
+   * `ai.ask.reasoning` — how much the model reasons before answering, sent
+   * as the backend's own reasoning-effort control.
+   */
   reasoning?: AskReasoning;
   /** `ai.ask.retrieval` — how much documentation each question carries. */
   retrieval?: AskRetrievalOptions;
@@ -1055,8 +1058,8 @@ export interface AskEndpointOptions {
  * built-in prompt on every path: the grounded prompt via `createAskContext`,
  * and the plain fallback here. `options.retrieval` (the `ai.ask.retrieval`
  * config) is forwarded to `createAskContext` on the grounded path, where it
- * sizes retrieval. `options.reasoning` (the `ai.ask.reasoning` config) is
- * forwarded to `streamText` on both paths. All three travel in one options
+ * sizes retrieval. `options.reasoning` (the `ai.ask.reasoning` config)
+ * reaches the model call on both paths. All three travel in one options
  * object so a new call site can't silently drop one of them.
  */
 export const askEndpointTemplate = (
@@ -1065,6 +1068,13 @@ export const askEndpointTemplate = (
   options?: AskEndpointOptions
 ): string => {
   const instructions = options?.instructions;
+  // `ai.ask.reasoning`. The gateway and OpenAI-compatible providers take it
+  // from `streamText`'s top-level `reasoning` (the gateway maps it to the
+  // model's own control, the OpenAI-compatible provider sends it as
+  // `reasoning_effort`). OpenRouter's provider ignores that call option and
+  // only reads its own model setting, so there the level rides on the model
+  // as `reasoning.effort`. Omitted keeps the provider default on every path.
+  const reasoning = options?.reasoning;
   const fallbackPrompt = instructions
     ? `${ASK_FALLBACK_PROMPT}\n\n${instructions}`
     : ASK_FALLBACK_PROMPT;
@@ -1100,7 +1110,10 @@ export const askEndpointTemplate = (
     setup = `\nconst openrouter = createOpenRouter({
   apiKey: getSecret(${JSON.stringify(backend.apiKeyEnv)}),${headersField}
 });\n`;
-    modelExpr = `openrouter(${JSON.stringify(backend.model)})`;
+    const settings = reasoning
+      ? `, { reasoning: { effort: ${JSON.stringify(reasoning)} } }`
+      : "";
+    modelExpr = `openrouter(${JSON.stringify(backend.model)}${settings})`;
   } else if (backend.kind === "openai-compatible") {
     imports.push(
       'import { createOpenAICompatible } from "@ai-sdk/openai-compatible";'
@@ -1186,28 +1199,28 @@ export const askEndpointTemplate = (
   const onError = `      onError({ error }) {
         console.error("Ask AI provider error:", error);
       },`;
-  // `ai.ask.reasoning`, forwarded as the AI SDK's top-level `reasoning` so the
-  // provider maps it to its own control. Omitted keeps the provider default.
-  const reasoningField = options?.reasoning
-    ? `\n      reasoning: ${JSON.stringify(options.reasoning)},`
-    : "";
+  // The `streamText` argument list, built once so the grounded and plain
+  // paths can't drift: they differ only in where the instructions come from.
+  const streamFields = [
+    `model: ${modelExpr}`,
+    grounded
+      ? "instructions"
+      : `instructions:\n        ${JSON.stringify(fallbackPrompt)}`,
+    "messages",
+  ];
+  if (reasoning && backend.kind !== "openrouter") {
+    streamFields.push(`reasoning: ${JSON.stringify(reasoning)}`);
+  }
+  const call = `    const result = streamText({
+      ${streamFields.join(",\n      ")},
+${onError}
+    });`;
   const stream = grounded
     ? `    const instructions =
       (await ground(messages, body.page)) ??
       ${JSON.stringify(fallbackPrompt)};
-    const result = streamText({
-      model: ${modelExpr},
-      instructions,
-      messages,${reasoningField}
-${onError}
-    });`
-    : `    const result = streamText({
-      model: ${modelExpr},
-      instructions:
-        ${JSON.stringify(fallbackPrompt)},
-      messages,${reasoningField}
-${onError}
-    });`;
+${call}`
+    : call;
   const handler = `export const POST: APIRoute = async ({ request }) => {
 ${validate}
 ${keyCheck}
