@@ -225,17 +225,18 @@ describe("config schema", () => {
     ).toBeUndefined();
   });
 
-  it("normalizes ai.mcp.route to a leading slash, no trailing slash", () => {
+  it("normalizes agents.mcp.route to a leading slash, no trailing slash", () => {
     // A slash-less route would be string-concatenated onto the site origin
     // (`https://acme.comdocs-mcp`) by the well-known/card/agent URLs.
     expect(
-      blumeConfigSchema.parse({ ai: { mcp: { route: "docs-mcp" } } }).ai.mcp
-        .route
+      blumeConfigSchema.parse({ agents: { mcp: { route: "docs-mcp" } } }).agents
+        .mcp.route
     ).toBe("/docs-mcp");
     expect(
-      blumeConfigSchema.parse({ ai: { mcp: { route: "/mcp/" } } }).ai.mcp.route
+      blumeConfigSchema.parse({ agents: { mcp: { route: "/mcp/" } } }).agents
+        .mcp.route
     ).toBe("/mcp");
-    expect(blumeConfigSchema.parse({}).ai.mcp.route).toBe("/mcp");
+    expect(blumeConfigSchema.parse({}).agents.mcp.route).toBe("/mcp");
   });
 
   it("accepts a banner string or object, defaulting dismissible to false", () => {
@@ -285,9 +286,9 @@ describe("astro config template", () => {
     expect(output).toContain("defaultColor: false");
   });
 
-  it("threads a configured codeBlocks theme into shikiConfig and the processors", () => {
+  it("threads a configured code theme into shikiConfig and the processors", () => {
     const config = blumeConfigSchema.parse({
-      markdown: { codeBlocks: { theme: { dark: "vesper" } } },
+      markdown: { code: { theme: { dark: "vesper" } } },
     });
     // SAFETY: astroConfigTemplate reads only root, outDir, and pagesRoot from
     // the context.
@@ -334,7 +335,7 @@ describe("astro config template", () => {
       type: "dark" as const,
     };
     const config = blumeConfigSchema.parse({
-      markdown: { codeBlocks: { theme: { dark: customDark } } },
+      markdown: { code: { theme: { dark: customDark } } },
     });
     // SAFETY: astroConfigTemplate reads only root, outDir, and pagesRoot from
     // the context.
@@ -358,7 +359,7 @@ describe("astro config template", () => {
       themePath: "/r/.blume/src/generated/app.css",
     });
 
-    expect(config.markdown.codeBlocks.theme.dark).toStrictEqual(customDark);
+    expect(config.markdown.code.theme.dark).toStrictEqual(customDark);
     expect(output).toContain('dark: {"colors":{"editor.background":"#010203"');
     expect(output).toContain('"codeThemes":{"dark":{"colors"');
   });
@@ -1603,7 +1604,7 @@ describe("robots.txt", () => {
   it("restricts an individual signal while leaving the rest yes", () => {
     const robots =
       buildRobots(
-        makeProject([], { seo: { contentSignals: { aiTrain: false } } })
+        makeProject([], { agents: { contentSignals: { aiTrain: false } } })
       ) ?? "";
     expect(robots).toContain(
       "Content-Signal: search=yes, ai-input=yes, ai-train=no"
@@ -1612,7 +1613,7 @@ describe("robots.txt", () => {
 
   it("omits the Content-Signal line when disabled with false", () => {
     const robots =
-      buildRobots(makeProject([], { seo: { contentSignals: false } })) ?? "";
+      buildRobots(makeProject([], { agents: { contentSignals: false } })) ?? "";
     expect(robots).toContain("User-agent: *");
     expect(robots).not.toContain("Content-Signal:");
   });
@@ -1670,7 +1671,7 @@ describe("agent-readability.json", () => {
   it("returns null when disabled", () => {
     expect(
       buildAgentReadability(
-        makeProject([], { seo: { agentReadability: false } })
+        makeProject([], { agents: { agentReadability: false } })
       )
     ).toBeNull();
   });
@@ -1678,9 +1679,13 @@ describe("agent-readability.json", () => {
   it("advertises llms.txt, MCP, Ask AI, feeds, and content usage when configured", () => {
     const manifest = buildAgentReadability(
       makeProject([postPage("changes", "/blog/changes", "blog", {})], {
-        ai: { ask: { enabled: true }, llmsTxt: true, mcp: { enabled: true } },
+        agents: {
+          contentSignals: { aiTrain: false, search: true },
+          llmsTxt: true,
+          mcp: { enabled: true },
+        },
+        ai: { ask: { enabled: true } },
         github: { owner: "inthhq", repo: "leadtype" },
-        seo: { contentSignals: { aiTrain: false, search: true } },
       })
     );
     expect(manifest?.artifacts).toMatchObject({
@@ -1720,14 +1725,16 @@ describe("agent-readability.json", () => {
       pages: "https://example.com/api/docs/pages.json",
       search: "https://example.com/api/docs/search",
     });
-    const off = buildAgentReadability(makeProject([], { ai: { api: false } }));
+    const off = buildAgentReadability(
+      makeProject([], { agents: { api: false } })
+    );
     expect(off?.artifacts).not.toHaveProperty("api");
   });
 
   it("advertises the Web Bot Auth directory only when keys are configured", () => {
     const key = { crv: "Ed25519", kty: "OKP", x: "abc" };
     const manifest = buildAgentReadability(
-      makeProject([], { ai: { webBotAuth: { keys: [key] } } })
+      makeProject([], { agents: { webBotAuth: { keys: [key] } } })
     );
     expect(manifest?.artifacts).toMatchObject({
       httpMessageSignaturesDirectory:
@@ -1741,7 +1748,7 @@ describe("agent-readability.json", () => {
 
   it("advertises the agent-skills index only when skills are configured", () => {
     const manifest = buildAgentReadability(
-      makeProject([], { ai: { skills: "./skills" } })
+      makeProject([], { agents: { skills: "./skills" } })
     );
     expect(manifest?.artifacts).toMatchObject({
       agentSkills: "https://example.com/.well-known/agent-skills/index.json",
@@ -1759,7 +1766,7 @@ describe("agent-readability.json", () => {
       search: true,
     });
     const off = buildAgentReadability(
-      makeProject([], { seo: { contentSignals: false } })
+      makeProject([], { agents: { contentSignals: false } })
     );
     expect(off?.contentUsage).toBeUndefined();
   });
@@ -1805,7 +1812,7 @@ describe("agent-readability.json", () => {
 
   it("uses root-relative URLs and omits the sitemap without a site", () => {
     const manifest = buildAgentReadability(
-      makeProject([], { ai: { llmsTxt: true }, deployment: {} })
+      makeProject([], { agents: { llmsTxt: true }, deployment: {} })
     );
     // SAFETY: only these artifact keys are asserted below; buildAgentReadability
     // emits them as strings (llmsTxt, sitemap) and a pattern object (markdown).
@@ -1825,7 +1832,8 @@ describe("agent-readability.json", () => {
   it("layers deployment.base onto root-relative URLs without a site", () => {
     const manifest = buildAgentReadability(
       makeProject([], {
-        ai: { ask: { enabled: true }, llmsTxt: true, mcp: { enabled: true } },
+        agents: { llmsTxt: true, mcp: { enabled: true } },
+        ai: { ask: { enabled: true } },
         deployment: { base: "/docs" },
       })
     );

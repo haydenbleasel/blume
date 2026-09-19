@@ -83,16 +83,18 @@ describe("buildAiCatalog", () => {
     expect(hasAiCatalog(config)).toBe(false);
   });
 
-  it("is off when ai.catalog is false or nothing is publishable", () => {
-    expect(hasAiCatalog(configWith({ ai: { catalog: false } }))).toBe(false);
-    const bare = configWith({ ai: { api: false, llmsTxt: false } });
+  it("is off when agents.catalog is false or nothing is publishable", () => {
+    expect(hasAiCatalog(configWith({ agents: { catalog: false } }))).toBe(
+      false
+    );
+    const bare = configWith({ agents: { api: false, llmsTxt: false } });
     expect(hasAiCatalog(bare)).toBe(false);
     expect(buildAiCatalog(bare, [])).toBeNull();
   });
 
   it("catalogs the MCP server card with its tool capabilities", () => {
     const config = configWith({
-      ai: {
+      agents: {
         api: false,
         llmsTxt: false,
         mcp: {
@@ -120,7 +122,7 @@ describe("buildAiCatalog", () => {
 
   it("falls back to a generated MCP description and a `docs` name for a non-ASCII server name", () => {
     const config = configWith({
-      ai: { api: false, llmsTxt: false, mcp: { enabled: true } },
+      agents: { api: false, llmsTxt: false, mcp: { enabled: true } },
       title: "文档",
     });
     const [entry] = parse(config).entries;
@@ -132,7 +134,7 @@ describe("buildAiCatalog", () => {
 
   it("catalogs each published skill by artifact type", () => {
     const config = configWith({
-      ai: { api: false, llmsTxt: false, skills: "./skills" },
+      agents: { api: false, llmsTxt: false, skills: "./skills" },
     });
     const { entries } = parse(config, [
       skill("blume"),
@@ -168,7 +170,7 @@ describe("buildAiCatalog", () => {
 
   it("catalogs rendered API references at their docs route, under basePath and deployment.base", () => {
     const config = configWith({
-      ai: { api: false, llmsTxt: false },
+      agents: { api: false, llmsTxt: false },
       basePath: "/docs",
       deployment: { base: "/site", site: "https://docs.example.com" },
       reference: [openapi({ route: "/reference", spec: "./openapi.json" })],
@@ -193,7 +195,7 @@ describe("buildAiCatalog", () => {
 
   it("keeps a Scalar-rendered reference at its raw route", () => {
     const config = configWith({
-      ai: { api: false, llmsTxt: false },
+      agents: { api: false, llmsTxt: false },
       basePath: "/docs",
       reference: [
         openapi({
@@ -210,7 +212,7 @@ describe("buildAiCatalog", () => {
 
   it("replaces an entry's generated queries with the configured ones", () => {
     const config = configWith({
-      ai: {
+      agents: {
         catalog: { queries: { "api:docs": ["read the Acme API"] } },
         llmsTxt: false,
       },
@@ -218,10 +220,10 @@ describe("buildAiCatalog", () => {
     expect(parse(config).entries[0].representativeQueries).toStrictEqual([
       "read the Acme API",
     ]);
-    // `ai.catalog: true` is the same as the default object form.
-    expect(parse(configWith({ ai: { catalog: true } })).entries).toStrictEqual(
-      parse(configWith()).entries
-    );
+    // `agents.catalog: true` is the same as the default object form.
+    expect(
+      parse(configWith({ agents: { catalog: true } })).entries
+    ).toStrictEqual(parse(configWith()).entries);
   });
 
   it("pins the well-known paths and the registered media type", () => {
@@ -234,7 +236,9 @@ describe("buildAiCatalog", () => {
 describe("crossOriginDiscoveryPaths", () => {
   it("lists every discovery document registries fetch cross-origin", () => {
     expect(
-      crossOriginDiscoveryPaths(configWith({ ai: { mcp: { enabled: true } } }))
+      crossOriginDiscoveryPaths(
+        configWith({ agents: { mcp: { enabled: true } } })
+      )
     ).toStrictEqual([
       "/.well-known/ai-catalog.json",
       "/.well-known/ard.json",
@@ -247,7 +251,7 @@ describe("crossOriginDiscoveryPaths", () => {
   it("is empty when nothing is published", () => {
     expect(
       crossOriginDiscoveryPaths(
-        configWith({ ai: { api: false, llmsTxt: false }, deployment: {} })
+        configWith({ agents: { api: false, llmsTxt: false }, deployment: {} })
       )
     ).toStrictEqual([]);
   });

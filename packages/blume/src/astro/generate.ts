@@ -1374,15 +1374,15 @@ export const buildRuntimeData = (project: BlumeProject): string => {
         : null,
       banner: resolveBanner(config),
       basePath: config.basePath,
-      codeThemes: config.markdown.codeBlocks.theme,
+      codeThemes: config.markdown.code.theme,
       codeWrap: config.markdown.code.wrap,
       dateFormat: config.dateFormat,
       description: config.description,
       discovery: {
-        agentReadability: config.seo.agentReadability,
+        agentReadability: config.agents.agentReadability,
         aiCatalog: hasAiCatalog(config),
-        api: config.ai.api,
-        llmsTxt: config.ai.llmsTxt.enabled,
+        api: config.agents.api,
+        llmsTxt: config.agents.llmsTxt.enabled,
         // Mirrors `buildSitemapFiles`: no site, no sitemap.
         sitemap: config.seo.sitemap && Boolean(config.deployment.options.site),
       },
@@ -1414,10 +1414,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
           : null,
       imageZoom: config.markdown.imageZoom,
       logo,
-      mcp: config.ai.mcp.enabled
+      mcp: config.agents.mcp.enabled
         ? {
-            name: config.ai.mcp.name ?? config.title,
-            route: config.ai.mcp.route,
+            name: config.agents.mcp.name ?? config.title,
+            route: config.agents.mcp.route,
           }
         : null,
       // `og.enabled` is resolved to a definite boolean in `loadConfig`; coerce
@@ -1446,8 +1446,8 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       toc: config.toc,
       versions: config.versions ?? null,
       webmcp: {
-        enabled: config.ai.webmcp,
-        llms: config.ai.llmsTxt.enabled,
+        enabled: config.agents.webmcp,
+        llms: config.agents.llmsTxt.enabled,
       },
       x: config.seo.x,
     },
@@ -1527,7 +1527,7 @@ const planMcp = (
   userPages: { pattern: string }[]
 ): McpPlan => {
   const { config } = project;
-  const { route } = config.ai.mcp;
+  const { route } = config.agents.mcp;
   const dir = join(srcDir, "blume-mcp");
   const base: McpPlan = {
     dir,
@@ -1537,14 +1537,14 @@ const planMcp = (
     srcDir,
     warnings: [],
   };
-  if (!config.ai.mcp.enabled) {
+  if (!config.agents.mcp.enabled) {
     return base;
   }
   if (routeIsTaken(userPages, project.graph.pages, route)) {
     return {
       ...base,
       warnings: [
-        `MCP server route "${route}" is already used by a content or custom page; the MCP server was not generated. Set a different "ai.mcp.route" in blume.config.ts.`,
+        `MCP server route "${route}" is already used by a content or custom page; the MCP server was not generated. Set a different "agents.mcp.route" in blume.config.ts.`,
       ],
     };
   }
@@ -1668,7 +1668,7 @@ const planApi = (
       server &&
       !userPages.some(ownsApiRest) &&
       !project.graph.pages.some(contentUnderApi),
-    enabled: config.ai.api,
+    enabled: config.agents.api,
     server,
     spec:
       !routeIsTaken(userPages, project.graph.pages, OPENAPI_PATH) &&
@@ -1723,10 +1723,10 @@ const writeApiFiles = async (
         join(plan.srcDir, "pages", "openapi.json.ts"),
         staticJsonEndpointTemplate(
           buildApiSpec({
-            agentReadability: config.seo.agentReadability,
+            agentReadability: config.agents.agentReadability,
             base: data.base,
             description: config.description,
-            llmsTxt: config.ai.llmsTxt.enabled,
+            llmsTxt: config.agents.llmsTxt.enabled,
             mcpRoute,
             name: config.title,
             search: plan.server,

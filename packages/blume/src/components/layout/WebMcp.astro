@@ -2,7 +2,7 @@
 // WebMCP: expose the docs' read-only tools (search, page Markdown, the docs
 // index) to agentic browsers via the page's model context. Rendered by
 // PageLayout on every page; the marker element below both gates the script
-// (absent when `ai.webmcp` is off, so it returns immediately) and carries the
+// (absent when `agents.webmcp` is off, so it returns immediately) and carries the
 // two config flags the client needs — importing `blume:data` from the client
 // script would drag the whole navigation snapshot into the bundle.
 import data from "blume:data";

@@ -422,8 +422,6 @@ export interface ThemeConfig {
   backgroundImage?: PerModeValue;
   /** Font selection for body, display, and mono roles. */
   fonts?: FontsConfig;
-  /** Overall page layout. Currently only `sidebar`. */
-  layout?: "sidebar";
   /** Initial color mode. Defaults to `system`. */
   mode?: "system" | "light" | "dark";
   /** Corner radius scale. Defaults to `md`. */
@@ -581,7 +579,7 @@ export interface AiCatalogConfig {
    * registries embed for semantic search.
    *
    * ```ts
-   * ai: {
+   * agents: {
    *   catalog: {
    *     queries: {
    *       "mcp:acme": ["how do I install Acme", "search the Acme docs"],
@@ -603,7 +601,7 @@ export interface LlmsTxtConfig {
    * dropped.
    *
    * ```ts
-   * ai: {
+   * agents: {
    *   llmsTxt: {
    *     details: "## When to use Acme\n\nUse Acme when…",
    *   },
@@ -633,59 +631,10 @@ export interface McpConfig {
   route?: string;
 }
 
-/**
- * AI-facing features: the Ask AI assistant, an `llms.txt` manifest, and the
- * hosted MCP server.
- */
+/** Model-facing features: the Ask AI assistant and the "Open in chat" action. */
 export interface AiConfig {
-  /**
-   * The JSON docs API — the REST twin of the MCP tools. Serves the page index
-   * (`/api/docs/pages.json`), each page as JSON (`/api/docs/pages/{route}.json`),
-   * and the navigation tree (`/api/docs/navigation.json`) as prerendered
-   * files, plus full-text search (`/api/docs/search?q=`) on server output,
-   * all described by an OpenAPI document at `/openapi.json`. Errors are RFC
-   * 9457 problem details. Defaults to `true`; set `false` to publish none of it.
-   */
-  api?: boolean;
   /** The Ask AI chat assistant. */
   ask?: AskConfig;
-  /**
-   * The AI Catalog / ARD manifest (`/.well-known/ai-catalog.json`, mirrored
-   * at `/.well-known/ard.json`): a domain-level index of the agent-facing
-   * resources the site publishes — MCP server, agent skills, the JSON docs
-   * API, API references, llms.txt — for agent registries. Needs a
-   * `deployment.site`. Defaults to `true`; the object form overrides the
-   * generated representative queries per entry.
-   */
-  catalog?: boolean | AiCatalogConfig;
-  /**
-   * Emit `llms.txt` (an index of the docs for LLMs). Defaults to `true`.
-   * The object form adds knobs for what the files include.
-   */
-  llmsTxt?: boolean | LlmsTxtConfig;
-  /**
-   * Markdown serializers for custom components in agent-facing output (the
-   * `.md` mirror, `llms-full.txt`, MCP `get_page`), keyed by JSX name. Each
-   * receives the component's statically-evaluated `props` (with the page's
-   * `frontmatter` in scope, so `prop={frontmatter.status}` resolves), its
-   * downleveled `children`, and the page's `frontmatter` data, and returns
-   * replacement Markdown — or `null` to leave the JSX verbatim. A same-name
-   * entry replaces a built-in serializer.
-   *
-   * These live in `blume.config.ts` (which is executed at build time), not in
-   * `components.tsx` (which is only statically analyzed, never run).
-   *
-   * ```ts
-   * ai: {
-   *   markdownComponents: {
-   *     Chart: ({ props }) => `![${props.title}](/charts/${props.slug}.png)`,
-   *   },
-   * }
-   * ```
-   */
-  markdownComponents?: Record<string, ComponentMarkdown>;
-  /** Expose the docs as an MCP server for agents. */
-  mcp?: McpConfig;
   /**
    * The "Open in chat" page action, which opens the current page in an AI
    * assistant pre-filled with a prompt pointing at its raw Markdown.
@@ -699,34 +648,6 @@ export interface AiConfig {
    * ```
    */
   openInChat?: boolean | OpenInChatProvider[];
-  /**
-   * Publish Agent Skills for discovery: a directory (resolved against the
-   * project root) whose subdirectories each hold a `SKILL.md`. Skills are
-   * copied under `/.well-known/agent-skills/` — single-file skills verbatim,
-   * skills with supporting resources as `.tar.gz` archives — and enumerated
-   * in a discovery index with SHA-256 digests (Agent Skills Discovery RFC).
-   *
-   * ```ts
-   * ai: {
-   *   skills: "./skills",
-   * }
-   * ```
-   */
-  skills?: string;
-  /**
-   * Web Bot Auth: publish the org's HTTP Message Signature public keys at
-   * `/.well-known/http-message-signatures-directory`, so sites receiving
-   * requests from your agents can verify them. Public keys only — a key
-   * containing private material (`d`, `p`, `q`, …) is rejected.
-   */
-  webBotAuth?: WebBotAuthConfig;
-  /**
-   * WebMCP: register in-page tools (search, page Markdown, the docs index)
-   * on the browser's model context, so agentic browsers can drive the docs
-   * without a separate MCP connection. The script is tiny and no-ops in
-   * browsers without the API. Defaults to `true`; set `false` to opt out.
-   */
-  webmcp?: boolean;
 }
 
 /** Web Bot Auth signature directory. Off until at least one key is listed. */
@@ -909,6 +830,96 @@ export type ContentSignalsConfig =
       search?: boolean;
     };
 
+/**
+ * The machine-readable surface agents consume: the JSON API, `llms.txt`, the
+ * MCP server, published skills, discovery manifests, and the robots.txt usage
+ * policy. The reader-facing model features (Ask AI, Open in chat) live under
+ * `ai`.
+ */
+export interface AgentsConfig {
+  /**
+   * Emit `agent-readability.json`: a manifest indexing the agent-facing surface
+   * (llms.txt, Markdown mirrors, MCP, feeds). Defaults to `true`.
+   */
+  agentReadability?: boolean;
+  /**
+   * The JSON docs API — the REST twin of the MCP tools. Serves the page index
+   * (`/api/docs/pages.json`), each page as JSON (`/api/docs/pages/{route}.json`),
+   * and the navigation tree (`/api/docs/navigation.json`) as prerendered
+   * files, plus full-text search (`/api/docs/search?q=`) on server output,
+   * all described by an OpenAPI document at `/openapi.json`. Errors are RFC
+   * 9457 problem details. Defaults to `true`; set `false` to publish none of it.
+   */
+  api?: boolean;
+  /**
+   * The AI Catalog / ARD manifest (`/.well-known/ai-catalog.json`, mirrored
+   * at `/.well-known/ard.json`): a domain-level index of the agent-facing
+   * resources the site publishes — MCP server, agent skills, the JSON docs
+   * API, API references, llms.txt — for agent registries. Needs a
+   * `deployment.site`. Defaults to `true`; the object form overrides the
+   * generated representative queries per entry.
+   */
+  catalog?: boolean | AiCatalogConfig;
+  /** robots.txt `Content-Signal` usage declaration. Defaults to `true`. */
+  contentSignals?: ContentSignalsConfig;
+  /**
+   * Emit `llms.txt` (an index of the docs for LLMs). Defaults to `true`.
+   * The object form adds knobs for what the files include.
+   */
+  llmsTxt?: boolean | LlmsTxtConfig;
+  /**
+   * Markdown serializers for custom components in agent-facing output (the
+   * `.md` mirror, `llms-full.txt`, MCP `get_page`), keyed by JSX name. Each
+   * receives the component's statically-evaluated `props` (with the page's
+   * `frontmatter` in scope, so `prop={frontmatter.status}` resolves), its
+   * downleveled `children`, and the page's `frontmatter` data, and returns
+   * replacement Markdown — or `null` to leave the JSX verbatim. A same-name
+   * entry replaces a built-in serializer.
+   *
+   * These live in `blume.config.ts` (which is executed at build time), not in
+   * `components.tsx` (which is only statically analyzed, never run).
+   *
+   * ```ts
+   * agents: {
+   *   markdownComponents: {
+   *     Chart: ({ props }) => `![${props.title}](/charts/${props.slug}.png)`,
+   *   },
+   * }
+   * ```
+   */
+  markdownComponents?: Record<string, ComponentMarkdown>;
+  /** Expose the docs as an MCP server for agents. */
+  mcp?: McpConfig;
+  /**
+   * Publish Agent Skills for discovery: a directory (resolved against the
+   * project root) whose subdirectories each hold a `SKILL.md`. Skills are
+   * copied under `/.well-known/agent-skills/` — single-file skills verbatim,
+   * skills with supporting resources as `.tar.gz` archives — and enumerated
+   * in a discovery index with SHA-256 digests (Agent Skills Discovery RFC).
+   *
+   * ```ts
+   * agents: {
+   *   skills: "./skills",
+   * }
+   * ```
+   */
+  skills?: string;
+  /**
+   * Web Bot Auth: publish the org's HTTP Message Signature public keys at
+   * `/.well-known/http-message-signatures-directory`, so sites receiving
+   * requests from your agents can verify them. Public keys only — a key
+   * containing private material (`d`, `p`, `q`, …) is rejected.
+   */
+  webBotAuth?: WebBotAuthConfig;
+  /**
+   * WebMCP: register in-page tools (search, page Markdown, the docs index)
+   * on the browser's model context, so agentic browsers can drive the docs
+   * without a separate MCP connection. The script is tiny and no-ops in
+   * browsers without the API. Defaults to `true`; set `false` to opt out.
+   */
+  webmcp?: boolean;
+}
+
 /** RSS/Atom feed generation. */
 export interface RssConfig {
   /** Generate feeds. Defaults to `true`. */
@@ -1057,13 +1068,6 @@ export interface SoftwareConfig {
 
 /** Discoverability: OG images, feeds, sitemap, robots, and structured data. */
 export interface SeoConfig {
-  /**
-   * Emit `agent-readability.json`: a manifest indexing the agent-facing surface
-   * (llms.txt, Markdown mirrors, MCP, feeds). Defaults to `true`.
-   */
-  agentReadability?: boolean;
-  /** robots.txt `Content-Signal` usage declaration. Defaults to `true`. */
-  contentSignals?: ContentSignalsConfig;
   /** Per-page Open Graph image generation. */
   og?: OgConfig;
   /**
@@ -1151,31 +1155,29 @@ export interface GithubConfig {
 // Markdown
 // ---------------------------------------------------------------------------
 
-/** Code-block rendering options. */
+/** Code rendering options. */
 export interface CodeConfig {
   /** Show a brand language icon in the code-block header. Defaults to `true`. */
   icons?: boolean;
+  /**
+   * Syntax-highlighting themes for every code surface — fenced blocks, inline
+   * `` `code`{:lang} ``, `<CodeBlock>`, and `<Diff>` — as bundled Shiki theme
+   * names or inline custom Shiki themes per color mode.
+   */
+  theme?: {
+    /** Dark-mode theme name or custom theme. Defaults to `github-dark`. */
+    dark?: CodeTheme;
+    /** Light-mode theme name or custom theme. Defaults to `github-light`. */
+    light?: CodeTheme;
+  };
   /** Wrap long lines instead of scrolling horizontally. Defaults to `false`. */
   wrap?: boolean;
 }
 
 /** Markdown / MDX rendering behavior. */
 export interface MarkdownConfig {
-  /** Code-block rendering: language icons, line wrap. */
+  /** Code rendering: language icons, syntax themes, line wrap. */
   code?: CodeConfig;
-  /**
-   * Syntax-highlighting themes for every code surface — fenced blocks, inline
-   * `` `code`{:lang} ``, `<CodeBlock>`, and `<Diff>`.
-   */
-  codeBlocks?: {
-    /** Bundled Shiki theme names or inline custom Shiki themes per color mode. */
-    theme?: {
-      /** Dark-mode theme name or custom theme. Defaults to `github-dark`. */
-      dark?: CodeTheme;
-      /** Light-mode theme name or custom theme. Defaults to `github-light`. */
-      light?: CodeTheme;
-    };
-  };
   /**
    * Wrap each `##`–`######` heading in a self-anchor link so readers can copy,
    * bookmark, or share a section permalink. Defaults to `true`.
@@ -1265,16 +1267,11 @@ export interface FrontmatterConfig {
 }
 
 /**
- * "Last updated" timestamps. `false` (default) disables them; `true` derives
- * each date from git history; the object form selects the source. A page's
- * `lastModified` frontmatter always wins.
+ * "Last updated" timestamps. `false` (default) disables them; `"git"` derives
+ * each date from the repository history; `"frontmatter"` reads only the page's
+ * own field. A page's `lastModified` frontmatter always wins.
  */
-export type LastModifiedConfig =
-  | boolean
-  | {
-      /** Where the date comes from. Defaults to `git`. */
-      type?: "git" | "frontmatter";
-    };
+export type LastModifiedConfig = false | "git" | "frontmatter";
 
 /**
  * Date presentation for the "last updated" stamp and the changelog timeline —
@@ -1326,7 +1323,9 @@ export type TocConfig =
  * Markdown/MDX under `docs/` with sensible defaults.
  */
 export interface BlumeConfig {
-  /** AI-facing features: the Ask AI assistant and an `llms.txt` manifest. */
+  /** The machine-readable surface for agents: JSON API, `llms.txt`, MCP, skills, discovery. */
+  agents?: AgentsConfig;
+  /** Model-facing features: the Ask AI assistant and the "Open in chat" action. */
   ai?: AiConfig;
   /**
    * Analytics adapters from `blume/analytics`, emitted into `<head>` of every
@@ -1381,7 +1380,7 @@ export interface BlumeConfig {
   image?: ImageConfig;
   /** Astro integrations appended after Blume's built-ins, in declaration order. */
   integrations?: AstroIntegration[];
-  /** "Last updated" timestamps from git history or frontmatter. Defaults to `false`. */
+  /** "Last updated" timestamps: `"git"`, `"frontmatter"`, or `false` (default). */
   lastModified?: LastModifiedConfig;
   /** Site logo / brand mark. */
   logo?: LogoConfig;

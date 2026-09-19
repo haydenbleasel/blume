@@ -6,16 +6,16 @@ import { ERROR_ROUTES } from "../types.ts";
 import type { AuditContext, CheckModule } from "../types.ts";
 import { isServed, normalizePath, siteOrigin } from "../url.ts";
 
-/** The object form of `ai.llmsTxt`. The schema always emits it, but hand-built
+/** The object form of `agents.llmsTxt`. The schema always emits it, but hand-built
  * audit contexts (tests, partial configs) may still carry the raw boolean. */
 const isLlmsToggleObject = (
   value: boolean | { enabled: boolean; openapi: boolean } | undefined
 ): value is { enabled: boolean; openapi: boolean } =>
   typeof value === "object" && value !== null;
 
-/** The `ai.llmsTxt` config normalized to what the checks need. */
+/** The `agents.llmsTxt` config normalized to what the checks need. */
 const llmsConfig = (context: AuditContext) => {
-  const value = context.project.config.ai?.llmsTxt;
+  const value = context.project.config.agents?.llmsTxt;
   if (isLlmsToggleObject(value)) {
     return { enabled: value.enabled, openapi: value.openapi };
   }
@@ -114,7 +114,7 @@ export const llmsChecks: CheckModule = {
     // The reverse direction, mirroring INDEXABLE_PAGE_NOT_IN_SITEMAP: a page
     // that is built, indexable, and in the nav belongs in the index. Pages the
     // generator deliberately skips — hidden, drafts, error routes, API
-    // reference when `ai.llmsTxt.openapi` is off, custom pages with no
+    // reference when `agents.llmsTxt.openapi` is off, custom pages with no
     // manifest route — are skipped here for the same reasons.
     for (const page of context.pages) {
       const { route } = page;

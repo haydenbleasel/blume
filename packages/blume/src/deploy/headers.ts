@@ -91,7 +91,7 @@ export const buildNetlifyHeaders = (
       `${deployBase}${API_CATALOG_PATH}\n  Content-Type: ${API_CATALOG_TYPE}`
     );
   }
-  if (config.ai.webBotAuth.keys.length > 0) {
+  if (config.agents.webBotAuth.keys.length > 0) {
     rules.push(
       `${deployBase}${SIGNATURES_DIRECTORY_PATH}\n  Content-Type: ${SIGNATURES_DIRECTORY_TYPE}`
     );
@@ -104,7 +104,7 @@ export const buildNetlifyHeaders = (
   // Published skills live at the deployment base, outside `basePath` — the
   // `.md` charset rule above misses them whenever a basePath is set, and the
   // RFC wants archives served as application/gzip explicitly.
-  if (config.ai.skills) {
+  if (config.agents.skills) {
     rules.push(
       `${deployBase}/.well-known/agent-skills/*.md\n  Content-Type: text/markdown; charset=utf-8`,
       `${deployBase}/.well-known/agent-skills/*.tar.gz\n  Content-Type: application/gzip`

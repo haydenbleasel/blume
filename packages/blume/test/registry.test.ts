@@ -79,6 +79,7 @@ describe("eject", () => {
     // and the hosted MCP server.
     await writeFiles(root, {
       "blume.config.ts": `export default {
+        agents: { mcp: { enabled: true } },
         ai: {
           ask: {
             cors: ["https://www.example.com/"],
@@ -92,7 +93,6 @@ describe("eject", () => {
             },
             retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
           },
-          mcp: { enabled: true },
         },
         deployment: { site: "https://example.com" },
         reference: [{ kind: "openapi", options: { renderer: { kind: "scalar", options: {}, requiredSecrets: [], runtimeDeps: ["@scalar/astro"] }, spec: "openapi.json" }, requiredSecrets: [], runtimeDeps: [] }],

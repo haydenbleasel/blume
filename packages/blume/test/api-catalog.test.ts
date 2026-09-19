@@ -15,7 +15,7 @@ const configWith = (overrides: BlumeConfigInput = {}) =>
 
 describe("buildApiCatalog", () => {
   it("returns null when the site publishes no APIs", () => {
-    const config = configWith({ ai: { api: false } });
+    const config = configWith({ agents: { api: false } });
     expect(buildApiCatalog(config)).toBeNull();
     expect(hasApiCatalog(config)).toBe(false);
   });
@@ -44,7 +44,7 @@ describe("buildApiCatalog", () => {
 
   it("catalogs an OpenAPI reference with absolute service links", () => {
     const config = configWith({
-      ai: { api: false },
+      agents: { api: false },
       deployment: { site: "https://docs.example.com" },
       reference: [
         openapi({
@@ -67,7 +67,7 @@ describe("buildApiCatalog", () => {
 
   it("omits service-desc for a local spec file", () => {
     const config = configWith({
-      ai: { api: false },
+      agents: { api: false },
       reference: [openapi({ spec: "./openapi.json" })],
     });
     const [entry] = JSON.parse(buildApiCatalog(config) ?? "").linkset;
@@ -79,7 +79,7 @@ describe("buildApiCatalog", () => {
 
   it("mounts Blume-rendered references under basePath and deployment.base", () => {
     const config = configWith({
-      ai: { api: false },
+      agents: { api: false },
       basePath: "/docs",
       deployment: { base: "/site" },
       reference: [openapi({ spec: "./openapi.json" })],
@@ -90,7 +90,7 @@ describe("buildApiCatalog", () => {
 
   it("catalogs the hosted MCP server", () => {
     const config = configWith({
-      ai: { api: false, mcp: { enabled: true } },
+      agents: { api: false, mcp: { enabled: true } },
       deployment: { site: "https://docs.example.com" },
     });
     const catalog = JSON.parse(buildApiCatalog(config) ?? "");

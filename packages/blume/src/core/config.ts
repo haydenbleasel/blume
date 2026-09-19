@@ -148,7 +148,8 @@ import type { Diagnostic } from "./types.ts";
  *       sources: [{ label: "Core", spec: "./openapi.json" }],
  *     }),
  *   ],
- *   ai: { ask: { enabled: true }, llmsTxt: true },
+ *   agents: { llmsTxt: true },
+ *   ai: { ask: { enabled: true } },
  * });
  * ```
  *

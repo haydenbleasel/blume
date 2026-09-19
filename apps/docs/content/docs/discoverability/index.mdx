@@ -5,7 +5,7 @@ description: How a Blume site gets found — by search engines and social platfo
 
 Search engines and AI agents want the same thing from your docs: a clean, machine-readable account of what each page says, how the pages relate, and who publishes them. Blume treats the two as one discoverability layer. Metadata, social cards, feeds, and structured data serve the crawlers that rank you; `llms.txt`, raw Markdown, a JSON API, an MCP server, and discovery manifests serve the agents that answer questions about you — and the files in between (`robots.txt`, the sitemap, JSON-LD) are read by both.
 
-Almost all of it is on by default and needs no configuration. The knobs live under two keys in `blume.config.ts`: `seo` for what search engines and social platforms see, and `ai` for what agents see.
+Almost all of it is on by default and needs no configuration. The knobs live under two keys in `blume.config.ts`: `seo` for what search engines and social platforms see, and `agents` for what agents see.
 
 ```ts blume.config.ts lineNumbers
 seo: {
@@ -16,7 +16,7 @@ seo: {
   structuredData: true,
   x: { handle: "@acme" },
 },
-ai: {
+agents: {
   llmsTxt: true,
   mcp: { enabled: false },
 },
@@ -41,7 +41,7 @@ Most of this is sharper with an absolute site URL — set [`deployment.site`](/d
 
 Every generated file yields to one you ship yourself: drop a `robots.txt`, `sitemap.xml`, `llms.txt`, `openapi.json`, or `agent-readability.json` in `public/` and Blume serves yours in its place.
 
-The in-page **Ask AI** assistant is the one AI feature documented elsewhere: it's a reader-facing product feature rather than a discovery surface, so it lives under [Configuration](/docs/configuration/ask-ai).
+The in-page **Ask AI** assistant is the one AI feature documented elsewhere: it's a reader-facing product feature rather than a discovery surface, so it's configured under `ai` and lives under [Configuration](/docs/configuration/ask-ai).
 
 ## Checking your work
 

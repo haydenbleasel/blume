@@ -41,7 +41,7 @@ export const buildRobots = (project: BlumeProject): string | null => {
   }
 
   const lines = ["User-agent: *"];
-  const signal = contentSignalLine(config.seo.contentSignals);
+  const signal = contentSignalLine(config.agents.contentSignals);
   if (signal) {
     lines.push(signal);
   }

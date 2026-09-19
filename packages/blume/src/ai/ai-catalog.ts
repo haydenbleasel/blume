@@ -75,12 +75,12 @@ const publisherHost = (site: string): string => new URL(site).hostname;
  * header rules, the `Link` header, and the head links read.
  */
 export const hasAiCatalog = (config: ResolvedConfig): boolean =>
-  config.ai.catalog.enabled &&
+  config.agents.catalog.enabled &&
   Boolean(config.deployment.options.site) &&
-  (config.ai.mcp.enabled ||
-    config.ai.api ||
-    config.ai.llmsTxt.enabled ||
-    Boolean(config.ai.skills) ||
+  (config.agents.mcp.enabled ||
+    config.agents.api ||
+    config.agents.llmsTxt.enabled ||
+    Boolean(config.agents.skills) ||
     resolveReferences(config).length > 0);
 
 /**
@@ -97,7 +97,7 @@ export const crossOriginDiscoveryPaths = (config: ResolvedConfig): string[] => {
   if (hasApiCatalog(config)) {
     paths.push(API_CATALOG_PATH);
   }
-  if (config.ai.mcp.enabled) {
+  if (config.agents.mcp.enabled) {
     paths.push("/.well-known/mcp.json", "/.well-known/mcp/server-card.json");
   }
   return paths;
@@ -111,12 +111,12 @@ const entrySeeds = (
   const { title } = config;
   const seeds: EntrySeed[] = [];
 
-  if (config.ai.mcp.enabled) {
-    const name = config.ai.mcp.name ?? title;
+  if (config.agents.mcp.enabled) {
+    const name = config.agents.mcp.name ?? title;
     seeds.push({
       capabilities: ["search_docs", "get_page", "list_pages", "get_navigation"],
       description:
-        config.ai.mcp.instructions ??
+        config.agents.mcp.instructions ??
         `Model Context Protocol server over the ${title} documentation: full-text search, page Markdown, the page index, and the navigation tree.`,
       displayName: name,
       key: `mcp:${asciiSlugify(name) || "docs"}`,
@@ -147,7 +147,7 @@ const entrySeeds = (
     });
   }
 
-  if (config.ai.api) {
+  if (config.agents.api) {
     seeds.push({
       description: `REST API over the ${title} documentation: the page index, each page as JSON or Markdown, and the navigation tree, described by this OpenAPI document.`,
       displayName: `${title} docs API`,
@@ -184,7 +184,7 @@ const entrySeeds = (
     });
   }
 
-  if (config.ai.llmsTxt.enabled) {
+  if (config.agents.llmsTxt.enabled) {
     seeds.push({
       description: `llms.txt index of the ${title} documentation: every page with a one-line summary, plus the agent-facing resources on this site.`,
       displayName: `${title} llms.txt`,
@@ -216,7 +216,7 @@ export const buildAiCatalog = (
       displayName: seed.displayName,
       identifier: `urn:air:${host}:${seed.key}`,
       representativeQueries:
-        config.ai.catalog.queries[seed.key] ?? seed.queries,
+        config.agents.catalog.queries[seed.key] ?? seed.queries,
       type: seed.type,
       url: seed.url,
     };

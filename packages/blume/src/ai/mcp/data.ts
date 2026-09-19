@@ -128,8 +128,8 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
       }
       return document;
     }),
-    instructions: config.ai.mcp.instructions,
-    name: config.ai.mcp.name ?? config.title,
+    instructions: config.agents.mcp.instructions,
+    name: config.agents.mcp.name ?? config.title,
     navigation: graph.navigation,
     pages,
     routes,

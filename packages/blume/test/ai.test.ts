@@ -205,10 +205,10 @@ describe("buildLlmsFiles — index", () => {
     expect(index).not.toContain("Gamma");
   });
 
-  it("places ai.llmsTxt.details between the summary and the sections", async () => {
+  it("places agents.llmsTxt.details between the summary and the sections", async () => {
     const { index } = await buildLlmsFiles(
       makeProject([makePage("a.md", "/a", "Alpha")], {
-        ai: {
+        agents: {
           llmsTxt: {
             details: "## When to use Docs\n\nReach for Docs when you ship.",
           },
@@ -249,13 +249,14 @@ describe("buildLlmsFiles — agent resources", () => {
   it("adds the MCP server, skills index, and API catalog when configured, and drops disabled artifacts", async () => {
     const { index } = await buildLlmsFiles(
       makeProject([makePage("a.md", "/a", "Alpha")], {
-        ai: {
+        agents: {
+          agentReadability: false,
           api: false,
           mcp: { enabled: true, route: "/docs-mcp" },
           skills: "./skills",
         },
         deployment: node({ site: "https://example.com/" }),
-        seo: { agentReadability: false, sitemap: false },
+        seo: { sitemap: false },
       })
     );
     expect(agentResources(index)).toStrictEqual([
@@ -498,7 +499,7 @@ describe("buildLlmsFiles — navigation structure", () => {
   });
 });
 
-describe("buildLlmsFiles — ai.llmsTxt.openapi", () => {
+describe("buildLlmsFiles — agents.llmsTxt.openapi", () => {
   const apiPage = (): PageRecord =>
     makePage("openapi:reference/get-pet.mdx", "/reference/get-pet", "Get Pet", {
       body: { format: "mdx", text: "API operation body." },
@@ -520,7 +521,7 @@ describe("buildLlmsFiles — ai.llmsTxt.openapi", () => {
   it("drops them from both files when openapi is false", async () => {
     const { full, index } = await buildLlmsFiles(
       makeProject([makePage("a.md", "/a", "Alpha"), apiPage()], {
-        ai: { llmsTxt: { openapi: false } },
+        agents: { llmsTxt: { openapi: false } },
       })
     );
     expect(index).toContain("- [Alpha]");
@@ -545,33 +546,33 @@ describe("buildLlmsFiles — ai.llmsTxt.openapi", () => {
   });
 });
 
-describe("ai.llmsTxt schema", () => {
+describe("agents.llmsTxt schema", () => {
   it("resolves the boolean shorthand and the object form", () => {
-    expect(blumeConfigSchema.parse({}).ai.llmsTxt).toStrictEqual({
+    expect(blumeConfigSchema.parse({}).agents.llmsTxt).toStrictEqual({
       enabled: true,
       openapi: true,
     });
     expect(
-      blumeConfigSchema.parse({ ai: { llmsTxt: false } }).ai.llmsTxt
+      blumeConfigSchema.parse({ agents: { llmsTxt: false } }).agents.llmsTxt
     ).toStrictEqual({ enabled: false, openapi: true });
     expect(
-      blumeConfigSchema.parse({ ai: { llmsTxt: { openapi: false } } }).ai
-        .llmsTxt
+      blumeConfigSchema.parse({ agents: { llmsTxt: { openapi: false } } })
+        .agents.llmsTxt
     ).toStrictEqual({ enabled: true, openapi: false });
   });
 
   it("keeps a trimmed details block and rejects a blank one", () => {
     expect(
       blumeConfigSchema.parse({
-        ai: { llmsTxt: { details: "  ## When to use\n\nNow.  " } },
-      }).ai.llmsTxt
+        agents: { llmsTxt: { details: "  ## When to use\n\nNow.  " } },
+      }).agents.llmsTxt
     ).toStrictEqual({
       details: "## When to use\n\nNow.",
       enabled: true,
       openapi: true,
     });
     expect(() =>
-      blumeConfigSchema.parse({ ai: { llmsTxt: { details: "   " } } })
+      blumeConfigSchema.parse({ agents: { llmsTxt: { details: "   " } } })
     ).toThrow();
   });
 });
@@ -782,10 +783,10 @@ describe("component downleveling in agent surfaces", () => {
     expect(raw["/comp"]?.mdx).toContain('<Component path="forms/login" />');
   });
 
-  it("honors ai.markdownComponents serializers from the config", async () => {
+  it("honors agents.markdownComponents serializers from the config", async () => {
     const customized = tableProject();
     customized.config = blumeConfigSchema.parse({
-      ai: {
+      agents: {
         markdownComponents: {
           Callout: ({ children }: { children: string }) => `NOTE: ${children}`,
         },
@@ -811,11 +812,11 @@ describe("component downleveling in agent surfaces", () => {
   it("validates markdownComponents entries are functions", () => {
     expect(
       blumeConfigSchema.safeParse({
-        ai: { markdownComponents: { Chart: "not a function" } },
+        agents: { markdownComponents: { Chart: "not a function" } },
       }).success
     ).toBe(false);
     const parsed = blumeConfigSchema.parse({});
-    expect(parsed.ai.markdownComponents).toStrictEqual({});
+    expect(parsed.agents.markdownComponents).toStrictEqual({});
   });
 });
 

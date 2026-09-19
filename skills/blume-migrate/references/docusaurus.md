@@ -21,7 +21,7 @@ Read `themeConfig`, `presets`, and `plugins`:
 | `themeConfig.navbar.items` (external/utility links — Blog, Discord…) | **`navigation.actions`** (`[{ label, href }]`, plain header links) to keep them in the header, or **`navigation.featured`** (`{ label, href, icon? }`, pinned above the sidebar on every route) if they should survive on phones; the GitHub link → the `github` config instead |
 | `themeConfig.navbar.items` (a `className`-styled button — "Get started", "Sign up") | **`navigation.cta`** (`{ label, href }`, the header's one filled button; a route the docs don't serve must be an absolute URL) |
 | `themeConfig.colorMode.defaultMode` | `theme.mode` (`respectPrefersColorScheme: true` → `"system"`) |
-| `themeConfig.prism.theme` / `.darkTheme` | `markdown.codeBlocks.theme: { light, dark }` (map Prism theme names to Shiki themes, e.g. `github`/`github-dark`) |
+| `themeConfig.prism.theme` / `.darkTheme` | `markdown.code.theme: { light, dark }` (map Prism theme names to Shiki themes, e.g. `github`/`github-dark`) |
 | `themeConfig.metadata` / `themeConfig.image` | per-page `seo` frontmatter / `seo.og`; report what doesn't fit |
 | `url` + `baseUrl` | **`url` → drop** (`deployment.site` auto-detects); `baseUrl` (when not `/`) → `deployment.base` |
 | preset `docs.routeBasePath` — **including the default!** | Docusaurus serves docs at **`/docs/…` by default**; the "map only declared fields" rule does **not** apply here because the _URLs_ are load-bearing. Either keep them with top-level **`basePath: "/docs"`** (invisible to the sidebar), or intentionally move to root and emit a `redirects` entry per page. Decide explicitly and say which. (`routeBasePath: '/'` = docs-only mode — nothing to do.) |

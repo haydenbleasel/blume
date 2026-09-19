@@ -154,7 +154,7 @@ export const emitHeaderFiles = async (
 };
 
 /**
- * Collect the Agent Skills `ai.skills` publishes, once per build, so both the
+ * Collect the Agent Skills `agents.skills` publishes, once per build, so both the
  * skills surface and llms.txt (which lists them) read the same set. Empty
  * when the feature is off, the directory is missing, nothing in it is
  * publishable (each with a warning), or a user-shipped
@@ -165,14 +165,14 @@ const collectConfiguredSkills = async (
   distDir: string,
   logger: ArtifactLogger
 ): Promise<SkillArtifact[]> => {
-  const configured = project.config.ai.skills;
+  const configured = project.config.agents.skills;
   if (!configured) {
     return [];
   }
   const dir = resolve(project.context.root, configured);
   if (!existsSync(dir)) {
     logger.warn(
-      `ai.skills points at "${configured}" (${dir}), which does not exist; no skills published.`
+      `agents.skills points at "${configured}" (${dir}), which does not exist; no skills published.`
     );
     return [];
   }
@@ -184,7 +184,9 @@ const collectConfiguredSkills = async (
     logger.warn(warning);
   }
   if (skills.length === 0) {
-    logger.warn(`ai.skills: no publishable skills found in "${configured}".`);
+    logger.warn(
+      `agents.skills: no publishable skills found in "${configured}".`
+    );
   }
   return skills;
 };
@@ -333,7 +335,7 @@ export const publishBuildArtifacts = async (
 
   // Collected once: llms.txt lists the skills the build publishes below.
   const skills = await collectConfiguredSkills(project, distDir, logger);
-  if (project.config.ai.llmsTxt.enabled) {
+  if (project.config.agents.llmsTxt.enabled) {
     await publishLlmsFiles(project, distDir, skills, logger);
   }
 

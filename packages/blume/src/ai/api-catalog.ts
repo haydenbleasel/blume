@@ -57,7 +57,7 @@ const linksetEntries = (config: ResolvedConfig): LinksetEntry[] => {
     entries.push(entry);
   }
 
-  if (config.ai.api) {
+  if (config.agents.api) {
     entries.push({
       anchor: abs(API_BASE),
       "service-desc": [{ href: abs(OPENAPI_PATH), type: "application/json" }],
@@ -65,9 +65,9 @@ const linksetEntries = (config: ResolvedConfig): LinksetEntry[] => {
     });
   }
 
-  if (config.ai.mcp.enabled) {
+  if (config.agents.mcp.enabled) {
     entries.push({
-      anchor: abs(config.ai.mcp.route),
+      anchor: abs(config.agents.mcp.route),
       "service-desc": [
         { href: abs("/.well-known/mcp.json"), type: "application/json" },
       ],

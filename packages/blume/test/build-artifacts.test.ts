@@ -148,7 +148,7 @@ describe("publishBuildArtifacts", () => {
     it("writes the catalog to both well-known paths, listing the published skills", async () => {
       const { dist, root } = await fixture({
         "blume.config.ts":
-          'export default { ai: { skills: "skills" }, deployment: { site: "https://docs.example.com" } };\n',
+          'export default { agents: { skills: "skills" }, deployment: { site: "https://docs.example.com" } };\n',
         "docs/index.md": HOME,
         "skills/simple/SKILL.md": skillMd("simple"),
       });
@@ -184,7 +184,7 @@ describe("publishBuildArtifacts", () => {
   describe("agent skills", () => {
     it("publishes the configured skills and lists them in the index", async () => {
       const { dist, root } = await fixture({
-        "blume.config.ts": 'export default { ai: { skills: "skills" } };\n',
+        "blume.config.ts": 'export default { agents: { skills: "skills" } };\n',
         "docs/index.md": HOME,
         "skills/simple/SKILL.md": skillMd("simple"),
       });
@@ -207,7 +207,7 @@ describe("publishBuildArtifacts", () => {
 
     it("warns when the skills directory is missing or holds nothing publishable", async () => {
       const missing = await fixture({
-        "blume.config.ts": 'export default { ai: { skills: "skills" } };\n',
+        "blume.config.ts": 'export default { agents: { skills: "skills" } };\n',
         "docs/index.md": HOME,
       });
       const missingLog = await publish(missing.root, missing.dist);
@@ -216,7 +216,7 @@ describe("publishBuildArtifacts", () => {
       ).toBe(true);
 
       const empty = await fixture({
-        "blume.config.ts": 'export default { ai: { skills: "skills" } };\n',
+        "blume.config.ts": 'export default { agents: { skills: "skills" } };\n',
         "docs/index.md": HOME,
         // A skill without the required frontmatter is skipped with a warning
         // of its own, leaving nothing to publish.
@@ -238,7 +238,7 @@ describe("publishBuildArtifacts", () => {
 
     it("yields to a user-shipped agent-skills index", async () => {
       const { dist, root } = await fixture({
-        "blume.config.ts": 'export default { ai: { skills: "skills" } };\n',
+        "blume.config.ts": 'export default { agents: { skills: "skills" } };\n',
         "docs/index.md": HOME,
         "skills/simple/SKILL.md": skillMd("simple"),
       });

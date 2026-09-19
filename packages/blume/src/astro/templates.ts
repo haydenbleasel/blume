@@ -703,7 +703,7 @@ export const astroConfigTemplate = (options: {
   const integrations = [
     `mdx({ processor: blumeMdxProcessor(${JSON.stringify({
       basePath: config.basePath,
-      codeThemes: config.markdown.codeBlocks.theme,
+      codeThemes: config.markdown.code.theme,
       contentRoot: options.contentRoot,
       deployBase,
       headingAnchors: config.markdown.headingAnchors,
@@ -756,15 +756,15 @@ ${userConfigSetup}export default defineConfig({
   markdown: {
     processor: blumeMarkdownProcessor(${JSON.stringify({
       basePath: config.basePath,
-      codeThemes: config.markdown.codeBlocks.theme,
+      codeThemes: config.markdown.code.theme,
       contentRoot: options.contentRoot,
       deployBase,
       headingAnchors: config.markdown.headingAnchors,
     })}),
     shikiConfig: {
       themes: {
-        light: ${JSON.stringify(config.markdown.codeBlocks.theme.light)},
-        dark: ${JSON.stringify(config.markdown.codeBlocks.theme.dark)},
+        light: ${JSON.stringify(config.markdown.code.theme.light)},
+        dark: ${JSON.stringify(config.markdown.code.theme.dark)},
       },
       defaultColor: false,
       transformers: [${twoslashTransformer}...blumeShikiTransformers(${JSON.stringify(
@@ -2635,7 +2635,7 @@ const htmlLang = i18n ? i18n.defaultLocale : "en";
 // Recovery links, so a reader — or an agent that followed a stale URL — can
 // get back on track without guessing: every top-level section, then the
 // machine-readable indexes the build emits (the sitemap only exists with a
-// \`deployment.site\`; llms.txt only when \`ai.llmsTxt\` is on). Tabs link to
+// \`deployment.site\`; llms.txt only when \`agents.llmsTxt\` is on). Tabs link to
 // their resolved target when the section has no index page of its own.
 const suggestions = [
   ...data.navigation.tabs.map((tab) => ({

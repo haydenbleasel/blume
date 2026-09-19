@@ -10,6 +10,10 @@ import { z } from "zod";
  * AsyncAPI renderers, search, Ask AI, MCP, i18n, export, and OG images.
  */
 export default defineConfig({
+  agents: {
+    mcp: { enabled: true },
+    skills: "../../skills",
+  },
   ai: {
     ask: {
       enabled: true,
@@ -19,8 +23,6 @@ export default defineConfig({
         { icon: "blocks", label: "Which components can I use?" },
       ],
     },
-    mcp: { enabled: true },
-    skills: "../../skills",
   },
   banner: {
     content: "This is the Blume kitchen-sink sandbox.",
@@ -63,7 +65,7 @@ export default defineConfig({
       { code: "de", label: "Deutsch", style: "Informal du-form" },
     ],
   },
-  lastModified: true,
+  lastModified: "git",
   logo: "/logo.svg",
   markdown: {
     code: { icons: true, wrap: true },

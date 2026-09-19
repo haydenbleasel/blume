@@ -36,7 +36,7 @@ export interface DiffOptions {
   /** Path to a `.patch`/`.diff` file, resolved relative to {@link DiffOptions.root}. */
   src?: string;
   /**
-   * Light/dark Shiki themes (`markdown.codeBlocks.theme`). Defaults to the same
+   * Light/dark Shiki themes (`markdown.code.theme`). Defaults to the same
    * github pair Blume's code blocks use, keeping diffs in lockstep.
    */
   theme?: CodeThemes;

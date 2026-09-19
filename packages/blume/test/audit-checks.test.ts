@@ -1766,7 +1766,7 @@ describe("llms.txt checks", () => {
   });
 
   it("accepts the MCP route, which the server answers rather than a file", () => {
-    // `llms.ts` lists `ai.mcp.route` whenever the server is on, but the
+    // `llms.ts` lists `agents.mcp.route` whenever the server is on, but the
     // endpoint is a server route: it is in neither the page snapshots nor the
     // static file index. Read as a stale entry, it failed every server-output
     // site that enables MCP — and under `--fail-on warning`, blocked publish.

@@ -550,7 +550,7 @@ export interface DownlevelWalk {
 }
 type Walk = DownlevelWalk;
 
-/** The serializer registry for a site: built-ins under a user's `ai.markdownComponents`. */
+/** The serializer registry for a site: built-ins under a user's `agents.markdownComponents`. */
 export const componentRegistry = (
   components?: Record<string, ComponentMarkdown>
 ): Record<string, ComponentMarkdown> =>
@@ -695,7 +695,7 @@ const collectSplices = (
  * with no supported components — and sources Satteri can't parse as MDX, e.g.
  * plain `.md` with literal `<`/`{` — are returned byte-identical.
  *
- * `components` adds user serializers from `ai.markdownComponents`, layered
+ * `components` adds user serializers from `agents.markdownComponents`, layered
  * over the built-ins: a same-name entry replaces the built-in serializer, and
  * one that always returns `null` effectively opts that component out.
  *

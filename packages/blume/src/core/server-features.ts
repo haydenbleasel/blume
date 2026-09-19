@@ -11,7 +11,7 @@ export const serverFeatures = (config: ResolvedConfig): string[] => {
     features.push("Ask AI");
   }
   // The hosted MCP server is a live JSON-RPC endpoint, so it needs a runtime.
-  if (config.ai.mcp.enabled) {
+  if (config.agents.mcp.enabled) {
     features.push("MCP server");
   }
   // The built-in playground proxy (`playground.proxy: true` on an `openapi()`

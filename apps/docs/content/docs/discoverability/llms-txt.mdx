@@ -6,7 +6,7 @@ description: The llms.txt index and llms-full.txt corpus Blume generates for cod
 Blume emits machine-readable versions of your docs that coding agents and chat assistants can consume. This is on by default; set `llmsTxt: false` to turn it off:
 
 ```ts blume.config.ts lineNumbers
-ai: {
+agents: {
   llmsTxt: false,
 }
 ```
@@ -23,7 +23,7 @@ Draft pages are excluded. Set [`deployment.site`](/docs/deployment) so the links
 `llmsTxt` also takes an object form with knobs for what the files include. If your [API reference](/docs/advanced/api-reference) documents a placeholder or example spec, set `openapi: false` to keep its generated pages out of both files:
 
 ```ts blume.config.ts lineNumbers
-ai: {
+agents: {
   llmsTxt: {
     enabled: true, // default
     openapi: false, // exclude generated API reference pages
@@ -34,7 +34,7 @@ ai: {
 The object form also takes `details`: Markdown placed right after the title and summary in `llms.txt`, before the page sections — the [llms.txt spec](https://llmstxt.org)'s free-form "details" block. It's the place to tell agents _when_ to reach for your product and how to call it, which readiness scanners look for explicitly; an install command and the package name belong here too:
 
 ```ts blume.config.ts lineNumbers
-ai: {
+agents: {
   llmsTxt: {
     details: [
       "## When to use Acme",
@@ -47,7 +47,7 @@ ai: {
 
 ## Generated sections
 
-`llms.txt` closes with two generated sections that need no configuration. **Agent skills** lists each skill published through [`ai.skills`](/docs/discoverability/agent-discovery#skills-discovery) with its description (where a skill says when to use it). **Agent resources** links every machine-readable artifact the build emits — `llms-full.txt`, the per-page [raw Markdown](/docs/discoverability/markdown) mirror, the [MCP server](/docs/discoverability/mcp) and its discovery document, the skills index, the [API catalog](/docs/discoverability/agent-discovery#api-catalog), the [AI catalog](/docs/discoverability/agent-discovery#ai-catalog), [`agent-readability.json`](/docs/discoverability/agent-discovery#agent-readability), and the [sitemap](/docs/discoverability/sitemap-and-robots#sitemap) — each only when it exists, so an agent that reads nothing but `llms.txt` still finds the whole surface.
+`llms.txt` closes with two generated sections that need no configuration. **Agent skills** lists each skill published through [`agents.skills`](/docs/discoverability/agent-discovery#skills-discovery) with its description (where a skill says when to use it). **Agent resources** links every machine-readable artifact the build emits — `llms-full.txt`, the per-page [raw Markdown](/docs/discoverability/markdown) mirror, the [MCP server](/docs/discoverability/mcp) and its discovery document, the skills index, the [API catalog](/docs/discoverability/agent-discovery#api-catalog), the [AI catalog](/docs/discoverability/agent-discovery#ai-catalog), [`agent-readability.json`](/docs/discoverability/agent-discovery#agent-readability), and the [sitemap](/docs/discoverability/sitemap-and-robots#sitemap) — each only when it exists, so an agent that reads nothing but `llms.txt` still finds the whole surface.
 
 ## Excluding a page
 

@@ -31,18 +31,13 @@ const gitEnv = (): NodeJS.ProcessEnv =>
     Object.entries(process.env).filter(([key]) => !GIT_LOCATION_VARS.has(key))
   );
 
-/** Normalize the `lastModified` config union into `{ enabled, source }`. */
+/** Normalize the `lastModified` config (`false | "git" | "frontmatter"`) into `{ enabled, source }`. */
 export const resolveLastModifiedConfig = (
-  value: boolean | { type: "git" | "frontmatter" }
-): ResolvedLastModified => {
-  if (value === false) {
-    return { enabled: false, source: "git" };
-  }
-  if (value === true) {
-    return { enabled: true, source: "git" };
-  }
-  return { enabled: true, source: value.type };
-};
+  value: false | "git" | "frontmatter"
+): ResolvedLastModified =>
+  value === false
+    ? { enabled: false, source: "git" }
+    : { enabled: true, source: value };
 
 /**
  * Parse `git log --format=%x00%cI --name-only` output into a map of

@@ -115,7 +115,7 @@ const apiArtifact = (
   config: BlumeProject["config"],
   abs: (path: string) => string
 ): ApiArtifact | null => {
-  if (!config.ai.api) {
+  if (!config.agents.api) {
     return null;
   }
   const api: ApiArtifact = {
@@ -134,7 +134,7 @@ const wellKnownArtifacts = (
   abs: (path: string) => string
 ): WellKnownArtifacts => {
   const artifacts: WellKnownArtifacts = {};
-  if (config.ai.webBotAuth.keys.length > 0) {
+  if (config.agents.webBotAuth.keys.length > 0) {
     artifacts.httpMessageSignaturesDirectory = abs(
       "/.well-known/http-message-signatures-directory"
     );
@@ -145,7 +145,7 @@ const wellKnownArtifacts = (
   if (hasApiCatalog(config)) {
     artifacts.apiCatalog = abs("/.well-known/api-catalog");
   }
-  if (config.ai.skills) {
+  if (config.agents.skills) {
     artifacts.agentSkills = abs("/.well-known/agent-skills/index.json");
   }
   return artifacts;
@@ -164,7 +164,7 @@ export const buildAgentReadability = (
   project: BlumeProject
 ): AgentReadabilityManifest | null => {
   const { config } = project;
-  if (!config.seo.agentReadability) {
+  if (!config.agents.agentReadability) {
     return null;
   }
 
@@ -184,14 +184,14 @@ export const buildAgentReadability = (
   if (api) {
     artifacts.api = api;
   }
-  if (config.ai.llmsTxt.enabled) {
+  if (config.agents.llmsTxt.enabled) {
     artifacts.llmsFullTxt = abs("/llms-full.txt");
     artifacts.llmsTxt = abs("/llms.txt");
   }
-  if (config.ai.mcp.enabled) {
+  if (config.agents.mcp.enabled) {
     artifacts.mcp = {
       discovery: abs("/.well-known/mcp.json"),
-      url: abs(config.ai.mcp.route),
+      url: abs(config.agents.mcp.route),
     };
   }
   if (config.ai.ask?.enabled) {
@@ -214,11 +214,11 @@ export const buildAgentReadability = (
     artifacts,
     description: config.description,
     generator: version ? `blume@${version}` : undefined,
-    name: config.ai.mcp.name ?? config.title,
+    name: config.agents.mcp.name ?? config.title,
     site,
   };
 
-  const usage = usagePolicy(config.seo.contentSignals);
+  const usage = usagePolicy(config.agents.contentSignals);
   if (usage) {
     manifest.contentUsage = usage;
   }

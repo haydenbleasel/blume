@@ -26,10 +26,10 @@ Keep content where it is — set `content.root: "src/content/docs"`.
 | `sidebar` (array) | filesystem nav / `navigation.sidebar` (see below) |
 | `tableOfContents` (`false` or `{ minHeadingLevel, maxHeadingLevel }`) | `toc` — identical shape, 1:1 |
 | `markdown.headingLinks: false` | `markdown.headingAnchors: false` |
-| `expressiveCode.themes` | `markdown.codeBlocks.theme: { light, dark }` — EC assigns by theme _type_, so match each theme by its darkness, not by array position |
+| `expressiveCode.themes` | `markdown.code.theme: { light, dark }` — EC assigns by theme _type_, so match each theme by its darkness, not by array position |
 | `expressiveCode.styleOverrides` | drop → restyle via a root `theme.css` file |
 | `head` | **drop and report** (there is no `seo.metatags`); analytics `<script>` entries → one `script()` adapter each in the `analytics` list (from `blume/analytics`): `attrs.src` → `src`, an `async`/`defer` attr → `strategy`, every other `attrs` key → `attributes`, and an inline body (`content`) → `content` |
-| `lastUpdated: true` | `lastModified: true` |
+| `lastUpdated: true` | `lastModified: "git"` |
 | `customCss` | drop → move into a root **`theme.css`** file (auto-picked-up; not a config field) |
 | `components` (overrides) | Blume's layout slots via `defineComponents({ layout: { Header, Search, Sidebar, TableOfContents, Footer, … } })` — a near-1:1 map; reach for `blume eject` only beyond those |
 | `plugins` | **map, don't blanket-drop** — see Plugins below |

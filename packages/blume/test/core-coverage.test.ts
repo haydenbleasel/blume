@@ -200,7 +200,8 @@ describe("folder meta discovery", () => {
 describe("server features", () => {
   it("lists every enabled server-only feature", () => {
     const config = blumeConfigSchema.parse({
-      ai: { ask: { enabled: true }, mcp: { enabled: true } },
+      agents: { mcp: { enabled: true } },
+      ai: { ask: { enabled: true } },
       search: mixedbread({ storeId: "store-1" }),
     });
     expect(serverFeatures(config)).toStrictEqual([

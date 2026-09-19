@@ -19,10 +19,11 @@ const configWith = (
     mcp: boolean;
   }> = {}
 ): ResolvedConfig =>
-  // SAFETY: buildHomeLinkHeader reads only the ai, api-reference, base, and
-  // seo fields populated here.
+  // SAFETY: buildHomeLinkHeader reads only the agents, api-reference, and
+  // base fields populated here.
   asResolvedConfig({
-    ai: {
+    agents: {
+      agentReadability: overrides.agentReadability ?? true,
       api: overrides.api ?? false,
       catalog: { enabled: true, queries: {} },
       llmsTxt: { enabled: overrides.llmsTxt ?? true },
@@ -37,7 +38,6 @@ const configWith = (
       },
     },
     reference: [],
-    seo: { agentReadability: overrides.agentReadability ?? true },
   });
 
 describe("buildHomeLinkHeader", () => {

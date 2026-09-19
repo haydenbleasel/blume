@@ -274,13 +274,13 @@ describe("code block themes", () => {
       ["github-dark"],
     ]) {
       const result = blumeConfigSchema.safeParse({
-        markdown: { codeBlocks: { theme: { dark: theme } } },
+        markdown: { code: { theme: { dark: theme } } },
       });
       expect(result.success, JSON.stringify(theme)).toBe(false);
       if (!result.success) {
         expect(result.error.issues[0]).toMatchObject({
           message: "Expected a Shiki theme name or custom theme object",
-          path: ["markdown", "codeBlocks", "theme", "dark"],
+          path: ["markdown", "code", "theme", "dark"],
         });
       }
     }
@@ -301,7 +301,7 @@ describe("code block themes", () => {
       { colors: {} },
     ]) {
       const result = blumeConfigSchema.safeParse({
-        markdown: { codeBlocks: { theme: { dark: theme } } },
+        markdown: { code: { theme: { dark: theme } } },
       });
       expect(result.success, JSON.stringify(theme)).toBe(true);
     }

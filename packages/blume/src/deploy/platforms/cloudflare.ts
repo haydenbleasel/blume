@@ -100,7 +100,7 @@ export const emitCloudflareNegotiation = async (
       homeTokens: home ? markdownTokenCount(agentMarkdown(home)) : undefined,
       // Exactly the per-page JSON documents the API emits (see `pageParams`):
       // the non-hidden routes with agent Markdown, when the API is on.
-      pageJsonPaths: config.ai.api
+      pageJsonPaths: config.agents.api
         ? project.manifest.routes
             .filter(
               (route) => !route.hidden && rawMarkdown[route.path] !== undefined

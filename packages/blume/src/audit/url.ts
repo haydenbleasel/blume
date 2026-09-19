@@ -11,16 +11,16 @@ export type ServedContext = Pick<AuditContext, "byUrl" | "files" | "project">;
 /**
  * Routes the server answers that the build writes no file for.
  *
- * The MCP endpoint is streamable HTTP: llms.txt advertises `ai.mcp.route`
+ * The MCP endpoint is streamable HTTP: llms.txt advertises `agents.mcp.route`
  * whenever the server is enabled, but it appears in neither the page snapshots
  * nor the static file index, so a check that only consults those reads the
  * site's own index as broken. The exemption is the configured route while the
- * server is on, and nothing wider — with `ai.mcp` off, a listed `/mcp` is as
+ * server is on, and nothing wider — with `agents.mcp` off, a listed `/mcp` is as
  * dead as any other missing target. Any future server route (a search API, a
  * playground proxy) belongs here too, so every check recognizes it at once.
  */
 const serverRoutes = (context: ServedContext): string[] => {
-  const mcp = context.project.config.ai?.mcp;
+  const mcp = context.project.config.agents?.mcp;
   return mcp?.enabled ? [normalizePath(mcp.route)] : [];
 };
 

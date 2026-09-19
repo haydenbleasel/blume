@@ -99,7 +99,7 @@ export const emitVercelNegotiation = async (
   if (hasApiCatalog(config)) {
     overrides[API_CATALOG_PATH.slice(1)] = API_CATALOG_TYPE;
   }
-  if (config.ai.webBotAuth.keys.length > 0) {
+  if (config.agents.webBotAuth.keys.length > 0) {
     overrides[SIGNATURES_DIRECTORY_PATH.slice(1)] = SIGNATURES_DIRECTORY_TYPE;
   }
   // The homepage rewrite serves `/index.md` from the static layer, so its

@@ -196,7 +196,7 @@ export interface HighlightCodeOptions extends BlumeShikiOptions {
   /** Extra `<pre>` class names, e.g. `blume-source` for a height-capped pane. */
   className?: string;
   /**
-   * Light/dark Shiki themes (`markdown.codeBlocks.theme`). Defaults to the same
+   * Light/dark Shiki themes (`markdown.code.theme`). Defaults to the same
    * github pair fenced code uses, so out-of-pipeline code stays in lockstep.
    */
   themes?: CodeThemes;
@@ -248,7 +248,7 @@ export const highlightCode = async (
 export interface BlumeMarkdownOptions {
   /**
    * Light/dark Shiki themes for inline `` `code`{:lang} `` highlighting
-   * (`markdown.codeBlocks.theme`). Defaults to the github pair fenced code uses.
+   * (`markdown.code.theme`). Defaults to the github pair fenced code uses.
    */
   codeThemes?: CodeThemes;
   /**

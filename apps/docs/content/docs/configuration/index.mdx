@@ -55,8 +55,6 @@ export default defineConfig({
     code: {
       icons: true, // language icon in the code-block header
       wrap: false, // wrap long lines instead of scrolling
-    },
-    codeBlocks: {
       theme: {
         light: "github-light", // bundled name or custom Shiki theme object
         dark: "github-dark",
@@ -64,8 +62,8 @@ export default defineConfig({
     },
   },
 
-  // AI — llms.txt, MCP, the AI catalog; see the Discoverability section
-  ai: {
+  // Agents — llms.txt, MCP, the AI catalog; see the Discoverability section
+  agents: {
     llmsTxt: true,
     // AI Catalog / ARD manifest at /.well-known/ai-catalog.json (needs deployment.site)
     catalog: true,
@@ -314,18 +312,17 @@ An instance reachable only over plain HTTP still renders its counts, but `GITHUB
 
 ## Last modified
 
-Show a "Last updated on …" line at the bottom of each page. Off by default; set `lastModified` to `true` to derive each page's date from its git history:
+Show a "Last updated on …" line at the bottom of each page. Off by default; set `lastModified` to `"git"` to derive each page's date from its git history:
 
 ```ts blume.config.ts
-lastModified: true,
+lastModified: "git",
 ```
 
 | Value | Description |
 | --- | --- |
 | `false` | Disabled (default). |
-| `true` | Read the date from git history (commit dates). |
-| `{ type: "git" }` | Same as `true`, written explicitly. |
-| `{ type: "frontmatter" }` | Never run git — use only the `lastModified` frontmatter field. |
+| `"git"` | Read the date from git history (commit dates). |
+| `"frontmatter"` | Never run git — use only the `lastModified` frontmatter field. |
 
 The git source reads the most recent commit that touched each file, so it works in any git repository — including monorepos — and needs the repo's history at build time. CI platforms usually check out a shallow clone, which silently drops most dates (the build warns with `BLUME_SHALLOW_GIT_HISTORY` when that happens): on Vercel, set the `VERCEL_DEEP_CLONE=true` environment variable; with `actions/checkout`, set `fetch-depth: 0`. A page's own `lastModified` frontmatter always wins, which is handy for pinning a date or for files that aren't committed yet:
 
@@ -365,9 +362,9 @@ dateFormat: { year: "numeric", month: "2-digit", day: "2-digit" },
 | `timeZone` | IANA time zone. Defaults to `UTC`, so a date reads the same regardless of where the site builds. |
 | `calendar`, `numberingSystem` | Calendar system (e.g. `"japanese"`) and numbering system (e.g. `"arab"`). |
 
-## SEO and AI
+## SEO and agents
 
-Metadata, Open Graph images, RSS feeds, JSON-LD, the sitemap, and `robots.txt` live under `seo`; `llms.txt`, raw Markdown, the JSON API, and the MCP server live under `ai`. Both are covered page by page in the [Discoverability](/docs/discoverability) section, which treats search engines and AI agents as two audiences for the same machine-readable layer.
+Metadata, Open Graph images, RSS feeds, JSON-LD, the sitemap, and `robots.txt` live under `seo`; `llms.txt`, raw Markdown, the JSON API, the MCP server, and the discovery manifests live under `agents`. Both are covered page by page in the [Discoverability](/docs/discoverability) section, which treats search engines and AI agents as two audiences for the same machine-readable layer. The reader-facing model features — the Ask AI assistant and the Open in chat action — live under `ai`.
 
 ```ts blume.config.ts lineNumbers
 seo: {
@@ -419,8 +416,8 @@ Each of these has its own guide. The config field is the entry point:
 | `navigation` | Explicit sidebar and header tabs | [Navigation](/docs/content/navigation) |
 | `search` | Provider (Orama, Pagefind, Algolia, and more) and indexing | [Search](/docs/configuration/search) |
 | `markdown` | Markdown rendering options — code blocks, heading anchors, image zoom | [Syntax](/docs/content/syntax) |
-| `ai` | `llms.txt`, Markdown mirrors, the JSON API, and the hosted MCP server for coding agents | [SEO and AEO](/docs/discoverability) |
-| `ai.ask` | The in-page Ask AI assistant | [Ask AI](/docs/configuration/ask-ai) |
+| `agents` | `llms.txt`, Markdown mirrors, the JSON API, the hosted MCP server, skills, and discovery manifests for coding agents | [SEO and AEO](/docs/discoverability) |
+| `ai` | The in-page Ask AI assistant and the Open in chat action | [Ask AI](/docs/configuration/ask-ai) |
 | `reference` | API references: `openapi()`, `asyncapi()`, and `graphql()` adapters from `blume/reference` | [OpenAPI / AsyncAPI](/docs/advanced/api-reference), [GraphQL](/docs/advanced/graphql) |
 | `analytics` | Adapters from `blume/analytics` — PostHog, Google Analytics, Plausible, Mixpanel, Segment, and more — plus custom scripts | [Analytics](/docs/configuration/analytics) |
 | `seo` | Metadata, OG images, feeds, structured data, sitemap, robots | [SEO and AEO](/docs/discoverability) |

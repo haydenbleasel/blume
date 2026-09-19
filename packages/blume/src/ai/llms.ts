@@ -56,17 +56,17 @@ const agentResourceLines = (project: BlumeProject): string[] => {
     `- [llms-full.txt](${url("/llms-full.txt")}): The full Markdown of every page in one file.`,
     `- [Page Markdown](${url("/index.md")}): Append \`.md\` to any page URL to fetch that page as raw Markdown.`,
   ];
-  if (config.ai.api) {
+  if (config.agents.api) {
     lines.push(
       `- [JSON API](${url(API_PAGES_PATH)}): Page index of the JSON docs API; each entry links the page's JSON and Markdown forms. Described by the OpenAPI document at ${url(OPENAPI_PATH)}.`
     );
   }
-  if (config.ai.mcp.enabled) {
+  if (config.agents.mcp.enabled) {
     lines.push(
-      `- [MCP server](${url(config.ai.mcp.route)}): Streamable HTTP Model Context Protocol server with search_docs, get_page, list_pages, and get_navigation tools, plus every page as a resource. Discovery document: ${url("/.well-known/mcp.json")}`
+      `- [MCP server](${url(config.agents.mcp.route)}): Streamable HTTP Model Context Protocol server with search_docs, get_page, list_pages, and get_navigation tools, plus every page as a resource. Discovery document: ${url("/.well-known/mcp.json")}`
     );
   }
-  if (config.ai.skills) {
+  if (config.agents.skills) {
     lines.push(
       `- [Agent skills](${url(AGENT_SKILLS_INDEX_PATH)}): Agent Skills discovery index of the skills this site publishes.`
     );
@@ -81,7 +81,7 @@ const agentResourceLines = (project: BlumeProject): string[] => {
       `- [AI catalog](${url(AI_CATALOG_PATH)}): ARD manifest of the agent-facing resources on this site (MCP server, skills, APIs).`
     );
   }
-  if (config.seo.agentReadability) {
+  if (config.agents.agentReadability) {
     lines.push(
       `- [agent-readability.json](${url("/agent-readability.json")}): Manifest of every agent-facing artifact on this site.`
     );
@@ -96,7 +96,7 @@ const agentResourceLines = (project: BlumeProject): string[] => {
 
 // Drafts, hidden, and ordinary `noindex` pages are excluded. Generated API
 // references keep crawler visibility (`noindex`) separate from LLM visibility
-// (`ai.exclude`), and are excluded wholesale when `ai.llmsTxt.openapi` is off.
+// (`ai.exclude`), and are excluded wholesale when `agents.llmsTxt.openapi` is off.
 // `versions: "current"` additionally drops archived-snapshot pages — the flat
 // llms-full.txt dump serves agents the live docs, not every frozen copy.
 const eligiblePages = (
@@ -112,7 +112,7 @@ const eligiblePages = (
         (page.meta.seo.noindex && page.source.name !== "openapi") ||
         (options.versions === "current" && page.version !== "")
       ) &&
-      (project.config.ai.llmsTxt.openapi || page.source.name !== "openapi")
+      (project.config.agents.llmsTxt.openapi || page.source.name !== "openapi")
   );
 
 /**
@@ -285,7 +285,7 @@ export const buildLlmsIndex = (
     : `# ${config.title}`;
   // `details` is the llms.txt spec's free-form block between the summary and
   // the file sections — "when to use this" guidance in the site's own words.
-  const { details } = config.ai.llmsTxt;
+  const { details } = config.agents.llmsTxt;
   const lead = details ? `${header}\n\n${details}` : header;
   return `${[lead, ...blocks].join("\n\n")}\n`;
 };

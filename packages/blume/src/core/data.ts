@@ -125,8 +125,8 @@ export interface BlumeDataConfig {
   banner: BlumeBanner | null;
   /** Site-wide route mount point, normalized to `""` or `/seg` (see config). */
   basePath: string;
-  /** `markdown.codeBlocks.theme`: light/dark Shiki themes for code surfaces. */
-  codeThemes: ResolvedConfig["markdown"]["codeBlocks"]["theme"];
+  /** `markdown.code.theme`: light/dark Shiki themes for code surfaces. */
+  codeThemes: ResolvedConfig["markdown"]["code"]["theme"];
   /** `markdown.code.wrap`: wrap long code lines instead of scrolling. */
   codeWrap: boolean;
   /** `dateFormat`: `Intl.DateTimeFormat` options for the date stamps. */
@@ -134,7 +134,7 @@ export interface BlumeDataConfig {
   description: string | undefined;
   /**
    * Which agent-discovery resources exist for the layout to advertise in every
-   * page's `<head>` (`seo.agentReadability`, `ai.llmsTxt.enabled`) — the HTML
+   * page's `<head>` (`agents.agentReadability`, `agents.llmsTxt.enabled`) — the HTML
    * counterpart of the homepage-only HTTP `Link` header, for agents that enter
    * on a deep page (see `ai/link-headers.ts`). `sitemap` (`seo.sitemap` with a
    * `deployment.site`, the condition under which one is emitted) feeds the
@@ -142,7 +142,7 @@ export interface BlumeDataConfig {
    */
   discovery: {
     agentReadability: boolean;
-    /** Whether the AI Catalog / ARD manifest is published (`ai.catalog`). */
+    /** Whether the AI Catalog / ARD manifest is published (`agents.catalog`). */
     aiCatalog: boolean;
     /** Whether the JSON docs API and its `/openapi.json` are published. */
     api: boolean;
@@ -216,8 +216,8 @@ export interface BlumeDataConfig {
   /** Table-of-contents settings: whether to show it and the heading range. */
   toc: ResolvedConfig["toc"];
   /**
-   * WebMCP in-page tools (`ai.webmcp`), plus whether llms.txt exists for the
-   * list tool to fetch (`ai.llmsTxt.enabled`).
+   * WebMCP in-page tools (`agents.webmcp`), plus whether llms.txt exists for the
+   * list tool to fetch (`agents.llmsTxt.enabled`).
    */
   /** Docs versioning config; `null` when the site is unversioned. */
   versions: NonNullable<ResolvedConfig["versions"]> | null;

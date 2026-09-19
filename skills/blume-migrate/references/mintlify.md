@@ -30,7 +30,7 @@ Resolve `$ref` includes first (Mintlify splits config across files). Map only wh
 | `fonts.family` / `fonts.{heading,body}.family` | `theme.fonts.{display,body}` | a curated slug (kebab-case, e.g. `space-grotesk`) maps directly; any other Google family maps to the object form `{ name: "Family Name" }`; a self-hosted font (`fonts.*.src` URLs) maps to `{ name, variants: [{ src, weight }] }` after downloading the files into the project |
 | `banner` | `banner` (`{ content, dismissible, id, link }`) | **only** those keys — drop `banner.color`/`banner.type` |
 | `styling.latex: true` | **drop the field** — block math `$$…$$` renders in `.mdx` with no config | there is **no** `markdown.math` field; inline `$…$` is **not** supported — convert inline math to `$$…$$` or drop it (report) |
-| `styling.codeblocks.theme` | `markdown.codeBlocks.theme` (`{ light, dark }`) |  |
+| `styling.codeblocks.theme` | `markdown.code.theme` (`{ light, dark }`) |  |
 | `search.prompt` | **drop** | no equivalent |
 | `seo.metatags` | **drop** | no equivalent; use per-page `seo` frontmatter |
 | `seo.indexing: "all"` | `search.indexing.includeHiddenPages: true` |  |
@@ -52,7 +52,7 @@ Resolve `$ref` includes first (Mintlify splits config across files). Map only wh
 | `integrations.clearbit` (`{ publicApiKey }`) | `clearbit({ key })` |  |
 | `integrations.adobe` (`{ launchUrl }`) | `adobe({ url })` |  |
 | any other `integrations` script | `script({ src, strategy, attributes })` / `vercel()` in the `analytics` list | one `script()` adapter per provider without a factory |
-| `contextual` (`["copy","chatgpt","claude",…]`) | **mostly free** | Copy-as-Markdown and Open-in-chat are default page actions; `mcp` needs `ai.mcp.enabled` + server output (report as a follow-up) |
+| `contextual` (`["copy","chatgpt","claude",…]`) | **mostly free** | Copy-as-Markdown and Open-in-chat are default page actions; `mcp` needs `agents.mcp.enabled` + server output (report as a follow-up) |
 | `redirects` | `redirects: [{ from, to }]` | static only — see below |
 | `navigation.languages` | `i18n` | see i18n below |
 

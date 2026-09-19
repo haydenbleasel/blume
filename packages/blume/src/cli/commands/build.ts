@@ -218,8 +218,8 @@ const reportBuild = async (
       `Redirects  ${config.redirects.length}`,
       `Sitemap    ${config.deployment.options.site && config.seo.sitemap ? "yes" : sitemapNote}`,
       `Robots     ${config.seo.robots ? "yes" : "no"}`,
-      `Agent JSON ${config.seo.agentReadability ? "yes" : "no"}`,
-      `LLM files  ${config.ai.llmsTxt.enabled ? "yes" : "no"}`,
+      `Agent JSON ${config.agents.agentReadability ? "yes" : "no"}`,
+      `LLM files  ${config.agents.llmsTxt.enabled ? "yes" : "no"}`,
       `Server features  ${features.length > 0 ? features.join(", ") : "none"}`,
     ].join("\n")
   );

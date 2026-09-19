@@ -51,17 +51,17 @@ export const buildHomeLinkHeader = (
   }
   // RFC 8631: `service-desc` is the relation for a machine-readable
   // description of the service — the JSON docs API's OpenAPI document.
-  if (config.ai.api) {
+  if (config.agents.api) {
     links.push(
       `<${deployBase}${OPENAPI_PATH}>; rel="service-desc"; type="application/json"`
     );
   }
-  if (config.seo.agentReadability) {
+  if (config.agents.agentReadability) {
     links.push(
       `<${deployBase}/agent-readability.json>; rel="describedby"; type="application/json"`
     );
   }
-  if (config.ai.llmsTxt.enabled) {
+  if (config.agents.llmsTxt.enabled) {
     links.push(
       `<${deployBase}/llms.txt>; rel="describedby"; type="text/plain"`
     );

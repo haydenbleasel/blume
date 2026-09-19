@@ -64,15 +64,15 @@ describe("resolveLastModifiedConfig", () => {
     });
   });
 
-  it("enables git on true", () => {
-    expect(resolveLastModifiedConfig(true)).toEqual({
+  it('enables the git source on "git"', () => {
+    expect(resolveLastModifiedConfig("git")).toEqual({
       enabled: true,
       source: "git",
     });
   });
 
-  it("honors an explicit source", () => {
-    expect(resolveLastModifiedConfig({ type: "frontmatter" })).toEqual({
+  it('enables the frontmatter-only source on "frontmatter"', () => {
+    expect(resolveLastModifiedConfig("frontmatter")).toEqual({
       enabled: true,
       source: "frontmatter",
     });
@@ -139,8 +139,7 @@ describe("scanProject lastModified", () => {
 
   it("uses the frontmatter date as an override, no git needed", async () => {
     const root = await makeProject({
-      "blume.config.ts":
-        'export default { lastModified: { type: "frontmatter" } };\n',
+      "blume.config.ts": 'export default { lastModified: "frontmatter" };\n',
       "docs/index.md":
         "---\ntitle: Home\nlastModified: 2020-01-02\n---\n# Home\n",
     });
@@ -159,7 +158,7 @@ describe("scanProject lastModified", () => {
         "blume.config.ts": [
           "export default {",
           '  content: { sources: [{ kind: "filesystem", options: { root: "documentation" }, requiredSecrets: [], runtimeDeps: [] }] },',
-          "  lastModified: true,",
+          '  lastModified: "git",',
           "};",
           "",
         ].join("\n"),
@@ -185,7 +184,7 @@ describe("scanProject lastModified", () => {
         "blume.config.ts": [
           "export default {",
           '  content: { sources: [{ kind: "obsidian", options: { vault: "vault" }, requiredSecrets: [], runtimeDeps: [] }] },',
-          "  lastModified: true,",
+          '  lastModified: "git",',
           "};",
           "",
         ].join("\n"),

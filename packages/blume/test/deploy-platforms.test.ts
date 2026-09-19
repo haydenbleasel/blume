@@ -291,7 +291,7 @@ describe("vercel platform", () => {
     const built = await project(
       JSON.stringify(vercel()),
       { ".vercel/output/config.json": VERCEL_CONFIG },
-      `, ai: { webBotAuth: { keys: [${JSON.stringify(ED25519_PUBLIC)}] } }`
+      `, agents: { webBotAuth: { keys: [${JSON.stringify(ED25519_PUBLIC)}] } }`
     );
     const { log } = recorder();
     await emitVercelNegotiation(built, log);

@@ -668,7 +668,7 @@ export const CHECKS = [
   // audits it — they audit for Google. Blume emits it, so Blume checks it.
   {
     category: "ai",
-    fix: "Rebuild — `ai.llmsTxt` is enabled but the build has no llms.txt. If that's intentional, set `ai.llmsTxt: false`.",
+    fix: "Rebuild — `agents.llmsTxt` is enabled but the build has no llms.txt. If that's intentional, set `agents.llmsTxt: false`.",
     id: "BLUME_AUDIT_LLMS_TXT_MISSING",
     severity: "warning",
     tier: "static",

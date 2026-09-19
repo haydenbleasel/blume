@@ -4,7 +4,7 @@ import type { ResolvedConfig } from "../core/schema.ts";
  * Web Bot Auth (IETF `webbotauth` WG): an org that runs agents publishes the
  * agents' HTTP Message Signature public keys in a JWKS at a well-known path
  * on its domain; sites receiving the signed requests fetch it to verify them.
- * Blume publishes the directory from `ai.webBotAuth.keys` — the schema admits
+ * Blume publishes the directory from `agents.webBotAuth.keys` — the schema admits
  * public keys only, so the site can never leak signing credentials.
  */
 
@@ -22,7 +22,7 @@ export const SIGNATURES_DIRECTORY_TYPE =
 export const buildSignaturesDirectory = (
   config: ResolvedConfig
 ): string | null => {
-  const { keys } = config.ai.webBotAuth;
+  const { keys } = config.agents.webBotAuth;
   if (keys.length === 0) {
     return null;
   }

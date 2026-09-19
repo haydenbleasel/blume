@@ -27,7 +27,7 @@ Missing pages negotiate too. Every build emits a Markdown [404 page](/docs/advan
 
 ### Custom component serializers
 
-Give your own components a Markdown form with `ai.markdownComponents` — a map of JSX name to serializer. Each serializer receives the component's `props` (statically evaluated from the MDX attributes, with the page's `frontmatter` in scope), its `children` (already downleveled to Markdown), and the page's `frontmatter` data, and returns the replacement — or `null` to leave the JSX as-is:
+Give your own components a Markdown form with `agents.markdownComponents` — a map of JSX name to serializer. Each serializer receives the component's `props` (statically evaluated from the MDX attributes, with the page's `frontmatter` in scope), its `children` (already downleveled to Markdown), and the page's `frontmatter` data, and returns the replacement — or `null` to leave the JSX as-is:
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -37,7 +37,7 @@ const chart: ComponentMarkdown = ({ props }) =>
   `![${props.title}](/charts/${props.slug}.png)`;
 
 export default defineConfig({
-  ai: {
+  agents: {
     markdownComponents: {
       Chart: chart,
     },

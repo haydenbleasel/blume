@@ -3,7 +3,7 @@ import { cloudflare } from "blume/deploy";
 import { filesystem, githubReleases } from "blume/sources";
 
 export default defineConfig({
-  ai: {
+  agents: {
     catalog: {
       queries: {
         "mcp:blume": [
@@ -79,7 +79,7 @@ export default defineConfig({
       },
     ],
   },
-  lastModified: true,
+  lastModified: "git",
   logo: "/logo.svg",
   navigation: {
     tabs: [

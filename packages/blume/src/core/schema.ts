@@ -62,6 +62,24 @@ const isObjectLike = <Value>(value: Value): value is Value & object =>
 /** Icon inputs in serializable contexts (frontmatter, meta files). */
 const iconName = z.string().min(1);
 
+/**
+ * Error params for a strict object whose keys were removed or moved in a
+ * major release. A config still carrying one of `hints`' keys fails with
+ * the message that names its replacement, instead of Zod's bare
+ * "Unrecognized key"; any other unknown key keeps the default message.
+ */
+const removedKeysHint = (hints: Record<string, string>) => ({
+  error: (issue: z.core.$ZodRawIssue): string | undefined => {
+    if (issue.code !== "unrecognized_keys") {
+      return;
+    }
+    const messages = issue.keys.flatMap((key) =>
+      Object.hasOwn(hints, key) ? [hints[key]] : []
+    );
+    return messages.length > 0 ? messages.join(" ") : undefined;
+  },
+});
+
 /** Default include glob for filesystem-backed content sources. */
 const hydrationMode = z.enum(["load", "idle", "visible", "media", "only"]);
 export type HydrationMode = z.infer<typeof hydrationMode>;
@@ -544,7 +562,7 @@ const perModeValueSchema = z
     isString(value) ? { dark: value, light: value } : value
   );
 
-const themeConfigSchema = z.strictObject({
+const themeConfigFields = {
   accent: z
     .union([
       z.string(),
@@ -564,10 +582,17 @@ const themeConfigSchema = z.strictObject({
       mono: fontValueSchema.default("ibm-plex-mono"),
     })
     .prefault({}),
-  layout: z.enum(["sidebar"]).default("sidebar"),
   mode: z.enum(["system", "light", "dark"]).default("system"),
   radius: z.enum(["none", "sm", "md", "lg"]).default("md"),
-});
+};
+
+const themeConfigSchema = z.strictObject(
+  themeConfigFields,
+  removedKeysHint({
+    layout:
+      "theme.layout was removed: the sidebar layout is the only one, so delete the field.",
+  })
+);
 
 /** Curated link for the search dialog empty state (internal route or external URL). */
 const searchPopularLinkSchema = z.strictObject({
@@ -698,7 +723,7 @@ const askEndpointSchema = z
     }
   );
 
-/** The object form of `ai.llmsTxt`; a bare boolean normalizes onto it. */
+/** The object form of `agents.llmsTxt`; a bare boolean normalizes onto it. */
 const llmsTxtObjectSchema = z.strictObject({
   /**
    * Markdown inserted after the title and summary, before the page sections:
@@ -712,7 +737,7 @@ const llmsTxtObjectSchema = z.strictObject({
 
 type LlmsTxtResolved = z.output<typeof llmsTxtObjectSchema>;
 
-/** The object form of `ai.catalog`; a bare boolean normalizes onto it. */
+/** The object form of `agents.catalog`; a bare boolean normalizes onto it. */
 const aiCatalogObjectSchema = z.strictObject({
   enabled: z.boolean().default(true),
   /**
@@ -729,14 +754,32 @@ const aiCatalogObjectSchema = z.strictObject({
 
 type AiCatalogResolved = z.output<typeof aiCatalogObjectSchema>;
 
-const aiConfigSchema = z.strictObject({
-  /**
-   * The JSON docs API: the page index, per-page JSON, and navigation under
-   * `/api/docs/` (prerendered, so a static site serves them from files), the
-   * live search endpoint on server output, and the OpenAPI description of
-   * the whole machine-readable surface at `/openapi.json`. On by default.
-   */
-  api: z.boolean().default(true),
+/**
+ * The keys that moved from `ai` to `agents`: `ai` now holds only what faces a
+ * model at read time (Ask AI, Open in chat), and the machine-readable surface
+ * agents consume lives under `agents`.
+ */
+const MOVED_TO_AGENTS = [
+  "api",
+  "catalog",
+  "llmsTxt",
+  "markdownComponents",
+  "mcp",
+  "skills",
+  "webBotAuth",
+  "webmcp",
+] as const;
+
+const movedToAgentsHints = (from: string): Record<string, string> =>
+  Object.fromEntries(
+    MOVED_TO_AGENTS.map((key) => [
+      key,
+      `${from}.${key} moved to agents.${key}.`,
+    ])
+  );
+
+/** Model-facing config: the Ask AI assistant and the "Open in chat" action. */
+const aiConfigFields = {
   ask: z
     .strictObject({
       // Origins allowed to call the generated `/api/ask` from another site (a
@@ -807,54 +850,6 @@ const aiConfigSchema = z.strictObject({
     })
     .optional(),
   /**
-   * The AI Catalog / ARD manifest at `/.well-known/ai-catalog.json` (mirrored
-   * at `/.well-known/ard.json`): one entry per agent-facing resource the site
-   * publishes — the MCP server card, each agent skill, the JSON docs API's
-   * OpenAPI document, each rendered API reference, and llms.txt — so agent
-   * registries can index the site from its domain alone. Needs a
-   * `deployment.site` (identifiers are domain-anchored URNs). On by default;
-   * the object form overrides the generated representative queries.
-   */
-  catalog: z
-    .union([z.boolean(), aiCatalogObjectSchema])
-    .default(true)
-    .transform((value): AiCatalogResolved =>
-      isBoolean(value) ? { enabled: value, queries: {} } : value
-    ),
-  /**
-   * `llms.txt`/`llms-full.txt` emission. A bare boolean toggles it; the object
-   * form adds `openapi: false` to keep generated API reference pages out of
-   * both files (e.g. when the configured spec is example content) and
-   * `details`, free-form Markdown placed after the summary — the llms.txt
-   * spec's details block, where a site tells agents when to reach for it.
-   */
-  llmsTxt: z
-    .union([z.boolean(), llmsTxtObjectSchema])
-    .default(true)
-    .transform((value): LlmsTxtResolved =>
-      isBoolean(value) ? { enabled: value, openapi: true } : value
-    ),
-  // Serializers for the agent-facing Markdown downlevel (the `.md` mirror,
-  // llms-full.txt, MCP get_page), keyed by JSX name. Functions live here —
-  // not in components.tsx — because the config file is executed at build
-  // time while the components file is only statically analyzed. A same-name
-  // entry replaces the built-in serializer.
-  // Two-argument `z.record` — the single-argument form throws at
-  // schema-construction time under Zod 4 (see uiStringsOverrideSchema).
-  markdownComponents: z
-    .record(
-      z.string(),
-      z.custom<ComponentMarkdown>(
-        (value): value is ComponentMarkdown => typeof value === "function",
-        {
-          message: "Expected a serializer function.",
-        }
-      )
-    )
-    .default({}),
-  /** Expose the docs as an MCP server for connecting agents. */
-  mcp: mcpConfigSchema.prefault({}),
-  /**
    * The "Open in chat" page action. `true` (the default) lists every
    * provider, `false` hides the action entirely, and an array of provider
    * keys shows just that subset, in the given order. Normalized to the
@@ -876,35 +871,12 @@ const aiConfigSchema = z.strictObject({
       }
       return value;
     }),
-  /**
-   * Publish Agent Skills for discovery: a directory (resolved against the
-   * project root) whose subdirectories each hold a `SKILL.md`. The build
-   * copies each skill under `/.well-known/agent-skills/` — a lone `SKILL.md`
-   * verbatim, a skill with supporting files as a `.tar.gz` — and emits the
-   * discovery index (`index.json`) with SHA-256 digests per the Agent Skills
-   * Discovery RFC.
-   */
-  skills: z.string().min(1).optional(),
-  /**
-   * Web Bot Auth (IETF `webbotauth`): publish the org's HTTP Message
-   * Signature public keys at `/.well-known/http-message-signatures-directory`
-   * so sites receiving requests from the org's agents can verify them.
-   * Opt-in and public-keys-only — the private keys live wherever the signing
-   * agents run, never in the site.
-   */
-  webBotAuth: z
-    .strictObject({
-      keys: z.array(publicJwkSchema).default([]),
-    })
-    .prefault({}),
-  /**
-   * WebMCP: register in-page tools (search, page Markdown, the docs index)
-   * on the browser's model context so agentic browsers can drive the docs
-   * without a separate MCP connection. A tiny script that no-ops in browsers
-   * without the API; on by default.
-   */
-  webmcp: z.boolean().default(true),
-});
+};
+
+const aiConfigSchema = z.strictObject(
+  aiConfigFields,
+  removedKeysHint(movedToAgentsHints("ai"))
+);
 
 /**
  * A pinned link rendered above the sidebar sections — a blog, changelog, or
@@ -1345,15 +1317,7 @@ const softwareConfigSchema = z.strictObject({
 type SoftwareResolved = z.output<typeof softwareConfigSchema>;
 
 /** Discoverability features: OG images, feeds, sitemap, structured data. */
-const seoConfigSchema = z.strictObject({
-  /**
-   * Emit `agent-readability.json` at the site root: a manifest that indexes
-   * the agent-facing surface (llms.txt, Markdown mirrors, MCP server, feeds)
-   * so agents can discover it without scraping HTML.
-   */
-  agentReadability: z.boolean().default(true),
-  /** robots.txt `Content-Signal` usage declaration (on by default). */
-  contentSignals: contentSignalsSchema.prefault(true),
+const seoConfigFields = {
   og: ogConfigSchema.default({}),
   /** The organization behind the site, as an `Organization` JSON-LD node. */
   organization: organizationConfigSchema.optional(),
@@ -1376,6 +1340,114 @@ const seoConfigSchema = z.strictObject({
   structuredData: z.boolean().default(true),
   /** X (Twitter) account attribution for share cards. */
   x: xConfigSchema.default({}),
+};
+
+const seoConfigSchema = z.strictObject(
+  seoConfigFields,
+  removedKeysHint({
+    agentReadability: "seo.agentReadability moved to agents.agentReadability.",
+    contentSignals: "seo.contentSignals moved to agents.contentSignals.",
+  })
+);
+
+/**
+ * The machine-readable surface agents consume: the JSON API, `llms.txt`, the
+ * MCP server, published skills, discovery manifests, and the robots.txt
+ * usage policy. Everything reader-facing that talks to a model (Ask AI, Open
+ * in chat) stays under `ai`.
+ */
+const agentsConfigSchema = z.strictObject({
+  /**
+   * Emit `agent-readability.json` at the site root: a manifest that indexes
+   * the agent-facing surface (llms.txt, Markdown mirrors, MCP server, feeds)
+   * so agents can discover it without scraping HTML.
+   */
+  agentReadability: z.boolean().default(true),
+  /**
+   * The JSON docs API: the page index, per-page JSON, and navigation under
+   * `/api/docs/` (prerendered, so a static site serves them from files), the
+   * live search endpoint on server output, and the OpenAPI description of
+   * the whole machine-readable surface at `/openapi.json`. On by default.
+   */
+  api: z.boolean().default(true),
+  /**
+   * The AI Catalog / ARD manifest at `/.well-known/ai-catalog.json` (mirrored
+   * at `/.well-known/ard.json`): one entry per agent-facing resource the site
+   * publishes — the MCP server card, each agent skill, the JSON docs API's
+   * OpenAPI document, each rendered API reference, and llms.txt — so agent
+   * registries can index the site from its domain alone. Needs a
+   * `deployment.site` (identifiers are domain-anchored URNs). On by default;
+   * the object form overrides the generated representative queries.
+   */
+  catalog: z
+    .union([z.boolean(), aiCatalogObjectSchema])
+    .default(true)
+    .transform((value): AiCatalogResolved =>
+      isBoolean(value) ? { enabled: value, queries: {} } : value
+    ),
+  /** robots.txt `Content-Signal` usage declaration (on by default). */
+  contentSignals: contentSignalsSchema.prefault(true),
+  /**
+   * `llms.txt`/`llms-full.txt` emission. A bare boolean toggles it; the object
+   * form adds `openapi: false` to keep generated API reference pages out of
+   * both files (e.g. when the configured spec is example content) and
+   * `details`, free-form Markdown placed after the summary — the llms.txt
+   * spec's details block, where a site tells agents when to reach for it.
+   */
+  llmsTxt: z
+    .union([z.boolean(), llmsTxtObjectSchema])
+    .default(true)
+    .transform((value): LlmsTxtResolved =>
+      isBoolean(value) ? { enabled: value, openapi: true } : value
+    ),
+  // Serializers for the agent-facing Markdown downlevel (the `.md` mirror,
+  // llms-full.txt, MCP get_page), keyed by JSX name. Functions live here —
+  // not in components.tsx — because the config file is executed at build
+  // time while the components file is only statically analyzed. A same-name
+  // entry replaces the built-in serializer.
+  // Two-argument `z.record` — the single-argument form throws at
+  // schema-construction time under Zod 4 (see uiStringsOverrideSchema).
+  markdownComponents: z
+    .record(
+      z.string(),
+      z.custom<ComponentMarkdown>(
+        (value): value is ComponentMarkdown => typeof value === "function",
+        {
+          message: "Expected a serializer function.",
+        }
+      )
+    )
+    .default({}),
+  /** Expose the docs as an MCP server for connecting agents. */
+  mcp: mcpConfigSchema.prefault({}),
+  /**
+   * Publish Agent Skills for discovery: a directory (resolved against the
+   * project root) whose subdirectories each hold a `SKILL.md`. The build
+   * copies each skill under `/.well-known/agent-skills/` — a lone `SKILL.md`
+   * verbatim, a skill with supporting files as a `.tar.gz` — and emits the
+   * discovery index (`index.json`) with SHA-256 digests per the Agent Skills
+   * Discovery RFC.
+   */
+  skills: z.string().min(1).optional(),
+  /**
+   * Web Bot Auth (IETF `webbotauth`): publish the org's HTTP Message
+   * Signature public keys at `/.well-known/http-message-signatures-directory`
+   * so sites receiving requests from the org's agents can verify them.
+   * Opt-in and public-keys-only — the private keys live wherever the signing
+   * agents run, never in the site.
+   */
+  webBotAuth: z
+    .strictObject({
+      keys: z.array(publicJwkSchema).default([]),
+    })
+    .prefault({}),
+  /**
+   * WebMCP: register in-page tools (search, page Markdown, the docs index)
+   * on the browser's model context so agentic browsers can drive the docs
+   * without a separate MCP connection. A tiny script that no-ops in browsers
+   * without the API; on by default.
+   */
+  webmcp: z.boolean().default(true),
 });
 
 /**
@@ -1452,10 +1524,6 @@ const codeBlockThemeSchema = z.strictObject({
   light: codeThemeSchema.default("github-light"),
 });
 
-const codeBlocksConfigSchema = z.strictObject({
-  theme: codeBlockThemeSchema.prefault({}),
-});
-
 /**
  * `<Component />` example previews. A string is shorthand for `{ source }`:
  * where examples live, relative to the project root (default `examples`).
@@ -1487,13 +1555,20 @@ const examplesConfigSchema = z
 
 /**
  * "Last updated" timestamps for content pages. `false` (default) disables the
- * feature; `true` derives each page's date from git history; an object selects
- * the source explicitly. A page's `lastModified` frontmatter always wins.
+ * feature; `"git"` derives each page's date from the repository history;
+ * `"frontmatter"` never runs git and reads only the page's own field. A page's
+ * `lastModified` frontmatter always wins. The 1.x `true` and `{ type }` forms
+ * fail with the hint below.
  */
-const lastModifiedConfigSchema = z.union([
-  z.boolean(),
-  z.strictObject({ type: z.enum(["git", "frontmatter"]).default("git") }),
-]);
+const lastModifiedConfigSchema = z.union(
+  [z.literal(false), z.enum(["git", "frontmatter"])],
+  {
+    error: (issue) =>
+      issue.code === "invalid_union"
+        ? 'lastModified takes false, "git", or "frontmatter": `true` became "git" and `{ type: "…" }` became the bare string.'
+        : undefined,
+  }
+);
 
 /**
  * How the "last updated" stamp and the changelog timeline render their dates —
@@ -1538,7 +1613,7 @@ const dateFormatConfigSchema = z
     }
   );
 
-/** Code-block rendering options (`markdown.code`). */
+/** Code rendering options (`markdown.code`). */
 const codeConfigSchema = z.strictObject({
   /**
    * Show a brand language icon in the code-block header (TypeScript, Python,
@@ -1546,16 +1621,20 @@ const codeConfigSchema = z.strictObject({
    */
   icons: z.boolean().default(true),
   /**
+   * Light/dark Shiki themes for every code surface: fenced blocks, inline
+   * `` `code`{:lang} ``, `<CodeBlock>`, and `<Diff>`.
+   */
+  theme: codeBlockThemeSchema.prefault({}),
+  /**
    * Wrap long lines instead of scrolling horizontally. Off by default, so
    * code keeps its original line breaks and overflows into a scroll area.
    */
   wrap: z.boolean().default(false),
 });
 
-const markdownConfigSchema = z.strictObject({
-  /** Code-block rendering: language icons and line wrapping. */
+const markdownConfigFields = {
+  /** Code rendering: language icons, syntax themes, and line wrapping. */
   code: codeConfigSchema.prefault({}),
-  codeBlocks: codeBlocksConfigSchema.prefault({}),
   /**
    * Wrap each `##`–`######` heading in a link to its own anchor so readers can
    * click to copy, bookmark, or share a permalink to that section. On by
@@ -1567,7 +1646,15 @@ const markdownConfigSchema = z.strictObject({
    * opt a single image out with `data-no-zoom`.
    */
   imageZoom: z.boolean().default(true),
-});
+};
+
+const markdownConfigSchema = z.strictObject(
+  markdownConfigFields,
+  removedKeysHint({
+    codeBlocks:
+      "markdown.codeBlocks was merged into markdown.code: move theme: { light, dark } under markdown.code.",
+  })
+);
 
 /** React island behavior (`react`). */
 const reactConfigSchema = z.strictObject({
@@ -1630,6 +1717,7 @@ const tocConfigSchema = z
 
 export const blumeConfigSchema = z
   .strictObject({
+    agents: agentsConfigSchema.prefault({}),
     ai: aiConfigSchema.prefault({}),
     // Adapters from `blume/analytics`, each a serializable descriptor.
     analytics: analyticsConfigSchema,

@@ -38,7 +38,7 @@ import type { RenderedPage } from "./render-mdx.ts";
  * first-class Blume pages (real routes, sidebar, search, i18n, OG) and the
  * parsed documents are handed to the generated `blume:openapi` module for the
  * UI components to render. The source keeps its historical `openapi` name for
- * both kinds — downstream consumers (`ai.llmsTxt.openapi`, the llms noindex
+ * both kinds — downstream consumers (`agents.llmsTxt.openapi`, the llms noindex
  * exemption) key on it as "the generated API reference source".
  */
 

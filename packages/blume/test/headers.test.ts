@@ -27,10 +27,10 @@ const configWith = (
   }
   return {
     ...base,
-    ai: {
-      ...base.ai,
+    agents: {
+      ...base.agents,
       api: overrides.api ?? true,
-      mcp: { ...base.ai.mcp, enabled: overrides.mcp ?? false },
+      mcp: { ...base.agents.mcp, enabled: overrides.mcp ?? false },
       skills: overrides.skills,
       webBotAuth: { keys: overrides.webBotAuthKeys ?? [] },
     },

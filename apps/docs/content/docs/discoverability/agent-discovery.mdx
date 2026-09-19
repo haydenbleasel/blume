@@ -10,7 +10,7 @@ Publishing `llms.txt`, Markdown mirrors, a JSON API, and an MCP server is only h
 Blume writes an **`/agent-readability.json`** manifest at your site root that indexes the agent-facing surface described across this section — so an agent can discover it in a single fetch instead of guessing at conventions or scraping HTML. Like `llms.txt`, it's on by default:
 
 ```ts blume.config.ts lineNumbers
-seo: {
+agents: {
   agentReadability: true,
 }
 ```
@@ -47,7 +47,7 @@ The manifest lists only what you've enabled — the [raw Markdown](/docs/discove
 
 The `contentNegotiation` field appears only when the deployed site actually honors the `Accept: text/markdown` header — see [content negotiation](/docs/discoverability/markdown#content-negotiation); on every other deployment the manifest advertises just the `.md` mirror pattern.
 
-Set `seo.agentReadability` to `false` to skip it, or ship your own `public/agent-readability.json` to take over — Blume never overwrites a file you place in `public/`.
+Set `agents.agentReadability` to `false` to skip it, or ship your own `public/agent-readability.json` to take over — Blume never overwrites a file you place in `public/`.
 
 ## Discovery Link header
 
@@ -185,11 +185,11 @@ The API catalog lists APIs. The **AI catalog** lists everything an agent could p
 
 ARD's current revision reads the manifest from `/.well-known/ard.json` and calls `ai-catalog.json` the predecessor path, so Blume writes the same document to both, advertises it under both link relations (`ai-catalog` and `ard`) in every page's head, and lists it in `llms.txt` and `agent-readability.json`. The catalog and its `.well-known` neighbors (the API catalog, the MCP discovery files) are served with `Access-Control-Allow-Origin: *` on every build surface, so a registry reading them from another origin isn't blocked.
 
-Entry identifiers are anchored on your domain, so the catalog needs a [`deployment.site`](/docs/deployment) — without one nothing is emitted. It's on by default; `ai.catalog: false` turns it off. The generated queries are derived from the site title and each entry's own description. To write your own for an entry, key them by the identifier's tail (`<namespace>:<name>`):
+Entry identifiers are anchored on your domain, so the catalog needs a [`deployment.site`](/docs/deployment) — without one nothing is emitted. It's on by default; `agents.catalog: false` turns it off. The generated queries are derived from the site title and each entry's own description. To write your own for an entry, key them by the identifier's tail (`<namespace>:<name>`):
 
 ```ts blume.config.ts
 export default defineConfig({
-  ai: {
+  agents: {
     catalog: {
       queries: {
         "mcp:acme": ["how do I install Acme", "search the Acme docs"],
@@ -209,17 +209,17 @@ A list replaces the generated queries for that entry; entries you don't name kee
 It's on by default; set `webmcp: false` to opt out:
 
 ```ts blume.config.ts lineNumbers
-ai: {
+agents: {
   webmcp: false,
 }
 ```
 
 ## Skills discovery
 
-If your project ships [agent skills](https://agentskills.io) — the [Blume repo itself does](/docs/advanced/skills) — point `ai.skills` at the directory that holds them, and the build publishes them for discovery per the [Agent Skills Discovery RFC](https://github.com/cloudflare/agent-skills-discovery-rfc):
+If your project ships [agent skills](https://agentskills.io) — the [Blume repo itself does](/docs/advanced/skills) — point `agents.skills` at the directory that holds them, and the build publishes them for discovery per the [Agent Skills Discovery RFC](https://github.com/cloudflare/agent-skills-discovery-rfc):
 
 ```ts blume.config.ts lineNumbers
-ai: {
+agents: {
   skills: "./skills",
 }
 ```
@@ -245,7 +245,7 @@ Use the `HTTPS` record type if your provider offers it (Vercel DNS does; it does
 [Web Bot Auth](https://datatracker.ietf.org/wg/webbotauth/about/) works in the other direction: it's not about agents reading your docs, but about **your organization's agents identifying themselves** when they make requests elsewhere. Your agents sign their requests with [HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421), and receiving sites verify them against a public-key directory published on your domain. If your org runs agents and your Blume site lives at the domain they identify as, publish their public keys:
 
 ```ts blume.config.ts lineNumbers
-ai: {
+agents: {
   webBotAuth: {
     keys: [{ kty: "OKP", crv: "Ed25519", x: "JrQLj5P_89iXES9-vFgrIy29c…" }],
   },
@@ -266,7 +266,7 @@ Since `blume.config.ts` is executed at build time, the key doesn't have to be ha
 const webBotAuthKey = process.env.WEB_BOT_AUTH_PUBLIC_JWK;
 
 export default defineConfig({
-  ai: {
+  agents: {
     webBotAuth: {
       keys: webBotAuthKey ? [JSON.parse(webBotAuthKey)] : [],
     },

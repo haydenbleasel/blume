@@ -1537,7 +1537,7 @@ export default { content: { types: { rfc: { facets: ["status"], frontmatter: { s
   it("builds a snapshot, honoring config and filtering hidden routes", async () => {
     const project = await scanFixture({
       "blume.config.ts":
-        'export default { ai: { mcp: { enabled: true, instructions: "Be concise.", name: "Custom MCP" } }, deployment: { base: "sub/", site: "https://docs.example.com" }, title: "Project Title" };',
+        'export default { agents: { mcp: { enabled: true, instructions: "Be concise.", name: "Custom MCP" } }, deployment: { base: "sub/", site: "https://docs.example.com" }, title: "Project Title" };',
       "docs/guides/install.md":
         '---\ntitle: Installation\ndescription: How to install\n---\n# Installation\n\nInstall it now.\n\n<Callout type="tip">Use bun.</Callout>\n',
       "docs/index.md":

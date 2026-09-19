@@ -481,8 +481,7 @@ describe("buildRuntimeData", () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts": `export default {
-  ai: { api: false, llmsTxt: false },
-  seo: { agentReadability: false },
+  agents: { agentReadability: false, api: false, llmsTxt: false },
 };
 `,
         "docs/index.md": "# Home\n",
@@ -719,7 +718,7 @@ describe("buildRuntimeData", () => {
   banner: { content: "Hello", dismissible: true, id: "promo", link: { href: "/x", text: "Go" } },
   deployment: { site: "https://example.com" },
   github: { owner: "acme", repo: "docs" },
-  ai: { mcp: { enabled: true, name: "Docs MCP" } },
+  agents: { mcp: { enabled: true, name: "Docs MCP" } },
   logo: { href: "/home", image: { alt: "Logo", dark: "/dark.png", light: "/light.png" } },
 };
 `,
@@ -1231,10 +1230,8 @@ describe("buildRuntimeData", () => {
 
 const KITCHEN_SINK = {
   "blume.config.ts": `export default {
-  ai: {
-    ask: { cors: ["https://www.example.com"], enabled: true },
-    mcp: { enabled: true },
-  },
+  agents: { mcp: { enabled: true } },
+  ai: { ask: { cors: ["https://www.example.com"], enabled: true } },
   deployment: { site: "https://example.com" },
   export: true,
   github: { dir: "site", owner: "acme", repo: "docs" },
@@ -1717,7 +1714,7 @@ describe("generateRuntime", () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts": `export default {
-  ai: { mcp: { enabled: true, route: "/docs-mcp" } },
+  agents: { mcp: { enabled: true, route: "/docs-mcp" } },
   deployment: ${JSON.stringify(node({ site: "https://example.com" }))},
 };
 `,
@@ -1783,11 +1780,11 @@ describe("generateRuntime", () => {
     expect(has("src/pages/api/docs/pages.json.ts")).toBe(true);
   });
 
-  it("writes no docs API when ai.api is off, and no snapshot without MCP", async () => {
+  it("writes no docs API when agents.api is off, and no snapshot without MCP", async () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts": `export default {
-  ai: { api: false },
+  agents: { api: false },
 };
 `,
         "docs/index.md": "# Home\n",
@@ -1852,7 +1849,7 @@ describe("generateRuntime", () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts":
-          "export default { ai: { mcp: { enabled: true } } };\n",
+          "export default { agents: { mcp: { enabled: true } } };\n",
         "docs/index.md": "# Home\n",
         "docs/mcp.md": "# MCP\n",
       })
@@ -1872,7 +1869,7 @@ describe("generateRuntime", () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts":
-          "export default { ai: { mcp: { enabled: true } } };\n",
+          "export default { agents: { mcp: { enabled: true } } };\n",
         "docs/index.md": "# Home\n",
         "pages/mcp.astro": "---\n---\n<h1>Custom MCP page</h1>\n",
       })

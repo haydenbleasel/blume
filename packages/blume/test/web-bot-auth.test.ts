@@ -15,24 +15,25 @@ const ED25519_PUBLIC = {
   x: "JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs",
 };
 
-const parseAi = (webBotAuth: NonNullable<BlumeConfig["ai"]>["webBotAuth"]) =>
-  blumeConfigSchema.safeParse({ ai: { webBotAuth } });
+const parseAgents = (
+  webBotAuth: NonNullable<BlumeConfig["agents"]>["webBotAuth"]
+) => blumeConfigSchema.safeParse({ agents: { webBotAuth } });
 
 const configWith = (
-  keys: ResolvedConfig["ai"]["webBotAuth"]["keys"]
+  keys: ResolvedConfig["agents"]["webBotAuth"]["keys"]
 ): ResolvedConfig =>
   // SAFETY: buildSignaturesDirectory reads only the configured keys.
-  ({ ai: { webBotAuth: { keys } } }) as ResolvedConfig;
+  ({ agents: { webBotAuth: { keys } } }) as ResolvedConfig;
 
-describe("ai.webBotAuth schema", () => {
+describe("agents.webBotAuth schema", () => {
   it("defaults to no keys and accepts a public JWK", () => {
-    expect(blumeConfigSchema.parse({}).ai.webBotAuth.keys).toEqual([]);
-    const parsed = parseAi({ keys: [ED25519_PUBLIC] });
+    expect(blumeConfigSchema.parse({}).agents.webBotAuth.keys).toEqual([]);
+    const parsed = parseAgents({ keys: [ED25519_PUBLIC] });
     expect(parsed.success).toBe(true);
   });
 
   it("requires the mandatory kty parameter", () => {
-    const parsed = parseAi({ keys: [{ crv: "Ed25519" }] });
+    const parsed = parseAgents({ keys: [{ crv: "Ed25519" }] });
     expect(parsed.success).toBe(false);
     expect(JSON.stringify(parsed.error?.issues)).toContain("key type");
   });
@@ -43,7 +44,7 @@ describe("ai.webBotAuth schema", () => {
       { k: "SECRET", kty: "oct" },
       { dp: "x", dq: "x", e: "AQAB", kty: "RSA", n: "x", p: "x", q: "x" },
     ]) {
-      const parsed = parseAi({ keys: [leak] });
+      const parsed = parseAgents({ keys: [leak] });
       expect(parsed.success).toBe(false);
       expect(JSON.stringify(parsed.error?.issues)).toContain(
         "private key material"

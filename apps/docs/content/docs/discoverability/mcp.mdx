@@ -6,7 +6,7 @@ description: Host a Model Context Protocol server so coding agents can search an
 Host a [Model Context Protocol](https://modelcontextprotocol.io) server so coding agents (Claude Code, Cursor, VS Code, claude.ai connectors) can search and read your docs directly — no scraping. It's opt-in:
 
 ```ts blume.config.ts lineNumbers
-ai: {
+agents: {
   mcp: {
     enabled: true,
     route: "/mcp", // where the server is mounted
@@ -57,7 +57,7 @@ export default defineConfig({
 });
 ```
 
-A static build with `ai.mcp.enabled` fails fast with a message telling you to set a host adapter. See [Deployment](/docs/deployment) for the adapters. Once deployed, connect from Claude Code with:
+A static build with `agents.mcp.enabled` fails fast with a message telling you to set a host adapter. See [Deployment](/docs/deployment) for the adapters. Once deployed, connect from Claude Code with:
 
 ```bash
 claude mcp add --transport http my-docs https://docs.example.com/mcp

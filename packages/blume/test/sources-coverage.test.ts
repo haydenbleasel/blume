@@ -882,7 +882,7 @@ describe("scanProject: git last-modified branch", () => {
     await mkdir(join(root, "docs"), { recursive: true });
     await writeFile(
       join(root, "blume.config.ts"),
-      "export default { lastModified: true };\n"
+      'export default { lastModified: "git" };\n'
     );
     await writeFile(join(root, "docs", "index.md"), "# Home\n");
     // Strip the repo-locating GIT_* variables a parent git process exports to
