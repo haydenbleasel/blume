@@ -745,8 +745,10 @@ export interface AskConfig {
   /**
    * How much the model reasons before answering, from `"none"` to `"xhigh"`.
    * Forwarded to the AI SDK, which maps it to each provider's own control
-   * (OpenAI's `reasoning_effort`, for example); a provider without the
-   * concept ignores it with a warning. Omitted keeps the model's default.
+   * (OpenAI's `reasoning_effort`, for example). The model has to support the
+   * level — OpenAI rejects one a model doesn't offer — and only a provider
+   * without reasoning at all ignores it with a warning. Omitted keeps the
+   * model's default.
    * `"none"` is the fastest and cheapest for grounded docs Q&A, where the
    * retrieved excerpts carry the answer.
    */

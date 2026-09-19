@@ -190,7 +190,7 @@ Keys are read through Astro's [`getSecret()`](https://docs.astro.build/en/guides
 
 ## Reasoning
 
-Reasoning models think before they answer, and how much they do so by default varies by model. For grounded docs Q&A the retrieved excerpts carry the answer, so most of that thinking is latency the reader waits through. `reasoning` sets how much the model reasons, from `"none"` to `"xhigh"`:
+Reasoning models think before they answer, and how much they do so by default varies by model. For grounded docs Q&A the retrieved excerpts carry the answer, so most of that thinking is latency the reader waits through. `reasoning` sets how much the model reasons: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, or `"xhigh"`:
 
 ```ts blume.config.ts lineNumbers
 ai: {
@@ -202,7 +202,7 @@ ai: {
 }
 ```
 
-The value is forwarded to the [AI SDK's `reasoning` option](https://ai-sdk.dev/docs/ai-sdk-core/reasoning), which maps it to each provider's own control — OpenAI's `reasoning_effort`, for example; a provider without the concept ignores it with a warning. Leave it unset to keep the model's default. Like [retrieval size](#retrieval-size), it trades thoroughness for time-to-first-token, and answers stay grounded either way.
+The value is forwarded to the [AI SDK's `reasoning` option](https://ai-sdk.dev/docs/ai-sdk-core/reasoning), which maps it to each provider's own control — OpenAI's `reasoning_effort`, for example. The model has to support the level you pick: OpenAI rejects a level a model doesn't offer (`"none"` and `"xhigh"` exist only on some), so check the model's documentation before setting one; only a provider without reasoning at all ignores the value with a warning. Leave it unset to keep the model's default. Like [retrieval size](#retrieval-size), it trades thoroughness for time-to-first-token, and answers stay grounded either way.
 
 ## Rate limiting
 
