@@ -9,7 +9,7 @@ import type { AskBackend } from "../ai/ask.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { TOC_HIDDEN_KEY } from "../core/heading-markers.ts";
-import type { ResolvedConfig } from "../core/schema.ts";
+import type { AskReasoning, ResolvedConfig } from "../core/schema.ts";
 import { BLUME_IGNORE_DIRS } from "../core/sources/watch.ts";
 import { trimChar } from "../core/trim.ts";
 import type { ProjectContext } from "../core/types.ts";
@@ -1042,6 +1042,8 @@ const ASK_FALLBACK_PROMPT =
 export interface AskEndpointOptions {
   /** `ai.ask.instructions` — extra system-prompt text. */
   instructions?: string;
+  /** `ai.ask.reasoning` — how much the model reasons before answering. */
+  reasoning?: AskReasoning;
   /** `ai.ask.retrieval` — how much documentation each question carries. */
   retrieval?: AskRetrievalOptions;
 }
@@ -1053,8 +1055,9 @@ export interface AskEndpointOptions {
  * built-in prompt on every path: the grounded prompt via `createAskContext`,
  * and the plain fallback here. `options.retrieval` (the `ai.ask.retrieval`
  * config) is forwarded to `createAskContext` on the grounded path, where it
- * sizes retrieval. Both travel in one options object so a new call site can't
- * silently drop one of them.
+ * sizes retrieval. `options.reasoning` (the `ai.ask.reasoning` config) is
+ * forwarded to `streamText` on both paths. All three travel in one options
+ * object so a new call site can't silently drop one of them.
  */
 export const askEndpointTemplate = (
   backend: AskBackend,
@@ -1183,6 +1186,11 @@ export const askEndpointTemplate = (
   const onError = `      onError({ error }) {
         console.error("Ask AI provider error:", error);
       },`;
+  // `ai.ask.reasoning`, forwarded as the AI SDK's top-level `reasoning` so the
+  // provider maps it to its own control. Omitted keeps the provider default.
+  const reasoningField = options?.reasoning
+    ? `\n      reasoning: ${JSON.stringify(options.reasoning)},`
+    : "";
   const stream = grounded
     ? `    const instructions =
       (await ground(messages, body.page)) ??
@@ -1190,14 +1198,14 @@ export const askEndpointTemplate = (
     const result = streamText({
       model: ${modelExpr},
       instructions,
-      messages,
+      messages,${reasoningField}
 ${onError}
     });`
     : `    const result = streamText({
       model: ${modelExpr},
       instructions:
         ${JSON.stringify(fallbackPrompt)},
-      messages,
+      messages,${reasoningField}
 ${onError}
     });`;
   const handler = `export const POST: APIRoute = async ({ request }) => {

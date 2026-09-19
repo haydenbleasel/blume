@@ -29,7 +29,11 @@ import {
 } from "../src/astro/templates.ts";
 import { buildContentGraph } from "../src/core/graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
-import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
+import {
+  askReasoningLevels,
+  blumeConfigSchema,
+  pageMetaSchema,
+} from "../src/core/schema.ts";
 import type {
   AskAiConfig,
   BlumeConfigInput,
@@ -2024,6 +2028,23 @@ describe("ai.ask schema", () => {
         ai: { ask: { enabled: true, headers: { "X-Retries": 3 } } },
       })
     ).toThrow();
+  });
+
+  it("accepts every reasoning level and rejects anything else", () => {
+    for (const reasoning of askReasoningLevels) {
+      expect(
+        blumeConfigSchema.parse({ ai: { ask: { enabled: true, reasoning } } })
+          .ai.ask?.reasoning
+      ).toBe(reasoning);
+    }
+    expect(
+      blumeConfigSchema.parse({ ai: { ask: { enabled: true } } }).ai.ask
+    ).not.toHaveProperty("reasoning");
+    for (const reasoning of ["provider-default", "max", 2]) {
+      expect(() =>
+        blumeConfigSchema.parse({ ai: { ask: { enabled: true, reasoning } } })
+      ).toThrow();
+    }
   });
 
   it("requires baseUrl for the openai-compatible provider", () => {

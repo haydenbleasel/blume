@@ -681,6 +681,8 @@ export interface AskSuggestion {
 /** Backends that can route an Ask AI request. */
 type AskProviderGateway = "gateway" | "openrouter" | "llmgateway";
 type AskProvider = AskProviderGateway | "inkeep" | "openai-compatible";
+/** How much the model reasons before answering (`ai.ask.reasoning`). */
+type AskReasoning = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 /** How much retrieved documentation each Ask AI question carries. */
 export interface AskRetrievalConfig {
@@ -740,6 +742,15 @@ export interface AskConfig {
   model?: string;
   /** Which backend routes the request. Defaults to `gateway`. */
   provider?: AskProvider;
+  /**
+   * How much the model reasons before answering, from `"none"` to `"xhigh"`.
+   * Forwarded to the AI SDK, which maps it to each provider's own control
+   * (OpenAI's `reasoning_effort`, for example); a provider without the
+   * concept ignores it with a warning. Omitted keeps the model's default.
+   * `"none"` is the fastest and cheapest for grounded docs Q&A, where the
+   * retrieved excerpts carry the answer.
+   */
+  reasoning?: AskReasoning;
   /**
    * How much documentation each question carries into the model's prompt.
    * Lower values cut time-to-first-token — which dominates on a self-hosted

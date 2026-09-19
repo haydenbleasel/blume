@@ -1222,7 +1222,7 @@ describe("buildRuntimeData", () => {
 
 const KITCHEN_SINK = {
   "blume.config.ts": `export default {
-  ai: { ask: { enabled: true }, mcp: { enabled: true } },
+  ai: { ask: { enabled: true, reasoning: "none" }, mcp: { enabled: true } },
   deployment: { site: "https://example.com" },
   export: true,
   github: { dir: "site", owner: "acme", repo: "docs" },
@@ -1396,6 +1396,10 @@ describe("generateRuntime", () => {
 
     // Feature-gated files.
     expect(has("src/pages/api/ask.ts")).toBe(true);
+    // The `ai.ask.reasoning` level reaches the generated route.
+    expect(
+      await readFile(join(out, "src/pages/api/ask.ts"), "utf-8")
+    ).toContain('reasoning: "none",');
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/changelog.astro")).toBe(true);
     expect(has("src/pages/404.astro")).toBe(true);

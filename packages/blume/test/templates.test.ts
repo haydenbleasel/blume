@@ -1674,6 +1674,24 @@ describe("askEndpointTemplate", () => {
     expect(out).not.toContain("createOpenRouter");
     expect(out).not.toContain("process.env");
     expect(out).not.toContain("headers:");
+    // No `ai.ask.reasoning`: the provider keeps its own default.
+    expect(out).not.toContain("reasoning:");
+  });
+
+  it("forwards ai.ask.reasoning to streamText on the grounded and plain paths", () => {
+    const grounded = askEndpointTemplate(resolveAskBackend(), true, {
+      reasoning: "none",
+    });
+    expect(grounded).toContain(
+      'instructions,\n      messages,\n      reasoning: "none",\n      onError({ error })'
+    );
+    const plain = askEndpointTemplate(resolveAskBackend(), false, {
+      reasoning: "low",
+    });
+    expect(plain).not.toContain("createAskContext");
+    expect(plain).toContain(
+      'messages,\n      reasoning: "low",\n      onError({ error })'
+    );
   });
 
   it("inlines ai.ask.headers into every provider factory", () => {

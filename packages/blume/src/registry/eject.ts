@@ -138,6 +138,7 @@ const askFiles = async (
     {
       content: askEndpointTemplate(resolveAskBackend(ask), grounded, {
         instructions: ask.instructions,
+        reasoning: ask.reasoning,
         retrieval: ask.retrieval,
       }),
       path: join(srcDir, "pages", "api", "ask.ts"),

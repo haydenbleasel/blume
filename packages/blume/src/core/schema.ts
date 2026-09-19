@@ -768,6 +768,19 @@ const searchConfigSchema = z
   });
 
 /** Ask AI backends. `gateway` (default) routes through the Vercel AI Gateway. */
+/**
+ * The `ai.ask.reasoning` levels: the AI SDK's top-level `reasoning` values
+ * minus `provider-default`, which is what omitting the field means.
+ */
+export const askReasoningLevels = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+] as const;
+
 export const askAiProviders = [
   "gateway",
   "openrouter",
@@ -888,6 +901,11 @@ const aiConfigSchema = z.strictObject({
       instructions: z.string().trim().min(1).optional(),
       model: z.string().default("openai/gpt-5.5"),
       provider: z.enum(askAiProviders).default("gateway"),
+      // How much the model reasons before answering, forwarded to the AI SDK's
+      // top-level `reasoning` so each provider maps it to its own control.
+      // Omitted keeps the provider's default; `none` is the fastest and
+      // cheapest for grounded docs Q&A, where the excerpts carry the answer.
+      reasoning: z.enum(askReasoningLevels).optional(),
       // How much documentation each question carries. Injected characters are
       // the dominant term in time-to-first-token on a self-hosted backend, so
       // these trade recall for latency. No zod defaults here: only what the
@@ -1078,6 +1096,7 @@ const navigationConfigSchema = z.strictObject({
 });
 
 export type AskAiProvider = (typeof askAiProviders)[number];
+export type AskReasoning = (typeof askReasoningLevels)[number];
 export type AskAiConfig = NonNullable<z.infer<typeof aiConfigSchema>["ask"]>;
 export { openInChatProviders } from "./open-in-chat.ts";
 export type { OpenInChatProvider } from "./open-in-chat.ts";
