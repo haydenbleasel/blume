@@ -7,6 +7,7 @@ import { mixedbread } from "../src/search/adapters/index.ts";
 const KEYS = [
   "AI_GATEWAY_API_KEY",
   "OPENROUTER_API_KEY",
+  "OR_KEY",
   "MIXEDBREAD_API_KEY",
   "PROBE_ANALYTICS_TOKEN",
 ];
@@ -32,7 +33,9 @@ describe("checkRequiredSecrets", () => {
     const config = blumeConfigSchema.parse({ ai: { ask: { enabled: true } } });
     const result = checkRequiredSecrets(config);
     expect(result[0]?.code).toBe("BLUME_MISSING_SECRET");
-    expect(result[0]?.message).toContain("AI_GATEWAY_API_KEY");
+    expect(result[0]?.message).toBe(
+      "Ask AI (AI Gateway) is enabled but AI_GATEWAY_API_KEY is not set (on Vercel the gateway can also authenticate via OIDC)."
+    );
   });
 
   it("is satisfied when the key is set", () => {
@@ -41,18 +44,66 @@ describe("checkRequiredSecrets", () => {
     expect(checkRequiredSecrets(config)).toEqual([]);
   });
 
-  it("warns when a non-gateway Ask AI backend has no API key", () => {
+  it("warns with the adapter's own key env var when it is unset", () => {
     Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
     const config = blumeConfigSchema.parse({
-      ai: { ask: { enabled: true, provider: "openrouter" } },
+      ai: {
+        ask: {
+          enabled: true,
+          provider: {
+            kind: "openrouter",
+            options: { model: "x/y" },
+            requiredSecrets: ["OPENROUTER_API_KEY"],
+            runtimeDeps: ["@openrouter/ai-sdk-provider"],
+          },
+        },
+      },
     });
     expect(
       checkRequiredSecrets(config).some(
         (d) =>
           d.code === "BLUME_MISSING_SECRET" &&
-          d.message.includes("OPENROUTER_API_KEY")
+          d.message ===
+            "Ask AI (OpenRouter) is enabled but OPENROUTER_API_KEY is not set."
       )
     ).toBe(true);
+    // An overridden env var name is what gets checked.
+    Reflect.deleteProperty(process.env, "OR_KEY");
+    const renamed = blumeConfigSchema.parse({
+      ai: {
+        ask: {
+          enabled: true,
+          provider: {
+            kind: "openrouter",
+            options: { apiKeyEnv: "OR_KEY", model: "x/y" },
+            requiredSecrets: ["OR_KEY"],
+            runtimeDeps: ["@openrouter/ai-sdk-provider"],
+          },
+        },
+      },
+    });
+    expect(checkRequiredSecrets(renamed).map((d) => d.message)).toContainEqual(
+      expect.stringContaining("OR_KEY is not set")
+    );
+  });
+
+  it("checks nothing for an external endpoint", () => {
+    Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
+    const config = blumeConfigSchema.parse({
+      ai: {
+        ask: {
+          enabled: true,
+          endpoint: "https://api.example.com/ask",
+          provider: {
+            kind: "openrouter",
+            options: { model: "x/y" },
+            requiredSecrets: ["OPENROUTER_API_KEY"],
+            runtimeDeps: ["@openrouter/ai-sdk-provider"],
+          },
+        },
+      },
+    });
+    expect(checkRequiredSecrets(config)).toEqual([]);
   });
 
   it("warns for mixedbread search without its key", () => {

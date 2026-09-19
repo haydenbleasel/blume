@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 import { dirname, join, normalize, relative } from "pathe";
 
+import { openaiCompatible, openrouter } from "../src/ai/ask.ts";
 import {
   askProviderWarnings,
   buildRuntimeData,
@@ -36,7 +37,7 @@ import {
 import { BlumeError } from "../src/core/diagnostics.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
-import type { ResolvedConfig } from "../src/core/schema.ts";
+import type { BlumeConfigInput, ResolvedConfig } from "../src/core/schema.ts";
 import type { Diagnostic } from "../src/core/types.ts";
 import { flexsearch, mixedbread, orama } from "../src/search/adapters/index.ts";
 
@@ -1389,11 +1390,22 @@ describe("generateRuntime", () => {
     expect(generateRuntime(project)).rejects.toThrow(/ghost\.woff2/u);
   });
 
-  it("forwards ai.ask.reasoning to the generated Ask route", async () => {
+  it("generates the Ask route from the configured adapter descriptor", async () => {
+    // A plain descriptor literal, as the `openrouter()` factory returns it.
     const project = await scanProject(
       await writeProject({
         "blume.config.ts": `export default {
-  ai: { ask: { enabled: true, reasoning: "none" } },
+  ai: {
+    ask: {
+      enabled: true,
+      provider: {
+        kind: "openrouter",
+        options: { model: "x/y", reasoning: "none" },
+        requiredSecrets: ["OPENROUTER_API_KEY"],
+        runtimeDeps: ["@openrouter/ai-sdk-provider"],
+      },
+    },
+  },
 };
 `,
         "docs/index.md": "# Home\n",
@@ -1404,7 +1416,48 @@ describe("generateRuntime", () => {
       join(project.context.outDir, "src", "pages", "api", "ask.ts"),
       "utf-8"
     );
-    expect(route).toContain('reasoning: "none",');
+    expect(route).toContain(
+      'import { createOpenRouter } from "@openrouter/ai-sdk-provider";'
+    );
+    expect(route).toContain(
+      'model: openrouter("x/y", { reasoning: { effort: "none" } }),'
+    );
+    expect(route).toContain("createAskContext(askData)");
+    // The provider SDK is declared in the generated manifest.
+    const manifest = await readFile(
+      join(project.context.outDir, "package.json"),
+      "utf-8"
+    );
+    expect(manifest).toContain('"@openrouter/ai-sdk-provider"');
+  });
+
+  it("skips the grounding snapshot for an adapter that retrieves itself", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  ai: {
+    ask: {
+      enabled: true,
+      provider: {
+        kind: "inkeep",
+        options: { model: "inkeep-qa-expert" },
+        requiredSecrets: ["INKEEP_API_KEY"],
+        runtimeDeps: ["@ai-sdk/openai-compatible"],
+      },
+    },
+  },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    await generateRuntime(project);
+    const route = await readFile(
+      join(project.context.outDir, "src", "pages", "api", "ask.ts"),
+      "utf-8"
+    );
+    expect(route).toContain('model: provider("inkeep-qa-expert"),');
+    expect(route).not.toContain("blume:ask-data");
   });
 
   it("writes the full runtime for a feature-rich project", async () => {
@@ -2251,12 +2304,9 @@ describe("diagnosticWarning", () => {
 
 // A parsed (schema-defaulted) `ai.ask` block, the shape askProviderWarnings
 // receives from the resolved config.
-const parsedAsk = (ask: {
-  baseUrl?: string;
-  enabled: boolean;
-  endpoint?: string;
-  provider?: string;
-}) => blumeConfigSchema.parse({ ai: { ask } }).ai.ask;
+const parsedAsk = (
+  ask: NonNullable<NonNullable<BlumeConfigInput["ai"]>["ask"]>
+) => blumeConfigSchema.parse({ ai: { ask } }).ai.ask;
 
 describe("generateRuntime preflight and write failures", () => {
   it("warns when the search adapter's SDK isn't installed anywhere", () => {
@@ -2273,7 +2323,10 @@ describe("generateRuntime preflight and write failures", () => {
   });
 
   it("warns when the Ask AI backend's provider SDK isn't installed anywhere", () => {
-    const ask = parsedAsk({ enabled: true, provider: "openrouter" });
+    const ask = parsedAsk({
+      enabled: true,
+      provider: openrouter({ model: "x/y" }),
+    });
     const warnings = askProviderWarnings(ask, srcDir, srcDir);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('Ask AI provider "openrouter"');
@@ -2293,7 +2346,7 @@ describe("generateRuntime preflight and write failures", () => {
         parsedAsk({
           enabled: true,
           endpoint: "https://api.example.com/ask",
-          provider: "openrouter",
+          provider: openrouter({ model: "x/y" }),
         }),
         srcDir,
         srcDir
@@ -2304,9 +2357,12 @@ describe("generateRuntime preflight and write failures", () => {
 
   it("stays quiet when the Ask AI provider SDK is resolvable", () => {
     const ask = parsedAsk({
-      baseUrl: "https://api.example.com/v1",
       enabled: true,
-      provider: "openai-compatible",
+      provider: openaiCompatible({
+        apiKeyEnv: "K",
+        baseUrl: "https://api.example.com/v1",
+        model: "m",
+      }),
     });
     // The monorepo root resolves the workspace-installed SDK.
     expect(askProviderWarnings(ask, srcDir)).toEqual([]);

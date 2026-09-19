@@ -4,12 +4,11 @@ import { pathToFileURL } from "node:url";
 import { dirname, isAbsolute, join, relative } from "pathe";
 
 import type { AskRetrievalOptions } from "../ai/ask-context.ts";
-import { askBackendRuntimeDep } from "../ai/ask.ts";
 import type { AskBackend } from "../ai/ask.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { TOC_HIDDEN_KEY } from "../core/heading-markers.ts";
-import type { AskReasoning, ResolvedConfig } from "../core/schema.ts";
+import type { ResolvedConfig } from "../core/schema.ts";
 import { resolveDocsCollection } from "../core/sources/collection.ts";
 import { BLUME_IGNORE_DIRS } from "../core/sources/watch.ts";
 import { trimChar } from "../core/trim.ts";
@@ -208,12 +207,10 @@ export const runtimeDependencies = (options: {
       }
     }
   }
-  // Ask AI's provider SDK, when its backend needs one (gateway uses core `ai`).
+  // Ask AI's provider SDK, as its adapter declares it (the gateway needs
+  // nothing beyond core `ai`, so it declares none).
   if (config.ai.ask?.enabled && !config.ai.ask.endpoint) {
-    const askDep = askBackendRuntimeDep(config.ai.ask);
-    if (askDep) {
-      deps.push(askDep);
-    }
+    deps.push(...config.ai.ask.provider.runtimeDeps);
   }
   const { deployment } = config;
   if (deployment.output === "server" && deployment.adapter) {
@@ -1061,11 +1058,6 @@ export interface AskEndpointOptions {
   cors?: string[];
   /** `ai.ask.instructions` — extra system-prompt text. */
   instructions?: string;
-  /**
-   * `ai.ask.reasoning` — how much the model reasons before answering, sent
-   * as the backend's own reasoning-effort control.
-   */
-  reasoning?: AskReasoning;
   /** `ai.ask.retrieval` — how much documentation each question carries. */
   retrieval?: AskRetrievalOptions;
 }
@@ -1112,28 +1104,28 @@ export const OPTIONS: APIRoute = ({ request }) =>
 /**
  * Generate the Ask AI server endpoint (`.blume/src/pages/api/ask.ts`).
  *
+ * The provider-specific pieces — imports, the provider factory call, the model
+ * expression, the credential guard, and the adapter's reasoning mapping and
+ * `providerOptions` — come from the resolved `backend` descriptor, inlined as
+ * literals so the route imports the provider SDK by bare name and never
+ * `blume.config.ts`. `backend.grounded` decides whether answers are grounded
+ * in the retrieved docs (every adapter but Inkeep, which retrieves itself).
+ *
  * `options.instructions` (the `ai.ask.instructions` config) is appended to the
  * built-in prompt on every path: the grounded prompt via `createAskContext`,
  * and the plain fallback here. `options.retrieval` (the `ai.ask.retrieval`
  * config) is forwarded to `createAskContext` on the grounded path, where it
- * sizes retrieval. `options.reasoning` (the `ai.ask.reasoning` config)
- * reaches the model call on both paths. `options.cors` (the `ai.ask.cors`
- * config) adds a preflight handler and wraps the `POST` so every response
- * names a listed origin. All four travel in one options object so a new call
- * site can't silently drop one of them.
+ * sizes retrieval. `options.cors` (the `ai.ask.cors` config) adds a preflight
+ * handler and wraps the `POST` so every response names a listed origin. All
+ * three travel in one options object so a new call site can't silently drop
+ * one of them.
  */
 export const askEndpointTemplate = (
   backend: AskBackend,
-  grounded: boolean,
   options?: AskEndpointOptions
 ): string => {
-  const { instructions, reasoning, retrieval } = options ?? {};
-  // `ai.ask.reasoning`. The gateway and OpenAI-compatible providers take it
-  // from `streamText`'s top-level `reasoning` (the gateway maps it to the
-  // model's own control, the OpenAI-compatible provider sends it as
-  // `reasoning_effort`). OpenRouter's provider ignores that call option and
-  // only reads its own model setting, so there the level rides on the model
-  // as `reasoning.effort`. Omitted keeps the provider default on every path.
+  const { instructions, retrieval } = options ?? {};
+  const { grounded } = backend;
   const fallbackPrompt = instructions
     ? `${ASK_FALLBACK_PROMPT}\n\n${instructions}`
     : ASK_FALLBACK_PROMPT;
@@ -1143,47 +1135,9 @@ export const askEndpointTemplate = (
   const imports = [
     'import type { APIRoute } from "astro";',
     'import { getSecret } from "astro:env/server";',
-    // The gateway provider reads the key (or Vercel's OIDC token) from the
-    // environment itself; passing the key explicitly lets a binding-backed
-    // secret store reach it too.
-    backend.kind === "gateway"
-      ? 'import { createGateway, streamText } from "ai";'
-      : 'import { streamText } from "ai";',
+    ...backend.template.imports,
   ];
-  let setup = "";
-  let modelExpr = JSON.stringify(backend.model);
-  // `ai.ask.headers`, inlined as literals: every provider factory below takes
-  // the same `headers` option, so one line serves all three.
-  const headersField = backend.headers
-    ? `\n  headers: ${JSON.stringify(backend.headers)},`
-    : "";
-  if (backend.kind === "gateway") {
-    setup = `\nconst gateway = createGateway({
-  apiKey: getSecret("AI_GATEWAY_API_KEY"),${headersField}
-});\n`;
-    modelExpr = `gateway(${JSON.stringify(backend.model)})`;
-  } else if (backend.kind === "openrouter") {
-    imports.push(
-      'import { createOpenRouter } from "@openrouter/ai-sdk-provider";'
-    );
-    setup = `\nconst openrouter = createOpenRouter({
-  apiKey: getSecret(${JSON.stringify(backend.apiKeyEnv)}),${headersField}
-});\n`;
-    const settings = reasoning
-      ? `, { reasoning: { effort: ${JSON.stringify(reasoning)} } }`
-      : "";
-    modelExpr = `openrouter(${JSON.stringify(backend.model)}${settings})`;
-  } else if (backend.kind === "openai-compatible") {
-    imports.push(
-      'import { createOpenAICompatible } from "@ai-sdk/openai-compatible";'
-    );
-    setup = `\nconst provider = createOpenAICompatible({
-  apiKey: getSecret(${JSON.stringify(backend.apiKeyEnv)}),
-  baseURL: ${JSON.stringify(backend.baseUrl)},${headersField}
-  name: ${JSON.stringify(backend.name)},
-});\n`;
-    modelExpr = `provider(${JSON.stringify(backend.model)})`;
-  }
+  let { setup } = backend.template;
   // Ground the answer in retrieved docs, except for RAG-native backends (Inkeep),
   // which run their own retrieval and would conflict with injected context.
   if (grounded) {
@@ -1239,22 +1193,9 @@ export const askEndpointTemplate = (
   // to stream consumption, so the handler's try/catch never sees them: without
   // these the client gets a 200 whose stream aborts mid-flight and nothing is
   // logged server-side. A missing credential is rejected up front as a real
-  // 500; everything else is at least logged via `onError`.
-  const keyCheck =
-    backend.kind === "gateway"
-      ? `  // The AI Gateway authenticates with an API key or Vercel's OIDC token.
-  if (!(getSecret("AI_GATEWAY_API_KEY") || getSecret("VERCEL_OIDC_TOKEN"))) {
-    return new Response(
-      "Ask AI is not configured: set AI_GATEWAY_API_KEY (or deploy on Vercel with OIDC).",
-      { status: 500 }
-    );
-  }`
-      : `  if (!getSecret(${JSON.stringify(backend.apiKeyEnv)})) {
-    return new Response(
-      ${JSON.stringify(`Ask AI is not configured: set ${backend.apiKeyEnv}.`)},
-      { status: 500 }
-    );
-  }`;
+  // 500 (the adapter's `keyCheck`); everything else is at least logged via
+  // `onError`.
+  const { keyCheck } = backend.template;
   // Provider errors surface mid-stream, after the 200 is committed; this is
   // the only place they can be observed server-side.
   const onError = `      onError({ error }) {
@@ -1262,16 +1203,16 @@ export const askEndpointTemplate = (
       },`;
   // The `streamText` argument list, built once so the grounded and plain
   // paths can't drift: they differ only in where the instructions come from.
+  // The adapter appends its own call-level fields (its reasoning mapping when
+  // that is a call option, and the verbatim `providerOptions`).
   const streamFields = [
-    `model: ${modelExpr}`,
+    `model: ${backend.template.model}`,
     grounded
       ? "instructions"
       : `instructions:\n        ${JSON.stringify(fallbackPrompt)}`,
     "messages",
+    ...backend.template.fields,
   ];
-  if (reasoning && backend.kind !== "openrouter") {
-    streamFields.push(`reasoning: ${JSON.stringify(reasoning)}`);
-  }
   const call = `    const result = streamText({
       ${streamFields.join(",\n      ")},
 ${onError}

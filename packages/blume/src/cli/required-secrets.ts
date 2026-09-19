@@ -25,15 +25,11 @@ export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
   };
 
   if (config.ai.ask?.enabled && !config.ai.ask.endpoint) {
-    const backend = resolveAskBackend(config.ai.ask);
-    if (backend.kind === "gateway") {
-      requireSecret(
-        "Ask AI (AI Gateway)",
-        "AI_GATEWAY_API_KEY",
-        "on Vercel the gateway can also authenticate via OIDC"
-      );
-    } else {
-      requireSecret("Ask AI", backend.apiKeyEnv);
+    // The adapter descriptor names the env vars its route reads.
+    const { provider } = config.ai.ask;
+    const backend = resolveAskBackend(provider);
+    for (const env of provider.requiredSecrets) {
+      requireSecret(`Ask AI (${backend.label})`, env, backend.secretNote);
     }
   }
 

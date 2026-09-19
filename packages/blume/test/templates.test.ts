@@ -5,7 +5,14 @@ import { pathToFileURL } from "node:url";
 
 import { join } from "pathe";
 
-import { resolveAskBackend } from "../src/ai/ask.ts";
+import {
+  gateway,
+  inkeep,
+  llmgateway,
+  openaiCompatible,
+  openrouter,
+  resolveAskBackend,
+} from "../src/ai/ask.ts";
 import type { ExampleSpec } from "../src/astro/examples.ts";
 import { RUNTIME_MODULE_FILES } from "../src/astro/runtime-modules.ts";
 import {
@@ -817,7 +824,7 @@ describe("runtimeDependencies", () => {
 
   it("declares the React, Scalar and Ask provider deps", () => {
     const full = blumeConfigSchema.parse({
-      ai: { ask: { enabled: true, provider: "openrouter" } },
+      ai: { ask: { enabled: true, provider: openrouter({ model: "x/y" }) } },
       openapi: {
         enabled: true,
         renderer: "scalar",
@@ -1625,9 +1632,28 @@ describe("stagedContentDir", () => {
   });
 });
 
+/** The backend a schema-parsed `ai.ask` block resolves to. */
+const backendFor = (ask: NonNullable<BlumeConfig["ai"]>["ask"]) =>
+  resolveAskBackend(askConfig(ask)?.provider);
+
+const COMPATIBLE = {
+  apiKeyEnv: "GW_KEY",
+  baseUrl: "https://api.example.com/v1",
+  model: "m",
+};
+
+/** One descriptor per adapter, for the assertions every adapter must meet. */
+const EVERY_ADAPTER = [
+  gateway(),
+  openrouter({ model: "x/y" }),
+  llmgateway({ model: "m" }),
+  inkeep({ model: "m" }),
+  openaiCompatible(COMPATIBLE),
+];
+
 describe("askEndpointTemplate", () => {
   it("uses the AI gateway (core model id) by default", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), true);
+    const out = askEndpointTemplate(resolveAskBackend());
     expect(out).toContain('import { createGateway, streamText } from "ai";');
     expect(out).toContain(
       'const gateway = createGateway({\n  apiKey: getSecret("AI_GATEWAY_API_KEY"),\n});'
@@ -1636,8 +1662,9 @@ describe("askEndpointTemplate", () => {
     expect(out).not.toContain("createOpenRouter");
     expect(out).not.toContain("process.env");
     expect(out).not.toContain("headers:");
-    // No `ai.ask.reasoning`: the provider keeps its own default.
-    expect(out).not.toContain("reasoning:");
+    // No `reasoning` or `providerOptions`: the provider keeps its defaults.
+    expect(out).not.toContain("reasoning");
+    expect(out).not.toContain("providerOptions");
     // No `ai.ask.cors`: no preflight handler, no wrapper around the POST.
     expect(out).not.toContain("OPTIONS");
     expect(out).not.toContain("blume/ai/cors.ts");
@@ -1649,7 +1676,7 @@ describe("askEndpointTemplate", () => {
   });
 
   it("answers preflight and wraps the POST when ai.ask.cors is set", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), true, {
+    const out = askEndpointTemplate(resolveAskBackend(), {
       cors: ["https://www.example.com", "http://localhost:3000"],
     });
     expect(out).toContain(
@@ -1673,112 +1700,212 @@ describe("askEndpointTemplate", () => {
     expect(out).toContain("result.toTextStreamResponse();");
   });
 
-  it("wraps the POST of every backend", () => {
-    const cors = ["https://www.example.com"];
-    const openrouter = askEndpointTemplate(
-      resolveAskBackend(askConfig({ enabled: true, provider: "openrouter" })),
-      false,
-      { cors }
-    );
-    expect(openrouter).toContain("withCors(ALLOWED_ORIGINS,");
-    expect(openrouter).toContain("export const OPTIONS");
+  it("wraps the POST of every adapter", () => {
+    for (const provider of EVERY_ADAPTER) {
+      const out = askEndpointTemplate(backendFor({ enabled: true, provider }), {
+        cors: ["https://www.example.com"],
+      });
+      expect(out).toContain("withCors(ALLOWED_ORIGINS,");
+      expect(out).toContain("export const OPTIONS");
+    }
   });
 
-  it("forwards ai.ask.reasoning to streamText on the grounded and plain paths", () => {
-    const grounded = askEndpointTemplate(resolveAskBackend(), true, {
-      reasoning: "none",
-    });
-    expect(grounded).toContain(
-      'instructions,\n      messages,\n      reasoning: "none",\n      onError({ error })'
-    );
-    const plain = askEndpointTemplate(resolveAskBackend(), false, {
-      reasoning: "low",
-    });
-    expect(plain).not.toContain("createAskContext");
-    expect(plain).toContain(
-      'messages,\n      reasoning: "low",\n      onError({ error })'
-    );
-    // OpenAI-compatible backends take the same top-level option (their
-    // provider sends it as `reasoning_effort`).
-    const compatible = askEndpointTemplate(
-      resolveAskBackend(
-        askConfig({
-          baseUrl: "https://api.example.com/v1",
-          enabled: true,
-          provider: "openai-compatible",
-        })
-      ),
-      true,
-      { reasoning: "high" }
-    );
-    expect(compatible).toContain(
-      'messages,\n      reasoning: "high",\n      onError({ error })'
-    );
+  it("imports the provider SDK by bare name and never the config", () => {
+    for (const provider of EVERY_ADAPTER) {
+      const out = askEndpointTemplate(backendFor({ enabled: true, provider }));
+      expect(out).not.toContain("blume.config");
+      expect(out).not.toContain("process.env");
+      expect(out).toContain('import { getSecret } from "astro:env/server";');
+    }
   });
 
-  it("gives OpenRouter the reasoning level as its own model setting", () => {
+  it("generates the gateway route with reasoning as the call option", () => {
     const out = askEndpointTemplate(
-      resolveAskBackend(
-        askConfig({ enabled: true, model: "x/y", provider: "openrouter" })
-      ),
-      true,
-      { reasoning: "none" }
+      backendFor({
+        enabled: true,
+        provider: gateway({
+          model: "anthropic/claude-sonnet-4-5",
+          reasoning: "none",
+        }),
+      })
     );
+    expect(out).toContain('import { createGateway, streamText } from "ai";');
+    expect(out).toContain(
+      'const gateway = createGateway({\n  apiKey: getSecret("AI_GATEWAY_API_KEY"),\n});'
+    );
+    expect(out).toContain(
+      'if (!(getSecret("AI_GATEWAY_API_KEY") || getSecret("VERCEL_OIDC_TOKEN")))'
+    );
+    // Grounded: the instructions come from `ground`, and the level is the AI
+    // SDK's top-level `reasoning`, which the gateway maps to the model's own.
+    expect(out).toContain("const ground = createAskContext(askData);");
+    expect(out).toContain(
+      'model: gateway("anthropic/claude-sonnet-4-5"),\n      instructions,\n      messages,\n      reasoning: "none",\n      onError({ error })'
+    );
+  });
+
+  it("generates the OpenRouter route with reasoning on the model, not the call", () => {
+    const out = askEndpointTemplate(
+      backendFor({
+        enabled: true,
+        provider: openrouter({ model: "x/y", reasoning: "none" }),
+      })
+    );
+    expect(out).toContain('import { streamText } from "ai";');
+    expect(out).toContain(
+      'import { createOpenRouter } from "@openrouter/ai-sdk-provider";'
+    );
+    expect(out).toContain(
+      'const openrouter = createOpenRouter({\n  apiKey: getSecret("OPENROUTER_API_KEY"),\n});'
+    );
+    expect(out).toContain('if (!getSecret("OPENROUTER_API_KEY"))');
     // The OpenRouter provider ignores the AI SDK's top-level `reasoning` call
     // option, so the level rides on the model as `reasoning.effort` — and
     // nowhere else, so the ejected route doesn't carry a dead field.
     expect(out).toContain(
-      'openrouter("x/y", { reasoning: { effort: "none" } })'
+      'model: openrouter("x/y", { reasoning: { effort: "none" } }),\n      instructions,\n      messages,\n      onError({ error })'
     );
     expect(out).not.toContain('reasoning: "none"');
+    // Without a level the model takes no settings object.
+    expect(
+      askEndpointTemplate(
+        backendFor({ enabled: true, provider: openrouter({ model: "x/y" }) })
+      )
+    ).toContain('model: openrouter("x/y"),\n      instructions,');
   });
 
-  it("inlines ai.ask.headers into every provider factory", () => {
+  it("generates the LLMGateway route through the OpenAI-compatible provider", () => {
+    const out = askEndpointTemplate(
+      backendFor({
+        enabled: true,
+        provider: llmgateway({ model: "m", reasoning: "high" }),
+      })
+    );
+    expect(out).toContain('import { streamText } from "ai";');
+    expect(out).toContain(
+      'import { createOpenAICompatible } from "@ai-sdk/openai-compatible";'
+    );
+    expect(out).toContain(
+      'const provider = createOpenAICompatible({\n  apiKey: getSecret("LLMGATEWAY_API_KEY"),\n  baseURL: "https://api.llmgateway.io/v1",\n  name: "llmgateway",\n});'
+    );
+    expect(out).toContain('if (!getSecret("LLMGATEWAY_API_KEY"))');
+    // Grounded, with the level as the call option (sent as `reasoning_effort`).
+    expect(out).toContain("const ground = createAskContext(askData);");
+    expect(out).toContain(
+      'model: provider("m"),\n      instructions,\n      messages,\n      reasoning: "high",\n      onError({ error })'
+    );
+  });
+
+  it("generates the Inkeep route ungrounded, on the plain prompt, with no reasoning", () => {
+    const out = askEndpointTemplate(
+      backendFor({
+        enabled: true,
+        provider: inkeep({ model: "inkeep-qa-expert" }),
+      })
+    );
+    expect(out).toContain(
+      'const provider = createOpenAICompatible({\n  apiKey: getSecret("INKEEP_API_KEY"),\n  baseURL: "https://api.inkeep.com/v1",\n  name: "inkeep",\n});'
+    );
+    expect(out).toContain('if (!getSecret("INKEEP_API_KEY"))');
+    // Inkeep retrieves from its own index: no grounding module, no snapshot.
+    expect(out).not.toContain("createAskContext");
+    expect(out).not.toContain("blume:ask-data");
+    expect(out).toContain(
+      'model: provider("inkeep-qa-expert"),\n      instructions:\n        "You are a helpful documentation assistant. Answer using the project\'s documentation.",\n      messages,\n      onError({ error })'
+    );
+    expect(out).not.toContain("reasoning");
+  });
+
+  it("generates the OpenAI-compatible route from the configured endpoint", () => {
+    const out = askEndpointTemplate(
+      backendFor({
+        enabled: true,
+        provider: openaiCompatible({
+          ...COMPATIBLE,
+          name: "acme",
+          reasoning: "low",
+        }),
+      })
+    );
+    expect(out).toContain(
+      'const provider = createOpenAICompatible({\n  apiKey: getSecret("GW_KEY"),\n  baseURL: "https://api.example.com/v1",\n  name: "acme",\n});'
+    );
+    expect(out).toContain('if (!getSecret("GW_KEY"))');
+    expect(out).toContain("Ask AI is not configured: set GW_KEY.");
+    expect(out).toContain("const ground = createAskContext(askData);");
+    expect(out).toContain(
+      'model: provider("m"),\n      instructions,\n      messages,\n      reasoning: "low",\n      onError({ error })'
+    );
+  });
+
+  it("forwards providerOptions verbatim to streamText on every adapter", () => {
+    const providerOptions = { openai: { textVerbosity: "low" } };
+    const expected =
+      'providerOptions: {"openai":{"textVerbosity":"low"}},\n      onError({ error })';
+    for (const provider of [
+      gateway({ providerOptions }),
+      openrouter({ model: "x/y", providerOptions, reasoning: "low" }),
+      llmgateway({ model: "m", providerOptions }),
+      inkeep({ model: "m", providerOptions }),
+      openaiCompatible({ ...COMPATIBLE, providerOptions }),
+    ]) {
+      expect(
+        askEndpointTemplate(backendFor({ enabled: true, provider }))
+      ).toContain(expected);
+    }
+    // After the adapter's own call fields.
+    expect(
+      askEndpointTemplate(
+        backendFor({
+          enabled: true,
+          provider: gateway({ providerOptions, reasoning: "none" }),
+        })
+      )
+    ).toContain(
+      'reasoning: "none",\n      providerOptions: {"openai":{"textVerbosity":"low"}},'
+    );
+  });
+
+  it("inlines headers into every provider factory", () => {
     const headers = { "X-Caller-Id": "docs", "X-Team": "platform" };
     const expected = `  headers: ${JSON.stringify(headers)},`;
 
-    const gateway = askEndpointTemplate(
-      resolveAskBackend(askConfig({ enabled: true, headers })),
-      true
+    const gw = askEndpointTemplate(
+      backendFor({ enabled: true, provider: gateway({ headers }) })
     );
-    expect(gateway).toContain(
+    expect(gw).toContain(
       `createGateway({\n  apiKey: getSecret("AI_GATEWAY_API_KEY"),\n${expected}\n});`
     );
 
-    const openrouter = askEndpointTemplate(
-      resolveAskBackend(
-        askConfig({ enabled: true, headers, provider: "openrouter" })
-      ),
-      true
+    const router = askEndpointTemplate(
+      backendFor({
+        enabled: true,
+        provider: openrouter({ headers, model: "x/y" }),
+      })
     );
-    expect(openrouter).toContain(
+    expect(router).toContain(
       `createOpenRouter({\n  apiKey: getSecret("OPENROUTER_API_KEY"),\n${expected}\n});`
     );
 
     const compatible = askEndpointTemplate(
-      resolveAskBackend(
-        askConfig({
-          baseUrl: "https://api.example.com/v1",
-          enabled: true,
-          headers,
-          provider: "openai-compatible",
-        })
-      ),
-      true
+      backendFor({
+        enabled: true,
+        provider: openaiCompatible({ ...COMPATIBLE, headers }),
+      })
     );
     // Sits between the key and the name so the API key's `Authorization`
     // header is applied first and custom headers can't displace it.
     expect(compatible).toContain(
-      `  apiKey: getSecret("API_KEY"),\n  baseURL: "https://api.example.com/v1",\n${expected}\n  name: "openai-compatible",`
+      `  apiKey: getSecret("GW_KEY"),\n  baseURL: "https://api.example.com/v1",\n${expected}\n  name: "openai-compatible",`
     );
   });
 
   it("leaves headers out of the factories when the map is empty", () => {
     const out = askEndpointTemplate(
-      resolveAskBackend(
-        askConfig({ enabled: true, headers: {}, provider: "openrouter" })
-      ),
-      true
+      backendFor({
+        enabled: true,
+        provider: openrouter({ headers: {}, model: "x/y" }),
+      })
     );
     expect(out).toContain(
       'createOpenRouter({\n  apiKey: getSecret("OPENROUTER_API_KEY"),\n});'
@@ -1786,43 +1913,8 @@ describe("askEndpointTemplate", () => {
     expect(out).not.toContain("headers:");
   });
 
-  it("wires the OpenRouter provider", () => {
-    const out = askEndpointTemplate(
-      resolveAskBackend(
-        askConfig({
-          apiKeyEnv: "OR_KEY",
-          enabled: true,
-          model: "x/y",
-          provider: "openrouter",
-        })
-      ),
-      true
-    );
-    expect(out).toContain("createOpenRouter");
-    expect(out).toContain('import { getSecret } from "astro:env/server"');
-    expect(out).toContain('getSecret("OR_KEY")');
-    expect(out).toContain('openrouter("x/y")');
-  });
-
-  it("wires an OpenAI-compatible provider", () => {
-    const out = askEndpointTemplate(
-      resolveAskBackend(
-        askConfig({
-          baseUrl: "https://api.example.com/v1",
-          enabled: true,
-          model: "m",
-          provider: "openai-compatible",
-        })
-      ),
-      true
-    );
-    expect(out).toContain("createOpenAICompatible");
-    expect(out).toContain('baseURL: "https://api.example.com/v1"');
-    expect(out).toContain('provider("m")');
-  });
-
   it("threads custom instructions into the grounded route and its fallback", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), true, {
+    const out = askEndpointTemplate(resolveAskBackend(), {
       instructions: "Answer in French.",
     });
     expect(out).toContain(
@@ -1834,7 +1926,7 @@ describe("askEndpointTemplate", () => {
   });
 
   it("threads the configured retrieval sizes into the grounded route", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), true, {
+    const out = askEndpointTemplate(resolveAskBackend(), {
       retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
     });
     expect(out).toContain(
@@ -1843,7 +1935,7 @@ describe("askEndpointTemplate", () => {
   });
 
   it("carries instructions and retrieval together", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), true, {
+    const out = askEndpointTemplate(resolveAskBackend(), {
       instructions: "Answer in French.",
       retrieval: { contextBudget: 2500 },
     });
@@ -1852,9 +1944,10 @@ describe("askEndpointTemplate", () => {
   });
 
   it("appends custom instructions to the ungrounded prompt", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), false, {
-      instructions: "Answer in French.",
-    });
+    const out = askEndpointTemplate(
+      backendFor({ enabled: true, provider: inkeep({ model: "m" }) }),
+      { instructions: "Answer in French." }
+    );
     expect(out).not.toContain("createAskContext");
     expect(out).toContain(
       "Answer using the project's documentation.\\n\\nAnswer in French."
@@ -1862,7 +1955,7 @@ describe("askEndpointTemplate", () => {
   });
 
   it("keeps the plain prompt when no instructions are configured", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), true);
+    const out = askEndpointTemplate(resolveAskBackend());
     expect(out).toContain("createAskContext(askData);");
     expect(out).toContain("Answer using the project's documentation.\"");
   });

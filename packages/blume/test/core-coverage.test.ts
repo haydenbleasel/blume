@@ -262,14 +262,26 @@ describe("config schema validators", () => {
     ).toContainEqual(["search", "provider", "options", "appId"]);
   });
 
-  it("requires a baseUrl for an openai-compatible Ask AI backend", () => {
+  it("requires a baseUrl for the openaiCompatible Ask AI adapter", () => {
     const result = blumeConfigSchema.safeParse({
-      ai: { ask: { enabled: true, provider: "openai-compatible" } },
+      ai: {
+        ask: {
+          enabled: true,
+          provider: {
+            kind: "openai-compatible",
+            options: { apiKeyEnv: "K", model: "m" },
+            requiredSecrets: ["K"],
+            runtimeDeps: ["@ai-sdk/openai-compatible"],
+          },
+        },
+      },
     });
     expect(result.success).toBe(false);
     expect(
-      result.success ? [] : result.error.issues.map((issue) => issue.message)
-    ).toContainEqual(expect.stringContaining("ai.ask.baseUrl"));
+      result.success
+        ? []
+        : result.error.issues.map((issue) => issue.path.join("."))
+    ).toContainEqual("ai.ask.provider.options.baseUrl");
   });
 
   it("accepts a custom content source via the ContentSource validator", () => {

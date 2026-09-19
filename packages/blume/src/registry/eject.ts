@@ -135,19 +135,18 @@ const askFiles = async (
     await rm(join(genDir, "ask-data.json"), { force: true });
     return [];
   }
-  const grounded = ask.provider !== "inkeep";
+  const backend = resolveAskBackend(ask.provider);
   const files = [
     {
-      content: askEndpointTemplate(resolveAskBackend(ask), grounded, {
+      content: askEndpointTemplate(backend, {
         cors: ask.cors,
         instructions: ask.instructions,
-        reasoning: ask.reasoning,
         retrieval: ask.retrieval,
       }),
       path: join(srcDir, "pages", "api", "ask.ts"),
     },
   ];
-  if (grounded) {
+  if (backend.grounded) {
     files.push({
       content: `${JSON.stringify(await buildAskData(project))}\n`,
       path: join(genDir, "ask-data.json"),

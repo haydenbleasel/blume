@@ -28,7 +28,7 @@ import { hasAiCatalog } from "../ai/ai-catalog.ts";
 import { OPENAPI_PATH } from "../ai/api/paths.ts";
 import { buildApiSpec } from "../ai/api/spec.ts";
 import { buildAskData } from "../ai/ask-data.ts";
-import { askBackendRuntimeDep, resolveAskBackend } from "../ai/ask.ts";
+import { resolveAskBackend } from "../ai/ask.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { buildRawMarkdown, markdownRoutePaths } from "../ai/markdown.ts";
 import type { RawMarkdownEntry } from "../ai/markdown.ts";
@@ -716,7 +716,7 @@ export const sourceAdapterWarnings = (
 };
 
 /**
- * Warn when the Ask AI backend's provider SDK is missing. Like search provider
+ * Warn when the Ask AI adapter's provider SDK is missing. Like search provider
  * SDKs, these are optional peers the project must install (only `gateway`
  * needs nothing beyond the core `ai` package Blume ships) — warn early with
  * the package name rather than let Vite fail to resolve the import opaquely.
@@ -733,13 +733,15 @@ export const askProviderWarnings = (
   if (!ask?.enabled || ask.endpoint) {
     return [];
   }
-  const dep = askBackendRuntimeDep(ask);
-  if (!dep || canResolveFrom(root, dep) || canResolveFrom(pkgDir, dep)) {
-    return [];
-  }
-  return [
-    `Ask AI provider "${ask.provider}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`,
-  ];
+  const { provider } = ask;
+  return provider.runtimeDeps
+    .filter(
+      (dep) => !(canResolveFrom(root, dep) || canResolveFrom(pkgDir, dep))
+    )
+    .map(
+      (dep) =>
+        `Ask AI provider "${provider.kind}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`
+    );
 };
 
 /** Absolute path to the configured `examples.css`, or null when unset. */
@@ -1846,16 +1848,15 @@ const writeAskFiles = async (
   if (!(ask?.enabled && !ask.endpoint)) {
     return;
   }
-  const grounded = ask.provider !== "inkeep";
-  if (grounded) {
+  const backend = resolveAskBackend(ask.provider);
+  if (backend.grounded) {
     modules.set("blume:ask-data", JSON.stringify(await buildAskData(project)));
   }
   await write(
     join(srcDir, "pages", "api", "ask.ts"),
-    askEndpointTemplate(resolveAskBackend(ask), grounded, {
+    askEndpointTemplate(backend, {
       cors: ask.cors,
       instructions: ask.instructions,
-      reasoning: ask.reasoning,
       retrieval: ask.retrieval,
     })
   );

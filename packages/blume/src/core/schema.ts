@@ -1,6 +1,7 @@
 import type { AstroIntegration } from "astro";
 import { z } from "zod";
 
+import { askAdapterSchema, DEFAULT_ASK_PROVIDER } from "../ai/ask.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import { analyticsConfigSchema } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
@@ -630,28 +631,6 @@ const searchConfigSchema = z
   .pipe(searchOptionsSchema);
 
 /**
- * The `ai.ask.reasoning` levels: the AI SDK's top-level `reasoning` values
- * minus `provider-default`, which is what omitting the field means.
- */
-export const askReasoningLevels = [
-  "none",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-] as const;
-
-/** Ask AI backends. `gateway` (default) routes through the Vercel AI Gateway. */
-export const askAiProviders = [
-  "gateway",
-  "openrouter",
-  "llmgateway",
-  "inkeep",
-  "openai-compatible",
-] as const;
-
-/**
  * JWK parameters that carry private or secret key material (RFC 7518): the
  * private exponent/scalar, the RSA CRT parameters, and the symmetric key.
  * A directory is public by definition, so any of these in a configured key is
@@ -758,12 +737,6 @@ const aiConfigSchema = z.strictObject({
   api: z.boolean().default(true),
   ask: z
     .strictObject({
-      // Name of the env var holding the provider's API key; each provider has
-      // a sensible default, so this only needs setting to override it.
-      apiKeyEnv: z.string().optional(),
-      // Base URL of the backend. Required for `openai-compatible` only when no
-      // external endpoint is supplied; for named providers it overrides the preset.
-      baseUrl: z.url().optional(),
       // Origins allowed to call the generated `/api/ask` from another site (a
       // marketing page that embeds an ask box, say), or `"*"` for every
       // origin. Each URL is reduced to its origin so a trailing slash or path
@@ -784,23 +757,16 @@ const aiConfigSchema = z.strictObject({
       // and host Ask AI in an existing backend. Absolute URLs and root-relative
       // paths are both valid; the built-in request/stream contract is unchanged.
       endpoint: askEndpointSchema.optional(),
-      // Static request headers the generated endpoint sends the provider on
-      // every call (a caller-identifying header for a shared backend, say).
-      // Values are inlined into the generated route as literals, so the API
-      // key stays in `apiKeyEnv`; these are for non-secret metadata.
-      headers: z.record(z.string(), z.string()).optional(),
       // Extra system-prompt text (identity, language, tone) appended to the
       // built-in instructions, so the grounding contract — answer from the
       // retrieved excerpts, cite pages as Markdown links — stays intact.
       instructions: z.string().trim().min(1).optional(),
-      model: z.string().default("openai/gpt-5.5"),
-      provider: z.enum(askAiProviders).default("gateway"),
-      // How much the model reasons before answering, sent as the backend's
-      // own reasoning-effort control (see `askEndpointTemplate`). Omitted
-      // keeps the provider's default; `none` is the fastest and cheapest for
-      // grounded docs Q&A, where the excerpts carry the answer. Not for
-      // Inkeep, which has no such control (refined below).
-      reasoning: z.enum(askReasoningLevels).optional(),
+      // The adapter descriptor a `gateway()`/`openrouter()`/... factory
+      // returns; each adapter validates its own options (model, key env var,
+      // reasoning mapping, `providerOptions` passthrough) in `ai/ask.ts`.
+      // Unset means the gateway with its default model, so zero-config Ask AI
+      // is unchanged.
+      provider: askAdapterSchema.prefault(DEFAULT_ASK_PROVIDER),
       // How much documentation each question carries. Injected characters are
       // the dominant term in time-to-first-token on a self-hosted backend, so
       // these trade recall for latency. No zod defaults here: only what the
@@ -826,19 +792,6 @@ const aiConfigSchema = z.strictObject({
         .default([]),
     })
     .superRefine((value, ctx) => {
-      // A generic OpenAI-compatible backend has no preset URL, so the user
-      // must supply one; the named providers fall back to their preset.
-      if (
-        value.provider === "openai-compatible" &&
-        !(value.baseUrl || value.endpoint)
-      ) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            'ai.ask.baseUrl is required when provider is "openai-compatible".',
-          path: ["baseUrl"],
-        });
-      }
       // `cors` configures the generated route, which an external `endpoint`
       // replaces; accepting both would silently do nothing.
       if (value.cors && value.endpoint) {
@@ -847,17 +800,6 @@ const aiConfigSchema = z.strictObject({
           message:
             "ai.ask.cors only applies to the generated route; with ai.ask.endpoint, CORS is that backend's job.",
           path: ["cors"],
-        });
-      }
-      // Inkeep runs its own QA pipeline behind an OpenAI-compatible endpoint
-      // with no reasoning control; a level would only reach it as an
-      // unsupported `reasoning_effort`, so refuse it up front.
-      if (value.provider === "inkeep" && value.reasoning) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            'ai.ask.reasoning is not supported when provider is "inkeep".',
-          path: ["reasoning"],
         });
       }
     })
@@ -1026,8 +968,8 @@ const navigationConfigSchema = z.strictObject({
   tabs: z.array(navTabSchema).default([]),
 });
 
-export type AskAiProvider = (typeof askAiProviders)[number];
-export type AskReasoning = (typeof askReasoningLevels)[number];
+export { askReasoningLevels } from "../ai/ask.ts";
+export type { AskReasoning } from "../ai/ask.ts";
 export type AskAiConfig = NonNullable<z.infer<typeof aiConfigSchema>["ask"]>;
 export { openInChatProviders } from "./open-in-chat.ts";
 export type { OpenInChatProvider } from "./open-in-chat.ts";

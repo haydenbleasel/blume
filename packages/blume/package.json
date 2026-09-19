@@ -39,6 +39,10 @@
       "types": "./dist/types/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./ai": {
+      "types": "./dist/types/ai/index.d.ts",
+      "default": "./src/ai/index.ts"
+    },
     "./ai/*": "./src/ai/*",
     "./analytics": {
       "types": "./dist/types/analytics/index.d.ts",

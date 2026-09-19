@@ -12,6 +12,7 @@
   },
   "files": [
     "src/index.ts",
+    "src/ai/index.ts",
     "src/analytics/index.ts",
     "src/core/schema.ts",
     "src/search/adapters/index.ts",

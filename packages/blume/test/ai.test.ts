@@ -12,7 +12,15 @@ import {
 } from "../src/ai/ask-context.ts";
 import type { AskData } from "../src/ai/ask-context.ts";
 import { buildAskData } from "../src/ai/ask-data.ts";
-import { askBackendRuntimeDep, resolveAskBackend } from "../src/ai/ask.ts";
+import { resolveAskBackend } from "../src/ai/ask.ts";
+// The factories through the `blume/ai` entry a config imports them from.
+import {
+  gateway,
+  inkeep,
+  llmgateway,
+  openaiCompatible,
+  openrouter,
+} from "../src/ai/index.ts";
 import { buildLlmsFiles } from "../src/ai/llms.ts";
 import {
   buildRawMarkdown,
@@ -1915,119 +1923,483 @@ describe("sectionExcerpt", () => {
   });
 });
 
+/** The backend a schema-parsed `ai.ask` block resolves to. */
+const backendFor = (ask?: AskConfigInput) =>
+  resolveAskBackend(askConfig(ask ?? { enabled: true }).provider);
+
+const COMPATIBLE = {
+  apiKeyEnv: "GW_KEY",
+  baseUrl: "https://gw.example/v1",
+  model: "m",
+};
+
+/** The descriptor fields a hand-written literal has to carry. */
+const BARE = { requiredSecrets: [], runtimeDeps: [] };
+
+describe("ask adapter factories", () => {
+  it("return serializable descriptors the schema accepts", () => {
+    // The shared descriptor contract (`core/adapter.ts`): kind, options,
+    // the env vars the route reads, and the SDK the project must install.
+    expect(gateway()).toStrictEqual({
+      kind: "gateway",
+      options: {},
+      requiredSecrets: ["AI_GATEWAY_API_KEY"],
+      runtimeDeps: [],
+    });
+    expect(openrouter({ model: "x/y", reasoning: "low" })).toStrictEqual({
+      kind: "openrouter",
+      options: { model: "x/y", reasoning: "low" },
+      requiredSecrets: ["OPENROUTER_API_KEY"],
+      runtimeDeps: ["@openrouter/ai-sdk-provider"],
+    });
+    expect(llmgateway({ model: "m" })).toStrictEqual({
+      kind: "llmgateway",
+      options: { model: "m" },
+      requiredSecrets: ["LLMGATEWAY_API_KEY"],
+      runtimeDeps: ["@ai-sdk/openai-compatible"],
+    });
+    expect(inkeep({ model: "inkeep-qa-expert" })).toStrictEqual({
+      kind: "inkeep",
+      options: { model: "inkeep-qa-expert" },
+      requiredSecrets: ["INKEEP_API_KEY"],
+      runtimeDeps: ["@ai-sdk/openai-compatible"],
+    });
+    expect(openaiCompatible(COMPATIBLE)).toStrictEqual({
+      kind: "openai-compatible",
+      options: COMPATIBLE,
+      requiredSecrets: ["GW_KEY"],
+      runtimeDeps: ["@ai-sdk/openai-compatible"],
+    });
+    // A renamed key env var is what the descriptor declares.
+    expect(
+      openrouter({ apiKeyEnv: "OR_KEY", model: "x/y" }).requiredSecrets
+    ).toStrictEqual(["OR_KEY"]);
+    expect(gateway({ apiKeyEnv: "GW" }).requiredSecrets).toStrictEqual(["GW"]);
+    // Plain data: the generated and ejected routes inline the descriptor, so
+    // it must survive a JSON round trip, and the schema must take it as-is.
+    for (const provider of [
+      gateway(),
+      openrouter({ model: "x/y" }),
+      llmgateway({ model: "m" }),
+      inkeep({ model: "m" }),
+      openaiCompatible(COMPATIBLE),
+    ]) {
+      // A JSON round trip on purpose (not structuredClone): the route is
+      // written with JSON.stringify, which would drop anything non-JSON.
+      // oxlint-disable-next-line unicorn/prefer-structured-clone
+      expect(JSON.parse(JSON.stringify(provider))).toStrictEqual(provider);
+      expect(() => askConfig({ enabled: true, provider })).not.toThrow();
+    }
+  });
+});
+
 describe("resolveAskBackend", () => {
-  it("defaults to the gateway backend when ask is unset", () => {
-    expect(resolveAskBackend()).toStrictEqual({
+  it("defaults to the gateway and its model when ask is unset", () => {
+    const backend = resolveAskBackend();
+    expect(backend).toMatchObject({
+      grounded: true,
       kind: "gateway",
-      model: "openai/gpt-5.5",
+      label: "AI Gateway",
+      secretNote: expect.stringContaining("OIDC"),
     });
-  });
-
-  it("uses the dedicated provider and preset env var for openrouter", () => {
-    const backend = resolveAskBackend(
-      askConfig({ enabled: true, model: "anthropic/x", provider: "openrouter" })
+    expect(backend.template.model).toBe('gateway("openai/gpt-5.5")');
+    expect(backend.template.fields).toStrictEqual([]);
+    // Nothing written, an empty `gateway()`, and the resolver's own default
+    // all land on the same backend.
+    expect(backendFor()).toStrictEqual(backend);
+    expect(backendFor({ enabled: true, provider: gateway() })).toStrictEqual(
+      backend
     );
-    expect(backend).toStrictEqual({
-      apiKeyEnv: "OPENROUTER_API_KEY",
+  });
+
+  it("reads each adapter's defaults: key env var, base URL, provider name", () => {
+    const router = backendFor({
+      enabled: true,
+      provider: openrouter({ model: "anthropic/x" }),
+    });
+    expect(router).toMatchObject({
+      grounded: true,
       kind: "openrouter",
-      model: "anthropic/x",
+      label: "OpenRouter",
     });
-  });
+    expect(router.template.model).toBe('openrouter("anthropic/x")');
 
-  it("maps the OpenAI-compatible providers to their presets", () => {
-    expect(
-      resolveAskBackend(askConfig({ provider: "llmgateway" }))
-    ).toMatchObject({
-      apiKeyEnv: "LLMGATEWAY_API_KEY",
-      baseUrl: "https://api.llmgateway.io/v1",
+    const llm = backendFor({
+      enabled: true,
+      provider: llmgateway({ model: "m" }),
+    });
+    expect(llm).toMatchObject({
+      grounded: true,
+      kind: "llmgateway",
+      label: "LLMGateway",
+    });
+    expect(llm.template.setup).toContain(
+      'baseURL: "https://api.llmgateway.io/v1"'
+    );
+    expect(llm.template.setup).toContain('name: "llmgateway"');
+
+    const ink = backendFor({ enabled: true, provider: inkeep({ model: "m" }) });
+    expect(ink).toMatchObject({
+      grounded: false,
+      kind: "inkeep",
+      label: "Inkeep",
+    });
+    expect(ink.template.setup).toContain(
+      'baseURL: "https://api.inkeep.com/v1"'
+    );
+    expect(ink.template.setup).toContain('name: "inkeep"');
+
+    const compatible = backendFor({
+      enabled: true,
+      provider: openaiCompatible(COMPATIBLE),
+    });
+    expect(compatible).toMatchObject({
+      grounded: true,
       kind: "openai-compatible",
-      name: "llmgateway",
+      label: "OpenAI-compatible",
     });
-    expect(resolveAskBackend(askConfig({ provider: "inkeep" }))).toMatchObject({
-      apiKeyEnv: "INKEEP_API_KEY",
-      baseUrl: "https://api.inkeep.com/v1",
-      kind: "openai-compatible",
-      name: "inkeep",
-    });
+    expect(compatible.template.setup).toContain(
+      'baseURL: "https://gw.example/v1"'
+    );
+    expect(compatible.template.setup).toContain('name: "openai-compatible"');
   });
 
-  it("honors baseUrl and apiKeyEnv overrides", () => {
-    expect(
-      resolveAskBackend(
-        askConfig({
-          apiKeyEnv: "MY_KEY",
-          baseUrl: "https://proxy.example/v1",
-          provider: "llmgateway",
-        })
-      )
-    ).toMatchObject({
-      apiKeyEnv: "MY_KEY",
-      baseUrl: "https://proxy.example/v1",
+  it("honors apiKeyEnv, baseUrl, and name overrides", () => {
+    const llm = backendFor({
+      enabled: true,
+      provider: llmgateway({
+        apiKeyEnv: "MY_KEY",
+        baseUrl: "https://proxy.example/v1",
+        model: "m",
+      }),
     });
+    expect(llm.template.setup).toContain('apiKey: getSecret("MY_KEY")');
+    expect(llm.template.setup).toContain('baseURL: "https://proxy.example/v1"');
+    expect(llm.template.keyCheck).toContain('if (!getSecret("MY_KEY"))');
+    expect(llm.template.keyCheck).toContain(
+      "Ask AI is not configured: set MY_KEY."
+    );
+
+    const named = backendFor({
+      enabled: true,
+      provider: openaiCompatible({ ...COMPATIBLE, name: "acme" }),
+    });
+    expect(named.template.setup).toContain('name: "acme"');
+
+    // The gateway keeps its OIDC alternative around a renamed key.
+    const gw = backendFor({
+      enabled: true,
+      provider: gateway({ apiKeyEnv: "GATEWAY_KEY" }),
+    });
+    expect(gw.template.setup).toContain('apiKey: getSecret("GATEWAY_KEY")');
+    expect(gw.template.keyCheck).toContain(
+      'if (!(getSecret("GATEWAY_KEY") || getSecret("VERCEL_OIDC_TOKEN")))'
+    );
+    expect(gw.template.keyCheck).toContain(
+      "set GATEWAY_KEY (or deploy on Vercel with OIDC)"
+    );
   });
 
-  it("carries the user baseUrl through for openai-compatible", () => {
-    expect(
-      resolveAskBackend(
-        askConfig({
-          apiKeyEnv: "GW_KEY",
-          baseUrl: "https://gw.example/v1",
-          provider: "openai-compatible",
-        })
-      )
-    ).toStrictEqual({
-      apiKeyEnv: "GW_KEY",
-      baseUrl: "https://gw.example/v1",
-      kind: "openai-compatible",
-      model: "openai/gpt-5.5",
-      name: "openai-compatible",
-    });
-  });
-
-  it("carries ai.ask.headers on every backend kind", () => {
+  it("inlines headers into every provider factory and drops an empty map", () => {
     const headers = { "X-Caller-Id": "docs" };
-    expect(resolveAskBackend(askConfig({ headers }))).toStrictEqual({
-      headers,
-      kind: "gateway",
-      model: "openai/gpt-5.5",
-    });
+    const expected = `  headers: ${JSON.stringify(headers)},`;
     expect(
-      resolveAskBackend(askConfig({ headers, provider: "openrouter" }))
-    ).toStrictEqual({
-      apiKeyEnv: "OPENROUTER_API_KEY",
-      headers,
-      kind: "openrouter",
-      model: "openai/gpt-5.5",
-    });
+      backendFor({ enabled: true, provider: gateway({ headers }) }).template
+        .setup
+    ).toContain(expected);
     expect(
-      resolveAskBackend(askConfig({ headers, provider: "llmgateway" }))
-    ).toMatchObject({ headers, kind: "openai-compatible" });
+      backendFor({
+        enabled: true,
+        provider: openrouter({ headers, model: "x/y" }),
+      }).template.setup
+    ).toContain(expected);
+    expect(
+      backendFor({ enabled: true, provider: inkeep({ headers, model: "m" }) })
+        .template.setup
+    ).toContain(expected);
+    for (const provider of [
+      gateway({ headers: {} }),
+      openrouter({ headers: {}, model: "x/y" }),
+      inkeep({ headers: {}, model: "m" }),
+    ]) {
+      expect(
+        backendFor({ enabled: true, provider }).template.setup
+      ).not.toContain("headers:");
+    }
   });
 
-  it("drops an empty headers map so the route carries no headers option", () => {
-    expect(resolveAskBackend(askConfig({ headers: {} }))).toStrictEqual({
-      kind: "gateway",
-      model: "openai/gpt-5.5",
+  it("maps reasoning per adapter", () => {
+    // The gateway and the OpenAI-compatible adapters: the AI SDK's top-level
+    // call option (the gateway maps it to the model's control, the
+    // OpenAI-compatible provider sends it as `reasoning_effort`).
+    expect(
+      backendFor({ enabled: true, provider: gateway({ reasoning: "none" }) })
+        .template
+    ).toMatchObject({
+      fields: ['reasoning: "none"'],
+      model: 'gateway("openai/gpt-5.5")',
     });
     expect(
-      resolveAskBackend(askConfig({ headers: {}, provider: "openrouter" }))
-    ).not.toHaveProperty("headers");
+      backendFor({
+        enabled: true,
+        provider: llmgateway({ model: "m", reasoning: "high" }),
+      }).template.fields
+    ).toStrictEqual(['reasoning: "high"']);
     expect(
-      resolveAskBackend(askConfig({ headers: {}, provider: "inkeep" }))
-    ).not.toHaveProperty("headers");
+      backendFor({
+        enabled: true,
+        provider: openaiCompatible({ ...COMPATIBLE, reasoning: "low" }),
+      }).template.fields
+    ).toStrictEqual(['reasoning: "low"']);
+    // OpenRouter: on the model as `reasoning.effort`, because its provider
+    // ignores the call option — and nowhere else.
+    expect(
+      backendFor({
+        enabled: true,
+        provider: openrouter({ model: "x/y", reasoning: "none" }),
+      }).template
+    ).toMatchObject({
+      fields: [],
+      model: 'openrouter("x/y", { reasoning: { effort: "none" } })',
+    });
+    // Unset keeps the provider default: no field anywhere.
+    expect(
+      backendFor({ enabled: true, provider: openrouter({ model: "x/y" }) })
+        .template
+    ).toMatchObject({ fields: [], model: 'openrouter("x/y")' });
+  });
+
+  it("forwards providerOptions verbatim after the adapter's own fields", () => {
+    const providerOptions = {
+      openai: {
+        tags: ["docs", 1, null, { nested: true }],
+        textVerbosity: "low",
+      },
+    };
+    const serialized = `providerOptions: ${JSON.stringify(providerOptions)}`;
+    expect(
+      backendFor({
+        enabled: true,
+        provider: gateway({ providerOptions, reasoning: "none" }),
+      }).template.fields
+    ).toStrictEqual(['reasoning: "none"', serialized]);
+    expect(
+      backendFor({
+        enabled: true,
+        provider: inkeep({ model: "m", providerOptions }),
+      }).template.fields
+    ).toStrictEqual([serialized]);
   });
 });
 
 describe("ai.ask schema", () => {
-  it("accepts a string-valued headers map and rejects other values", () => {
+  it("defaults provider to the gateway with its model", () => {
+    expect(askConfig({ enabled: true }).provider).toStrictEqual({
+      kind: "gateway",
+      options: { apiKeyEnv: "AI_GATEWAY_API_KEY", model: "openai/gpt-5.5" },
+      requiredSecrets: ["AI_GATEWAY_API_KEY"],
+      runtimeDeps: [],
+    });
+    expect(blumeConfigSchema.parse({}).ai.ask).toBeUndefined();
+  });
+
+  it("applies each adapter's defaults and keeps what was set", () => {
     expect(
+      askConfig({ enabled: true, provider: openrouter({ model: "x/y" }) })
+        .provider
+    ).toStrictEqual({
+      kind: "openrouter",
+      options: { apiKeyEnv: "OPENROUTER_API_KEY", model: "x/y" },
+      requiredSecrets: ["OPENROUTER_API_KEY"],
+      runtimeDeps: ["@openrouter/ai-sdk-provider"],
+    });
+    expect(
+      askConfig({ enabled: true, provider: llmgateway({ model: "m" }) })
+        .provider
+    ).toStrictEqual({
+      kind: "llmgateway",
+      options: {
+        apiKeyEnv: "LLMGATEWAY_API_KEY",
+        baseUrl: "https://api.llmgateway.io/v1",
+        model: "m",
+      },
+      requiredSecrets: ["LLMGATEWAY_API_KEY"],
+      runtimeDeps: ["@ai-sdk/openai-compatible"],
+    });
+    expect(
+      askConfig({ enabled: true, provider: inkeep({ model: "m" }) }).provider
+    ).toStrictEqual({
+      kind: "inkeep",
+      options: {
+        apiKeyEnv: "INKEEP_API_KEY",
+        baseUrl: "https://api.inkeep.com/v1",
+        model: "m",
+      },
+      requiredSecrets: ["INKEEP_API_KEY"],
+      runtimeDeps: ["@ai-sdk/openai-compatible"],
+    });
+    expect(
+      askConfig({ enabled: true, provider: openaiCompatible(COMPATIBLE) })
+        .provider
+    ).toStrictEqual({
+      kind: "openai-compatible",
+      options: { ...COMPATIBLE, name: "openai-compatible" },
+      requiredSecrets: ["GW_KEY"],
+      runtimeDeps: ["@ai-sdk/openai-compatible"],
+    });
+  });
+
+  it("requires what an adapter has no default for", () => {
+    for (const provider of [
+      { ...BARE, kind: "openrouter", options: {} },
+      { ...BARE, kind: "llmgateway", options: {} },
+      { ...BARE, kind: "inkeep", options: {} },
+      // The generic endpoint has no preset URL or key env var.
+      { ...BARE, kind: "openai-compatible", options: { model: "m" } },
+      {
+        ...BARE,
+        kind: "openai-compatible",
+        options: { apiKeyEnv: "K", baseUrl: "not a url", model: "m" },
+      },
+      {
+        ...BARE,
+        kind: "openai-compatible",
+        options: { ...COMPATIBLE, model: "" },
+      },
+      // The descriptor contract itself: a bare `{ kind, options }` is not one.
+      { kind: "gateway", options: {} },
+    ]) {
+      expect(() =>
+        blumeConfigSchema.parse({ ai: { ask: { enabled: true, provider } } })
+      ).toThrow();
+    }
+  });
+
+  it("rejects unknown adapters, the old flat props, and reasoning on Inkeep", () => {
+    // The provider is a descriptor now, not a name.
+    expect(() =>
       blumeConfigSchema.parse({
-        ai: { ask: { enabled: true, headers: { "X-Caller-Id": "docs" } } },
-      }).ai.ask?.headers
+        ai: { ask: { enabled: true, provider: "openrouter" } },
+      })
+    ).toThrow();
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: {
+          ask: {
+            enabled: true,
+            provider: { ...BARE, kind: "ollama", options: {} },
+          },
+        },
+      })
+    ).toThrow(/Invalid discriminator value/u);
+    for (const flat of [
+      { model: "x" },
+      { apiKeyEnv: "K" },
+      { baseUrl: "https://x.y/v1" },
+      { headers: {} },
+      { reasoning: "none" },
+    ]) {
+      expect(() =>
+        blumeConfigSchema.parse({ ai: { ask: { enabled: true, ...flat } } })
+      ).toThrow(/Unrecognized key/u);
+    }
+    // Inkeep runs its own QA pipeline with no reasoning control, so its
+    // adapter has no such option to accept.
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: {
+          ask: {
+            enabled: true,
+            provider: {
+              ...BARE,
+              kind: "inkeep",
+              options: { model: "m", reasoning: "none" },
+            },
+          },
+        },
+      })
+    ).toThrow(/Unrecognized key: \\"reasoning\\"/u);
+  });
+
+  it("accepts every reasoning level where an adapter maps it and rejects anything else", () => {
+    for (const reasoning of askReasoningLevels) {
+      expect(
+        askConfig({ enabled: true, provider: gateway({ reasoning }) }).provider
+          .options
+      ).toMatchObject({ reasoning });
+      expect(
+        askConfig({
+          enabled: true,
+          provider: openrouter({ model: "x/y", reasoning }),
+        }).provider.options
+      ).toMatchObject({ reasoning });
+    }
+    expect(askConfig({ enabled: true }).provider.options).not.toHaveProperty(
+      "reasoning"
+    );
+    for (const reasoning of ["provider-default", "max", 2]) {
+      expect(() =>
+        blumeConfigSchema.parse({
+          ai: {
+            ask: {
+              enabled: true,
+              provider: { ...BARE, kind: "gateway", options: { reasoning } },
+            },
+          },
+        })
+      ).toThrow();
+    }
+  });
+
+  it("accepts string headers and JSON providerOptions, rejecting other values", () => {
+    expect(
+      askConfig({
+        enabled: true,
+        provider: gateway({ headers: { "X-Caller-Id": "docs" } }),
+      }).provider.options.headers
     ).toStrictEqual({ "X-Caller-Id": "docs" });
     expect(() =>
       blumeConfigSchema.parse({
-        ai: { ask: { enabled: true, headers: { "X-Retries": 3 } } },
+        ai: {
+          ask: {
+            enabled: true,
+            provider: {
+              ...BARE,
+              kind: "gateway",
+              options: { headers: { "X-Retries": 3 } },
+            },
+          },
+        },
+      })
+    ).toThrow();
+    // `providerOptions` is inlined into the route with JSON.stringify, so a
+    // function (silently dropped) or a non-object provider entry is refused.
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: {
+          ask: {
+            enabled: true,
+            provider: {
+              ...BARE,
+              kind: "gateway",
+              options: { providerOptions: { openai: { fn: () => 1 } } },
+            },
+          },
+        },
+      })
+    ).toThrow();
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: {
+          ask: {
+            enabled: true,
+            provider: {
+              ...BARE,
+              kind: "gateway",
+              options: { providerOptions: { openai: "low" } },
+            },
+          },
+        },
       })
     ).toThrow();
   });
@@ -2062,23 +2434,6 @@ describe("ai.ask schema", () => {
     }
   });
 
-  it("accepts every reasoning level and rejects anything else", () => {
-    for (const reasoning of askReasoningLevels) {
-      expect(
-        blumeConfigSchema.parse({ ai: { ask: { enabled: true, reasoning } } })
-          .ai.ask?.reasoning
-      ).toBe(reasoning);
-    }
-    expect(
-      blumeConfigSchema.parse({ ai: { ask: { enabled: true } } }).ai.ask
-    ).not.toHaveProperty("reasoning");
-    for (const reasoning of ["provider-default", "max", 2]) {
-      expect(() =>
-        blumeConfigSchema.parse({ ai: { ask: { enabled: true, reasoning } } })
-      ).toThrow();
-    }
-  });
-
   it("rejects cors alongside an external endpoint", () => {
     // The generated route is what reads `cors`; an `endpoint` replaces it, so
     // the pair would silently do nothing.
@@ -2095,48 +2450,13 @@ describe("ai.ask schema", () => {
     ).toThrow(/ai\.ask\.cors only applies to the generated route/u);
   });
 
-  it("requires baseUrl for the openai-compatible provider", () => {
-    expect(() =>
-      blumeConfigSchema.parse({
-        ai: { ask: { enabled: true, provider: "openai-compatible" } },
-      })
-    ).toThrow(/ai\.ask\.baseUrl is required/u);
-  });
-
-  it("rejects reasoning on the inkeep provider", () => {
-    expect(() =>
-      blumeConfigSchema.parse({
-        ai: { ask: { enabled: true, provider: "inkeep", reasoning: "none" } },
-      })
-    ).toThrow(/ai\.ask\.reasoning is not supported/u);
-    expect(() =>
-      blumeConfigSchema.parse({
-        ai: { ask: { enabled: true, provider: "inkeep" } },
-      })
-    ).not.toThrow();
-  });
-
-  it("accepts openai-compatible with a baseUrl", () => {
-    expect(() =>
-      blumeConfigSchema.parse({
-        ai: {
-          ask: {
-            baseUrl: "https://gw.example/v1",
-            enabled: true,
-            provider: "openai-compatible",
-          },
-        },
-      })
-    ).not.toThrow();
-  });
-
-  it("accepts an external endpoint without provider configuration", () => {
+  it("accepts an external endpoint beside an adapter it then ignores", () => {
     const config = blumeConfigSchema.parse({
       ai: {
         ask: {
           enabled: true,
           endpoint: "https://api.example.com/v1/docs/ask",
-          provider: "openai-compatible",
+          provider: openrouter({ model: "x/y" }),
         },
       },
     });
@@ -2168,7 +2488,7 @@ describe("ai.ask schema", () => {
 
 describe("askEndpointTemplate", () => {
   it("grounds the gateway endpoint and imports the retrieval helper", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), true);
+    const out = askEndpointTemplate(resolveAskBackend());
     expect(out).toContain('import { createGateway, streamText } from "ai";');
     expect(out).not.toContain("@openrouter/ai-sdk-provider");
     expect(out).not.toContain("@ai-sdk/openai-compatible");
@@ -2189,10 +2509,12 @@ describe("askEndpointTemplate", () => {
     expect(out).toContain('typeof m.content === "string"');
     expect(out).toContain("status: 400");
     expect(out).toContain("status: 500");
+    // Nothing generated reaches back into the config at request time.
+    expect(out).not.toContain("blume.config");
   });
 
   it("rejects a missing gateway credential up front and logs stream errors", () => {
-    const out = askEndpointTemplate(resolveAskBackend(), true);
+    const out = askEndpointTemplate(resolveAskBackend());
     // streamText defers provider/auth errors to stream consumption, so the
     // handler's try/catch never sees a missing key: the guard must run before
     // streamText or the client gets a 200 whose stream aborts mid-flight.
@@ -2208,31 +2530,28 @@ describe("askEndpointTemplate", () => {
     expect(out).toContain('console.error("Ask AI provider error:", error);');
   });
 
-  it("guards the provider key env var for non-gateway backends", () => {
-    const openrouter = askEndpointTemplate(
-      resolveAskBackend(askConfig({ provider: "openrouter" })),
-      true
+  it("guards the adapter's key env var for the non-gateway adapters", () => {
+    const router = askEndpointTemplate(
+      backendFor({ enabled: true, provider: openrouter({ model: "x/y" }) })
     );
-    expect(openrouter).toContain('if (!getSecret("OPENROUTER_API_KEY"))');
-    expect(openrouter).toContain(
+    expect(router).toContain('if (!getSecret("OPENROUTER_API_KEY"))');
+    expect(router).toContain(
       "Ask AI is not configured: set OPENROUTER_API_KEY."
     );
-    expect(openrouter).not.toContain("AI_GATEWAY_API_KEY");
+    expect(router).not.toContain("AI_GATEWAY_API_KEY");
 
     // The ungrounded branch builds its streamText call separately; it must
     // carry the same onError logging.
-    const inkeep = askEndpointTemplate(
-      resolveAskBackend(askConfig({ provider: "inkeep" })),
-      false
+    const ink = askEndpointTemplate(
+      backendFor({ enabled: true, provider: inkeep({ model: "m" }) })
     );
-    expect(inkeep).toContain('if (!getSecret("INKEEP_API_KEY"))');
-    expect(inkeep).toContain("onError({ error })");
+    expect(ink).toContain('if (!getSecret("INKEEP_API_KEY"))');
+    expect(ink).toContain("onError({ error })");
   });
 
   it("leaves the Inkeep endpoint ungrounded (it runs its own retrieval)", () => {
     const out = askEndpointTemplate(
-      resolveAskBackend(askConfig({ provider: "inkeep" })),
-      false
+      backendFor({ enabled: true, provider: inkeep({ model: "m" }) })
     );
     expect(out).toContain(
       'import { createOpenAICompatible } from "@ai-sdk/openai-compatible";'
@@ -2245,10 +2564,10 @@ describe("askEndpointTemplate", () => {
 
   it("wires the OpenRouter provider and its env var", () => {
     const out = askEndpointTemplate(
-      resolveAskBackend(
-        askConfig({ model: "anthropic/x", provider: "openrouter" })
-      ),
-      true
+      backendFor({
+        enabled: true,
+        provider: openrouter({ model: "anthropic/x" }),
+      })
     );
     expect(out).toContain(
       'import { createOpenRouter } from "@openrouter/ai-sdk-provider";'
@@ -2257,10 +2576,9 @@ describe("askEndpointTemplate", () => {
     expect(out).toContain('model: openrouter("anthropic/x")');
   });
 
-  it("wires the OpenAI-compatible provider with the preset base URL", () => {
+  it("wires the OpenAI-compatible provider with LLMGateway's preset base URL", () => {
     const out = askEndpointTemplate(
-      resolveAskBackend(askConfig({ provider: "llmgateway" })),
-      true
+      backendFor({ enabled: true, provider: llmgateway({ model: "m" }) })
     );
     expect(out).toContain(
       'import { createOpenAICompatible } from "@ai-sdk/openai-compatible";'
@@ -2270,30 +2588,33 @@ describe("askEndpointTemplate", () => {
   });
 });
 
-describe("ask backend runtime dependency", () => {
-  it("adds no provider dep for the gateway backend", () => {
-    expect(askBackendRuntimeDep()).toBeUndefined();
+describe("ask adapter runtime dependency", () => {
+  it("adds no provider dep for the gateway adapter", () => {
+    expect(gateway().runtimeDeps).toStrictEqual([]);
     expect(runtimeDeps({ enabled: true })).not.toContain(
       "@ai-sdk/openai-compatible"
     );
   });
 
-  it("declares the dedicated SDK only when its backend is enabled", () => {
-    expect(runtimeDeps({ enabled: true, provider: "openrouter" })).toContain(
-      "@openrouter/ai-sdk-provider"
-    );
+  it("declares the SDK the adapter descriptor names", () => {
     expect(
-      runtimeDeps({
-        baseUrl: "https://x/v1",
-        enabled: true,
-        provider: "openai-compatible",
-      })
+      runtimeDeps({ enabled: true, provider: openrouter({ model: "x/y" }) })
+    ).toContain("@openrouter/ai-sdk-provider");
+    expect(
+      runtimeDeps({ enabled: true, provider: openaiCompatible(COMPATIBLE) })
     ).toContain("@ai-sdk/openai-compatible");
   });
 
-  it("declares nothing when Ask AI is disabled", () => {
+  it("declares nothing when Ask AI is disabled or external", () => {
     expect(
-      runtimeDeps({ enabled: false, provider: "openrouter" })
+      runtimeDeps({ enabled: false, provider: openrouter({ model: "x/y" }) })
+    ).not.toContain("@openrouter/ai-sdk-provider");
+    expect(
+      runtimeDeps({
+        enabled: true,
+        endpoint: "https://api.example.com/ask",
+        provider: openrouter({ model: "x/y" }),
+      })
     ).not.toContain("@openrouter/ai-sdk-provider");
   });
 });

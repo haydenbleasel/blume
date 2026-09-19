@@ -5,7 +5,10 @@ import { tmpdir } from "node:os";
 
 import { dirname, join, relative } from "pathe";
 
+import { inkeep, openrouter, resolveAskBackend } from "../src/ai/ask.ts";
+import { askEndpointTemplate } from "../src/astro/templates.ts";
 import { packageRoot } from "../src/core/package-root.ts";
+import { blumeConfigSchema } from "../src/core/schema.ts";
 import { blumeSourceGlob, eject } from "../src/registry/eject.ts";
 import { findItem, packageSrc, registry } from "../src/registry/registry.ts";
 import { rewriteImports } from "../src/registry/rewrite-imports.ts";
@@ -81,7 +84,12 @@ describe("eject", () => {
             cors: ["https://www.example.com/"],
             enabled: true,
             instructions: "Answer in pirate speak.",
-            reasoning: "low",
+            provider: {
+              kind: "openrouter",
+              options: { model: "x/y", reasoning: "low" },
+              requiredSecrets: ["OPENROUTER_API_KEY"],
+              runtimeDeps: ["@openrouter/ai-sdk-provider"],
+            },
             retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
           },
           mcp: { enabled: true },
@@ -158,8 +166,32 @@ describe("eject", () => {
       'const ALLOWED_ORIGINS = ["https://www.example.com"];'
     );
     expect(ejectedAsk).toContain("export const OPTIONS");
-    // ...and the `ai.ask.reasoning` level, forwarded to `streamText`.
-    expect(ejectedAsk).toContain('reasoning: "low",');
+    // ...and the adapter, with its own reasoning mapping (OpenRouter's is on
+    // the model). The ejected route is byte-for-byte what `blume dev`/`build`
+    // generate for the same config, so an eject changes nothing at request
+    // time.
+    expect(ejectedAsk).toContain(
+      'model: openrouter("x/y", { reasoning: { effort: "low" } }),'
+    );
+    const parsedAsk = blumeConfigSchema.parse({
+      ai: {
+        ask: {
+          cors: ["https://www.example.com/"],
+          enabled: true,
+          instructions: "Answer in pirate speak.",
+          provider: openrouter({ model: "x/y", reasoning: "low" }),
+          retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
+        },
+      },
+    }).ai.ask;
+    expect(ejectedAsk).toBe(
+      askEndpointTemplate(resolveAskBackend(parsedAsk?.provider), {
+        cors: parsedAsk?.cors,
+        instructions: parsedAsk?.instructions,
+        retrieval: parsedAsk?.retrieval,
+      })
+    );
+    expect(has("src/generated/ask-data.json")).toBe(true);
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/api/search.ts")).toBe(true);
     expect(has("src/pages/[section]/rss.xml.ts")).toBe(true);
@@ -228,6 +260,50 @@ describe("eject", () => {
 
     expect(existsSync(join(root, "src/generated/search.json"))).toBe(true);
     expect(existsSync(join(root, "src/pages/blume-search.json.ts"))).toBe(true);
+  });
+
+  it("ejects an ungrounded adapter's route without a grounding snapshot", async () => {
+    const root = await mkdtemp(join(tmpdir(), "blume-eject-"));
+    ejectDirs.push(root);
+    await writeFiles(root, {
+      "blume.config.ts": `export default {
+        ai: {
+          ask: {
+            enabled: true,
+            provider: {
+              kind: "inkeep",
+              options: { model: "inkeep-qa-expert" },
+              requiredSecrets: ["INKEEP_API_KEY"],
+              runtimeDeps: ["@ai-sdk/openai-compatible"],
+            },
+          },
+        },
+      };\n`,
+      "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
+    });
+
+    await eject(root);
+    const ejectedAsk = readFileSync(
+      join(root, "src/pages/api/ask.ts"),
+      "utf-8"
+    );
+    expect(ejectedAsk).toBe(
+      askEndpointTemplate(
+        resolveAskBackend(
+          blumeConfigSchema.parse({
+            ai: {
+              ask: {
+                enabled: true,
+                provider: inkeep({ model: "inkeep-qa-expert" }),
+              },
+            },
+          }).ai.ask?.provider
+        ),
+        {}
+      )
+    );
+    expect(ejectedAsk).not.toContain("createAskContext");
+    expect(existsSync(join(root, "src/generated/ask-data.json"))).toBe(false);
   });
 
   it("removes only Blume-owned Ask artifacts in external-endpoint mode", async () => {

@@ -2,6 +2,7 @@ import type { AstroIntegration } from "astro";
 import type { z } from "zod";
 
 import type { AskRetrievalOptions } from "../ai/ask-context.ts";
+import type { AskAdapter } from "../ai/ask.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import type { AnalyticsAdapter } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
@@ -497,13 +498,6 @@ export interface AskSuggestion {
   label: string;
 }
 
-/** The Ask AI chat assistant. */
-/** Backends that can route an Ask AI request. */
-type AskProviderGateway = "gateway" | "openrouter" | "llmgateway";
-type AskProvider = AskProviderGateway | "inkeep" | "openai-compatible";
-/** How much the model reasons before answering (`ai.ask.reasoning`). */
-type AskReasoning = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
-
 /** How much retrieved documentation each Ask AI question carries. */
 export interface AskRetrievalConfig {
   /**
@@ -526,17 +520,8 @@ export interface AskRetrievalConfig {
   maxResults?: number;
 }
 
+/** The Ask AI chat assistant. */
 export interface AskConfig {
-  /**
-   * Name of the env var holding the provider API key. Each provider has a
-   * sensible default; set this only to override it.
-   */
-  apiKeyEnv?: string;
-  /**
-   * Backend base URL. Required for `openai-compatible`; for named providers it
-   * overrides the built-in preset.
-   */
-  baseUrl?: string;
   /**
    * Origins allowed to call the generated endpoint from another site — a
    * marketing page that embeds an ask box, for example — or `"*"` to allow
@@ -558,34 +543,21 @@ export interface AskConfig {
    */
   endpoint?: string;
   /**
-   * Static request headers sent to the provider on every call — a
-   * caller-identifying header for a shared backend, for example. Values are
-   * written into the generated route as literals, so keep secrets in
-   * `apiKeyEnv` rather than here.
-   */
-  headers?: Record<string, string>;
-  /**
    * Extra system-prompt text appended to the built-in instructions — use it
    * for identity, language, or tone. The built-in grounding behavior (answer
    * from the retrieved excerpts, cite pages as Markdown links) is preserved.
    */
   instructions?: string;
-  /** Model id to use. Defaults to `openai/gpt-5.5`. */
-  model?: string;
-  /** Which backend routes the request. Defaults to `gateway`. */
-  provider?: AskProvider;
   /**
-   * How much the model reasons before answering, from `"none"` to `"xhigh"`.
-   * Sent as the backend's own reasoning-effort control: the AI SDK's
-   * `reasoning` option on the gateway, `reasoning.effort` on OpenRouter, and
-   * `reasoning_effort` on OpenAI-compatible endpoints. The model has to
-   * support the level — OpenAI rejects one a model doesn't offer — and the
-   * endpoint has to accept the parameter; Inkeep has no reasoning control,
-   * so the field is rejected there. Omitted keeps the model's default.
-   * `"none"` is the fastest and cheapest for grounded docs Q&A, where the
-   * retrieved excerpts carry the answer.
+   * Which backend answers: the descriptor an adapter factory returns —
+   * `gateway({ model })`, `openrouter({ model, reasoning })`,
+   * `llmgateway({ model })`, `inkeep({ model })`, or
+   * `openaiCompatible({ baseUrl, name, model, apiKeyEnv })`, all exported
+   * from `blume/ai`. Each adapter owns its model, key env var, reasoning
+   * mapping, and `providerOptions` passthrough. Defaults to
+   * `gateway({ model: "openai/gpt-5.5" })`.
    */
-  reasoning?: AskReasoning;
+  provider?: AskAdapter;
   /**
    * How much documentation each question carries into the model's prompt.
    * Lower values cut time-to-first-token — which dominates on a self-hosted

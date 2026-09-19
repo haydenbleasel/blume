@@ -82,7 +82,7 @@ import type { Diagnostic } from "./types.ts";
  *   `flexsearch()`, `pagefind()`, `algolia({…})`, `oramaCloud({…})`,
  *   `typesense({…})`, `mixedbread({…})`, or `false`), or `{ provider,
  *   popular, indexing }` to add curated links and indexing settings.
- * - `ai` — `ask` (the Ask AI chat endpoint and its provider/model), `llmsTxt`
+ * - `ai` — `ask` (the Ask AI chat endpoint and its provider adapter), `llmsTxt`
  *   (emit `llms.txt`), `mcp` (expose the docs as an MCP server for connecting
  *   agents), and `markdownComponents` (Markdown serializers for custom
  *   components in agent-facing output).
