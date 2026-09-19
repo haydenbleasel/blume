@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import type { AskRetrievalOptions } from "../ai/ask-context.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
+import type { AnalyticsAdapter } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
 import type { FontSlug } from "../theme/fonts.ts";
 import type {
@@ -945,47 +946,6 @@ export interface WebBotAuthConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Analytics
-// ---------------------------------------------------------------------------
-
-/** An arbitrary analytics `<script>`; set exactly one of `src` or `content`. */
-export interface AnalyticsScript {
-  /** Extra attributes spread onto the `<script>` (e.g. `data-domain`, `id`). */
-  attributes?: Record<string, string>;
-  /** Inline script body. Mutually exclusive with `src`. */
-  content?: string;
-  /** External script URL. Mutually exclusive with `content`. */
-  src?: string;
-  /** Load strategy for an external script. */
-  strategy?: "async" | "defer";
-}
-
-/** Analytics providers. Configure one, several, or none. */
-export interface AnalyticsConfig {
-  /**
-   * Cloudflare Web Analytics, for a site Cloudflare doesn't proxy (manual
-   * setup). Not needed on a proxied zone with automatic RUM enabled — that
-   * injects the beacon at the edge, and configuring it here too would count
-   * every pageview twice.
-   */
-  cloudflare?: {
-    /** Site token from the Web Analytics JS snippet (`data-cf-beacon`). */
-    token: string;
-  };
-  /** PostHog product analytics. */
-  posthog?: {
-    /** API host (for self-hosted / EU). Defaults to PostHog cloud. */
-    host?: string;
-    /** Project API key. */
-    key: string;
-  };
-  /** Escape hatch for any other provider (Plausible, Fathom, GA, Umami, …). */
-  scripts?: AnalyticsScript[];
-  /** Enable Vercel Web Analytics. */
-  vercel?: boolean;
-}
-
-// ---------------------------------------------------------------------------
 // i18n
 // ---------------------------------------------------------------------------
 
@@ -1702,8 +1662,12 @@ export type TocConfig =
 export interface BlumeConfig {
   /** AI-facing features: the Ask AI assistant and an `llms.txt` manifest. */
   ai?: AiConfig;
-  /** Analytics providers (PostHog, Vercel, or arbitrary scripts). */
-  analytics?: AnalyticsConfig;
+  /**
+   * Analytics adapters from `blume/analytics`, emitted into `<head>` of every
+   * production page in this order: `[posthog({ key }), vercel(),
+   * cloudflare({ token }), script({ src })]`. Unset or empty injects nothing.
+   */
+  analytics?: AnalyticsAdapter[];
   /** AsyncAPI reference (native renderer by default, Scalar opt-out). */
   asyncapi?: AsyncApiConfig;
   /** Site-wide announcement banner shown above the header. */

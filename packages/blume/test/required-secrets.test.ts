@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { checkRequiredSecrets } from "../src/cli/required-secrets.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 
-const KEYS = ["AI_GATEWAY_API_KEY", "OPENROUTER_API_KEY", "MIXEDBREAD_API_KEY"];
+const KEYS = [
+  "AI_GATEWAY_API_KEY",
+  "OPENROUTER_API_KEY",
+  "MIXEDBREAD_API_KEY",
+  "PROBE_ANALYTICS_TOKEN",
+];
 const saved = new Map(KEYS.map((k) => [k, process.env[k]]));
 
 afterEach(() => {
@@ -59,5 +64,36 @@ describe("checkRequiredSecrets", () => {
         d.message.includes("MIXEDBREAD_API_KEY")
       )
     ).toBe(true);
+  });
+
+  it("reads an analytics adapter's requiredSecrets from its descriptor", () => {
+    Reflect.deleteProperty(process.env, "PROBE_ANALYTICS_TOKEN");
+    const config = blumeConfigSchema.parse({
+      analytics: [
+        {
+          kind: "script",
+          options: { src: "https://x.test/a.js" },
+          requiredSecrets: ["PROBE_ANALYTICS_TOKEN"],
+          runtimeDeps: [],
+        },
+      ],
+    });
+    const result = checkRequiredSecrets(config);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.message).toBe(
+      "Analytics (script) is enabled but PROBE_ANALYTICS_TOKEN is not set."
+    );
+
+    process.env.PROBE_ANALYTICS_TOKEN = "set";
+    expect(checkRequiredSecrets(config)).toEqual([]);
+  });
+
+  it("requires nothing for the built-in analytics adapters", () => {
+    const config = blumeConfigSchema.parse({
+      analytics: [
+        { kind: "vercel", options: {}, requiredSecrets: [], runtimeDeps: [] },
+      ],
+    });
+    expect(checkRequiredSecrets(config)).toEqual([]);
   });
 });

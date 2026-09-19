@@ -3,7 +3,7 @@ import IconSprite from "./IconSprite.astro";
 import { createIconSprite } from "../icon-sprite.ts";
 import "blume:theme";
 import data from "blume:data";
-import type { BlumeFavicon } from "../../core/data.ts";
+import type { BlumeDataConfig, BlumeFavicon } from "../../core/data.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { FontHead } from "../../theme/fonts.ts";
@@ -50,17 +50,7 @@ interface Props {
     dismissible: boolean;
     key: string;
   } | null;
-  analytics?: {
-    cloudflare?: { token: string };
-    posthog?: { host?: string; key: string };
-    scripts?: {
-      attributes?: Record<string, string>;
-      content?: string;
-      src?: string;
-      strategy?: "async" | "defer";
-    }[];
-    vercel?: boolean;
-  } | null;
+  analytics?: BlumeDataConfig["analytics"] | null;
   navigation: Navigation;
   route: string;
   themeMode: "system" | "light" | "dark";

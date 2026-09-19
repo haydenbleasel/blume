@@ -7,7 +7,11 @@ import type { UIStrings } from "../../core/i18n-ui.ts";
 import { resolveDateFormatOptions } from "../../core/date-format.ts";
 import type { ResolvedDateFormat } from "../../core/schema.ts";
 import type { OpenInChatProvider } from "../../core/open-in-chat.ts";
-import type { BlumeClientData, BlumeFavicon } from "../../core/data.ts";
+import type {
+  BlumeClientData,
+  BlumeDataConfig,
+  BlumeFavicon,
+} from "../../core/data.ts";
 import type {
   Heading,
   LocaleSwitchOption,
@@ -87,17 +91,7 @@ interface Props {
     dismissible: boolean;
     key: string;
   } | null;
-  analytics?: {
-    cloudflare?: { token: string };
-    posthog?: { host?: string; key: string };
-    scripts?: {
-      attributes?: Record<string, string>;
-      content?: string;
-      src?: string;
-      strategy?: "async" | "defer";
-    }[];
-    vercel?: boolean;
-  } | null;
+  analytics?: BlumeDataConfig["analytics"] | null;
   navigation: Navigation;
   mcp?: { name: string; route: string } | null;
   page: { title: string; description?: string; route: string };

@@ -112,7 +112,8 @@ export interface BlumeRoute {
 
 /** Site-wide settings derived from `blume.config` — the `config` field of {@link BlumeData}. */
 export interface BlumeDataConfig {
-  analytics: NonNullable<ResolvedConfig["analytics"]> | null;
+  /** Analytics adapter descriptors, in configured order; empty when none. */
+  analytics: ResolvedConfig["analytics"];
   /** Apple touch icon, or `null` when none is configured/detected. */
   appleIcon: BlumeFavicon | null;
   /** Ask AI empty-state suggestions, or `null` when Ask AI is off. */

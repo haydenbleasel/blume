@@ -381,18 +381,29 @@ describe("dateFormat config", () => {
   });
 });
 
+const scriptAdapter = (options: { content?: string; src?: string }) => ({
+  kind: "script",
+  options,
+  requiredSecrets: [],
+  runtimeDeps: [],
+});
+
 describe("analytics script refinement", () => {
   it("accepts a script that sets exactly one of src or content", () => {
     const config = blumeConfigSchema.parse({
-      analytics: { scripts: [{ src: "https://x.test/a.js" }] },
+      analytics: [scriptAdapter({ src: "https://x.test/a.js" })],
     });
-    expect(config.analytics?.scripts?.[0]?.src).toBe("https://x.test/a.js");
+    expect(config.analytics[0]?.options).toEqual({
+      src: "https://x.test/a.js",
+    });
   });
 
   it("rejects a script that sets both src and content", () => {
     expect(
       blumeConfigSchema.safeParse({
-        analytics: { scripts: [{ content: "x", src: "https://x.test/a.js" }] },
+        analytics: [
+          scriptAdapter({ content: "x", src: "https://x.test/a.js" }),
+        ],
       }).success
     ).toBeFalsy();
   });

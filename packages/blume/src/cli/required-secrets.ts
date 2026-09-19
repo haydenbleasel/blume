@@ -41,5 +41,13 @@ export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
     requireSecret("Mixedbread search", "MIXEDBREAD_API_KEY");
   }
 
+  // Adapters name their own secrets; the built-in analytics adapters ship
+  // public tokens in the page and declare none.
+  for (const adapter of config.analytics) {
+    for (const env of adapter.requiredSecrets) {
+      requireSecret(`Analytics (${adapter.kind})`, env);
+    }
+  }
+
   return diagnostics;
 };

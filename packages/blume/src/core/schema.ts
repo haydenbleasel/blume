@@ -2,6 +2,7 @@ import type { AstroIntegration } from "astro";
 import { z } from "zod";
 
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
+import { analyticsConfigSchema } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
 import { normalizeRoute } from "../openapi/references.ts";
 import { normalizeXHandle } from "../seo/x-handle.ts";
@@ -1316,41 +1317,6 @@ const versionsConfigSchema = z
     }
   });
 
-const analyticsScriptSchema = z
-  .strictObject({
-    // Extra attributes (e.g. `data-domain`, `id`) spread onto the <script>.
-    attributes: z.record(z.string(), z.string()).optional(),
-    // Inline script body, mutually exclusive with `src`.
-    content: z.string().optional(),
-    // External script URL, mutually exclusive with `content`.
-    src: z.string().optional(),
-    // Load strategy for an external script.
-    strategy: z.enum(["async", "defer"]).optional(),
-  })
-  .refine((value) => Boolean(value.src) !== Boolean(value.content), {
-    message: "An analytics script must set exactly one of `src` or `content`.",
-  });
-
-const analyticsConfigSchema = z.strictObject({
-  // Cloudflare Web Analytics in manual (JS snippet) mode; the token comes from
-  // the site's snippet in the dashboard. A zone Cloudflare proxies with
-  // automatic RUM injection on needs no config at all.
-  cloudflare: z
-    .strictObject({
-      token: z.string().min(1),
-    })
-    .optional(),
-  posthog: z
-    .strictObject({
-      host: z.string().optional(),
-      key: z.string(),
-    })
-    .optional(),
-  // Escape hatch for any other provider (Plausible, Fathom, GA, Umami, …).
-  scripts: z.array(analyticsScriptSchema).optional(),
-  vercel: z.boolean().optional(),
-});
-
 const deploymentConfigSchema = z.strictObject({
   adapter: z
     .enum(["vercel", "node", "netlify", "cloudflare"])
@@ -2027,7 +1993,8 @@ const tocConfigSchema = z
 export const blumeConfigSchema = z
   .strictObject({
     ai: aiConfigSchema.prefault({}),
-    analytics: analyticsConfigSchema.optional(),
+    // Adapters from `blume/analytics`, each a serializable descriptor.
+    analytics: analyticsConfigSchema,
     asyncapi: asyncapiConfigSchema.prefault({}),
     banner: bannerConfigSchema.optional(),
     /**

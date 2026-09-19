@@ -35,8 +35,8 @@ Resolve `$ref` includes first (Mintlify splits config across files). Map only wh
 | `seo.metatags` | **drop** | no equivalent; use per-page `seo` frontmatter |
 | `seo.indexing: "all"` | `search.indexing.includeHiddenPages: true` |  |
 | `variables` (`{{name}}`) | **inline into content** | Blume has no runtime `{{var}}` substitution — replace each `{{name}}` with its value in the pages |
-| `integrations.posthog` (`{ apiKey, apiHost }`) | `analytics.posthog` (`{ key, host }`) | preserve the host verbatim (e.g. `us.posthog.com` — Blume's default is `us.i.posthog.com`) |
-| `integrations` (GA, Plausible, Fathom, …) | `analytics.scripts` / `analytics.vercel` | one `scripts[]` entry per provider (`{ src, strategy, attributes }`); no first-class mapping beyond PostHog/Vercel |
+| `integrations.posthog` (`{ apiKey, apiHost }`) | `posthog({ key, host })` in the `analytics` list | preserve the host verbatim (e.g. `us.posthog.com` — Blume's default is `us.i.posthog.com`); import the adapter from `blume/analytics` |
+| `integrations` (GA, Plausible, Fathom, …) | `script({ src, strategy, attributes })` / `vercel()` in the `analytics` list | one `script()` adapter per provider; no first-class mapping beyond PostHog/Vercel/Cloudflare |
 | `contextual` (`["copy","chatgpt","claude",…]`) | **mostly free** | Copy-as-Markdown and Open-in-chat are default page actions; `mcp` needs `ai.mcp.enabled` + server output (report as a follow-up) |
 | `redirects` | `redirects: [{ from, to }]` | static only — see below |
 | `navigation.languages` | `i18n` | see i18n below |

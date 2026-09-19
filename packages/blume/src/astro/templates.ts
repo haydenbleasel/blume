@@ -190,8 +190,13 @@ export const runtimeDependencies = (options: {
     deps.push("@scalar/astro");
   }
   // Only the configured search provider's SDK is declared, so a project pulls in
-  // (and the user installs) exactly the backend it uses — nothing more.
-  deps.push(...searchProviderMeta(config.search.provider).runtimeDeps);
+  // (and the user installs) exactly the backend it uses — nothing more. Each
+  // analytics adapter declares what it needs the same way; the built-ins need
+  // nothing beyond Blume's own deps, so their share is usually empty.
+  deps.push(
+    ...searchProviderMeta(config.search.provider).runtimeDeps,
+    ...config.analytics.flatMap((adapter) => adapter.runtimeDeps)
+  );
   // Ask AI's provider SDK, when its backend needs one (gateway uses core `ai`).
   if (config.ai.ask?.enabled && !config.ai.ask.endpoint) {
     const askDep = askBackendRuntimeDep(config.ai.ask);

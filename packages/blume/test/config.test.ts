@@ -349,39 +349,65 @@ export default {
   });
 });
 
+// The adapters from `blume/analytics` return exactly these descriptors; the
+// fixtures inline them because a tmp-dir config can't resolve the package.
+const descriptor = (kind: string, options: string): string =>
+  `{ kind: "${kind}", options: ${options}, requiredSecrets: [], runtimeDeps: [] }`;
+
 describe("analytics config", () => {
-  it("accepts vercel, posthog, and custom scripts together", async () => {
+  it("accepts vercel, posthog, and script adapters together, in order", async () => {
     const dir = await makeDir(
-      'export default { analytics: { vercel: true, posthog: { key: "phc_test" }, scripts: [{ src: "https://plausible.io/js/script.js", strategy: "defer", attributes: { "data-domain": "example.com" } }] } };'
+      `export default { analytics: [${descriptor("vercel", "{}")}, ${descriptor("posthog", '{ key: "phc_test" }')}, ${descriptor("script", '{ src: "https://plausible.io/js/script.js", strategy: "defer", attributes: { "data-domain": "example.com" } }')}] };`
     );
     const result = await loadConfig(dir);
-    expect(result.config.analytics?.vercel).toBe(true);
-    expect(result.config.analytics?.posthog?.key).toBe("phc_test");
-    expect(result.config.analytics?.scripts?.[0]?.src).toBe(
-      "https://plausible.io/js/script.js"
-    );
+    expect(result.config.analytics.map((adapter) => adapter.kind)).toEqual([
+      "vercel",
+      "posthog",
+      "script",
+    ]);
+    expect(result.config.analytics[1]?.options).toEqual({ key: "phc_test" });
+    expect(result.config.analytics[2]?.options).toMatchObject({
+      src: "https://plausible.io/js/script.js",
+    });
+  });
+
+  it("defaults to no adapters", async () => {
+    const dir = await makeDir("export default {};");
+    const result = await loadConfig(dir);
+    expect(result.config.analytics).toEqual([]);
   });
 
   it("accepts a cloudflare web analytics token", async () => {
     const dir = await makeDir(
-      'export default { analytics: { cloudflare: { token: "0123456789abcdef" } } };'
+      `export default { analytics: [${descriptor("cloudflare", '{ token: "0123456789abcdef" }')}] };`
     );
     const result = await loadConfig(dir);
-    expect(result.config.analytics?.cloudflare?.token).toBe("0123456789abcdef");
+    expect(result.config.analytics[0]?.options).toEqual({
+      token: "0123456789abcdef",
+    });
   });
 
   it("rejects an empty cloudflare web analytics token", async () => {
     const dir = await makeDir(
-      'export default { analytics: { cloudflare: { token: "" } } };'
+      `export default { analytics: [${descriptor("cloudflare", '{ token: "" }')}] };`
     );
     const error = await loadError(dir);
     expect(error).toBeInstanceOf(BlumeError);
     expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
   });
 
+  it("rejects the pre-adapter object form with a hint", async () => {
+    const dir = await makeDir(
+      'export default { analytics: { vercel: true, posthog: { key: "phc_test" } } };'
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+    expect(error.diagnostic.message).toContain('"blume/analytics"');
+  });
+
   it("rejects a script with both src and content", async () => {
     const dir = await makeDir(
-      'export default { analytics: { scripts: [{ src: "https://x.test/a.js", content: "noop()" }] } };'
+      `export default { analytics: [${descriptor("script", '{ src: "https://x.test/a.js", content: "noop()" }')}] };`
     );
     const error = await loadError(dir);
     expect(error).toBeInstanceOf(BlumeError);
@@ -390,7 +416,7 @@ describe("analytics config", () => {
 
   it("rejects a script with neither src nor content", async () => {
     const dir = await makeDir(
-      'export default { analytics: { scripts: [{ strategy: "defer" }] } };'
+      `export default { analytics: [${descriptor("script", '{ strategy: "defer" }')}] };`
     );
     const error = await loadError(dir);
     expect(error).toBeInstanceOf(BlumeError);

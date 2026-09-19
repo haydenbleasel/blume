@@ -10,5 +10,5 @@
     "outDir": "dist/types",
     "rootDir": "src"
   },
-  "files": ["src/index.ts", "src/core/schema.ts"]
+  "files": ["src/index.ts", "src/analytics/index.ts", "src/core/schema.ts"]
 }

@@ -1342,7 +1342,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
 
   const data: BlumeData = {
     config: {
-      analytics: config.analytics ?? null,
+      analytics: config.analytics,
       appleIcon: resolveAppleIcon(project),
       ask: config.ai.ask?.enabled
         ? {

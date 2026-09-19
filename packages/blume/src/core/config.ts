@@ -87,7 +87,8 @@ import type { Diagnostic } from "./types.ts";
  * **SEO, feeds & analytics**
  * - `seo` — `og` images, `sitemap`, `robots`, `rss` feeds, `structuredData`
  *   JSON-LD, `agentReadability`, and robots `contentSignals`.
- * - `analytics` — PostHog, Vercel, or arbitrary `scripts` (Plausible, Fathom,
+ * - `analytics` — adapters from `blume/analytics`: `posthog()`, `vercel()`,
+ *   `cloudflare()`, or `script()` for any other provider (Plausible, Fathom,
  *   GA, …).
  *
  * **Astro**

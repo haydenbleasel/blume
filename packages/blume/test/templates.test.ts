@@ -894,6 +894,23 @@ describe("runtimeDependencies", () => {
     ).toContain("@astrojs/vercel");
   });
 
+  it("declares each analytics adapter's runtimeDeps", () => {
+    const withAnalytics = blumeConfigSchema.parse({
+      analytics: [
+        { kind: "vercel", options: {}, requiredSecrets: [], runtimeDeps: [] },
+        {
+          kind: "script",
+          options: { src: "https://x.test/a.js" },
+          requiredSecrets: [],
+          runtimeDeps: ["probe-analytics-sdk"],
+        },
+      ],
+    });
+    expect(
+      runtimeDependencies({ config: withAnalytics, needsReact: false })
+    ).toContain("probe-analytics-sdk");
+  });
+
   it("never declares the React Compiler plugin as a runtime dep (it's resolved by absolute path)", () => {
     expect(runtimeDependencies({ config, needsReact: true })).not.toContain(
       "babel-plugin-react-compiler"
