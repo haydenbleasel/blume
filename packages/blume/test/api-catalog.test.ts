@@ -8,6 +8,7 @@ import {
 } from "../src/ai/api-catalog.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { BlumeConfigInput } from "../src/core/schema.ts";
+import { openapi } from "../src/reference/index.ts";
 
 const configWith = (overrides: BlumeConfigInput = {}) =>
   blumeConfigSchema.parse({ title: "Docs", ...overrides });
@@ -45,11 +46,12 @@ describe("buildApiCatalog", () => {
     const config = configWith({
       ai: { api: false },
       deployment: { site: "https://docs.example.com" },
-      openapi: {
-        enabled: true,
-        route: "/reference",
-        spec: "https://api.example.com/openapi.json",
-      },
+      reference: [
+        openapi({
+          route: "/reference",
+          spec: "https://api.example.com/openapi.json",
+        }),
+      ],
     });
     const catalog = JSON.parse(buildApiCatalog(config) ?? "");
     expect(catalog.linkset).toEqual([
@@ -66,7 +68,7 @@ describe("buildApiCatalog", () => {
   it("omits service-desc for a local spec file", () => {
     const config = configWith({
       ai: { api: false },
-      openapi: { enabled: true, spec: "./openapi.json" },
+      reference: [openapi({ spec: "./openapi.json" })],
     });
     const [entry] = JSON.parse(buildApiCatalog(config) ?? "").linkset;
     expect(entry["service-desc"]).toBeUndefined();
@@ -80,7 +82,7 @@ describe("buildApiCatalog", () => {
       ai: { api: false },
       basePath: "/docs",
       deployment: { base: "/site" },
-      openapi: { enabled: true, spec: "./openapi.json" },
+      reference: [openapi({ spec: "./openapi.json" })],
     });
     const [entry] = JSON.parse(buildApiCatalog(config) ?? "").linkset;
     expect(entry.anchor).toBe("/site/docs/reference");

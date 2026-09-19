@@ -84,6 +84,9 @@ export const doctorCommand = defineCommand({
         logger.info(`Output: ${config.deployment.output}`);
         logger.info(`Search: ${config.search.provider.kind}`);
         logger.info(
+          `References: ${config.reference.map((adapter) => adapter.kind).join(", ") || "none"}`
+        );
+        logger.info(
           `Analytics: ${config.analytics.map((adapter) => adapter.kind).join(", ") || "none"}`
         );
         logger.info(

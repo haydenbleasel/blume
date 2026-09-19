@@ -91,7 +91,7 @@ import type { DerivedOgFonts } from "../og/derive.ts";
 import { resolveOgLogo } from "../og/logo.ts";
 import type { ApiSpecData, OpenApiData } from "../openapi/model.ts";
 import {
-  builtinProxyKinds,
+  builtinProxyReferences,
   hasScalarReferences,
   needsPlaygroundProxy,
   referenceRoutes,
@@ -1818,15 +1818,17 @@ const proxyAllowlistWarnings = (
   config: ResolvedConfig,
   data: OpenApiData
 ): string[] => {
-  const kinds = builtinProxyKinds(config);
+  const proxied = new Set(
+    builtinProxyReferences(config).map((reference) => reference.slug)
+  );
   const warnings: string[] = [];
   for (const spec of Object.values(data)) {
-    if (!kinds.includes(spec.kind) || specOriginsOf(spec).length > 0) {
+    if (!proxied.has(spec.slug) || specOriginsOf(spec).length > 0) {
       continue;
     }
     warnings.push(
       spec.kind === "graphql"
-        ? `The "${spec.label}" GraphQL reference (${spec.route}) has playground.proxy: true, but no absolute endpoint is configured for it, so the built-in proxy has no origin to allow and will refuse every request its playground sends. Set the graphql block's (or the source's) \`endpoint\` to the live GraphQL URL, or point playground.proxy at an external proxy URL.`
+        ? `The "${spec.label}" GraphQL reference (${spec.route}) has playground.proxy: true, but no absolute endpoint is configured for it, so the built-in proxy has no origin to allow and will refuse every request its playground sends. Set \`endpoint\` on the graphql() adapter (or the source) to the live GraphQL URL, or point playground.proxy at an external proxy URL.`
         : `The "${spec.label}" reference (${spec.route}) has playground.proxy: true, but its spec declares no absolute servers[].url (relative and templated URLs carry no origin), so the built-in proxy has no origin to allow and will refuse every request its playground sends. Add an absolute server URL to the spec, or point playground.proxy at an external proxy URL.`
     );
   }

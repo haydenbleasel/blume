@@ -58,6 +58,7 @@ import type { BlumeConfig } from "../src/core/config-input.ts";
 import { TOC_HIDDEN_KEY } from "../src/core/heading-markers.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
+import { openapi, scalar } from "../src/reference/index.ts";
 import {
   algolia,
   flexsearch,
@@ -825,11 +826,12 @@ describe("runtimeDependencies", () => {
   it("declares the React, Scalar and Ask provider deps", () => {
     const full = blumeConfigSchema.parse({
       ai: { ask: { enabled: true, provider: openrouter({ model: "x/y" }) } },
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/openapi.json",
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+          spec: "https://x.dev/openapi.json",
+        }),
+      ],
     });
     const deps = runtimeDependencies({ config: full, needsReact: true });
     expect(deps).toContain("@astrojs/react");

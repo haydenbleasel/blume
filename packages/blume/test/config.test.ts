@@ -353,6 +353,41 @@ export default {
 // fixtures inline them because a tmp-dir config can't resolve the package.
 const descriptor = (kind: string, options: string): string =>
   `{ kind: "${kind}", options: ${options}, requiredSecrets: [], runtimeDeps: [] }`;
+describe("reference config", () => {
+  it("accepts an inline adapter descriptor and resolves its options", async () => {
+    // The `blume/reference` factories return exactly this descriptor; the
+    // fixture inlines it because a tmp-dir config can't resolve the package.
+    const dir = await makeDir(
+      'export default { reference: [{ kind: "openapi", options: { spec: "./openapi.json", route: "/api" }, requiredSecrets: [], runtimeDeps: [] }] };'
+    );
+    const result = await loadConfig(dir);
+    expect(result.config.reference.map((adapter) => adapter.kind)).toEqual([
+      "openapi",
+    ]);
+    expect(result.config.reference[0]?.options).toMatchObject({
+      route: "/api",
+      sources: [{ spec: "./openapi.json" }],
+    });
+  });
+
+  it("rejects the 1.x openapi/asyncapi/graphql blocks with a hint", async () => {
+    const dir = await makeDir(
+      'export default { asyncapi: { enabled: true, spec: "./asyncapi.yaml" }, openapi: { enabled: true, spec: "./openapi.json" } };'
+    );
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+    expect(error.diagnostic.message).toContain("`asyncapi`, `openapi`");
+    expect(error.diagnostic.message).toContain('"blume/reference"');
+  });
+
+  it("keeps the schema's own wording for any other unrecognized key", async () => {
+    const dir = await makeDir('export default { colour: "teal" };');
+    const error = await loadError(dir);
+    expect(error.diagnostic.code).toBe("BLUME_CONFIG_INVALID");
+    expect(error.diagnostic.message).toContain("Unrecognized key");
+    expect(error.diagnostic.message).not.toContain("blume/reference");
+  });
+});
 
 describe("analytics config", () => {
   it("accepts vercel, posthog, and script adapters together, in order", async () => {

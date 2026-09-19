@@ -87,7 +87,7 @@ Starlight content is full of Expressive Code fence meta; Blume understands some 
 
 ## Plugins — map, don't drop
 
-- `starlight-openapi` → Blume's native `openapi.sources` (delete any generated pages; add the `navigation.tabs` entry).
+- `starlight-openapi` → an `openapi({ sources })` entry in Blume's `reference` list, imported from `blume/reference` (delete any generated pages; add the `navigation.tabs` entry).
 - `starlight-blog` → `type: blog` pages.
 - `starlight-versions` → `navigation.selectors` with `kind: "version"`.
 - `starlight-image-zoom` → delete (Blume zooms content images by default).

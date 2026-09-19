@@ -48,6 +48,10 @@
       "types": "./dist/types/analytics/index.d.ts",
       "default": "./src/analytics/index.ts"
     },
+    "./reference": {
+      "types": "./dist/types/reference/index.d.ts",
+      "default": "./src/reference/index.ts"
+    },
     "./schema": {
       "types": "./dist/types/core/schema.d.ts",
       "default": "./src/core/schema.ts"

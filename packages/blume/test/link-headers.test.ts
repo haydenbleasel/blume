@@ -29,14 +29,12 @@ const configWith = (
       mcp: { enabled: overrides.mcp ?? false, route: "/mcp" },
       skills: undefined,
     },
-    asyncapi: { enabled: false, sources: [] },
     basePath: "",
     deployment: {
       base: overrides.base,
       site: overrides.catalog ? "https://example.com" : undefined,
     },
-    graphql: { enabled: false, sources: [] },
-    openapi: { enabled: false, sources: [] },
+    reference: [],
     seo: { agentReadability: overrides.agentReadability ?? true },
   });
 

@@ -15,6 +15,7 @@
     "src/ai/index.ts",
     "src/analytics/index.ts",
     "src/core/schema.ts",
+    "src/reference/index.ts",
     "src/search/adapters/index.ts",
     "src/sources/index.ts"
   ]

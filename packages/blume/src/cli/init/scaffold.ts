@@ -61,6 +61,8 @@ export interface ScaffoldLog {
 /** A starter: a config fragment plus seed content files (paths relative to root). */
 interface Starter {
   configExtra: string;
+  /** Import lines the fragment needs, placed after the `defineConfig` import. */
+  configImports: string[];
   files: (contentDir: string) => { content: string; path: string }[];
 }
 
@@ -70,22 +72,24 @@ const page = (title: string, description: string, body: string): string =>
 export const STARTERS = {
   api: {
     configExtra: `
-  openapi: {
-    enabled: true,
-    route: "/api",
-    sources: [
-      {
-        label: "Petstore",
-        spec: "https://petstore3.swagger.io/api/v3/openapi.json",
-      },
-    ],
-  },`,
+  reference: [
+    openapi({
+      route: "/api",
+      sources: [
+        {
+          label: "Petstore",
+          spec: "https://petstore3.swagger.io/api/v3/openapi.json",
+        },
+      ],
+    }),
+  ],`,
+    configImports: ['import { openapi } from "blume/reference";'],
     files: (dir) => [
       {
         content: page(
           "API Reference",
           "Explore the API.",
-          "# API Reference\n\nYour OpenAPI spec renders at [`/api`](/api). Point `openapi.sources` at your own spec in `blume.config.ts`."
+          "# API Reference\n\nYour OpenAPI spec renders at [`/api`](/api). Point `openapi()` at your own spec in `blume.config.ts`."
         ),
         path: join(dir, "index.mdx"),
       },
@@ -99,6 +103,7 @@ export const STARTERS = {
       { label: "Changelog", path: "/changelog" },
     ],
   },`,
+    configImports: [],
     files: (dir) => [
       {
         content: page(
@@ -116,6 +121,7 @@ export const STARTERS = {
   },
   docs: {
     configExtra: "",
+    configImports: [],
     files: (dir) => [
       {
         content: page(
@@ -129,6 +135,7 @@ export const STARTERS = {
   },
   sdk: {
     configExtra: "",
+    configImports: [],
     files: (dir) => [
       {
         content: page(
@@ -390,17 +397,22 @@ ${entries.join("\n")}
 
 /** The full `blume.config.ts` text for the chosen answers. */
 export const buildConfig = (answers: InitAnswers): string => {
+  const starter = STARTERS[answers.template];
   const sources = selectedSources(answers);
   // Only an explicit `sources` array calls factories; the shorthand `root`
   // (or no content block at all) needs no import.
   const sourcesImport = needsExplicitSources(sources)
     ? sourcesImportFor(sources)
     : "";
-  return `import { defineConfig } from "blume";
+  const imports = [
+    'import { defineConfig } from "blume";',
+    ...starter.configImports,
+  ].join("\n");
+  return `${imports}
 ${sourcesImport}
 export default defineConfig({
   title: ${JSON.stringify(answers.title)},
-  description: "Documentation powered by Blume.",${STARTERS[answers.template].configExtra}${contentBlockFor(answers)}
+  description: "Documentation powered by Blume.",${starter.configExtra}${contentBlockFor(answers)}
 });
 `;
 };

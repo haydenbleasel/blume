@@ -42,6 +42,7 @@ import {
 } from "../src/openapi/references.ts";
 import { operationMdx } from "../src/openapi/render-mdx.ts";
 import { openApiSource } from "../src/openapi/source.ts";
+import { graphql, openapi, scalar } from "../src/reference/index.ts";
 
 /**
  * One SDL fixture exercising every member kind the pipeline models: root
@@ -360,25 +361,32 @@ describe("graphql lookups", () => {
 });
 
 describe("graphql config and references", () => {
-  it("defaults the block off with a /graphql route", () => {
-    const config = blumeConfigSchema.parse({});
-    expect(config.graphql.enabled).toBe(false);
-    expect(config.graphql.route).toBe("/graphql");
-    expect(config.graphql.codeSamples).toStrictEqual(["curl", "js", "python"]);
-    expect(config.graphql.playground).toStrictEqual({
+  it("fills the adapter defaults: a /graphql route, samples, and the playground", () => {
+    const [adapter] = blumeConfigSchema.parse({
+      reference: [graphql({ spec: "schema.graphql" })],
+    }).reference;
+    expect(adapter?.kind).toBe("graphql");
+    expect(adapter?.options.route).toBe("/graphql");
+    expect(adapter?.options.codeSamples).toStrictEqual([
+      "curl",
+      "js",
+      "python",
+    ]);
+    expect(adapter?.options.playground).toStrictEqual({
       enabled: true,
       proxy: false,
     });
-    expect(resolveReferences(config)).toStrictEqual([]);
+    expect(resolveReferences(blumeConfigSchema.parse({}))).toStrictEqual([]);
   });
 
   it("resolves a Blume-rendered GraphQL reference", () => {
     const config = blumeConfigSchema.parse({
-      graphql: {
-        enabled: true,
-        endpoint: "https://api.test/graphql",
-        spec: "schema.graphql",
-      },
+      reference: [
+        graphql({
+          endpoint: "https://api.test/graphql",
+          spec: "schema.graphql",
+        }),
+      ],
     });
     const refs = resolveReferences(config);
     expect(refs).toHaveLength(1);
@@ -395,18 +403,19 @@ describe("graphql config and references", () => {
 
   it("lets a per-source endpoint win over the block default", () => {
     const config = blumeConfigSchema.parse({
-      graphql: {
-        enabled: true,
-        endpoint: "https://shared.test/graphql",
-        sources: [
-          { label: "Main", spec: "a.graphql" },
-          {
-            endpoint: "https://other.test/graphql",
-            label: "Other",
-            spec: "b.graphql",
-          },
-        ],
-      },
+      reference: [
+        graphql({
+          endpoint: "https://shared.test/graphql",
+          sources: [
+            { label: "Main", spec: "a.graphql" },
+            {
+              endpoint: "https://other.test/graphql",
+              label: "Other",
+              spec: "b.graphql",
+            },
+          ],
+        }),
+      ],
     });
     const refs = resolveReferences(config);
     expect(refs.map((ref) => ref.endpoint)).toStrictEqual([
@@ -419,48 +428,59 @@ describe("graphql config and references", () => {
     expect(needsPlaygroundProxy(parse({}))).toBe(false);
     expect(
       needsPlaygroundProxy(
-        parse({ openapi: { enabled: true, playground: { proxy: true } } })
+        parse({
+          reference: [openapi({ playground: { proxy: true }, spec: "s.json" })],
+        })
       )
     ).toBe(true);
     expect(
       needsPlaygroundProxy(
         parse({
-          openapi: {
-            enabled: true,
-            playground: { proxy: true },
-            renderer: "scalar",
-          },
+          reference: [
+            openapi({
+              playground: { proxy: true },
+              renderer: scalar(),
+              spec: "s.json",
+            }),
+          ],
         })
       )
     ).toBe(false);
     expect(
       needsPlaygroundProxy(
         parse({
-          openapi: {
-            enabled: true,
-            playground: { enabled: false, proxy: true },
-          },
+          reference: [
+            openapi({
+              playground: { enabled: false, proxy: true },
+              spec: "s.json",
+            }),
+          ],
         })
       )
     ).toBe(false);
     expect(
       needsPlaygroundProxy(
-        parse({ graphql: { enabled: true, playground: { proxy: true } } })
+        parse({
+          reference: [
+            graphql({ playground: { proxy: true }, spec: "s.graphql" }),
+          ],
+        })
       )
     ).toBe(true);
-    expect(needsPlaygroundProxy(parse({ graphql: { enabled: true } }))).toBe(
-      false
-    );
     expect(
-      needsPlaygroundProxy(parse({ graphql: { playground: { proxy: true } } }))
+      needsPlaygroundProxy(
+        parse({ reference: [graphql({ spec: "s.graphql" })] })
+      )
     ).toBe(false);
     expect(
       needsPlaygroundProxy(
         parse({
-          graphql: {
-            enabled: true,
-            playground: { enabled: false, proxy: true },
-          },
+          reference: [
+            graphql({
+              playground: { enabled: false, proxy: true },
+              spec: "s.graphql",
+            }),
+          ],
         })
       )
     ).toBe(false);
@@ -468,10 +488,12 @@ describe("graphql config and references", () => {
     expect(
       needsPlaygroundProxy(
         parse({
-          graphql: {
-            enabled: true,
-            playground: { proxy: "https://proxy.test" },
-          },
+          reference: [
+            graphql({
+              playground: { proxy: "https://proxy.test" },
+              spec: "s.graphql",
+            }),
+          ],
         })
       )
     ).toBe(false);
@@ -479,7 +501,7 @@ describe("graphql config and references", () => {
 
   it("reports the proxy as a server feature for the GraphQL block", () => {
     const config = blumeConfigSchema.parse({
-      graphql: { enabled: true, playground: { proxy: true } },
+      reference: [graphql({ playground: { proxy: true }, spec: "s.graphql" })],
     });
     expect(serverFeatures(config)).toContain("API playground proxy");
   });

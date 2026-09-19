@@ -21,6 +21,7 @@ import type { BlumeConfig } from "../src/core/config-input.ts";
 import { blumePackageJson, toPackageName } from "../src/core/package-json.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { getBlumeVersion } from "../src/core/version.ts";
+import { openapi } from "../src/reference/index.ts";
 import {
   contentful,
   filesystem,
@@ -57,7 +58,6 @@ const answersWith = (overrides: Partial<InitAnswers> = {}): InitAnswers => ({
   ...overrides,
 });
 
-/** Evaluate the generated `blume.config.ts` down to its config object. */
 /** The `blume/sources` factories a generated config may import, by name. */
 const FACTORIES = {
   contentful,
@@ -71,15 +71,21 @@ const FACTORIES = {
   strapi,
 };
 
+/**
+ * Evaluate the generated `blume.config.ts` down to its config object. The
+ * `blume/sources` and `blume/reference` factories a generated config imports
+ * are passed in as arguments, since the evaluated body can't import.
+ */
 const evalConfig = (config: string): BlumeConfig => {
   const object = config
     .replace('import { defineConfig } from "blume";', "")
-    .replace(/import \{[^}]*\} from "blume\/sources";/u, "")
+    .replaceAll(/import \{[^}]*\} from "blume\/(?:reference|sources)";/gu, "")
     .replace("export default defineConfig(", "return (")
     .replace(/\);\s*$/u, ");");
   // oxlint-disable-next-line no-new-func -- evaluating our own generated output
-  return new Function(...Object.keys(FACTORIES), object)(
-    ...Object.values(FACTORIES)
+  return new Function(...Object.keys(FACTORIES), "openapi", object)(
+    ...Object.values(FACTORIES),
+    openapi
   );
 };
 
@@ -216,14 +222,15 @@ export default defineConfig({
   });
 
   it("keeps each template's config fragment", () => {
-    expect(buildConfig(answersWith({ template: "api" }))).toContain(
-      "openapi: {"
-    );
+    const api = buildConfig(answersWith({ template: "api" }));
+    expect(api).toContain("reference: [");
+    expect(api).toContain("openapi({");
+    expect(api).toContain('import { openapi } from "blume/reference";');
     expect(buildConfig(answersWith({ template: "changelog" }))).toContain(
       "navigation: {"
     );
     expect(buildConfig(answersWith({ template: "sdk" }))).not.toContain(
-      "openapi: {"
+      "openapi({"
     );
   });
 

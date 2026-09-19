@@ -1,25 +1,27 @@
 import { normalizeRoute, withBasePath } from "../core/base-path.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { trimChar } from "../core/trim.ts";
+import type { ScalarOptions, ScalarRenderer } from "../reference/scalar.ts";
+import type { ResolvedReferenceAdapter } from "../reference/schema.ts";
 
 // Re-exported from its home next to the other path helpers; `core/schema.ts`
 // and downstream consumers historically imported it from here.
 export { normalizeRoute } from "../core/base-path.ts";
 
 /**
- * Pure resolution of the configured API reference blocks into concrete routes,
+ * Pure resolution of the configured `reference` adapters into concrete routes,
  * labels, and a renderer choice — no file IO, so the content source, the
  * nav-target validation, the Scalar page generator, and the `blume:openapi`
  * data module all share one source of truth. Kept free of any Astro/template
  * imports so `core` can depend on it without a cycle.
  */
 
-export type ReferenceKind = "openapi" | "asyncapi" | "graphql";
+export type ReferenceKind = ResolvedReferenceAdapter["kind"];
 
 /** Who renders a reference: Blume's own UI, or the embedded Scalar SPA. */
 export type ReferenceRenderer = "blume" | "scalar";
 
-/** Per-block display options for the Blume renderer. */
+/** Per-adapter display options for the Blume renderer. */
 export interface ReferenceDisplay {
   /** Code-sample languages shown per operation. */
   codeSamples: string[];
@@ -66,14 +68,12 @@ export interface ReferenceSource {
    * (GraphQL only — a schema, unlike an OpenAPI document, names no server).
    */
   endpoint?: string;
-  /** Per-block Scalar theme name override, if any (Scalar renderer only). */
-  theme?: string;
   /**
-   * Arbitrary Scalar config forwarded to `<ScalarComponent>` (Scalar renderer
-   * only). Takes precedence over Blume's derived spec/theme config. Typed off
-   * the config schema so the two can never drift.
+   * The `scalar()` renderer's options (Scalar renderer only): `theme` plus
+   * any Scalar config forwarded verbatim to `<ScalarComponent>`, which takes
+   * precedence over Blume's derived spec/theme config.
    */
-  scalar?: ResolvedConfig["openapi"]["scalar"];
+  scalar?: ScalarOptions;
   /** Display options carried through to the Blume renderer. */
   display: ReferenceDisplay;
   /**
@@ -119,59 +119,59 @@ export const slugify = (text: string): string =>
 const routeSlug = (route: string): string =>
   slugify(trimChar(route, "/")) || "reference";
 
-/**
- * The structural shape all three reference blocks (`openapi`, `asyncapi`,
- * `graphql`) share. `endpoint` exists only on the GraphQL block and its
- * sources; `scalar`/`theme` only on the Scalar-capable kinds — optional here
- * so one resolver serves every block.
- */
-interface Block {
-  enabled: boolean;
-  endpoint?: string;
-  route: string;
-  scalar?: ResolvedConfig["openapi"]["scalar"];
-  sources: {
-    endpoint?: string;
-    includeInLlms: boolean;
-    includeInSearch: boolean;
-    label?: string;
-    noindex: boolean;
-    route?: string;
-    seoDescriptionSuffix: boolean;
-    spec: string;
-  }[];
-  spec?: string;
-  theme?: string;
-}
-
-/** A spec is a single source (`spec` shorthand prepended to any `sources`). */
-const sourcesOf = (block: Block): Block["sources"] => {
-  const sources = [...block.sources];
-  if (block.spec) {
-    sources.unshift({
-      includeInLlms: true,
-      includeInSearch: true,
-      noindex: false,
-      seoDescriptionSuffix: true,
-      spec: block.spec,
-    });
-  }
-  return sources;
+/** The label a source gets when it names none (numbered when there are several). */
+const DEFAULT_LABELS: Record<ReferenceKind, string> = {
+  asyncapi: "Events",
+  graphql: "GraphQL",
+  openapi: "API Reference",
 };
 
+/**
+ * The Scalar renderer an adapter opted into, or null for Blume's own UI.
+ * GraphQL is always Blume-rendered — the Scalar SPA reads OpenAPI documents
+ * only — so `graphql()` accepts no renderer to read.
+ */
+const scalarRendererOf = (
+  adapter: ResolvedReferenceAdapter
+): ScalarRenderer | null =>
+  adapter.kind === "graphql" ? null : (adapter.options.renderer ?? null);
+
+const displayOf = (adapter: ResolvedReferenceAdapter): ReferenceDisplay => ({
+  codeSamples: adapter.options.codeSamples,
+  // GraphQL field tables have no nesting, so `graphql()` takes no
+  // `expandSchemas` toggle.
+  expandSchemas:
+    adapter.kind === "graphql" ? false : adapter.options.expandSchemas,
+  playground: adapter.options.playground,
+});
+
+/**
+ * One row per source, with the kind-specific fields already reconciled: a
+ * GraphQL source's `endpoint` falls back to the adapter-wide default (the
+ * common single-schema case pairs it with the `spec` shorthand); the other
+ * kinds have no endpoint at all.
+ */
+const sourceRowsOf = (
+  adapter: ResolvedReferenceAdapter
+): (ResolvedReferenceAdapter["options"]["sources"][number] & {
+  endpoint?: string;
+})[] =>
+  adapter.kind === "graphql"
+    ? adapter.options.sources.map((source) => ({
+        ...source,
+        endpoint: source.endpoint ?? adapter.options.endpoint,
+      }))
+    : adapter.options.sources;
+
 const referencesFor = (
-  kind: ReferenceKind,
-  block: Block,
-  defaultLabel: string,
-  renderer: ReferenceRenderer,
-  display: ReferenceDisplay,
+  adapter: ResolvedReferenceAdapter,
   basePath: string
 ): ReferenceSource[] => {
-  if (!block.enabled) {
-    return [];
-  }
-  const sources = sourcesOf(block);
-  const base = normalizeRoute(block.route);
+  const sources = sourceRowsOf(adapter);
+  const base = normalizeRoute(adapter.options.route);
+  const defaultLabel = DEFAULT_LABELS[adapter.kind];
+  const renderer = scalarRendererOf(adapter);
+  const display = displayOf(adapter);
 
   return sources.map((source, index) => {
     const label =
@@ -193,74 +193,34 @@ const referencesFor = (
       display,
       includeInLlms: source.includeInLlms,
       includeInSearch: source.includeInSearch,
-      kind,
+      kind: adapter.kind,
       label,
       noindex: source.noindex,
-      renderer,
+      renderer: renderer ? "scalar" : "blume",
       route,
-      scalar: block.scalar,
       seoDescriptionSuffix: source.seoDescriptionSuffix,
       slug: routeSlug(route),
       spec: source.spec,
-      theme: block.theme,
     };
-    // Per-source endpoint wins; the block-level one is the shared default
-    // (the common single-schema case pairs it with the `spec` shorthand).
-    const endpoint = source.endpoint ?? block.endpoint;
-    if (endpoint !== undefined) {
-      reference.endpoint = endpoint;
+    if (renderer) {
+      reference.scalar = renderer.options;
+    }
+    if (source.endpoint !== undefined) {
+      reference.endpoint = source.endpoint;
     }
     return reference;
   });
 };
 
 /**
- * Resolve every enabled reference. Both blocks honor their `renderer` —
- * Blume's own UI by default, with the embedded Scalar SPA as the opt-out.
+ * Resolve every configured reference, in `reference` order. Each adapter
+ * honors its `renderer` — Blume's own UI by default, with the embedded Scalar
+ * SPA as the opt-out on the kinds that support it.
  */
-export const resolveReferences = (
-  config: ResolvedConfig
-): ReferenceSource[] => [
-  ...referencesFor(
-    "openapi",
-    config.openapi,
-    "API Reference",
-    config.openapi.renderer,
-    {
-      codeSamples: config.openapi.codeSamples,
-      expandSchemas: config.openapi.expandSchemas,
-      playground: config.openapi.playground,
-    },
-    config.basePath
-  ),
-  ...referencesFor(
-    "asyncapi",
-    config.asyncapi,
-    "Events",
-    config.asyncapi.renderer,
-    {
-      codeSamples: config.asyncapi.codeSamples,
-      expandSchemas: config.asyncapi.expandSchemas,
-      playground: config.asyncapi.playground,
-    },
-    config.basePath
-  ),
-  // GraphQL is always Blume-rendered — Scalar's embedded SPA reads OpenAPI
-  // documents only, so the block declares no `renderer` opt-out (nor the
-  // schema-row `expandSchemas` toggle; GraphQL field tables have no nesting).
-  ...referencesFor(
-    "graphql",
-    config.graphql,
-    "GraphQL",
-    "blume",
-    {
-      codeSamples: config.graphql.codeSamples,
-      expandSchemas: false,
-      playground: config.graphql.playground,
-    },
-    config.basePath
-  ),
-];
+export const resolveReferences = (config: ResolvedConfig): ReferenceSource[] =>
+  config.reference.flatMap((adapter) =>
+    referencesFor(adapter, config.basePath)
+  );
 
 /**
  * Mounted route for every reference, regardless of renderer. References no
@@ -318,7 +278,7 @@ const blumeReferenceOf = (
   return accepted;
 };
 
-/** Blume-rendered references (both kinds), deduped by route (first wins). */
+/** Blume-rendered references (every kind), deduped by route (first wins). */
 export const blumeReferences = (config: ResolvedConfig): ReferenceSource[] => {
   const seen = new Map<string, ReferenceSource>();
   const usedSlugs = new Set<string>();
@@ -332,42 +292,35 @@ export const blumeReferences = (config: ResolvedConfig): ReferenceSource[] => {
   return result;
 };
 
-/** Whether any reference is Scalar-rendered (gates the `@scalar/astro` dep + pages). */
+/** Whether any reference is Scalar-rendered (gates the Scalar pages). */
 export const hasScalarReferences = (config: ResolvedConfig): boolean =>
   resolveReferences(config).some((ref) => ref.renderer === "scalar");
 
 /**
- * The reference kinds whose enabled, Blume-rendered playground opted into the
+ * The Blume-rendered references whose enabled playground opted into the
  * built-in CORS proxy with `proxy: true`. A proxy URL string points at an
  * external service, and `false` sends requests directly — neither routes
- * through the endpoint. The generator's per-spec allowlist diagnostics key on
- * this, so it shares one definition with {@link needsPlaygroundProxy}.
+ * through the endpoint. AsyncAPI never does: an event composer's WebSocket
+ * connect is direct, so its `proxy` has nothing to forward. Drawn from the
+ * deduped set so the slugs match the `blume:openapi` data keys; the
+ * generator's per-spec allowlist diagnostics key on this, so it shares one
+ * definition with {@link needsPlaygroundProxy}.
  */
-export const builtinProxyKinds = (config: ResolvedConfig): ReferenceKind[] => {
-  const kinds: ReferenceKind[] = [];
-  if (
-    config.openapi.enabled &&
-    config.openapi.renderer === "blume" &&
-    config.openapi.playground.enabled &&
-    config.openapi.playground.proxy === true
-  ) {
-    kinds.push("openapi");
-  }
-  if (
-    config.graphql.enabled &&
-    config.graphql.playground.enabled &&
-    config.graphql.playground.proxy === true
-  ) {
-    kinds.push("graphql");
-  }
-  return kinds;
-};
+export const builtinProxyReferences = (
+  config: ResolvedConfig
+): ReferenceSource[] =>
+  blumeReferences(config).filter(
+    (ref) =>
+      ref.kind !== "asyncapi" &&
+      ref.display.playground.enabled &&
+      ref.display.playground.proxy === true
+  );
 
 /**
  * Whether the built-in playground CORS proxy endpoint (`/_api-proxy`) must be
- * generated: some enabled Blume-rendered block's playground opted into it with
+ * generated: some Blume-rendered reference's playground opted into it with
  * `proxy: true`. Shared by the server feature gate and the generator so the
  * two can never disagree.
  */
 export const needsPlaygroundProxy = (config: ResolvedConfig): boolean =>
-  builtinProxyKinds(config).length > 0;
+  builtinProxyReferences(config).length > 0;

@@ -8,26 +8,21 @@ import { join } from "pathe";
 import { generateRuntime } from "../src/astro/generate.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
-import type { BlumeConfigInput } from "../src/core/schema.ts";
 import { serverFeatures } from "../src/core/server-features.ts";
 import { resolveReferences } from "../src/openapi/references.ts";
 import { openApiSource } from "../src/openapi/source.ts";
+import { asyncapi, openapi, scalar } from "../src/reference/index.ts";
+import type { OpenApiOptions } from "../src/reference/index.ts";
 
-/** The user-authored `openapi` config block, straight off the schema input. */
-type OpenApiInput = NonNullable<BlumeConfigInput["openapi"]>;
-
-/** Shorthand: the resolved `openapi.playground` for a given input. */
-const playgroundOf = (playground?: OpenApiInput["playground"]) =>
+/** Shorthand: the resolved `playground` of an `openapi()` adapter for a given input. */
+const playgroundOf = (playground?: OpenApiOptions["playground"]) =>
   blumeConfigSchema.parse({
-    openapi: { enabled: true, playground, spec: "spec.json" },
-  }).openapi.playground;
+    reference: [openapi({ playground, spec: "spec.json" })],
+  }).reference[0]?.options.playground;
 
 describe("openapi.playground config schema", () => {
   it("defaults to an enabled, proxy-less playground", () => {
-    expect(blumeConfigSchema.parse({}).openapi.playground).toStrictEqual({
-      enabled: true,
-      proxy: false,
-    });
+    expect(playgroundOf()).toStrictEqual({ enabled: true, proxy: false });
   });
 
   it("normalizes the boolean shorthands to the object shape", () => {
@@ -57,11 +52,12 @@ describe("openapi.playground config schema", () => {
   it("strictly rejects unknown playground subkeys", () => {
     expect(
       blumeConfigSchema.safeParse({
-        openapi: {
-          enabled: true,
-          playground: { enalbed: true },
-          spec: "spec.json",
-        },
+        reference: [
+          {
+            ...openapi({ spec: "spec.json" }),
+            options: { playground: { enalbed: true }, spec: "spec.json" },
+          },
+        ],
       }).success
     ).toBeFalsy();
   });
@@ -70,11 +66,12 @@ describe("openapi.playground config schema", () => {
 describe("resolveReferences playground display", () => {
   it("carries the resolved playground onto OpenAPI references", () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        playground: { proxy: "https://proxy.example" },
-        spec: "spec.json",
-      },
+      reference: [
+        openapi({
+          playground: { proxy: "https://proxy.example" },
+          spec: "spec.json",
+        }),
+      ],
     });
     expect(resolveReferences(config)[0]?.display.playground).toStrictEqual({
       enabled: true,
@@ -84,7 +81,7 @@ describe("resolveReferences playground display", () => {
 
   it("carries an enabled playground onto AsyncAPI references by default", () => {
     const config = blumeConfigSchema.parse({
-      asyncapi: { enabled: true, spec: "async.yaml" },
+      reference: [asyncapi({ spec: "async.yaml" })],
     });
     expect(resolveReferences(config)[0]?.renderer).toBe("blume");
     expect(resolveReferences(config)[0]?.display.playground).toStrictEqual({
@@ -95,7 +92,7 @@ describe("resolveReferences playground display", () => {
 
   it("honors playground: false on the asyncapi block", () => {
     const config = blumeConfigSchema.parse({
-      asyncapi: { enabled: true, playground: false, spec: "async.yaml" },
+      reference: [asyncapi({ playground: false, spec: "async.yaml" })],
     });
     expect(resolveReferences(config)[0]?.display.playground).toStrictEqual({
       enabled: false,
@@ -188,14 +185,13 @@ describe("ApiSpecData.playground resolution", () => {
   });
 });
 
-const parse = (openapi: OpenApiInput) => blumeConfigSchema.parse({ openapi });
+const parse = (options: OpenApiOptions) =>
+  blumeConfigSchema.parse({ reference: [openapi(options)] });
 
 describe("serverFeatures playground proxy", () => {
   it("requires server output only for the built-in proxy (proxy: true)", () => {
     expect(
-      serverFeatures(
-        parse({ enabled: true, playground: { proxy: true }, spec: "s.json" })
-      )
+      serverFeatures(parse({ playground: { proxy: true }, spec: "s.json" }))
     ).toStrictEqual(["API playground proxy"]);
   });
 
@@ -203,45 +199,29 @@ describe("serverFeatures playground proxy", () => {
     expect(
       serverFeatures(
         parse({
-          enabled: true,
           playground: { proxy: "https://proxy.example" },
           spec: "s.json",
         })
       )
     ).toStrictEqual([]);
-    expect(
-      serverFeatures(parse({ enabled: true, spec: "s.json" }))
-    ).toStrictEqual([]);
+    expect(serverFeatures(parse({ spec: "s.json" }))).toStrictEqual([]);
   });
 
   it("stays static when the playground or the reference is off", () => {
     expect(
       serverFeatures(
-        parse({
-          enabled: true,
-          playground: { enabled: false, proxy: true },
-          spec: "s.json",
-        })
+        parse({ playground: { enabled: false, proxy: true }, spec: "s.json" })
       )
     ).toStrictEqual([]);
-    expect(
-      serverFeatures(
-        parse({
-          enabled: false,
-          playground: { proxy: true },
-          spec: "s.json",
-        })
-      )
-    ).toStrictEqual([]);
+    expect(serverFeatures(blumeConfigSchema.parse({}))).toStrictEqual([]);
   });
 
   it("stays static for the Scalar renderer (no native playground)", () => {
     expect(
       serverFeatures(
         parse({
-          enabled: true,
           playground: { proxy: true },
-          renderer: "scalar",
+          renderer: scalar(),
           spec: "s.json",
         })
       )
@@ -277,7 +257,7 @@ const generateWith = async (
   await writeFile(
     join(root, "blume.config.ts"),
     `export default {
-  openapi: { enabled: true, playground: ${playground}, spec: "./openapi.json" },
+  reference: [{ kind: "openapi", options: { playground: ${playground}, spec: "./openapi.json" }, requiredSecrets: [], runtimeDeps: [] }],
 };
 `
   );
@@ -356,15 +336,19 @@ describe("generateRuntime playground proxy endpoint", () => {
     await writeFile(
       join(root, "blume.config.ts"),
       `export default {
-  graphql: {
-    enabled: true,
-    endpoint: "https://gql.example.com/graphql",
-    playground: { proxy: true },
-    sources: [
-      { label: "Main", spec: "./schema.graphql" },
-      { endpoint: "/relative", label: "Alt", route: "/alt", spec: "./schema.graphql" },
-    ],
-  },
+  reference: [{
+    kind: "graphql",
+    options: {
+      endpoint: "https://gql.example.com/graphql",
+      playground: { proxy: true },
+      sources: [
+        { label: "Main", spec: "./schema.graphql" },
+        { endpoint: "/relative", label: "Alt", route: "/alt", spec: "./schema.graphql" },
+      ],
+    },
+    requiredSecrets: [],
+    runtimeDeps: [],
+  }],
 };
 `
     );

@@ -6,13 +6,12 @@ import type { AskAdapter } from "../ai/ask.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import type { AnalyticsAdapter } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
+import type { ReferenceAdapter } from "../reference/schema.ts";
 import type { AnySearchAdapter } from "../search/adapters/registry.ts";
 import type { SourceAdapterInput } from "../sources/registry.ts";
 import type { FontSlug } from "../theme/fonts.ts";
 import type {
   blumeConfigSchema,
-  GraphqlSource,
-  OpenApiSource,
   OpenInChatProvider,
   SidebarDisplay,
   SidebarItemConfig,
@@ -1208,119 +1207,6 @@ export interface ReactConfig {
 }
 
 // ---------------------------------------------------------------------------
-// OpenAPI / AsyncAPI
-// ---------------------------------------------------------------------------
-
-/**
- * The shared shape of both API-reference blocks (`openapi`, `asyncapi`). Only
- * the per-block defaults differ; those are documented on the extending
- * interfaces.
- */
-interface ReferenceConfig {
-  /** Turn the reference on. Defaults to `false`. */
-  enabled?: boolean;
-  /** Start nested schema rows expanded (Blume renderer). Defaults to `false`. */
-  expandSchemas?: boolean;
-  /**
-   * The interactive "Try it" panel on operation pages (Blume renderer). On by
-   * default; `false` hides it. `proxy` is the CORS escape hatch the OpenAPI
-   * Send button routes requests through: a proxy URL, or `true` for the
-   * built-in `/_api-proxy` endpoint (which requires
-   * `deployment.output: "server"`). `proxy` is OpenAPI-only — an event
-   * composer's WebSocket connect is direct.
-   */
-  playground?: boolean | { enabled?: boolean; proxy?: boolean | string };
-  /** Who renders the reference. Defaults to `blume`. */
-  renderer?: "blume" | "scalar";
-  /**
-   * Extra Scalar options forwarded verbatim to the embedded `<ScalarComponent>`
-   * (Scalar renderer only) — e.g. `localization`, `agent`,
-   * `hideTestRequestButton`, `orderSchemaPropertiesBy`. These win over Blume's
-   * derived spec/theme config, so it's a full escape hatch to Scalar's API.
-   */
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- mirrors the schema's `z.record(z.unknown())` (the drift guard requires it); the values are Scalar's own API surface, deliberately unmodeled.
-  scalar?: Record<string, unknown>;
-  /** One or more specs; each renders on its own route by default. */
-  sources?: OpenApiSource[];
-  /** Shorthand for a single source: `sources: [{ spec }]`. */
-  spec?: string;
-  /** Scalar theme name (Scalar renderer only). */
-  theme?: string;
-}
-
-/**
- * OpenAPI reference. By default (`renderer: "blume"`) Blume renders its own UI:
- * one real page per operation, grouped by tag in the sidebar and included in
- * search, llms.txt, and OG. Set `renderer: "scalar"` for the embedded Scalar
- * SPA (a single self-contained route).
- */
-export interface OpenApiConfig extends ReferenceConfig {
-  /**
-   * Code-sample languages shown per operation (Blume renderer). Defaults to
-   * `["curl", "js", "python"]`.
-   */
-  codeSamples?: string[];
-  /** Where the reference mounts. Defaults to `/reference`. */
-  route?: string;
-}
-
-/**
- * AsyncAPI reference. Same shape as {@link OpenApiConfig}: by default
- * (`renderer: "blume"`) Blume normalizes the spec to AsyncAPI 3.x and renders
- * its own UI — one real page per operation, grouped by tag (or channel) in the
- * sidebar and included in search, llms.txt, and OG. Set `renderer: "scalar"`
- * for the embedded Scalar SPA (a single self-contained route).
- */
-export interface AsyncApiConfig extends ReferenceConfig {
-  /**
-   * Code-sample tools shown per operation (Blume renderer). Defaults to every
-   * tool appropriate to the operation's protocol binding.
-   */
-  codeSamples?: string[];
-  /** Where the reference mounts. Defaults to `/events`. */
-  route?: string;
-}
-
-/**
- * GraphQL reference. Blume lowers the schema — SDL text or an introspection
- * JSON result, local or remote — into one real page per root field (grouped
- * as Queries/Mutations/Subscriptions) plus one page per named type (Objects,
- * Input Objects, Enums, Interfaces, Unions, Scalars), all in the sidebar,
- * search, llms.txt, and OG. Always Blume-rendered — the embedded Scalar SPA
- * reads OpenAPI documents only — so unlike the other reference blocks there
- * is no `renderer` opt-out.
- */
-export interface GraphqlConfig {
-  /**
-   * Code-sample languages shown per operation. Defaults to
-   * `["curl", "js", "python"]`.
-   */
-  codeSamples?: string[];
-  /** Turn the reference on. Defaults to `false`. */
-  enabled?: boolean;
-  /**
-   * URL of the live GraphQL endpoint the playground and code samples target —
-   * a schema, unlike an OpenAPI document, names no server. Applies to every
-   * source in the block; a per-source `endpoint` wins.
-   */
-  endpoint?: string;
-  /**
-   * The interactive "Try it" panel on operation pages. On by default; `false`
-   * hides it. The object form keeps it on and sets `proxy`, the CORS escape
-   * hatch the Send button routes requests through: a proxy URL, or `true` for
-   * the built-in `/_api-proxy` endpoint (which requires
-   * `deployment.output: "server"`).
-   */
-  playground?: boolean | { enabled?: boolean; proxy?: boolean | string };
-  /** Where the reference mounts. Defaults to `/graphql`. */
-  route?: string;
-  /** One or more schemas; each renders on its own route by default. */
-  sources?: GraphqlSource[];
-  /** Shorthand for a single source: `sources: [{ spec }]`. */
-  spec?: string;
-}
-
-// ---------------------------------------------------------------------------
 // Misc top-level unions
 // ---------------------------------------------------------------------------
 
@@ -1459,8 +1345,6 @@ export interface BlumeConfig {
    * cloudflare({ token }), script({ src })]`. Unset or empty injects nothing.
    */
   analytics?: AnalyticsAdapter[];
-  /** AsyncAPI reference (native renderer by default, Scalar opt-out). */
-  asyncapi?: AsyncApiConfig;
   /** Site-wide announcement banner shown above the header. */
   banner?: BannerConfig;
   /**
@@ -1502,8 +1386,6 @@ export interface BlumeConfig {
   frontmatter?: FrontmatterConfig;
   /** Source repository (Edit-this-page links and the header repo link). */
   github?: GithubConfig;
-  /** Native GraphQL reference (root fields and named types as real pages). */
-  graphql?: GraphqlConfig;
   /** Internationalization (opt-in multi-locale). */
   i18n?: I18nConfig;
   /** Image optimization: remote-host authorization for the image service. */
@@ -1518,12 +1400,16 @@ export interface BlumeConfig {
   markdown?: MarkdownConfig;
   /** Header, sidebar, tabs, and switchers. */
   navigation?: NavigationConfig;
-  /** Native OpenAPI reference. */
-  openapi?: OpenApiConfig;
   /** React island behavior (compiler auto-memoization). */
   react?: ReactConfig;
   /** URL redirect rules. */
   redirects?: RedirectConfig[];
+  /**
+   * API references: adapters from `blume/reference`, each rendering one or
+   * more specs — `[openapi({ spec }), asyncapi({ spec }), graphql({ spec,
+   * endpoint })]`. Unset or empty renders none.
+   */
+  reference?: ReferenceAdapter[];
   /** Search backend and credentials. */
   search?: SearchConfig;
   /** Discoverability: OG images, feeds, sitemap, robots, structured data. */

@@ -8,6 +8,7 @@ import { discoverFolderMeta } from "../src/core/meta.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { serverFeatures } from "../src/core/server-features.ts";
 import { buildReferenceFiles } from "../src/openapi/scalar.ts";
+import { openapi, scalar } from "../src/reference/index.ts";
 import { algolia, mixedbread } from "../src/search/adapters/index.ts";
 
 const dirs: string[] = [];
@@ -30,11 +31,13 @@ describe("scalar reference builder", () => {
     // Scalar's color mode to `data-theme` at mount; a build-time `darkMode`
     // would only ever restate the configured default.
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/openapi.json",
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+
+          spec: "https://x.dev/openapi.json",
+        }),
+      ],
       theme: { mode: "dark" },
     });
     const { files } = await buildReferenceFiles({
@@ -48,12 +51,15 @@ describe("scalar reference builder", () => {
 
   it("passes an explicit Scalar theme name straight through", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/openapi.json",
-        theme: "purple",
-      },
+      reference: [
+        openapi({
+          renderer: scalar({
+            theme: "purple",
+          }),
+
+          spec: "https://x.dev/openapi.json",
+        }),
+      ],
     });
     const { files } = await buildReferenceFiles({
       config,
@@ -72,14 +78,16 @@ describe("scalar reference builder", () => {
       '{"openapi":"3.1.0","info":{"title":"Local"}}'
     );
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        sources: [
-          { route: "/ref", spec: "openapi.json" },
-          { route: "/missing", spec: "nope.json" },
-        ],
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+
+          sources: [
+            { route: "/ref", spec: "openapi.json" },
+            { route: "/missing", spec: "nope.json" },
+          ],
+        }),
+      ],
     });
     const { files, warnings } = await buildReferenceFiles({
       config,
@@ -98,14 +106,16 @@ describe("scalar reference builder", () => {
 
   it("derives slugged routes for multiple labeled sources", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        sources: [
-          { label: "Public API", spec: "https://x.dev/a.json" },
-          { label: "Admin API", spec: "https://x.dev/b.json" },
-        ],
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+
+          sources: [
+            { label: "Public API", spec: "https://x.dev/a.json" },
+            { label: "Admin API", spec: "https://x.dev/b.json" },
+          ],
+        }),
+      ],
     });
     const { files } = await buildReferenceFiles({
       config,
@@ -120,11 +130,13 @@ describe("scalar reference builder", () => {
 
   it("skips a reference whose route collides with a content page", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/a.json",
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+
+          spec: "https://x.dev/a.json",
+        }),
+      ],
     });
     const { files, warnings } = await buildReferenceFiles({
       config,
@@ -139,14 +151,16 @@ describe("scalar reference builder", () => {
 
   it("keeps the first of two sources that resolve to the same route", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        sources: [
-          { route: "/dup", spec: "https://x.dev/a.json" },
-          { route: "/dup", spec: "https://x.dev/b.json" },
-        ],
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+
+          sources: [
+            { route: "/dup", spec: "https://x.dev/a.json" },
+            { route: "/dup", spec: "https://x.dev/b.json" },
+          ],
+        }),
+      ],
     });
     const { files, warnings } = await buildReferenceFiles({
       config,

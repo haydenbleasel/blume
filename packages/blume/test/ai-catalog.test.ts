@@ -11,6 +11,7 @@ import {
 import type { SkillArtifact } from "../src/ai/skills.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { BlumeConfigInput } from "../src/core/schema.ts";
+import { openapi, scalar } from "../src/reference/index.ts";
 
 const configWith = (overrides: BlumeConfigInput = {}) =>
   blumeConfigSchema.parse({
@@ -170,7 +171,7 @@ describe("buildAiCatalog", () => {
       ai: { api: false, llmsTxt: false },
       basePath: "/docs",
       deployment: { base: "/site", site: "https://docs.example.com" },
-      openapi: { enabled: true, route: "/reference", spec: "./openapi.json" },
+      reference: [openapi({ route: "/reference", spec: "./openapi.json" })],
     });
     const [entry] = parse(config).entries;
     expect(entry).toStrictEqual({
@@ -194,12 +195,13 @@ describe("buildAiCatalog", () => {
     const config = configWith({
       ai: { api: false, llmsTxt: false },
       basePath: "/docs",
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        route: "/reference",
-        spec: "./openapi.json",
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+          route: "/reference",
+          spec: "./openapi.json",
+        }),
+      ],
     });
     expect(parse(config).entries[0].url).toBe(
       "https://docs.example.com/reference"

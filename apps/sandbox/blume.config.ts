@@ -1,4 +1,5 @@
 import { defineConfig } from "blume";
+import { asyncapi, graphql, openapi } from "blume/reference";
 import { filesystem, githubReleases } from "blume/sources";
 import { z } from "zod";
 
@@ -19,10 +20,6 @@ export default defineConfig({
     },
     mcp: { enabled: true },
     skills: "../../skills",
-  },
-  asyncapi: {
-    enabled: true,
-    sources: [{ label: "Commerce events", spec: "./specs/asyncapi.yaml" }],
   },
   banner: {
     content: "This is the Blume kitchen-sink sandbox.",
@@ -61,11 +58,6 @@ export default defineConfig({
     owner: "haydenbleasel",
     repo: "blume",
   },
-  graphql: {
-    enabled: true,
-    endpoint: "https://petstore.example.com/graphql",
-    spec: "./specs/schema.graphql",
-  },
   i18n: {
     defaultLocale: "en",
     fallbackLocale: "en",
@@ -96,13 +88,21 @@ export default defineConfig({
       { label: "Changelog", path: "/changelog" },
     ],
   },
-  openapi: {
-    enabled: true,
-    expandSchemas: true,
-    route: "/api",
-    spec: "./specs/openapi.yaml",
-  },
   redirects: [{ from: "/start", to: "/docs" }],
+  reference: [
+    openapi({
+      expandSchemas: true,
+      route: "/api",
+      spec: "./specs/openapi.yaml",
+    }),
+    asyncapi({
+      sources: [{ label: "Commerce events", spec: "./specs/asyncapi.yaml" }],
+    }),
+    graphql({
+      endpoint: "https://petstore.example.com/graphql",
+      spec: "./specs/schema.graphql",
+    }),
+  ],
   search: {
     popular: [
       { href: "/docs", icon: "rocket", label: "Getting started" },

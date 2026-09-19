@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { z } from "zod";
 
+import { removedReferenceKeysHint } from "../reference/schema.ts";
 import type { BlumeConfig } from "./config-input.ts";
 import { applyDeploymentEnv } from "./deployment-env.ts";
 import { BlumeError, diagnosticsFromZod } from "./diagnostics.ts";
@@ -136,13 +137,16 @@ import type { Diagnostic } from "./types.ts";
  *
  * @example An OpenAPI reference with the Ask AI assistant enabled.
  * ```ts
+ * import { openapi } from "blume/reference";
+ *
  * export default defineConfig({
  *   title: "Acme API",
- *   openapi: {
- *     enabled: true,
- *     route: "/reference",
- *     sources: [{ label: "Core", spec: "./openapi.json" }],
- *   },
+ *   reference: [
+ *     openapi({
+ *       route: "/reference",
+ *       sources: [{ label: "Core", spec: "./openapi.json" }],
+ *     }),
+ *   ],
  *   ai: { ask: { enabled: true }, llmsTxt: true },
  * });
  * ```
@@ -215,6 +219,21 @@ export const loadConfig = async (
   const probe = themeFontsProbeSchema.safeParse(raw);
   const themeFontsConfigured =
     probe.success && probe.data.theme?.fonts !== undefined;
+
+  // The 1.x `openapi`/`asyncapi`/`graphql` blocks are gone from the schema, so
+  // a config still carrying one would only ever see "Unrecognized key" — name
+  // the `reference` list form instead, before the schema runs.
+  const removedKeysHint = probe.success
+    ? removedReferenceKeysHint(Object.keys(probe.data))
+    : undefined;
+  if (removedKeysHint) {
+    throw new BlumeError({
+      code: "BLUME_CONFIG_INVALID",
+      file: configFile ?? undefined,
+      message: removedKeysHint,
+      severity: "error",
+    });
+  }
 
   const parsed = blumeConfigSchema.safeParse(raw ?? {});
   if (!parsed.success) {

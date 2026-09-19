@@ -32,7 +32,8 @@ Read `themeConfig`, `presets`, and `plugins`:
 | `themeConfig.algolia` | drop — Blume ships built-in search (Orama); remove the Algolia dep. To keep the index, `search: algolia({ appId, apiKey, indexName })` from `blume/search` (the DocSearch `apiKey` is the search-only key) |
 | `@docusaurus/plugin-client-redirects` | **static `redirects: [{from, to}]` arrays convert 1:1** to Blume `redirects` (a `from` array = one entry per item); only `createRedirects` functions are truly dynamic → host rules |
 | `@docusaurus/theme-mermaid` | delete the dep — ` ```mermaid ` renders natively (in `.mdx`) |
-| GraphQL doc generators (`@graphql-markdown/docusaurus`, `@edno/docusaurus2-graphql-doc-generator`) | delete the plugin **and its generated pages** — point the top-level `graphql: { enabled: true, spec, endpoint }` at the schema instead (see SKILL.md "GraphQL") |
+| OpenAPI doc plugins (`docusaurus-plugin-openapi-docs`, `redocusaurus`) | delete the plugin **and its generated pages** — add `openapi({ spec })` (from `blume/reference`) to the top-level `reference` list; `redocusaurus` `specs[].route` → the adapter's `route`, one `openapi()` entry (or source) per spec (see SKILL.md "OpenAPI") |
+| GraphQL doc generators (`@graphql-markdown/docusaurus`, `@edno/docusaurus2-graphql-doc-generator`) | delete the plugin **and its generated pages** — add `graphql({ spec, endpoint })` (from `blume/reference`) to the top-level `reference` list instead (see SKILL.md "GraphQL") |
 | `remark-math` + `rehype-katex` | delete — block `$$…$$` renders in `.mdx` with no config (no `markdown.math` field exists); **inline `$…$` is not supported** — convert or drop (report) |
 | Multi-instance docs plugins (`plugin-content-docs` with `id`) | one folder (and usually one `navigation.tabs` entry) per instance |
 

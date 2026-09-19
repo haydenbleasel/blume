@@ -3,16 +3,22 @@ title: OpenAPI / AsyncAPI
 description: Drop in an OpenAPI or AsyncAPI spec and get a native API reference — one real page per operation, in your sidebar and search.
 ---
 
-Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, generated code samples, and an interactive [Try it](#try-it-playground) panel. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc. The config below points Blume at the public Petstore spec as an example.
+Point Blume at an OpenAPI spec and it generates a native API reference: one **real page per operation**, grouped by tag in a tab-scoped sidebar, with schema tables, request/response examples, generated code samples, and an interactive [Try it](#try-it-playground) panel. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc.
+
+Every reference is an **adapter** imported from `blume/reference` and listed under `reference`: `openapi()` for an OpenAPI document, `asyncapi()` for an [AsyncAPI](#asyncapi) document, and `graphql()` for a [GraphQL schema](/docs/advanced/graphql). Each adapter owns its spec sources, its mount route, and its display options, so the list can hold as many of each kind as you need. The config below points Blume at the public Petstore spec as an example.
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  spec: "https://petstore3.swagger.io/api/v3/openapi.json",
-}
+import { defineConfig } from "blume";
+import { openapi } from "blume/reference";
+
+export default defineConfig({
+  reference: [
+    openapi({ spec: "https://petstore3.swagger.io/api/v3/openapi.json" }),
+  ],
+});
 ```
 
-That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically. Documenting a GraphQL API instead? See the [GraphQL reference](/docs/advanced/graphql).
+That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically. An adapter is a plain description of the reference — not a parsed spec — so Blume can validate it up front and inline it into the generated site; leaving `reference` out (or empty) renders no reference at all. Documenting a GraphQL API instead? See the [GraphQL reference](/docs/advanced/graphql).
 
 The reference doesn't add a header tab on its own. To surface it, point a [navigation tab](/docs/content/navigation#tabs) at its route — this also scopes the operations sidebar for the native renderer:
 
@@ -31,10 +37,7 @@ Operations are indexed for search by their **summary and tag**. The rendered sch
 A relative path is resolved from your project root and read at build time. Both JSON and YAML work:
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  spec: "./openapi.yaml",
-}
+reference: [openapi({ spec: "./openapi.yaml" })],
 ```
 
 ## Route
@@ -42,11 +45,12 @@ openapi: {
 `route` controls where the reference mounts — the overview page and the prefix for every operation route (and the route you point a navigation tab at):
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  route: "/api",   // overview at /api, operations at /api/<tag>/<operation>
-  spec: "./openapi.yaml",
-}
+reference: [
+  openapi({
+    route: "/api",   // overview at /api, operations at /api/<tag>/<operation>
+    spec: "./openapi.yaml",
+  }),
+],
 ```
 
 ## Code samples and schemas
@@ -54,12 +58,13 @@ openapi: {
 `codeSamples` picks which languages render per operation (built in: `curl`, `js`, `python`); `expandSchemas` starts nested schema rows expanded rather than collapsed:
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  spec: "./openapi.yaml",
-  codeSamples: ["curl", "js"],
-  expandSchemas: true,
-}
+reference: [
+  openapi({
+    spec: "./openapi.yaml",
+    codeSamples: ["curl", "js"],
+    expandSchemas: true,
+  }),
+],
 ```
 
 ## Try it playground
@@ -71,11 +76,7 @@ The panel and the code samples stay in lockstep: values typed into the form upda
 `playground: false` is the entire off switch:
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  spec: "./openapi.yaml",
-  playground: false,
-}
+reference: [openapi({ spec: "./openapi.yaml", playground: false })],
 ```
 
 ### Credentials
@@ -87,52 +88,55 @@ Credentials typed into the auth inputs stay in memory and vanish on reload. Chec
 As with the [Scalar renderer](#the-scalar-renderer), requests go **directly from the browser** to the target API, so the API must allow cross-origin requests from the docs site (`Access-Control-Allow-Origin`). For APIs that can't, set `playground.proxy`: a URL routes requests through a proxy you host, and `true` enables the built-in `/_api-proxy` route — which needs a server build, so it requires [`deployment.output: "server"`](/docs/deployment#server-rendering):
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  spec: "./openapi.yaml",
-  playground: {
-    proxy: true,   // or a URL of your own
-  },
-}
+reference: [
+  openapi({
+    spec: "./openapi.yaml",
+    playground: {
+      proxy: true,   // or a URL of your own
+    },
+  }),
+],
 ```
 
 The built-in proxy only forwards requests to the origins your specs declare in `servers` — including across redirects — so a public docs deployment can't be aimed at other hosts on its network. A **Custom base URL** typed into the panel isn't a documented server: with the proxy enabled, requests to it are refused with a 403.
 
 ## Multiple specs
 
-Use `sources` to publish more than one spec. Each source gets its own overview route, operation pages, and header tab. Give each a `label` (used for the tab and to derive its route), or set an explicit `route`:
+Use `sources` to publish more than one spec from one adapter. Each source gets its own overview route and operation pages, and shares the adapter's display options. Give each a `label` (used for the sidebar and to derive its route), or set an explicit `route`:
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  sources: [
-    { label: "Public API", spec: "./public.json" },   // → /reference/public-api
-    { label: "Admin API", route: "/admin", spec: "./admin.json" },
-  ],
-}
+reference: [
+  openapi({
+    sources: [
+      { label: "Public API", spec: "./public.json" },   // → /reference/public-api
+      { label: "Admin API", route: "/admin", spec: "./admin.json" },
+    ],
+  }),
+],
 ```
 
-`spec` is shorthand for a single-entry `sources`, so you only reach for `sources` when you have more than one.
+`spec` is shorthand for a single-entry `sources`, so you only reach for `sources` when you have more than one. When two specs need different display options — a different code-sample set, an embedded [Scalar](#the-scalar-renderer) reference beside native pages — list two `openapi()` adapters instead, each with its own `route`. Sources are resolved in list order, and when two resolve to the same route the first one wins (the build warns about the one it dropped).
 
 ### Per-source indexing
 
 Generated pages participate in search, `llms.txt`, and crawler indexing by default. A secondary or overlapping spec can opt out of any surface without hiding its pages or removing it from navigation:
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  sources: [
-    { label: "Public API", route: "/api", spec: "./public.json" },
-    {
-      label: "Platform API",
-      route: "/platform",
-      spec: "./platform.json",
-      includeInSearch: false,
-      includeInLlms: false,
-      noindex: true,
-    },
-  ],
-}
+reference: [
+  openapi({
+    sources: [
+      { label: "Public API", route: "/api", spec: "./public.json" },
+      {
+        label: "Platform API",
+        route: "/platform",
+        spec: "./platform.json",
+        includeInSearch: false,
+        includeInLlms: false,
+        noindex: true,
+      },
+    ],
+  }),
+],
 ```
 
 - `includeInSearch: false` keeps the source's overview and operations out of site search.
@@ -142,10 +146,11 @@ openapi: {
 Each operation page's meta description is the operation's own `description` (or `summary`), followed by a generated sentence naming the endpoint — "Reference for the `GET /pets` endpoint in the Petstore API." — so a spec of terse one-line summaries still ships a distinct, snippet-length description per page. That sentence is English. On a site whose spec prose is written in another language, set `seoDescriptionSuffix: false` on the source to drop it and describe each page with the authored prose alone; an operation with neither a `description` nor a `summary` falls back to its title (`GET /pets`), so no page ships an empty description:
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  sources: [{ spec: "./openapi.de.json", seoDescriptionSuffix: false }],
-}
+reference: [
+  openapi({
+    sources: [{ spec: "./openapi.de.json", seoDescriptionSuffix: false }],
+  }),
+],
 ```
 
 With the [Scalar renderer](#the-scalar-renderer), only `noindex` applies — a Scalar-rendered reference already sits outside Blume's search and `llms.txt`, so the two `include*` settings have nothing to act on there.
@@ -163,57 +168,61 @@ The OpenAPI semantics carry over as written:
 
 ## The Scalar renderer
 
-The native renderer is the default — operation pages, search integration, and the [Try it playground](#try-it-playground) above are all its work. If you'd rather embed [Scalar](https://scalar.com)'s self-contained API reference UI — its own sidebar, search, theme, and request client on a single route — set `renderer: "scalar"`:
+The native renderer is the default — operation pages, search integration, and the [Try it playground](#try-it-playground) above are all its work. If you'd rather embed [Scalar](https://scalar.com)'s self-contained API reference UI — its own sidebar, search, theme, and request client on a single route — pass `scalar()` from `blume/reference` as the adapter's `renderer`:
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  renderer: "scalar",
-  spec: "./openapi.yaml",
-  theme: "purple",   // a Scalar theme name (Scalar renderer only)
-}
+import { openapi, scalar } from "blume/reference";
+
+reference: [
+  openapi({
+    spec: "./openapi.yaml",
+    renderer: scalar({ theme: "purple" }),   // a Scalar theme name
+  }),
+],
 ```
 
-A Scalar-rendered reference is a self-contained embed on its own route — it doesn't weave into Blume's sidebar, search, or `llms.txt`, and Blume's [`playground`](#try-it-playground) config doesn't apply to it. It does follow Blume's light/dark toggle: the embed is pinned to the page's theme when it mounts and switches with it, so Scalar's own theme switch is hidden (set `scalar.forceDarkModeState` or `scalar.darkMode` to hand color mode back to Scalar). Scalar brings its own request client, which calls your **target API directly from the browser** (the `playground.proxy` route isn't available here), so the API must allow cross-origin requests from the docs site (`Access-Control-Allow-Origin`). `theme` applies to the Scalar renderer only.
+A Scalar-rendered reference is a self-contained embed on its own route — it doesn't weave into Blume's sidebar, search, or `llms.txt`, and Blume's [`playground`](#try-it-playground), `codeSamples`, and `expandSchemas` options don't apply to it. It does follow Blume's light/dark toggle: the embed is pinned to the page's theme when it mounts and switches with it, so Scalar's own theme switch is hidden (pass `forceDarkModeState` or `darkMode` to `scalar()` to hand color mode back to Scalar). Scalar brings its own request client, which calls your **target API directly from the browser** (the `playground.proxy` route isn't available here), so the API must allow cross-origin requests from the docs site (`Access-Control-Allow-Origin`). The renderer declares `@scalar/astro` as its runtime dependency, so the generated project only lists it when a reference actually uses it. `renderer` is accepted on `openapi()` and `asyncapi()`; a [`graphql()`](/docs/advanced/graphql) reference is always rendered natively, because the Scalar embed reads OpenAPI documents only.
 
 ### Passing Scalar options
 
-`theme` is a shorthand for the one option most people reach for, but Scalar supports many more. A `scalar` object forwards any [Scalar configuration](https://github.com/scalar/scalar/blob/main/documentation/configuration.md) straight to the embedded reference — Blume doesn't gate the keys, so anything Scalar accepts flows through:
+`theme` is the one option most people reach for, but Scalar supports many more. Every other key you pass to `scalar()` is forwarded verbatim as [Scalar configuration](https://github.com/scalar/scalar/blob/main/documentation/configuration.md) to the embedded reference — Blume doesn't gate the keys, so anything Scalar accepts flows through (JSON values only, since the configuration is inlined into the generated page):
 
 ```ts blume.config.ts lineNumbers
-openapi: {
-  enabled: true,
-  renderer: "scalar",
-  spec: "./openapi.yaml",
-  scalar: {
-    localization: { locale: "es" },   // translate Scalar's own UI
-    agent: { disabled: true },         // disable the Scalar Agent
-    hideTestRequestButton: true,
-    orderSchemaPropertiesBy: "preserve",
-  },
-}
+reference: [
+  openapi({
+    spec: "./openapi.yaml",
+    renderer: scalar({
+      localization: { locale: "es" },   // translate Scalar's own UI
+      agent: { disabled: true },         // disable the Scalar Agent
+      hideTestRequestButton: true,
+      orderSchemaPropertiesBy: "preserve",
+    }),
+  }),
+],
 ```
 
-Blume's own [`i18n`](/docs/content/i18n) translates the docs chrome, but Scalar has a separate localization system — set `scalar.localization.locale` to translate the embedded reference too. Options in the `scalar` object win over Blume's derived config, so anything set here (including `theme`, `customCss`, or the spec `content`/`url`) overrides Blume's defaults. The same `scalar` block works on the `asyncapi` reference.
+Blume's own [`i18n`](/docs/content/i18n) translates the docs chrome, but Scalar has a separate localization system — set `localization.locale` to translate the embedded reference too. Forwarded options win over Blume's derived config, so anything set here (including `customCss` or the spec `content`/`url`) overrides Blume's defaults. The same `scalar()` renderer works on an `asyncapi()` reference.
 
 ## AsyncAPI
 
-Event-driven APIs use a sibling `asyncapi` block with the same shape — and the same native renderer. Each `send`/`receive` operation becomes a real page with message payload and header schema tables, channel parameters, protocol bindings, an Authorization section derived from the spec's `securitySchemes` (server-level and operation-level, alternatives as "or" groups), and a [Try it](#try-it-for-events) message composer. Only the default route differs (`/events`):
+Event-driven APIs use the sibling `asyncapi()` adapter with the same options — and the same native renderer. Each `send`/`receive` operation becomes a real page with message payload and header schema tables, channel parameters, protocol bindings, an Authorization section derived from the spec's `securitySchemes` (server-level and operation-level, alternatives as "or" groups), and a [Try it](#try-it-for-events) message composer. Only the default route differs (`/events`):
 
 ```ts blume.config.ts lineNumbers
-asyncapi: {
-  enabled: true,
-  spec: "./asyncapi.yaml",
-}
+import { asyncapi, openapi } from "blume/reference";
+
+reference: [
+  openapi({ spec: "./openapi.yaml" }),
+  asyncapi({ spec: "./asyncapi.yaml" }),
+],
 ```
 
 AsyncAPI **2.x specs are normalized to 3.x automatically** with the official AsyncAPI converter, so `publish`/`subscribe` channels map onto `send`/`receive` operation pages with stable URLs — later upgrading the spec file itself through the converter moves nothing. Operations group by tag; untagged operations group under their channel address.
 
-Code samples are **protocol-aware**, keyed off the operation's binding (or its servers' protocol): `wscat` and a browser `WebSocket` snippet for WebSockets, `kcat` for Kafka, `mosquitto_pub`/`mosquitto_sub` for MQTT. `codeSamples` filters that set, the same way it picks languages on the `openapi` block; a protocol without a supported tool renders the message payload example alone rather than a fabricated client.
+Code samples are **protocol-aware**, keyed off the operation's binding (or its servers' protocol): `wscat` and a browser `WebSocket` snippet for WebSockets, `kcat` for Kafka, `mosquitto_pub`/`mosquitto_sub` for MQTT. `codeSamples` filters that set, the same way it picks languages on `openapi()`; a protocol without a supported tool renders the message payload example alone rather than a fabricated client.
 
 Everything documented above carries over, [`playground`](#try-it-for-events) included: `route`, `sources` with `label`/`route`, `expandSchemas`, the [per-source indexing](#per-source-indexing) flags (`seoDescriptionSuffix` too — the generated sentence names the channel and action instead of an endpoint), and search indexing by operation summary and tag.
 
-Setting `renderer: "scalar"` opts back into the embedded Scalar SPA, where — as with OpenAPI — only `noindex` applies. Scalar has no AsyncAPI playground of its own; its embed auto-detects the document type and renders channels, operations, messages, and a Models section, so that swap trades the composer away.
+Passing `renderer: scalar()` opts back into the embedded Scalar SPA, where — as with OpenAPI — only `noindex` applies. Scalar has no AsyncAPI playground of its own; its embed auto-detects the document type and renders channels, operations, messages, and a Models section, so that swap trades the composer away.
 
 ### Try it for events
 
@@ -223,14 +232,10 @@ Whatever the protocol, the panel opens with a payload editor prefilled from the 
 
 Live connect is WebSocket-only. On a `ws` or `wss` binding the panel connects to the resolved channel URL, shows the connection state, and logs every frame with a timestamp. AsyncAPI 3 states an action from the API's side, and the panel follows it: a `receive` operation is one the API receives from you, so it gets a **Send** button that publishes the composed payload; a `send` operation only streams messages at you, so it connects and logs. There's no reconnect logic — once a socket closes, it stays closed until you connect again. Kafka, MQTT, AMQP, and every other protocol get the composer and the copyable CLI samples, and the panel says as much on the page: Blume doesn't fake broker connectivity from a browser tab.
 
-`asyncapi.playground` mirrors `openapi.playground` — on by default with the native renderer, and `false` is the entire off switch:
+`asyncapi()`'s `playground` mirrors `openapi()`'s — on by default with the native renderer, and `false` is the entire off switch:
 
 ```ts blume.config.ts lineNumbers
-asyncapi: {
-  enabled: true,
-  spec: "./asyncapi.yaml",
-  playground: false,
-}
+reference: [asyncapi({ spec: "./asyncapi.yaml", playground: false })],
 ```
 
 :::note

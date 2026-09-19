@@ -14,9 +14,9 @@ export const serverFeatures = (config: ResolvedConfig): string[] => {
   if (config.ai.mcp.enabled) {
     features.push("MCP server");
   }
-  // The built-in playground proxy (`playground.proxy: true` on the OpenAPI or
-  // GraphQL block) is a live fetch endpoint at `/_api-proxy`; an external
-  // proxy URL (string) or a proxy-less playground stays fully static.
+  // The built-in playground proxy (`playground.proxy: true` on an `openapi()`
+  // or `graphql()` adapter) is a live fetch endpoint at `/_api-proxy`; an
+  // external proxy URL (string) or a proxy-less playground stays fully static.
   if (needsPlaygroundProxy(config)) {
     features.push("API playground proxy");
   }

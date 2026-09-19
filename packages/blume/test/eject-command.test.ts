@@ -136,7 +136,7 @@ describe("blume eject", () => {
   it("surfaces generation warnings like the runtime path does", async () => {
     const root = await fixture({
       "blume.config.ts":
-        'export default { openapi: { enabled: true, renderer: "scalar", spec: "missing.json" } };\n',
+        'export default { reference: [{ kind: "openapi", options: { renderer: { kind: "scalar", options: {}, requiredSecrets: [], runtimeDeps: ["@scalar/astro"] }, spec: "missing.json" }, requiredSecrets: [], runtimeDeps: [] }] };\n',
       "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
     });
     const { exitCode, output } = await runEject(root, undefined, "--yes");

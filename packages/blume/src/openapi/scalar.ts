@@ -10,11 +10,11 @@ import { resolveReferences } from "./references.ts";
 import type { ReferenceSource } from "./references.ts";
 
 /**
- * The Scalar renderer: an escape hatch (`openapi.renderer: "scalar"`) and the
- * path AsyncAPI still uses. Each Scalar-rendered spec becomes one self-contained
- * `@scalar/astro` page loaded client-side from Scalar's CDN. Blume's own OpenAPI
- * renderer (the default) lives in `source.ts` / the `components/openapi` set and
- * does not pass through here.
+ * The Scalar renderer: the `renderer: scalar()` escape hatch on `openapi()`
+ * and `asyncapi()`. Each Scalar-rendered spec becomes one self-contained
+ * `@scalar/astro` page loaded client-side from Scalar's CDN. Blume's own
+ * renderer (the default) lives in `source.ts` / the `components/openapi` set
+ * and does not pass through here.
  */
 
 /** A generated Scalar reference page, ready to write under `src/pages`. */
@@ -144,15 +144,18 @@ export const buildReferenceFiles = async (options: {
       warnings.push(spec.warning);
     }
     const pagePath = referencePagePath(ref.route);
+    // `theme` is the one option Blume maps (a named theme replaces the
+    // accent/radius layering); every other `scalar()` option is forwarded
+    // verbatim and wins outright — a full escape hatch over Blume's derived
+    // spec/theme config (localization, agent, hideTestRequestButton,
+    // orderSchemaPropertiesBy, customCss, and the rest).
+    const { theme, ...passthrough } = ref.scalar ?? {};
     files.push({
       content: scalarReferenceTemplate({
         configuration: {
           ...spec.config,
-          ...themeConfiguration(config, ref.theme),
-          // Author-supplied Scalar options win outright — a full escape hatch
-          // over Blume's derived spec/theme config (localization, agent,
-          // hideTestRequestButton, orderSchemaPropertiesBy, and the rest).
-          ...ref.scalar,
+          ...themeConfiguration(config, theme),
+          ...passthrough,
         },
         noindex: ref.noindex,
         route: ref.route,

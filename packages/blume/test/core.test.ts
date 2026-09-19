@@ -38,6 +38,7 @@ import {
   resolveReferences,
 } from "../src/openapi/references.ts";
 import { buildReferenceFiles } from "../src/openapi/scalar.ts";
+import { asyncapi, graphql, openapi, scalar } from "../src/reference/index.ts";
 import { buildStructuredData } from "../src/seo/jsonld.ts";
 import { normalizeXHandle } from "../src/seo/x-handle.ts";
 
@@ -1879,18 +1880,25 @@ describe("api reference (scalar)", () => {
     ).toBeFalsy();
   });
 
-  it("defaults openapi and asyncapi to disabled with sensible routes", () => {
+  it("defaults to no references, with each kind's own mount route", () => {
     const config = blumeConfigSchema.parse({});
-    expect(config.openapi.enabled).toBeFalsy();
-    expect(config.openapi.route).toBe("/reference");
-    expect(config.asyncapi.enabled).toBeFalsy();
-    expect(config.asyncapi.route).toBe("/events");
+    expect(config.reference).toStrictEqual([]);
     expect(resolveReferences(config)).toStrictEqual([]);
+    const routes = blumeConfigSchema
+      .parse({
+        reference: [
+          openapi({ spec: "o.json" }),
+          asyncapi({ spec: "a.yaml" }),
+          graphql({ spec: "s.graphql" }),
+        ],
+      })
+      .reference.map((adapter) => adapter.options.route);
+    expect(routes).toStrictEqual(["/reference", "/events", "/graphql"]);
   });
 
   it("treats the spec shorthand as a single source at the base route", () => {
     const config = blumeConfigSchema.parse({
-      openapi: { enabled: true, spec: "https://example.com/openapi.json" },
+      reference: [openapi({ spec: "https://example.com/openapi.json" })],
     });
     expect(resolveReferences(config)).toStrictEqual([
       {
@@ -1907,29 +1915,23 @@ describe("api reference (scalar)", () => {
         noindex: false,
         renderer: "blume",
         route: "/reference",
-        // toStrictEqual requires the `scalar`/`theme` keys present and
-        // undefined; null would change what the resolved reference is asserted
-        // to be.
-        // oxlint-disable-next-line sonarjs/no-undefined-assignment
-        scalar: undefined,
         seoDescriptionSuffix: true,
         slug: "reference",
         spec: "https://example.com/openapi.json",
-        // oxlint-disable-next-line sonarjs/no-undefined-assignment
-        theme: undefined,
       },
     ]);
   });
 
   it("derives one route per source and honors explicit routes", () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        sources: [
-          { label: "Public API", spec: "https://x.dev/public.json" },
-          { route: "/admin", spec: "https://x.dev/admin.json" },
-        ],
-      },
+      reference: [
+        openapi({
+          sources: [
+            { label: "Public API", spec: "https://x.dev/public.json" },
+            { route: "/admin", spec: "https://x.dev/admin.json" },
+          ],
+        }),
+      ],
     });
     const routes = resolveReferences(config).map((ref) => ref.route);
     expect(routes).toStrictEqual(["/reference/public-api", "/admin"]);
@@ -1937,8 +1939,10 @@ describe("api reference (scalar)", () => {
 
   it("exposes both openapi and asyncapi reference routes as nav targets", () => {
     const config = blumeConfigSchema.parse({
-      asyncapi: { enabled: true, spec: "https://x.dev/async.yaml" },
-      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      reference: [
+        openapi({ spec: "https://x.dev/openapi.json" }),
+        asyncapi({ spec: "https://x.dev/async.yaml" }),
+      ],
     });
     expect(referenceRoutes(config)).toStrictEqual(["/reference", "/events"]);
   });
@@ -1947,14 +1951,12 @@ describe("api reference (scalar)", () => {
     const off = blumeConfigSchema.parse({});
     // The default Blume renderer parses at generate time and needs no dep.
     const blume = blumeConfigSchema.parse({
-      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      reference: [openapi({ spec: "https://x.dev/openapi.json" })],
     });
-    const scalar = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/openapi.json",
-      },
+    const embedded = blumeConfigSchema.parse({
+      reference: [
+        openapi({ renderer: scalar(), spec: "https://x.dev/openapi.json" }),
+      ],
     });
     expect(
       runtimeDependencies({ config: off, needsReact: false })
@@ -1963,13 +1965,13 @@ describe("api reference (scalar)", () => {
       runtimeDependencies({ config: blume, needsReact: false })
     ).not.toContain("@scalar/astro");
     expect(
-      runtimeDependencies({ config: scalar, needsReact: false })
+      runtimeDependencies({ config: embedded, needsReact: false })
     ).toContain("@scalar/astro");
   });
 
   it("skips a Scalar page for a Blume-rendered reference", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: { enabled: true, spec: "https://x.dev/openapi.json" },
+      reference: [openapi({ spec: "https://x.dev/openapi.json" })],
     });
     const { files } = await buildReferenceFiles({
       config,
@@ -1981,11 +1983,13 @@ describe("api reference (scalar)", () => {
 
   it("builds a prerendered page passing a remote spec straight through", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/openapi.json",
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+
+          spec: "https://x.dev/openapi.json",
+        }),
+      ],
       theme: { accent: "teal" },
     });
     const { files, warnings } = await buildReferenceFiles({
@@ -2001,11 +2005,13 @@ describe("api reference (scalar)", () => {
 
   it("emits a prerendered Scalar page with the spec url and theme accent", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/openapi.json",
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+
+          spec: "https://x.dev/openapi.json",
+        }),
+      ],
       theme: { accent: "teal" },
     });
     const { files } = await buildReferenceFiles({
@@ -2021,11 +2027,13 @@ describe("api reference (scalar)", () => {
 
   it("skips a reference whose route collides with a content page", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        spec: "https://x.dev/openapi.json",
-      },
+      reference: [
+        openapi({
+          renderer: scalar(),
+
+          spec: "https://x.dev/openapi.json",
+        }),
+      ],
     });
     const { files, warnings } = await buildReferenceFiles({
       config,

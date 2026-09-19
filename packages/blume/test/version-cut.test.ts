@@ -299,7 +299,7 @@ export default {
       // into the snapshot, so links to them must keep pointing at the live
       // routes rather than a 404 inside the frozen tree.
       "blume.config.ts": `export default {
-  openapi: { enabled: true, route: "/api", spec: "./openapi.yaml" },
+  reference: [{ kind: "openapi", options: { route: "/api", spec: "./openapi.yaml" }, requiredSecrets: [], runtimeDeps: [] }],
   versions: { archived: [], current: { label: "v2.0" } },
 };
 `,

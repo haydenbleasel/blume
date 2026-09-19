@@ -6,6 +6,7 @@ import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import { analyticsConfigSchema } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
 import { normalizeRoute } from "../openapi/references.ts";
+import { referenceConfigSchema } from "../reference/schema.ts";
 import { orama } from "../search/adapters/orama.ts";
 import {
   NONE_SEARCH_ADAPTER,
@@ -1589,163 +1590,6 @@ const reactConfigSchema = z.strictObject({
 });
 
 /**
- * A single spec rendered by the API reference. `spec` is a local path or an
- * `http(s)` URL (an OpenAPI document under `openapi`, an AsyncAPI document
- * under `asyncapi`).
- */
-const openapiSourceSchema = z.strictObject({
-  /** Include generated pages from this spec in llms.txt/llms-full.txt. */
-  includeInLlms: z.boolean().default(true),
-  /** Include generated pages from this spec in site search. */
-  includeInSearch: z.boolean().default(true),
-  /** Nav/section label for this source. */
-  label: z.string().optional(),
-  /** Emit noindex metadata and omit generated pages from the sitemap. */
-  noindex: z.boolean().default(false),
-  /** Per-source route; defaults to the block's `route` (or a derived path). */
-  route: z.string().optional(),
-  /**
-   * Append the English "Reference for the … endpoint in the … API." sentence
-   * to every generated operation page's meta description. On by default, so
-   * terse specs still ship distinct, snippet-length descriptions; set to
-   * `false` on a non-English site to describe pages with the spec's own prose
-   * alone (falling back to the page title when an operation has none).
-   */
-  seoDescriptionSuffix: z.boolean().default(true),
-  /** Local path or `http(s)` URL to the spec. */
-  spec: z.string(),
-});
-
-export type OpenApiSource = z.input<typeof openapiSourceSchema>;
-
-/**
- * Arbitrary Scalar API-reference options forwarded verbatim to the generated
- * `<ScalarComponent>` (Scalar renderer only). A passthrough map — Blume doesn't
- * mirror Scalar's full config surface — so keys like `localization`, `agent`,
- * `hideTestRequestButton`, or `orderSchemaPropertiesBy` all flow through. These
- * take precedence over Blume's own derived config (spec, theme), so this is a
- * full escape hatch; the dedicated `theme` field is the ergonomic shorthand.
- */
-const scalarConfigSchema = z.record(z.string(), z.unknown()).optional();
-
-/**
- * The interactive "Try it" panel on operation pages (Blume renderer). On by
- * default; `false` hides it. The object form keeps it on and sets `proxy`,
- * the CORS escape hatch the Send button routes requests through: a proxy URL,
- * or `true` for the built-in `/_api-proxy` endpoint (which requires
- * `deployment.output: "server"`). Booleans normalize to the object shape so
- * consumers read `{ enabled, proxy }` directly. `proxy` applies to the
- * HTTP-posting playgrounds (OpenAPI, GraphQL) — an event composer's WebSocket
- * connect is direct. One schema for every reference block, so the
- * normalization can never drift between them.
- */
-const playgroundConfigSchema = z
-  .union([
-    z.boolean(),
-    z.strictObject({
-      enabled: z.boolean().default(true),
-      proxy: z.union([z.boolean(), z.string()]).default(false),
-    }),
-  ])
-  .default(true)
-  .transform((value) =>
-    isBoolean(value) ? { enabled: value, proxy: false } : value
-  );
-
-/**
- * The shared shape of the API-reference blocks — only the mount route and
- * code-sample defaults differ per spec kind, so each block declares just
- * those (the GraphQL block derives from this via omit/extend below).
- */
-const referenceConfigSchema = (defaults: {
-  codeSamples: string[];
-  route: string;
-}) =>
-  z.strictObject({
-    /** Code-sample languages/tools shown per operation (Blume renderer). */
-    codeSamples: z.array(z.string()).default(defaults.codeSamples),
-    enabled: z.boolean().default(false),
-    /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
-    expandSchemas: z.boolean().default(false),
-    /** The "Try it" panel; see {@link playgroundConfigSchema}. */
-    playground: playgroundConfigSchema,
-    /** Who renders the reference: Blume's own UI, or the embedded Scalar SPA. */
-    renderer: z.enum(["blume", "scalar"]).default("blume"),
-    /** Where the reference mounts. */
-    route: z.string().default(defaults.route),
-    /** Extra Scalar config forwarded to `<ScalarComponent>` (Scalar renderer only). */
-    scalar: scalarConfigSchema,
-    /** One or more specs; each renders on its own route by default. */
-    sources: z.array(openapiSourceSchema).default([]),
-    /** Shorthand for a single source: `sources: [{ spec }]`. */
-    spec: z.string().optional(),
-    /** Scalar theme name (Scalar renderer only). */
-    theme: z.string().optional(),
-  });
-
-/**
- * OpenAPI reference. By default (`renderer: "blume"`) Blume parses the spec with
- * Scalar's parser and renders its own UI: one real page per operation, grouped
- * by tag in the sidebar and included in site search, llms.txt, and OG. Set
- * `renderer: "scalar"` to fall back to the embedded Scalar SPA (a single
- * self-contained route that doesn't weave into the sidebar or search).
- */
-const openapiConfigSchema = referenceConfigSchema({
-  codeSamples: ["curl", "js", "python"],
-  route: "/reference",
-});
-
-/**
- * AsyncAPI reference. Same shape as {@link openapiConfigSchema}: by default
- * (`renderer: "blume"`) Blume normalizes the spec to AsyncAPI 3.x and renders
- * its own UI — one real page per operation — with `renderer: "scalar"` as the
- * embedded-SPA opt-out. Only the defaults differ: the reference mounts at
- * `/events`, and empty `codeSamples` means every tool the operation's protocol
- * binding suggests.
- */
-const asyncapiConfigSchema = referenceConfigSchema({
-  codeSamples: [],
-  route: "/events",
-});
-
-/**
- * A single GraphQL schema rendered by the reference. `spec` is a local path or
- * an `http(s)` URL to SDL text or an introspection JSON result; `endpoint` is
- * the live GraphQL API URL the playground and code samples target (a schema,
- * unlike an OpenAPI document, names no server).
- */
-const graphqlSourceSchema = openapiSourceSchema.extend({
-  /** URL of the live GraphQL endpoint (playground + code samples). */
-  endpoint: z.string().optional(),
-});
-
-export type GraphqlSource = z.input<typeof graphqlSourceSchema>;
-
-/**
- * GraphQL reference. Blume lowers the schema (SDL or introspection JSON) to
- * one real page per root field — grouped as Queries/Mutations/Subscriptions —
- * plus one page per named type (Objects, Input Objects, Enums, Interfaces,
- * Unions, Scalars), all included in the sidebar, search, llms.txt, and OG.
- * Always Blume-rendered: the Scalar SPA reads OpenAPI documents only, so the
- * block declares no `renderer`/`scalar`/`theme` escape hatches.
- */
-const graphqlConfigSchema = referenceConfigSchema({
-  codeSamples: ["curl", "js", "python"],
-  route: "/graphql",
-})
-  // No `renderer`/`scalar`/`theme` escape hatches (the Scalar SPA reads
-  // OpenAPI documents only) and no `expandSchemas` (GraphQL field tables have
-  // no nesting) — everything else, the playground normalization included, is
-  // the shared reference shape.
-  .omit({ expandSchemas: true, renderer: true, scalar: true, theme: true })
-  .extend({
-    /** Default live endpoint URL for every source (per-source `endpoint` wins). */
-    endpoint: z.string().optional(),
-    /** One or more schemas; each renders on its own route by default. */
-    sources: z.array(graphqlSourceSchema).default([]),
-  });
-
-/**
  * Opt-in custom frontmatter keys. `extend` maps each extra key a project's
  * pages may carry (e.g. `owner`, `reviewedAt`) to a validation schema; the
  * page schema stays strict for everything else, so typo-catching is preserved.
@@ -1798,7 +1642,6 @@ export const blumeConfigSchema = z
     ai: aiConfigSchema.prefault({}),
     // Adapters from `blume/analytics`, each a serializable descriptor.
     analytics: analyticsConfigSchema,
-    asyncapi: asyncapiConfigSchema.prefault({}),
     banner: bannerConfigSchema.optional(),
     /**
      * Site-wide mount point prepended to every generated route (e.g. `/docs`),
@@ -1831,7 +1674,6 @@ export const blumeConfigSchema = z
     /** Opt-in custom frontmatter keys, validated by user-supplied schemas. */
     frontmatter: frontmatterConfigSchema.prefault({}),
     github: githubConfigSchema.optional(),
-    graphql: graphqlConfigSchema.prefault({}),
     i18n: i18nConfigSchema.optional(),
     image: imageConfigSchema.prefault({}),
     integrations: z.array(z.custom<AstroIntegration>()).default([]),
@@ -1839,9 +1681,10 @@ export const blumeConfigSchema = z
     logo: logoConfigSchema.optional(),
     markdown: markdownConfigSchema.prefault({}),
     navigation: navigationConfigSchema.prefault({}),
-    openapi: openapiConfigSchema.prefault({}),
     react: reactConfigSchema.prefault({}),
     redirects: z.array(redirectSchema).default([]),
+    /** API references: adapters from `blume/reference`, each a serializable descriptor. */
+    reference: referenceConfigSchema,
     search: searchConfigSchema.prefault({}),
     seo: seoConfigSchema.prefault({}),
     theme: themeConfigSchema.prefault({}),

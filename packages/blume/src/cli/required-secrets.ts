@@ -54,5 +54,13 @@ export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
     }
   }
 
+  // Adapters name their own secrets; the built-in reference adapters read
+  // public specs and declare none.
+  for (const adapter of config.reference) {
+    for (const env of adapter.requiredSecrets) {
+      requireSecret(`API reference (${adapter.kind})`, env);
+    }
+  }
+
   return diagnostics;
 };

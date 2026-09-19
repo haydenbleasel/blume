@@ -54,6 +54,7 @@ import {
 import { operationMdx, overviewMdx } from "../src/openapi/render-mdx.ts";
 import { buildReferenceFiles } from "../src/openapi/scalar.ts";
 import { isOpenApiSource, openApiSource } from "../src/openapi/source.ts";
+import { asyncapi, openapi, scalar } from "../src/reference/index.ts";
 
 const ctx = (projectRoot: string) => ({
   cacheDir: join(projectRoot, ".blume/cache/openapi"),
@@ -231,7 +232,7 @@ const queued = (responses: Response[]) => {
 describe("references", () => {
   it("resolves a Blume-rendered OpenAPI reference by default", () => {
     const config = blumeConfigSchema.parse({
-      openapi: { enabled: true, spec: "spec.json" },
+      reference: [openapi({ spec: "spec.json" })],
     });
     const refs = resolveReferences(config);
     expect(refs).toHaveLength(1);
@@ -248,7 +249,7 @@ describe("references", () => {
 
   it("resolves a Blume-rendered AsyncAPI reference by default", () => {
     const config = blumeConfigSchema.parse({
-      asyncapi: { enabled: true, spec: "async.yaml" },
+      reference: [asyncapi({ spec: "async.yaml" })],
     });
     const refs = resolveReferences(config);
     expect(refs).toHaveLength(1);
@@ -266,7 +267,7 @@ describe("references", () => {
 
   it("keeps the Scalar opt-out for AsyncAPI", () => {
     const config = blumeConfigSchema.parse({
-      asyncapi: { enabled: true, renderer: "scalar", spec: "async.yaml" },
+      reference: [asyncapi({ renderer: scalar(), spec: "async.yaml" })],
     });
     expect(hasScalarReferences(config)).toBe(true);
     expect(blumeReferences(config)).toStrictEqual([]);
@@ -275,17 +276,18 @@ describe("references", () => {
 
   it("carries a scalar passthrough block onto its references", () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        scalar: {
-          agent: { disabled: true },
-          hideTestRequestButton: true,
-          localization: { locale: "es" },
-          orderSchemaPropertiesBy: "preserve",
-        },
-        spec: "https://example.com/spec.json",
-      },
+      reference: [
+        openapi({
+          renderer: scalar({
+            agent: { disabled: true },
+            hideTestRequestButton: true,
+            localization: { locale: "es" },
+            orderSchemaPropertiesBy: "preserve",
+          }),
+
+          spec: "https://example.com/spec.json",
+        }),
+      ],
     });
     expect(resolveReferences(config)[0]?.scalar).toStrictEqual({
       agent: { disabled: true },
@@ -297,18 +299,19 @@ describe("references", () => {
 
   it("carries per-source search, LLM, and crawler controls", () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        sources: [
-          {
-            includeInLlms: false,
-            includeInSearch: false,
-            noindex: true,
-            seoDescriptionSuffix: false,
-            spec: "platform.json",
-          },
-        ],
-      },
+      reference: [
+        openapi({
+          sources: [
+            {
+              includeInLlms: false,
+              includeInSearch: false,
+              noindex: true,
+              seoDescriptionSuffix: false,
+              spec: "platform.json",
+            },
+          ],
+        }),
+      ],
     });
     expect(resolveReferences(config)[0]).toMatchObject({
       includeInLlms: false,
@@ -318,16 +321,18 @@ describe("references", () => {
     });
   });
 
-  it("forwards scalar options into the generated page, winning over theme", async () => {
+  it("forwards scalar options into the generated page, winning over Blume's derived config", async () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        renderer: "scalar",
-        // A remote spec avoids file IO; the config is inlined verbatim.
-        scalar: { localization: { locale: "es" }, theme: "moon" },
-        spec: "https://example.com/spec.json",
-        theme: "purple",
-      },
+      reference: [
+        openapi({
+          renderer: scalar({
+            customCss: "body{}",
+            localization: { locale: "es" },
+          }),
+          // A remote spec avoids file IO; the config is inlined verbatim.
+          spec: "https://example.com/spec.json",
+        }),
+      ],
     });
     const { files } = await buildReferenceFiles({
       config,
@@ -337,20 +342,22 @@ describe("references", () => {
     expect(files).toHaveLength(1);
     const { content } = files[0] ?? { content: "" };
     expect(content).toContain('"locale": "es"');
-    // The scalar block's theme wins over the dedicated `theme` field.
-    expect(content).toContain('"theme": "moon"');
-    expect(content).not.toContain('"theme": "purple"');
+    // A forwarded `customCss` replaces the accent/radius layering Blume
+    // derives from its own theme.
+    expect(content).toContain('"customCss": "body{}"');
+    expect(content).not.toContain("--scalar-color-accent");
   });
 
   it("dedupes Blume references that resolve to the same route", () => {
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        sources: [
-          { route: "/api", spec: "a.json" },
-          { route: "/api", spec: "b.json" },
-        ],
-      },
+      reference: [
+        openapi({
+          sources: [
+            { route: "/api", spec: "a.json" },
+            { route: "/api", spec: "b.json" },
+          ],
+        }),
+      ],
     });
     const refs = blumeReferences(config);
     expect(refs).toHaveLength(1);
@@ -366,13 +373,14 @@ describe("references", () => {
     // `/api/v1` and `/api-v1` both slugify to `api-v1`; the slug keys the
     // `blume:openapi` data module, so a collision would clobber one spec.
     const config = blumeConfigSchema.parse({
-      openapi: {
-        enabled: true,
-        sources: [
-          { route: "/api/v1", spec: "a.json" },
-          { route: "/api-v1", spec: "b.json" },
-        ],
-      },
+      reference: [
+        openapi({
+          sources: [
+            { route: "/api/v1", spec: "a.json" },
+            { route: "/api-v1", spec: "b.json" },
+          ],
+        }),
+      ],
     });
     const refs = blumeReferences(config);
     expect(refs.map((ref) => ref.slug)).toStrictEqual(["api-v1", "api-v1-2"]);
@@ -381,7 +389,7 @@ describe("references", () => {
   it("carries the site-wide basePath onto every resolved reference", () => {
     const config = blumeConfigSchema.parse({
       basePath: "/docs",
-      openapi: { enabled: true, spec: "spec.json" },
+      reference: [openapi({ spec: "spec.json" })],
     });
     const [ref] = resolveReferences(config);
     expect(ref?.basePath).toBe("/docs");
@@ -392,7 +400,7 @@ describe("references", () => {
 
   it("appends a staged openapi source when a Blume reference is configured", () => {
     const config = blumeConfigSchema.parse({
-      openapi: { enabled: true, spec: "spec.json" },
+      reference: [openapi({ spec: "spec.json" })],
     });
     // SAFETY: resolveSources only reads `root`, `contentRoot`, and `outDir`
     // from the context; the other ProjectContext paths are never touched.
@@ -1886,7 +1894,7 @@ describe("source.openApiSource", () => {
       await mkdir(join(root, "docs"), { recursive: true });
       await writeFile(
         join(root, "blume.config.ts"),
-        'export default {\n  openapi: { enabled: true, route: "/api", spec: "./openapi.json" },\n};\n'
+        'export default {\n  reference: [{ kind: "openapi", options: { route: "/api", spec: "./openapi.json" }, requiredSecrets: [], runtimeDeps: [] }],\n};\n'
       );
       await writeFile(join(root, "docs/index.md"), "# Home\n");
       await writeFile(

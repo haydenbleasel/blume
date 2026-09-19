@@ -16,7 +16,6 @@ import type { ProjectContext } from "../core/types.ts";
 import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
 import type { OgCache } from "../og/cache.ts";
 import type { OgFont, OgFontFamilies } from "../og/card.ts";
-import { hasScalarReferences } from "../openapi/references.ts";
 import type { MixedbreadOptions } from "../search/adapters/mixedbread.ts";
 import type { ResolvedSearchAdapter } from "../search/adapters/registry.ts";
 import { buildFontEntries, fontLocaleCodes } from "../theme/fonts.ts";
@@ -184,17 +183,16 @@ export const runtimeDependencies = (options: {
   if (needsSvelte) {
     deps.push("@astrojs/svelte");
   }
-  // The Scalar integration is only declared for a Scalar-rendered reference
-  // (the `renderer: "scalar"` opt-out on either block). Blume-rendered
-  // references parse at generate time and need no runtime Scalar dependency.
-  if (hasScalarReferences(config)) {
-    deps.push("@scalar/astro");
-  }
-  // Only the configured search adapter's SDK is declared, so a project pulls in
-  // (and the user installs) exactly the backend it uses — nothing more. Each
-  // analytics adapter declares what it needs the same way; the built-ins need
-  // nothing beyond Blume's own deps, so their share is usually empty.
+  // Each reference adapter declares what its renderer needs: Blume's own
+  // renderer parses at generate time and needs nothing, while `scalar()`
+  // declares `@scalar/astro` so the framework crawl bundles the embed (two
+  // Scalar references declare it twice, hence the set). Only the configured
+  // search adapter's SDK is declared, so a project pulls in (and the user
+  // installs) exactly the backend it uses — nothing more. Each analytics
+  // adapter declares what it needs the same way; the built-ins need nothing
+  // beyond Blume's own deps, so their share is usually empty.
   deps.push(
+    ...new Set(config.reference.flatMap((adapter) => adapter.runtimeDeps)),
     ...config.search.provider.runtimeDeps,
     ...config.analytics.flatMap((adapter) => adapter.runtimeDeps)
   );

@@ -95,7 +95,7 @@ describe("eject", () => {
           mcp: { enabled: true },
         },
         deployment: { site: "https://example.com" },
-        openapi: { enabled: true, renderer: "scalar", spec: "openapi.json" },
+        reference: [{ kind: "openapi", options: { renderer: { kind: "scalar", options: {}, requiredSecrets: [], runtimeDeps: ["@scalar/astro"] }, spec: "openapi.json" }, requiredSecrets: [], runtimeDeps: [] }],
         search: ${JSON.stringify(mixedbread({ storeId: "store-1" }))},
       };\n`,
       // A blog post so an RSS feed is produced (alongside the home page).
@@ -359,7 +359,7 @@ describe("eject", () => {
     // warning is the only signal — eject must return it like generate does.
     await writeFiles(root, {
       "blume.config.ts": `export default {
-        openapi: { enabled: true, renderer: "scalar", spec: "missing.json" },
+        reference: [{ kind: "openapi", options: { renderer: { kind: "scalar", options: {}, requiredSecrets: [], runtimeDeps: ["@scalar/astro"] }, spec: "missing.json" }, requiredSecrets: [], runtimeDeps: [] }],
       };\n`,
       "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
     });
