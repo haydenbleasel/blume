@@ -67,6 +67,7 @@ describe("eject", () => {
       "blume.config.ts": `export default {
         ai: {
           ask: {
+            cors: ["https://www.example.com/"],
             enabled: true,
             instructions: "Answer in pirate speak.",
             retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
@@ -138,6 +139,9 @@ describe("eject", () => {
     expect(ejectedAsk).toContain("Answer in pirate speak.");
     expect(ejectedAsk).toContain('"contextBudget":2500');
     expect(ejectedAsk).toContain('"maxResults":3');
+    // ...and the `ai.ask.cors` origins, with their preflight handler.
+    expect(ejectedAsk).toContain('new Set(["https://www.example.com"])');
+    expect(ejectedAsk).toContain("export const OPTIONS");
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/api/search.ts")).toBe(true);
     expect(has("src/pages/[section]/rss.xml.ts")).toBe(true);

@@ -2026,6 +2026,31 @@ describe("ai.ask schema", () => {
     ).toThrow();
   });
 
+  it("reduces cors entries to origins and rejects non-HTTP(S) values", () => {
+    expect(
+      blumeConfigSchema.parse({
+        ai: {
+          ask: {
+            cors: ["https://www.example.com/docs/", "http://localhost:3000"],
+            enabled: true,
+          },
+        },
+      }).ai.ask?.cors
+    ).toStrictEqual(["https://www.example.com", "http://localhost:3000"]);
+    expect(
+      blumeConfigSchema.parse({ ai: { ask: { enabled: true } } }).ai.ask
+    ).not.toHaveProperty("cors");
+    for (const cors of [
+      ["example.com"],
+      ["ftp://example.com"],
+      "https://x.y",
+    ]) {
+      expect(() =>
+        blumeConfigSchema.parse({ ai: { ask: { cors, enabled: true } } })
+      ).toThrow();
+    }
+  });
+
   it("requires baseUrl for the openai-compatible provider", () => {
     expect(() =>
       blumeConfigSchema.parse({

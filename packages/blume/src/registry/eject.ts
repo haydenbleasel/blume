@@ -137,6 +137,7 @@ const askFiles = async (
   const files = [
     {
       content: askEndpointTemplate(resolveAskBackend(ask), grounded, {
+        cors: ask.cors,
         instructions: ask.instructions,
         retrieval: ask.retrieval,
       }),

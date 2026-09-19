@@ -109,6 +109,23 @@ Blume sends the same `POST` body as its built-in route:
 
 Return a successful response whose body is a plain UTF-8 text stream. If the endpoint is on another origin, allow the docs origin with CORS: accept `OPTIONS` and `POST`, permit the `content-type` request header, and return the CORS headers on both the preflight and streamed response. With `endpoint` set, Blume generates the chat UI but no server route, grounding snapshot, provider dependency, or provider-secret warning; your backend owns retrieval, authentication, rate limiting, model access, and citations.
 
+## Cross-origin callers
+
+The generated endpoint answers the in-page assistant on its own origin. To call it from another site as well — a marketing page with an ask box, say — list that site's origin in `cors`:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    cors: ["https://www.example.com"],
+  },
+}
+```
+
+The route then answers the browser's `OPTIONS` preflight and names a listed origin on every response — the streamed answer and the error statuses alike, so the caller can tell a rejected body from a provider failure. Origins that aren't listed get no header and stay subject to the browser's same-origin rule. Each entry is reduced to its origin, so `https://www.example.com/docs/` and `https://www.example.com` mean the same thing.
+
+The caller sends the same `POST` body the [external endpoint](#external-endpoint) contract describes and reads back the same text stream. `cors` only affects the generated route; with an external `endpoint`, CORS is that backend's job. The endpoint stays unauthenticated either way, so the [rate limiting](#rate-limiting) advice applies to cross-origin traffic too.
+
 ## Server output required
 
 Blume's built-in Ask AI backend is a server route (`POST /api/ask`), so it can't run on a static build. Switch to server output and pick an adapter:

@@ -715,6 +715,15 @@ export interface AskConfig {
    * overrides the built-in preset.
    */
   baseUrl?: string;
+  /**
+   * Origins allowed to call the generated endpoint from another site — a
+   * marketing page that embeds an ask box, for example. The route answers
+   * preflight requests and names a listed origin on every response, errors
+   * included; every other origin stays subject to the browser's same-origin
+   * rule. Only the generated route reads this; an external `endpoint` handles
+   * its own CORS.
+   */
+  cors?: string[];
   /** Turn Ask AI on. Defaults to `false`. */
   enabled?: boolean;
   /**

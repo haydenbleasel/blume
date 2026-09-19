@@ -1674,6 +1674,54 @@ describe("askEndpointTemplate", () => {
     expect(out).not.toContain("createOpenRouter");
     expect(out).not.toContain("process.env");
     expect(out).not.toContain("headers:");
+    // No `ai.ask.cors`: no preflight handler and plain response inits.
+    expect(out).not.toContain("OPTIONS");
+    expect(out).not.toContain("corsHeaders");
+    expect(out).toContain("{ status: 400 }");
+    expect(out).toContain("result.toTextStreamResponse();");
+  });
+
+  it("answers preflight and names listed origins when ai.ask.cors is set", () => {
+    const out = askEndpointTemplate(resolveAskBackend(), true, {
+      cors: ["https://www.example.com", "http://localhost:3000"],
+    });
+    expect(out).toContain(
+      'const ALLOWED_ORIGINS = new Set(["https://www.example.com","http://localhost:3000"]);'
+    );
+    // A listed `Origin` is echoed back (with `Vary`), anything else gets no
+    // header and stays subject to the browser's same-origin rule.
+    expect(out).toContain('const origin = request.headers.get("origin");');
+    expect(out).toContain(
+      '? { "access-control-allow-origin": origin, vary: "origin" }\n    : {};'
+    );
+    // The preflight the island's JSON POST triggers.
+    expect(out).toContain("export const OPTIONS: APIRoute = ({ request }) =>");
+    expect(out).toContain('"access-control-allow-headers": "content-type"');
+    expect(out).toContain('"access-control-allow-methods": "POST"');
+    expect(out).toContain("status: 204");
+    // Every POST response carries the headers — the stream and the errors —
+    // so a cross-origin caller can read a 400 or 500 instead of an opaque
+    // network failure.
+    expect(out).toContain("{ headers: corsHeaders(request), status: 400 }");
+    expect(out).toContain("{ headers: corsHeaders(request), status: 500 }");
+    expect(out).toContain(
+      "result.toTextStreamResponse({ headers: corsHeaders(request) });"
+    );
+    expect(out).not.toContain("{ status: 400 }");
+    expect(out).not.toContain("{ status: 500 }");
+  });
+
+  it("puts the CORS headers on the provider-key guard of every backend", () => {
+    const cors = ["https://www.example.com"];
+    const openrouter = askEndpointTemplate(
+      resolveAskBackend(askConfig({ enabled: true, provider: "openrouter" })),
+      false,
+      { cors }
+    );
+    expect(openrouter).toContain(
+      '"Ask AI is not configured: set OPENROUTER_API_KEY.",\n      { headers: corsHeaders(request), status: 500 }'
+    );
+    expect(openrouter).toContain("export const OPTIONS");
   });
 
   it("inlines ai.ask.headers into every provider factory", () => {
