@@ -153,7 +153,7 @@ export const networkChecks: CheckModule = {
 
     const found: Diagnostic[] = [];
     const deployBase = normalizeBasePath(
-      context.project.config.deployment.base
+      context.project.config.deployment.options.base
     );
     const targets = context.pages.map((page) =>
       liveUrl(origin, page, deployBase)
@@ -217,9 +217,9 @@ export const networkChecks: CheckModule = {
 export const externalChecks: CheckModule = {
   category: "network",
   async run(context) {
-    const origin = siteOrigin(context.project.config.deployment.site);
+    const origin = siteOrigin(context.project.config.deployment.options.site);
     const deployBase = normalizeBasePath(
-      context.project.config.deployment.base
+      context.project.config.deployment.options.base
     );
 
     /** Every outbound URL, and the pages that link to it. */

@@ -326,12 +326,12 @@ export default {
     const result = await loadConfig(dir, {
       devServerUrl: "http://localhost:4321",
     });
-    expect(result.config.deployment.site).toBe("http://localhost:4321");
+    expect(result.config.deployment.options.site).toBe("http://localhost:4321");
     // The localhost fallback is a known site URL, so OG turns on with it.
     expect(result.config.seo.og.enabled).toBe(true);
     // No fallback (the build path) leaves the site unset.
     const built = await loadConfig(dir);
-    expect(built.config.deployment.site).toBeUndefined();
+    expect(built.config.deployment.options.site).toBeUndefined();
   });
 
   it("honors an explicit seo.og.enabled over the site-based default", async () => {

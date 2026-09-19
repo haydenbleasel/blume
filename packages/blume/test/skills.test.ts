@@ -197,7 +197,7 @@ describe("buildSkillsIndex", () => {
     // SAFETY: buildSkillsIndex reads only deployment.base off the config.
     const index = JSON.parse(
       buildSkillsIndex(skills, {
-        deployment: { base: "/base/" },
+        deployment: { options: { base: "/base/" } },
       } as ResolvedConfig)
     );
     expect(index.$schema).toBe(

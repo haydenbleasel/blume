@@ -18,6 +18,13 @@ const configWith = (
   }>
 ): ResolvedConfig => {
   const base = blumeConfigSchema.parse({});
+  const options = { ...base.deployment.options };
+  if (overrides.base) {
+    options.base = overrides.base;
+  }
+  if (overrides.site) {
+    options.site = overrides.site;
+  }
   return {
     ...base,
     ai: {
@@ -28,11 +35,7 @@ const configWith = (
       webBotAuth: { keys: overrides.webBotAuthKeys ?? [] },
     },
     basePath: overrides.basePath ?? "",
-    deployment: {
-      ...base.deployment,
-      base: overrides.base,
-      site: overrides.site,
-    },
+    deployment: { ...base.deployment, options },
   };
 };
 

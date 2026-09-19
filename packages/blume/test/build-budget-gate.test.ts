@@ -7,11 +7,10 @@ import { join } from "pathe";
 /**
  * The `--analyze`/`--budget-js`/`--budget-css` gate shared by real and
  * isolated builds: `runClientAssetChecks` must measure the given static dir
- * and exit non-zero on an exceeded budget, and `isolatedStaticDir` must point
- * it at where an isolated build's client assets actually land (the adapter
- * bundle is never surfaced to the project root). Exercised in subprocesses so
- * the command module stays out of the coverage run, like the other command
- * suites.
+ * and exit non-zero on an exceeded budget. Where an isolated build's client
+ * assets land is `deployStaticDir` with a relocated context, covered in
+ * adapter-output.test.ts. Exercised in subprocesses so the command module
+ * stays out of the coverage run, like the other command suites.
  */
 
 const PKG_ROOT = join(import.meta.dir, "..");
@@ -119,101 +118,5 @@ describe("runClientAssetChecks", () => {
     expect(output).not.toContain("budget");
     expect(output).toContain("GATE_PASSED");
     expect(exitCode).toBe(0);
-  });
-});
-
-describe("isolatedOutputDir", () => {
-  it("reports the runtime-local output root per output/adapter", async () => {
-    const { exitCode, output } = await runScript(`
-      const { isolatedOutputDir } = await import(${JSON.stringify(BUILD)});
-      const context = {
-        distDir: "/proj/.blume-verify/dist",
-        outDir: "/proj/.blume-verify",
-      };
-      const config = (deployment) => ({ deployment });
-      console.log(
-        JSON.stringify({
-          missingDist: isolatedOutputDir(
-            config({ output: "static" }),
-            { ...context, distDir: null }
-          ),
-          nodeServer: isolatedOutputDir(
-            config({ adapter: "node", output: "server" }),
-            context
-          ),
-          static: isolatedOutputDir(config({ output: "static" }), context),
-          vercelServer: isolatedOutputDir(
-            config({ adapter: "vercel", output: "server" }),
-            context
-          ),
-        })
-      );
-    `);
-    expect(exitCode).toBe(0);
-
-    const parsed = JSON.parse(output);
-    // A Vercel server bundle stays inside the runtime dir — the success
-    // message must point there, not at the never-populated dist/.
-    expect(parsed.vercelServer).toBe("/proj/.blume-verify/.vercel/output");
-    expect(parsed.static).toBe("/proj/.blume-verify/dist");
-    // Node's standalone output root is dist/ (server + client inside).
-    expect(parsed.nodeServer).toBe("/proj/.blume-verify/dist");
-    expect(parsed.missingDist).toBe("/proj/.blume-verify/dist");
-  });
-});
-
-describe("isolatedStaticDir", () => {
-  it("resolves the runtime-local static dir per output/adapter", async () => {
-    const { exitCode, output } = await runScript(`
-      const { isolatedStaticDir } = await import(${JSON.stringify(BUILD)});
-      const context = {
-        distDir: "/proj/.blume-verify/dist",
-        outDir: "/proj/.blume-verify",
-      };
-      const config = (deployment) => ({ deployment });
-      console.log(
-        JSON.stringify({
-          cloudflareServer: isolatedStaticDir(
-            config({ adapter: "cloudflare", output: "server" }),
-            context
-          ),
-          cloudflareStatic: isolatedStaticDir(
-            config({ adapter: "cloudflare", output: "static" }),
-            context
-          ),
-          missingDist: isolatedStaticDir(
-            config({ output: "static" }),
-            { ...context, distDir: null }
-          ),
-          nodeServer: isolatedStaticDir(
-            config({ adapter: "node", output: "server" }),
-            context
-          ),
-          static: isolatedStaticDir(config({ output: "static" }), context),
-          vercelServer: isolatedStaticDir(
-            config({ adapter: "vercel", output: "server" }),
-            context
-          ),
-        })
-      );
-    `);
-    expect(exitCode).toBe(0);
-
-    const parsed = JSON.parse(output);
-    // A Vercel server bundle is never surfaced on an isolated build, so its
-    // static assets sit inside the runtime dir, not at the project root.
-    expect(parsed.vercelServer).toBe(
-      "/proj/.blume-verify/.vercel/output/static"
-    );
-    expect(parsed.static).toBe("/proj/.blume-verify/dist");
-    // Node's standalone server serves only Astro's `build.client` dir.
-    expect(parsed.nodeServer).toBe("/proj/.blume-verify/dist/client");
-    // `@astrojs/cloudflare` keeps the same client/server split and serves
-    // `dist/client` through the generated wrangler config's ASSETS binding, so
-    // the bundle report must measure there rather than a directory above it.
-    expect(parsed.cloudflareServer).toBe("/proj/.blume-verify/dist/client");
-    // A Cloudflare static build has no split — the `outDir` root ships as-is.
-    expect(parsed.cloudflareStatic).toBe("/proj/.blume-verify/dist");
-    expect(parsed.missingDist).toBe("/proj/.blume-verify/dist");
   });
 });

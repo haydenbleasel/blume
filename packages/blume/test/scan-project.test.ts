@@ -111,26 +111,18 @@ export default { content: { types: { rfc: { frontmatter: { status } } } } };`,
   it("applies CLI config overrides over the loaded config", async () => {
     const root = await makeProject({ "guides/index.md": "# Home\n" });
     const project = await scanProject(root, {
-      overrides: {
-        adapter: "node",
-        base: "/docs",
-        contentRoot: "guides",
-        output: "server",
-      },
+      overrides: { contentRoot: "guides" },
     });
 
     // `--content-dir` re-roots the (implicit) filesystem source.
     expect(project.config.content.sources[0]?.options).toMatchObject({
       root: "guides",
     });
-    expect(project.config.deployment.adapter).toBe("node");
-    expect(project.config.deployment.base).toBe("/docs");
-    expect(project.config.deployment.output).toBe("server");
     expect(project.context.contentRoot.endsWith("guides")).toBe(true);
     expect(project.droppedPages).toBe(0);
   });
 
-  it("auto-detects the platform adapter when --output server is a CLI override", async () => {
+  it("keeps the platform site detection loadConfig ran", async () => {
     const root = await makeProject({ "docs/index.md": "# Home\n" });
     const saved = {
       VERCEL: process.env.VERCEL,
@@ -139,23 +131,15 @@ export default { content: { types: { rfc: { frontmatter: { status } } } } };`,
     process.env.VERCEL = "1";
     process.env.VERCEL_PROJECT_PRODUCTION_URL = "docs.example.com";
     try {
-      // No `deployment` config block: output only becomes "server" via the
-      // override, so adapter inference must run after overrides are applied.
       const project = await scanProject(root, {
         mode: "build",
-        overrides: { output: "server" },
+        overrides: { contentRoot: "docs" },
       });
-      expect(project.config.deployment.output).toBe("server");
-      expect(project.config.deployment.adapter).toBe("vercel");
       // Platform site resolution from loadConfig is preserved, not clobbered.
-      expect(project.config.deployment.site).toBe("https://docs.example.com");
-
-      // An explicit --adapter override still beats platform detection.
-      const explicit = await scanProject(root, {
-        mode: "build",
-        overrides: { adapter: "node", output: "server" },
-      });
-      expect(explicit.config.deployment.adapter).toBe("node");
+      expect(project.config.deployment.kind).toBe("static");
+      expect(project.config.deployment.options.site).toBe(
+        "https://docs.example.com"
+      );
     } finally {
       for (const [key, value] of Object.entries(saved)) {
         if (value === undefined) {

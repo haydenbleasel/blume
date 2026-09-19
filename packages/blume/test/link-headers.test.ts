@@ -31,8 +31,10 @@ const configWith = (
     },
     basePath: "",
     deployment: {
-      base: overrides.base,
-      site: overrides.catalog ? "https://example.com" : undefined,
+      options: {
+        base: overrides.base,
+        site: overrides.catalog ? "https://example.com" : undefined,
+      },
     },
     reference: [],
     seo: { agentReadability: overrides.agentReadability ?? true },

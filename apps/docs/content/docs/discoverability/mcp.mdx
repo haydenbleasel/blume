@@ -47,17 +47,17 @@ Every `filters` entry must match (results carry their facet values, and `list_pa
 
 ## Server output required
 
-The MCP server is a live endpoint (`/mcp`), so it can't run on a static build. Switch to server output and pick an adapter:
+The MCP server is a live endpoint (`/mcp`), so it can't run on a static build. Name a host adapter from `blume/deploy` to switch to server output:
 
 ```ts blume.config.ts lineNumbers
-deployment: {
-  output: "server",
-  adapter: "node", // or "vercel" | "netlify" | "cloudflare"
-  site: "https://docs.example.com",
-}
+import { node } from "blume/deploy"; // or vercel, netlify, cloudflare
+
+export default defineConfig({
+  deployment: node({ site: "https://docs.example.com" }),
+});
 ```
 
-A static build with `ai.mcp.enabled` fails fast with a message telling you to set `deployment.output` to `server`. See [Deployment](/docs/deployment) for the adapters. Once deployed, connect from Claude Code with:
+A static build with `ai.mcp.enabled` fails fast with a message telling you to set a host adapter. See [Deployment](/docs/deployment) for the adapters. Once deployed, connect from Claude Code with:
 
 ```bash
 claude mcp add --transport http my-docs https://docs.example.com/mcp

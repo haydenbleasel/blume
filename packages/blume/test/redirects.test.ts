@@ -56,7 +56,7 @@ describe("redirect emitters", () => {
     // redirects; the rest of ResolvedConfig is irrelevant to this test.
     const config = {
       basePath: "/docs",
-      deployment: { base: "/base" },
+      deployment: { options: { base: "/base" } },
       redirects,
     } as ResolvedConfig;
     expect(platformRedirects(config)).toStrictEqual(
@@ -65,7 +65,7 @@ describe("redirect emitters", () => {
     // SAFETY: same three fields as above — everything platformRedirects reads.
     const unbased = {
       basePath: "",
-      deployment: {},
+      deployment: { options: {} },
       redirects,
     } as ResolvedConfig;
     expect(platformRedirects(unbased)).toBe(redirects);

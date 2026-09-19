@@ -72,14 +72,14 @@ ${urls.join("\n")}
 export const buildSitemapFiles = (
   project: BlumeProject
 ): SitemapFile[] | null => {
-  const { site } = project.config.deployment;
+  const { site } = project.config.deployment.options;
   if (!(site && project.config.seo.sitemap)) {
     return null;
   }
 
   const base = siteRoot(site);
   // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top.
-  const deployBase = normalizeBasePath(project.config.deployment.base);
+  const deployBase = normalizeBasePath(project.config.deployment.options.base);
 
   // Archived-version pages leave the sitemap when the version is noindexed,
   // or when their canonical points at a still-existing latest equivalent —

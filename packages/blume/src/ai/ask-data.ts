@@ -28,6 +28,6 @@ export const buildAskData = async (project: BlumeProject): Promise<AskData> => {
       route: doc.route,
       title: doc.title,
     })),
-    site: project.config.deployment.site ?? null,
+    site: project.config.deployment.options.site ?? null,
   };
 };

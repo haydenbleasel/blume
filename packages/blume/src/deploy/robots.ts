@@ -47,10 +47,10 @@ export const buildRobots = (project: BlumeProject): string | null => {
   }
   lines.push("Allow: /");
 
-  const { site } = config.deployment;
+  const { site } = config.deployment.options;
   if (site && config.seo.sitemap) {
     const sitemapPath = withBasePath(
-      normalizeBasePath(config.deployment.base),
+      normalizeBasePath(config.deployment.options.base),
       "/sitemap.xml"
     );
     lines.push("", `Sitemap: ${absoluteUrl(site, sitemapPath)}`);

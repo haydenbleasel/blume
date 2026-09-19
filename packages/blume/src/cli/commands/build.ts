@@ -1,61 +1,25 @@
 import { existsSync } from "node:fs";
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 
 import { build } from "astro";
 import { defineCommand } from "citty";
 import { join } from "pathe";
 
-import { crossOriginDiscoveryPaths } from "../../ai/ai-catalog.ts";
-import {
-  API_CATALOG_PATH,
-  API_CATALOG_TYPE,
-  hasApiCatalog,
-} from "../../ai/api-catalog.ts";
-import { pageJsonPath } from "../../ai/api/paths.ts";
-import { buildHomeLinkHeader } from "../../ai/link-headers.ts";
-import {
-  agentMarkdown,
-  buildRawMarkdown,
-  markdownRoutePaths,
-  markdownTokenCount,
-} from "../../ai/markdown.ts";
-import {
-  SIGNATURES_DIRECTORY_PATH,
-  SIGNATURES_DIRECTORY_TYPE,
-} from "../../ai/web-bot-auth.ts";
 import { publishBuildProject } from "../../astro/integration.ts";
 import { ensureGitignore } from "../../core/gitignore.ts";
 import type { BlumeProject } from "../../core/project-graph.ts";
-import type { ResolvedConfig } from "../../core/schema.ts";
 import { serverFeatures } from "../../core/server-features.ts";
-import type { ProjectContext } from "../../core/types.ts";
 import {
-  ADAPTER_IGNORE_DIRS,
+  deployOutputDir,
   deployStaticDir,
-  servesClientSubdir,
   surfaceAdapterOutput,
 } from "../../deploy/adapter-output.ts";
-import {
-  injectWorkerNegotiation,
-  NEGOTIATION_WORKER_FILE,
-} from "../../deploy/cloudflare-negotiation.ts";
-import {
-  auditVercelFunctions,
-  blumeDependencyNames,
-  functionBundleVerdict,
-} from "../../deploy/function-bundle.ts";
-import { platformRedirects } from "../../deploy/redirects.ts";
-import { injectNegotiationRoutes } from "../../deploy/vercel-negotiation.ts";
+import { deployPlatform } from "../../deploy/platforms/index.ts";
 import { cardCacheTally, ogCacheDir, pruneCardCache } from "../../og/cache.ts";
 import { commandMeta } from "../command-meta.ts";
 import { refuseIfDevRunning } from "../dev-lock.ts";
 import { logger } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
-
-const ADAPTERS = ["vercel", "node", "netlify", "cloudflare"] as const;
-
-const isAdapter = (value: string): value is (typeof ADAPTERS)[number] =>
-  ADAPTERS.some((adapter) => adapter === value);
 
 const BUDGET_JS = "budget-js";
 const BUDGET_CSS = "budget-css";
@@ -84,171 +48,6 @@ const validateBudgetFlags = (args: BudgetArgs): void => {
       process.exit(1);
     }
   }
-};
-
-/**
- * Splice `Accept: text/markdown` negotiation routes into the Vercel adapter's
- * Build Output config, so a content-page request that prefers Markdown gets the
- * page's prerendered `.md` mirror (content pages are prerendered even in server
- * output, so Astro middleware never sees them — the routing layer is the only
- * request-time hook). Vercel server builds only; the adapter writes the config
- * straight to the project root (see `withAdapterRoot`).
- */
-const emitVercelNegotiation = async (
-  project: BlumeProject,
-  routePaths: string[],
-  root: string
-): Promise<void> => {
-  const { config } = project;
-  const configPath = join(root, ".vercel", "output", "config.json");
-  if (!existsSync(configPath)) {
-    return;
-  }
-  const overrides: Record<string, string> = {};
-  if (hasApiCatalog(config)) {
-    overrides[API_CATALOG_PATH.slice(1)] = API_CATALOG_TYPE;
-  }
-  if (config.ai.webBotAuth.keys.length > 0) {
-    overrides[SIGNATURES_DIRECTORY_PATH.slice(1)] = SIGNATURES_DIRECTORY_TYPE;
-  }
-  // The homepage rewrite serves `/index.md` from the static layer, so its
-  // `x-markdown-tokens` estimate has to ride the routing config; the runtime
-  // endpoint stamps it on dev/server-rendered responses itself.
-  const rawMarkdown = await buildRawMarkdown(project);
-  const home = rawMarkdown["/"];
-  // The Markdown and JSON 404 routes point at the prerendered twins; only
-  // wire each when the build actually emitted it (a project that owns `/404`
-  // gets none).
-  const staticDir = join(root, ".vercel", "output", "static");
-  const injected = injectNegotiationRoutes(
-    await readFile(configPath, "utf-8"),
-    routePaths,
-    buildHomeLinkHeader(config, routePaths),
-    overrides,
-    home ? markdownTokenCount(agentMarkdown(home)) : undefined,
-    {
-      json: existsSync(join(staticDir, "404.json")),
-      markdown: existsSync(join(staticDir, "404.md")),
-    },
-    crossOriginDiscoveryPaths(config)
-  );
-  if (injected === null) {
-    logger.warn(
-      "Could not wire Accept: text/markdown negotiation into .vercel/output/config.json — raw Markdown stays available at the .md URLs."
-    );
-    return;
-  }
-  await writeFile(configPath, injected, "utf-8");
-  logger.success(
-    "Wired Accept: text/markdown negotiation into the Vercel routing config"
-  );
-};
-
-/**
- * Refuse to ship a Vercel function bundle that would crash at runtime: a bare
- * import the adapter's dependency trace silently dropped (see
- * `deploy/function-bundle.ts`). A missing package that is one of Blume's own
- * dependencies is fatal — the generated runtime imports it, so every request
- * would die; a project's own external import is reported as a warning and left
- * to the author.
- */
-const checkVercelFunctionBundles = async (
-  outputDir: string,
-  root: string
-): Promise<void> => {
-  const audits = await auditVercelFunctions(outputDir);
-  if (audits.length === 0) {
-    return;
-  }
-  const own = blumeDependencyNames();
-  let fatal = false;
-  for (const audit of audits) {
-    const verdict = functionBundleVerdict(audit, root, own);
-    if (verdict.fatal) {
-      fatal = true;
-      logger.error(verdict.message);
-    } else {
-      logger.warn(verdict.message);
-    }
-  }
-  if (fatal) {
-    process.exit(1);
-  }
-};
-
-const warnCloudflareNegotiationSkipped = (): void =>
-  logger.warn(
-    "Could not wire Accept: text/markdown negotiation into dist/server/wrangler.json — raw Markdown stays available at the .md URLs."
-  );
-
-/**
- * Wire `Accept: text/markdown` negotiation into a Cloudflare server build. The
- * ASSETS binding serves the prerendered content pages before the Worker runs —
- * and even a request that reaches the Worker is answered by the adapter's
- * handler from that binding, ahead of the only place middleware runs — so the
- * negotiation lives in a generated wrapper Worker, routed to by
- * `assets.run_worker_first` (see `deploy/cloudflare-negotiation.ts`). Both
- * pieces are spliced into the adapter's emitted `dist/server` bundle.
- */
-const emitCloudflareNegotiation = async (
-  project: BlumeProject,
-  routePaths: string[]
-): Promise<void> => {
-  const { config, context } = project;
-  const serverDir = join(
-    context.distDir ?? join(context.root, "dist"),
-    "server"
-  );
-  const wranglerPath = join(serverDir, "wrangler.json");
-  if (!existsSync(wranglerPath)) {
-    warnCloudflareNegotiationSkipped();
-    return;
-  }
-  // The homepage mirror is served from the static layer, so its
-  // `x-markdown-tokens` estimate rides the wrapper Worker, mirroring the
-  // Vercel routing config.
-  const rawMarkdown = await buildRawMarkdown(project);
-  const home = rawMarkdown["/"];
-  const injected = injectWorkerNegotiation(
-    await readFile(wranglerPath, "utf-8"),
-    {
-      base: config.deployment.base,
-      // The manifest routes guard the wrapper's redirect table; `routePaths`
-      // also carries the synthesized homepage mirror, which must not block a
-      // configured root redirect.
-      contentRoutePaths: project.manifest.routes.map((route) => route.path),
-      homeLinkHeader: buildHomeLinkHeader(config, routePaths),
-      homeTokens: home ? markdownTokenCount(agentMarkdown(home)) : undefined,
-      // Exactly the per-page JSON documents the API emits (see `pageParams`):
-      // the non-hidden routes with agent Markdown, when the API is on.
-      pageJsonPaths: config.ai.api
-        ? project.manifest.routes
-            .filter(
-              (route) => !route.hidden && rawMarkdown[route.path] !== undefined
-            )
-            .map((route) => pageJsonPath(route.path))
-        : [],
-      // The wrapper Worker matches full served URLs, so the redirects are
-      // based the same way the platform files are — it answers any the
-      // worker-first rules claim, where `_redirects` is never consulted and
-      // Astro would default their status.
-      redirects: platformRedirects(config),
-      routePaths,
-    }
-  );
-  if (injected === null) {
-    warnCloudflareNegotiationSkipped();
-    return;
-  }
-  await writeFile(
-    join(serverDir, NEGOTIATION_WORKER_FILE),
-    injected.worker,
-    "utf-8"
-  );
-  await writeFile(wranglerPath, injected.wrangler, "utf-8");
-  logger.success(
-    "Wired Accept: text/markdown negotiation into the Cloudflare Worker"
-  );
 };
 
 /**
@@ -391,46 +190,6 @@ export const runClientAssetChecks = async (
 };
 
 /**
- * Root of an isolated build's output. The runtime-local `dist/`, except for a
- * Vercel server build, whose deploy bundle lands at `<runtime>/.vercel/output`
- * and is never surfaced to the project root.
- */
-export const isolatedOutputDir = (
-  config: ResolvedConfig,
-  context: ProjectContext
-): string => {
-  const { adapter, output } = config.deployment;
-  if (output === "server" && adapter === "vercel") {
-    return join(context.outDir, ".vercel", "output");
-  }
-  return context.distDir ?? join(context.outDir, "dist");
-};
-
-/**
- * Directory holding an isolated build's client `_astro/` assets. Mirrors
- * `deployStaticDir`, except that an isolated build never surfaces the adapter
- * bundle to the project root — a Vercel server build's static output stays at
- * `<runtime>/.vercel/output/static`, where `deployStaticDir` would instead
- * point at the project-root copy (a previous real build's assets, or nothing).
- * Node and Cloudflare server builds serve one level down, at `client/` — see
- * {@link servesClientSubdir}.
- */
-export const isolatedStaticDir = (
-  config: ResolvedConfig,
-  context: ProjectContext
-): string => {
-  const { adapter, output } = config.deployment;
-  const outputDir = isolatedOutputDir(config, context);
-  if (output === "server" && adapter === "vercel") {
-    return join(outputDir, "static");
-  }
-  if (servesClientSubdir(config.deployment)) {
-    return join(outputDir, "client");
-  }
-  return outputDir;
-};
-
-/**
  * Print the build summary box and run the optional bundle report / budget
  * gate against the served static dir. The deploy artifacts themselves
  * (search index, llms.txt, sitemap, robots, redirect and header files, …)
@@ -452,12 +211,12 @@ const reportBuild = async (
     : "no (seo.sitemap is false)";
   logger.box(
     [
-      `Output     ${config.deployment.output}`,
-      `Adapter    ${config.deployment.adapter ?? "none"}`,
-      `Site       ${config.deployment.site ?? "not set"}`,
+      `Output     ${config.deployment.options.output}`,
+      `Adapter    ${config.deployment.kind}`,
+      `Site       ${config.deployment.options.site ?? "not set"}`,
       `Search     ${config.search.provider.kind}`,
       `Redirects  ${config.redirects.length}`,
-      `Sitemap    ${config.deployment.site && config.seo.sitemap ? "yes" : sitemapNote}`,
+      `Sitemap    ${config.deployment.options.site && config.seo.sitemap ? "yes" : sitemapNote}`,
       `Robots     ${config.seo.robots ? "yes" : "no"}`,
       `Agent JSON ${config.seo.agentReadability ? "yes" : "no"}`,
       `LLM files  ${config.ai.llmsTxt.enabled ? "yes" : "no"}`,
@@ -479,17 +238,9 @@ const reportBuild = async (
 
 export const buildCommand = defineCommand({
   args: {
-    adapter: {
-      description: "Server adapter: vercel | node | netlify | cloudflare.",
-      type: "string",
-    },
     analyze: {
       description: "Report client JavaScript bundle sizes after the build.",
       type: "boolean",
-    },
-    base: {
-      description: "Base path the site is served under (e.g. /docs).",
-      type: "string",
     },
     [BUDGET_CSS]: {
       description: "Fail if total client CSS exceeds this many kB.",
@@ -503,10 +254,6 @@ export const buildCommand = defineCommand({
       description:
         "Build into an isolated .blume-verify runtime (and its own dist) so a running dev server and the real dist/ are untouched. For verifying changes while `blume dev` runs.",
       type: "boolean",
-    },
-    output: {
-      description: "Output mode: static | server.",
-      type: "string",
     },
     preview: {
       description: "Include drafts and unpublished CMS content.",
@@ -535,29 +282,10 @@ export const buildCommand = defineCommand({
       await ensureGitignore(root, [".blume-verify/"]);
     }
 
-    if (args.output && args.output !== "static" && args.output !== "server") {
-      logger.error(`Invalid --output "${args.output}" (use static | server).`);
-      process.exit(1);
-    }
-    if (args.adapter && !isAdapter(args.adapter)) {
-      logger.error(
-        `Invalid --adapter "${args.adapter}" (use ${ADAPTERS.join(" | ")}).`
-      );
-      process.exit(1);
-    }
     validateBudgetFlags(args);
 
     const project = await prepareProject({
       mode: "build",
-      overrides: {
-        // SAFETY: an invalid --adapter exited above; a set flag is an ADAPTERS
-        // member.
-        adapter: args.adapter as (typeof ADAPTERS)[number] | undefined,
-        base: args.base,
-        // SAFETY: an invalid --output exited above; a set flag is static or
-        // server.
-        output: args.output as "server" | "static" | undefined,
-      },
       preview: args.preview,
       root,
       runtimeDir,
@@ -565,7 +293,7 @@ export const buildCommand = defineCommand({
     });
 
     logger.start(
-      `Building ${project.graph.pages.length} page(s) (${project.config.deployment.output} output)`
+      `Building ${project.graph.pages.length} page(s) (${project.config.deployment.options.output} output)`
     );
 
     // Hand the scanned project to the integration: its `astro:build:done`
@@ -587,25 +315,36 @@ export const buildCommand = defineCommand({
     // cards a live dev server is still serving.
     await reportCardCache(project, !runtimeDir);
 
+    // Everything the deploy target does differently after `astro build` comes
+    // off its platform (see `deploy/platforms/*`): a server build's post-build
+    // step (Vercel's function-bundle audit and negotiation routes, Cloudflare's
+    // wrapper Worker), and where its bundle and static assets landed.
+    const { deployment } = project.config;
+    const platform = deployPlatform(deployment);
+    const server = deployment.options.output === "server";
+    const finalize = async (isolated: boolean): Promise<void> => {
+      if (
+        server &&
+        platform.finalizeBuild &&
+        !(await platform.finalizeBuild({ isolated, log: logger, project }))
+      ) {
+        process.exit(1);
+      }
+    };
+
     // The bundle report and budget gate still run for an isolated build —
     // `blume build --isolated --budget-js 100` exiting 0 without measuring
-    // anything would be a silent false pass in CI.
+    // anything would be a silent false pass in CI. An isolated build never
+    // surfaces the adapter bundle to the project root, so its output dirs
+    // resolve under the relocated runtime.
     if (runtimeDir) {
-      if (
-        project.config.deployment.output === "server" &&
-        project.config.deployment.adapter === "vercel"
-      ) {
-        await checkVercelFunctionBundles(
-          isolatedOutputDir(project.config, project.context),
-          root
-        );
-      }
+      await finalize(true);
       await runClientAssetChecks(
-        isolatedStaticDir(project.config, project.context),
+        deployStaticDir(project.config, project.context),
         args
       );
       logger.success(
-        `Isolated build OK — output at ${isolatedOutputDir(project.config, project.context)} (not published).`
+        `Isolated build OK — output at ${deployOutputDir(project.config, project.context)} (not published).`
       );
       return;
     }
@@ -614,9 +353,8 @@ export const buildCommand = defineCommand({
     // version control (Vercel's own CLI ignores `.vercel/` for the same reason).
     // Ignoring it is independent of whether the bundle had to be moved below:
     // Vercel writes straight to the project root, Netlify does not.
-    const { adapter } = project.config.deployment;
-    const ignoreDir = adapter ? ADAPTER_IGNORE_DIRS[adapter] : undefined;
-    if (project.config.deployment.output === "server" && ignoreDir) {
+    const { ignoreDir } = platform.hiddenRuntime;
+    if (server && ignoreDir) {
       await ensureGitignore(root, [ignoreDir]);
     }
 
@@ -629,20 +367,10 @@ export const buildCommand = defineCommand({
       project.context
     );
     if (surfaced.moved) {
-      logger.success(`Surfaced ${adapter} output to ${surfaced.to}`);
+      logger.success(`Surfaced ${deployment.kind} output to ${surfaced.to}`);
     }
 
-    if (project.config.deployment.output === "server" && adapter === "vercel") {
-      await checkVercelFunctionBundles(join(root, ".vercel", "output"), root);
-      await emitVercelNegotiation(project, markdownRoutePaths(project), root);
-    }
-
-    if (
-      project.config.deployment.output === "server" &&
-      adapter === "cloudflare"
-    ) {
-      await emitCloudflareNegotiation(project, markdownRoutePaths(project));
-    }
+    await finalize(false);
 
     await reportBuild(
       project,

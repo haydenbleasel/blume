@@ -9,6 +9,15 @@ import { discoverPages } from "../src/astro/pages.ts";
 import { validateLinks } from "../src/core/links.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { serverFeatures } from "../src/core/server-features.ts";
+import { node } from "../src/deploy/adapters/index.ts";
+
+/**
+ * An Ask AI config with the given `deployment` literal. The descriptor is
+ * plain data, so the server fixture inlines its JSON instead of importing
+ * the adapter from `blume/deploy`.
+ */
+const askConfig = (deployment: string): string =>
+  `export default { ai: { ask: { enabled: true } }, deployment: ${deployment} };\n`;
 
 /**
  * Fixture matrix: whole projects exercised end-to-end through the core pipeline,
@@ -101,14 +110,12 @@ describe("fixture matrix", () => {
   });
 
   it("gates server-only features by deployment output", async () => {
-    const askConfig =
-      'export default { ai: { ask: { enabled: true } }, deployment: { output: "OUTPUT" } };\n';
     const staticRoot = await fixture({
-      "blume.config.ts": askConfig.replace("OUTPUT", "static"),
+      "blume.config.ts": askConfig("{}"),
       "docs/index.md": page("Home"),
     });
     const serverRoot = await fixture({
-      "blume.config.ts": askConfig.replace("OUTPUT", "server"),
+      "blume.config.ts": askConfig(JSON.stringify(node())),
       "docs/index.md": page("Home"),
     });
     const [staticProject, serverProject] = await Promise.all([
@@ -117,7 +124,7 @@ describe("fixture matrix", () => {
     ]);
     // Ask AI is a server feature: it can't ship in a static build.
     expect(serverFeatures(staticProject.config)).toContain("Ask AI");
-    expect(staticProject.config.deployment.output).toBe("static");
-    expect(serverProject.config.deployment.output).toBe("server");
+    expect(staticProject.config.deployment.options.output).toBe("static");
+    expect(serverProject.config.deployment.options.output).toBe("server");
   });
 });

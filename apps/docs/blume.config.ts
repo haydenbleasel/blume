@@ -1,4 +1,5 @@
 import { defineConfig } from "blume";
+import { cloudflare } from "blume/deploy";
 import { filesystem, githubReleases } from "blume/sources";
 
 export default defineConfig({
@@ -50,16 +51,12 @@ export default defineConfig({
       }),
     ],
   },
-  deployment: {
-    // Server output (MCP server) on Cloudflare Workers via @astrojs/cloudflare.
-    // The adapter reads wrangler.jsonc at this directory's root and emits the
-    // deployable config to dist/server/wrangler.json, which the `deploy` script
-    // hands to wrangler. Workers Builds doesn't expose a site URL the way Pages
-    // does, so the canonical origin is pinned here.
-    adapter: "cloudflare",
-    output: "server",
-    site: "https://useblume.dev",
-  },
+  // Server output (MCP server) on Cloudflare Workers via @astrojs/cloudflare.
+  // The adapter reads wrangler.jsonc at this directory's root and emits the
+  // deployable config to dist/server/wrangler.json, which the `deploy` script
+  // hands to wrangler. Workers Builds doesn't expose a site URL the way Pages
+  // does, so the canonical origin is pinned here.
+  deployment: cloudflare({ site: "https://useblume.dev" }),
   description:
     "Open-source, markdown-first documentation powered by Astro and Vite.",
   export: true,

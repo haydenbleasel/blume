@@ -234,7 +234,7 @@ export const buildManifest = (options: {
   return {
     blumeVersion: getBlumeVersion(),
     contentRoot: context.contentRoot,
-    output: config.deployment.output,
+    output: config.deployment.options.output,
     projectRoot: context.root,
     routes,
     version: MANIFEST_VERSION,

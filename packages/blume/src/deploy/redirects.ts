@@ -78,7 +78,7 @@ export const platformRedirects = (config: ResolvedConfig): Redirect[] =>
   applyBaseToPlatformRedirects(
     config.redirects,
     config.basePath,
-    config.deployment.base ?? ""
+    config.deployment.options.base ?? ""
   );
 
 /** `_redirects` text (Netlify + Cloudflare Pages): `from to status` per line. */

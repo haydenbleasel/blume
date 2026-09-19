@@ -1,7 +1,6 @@
 import { isAbsolute, relative } from "pathe";
 
 import { loadConfig } from "./config.ts";
-import { applyDeploymentEnv } from "./deployment-env.ts";
 import { buildContentGraph } from "./graph.ts";
 import { i18nDiagnostics } from "./i18n.ts";
 import { expandIncludes, hasIncludeStatements } from "./includes.ts";
@@ -36,12 +35,6 @@ export type BuildMode = "dev" | "build";
 export interface ConfigOverrides {
   /** Override `content.root` (`blume dev --content-dir`). */
   contentRoot?: string;
-  /** Override `deployment.adapter` (`blume build --adapter`). */
-  adapter?: ResolvedConfig["deployment"]["adapter"];
-  /** Override `deployment.base` (`blume build --base`). */
-  base?: string;
-  /** Override `deployment.output` (`blume build --output`). */
-  output?: ResolvedConfig["deployment"]["output"];
 }
 
 /**
@@ -75,12 +68,6 @@ const applyConfigOverrides = (
   return {
     ...config,
     content: { ...config.content, sources },
-    deployment: {
-      ...config.deployment,
-      adapter: overrides.adapter ?? config.deployment.adapter,
-      base: overrides.base ?? config.deployment.base,
-      output: overrides.output ?? config.deployment.output,
-    },
   };
 };
 
@@ -234,13 +221,7 @@ export const scanProject = async (
   const configResult = await loadConfig(root, {
     devServerUrl: options.devServerUrl,
   });
-  // Re-run platform detection after CLI overrides: `loadConfig` already ran it,
-  // but adapter inference keys off `deployment.output`, which `--output server`
-  // only sets here. Idempotent for already-resolved fields — `deployment.site`
-  // keeps loadConfig's explicit > platform env > devServerUrl precedence.
-  const config = applyDeploymentEnv(
-    applyConfigOverrides(configResult.config, options.overrides)
-  );
+  const config = applyConfigOverrides(configResult.config, options.overrides);
   const context = resolveProjectContext(root, config, {
     runtimeDir: options.runtimeDir,
   });

@@ -5,6 +5,7 @@ import type { AskRetrievalOptions } from "../ai/ask-context.ts";
 import type { AskAdapter } from "../ai/ask.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import type { AnalyticsAdapter } from "../analytics/schema.ts";
+import type { DeploymentInput } from "../deploy/adapters/registry.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
 import type { ReferenceAdapter } from "../reference/schema.ts";
 import type { AnySearchAdapter } from "../search/adapters/registry.ts";
@@ -836,26 +837,14 @@ export interface VersionsConfig {
 // ---------------------------------------------------------------------------
 
 /**
- * Where and how the site deploys. `site` (and `adapter`) are auto-detected from
- * the platform env on Vercel, Netlify, and Cloudflare.
+ * Where and how the site deploys: a host adapter from `blume/deploy` —
+ * `vercel()`, `netlify()`, `cloudflare()`, `node()`, each taking `{ output,
+ * site, base }` plus the underlying `@astrojs/*` adapter's own options — for
+ * a server build on that host, or the plain `{ site, base }` form for a
+ * static build anywhere. `site` is detected from the platform env on Vercel,
+ * Netlify, and Cloudflare Pages when unset.
  */
-/** Astro server-output adapters, by hosting platform. */
-type CloudDeploymentAdapter = "netlify" | "cloudflare";
-type DeploymentAdapter = "vercel" | "node" | CloudDeploymentAdapter;
-
-export interface DeploymentConfig {
-  /** Astro adapter for server output. `null` (default) keeps a static build. */
-  adapter?: DeploymentAdapter | null;
-  /** Base path when the site is served from a subdirectory. */
-  base?: string;
-  /** Build output mode. Defaults to `static`. */
-  output?: "static" | "server";
-  /**
-   * Canonical site URL. Needed for absolute links, the sitemap, and OG images;
-   * auto-detected on supported platforms.
-   */
-  site?: string;
-}
+export type DeploymentConfig = DeploymentInput;
 
 /**
  * One authorized remote image source, passed through to Astro's

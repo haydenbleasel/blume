@@ -49,9 +49,9 @@ const oneLine = (text: string): string => text.replaceAll(/\s+/gu, " ").trim();
  */
 const agentResourceLines = (project: BlumeProject): string[] => {
   const { config } = project;
-  const { site } = config.deployment;
+  const { site } = config.deployment.options;
   const url = (path: string): string =>
-    pageUrl(path, site, normalizeBasePath(config.deployment.base));
+    pageUrl(path, site, normalizeBasePath(config.deployment.options.base));
   const lines = [
     `- [llms-full.txt](${url("/llms-full.txt")}): The full Markdown of every page in one file.`,
     `- [Page Markdown](${url("/index.md")}): Append \`.md\` to any page URL to fetch that page as raw Markdown.`,
@@ -166,8 +166,8 @@ export const buildLlmsIndex = (
   options: LlmsIndexOptions = {}
 ): string => {
   const { config } = project;
-  const { site } = config.deployment;
-  const base = normalizeBasePath(config.deployment.base);
+  const { site } = config.deployment.options;
+  const base = normalizeBasePath(config.deployment.options.base);
   const eligible = eligiblePages(project);
   const byRoute = new Map(eligible.map((page) => [page.route, page]));
   const seen = new Set<string>();
@@ -305,7 +305,7 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
       // llms-full.txt; point them at the served originals instead.
       if (page.sourcePath) {
         raw = rewriteRelativeImages({
-          deployBase: config.deployment.base,
+          deployBase: config.deployment.options.base,
           projectRoot: project.context.root,
           source: raw,
           sourcePath: page.sourcePath,
@@ -322,8 +322,8 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
       ).trim();
       const url = pageUrl(
         page.route,
-        config.deployment.site,
-        normalizeBasePath(config.deployment.base)
+        config.deployment.options.site,
+        normalizeBasePath(config.deployment.options.base)
       );
       return [`# ${page.title}`, `Source: ${url}`, "", body].join("\n");
     })

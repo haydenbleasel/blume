@@ -409,6 +409,6 @@ export interface BlumeManifest {
   blumeVersion: string;
   projectRoot: string;
   contentRoot: string;
-  output: ResolvedConfig["deployment"]["output"];
+  output: ResolvedConfig["deployment"]["options"]["output"];
   routes: RouteManifestEntry[];
 }

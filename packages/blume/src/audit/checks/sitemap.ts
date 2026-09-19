@@ -150,7 +150,7 @@ export const sitemapChecks: CheckModule = {
   category: "sitemap",
   run(context) {
     const { sitemap } = context;
-    const { site } = context.project.config.deployment;
+    const { site } = context.project.config.deployment.options;
 
     // Without `deployment.site` Blume can't emit a sitemap at all (absolute URLs
     // are required), and that's a config choice, not a defect. Stay quiet.
@@ -220,7 +220,7 @@ export const sitemapChecks: CheckModule = {
 
     const origin = siteOrigin(site);
     const deployBase = normalizeBasePath(
-      context.project.config.deployment.base
+      context.project.config.deployment.options.base
     );
     const listed = sitemapPaths(context, deployBase);
 

@@ -4,10 +4,16 @@ import type { BlumeConfig } from "../src/core/config-input.ts";
 import { applyDeploymentEnv } from "../src/core/deployment-env.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
+import {
+  cloudflare,
+  netlify,
+  node,
+  vercel,
+} from "../src/deploy/adapters/index.ts";
 
-/** A fully-resolved config with the given deployment overrides applied. */
-const resolve = (deployment: BlumeConfig["deployment"] = {}): ResolvedConfig =>
-  blumeConfigSchema.parse({ deployment });
+/** A fully-resolved config with the given deployment applied. */
+const resolve = (deployment?: BlumeConfig["deployment"]): ResolvedConfig =>
+  blumeConfigSchema.parse(deployment ? { deployment } : {});
 
 const env = (vars: Record<string, string>): NodeJS.ProcessEnv => vars;
 
@@ -22,7 +28,10 @@ describe("applyDeploymentEnv", () => {
       resolve(),
       env({ VERCEL: "1", VERCEL_PROJECT_PRODUCTION_URL: "docs.example.com" })
     );
-    expect(result.deployment.site).toBe("https://docs.example.com");
+    expect(result.deployment.options.site).toBe("https://docs.example.com");
+    // A static build stays static: only the site was filled in.
+    expect(result.deployment.kind).toBe("static");
+    expect(result.deployment.options.output).toBe("static");
   });
 
   it("prefers the production domain over the per-deploy VERCEL_URL", () => {
@@ -34,7 +43,7 @@ describe("applyDeploymentEnv", () => {
         VERCEL_URL: "preview-abc123.vercel.app",
       })
     );
-    expect(result.deployment.site).toBe("https://docs.example.com");
+    expect(result.deployment.options.site).toBe("https://docs.example.com");
   });
 
   it("falls back to VERCEL_URL when no production domain is set", () => {
@@ -42,7 +51,7 @@ describe("applyDeploymentEnv", () => {
       resolve(),
       env({ VERCEL: "1", VERCEL_URL: "my-app.vercel.app" })
     );
-    expect(result.deployment.site).toBe("https://my-app.vercel.app");
+    expect(result.deployment.options.site).toBe("https://my-app.vercel.app");
   });
 
   it("falls through an empty VERCEL_PROJECT_PRODUCTION_URL to VERCEL_URL", () => {
@@ -56,7 +65,7 @@ describe("applyDeploymentEnv", () => {
         VERCEL_URL: "my-app.vercel.app",
       })
     );
-    expect(result.deployment.site).toBe("https://my-app.vercel.app");
+    expect(result.deployment.options.site).toBe("https://my-app.vercel.app");
   });
 
   it("falls through empty Netlify URL vars to the first non-empty one", () => {
@@ -69,25 +78,43 @@ describe("applyDeploymentEnv", () => {
         URL: "",
       })
     );
-    expect(result.deployment.site).toBe("https://deploy-123.netlify.app");
-  });
-
-  it("infers the adapter for server output", () => {
-    const result = applyDeploymentEnv(
-      resolve({ output: "server" }),
-      env({ VERCEL: "1" })
+    expect(result.deployment.options.site).toBe(
+      "https://deploy-123.netlify.app"
     );
-    expect(result.deployment.adapter).toBe("vercel");
   });
 
-  it("does not infer an adapter for static output", () => {
+  it("fills the site of a host adapter from its own platform", () => {
     const result = applyDeploymentEnv(
-      resolve({ output: "static" }),
+      resolve(vercel()),
       env({ VERCEL: "1", VERCEL_URL: "my-app.vercel.app" })
     );
-    expect(result.deployment.adapter).toBeNull();
-    // ...but the site origin is still inferred for static sitemaps/OG.
-    expect(result.deployment.site).toBe("https://my-app.vercel.app");
+    expect(result.deployment.kind).toBe("vercel");
+    expect(result.deployment.options.output).toBe("server");
+    expect(result.deployment.options.site).toBe("https://my-app.vercel.app");
+  });
+
+  it("asks the configured adapter's platform before the others", () => {
+    // Both platforms claim the env; the adapter the config names wins.
+    const result = applyDeploymentEnv(
+      resolve(netlify()),
+      env({
+        NETLIFY: "true",
+        URL: "https://example.netlify.app",
+        VERCEL: "1",
+        VERCEL_URL: "my-app.vercel.app",
+      })
+    );
+    expect(result.deployment.options.site).toBe("https://example.netlify.app");
+  });
+
+  it("falls back to whichever platform the build runs on", () => {
+    // A Node server has no platform env of its own; building it on Netlify
+    // still yields a canonical origin.
+    const result = applyDeploymentEnv(
+      resolve(node()),
+      env({ NETLIFY: "true", URL: "https://example.netlify.app" })
+    );
+    expect(result.deployment.options.site).toBe("https://example.netlify.app");
   });
 
   it("never overrides an explicitly configured site", () => {
@@ -97,44 +124,38 @@ describe("applyDeploymentEnv", () => {
       env({ VERCEL: "1", VERCEL_URL: "my-app.vercel.app" })
     );
     expect(result).toBe(config);
-    expect(result.deployment.site).toBe("https://canonical.example.com");
-  });
-
-  it("never overrides an explicitly configured adapter", () => {
-    const result = applyDeploymentEnv(
-      resolve({ adapter: "node", output: "server" }),
-      env({ VERCEL: "1" })
+    expect(result.deployment.options.site).toBe(
+      "https://canonical.example.com"
     );
-    expect(result.deployment.adapter).toBe("node");
   });
 
   it("infers Netlify, preferring the canonical URL", () => {
     const result = applyDeploymentEnv(
-      resolve({ output: "server" }),
+      resolve(netlify()),
       env({
         DEPLOY_PRIME_URL: "https://branch--example.netlify.app",
         NETLIFY: "true",
         URL: "https://example.netlify.app",
       })
     );
-    expect(result.deployment.adapter).toBe("netlify");
-    expect(result.deployment.site).toBe("https://example.netlify.app");
+    expect(result.deployment.options.site).toBe("https://example.netlify.app");
   });
 
   it("infers Cloudflare Pages from CF_PAGES_URL", () => {
     const result = applyDeploymentEnv(
-      resolve({ output: "server" }),
+      resolve(cloudflare()),
       env({ CF_PAGES: "1", CF_PAGES_URL: "https://example.pages.dev" })
     );
-    expect(result.deployment.adapter).toBe("cloudflare");
-    expect(result.deployment.site).toBe("https://example.pages.dev");
+    expect(result.deployment.options.site).toBe("https://example.pages.dev");
   });
 
   it("ignores blank env values", () => {
+    const config = resolve();
     const result = applyDeploymentEnv(
-      resolve(),
+      config,
       env({ VERCEL: "1", VERCEL_URL: "   " })
     );
-    expect(result.deployment.site).toBeUndefined();
+    expect(result).toBe(config);
+    expect(result.deployment.options.site).toBeUndefined();
   });
 });

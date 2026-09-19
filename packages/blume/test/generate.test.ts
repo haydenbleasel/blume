@@ -39,6 +39,7 @@ import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { BlumeConfigInput, ResolvedConfig } from "../src/core/schema.ts";
 import type { Diagnostic } from "../src/core/types.ts";
+import { cloudflare, netlify, node } from "../src/deploy/adapters/index.ts";
 import { flexsearch, mixedbread, orama } from "../src/search/adapters/index.ts";
 
 let srcDir: string;
@@ -1717,7 +1718,7 @@ describe("generateRuntime", () => {
       await writeProject({
         "blume.config.ts": `export default {
   ai: { mcp: { enabled: true, route: "/docs-mcp" } },
-  deployment: { adapter: "node", output: "server", site: "https://example.com" },
+  deployment: ${JSON.stringify(node({ site: "https://example.com" }))},
 };
 `,
         "docs/index.md": "# Home\n",
@@ -1744,7 +1745,7 @@ describe("generateRuntime", () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts": `export default {
-  deployment: { adapter: "node", output: "server" },
+  deployment: ${JSON.stringify(node())},
 };
 `,
         "docs/index.md": "# Home\n",
@@ -1766,7 +1767,7 @@ describe("generateRuntime", () => {
     const project = await scanProject(
       await writeProject({
         "blume.config.ts": `export default {
-  deployment: { adapter: "node", output: "server" },
+  deployment: ${JSON.stringify(node())},
 };
 `,
         "docs/api/overview.md": "# API overview\n",
@@ -1996,9 +1997,9 @@ describe("generateRuntime", () => {
   it("writes the mixedbread proxy endpoint for the server provider", async () => {
     const project = await scanProject(
       await writeProject({
-        // The descriptor is plain data, so the fixture config can inline its
-        // JSON instead of importing the adapter from `blume/search`.
-        "blume.config.ts": `export default { deployment: { output: "server" }, search: ${JSON.stringify(mixedbread({ storeId: "store_7" }))} };
+        // The descriptors are plain data, so the fixture config can inline their
+        // JSON instead of importing the adapters from `blume/deploy` and `blume/search`.
+        "blume.config.ts": `export default { deployment: ${JSON.stringify(node())}, search: ${JSON.stringify(mixedbread({ storeId: "store_7" }))} };
 `,
         "docs/index.md": "# Home\n",
       })
@@ -2040,7 +2041,7 @@ describe("generateRuntime", () => {
   it("warns when the netlify adapter package isn't installed", async () => {
     const project = await scanProject(
       await writeProject({
-        "blume.config.ts": `export default { deployment: { adapter: "netlify", output: "server" } };
+        "blume.config.ts": `export default { deployment: ${JSON.stringify(netlify())} };
 `,
         "docs/index.md": "# Home\n",
       })
@@ -2064,7 +2065,7 @@ describe("generateRuntime", () => {
     // has no `node_modules` at all.
     await mkdir(join(srcDir, "node_modules"));
     const { deployment } = blumeConfigSchema.parse({
-      deployment: { adapter: "cloudflare", output: "server" },
+      deployment: cloudflare(),
     });
     const warnings = deploymentAdapterWarnings(deployment, srcDir, srcDir);
     expect(warnings).toHaveLength(1);
@@ -2075,7 +2076,7 @@ describe("generateRuntime", () => {
   it("stays quiet when the project installed the netlify adapter", async () => {
     const project = await scanProject(
       await writeProject({
-        "blume.config.ts": `export default { deployment: { adapter: "netlify", output: "server" } };
+        "blume.config.ts": `export default { deployment: ${JSON.stringify(netlify())} };
 `,
         "docs/index.md": "# Home\n",
         "node_modules/@astrojs/netlify/index.js":
@@ -2095,7 +2096,7 @@ describe("generateRuntime", () => {
     // never flags them.
     const project = await scanProject(
       await writeProject({
-        "blume.config.ts": `export default { deployment: { adapter: "node", output: "server" } };
+        "blume.config.ts": `export default { deployment: ${JSON.stringify(node())} };
 `,
         "docs/index.md": "# Home\n",
       })

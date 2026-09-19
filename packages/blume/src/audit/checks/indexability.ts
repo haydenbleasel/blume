@@ -1,6 +1,6 @@
 import { normalizeBasePath, stripBasePath } from "../../core/base-path.ts";
-import { SITE_INFERRING_ADAPTERS } from "../../core/deployment-env.ts";
 import type { Diagnostic } from "../../core/types.ts";
+import { deployPlatform } from "../../deploy/platforms/index.ts";
 import { finding } from "../catalog.ts";
 import { pageSite } from "../locate.ts";
 import { ERROR_ROUTES } from "../types.ts";
@@ -20,7 +20,7 @@ const canonicalChecks = (
   context: AuditContext,
   page: PageSnapshot
 ): Diagnostic[] => {
-  const { site } = context.project.config.deployment;
+  const { site } = context.project.config.deployment.options;
   const origin = siteOrigin(site);
 
   // Error routes are noindex by design, so a canonical on them is meaningless
@@ -79,7 +79,7 @@ const canonicalChecks = (
   // comparing.
   const target = normalizePath(
     stripBasePath(
-      normalizeBasePath(context.project.config.deployment.base),
+      normalizeBasePath(context.project.config.deployment.options.base),
       decodePath(canonical.pathname)
     )
   );
@@ -151,8 +151,8 @@ export const indexabilityChecks: CheckModule = {
     // cannot emit a canonical, an Open Graph image, or a sitemap on *any* page.
     // That's one fact about the config, not a defect on each of 200 pages —
     // report it once, and let the checks that depend on it stay quiet.
-    if (!context.project.config.deployment.site) {
-      const { adapter } = context.project.config.deployment;
+    if (!context.project.config.deployment.options.site) {
+      const { deployment } = context.project.config;
       const site = {
         file: context.project.context.configFile ?? undefined,
         url: "/",
@@ -163,11 +163,11 @@ export const indexabilityChecks: CheckModule = {
       // would duplicate state the platform owns, so the finding (which agents
       // apply verbatim via `--claude`/`--codex`) must not suggest it.
       found.push(
-        adapter && SITE_INFERRING_ADAPTERS.has(adapter)
+        deployPlatform(deployment).env
           ? finding(
               "BLUME_AUDIT_SITE_INFERRED_AT_DEPLOY",
               site,
-              `deployment.site is not set in this build — on ${adapter} it is inferred from the platform env at deploy time, so canonical URLs, Open Graph images, and the sitemap are only missing from this local artifact.`
+              `deployment.site is not set in this build — on ${deployment.kind} it is inferred from the platform env at deploy time, so canonical URLs, Open Graph images, and the sitemap are only missing from this local artifact.`
             )
           : finding(
               "BLUME_AUDIT_SITE_NOT_SET",

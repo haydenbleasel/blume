@@ -111,7 +111,7 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
   }
 
   const data: McpData = {
-    base: normalizeBasePath(config.deployment.base),
+    base: normalizeBasePath(config.deployment.options.base),
     defaultLocale: config.i18n?.defaultLocale,
     documents: documents.map((doc) => {
       const document: OramaDoc = {
@@ -133,7 +133,7 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
     navigation: graph.navigation,
     pages,
     routes,
-    site: config.deployment.site ?? null,
+    site: config.deployment.options.site ?? null,
     version: manifest.blumeVersion,
   };
   if (config.versions) {

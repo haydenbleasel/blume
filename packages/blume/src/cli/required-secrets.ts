@@ -62,5 +62,11 @@ export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
     }
   }
 
+  // The deployment adapter names its own secrets; the built-in host adapters
+  // read platform-injected env and declare none.
+  for (const env of config.deployment.requiredSecrets) {
+    requireSecret(`Deployment (${config.deployment.kind})`, env);
+  }
+
   return diagnostics;
 };

@@ -76,7 +76,7 @@ const publisherHost = (site: string): string => new URL(site).hostname;
  */
 export const hasAiCatalog = (config: ResolvedConfig): boolean =>
   config.ai.catalog.enabled &&
-  Boolean(config.deployment.site) &&
+  Boolean(config.deployment.options.site) &&
   (config.ai.mcp.enabled ||
     config.ai.api ||
     config.ai.llmsTxt.enabled ||
@@ -203,11 +203,11 @@ export const buildAiCatalog = (
   config: ResolvedConfig,
   skills: readonly SkillArtifact[]
 ): string | null => {
-  const site = config.deployment.site ?? null;
+  const site = config.deployment.options.site ?? null;
   if (!(site && hasAiCatalog(config))) {
     return null;
   }
-  const deployBase = normalizeBasePath(config.deployment.base);
+  const deployBase = normalizeBasePath(config.deployment.options.base);
   const abs = (path: string): string =>
     absoluteUrl(site, withBasePath(deployBase, path));
   const host = publisherHost(site);

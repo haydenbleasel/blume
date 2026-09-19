@@ -43,12 +43,12 @@ const resolveAsset = (
     return null;
   }
 
-  const origin = siteOrigin(context.project.config.deployment.site);
+  const origin = siteOrigin(context.project.config.deployment.options.site);
   const resolved = resolveHref(
     page.url,
     asset.src,
     origin,
-    normalizeBasePath(context.project.config.deployment.base)
+    normalizeBasePath(context.project.config.deployment.options.base)
   );
   // A subresource on another origin (a CDN, an analytics script) is outside the
   // build; we can't check whether it exists without the network.

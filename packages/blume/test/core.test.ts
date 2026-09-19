@@ -30,6 +30,7 @@ import type {
   PageRecord,
   ProjectContext,
 } from "../src/core/types.ts";
+import { cloudflare, node, vercel } from "../src/deploy/adapters/index.ts";
 import { buildRobots } from "../src/deploy/robots.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
 import { buildSitemapFiles } from "../src/deploy/sitemap.ts";
@@ -158,7 +159,7 @@ describe("config schema", () => {
         runtimeDeps: [],
       },
     ]);
-    expect(config.deployment.output).toBe("static");
+    expect(config.deployment.options.output).toBe("static");
     expect(config.search.provider.kind).toBe("orama");
   });
 
@@ -1645,11 +1646,7 @@ describe("agent-readability.json", () => {
   it("advertises content negotiation only where the deploy honors it", () => {
     const manifest = buildAgentReadability(
       makeProject([], {
-        deployment: {
-          adapter: "vercel",
-          output: "server",
-          site: "https://example.com",
-        },
+        deployment: vercel({ site: "https://example.com" }),
       })
     );
     expect(markdownArtifact(manifest)).toMatchObject({
@@ -1658,18 +1655,16 @@ describe("agent-readability.json", () => {
     });
     // A Cloudflare server build negotiates through the generated wrapper
     // Worker (see deploy/cloudflare-negotiation.ts).
-    const cloudflare = buildAgentReadability(
-      makeProject([], {
-        deployment: { adapter: "cloudflare", output: "server" },
-      })
+    const onCloudflare = buildAgentReadability(
+      makeProject([], { deployment: cloudflare() })
     );
-    expect(markdownArtifact(cloudflare)).toMatchObject({
+    expect(markdownArtifact(onCloudflare)).toMatchObject({
       contentNegotiation: "text/markdown",
     });
-    const node = buildAgentReadability(
-      makeProject([], { deployment: { adapter: "node", output: "server" } })
+    const onNode = buildAgentReadability(
+      makeProject([], { deployment: node() })
     );
-    expect(markdownArtifact(node)).not.toContainKey("contentNegotiation");
+    expect(markdownArtifact(onNode)).not.toContainKey("contentNegotiation");
   });
 
   it("returns null when disabled", () => {
@@ -1717,11 +1712,7 @@ describe("agent-readability.json", () => {
     });
     const server = buildAgentReadability(
       makeProject([], {
-        deployment: {
-          adapter: "node",
-          output: "server",
-          site: "https://example.com",
-        },
+        deployment: node({ site: "https://example.com" }),
       })
     );
     expect(server?.artifacts.api).toStrictEqual({

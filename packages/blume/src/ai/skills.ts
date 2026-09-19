@@ -201,7 +201,7 @@ export const buildSkillsIndex = (
   skills: readonly SkillArtifact[],
   config: ResolvedConfig
 ): string => {
-  const deployBase = normalizeBasePath(config.deployment.base);
+  const deployBase = normalizeBasePath(config.deployment.options.base);
   const index = {
     $schema: AGENT_SKILLS_SCHEMA,
     skills: skills.map((skill) => ({

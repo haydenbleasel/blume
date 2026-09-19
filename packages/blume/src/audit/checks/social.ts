@@ -27,7 +27,7 @@ export const socialChecks: CheckModule = {
   category: "social",
   run(context) {
     const found: Diagnostic[] = [];
-    const hasSite = Boolean(context.project.config.deployment.site);
+    const hasSite = Boolean(context.project.config.deployment.options.site);
     const required = ogRequired(hasSite);
 
     for (const page of context.pages) {

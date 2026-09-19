@@ -1,87 +1,31 @@
+import { inferDeploymentSite } from "../deploy/platforms/index.ts";
 import type { ResolvedConfig } from "./schema.ts";
 
-/** The deployment platforms Blume can infer from runtime/CI env vars. */
-type DeploymentAdapter = NonNullable<ResolvedConfig["deployment"]["adapter"]>;
-
-interface Platform {
-  /** Astro adapter to use when building for server output on this platform. */
-  adapter: DeploymentAdapter;
-  /** True when the env indicates the build is running on this platform. */
-  detect: (env: NodeJS.ProcessEnv) => boolean;
-  /** Resolve the canonical site URL from the platform's env vars, or null. */
-  site: (env: NodeJS.ProcessEnv) => string | null;
-}
-
-/** Prefix a bare host with `https://`; pass values that are already absolute. */
-const toUrl = (value: string | undefined): string | null => {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return null;
-  }
-  return /^https?:\/\//u.test(trimmed) ? trimmed : `https://${trimmed}`;
-};
-
 /**
- * Platforms checked in order; the first whose `detect` matches wins. Site URLs
- * prefer the stable production domain over per-deployment preview URLs so the
- * inferred origin (sitemap, OG, RSS) stays put across deploys.
- */
-const PLATFORMS: Platform[] = [
-  {
-    adapter: "vercel",
-    detect: (env) => Boolean(env.VERCEL),
-    // Fall through per *resolved* value, not per variable — a platform can set
-    // a var to the empty string, which `??` on the raw values treats as
-    // present, dead-ending the chain and silently losing the site URL.
-    site: (env) =>
-      toUrl(env.VERCEL_PROJECT_PRODUCTION_URL) ?? toUrl(env.VERCEL_URL),
-  },
-  {
-    adapter: "netlify",
-    detect: (env) => Boolean(env.NETLIFY),
-    site: (env) =>
-      toUrl(env.URL) ?? toUrl(env.DEPLOY_PRIME_URL) ?? toUrl(env.DEPLOY_URL),
-  },
-  {
-    adapter: "cloudflare",
-    detect: (env) => Boolean(env.CF_PAGES),
-    site: (env) => toUrl(env.CF_PAGES_URL),
-  },
-];
-
-/**
- * Adapters whose `deployment.site` arrives from platform env vars at deploy
- * time. Consumers (e.g. the audit) use this to tell "site is missing" apart
- * from "site is missing *here*, but the platform will set it".
- */
-export const SITE_INFERRING_ADAPTERS: ReadonlySet<string> = new Set(
-  PLATFORMS.map((platform) => platform.adapter)
-);
-
-/**
- * Fill in `deployment.adapter` and `deployment.site` from platform env vars
- * (Vercel, Netlify, Cloudflare Pages) when the user hasn't set them. Explicit
- * config always wins, and the adapter is only inferred for server output (it
- * has no effect on static builds). Mirrors Astro's platform auto-detection so a
- * project deployed to a known host gets a working canonical origin for free.
+ * Fill in the deployment `site` from platform env vars (Vercel, Netlify,
+ * Cloudflare Pages) when the config hasn't set one. Explicit config always
+ * wins. Each adapter's platform declares its own detection and URL vars (see
+ * `deploy/platforms/*`); the configured adapter is asked first, then every
+ * other platform, so a static build deployed to a known host gets a working
+ * canonical origin for free, mirroring Astro's platform auto-detection.
  */
 export const applyDeploymentEnv = (
   config: ResolvedConfig,
   env: NodeJS.ProcessEnv = process.env
 ): ResolvedConfig => {
-  const platform = PLATFORMS.find((candidate) => candidate.detect(env));
-  if (!platform) {
-    return config;
-  }
-
   const { deployment } = config;
-  const adapter =
-    deployment.adapter ??
-    (deployment.output === "server" ? platform.adapter : null);
-  const site = deployment.site ?? platform.site(env) ?? undefined;
-
-  if (adapter === deployment.adapter && site === deployment.site) {
+  if (deployment.options.site) {
     return config;
   }
-  return { ...config, deployment: { ...deployment, adapter, site } };
+  const site = inferDeploymentSite(deployment, env);
+  if (!site) {
+    return config;
+  }
+  return {
+    ...config,
+    deployment: {
+      ...deployment,
+      options: { ...deployment.options, site },
+    },
+  };
 };

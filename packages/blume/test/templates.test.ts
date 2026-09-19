@@ -58,6 +58,7 @@ import type { BlumeConfig } from "../src/core/config-input.ts";
 import { TOC_HIDDEN_KEY } from "../src/core/heading-markers.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
+import { cloudflare, node, vercel } from "../src/deploy/adapters/index.ts";
 import { openapi, scalar } from "../src/reference/index.ts";
 import {
   algolia,
@@ -839,13 +840,18 @@ describe("runtimeDependencies", () => {
     expect(deps).toContain("@openrouter/ai-sdk-provider");
   });
 
-  it("adds the server adapter dependency", () => {
-    const server = blumeConfigSchema.parse({
-      deployment: { adapter: "vercel", output: "server" },
-    });
+  it("adds the server adapter dependency the descriptor declares", () => {
+    const server = blumeConfigSchema.parse({ deployment: vercel() });
     expect(
       runtimeDependencies({ config: server, needsReact: false })
     ).toContain("@astrojs/vercel");
+    // A static build on a host imports no adapter, so it declares none.
+    const onHost = blumeConfigSchema.parse({
+      deployment: vercel({ output: "static" }),
+    });
+    expect(
+      runtimeDependencies({ config: onHost, needsReact: false })
+    ).not.toContain("@astrojs/vercel");
   });
 
   it("declares each analytics adapter's runtimeDeps", () => {
@@ -1050,12 +1056,7 @@ describe("astroConfigTemplate", () => {
 
   it("wires the adapter, site, base, redirects, i18n and renderers", () => {
     const serverConfig = blumeConfigSchema.parse({
-      deployment: {
-        adapter: "node",
-        base: "/docs",
-        output: "server",
-        site: "https://x.com",
-      },
+      deployment: node({ base: "/docs", site: "https://x.com" }),
       i18n: {
         defaultLocale: "en",
         hideDefaultLocalePrefix: false,
@@ -1079,7 +1080,7 @@ describe("astroConfigTemplate", () => {
       themePath: THEME_PATH,
     });
     expect(out).toContain('import adapter from "@astrojs/node"');
-    expect(out).toContain('adapter: adapter({ mode: "standalone" })');
+    expect(out).toContain('adapter: adapter({"mode":"standalone"})');
     expect(out).toContain('site: "https://x.com"');
     expect(out).toContain('base: "/docs"');
     // The deployment base reaches the markdown processors as its own layer so
@@ -1209,7 +1210,7 @@ describe("astroConfigTemplate", () => {
 
   it("prerenders cloudflare adapter builds in Node so build-time node: imports resolve", () => {
     const cloudflareConfig = blumeConfigSchema.parse({
-      deployment: { adapter: "cloudflare", output: "server" },
+      deployment: cloudflare(),
     });
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
@@ -1226,13 +1227,13 @@ describe("astroConfigTemplate", () => {
     });
     expect(out).toContain('import adapter from "@astrojs/cloudflare"');
     expect(out).toContain(
-      'adapter: adapter({ prerenderEnvironment: "node", imageService: "compile" })'
+      'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node"})'
     );
   });
 
   it("opts cloudflare builds out of the adapter's KV session and Images bindings", () => {
     const cloudflareConfig = blumeConfigSchema.parse({
-      deployment: { adapter: "cloudflare", output: "server" },
+      deployment: cloudflare(),
     });
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
@@ -1253,12 +1254,12 @@ describe("astroConfigTemplate", () => {
       'import { defineConfig, fontProviders } from "astro/config";'
     );
     expect(out).toContain("session: false,");
-    expect(out).toContain('imageService: "compile"');
+    expect(out).toContain('"imageService":"compile"');
   });
 
   it("leaves sessions alone for non-cloudflare server adapters", () => {
     const nodeConfig = blumeConfigSchema.parse({
-      deployment: { adapter: "node", output: "server" },
+      deployment: node(),
     });
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
@@ -1285,7 +1286,7 @@ describe("astroConfigTemplate", () => {
         'compatibility_flags = ["nodejs_compat"]\n'
       );
       const cloudflareConfig = blumeConfigSchema.parse({
-        deployment: { adapter: "cloudflare", output: "server" },
+        deployment: cloudflare(),
       });
       const out = astroConfigTemplate({
         askPath: ASK_PATH,
@@ -1304,7 +1305,7 @@ describe("astroConfigTemplate", () => {
         themePath: THEME_PATH,
       });
       expect(out).toContain(
-        'adapter: adapter({ prerenderEnvironment: "node", imageService: "compile", configPath: "../wrangler.toml" })'
+        'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node","configPath":"../wrangler.toml"})'
       );
     } finally {
       await rm(root, { force: true, recursive: true });
@@ -1321,7 +1322,7 @@ describe("astroConfigTemplate", () => {
         'compatibility_flags = ["nodejs_compat"]\n'
       );
       const cloudflareConfig = blumeConfigSchema.parse({
-        deployment: { adapter: "cloudflare", output: "server" },
+        deployment: cloudflare(),
       });
       const out = astroConfigTemplate({
         askPath: ASK_PATH,
@@ -1339,7 +1340,7 @@ describe("astroConfigTemplate", () => {
         searchClientPath: SEARCH_CLIENT_PATH,
         themePath: THEME_PATH,
       });
-      expect(out).toContain('configPath: "./wrangler.toml"');
+      expect(out).toContain('"configPath":"./wrangler.toml"');
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -1347,7 +1348,7 @@ describe("astroConfigTemplate", () => {
 
   it("omits adapter options for adapters that need none", () => {
     const vercelConfig = blumeConfigSchema.parse({
-      deployment: { adapter: "vercel", output: "server" },
+      deployment: vercel(),
     });
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
@@ -1375,7 +1376,7 @@ describe("astroConfigTemplate", () => {
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
       config: blumeConfigSchema.parse({
-        deployment: { adapter: "vercel", output: "server" },
+        deployment: vercel(),
       }),
       contentRoutes: [],
       context: context(),
@@ -1402,7 +1403,7 @@ describe("astroConfigTemplate", () => {
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
       config: blumeConfigSchema.parse({
-        deployment: { adapter: "vercel", output: "server" },
+        deployment: vercel(),
       }),
       contentRoutes: [],
       context: context({
@@ -1428,7 +1429,7 @@ describe("astroConfigTemplate", () => {
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
       config: blumeConfigSchema.parse({
-        deployment: { adapter: "node", output: "server" },
+        deployment: node(),
       }),
       contentRoutes: [],
       context: context(),
@@ -1440,7 +1441,7 @@ describe("astroConfigTemplate", () => {
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
     });
-    expect(out).toContain('adapter: adapter({ mode: "standalone" }),');
+    expect(out).toContain('adapter: adapter({"mode":"standalone"}),');
     expect(out).not.toContain("withAdapterRoot");
   });
 

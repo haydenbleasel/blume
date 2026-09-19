@@ -62,26 +62,23 @@ export const doctorCommand = defineCommand({
 
       const { config } = project;
       const features = serverFeatures(config);
-      if (features.length > 0 && config.deployment.output === "static") {
+      if (
+        features.length > 0 &&
+        config.deployment.options.output === "static"
+      ) {
         diagnostics.push({
           code: "BLUME_SERVER_FEATURE_REQUIRED",
           message: `${features.join(", ")} require server output.`,
           severity: "error",
-          suggestion: 'Set deployment.output to "server".',
-        });
-      }
-      if (config.deployment.output === "server" && !config.deployment.adapter) {
-        diagnostics.push({
-          code: "BLUME_ADAPTER_REQUIRED",
-          message: "Server output requires an adapter.",
-          severity: "error",
-          suggestion: 'Set deployment.adapter (e.g. "vercel").',
+          suggestion:
+            'Set deployment to a host adapter from "blume/deploy" (e.g. `deployment: vercel()`).',
         });
       }
 
       if (!args.json) {
         logger.info(`Pages: ${project.graph.pages.length}`);
-        logger.info(`Output: ${config.deployment.output}`);
+        logger.info(`Output: ${config.deployment.options.output}`);
+        logger.info(`Adapter: ${config.deployment.kind}`);
         logger.info(`Search: ${config.search.provider.kind}`);
         logger.info(
           `References: ${config.reference.map((adapter) => adapter.kind).join(", ") || "none"}`

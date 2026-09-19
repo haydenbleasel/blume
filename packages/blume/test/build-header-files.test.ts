@@ -7,6 +7,7 @@ import { join } from "pathe";
 
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { BlumeConfigInput } from "../src/core/schema.ts";
+import { cloudflare, node } from "../src/deploy/adapters/index.ts";
 import { emitHeaderFiles } from "../src/deploy/artifacts.ts";
 
 /**
@@ -73,10 +74,7 @@ const emit = async (
   });
 };
 
-const CLOUDFLARE_SERVER = {
-  adapter: "cloudflare",
-  output: "server",
-} satisfies BlumeConfigInput["deployment"];
+const CLOUDFLARE_SERVER = cloudflare() satisfies BlumeConfigInput["deployment"];
 
 describe("emitHeaderFiles", () => {
   it("writes the discovery rules for a Cloudflare server build", async () => {
@@ -120,7 +118,7 @@ describe("emitHeaderFiles", () => {
 
   it("writes nothing for a Node server build", async () => {
     const { root, staticDir } = await projectFixture({});
-    await emit(root, staticDir, { adapter: "node", output: "server" });
+    await emit(root, staticDir, node());
     expect(existsSync(join(staticDir, "_headers"))).toBe(false);
   });
 });

@@ -610,10 +610,6 @@ const ISLAND_FRAMEWORK_DEPS = new Map([
  * platform whose adapter Blume doesn't ship. Node and Vercel ship with Blume,
  * so they never need this.
  */
-const DEPLOYMENT_ADAPTER_DEPS = new Map([
-  ["cloudflare", "@astrojs/cloudflare"],
-  ["netlify", "@astrojs/netlify"],
-]);
 
 /**
  * Warn when a Vue/Svelte island is present but its Astro integration isn't
@@ -637,30 +633,29 @@ const islandFrameworkWarnings = (
 };
 
 /**
- * Warn when the resolved server-output adapter is one the project must install
- * itself (Netlify/Cloudflare; Node and Vercel ship with Blume). The generated
- * astro.config.mjs imports the adapter package directly — and on those
- * platforms the adapter is even auto-selected from env vars — so warn early
- * rather than let the build die with an opaque ERR_MODULE_NOT_FOUND from the
- * hidden generated config. Availability mirrors the search-provider check: a
- * dep resolves from the project root or from the Blume package itself.
- * `pkgDir` is injectable for testing.
+ * Warn when the deployment adapter's package is missing. Each adapter declares
+ * what its server build imports (`runtimeDeps`): Node and Vercel ship with
+ * Blume, so theirs always resolve; Netlify and Cloudflare are optional peers
+ * the project must install itself. The generated astro.config.mjs imports the
+ * package directly, so warn early rather than let the build die with an
+ * opaque ERR_MODULE_NOT_FOUND from the hidden generated config. Availability
+ * mirrors the search-adapter check: a dep resolves from the project root or
+ * from the Blume package itself. `pkgDir` is injectable for testing.
  */
 export const deploymentAdapterWarnings = (
   deployment: ResolvedConfig["deployment"],
   root: string,
   pkgDir: string = packageRoot()
 ): string[] => {
-  const dep =
-    deployment.output === "server" && deployment.adapter
-      ? DEPLOYMENT_ADAPTER_DEPS.get(deployment.adapter)
-      : undefined;
-  if (dep && !(canResolveFrom(root, dep) || canResolveFrom(pkgDir, dep))) {
-    return [
-      `Deployment adapter "${deployment.adapter}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`,
-    ];
+  const warnings: string[] = [];
+  for (const dep of deployment.runtimeDeps) {
+    if (!(canResolveFrom(root, dep) || canResolveFrom(pkgDir, dep))) {
+      warnings.push(
+        `Deployment adapter "${deployment.kind}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`
+      );
+    }
   }
-  return [];
+  return warnings;
 };
 
 /**
@@ -935,7 +930,7 @@ export const collectStaged = (project: BlumeProject): Map<string, string> => {
       // agent-facing Markdown gets.
       const text = page.sourcePath
         ? rewriteRelativeImages({
-            deployBase: project.config.deployment.base,
+            deployBase: project.config.deployment.options.base,
             projectRoot: project.context.root,
             source: page.body.text,
             sourcePath: page.sourcePath,
@@ -1252,9 +1247,9 @@ const resolveOgSite = (config: ResolvedConfig): string | undefined => {
   if (configured !== undefined) {
     return configured;
   }
-  return config.deployment.site
-    ? `${new URL(config.deployment.site).host}${normalizeBasePath(
-        config.deployment.base
+  return config.deployment.options.site
+    ? `${new URL(config.deployment.options.site).host}${normalizeBasePath(
+        config.deployment.options.base
       )}`
     : undefined;
 };
@@ -1389,7 +1384,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
         api: config.ai.api,
         llmsTxt: config.ai.llmsTxt.enabled,
         // Mirrors `buildSitemapFiles`: no site, no sitemap.
-        sitemap: config.seo.sitemap && Boolean(config.deployment.site),
+        sitemap: config.seo.sitemap && Boolean(config.deployment.options.site),
       },
       favicon: resolveFavicon(project),
       feedback: config.feedback,
@@ -1444,7 +1439,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
         popular: resolveSearchPopular(config.search.popular, config.basePath),
         provider: config.search.provider.kind,
       },
-      site: config.deployment.site ?? null,
+      site: config.deployment.options.site ?? null,
       structuredData: config.seo.structuredData,
       theme: config.theme,
       title: config.title,
@@ -1667,7 +1662,7 @@ const planApi = (
   userPages: { pattern: string }[]
 ): ApiPlan => {
   const { config, context } = project;
-  const server = config.deployment.output === "server";
+  const server = config.deployment.options.output === "server";
   return {
     catchAll:
       server &&

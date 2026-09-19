@@ -181,7 +181,7 @@ export const dnsAidChecks: CheckModule = {
     if (!context.origin) {
       return [];
     }
-    const host = dnsAidHost(context.project.config.deployment.site);
+    const host = dnsAidHost(context.project.config.deployment.options.site);
     if (!host) {
       return [];
     }

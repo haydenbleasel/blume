@@ -54,6 +54,7 @@ import type {
   ProjectContext,
   RouteManifestEntry,
 } from "../src/core/types.ts";
+import { node } from "../src/deploy/adapters/index.ts";
 
 /** The `ai.ask` block as the config schema accepts it, pre-parse. */
 type AskConfigInput = NonNullable<NonNullable<BlumeConfigInput["ai"]>["ask"]>;
@@ -253,7 +254,7 @@ describe("buildLlmsFiles — agent resources", () => {
           mcp: { enabled: true, route: "/docs-mcp" },
           skills: "./skills",
         },
-        deployment: { output: "server", site: "https://example.com/" },
+        deployment: node({ site: "https://example.com/" }),
         seo: { agentReadability: false, sitemap: false },
       })
     );

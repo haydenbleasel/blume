@@ -62,7 +62,7 @@ export const prepareProject = async (
   // Hard gate: server-only features cannot ship in a static build.
   if (
     options.mode === "build" &&
-    project.config.deployment.output === "static"
+    project.config.deployment.options.output === "static"
   ) {
     const features = serverFeatures(project.config);
     if (features.length > 0) {
@@ -73,7 +73,7 @@ export const prepareProject = async (
             message: `${features.join(", ")} require server output, but deployment.output is "static".`,
             severity: "error",
             suggestion:
-              'Set deployment: { output: "server", adapter: "vercel" } in blume.config.ts.',
+              'Set deployment to a host adapter from "blume/deploy" in blume.config.ts, e.g. `deployment: vercel()`.',
           },
         ],
         options.root

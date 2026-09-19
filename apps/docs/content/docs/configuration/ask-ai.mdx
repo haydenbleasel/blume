@@ -142,16 +142,17 @@ The content type matters: Astro's cross-site request check rejects a cross-origi
 
 ## Server output required
 
-Blume's built-in Ask AI backend is a server route (`POST /api/ask`), so it can't run on a static build. Switch to server output and pick a deployment adapter:
+Blume's built-in Ask AI backend is a server route (`POST /api/ask`), so it can't run on a static build. Name a host adapter from `blume/deploy` to switch to server output:
 
 ```ts blume.config.ts lineNumbers
-deployment: {
-  output: "server",
-  adapter: "vercel",
-}
+import { vercel } from "blume/deploy";
+
+export default defineConfig({
+  deployment: vercel(),
+});
 ```
 
-A static build with Ask AI enabled and no external `endpoint` fails fast with a message telling you to set `deployment.output` to `server`. See [Deployment](/docs/deployment) for the adapters.
+A static build with Ask AI enabled and no external `endpoint` fails fast with a message telling you to set a host adapter. See [Deployment](/docs/deployment) for the adapters.
 
 ## Adapters
 

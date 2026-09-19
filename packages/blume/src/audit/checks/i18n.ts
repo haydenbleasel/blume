@@ -7,7 +7,7 @@ import { normalizePath } from "../url.ts";
 
 /** The normalized `deployment.base` — hreflang hrefs carry it, page URLs don't. */
 const deployBaseOf = (context: AuditContext): string =>
-  normalizeBasePath(context.project.config.deployment.base);
+  normalizeBasePath(context.project.config.deployment.options.base);
 
 /** The hreflang value meaning "use this when nothing else matches". Not a locale. */
 const X_DEFAULT = "x-default";

@@ -1,4 +1,5 @@
 import { defineConfig } from "blume";
+import { node } from "blume/deploy";
 import { asyncapi, graphql, openapi } from "blume/reference";
 import { filesystem, githubReleases } from "blume/sources";
 import { z } from "zod";
@@ -40,11 +41,7 @@ export default defineConfig({
       doc: { facets: ["owner"] },
     },
   },
-  deployment: {
-    adapter: "node",
-    output: "server",
-    site: "https://sandbox.useblume.dev",
-  },
+  deployment: node({ site: "https://sandbox.useblume.dev" }),
   description: "Every Blume feature, enabled in one place.",
   export: true,
   feedback: true,

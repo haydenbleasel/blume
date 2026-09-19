@@ -4,6 +4,7 @@ import { z } from "zod";
 import { askAdapterSchema, DEFAULT_ASK_PROVIDER } from "../ai/ask.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import { analyticsConfigSchema } from "../analytics/schema.ts";
+import { resolvedDeploymentSchema } from "../deploy/adapters/registry.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
 import { normalizeRoute } from "../openapi/references.ts";
 import { referenceConfigSchema } from "../reference/schema.ts";
@@ -1121,16 +1122,6 @@ const versionsConfigSchema = z
     }
   });
 
-const deploymentConfigSchema = z.strictObject({
-  adapter: z
-    .enum(["vercel", "node", "netlify", "cloudflare"])
-    .nullable()
-    .default(null),
-  base: z.string().optional(),
-  output: z.enum(["static", "server"]).default("static"),
-  site: z.url().optional(),
-});
-
 const redirectSchema = z.strictObject({
   from: z.string(),
   status: z
@@ -1659,7 +1650,13 @@ export const blumeConfigSchema = z
      * Pass-through `Intl.DateTimeFormat` options; defaults to `{ dateStyle: "long" }`.
      */
     dateFormat: dateFormatConfigSchema.default({ dateStyle: "long" }),
-    deployment: deploymentConfigSchema.prefault({}),
+    /**
+     * A host adapter from `blume/deploy` (`vercel()`, `netlify()`,
+     * `cloudflare()`, `node()`) for a server build on that host, or the plain
+     * `{ site, base }` form for a static build anywhere. Resolves to the
+     * adapter's descriptor with `output` filled in; `static` when unset.
+     */
+    deployment: resolvedDeploymentSchema.prefault({}),
     description: z.string().optional(),
     /**
      * Where `<Component path>` resolves live previews and their source from.

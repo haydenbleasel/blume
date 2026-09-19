@@ -1,6 +1,6 @@
 ---
 title: Deployment
-description: Deploy static docs to any host with zero configuration, or switch to server-side rendering with an adapter when you need dynamic behavior.
+description: Deploy static docs to any host with zero configuration, or name a host adapter from blume/deploy to switch to server rendering when you need dynamic behavior.
 sidebar:
   label: Deployment
   order: 2
@@ -22,7 +22,7 @@ A static build includes:
 
 - every docs and custom page as static HTML
 - a local search index (Orama by default, Pagefind opt-in)
-- a [`sitemap.xml`](/docs/discoverability/sitemap-and-robots#sitemap) and [`robots.txt`](/docs/discoverability/sitemap-and-robots#robots) when `deployment.site` is set
+- a [`sitemap.xml`](/docs/discoverability/sitemap-and-robots#sitemap) and [`robots.txt`](/docs/discoverability/sitemap-and-robots#robots) when the site URL is known
 - `llms.txt` and `llms-full.txt` for AI tools
 - redirect pages
 - prerendered [Open Graph images](/docs/discoverability/open-graph) when `seo.og.enabled` is on
@@ -31,7 +31,7 @@ A static build includes:
 
 Sitemaps, canonical tags, RSS, and Open Graph images need an absolute origin. On **Vercel**, **Netlify**, and **Cloudflare Pages**, Blume detects it from the platform's environment at build time — no config required.
 
-Set `deployment.site` to override the detected value, or to provide one on hosts that don't expose it (GitHub Pages, S3, a custom CDN):
+Set `site` to override the detected value, or to provide one on hosts that don't expose it (GitHub Pages, S3, a custom CDN). For a static build that's the plain `deployment` object:
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -54,13 +54,15 @@ blume preview
 
 ## Subpath deploys
 
-Serving docs under a path like `example.com/docs`? Set `deployment.base` — common for GitHub Pages project sites. The whole site, root included, moves under the base, and internal links and assets are rewritten to include it.
+Serving docs under a path like `example.com/docs`? Set `base` — common for GitHub Pages project sites. The whole site, root included, moves under the base, and internal links and assets are rewritten to include it.
 
 ```ts blume.config.ts lineNumbers
 deployment: {
   base: "/docs",
 }
 ```
+
+`base` (and `site`) are options of every host adapter too: `vercel({ base: "/docs" })`.
 
 ## Mount the docs under a path
 
@@ -79,29 +81,49 @@ This is a distinct concept from the two paths above:
 
 ## Server rendering
 
-Static output covers most docs. Switch to server output when you need request-time features — most notably the [Ask AI](/docs/configuration/ask-ai) endpoint:
+Static output covers most docs. Switch to server output when you need request-time features — most notably the [Ask AI](/docs/configuration/ask-ai) endpoint and the [MCP server](/docs/discoverability/mcp). You do that by naming the host: `deployment` takes an adapter imported from `blume/deploy`.
 
 ```ts blume.config.ts lineNumbers
-deployment: {
-  output: "server",
-  adapter: "vercel",
-}
+import { defineConfig } from "blume";
+import { vercel } from "blume/deploy";
+
+export default defineConfig({
+  deployment: vercel(),
+});
 ```
 
-The `vercel` and `node` adapters ship with Blume — choosing one just works. The `netlify` and `cloudflare` adapters must be installed in your project (e.g. `bun add -d @astrojs/netlify`); the CLI warns you if the package is missing:
+Every adapter takes the same named options — `site`, `base`, and `output` — and forwards anything else verbatim to the underlying `@astrojs/*` adapter, so an option Blume doesn't name still reaches it:
 
-| Adapter      | Package               | Use for                              |
-| ------------ | --------------------- | ------------------------------------ |
-| `vercel`     | `@astrojs/vercel`     | Vercel — the most polished path      |
-| `netlify`    | `@astrojs/netlify`    | Netlify Functions                    |
-| `node`       | `@astrojs/node`       | Self-hosted Node servers, containers |
-| `cloudflare` | `@astrojs/cloudflare` | Cloudflare Workers and Pages         |
+```ts blume.config.ts lineNumbers
+deployment: vercel({
+  site: "https://docs.example.com",
+  // Passed straight to @astrojs/vercel.
+  isr: { expiration: 60 },
+}),
+```
 
-On **Vercel**, **Netlify**, and **Cloudflare Pages**, Blume picks the matching adapter automatically for server output — set `output: "server"` and deploy (on Netlify and Cloudflare, install the adapter package too). Set `adapter` explicitly to override the detected value, or when self-hosting with `node`.
+| Adapter | Package | Use for |
+| --- | --- | --- |
+| `vercel()` | `@astrojs/vercel` | Vercel — the most polished path |
+| `netlify()` | `@astrojs/netlify` | Netlify Functions |
+| `node()` | `@astrojs/node` | Self-hosted Node servers, containers |
+| `cloudflare()` | `@astrojs/cloudflare` | Cloudflare Workers and Pages |
 
-A server build includes everything a static build does, plus any Astro endpoints or middleware you add. The `node` adapter produces a standalone server you can run directly.
+`vercel()` and `node()` ship with Blume — choosing one just works. `netlify()` and `cloudflare()` need their package installed in your project (e.g. `bun add -d @astrojs/netlify`); the CLI warns you if it is missing.
+
+Naming an adapter switches the build to server output. To keep a static build on that host — with its site detection and the platform files it reads — pass `output: "static"`:
+
+```ts blume.config.ts lineNumbers
+deployment: netlify({ output: "static" }),
+```
+
+A server build includes everything a static build does, plus any Astro endpoints or middleware you add. The `node()` adapter produces a standalone server you can run directly.
 
 On Vercel and Cloudflare, a server build also turns on [`Accept: text/markdown` content negotiation](/docs/discoverability/markdown#content-negotiation), so an agent requesting any content page with that header receives its raw-Markdown mirror at the same URL. On Vercel, Blume splices header-conditional rewrites into the deploy's routing config; on Cloudflare, it generates a small Worker in front of the Astro one and scopes `assets.run_worker_first` to the content routes, since the platform would otherwise serve the prerendered pages before any server code runs — other assets keep their zero-Worker fast path. That Worker also answers the prerendered per-page JSON documents (`/api/docs/pages/{route}.json`) from the asset binding when a request for one reaches it, because Astro would otherwise route it to the `/api/` catch-all.
+
+:::note
+`vercel` and `cloudflare` are also the names of two [analytics adapters](/docs/configuration/analytics). When one config uses both, alias one of the imports: `import { cloudflare as cloudflareDeploy } from "blume/deploy"`.
+:::
 
 :::note
 Server features have their own configuration — for example, Ask AI needs a model API key. See the [Ask AI guide](/docs/configuration/ask-ai) for setup.
@@ -115,19 +137,19 @@ Map old URLs to new ones in `blume.config.ts`:
 redirects: [{ from: "/old", to: "/new", status: 301 }];
 ```
 
-`status` accepts `301`, `302`, `307`, or `308` (default `301`). Server builds handle redirects at request time. Static builds emit redirect pages **and** platform files so your host issues a real HTTP redirect: `_redirects` (Netlify, Cloudflare Pages), `vercel.json` (Vercel), and `blume-redirects.json` — a structured manifest for anything else (nginx/Apache rules, an edge worker). A `_redirects` or `vercel.json` you ship in `public/` is left untouched.
+`status` accepts `301`, `302`, `307`, or `308` (default `301`). Server builds handle redirects at request time. Static builds emit redirect pages **and** the platform files your host reads, so it issues a real HTTP redirect: `_redirects` for `netlify()` and `cloudflare()`, `vercel.json` for `vercel()`, and — when no host is named — both of those plus `blume-redirects.json`, a structured manifest for anything else (nginx/Apache rules, an edge worker). A `_redirects` or `vercel.json` you ship in `public/` is left untouched.
 
 :::note
 `from` is matched as an exact path — wildcards and pattern matching (e.g. `/blog/:slug` or `/old/*`) aren't supported. If you need pattern-based rules, handle them in an infrastructure file like `vercel.json` (which supports wildcard `source` patterns) or your host's redirect config instead. A `vercel.json` you ship in `public/` is preserved as-is.
 :::
 
 :::note
-Write both `from` and `to` as if mounted at root — under [`deployment.base`](#subpath-deploys) and [`basePath`](#mount-the-docs-under-a-path) alike, Blume rewrites both sides for you, so a redirect lands inside the base. A base you've already written into `to` by hand is preserved rather than doubled.
+Write both `from` and `to` as if mounted at root — under [`base`](#subpath-deploys) and [`basePath`](#mount-the-docs-under-a-path) alike, Blume rewrites both sides for you, so a redirect lands inside the base. A base you've already written into `to` by hand is preserved rather than doubled.
 :::
 
 ## Content types
 
-A static build also emits a `_headers` file that pins `charset=utf-8` onto the raw AI-ready endpoints — `/<route>.md`, `/<route>.mdx`, and the `.txt` files (`llms.txt`, `llms-full.txt`). Those responses are valid UTF-8, but many static hosts serve them as `text/markdown` / `text/plain` with **no** charset, and browsers then fall back to Windows-1252 — so non-ASCII docs (Japanese, accented Latin, …) render as mojibake when the raw URL is opened directly. HTML pages are unaffected because they carry `<meta charset>`. Netlify and Cloudflare (Pages/Workers static assets) read `_headers`; hosts that don't (Vercel, S3) ignore the file harmlessly. A `_headers` you ship in `public/` is left untouched.
+Where the host reads one, a build also emits a `_headers` file that pins `charset=utf-8` onto the raw AI-ready endpoints — `/<route>.md`, `/<route>.mdx`, and the `.txt` files (`llms.txt`, `llms-full.txt`). Those responses are valid UTF-8, but many static hosts serve them as `text/markdown` / `text/plain` with **no** charset, and browsers then fall back to Windows-1252 — so non-ASCII docs (Japanese, accented Latin, …) render as mojibake when the raw URL is opened directly. HTML pages are unaffected because they carry `<meta charset>`. Netlify reads `_headers` on a static deploy and Cloudflare (Pages, and Workers static assets) on both static and server builds, so those adapters and an unnamed static host get the file; Vercel (whose headers ride the routing config) and Node (whose server ignores the file) don't. A `_headers` you ship in `public/` is left untouched.
 
 ## Environment variables
 

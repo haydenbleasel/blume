@@ -52,7 +52,7 @@ const pageDate = (page: PageRecord): Date | undefined => {
 export const buildRssFeeds = (project: BlumeProject): RssFeed[] => {
   const { config } = project;
   const { rss } = config.seo;
-  const { site } = config.deployment;
+  const { site } = config.deployment.options;
   if (!(rss.enabled && site)) {
     return [];
   }
@@ -60,7 +60,7 @@ export const buildRssFeeds = (project: BlumeProject): RssFeed[] => {
   // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top.
   // The feed's own `link`/self URL points at the docs root under that base, while
   // `path` stays base-less (it's also the on-disk output location).
-  const deployBase = normalizeBasePath(config.deployment.base);
+  const deployBase = normalizeBasePath(config.deployment.options.base);
   const rootLink = `${base}${deployBase}`;
 
   const feeds: RssFeed[] = [];

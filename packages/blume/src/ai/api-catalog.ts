@@ -30,8 +30,8 @@ const HTTP_URL = /^https?:\/\//u;
 
 /** The catalog's linkset entries; empty when the site publishes no APIs. */
 const linksetEntries = (config: ResolvedConfig): LinksetEntry[] => {
-  const site = config.deployment.site ?? null;
-  const deployBase = normalizeBasePath(config.deployment.base);
+  const site = config.deployment.options.site ?? null;
+  const deployBase = normalizeBasePath(config.deployment.options.base);
   const abs = (path: string): string => {
     const based = withBasePath(deployBase, path);
     return site ? absoluteUrl(site, based) : based;

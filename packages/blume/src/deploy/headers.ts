@@ -73,7 +73,7 @@ export const buildNetlifyHeaders = (
   config: ResolvedConfig,
   homeLinkHeader?: string | null
 ): string => {
-  const deployBase = normalizeBasePath(config.deployment.base);
+  const deployBase = normalizeBasePath(config.deployment.options.base);
   const rules = HEADER_RULES.map((rule) => {
     const prefix = rule.underBasePath
       ? `${deployBase}${config.basePath}`

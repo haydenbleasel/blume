@@ -27,7 +27,9 @@ const isNonCanonical = (page: PageSnapshot, deployBase: string): boolean => {
 
 /** Pages that can meaningfully be compared against each other for duplication. */
 const comparable = (context: AuditContext): PageSnapshot[] => {
-  const deployBase = normalizeBasePath(context.project.config.deployment.base);
+  const deployBase = normalizeBasePath(
+    context.project.config.deployment.options.base
+  );
   return context.pages.filter(
     (page) =>
       page.indexable &&

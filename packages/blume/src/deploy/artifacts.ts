@@ -29,12 +29,8 @@ import { buildSearchIndex } from "../search/build.ts";
 import { syncSearchProvider } from "../search/sync/index.ts";
 import { readsHeaderFiles } from "./adapter-output.ts";
 import { buildNetlifyHeaders } from "./headers.ts";
-import {
-  buildNetlifyRedirects,
-  buildRedirectManifest,
-  buildVercelConfig,
-  platformRedirects,
-} from "./redirects.ts";
+import { deployPlatform } from "./platforms/index.ts";
+import { buildRedirectManifest, platformRedirects } from "./redirects.ts";
 import { buildRobots } from "./robots.ts";
 import { buildSitemapFiles, describeSitemapFiles } from "./sitemap.ts";
 
@@ -63,12 +59,13 @@ export interface ArtifactLogger {
 }
 
 /**
- * Emit platform redirect files for a static build (adapters wire redirects
- * natively). Always writes the manifest; writes `_redirects`/`vercel.json` only
- * when the user hasn't shipped one via public/. Note that Vercel's
- * git-integration builds read `vercel.json` from the repository root only —
- * the copy emitted here takes effect when the dist folder itself is deployed
- * directly via the Vercel CLI.
+ * Emit platform redirect files for a static build (a server build answers
+ * redirects at request time). Always writes the manifest; writes the files
+ * the deployment's platform reads (`_redirects`, `vercel.json` — every one of
+ * them when no host is named) only when the user hasn't shipped one via
+ * public/. Note that Vercel's git-integration builds read `vercel.json` from
+ * the repository root only — the copy emitted here takes effect when the dist
+ * folder itself is deployed directly via the Vercel CLI.
  */
 const emitRedirectFiles = async (
   config: ResolvedConfig,
@@ -76,7 +73,7 @@ const emitRedirectFiles = async (
   logger: ArtifactLogger
 ): Promise<void> => {
   const redirects = platformRedirects(config);
-  if (redirects.length === 0 || config.deployment.output !== "static") {
+  if (redirects.length === 0 || config.deployment.options.output !== "static") {
     return;
   }
   await writeFile(
@@ -84,15 +81,11 @@ const emitRedirectFiles = async (
     buildRedirectManifest(redirects),
     "utf-8"
   );
-  const platformFiles = [
-    { content: buildNetlifyRedirects(redirects), name: "_redirects" },
-    { content: buildVercelConfig(redirects), name: "vercel.json" },
-  ];
   await Promise.all(
-    platformFiles.map((file) =>
+    deployPlatform(config.deployment).redirectFiles.map((file) =>
       existsSync(join(distDir, file.name))
         ? Promise.resolve()
-        : writeFile(join(distDir, file.name), file.content, "utf-8")
+        : writeFile(join(distDir, file.name), file.build(redirects), "utf-8")
     )
   );
   logger.info(`Emitted redirect files for ${redirects.length} redirect(s)`);

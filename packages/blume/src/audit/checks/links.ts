@@ -45,9 +45,9 @@ export const linkChecks: CheckModule = {
   category: "links",
   run(context) {
     const found: Diagnostic[] = [];
-    const origin = siteOrigin(context.project.config.deployment.site);
+    const origin = siteOrigin(context.project.config.deployment.options.site);
     const deployBase = normalizeBasePath(
-      context.project.config.deployment.base
+      context.project.config.deployment.options.base
     );
     /** Broken chrome targets, and the first page each was seen on. */
     const brokenChrome = new Map<string, PageSnapshot>();

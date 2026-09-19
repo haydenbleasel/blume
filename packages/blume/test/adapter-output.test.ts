@@ -16,11 +16,17 @@ import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { BlumeConfigInput, ResolvedConfig } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 import {
-  ADAPTER_OUTPUT_PATHS,
+  deployOutputDir,
   deployStaticDir,
   readsHeaderFiles,
   surfaceAdapterOutput,
 } from "../src/deploy/adapter-output.ts";
+import {
+  cloudflare,
+  netlify,
+  node,
+  vercel,
+} from "../src/deploy/adapters/index.ts";
 
 const config = (
   deployment: BlumeConfigInput["deployment"] = {}
@@ -37,10 +43,17 @@ const context = (root: string): ProjectContext => ({
   themeFile: null,
 });
 
+/** A `blume build --isolated` context: the runtime and its dist relocated. */
+const isolated = (root: string): ProjectContext => ({
+  ...context(root),
+  distDir: join(root, ".blume-verify", "dist"),
+  outDir: join(root, ".blume-verify"),
+});
+
 /**
  * Write a fake Netlify Frameworks API bundle under `<root>/.blume/.netlify/v1`.
- * Netlify is the surfacing machinery's only remaining caller — Vercel is handed
- * the real project root and writes straight there (see `withAdapterRoot`).
+ * Netlify is the surfacing machinery's only caller — Vercel is handed the real
+ * project root and writes straight there (see `withAdapterRoot`).
  */
 const seed = async (root: string): Promise<void> => {
   const src = join(root, ".blume", ".netlify", "v1");
@@ -62,7 +75,7 @@ const surfaceUnderNode = async (root: string): Promise<void> => {
       "--eval",
       `const { surfaceAdapterOutput } = await import(${JSON.stringify(source)});
        await surfaceAdapterOutput(
-         { deployment: { adapter: "netlify", output: "server" } },
+         { deployment: { kind: "netlify", options: { output: "server" } } },
          { outDir: ${JSON.stringify(join(root, ".blume"))}, root: ${JSON.stringify(root)} }
        );`,
     ],
@@ -80,9 +93,9 @@ const surfaceUnderNode = async (root: string): Promise<void> => {
 describe("deployStaticDir", () => {
   it("serves .vercel/output/static for a Vercel server build", () => {
     const ctx = context("/proj");
-    expect(
-      deployStaticDir(config({ adapter: "vercel", output: "server" }), ctx)
-    ).toBe("/proj/.vercel/output/static");
+    expect(deployStaticDir(config(vercel()), ctx)).toBe(
+      "/proj/.vercel/output/static"
+    );
   });
 
   it("serves dist/ for a static build", () => {
@@ -92,18 +105,14 @@ describe("deployStaticDir", () => {
 
   it("serves dist/ for server adapters whose platform serves dist/", () => {
     const ctx = context("/proj");
-    expect(
-      deployStaticDir(config({ adapter: "netlify", output: "server" }), ctx)
-    ).toBe("/proj/dist");
+    expect(deployStaticDir(config(netlify()), ctx)).toBe("/proj/dist");
   });
 
   it("serves dist/client/ for a Node server build", () => {
     // The @astrojs/node standalone server's static handler reads only
     // Astro's `build.client` dir (`dist/client/`), never `dist/` itself.
     const ctx = context("/proj");
-    expect(
-      deployStaticDir(config({ adapter: "node", output: "server" }), ctx)
-    ).toBe("/proj/dist/client");
+    expect(deployStaticDir(config(node()), ctx)).toBe("/proj/dist/client");
   });
 
   it("serves dist/client/ for a Cloudflare server build", () => {
@@ -112,18 +121,18 @@ describe("deployStaticDir", () => {
     // binding in the `dist/server/wrangler.json` it generates at `../client`.
     // Artifacts written to `dist/` itself are above what the Worker serves.
     const ctx = context("/proj");
-    expect(
-      deployStaticDir(config({ adapter: "cloudflare", output: "server" }), ctx)
-    ).toBe("/proj/dist/client");
+    expect(deployStaticDir(config(cloudflare()), ctx)).toBe(
+      "/proj/dist/client"
+    );
   });
 
   it("serves dist/ for a Cloudflare static build", () => {
     // A static build has no server dir to split against, so the `outDir` root
     // is what ships — unchanged by the server-build fix above.
     const ctx = context("/proj");
-    expect(
-      deployStaticDir(config({ adapter: "cloudflare", output: "static" }), ctx)
-    ).toBe("/proj/dist");
+    expect(deployStaticDir(config(cloudflare({ output: "static" })), ctx)).toBe(
+      "/proj/dist"
+    );
   });
 
   it("falls back to <root>/dist when the context has no distDir", () => {
@@ -132,6 +141,49 @@ describe("deployStaticDir", () => {
     // oxlint-disable-next-line sonarjs/no-undefined-assignment
     const ctx: ProjectContext = { ...context("/proj"), distDir: undefined };
     expect(deployStaticDir(config(), ctx)).toBe("/proj/dist");
+  });
+
+  it("keeps an isolated build's static dir inside the relocated runtime", () => {
+    // A Vercel server bundle is never surfaced on an isolated build, so its
+    // static assets sit inside the runtime dir, not at the project root —
+    // where a previous real build's assets (or nothing) would be measured.
+    const ctx = isolated("/proj");
+    expect(deployStaticDir(config(vercel()), ctx)).toBe(
+      "/proj/.blume-verify/.vercel/output/static"
+    );
+    expect(deployStaticDir(config(), ctx)).toBe("/proj/.blume-verify/dist");
+    expect(deployStaticDir(config(node()), ctx)).toBe(
+      "/proj/.blume-verify/dist/client"
+    );
+    expect(deployStaticDir(config(cloudflare()), ctx)).toBe(
+      "/proj/.blume-verify/dist/client"
+    );
+    expect(deployStaticDir(config(cloudflare({ output: "static" })), ctx)).toBe(
+      "/proj/.blume-verify/dist"
+    );
+  });
+});
+
+describe("deployOutputDir", () => {
+  it("reports where each build's output lands", () => {
+    const ctx = context("/proj");
+    expect(deployOutputDir(config(), ctx)).toBe("/proj/dist");
+    // Node's standalone output root is dist/ (server + client inside).
+    expect(deployOutputDir(config(node()), ctx)).toBe("/proj/dist");
+    expect(deployOutputDir(config(vercel()), ctx)).toBe("/proj/.vercel/output");
+  });
+
+  it("keeps an isolated build's output inside the relocated runtime", () => {
+    // The success message must point at the Vercel bundle inside the runtime
+    // dir, not at the never-populated dist/.
+    const ctx = isolated("/proj");
+    expect(deployOutputDir(config(vercel()), ctx)).toBe(
+      "/proj/.blume-verify/.vercel/output"
+    );
+    expect(deployOutputDir(config(), ctx)).toBe("/proj/.blume-verify/dist");
+    expect(deployOutputDir(config(node()), ctx)).toBe(
+      "/proj/.blume-verify/dist"
+    );
   });
 });
 
@@ -144,13 +196,9 @@ describe("surfaceAdapterOutput", () => {
     const root = await mkdtemp(join(tmpdir(), "blume-surface-"));
     await mkdir(join(root, ".blume", ".vercel", "output"), { recursive: true });
 
-    expect(
-      await surfaceAdapterOutput(
-        config({ adapter: "vercel", output: "server" }),
-        context(root)
-      )
-    ).toEqual({ moved: false });
-    expect(ADAPTER_OUTPUT_PATHS.vercel).toBeUndefined();
+    expect(await surfaceAdapterOutput(config(vercel()), context(root))).toEqual(
+      { moved: false }
+    );
   });
 
   it("moves only .netlify/v1, preserving netlify link state", async () => {
@@ -169,10 +217,7 @@ describe("surfaceAdapterOutput", () => {
       "utf-8"
     );
 
-    const result = await surfaceAdapterOutput(
-      config({ adapter: "netlify", output: "server" }),
-      context(root)
-    );
+    const result = await surfaceAdapterOutput(config(netlify()), context(root));
 
     expect(result).toEqual({
       from: join(root, ".blume", ".netlify", "v1"),
@@ -223,10 +268,7 @@ describe("surfaceAdapterOutput", () => {
     await mkdir(join(root, ".netlify", "v1"), { recursive: true });
     await writeFile(join(root, ".netlify", "v1", "stale.txt"), "old", "utf-8");
 
-    await surfaceAdapterOutput(
-      config({ adapter: "netlify", output: "server" }),
-      context(root)
-    );
+    await surfaceAdapterOutput(config(netlify()), context(root));
 
     expect(existsSync(join(root, ".netlify", "v1", "stale.txt"))).toBe(false);
     expect(existsSync(join(root, ".netlify", "v1", "config.json"))).toBe(true);
@@ -238,70 +280,75 @@ describe("surfaceAdapterOutput", () => {
     expect(await surfaceAdapterOutput(config(), context(root))).toEqual({
       moved: false,
     });
+    // A static build on Netlify has no bundle to move either.
+    expect(
+      await surfaceAdapterOutput(
+        config(netlify({ output: "static" })),
+        context(root)
+      )
+    ).toEqual({ moved: false });
     expect(existsSync(join(root, ".netlify", "v1"))).toBe(false);
   });
 
   it("is a no-op for adapters that emit into dist/", async () => {
     const root = await mkdtemp(join(tmpdir(), "blume-surface-"));
-    expect(
-      await surfaceAdapterOutput(
-        config({ adapter: "node", output: "server" }),
-        context(root)
-      )
-    ).toEqual({ moved: false });
-    expect(ADAPTER_OUTPUT_PATHS.node).toBeUndefined();
+    expect(await surfaceAdapterOutput(config(node()), context(root))).toEqual({
+      moved: false,
+    });
   });
 
   it("is a no-op when the expected output is absent", async () => {
     const root = await mkdtemp(join(tmpdir(), "blume-surface-"));
     expect(
-      await surfaceAdapterOutput(
-        config({ adapter: "netlify", output: "server" }),
-        context(root)
-      )
+      await surfaceAdapterOutput(config(netlify()), context(root))
     ).toEqual({ moved: false });
   });
 });
 
 describe("readsHeaderFiles", () => {
-  it("is true for every static build", () => {
-    for (const adapter of [
-      "netlify",
-      "cloudflare",
-      "vercel",
-      "node",
-    ] as const) {
+  it("is true for a static build with no named host", () => {
+    // Nothing is known about where dist/ ends up, so the file is written for
+    // the hosts that read it; the rest ignore it harmlessly.
+    expect(readsHeaderFiles(config().deployment)).toBe(true);
+  });
+
+  it("is true for a static build on the hosts that read the file", () => {
+    for (const adapter of [netlify, cloudflare]) {
       expect(
-        readsHeaderFiles(config({ adapter, output: "static" }).deployment)
+        readsHeaderFiles(config(adapter({ output: "static" })).deployment)
       ).toBe(true);
+    }
+  });
+
+  it("is false for a static build on hosts that never read the file", () => {
+    // Vercel's headers ride the routing config; Node has no static host at
+    // all — writing the file for either would report a rule nothing applies.
+    for (const adapter of [vercel, node]) {
+      expect(
+        readsHeaderFiles(config(adapter({ output: "static" })).deployment)
+      ).toBe(false);
     }
   });
 
   /**
    * The regression this fixes. A Cloudflare server build serves `dist/client`
-   * through the Worker's ASSETS binding, which honours `_headers` — so skipping
+   * through the Worker's ASSETS binding, which honors `_headers` — so skipping
    * the file left the homepage with no agent-discovery `Link` header and the
    * well-known files with no registered media type.
    */
   it("is true for a Cloudflare server build", () => {
-    expect(
-      readsHeaderFiles(
-        config({ adapter: "cloudflare", output: "server" }).deployment
-      )
-    ).toBe(true);
+    expect(readsHeaderFiles(config(cloudflare()).deployment)).toBe(true);
   });
 
   it("is false for a Node server build, whose static handler ignores the file", () => {
-    expect(
-      readsHeaderFiles(config({ adapter: "node", output: "server" }).deployment)
-    ).toBe(false);
+    expect(readsHeaderFiles(config(node()).deployment)).toBe(false);
   });
 
   it("is false for a Vercel server build, which uses the routing config", () => {
-    expect(
-      readsHeaderFiles(
-        config({ adapter: "vercel", output: "server" }).deployment
-      )
-    ).toBe(false);
+    expect(readsHeaderFiles(config(vercel()).deployment)).toBe(false);
+  });
+
+  it("is false for a Netlify server build, whose bundle never applied it", () => {
+    expect(readsHeaderFiles(config(netlify()).deployment)).toBe(false);
   });
 });

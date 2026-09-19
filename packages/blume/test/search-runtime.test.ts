@@ -490,7 +490,7 @@ describe("hosted sync uploads", () => {
       manifest: {
         blumeVersion: "0.0.0",
         contentRoot: "/tmp/docs",
-        output: config.deployment.output,
+        output: config.deployment.options.output,
         projectRoot: "/tmp",
         routes: [],
         version: 1,

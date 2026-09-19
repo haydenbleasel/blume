@@ -150,8 +150,8 @@ export const runAudit = async (options: AuditOptions): Promise<AuditResult> => {
     files: crawl.files,
     graph: buildGraph(
       crawl.pages,
-      siteOrigin(project.config.deployment.site),
-      normalizeBasePath(project.config.deployment.base)
+      siteOrigin(project.config.deployment.options.site),
+      normalizeBasePath(project.config.deployment.options.base)
     ),
     llms: crawl.llms,
     origin,

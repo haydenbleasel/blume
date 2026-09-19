@@ -92,9 +92,12 @@ export const context = (options: ContextOptions = {}): AuditContext => {
       },
       basePath: "",
       deployment: {
-        adapter: options.adapter ?? null,
-        base: options.base,
-        site: options.site,
+        kind: options.adapter ?? "static",
+        options: {
+          base: options.base,
+          output: options.adapter ? "server" : "static",
+          site: options.site,
+        },
       },
       redirects,
       seo: {

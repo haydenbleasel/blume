@@ -33,7 +33,7 @@ export const buildHomeLinkHeader = (
   config: ResolvedConfig,
   routePaths: readonly string[]
 ): string | null => {
-  const deployBase = normalizeBasePath(config.deployment.base);
+  const deployBase = normalizeBasePath(config.deployment.options.base);
   const links: string[] = [];
   // RFC 9727 §3: the api-catalog relation is how a homepage advertises the
   // well-known catalog.

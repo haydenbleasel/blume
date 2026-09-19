@@ -23,7 +23,7 @@ export const robotsChecks: CheckModule = {
   category: "robots",
   run(context) {
     const { robots } = context;
-    const { site } = context.project.config.deployment;
+    const { site } = context.project.config.deployment.options;
 
     if (!context.project.config.seo.robots) {
       return [];

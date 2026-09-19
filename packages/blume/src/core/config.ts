@@ -100,10 +100,10 @@ import type { Diagnostic } from "./types.ts";
  *   declaration order. Install and maintain each integration in the site.
  *
  * **Deployment & i18n**
- * - `deployment` — `site` URL (needed for absolute links, sitemaps, and OG),
- *   `adapter` (`vercel`/`node`/`netlify`/`cloudflare`), `output`
- *   (`static`/`server`), and `base` path. Auto-detected on Vercel/Netlify/
- *   Cloudflare from the platform env.
+ * - `deployment` — a host adapter from `blume/deploy` (`vercel()`, `node()`,
+ *   `netlify()`, `cloudflare()`) for a server build, each taking `site`,
+ *   `base`, and `output`; or `{ site, base }` for a static build anywhere.
+ *   `site` is auto-detected on Vercel/Netlify/Cloudflare from the platform env.
  * - `i18n` — opt-in multi-locale: `locales`, `defaultLocale`, `parser`
  *   (`dir` vs filename `dot` suffix), and per-locale UI overrides.
  *
@@ -131,7 +131,8 @@ import type { Diagnostic } from "./types.ts";
  *     ],
  *   },
  *   search: orama(),
- *   deployment: { site: "https://docs.acme.com", adapter: "vercel" },
+ *   // `vercel` from "blume/deploy": a server build on Vercel.
+ *   deployment: vercel({ site: "https://docs.acme.com" }),
  * });
  * ```
  *
@@ -271,7 +272,7 @@ export const loadConfig = async (
   // Precedence: explicit config > platform env (Vercel/Netlify/Cloudflare, via
   // applyDeploymentEnv) > the local dev server URL (dev only).
   const config = applyDeploymentEnv(parsed.data);
-  const site = config.deployment.site ?? options.devServerUrl;
+  const site = config.deployment.options.site ?? options.devServerUrl;
 
   // OG images need an absolute `og:image`, so they default on once a site URL
   // is known and off otherwise. An explicit `seo.og.enabled` always wins.
@@ -280,7 +281,12 @@ export const loadConfig = async (
   return {
     config: {
       ...config,
-      deployment: { ...config.deployment, site },
+      deployment: site
+        ? {
+            ...config.deployment,
+            options: { ...config.deployment.options, site },
+          }
+        : config.deployment,
       seo: { ...config.seo, og: { ...config.seo.og, enabled: ogEnabled } },
     },
     configFile,

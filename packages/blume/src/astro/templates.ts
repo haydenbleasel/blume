@@ -13,6 +13,9 @@ import { resolveDocsCollection } from "../core/sources/collection.ts";
 import { BLUME_IGNORE_DIRS } from "../core/sources/watch.ts";
 import { trimChar } from "../core/trim.ts";
 import type { ProjectContext } from "../core/types.ts";
+import { deployPassthrough } from "../deploy/adapters/types.ts";
+import { deployPlatform } from "../deploy/platforms/index.ts";
+import { adapterRoot, distDir } from "../deploy/platforms/paths.ts";
 import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
 import type { OgCache } from "../og/cache.ts";
 import type { OgFont, OgFontFamilies } from "../og/card.ts";
@@ -77,66 +80,49 @@ const findWorkspaceRoot = (start: string): string => {
   }
 };
 
-type DeploymentAdapter = NonNullable<ResolvedConfig["deployment"]["adapter"]>;
-
-const ADAPTER_IMPORTS = {
-  cloudflare: "@astrojs/cloudflare",
-  netlify: "@astrojs/netlify",
-  node: "@astrojs/node",
-  vercel: "@astrojs/vercel",
-} satisfies Record<DeploymentAdapter, string>;
-
-/** Adapter constructor arguments, for the adapters that need any. */
-const ADAPTER_OPTIONS = new Map<DeploymentAdapter, string>([
-  ["node", '{ mode: "standalone" }'],
-]);
-
-const WRANGLER_CONFIG_FILES = [
-  "wrangler.jsonc",
-  "wrangler.json",
-  "wrangler.toml",
-];
-
-const resolveCloudflareAdapterArgs = (context: ProjectContext): string => {
-  // Every Blume HTML route prerenders (the only server routes are API
-  // endpoints), so images are optimized at build time with sharp. The
-  // adapter's default (`cloudflare-binding`) would instead declare a runtime
-  // `IMAGES` binding in the generated wrangler config that nothing uses.
-  const args: string[] = [
-    'prerenderEnvironment: "node"',
-    'imageService: "compile"',
-  ];
-  const wranglerPath = WRANGLER_CONFIG_FILES.map((file) =>
-    join(context.root, file)
-  ).find((file) => existsSync(file));
-  if (wranglerPath) {
-    let configPath = relative(context.outDir, wranglerPath);
-    // The wrangler config always lives at the project root, above the `.blume`
-    // runtime, so `relative` yields a `../…` path; normalize the theoretical
-    // sibling case to an explicit `./` so it reads as a relative import.
-    if (!configPath.startsWith(".") && !configPath.startsWith("/")) {
-      configPath = `./${configPath}`;
-    }
-    args.push(`configPath: ${JSON.stringify(configPath)}`);
-  }
-  return `{ ${args.join(", ")} }`;
-};
-
 /**
- * Without a configured driver, `@astrojs/cloudflare` force-enables KV-backed
- * sessions and declares a `SESSION` kv_namespaces entry in the generated
- * wrangler config — which `wrangler deploy` then requires a real KV namespace
- * for, even though Blume never reads `Astro.session`. Astro's `session: false`
- * opts the project out, and the adapter checks for it before adding the
- * binding. (An in-memory driver used to stand in before the opt-out existed.)
+ * The `adapter:` entry of the generated config plus the import that backs it,
+ * for a server build. The platform (see `deploy/platforms/*`) names the
+ * `@astrojs/*` package and Blume's own constructor options; the descriptor's
+ * passthrough options are spread over those, verbatim, so anything the
+ * adapter was given reaches the real adapter. A platform that resolves its
+ * output against Astro's root is handed the project root instead of the
+ * hidden runtime (`withAdapterRoot`).
  */
-const resolveSessionOption = (deployment: {
-  adapter: string | null;
-  output: string;
-}): string =>
-  deployment.output === "server" && deployment.adapter === "cloudflare"
-    ? "\n  session: false,"
-    : "";
+interface AstroAdapterRender {
+  /** Extra top-level `defineConfig` entries the adapter needs. */
+  configEntries: string;
+  importLine: string;
+  /** The `adapter:` entry, or empty for a static build. */
+  option: string;
+}
+
+const renderAstroAdapter = (
+  deployment: ResolvedConfig["deployment"],
+  context: ProjectContext
+): AstroAdapterRender => {
+  const platform = deployPlatform(deployment);
+  if (deployment.options.output !== "server" || !platform.astro) {
+    return { configEntries: "", importLine: "", option: "" };
+  }
+  const { astro } = platform;
+  const args = {
+    ...astro.options(context),
+    ...deployPassthrough(deployment.options),
+  };
+  const argsLiteral = Object.keys(args).length > 0 ? JSON.stringify(args) : "";
+  const construct = `adapter(${argsLiteral})`;
+  const expression = platform.hiddenRuntime.showProjectRoot
+    ? `withAdapterRoot(${construct}, ${JSON.stringify(adapterRoot(context))})`
+    : construct;
+  return {
+    configEntries: Object.entries(astro.config)
+      .map(([key, value]) => `\n  ${key}: ${JSON.stringify(value)},`)
+      .join(""),
+    importLine: `import adapter from "${astro.package}";\n`,
+    option: `\n  adapter: ${expression},`,
+  };
+};
 
 /**
  * A font weight as Astro's Fonts API spells it: a variable range is
@@ -210,13 +196,9 @@ export const runtimeDependencies = (options: {
   if (config.ai.ask?.enabled && !config.ai.ask.endpoint) {
     deps.push(...config.ai.ask.provider.runtimeDeps);
   }
-  const { deployment } = config;
-  if (deployment.output === "server" && deployment.adapter) {
-    const adapter = ADAPTER_IMPORTS[deployment.adapter];
-    if (adapter) {
-      deps.push(adapter);
-    }
-  }
+  // The deployment adapter's `@astrojs/*` package, for a server build; the
+  // descriptor declares it (and nothing for a static build).
+  deps.push(...config.deployment.runtimeDeps);
   return deps;
 };
 
@@ -281,25 +263,6 @@ const renderUserAliases = (
         `\n        ${JSON.stringify(find)}: ${JSON.stringify(replacement)},`
     )
     .join("");
-
-/** Astro's build output dir: the runtime's own `distDir`, else `<root>/dist`. */
-const astroOutDir = (context: ProjectContext): string =>
-  context.distDir ?? `${context.root}/dist`;
-
-/**
- * The root a deploy adapter is shown, in place of the `.blume` runtime Astro
- * actually roots at. Adapters assume `outDir` is `<root>/dist` and resolve their
- * own output (and Vercel's dependency trace) against `root`, so the root implied
- * by Blume's `outDir` is the one that keeps that assumption true. See
- * {@link withAdapterRoot}.
- *
- * For a normal build that is the project root (`<project>/dist` -> `<project>`).
- * For a relocated runtime (`blume build --isolated`) it is the runtime dir
- * itself (`<runtime>/dist` -> `<runtime>`), keeping a verify build's adapter
- * output self-contained instead of overwriting the real `.vercel/output`.
- */
-const adapterRoot = (context: ProjectContext): string =>
-  dirname(astroOutDir(context));
 
 /**
  * Excludes Vite's pre-bundled dep cache from @vitejs/plugin-react. Astro's
@@ -590,7 +553,6 @@ export const astroConfigTemplate = (options: {
   } = renderRuntimeModuleWiring(generatedModulesDir);
   const { deployment } = config;
   const userAliasLines = renderUserAliases(options.aliases);
-  const server = deployment.output === "server";
 
   // The project root plus the workspace root, so hoisted dependencies (e.g.
   // KaTeX fonts under a monorepo's root node_modules) stay servable in dev.
@@ -604,38 +566,17 @@ export const astroConfigTemplate = (options: {
     reactCompilerPath: options.reactCompilerPath,
   });
 
-  const adapterImport =
-    server && deployment.adapter
-      ? `import adapter from "${ADAPTER_IMPORTS[deployment.adapter]}";\n`
-      : "";
-  const adapterArgs = (() => {
-    if (!server || !deployment.adapter) {
-      return "";
-    }
-    if (deployment.adapter === "cloudflare") {
-      return resolveCloudflareAdapterArgs(context);
-    }
-    return ADAPTER_OPTIONS.get(deployment.adapter) ?? "";
-  })();
-  // Vercel resolves its Build Output tree and its `@vercel/nft` dependency
-  // trace against the Astro root, which for Blume is the hidden `.blume`
-  // runtime — leaving the traced function without its chunks or node_modules.
-  // The other adapters emit into `outDir` (cloudflare, node) or are surfaced
-  // afterwards (netlify), so none of them read `root` this way.
-  const adapterExpr =
-    deployment.adapter === "vercel"
-      ? `withAdapterRoot(adapter(${adapterArgs}), ${JSON.stringify(adapterRoot(context))})`
-      : `adapter(${adapterArgs})`;
-  const adapterOption =
-    server && deployment.adapter ? `\n  adapter: ${adapterExpr},` : "";
+  const {
+    configEntries: adapterConfigEntries,
+    importLine: adapterImport,
+    option: adapterOption,
+  } = renderAstroAdapter(deployment, context);
 
-  const sessionOption = resolveSessionOption(deployment);
-
-  const siteOption = deployment.site
-    ? `\n  site: ${JSON.stringify(deployment.site)},`
+  const siteOption = deployment.options.site
+    ? `\n  site: ${JSON.stringify(deployment.options.site)},`
     : "";
-  const baseOption = deployment.base
-    ? `\n  base: ${JSON.stringify(deployment.base)},`
+  const baseOption = deployment.options.base
+    ? `\n  base: ${JSON.stringify(deployment.options.base)},`
     : "";
   const imageOption = renderImageOption(config);
 
@@ -660,7 +601,7 @@ export const astroConfigTemplate = (options: {
   const basedRedirects = applyBaseToAstroRedirects(
     config.redirects,
     config.basePath,
-    deployment.base ?? ""
+    deployment.options.base ?? ""
   );
   const redirectsOption =
     basedRedirects.length > 0
@@ -757,7 +698,7 @@ export const astroConfigTemplate = (options: {
   // hand-written `basePath` link (`/docs/x`) isn't double-prefixed (see
   // `withComposedBasePath`). The link checker validates the base-less authored
   // path against `basePath` routes separately.
-  const deployBase = normalizeBasePath(deployment.base);
+  const deployBase = normalizeBasePath(deployment.options.base);
 
   const integrations = [
     `mdx({ processor: blumeMdxProcessor(${JSON.stringify({
@@ -808,9 +749,9 @@ ${reactImport}${vueImport}${svelteImport}${blumeImport}${adapterImport}
 ${userConfigSetup}export default defineConfig({
   root: ${JSON.stringify(context.outDir)},
   srcDir: ${JSON.stringify(`${context.outDir}/src`)},
-  outDir: ${JSON.stringify(astroOutDir(context))},
+  outDir: ${JSON.stringify(distDir(context))},
   publicDir: ${JSON.stringify(`${context.root}/public`)},${cacheOptions}
-  output: ${JSON.stringify(deployment.output)},${adapterOption}${sessionOption}${siteOption}${baseOption}${imageOption}${redirectsOption}${i18nOption}${fontsOption}
+  output: ${JSON.stringify(deployment.options.output)},${adapterOption}${adapterConfigEntries}${siteOption}${baseOption}${imageOption}${redirectsOption}${i18nOption}${fontsOption}
   integrations: [${integrations.join(", ")}${userIntegrationSpread}],
   markdown: {
     processor: blumeMarkdownProcessor(${JSON.stringify({

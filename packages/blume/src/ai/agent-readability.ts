@@ -3,6 +3,7 @@ import { repoUrl } from "../core/github.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ContentSignalPolicy, ContentSignals } from "../core/schema.ts";
 import { absoluteUrl } from "../core/site-url.ts";
+import { deployPlatform } from "../deploy/platforms/index.ts";
 import { buildRssFeeds } from "../deploy/rss.ts";
 import { AI_CATALOG_PATH, hasAiCatalog } from "./ai-catalog.ts";
 import { hasApiCatalog } from "./api-catalog.ts";
@@ -90,22 +91,20 @@ export interface AgentReadabilityManifest {
 
 /**
  * The raw-Markdown mirror pattern. `Accept: text/markdown` negotiation is
- * advertised only where the deployed site actually honors it — a Vercel
- * server build, whose routing config gets the rewrite rules (see
- * `deploy/vercel-negotiation.ts`), and a Cloudflare server build, whose
- * deploy bundle gets a wrapper Worker (see `deploy/cloudflare-negotiation.ts`).
- * Static builds and other adapters serve prerendered pages from a static
- * layer with no request-time hook, so agents there should fetch the `.md`
- * pattern directly.
+ * advertised only where the deployed site actually honors it — a server build
+ * on a platform that declares `negotiatesMarkdown` (Vercel, whose routing
+ * config gets the rewrite rules; Cloudflare, whose deploy bundle gets a
+ * wrapper Worker — see `deploy/platforms/*`). Static builds and other
+ * adapters serve prerendered pages from a static layer with no request-time
+ * hook, so agents there should fetch the `.md` pattern directly.
  */
 const markdownArtifact = (
   config: BlumeProject["config"],
   abs: (path: string) => string
 ): AgentArtifacts["markdown"] => {
   const negotiates =
-    config.deployment.output === "server" &&
-    (config.deployment.adapter === "vercel" ||
-      config.deployment.adapter === "cloudflare");
+    config.deployment.options.output === "server" &&
+    deployPlatform(config.deployment).negotiatesMarkdown;
   return negotiates
     ? { contentNegotiation: "text/markdown", pattern: abs("/{route}.md") }
     : { pattern: abs("/{route}.md") };
@@ -123,7 +122,7 @@ const apiArtifact = (
     openapi: abs(OPENAPI_PATH),
     pages: abs(API_PAGES_PATH),
   };
-  if (config.deployment.output === "server") {
+  if (config.deployment.options.output === "server") {
     api.search = abs(API_SEARCH_PATH);
   }
   return api;
@@ -169,10 +168,10 @@ export const buildAgentReadability = (
     return null;
   }
 
-  const site = config.deployment.site ?? null;
+  const site = config.deployment.options.site ?? null;
   // Every artifact is served under `deployment.base` — with or without a
   // `site`; concatenate rather than `new URL()` so the subpath is preserved.
-  const deployBase = normalizeBasePath(config.deployment.base);
+  const deployBase = normalizeBasePath(config.deployment.options.base);
   const abs = (path: string): string => {
     const based = withBasePath(deployBase, path);
     return site ? absoluteUrl(site, based) : based;

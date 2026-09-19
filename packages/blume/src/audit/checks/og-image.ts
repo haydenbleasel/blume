@@ -53,9 +53,9 @@ export const ogImageChecks: CheckModule = {
       return pending;
     };
 
-    const origin = siteOrigin(context.project.config.deployment.site);
+    const origin = siteOrigin(context.project.config.deployment.options.site);
     const deployBase = normalizeBasePath(
-      context.project.config.deployment.base
+      context.project.config.deployment.options.base
     );
     const candidates: { page: PageSnapshot; path: string }[] = [];
 

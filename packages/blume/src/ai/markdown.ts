@@ -68,7 +68,7 @@ export const buildRawMarkdown = async (
       let text = await readRoute(route);
       if (route.sourcePath) {
         text = rewriteRelativeImages({
-          deployBase: project.config.deployment.base,
+          deployBase: project.config.deployment.options.base,
           projectRoot: project.context.root,
           source: text,
           sourcePath: route.sourcePath,
