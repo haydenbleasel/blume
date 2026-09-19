@@ -19,7 +19,7 @@ export default defineConfig({
 });
 ```
 
-Adapters emit into `<head>` in the order you list them, and you can combine as many as you like. Every adapter is plain data: what it returns is validated with the rest of your config and inlined into the built site, so it can carry any JSON-serializable option but never a function.
+Adapters emit into `<head>` in the order you list them, and you can combine as many as you like. Every adapter is plain data: what it returns is validated with the rest of your config and inlined into the built site, so it can carry any JSON value but never a function. A passthrough option that JSON can't carry (a function, `undefined`, a bigint) fails validation with its path rather than disappearing from the build.
 
 Analytics loads in **production builds only**. The scripts are emitted by `blume build`, never by `blume dev`, so local traffic never reaches your dashboards and you don't need a separate "development" project.
 

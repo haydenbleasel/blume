@@ -1,28 +1,33 @@
 import { z } from "zod";
 
-import type { AdapterDescriptor } from "../core/adapter.ts";
+import type { AdapterDescriptor, JsonValue } from "../core/adapter.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
 
-/** Options for {@link vercel}: the props of `@vercel/analytics/astro`. */
-export interface VercelOptions {
-  /**
-   * Any other prop of the official component, forwarded verbatim (`endpoint`,
-   * `scriptSrc`, `dsn`, …). Must be JSON-serializable; `beforeSend` is a
-   * function and can't travel through config — assign
-   * `window.webAnalyticsBeforeSend` from a `script()` adapter instead.
-   */
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- the verbatim passthrough to `<VercelAnalytics>`; mirrors the schema's loose object (the drift guard requires it).
-  [option: string]: unknown;
+/** The props of `@vercel/analytics/astro` that {@link vercel} documents. */
+export interface VercelNamedOptions {
   /** Log every event to the console. Defaults to the component's own rule (on outside production). */
   debug?: boolean;
   /** Force the script's environment instead of letting it detect one. */
   mode?: "auto" | "development" | "production";
 }
 
-export const vercelOptionsSchema = z.looseObject({
-  debug: z.boolean().optional(),
-  mode: z.enum(["auto", "development", "production"]).optional(),
-});
+/**
+ * Options for {@link vercel}: the documented props plus any other prop of the
+ * official component, forwarded verbatim (`endpoint`, `scriptSrc`, `dsn`, …).
+ * JSON values only; `beforeSend` is a function and can't travel through
+ * config — assign `window.webAnalyticsBeforeSend` from a `script()` adapter
+ * listed before `vercel()` instead.
+ */
+export type VercelOptions = VercelNamedOptions & {
+  [option: string]: JsonValue;
+};
+
+export const vercelOptionsSchema = z
+  .object({
+    debug: z.boolean().optional(),
+    mode: z.enum(["auto", "development", "production"]).optional(),
+  })
+  .catchall(z.json());
 
 export type VercelAdapter = AdapterDescriptor<"vercel", VercelOptions>;
 

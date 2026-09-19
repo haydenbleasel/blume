@@ -1,30 +1,35 @@
 import { z } from "zod";
 
-import type { AdapterDescriptor } from "../core/adapter.ts";
+import type { AdapterDescriptor, JsonValue } from "../core/adapter.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
 import type { HeadScript } from "./head.ts";
 
 /** PostHog Cloud US, the ingestion host `posthog()` uses when `host` is unset. */
 export const POSTHOG_DEFAULT_HOST = "https://us.i.posthog.com";
 
-/** Options for {@link posthog}. */
-export interface PosthogOptions {
-  /**
-   * Any other `posthog.init` option, forwarded verbatim (`persistence`,
-   * `capture_pageview`, `autocapture`, …). Must be JSON-serializable.
-   */
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- the verbatim passthrough to `posthog.init`; mirrors the schema's loose object (the drift guard requires it).
-  [option: string]: unknown;
+/** The options {@link posthog} maps itself. */
+export interface PosthogNamedOptions {
   /** API host (for self-hosted / EU). Defaults to PostHog Cloud US. */
   host?: string;
   /** Project API key. */
   key: string;
 }
 
-export const posthogOptionsSchema = z.looseObject({
-  host: z.string().optional(),
-  key: z.string().min(1),
-});
+/**
+ * Options for {@link posthog}: the named options plus any other `posthog.init`
+ * option, forwarded verbatim (`persistence`, `capture_pageview`,
+ * `autocapture`, …). JSON values only.
+ */
+export type PosthogOptions = PosthogNamedOptions & {
+  [option: string]: JsonValue;
+};
+
+export const posthogOptionsSchema = z
+  .object({
+    host: z.string().optional(),
+    key: z.string().min(1),
+  })
+  .catchall(z.json());
 
 export type PosthogAdapter = AdapterDescriptor<"posthog", PosthogOptions>;
 

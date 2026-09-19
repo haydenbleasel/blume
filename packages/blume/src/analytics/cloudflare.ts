@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { AdapterDescriptor } from "../core/adapter.ts";
+import type { AdapterDescriptor, JsonValue } from "../core/adapter.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
 import type { HeadScript } from "./head.ts";
 
@@ -8,21 +8,25 @@ import type { HeadScript } from "./head.ts";
 export const CLOUDFLARE_BEACON_SRC =
   "https://static.cloudflareinsights.com/beacon.min.js";
 
-/** Options for {@link cloudflare}. */
-export interface CloudflareOptions {
-  /**
-   * Any other `data-cf-beacon` setting, forwarded verbatim (`spa`, …). Must be
-   * JSON-serializable.
-   */
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- the verbatim passthrough to the beacon's `data-cf-beacon` JSON; mirrors the schema's loose object (the drift guard requires it).
-  [option: string]: unknown;
+/** The options {@link cloudflare} maps itself. */
+export interface CloudflareNamedOptions {
   /** Site token from the Web Analytics JS snippet (`data-cf-beacon`). */
   token: string;
 }
 
-export const cloudflareOptionsSchema = z.looseObject({
-  token: z.string().min(1),
-});
+/**
+ * Options for {@link cloudflare}: the token plus any other `data-cf-beacon`
+ * setting, forwarded verbatim (`spa`, …). JSON values only.
+ */
+export type CloudflareOptions = CloudflareNamedOptions & {
+  [option: string]: JsonValue;
+};
+
+export const cloudflareOptionsSchema = z
+  .object({
+    token: z.string().min(1),
+  })
+  .catchall(z.json());
 
 export type CloudflareAdapter = AdapterDescriptor<
   "cloudflare",

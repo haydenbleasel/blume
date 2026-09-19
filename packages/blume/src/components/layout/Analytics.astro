@@ -5,26 +5,28 @@ import { analyticsHead } from "../../analytics/head.ts";
 import type { BlumeDataConfig } from "../../core/data.ts";
 
 // The analytics adapters' <head> output. Each adapter in `analytics` owns the
-// snippet it emits (src/analytics/*); `analyticsHead` collects them and this
-// component renders the result: the official Vercel component when `vercel()`
-// is listed, and one <script> per other adapter, in configured order. Loads
-// ONLY in production builds so `blume dev` stays clean and local traffic never
+// snippet it emits (src/analytics/*); `analyticsHead` collects them into one
+// list in declared order and this component renders it: the official Vercel
+// component for `vercel()`, one <script> for every other adapter. Loads ONLY
+// in production builds so `blume dev` stays clean and local traffic never
 // reaches your analytics.
 interface Props {
   analytics?: BlumeDataConfig["analytics"] | null;
 }
 
 const { analytics } = Astro.props;
-const head = analyticsHead(import.meta.env.PROD ? (analytics ?? []) : []);
+const nodes = analyticsHead(import.meta.env.PROD ? (analytics ?? []) : []);
 ---
 
-{head.vercel && <VercelAnalytics {...head.vercel} />}
 {
-  head.scripts.map((script) =>
-    script.content === null ? (
-      <script is:inline {...script.attributes} />
+  nodes.map((node) => {
+    if (node.type === "vercel") {
+      return <VercelAnalytics {...node.props} />;
+    }
+    return node.content === null ? (
+      <script is:inline {...node.attributes} />
     ) : (
-      <script is:inline set:html={script.content} {...script.attributes} />
-    )
-  )
+      <script is:inline set:html={node.content} {...node.attributes} />
+    );
+  })
 }

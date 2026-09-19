@@ -111,58 +111,113 @@ describe("analyticsConfigSchema", () => {
       ]).success
     ).toBe(false);
   });
+
+  it("accepts nested JSON in a passthrough option", () => {
+    const result = analyticsConfigSchema.safeParse([
+      posthog({
+        bootstrap: { featureFlags: { beta: true }, ids: [1, 2, null] },
+        key: "k",
+      }),
+      cloudflare({ spa: false, token: "t" }),
+      vercel({ endpoint: "https://va.example/api" }),
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects passthrough values JSON would drop or choke on, with a path", () => {
+    const cases = [
+      ["bigint", 10n],
+      ["fn", () => 1],
+      ["nan", Number.NaN],
+      ["undefined", undefined],
+    ] as const;
+    for (const [name, value] of cases) {
+      const result = analyticsConfigSchema.safeParse([
+        { ...posthog({ key: "k" }), options: { key: "k", probe: value } },
+      ]);
+      expect(result.success, `${name} should be rejected`).toBe(false);
+      expect(result.error?.issues[0]?.path).toEqual([0, "options", "probe"]);
+    }
+    expect(
+      analyticsConfigSchema.safeParse([
+        { ...vercel(), options: { beforeSend: () => null } },
+      ]).success
+    ).toBe(false);
+    expect(
+      analyticsConfigSchema.safeParse([
+        {
+          ...cloudflare({ token: "t" }),
+          options: { spa: undefined, token: "t" },
+        },
+      ]).success
+    ).toBe(false);
+  });
 });
 
 describe("analyticsHead", () => {
   it("emits nothing for an empty list", () => {
-    expect(analyticsHead([])).toEqual({ scripts: [], vercel: null });
+    expect(analyticsHead([])).toEqual([]);
   });
 
   it("emits the PostHog loader with the key, the default host, and passthrough init options", () => {
-    const { scripts, vercel: vercelProps } = analyticsHead([
+    const nodes = analyticsHead([
       posthog({ key: "phc_test", persistence: "memory" }),
     ]);
-    expect(vercelProps).toBeNull();
-    expect(scripts).toHaveLength(1);
-    const [tag] = scripts;
-    expect(tag?.attributes).toEqual({});
-    expect(tag?.content).toContain("window.posthog=e");
-    expect(tag?.content).toContain(
+    expect(nodes).toHaveLength(1);
+    const [node] = nodes;
+    expect(node?.type).toBe("script");
+    if (node?.type !== "script") {
+      throw new Error("expected a script node");
+    }
+    expect(node.attributes).toEqual({});
+    expect(node.content).toContain("window.posthog=e");
+    expect(node.content).toContain(
       `posthog.init("phc_test",{"api_host":"${POSTHOG_DEFAULT_HOST}","persistence":"memory"});`
     );
     // Client-router swaps count as pageviews.
-    expect(tag?.content).toContain('addEventListener("astro:page-load"');
+    expect(node.content).toContain('addEventListener("astro:page-load"');
   });
 
   it("maps host to api_host and lets a raw api_host win", () => {
-    const eu = analyticsHead([
+    const [eu] = analyticsHead([
       posthog({ host: "https://eu.i.posthog.com", key: "k" }),
     ]);
-    expect(eu.scripts[0]?.content).toContain(
-      '{"api_host":"https://eu.i.posthog.com"}'
-    );
-    const raw = analyticsHead([
+    expect(eu).toMatchObject({
+      content: expect.stringContaining(
+        '{"api_host":"https://eu.i.posthog.com"}'
+      ),
+    });
+    const [raw] = analyticsHead([
       posthog({ api_host: "https://ph.example.com", key: "k" }),
     ]);
-    expect(raw.scripts[0]?.content).toContain(
-      '{"api_host":"https://ph.example.com"}'
-    );
+    expect(raw).toMatchObject({
+      content: expect.stringContaining('{"api_host":"https://ph.example.com"}'),
+    });
   });
 
   it("hands the Vercel component its props verbatim", () => {
-    const head = analyticsHead([vercel({ debug: true, mode: "production" })]);
-    expect(head.scripts).toEqual([]);
-    expect(head.vercel).toEqual({ debug: true, mode: "production" });
+    expect(
+      analyticsHead([vercel({ debug: true, mode: "production" })])
+    ).toEqual([{ props: { debug: true, mode: "production" }, type: "vercel" }]);
   });
 
-  it("renders one Vercel component however many vercel() entries are listed", () => {
-    const head = analyticsHead([vercel({ debug: true }), vercel()]);
-    expect(head.vercel).toEqual({ debug: true });
+  it("keeps the first vercel() in place and drops a second one", () => {
+    const nodes = analyticsHead([
+      script({ content: "window.webAnalyticsBeforeSend = (e) => e" }),
+      vercel({ debug: true }),
+      script({ src: "https://x.test/after.js" }),
+      vercel(),
+    ]);
+    expect(nodes.map((node) => node.type)).toEqual([
+      "script",
+      "vercel",
+      "script",
+    ]);
+    expect(nodes[1]).toEqual({ props: { debug: true }, type: "vercel" });
   });
 
   it("emits the Cloudflare beacon with the whole option object as data-cf-beacon", () => {
-    const head = analyticsHead([cloudflare({ spa: false, token: "tok" })]);
-    expect(head.scripts).toEqual([
+    expect(analyticsHead([cloudflare({ spa: false, token: "tok" })])).toEqual([
       {
         attributes: {
           "data-cf-beacon": '{"spa":false,"token":"tok"}',
@@ -170,12 +225,13 @@ describe("analyticsHead", () => {
           src: CLOUDFLARE_BEACON_SRC,
         },
         content: null,
+        type: "script",
       },
     ]);
   });
 
   it("emits an external script with its strategy and attributes", () => {
-    const head = analyticsHead([
+    const nodes = analyticsHead([
       script({
         attributes: { "data-domain": "example.com" },
         src: "https://plausible.io/js/script.js",
@@ -184,7 +240,7 @@ describe("analyticsHead", () => {
       script({ src: "https://x.test/a.js", strategy: "async" }),
       script({ src: "https://x.test/b.js" }),
     ]);
-    expect(head.scripts).toEqual([
+    expect(nodes).toEqual([
       {
         attributes: {
           "data-domain": "example.com",
@@ -192,50 +248,66 @@ describe("analyticsHead", () => {
           src: "https://plausible.io/js/script.js",
         },
         content: null,
+        type: "script",
       },
       {
         attributes: { async: true, src: "https://x.test/a.js" },
         content: null,
+        type: "script",
       },
-      { attributes: { src: "https://x.test/b.js" }, content: null },
+      {
+        attributes: { src: "https://x.test/b.js" },
+        content: null,
+        type: "script",
+      },
     ]);
   });
 
   it("lets an explicit src win over a same-named attribute", () => {
-    const head = analyticsHead([
+    const [node] = analyticsHead([
       script({
         attributes: { src: "https://old.test/x.js" },
         src: "https://x.test/a.js",
       }),
     ]);
-    expect(head.scripts[0]?.attributes.src).toBe("https://x.test/a.js");
+    expect(node).toMatchObject({ attributes: { src: "https://x.test/a.js" } });
   });
 
   it("emits an inline script with its attributes", () => {
-    const head = analyticsHead([
-      script({ attributes: { id: "probe" }, content: "console.log(1)" }),
-    ]);
-    expect(head.scripts).toEqual([
-      { attributes: { id: "probe" }, content: "console.log(1)" },
+    expect(
+      analyticsHead([
+        script({ attributes: { id: "probe" }, content: "console.log(1)" }),
+      ])
+    ).toEqual([
+      {
+        attributes: { id: "probe" },
+        content: "console.log(1)",
+        type: "script",
+      },
     ]);
   });
 
   it("keeps the adapters' declared order across kinds", () => {
-    const head = analyticsHead([
+    const nodes = analyticsHead([
       script({ src: "https://x.test/first.js" }),
       cloudflare({ token: "tok" }),
+      vercel(),
       posthog({ key: "k" }),
       script({ content: "last()" }),
     ]);
     expect(
-      head.scripts.map((tag) =>
-        tag.content?.includes("posthog.init(")
+      nodes.map((node) => {
+        if (node.type === "vercel") {
+          return "vercel";
+        }
+        return node.content?.includes("posthog.init(")
           ? "posthog"
-          : (tag.attributes.src ?? tag.content)
-      )
+          : (node.attributes.src ?? node.content);
+      })
     ).toEqual([
       "https://x.test/first.js",
       CLOUDFLARE_BEACON_SRC,
+      "vercel",
       "posthog",
       "last()",
     ]);

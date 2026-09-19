@@ -14,7 +14,7 @@
  * schema validates and the generated site inlines as a literal; nothing here
  * runs in the browser.
  */
-export type { AdapterDescriptor } from "../core/adapter.ts";
+export type { AdapterDescriptor, JsonValue } from "../core/adapter.ts";
 export { cloudflare } from "./cloudflare.ts";
 export type { CloudflareAdapter, CloudflareOptions } from "./cloudflare.ts";
 export { posthog } from "./posthog.ts";
