@@ -23,6 +23,8 @@ export default defineConfig({
 An adapter is a plain description of the backend — not a live client — so Blume can inline it into the generated site and into an ejected project. Pass the adapter directly, or use the object form when you also want to set the [popular links](#popular-pages) or [indexing](#whats-indexed) options beside it:
 
 ```ts blume.config.ts lineNumbers
+import { pagefind } from "blume/search";
+
 search: {
   provider: pagefind(),
   popular: [{ href: "/guides/getting-started", icon: "rocket", label: "Getting started" }],

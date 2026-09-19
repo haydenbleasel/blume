@@ -236,6 +236,20 @@ describe("search config schema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("reports the removed 1.x provider string as a diagnostic, not a crash", () => {
+    // A leftover `search: { provider: "algolia" }` still parses as the object
+    // form and fails inside `provider`; a bare string or null reaches the
+    // shorthand lift, which must refuse it before the `in` check runs.
+    for (const search of ["orama", null, true]) {
+      const result = blumeConfigSchema.safeParse({ search });
+      expect(result.success).toBe(false);
+      const messages = result.success
+        ? []
+        : result.error.issues.map((issue) => issue.message);
+      expect(messages[0]).toContain('"blume/search"');
+    }
+  });
 });
 
 describe("runtimeDependencies", () => {

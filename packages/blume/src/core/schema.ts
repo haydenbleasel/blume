@@ -53,6 +53,9 @@ const isString = <Value>(value: Value): value is Value & string =>
 const isBoolean = <Value>(value: Value): value is Value & boolean =>
   typeof value === "boolean";
 
+const isObjectLike = <Value>(value: Value): value is Value & object =>
+  typeof value === "object" && value !== null;
+
 /** Icon inputs in serializable contexts (frontmatter, meta files). */
 const iconName = z.string().min(1);
 
@@ -612,7 +615,15 @@ type SearchConfigInput = false | SearchAdapterInput | SearchOptionsInput;
  * descriptor is recognized by its `kind`; the object form never has one.
  */
 const searchConfigSchema = z
-  .custom<SearchConfigInput>()
+  .custom<SearchConfigInput>(
+    // Anything else (a 1.x provider string, null, true) must become a
+    // diagnostic here: the `in` check below would throw a TypeError on it.
+    (value) => value === false || isObjectLike(value),
+    {
+      message:
+        'search must be an adapter from "blume/search" (orama(), algolia({…}), …), false, or { provider, popular, indexing }. The 1.x provider string was removed.',
+    }
+  )
   .transform((value): SearchOptionsInput =>
     value === false || "kind" in value ? { provider: value } : value
   )
