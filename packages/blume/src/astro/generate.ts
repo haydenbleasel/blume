@@ -1828,6 +1828,7 @@ const writeAskFiles = async (
     askEndpointTemplate(resolveAskBackend(ask), grounded, {
       cors: ask.cors,
       instructions: ask.instructions,
+      reasoning: ask.reasoning,
       retrieval: ask.retrieval,
     })
   );

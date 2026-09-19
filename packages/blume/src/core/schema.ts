@@ -767,6 +767,19 @@ const searchConfigSchema = z
     }
   });
 
+/**
+ * The `ai.ask.reasoning` levels: the AI SDK's top-level `reasoning` values
+ * minus `provider-default`, which is what omitting the field means.
+ */
+export const askReasoningLevels = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+] as const;
+
 /** Ask AI backends. `gateway` (default) routes through the Vercel AI Gateway. */
 export const askAiProviders = [
   "gateway",
@@ -903,6 +916,12 @@ const aiConfigSchema = z.strictObject({
       instructions: z.string().trim().min(1).optional(),
       model: z.string().default("openai/gpt-5.5"),
       provider: z.enum(askAiProviders).default("gateway"),
+      // How much the model reasons before answering, sent as the backend's
+      // own reasoning-effort control (see `askEndpointTemplate`). Omitted
+      // keeps the provider's default; `none` is the fastest and cheapest for
+      // grounded docs Q&A, where the excerpts carry the answer. Not for
+      // Inkeep, which has no such control (refined below).
+      reasoning: z.enum(askReasoningLevels).optional(),
       // How much documentation each question carries. Injected characters are
       // the dominant term in time-to-first-token on a self-hosted backend, so
       // these trade recall for latency. No zod defaults here: only what the
@@ -949,6 +968,17 @@ const aiConfigSchema = z.strictObject({
           message:
             "ai.ask.cors only applies to the generated route; with ai.ask.endpoint, CORS is that backend's job.",
           path: ["cors"],
+        });
+      }
+      // Inkeep runs its own QA pipeline behind an OpenAI-compatible endpoint
+      // with no reasoning control; a level would only reach it as an
+      // unsupported `reasoning_effort`, so refuse it up front.
+      if (value.provider === "inkeep" && value.reasoning) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'ai.ask.reasoning is not supported when provider is "inkeep".',
+          path: ["reasoning"],
         });
       }
     })
@@ -1103,6 +1133,7 @@ const navigationConfigSchema = z.strictObject({
 });
 
 export type AskAiProvider = (typeof askAiProviders)[number];
+export type AskReasoning = (typeof askReasoningLevels)[number];
 export type AskAiConfig = NonNullable<z.infer<typeof aiConfigSchema>["ask"]>;
 export { openInChatProviders } from "./open-in-chat.ts";
 export type { OpenInChatProvider } from "./open-in-chat.ts";

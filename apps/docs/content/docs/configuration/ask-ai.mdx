@@ -219,6 +219,22 @@ The values are written into the generated route as-is, so keep secrets in `apiKe
 
 Keys are read through Astro's [`getSecret()`](https://docs.astro.build/en/guides/environment-variables/#retrieving-secrets-programmatically), so each adapter supplies them its own way: environment variables on Node, Vercel, and Netlify, and the Worker's [bindings](https://docs.astro.build/en/guides/integrations-guide/cloudflare/#environment-variables-and-secrets) on Cloudflare. Enabling Ask AI also turns on React for the in-page island — see [Customization](/docs/configuration/customization#interactive-islands).
 
+## Reasoning
+
+Reasoning models think before they answer, and how much they do so by default varies by model. For grounded docs Q&A the retrieved excerpts carry the answer, so most of that thinking is latency the reader waits through. `reasoning` sets how much the model reasons: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, or `"xhigh"`:
+
+```ts blume.config.ts lineNumbers
+ai: {
+  ask: {
+    enabled: true,
+    model: "openai/gpt-5.5",
+    reasoning: "none",
+  },
+}
+```
+
+The value is sent as the backend's own reasoning-effort control. Through the gateway it travels as the [AI SDK's `reasoning` option](https://ai-sdk.dev/docs/ai-sdk-core/reasoning), which the gateway maps to the model's setting — OpenAI's `reasoning_effort`, for example. On OpenRouter it is sent as `reasoning.effort`, and on LLMGateway or a custom `openai-compatible` endpoint as `reasoning_effort` in the request, so the endpoint has to accept that parameter. The model has to support the level you pick: OpenAI rejects a level a model doesn't offer (`"none"` and `"xhigh"` exist only on some), so check the model's documentation before setting one. Inkeep runs its own QA pipeline and has no reasoning control, so setting `reasoning` with that backend is a config error. Leave it unset to keep the model's default. Like [retrieval size](#retrieval-size), it trades thoroughness for time-to-first-token, and answers stay grounded either way.
+
 ## Rate limiting
 
 The `POST /api/ask` endpoint is **unauthenticated** — it has to be, so the in-page assistant can call it. Blume validates each request — rejecting malformed bodies, capping it to 1–40 messages, and accepting only `user`/`assistant` roles so a caller can't inject their own system prompt and repurpose the route as a general LLM proxy — to bound how much a single call can spend against your model, but it can't stop someone from calling the endpoint repeatedly. If cost abuse is a concern, put the route behind a rate limiter — your host's (e.g. Vercel's) edge rate limiting, a middleware, or your model provider's per-key spend limits.

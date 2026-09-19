@@ -1382,6 +1382,24 @@ describe("generateRuntime", () => {
     expect(generateRuntime(project)).rejects.toThrow(/ghost\.woff2/u);
   });
 
+  it("forwards ai.ask.reasoning to the generated Ask route", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts": `export default {
+  ai: { ask: { enabled: true, reasoning: "none" } },
+};
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    await generateRuntime(project);
+    const route = await readFile(
+      join(project.context.outDir, "src", "pages", "api", "ask.ts"),
+      "utf-8"
+    );
+    expect(route).toContain('reasoning: "none",');
+  });
+
   it("writes the full runtime for a feature-rich project", async () => {
     const project = await scanProject(await writeProject(KITCHEN_SINK));
     const out = project.context.outDir;

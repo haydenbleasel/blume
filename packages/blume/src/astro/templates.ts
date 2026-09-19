@@ -9,7 +9,7 @@ import type { AskBackend } from "../ai/ask.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { TOC_HIDDEN_KEY } from "../core/heading-markers.ts";
-import type { ResolvedConfig } from "../core/schema.ts";
+import type { AskReasoning, ResolvedConfig } from "../core/schema.ts";
 import { BLUME_IGNORE_DIRS } from "../core/sources/watch.ts";
 import { trimChar } from "../core/trim.ts";
 import type { ProjectContext } from "../core/types.ts";
@@ -1044,9 +1044,53 @@ export interface AskEndpointOptions {
   cors?: string[];
   /** `ai.ask.instructions` — extra system-prompt text. */
   instructions?: string;
+  /**
+   * `ai.ask.reasoning` — how much the model reasons before answering, sent
+   * as the backend's own reasoning-effort control.
+   */
+  reasoning?: AskReasoning;
   /** `ai.ask.retrieval` — how much documentation each question carries. */
   retrieval?: AskRetrievalOptions;
 }
+
+/** The pieces `askEndpointTemplate` splices in for `ai.ask.cors`. */
+interface AskCorsTemplate {
+  /** The route's closing token: `});` when the POST is wrapped, `};` otherwise. */
+  close: string;
+  /** The runtime import, when anything is listed. */
+  imports: string[];
+  /** The opening of `export const POST: APIRoute = `. */
+  open: string;
+  /** The allow list and the `OPTIONS` handler, spliced after the provider setup. */
+  setup: string;
+}
+
+/**
+ * `ai.ask.cors`: a browser only lets another origin read the stream when the
+ * response names that origin, and a JSON POST preflights first, so the route
+ * answers `OPTIONS` and wraps the `POST` in `withCors`, which stamps a listed
+ * origin on every response — errors included, so a cross-origin caller can
+ * tell a 400 from a 500 — without each `return` having to remember to.
+ * Unlisted origins get no allow header and stay subject to the same-origin
+ * rule. Left out entirely when nothing is listed, so the default route is
+ * unchanged.
+ */
+const askCorsTemplate = (cors: readonly string[] = []): AskCorsTemplate =>
+  cors.length > 0
+    ? {
+        close: "});",
+        imports: [
+          'import { preflightResponse, withCors } from "blume/ai/cors.ts";',
+        ],
+        open: "withCors(ALLOWED_ORIGINS, async ({ request }) => {",
+        setup: `
+const ALLOWED_ORIGINS = ${JSON.stringify(cors)};
+
+export const OPTIONS: APIRoute = ({ request }) =>
+  preflightResponse(request, ALLOWED_ORIGINS);
+`,
+      }
+    : { close: "};", imports: [], open: "async ({ request }) => {", setup: "" };
 
 /**
  * Generate the Ask AI server endpoint (`.blume/src/pages/api/ask.ts`).
@@ -1055,17 +1099,24 @@ export interface AskEndpointOptions {
  * built-in prompt on every path: the grounded prompt via `createAskContext`,
  * and the plain fallback here. `options.retrieval` (the `ai.ask.retrieval`
  * config) is forwarded to `createAskContext` on the grounded path, where it
- * sizes retrieval. `options.cors` (the `ai.ask.cors` config) adds a preflight
- * handler and wraps the `POST` so every response names a listed origin. All
- * three travel in one options object so a new call site can't silently drop
- * one of them.
+ * sizes retrieval. `options.reasoning` (the `ai.ask.reasoning` config)
+ * reaches the model call on both paths. `options.cors` (the `ai.ask.cors`
+ * config) adds a preflight handler and wraps the `POST` so every response
+ * names a listed origin. All four travel in one options object so a new call
+ * site can't silently drop one of them.
  */
 export const askEndpointTemplate = (
   backend: AskBackend,
   grounded: boolean,
   options?: AskEndpointOptions
 ): string => {
-  const instructions = options?.instructions;
+  const { instructions, reasoning, retrieval } = options ?? {};
+  // `ai.ask.reasoning`. The gateway and OpenAI-compatible providers take it
+  // from `streamText`'s top-level `reasoning` (the gateway maps it to the
+  // model's own control, the OpenAI-compatible provider sends it as
+  // `reasoning_effort`). OpenRouter's provider ignores that call option and
+  // only reads its own model setting, so there the level rides on the model
+  // as `reasoning.effort`. Omitted keeps the provider default on every path.
   const fallbackPrompt = instructions
     ? `${ASK_FALLBACK_PROMPT}\n\n${instructions}`
     : ASK_FALLBACK_PROMPT;
@@ -1101,7 +1152,10 @@ export const askEndpointTemplate = (
     setup = `\nconst openrouter = createOpenRouter({
   apiKey: getSecret(${JSON.stringify(backend.apiKeyEnv)}),${headersField}
 });\n`;
-    modelExpr = `openrouter(${JSON.stringify(backend.model)})`;
+    const settings = reasoning
+      ? `, { reasoning: { effort: ${JSON.stringify(reasoning)} } }`
+      : "";
+    modelExpr = `openrouter(${JSON.stringify(backend.model)}${settings})`;
   } else if (backend.kind === "openai-compatible") {
     imports.push(
       'import { createOpenAICompatible } from "@ai-sdk/openai-compatible";'
@@ -1124,36 +1178,15 @@ export const askEndpointTemplate = (
     if (instructions) {
       groundFields.push(`instructions: ${JSON.stringify(instructions)}`);
     }
-    if (options?.retrieval) {
-      groundFields.push(`retrieval: ${JSON.stringify(options.retrieval)}`);
+    if (retrieval) {
+      groundFields.push(`retrieval: ${JSON.stringify(retrieval)}`);
     }
     const groundOptions =
       groundFields.length > 0 ? `, { ${groundFields.join(", ")} }` : "";
     setup += `\nconst ground = createAskContext(askData${groundOptions});\n`;
   }
-  // `ai.ask.cors`: a browser only lets another origin read the stream when the
-  // response names that origin, and a JSON POST preflights first, so the route
-  // answers `OPTIONS` and wraps the `POST` in `withCors`, which stamps a listed
-  // origin on every response — errors included, so a cross-origin caller can
-  // tell a 400 from a 500 — without each `return` having to remember to.
-  // Unlisted origins get no allow header and stay subject to the same-origin
-  // rule. Left out entirely when nothing is listed, so the default route is
-  // unchanged.
-  const cors = options?.cors ?? [];
-  if (cors.length > 0) {
-    imports.push(
-      'import { preflightResponse, withCors } from "blume/ai/cors.ts";'
-    );
-  }
-  const corsSetup =
-    cors.length > 0
-      ? `
-const ALLOWED_ORIGINS = ${JSON.stringify(cors)};
-
-export const OPTIONS: APIRoute = ({ request }) =>
-  preflightResponse(request, ALLOWED_ORIGINS);
-`
-      : "";
+  const cors = askCorsTemplate(options?.cors);
+  imports.push(...cors.imports);
   // Validate the client-supplied body and cap its size. The endpoint is
   // unauthenticated, so bounding message count/length limits how much a caller
   // can spend against the model per request, and restricting roles to
@@ -1210,28 +1243,29 @@ export const OPTIONS: APIRoute = ({ request }) =>
   const onError = `      onError({ error }) {
         console.error("Ask AI provider error:", error);
       },`;
+  // The `streamText` argument list, built once so the grounded and plain
+  // paths can't drift: they differ only in where the instructions come from.
+  const streamFields = [
+    `model: ${modelExpr}`,
+    grounded
+      ? "instructions"
+      : `instructions:\n        ${JSON.stringify(fallbackPrompt)}`,
+    "messages",
+  ];
+  if (reasoning && backend.kind !== "openrouter") {
+    streamFields.push(`reasoning: ${JSON.stringify(reasoning)}`);
+  }
+  const call = `    const result = streamText({
+      ${streamFields.join(",\n      ")},
+${onError}
+    });`;
   const stream = grounded
     ? `    const instructions =
       (await ground(messages, body.page)) ??
       ${JSON.stringify(fallbackPrompt)};
-    const result = streamText({
-      model: ${modelExpr},
-      instructions,
-      messages,
-${onError}
-    });`
-    : `    const result = streamText({
-      model: ${modelExpr},
-      instructions:
-        ${JSON.stringify(fallbackPrompt)},
-      messages,
-${onError}
-    });`;
-  const [open, close] =
-    cors.length > 0
-      ? ["withCors(ALLOWED_ORIGINS, async ({ request }) => {", "});"]
-      : ["async ({ request }) => {", "};"];
-  const handler = `export const POST: APIRoute = ${open}
+${call}`
+    : call;
+  const handler = `export const POST: APIRoute = ${cors.open}
 ${validate}
 ${keyCheck}
   try {
@@ -1240,12 +1274,12 @@ ${stream}
   } catch {
     return new Response("Failed to generate a response.", { status: 500 });
   }
-${close}`;
+${cors.close}`;
   return `// Generated by Blume. Do not edit.
 ${imports.join("\n")}
 
 export const prerender = false;
-${setup}${corsSetup}
+${setup}${cors.setup}
 ${handler}
 `;
 };

@@ -70,6 +70,7 @@ describe("eject", () => {
             cors: ["https://www.example.com/"],
             enabled: true,
             instructions: "Answer in pirate speak.",
+            reasoning: "low",
             retrieval: { contextBudget: 2500, excerptChars: 1200, maxResults: 3 },
           },
           mcp: { enabled: true },
@@ -144,6 +145,8 @@ describe("eject", () => {
       'const ALLOWED_ORIGINS = ["https://www.example.com"];'
     );
     expect(ejectedAsk).toContain("export const OPTIONS");
+    // ...and the `ai.ask.reasoning` level, forwarded to `streamText`.
+    expect(ejectedAsk).toContain('reasoning: "low",');
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/api/search.ts")).toBe(true);
     expect(has("src/pages/[section]/rss.xml.ts")).toBe(true);

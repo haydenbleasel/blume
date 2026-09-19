@@ -1674,6 +1674,8 @@ describe("askEndpointTemplate", () => {
     expect(out).not.toContain("createOpenRouter");
     expect(out).not.toContain("process.env");
     expect(out).not.toContain("headers:");
+    // No `ai.ask.reasoning`: the provider keeps its own default.
+    expect(out).not.toContain("reasoning:");
     // No `ai.ask.cors`: no preflight handler, no wrapper around the POST.
     expect(out).not.toContain("OPTIONS");
     expect(out).not.toContain("blume/ai/cors.ts");
@@ -1718,6 +1720,55 @@ describe("askEndpointTemplate", () => {
     );
     expect(openrouter).toContain("withCors(ALLOWED_ORIGINS,");
     expect(openrouter).toContain("export const OPTIONS");
+  });
+
+  it("forwards ai.ask.reasoning to streamText on the grounded and plain paths", () => {
+    const grounded = askEndpointTemplate(resolveAskBackend(), true, {
+      reasoning: "none",
+    });
+    expect(grounded).toContain(
+      'instructions,\n      messages,\n      reasoning: "none",\n      onError({ error })'
+    );
+    const plain = askEndpointTemplate(resolveAskBackend(), false, {
+      reasoning: "low",
+    });
+    expect(plain).not.toContain("createAskContext");
+    expect(plain).toContain(
+      'messages,\n      reasoning: "low",\n      onError({ error })'
+    );
+    // OpenAI-compatible backends take the same top-level option (their
+    // provider sends it as `reasoning_effort`).
+    const compatible = askEndpointTemplate(
+      resolveAskBackend(
+        askConfig({
+          baseUrl: "https://api.example.com/v1",
+          enabled: true,
+          provider: "openai-compatible",
+        })
+      ),
+      true,
+      { reasoning: "high" }
+    );
+    expect(compatible).toContain(
+      'messages,\n      reasoning: "high",\n      onError({ error })'
+    );
+  });
+
+  it("gives OpenRouter the reasoning level as its own model setting", () => {
+    const out = askEndpointTemplate(
+      resolveAskBackend(
+        askConfig({ enabled: true, model: "x/y", provider: "openrouter" })
+      ),
+      true,
+      { reasoning: "none" }
+    );
+    // The OpenRouter provider ignores the AI SDK's top-level `reasoning` call
+    // option, so the level rides on the model as `reasoning.effort` — and
+    // nowhere else, so the ejected route doesn't carry a dead field.
+    expect(out).toContain(
+      'openrouter("x/y", { reasoning: { effort: "none" } })'
+    );
+    expect(out).not.toContain('reasoning: "none"');
   });
 
   it("inlines ai.ask.headers into every provider factory", () => {

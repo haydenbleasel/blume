@@ -29,7 +29,11 @@ import {
 } from "../src/astro/templates.ts";
 import { buildContentGraph } from "../src/core/graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
-import { blumeConfigSchema, pageMetaSchema } from "../src/core/schema.ts";
+import {
+  askReasoningLevels,
+  blumeConfigSchema,
+  pageMetaSchema,
+} from "../src/core/schema.ts";
 import type {
   AskAiConfig,
   BlumeConfigInput,
@@ -2056,6 +2060,23 @@ describe("ai.ask schema", () => {
     }
   });
 
+  it("accepts every reasoning level and rejects anything else", () => {
+    for (const reasoning of askReasoningLevels) {
+      expect(
+        blumeConfigSchema.parse({ ai: { ask: { enabled: true, reasoning } } })
+          .ai.ask?.reasoning
+      ).toBe(reasoning);
+    }
+    expect(
+      blumeConfigSchema.parse({ ai: { ask: { enabled: true } } }).ai.ask
+    ).not.toHaveProperty("reasoning");
+    for (const reasoning of ["provider-default", "max", 2]) {
+      expect(() =>
+        blumeConfigSchema.parse({ ai: { ask: { enabled: true, reasoning } } })
+      ).toThrow();
+    }
+  });
+
   it("rejects cors alongside an external endpoint", () => {
     // The generated route is what reads `cors`; an `endpoint` replaces it, so
     // the pair would silently do nothing.
@@ -2078,6 +2099,19 @@ describe("ai.ask schema", () => {
         ai: { ask: { enabled: true, provider: "openai-compatible" } },
       })
     ).toThrow(/ai\.ask\.baseUrl is required/u);
+  });
+
+  it("rejects reasoning on the inkeep provider", () => {
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: { ask: { enabled: true, provider: "inkeep", reasoning: "none" } },
+      })
+    ).toThrow(/ai\.ask\.reasoning is not supported/u);
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: { ask: { enabled: true, provider: "inkeep" } },
+      })
+    ).not.toThrow();
   });
 
   it("accepts openai-compatible with a baseUrl", () => {
