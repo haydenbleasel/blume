@@ -1826,6 +1826,7 @@ const writeAskFiles = async (
   await write(
     join(srcDir, "pages", "api", "ask.ts"),
     askEndpointTemplate(resolveAskBackend(ask), grounded, {
+      cors: ask.cors,
       instructions: ask.instructions,
       reasoning: ask.reasoning,
       retrieval: ask.retrieval,

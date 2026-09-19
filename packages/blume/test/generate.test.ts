@@ -1222,7 +1222,10 @@ describe("buildRuntimeData", () => {
 
 const KITCHEN_SINK = {
   "blume.config.ts": `export default {
-  ai: { ask: { enabled: true }, mcp: { enabled: true } },
+  ai: {
+    ask: { cors: ["https://www.example.com"], enabled: true },
+    mcp: { enabled: true },
+  },
   deployment: { site: "https://example.com" },
   export: true,
   github: { dir: "site", owner: "acme", repo: "docs" },
@@ -1414,6 +1417,10 @@ describe("generateRuntime", () => {
 
     // Feature-gated files.
     expect(has("src/pages/api/ask.ts")).toBe(true);
+    // The `ai.ask.cors` origins reach the generated route.
+    expect(
+      await readFile(join(out, "src/pages/api/ask.ts"), "utf-8")
+    ).toContain('const ALLOWED_ORIGINS = ["https://www.example.com"];');
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/changelog.astro")).toBe(true);
     expect(has("src/pages/404.astro")).toBe(true);

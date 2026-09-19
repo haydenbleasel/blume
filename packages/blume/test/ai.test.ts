@@ -2030,6 +2030,36 @@ describe("ai.ask schema", () => {
     ).toThrow();
   });
 
+  it("reduces cors entries to origins and rejects non-HTTP(S) values", () => {
+    expect(
+      blumeConfigSchema.parse({
+        ai: {
+          ask: {
+            cors: ["https://www.example.com/docs/", "http://localhost:3000"],
+            enabled: true,
+          },
+        },
+      }).ai.ask?.cors
+    ).toStrictEqual(["https://www.example.com", "http://localhost:3000"]);
+    expect(
+      blumeConfigSchema.parse({ ai: { ask: { enabled: true } } }).ai.ask
+    ).not.toHaveProperty("cors");
+    // `"*"` admits every origin and rides through untouched.
+    expect(
+      blumeConfigSchema.parse({ ai: { ask: { cors: ["*"], enabled: true } } })
+        .ai.ask?.cors
+    ).toStrictEqual(["*"]);
+    for (const cors of [
+      ["example.com"],
+      ["ftp://example.com"],
+      "https://x.y",
+    ]) {
+      expect(() =>
+        blumeConfigSchema.parse({ ai: { ask: { cors, enabled: true } } })
+      ).toThrow();
+    }
+  });
+
   it("accepts every reasoning level and rejects anything else", () => {
     for (const reasoning of askReasoningLevels) {
       expect(
@@ -2045,6 +2075,22 @@ describe("ai.ask schema", () => {
         blumeConfigSchema.parse({ ai: { ask: { enabled: true, reasoning } } })
       ).toThrow();
     }
+  });
+
+  it("rejects cors alongside an external endpoint", () => {
+    // The generated route is what reads `cors`; an `endpoint` replaces it, so
+    // the pair would silently do nothing.
+    expect(() =>
+      blumeConfigSchema.parse({
+        ai: {
+          ask: {
+            cors: ["https://www.example.com"],
+            enabled: true,
+            endpoint: "https://api.example.com/ask",
+          },
+        },
+      })
+    ).toThrow(/ai\.ask\.cors only applies to the generated route/u);
   });
 
   it("requires baseUrl for the openai-compatible provider", () => {

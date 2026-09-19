@@ -885,6 +885,21 @@ const aiConfigSchema = z.strictObject({
       // Base URL of the backend. Required for `openai-compatible` only when no
       // external endpoint is supplied; for named providers it overrides the preset.
       baseUrl: z.url().optional(),
+      // Origins allowed to call the generated `/api/ask` from another site (a
+      // marketing page that embeds an ask box, say), or `"*"` for every
+      // origin. Each URL is reduced to its origin so a trailing slash or path
+      // can't defeat the exact match the route performs. Read by the
+      // generated route only; an external `endpoint` owns its own CORS.
+      cors: z
+        .array(
+          z.union([
+            z.literal("*"),
+            z
+              .url({ protocol: /^https?$/u })
+              .transform((value) => new URL(value).origin),
+          ])
+        )
+        .optional(),
       enabled: z.boolean().default(false),
       // Optional external endpoint for projects that keep their docs static
       // and host Ask AI in an existing backend. Absolute URLs and root-relative
@@ -943,6 +958,16 @@ const aiConfigSchema = z.strictObject({
           message:
             'ai.ask.baseUrl is required when provider is "openai-compatible".',
           path: ["baseUrl"],
+        });
+      }
+      // `cors` configures the generated route, which an external `endpoint`
+      // replaces; accepting both would silently do nothing.
+      if (value.cors && value.endpoint) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "ai.ask.cors only applies to the generated route; with ai.ask.endpoint, CORS is that backend's job.",
+          path: ["cors"],
         });
       }
       // Inkeep runs its own QA pipeline behind an OpenAI-compatible endpoint

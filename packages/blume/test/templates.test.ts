@@ -1676,6 +1676,50 @@ describe("askEndpointTemplate", () => {
     expect(out).not.toContain("headers:");
     // No `ai.ask.reasoning`: the provider keeps its own default.
     expect(out).not.toContain("reasoning:");
+    // No `ai.ask.cors`: no preflight handler, no wrapper around the POST.
+    expect(out).not.toContain("OPTIONS");
+    expect(out).not.toContain("blume/ai/cors.ts");
+    expect(out).toContain(
+      "export const POST: APIRoute = async ({ request }) => {"
+    );
+    expect(out).toContain("{ status: 400 }");
+    expect(out).toContain("result.toTextStreamResponse();");
+  });
+
+  it("answers preflight and wraps the POST when ai.ask.cors is set", () => {
+    const out = askEndpointTemplate(resolveAskBackend(), true, {
+      cors: ["https://www.example.com", "http://localhost:3000"],
+    });
+    expect(out).toContain(
+      'import { preflightResponse, withCors } from "blume/ai/cors.ts";'
+    );
+    expect(out).toContain(
+      'const ALLOWED_ORIGINS = ["https://www.example.com","http://localhost:3000"];'
+    );
+    // The preflight the island's JSON POST triggers.
+    expect(out).toContain(
+      "export const OPTIONS: APIRoute = ({ request }) =>\n  preflightResponse(request, ALLOWED_ORIGINS);"
+    );
+    // The POST is wrapped once, so every response — the stream and the
+    // errors — carries the headers without each `return` opting in, and a
+    // cross-origin caller can read a 400 or 500 instead of an opaque failure.
+    expect(out).toContain(
+      "export const POST: APIRoute = withCors(ALLOWED_ORIGINS, async ({ request }) => {"
+    );
+    expect(out).toContain("  }\n});\n");
+    expect(out).toContain("{ status: 400 }");
+    expect(out).toContain("result.toTextStreamResponse();");
+  });
+
+  it("wraps the POST of every backend", () => {
+    const cors = ["https://www.example.com"];
+    const openrouter = askEndpointTemplate(
+      resolveAskBackend(askConfig({ enabled: true, provider: "openrouter" })),
+      false,
+      { cors }
+    );
+    expect(openrouter).toContain("withCors(ALLOWED_ORIGINS,");
+    expect(openrouter).toContain("export const OPTIONS");
   });
 
   it("forwards ai.ask.reasoning to streamText on the grounded and plain paths", () => {
