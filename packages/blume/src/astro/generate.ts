@@ -41,7 +41,11 @@ import {
 } from "../components/layout/nav-utils.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { validateUsedComponents } from "../core/component-diagnostics.ts";
-import { analyzeComponentOverrides } from "../core/component-overrides.ts";
+import {
+  analyzeComponentOverrides,
+  emptyComponentOverrides,
+} from "../core/component-overrides.ts";
+import type { ComponentOverrideAnalysis } from "../core/component-overrides.ts";
 import {
   collectContentAssets,
   rewriteRelativeImages,
@@ -111,7 +115,6 @@ import { buildThemeCss } from "../theme/palette.ts";
 import { rebaseSourceDirectives } from "../theme/sources.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
 import { planComponentSlots } from "./component-slots.ts";
-import type { ComponentSlotPlan } from "./component-slots.ts";
 import {
   EXAMPLE_SCAN_GLOB,
   discoverExamples,
@@ -140,8 +143,6 @@ import {
   exampleWrapperTemplate,
   examplesPageTemplate,
   exampleSlug,
-  islandMapTemplate,
-  islandWrapperTemplate,
   apiNavigationTemplate,
   apiNotFoundTemplate,
   apiPageTemplate,
@@ -1879,33 +1880,19 @@ export interface GenerateResult {
 }
 
 /**
- * Statically analyze the user's `components.ts` (never executing it) and plan the
- * generated `components.ts` module plus any hydration wrappers. Returns the plan
- * and the analyzer's warnings; a project with no components file gets an empty
- * plan and no warnings.
+ * Statically analyze the user's `components.ts` (never executing it). Empty for
+ * a project with no components file; throws `BLUME_COMPONENTS_INVALID` for an
+ * override that isn't one of the accepted static forms.
  */
-const buildComponentSlots = async (
+export const analyzeComponentsFile = async (
   componentsFile: string | null
-): Promise<{
-  plan: ComponentSlotPlan;
-  /** MDX tags the overrides define (for the unknown-component check). */
-  tags: string[];
-  warnings: string[];
-}> => {
-  const analysis = componentsFile
+): Promise<ComponentOverrideAnalysis> =>
+  componentsFile
     ? analyzeComponentOverrides(
         await readFile(componentsFile, "utf-8"),
         componentsFile
       )
-    : null;
-  return {
-    plan: planComponentSlots(componentsFile, analysis),
-    tags: analysis
-      ? [...analysis.mdx, ...analysis.islands].map((entry) => entry.key)
-      : [],
-    warnings: analysis ? analysis.warnings : [],
-  };
-};
+    : emptyComponentOverrides();
 
 /** The OG endpoint fonts for a scanned project (see {@link resolveOgFonts}). */
 const projectOgFonts = (project: BlumeProject): DerivedOgFonts =>
@@ -2072,10 +2059,10 @@ export const generateRuntime = async (
   // entryId so i18n duplicates of one entry write a single file. Collected here
   // so math detection also sees staged bodies (they never live under root).
   const staged = collectStaged(project);
-  // Statically analyze `components.ts` overrides (never executed): drives the
-  // `islands` group, hydration on layout/mdx overrides, string-path resolution,
-  // and the "framework component with no client mode" diagnostic. Independent of
-  // the discovery reads, so it joins the same parallel batch.
+  // Statically analyze `components.ts` overrides (never executed): drives
+  // hydration on layout/mdx overrides, string-path resolution, and the
+  // "framework component with no client mode" diagnostic. Independent of the
+  // discovery reads, so it joins the same parallel batch.
   const [
     pages,
     detectedReact,
@@ -2085,7 +2072,7 @@ export const generateRuntime = async (
     integrationBridge,
     islandDiscovery,
     exampleDiscovery,
-    componentSlots,
+    overrideAnalysis,
   ] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(context.root),
@@ -2095,13 +2082,15 @@ export const generateRuntime = async (
     loadIntegrationBridge(config, context),
     discoverIslands(context.root),
     discoverExamples(context.root, config.examples.source),
-    buildComponentSlots(context.componentsFile),
+    analyzeComponentsFile(context.componentsFile),
   ]);
-  const {
-    plan: slotPlan,
-    tags: overrideTags,
-    warnings: overrideWarnings,
-  } = componentSlots;
+  // The `islands/` convention and `components.ts` share one static plan: every
+  // entry is imported by path, hydrated ones through a generated wrapper.
+  const slotPlan = planComponentSlots(
+    islandDiscovery.islands,
+    overrideAnalysis
+  );
+  const overrideWarnings = overrideAnalysis.warnings;
   // Expose the discovered examples for agent-facing Markdown downleveling
   // (`<Component>` → source) before any consumer (raw `.md`, MCP, llms) runs.
   project.examples = exampleMarkdownLookup(exampleDiscovery.examples);
@@ -2237,10 +2226,6 @@ export const generateRuntime = async (
       write(askPath, askComponentTemplate(askEnabled)),
       write(join(srcDir, "generated", "components.ts"), slotPlan.module),
       write(
-        join(srcDir, "generated", "islands.ts"),
-        islandMapTemplate(islandDiscovery.islands)
-      ),
-      write(
         join(srcDir, "generated", "examples.ts"),
         exampleMapTemplate(exampleDiscovery.examples, config.basePath)
       ),
@@ -2272,18 +2257,7 @@ export const generateRuntime = async (
         })
       ),
     ]),
-    // Per-island hydration wrappers for the `islands/` convention. The map
-    // module (written above, always) imports these; orphans from removed
-    // islands are pruned at the end of the pass.
-    Promise.all(
-      islandDiscovery.islands.map((island) =>
-        write(
-          join(srcDir, "generated", "islands", `${island.name}.astro`),
-          islandWrapperTemplate(island)
-        )
-      )
-    ),
-    // Per-override hydration wrappers for `defineComponents` islands and
+    // Per-override hydration wrappers for `islands/` convention components and
     // `client:*` layout/mdx overrides. The generated `components.ts` (written
     // above) imports these; orphans from removed overrides are pruned at the
     // end of the pass.
@@ -2472,7 +2446,7 @@ export const generateRuntime = async (
   // or a `components.ts` override. Needs the project's own components, known here.
   const knownComponentTags = new Set<string>([
     ...islandDiscovery.islands.map((island) => island.name),
-    ...overrideTags,
+    ...overrideAnalysis.mdx.map((entry) => entry.key),
   ]);
   // Missing-dependency preflights: the search provider's SDK, the Ask AI
   // backend's provider SDK, the deployment adapter's package, and — since

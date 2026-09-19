@@ -8,6 +8,7 @@ import {
   refreshBlumeContent,
   showBlumeErrorOverlay,
 } from "../../astro/integration.ts";
+import { BlumeError } from "../../core/diagnostics.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import { resolveRuntimeDir } from "../../core/project.ts";
 import { parsePort } from "../args.ts";
@@ -175,6 +176,15 @@ export const devCommand = defineCommand({
         reportDiagnostics(next.diagnostics, root);
         showBlumeErrorOverlay(next.diagnostics);
       } catch (error) {
+        // A config error the generator raised (an unplannable `components.ts`
+        // override, a missing font file) is a diagnostic: report it in the
+        // terminal and the browser overlay like a scan-time error, so the fix
+        // is visible where the edit happened.
+        if (error instanceof BlumeError) {
+          reportDiagnostics([error.diagnostic], root);
+          showBlumeErrorOverlay([error.diagnostic]);
+          return;
+        }
         // SAFETY: regeneration failures come from the generator and Astro's
         // server API, which raise Error instances; only the message is shown.
         logger.error(`Regeneration failed: ${(error as Error).message}`);

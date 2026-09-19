@@ -7,7 +7,6 @@ import { join } from "pathe";
 
 import { resolveAskBackend } from "../src/ai/ask.ts";
 import type { ExampleSpec } from "../src/astro/examples.ts";
-import type { IslandSpec } from "../src/astro/islands.ts";
 import { RUNTIME_MODULE_FILES } from "../src/astro/runtime-modules.ts";
 import {
   apiNavigationTemplate,
@@ -26,8 +25,6 @@ import {
   exampleSlug,
   examplesPageTemplate,
   exampleWrapperTemplate,
-  islandMapTemplate,
-  islandWrapperTemplate,
   mcpEndpointTemplate,
   mcpPageFile,
   mixedbreadSearchEndpointTemplate,
@@ -83,14 +80,6 @@ const askConfig = (ask: NonNullable<BlumeConfig["ai"]>["ask"]) =>
 const withProvider = (search: BlumeConfig["search"]) =>
   blumeConfigSchema.parse({ search });
 
-const island = (over: Partial<IslandSpec> = {}): IslandSpec => ({
-  client: "visible",
-  file: "/project/islands/Counter.tsx",
-  framework: "react",
-  name: "Counter",
-  ...over,
-});
-
 const example = (over: Partial<ExampleSpec> = {}): ExampleSpec => ({
   client: "visible",
   file: "/project/examples/counter.tsx",
@@ -116,12 +105,11 @@ describe("catchAllPageTemplate", () => {
     expect(out).toContain("layout={layoutOverrides}");
   });
 
-  it("imports the island map and spreads it into the MDX scope", () => {
+  it("reads islands through the generated components map, not a separate island map", () => {
     const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
-    expect(out).toContain(
-      'import { islandComponents } from "../generated/islands.ts"'
-    );
-    expect(out).toContain("...islandComponents,");
+    expect(out).not.toContain("generated/islands");
+    expect(out).not.toContain("islandComponents");
+    expect(out).toContain("...userMdx,");
   });
 
   it("no longer imports the removed Warning component", () => {
@@ -282,58 +270,6 @@ return i18n.locales.map((l) => mountLocalized(logicalRoute, l.code));
   });
 });
 
-describe("islandWrapperTemplate", () => {
-  it("applies the default visible directive and forwards props + slot", () => {
-    const out = islandWrapperTemplate(island());
-    expect(out).toContain('import Island from "/project/islands/Counter.tsx"');
-    expect(out).toContain(
-      "<Island client:visible {...Astro.props}><slot /></Island>"
-    );
-  });
-
-  it("applies client:load", () => {
-    expect(islandWrapperTemplate(island({ client: "load" }))).toContain(
-      "<Island client:load {...Astro.props}>"
-    );
-  });
-
-  it("applies client:only with the framework name", () => {
-    expect(islandWrapperTemplate(island({ client: "only" }))).toContain(
-      '<Island client:only="react" {...Astro.props}>'
-    );
-  });
-
-  it("uses the island's framework for client:only (Vue)", () => {
-    expect(
-      islandWrapperTemplate(island({ client: "only", framework: "vue" }))
-    ).toContain('<Island client:only="vue" {...Astro.props}>');
-  });
-
-  // Without a `Props` alias the spread contributes nothing to the JSX props
-  // type, so an island with a required prop fails `astro check` (#91).
-  it("types Props from the island so required props type-check", () => {
-    const out = islandWrapperTemplate(island());
-    expect(out).toContain("type Props = typeof Island extends (");
-    expect(out).toContain("infer P extends object");
-  });
-});
-
-describe("islandMapTemplate", () => {
-  it("exports an empty map when there are no islands", () => {
-    expect(islandMapTemplate([])).toContain(
-      "export const islandComponents = {}"
-    );
-  });
-
-  it("imports each wrapper and maps it by name", () => {
-    const out = islandMapTemplate([island(), island({ name: "Chart" })]);
-    expect(out).toContain('import I0 from "./islands/Counter.astro"');
-    expect(out).toContain('import I1 from "./islands/Chart.astro"');
-    expect(out).toContain("Counter: I0,");
-    expect(out).toContain("Chart: I1,");
-  });
-});
-
 describe("exampleSlug", () => {
   it("hex-escapes every non-alphanumeric character", () => {
     expect(exampleSlug("forms/login")).toBe("forms_2f_login");
@@ -478,7 +414,7 @@ describe("changelogIndexTemplate", () => {
       'import Callout from "blume/components/content/Callout.astro"'
     );
     expect(out).toContain(
-      'import { islandComponents } from "../generated/islands.ts"'
+      'import { mdxComponents as userMdx, layoutOverrides } from "../generated/components.ts"'
     );
     expect(componentMapOf(out)).toBeDefined();
     expect(componentMapOf(out)).toBe(componentMapOf(page));
@@ -497,7 +433,7 @@ describe("changelogIndexTemplate", () => {
     expect(out).toContain(
       'import Math from "blume/components/content/Math.astro"'
     );
-    expect(out).toContain("  Math,\n  ...islandComponents,");
+    expect(out).toContain("  Math,\n  ...userMdx,");
     const off = changelogIndexTemplate({ ...changelogOpts, staged: false });
     expect(off).not.toContain("Math.astro");
   });

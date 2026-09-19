@@ -99,7 +99,19 @@ export const prepareProject = async (
     );
   }
 
-  const { warnings } = await generateRuntime(project);
+  let warnings: string[];
+  try {
+    ({ warnings } = await generateRuntime(project));
+  } catch (error) {
+    // A config error the generator raised (an unplannable `components.ts`
+    // override, a missing font file) is the user's to fix, not an internal
+    // failure: report the diagnostic and stop, like a scan-time error.
+    if (error instanceof BlumeError) {
+      reportDiagnostics([error.diagnostic], options.root);
+      process.exit(1);
+    }
+    throw error;
+  }
   for (const warning of warnings) {
     logger.warn(warning);
   }

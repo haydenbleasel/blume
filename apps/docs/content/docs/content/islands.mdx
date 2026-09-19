@@ -30,28 +30,30 @@ Islands are for **interactive** UI. For a static component you reuse across page
 
 ## Registering islands in `components.ts`
 
-If you'd rather keep islands next to the rest of your components — or give them a different name than the file — register them with `defineComponents`. The `islands` group is exactly like the `islands/` folder: each entry is available in every MDX page and hydrates (defaulting to `client: "visible"`).
+If you'd rather keep islands next to the rest of your components — or give them a different name than the file — register them with `defineComponents` as an `mdx` entry with a `client` mode. That's all an island is: an MDX component that hydrates. Each entry is available in every MDX page, and an entry with the same name as an `islands/` file replaces it.
 
 ```ts components.ts
 import { defineComponents } from "blume";
 import Counter from "./widgets/Counter.tsx";
 
 export default defineComponents({
-  islands: {
-    Counter, // <Counter /> in any MDX page, hydrated
+  mdx: {
+    Counter: { component: Counter, client: "visible" }, // <Counter /> in any MDX page, hydrated
   },
 });
 ```
 
-Reference the component by import or by a path string, and set a hydration mode per island with the descriptor form:
+Reference the component by import or by a path string, and pick the hydration mode per island (`"media"` takes a `media` query alongside it):
 
 ```ts components.ts
 export default defineComponents({
-  islands: {
+  mdx: {
     Chart: { component: "./widgets/Chart.tsx", client: "only" },
   },
 });
 ```
+
+Unlike the folder, there's no default: an `mdx` entry without `client` renders as static HTML, and Blume warns when that entry is a React, Vue, or Svelte component. Blume reads `components.ts` statically, so an entry must be an imported component, a path string, or a `{ component, client, media }` object literal — see [Customization](/docs/configuration/customization#reference-form) for the accepted forms and the error you get otherwise.
 
 ## Hydration
 

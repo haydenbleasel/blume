@@ -1,25 +1,27 @@
 import { existsSync } from "node:fs";
 
-import { dirname, extname, isAbsolute, resolve } from "pathe";
+import { basename, dirname, extname, isAbsolute, resolve } from "pathe";
 import ts from "typescript";
 
+import { BlumeError } from "./diagnostics.ts";
 import type { HydrationMode } from "./schema.ts";
 
 /**
  * Static analysis of a user `components.ts`/`.tsx`.
  *
  * Astro can only hydrate a component it imports *statically by path*, so to honor
- * hydration on overrides (the `islands` group and `client:*` layout/mdx
- * descriptors) Blume needs each override's source path and client mode at
- * generate time — before Vite compiles anything. We read that here by parsing the
- * file with the TypeScript compiler API (never executing it, so `.astro`/React
+ * hydration on overrides Blume needs each override's source path and client mode
+ * at generate time — before Vite compiles anything. We read that here by parsing
+ * the file with the TypeScript compiler API (never executing it, so `.astro`/React
  * imports don't need a Node loader).
  *
- * Only statically-analyzable authoring is understood: a default export that is an
- * object literal or a `defineComponents({ ... })` call, with entries that are
- * imported identifiers, path strings, or `{ component, client, media }` object
- * literals. Anything else falls back to the runtime overrides object (which can
- * still render a static component, just not hydrate it).
+ * Only statically-analyzable authoring is accepted: a default export that is an
+ * object literal or a `defineComponents({ ... })` call, whose `mdx`/`layout`
+ * groups are object literals with entries that are imported identifiers, path
+ * strings, or `{ component, client, media }` object literals. Anything else is a
+ * config error ({@link BlumeError}, `BLUME_COMPONENTS_INVALID`) naming the entry
+ * and the accepted forms — there is no runtime fallback, so an override that
+ * can't be planned never silently renders without hydration.
  */
 
 export type OverrideFramework = "react" | "svelte" | "vue";
@@ -38,34 +40,35 @@ export interface OverrideImport {
 export interface NormalizedOverride {
   /** Present when the override should hydrate; drives the `client:*` directive. */
   client?: HydrationMode;
-  /**
-   * True when the value is a bare imported identifier, so the runtime overrides
-   * object already holds a usable component (no generated import needed for a
-   * non-hydrated entry). False for path strings and `{ component }` descriptors.
-   */
-  identifier: boolean;
   key: string;
   /** Media query for `client: "media"`. */
   media?: string;
-  /**
-   * How to obtain the component. `null` means it couldn't be resolved to a file,
-   * so the runtime overrides object is used (static render only).
-   */
-  source: OverrideImport | null;
+  /** How to obtain the component. */
+  source: OverrideImport;
 }
 
 export interface ComponentOverrideAnalysis {
-  islands: NormalizedOverride[];
   layout: NormalizedOverride[];
   mdx: NormalizedOverride[];
   warnings: string[];
 }
 
-const GROUPS = ["mdx", "layout", "islands"] as const;
+/** The analysis of a project with no `components.ts`. */
+export const emptyComponentOverrides = (): ComponentOverrideAnalysis => ({
+  layout: [],
+  mdx: [],
+  warnings: [],
+});
+
+const GROUPS = ["mdx", "layout"] as const;
 const GROUP_SET = new Set<string>(GROUPS);
 type Group = (typeof GROUPS)[number];
 
 const isGroup = (name: string): name is Group => GROUP_SET.has(name);
+
+/** The authoring forms an override accepts; the fix every rejection points at. */
+export const ACCEPTED_OVERRIDE_FORMS =
+  "Each override must be an imported identifier, a path string, or a `{ component, client, media }` object literal whose `component` is an imported identifier or a path string.";
 
 const FRAMEWORK_BY_EXT = new Map<string, OverrideFramework>([
   ["jsx", "react"],
@@ -100,6 +103,8 @@ const HYDRATION_MODES: ReadonlySet<string> = new Set<HydrationMode>([
   "visible",
 ]);
 
+const HYDRATION_MODE_LIST = '"load", "idle", "visible", "media", or "only"';
+
 const isHydrationMode = (value: string): value is HydrationMode =>
   HYDRATION_MODES.has(value);
 
@@ -112,17 +117,18 @@ interface ImportBinding {
 /** An override's declared component before framework/path resolution. */
 interface RawDescriptor {
   client?: HydrationMode;
-  hadComponent: boolean;
   media?: string;
   source: OverrideImport | null;
 }
 
-const emptyAnalysis = (): ComponentOverrideAnalysis => ({
-  islands: [],
-  layout: [],
-  mdx: [],
-  warnings: [],
-});
+/** Everything one analysis pass needs to resolve and report an entry. */
+interface AnalysisContext {
+  dir: string;
+  /** Rejections collected across the file; thrown together at the end. */
+  errors: string[];
+  imports: Map<string, ImportBinding>;
+  warnings: string[];
+}
 
 const propName = (name: ts.PropertyName): string | undefined =>
   ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
@@ -188,16 +194,13 @@ const unwrapObject = (
   return undefined;
 };
 
-const findDefaultExportObject = (
+const findDefaultExport = (
   sourceFile: ts.SourceFile
-): ts.ObjectLiteralExpression | undefined => {
-  for (const statement of sourceFile.statements) {
-    if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
-      return unwrapObject(statement.expression);
-    }
-  }
-  return undefined;
-};
+): ts.ExportAssignment | undefined =>
+  sourceFile.statements.find(
+    (statement): statement is ts.ExportAssignment =>
+      ts.isExportAssignment(statement) && !statement.isExportEquals
+  );
 
 const probeExtension = (base: string): string | null => {
   for (const extension of COMPONENT_EXTS) {
@@ -237,88 +240,129 @@ const toImport = (
   };
 };
 
+/**
+ * Resolve an identifier to the import it names, or record why it can't be: a
+ * local binding (a `const`, a function declared in the file) has no source path
+ * a wrapper could import.
+ */
 const resolveIdentifier = (
   name: string,
-  imports: Map<string, ImportBinding>,
-  dir: string
+  label: string,
+  context: AnalysisContext
 ): OverrideImport | null => {
-  const binding = imports.get(name);
-  return binding ? toImport(binding.specifier, binding.imported, dir) : null;
+  const binding = context.imports.get(name);
+  if (binding) {
+    return toImport(binding.specifier, binding.imported, context.dir);
+  }
+  context.errors.push(
+    `${label} refers to "${name}", which isn't imported in this file; import the component from its file.`
+  );
+  return null;
 };
+
+const ALLOWED_FIELDS =
+  "only `component`, `client`, and `media` are allowed in a descriptor.";
 
 /** Fold one descriptor-object property into the accumulating descriptor. */
 const applyDescriptorProperty = (
   descriptor: RawDescriptor,
   property: ts.ObjectLiteralElementLike,
-  imports: Map<string, ImportBinding>,
-  dir: string
+  label: string,
+  context: AnalysisContext
 ): void => {
   if (ts.isShorthandPropertyAssignment(property)) {
     if (property.name.text === "component") {
-      descriptor.hadComponent = true;
-      descriptor.source = resolveIdentifier(property.name.text, imports, dir);
+      descriptor.source = resolveIdentifier(
+        property.name.text,
+        `${label}'s \`component\``,
+        context
+      );
+      return;
     }
+    context.errors.push(
+      `${label} has a \`${property.name.text}\` field; ${ALLOWED_FIELDS}`
+    );
     return;
   }
   if (!ts.isPropertyAssignment(property)) {
+    context.errors.push(
+      `${label} contains a spread, method, or accessor; write it as a plain \`{ component, client, media }\` object literal.`
+    );
     return;
   }
   const name = propName(property.name);
   const init = property.initializer;
   if (name === "component") {
-    descriptor.hadComponent = true;
     if (ts.isStringLiteral(init)) {
-      descriptor.source = toImport(init.text, "default", dir);
+      descriptor.source = toImport(init.text, "default", context.dir);
     } else if (ts.isIdentifier(init)) {
-      descriptor.source = resolveIdentifier(init.text, imports, dir);
+      descriptor.source = resolveIdentifier(
+        init.text,
+        `${label}'s \`component\``,
+        context
+      );
+    } else {
+      context.errors.push(
+        `${label}'s \`component\` must be an imported identifier or a path string.`
+      );
     }
-  } else if (
-    name === "client" &&
-    ts.isStringLiteral(init) &&
-    isHydrationMode(init.text)
-  ) {
-    descriptor.client = init.text;
-  } else if (name === "media" && ts.isStringLiteral(init)) {
-    descriptor.media = init.text;
+  } else if (name === "client") {
+    if (ts.isStringLiteral(init) && isHydrationMode(init.text)) {
+      descriptor.client = init.text;
+    } else {
+      context.errors.push(
+        `${label}'s \`client\` must be a string literal: ${HYDRATION_MODE_LIST}.`
+      );
+    }
+  } else if (name === "media") {
+    if (ts.isStringLiteral(init)) {
+      descriptor.media = init.text;
+    } else {
+      context.errors.push(`${label}'s \`media\` must be a string literal.`);
+    }
+  } else {
+    context.errors.push(
+      `${label} has a \`${name ?? property.name.getText()}\` field; ${ALLOWED_FIELDS}`
+    );
   }
 };
 
+/**
+ * Read a `{ component, client, media }` descriptor. Returns null (after
+ * recording the reason) when it can't be planned.
+ */
 const readDescriptor = (
   object: ts.ObjectLiteralExpression,
-  imports: Map<string, ImportBinding>,
-  dir: string
-): RawDescriptor => {
-  const descriptor: RawDescriptor = { hadComponent: false, source: null };
+  label: string,
+  context: AnalysisContext
+): RawDescriptor | null => {
+  const descriptor: RawDescriptor = { source: null };
+  const before = context.errors.length;
+  let hadComponent = false;
   for (const property of object.properties) {
-    applyDescriptorProperty(descriptor, property, imports, dir);
+    if (property.name && propName(property.name) === "component") {
+      hadComponent = true;
+    }
+    applyDescriptorProperty(descriptor, property, label, context);
   }
-  return descriptor;
+  if (!hadComponent) {
+    context.errors.push(
+      `${label} is an object literal without a \`component\` field.`
+    );
+  }
+  return context.errors.length === before ? descriptor : null;
 };
 
 /** Apply cross-cutting validation and produce the final normalized override. */
 const finalize = (
   key: string,
-  group: Group,
   descriptor: RawDescriptor,
   label: string,
-  identifier: boolean,
   warnings: string[]
 ): NormalizedOverride | null => {
   const { client, media, source } = descriptor;
-
-  if (group === "islands") {
-    if (!source) {
-      warnings.push(
-        `Island override "${key}" couldn't be resolved to a file. Reference it by an imported component or a path string with an extension.`
-      );
-      return null;
-    }
-    if (!source.framework) {
-      warnings.push(
-        `Island override "${key}" (${label}) is not a React, Vue, or Svelte component; only framework components can be islands.`
-      );
-      return null;
-    }
+  if (!source) {
+    return null;
   }
 
   if (client === "media" && !media) {
@@ -327,19 +371,19 @@ const finalize = (
     );
   }
 
-  if (client === "only" && source && !source.framework) {
+  if (client === "only" && !source.framework) {
     warnings.push(
       `Override "${key}" uses client: "only" but its framework couldn't be inferred; reference a .tsx/.jsx/.vue/.svelte file.`
     );
   }
 
-  if (!client && source?.framework) {
+  if (!client && source.framework) {
     warnings.push(
       `Override "${key}" points to a ${FRAMEWORK_LABEL[source.framework]} component (${label}) but has no hydration mode, so it renders as static HTML with no interactivity. Add one, e.g. \`${key}: { component: ${JSON.stringify(label)}, client: "load" }\`.`
     );
   }
 
-  const normalized: NormalizedOverride = { identifier, key, source };
+  const normalized: NormalizedOverride = { key, source };
   if (client) {
     normalized.client = client;
   }
@@ -349,37 +393,42 @@ const finalize = (
   return normalized;
 };
 
+/** Normalize one `key: value` entry of a group, or record why it's rejected. */
 const normalizeEntry = (
   entry: ts.ObjectLiteralElementLike,
   group: Group,
-  imports: Map<string, ImportBinding>,
-  dir: string,
-  warnings: string[]
+  context: AnalysisContext
 ): NormalizedOverride | null => {
-  const defaultClient: HydrationMode | undefined =
-    group === "islands" ? "visible" : undefined;
+  const { warnings } = context;
 
   if (ts.isShorthandPropertyAssignment(entry)) {
     const name = entry.name.text;
     return finalize(
       name,
-      group,
-      {
-        client: defaultClient,
-        hadComponent: true,
-        source: resolveIdentifier(name, imports, dir),
-      },
+      { source: resolveIdentifier(name, `${group}.${name}`, context) },
       name,
-      true,
       warnings
     );
   }
 
-  if (!ts.isPropertyAssignment(entry)) {
+  if (ts.isSpreadAssignment(entry)) {
+    context.errors.push(
+      `${group} contains a spread (\`...${entry.expression.getText()}\`); list each override explicitly.`
+    );
     return null;
   }
   const key = propName(entry.name);
   if (!key) {
+    context.errors.push(
+      `${group} has an entry with a computed key (\`${entry.name.getText()}\`); keys must be plain names.`
+    );
+    return null;
+  }
+  const label = `${group}.${key}`;
+  if (!ts.isPropertyAssignment(entry)) {
+    context.errors.push(
+      `${label} is a method or accessor, which Blume can't analyze statically.`
+    );
     return null;
   }
   const value = entry.initializer;
@@ -387,100 +436,89 @@ const normalizeEntry = (
   if (ts.isIdentifier(value)) {
     return finalize(
       key,
-      group,
-      {
-        client: defaultClient,
-        hadComponent: true,
-        source: resolveIdentifier(value.text, imports, dir),
-      },
+      { source: resolveIdentifier(value.text, label, context) },
       value.text,
-      true,
       warnings
     );
   }
   if (ts.isStringLiteral(value)) {
     return finalize(
       key,
-      group,
-      {
-        client: defaultClient,
-        hadComponent: true,
-        source: toImport(value.text, "default", dir),
-      },
+      { source: toImport(value.text, "default", context.dir) },
       value.text,
-      false,
       warnings
     );
   }
   if (ts.isObjectLiteralExpression(value)) {
-    const descriptor = readDescriptor(value, imports, dir);
-    if (!descriptor.hadComponent) {
-      warnings.push(
-        `Override "${key}" is an object without a \`component\` field; expected \`{ component, client }\`.`
-      );
-      return null;
-    }
-    if (!descriptor.source) {
-      warnings.push(
-        `Override "${key}"'s \`component\` couldn't be resolved to a file. Reference an imported component or a path string with an extension.`
-      );
-      return null;
-    }
-    return finalize(
-      key,
-      group,
-      { ...descriptor, client: descriptor.client ?? defaultClient },
-      key,
-      false,
-      warnings
-    );
+    const descriptor = readDescriptor(value, label, context);
+    return descriptor ? finalize(key, descriptor, key, warnings) : null;
   }
 
-  // An inline function/expression: keep it on the runtime object (static only).
-  return { identifier: false, key, source: null };
+  context.errors.push(
+    `${label} is an inline expression, which Blume can't analyze statically.`
+  );
+  return null;
 };
 
-/** Normalize one top-level `{ mdx | layout | islands }` group into `result`. */
+/** Normalize one top-level `{ mdx | layout }` group into `result`. */
 const collectGroupOverrides = (
   property: ts.ObjectLiteralElementLike,
-  imports: Map<string, ImportBinding>,
-  dir: string,
+  context: AnalysisContext,
   result: ComponentOverrideAnalysis
 ): void => {
-  if (!ts.isPropertyAssignment(property)) {
+  if (ts.isSpreadAssignment(property)) {
+    context.errors.push(
+      `The top-level object contains a spread (\`...${property.expression.getText()}\`); list \`mdx\` and \`layout\` explicitly.`
+    );
     return;
   }
   const name = propName(property.name);
+  if (name === "islands") {
+    context.errors.push(
+      'The `islands` group was folded into `mdx`: move each entry there and give it a `client` mode, e.g. `mdx: { Counter: { component: Counter, client: "visible" } }`.'
+    );
+    return;
+  }
+  if (!(name && isGroup(name))) {
+    context.errors.push(
+      `\`${name ?? property.name.getText()}\` isn't an override group; use \`mdx\` or \`layout\`.`
+    );
+    return;
+  }
   if (
-    !(name && isGroup(name)) ||
+    !ts.isPropertyAssignment(property) ||
     !ts.isObjectLiteralExpression(property.initializer)
   ) {
+    context.errors.push(`\`${name}\` must be an object literal of overrides.`);
     return;
   }
   for (const entry of property.initializer.properties) {
-    const normalized = normalizeEntry(
-      entry,
-      name,
-      imports,
-      dir,
-      result.warnings
-    );
+    const normalized = normalizeEntry(entry, name, context);
     if (normalized) {
       result[name].push(normalized);
     }
   }
 };
 
+const invalidOverrides = (filePath: string, errors: string[]): BlumeError =>
+  new BlumeError({
+    code: "BLUME_COMPONENTS_INVALID",
+    file: filePath,
+    message: `${basename(filePath)} has ${errors.length} override(s) Blume can't plan:\n${errors.map((error) => `  - ${error}`).join("\n")}`,
+    severity: "error",
+    suggestion: ACCEPTED_OVERRIDE_FORMS,
+  });
+
 /**
  * Parse a user `components.ts`/`.tsx` and return its normalized overrides. Never
- * executes the file. On a parse failure or unrecognized shape, returns empty
- * groups so generation falls back to the plain runtime overrides object.
+ * executes the file. Throws a `BLUME_COMPONENTS_INVALID` {@link BlumeError}
+ * listing every entry that isn't one of the accepted forms.
  */
 export const analyzeComponentOverrides = (
   source: string,
   filePath: string
 ): ComponentOverrideAnalysis => {
-  const result = emptyAnalysis();
+  const result = emptyComponentOverrides();
   const sourceFile = ts.createSourceFile(
     filePath,
     source,
@@ -489,17 +527,32 @@ export const analyzeComponentOverrides = (
     filePath.endsWith("tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   );
 
-  const object = findDefaultExportObject(sourceFile);
+  const exported = findDefaultExport(sourceFile);
+  if (!exported) {
+    throw invalidOverrides(filePath, [
+      "No default export was found; export `defineComponents({ mdx, layout })` (or a plain object literal) as the default.",
+    ]);
+  }
+  const object = unwrapObject(exported.expression);
   if (!object) {
-    return result;
+    throw invalidOverrides(filePath, [
+      "The default export isn't an object literal or a `defineComponents({ ... })` call.",
+    ]);
   }
 
-  const imports = collectImports(sourceFile);
-  const dir = dirname(filePath);
+  const context: AnalysisContext = {
+    dir: dirname(filePath),
+    errors: [],
+    imports: collectImports(sourceFile),
+    warnings: result.warnings,
+  };
 
   for (const property of object.properties) {
-    collectGroupOverrides(property, imports, dir, result);
+    collectGroupOverrides(property, context, result);
   }
 
+  if (context.errors.length > 0) {
+    throw invalidOverrides(filePath, context.errors);
+  }
   return result;
 };

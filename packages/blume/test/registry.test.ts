@@ -121,10 +121,12 @@ describe("eject", () => {
     // The include graph the ejected astro.config's includeHmrPlugin reads —
     // without it partial edits would silently serve stale pages post-eject.
     expect(has("src/generated/includes.json")).toBe(true);
-    // The island/example maps the catch-all imports, plus their live wrappers.
-    expect(has("src/generated/islands.ts")).toBe(true);
+    // The component/example maps the catch-all imports, plus their live
+    // wrappers; the `islands/` convention plans through the components map.
+    expect(has("src/generated/components.ts")).toBe(true);
+    expect(has("src/generated/islands.ts")).toBe(false);
     expect(has("src/generated/examples.ts")).toBe(true);
-    expect(has("src/generated/islands/Counter.astro")).toBe(true);
+    expect(has("src/generated/component-slots/mdx-Counter.astro")).toBe(true);
     expect(has("src/generated/examples/demo.astro")).toBe(true);
 
     // Feature-gated endpoints: Ask AI, OG images, mixedbread search, the RSS

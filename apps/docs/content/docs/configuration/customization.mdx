@@ -24,7 +24,7 @@ Keys are the names you write in MDX (`<Callout>`, `<Pricing>`). Use the `.tsx` f
 
 ### Reference form
 
-Every override — in `mdx`, `layout`, or `islands` — accepts three forms:
+Every override — in `mdx` or `layout` — accepts three forms:
 
 ```ts components.ts
 import { defineComponents } from "blume";
@@ -39,6 +39,8 @@ export default defineComponents({
 });
 ```
 
+Blume reads `components.ts` statically — it never runs the file — so these three forms are the only ones it accepts. An inline function or expression, a component declared in the file itself, a spread, a computed key, or a `client` that isn't one of the mode strings below is a `BLUME_COMPONENTS_INVALID` error that names the entry: `blume dev` reports it in the terminal and the browser overlay, and `blume build` fails.
+
 The **descriptor** form adds a hydration mode so an interactive React/Vue/Svelte component ships its JavaScript and comes alive on the client. Without a `client` mode a framework component renders as static HTML — Blume prints a build warning when it spots one, since that's usually a mistake.
 
 | `client` | Hydrates |
@@ -49,7 +51,7 @@ The **descriptor** form adds a hydration mode so an interactive React/Vue/Svelte
 | `"media"` | When a `media` query matches (add `media: "(min-width: 40rem)"`) |
 | `"only"` | Client only, never server-rendered |
 
-For interactive components you use across many pages, the [`islands` group](/docs/content/islands#registering-islands-in-componentsts) is a shorthand for the descriptor form with `client: "visible"`.
+An `mdx` entry with a `client` mode _is_ an island: it's available in every page and hydrates exactly like a component dropped in the [`islands/` folder](/docs/content/islands). The folder stays the zero-config path — reach for a `components.ts` entry when you want a different name than the file, a `media` query, or to keep islands beside your other overrides.
 
 ### Typing an override
 

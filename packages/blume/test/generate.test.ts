@@ -33,6 +33,7 @@ import {
   readRuntimeModule,
   RUNTIME_MODULE_FILES,
 } from "../src/astro/runtime-modules.ts";
+import { BlumeError } from "../src/core/diagnostics.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
@@ -1416,7 +1417,8 @@ describe("generateRuntime", () => {
     expect(has("src/content.config.ts")).toBe(true);
     expect(has("src/pages/[...slug].astro")).toBe(true);
     expect(has("src/generated/components.ts")).toBe(true);
-    expect(has("src/generated/islands.ts")).toBe(true);
+    // Convention islands ride the components module; no separate island map.
+    expect(has("src/generated/islands.ts")).toBe(false);
 
     // Feature-gated files.
     expect(has("src/pages/api/ask.ts")).toBe(true);
@@ -1443,7 +1445,7 @@ describe("generateRuntime", () => {
     expect(has("src/blume-mcp/discovery.ts")).toBe(true);
     expect(has("src/blume-mcp/server-card.ts")).toBe(true);
     expect(has("src/pages/reference.astro")).toBe(true);
-    expect(has("src/generated/islands/Counter.astro")).toBe(true);
+    expect(has("src/generated/component-slots/mdx-Counter.astro")).toBe(true);
     expect(has("src/generated/examples.ts")).toBe(true);
     expect(has("src/generated/examples/demo.astro")).toBe(true);
     // The isolated preview frame: its Tailwind entry and per-example route.
@@ -1969,10 +1971,12 @@ describe("generateRuntime", () => {
     expect(result.warnings.some((w) => w.includes("@astrojs/svelte"))).toBe(
       true
     );
-    expect(existsSync(join(out, "src/generated/islands/Widget.astro"))).toBe(
-      true
-    );
-    expect(existsSync(join(out, "src/generated/islands/Box.astro"))).toBe(true);
+    expect(
+      existsSync(join(out, "src/generated/component-slots/mdx-Widget.astro"))
+    ).toBe(true);
+    expect(
+      existsSync(join(out, "src/generated/component-slots/mdx-Box.astro"))
+    ).toBe(true);
   });
 
   it("warns when the netlify adapter package isn't installed", async () => {
@@ -2091,7 +2095,7 @@ describe("generateRuntime", () => {
 };
 `,
         "components.ts": `import Counter from "./Counter.tsx";
-export default { islands: { Counter } };
+export default { mdx: { Counter: { component: Counter, client: "visible" } } };
 `,
         "docs/index.md": "# Home\n",
         // An unknown `<Fancy>` tag that isn't a built-in, island, or override.
@@ -2100,7 +2104,7 @@ export default { islands: { Counter } };
     );
     const out = project.context.outDir;
     const result = await generateRuntime(project);
-    // The island override was analyzed and emitted as a per-override wrapper.
+    // The hydrated override was analyzed and emitted as a per-override wrapper.
     expect(
       existsSync(join(out, "src/generated/component-slots/mdx-Counter.astro"))
     ).toBe(true);
@@ -2108,6 +2112,31 @@ export default { islands: { Counter } };
     expect(result.warnings.some((w) => w.includes("/ghost"))).toBe(true);
     // The unknown MDX component tag is flagged.
     expect(result.warnings.some((w) => w.includes("<Fancy>"))).toBe(true);
+    // The override's own tag is known, so it is not.
+    expect(result.warnings.some((w) => w.includes("<Counter>"))).toBe(false);
+  });
+
+  it("fails generation on a components.ts override it cannot plan", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "components.ts": `export default { mdx: { Widget: () => null } };
+`,
+        "docs/index.md": "# Home\n",
+      })
+    );
+    let failure: BlumeError | undefined;
+    try {
+      await generateRuntime(project);
+    } catch (error) {
+      if (error instanceof BlumeError) {
+        failure = error;
+      }
+    }
+    expect(failure?.diagnostic.code).toBe("BLUME_COMPONENTS_INVALID");
+    expect(failure?.diagnostic.file).toBe(project.context.componentsFile ?? "");
+    expect(failure?.diagnostic.message).toContain(
+      "mdx.Widget is an inline expression"
+    );
   });
 });
 

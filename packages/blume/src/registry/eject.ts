@@ -16,6 +16,7 @@ import {
   exampleScanRoots,
 } from "../astro/examples.ts";
 import {
+  analyzeComponentsFile,
   buildRuntimeData,
   clientFeaturesFor,
   collectStaged,
@@ -37,8 +38,6 @@ import {
   examplesPageTemplate,
   exampleWrapperTemplate,
   featuresTemplate,
-  islandMapTemplate,
-  islandWrapperTemplate,
   mcpEndpointTemplate,
   mcpPageFile,
   mixedbreadSearchEndpointTemplate,
@@ -345,6 +344,7 @@ export const eject = async (
     userExamplesCss,
     rawMarkdown,
     islands,
+    overrideAnalysis,
   ] = await Promise.all([
     context.pagesRoot ? discoverPages(context.pagesRoot) : Promise.resolve([]),
     detectNeedsReact(root),
@@ -356,12 +356,18 @@ export const eject = async (
     ),
     buildRawMarkdown(project),
     discoverIslands(root),
+    analyzeComponentsFile(context.componentsFile),
   ]);
-  // Island/example frameworks drive which Astro renderers the ejected config
-  // wires in; React also switches on for project `.tsx`/`.jsx` and Ask AI.
+  // The `islands/` convention and `components.ts` share the same static plan
+  // the CLI uses, so hydration wrappers eject as-is (the source paths are
+  // absolute, like the example wrappers below).
+  const slotPlan = planComponentSlots(islands.islands, overrideAnalysis);
+  // Island/example/override frameworks drive which Astro renderers the ejected
+  // config wires in; React also switches on for project `.tsx`/`.jsx` and Ask AI.
   const frameworks = new Set<string>([
     ...islands.islands.map((island) => island.framework),
     ...examples.examples.map((example) => example.framework),
+    ...slotPlan.frameworks,
   ]);
   const needsReact = needsReactRaw || askEnabled || frameworks.has("react");
   const needsVue = frameworks.has("vue");
@@ -375,9 +381,6 @@ export const eject = async (
     root: ".",
   };
 
-  const componentsImport = context.componentsFile
-    ? `../../${toPosix(relative(root, context.componentsFile))}`
-    : null;
   const relPages = [
     ...pages.map((page) => ({
       entrypoint: toPosix(relative(root, page.entrypoint)),
@@ -454,18 +457,11 @@ export const eject = async (
       path: join(srcDir, "pages", "[...slug].astro"),
     },
     {
-      // Eject keeps the portable re-export form (relative import to the user's
-      // components file); hydration/island wrappers would need machine-specific
-      // absolute paths, so the ejected app owns and wires those itself.
-      content: planComponentSlots(componentsImport, null).module,
+      content: slotPlan.module,
       path: join(genDir, "components.ts"),
     },
-    // Island/example maps the catch-all imports; written even when empty so the
-    // relative import and the `blume:examples` alias always resolve.
-    {
-      content: islandMapTemplate(islands.islands),
-      path: join(genDir, "islands.ts"),
-    },
+    // The example map the catch-all imports; written even when empty so the
+    // `blume:examples` alias always resolves.
     {
       content: exampleMapTemplate(examples.examples, config.basePath),
       path: join(genDir, "examples.ts"),
@@ -642,11 +638,11 @@ export const eject = async (
     }
   }
 
-  // Per-island and per-example live wrappers referenced by the maps above.
+  // Per-override and per-example live wrappers referenced by the maps above.
   files.push(
-    ...islands.islands.map((island) => ({
-      content: islandWrapperTemplate(island),
-      path: join(genDir, "islands", `${island.name}.astro`),
+    ...slotPlan.wrappers.map((wrapper) => ({
+      content: wrapper.content,
+      path: join(genDir, "component-slots", `${wrapper.name}.astro`),
     })),
     ...examples.examples.map((example) => ({
       content: exampleWrapperTemplate(example),
