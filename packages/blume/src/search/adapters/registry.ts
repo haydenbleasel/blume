@@ -120,7 +120,12 @@ export const resolvedSearchAdapterSchema = z
         return pagefind(value.options);
       }
       default: {
-        return typesense(value.options);
+        // Only Typesense is left, and TypeScript has narrowed `value` to it.
+        // It returns after the switch rather than from a last case block:
+        // Bun 1.4.0's line coverage never credits the closing brace of a
+        // switch's final block, which would fail the 100% gate in CI.
+        break;
       }
     }
+    return typesense(value.options);
   });
