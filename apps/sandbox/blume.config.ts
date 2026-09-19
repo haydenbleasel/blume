@@ -1,4 +1,5 @@
 import { defineConfig } from "blume";
+import { filesystem, githubReleases } from "blume/sources";
 import { z } from "zod";
 
 /**
@@ -30,15 +31,13 @@ export default defineConfig({
     link: { href: "/events", text: "Try the AsyncAPI reference" },
   },
   content: {
-    root: "content",
     sources: [
-      { root: "content", type: "filesystem" },
-      {
+      filesystem({ root: "content" }),
+      githubReleases({
         owner: "haydenbleasel",
         prefix: "changelog",
         repo: "blume",
-        type: "github-releases",
-      },
+      }),
     ],
     types: {
       doc: { facets: ["owner"] },

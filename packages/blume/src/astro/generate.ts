@@ -691,6 +691,30 @@ export const searchProviderWarnings = (
 };
 
 /**
+ * Warn when a content source adapter's SDK is missing (`@notionhq/client`,
+ * `@sanity/client`). The descriptor's `runtimeDeps` is the one place that
+ * knows; same resolution rule as {@link searchProviderWarnings}. `pkgDir` is
+ * injectable for testing.
+ */
+export const sourceAdapterWarnings = (
+  sources: ResolvedConfig["content"]["sources"],
+  root: string,
+  pkgDir: string = packageRoot()
+): string[] => {
+  const warnings: string[] = [];
+  for (const source of sources) {
+    for (const dep of source.runtimeDeps) {
+      if (!(canResolveFrom(root, dep) || canResolveFrom(pkgDir, dep))) {
+        warnings.push(
+          `Content source "${source.kind}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`
+        );
+      }
+    }
+  }
+  return warnings;
+};
+
+/**
  * Warn when the Ask AI backend's provider SDK is missing. Like search provider
  * SDKs, these are optional peers the project must install (only `gateway`
  * needs nothing beyond the core `ai` package Blume ships) — warn early with
@@ -2172,7 +2196,7 @@ export const generateRuntime = async (
   // sources, so the `docs` glob would otherwise scan (and watch) the whole
   // project root for nothing — see contentConfigTemplate.
   const hasFilesystemSource = project.sources.some((source) => !source.staged);
-  const docsCollection = resolveDocsCollection(config, context);
+  const docsCollection = resolveDocsCollection(config, context.root);
 
   // All of these write to distinct generated paths and never read one another's
   // output, so the structural files, the per-convention hydration wrappers, and
@@ -2486,6 +2510,7 @@ export const generateRuntime = async (
       new Set(registry.map((item) => item.name))
     ).map(diagnosticWarning),
     ...searchProviderWarnings(config.search.provider, context.root),
+    ...sourceAdapterWarnings(config.content.sources, context.root),
     ...askProviderWarnings(config.ai.ask, context.root),
     ...deploymentAdapterWarnings(config.deployment, context.root),
     ...islandFrameworkWarnings(frameworks, context.root)

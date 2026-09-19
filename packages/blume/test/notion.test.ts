@@ -15,6 +15,7 @@ import type { NotionClientLike } from "../src/core/sources/notion.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
 import type { SourceContext, SourceEntry } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
+import { notion } from "../src/sources/notion.ts";
 
 const dirs: string[] = [];
 const tempDir = async (): Promise<string> => {
@@ -893,12 +894,7 @@ describe("resolveSources (notion)", () => {
     const config = blumeConfigSchema.parse({
       content: {
         sources: [
-          {
-            concurrency: 2,
-            database: "db1",
-            prefix: "handbook",
-            type: "notion",
-          },
+          notion({ concurrency: 2, database: "db1", prefix: "handbook" }),
         ],
       },
     });

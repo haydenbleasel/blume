@@ -1640,10 +1640,10 @@ describe("contentConfigTemplate", () => {
   });
 
   it("excludes the runtime dir when it sits inside the content root", () => {
-    // Migrated `.`-rooted project: content root is the project root with a real
-    // filesystem source, so `.blume/` is nested and must be excluded.
+    // Migrated `.`-rooted project: the filesystem source roots the collection
+    // at the project root, so `.blume/` is nested and must be excluded.
     const out = contentConfigTemplate({
-      config,
+      config: blumeConfigSchema.parse({ content: { root: "." } }),
       context: context({ contentRoot: "/p", outDir: "/p/.blume" }),
       filesystem: true,
     });

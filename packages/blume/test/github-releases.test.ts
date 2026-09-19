@@ -15,6 +15,8 @@ import { normalizeEntry } from "../src/core/sources/normalize.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
 import type { SourceContext, SourceEntry } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
+import { filesystem } from "../src/sources/filesystem.ts";
+import { githubReleases } from "../src/sources/github-releases.ts";
 
 const dirs: string[] = [];
 
@@ -537,13 +539,12 @@ describe("resolveSources (github-releases)", () => {
     const config = blumeConfigSchema.parse({
       content: {
         sources: [
-          { root: "docs", type: "filesystem" },
-          {
+          filesystem({ root: "docs" }),
+          githubReleases({
             owner: "haydenbleasel",
             prefix: "changelog",
             repo: "blume",
-            type: "github-releases",
-          },
+          }),
         ],
       },
     });
@@ -571,9 +572,10 @@ describe("generateRuntime with a staged changelog source", () => {
       "blume.config.ts": `export default {
   content: {
     sources: [
-      { root: "docs", type: "filesystem" },
+      { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
       {
-        source: {
+        kind: "custom",
+        options: {
           load: () =>
             Promise.resolve({
               diagnostics: [],
@@ -590,7 +592,8 @@ describe("generateRuntime with a staged changelog source", () => {
           prefix: "changelog",
           staged: true,
         },
-        type: "custom",
+        requiredSecrets: [],
+        runtimeDeps: [],
       },
     ],
   },
@@ -621,8 +624,8 @@ describe("generateRuntime with a staged changelog source", () => {
       "blume.config.ts": `export default {
   content: {
     sources: [
-      { root: "docs", type: "filesystem" },
-      { owner: "acme", prefix: "changelog", repo: "sdk", type: "github-releases" },
+      { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+      { kind: "github-releases", options: { owner: "acme", prefix: "changelog", repo: "sdk" }, requiredSecrets: [], runtimeDeps: [] },
     ],
   },
 };

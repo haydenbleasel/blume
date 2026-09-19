@@ -158,7 +158,7 @@ describe("scanProject lastModified", () => {
       await makeProject({
         "blume.config.ts": [
           "export default {",
-          '  content: { sources: [{ type: "filesystem", root: "documentation" }] },',
+          '  content: { sources: [{ kind: "filesystem", options: { root: "documentation" }, requiredSecrets: [], runtimeDeps: [] }] },',
           "  lastModified: true,",
           "};",
           "",
@@ -184,7 +184,7 @@ describe("scanProject lastModified", () => {
       await makeProject({
         "blume.config.ts": [
           "export default {",
-          '  content: { sources: [{ type: "obsidian", vault: "vault" }] },',
+          '  content: { sources: [{ kind: "obsidian", options: { vault: "vault" }, requiredSecrets: [], runtimeDeps: [] }] },',
           "  lastModified: true,",
           "};",
           "",

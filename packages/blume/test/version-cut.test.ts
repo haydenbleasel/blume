@@ -241,8 +241,8 @@ describe("cutVersion", () => {
       "blume.config.ts": `export default {
   content: {
     sources: [
-      { type: "filesystem", root: "docs", exclude: ["vault/**"] },
-      { type: "obsidian", vault: "docs/vault" },
+      { kind: "filesystem", options: { root: "docs", exclude: ["vault/**"] }, requiredSecrets: [], runtimeDeps: [] },
+      { kind: "obsidian", options: { vault: "docs/vault" }, requiredSecrets: [], runtimeDeps: [] },
     ],
   },
   versions: { archived: [], current: { label: "v2.0" } },

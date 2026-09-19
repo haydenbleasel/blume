@@ -144,7 +144,19 @@ describe("config schema", () => {
   it("applies defaults for an empty config", () => {
     const config = blumeConfigSchema.parse({});
     expect(config.title).toBe("Documentation");
-    expect(config.content.root).toBe("docs");
+    // The zero-config shorthand desugars to one filesystem source at `docs`.
+    expect(config.content.sources).toStrictEqual([
+      {
+        kind: "filesystem",
+        options: {
+          exclude: ["**/_*", "**/.*"],
+          include: ["**/*.{md,mdx}"],
+          root: "docs",
+        },
+        requiredSecrets: [],
+        runtimeDeps: [],
+      },
+    ]);
     expect(config.deployment.output).toBe("static");
     expect(config.search.provider).toBe("orama");
   });

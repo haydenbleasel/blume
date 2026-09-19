@@ -47,14 +47,15 @@ const sources = [
 
 // Rendered through an Astro expression so the object/array syntax auto-escapes.
 const configSource = `import { defineConfig } from "blume";
+import { filesystem, mdxRemote, notion, sanity } from "blume/sources";
 
 export default defineConfig({
   content: {
     sources: [
-      { type: "filesystem", root: "docs" },
-      { type: "mdx-remote", github: { owner: "comet", repo: "docs", path: "docs" } },
-      { type: "sanity", projectId: "p1", dataset: "production", query: "*[_type == 'doc']" },
-      { type: "notion", database: process.env.NOTION_DB },
+      filesystem({ root: "docs" }),
+      mdxRemote({ github: { owner: "comet", repo: "docs", path: "docs" } }),
+      sanity({ projectId: "p1", dataset: "production", query: "*[_type == 'doc']" }),
+      notion({ database: process.env.NOTION_DB }),
     ],
   },
 });`;

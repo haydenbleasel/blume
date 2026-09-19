@@ -5,6 +5,12 @@ import { detect } from "package-manager-detector/detect";
 import { basename, dirname, isAbsolute, join, relative } from "pathe";
 
 import { blumePackageJson, toPackageName } from "../../core/package-json.ts";
+import { githubReleases } from "../../sources/github-releases.ts";
+import { mdxRemote } from "../../sources/mdx-remote.ts";
+import { notion } from "../../sources/notion.ts";
+import { obsidian } from "../../sources/obsidian.ts";
+import type { AnySourceAdapter } from "../../sources/registry.ts";
+import { sanity } from "../../sources/sanity.ts";
 
 export const TEMPLATES = ["docs", "api", "sdk", "changelog"] as const;
 export type Template = (typeof TEMPLATES)[number];
@@ -218,6 +224,41 @@ export const titleize = (raw: string): string => {
 const needsExplicitSources = (sources: SourceKind[]): boolean =>
   sources.some((source) => source !== "filesystem");
 
+/** The `blume/sources` factory each source kind is written with. */
+const SOURCE_FACTORIES = {
+  filesystem: "filesystem",
+  "github-releases": "githubReleases",
+  "mdx-remote": "mdxRemote",
+  notion: "notion",
+  obsidian: "obsidian",
+  sanity: "sanity",
+} satisfies Record<SourceKind, string>;
+
+/**
+ * The descriptor each remote source kind scaffolds — the same placeholder
+ * options the emitted snippet shows — so the SDK deps and env vars `init`
+ * sets up are read off the adapter rather than kept in a parallel table.
+ */
+const SOURCE_DESCRIPTORS = {
+  "github-releases": githubReleases({
+    owner: "your-org",
+    prefix: "changelog",
+    repo: "your-repo",
+  }),
+  "mdx-remote": mdxRemote({
+    github: { owner: "your-org", path: "docs", repo: "your-repo" },
+    prefix: "remote",
+  }),
+  notion: notion({ database: "your-database-id", prefix: "notion" }),
+  obsidian: obsidian({ prefix: "notes", vault: "vault" }),
+  sanity: sanity({
+    dataset: "production",
+    prefix: "sanity",
+    projectId: "your-project-id",
+    query: '*[_type == "doc"]',
+  }),
+} satisfies Record<Exclude<SourceKind, "filesystem">, AnySourceAdapter>;
+
 /**
  * Config snippets for each remote source kind, with placeholder values to
  * replace and comments naming the env var each source authenticates with.
@@ -225,43 +266,52 @@ const needsExplicitSources = (sources: SourceKind[]): boolean =>
 const SOURCE_SNIPPETS = {
   "github-releases": `      // Changelog entries from GitHub Releases. Private repos read
       // GITHUB_TOKEN from the environment.
-      {
-        type: "github-releases",
+      githubReleases({
         owner: "your-org",
         repo: "your-repo",
         prefix: "changelog",
-      },`,
+      }),`,
   "mdx-remote": `      // MDX fetched from a GitHub repo. Private repos read GITHUB_TOKEN
       // from the environment.
-      {
-        type: "mdx-remote",
+      mdxRemote({
         github: { owner: "your-org", repo: "your-repo", path: "docs" },
         prefix: "remote",
-      },`,
+      }),`,
   notion: `      // Pages from a Notion database. Reads NOTION_TOKEN from the environment.
-      {
-        type: "notion",
+      notion({
         database: "your-database-id",
         prefix: "notion",
-      },`,
+      }),`,
   obsidian: `      // An Obsidian vault, read in place. No export step, and no
       // generated notes in your repo. Point \`vault\` at your vault directory,
       // relative to this config file.
-      {
-        type: "obsidian",
+      obsidian({
         vault: "vault",
         prefix: "notes",
-      },`,
+      }),`,
   sanity: `      // Documents from a Sanity dataset. Private datasets read SANITY_TOKEN
       // from the environment.
-      {
-        type: "sanity",
+      sanity({
         projectId: "your-project-id",
         dataset: "production",
         query: \`*[_type == "doc"]\`,
         prefix: "sanity",
-      },`,
+      }),`,
 } satisfies Record<Exclude<SourceKind, "filesystem">, string>;
+
+/** The selected kinds in canonical order (the multiselect returns pick order). */
+const orderedSources = (sources: SourceKind[]): SourceKind[] =>
+  SOURCE_KINDS.filter((kind) => sources.includes(kind));
+
+/** The `blume/sources` import line for the selected kinds, in canonical order. */
+const sourcesImportFor = (sources: SourceKind[]): string =>
+  `import { ${orderedSources(sources)
+    .map((kind) => SOURCE_FACTORIES[kind])
+    .join(", ")} } from "blume/sources";\n`;
+
+/** The chosen source kinds; no selection means the implicit local source. */
+const selectedSources = (answers: InitAnswers): SourceKind[] =>
+  answers.sources.length === 0 ? ["filesystem"] : answers.sources;
 
 /**
  * The `content` block for the generated config, or an empty string when the
@@ -269,8 +319,7 @@ const SOURCE_SNIPPETS = {
  * scaffold byte-identical to a config with no `content` key at all.
  */
 const contentBlockFor = (answers: InitAnswers): string => {
-  const sources =
-    answers.sources.length === 0 ? ["filesystem" as const] : answers.sources;
+  const sources = selectedSources(answers);
   if (!needsExplicitSources(sources)) {
     return answers.contentDir === "docs"
       ? ""
@@ -281,11 +330,10 @@ const contentBlockFor = (answers: InitAnswers): string => {
   }
   // Explicit sources replace the implicit filesystem desugar, so the local
   // content dir must be listed alongside the other sources to stay included.
-  const entries = SOURCE_KINDS.filter((kind) => sources.includes(kind)).map(
-    (kind) =>
-      kind === "filesystem"
-        ? `      { type: "filesystem", root: ${JSON.stringify(answers.contentDir)} },`
-        : SOURCE_SNIPPETS[kind]
+  const entries = orderedSources(sources).map((kind) =>
+    kind === "filesystem"
+      ? `      filesystem({ root: ${JSON.stringify(answers.contentDir)} }),`
+      : SOURCE_SNIPPETS[kind]
   );
   return `
   content: {
@@ -296,24 +344,41 @@ ${entries.join("\n")}
 };
 
 /** The full `blume.config.ts` text for the chosen answers. */
-export const buildConfig = (
-  answers: InitAnswers
-): string => `import { defineConfig } from "blume";
-
+export const buildConfig = (answers: InitAnswers): string => {
+  const sources = selectedSources(answers);
+  // Only an explicit `sources` array calls factories; the shorthand `root`
+  // (or no content block at all) needs no import.
+  const sourcesImport = needsExplicitSources(sources)
+    ? sourcesImportFor(sources)
+    : "";
+  return `import { defineConfig } from "blume";
+${sourcesImport}
 export default defineConfig({
   title: ${JSON.stringify(answers.title)},
   description: "Documentation powered by Blume.",${STARTERS[answers.template].configExtra}${contentBlockFor(answers)}
 });
 `;
+};
 
-/** SDK dependencies required by the selected remote sources. */
+/** The version range `init` pins for each SDK an adapter declares. */
+const SDK_VERSIONS = new Map([
+  ["@notionhq/client", "^2.2.15"],
+  ["@sanity/client", "^7.25.0"],
+]);
+
+/** The scaffolded descriptors for the selected remote source kinds. */
+const descriptorsFor = (sources: SourceKind[]): AnySourceAdapter[] =>
+  orderedSources(sources).flatMap((kind) =>
+    kind === "filesystem" ? [] : [SOURCE_DESCRIPTORS[kind]]
+  );
+
+/** SDK dependencies the selected sources declare, read off their descriptors. */
 const extraDepsFor = (sources: SourceKind[]) => {
   const deps: Record<string, string> = {};
-  if (sources.includes("notion")) {
-    deps["@notionhq/client"] = "^2.2.15";
-  }
-  if (sources.includes("sanity")) {
-    deps["@sanity/client"] = "^7.25.0";
+  for (const descriptor of descriptorsFor(sources)) {
+    for (const dep of descriptor.runtimeDeps) {
+      deps[dep] = SDK_VERSIONS.get(dep) ?? "latest";
+    }
   }
   return deps;
 };
@@ -385,15 +450,12 @@ export const applyPlan = async (
   return { createdPackage };
 };
 
-/** Env vars the selected sources read, in a stable order. */
-const envVarsFor = (sources: SourceKind[]): string[] =>
-  [
-    ["GITHUB_TOKEN", ["github-releases", "mdx-remote"]] as const,
-    ["NOTION_TOKEN", ["notion"]] as const,
-    ["SANITY_TOKEN", ["sanity"]] as const,
-  ]
-    .filter(([, kinds]) => kinds.some((kind) => sources.includes(kind)))
-    .map(([envVar]) => envVar);
+/** Env vars the selected sources declare, deduplicated in a stable order. */
+const envVarsFor = (sources: SourceKind[]): string[] => [
+  ...new Set(
+    descriptorsFor(sources).flatMap((descriptor) => descriptor.requiredSecrets)
+  ),
+];
 
 /** The next-steps message: `cd` hint, install/dev commands, and token setup. */
 export const nextSteps = (

@@ -11,6 +11,7 @@ import type { ObsidianSourceOptions } from "../src/core/sources/obsidian.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
 import type { SourceContext } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
+import { obsidian } from "../src/sources/obsidian.ts";
 
 const dirs: string[] = [];
 
@@ -1202,12 +1203,7 @@ describe("resolveSources (obsidian)", () => {
     const config = blumeConfigSchema.parse({
       content: {
         sources: [
-          {
-            exclude: ["Templates"],
-            prefix: "notes",
-            type: "obsidian",
-            vault: "vault",
-          },
+          obsidian({ exclude: ["Templates"], prefix: "notes", vault: "vault" }),
         ],
       },
     });
@@ -1219,7 +1215,16 @@ describe("resolveSources (obsidian)", () => {
 
   it("names an unprefixed obsidian source after its type", () => {
     const config = blumeConfigSchema.parse({
-      content: { sources: [{ type: "obsidian", vault: "vault" }] },
+      content: {
+        sources: [
+          {
+            kind: "obsidian",
+            options: { vault: "vault" },
+            requiredSecrets: [],
+            runtimeDeps: [],
+          },
+        ],
+      },
     });
     const sources = resolveSources(config, projectContext, { mode: "build" });
     expect(sources[0]?.name).toBe("obsidian");
@@ -1233,7 +1238,14 @@ describe("resolveSources (obsidian)", () => {
     });
     const config = blumeConfigSchema.parse({
       content: {
-        sources: [{ type: "obsidian", vault: root }],
+        sources: [
+          {
+            kind: "obsidian",
+            options: { vault: root },
+            requiredSecrets: [],
+            runtimeDeps: [],
+          },
+        ],
         types: { rfc: { frontmatter: { rfcOwner: z.string() } } },
       },
       frontmatter: { extend: { owner: z.string() } },
@@ -1264,7 +1276,16 @@ describe("resolveSources (obsidian)", () => {
     // and build output as vault content.
     expect(() =>
       blumeConfigSchema.parse({
-        content: { sources: [{ type: "obsidian", vault: "" }] },
+        content: {
+          sources: [
+            {
+              kind: "obsidian",
+              options: { vault: "" },
+              requiredSecrets: [],
+              runtimeDeps: [],
+            },
+          ],
+        },
       })
     ).toThrow();
   });
@@ -1272,7 +1293,16 @@ describe("resolveSources (obsidian)", () => {
   it("rejects an obsidian source with no vault", () => {
     expect(() =>
       blumeConfigSchema.parse({
-        content: { sources: [{ type: "obsidian" }] },
+        content: {
+          sources: [
+            {
+              kind: "obsidian",
+              options: {},
+              requiredSecrets: [],
+              runtimeDeps: [],
+            },
+          ],
+        },
       })
     ).toThrow();
   });

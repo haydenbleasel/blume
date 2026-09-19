@@ -66,7 +66,7 @@ The single biggest shift for most sources — especially Mintlify — is that **
 
 - **Site:** `title`, `description`, `logo` (string SVG, or `{ image: string | { light, dark, alt }, text, href }`), `banner` (`{ content, link, dismissible, id }` — no color/type). A logo renders beside `title` in the header, so a **wordmark logo doubles the brand** ("Acme Acme") — set `text: ""` to render the mark alone. **Prefer the string form over `{ light, dark }`:** if you have the logo SVG locally and it's monochrome (solid black or white), rewrite its `fill`/`stroke` to `currentColor` and use `logo: "/logo.svg"` — it then inherits the theme's text color and adapts to light/dark automatically, so you don't need separate light/dark files.
 - **`theme`:** `accent` (a color string for both modes, or `{ light, dark }` per mode), `action` (color), `mode` (`light`/`dark`/`system`), `radius`, `fonts` (`{ body, display, mono }` — each a curated Google-font slug, a `{ name, provider?, weights? }` object for any Google/Fontsource/Bunny/Fontshare family, or `{ name, variants: [{ src, weight?, style? }] }` for local font files), `background` and `backgroundImage` (each a string, or `{ light, dark }` per mode). The old `accentDark`/`backgroundDark`/`backgroundImageDark` fields were **merged into these per-mode objects** — a bare string still applies to both modes, so only reach for `{ light, dark }` when the two modes differ. There is **no** `theme.strict` and **no** `theme.css` config field — custom CSS goes in a project-root **`theme.css` file** (auto-picked-up), and a source's "strict appearance" flags drop.
-- **`content`:** `root` (default `"docs"`, relative to the project dir where `blume` runs), `include`/`exclude` (arrays of globs **relative to `content.root`**; defaults `["**/*.{md,mdx}"]` / `["**/_*", "**/.*"]`), `sources` (staged sources: `filesystem`, `obsidian`, `github-releases`, `notion`, `sanity`, `mdx-remote`, `custom` — OpenAPI/GraphQL are **not** among these; they're the top-level `openapi`/`graphql` fields), `pages` (custom `.astro` dir), `defaultType`. When docs sit directly under the project dir (no `docs/` subfolder), set `root` there and **scope `include` to the real content folders** instead of scanning everything — `references/monorepo.md` §1.
+- **`content`:** `root` (default `"docs"`, relative to the project dir where `blume` runs), `include`/`exclude` (arrays of globs **relative to `content.root`**; defaults `["**/*.{md,mdx}"]` / `["**/_*", "**/.*"]`), `sources` (an array of **adapters imported from `blume/sources`**: `filesystem({ root, include, exclude })`, `obsidian({ vault })`, `githubReleases({ owner, repo })`, `notion({ database })`, `sanity({ projectId, dataset, query })`, `mdxRemote({ github })`, `custom(source)`; every adapter also takes `prefix` and `pollInterval`. The 1.x `{ type: "…" }` objects were removed — rename `type` to the factory call and pass the other fields as its options. `root`/`include`/`exclude` are shorthand for a single `filesystem()` and are **rejected beside `sources`** — move them into the `filesystem()` entry. OpenAPI/GraphQL are **not** among these; they're the top-level `openapi`/`graphql` fields), `pages` (custom `.astro` dir), `defaultType`. When docs sit directly under the project dir (no `docs/` subfolder), set `root` there and **scope `include` to the real content folders** instead of scanning everything — `references/monorepo.md` §1.
 - **`basePath`** (top-level): a site-wide mount point (e.g. `"/docs"`) prepended to **every** route while staying invisible to the sidebar (no wrapper group). This is the right target for a source that served all docs under a prefix (Docusaurus `routeBasePath`, a Fumadocs `baseUrl` of `/docs`) — distinct from a per-source `prefix` (which adds a nav group) and from `deployment.base` (host subdirectory).
 - **`navigation`:** `tabs`, `selectors`, `actions` and `cta` (header links and the one filled button), `featured` (links pinned above the sidebar on every route), `sidebar` (`{ display, items }` — `display` is the global render mode above; `items` is an explicit tree), `repo` (`true`/`false`, or an absolute GitHub URL for the header mark when the docs repo is private and `github` must stay unset). **Avoid an explicit `navigation.sidebar` unless you have to** — lean on the filesystem-derived sidebar. It only works when the file tree roughly matches the intended sidebar layout, so reshape folders to match first; reach for `sidebar.items` only for a shape files genuinely can't express (see "Config-declared nesting" above).
 - **`search`** (Orama default, Pagefind opt-in), **`ai`** (llms.txt, Ask AI, the MCP server), **`openapi`**, **`graphql`**, **`redirects`**, **`seo`**, **`markdown`**, **`analytics`** (a list of adapters imported from `blume/analytics` — `posthog({ key, host })`, `vercel()`, `cloudflare({ token })`, `script({ src | content, strategy, attributes })` — never an object keyed by provider), **`deployment`**, **`i18n`**, **`toc`**, **`lastModified`**, **`github`** (`{ owner, repo, branch?, dir?, host?, api? }` — set `host` whenever the source's edit URL is on a GitHub Enterprise origin rather than `github.com`).
@@ -136,27 +136,28 @@ Also valid: `date`/`authors` (blog/changelog feeds), `changelog` (changelog meta
 
 ### Changelogs
 
-If the source ships a **hand-maintained changelog** (a `changelog.mdx`, a folder of dated entries, Mintlify `<Update>` blocks) **and the project is open source on GitHub**, offer to replace it with the **`github-releases`** content source — release notes become the changelog automatically, with no files to maintain. It's an offer, not an automatic rewrite: some teams keep a curated changelog that doesn't map 1:1 to GitHub releases, so confirm the release notes are the source of truth before deleting their pages.
+If the source ships a **hand-maintained changelog** (a `changelog.mdx`, a folder of dated entries, Mintlify `<Update>` blocks) **and the project is open source on GitHub**, offer to replace it with the **`githubReleases()`** content source — release notes become the changelog automatically, with no files to maintain. It's an offer, not an automatic rewrite: some teams keep a curated changelog that doesn't map 1:1 to GitHub releases, so confirm the release notes are the source of truth before deleting their pages.
 
-Add it under `content.sources` alongside the filesystem source:
+Add it under `content.sources` alongside the filesystem source (both imported from `blume/sources`; with `sources` present, the content root moves into `filesystem()`):
 
 ```ts
+import { filesystem, githubReleases } from "blume/sources";
+
 content: {
   sources: [
-    { include: ["docs/**/*.mdx"], root: ".", type: "filesystem" },
-    {
+    filesystem({ include: ["docs/**/*.mdx"], root: "." }),
+    githubReleases({
       owner: "haydenbleasel",
       repo: "ultracite",
       prefix: "changelog",
-      type: "github-releases",
-    },
+    }),
   ],
 },
 ```
 
 - Each release materializes as a `type: changelog` page under `/<prefix>/` (`prefix: "changelog"` → `/changelog/…`); omit `prefix` to mount at the root.
 - Optional fields: `limit` (cap materialized releases, newest-first, default 100), `prereleases` (include prereleases), `drafts` (include drafts — needs a token with repo write access), `pollInterval` (dev polling seconds; omit to freeze for the session).
-- A **private** repo reads a token from `GITHUB_TOKEN`; it is never inlined in config. A public repo needs no token.
+- A **private** repo reads a token from `GITHUB_TOKEN`; it is never inlined in config. The adapter declares it, so `blume dev`/`build` warn when it is unset; a public repo still works without it.
 - **Delete the old changelog pages** once the source is wired (and add `redirects` from their old routes to the new `/<prefix>/…` slugs). Pin a header/sidebar link with `navigation.featured` if the source had one.
 
 ### Redirects are static

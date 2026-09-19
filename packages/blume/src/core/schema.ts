@@ -6,12 +6,16 @@ import { analyticsConfigSchema } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
 import { normalizeRoute } from "../openapi/references.ts";
 import { normalizeXHandle } from "../seo/x-handle.ts";
+import { filesystem } from "../sources/filesystem.ts";
+import {
+  contentSourcesSchema,
+  resolvedSourceAdapterSchema,
+} from "../sources/registry.ts";
 import { FONT_SLUGS, isFontSlug } from "../theme/fonts.ts";
 import { normalizeBasePath } from "./base-path.ts";
 import { PUBLIC_HOST_URL } from "./github.ts";
 import { uiLocaleOverridesSchema } from "./i18n-ui.ts";
 import { openInChatProviders } from "./open-in-chat.ts";
-import type { ContentSource } from "./sources/types.ts";
 import { isStandardSchema } from "./standard-schema.ts";
 import type { StandardSchema } from "./standard-schema.ts";
 import { trimEnd } from "./trim.ts";
@@ -47,8 +51,6 @@ const isBoolean = <Value>(value: Value): value is Value & boolean =>
 const iconName = z.string().min(1);
 
 /** Default include glob for filesystem-backed content sources. */
-const DEFAULT_CONTENT_GLOB = "**/*.{md,mdx}";
-
 const hydrationMode = z.enum(["load", "idle", "visible", "media", "only"]);
 export type HydrationMode = z.infer<typeof hydrationMode>;
 
@@ -292,161 +294,8 @@ const bannerConfigSchema = z.union([
   }),
 ]);
 
-/** A local filesystem content source. */
-const filesystemSourceSchema = z.strictObject({
-  exclude: z.array(z.string()).default(["**/_*", "**/.*"]),
-  include: z.array(z.string()).default([DEFAULT_CONTENT_GLOB]),
-  /** Namespaces the source's routes under `/<prefix>/`. */
-  prefix: z.string().optional(),
-  root: z.string().default("docs"),
-  type: z.literal("filesystem"),
-});
-
-/**
- * Remote Markdown/MDX fetched over HTTP. Enumerate files either explicitly
- * (`files` against a raw `url` base) or from a GitHub repo subtree (`github`).
- * The token, when needed, comes from `GITHUB_TOKEN` — never inlined here.
- */
-const mdxRemoteSourceSchema = z.strictObject({
-  /** Explicit list of source-relative file paths to fetch from `url`. */
-  files: z.array(z.string()).optional(),
-  /** Enumerate a GitHub repo subtree via the git-trees API. */
-  github: z
-    .strictObject({
-      owner: z.string(),
-      path: z.string().default(""),
-      ref: z.string().default("main"),
-      repo: z.string(),
-    })
-    .optional(),
-  /** Glob patterns applied to enumerated refs. */
-  include: z.array(z.string()).default([DEFAULT_CONTENT_GLOB]),
-  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
-  pollInterval: z.number().positive().optional(),
-  /** Namespaces the source's routes under `/<prefix>/`. */
-  prefix: z.string().optional(),
-  type: z.literal("mdx-remote"),
-  /** Raw base URL, e.g. `https://raw.githubusercontent.com/acme/sdk/main/docs`. */
-  url: z.string().optional(),
-});
-
-/** A Sanity dataset queried with GROQ; Portable Text bodies become Markdown. */
-const sanitySourceSchema = z.object({
-  /** Sanity API version (a date); default `2024-01-01`. */
-  apiVersion: z.string().optional(),
-  dataset: z.string(),
-  /** Field paths mapping a document onto Blume meta + body. */
-  fields: z
-    .strictObject({
-      body: z.string().optional(),
-      description: z.string().optional(),
-      lastModified: z.string().optional(),
-      slug: z.string().optional(),
-      title: z.string().optional(),
-    })
-    .optional(),
-  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
-  pollInterval: z.number().positive().optional(),
-  prefix: z.string().optional(),
-  projectId: z.string(),
-  /** GROQ query selecting the documents to import. */
-  query: z.string(),
-  type: z.literal("sanity"),
-});
-
-/** A Notion database; pages become entries, blocks become MDX. */
-const notionSourceSchema = z.object({
-  /** Max concurrent Notion API requests; default 3 (Notion's per-integration pace). */
-  concurrency: z.number().positive().optional(),
-  database: z.string(),
-  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
-  pollInterval: z.number().positive().optional(),
-  prefix: z.string().optional(),
-  /** Notion property names mapped onto Blume meta. */
-  properties: z
-    .strictObject({
-      description: z.string().optional(),
-      order: z.string().optional(),
-      slug: z.string().optional(),
-      status: z.string().optional(),
-      title: z.string().optional(),
-    })
-    .optional(),
-  /** Status value treated as published; others map to `draft`. Default `Published`. */
-  publishedValue: z.string().optional(),
-  type: z.literal("notion"),
-});
-
-/**
- * An Obsidian vault, read in place. Wikilinks become route links and
- * `%%comments%%` are stripped at load time, so the vault stays the source of
- * truth — no export step and no generated notes in the repo.
- */
-const obsidianSourceSchema = z.strictObject({
-  /** Vault folder names to skip at any depth, in addition to dot-folders. */
-  exclude: z.array(z.string()).optional(),
-  /** Namespaces the source's routes under `/<prefix>/`; e.g. `vault`. */
-  prefix: z.string().optional(),
-  type: z.literal("obsidian"),
-  /** Vault directory, absolute or relative to the project root. */
-  vault: z.string().min(1),
-});
-
-/**
- * A repo's GitHub Releases, materialized as `type: changelog` entries — release
- * notes become the changelog with no files to maintain. A private repo reads a
- * token from `GITHUB_TOKEN`; it is never inlined here.
- */
-const githubReleasesSourceSchema = z.strictObject({
-  /** Include draft releases (needs a token with repo write access). */
-  drafts: z.boolean().optional(),
-  /** Cap the number of releases materialized, newest-first. Default 100. */
-  limit: z.number().positive().optional(),
-  /** Repository owner (user or org). */
-  owner: z.string(),
-  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
-  pollInterval: z.number().positive().optional(),
-  /** Namespaces the source's routes under `/<prefix>/`; e.g. `changelog`. */
-  prefix: z.string().optional(),
-  /** Include prereleases. */
-  prereleases: z.boolean().optional(),
-  /** Repository name. */
-  repo: z.string(),
-  type: z.literal("github-releases"),
-});
-
-/**
- * A user-provided `ContentSource` instance, passed straight through from
- * `blume.config.ts`. This is the extension point that lets adapters with custom
- * serializers (or any backend) ship without their SDKs touching core.
- */
-const customSourceSchema = z.object({
-  source: z.custom<ContentSource>(
-    (val): val is ContentSource =>
-      typeof val === "object" &&
-      val !== null &&
-      "load" in val &&
-      typeof val.load === "function" &&
-      "name" in val &&
-      typeof val.name === "string",
-    { message: "custom source must be a ContentSource (with name + load)" }
-  ),
-  type: z.literal("custom"),
-});
-
-/** A single configured content source. */
-const contentSourceSchema = z.discriminatedUnion("type", [
-  filesystemSourceSchema,
-  mdxRemoteSourceSchema,
-  githubReleasesSourceSchema,
-  sanitySourceSchema,
-  notionSourceSchema,
-  obsidianSourceSchema,
-  customSourceSchema,
-]);
-
-/** A resolved content-source config entry (post-defaults). */
-export type ContentSourceConfig = z.infer<typeof contentSourceSchema>;
+/** A validated `content.sources` entry: an adapter descriptor from `blume/sources`. */
+export type { ContentSourceAdapter } from "../sources/registry.ts";
 
 /**
  * Per-type content definition. An object (rather than a bare frontmatter map)
@@ -472,24 +321,51 @@ const contentTypeConfigSchema = z.strictObject({
   frontmatter: customKeySchemaRecord("content.types"),
 });
 
-const contentConfigSchema = z.strictObject({
-  defaultType: z.string().default("doc"),
-  exclude: z.array(z.string()).default(["**/_*", "**/.*"]),
-  include: z.array(z.string()).default([DEFAULT_CONTENT_GLOB]),
-  pages: z.string().default("pages"),
-  root: z.string().default("docs"),
-  /**
-   * Pluggable content sources. When omitted, the top-level
-   * `root`/`include`/`exclude` desugar to one implicit filesystem source, so
-   * existing projects are unchanged.
-   */
-  sources: z.array(contentSourceSchema).optional(),
-  /**
-   * Per-type content definitions, keyed by the frontmatter `type` they apply
-   * to (including `defaultType`, for pages that set none).
-   */
-  types: z.record(z.string(), contentTypeConfigSchema).default({}),
-});
+/** The top-level fields that are shorthand for a single `filesystem()` source. */
+const FILESYSTEM_SHORTHAND_KEYS = ["exclude", "include", "root"] as const;
+
+/**
+ * `content`: where pages come from. `sources` lists adapters from
+ * `blume/sources`; the top-level `root`/`include`/`exclude` are zero-config
+ * shorthand that desugars to exactly one `filesystem()` entry when `sources`
+ * is absent, and are rejected beside it — so after parse, `sources` is the
+ * one source of truth and nothing downstream picks between the two.
+ */
+const contentConfigSchema = z
+  .strictObject({
+    defaultType: z.string().default("doc"),
+    exclude: z.array(z.string()).optional(),
+    include: z.array(z.string()).optional(),
+    pages: z.string().default("pages"),
+    root: z.string().optional(),
+    sources: contentSourcesSchema.optional(),
+    /**
+     * Per-type content definitions, keyed by the frontmatter `type` they apply
+     * to (including `defaultType`, for pages that set none).
+     */
+    types: z.record(z.string(), contentTypeConfigSchema).default({}),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.sources) {
+      return;
+    }
+    for (const key of FILESYSTEM_SHORTHAND_KEYS) {
+      if (value[key] !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `content.${key} is shorthand for a single filesystem() source and can't be combined with content.sources — move it into a filesystem({ ${key} }) entry in content.sources.`,
+          path: [key],
+        });
+      }
+    }
+  })
+  .transform(({ exclude, include, root, sources, ...rest }) => ({
+    ...rest,
+    sources: sources ?? [
+      // The shorthand's defaults are the adapter's own, applied by its schema.
+      resolvedSourceAdapterSchema.parse(filesystem({ exclude, include, root })),
+    ],
+  }));
 
 /**
  * A header label that may localize: a plain string, or a map of locale code to

@@ -13,6 +13,7 @@ import { sanitySource } from "../src/core/sources/sanity.ts";
 import type { SanityClientLike } from "../src/core/sources/sanity.ts";
 import type { SourceContext, SourceEntry } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
+import { sanity } from "../src/sources/sanity.ts";
 
 const dirs: string[] = [];
 const tempDir = async (): Promise<string> => {
@@ -417,13 +418,12 @@ describe("resolveSources (sanity)", () => {
     const config = blumeConfigSchema.parse({
       content: {
         sources: [
-          {
+          sanity({
             dataset: "production",
             prefix: "guides",
             projectId: "p1",
             query: "*",
-            type: "sanity",
-          },
+          }),
         ],
       },
     });

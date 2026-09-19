@@ -2,6 +2,7 @@ import { extname, relative } from "pathe";
 import { glob, globSync } from "tinyglobby";
 
 import type { BlumeProject } from "../core/project-graph.ts";
+import { sourcesOfKind } from "../core/sources/collection.ts";
 import type { BlumePageRoute } from "./integration.ts";
 
 const PAGE_GLOB = ["**/*.astro"];
@@ -127,9 +128,8 @@ export const hasGeneratedChangelog = (
       page.contentType === "changelog" &&
       !(page.meta.draft || page.meta.sidebar.hidden)
   );
-  const hasChangelogSource = (project.config.content.sources ?? []).some(
-    (source) => source.type === "github-releases"
-  );
+  const hasChangelogSource =
+    sourcesOfKind(project.config, "github-releases").length > 0;
   return (
     (hasChangelog || hasChangelogSource) &&
     !routeIsTaken(userPages, project.graph.pages, "/changelog")

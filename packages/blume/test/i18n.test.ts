@@ -28,6 +28,7 @@ import type {
   ResolvedConfig,
   ResolvedI18nConfig,
 } from "../src/core/schema.ts";
+import { resolveDocsCollection } from "../src/core/sources/collection.ts";
 import type { NavNode, ProjectContext } from "../src/core/types.ts";
 import { UI_PACKS } from "../src/core/ui-packs/index.ts";
 
@@ -85,9 +86,9 @@ const buildProject = async (resolved: ResolvedConfig) => {
   const { pages } = await discoverContent({
     contentRoot,
     defaultType: resolved.content.defaultType,
-    exclude: resolved.content.exclude,
+    exclude: resolveDocsCollection(resolved, contentRoot).exclude,
     i18n: resolved.i18n,
-    include: resolved.content.include,
+    include: resolveDocsCollection(resolved, contentRoot).include,
   });
   const graph = buildContentGraph(pages, {
     folderMeta: new Map<string, FolderMeta>(),
@@ -134,9 +135,9 @@ const discoverIn = (contentRoot: string, resolved: ResolvedConfig) =>
   discoverContent({
     contentRoot,
     defaultType: resolved.content.defaultType,
-    exclude: resolved.content.exclude,
+    exclude: resolveDocsCollection(resolved, contentRoot).exclude,
     i18n: resolved.i18n,
-    include: resolved.content.include,
+    include: resolveDocsCollection(resolved, contentRoot).include,
   });
 
 describe("i18n helpers", () => {
@@ -488,9 +489,9 @@ describe("i18n diagnostics", () => {
     const { pages } = await discoverContent({
       contentRoot,
       defaultType: resolved.content.defaultType,
-      exclude: resolved.content.exclude,
+      exclude: resolveDocsCollection(resolved, contentRoot).exclude,
       i18n: resolved.i18n,
-      include: resolved.content.include,
+      include: resolveDocsCollection(resolved, contentRoot).include,
     });
     const diagnostics = i18nDiagnostics(pages, i18nOf());
     expect(diagnostics.map((d) => d.code)).toContain(

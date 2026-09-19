@@ -21,6 +21,7 @@ import type {
   ResolvedConfig,
   ResolvedVersionsConfig,
 } from "../src/core/schema.ts";
+import { resolveDocsCollection } from "../src/core/sources/collection.ts";
 import type {
   BlumeManifest,
   PageRecord,
@@ -129,9 +130,9 @@ const discoverIn = (contentRoot: string, resolved: ResolvedConfig) =>
   discoverContent({
     contentRoot,
     defaultType: resolved.content.defaultType,
-    exclude: resolved.content.exclude,
+    exclude: resolveDocsCollection(resolved, contentRoot).exclude,
     i18n: resolved.i18n,
-    include: resolved.content.include,
+    include: resolveDocsCollection(resolved, contentRoot).include,
     versions: resolved.versions,
   });
 

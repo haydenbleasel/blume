@@ -9,6 +9,7 @@ import { z } from "zod";
 import { generateRuntime } from "../src/astro/generate.ts";
 import { contentConfigTemplate } from "../src/astro/templates.ts";
 import { scanProject } from "../src/core/project-graph.ts";
+import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { FrontmatterExtend } from "../src/core/schema.ts";
 import { entriesDigest } from "../src/core/sources/cache.ts";
 import { filesystemSource } from "../src/core/sources/filesystem.ts";
@@ -906,8 +907,8 @@ describe("scanProject composition", () => {
       `export default {
         content: {
           sources: [
-            { type: "filesystem", root: "docs" },
-            { type: "filesystem", root: "api", prefix: "api" },
+            { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+            { kind: "filesystem", options: { root: "api", prefix: "api" }, requiredSecrets: [], runtimeDeps: [] },
           ],
         },
       };\n`
@@ -927,10 +928,9 @@ describe("scanProject composition", () => {
       { "a/index.md": "# A\n", "b/index.md": "# B\n" },
       `export default {
         content: {
-          root: "a",
           sources: [
-            { type: "filesystem", root: "a" },
-            { type: "filesystem", root: "b" },
+            { kind: "filesystem", options: { root: "a" }, requiredSecrets: [], runtimeDeps: [] },
+            { kind: "filesystem", options: { root: "b" }, requiredSecrets: [], runtimeDeps: [] },
           ],
         },
       };\n`
@@ -963,8 +963,8 @@ describe("scanProject composition", () => {
       export default {
         content: {
           sources: [
-            { type: "filesystem", root: "docs" },
-            { type: "custom", source: memory },
+            { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+            { kind: "custom", options: memory, requiredSecrets: [], runtimeDeps: [] },
           ],
         },
       };\n`
@@ -992,7 +992,7 @@ describe("scanProject composition", () => {
       `export default {
         content: {
           sources: [
-            { type: "filesystem", root: "docs", prefix: "docs" },
+            { kind: "filesystem", options: { root: "docs", prefix: "docs" }, requiredSecrets: [], runtimeDeps: [] },
           ],
         },
       };\n`
@@ -1069,8 +1069,8 @@ describe("scanProject composition", () => {
       `export default {
         content: {
           sources: [
-            { type: "filesystem", root: "docs" },
-            { type: "filesystem", root: "guides", prefix: "guides" },
+            { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+            { kind: "filesystem", options: { root: "guides", prefix: "guides" }, requiredSecrets: [], runtimeDeps: [] },
           ],
         },
       };\n`
@@ -1191,15 +1191,11 @@ describe("filesystemSource watch", () => {
 });
 
 describe("contentConfigTemplate", () => {
-  // SAFETY: contentConfigTemplate reads only `contentRoot` and `outDir` from
-  // the project context; the fixture provides both.
-  const context = {
-    contentRoot: "/p/docs",
-    outDir: "/p/.blume",
-  } as ProjectContext;
-  // SAFETY: the template reads only `content.include` off the config; `never`
-  // bridges the rest of ResolvedConfig for this two-field fixture.
-  const config = { content: { include: ["**/*.{md,mdx}"] } } as never;
+  // SAFETY: contentConfigTemplate reads only `root` and `outDir` from the
+  // project context; the fixture provides both.
+  const context = { outDir: "/p/.blume", root: "/p" } as ProjectContext;
+  // The zero-config shorthand: one filesystem source rooted at `docs`.
+  const config = blumeConfigSchema.parse({});
 
   it("emits only the docs collection without staged sources", () => {
     const out = contentConfigTemplate({ config, context });
@@ -1223,8 +1219,8 @@ describe("staging end to end", () => {
       `export default {
         content: {
           sources: [
-            { type: "filesystem", root: "docs" },
-            { type: "mdx-remote", prefix: "sdk", url: "http://127.0.0.1:1", files: ["intro.mdx"] },
+            { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+            { kind: "mdx-remote", options: { prefix: "sdk", url: "http://127.0.0.1:1", files: ["intro.mdx"] }, requiredSecrets: [], runtimeDeps: [] },
           ],
         },
       };\n`
@@ -1267,8 +1263,8 @@ describe("staging end to end", () => {
       `export default {
         content: {
           sources: [
-            { type: "filesystem", root: "docs" },
-            { type: "mdx-remote", prefix: "sdk", url: "http://127.0.0.1:1", files: ["intro.mdx"] },
+            { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+            { kind: "mdx-remote", options: { prefix: "sdk", url: "http://127.0.0.1:1", files: ["intro.mdx"] }, requiredSecrets: [], runtimeDeps: [] },
           ],
         },
       };\n`

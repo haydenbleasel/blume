@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { isAbsolute, join, resolve } from "pathe";
 
 import type { ResolvedConfig } from "./schema.ts";
+import { resolveDocsCollection } from "./sources/collection.ts";
 import type { ProjectContext } from "./types.ts";
 
 const CONFIG_FILENAMES = [
@@ -51,9 +52,9 @@ export const resolveProjectContext = (
   options?: { runtimeDir?: string }
 ): ProjectContext => {
   const absoluteRoot = resolve(root);
-  const contentRoot = isAbsolute(config.content.root)
-    ? config.content.root
-    : join(absoluteRoot, config.content.root);
+  // The content root is where the `docs` collection roots: the first
+  // filesystem source (the implicit one, for a zero-config project).
+  const contentRoot = resolveDocsCollection(config, absoluteRoot).base;
 
   const pagesPath = join(absoluteRoot, config.content.pages);
   const pagesRoot = existsSync(pagesPath) ? pagesPath : null;

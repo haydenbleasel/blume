@@ -198,9 +198,10 @@ content: {
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `root` | `"docs"` | Folder Blume scans for content. |
-| `include` | `["**/*.{md,mdx}"]` | Globs that match content files. |
-| `exclude` | `["**/_*", "**/.*"]` | Globs to ignore (underscore- and dot-files). |
+| `root` | `"docs"` | Folder Blume scans for content. Shorthand for a single `filesystem()` source; not allowed beside `sources`. |
+| `include` | `["**/*.{md,mdx}"]` | Globs that match content files. Shorthand, like `root`. |
+| `exclude` | `["**/_*", "**/.*"]` | Globs to ignore (underscore- and dot-files). Shorthand, like `root`. |
+| `sources` | one `filesystem()` | Content source adapters from `blume/sources`, replacing the shorthand. See [Content sources](/docs/content/sources). |
 | `pages` | `"pages"` | Folder for custom `.astro` pages. |
 | `defaultType` | `"doc"` | Page `type` used when frontmatter omits it. |
 | `types` | `{}` | Per-type content definitions — custom frontmatter keys scoped to pages of one `type`. See [Frontmatter](#frontmatter). |

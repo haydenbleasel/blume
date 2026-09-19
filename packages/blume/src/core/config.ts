@@ -45,10 +45,11 @@ import type { Diagnostic } from "./types.ts";
  *   dismissible }`.
  *
  * **Content & navigation**
- * - `content` — where content lives (`root`, defaults to `docs`) and pluggable
- *   `sources` (filesystem, remote MDX, GitHub Releases, Sanity, Notion, or a
- *   custom `ContentSource`). Omit `sources` and the top-level `root` becomes one
- *   implicit filesystem source.
+ * - `content` — where content lives: adapters from `blume/sources` under
+ *   `sources` (`filesystem({ root })`, `mdxRemote({…})`, `githubReleases({…})`,
+ *   `sanity({…})`, `notion({…})`, `obsidian({…})`, or `custom(source)`), or the
+ *   zero-config shorthand `root`/`include`/`exclude`, which desugars to one
+ *   `filesystem()` source and can't be combined with `sources`.
  * - `navigation` — sidebar, header `tabs`, `selectors` (version/language/product
  *   switchers), pinned `featured` links, header `actions` and the one `cta`,
  *   and the `repo` link (a toggle, or a URL). Omit `sidebar` to generate it

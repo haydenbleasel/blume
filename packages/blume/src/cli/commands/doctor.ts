@@ -86,6 +86,9 @@ export const doctorCommand = defineCommand({
         logger.info(
           `Analytics: ${config.analytics.map((adapter) => adapter.kind).join(", ") || "none"}`
         );
+        logger.info(
+          `Sources: ${config.content.sources.map((source) => source.kind).join(", ")}`
+        );
       }
     } catch (error) {
       if (error instanceof BlumeError) {

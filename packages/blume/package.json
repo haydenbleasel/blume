@@ -57,6 +57,10 @@
     "./components/*": "./src/components/*",
     "./core/*": "./src/core/*",
     "./openapi/*": "./src/openapi/*",
+    "./sources": {
+      "types": "./dist/types/sources/index.d.ts",
+      "default": "./src/sources/index.ts"
+    },
     "./sources/*": "./src/core/sources/*",
     "./theme/*": "./src/theme/*",
     "./package.json": "./package.json"

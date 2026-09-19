@@ -21,6 +21,14 @@ import type { BlumeConfig } from "../src/core/config-input.ts";
 import { blumePackageJson, toPackageName } from "../src/core/package-json.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { getBlumeVersion } from "../src/core/version.ts";
+import {
+  filesystem,
+  githubReleases,
+  mdxRemote,
+  notion,
+  obsidian,
+  sanity,
+} from "../src/sources/index.ts";
 
 const tempDirs: string[] = [];
 
@@ -47,13 +55,26 @@ const answersWith = (overrides: Partial<InitAnswers> = {}): InitAnswers => ({
 });
 
 /** Evaluate the generated `blume.config.ts` down to its config object. */
+/** The `blume/sources` factories a generated config may import, by name. */
+const FACTORIES = {
+  filesystem,
+  githubReleases,
+  mdxRemote,
+  notion,
+  obsidian,
+  sanity,
+};
+
 const evalConfig = (config: string): BlumeConfig => {
   const object = config
     .replace('import { defineConfig } from "blume";', "")
+    .replace(/import \{[^}]*\} from "blume\/sources";/u, "")
     .replace("export default defineConfig(", "return (")
     .replace(/\);\s*$/u, ");");
   // oxlint-disable-next-line no-new-func -- evaluating our own generated output
-  return new Function(object)();
+  return new Function(...Object.keys(FACTORIES), object)(
+    ...Object.values(FACTORIES)
+  );
 };
 
 const collectLog = () => {
@@ -216,15 +237,25 @@ export default defineConfig({
     const config = buildConfig(
       answersWith({ contentDir: "content", sources: ["filesystem", "notion"] })
     );
-    expect(config).toContain('{ type: "filesystem", root: "content" },');
-    expect(config).toContain('type: "notion"');
+    expect(config).toContain(
+      'import { filesystem, notion } from "blume/sources";'
+    );
+    expect(config).toContain('filesystem({ root: "content" }),');
+    expect(config).toContain("notion({");
     expect(config).toContain("NOTION_TOKEN");
   });
 
   it("omits the filesystem source when only remote sources are picked", () => {
     const config = buildConfig(answersWith({ sources: ["github-releases"] }));
-    expect(config).toContain('type: "github-releases"');
-    expect(config).not.toContain('type: "filesystem"');
+    expect(config).toContain('import { githubReleases } from "blume/sources";');
+    expect(config).toContain("githubReleases({");
+    expect(config).not.toContain("filesystem(");
+  });
+
+  it("imports nothing from blume/sources for the shorthand content block", () => {
+    expect(buildConfig(answersWith({ contentDir: "content" }))).not.toContain(
+      "blume/sources"
+    );
   });
 
   it("generates schema-valid configs for every source combination", () => {

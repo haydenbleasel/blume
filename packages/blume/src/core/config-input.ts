@@ -5,6 +5,7 @@ import type { AskRetrievalOptions } from "../ai/ask-context.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import type { AnalyticsAdapter } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
+import type { SourceAdapterInput } from "../sources/registry.ts";
 import type { FontSlug } from "../theme/fonts.ts";
 import type {
   blumeConfigSchema,
@@ -15,7 +16,6 @@ import type {
   SidebarDisplay,
   SidebarItemConfig,
 } from "./schema.ts";
-import type { ContentSource } from "./sources/types.ts";
 import type { StandardSchema } from "./standard-schema.ts";
 
 /**
@@ -106,191 +106,32 @@ export type BannerConfig =
       };
     };
 
-// ---------------------------------------------------------------------------
-// Content sources
-// ---------------------------------------------------------------------------
-
-/** Local Markdown/MDX read from the filesystem. */
-export interface FilesystemSource {
-  type: "filesystem";
-  /** Glob patterns to ignore. Defaults to `["**\/_*", "**\/.*"]`. */
-  exclude?: string[];
-  /** Glob patterns to include. Defaults to `["**\/*.{md,mdx}"]`. */
-  include?: string[];
-  /** Namespaces this source's routes under `/<prefix>/`. */
-  prefix?: string;
-  /** Directory to read from, relative to the project root. Defaults to `docs`. */
-  root?: string;
-}
-
 /**
- * Remote Markdown/MDX fetched over HTTP. Enumerate files explicitly against a
- * raw `url` base, or from a GitHub repo subtree via `github`. A private repo's
- * token comes from `GITHUB_TOKEN` — never inline it here.
- */
-export interface MdxRemoteSource {
-  type: "mdx-remote";
-  /** Explicit list of source-relative file paths to fetch from `url`. */
-  files?: string[];
-  /** Enumerate a GitHub repo subtree via the git-trees API. */
-  github?: {
-    /** Repository owner (user or org). */
-    owner: string;
-    /** Subpath within the repo. Defaults to the repo root. */
-    path?: string;
-    /** Git ref (branch, tag, or SHA). Defaults to `main`. */
-    ref?: string;
-    /** Repository name. */
-    repo: string;
-  };
-  /** Glob patterns applied to enumerated refs. Defaults to `["**\/*.{md,mdx}"]`. */
-  include?: string[];
-  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
-  pollInterval?: number;
-  /** Namespaces this source's routes under `/<prefix>/`. */
-  prefix?: string;
-  /** Raw base URL, e.g. `https://raw.githubusercontent.com/acme/sdk/main/docs`. */
-  url?: string;
-}
-
-/**
- * A repo's GitHub Releases, materialized as `type: changelog` entries — release
- * notes become the changelog with no files to maintain. A private repo reads a
- * token from `GITHUB_TOKEN`; never inline it here.
- */
-export interface GithubReleasesSource {
-  type: "github-releases";
-  /** Include draft releases (needs a token with repo write access). */
-  drafts?: boolean;
-  /** Cap the number of releases materialized, newest-first. Defaults to 100. */
-  limit?: number;
-  /** Repository owner (user or org). */
-  owner: string;
-  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
-  pollInterval?: number;
-  /** Namespaces this source's routes under `/<prefix>/`; e.g. `changelog`. */
-  prefix?: string;
-  /** Include prereleases. */
-  prereleases?: boolean;
-  /** Repository name. */
-  repo: string;
-}
-
-/** A Sanity dataset queried with GROQ; Portable Text bodies become Markdown. */
-export interface SanitySource {
-  type: "sanity";
-  /** Sanity API version (a date). Defaults to `2024-01-01`. */
-  apiVersion?: string;
-  /** Dataset name to query. */
-  dataset: string;
-  /** Field paths mapping a document onto Blume meta + body. */
-  fields?: {
-    /** Field holding the renderable body (Portable Text or Markdown). */
-    body?: string;
-    /** Field holding the page description. */
-    description?: string;
-    /** Field holding the last-modified date. */
-    lastModified?: string;
-    /** Field holding the page slug. */
-    slug?: string;
-    /** Field holding the page title. */
-    title?: string;
-  };
-  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
-  pollInterval?: number;
-  /** Namespaces this source's routes under `/<prefix>/`. */
-  prefix?: string;
-  /** Sanity project id. */
-  projectId: string;
-  /** GROQ query selecting the documents to import. */
-  query: string;
-}
-
-/** A Notion database; pages become entries, blocks become MDX. */
-export interface NotionSource {
-  type: "notion";
-  /** Max concurrent Notion API requests; default 3 (Notion's per-integration pace). */
-  concurrency?: number;
-  /** Notion database id. */
-  database: string;
-  /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
-  pollInterval?: number;
-  /** Namespaces this source's routes under `/<prefix>/`. */
-  prefix?: string;
-  /** Notion property names mapped onto Blume meta. */
-  properties?: {
-    /** Property holding the page description. */
-    description?: string;
-    /** Property holding the sort order. */
-    order?: string;
-    /** Property holding the page slug. */
-    slug?: string;
-    /** Property holding the publish status. */
-    status?: string;
-    /** Property holding the page title. */
-    title?: string;
-  };
-  /** Status value treated as published; others map to `draft`. Defaults to `Published`. */
-  publishedValue?: string;
-}
-
-/**
- * An Obsidian vault, read in place. Wikilinks become route links and
- * `%%comments%%` are stripped at load time, so the vault stays the source of
- * truth — no export step and no generated notes in the repo.
- */
-export interface ObsidianSource {
-  type: "obsidian";
-  /** Vault folder names to skip at any depth, in addition to dot-folders. */
-  exclude?: string[];
-  /** Namespaces this source's routes under `/<prefix>/`; e.g. `vault`. */
-  prefix?: string;
-  /** Vault directory, absolute or relative to the project root. */
-  vault: string;
-}
-
-/**
- * A user-provided {@link ContentSource} instance, passed straight through. This
- * is the extension point for adapters with custom serializers or any other
- * backend, without their SDKs touching core.
- */
-export interface CustomSource {
-  type: "custom";
-  /** A `ContentSource` implementation (an object with `name` + `load`). */
-  source: ContentSource;
-}
-
-/** A single configured content source, discriminated by `type`. */
-export type ContentSourceInput =
-  | FilesystemSource
-  | MdxRemoteSource
-  | GithubReleasesSource
-  | SanitySource
-  | NotionSource
-  | ObsidianSource
-  | CustomSource;
-
-/**
- * Where content lives and how it's discovered. When `sources` is omitted, the
- * top-level `root`/`include`/`exclude` desugar to one implicit filesystem
- * source, so simple sites need nothing here.
+ * Where content lives and how it's discovered. `root`/`include`/`exclude` are
+ * zero-config shorthand for a single `filesystem()` source; set `sources` to
+ * compose adapters instead, and move those fields into its `filesystem()`
+ * entry — the two forms can't be combined.
  */
 export interface ContentConfig {
   /** Default page `type` for content that sets none. Defaults to `doc`. */
   defaultType?: string;
-  /** Glob patterns to ignore. Defaults to `["**\/_*", "**\/.*"]`. */
+  /** Glob patterns to ignore. Defaults to `["**\/_*", "**\/.*"]`. Shorthand; not allowed beside `sources`. */
   exclude?: string[];
-  /** Glob patterns to include. Defaults to `["**\/*.{md,mdx}"]`. */
+  /** Glob patterns to include. Defaults to `["**\/*.{md,mdx}"]`. Shorthand; not allowed beside `sources`. */
   include?: string[];
   /** Directory of standalone `pages` (outside the docs tree). Defaults to `pages`. */
   pages?: string;
-  /** Content root directory, relative to the project root. Defaults to `docs`. */
+  /** Content root directory, relative to the project root. Defaults to `docs`. Shorthand; not allowed beside `sources`. */
   root?: string;
   /**
-   * Pluggable content sources. Mix local files with remote MDX, GitHub
-   * Releases, Sanity, Notion, or a custom `ContentSource`.
+   * Content source adapters from `blume/sources`, read in order:
+   * `filesystem({ root })`, `mdxRemote({ github })`, `githubReleases({ owner,
+   * repo })`, `sanity({ projectId, dataset, query })`, `notion({ database })`,
+   * `obsidian({ vault })`, or `custom(source)` for any `ContentSource`
+   * implementation. When set it replaces the implicit filesystem source, so
+   * list a `filesystem()` entry for local docs.
    */
-  sources?: ContentSourceInput[];
+  sources?: SourceAdapterInput[];
   /**
    * Per-type content definitions, keyed by the frontmatter `type` they apply
    * to (including `defaultType`, for pages that set none):

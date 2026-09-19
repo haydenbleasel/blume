@@ -92,15 +92,16 @@ describe("customStaticRoutes", () => {
   });
 });
 
-// SAFETY: `hasGeneratedChangelog` reads only `config.content.sources` and each
-// page's contentType/route/meta visibility flags, which the fixture provides.
+// SAFETY: `hasGeneratedChangelog` reads only each source descriptor's `kind`
+// under `config.content.sources` and each page's contentType/route/meta
+// visibility flags, which the fixture provides.
 const projectOf = (
   pages: {
     contentType: string;
     route: string;
     meta?: { draft: boolean; sidebar: { hidden: boolean } };
   }[],
-  sources: { type: string }[] = []
+  sources: { kind: string }[] = []
 ): BlumeProject =>
   ({
     config: { content: { sources } },
@@ -137,7 +138,7 @@ describe("hasGeneratedChangelog", () => {
   });
 
   it("is true for a release-backed source even with no entries", () => {
-    const project = projectOf([], [{ type: "github-releases" }]);
+    const project = projectOf([], [{ kind: "github-releases" }]);
     expect(hasGeneratedChangelog(project, [])).toBe(true);
   });
 

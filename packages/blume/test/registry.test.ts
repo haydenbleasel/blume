@@ -292,8 +292,8 @@ describe("eject", () => {
       "blume.config.ts": `export default {
   content: {
     sources: [
-      { root: "docs", type: "filesystem" },
-      { owner: "acme", prefix: "changelog", repo: "sdk", type: "github-releases" },
+      { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+      { kind: "github-releases", options: { owner: "acme", prefix: "changelog", repo: "sdk" }, requiredSecrets: [], runtimeDeps: [] },
     ],
   },
 };\n`,

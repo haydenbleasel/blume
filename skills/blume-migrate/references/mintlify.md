@@ -112,7 +112,7 @@ Rewrite each page's MDX:
 - **`<Tabs>` → `<Tabs inline>`.** Mintlify renders tabs **borderless** — a strip on a full-width rule with the content flowing beneath as prose — while Blume's `<Tabs>` defaults to a bordered box. Add `inline` to each `<Tabs>` to preserve Mintlify's appearance; every child `<Tab title="…">` is unchanged. Don't add `param` — Mintlify tabs switch in place and don't deep-link to the URL, so plain `inline` is the faithful mapping.
 - **These pass through — Blume ships them natively:** `<Columns>`/`<Column>`, `<Expandable>`, `<Tooltip>`, `<Frame>`, `<Panel>`, `<Card>`/`<CardGroup>`, `<Tab>`, `<Steps>`/`<Step>`. Keep them as-is.
 - **API fields → `TypeTable`.** Blume does **not** ship `<ParamField>`/`<ResponseField>`/`<RequestField>`. Convert a cluster of fields into one `<TypeTable>` (rows keyed by field name, each `{ type, required?, default?, description }`). For a fully spec'd API, prefer deleting the hand-written fields and using the [OpenAPI reference](#openapi) instead.
-- **`<Update>`** (a Mintlify changelog entry) has no component form → convert to a `type: changelog` page, or use the `github-releases` source.
+- **`<Update>`** (a Mintlify changelog entry) has no component form → convert to a `type: changelog` page, or use the `githubReleases()` source.
 - **Snippets are inlined, not imported.** Blume has no `/snippets` import mechanism. For each `import X from "/snippets/x.mdx"` + `<X prop="v" />`, inline the snippet's body (substituting `{prop}` placeholders), then delete the import and the `/snippets` file. Named string imports (`import { foo } from "/snippets/vars.mdx"`) → inline the value at each `{foo}`.
 
 ## Frontmatter

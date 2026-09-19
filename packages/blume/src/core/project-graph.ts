@@ -61,12 +61,20 @@ const applyConfigOverrides = (
   if (!overrides) {
     return config;
   }
+  // `--content-dir` re-roots every filesystem source: with one (the
+  // zero-config case) it is exactly the old `content.root` override, and
+  // several must share a root anyway (see `resolveDocsCollection`).
+  const { contentRoot } = overrides;
+  const sources = contentRoot
+    ? config.content.sources.map((source) =>
+        source.kind === "filesystem"
+          ? { ...source, options: { ...source.options, root: contentRoot } }
+          : source
+      )
+    : config.content.sources;
   return {
     ...config,
-    content: {
-      ...config.content,
-      root: overrides.contentRoot ?? config.content.root,
-    },
+    content: { ...config.content, sources },
     deployment: {
       ...config.deployment,
       adapter: overrides.adapter ?? config.deployment.adapter,
@@ -138,7 +146,7 @@ const entryIdDiagnostics = (
         message: `Content source "${page.source.name}" is rooted outside the docs collection base, so ${page.route} resolves entry id "${entryId}" but the collection would generate "${expected}" — the page would 404 at runtime.`,
         severity: "error",
         suggestion:
-          "Use a single filesystem source (the docs collection roots at it), or root every filesystem source at content.root and partition them with include globs — a root at a subdirectory of content.root still mismatches.",
+          "Use a single filesystem() source (the docs collection roots at it), or give every filesystem() source the same root and partition them with include globs — a root at a subdirectory of the first source's root still mismatches.",
       });
     }
   }
@@ -397,7 +405,10 @@ export const scanProject = async (
       ...contentDiagnostics,
       ...includeDiagnostics,
       ...folderMeta.diagnostics,
-      ...entryIdDiagnostics(pages, resolveDocsCollection(config, context).base),
+      ...entryIdDiagnostics(
+        pages,
+        resolveDocsCollection(config, context.root).base
+      ),
       ...graph.diagnostics,
       ...i18nWarnings,
       ...versionWarnings,

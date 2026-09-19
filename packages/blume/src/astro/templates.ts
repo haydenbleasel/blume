@@ -10,6 +10,7 @@ import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { TOC_HIDDEN_KEY } from "../core/heading-markers.ts";
 import type { AskReasoning, ResolvedConfig } from "../core/schema.ts";
+import { resolveDocsCollection } from "../core/sources/collection.ts";
 import { BLUME_IGNORE_DIRS } from "../core/sources/watch.ts";
 import { trimChar } from "../core/trim.ts";
 import type { ProjectContext } from "../core/types.ts";
@@ -197,6 +198,15 @@ export const runtimeDependencies = (options: {
     ...searchProviderMeta(config.search.provider).runtimeDeps,
     ...config.analytics.flatMap((adapter) => adapter.runtimeDeps)
   );
+  // Each content source adapter declares the SDK its fetch imports (Notion,
+  // Sanity); the descriptor is the one place that knows.
+  for (const source of config.content.sources) {
+    for (const dep of source.runtimeDeps) {
+      if (!deps.includes(dep)) {
+        deps.push(dep);
+      }
+    }
+  }
   // Ask AI's provider SDK, when its backend needs one (gateway uses core `ai`).
   if (config.ai.ask?.enabled && !config.ai.ask.endpoint) {
     const askDep = askBackendRuntimeDep(config.ai.ask);
@@ -948,10 +958,9 @@ export const contentConfigTemplate = (options: {
   /** Base dir for the staged collection; defaults to `<outDir>/content`. */
   stagedBase?: string;
   /**
-   * The `docs` collection's base + include/exclude globs. Defaults to
-   * `content.root` and the top-level content globs; a single filesystem source
-   * roots the collection at *its* root so entry ids resolve (see
-   * `resolveDocsCollection`).
+   * The `docs` collection's base + include/exclude globs. Defaults to what
+   * `resolveDocsCollection` derives from the filesystem sources: the collection
+   * roots at the first one so entry ids resolve.
    */
   collection?: { base: string; include: string[]; exclude: string[] };
   /**
@@ -963,9 +972,11 @@ export const contentConfigTemplate = (options: {
 }): string => {
   const { context, config } = options;
   const stagedBase = options.stagedBase ?? stagedContentDir(context.outDir);
-  const collectionBase = options.collection?.base ?? context.contentRoot;
-  const includeGlobs = options.collection?.include ?? config.content.include;
-  const excludeGlobs = options.collection?.exclude ?? config.content.exclude;
+  const collection =
+    options.collection ?? resolveDocsCollection(config, context.root);
+  const collectionBase = collection.base;
+  const includeGlobs = collection.include;
+  const excludeGlobs = collection.exclude;
 
   // Fold the content excludes into the glob as negative patterns so the `docs`
   // collection doesn't ingest ignored trees (`node_modules`, `snippets`, the

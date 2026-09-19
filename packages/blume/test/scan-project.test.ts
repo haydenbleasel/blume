@@ -119,7 +119,10 @@ export default { content: { types: { rfc: { frontmatter: { status } } } } };`,
       },
     });
 
-    expect(project.config.content.root).toBe("guides");
+    // `--content-dir` re-roots the (implicit) filesystem source.
+    expect(project.config.content.sources[0]?.options).toMatchObject({
+      root: "guides",
+    });
     expect(project.config.deployment.adapter).toBe("node");
     expect(project.config.deployment.base).toBe("/docs");
     expect(project.config.deployment.output).toBe("server");

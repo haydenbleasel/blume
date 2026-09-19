@@ -7,7 +7,7 @@ By default Blume reads a folder of `.md`/`.mdx` files. **Content sources** let y
 
 ## The default
 
-With no configuration, Blume scans your content root (`docs` by default) as one implicit filesystem source. The top-level `content.root`/`include`/`exclude` options still work exactly as before — nothing to change.
+With no configuration, Blume scans your content root (`docs` by default) as one filesystem source. The top-level `content.root`, `content.include`, and `content.exclude` options are shorthand for that single source — nothing to import, nothing to change.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -17,50 +17,57 @@ export default defineConfig({
 });
 ```
 
-## Multiple sources
+## Adapters
 
-Add a `content.sources` array to compose sources. Each entry is namespaced by an optional `prefix`, so its routes nest under `/<prefix>/…`. When `sources` is present it replaces the implicit default, so include a `filesystem` entry for your local docs.
+Each entry in `content.sources` is an **adapter**: a factory imported from `blume/sources` that returns a plain descriptor Blume reads at build time. Add a `sources` array to compose sources. When `sources` is present it replaces the implicit default, so include a `filesystem()` entry for your local docs — and move `root`, `include`, or `exclude` into it. The shorthand and `sources` can't be combined; Blume reports which field to move.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
+import { filesystem, mdxRemote } from "blume/sources";
 
 export default defineConfig({
   content: {
     sources: [
       // Local docs at the site root
-      { type: "filesystem", root: "docs" },
+      filesystem({ root: "docs" }),
 
       // Remote MDX from a GitHub repo, mounted under /sdk
-      {
-        type: "mdx-remote",
+      mdxRemote({
         prefix: "sdk",
         github: { owner: "acme", repo: "sdk", ref: "main", path: "docs" },
-      },
+      }),
     ],
   },
 });
 ```
 
-If two sources resolve to the same route, Blume reports a `BLUME_DUPLICATE_ROUTE` build error — give each source a distinct `prefix`.
+The adapters are `filesystem()`, `mdxRemote()`, `githubReleases()`, `sanity()`, `notion()`, `obsidian()`, and `custom()`. Every adapter accepts two shared options:
+
+- **`prefix`** namespaces the source's routes under `/<prefix>/…`, which also becomes the source's name in diagnostics and its cache directory. If two sources resolve to the same route, Blume reports a `BLUME_DUPLICATE_ROUTE` build error — give each source a distinct `prefix`.
+- **`pollInterval`** (seconds) makes a remote source re-fetch on that interval in dev, reloading only when the content actually changes. Leave it unset to fetch once and freeze for the session. Local sources (`filesystem()`, `obsidian()`) watch the filesystem instead and ignore it.
+
+An adapter's descriptor also declares the SDK it needs and the environment variables it reads, so the generated project declares that package, `blume dev` and `blume build` warn when a variable is unset, and `blume doctor` lists the configured sources. Options are validated when the config loads: a missing required option, an unknown key, or a leftover 1.x `{ type: "…" }` object fails with a message naming the fix.
+
+A single `filesystem()` source roots the generated docs collection at its own directory. Several filesystem sources must share one root and partition it with `include` globs — a second source rooted elsewhere is reported as `BLUME_ENTRY_ID_MISMATCH` so its pages can't silently 404.
 
 ## Obsidian
 
-The built-in `obsidian` source reads an [Obsidian](https://obsidian.md) vault in place. There is no export step and nothing generated into your repo: the vault stays the source of truth, and Blume lowers Obsidian's dialect to Markdown as it loads.
+The built-in `obsidian()` adapter reads an [Obsidian](https://obsidian.md) vault in place. There is no export step and nothing generated into your repo: the vault stays the source of truth, and Blume lowers Obsidian's dialect to Markdown as it loads.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
+import { filesystem, obsidian } from "blume/sources";
 
 export default defineConfig({
   content: {
     sources: [
-      { type: "filesystem", root: "docs" },
-      {
-        type: "obsidian",
+      filesystem({ root: "docs" }),
+      obsidian({
         prefix: "notes",
         vault: "vault",
         // Vault folder names to skip at any depth, on top of dot-folders
         exclude: ["Templates", "Daily"],
-      },
+      }),
     ],
   },
 });
@@ -78,24 +85,23 @@ A heading that itself contains a link gets its manifest anchor from the heading'
 
 A link to an `index` note lands on its folder's route rather than a phantom `/index`. **An unresolved wikilink degrades to plain text with a build warning instead of failing the build**, so a vault mid-refactor still publishes. Single-line `%%comments%%` are stripped, a wikilink inside an HTML comment (`<!-- [[Draft]] -->`) is left alone since Obsidian hides it too, and a note with no `title` in its frontmatter is titled by its filename — the same rule Obsidian itself applies. An `index` note is the one exception: it names a route rather than a note, so its title falls through to Blume's usual derivation (first heading, then the humanized segment). Fenced, indented, and inline code passes through verbatim, so a note documenting the syntax survives.
 
-Dot-folders are skipped, including Obsidian's own `.obsidian` config directory and `.trash` — which the dev watcher also ignores, so moving a pane in the app or deleting a note to the trash doesn't rebuild your site. Editing a note does. The directories no content scan reads (`node_modules`, `dist`, `.git`, …) are skipped too, so a vault rooted at the project itself doesn't publish dependency READMEs. Symlinks inside the vault are followed, the way the filesystem source follows them, so a shared folder linked into the vault publishes with it. A vault that sits inside `content.root` must be excluded from the filesystem source (`exclude: ["vault/**"]`); `blume version cut` then leaves it out of the snapshot, since the vault keeps publishing its own notes as current.
+Dot-folders are skipped, including Obsidian's own `.obsidian` config directory and `.trash` — which the dev watcher also ignores, so moving a pane in the app or deleting a note to the trash doesn't rebuild your site. Editing a note does. The directories no content scan reads (`node_modules`, `dist`, `.git`, …) are skipped too, so a vault rooted at the project itself doesn't publish dependency READMEs. Symlinks inside the vault are followed, the way the filesystem source follows them, so a shared folder linked into the vault publishes with it. A vault that sits inside the filesystem source's root must be excluded from it (`filesystem({ root: "docs", exclude: ["vault/**"] })`); `blume version cut` then leaves it out of the snapshot, since the vault keeps publishing its own notes as current.
 
 Not yet lowered: callouts (`> [!note]`) render as plain blockquotes, embeds (`![[image.png]]`) pass through untouched, multi-line `%%comments%%` are left in place, and there is no backlink graph.
 
 ## Remote MDX
 
-The built-in `mdx-remote` source fetches raw `.md`/`.mdx` over HTTP. Enumerate files either from a GitHub repo subtree (`github`) or explicitly against a raw base URL (`url` + `files`):
+The built-in `mdxRemote()` adapter fetches raw `.md`/`.mdx` over HTTP. Enumerate files either from a GitHub repo subtree (`github`) or explicitly against a raw base URL (`url` + `files`):
 
 ```ts blume.config.ts
-{
-  type: "mdx-remote",
+mdxRemote({
   prefix: "sdk",
   url: "https://raw.githubusercontent.com/acme/sdk/main/docs",
   files: ["intro.mdx", "guide.mdx"],
-}
+});
 ```
 
-A private repo's token is read from the `GITHUB_TOKEN` environment variable — it is never inlined into your config or generated output, and it is only ever sent to GitHub's own hosts (`api.github.com`, `raw.githubusercontent.com`), never to a custom `url` base.
+A private repo's token is read from the `GITHUB_TOKEN` environment variable — the adapter declares it, so `blume dev` and `blume build` warn when it's unset. It is never inlined into your config or generated output, and it is only ever sent to GitHub's own hosts (`api.github.com`, `raw.githubusercontent.com`), never to a custom `url` base. A public repo works without it.
 
 Remote pages are rendered with full MDX-plus-component fidelity: their bodies are materialized into a hidden staging directory and rendered through Astro alongside your local docs, so callouts, tabs, and every other Blume component keep working.
 
@@ -103,28 +109,28 @@ Remote pages are rendered with full MDX-plus-component fidelity: their bodies ar
 
 Each remote source keeps a snapshot under `.blume/cache/<source>/`. If a fetch fails — a network blip or a CMS outage — Blume serves the last-known-good snapshot with a warning rather than failing the build. The cache lives inside `.blume/` and is regenerated, never committed.
 
-In dev, remote content is fetched once and frozen for the session; restart the dev server to refresh it. Local filesystem sources hot-reload as usual. To poll a remote source for changes instead, set `pollInterval` (seconds) on it — the dev server re-fetches on that interval and reloads only when the content actually changes. Leave it unset to avoid hitting the API while you work.
+In dev, remote content is fetched once and frozen for the session; restart the dev server to refresh it. Local filesystem sources hot-reload as usual. To poll a remote source for changes instead, set the shared `pollInterval` option (seconds) on it — the dev server re-fetches on that interval and reloads only when the content actually changes. Leave it unset to avoid hitting the API while you work.
 
 ## GitHub Releases
 
-The built-in `github-releases` source turns a repo's releases into a changelog: each release becomes a `type: changelog` entry, so your release notes _are_ your changelog — nothing to write twice. Combined with the generated [changelog timeline](/docs/advanced/changelog), publishing a GitHub release ships a changelog entry.
+The built-in `githubReleases()` adapter turns a repo's releases into a changelog: each release becomes a `type: changelog` entry, so your release notes _are_ your changelog — nothing to write twice. Combined with the generated [changelog timeline](/docs/advanced/changelog), publishing a GitHub release ships a changelog entry.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
+import { filesystem, githubReleases } from "blume/sources";
 
 export default defineConfig({
   content: {
     sources: [
-      { type: "filesystem", root: "content" },
-      {
-        type: "github-releases",
+      filesystem({ root: "content" }),
+      githubReleases({
         prefix: "changelog",
         owner: "acme",
         repo: "sdk",
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
-      },
+      }),
     ],
   },
 });
@@ -132,60 +138,60 @@ export default defineConfig({
 
 Each release maps to the changelog fields automatically: its name (or tag) becomes the title, its published date drives the timeline order, the tag becomes `changelog.version`, and prereleases are tagged `Prerelease` (others `Release`). The notes render as the entry body. Give the source a `prefix` so its release pages nest under a route like `/changelog/v1-2-0`.
 
-A private repo authenticates with the `GITHUB_TOKEN` environment variable — the same token the other GitHub features use, never inlined into your config. Like every remote source it's cached under `.blume/cache/<source>/` and served offline if the API is unreachable. Because a changelog is supplementary, a fetch failure with no cache (say a CI build without a token) degrades to an empty changelog with a warning rather than failing the build — set `GITHUB_TOKEN` in your CI and deploy environments to populate it.
+A private repo authenticates with the `GITHUB_TOKEN` environment variable — the same token the other GitHub features use, never inlined into your config; the adapter declares it, so a build without it warns. Like every remote source it's cached under `.blume/cache/<source>/` and served offline if the API is unreachable. Because a changelog is supplementary, a fetch failure with no cache (say a CI build without a token) degrades to an empty changelog with a warning rather than failing the build — set `GITHUB_TOKEN` in your CI and deploy environments to populate it.
 
 ## Sanity
 
-The built-in `sanity` source runs a GROQ query and maps each document's fields to frontmatter and its Portable Text body to Markdown. The `@sanity/client` package is an optional peer dependency — install it only if you use this source.
+The built-in `sanity()` adapter runs a GROQ query and maps each document's fields to frontmatter and its Portable Text body to Markdown. The adapter declares `@sanity/client` as its runtime dependency — an optional peer, so install it only if you use this source.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
+import { filesystem, sanity } from "blume/sources";
 
 export default defineConfig({
   content: {
     sources: [
-      { type: "filesystem", root: "docs" },
-      {
-        type: "sanity",
+      filesystem({ root: "docs" }),
+      sanity({
         prefix: "guides",
         projectId: "abc123",
         dataset: "production",
         query: `*[_type == "guide"]`,
         // Field paths default to title / slug.current / body / _updatedAt
         fields: { slug: "slug.current", body: "content" },
-      },
+      }),
     ],
   },
 });
 ```
 
-A read token for a private dataset comes from the `SANITY_TOKEN` environment variable. Custom Portable Text block types map to Blume components through the adapter's `serializers` option, available when you construct `sanitySource` directly via a [custom source](#custom-sources).
+A read token for a private dataset comes from the `SANITY_TOKEN` environment variable, which the adapter declares. Custom Portable Text block types map to Blume components through the engine's `serializers` option, available when you construct `sanitySource` directly and pass it to [`custom()`](#custom-sources).
 
 ## Notion
 
-The built-in `notion` source turns a Notion database into a collection: each row becomes a page, its properties become frontmatter, and its block tree becomes MDX. Callouts, toggles, columns, and code blocks map to the matching Blume components. Video blocks become a `<YouTube>` embed when they hold a YouTube link and a `<video>` player otherwise, with the block's caption as a `<Frame>` caption either way; a link to a video page rather than a media file (a Vimeo or Loom URL, say) is reported as a warning instead of embedded. `@notionhq/client` (v5 or later) is an optional peer dependency; Blume reads the database through its first data source.
+The built-in `notion()` adapter turns a Notion database into a collection: each row becomes a page, its properties become frontmatter, and its block tree becomes MDX. Callouts, toggles, columns, and code blocks map to the matching Blume components. Video blocks become a `<YouTube>` embed when they hold a YouTube link and a `<video>` player otherwise, with the block's caption as a `<Frame>` caption either way; a link to a video page rather than a media file (a Vimeo or Loom URL, say) is reported as a warning instead of embedded. The adapter declares `@notionhq/client` (v5 or later) as its runtime dependency — an optional peer; Blume reads the database through its first data source.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
+import { filesystem, notion } from "blume/sources";
 
 export default defineConfig({
   content: {
     sources: [
-      { type: "filesystem", root: "docs" },
-      {
-        type: "notion",
+      filesystem({ root: "docs" }),
+      notion({
         prefix: "handbook",
         database: process.env.NOTION_DB_ID,
         // Property names default to the title-typed prop / Description / Slug / Order
         // Set publishedValue to treat Status as a publish gate (opt-in)
         publishedValue: "Published",
-      },
+      }),
     ],
   },
 });
 ```
 
-The integration token comes from the `NOTION_TOKEN` environment variable (share the database with your integration). By default every page is imported; set `publishedValue` to make the `Status` property a publish gate — any other value then maps to `draft: true`, which production builds drop. **Notion image and video URLs are signed and expire**, so the adapter downloads them at build time into the site's assets and rewrites the references — a CMS asset never rots a static build. API calls are paced through a small request pool (3 at a time, matching Notion's per-integration rate limit) so databases with hundreds of pages import without tripping `429` responses; set `concurrency` on the source to tune it.
+The integration token comes from the `NOTION_TOKEN` environment variable (share the database with your integration); the adapter declares it, so a build without it warns. By default every page is imported; set `publishedValue` to make the `Status` property a publish gate — any other value then maps to `draft: true`, which production builds drop. **Notion image and video URLs are signed and expire**, so the adapter downloads them at build time into the site's assets and rewrites the references — a CMS asset never rots a static build. API calls are paced through a small request pool (3 at a time, matching Notion's per-integration rate limit) so databases with hundreds of pages import without tripping `429` responses; set `concurrency` on the source to tune it.
 
 ## Preview and sync
 
@@ -203,19 +209,19 @@ blume sync --force       # ...ignoring any cached snapshot
 
 ## Custom sources
 
-Any object implementing the `ContentSource` interface can be passed directly, which is how an adapter with custom serializers — or any backend not built in — plugs in without its SDK touching the core install:
+Any object implementing the `ContentSource` interface can be passed to `custom()`, which is how an adapter with custom serializers — or any backend not built in — plugs in without its SDK touching the core install:
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
+import { custom, filesystem } from "blume/sources";
 import { sanitySource } from "blume/sources/sanity.ts";
 
 export default defineConfig({
   content: {
     sources: [
-      { type: "filesystem", root: "docs" },
-      {
-        type: "custom",
-        source: sanitySource({
+      filesystem({ root: "docs" }),
+      custom(
+        sanitySource({
           name: "guides",
           prefix: "guides",
           projectId: "abc123",
@@ -225,13 +231,13 @@ export default defineConfig({
           serializers: {
             callout: (block) => `<Callout>${block.text}</Callout>`,
           },
-        }),
-      },
+        })
+      ),
     ],
   },
 });
 ```
 
-A source normalizes its native shape (Portable Text, Notion blocks, remote HTML) to Markdown/MDX text, so the same components and markdown features apply no matter where a page comes from.
+A source normalizes its native shape (Portable Text, Notion blocks, remote HTML) to Markdown/MDX text, so the same components and markdown features apply no matter where a page comes from. Unlike the built-in adapters, `custom()` carries a live instance rather than plain data, so it declares no runtime dependency or secret of its own — the instance manages those itself.
 
 A custom source that reads local files should set `sourcePath` on each entry and `contentRoot` on the source itself. `sourcePath` names the file in diagnostics and resolves relative images beside it; `contentRoot` bounds the git `log` that dates pages, so without it the source's pages get no git-derived ["Last updated" date](/docs/configuration#last-modified).

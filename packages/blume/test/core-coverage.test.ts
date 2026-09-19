@@ -270,7 +270,12 @@ describe("config schema validators", () => {
     const result = blumeConfigSchema.safeParse({
       content: {
         sources: [
-          { source: { load: () => ({}), name: "demo" }, type: "custom" },
+          {
+            kind: "custom",
+            options: { load: () => ({}), name: "demo" },
+            requiredSecrets: [],
+            runtimeDeps: [],
+          },
         ],
       },
     });

@@ -49,5 +49,12 @@ export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
     }
   }
 
+  // Each content source adapter declares the env vars its fetch reads.
+  for (const source of config.content.sources) {
+    for (const env of source.requiredSecrets) {
+      requireSecret(`Content source (${source.kind})`, env);
+    }
+  }
+
   return diagnostics;
 };

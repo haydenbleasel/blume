@@ -1,4 +1,5 @@
 import { defineConfig } from "blume";
+import { filesystem, githubReleases } from "blume/sources";
 
 export default defineConfig({
   ai: {
@@ -40,15 +41,13 @@ export default defineConfig({
     skills: "../../skills",
   },
   content: {
-    root: "content",
     sources: [
-      { root: "content", type: "filesystem" },
-      {
+      filesystem({ root: "content" }),
+      githubReleases({
         owner: "haydenbleasel",
         prefix: "changelog",
         repo: "blume",
-        type: "github-releases",
-      },
+      }),
     ],
   },
   deployment: {

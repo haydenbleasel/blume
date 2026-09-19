@@ -1,8 +1,9 @@
-import { isAbsolute, join, resolve } from "pathe";
+import { join } from "pathe";
 
 import { blumeReferences } from "../../openapi/references.ts";
 import { openApiSource } from "../../openapi/source.ts";
-import type { ContentSourceConfig, ResolvedConfig } from "../schema.ts";
+import type { ContentSourceAdapter } from "../../sources/registry.ts";
+import type { ResolvedConfig } from "../schema.ts";
 import type { ProjectContext } from "../types.ts";
 import { filesystemSource } from "./filesystem.ts";
 import { githubReleasesSource } from "./github-releases.ts";
@@ -12,7 +13,14 @@ import { obsidianSource } from "./obsidian.ts";
 import { sanitySource } from "./sanity.ts";
 import type { ContentSource, SourceContext } from "./types.ts";
 
-/** Allocate a unique, stable source name from a base (prefix or type). */
+export {
+  resolveDocsCollection,
+  resolveSourceRoot,
+  sourcesOfKind,
+} from "./collection.ts";
+export type { DocsCollection } from "./collection.ts";
+
+/** Allocate a unique, stable source name from a base (prefix or kind). */
 const uniqueNamer = (): ((base: string) => string) => {
   const used = new Set<string>();
   return (base) => {
@@ -63,191 +71,100 @@ const typeFrontmatterKeys = (
     ])
   );
 
+/**
+ * Instantiate the engine-side source for a descriptor. Each adapter's options
+ * spread straight into its engine factory: the descriptor carries exactly the
+ * fields the factory documents, plus the shared `prefix`/`pollInterval`.
+ */
 const buildSource = (
-  def: ContentSourceConfig,
+  adapter: ContentSourceAdapter,
   name: string,
   config: ResolvedConfig,
   context: ProjectContext,
   runtime: SourceRuntime
 ): ContentSource => {
-  if (def.type === "filesystem") {
-    return filesystemSource({
-      exclude: def.exclude,
-      include: def.include,
-      name,
-      prefix: def.prefix,
-      projectRoot: context.root,
-      root: def.root,
-    });
-  }
-  if (def.type === "custom") {
-    // A user-provided instance manages its own context/caching; we only ensure
-    // its name is unique across the project for id namespacing.
-    return def.source.name === name ? def.source : { ...def.source, name };
-  }
-  if (def.type === "sanity") {
-    return sanitySource(
-      {
-        apiVersion: def.apiVersion,
-        dataset: def.dataset,
-        fields: def.fields,
-        name,
-        pollInterval: def.pollInterval,
-        prefix: def.prefix,
-        projectId: def.projectId,
-        query: def.query,
-      },
-      sourceContext(context, name, runtime)
-    );
-  }
-  if (def.type === "notion") {
-    return notionSource(
-      {
-        concurrency: def.concurrency,
-        database: def.database,
-        name,
-        pollInterval: def.pollInterval,
-        prefix: def.prefix,
-        properties: def.properties,
-        publishedValue: def.publishedValue,
-      },
-      sourceContext(context, name, runtime)
-    );
-  }
-  if (def.type === "obsidian") {
-    return obsidianSource(
-      {
-        defaultType: config.content.defaultType,
-        exclude: def.exclude,
-        frontmatterKeys: Object.keys(config.frontmatter.extend),
-        i18n: config.i18n,
-        name,
-        prefix: def.prefix,
-        typeFrontmatterKeys: typeFrontmatterKeys(config),
-        vault: def.vault,
-        versions: config.versions,
-      },
-      sourceContext(context, name, runtime)
-    );
-  }
-  if (def.type === "github-releases") {
-    return githubReleasesSource(
-      {
-        drafts: def.drafts,
-        limit: def.limit,
-        name,
-        owner: def.owner,
-        pollInterval: def.pollInterval,
-        prefix: def.prefix,
-        prereleases: def.prereleases,
-        repo: def.repo,
-      },
-      sourceContext(context, name, runtime)
-    );
+  switch (adapter.kind) {
+    case "filesystem": {
+      const { pollInterval: _ignored, ...options } = adapter.options;
+      return filesystemSource({ ...options, name, projectRoot: context.root });
+    }
+    case "custom": {
+      // A user-provided instance manages its own context/caching; we only ensure
+      // its name is unique across the project for id namespacing.
+      const source = adapter.options;
+      return source.name === name ? source : { ...source, name };
+    }
+    case "sanity": {
+      return sanitySource(
+        { ...adapter.options, name },
+        sourceContext(context, name, runtime)
+      );
+    }
+    case "notion": {
+      return notionSource(
+        { ...adapter.options, name },
+        sourceContext(context, name, runtime)
+      );
+    }
+    case "obsidian": {
+      const { pollInterval: _ignored, ...options } = adapter.options;
+      return obsidianSource(
+        {
+          ...options,
+          defaultType: config.content.defaultType,
+          frontmatterKeys: Object.keys(config.frontmatter.extend),
+          i18n: config.i18n,
+          name,
+          typeFrontmatterKeys: typeFrontmatterKeys(config),
+          versions: config.versions,
+        },
+        sourceContext(context, name, runtime)
+      );
+    }
+    case "github-releases": {
+      return githubReleasesSource(
+        { ...adapter.options, name },
+        sourceContext(context, name, runtime)
+      );
+    }
+    default: {
+      // Only `mdx-remote` is left, and TypeScript has narrowed `adapter` to it.
+      // It returns after the switch rather than from a last case block: Bun
+      // 1.4.0's line coverage never credits the closing brace of a switch's
+      // final block, which would fail the 100% gate in CI.
+      break;
+    }
   }
   return mdxRemoteSource(
-    {
-      files: def.files,
-      github: def.github,
-      include: def.include,
-      name,
-      pollInterval: def.pollInterval,
-      prefix: def.prefix,
-      url: def.url,
-    },
+    { ...adapter.options, name },
     sourceContext(context, name, runtime)
   );
 };
 
-/** Resolve a source `root` against the project root (absolute passes through). */
-const resolveRoot = (projectRoot: string, root: string): string =>
-  isAbsolute(root) ? root : join(resolve(projectRoot), root);
-
-/**
- * The generated `docs` glob collection: its base directory and the include /
- * exclude globs applied under it. Astro's glob loader ids each entry by its path
- * relative to `base`, and a filesystem source ids each entry relative to its own
- * root — so the two only agree when the collection is rooted at that source. A
- * project with exactly one filesystem source therefore roots the collection at
- * *that* source (honoring a non-default `root`), rather than the global
- * `content.root`. With no sources (the implicit source) or several, the base
- * stays `content.root`; a second filesystem source rooted elsewhere can't share
- * one base and is caught by the entry-id guard in `scanProject`.
- */
-export interface DocsCollection {
-  base: string;
-  include: string[];
-  exclude: string[];
-}
-
-export const resolveDocsCollection = (
-  config: ResolvedConfig,
-  context: ProjectContext
-): DocsCollection => {
-  const filesystem = (config.content.sources ?? []).filter(
-    (def) => def.type === "filesystem"
-  );
-  const only = filesystem.length === 1 ? filesystem[0] : undefined;
-  if (only) {
-    return {
-      base: resolveRoot(context.root, only.root),
-      exclude: only.exclude,
-      include: only.include,
-    };
+/** The base name to allocate for a descriptor (before deduplication). */
+const baseName = (adapter: ContentSourceAdapter): string => {
+  if (adapter.kind === "custom") {
+    return adapter.options.name;
   }
-  return {
-    base: context.contentRoot,
-    exclude: config.content.exclude,
-    include: config.content.include,
-  };
-};
-
-/** The base name to allocate for a source config (before deduplication). */
-const baseName = (def: ContentSourceConfig): string => {
-  if (def.type === "custom") {
-    return def.source.name;
-  }
-  return def.prefix ?? def.type;
-};
-
-/** The content sources declared by config (implicit filesystem when none). */
-const contentSources = (
-  config: ResolvedConfig,
-  context: ProjectContext,
-  runtime: SourceRuntime
-): ContentSource[] => {
-  const defs = config.content.sources;
-  if (!defs || defs.length === 0) {
-    return [
-      filesystemSource({
-        exclude: config.content.exclude,
-        include: config.content.include,
-        name: "filesystem",
-        projectRoot: context.root,
-        root: config.content.root,
-      }),
-    ];
-  }
-
-  const nameFor = uniqueNamer();
-  return defs.map((def) =>
-    buildSource(def, nameFor(baseName(def)), config, context, runtime)
-  );
+  return adapter.options.prefix ?? adapter.kind;
 };
 
 /**
- * Build the ordered list of content sources for a project. With no
- * `content.sources` configured, the top-level `root`/`include`/`exclude` desugar
- * to a single implicit filesystem source, so existing projects are untouched.
- * A Blume-rendered OpenAPI reference contributes an internal staged source that
- * lowers each operation into a real content page (routing/nav/search/OG).
+ * Build the ordered list of content sources for a project. The config schema
+ * already desugared the zero-config shorthand into a single `filesystem()`
+ * descriptor, so every project has at least one entry here. A Blume-rendered
+ * OpenAPI reference contributes an internal staged source that lowers each
+ * operation into a real content page (routing/nav/search/OG).
  */
 export const resolveSources = (
   config: ResolvedConfig,
   context: ProjectContext,
   runtime: SourceRuntime
 ): ContentSource[] => {
-  const sources = contentSources(config, context, runtime);
+  const nameFor = uniqueNamer();
+  const sources = config.content.sources.map((adapter) =>
+    buildSource(adapter, nameFor(baseName(adapter)), config, context, runtime)
+  );
 
   const references = blumeReferences(config);
   if (references.length > 0) {
