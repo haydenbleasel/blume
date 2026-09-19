@@ -1674,53 +1674,49 @@ describe("askEndpointTemplate", () => {
     expect(out).not.toContain("createOpenRouter");
     expect(out).not.toContain("process.env");
     expect(out).not.toContain("headers:");
-    // No `ai.ask.cors`: no preflight handler and plain response inits.
+    // No `ai.ask.cors`: no preflight handler, no wrapper around the POST.
     expect(out).not.toContain("OPTIONS");
-    expect(out).not.toContain("corsHeaders");
+    expect(out).not.toContain("blume/ai/cors.ts");
+    expect(out).toContain(
+      "export const POST: APIRoute = async ({ request }) => {"
+    );
     expect(out).toContain("{ status: 400 }");
     expect(out).toContain("result.toTextStreamResponse();");
   });
 
-  it("answers preflight and names listed origins when ai.ask.cors is set", () => {
+  it("answers preflight and wraps the POST when ai.ask.cors is set", () => {
     const out = askEndpointTemplate(resolveAskBackend(), true, {
       cors: ["https://www.example.com", "http://localhost:3000"],
     });
     expect(out).toContain(
-      'const ALLOWED_ORIGINS = new Set(["https://www.example.com","http://localhost:3000"]);'
+      'import { preflightResponse, withCors } from "blume/ai/cors.ts";'
     );
-    // A listed `Origin` is echoed back (with `Vary`), anything else gets no
-    // header and stays subject to the browser's same-origin rule.
-    expect(out).toContain('const origin = request.headers.get("origin");');
     expect(out).toContain(
-      '? { "access-control-allow-origin": origin, vary: "origin" }\n    : {};'
+      'const ALLOWED_ORIGINS = ["https://www.example.com","http://localhost:3000"];'
     );
     // The preflight the island's JSON POST triggers.
-    expect(out).toContain("export const OPTIONS: APIRoute = ({ request }) =>");
-    expect(out).toContain('"access-control-allow-headers": "content-type"');
-    expect(out).toContain('"access-control-allow-methods": "POST"');
-    expect(out).toContain("status: 204");
-    // Every POST response carries the headers — the stream and the errors —
-    // so a cross-origin caller can read a 400 or 500 instead of an opaque
-    // network failure.
-    expect(out).toContain("{ headers: corsHeaders(request), status: 400 }");
-    expect(out).toContain("{ headers: corsHeaders(request), status: 500 }");
     expect(out).toContain(
-      "result.toTextStreamResponse({ headers: corsHeaders(request) });"
+      "export const OPTIONS: APIRoute = ({ request }) =>\n  preflightResponse(request, ALLOWED_ORIGINS);"
     );
-    expect(out).not.toContain("{ status: 400 }");
-    expect(out).not.toContain("{ status: 500 }");
+    // The POST is wrapped once, so every response — the stream and the
+    // errors — carries the headers without each `return` opting in, and a
+    // cross-origin caller can read a 400 or 500 instead of an opaque failure.
+    expect(out).toContain(
+      "export const POST: APIRoute = withCors(ALLOWED_ORIGINS, async ({ request }) => {"
+    );
+    expect(out).toContain("  }\n});\n");
+    expect(out).toContain("{ status: 400 }");
+    expect(out).toContain("result.toTextStreamResponse();");
   });
 
-  it("puts the CORS headers on the provider-key guard of every backend", () => {
+  it("wraps the POST of every backend", () => {
     const cors = ["https://www.example.com"];
     const openrouter = askEndpointTemplate(
       resolveAskBackend(askConfig({ enabled: true, provider: "openrouter" })),
       false,
       { cors }
     );
-    expect(openrouter).toContain(
-      '"Ask AI is not configured: set OPENROUTER_API_KEY.",\n      { headers: corsHeaders(request), status: 500 }'
-    );
+    expect(openrouter).toContain("withCors(ALLOWED_ORIGINS,");
     expect(openrouter).toContain("export const OPTIONS");
   });
 

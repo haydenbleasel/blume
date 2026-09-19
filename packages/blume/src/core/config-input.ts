@@ -717,11 +717,14 @@ export interface AskConfig {
   baseUrl?: string;
   /**
    * Origins allowed to call the generated endpoint from another site — a
-   * marketing page that embeds an ask box, for example. The route answers
-   * preflight requests and names a listed origin on every response, errors
-   * included; every other origin stays subject to the browser's same-origin
-   * rule. Only the generated route reads this; an external `endpoint` handles
-   * its own CORS.
+   * marketing page that embeds an ask box, for example — or `"*"` to allow
+   * every origin. The route answers preflight requests and names a listed
+   * origin on every response, errors included; every other origin stays
+   * subject to the browser's same-origin rule. Callers must send the body as
+   * JSON with a `content-type: application/json` header, or Astro's cross-site
+   * request check rejects the `POST` before the route runs. Only the generated
+   * route reads this; an external `endpoint` handles its own CORS and can't be
+   * combined with it.
    */
   cors?: string[];
   /** Turn Ask AI on. Defaults to `false`. */

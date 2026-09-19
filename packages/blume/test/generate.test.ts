@@ -1402,7 +1402,7 @@ describe("generateRuntime", () => {
     // The `ai.ask.cors` origins reach the generated route.
     expect(
       await readFile(join(out, "src/pages/api/ask.ts"), "utf-8")
-    ).toContain('new Set(["https://www.example.com"])');
+    ).toContain('const ALLOWED_ORIGINS = ["https://www.example.com"];');
     expect(has("src/pages/og/[...slug].png.ts")).toBe(true);
     expect(has("src/pages/changelog.astro")).toBe(true);
     expect(has("src/pages/404.astro")).toBe(true);

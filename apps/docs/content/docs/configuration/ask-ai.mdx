@@ -122,9 +122,23 @@ ai: {
 }
 ```
 
-The route then answers the browser's `OPTIONS` preflight and names a listed origin on every response — the streamed answer and the error statuses alike, so the caller can tell a rejected body from a provider failure. Origins that aren't listed get no header and stay subject to the browser's same-origin rule. Each entry is reduced to its origin, so `https://www.example.com/docs/` and `https://www.example.com` mean the same thing.
+The route then answers the browser's `OPTIONS` preflight and names a listed origin on every response — the streamed answer and the error statuses alike, so the caller can tell a rejected body from a provider failure. Origins that aren't listed get no header and stay subject to the browser's same-origin rule. Each entry is reduced to its origin, so `https://www.example.com/docs/` and `https://www.example.com` mean the same thing. To let any page call the route, list `"*"` instead of origins.
 
-The caller sends the same `POST` body the [external endpoint](#external-endpoint) contract describes and reads back the same text stream. `cors` only affects the generated route; with an external `endpoint`, CORS is that backend's job. The endpoint stays unauthenticated either way, so the [rate limiting](#rate-limiting) advice applies to cross-origin traffic too.
+The caller sends the same `POST` body the [external endpoint](#external-endpoint) contract describes and reads back the same text stream. Send it as JSON with a `content-type: application/json` header:
+
+```ts
+const response = await fetch("https://docs.example.com/api/ask", {
+  body: JSON.stringify({
+    messages: [{ role: "user", content: "How do I deploy?" }],
+  }),
+  headers: { "content-type": "application/json" },
+  method: "POST",
+});
+```
+
+The content type matters: Astro's cross-site request check rejects a cross-origin `POST` that has no content type, or a form-like one such as `text/plain`, with a 403 before the route runs, and that response carries no CORS headers, so the browser reports it as a network error rather than a status. The preflight allows whatever request headers the caller asks for, so a fetch wrapper that adds its own headers needs no extra configuration.
+
+`cors` only affects the generated route; with an external `endpoint`, CORS is that backend's job, and setting both is a config error. The endpoint stays unauthenticated either way, so the [rate limiting](#rate-limiting) advice applies to cross-origin traffic too.
 
 ## Server output required
 
