@@ -145,7 +145,7 @@ export const buildManifest = (options: {
   graph: ContentGraph;
 }): BlumeManifest => {
   const { context, config, graph } = options;
-  const searchEnabled = config.search.provider !== "none";
+  const searchEnabled = config.search.provider.mode !== "none";
   const { i18n } = config;
 
   // Real translations per logical page, for `hreflang` and the switcher. Built

@@ -65,7 +65,6 @@ import { hasScalarReferences } from "../openapi/references.ts";
 import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
-import { servesStaticIndex } from "../search/providers.ts";
 import {
   examplesEntryTemplate,
   tailwindEntryTemplate,
@@ -590,7 +589,8 @@ export const eject = async (
     }
   );
 
-  if (servesStaticIndex(config.search.provider)) {
+  const searchAdapter = config.search.provider;
+  if (searchAdapter.mode === "static") {
     const documents = await buildSearchDocuments(project);
     files.push(
       {
@@ -604,11 +604,9 @@ export const eject = async (
     );
   }
 
-  if (config.search.provider === "mixedbread") {
+  if (searchAdapter.kind === "mixedbread") {
     files.push({
-      content: mixedbreadSearchEndpointTemplate(
-        config.search.mixedbread?.storeId ?? ""
-      ),
+      content: mixedbreadSearchEndpointTemplate(searchAdapter.options),
       path: join(srcDir, "pages", "api", "search.ts"),
     });
   }

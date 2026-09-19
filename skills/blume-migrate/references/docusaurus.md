@@ -29,7 +29,7 @@ Read `themeConfig`, `presets`, and `plugins`:
 | `themeConfig.footer` | drop → Footer override (`defineComponents` layout slot) |
 | `themeConfig.announcementBar` | `banner` (`{ content, dismissible, id }` — `isCloseable` → `dismissible`; colors drop) |
 | `i18n.locales` / `defaultLocale` | `i18n` — translated files live at `i18n/<locale>/docusaurus-plugin-content-docs/current/…`; move them to `<locale>/…` under `content.root` |
-| `themeConfig.algolia` | drop — Blume ships built-in search (Orama); remove the Algolia dep |
+| `themeConfig.algolia` | drop — Blume ships built-in search (Orama); remove the Algolia dep. To keep the index, `search: algolia({ appId, apiKey, indexName })` from `blume/search` (the DocSearch `apiKey` is the search-only key) |
 | `@docusaurus/plugin-client-redirects` | **static `redirects: [{from, to}]` arrays convert 1:1** to Blume `redirects` (a `from` array = one entry per item); only `createRedirects` functions are truly dynamic → host rules |
 | `@docusaurus/theme-mermaid` | delete the dep — ` ```mermaid ` renders natively (in `.mdx`) |
 | GraphQL doc generators (`@graphql-markdown/docusaurus`, `@edno/docusaurus2-graphql-doc-generator`) | delete the plugin **and its generated pages** — point the top-level `graphql: { enabled: true, spec, endpoint }` at the schema instead (see SKILL.md "GraphQL") |

@@ -18,7 +18,8 @@ import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
 import type { OgCache } from "../og/cache.ts";
 import type { OgFont, OgFontFamilies } from "../og/card.ts";
 import { hasScalarReferences } from "../openapi/references.ts";
-import { searchProviderMeta } from "../search/providers.ts";
+import type { MixedbreadOptions } from "../search/adapters/mixedbread.ts";
+import type { ResolvedSearchAdapter } from "../search/adapters/registry.ts";
 import { buildFontEntries, fontLocaleCodes } from "../theme/fonts.ts";
 import { wrapperPropsType } from "./component-slots.ts";
 import type { ExampleSpec } from "./examples.ts";
@@ -190,12 +191,12 @@ export const runtimeDependencies = (options: {
   if (hasScalarReferences(config)) {
     deps.push("@scalar/astro");
   }
-  // Only the configured search provider's SDK is declared, so a project pulls in
+  // Only the configured search adapter's SDK is declared, so a project pulls in
   // (and the user installs) exactly the backend it uses — nothing more. Each
   // analytics adapter declares what it needs the same way; the built-ins need
   // nothing beyond Blume's own deps, so their share is usually empty.
   deps.push(
-    ...searchProviderMeta(config.search.provider).runtimeDeps,
+    ...config.search.provider.runtimeDeps,
     ...config.analytics.flatMap((adapter) => adapter.runtimeDeps)
   );
   // Each content source adapter declares the SDK its fetch imports (Notion,
@@ -1382,46 +1383,17 @@ export const createSearch = () => create({ indexUrl${
 `;
 
 /**
- * Public credential fields baked into a hosted provider's generated client
- * (Algolia/Orama Cloud/Typesense config values from `search.*`, all plain
- * strings or numbers; `JSON.stringify` drops the absent ones).
+ * A client that passes the adapter's options — public credentials, by
+ * contract — straight to the provider SDK. The options are inlined verbatim
+ * as a literal: Blume maps only the fields it names, and any extra option
+ * the adapter was given rides along untouched.
  */
-type HostedSearchCredentials = Record<string, string | number | undefined>;
-
-/** A client that passes public credentials straight to the provider SDK. */
 const hostedSearchClient = (
-  module: string,
-  options: HostedSearchCredentials
+  provider: Extract<ResolvedSearchAdapter, { mode: "hosted" }>
 ): string =>
-  `${SEARCH_CLIENT_HEADER}${searchClientImport(module)}
-export const createSearch = () => create(${JSON.stringify(options)});
+  `${SEARCH_CLIENT_HEADER}${searchClientImport(provider.kind)}
+export const createSearch = () => create(${JSON.stringify(provider.options)});
 `;
-
-/** Build the per-provider config object the hosted client is created with. */
-const hostedSearchOptions = (
-  search: ResolvedConfig["search"]
-): { module: string; options: HostedSearchCredentials } | null => {
-  switch (search.provider) {
-    case "algolia": {
-      return { module: "algolia", options: { ...search.algolia } };
-    }
-    case "orama-cloud": {
-      return {
-        module: "orama-cloud",
-        options: {
-          apiKey: search.oramaCloud?.apiKey,
-          endpoint: search.oramaCloud?.endpoint,
-        },
-      };
-    }
-    case "typesense": {
-      return { module: "typesense", options: { ...search.typesense } };
-    }
-    default: {
-      return null;
-    }
-  }
-};
 
 /**
  * Generate `.blume/src/generated/features.ts` — the client-feature loaders
@@ -1459,50 +1431,52 @@ export const loadEpub:
  * baked in here; secret keys never reach the client.
  */
 export const searchClientTemplate = (config: ResolvedConfig): string => {
-  const { search } = config;
+  const { provider } = config.search;
 
-  if (search.provider === "orama" || search.provider === "flexsearch") {
-    // Only Orama derives a tokenizer from the locale; FlexSearch has no
-    // equivalent hook, so its client keeps the bare index URL.
-    const locale =
-      search.provider === "orama" ? config.i18n?.defaultLocale : undefined;
-    return staticSearchClient(search.provider, locale);
-  }
-
-  const hosted = hostedSearchOptions(search);
-  if (hosted) {
-    return hostedSearchClient(hosted.module, hosted.options);
-  }
-
-  if (search.provider === "mixedbread") {
-    return `${SEARCH_CLIENT_HEADER}${searchClientImport("endpoint")}${SEARCH_BASE_IMPORT}
+  switch (provider.mode) {
+    case "static": {
+      // Only Orama derives a tokenizer from the locale; FlexSearch has no
+      // equivalent hook, so its client keeps the bare index URL.
+      const locale =
+        provider.kind === "orama" ? config.i18n?.defaultLocale : undefined;
+      return staticSearchClient(provider.kind, locale);
+    }
+    case "hosted": {
+      return hostedSearchClient(provider);
+    }
+    case "server": {
+      return `${SEARCH_CLIENT_HEADER}${searchClientImport("endpoint")}${SEARCH_BASE_IMPORT}
 const api = joinBase(import.meta.env.BASE_URL, "api/search");
 
 export const createSearch = () => create({ api });
 `;
-  }
-
-  if (search.provider === "pagefind") {
-    return `${SEARCH_CLIENT_HEADER}${searchClientImport("pagefind")}${SEARCH_BASE_IMPORT}
+    }
+    case "pagefind": {
+      return `${SEARCH_CLIENT_HEADER}${searchClientImport("pagefind")}${SEARCH_BASE_IMPORT}
 const url = joinBase(import.meta.env.BASE_URL, "pagefind/pagefind.js");
 
 export const createSearch = () => create({ url });
 `;
-  }
-
-  // Search disabled: a no-op client so the alias always resolves.
-  return `${SEARCH_CLIENT_HEADER}export const createSearch = () => () =>
+    }
+    default: {
+      // Search disabled: a no-op client so the alias always resolves.
+      return `${SEARCH_CLIENT_HEADER}export const createSearch = () => () =>
   Promise.resolve({ hits: [], sections: [] });
 `;
+    }
+  }
 };
 
 /**
  * Generate the Mixedbread search endpoint (`/api/search`). It holds the secret
  * key server-side and proxies semantic queries to the configured store. The
- * result mapping is best-effort and may need tuning to how your content was
- * synced (see the Mixedbread sync step / \`mxbai vs sync\`).
+ * adapter's options are inlined as a literal so the route never imports the
+ * config. The result mapping is best-effort and may need tuning to how your
+ * content was synced (see the Mixedbread sync step / \`mxbai vs sync\`).
  */
-export const mixedbreadSearchEndpointTemplate = (storeId: string): string =>
+export const mixedbreadSearchEndpointTemplate = (
+  options: MixedbreadOptions
+): string =>
   `// Generated by Blume. Do not edit.
 import type { APIRoute } from "astro";
 import { getSecret } from "astro:env/server";
@@ -1511,7 +1485,8 @@ import Mixedbread from "@mixedbread/sdk";
 export const prerender = false;
 
 const client = new Mixedbread({ apiKey: getSecret("MIXEDBREAD_API_KEY") ?? "" });
-const STORE_ID = ${JSON.stringify(storeId)};
+const OPTIONS = ${JSON.stringify(options)};
+const STORE_ID = OPTIONS.storeId;
 
 export const POST: APIRoute = async ({ request }) => {
   // The endpoint is public: a malformed body must 200-empty, not 500.

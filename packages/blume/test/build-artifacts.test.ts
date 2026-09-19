@@ -8,6 +8,7 @@ import { dirname, join } from "pathe";
 import { scanProject } from "../src/core/project-graph.ts";
 import { publishBuildArtifacts } from "../src/deploy/artifacts.ts";
 import { describeSitemapFiles } from "../src/deploy/sitemap.ts";
+import { pagefind } from "../src/search/adapters/index.ts";
 
 const dirs: string[] = [];
 
@@ -130,8 +131,7 @@ describe("publishBuildArtifacts", () => {
 
   it("indexes the rendered pages for the Pagefind provider", async () => {
     const { dist, root } = await fixture({
-      "blume.config.ts":
-        'export default { search: { provider: "pagefind" } };\n',
+      "blume.config.ts": `export default { search: ${JSON.stringify(pagefind())} };\n`,
       "docs/index.md": HOME,
     });
     const log = await publish(root, dist);

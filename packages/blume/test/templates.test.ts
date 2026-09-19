@@ -51,6 +51,15 @@ import type { BlumeConfig } from "../src/core/config-input.ts";
 import { TOC_HIDDEN_KEY } from "../src/core/heading-markers.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
+import {
+  algolia,
+  flexsearch,
+  mixedbread,
+  orama,
+  oramaCloud,
+  pagefind,
+  typesense,
+} from "../src/search/adapters/index.ts";
 
 const config = blumeConfigSchema.parse({});
 
@@ -1861,23 +1870,20 @@ describe("askEndpointTemplate", () => {
 
 describe("searchClientTemplate", () => {
   it("loads a static index for orama", () => {
-    expect(searchClientTemplate(withProvider({ provider: "orama" }))).toContain(
+    expect(searchClientTemplate(withProvider(orama()))).toContain(
       "search/orama.ts"
     );
   });
 
   it("loads a static index for flexsearch", () => {
-    expect(
-      searchClientTemplate(withProvider({ provider: "flexsearch" }))
-    ).toContain("search/flexsearch.ts");
+    expect(searchClientTemplate(withProvider(flexsearch()))).toContain(
+      "search/flexsearch.ts"
+    );
   });
 
   it("passes algolia credentials to the hosted client", () => {
     const out = searchClientTemplate(
-      withProvider({
-        algolia: { appId: "A", indexName: "I", searchApiKey: "K" },
-        provider: "algolia",
-      })
+      withProvider(algolia({ apiKey: "K", appId: "A", indexName: "I" }))
     );
     expect(out).toContain("search/algolia.ts");
     expect(out).toContain('"appId":"A"');
@@ -1885,10 +1891,7 @@ describe("searchClientTemplate", () => {
 
   it("passes orama-cloud credentials to the hosted client", () => {
     const out = searchClientTemplate(
-      withProvider({
-        oramaCloud: { apiKey: "K", endpoint: "https://e" },
-        provider: "orama-cloud",
-      })
+      withProvider(oramaCloud({ apiKey: "K", endpoint: "https://e" }))
     );
     expect(out).toContain("search/orama-cloud.ts");
     expect(out).toContain('"endpoint":"https://e"');
@@ -1896,30 +1899,27 @@ describe("searchClientTemplate", () => {
 
   it("passes typesense credentials to the hosted client", () => {
     const out = searchClientTemplate(
-      withProvider({
-        provider: "typesense",
-        typesense: { collection: "c", host: "h", searchApiKey: "K" },
-      })
+      withProvider(typesense({ apiKey: "K", collection: "c", host: "h" }))
     );
     expect(out).toContain("search/typesense.ts");
   });
 
   it("points mixedbread at the server endpoint", () => {
     const out = searchClientTemplate(
-      withProvider({ mixedbread: { storeId: "s" }, provider: "mixedbread" })
+      withProvider(mixedbread({ storeId: "s" }))
     );
     expect(out).toContain("search/endpoint.ts");
     expect(out).toContain("api/search");
   });
 
   it("loads pagefind from the build output", () => {
-    const out = searchClientTemplate(withProvider({ provider: "pagefind" }));
+    const out = searchClientTemplate(withProvider(pagefind()));
     expect(out).toContain("search/pagefind.ts");
     expect(out).toContain("pagefind/pagefind.js");
   });
 
   it("emits a no-op client when search is disabled", () => {
-    const out = searchClientTemplate(withProvider({ provider: "none" }));
+    const out = searchClientTemplate(withProvider(false));
     expect(out).toContain("hits: [], sections: []");
   });
 });
@@ -2028,8 +2028,9 @@ describe("static endpoint templates", () => {
   });
 
   it("proxies mixedbread queries with the store id", () => {
-    const out = mixedbreadSearchEndpointTemplate("store_42");
-    expect(out).toContain('const STORE_ID = "store_42"');
+    const out = mixedbreadSearchEndpointTemplate({ storeId: "store_42" });
+    expect(out).toContain('const OPTIONS = {"storeId":"store_42"}');
+    expect(out).toContain("const STORE_ID = OPTIONS.storeId");
     expect(out).toContain("client.stores.search");
   });
 

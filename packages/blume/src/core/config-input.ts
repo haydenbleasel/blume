@@ -5,6 +5,7 @@ import type { AskRetrievalOptions } from "../ai/ask-context.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import type { AnalyticsAdapter } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
+import type { AnySearchAdapter } from "../search/adapters/registry.ts";
 import type { SourceAdapterInput } from "../sources/registry.ts";
 import type { FontSlug } from "../theme/fonts.ts";
 import type {
@@ -12,7 +13,6 @@ import type {
   GraphqlSource,
   OpenApiSource,
   OpenInChatProvider,
-  SearchProvider,
   SidebarDisplay,
   SidebarItemConfig,
 } from "./schema.ts";
@@ -433,35 +433,6 @@ export interface ThemeConfig {
 // Search
 // ---------------------------------------------------------------------------
 
-/** Public credentials for the Algolia backend (the sync key stays an env var). */
-export interface AlgoliaSearch {
-  appId: string;
-  indexName: string;
-  searchApiKey: string;
-}
-
-/** Public credentials for the Orama Cloud backend. */
-export interface OramaCloudSearch {
-  apiKey: string;
-  endpoint: string;
-  /** Index id used by the build-time sync (with `ORAMA_PRIVATE_API_KEY`). */
-  indexId?: string;
-}
-
-/** Connection details for a self-hosted or cloud Typesense backend. */
-export interface TypesenseSearch {
-  collection: string;
-  host: string;
-  port?: number;
-  protocol?: "http" | "https";
-  searchApiKey: string;
-}
-
-/** Mixedbread semantic search: the store the server endpoint queries. */
-export interface MixedbreadSearch {
-  storeId: string;
-}
-
 /** A curated link for the search dialog empty state. */
 export interface SearchPopularLink {
   /** Internal route or external URL. */
@@ -476,13 +447,17 @@ export interface SearchPopularLink {
 }
 
 /**
- * Search backend. The default `orama` builds a local index at build time (and
- * runs in dev); hosted providers need their credential block below. `none`
- * disables search.
+ * The search backend: an adapter from `blume/search` — `orama()` (the
+ * default), `flexsearch()`, `pagefind()`, `algolia({…})`, `oramaCloud({…})`,
+ * `typesense({…})`, `mixedbread({…})` — or `false` to disable search. Each
+ * adapter is a plain descriptor carrying its own options, runtime dependency,
+ * and required secrets; hosted adapters take public credentials only and read
+ * their admin keys from the environment.
  */
-export interface SearchConfig {
-  /** Algolia credentials (required when `provider` is `algolia`). */
-  algolia?: AlgoliaSearch;
+export type SearchProviderConfig = AnySearchAdapter | false;
+
+/** The object form of `search`: the adapter plus adapter-independent settings. */
+export interface SearchOptions {
   /** Indexing behavior. */
   indexing?: {
     /**
@@ -494,20 +469,21 @@ export interface SearchConfig {
     /** Include pages marked `hidden` in the search index. Defaults to `false`. */
     includeHiddenPages?: boolean;
   };
-  /** Mixedbread store (required when `provider` is `mixedbread`). */
-  mixedbread?: MixedbreadSearch;
-  /** Orama Cloud credentials (required when `provider` is `orama-cloud`). */
-  oramaCloud?: OramaCloudSearch;
   /**
    * Curated links for the Cmd+K empty state. When omitted or empty, the first
    * sidebar pages are shown instead.
    */
   popular?: SearchPopularLink[];
-  /** Which backend powers search. Defaults to `orama`. */
-  provider?: SearchProvider;
-  /** Typesense credentials (required when `provider` is `typesense`). */
-  typesense?: TypesenseSearch;
+  /** Which adapter powers search. Defaults to `orama()`. */
+  provider?: SearchProviderConfig;
 }
+
+/**
+ * Search configuration. Pass an adapter directly (`search: algolia({…})`, or
+ * `false`) as shorthand for the object form, which also carries `popular`
+ * links and `indexing` settings.
+ */
+export type SearchConfig = SearchProviderConfig | SearchOptions;
 
 // ---------------------------------------------------------------------------
 // AI

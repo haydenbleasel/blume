@@ -1,8 +1,8 @@
+import type { OramaCloudOptions } from "../adapters/orama-cloud.ts";
 import type { SearchRecord } from "../documents.ts";
 
-export interface OramaCloudSyncConfig {
-  indexId?: string;
-}
+/** The adapter options the sync reads (the public credentials are never used). */
+export type OramaCloudSyncConfig = Pick<OramaCloudOptions, "indexId">;
 
 /**
  * Push the search records to an Orama Cloud index via `CloudManager`, using the
@@ -11,13 +11,10 @@ export interface OramaCloudSyncConfig {
  */
 export const syncOramaCloud = async (
   records: SearchRecord[],
-  config: OramaCloudSyncConfig | undefined
+  config: OramaCloudSyncConfig
 ): Promise<void> => {
-  if (!config) {
-    throw new Error("search.oramaCloud config is missing.");
-  }
   if (!config.indexId) {
-    throw new Error("search.oramaCloud.indexId is required to sync.");
+    throw new Error("oramaCloud({ indexId }) is required to sync.");
   }
   const privateKey = process.env.ORAMA_PRIVATE_API_KEY;
   if (!privateKey) {

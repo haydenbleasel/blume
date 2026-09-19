@@ -455,7 +455,7 @@ const reportBuild = async (
       `Output     ${config.deployment.output}`,
       `Adapter    ${config.deployment.adapter ?? "none"}`,
       `Site       ${config.deployment.site ?? "not set"}`,
-      `Search     ${config.search.provider}`,
+      `Search     ${config.search.provider.kind}`,
       `Redirects  ${config.redirects.length}`,
       `Sitemap    ${config.deployment.site && config.seo.sitemap ? "yes" : sitemapNote}`,
       `Robots     ${config.seo.robots ? "yes" : "no"}`,

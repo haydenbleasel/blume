@@ -45,10 +45,8 @@ export default defineConfig({
     mode: "system",
   },
 
-  // Search — see the Search guide
-  search: {
-    provider: "orama",
-  },
+  // Search — an adapter from "blume/search"; see the Search guide
+  search: orama(),
 
   // Markdown features
   markdown: {

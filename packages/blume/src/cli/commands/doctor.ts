@@ -82,7 +82,7 @@ export const doctorCommand = defineCommand({
       if (!args.json) {
         logger.info(`Pages: ${project.graph.pages.length}`);
         logger.info(`Output: ${config.deployment.output}`);
-        logger.info(`Search: ${config.search.provider}`);
+        logger.info(`Search: ${config.search.provider.kind}`);
         logger.info(
           `Analytics: ${config.analytics.map((adapter) => adapter.kind).join(", ") || "none"}`
         );

@@ -1,16 +1,16 @@
+import type { TypesenseOptions } from "../adapters/typesense.ts";
 import type { SearchRecord } from "../documents.ts";
 
-export interface TypesenseSyncConfig {
-  collection: string;
-  host: string;
-  port?: number;
-  protocol?: string;
-}
+/** The adapter options the sync reads (the public `apiKey` is never used). */
+export type TypesenseSyncConfig = Pick<
+  TypesenseOptions,
+  "collection" | "host" | "port" | "protocol"
+>;
 
 /**
  * Import the search records into a Typesense collection. Uses the admin key
- * from `TYPESENSE_ADMIN_API_KEY`. Throws on a missing key/config so the caller
- * can warn.
+ * from `TYPESENSE_ADMIN_API_KEY`. Throws on a missing key so the caller can
+ * warn.
  *
  * The collection is dropped and recreated on each sync so that pages deleted or
  * renamed since the last sync don't linger as stale search hits that 404 when
@@ -18,11 +18,8 @@ export interface TypesenseSyncConfig {
  */
 export const syncTypesense = async (
   records: SearchRecord[],
-  config: TypesenseSyncConfig | undefined
+  config: TypesenseSyncConfig
 ): Promise<void> => {
-  if (!config) {
-    throw new Error("search.typesense config is missing.");
-  }
   const adminKey = process.env.TYPESENSE_ADMIN_API_KEY;
   if (!adminKey) {
     throw new Error("TYPESENSE_ADMIN_API_KEY is not set.");

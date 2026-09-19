@@ -78,9 +78,10 @@ import type { Diagnostic } from "./types.ts";
  *   are normalized to 3.x automatically.
  *
  * **Search & AI**
- * - `search` — search backend `provider` (`orama` by default; `pagefind`,
- *   `algolia`, `typesense`, `orama-cloud`, `mixedbread`, or `none`) plus its
- *   credential block.
+ * - `search` — a search adapter from `blume/search` (`orama()` by default;
+ *   `flexsearch()`, `pagefind()`, `algolia({…})`, `oramaCloud({…})`,
+ *   `typesense({…})`, `mixedbread({…})`, or `false`), or `{ provider,
+ *   popular, indexing }` to add curated links and indexing settings.
  * - `ai` — `ask` (the Ask AI chat endpoint and its provider/model), `llmsTxt`
  *   (emit `llms.txt`), `mcp` (expose the docs as an MCP server for connecting
  *   agents), and `markdownComponents` (Markdown serializers for custom
@@ -128,7 +129,7 @@ import type { Diagnostic } from "./types.ts";
  *       { label: "API", path: "/api" },
  *     ],
  *   },
- *   search: { provider: "orama" },
+ *   search: orama(),
  *   deployment: { site: "https://docs.acme.com", adapter: "vercel" },
  * });
  * ```

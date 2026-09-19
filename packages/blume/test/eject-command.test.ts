@@ -115,7 +115,8 @@ describe("blume eject", () => {
   it("keeps the deploy artifacts through the integration's build hook", async () => {
     const root = await fixture({
       "blume.config.ts":
-        'export default { search: { provider: "pagefind" } };\n',
+        // A hand-written descriptor: the same JSON `pagefind()` returns.
+        'export default { search: { kind: "pagefind", mode: "pagefind", options: {}, requiredSecrets: [], runtimeDeps: [] } };\n',
       "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
     });
     // The confirmation (no --yes) writes nothing.

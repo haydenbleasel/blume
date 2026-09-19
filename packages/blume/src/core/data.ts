@@ -1,7 +1,8 @@
+import type { SearchAdapterKind } from "../search/adapters/registry.ts";
 import type { StructuredDataIdentity } from "../seo/jsonld.ts";
 import type { FontHead } from "../theme/fonts.ts";
 import type { UIStrings } from "./i18n-ui.ts";
-import type { ResolvedConfig, SearchProvider } from "./schema.ts";
+import type { ResolvedConfig } from "./schema.ts";
 import type { Navigation, RouteAlternate, VersionAlternate } from "./types.ts";
 
 /**
@@ -204,7 +205,8 @@ export interface BlumeDataConfig {
     enabled: boolean;
     /** Resolved empty-state links; empty when unset (Search falls back to sidebar). */
     popular: { icon?: string; label: string; route: string }[];
-    provider: SearchProvider;
+    /** The configured adapter's kind (`none` when search is disabled). */
+    provider: SearchAdapterKind;
   };
   /** Deployment site URL, or `null` when none is configured/detected. */
   site: string | null;

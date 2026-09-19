@@ -1,11 +1,34 @@
 ---
 title: Search
-description: Client-side search that works out of the box with no API keys, plus optional hosted and semantic backends you can switch to as your docs grow.
+description: Client-side search that works out of the box with no API keys, plus hosted and semantic adapters you can switch to as your docs grow.
 ---
 
-Blume ships local search with no hosted infrastructure and no API keys. It runs in the browser, works in both `blume dev` and `blume build`, and indexes only your real content — navigation chrome and excluded pages are skipped. When you outgrow it, you can switch to a hosted or semantic backend without changing how search looks or behaves — only the `search.provider` you configure changes.
+Blume ships local search with no hosted infrastructure and no API keys. It runs in the browser, works in both `blume dev` and `blume build`, and indexes only your real content — navigation chrome and excluded pages are skipped. When you outgrow it, you can switch to a hosted or semantic backend without changing how search looks or behaves — only the adapter you pass to `search` changes.
 
-Blume reaches parity with Fumadocs' provider set: **Orama**, **FlexSearch**, **Algolia**, **Orama Cloud**, **Typesense**, and **Mixedbread** (plus **Pagefind**). Only the configured provider's SDK is installed into your project, so picking one backend never pulls in the others.
+Every backend is an **adapter** imported from `blume/search`: **Orama** (the default), **FlexSearch**, **Pagefind**, **Algolia**, **Orama Cloud**, **Typesense**, and **Mixedbread**. Each adapter owns its options, its runtime dependency, and the secrets it needs, so only the configured adapter's SDK is installed into your project — picking one backend never pulls in the others.
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { algolia } from "blume/search";
+
+export default defineConfig({
+  search: algolia({
+    appId: "YOUR_APP_ID",
+    apiKey: "YOUR_SEARCH_ONLY_KEY",
+    indexName: "docs",
+  }),
+});
+```
+
+An adapter is a plain description of the backend — not a live client — so Blume can inline it into the generated site and into an ejected project. Pass the adapter directly, or use the object form when you also want to set the [popular links](#popular-pages) or [indexing](#whats-indexed) options beside it:
+
+```ts blume.config.ts lineNumbers
+search: {
+  provider: pagefind(),
+  popular: [{ href: "/guides/getting-started", icon: "rocket", label: "Getting started" }],
+  indexing: { includeCodeBlocks: true },
+},
+```
 
 ## Using search
 
@@ -27,7 +50,7 @@ search: {
 },
 ```
 
-Each entry takes an `href` (internal route or external URL) and a `label`, plus an optional `icon` — a [built-in icon](/docs/content/components#icon) name, image path/URL, or inline SVG (same _inputs_ as nav icons), defaulting to a file glyph. Omit `popular` or leave it empty to keep the sidebar fallback.
+Each entry takes an `href` (internal route or external URL) and a `label`, plus an optional `icon` — a [built-in icon](/docs/content/components#icon) name, image path/URL, or inline SVG (same _inputs_ as nav icons), defaulting to a file glyph. Omit `popular` or leave it empty to keep the sidebar fallback. Leaving `provider` out of the object form keeps the default Orama adapter.
 
 Write `href` as if the site were mounted at the root — a `basePath` is applied for you, the same as `navigation.featured`. External URLs pass through untouched.
 
@@ -52,31 +75,31 @@ search: {
 },
 ```
 
-Each fence's body and title (`blume.config.ts` above) become searchable; the language and fence markers don't. On `.mdx` pages the index reads components as the text they show — a Card's title, a Tab's label, a TypeTable's descriptions — using the same serializers as the [agent surfaces](/docs/discoverability/markdown), so an `ai.markdownComponents` entry covers your own components too. The option has no effect on Pagefind or Mixedbread. Expect the index to grow with your fenced content — the client index ships to every reader, hosted providers cap record size (Algolia rejects the sync batch when one page's record exceeds its plan's limit, leaving the previous index live), and a hit inside a fence shows flattened code in the result excerpt.
+Each fence's body and title (`blume.config.ts` above) become searchable; the language and fence markers don't. On `.mdx` pages the index reads components as the text they show — a Card's title, a Tab's label, a TypeTable's descriptions — using the same serializers as the [agent surfaces](/docs/discoverability/markdown), so an `ai.markdownComponents` entry covers your own components too. The option has no effect on Pagefind or Mixedbread. Expect the index to grow with your fenced content — the client index ships to every reader, hosted adapters cap record size (Algolia rejects the sync batch when one page's record exceeds its plan's limit, leaving the previous index live), and a hit inside a fence shows flattened code in the result excerpt.
 
 On a [versioned](/docs/content/versioning) site, results default to the version being viewed, with an "All versions" toggle in the dialog footer (remembered per reader). Cross-version hits name their version on the row. Orama, FlexSearch, Algolia, and Typesense honor the scoping — hosted records carry a `version` facet, with the current docs uploaded as `"current"` — while Pagefind stays unscoped, matching its locale behavior.
 
 ## Tags
 
-Add `search.tags` to a page's frontmatter to group it under a filter in the search dialog — readers can narrow results to a tag with a click. Tags also become a facet on the hosted providers.
+Add `search.tags` to a page's frontmatter to group it under a filter in the search dialog — readers can narrow results to a tag with a click. Tags also become a facet on the hosted adapters.
 
 ```yaml
 search:
   tags: [api, reference]
 ```
 
-## Providers
+## Adapters
 
-The client-side providers are keyless and need no extra config. The hosted ones take **public** credentials in `blume.config.ts` (safe to ship to the browser) and read their **secret** admin key from an environment variable at build time — the secret never lands in the config or the client bundle.
+The client-side adapters are keyless and take no options. The hosted ones take **public** credentials (safe to ship to the browser) and read their **secret** admin key from an environment variable at build time — the secret never lands in the config or the client bundle. Every option you pass is kept verbatim and handed to the adapter's client, so an option Blume doesn't name still reaches the SDK.
 
 ### Orama (default)
 
-Blume's default engine. It builds a JSON index served at `/blume-search.json` and queries it in the browser — instant, client-side, and live in `blume dev` as you edit. No keys, no service.
+Blume's default engine. It builds a JSON index served at `/blume-search.json` and queries it in the browser — instant, client-side, and live in `blume dev` as you edit. No keys, no service. Omitting `search` entirely selects it; spell it out only when you want to be explicit:
 
 ```ts blume.config.ts lineNumbers
-search: {
-  provider: "orama", // default
-}
+import { orama } from "blume/search";
+
+search: orama(),
 ```
 
 #### Non-Latin scripts
@@ -101,9 +124,9 @@ A second keyless, client-side option. It reuses the same `/blume-search.json` in
 FlexSearch has no equivalent segmentation hook, so for sites in a non-Latin script prefer Orama (the default) or [Pagefind](#pagefind), whose `pagefind_extended` binary indexes a broad set of languages and segments Chinese, Japanese and Korean natively.
 
 ```ts blume.config.ts lineNumbers
-search: {
-  provider: "flexsearch",
-}
+import { flexsearch } from "blume/search";
+
+search: flexsearch(),
 ```
 
 ### Pagefind
@@ -111,26 +134,25 @@ search: {
 For very large docs, opt into [Pagefind](https://pagefind.app). It indexes your built HTML and loads the index in shards on demand, keeping the initial payload tiny no matter how big the site grows.
 
 ```ts blume.config.ts lineNumbers
-search: {
-  provider: "pagefind",
-}
+import { pagefind } from "blume/search";
+
+search: pagefind(),
 ```
 
-Pagefind only runs during `blume build`, so search isn't available in `blume dev` with this provider.
+Pagefind only runs during `blume build`, so search isn't available in `blume dev` with this adapter.
 
 ### Algolia
 
 The browser queries [Algolia](https://www.algolia.com) directly with your search-only key. Each `blume build` replaces the index using the admin key from `ALGOLIA_ADMIN_API_KEY` (the build warns and skips the upload if it's unset). The whole index is replaced on every sync, so pages you delete or rename don't linger as stale results.
 
 ```ts blume.config.ts lineNumbers
-search: {
-  provider: "algolia",
-  algolia: {
-    appId: "YOUR_APP_ID",
-    indexName: "docs",
-    searchApiKey: "YOUR_SEARCH_ONLY_KEY", // public
-  },
-}
+import { algolia } from "blume/search";
+
+search: algolia({
+  appId: "YOUR_APP_ID",
+  apiKey: "YOUR_SEARCH_ONLY_KEY", // public
+  indexName: "docs",
+}),
 ```
 
 ### Orama Cloud
@@ -138,14 +160,13 @@ search: {
 Hosted Orama. The browser queries your index endpoint with the public API key; `blume build` pushes records to the index using `ORAMA_PRIVATE_API_KEY`. Set `indexId` to enable the sync.
 
 ```ts blume.config.ts lineNumbers
-search: {
-  provider: "orama-cloud",
-  oramaCloud: {
-    endpoint: "https://cloud.orama.run/v1/indexes/your-index",
-    apiKey: "YOUR_PUBLIC_API_KEY",
-    indexId: "your-index-id", // for the build-time sync
-  },
-}
+import { oramaCloud } from "blume/search";
+
+search: oramaCloud({
+  endpoint: "https://cloud.orama.run/v1/indexes/your-index",
+  apiKey: "YOUR_PUBLIC_API_KEY",
+  indexId: "your-index-id", // for the build-time sync
+}),
 ```
 
 ### Typesense
@@ -153,37 +174,35 @@ search: {
 Self-hosted or cloud [Typesense](https://typesense.org). The browser queries the collection with the search-only key; `blume build` recreates the collection and imports documents using `TYPESENSE_ADMIN_API_KEY`. The collection is dropped and rebuilt on every sync so deleted or renamed pages don't linger as stale results — if you hand-tune the collection's settings, reapply them after a build.
 
 ```ts blume.config.ts lineNumbers
-search: {
-  provider: "typesense",
-  typesense: {
-    host: "xyz.a1.typesense.net",
-    collection: "docs",
-    searchApiKey: "YOUR_SEARCH_ONLY_KEY", // public
-    // port + protocol default to 443 / https
-  },
-}
+import { typesense } from "blume/search";
+
+search: typesense({
+  host: "xyz.a1.typesense.net",
+  collection: "docs",
+  apiKey: "YOUR_SEARCH_ONLY_KEY", // public
+  // port + protocol default to 443 / https
+}),
 ```
 
 ### Mixedbread
 
-Semantic search via [Mixedbread](https://www.mixedbread.com). Queries are proxied through a generated `/api/search` endpoint that holds your key, so this provider **requires server output** (`deployment.output: "server"`). The endpoint reads `MIXEDBREAD_API_KEY`. Sync your content to the store with the Mixedbread CLI in your build, e.g. `mxbai vs sync <STORE_ID> ./content --ci`.
+Semantic search via [Mixedbread](https://www.mixedbread.com). Queries are proxied through a generated `/api/search` endpoint that holds your key, so this adapter **requires server output** (`deployment.output: "server"`). The endpoint reads `MIXEDBREAD_API_KEY`. Sync your content to the store with the Mixedbread CLI in your build, e.g. `mxbai vs sync <STORE_ID> ./content --ci`.
 
 ```ts blume.config.ts lineNumbers
-search: {
-  provider: "mixedbread",
-  mixedbread: {
-    storeId: "YOUR_STORE_ID",
-  },
-}
+import { mixedbread } from "blume/search";
+
+search: mixedbread({
+  storeId: "YOUR_STORE_ID",
+}),
 ```
 
 ### Disabling search
 
 ```ts blume.config.ts lineNumbers
-search: {
-  provider: "none",
-}
+search: false,
 ```
+
+Set `provider: false` in the object form instead when you still want `indexing` to apply to the MCP server's index.
 
 ## Excluding pages
 

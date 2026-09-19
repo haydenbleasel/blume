@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 
 import { checkRequiredSecrets } from "../src/cli/required-secrets.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
+import { mixedbread } from "../src/search/adapters/index.ts";
 
 const KEYS = [
   "AI_GATEWAY_API_KEY",
@@ -56,8 +57,9 @@ describe("checkRequiredSecrets", () => {
 
   it("warns for mixedbread search without its key", () => {
     Reflect.deleteProperty(process.env, "MIXEDBREAD_API_KEY");
+    // The adapter declares the secret; the check reads it off the descriptor.
     const config = blumeConfigSchema.parse({
-      search: { mixedbread: { storeId: "s" }, provider: "mixedbread" },
+      search: mixedbread({ storeId: "s" }),
     });
     expect(
       checkRequiredSecrets(config).some((d) =>

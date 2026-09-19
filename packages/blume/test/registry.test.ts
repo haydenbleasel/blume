@@ -9,6 +9,7 @@ import { packageRoot } from "../src/core/package-root.ts";
 import { blumeSourceGlob, eject } from "../src/registry/eject.ts";
 import { findItem, packageSrc, registry } from "../src/registry/registry.ts";
 import { rewriteImports } from "../src/registry/rewrite-imports.ts";
+import { mixedbread } from "../src/search/adapters/index.ts";
 
 const BLUME_SPEC = /["']blume\/(?<path>[^"']+)["']/gu;
 
@@ -87,7 +88,7 @@ describe("eject", () => {
         },
         deployment: { site: "https://example.com" },
         openapi: { enabled: true, renderer: "scalar", spec: "openapi.json" },
-        search: { mixedbread: { storeId: "store-1" }, provider: "mixedbread" },
+        search: ${JSON.stringify(mixedbread({ storeId: "store-1" }))},
       };\n`,
       // A blog post so an RSS feed is produced (alongside the home page).
       "docs/blog/hello.md":

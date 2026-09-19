@@ -16,11 +16,11 @@ interface AlgoliaRecord {
  * search-only key. Records are uploaded at build time by the sync step.
  */
 export const createSearch = (opts: {
+  apiKey: string;
   appId: string;
   indexName: string;
-  searchApiKey: string;
 }): SearchFn => {
-  const client = liteClient(opts.appId, opts.searchApiKey);
+  const client = liteClient(opts.appId, opts.apiKey);
   return async (query, options) => {
     const { results } = await client.search<AlgoliaRecord>({
       requests: [

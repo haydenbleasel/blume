@@ -324,7 +324,7 @@ export const publishBuildArtifacts = async (
   logger: ArtifactLogger,
   indexSearch: (outDir: string) => Promise<number> = buildSearchIndex
 ): Promise<void> => {
-  if (project.config.search.provider === "pagefind") {
+  if (project.config.search.provider.mode === "pagefind") {
     logger.info("Building search index");
     const indexed = await indexSearch(distDir);
     logger.info(`Indexed ${indexed} page(s) for search`);

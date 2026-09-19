@@ -16,14 +16,14 @@ interface TypesenseRecord extends Record<string, unknown> {
  * key. Documents are imported at build time by the sync step.
  */
 export const createSearch = (opts: {
+  apiKey: string;
   collection: string;
   host: string;
   port?: number;
   protocol?: string;
-  searchApiKey: string;
 }): SearchFn => {
   const client = new Client({
-    apiKey: opts.searchApiKey,
+    apiKey: opts.apiKey,
     nodes: [
       {
         host: opts.host,

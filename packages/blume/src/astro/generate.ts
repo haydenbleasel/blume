@@ -99,9 +99,9 @@ import {
 import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
 import { registry } from "../registry/registry.ts";
+import type { ResolvedSearchAdapter } from "../search/adapters/registry.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import { resolveSearchPopular } from "../search/popular.ts";
-import { searchProviderMeta, servesStaticIndex } from "../search/providers.ts";
 import {
   examplesEntryTemplate,
   tailwindEntryTemplate,
@@ -676,15 +676,15 @@ export const deploymentAdapterWarnings = (
  * deps. `pkgDir` is injectable for testing.
  */
 export const searchProviderWarnings = (
-  provider: ResolvedConfig["search"]["provider"],
+  provider: ResolvedSearchAdapter,
   root: string,
   pkgDir: string = packageRoot()
 ): string[] => {
   const warnings: string[] = [];
-  for (const dep of searchProviderMeta(provider).runtimeDeps) {
+  for (const dep of provider.runtimeDeps) {
     if (!(canResolveFrom(root, dep) || canResolveFrom(pkgDir, dep))) {
       warnings.push(
-        `Search provider "${provider}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`
+        `Search adapter "${provider.kind}" needs "${dep}", which isn't installed. Run \`npm install ${dep}\` (or your package manager's equivalent).`
       );
     }
   }
@@ -1438,9 +1438,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       openInChat: config.ai.openInChat,
       repoUrl,
       search: {
-        enabled: config.search.provider !== "none",
+        enabled: config.search.provider.mode !== "none",
         popular: resolveSearchPopular(config.search.popular, config.basePath),
-        provider: config.search.provider,
+        provider: config.search.provider.kind,
       },
       site: config.deployment.site ?? null,
       structuredData: config.seo.structuredData,
@@ -2367,8 +2367,9 @@ export const generateRuntime = async (
     write(featuresPath, featuresTemplate(clientFeatures)),
   ]);
 
-  // Client-loaded providers (orama, flexsearch) ship a static index + endpoint.
-  if (servesStaticIndex(config.search.provider)) {
+  // Client-loaded adapters (orama, flexsearch) ship a static index + endpoint.
+  const searchAdapter = config.search.provider;
+  if (searchAdapter.mode === "static") {
     const documents = await buildSearchDocuments(project);
     modules.set("blume:search-index", JSON.stringify(documents));
     await write(
@@ -2378,10 +2379,10 @@ export const generateRuntime = async (
   }
 
   // Mixedbread proxies queries through a server endpoint that holds the key.
-  if (config.search.provider === "mixedbread") {
+  if (searchAdapter.kind === "mixedbread") {
     await write(
       join(srcDir, "pages", "api", "search.ts"),
-      mixedbreadSearchEndpointTemplate(config.search.mixedbread?.storeId ?? "")
+      mixedbreadSearchEndpointTemplate(searchAdapter.options)
     );
   }
 

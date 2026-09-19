@@ -7,6 +7,7 @@ import { join } from "pathe";
 
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
+import { algolia } from "../src/search/adapters/index.ts";
 import { syncSearchProvider } from "../src/search/sync/index.ts";
 
 /**
@@ -252,9 +253,9 @@ describe("client loaders", () => {
     const { createSearch } =
       await import("../src/components/layout/search/algolia.ts");
     const search = createSearch({
+      apiKey: "key",
       appId: "app",
       indexName: "docs",
-      searchApiKey: "key",
     });
     const { hits } = await search("q");
     expect(captured.value?.requests[0]?.indexName).toBe("docs");
@@ -328,9 +329,9 @@ describe("client loaders", () => {
     const { createSearch } =
       await import("../src/components/layout/search/typesense.ts");
     const search = createSearch({
+      apiKey: "k",
       collection: "docs",
       host: "h",
-      searchApiKey: "k",
     });
     const result = await search("q");
     expect(captured.value?.q).toBe("q");
@@ -463,10 +464,7 @@ describe("hosted sync uploads", () => {
       return Promise.resolve();
     };
     const config = blumeConfigSchema.parse({
-      search: {
-        algolia: { appId: "app", indexName: "docs", searchApiKey: "k" },
-        provider: "algolia",
-      },
+      search: algolia({ apiKey: "k", appId: "app", indexName: "docs" }),
     });
     const project: BlumeProject = {
       config,

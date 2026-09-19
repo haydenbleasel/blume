@@ -740,7 +740,7 @@ describe("buildSearchDocuments with includeWhenDisabled", () => {
     // SAFETY: `buildSearchDocuments` reads only `config`, `graph.pages`,
     // `manifest.routes`, and `sources` from the project.
     ({
-      config: blumeConfigSchema.parse({ search: { provider: "none" } }),
+      config: blumeConfigSchema.parse({ search: false }),
       graph: {
         pages: [
           page({

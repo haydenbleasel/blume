@@ -38,6 +38,7 @@ import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ResolvedConfig } from "../src/core/schema.ts";
 import type { Diagnostic } from "../src/core/types.ts";
+import { flexsearch, mixedbread, orama } from "../src/search/adapters/index.ts";
 
 let srcDir: string;
 
@@ -1942,7 +1943,9 @@ describe("generateRuntime", () => {
   it("writes the mixedbread proxy endpoint for the server provider", async () => {
     const project = await scanProject(
       await writeProject({
-        "blume.config.ts": `export default { deployment: { output: "server" }, search: { mixedbread: { storeId: "store_7" }, provider: "mixedbread" } };
+        // The descriptor is plain data, so the fixture config can inline its
+        // JSON instead of importing the adapter from `blume/search`.
+        "blume.config.ts": `export default { deployment: { output: "server" }, search: ${JSON.stringify(mixedbread({ storeId: "store_7" }))} };
 `,
         "docs/index.md": "# Home\n",
       })
@@ -2256,17 +2259,17 @@ const parsedAsk = (ask: {
 }) => blumeConfigSchema.parse({ ai: { ask } }).ai.ask;
 
 describe("generateRuntime preflight and write failures", () => {
-  it("warns when the search provider's SDK isn't installed anywhere", () => {
+  it("warns when the search adapter's SDK isn't installed anywhere", () => {
     // An empty temp dir stands in for both the project root and the Blume
-    // package, so the provider's SDK resolves from neither.
-    const warnings = searchProviderWarnings("flexsearch", srcDir, srcDir);
+    // package, so the adapter's SDK resolves from neither.
+    const warnings = searchProviderWarnings(flexsearch(), srcDir, srcDir);
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('Search provider "flexsearch"');
+    expect(warnings[0]).toContain('Search adapter "flexsearch"');
     expect(warnings[0]).toContain('needs "flexsearch"');
   });
 
-  it("stays quiet when the provider's SDK ships with Blume", () => {
-    expect(searchProviderWarnings("orama", srcDir)).toEqual([]);
+  it("stays quiet when the adapter's SDK ships with Blume", () => {
+    expect(searchProviderWarnings(orama(), srcDir)).toEqual([]);
   });
 
   it("warns when the Ask AI backend's provider SDK isn't installed anywhere", () => {

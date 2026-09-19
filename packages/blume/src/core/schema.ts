@@ -5,6 +5,12 @@ import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import { analyticsConfigSchema } from "../analytics/schema.ts";
 import type { CodeTheme } from "../markdown/themes.ts";
 import { normalizeRoute } from "../openapi/references.ts";
+import { orama } from "../search/adapters/orama.ts";
+import {
+  NONE_SEARCH_ADAPTER,
+  resolvedSearchAdapterSchema,
+} from "../search/adapters/registry.ts";
+import type { SearchAdapterInput } from "../search/adapters/registry.ts";
 import { normalizeXHandle } from "../seo/x-handle.ts";
 import { filesystem } from "../sources/filesystem.ts";
 import {
@@ -557,54 +563,6 @@ const themeConfigSchema = z.strictObject({
   radius: z.enum(["none", "sm", "md", "lg"]).default("md"),
 });
 
-/** Public credentials for the Algolia search backend (sync key is an env var). */
-const algoliaSearchSchema = z.strictObject({
-  appId: z.string(),
-  indexName: z.string(),
-  searchApiKey: z.string(),
-});
-
-/** Public credentials for the Orama Cloud search backend. */
-const oramaCloudSearchSchema = z.strictObject({
-  apiKey: z.string(),
-  endpoint: z.string(),
-  /** Index id used by the build-time sync (with `ORAMA_PRIVATE_API_KEY`). */
-  indexId: z.string().optional(),
-});
-
-/** Public credentials for a (self-hosted or cloud) Typesense backend. */
-const typesenseSearchSchema = z.strictObject({
-  collection: z.string(),
-  host: z.string(),
-  port: z.number().int().positive().optional(),
-  protocol: z.enum(["http", "https"]).optional(),
-  searchApiKey: z.string(),
-});
-
-/** Mixedbread semantic search: the store the server endpoint queries. */
-const mixedbreadSearchSchema = z.strictObject({
-  storeId: z.string(),
-});
-
-export const searchProviders = [
-  "orama",
-  "pagefind",
-  "flexsearch",
-  "algolia",
-  "orama-cloud",
-  "typesense",
-  "mixedbread",
-  "none",
-] as const;
-
-/** Providers that need a config block, mapped to its `search.*` key. */
-const PROVIDER_CONFIG_KEY = {
-  algolia: "algolia",
-  mixedbread: "mixedbread",
-  "orama-cloud": "oramaCloud",
-  typesense: "typesense",
-} as const;
-
 /** Curated link for the search dialog empty state (internal route or external URL). */
 const searchPopularLinkSchema = z.strictObject({
   href: z.string(),
@@ -612,37 +570,53 @@ const searchPopularLinkSchema = z.strictObject({
   label: z.string(),
 });
 
-const searchConfigSchema = z
+/**
+ * The search backend: an adapter descriptor from `blume/search` (`algolia({…})`,
+ * `orama()`, …) or `false` to disable search. Resolves to a descriptor either
+ * way — `false` becomes the `none` adapter — so consumers read `kind`,
+ * `runtimeDeps`, and `requiredSecrets` without a special case.
+ */
+const searchProviderSchema = z
+  .custom<false | SearchAdapterInput>()
+  .transform((value) => (value === false ? NONE_SEARCH_ADAPTER : value))
+  .pipe(resolvedSearchAdapterSchema);
+
+/** Indexing behavior shared by every source-built index. */
+const searchIndexingSchema = z
   .strictObject({
-    algolia: algoliaSearchSchema.optional(),
-    indexing: z
-      .strictObject({
-        includeCodeBlocks: z.boolean().default(false),
-        includeHiddenPages: z.boolean().default(false),
-      })
-      .prefault({}),
-    mixedbread: mixedbreadSearchSchema.optional(),
-    oramaCloud: oramaCloudSearchSchema.optional(),
-    /** Curated links for the Cmd+K empty state; defaults to the first sidebar pages. */
-    popular: z.array(searchPopularLinkSchema).default([]),
-    provider: z.enum(searchProviders).default("orama"),
-    typesense: typesenseSearchSchema.optional(),
+    includeCodeBlocks: z.boolean().default(false),
+    includeHiddenPages: z.boolean().default(false),
   })
-  .superRefine((value, ctx) => {
-    // Hosted providers can't work without their credentials; flag a missing
-    // block with a path so the diagnostic points at `search.<provider>`.
-    // SAFETY: providers without a config block (orama, pagefind, …) miss the
-    // map and read undefined, which the `field &&` guard below absorbs.
-    const field =
-      PROVIDER_CONFIG_KEY[value.provider as keyof typeof PROVIDER_CONFIG_KEY];
-    if (field && !value[field]) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `search.${field} is required when provider is "${value.provider}".`,
-        path: [field],
-      });
-    }
-  });
+  .prefault({});
+
+/** The object form of `search`: the adapter plus its adapter-independent settings. */
+const searchOptionsSchema = z.strictObject({
+  indexing: searchIndexingSchema,
+  /** Curated links for the Cmd+K empty state; defaults to the first sidebar pages. */
+  popular: z.array(searchPopularLinkSchema).default([]),
+  provider: searchProviderSchema.default(() => orama()),
+});
+
+type SearchOptionsInput = z.input<typeof searchOptionsSchema>;
+
+/** What `search` accepts: an adapter (or `false`) directly, or the object form. */
+type SearchConfigInput = false | SearchAdapterInput | SearchOptionsInput;
+
+/**
+ * `search` takes an adapter directly (`search: algolia({…})`, or `false`) as
+ * shorthand for the object form (`search: { provider: algolia({…}), popular,
+ * indexing }`). The shorthand is lifted into `provider` before the object
+ * schema validates, rather than through a union: a union reports whichever
+ * branch fails "softest", which for a descriptor missing an option is the
+ * object form's "unrecognized keys" — pointing at the wrong problem. A
+ * descriptor is recognized by its `kind`; the object form never has one.
+ */
+const searchConfigSchema = z
+  .custom<SearchConfigInput>()
+  .transform((value): SearchOptionsInput =>
+    value === false || "kind" in value ? { provider: value } : value
+  )
+  .pipe(searchOptionsSchema);
 
 /**
  * The `ai.ask.reasoning` levels: the AI SDK's top-level `reasoning` values
@@ -1993,8 +1967,8 @@ export type ArchivedVersionConfig = z.infer<typeof archivedVersionSchema>;
  * guard keeps structurally identical to this.
  */
 export type BlumeConfigInput = z.input<typeof blumeConfigSchema>;
-/** A configured search backend. */
-export type SearchProvider = (typeof searchProviders)[number];
+/** The resolved search backend: an adapter descriptor, or `none`. */
+export type { ResolvedSearchAdapter } from "../search/adapters/registry.ts";
 /** Resolved robots.txt `Content-Signal` preferences (`null` when disabled). */
 export type ContentSignals = z.infer<typeof contentSignalsSchema>;
 /** The resolved per-signal policy object (present when signals are enabled). */

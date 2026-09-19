@@ -11,18 +11,23 @@ import { blumeConfigSchema } from "../src/core/schema.ts";
 import { serverFeatures } from "../src/core/server-features.ts";
 import type { ContentSource } from "../src/core/sources/types.ts";
 import type { NavNode, PageRecord } from "../src/core/types.ts";
-import type { SearchDocument } from "../src/search/documents.ts";
 import {
-  buildSearchDocuments,
-  toSearchRecords,
-} from "../src/search/documents.ts";
-import { searchProviderMeta } from "../src/search/providers.ts";
-import { syncAlgolia } from "../src/search/sync/algolia.ts";
+  algolia,
+  flexsearch,
+  mixedbread,
+  orama,
+  oramaCloud,
+  pagefind,
+  typesense,
+} from "../src/search/adapters/index.ts";
+import { NONE_SEARCH_ADAPTER } from "../src/search/adapters/registry.ts";
+import type { AnySearchAdapter } from "../src/search/adapters/registry.ts";
+import type { SearchDocument } from "../src/search/documents.ts";
+import { toSearchRecords } from "../src/search/documents.ts";
 import { syncSearchProvider } from "../src/search/sync/index.ts";
 import { syncOramaCloud } from "../src/search/sync/orama-cloud.ts";
-import { syncTypesense } from "../src/search/sync/typesense.ts";
 
-type SearchInput = NonNullable<BlumeConfigInput["search"]>;
+type SearchInput = BlumeConfigInput["search"];
 
 /**
  * The slice of {@link BlumeProject} these tests exercise. Each leaf uses the
@@ -86,9 +91,75 @@ const reporter = () => {
   };
 };
 
+const ALGOLIA = { apiKey: "pub", appId: "APP", indexName: "docs" };
+const ORAMA_CLOUD = {
+  apiKey: "pub",
+  endpoint: "https://x.orama.run",
+  indexId: "idx",
+};
+const TYPESENSE = { apiKey: "k", collection: "docs", host: "h.ts.net" };
+
+/**
+ * Every public adapter with the client module its generated `search-client.ts`
+ * must import and the SDK its `.blume/package.json` must declare. The table
+ * drives the per-adapter template tests: each adapter references exactly its
+ * own module and dependency, and none of the others'.
+ */
+const ADAPTERS: {
+  adapter: AnySearchAdapter;
+  deps: string[];
+  module: string;
+}[] = [
+  { adapter: algolia(ALGOLIA), deps: ["algoliasearch"], module: "algolia" },
+  { adapter: flexsearch(), deps: ["flexsearch"], module: "flexsearch" },
+  {
+    adapter: mixedbread({ storeId: "s" }),
+    deps: ["@mixedbread/sdk"],
+    module: "endpoint",
+  },
+  { adapter: orama(), deps: ["@orama/orama"], module: "orama" },
+  {
+    adapter: oramaCloud(ORAMA_CLOUD),
+    deps: ["@oramacloud/client"],
+    module: "orama-cloud",
+  },
+  { adapter: pagefind(), deps: [], module: "pagefind" },
+  { adapter: typesense(TYPESENSE), deps: ["typesense"], module: "typesense" },
+];
+
+const ALL_MODULES = ADAPTERS.map((entry) => entry.module);
+const ALL_DEPS = ADAPTERS.flatMap((entry) => entry.deps);
+
+describe("search adapter factories", () => {
+  it("return plain descriptors that survive a JSON round-trip", () => {
+    for (const { adapter } of ADAPTERS) {
+      // oxlint-disable-next-line unicorn/prefer-structured-clone -- the JSON round-trip is the claim: the templates inline descriptors with JSON.stringify, which drops what structuredClone keeps
+      expect(JSON.parse(JSON.stringify(adapter))).toStrictEqual(adapter);
+    }
+  });
+
+  it("declare their mode, runtime dependency, and required secrets", () => {
+    expect(orama()).toMatchObject({ mode: "static", requiredSecrets: [] });
+    expect(flexsearch().mode).toBe("static");
+    expect(pagefind()).toMatchObject({ mode: "pagefind", runtimeDeps: [] });
+    expect(algolia(ALGOLIA).mode).toBe("hosted");
+    expect(oramaCloud(ORAMA_CLOUD).mode).toBe("hosted");
+    expect(typesense(TYPESENSE).mode).toBe("hosted");
+    expect(mixedbread({ storeId: "s" })).toMatchObject({
+      mode: "server",
+      requiredSecrets: ["MIXEDBREAD_API_KEY"],
+    });
+  });
+
+  it("keep the options verbatim, including keys Blume doesn't name", () => {
+    const adapter = algolia({ ...ALGOLIA, hitsPerPage: 5 });
+    expect(adapter.options).toStrictEqual({ ...ALGOLIA, hitsPerPage: 5 });
+  });
+});
+
 describe("search config schema", () => {
-  it("defaults to the orama provider", () => {
-    expect(blumeConfigSchema.parse({}).search.provider).toBe("orama");
+  it("defaults to orama with no config", () => {
+    expect(blumeConfigSchema.parse({}).search.provider).toStrictEqual(orama());
   });
 
   it("defaults to excluding code blocks from the search index", () => {
@@ -98,76 +169,209 @@ describe("search config schema", () => {
     });
   });
 
-  it("accepts opting code blocks into the search index", () => {
+  it("accepts an adapter directly as shorthand for the object form", () => {
+    const shorthand = parse(algolia(ALGOLIA)).search;
+    const object = parse({ provider: algolia(ALGOLIA) }).search;
+    expect(shorthand).toStrictEqual(object);
+    expect(shorthand.provider).toStrictEqual(algolia(ALGOLIA));
+    expect(shorthand.popular).toStrictEqual([]);
+  });
+
+  it("keeps popular links and indexing beside the adapter in the object form", () => {
     const config = parse({
       indexing: { includeCodeBlocks: true },
-      provider: "orama",
+      popular: [{ href: "/docs", label: "Docs" }],
+      provider: pagefind(),
     });
+    expect(config.search.provider).toStrictEqual(pagefind());
     expect(config.search.indexing.includeCodeBlocks).toBe(true);
+    expect(config.search.popular).toHaveLength(1);
   });
 
-  it("accepts the keyless providers without extra config", () => {
-    expect(parse({ provider: "flexsearch" }).search.provider).toBe(
-      "flexsearch"
-    );
-    expect(parse({ provider: "pagefind" }).search.provider).toBe("pagefind");
-  });
-
-  it("requires the matching config block for a hosted provider", () => {
-    const result = blumeConfigSchema.safeParse({
-      search: { provider: "algolia" },
+  it("resolves false to the none adapter at either level", () => {
+    expect(parse(false).search.provider).toStrictEqual(NONE_SEARCH_ADAPTER);
+    // The object form still carries indexing, which the MCP index reads.
+    const config = parse({
+      indexing: { includeHiddenPages: true },
+      provider: false,
     });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0]?.path).toStrictEqual(["search", "algolia"]);
+    expect(config.search.provider.mode).toBe("none");
+    expect(config.search.indexing.includeHiddenPages).toBe(true);
+  });
+
+  it("accepts a descriptor that went through JSON", () => {
+    for (const { adapter } of ADAPTERS) {
+      // oxlint-disable-next-line unicorn/prefer-structured-clone -- a config that inlined JSON.stringify(adapter) is what the schema must accept
+      const config = parse(JSON.parse(JSON.stringify(adapter)));
+      expect(config.search.provider).toStrictEqual(adapter);
     }
   });
 
-  it("accepts a fully configured hosted provider", () => {
-    const config = parse({
-      algolia: { appId: "APP", indexName: "docs", searchApiKey: "key" },
-      provider: "algolia",
+  it("re-derives the metadata from the factory", () => {
+    // A descriptor serialized by an older Blume (or edited by hand) resolves
+    // to the metadata this version ships, not whatever it carried.
+    const stale = {
+      ...algolia(ALGOLIA),
+      requiredSecrets: ["X"],
+      runtimeDeps: [],
+    };
+    expect(parse(stale).search.provider).toStrictEqual(algolia(ALGOLIA));
+  });
+
+  it("validates an adapter's options and points at the missing one", () => {
+    const result = blumeConfigSchema.safeParse({
+      search: { ...algolia(ALGOLIA), options: { appId: "APP" } },
     });
-    expect(config.search.algolia?.appId).toBe("APP");
-  });
-});
-
-describe("searchProviderMeta", () => {
-  it("marks mixedbread as server-only", () => {
-    expect(searchProviderMeta("mixedbread").requiresServer).toBe(true);
-    expect(searchProviderMeta("mixedbread").kind).toBe("server");
+    expect(result.success).toBe(false);
+    const paths = result.success
+      ? []
+      : result.error.issues.map((issue) => issue.path.join("."));
+    expect(paths).toContain("search.provider.options.apiKey");
+    expect(paths).toContain("search.provider.options.indexName");
   });
 
-  it("marks orama as a keyless static provider", () => {
-    expect(searchProviderMeta("orama").kind).toBe("static");
-    expect(searchProviderMeta("orama").requiresServer).toBe(false);
-  });
-
-  it("only the hosted providers sync at build time", () => {
-    expect(searchProviderMeta("algolia").syncs).toBe(true);
-    expect(searchProviderMeta("typesense").syncs).toBe(true);
-    expect(searchProviderMeta("orama-cloud").syncs).toBe(true);
-    expect(searchProviderMeta("mixedbread").syncs).toBe(false);
-    expect(searchProviderMeta("flexsearch").syncs).toBe(false);
+  it("rejects an unknown adapter kind", () => {
+    const result = blumeConfigSchema.safeParse({
+      search: { ...orama(), kind: "elastic" },
+    });
+    expect(result.success).toBe(false);
   });
 });
 
 describe("runtimeDependencies", () => {
-  it("declares only the configured provider's SDK", () => {
-    const config = parse({
-      provider: "typesense",
-      typesense: { collection: "docs", host: "h", searchApiKey: "k" },
+  for (const { adapter, deps } of ADAPTERS) {
+    it(`declares only the ${adapter.kind} SDK`, () => {
+      const declared = runtimeDependencies({
+        config: parse(adapter),
+        needsReact: false,
+      });
+      for (const dep of deps) {
+        expect(declared).toContain(dep);
+      }
+      for (const dep of ALL_DEPS.filter((d) => !deps.includes(d))) {
+        expect(declared).not.toContain(dep);
+      }
     });
-    const deps = runtimeDependencies({ config, needsReact: false });
-    expect(deps).toContain("typesense");
-    expect(deps).not.toContain("algoliasearch");
-    expect(deps).not.toContain("@mixedbread/sdk");
+  }
+
+  it("declares no search SDK when search is disabled", () => {
+    const declared = runtimeDependencies({
+      config: parse(false),
+      needsReact: false,
+    });
+    expect(declared).toStrictEqual(["@astrojs/mdx"]);
+  });
+});
+
+describe("searchClientTemplate", () => {
+  for (const { adapter, module } of ADAPTERS) {
+    it(`imports only the ${adapter.kind} client module`, () => {
+      const client = searchClientTemplate(parse(adapter));
+      expect(client).toContain(`search/${module}.ts`);
+      for (const other of ALL_MODULES.filter((m) => m !== module)) {
+        expect(client).not.toContain(`search/${other}.ts`);
+      }
+    });
+  }
+
+  it("inlines a hosted adapter's options verbatim as a literal", () => {
+    const client = searchClientTemplate(
+      parse(algolia({ ...ALGOLIA, hitsPerPage: 5 }))
+    );
+    expect(client).toContain(
+      `create(${JSON.stringify({ ...ALGOLIA, hitsPerPage: 5 })})`
+    );
   });
 
-  it("adds no search SDK for pagefind", () => {
-    const config = parse({ provider: "pagefind" });
-    const deps = runtimeDependencies({ config, needsReact: false });
-    expect(deps).toStrictEqual(["@astrojs/mdx"]);
+  it("loads the static index for both client-side adapters", () => {
+    for (const adapter of [orama(), flexsearch()]) {
+      const client = searchClientTemplate(parse(adapter));
+      expect(client).toContain("blume-search.json");
+    }
+  });
+
+  it("bakes i18n.defaultLocale into the orama client for tokenizer selection", () => {
+    const config = blumeConfigSchema.parse({
+      i18n: {
+        defaultLocale: "ja",
+        locales: [{ code: "ja", label: "日本語" }],
+      },
+      search: orama(),
+    });
+    expect(searchClientTemplate(config)).toContain(
+      'create({ indexUrl, locale: "ja" })'
+    );
+  });
+
+  it("omits the locale without i18n, and always for flexsearch", () => {
+    expect(searchClientTemplate(parse(orama()))).toContain(
+      "create({ indexUrl })"
+    );
+    // FlexSearch has no tokenizer hook, so its client never takes a locale.
+    const config = blumeConfigSchema.parse({
+      i18n: {
+        defaultLocale: "ja",
+        locales: [{ code: "ja", label: "日本語" }],
+      },
+      search: flexsearch(),
+    });
+    expect(searchClientTemplate(config)).toContain("create({ indexUrl })");
+  });
+
+  it("points orama-cloud at its endpoint and key", () => {
+    const client = searchClientTemplate(parse(oramaCloud(ORAMA_CLOUD)));
+    expect(client).toContain('"endpoint":"https://x.orama.run"');
+    expect(client).toContain('"apiKey":"pub"');
+  });
+
+  it("passes the typesense host and collection", () => {
+    const client = searchClientTemplate(parse(typesense(TYPESENSE)));
+    expect(client).toContain('"collection":"docs"');
+    expect(client).toContain('"host":"h.ts.net"');
+  });
+
+  it("targets the server endpoint for mixedbread", () => {
+    const client = searchClientTemplate(parse(mixedbread({ storeId: "s" })));
+    expect(client).toContain("api/search");
+    // The store id is the endpoint's business; the client never sees it.
+    expect(client).not.toContain('"s"');
+  });
+
+  it("loads the pagefind bundle by URL", () => {
+    expect(searchClientTemplate(parse(pagefind()))).toContain(
+      "pagefind/pagefind.js"
+    );
+  });
+
+  it("falls back to a no-op client when search is disabled", () => {
+    const client = searchClientTemplate(parse(false));
+    expect(client).toContain("Promise.resolve({ hits: [], sections: [] })");
+    for (const module of ALL_MODULES) {
+      expect(client).not.toContain(`search/${module}.ts`);
+    }
+  });
+});
+
+describe("mixedbreadSearchEndpointTemplate", () => {
+  it("reads the secret from the environment and inlines the options", () => {
+    const endpoint = mixedbreadSearchEndpointTemplate({
+      storeId: "store-123",
+    });
+    expect(endpoint).toContain('import { getSecret } from "astro:env/server"');
+    expect(endpoint).toContain('getSecret("MIXEDBREAD_API_KEY")');
+    expect(endpoint).toContain('const OPTIONS = {"storeId":"store-123"};');
+    expect(endpoint).toContain("export const prerender = false;");
+  });
+});
+
+describe("serverFeatures", () => {
+  it("requires server output only for a server adapter", () => {
+    expect(serverFeatures(parse(mixedbread({ storeId: "s" })))).toStrictEqual([
+      "Search (mixedbread)",
+    ]);
+    for (const adapter of [orama(), pagefind(), algolia(ALGOLIA)]) {
+      expect(serverFeatures(parse(adapter))).toStrictEqual([]);
+    }
   });
 });
 
@@ -219,144 +423,32 @@ describe("toSearchRecords", () => {
   });
 });
 
-describe("searchClientTemplate", () => {
-  it("bakes public credentials into the hosted client", () => {
-    const config = parse({
-      algolia: { appId: "APP", indexName: "docs", searchApiKey: "pub" },
-      provider: "algolia",
-    });
-    const client = searchClientTemplate(config);
-    expect(client).toContain("search/algolia.ts");
-    expect(client).toContain('"appId":"APP"');
-    expect(client).toContain('"searchApiKey":"pub"');
-  });
-
-  it("loads the static index for both client-side providers", () => {
-    for (const provider of ["orama", "flexsearch"] as const) {
-      const client = searchClientTemplate(parse({ provider }));
-      expect(client).toContain(`search/${provider}.ts`);
-      expect(client).toContain("blume-search.json");
+describe("syncSearchProvider", () => {
+  it("is a no-op for adapters without a build-time sync", async () => {
+    const logs = [orama(), pagefind(), mixedbread({ storeId: "s" })].map(
+      (search) => ({ log: reporter(), search })
+    );
+    await Promise.all(
+      logs.map(({ log, search }) =>
+        syncSearchProvider(emptyProject(search), log)
+      )
+    );
+    for (const { log } of logs) {
+      expect(log.calls.start).toHaveLength(0);
+      expect(log.calls.warn).toHaveLength(0);
     }
   });
 
-  it("bakes i18n.defaultLocale into the orama client for tokenizer selection", () => {
-    const config = blumeConfigSchema.parse({
-      i18n: {
-        defaultLocale: "ja",
-        locales: [{ code: "ja", label: "日本語" }],
-      },
-      search: { provider: "orama" },
-    });
-    expect(searchClientTemplate(config)).toContain(
-      'create({ indexUrl, locale: "ja" })'
-    );
-  });
-
-  it("omits the locale without i18n, and always for flexsearch", () => {
-    expect(searchClientTemplate(parse({ provider: "orama" }))).toContain(
-      "create({ indexUrl })"
-    );
-    // FlexSearch has no tokenizer hook, so its client never takes a locale.
-    const config = blumeConfigSchema.parse({
-      i18n: {
-        defaultLocale: "ja",
-        locales: [{ code: "ja", label: "日本語" }],
-      },
-      search: { provider: "flexsearch" },
-    });
-    expect(searchClientTemplate(config)).toContain("create({ indexUrl })");
-  });
-
-  it("points orama-cloud at its endpoint and key", () => {
-    const client = searchClientTemplate(
-      parse({
-        oramaCloud: { apiKey: "pub", endpoint: "https://x.orama.run" },
-        provider: "orama-cloud",
-      })
-    );
-    expect(client).toContain("search/orama-cloud.ts");
-    expect(client).toContain('"endpoint":"https://x.orama.run"');
-    // The sync-only index id never reaches the client.
-    expect(client).not.toContain("indexId");
-  });
-
-  it("passes the typesense host and collection", () => {
-    const client = searchClientTemplate(
-      parse({
-        provider: "typesense",
-        typesense: { collection: "docs", host: "h.ts.net", searchApiKey: "k" },
-      })
-    );
-    expect(client).toContain("search/typesense.ts");
-    expect(client).toContain('"collection":"docs"');
-  });
-
-  it("targets the server endpoint for mixedbread", () => {
-    const client = searchClientTemplate(
-      parse({ mixedbread: { storeId: "s" }, provider: "mixedbread" })
-    );
-    expect(client).toContain("search/endpoint.ts");
-    expect(client).toContain("api/search");
-  });
-
-  it("loads the pagefind bundle by URL", () => {
-    const client = searchClientTemplate(parse({ provider: "pagefind" }));
-    expect(client).toContain("search/pagefind.ts");
-    expect(client).toContain("pagefind/pagefind.js");
-  });
-
-  it("falls back to a no-op client when search is disabled", () => {
-    const client = searchClientTemplate(parse({ provider: "none" }));
-    expect(client).toContain("Promise.resolve({ hits: [], sections: [] })");
-  });
-});
-
-describe("mixedbreadSearchEndpointTemplate", () => {
-  it("reads the secret from the environment and bakes the store id", () => {
-    const endpoint = mixedbreadSearchEndpointTemplate("store-123");
-    expect(endpoint).toContain('import { getSecret } from "astro:env/server"');
-    expect(endpoint).toContain('getSecret("MIXEDBREAD_API_KEY")');
-    expect(endpoint).toContain('"store-123"');
-    expect(endpoint).toContain("export const prerender = false;");
-  });
-});
-
-describe("syncSearchProvider", () => {
-  it("is a no-op for providers that don't sync", async () => {
-    const log = reporter();
-    await syncSearchProvider(emptyProject({ provider: "orama" }), log);
-    expect(log.calls.start).toHaveLength(0);
-    expect(log.calls.warn).toHaveLength(0);
-  });
-
-  // Every hosted provider's sync reads its admin key from the environment, and
+  // Every hosted adapter's sync reads its admin key from the environment, and
   // warns-and-skips (rather than failing the build) when it isn't set.
   const hosted = [
-    {
-      env: "ALGOLIA_ADMIN_API_KEY",
-      search: {
-        algolia: { appId: "a", indexName: "i", searchApiKey: "k" },
-        provider: "algolia",
-      },
-    },
-    {
-      env: "ORAMA_PRIVATE_API_KEY",
-      search: {
-        oramaCloud: { apiKey: "p", endpoint: "e", indexId: "id" },
-        provider: "orama-cloud",
-      },
-    },
-    {
-      env: "TYPESENSE_ADMIN_API_KEY",
-      search: {
-        provider: "typesense",
-        typesense: { collection: "c", host: "h", searchApiKey: "k" },
-      },
-    },
-  ] as const;
+    { env: "ALGOLIA_ADMIN_API_KEY", search: algolia(ALGOLIA) },
+    { env: "ORAMA_PRIVATE_API_KEY", search: oramaCloud(ORAMA_CLOUD) },
+    { env: "TYPESENSE_ADMIN_API_KEY", search: typesense(TYPESENSE) },
+  ];
 
   for (const { env, search } of hosted) {
-    it(`warns and skips ${search.provider} when ${env} is missing`, async () => {
+    it(`warns and skips ${search.kind} when ${env} is missing`, async () => {
       Reflect.deleteProperty(process.env, env);
       const log = reporter();
       await syncSearchProvider(emptyProject(search), log);
@@ -365,100 +457,10 @@ describe("syncSearchProvider", () => {
       expect(log.calls.warn[0]).toContain(`${env} is not set`);
     });
   }
-});
-
-// Each hosted sync throws (rather than silently skipping) when its config block
-// is absent, so the dispatcher's catch can surface a clear warning.
-describe("hosted sync config guards", () => {
-  // A config whose provider is "none" carries no hosted-provider blocks, so
-  // each block reads back as undefined.
-  const noBlocks = parse({ provider: "none" }).search;
-
-  it("throws when the algolia config block is missing", async () => {
-    await expect(syncAlgolia([], noBlocks.algolia)).rejects.toThrow(
-      "search.algolia config is missing."
-    );
-  });
-
-  it("throws when the orama-cloud config block is missing", async () => {
-    await expect(syncOramaCloud([], noBlocks.oramaCloud)).rejects.toThrow(
-      "search.oramaCloud config is missing."
-    );
-  });
 
   it("throws when the orama-cloud index id is absent", async () => {
-    await expect(syncOramaCloud([], {})).rejects.toThrow(
-      "indexId is required to sync"
-    );
-  });
-
-  it("throws when the typesense config block is missing", async () => {
-    await expect(syncTypesense([], noBlocks.typesense)).rejects.toThrow(
-      "search.typesense config is missing."
-    );
-  });
-});
-
-describe("buildSearchDocuments — localized sidebars", () => {
-  it("derives the section and breadcrumb from a locale's sidebar", async () => {
-    const fixture: ProjectFixture = {
-      config: blumeConfigSchema.parse({}),
-      graph: {
-        navigationByLocale: {
-          en: {
-            sidebar: [
-              {
-                children: [
-                  {
-                    kind: "page",
-                    label: "Intro",
-                    pageId: "x",
-                    route: "/intro",
-                  },
-                ],
-                display: "flat",
-                kind: "group",
-                label: "Guides",
-              },
-            ],
-          },
-        },
-        pages: [],
-      },
-      manifest: {
-        routes: [
-          {
-            id: "x",
-            indexable: true,
-            locale: "en",
-            path: "/intro",
-            title: "Intro",
-          },
-        ],
-      },
-      sources: [],
-    };
-    // SAFETY: buildSearchDocuments reads only config, graph, manifest.routes,
-    // and sources; the remaining BlumeProject fields are never touched.
-    const project = fixture as BlumeProject;
-
-    const [doc] = await buildSearchDocuments(project);
-    expect(doc?.route).toBe("/intro");
-    expect(doc?.section).toBe("Guides");
-    expect(doc?.breadcrumb).toStrictEqual(["Guides"]);
-  });
-});
-
-describe("serverFeatures", () => {
-  it("requires server output for mixedbread search", () => {
-    const config = parse({
-      mixedbread: { storeId: "store" },
-      provider: "mixedbread",
-    });
-    expect(serverFeatures(config)).toContain("Search (mixedbread)");
-  });
-
-  it("does not gate the static providers", () => {
-    expect(serverFeatures(parse({ provider: "orama" }))).toStrictEqual([]);
+    // `indexId` is optional on the adapter (the browser client doesn't need
+    // it), so the sync is what reports its absence.
+    await expect(syncOramaCloud([], {})).rejects.toThrow("indexId");
   });
 });

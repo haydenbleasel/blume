@@ -8,6 +8,7 @@ import { discoverFolderMeta } from "../src/core/meta.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { serverFeatures } from "../src/core/server-features.ts";
 import { buildReferenceFiles } from "../src/openapi/scalar.ts";
+import { algolia, mixedbread } from "../src/search/adapters/index.ts";
 
 const dirs: string[] = [];
 
@@ -186,7 +187,7 @@ describe("server features", () => {
   it("lists every enabled server-only feature", () => {
     const config = blumeConfigSchema.parse({
       ai: { ask: { enabled: true }, mcp: { enabled: true } },
-      search: { mixedbread: { storeId: "store-1" }, provider: "mixedbread" },
+      search: mixedbread({ storeId: "store-1" }),
     });
     expect(serverFeatures(config)).toStrictEqual([
       "Ask AI",
@@ -246,14 +247,19 @@ describe("config schema validators", () => {
     expect(result.success).toBe(false);
   });
 
-  it("requires credentials for a hosted search provider", () => {
+  it("requires credentials for a hosted search adapter", () => {
+    // A descriptor whose options lost a required credential (say, through a
+    // hand edit) fails at the option, not at the adapter as a whole.
     const result = blumeConfigSchema.safeParse({
-      search: { provider: "algolia" },
+      search: {
+        ...algolia({ apiKey: "k", appId: "a", indexName: "i" }),
+        options: { apiKey: "k", indexName: "i" },
+      },
     });
     expect(result.success).toBe(false);
     expect(
-      result.success ? [] : result.error.issues.map((issue) => issue.message)
-    ).toContainEqual(expect.stringContaining("search.algolia"));
+      result.success ? [] : result.error.issues.map((issue) => issue.path)
+    ).toContainEqual(["search", "provider", "options", "appId"]);
   });
 
   it("requires a baseUrl for an openai-compatible Ask AI backend", () => {

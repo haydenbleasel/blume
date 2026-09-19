@@ -1,14 +1,13 @@
+import type { AlgoliaOptions } from "../adapters/algolia.ts";
 import type { SearchRecord } from "../documents.ts";
 
-export interface AlgoliaSyncConfig {
-  appId: string;
-  indexName: string;
-}
+/** The adapter options the sync reads (the public `apiKey` is never used). */
+export type AlgoliaSyncConfig = Pick<AlgoliaOptions, "appId" | "indexName">;
 
 /**
  * Upload the search records to Algolia. Uses the admin key from
- * `ALGOLIA_ADMIN_API_KEY` (never the config, which holds only the public,
- * search-only key). Throws on a missing key/config so the caller can warn.
+ * `ALGOLIA_ADMIN_API_KEY` (never the adapter options, which hold only the
+ * public, search-only key). Throws on a missing key so the caller can warn.
  *
  * Uses `replaceAllObjects`, which atomically replaces the index contents, so
  * pages deleted or renamed since the last sync don't linger as stale search
@@ -16,11 +15,8 @@ export interface AlgoliaSyncConfig {
  */
 export const syncAlgolia = async (
   records: SearchRecord[],
-  config: AlgoliaSyncConfig | undefined
+  config: AlgoliaSyncConfig
 ): Promise<void> => {
-  if (!config) {
-    throw new Error("search.algolia config is missing.");
-  }
   const adminKey = process.env.ALGOLIA_ADMIN_API_KEY;
   if (!adminKey) {
     throw new Error("ALGOLIA_ADMIN_API_KEY is not set.");

@@ -37,8 +37,10 @@ export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
     }
   }
 
-  if (config.search.provider === "mixedbread") {
-    requireSecret("Mixedbread search", "MIXEDBREAD_API_KEY");
+  // Each search adapter declares the secrets its generated runtime reads.
+  const { provider } = config.search;
+  for (const env of provider.requiredSecrets) {
+    requireSecret(`Search (${provider.kind})`, env);
   }
 
   // Adapters name their own secrets; the built-in analytics adapters ship

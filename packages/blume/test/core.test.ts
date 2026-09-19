@@ -158,7 +158,7 @@ describe("config schema", () => {
       },
     ]);
     expect(config.deployment.output).toBe("static");
-    expect(config.search.provider).toBe("orama");
+    expect(config.search.provider.kind).toBe("orama");
   });
 
   it("rejects unknown top-level keys", () => {

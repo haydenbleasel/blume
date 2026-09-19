@@ -48,6 +48,10 @@
       "types": "./dist/types/core/schema.d.ts",
       "default": "./src/core/schema.ts"
     },
+    "./search": {
+      "types": "./dist/types/search/adapters/index.d.ts",
+      "default": "./src/search/adapters/index.ts"
+    },
     "./runtime": "./src/runtime/index.ts",
     "./hooks": "./src/components/islands/hooks.ts",
     "./astro": "./src/astro/index.ts",
