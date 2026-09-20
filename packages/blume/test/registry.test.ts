@@ -54,6 +54,16 @@ describe("eject", () => {
       .find((line) => line.includes("await loadBlumeConfig"));
     expect(configLoad).toContain('"blume.config.ts"');
     expect(configLoad).not.toContain(root);
+
+    // The docs collection roots at the project-relative content dir, not the
+    // absolute path eject ran from.
+    const contentConfig = readFileSync(
+      join(root, "src", "content.config.ts"),
+      "utf-8"
+    );
+    expect(contentConfig).toContain('base: "docs"');
+    expect(contentConfig).not.toContain(root);
+    expect(contentConfig).not.toContain("file://");
   });
 
   it("promotes the runtime, writing every feature-gated file", async () => {

@@ -41,10 +41,12 @@ export default defineConfig({
 });
 ```
 
-The adapters are `filesystem()`, `mdxRemote()`, `githubReleases()`, `sanity()`, `notion()`, `obsidian()`, and `custom()`. Every adapter accepts two shared options:
+The adapters are `filesystem()`, `mdxRemote()`, `githubReleases()`, `sanity()`, `notion()`, `obsidian()`, and `custom()`. Every adapter that takes an options object accepts two shared options:
 
 - **`prefix`** namespaces the source's routes under `/<prefix>/…`, which also becomes the source's name in diagnostics and its cache directory. If two sources resolve to the same route, Blume reports a `BLUME_DUPLICATE_ROUTE` build error — give each source a distinct `prefix`.
 - **`pollInterval`** (seconds) makes a remote source re-fetch on that interval in dev, reloading only when the content actually changes. Leave it unset to fetch once and freeze for the session. Local sources (`filesystem()`, `obsidian()`) watch the filesystem instead and ignore it.
+
+`custom(source)` is the exception: it takes a `ContentSource` instance rather than an options object, so there is nothing to pass `prefix` or `pollInterval` to. The source sets its own `prefix` property, and re-fetching is whatever its `watch` method implements.
 
 An adapter's descriptor also declares the SDK it needs and the environment variables it reads, so the generated project declares that package, `blume dev` and `blume build` warn when a variable is unset, and `blume doctor` lists the configured sources. Options are validated when the config loads: a missing required option, an unknown key, or a leftover 1.x `{ type: "…" }` object fails with a message naming the fix.
 

@@ -55,7 +55,10 @@ import { buildIncludeGraph } from "../core/includes.ts";
 import { packageRoot } from "../core/package-root.ts";
 import { scanProject } from "../core/project-graph.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
-import { sourcesOfKind } from "../core/sources/collection.ts";
+import {
+  resolveDocsCollection,
+  sourcesOfKind,
+} from "../core/sources/collection.ts";
 import type { ProjectContext } from "../core/types.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import type { OpenApiData } from "../openapi/model.ts";
@@ -374,6 +377,14 @@ export const eject = async (
     outDir: ".",
     root: ".",
   };
+  // The `docs` collection resolves its base against the real project root and
+  // is then relativized like everything else, so the ejected content config
+  // never bakes in the absolute path `eject` happened to run from.
+  const docsCollection = resolveDocsCollection(config, root);
+  const relCollection = {
+    ...docsCollection,
+    base: toPosix(relative(root, docsCollection.base)),
+  };
 
   const componentsImport = context.componentsFile
     ? `../../${toPosix(relative(root, context.componentsFile))}`
@@ -437,6 +448,7 @@ export const eject = async (
     },
     {
       content: contentConfigTemplate({
+        collection: relCollection,
         config,
         context: relContext,
         staged: hasStaged,

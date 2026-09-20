@@ -304,7 +304,7 @@ describe("blumePackageJson", () => {
     // SAFETY: blumePackageJson emits a manifest whose dependencies block is
     // asserted on right below.
     const json = JSON.parse(
-      blumePackageJson("docs", { "@notionhq/client": "^2.2.15" })
+      blumePackageJson("docs", { "@notionhq/client": "^5.26.0" })
     ) as { dependencies: Record<string, string> };
     expect(Object.keys(json.dependencies)).toEqual([
       "@notionhq/client",
@@ -361,7 +361,7 @@ describe("buildPlan", () => {
       "/proj",
       answersWith({ sources: ["filesystem", "notion", "sanity"] })
     );
-    expect(pkg?.content).toContain('"@notionhq/client": "^2.2.15"');
+    expect(pkg?.content).toContain('"@notionhq/client": "^5.26.0"');
     expect(pkg?.content).toContain('"@sanity/client": "^7.25.0"');
   });
 

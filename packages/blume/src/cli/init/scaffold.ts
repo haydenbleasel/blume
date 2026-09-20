@@ -362,7 +362,7 @@ export default defineConfig({
 
 /** The version range `init` pins for each SDK an adapter declares. */
 const SDK_VERSIONS = new Map([
-  ["@notionhq/client", "^2.2.15"],
+  ["@notionhq/client", "^5.26.0"],
   ["@sanity/client", "^7.25.0"],
 ]);
 
