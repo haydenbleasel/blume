@@ -11,12 +11,30 @@ mock.module("@vercel/analytics", () => ({ track: vercelTrack }));
 
 const { track } = await import("../src/components/layout/analytics-client.ts");
 
+type Fn = ReturnType<typeof mock>;
+
 interface WindowStub {
+  _satellite?: { track?: Fn };
+  amplitude?: { track?: Fn };
+  analytics?: { track?: Fn };
+  clarity?: Fn;
+  dataLayer?: { push: Fn };
   dispatchEvent: (event: CustomEvent) => boolean;
-  gtag?: ReturnType<typeof mock>;
-  plausible?: ReturnType<typeof mock>;
-  posthog?: { capture?: ReturnType<typeof mock> };
+  fathom?: { trackEvent?: Fn };
+  gtag?: Fn;
+  heap?: { track?: Fn };
+  hj?: Fn;
+  htevents?: { track?: Fn };
+  LogRocket?: { track?: Fn };
+  mixpanel?: { track?: Fn };
+  pirsch?: Fn;
+  plausible?: Fn;
+  posthog?: { capture?: Fn };
 }
+
+const noop = () => {
+  // no-op
+};
 
 const setWindow = (stub: WindowStub): void => {
   // SAFETY: tests run without a DOM, so `globalThis.window` is free for the
@@ -43,32 +61,69 @@ describe("track", () => {
 
   it("fans the event out to every configured provider", () => {
     const dispatched: CustomEvent[] = [];
-    const capture = mock(() => {
-      // no-op
-    });
-    const gtag = mock(() => {
-      // no-op
-    });
-    const plausible = mock(() => {
-      // no-op
-    });
+    const fns = {
+      LogRocket: mock(noop),
+      _satellite: mock(noop),
+      amplitude: mock(noop),
+      analytics: mock(noop),
+      capture: mock(noop),
+      clarity: mock(noop),
+      dataLayer: mock(noop),
+      fathom: mock(noop),
+      gtag: mock(noop),
+      heap: mock(noop),
+      hj: mock(noop),
+      htevents: mock(noop),
+      mixpanel: mock(noop),
+      pirsch: mock(noop),
+      plausible: mock(noop),
+    };
     setWindow({
+      LogRocket: { track: fns.LogRocket },
+      _satellite: { track: fns._satellite },
+      amplitude: { track: fns.amplitude },
+      analytics: { track: fns.analytics },
+      clarity: fns.clarity,
+      dataLayer: { push: fns.dataLayer },
       dispatchEvent: (event) => {
         dispatched.push(event);
         return true;
       },
-      gtag,
-      plausible,
-      posthog: { capture },
+      fathom: { trackEvent: fns.fathom },
+      gtag: fns.gtag,
+      heap: { track: fns.heap },
+      hj: fns.hj,
+      htevents: { track: fns.htevents },
+      mixpanel: { track: fns.mixpanel },
+      pirsch: fns.pirsch,
+      plausible: fns.plausible,
+      posthog: { capture: fns.capture },
     });
 
     const props = { helpful: "yes", path: "/docs/intro", title: "Intro" };
     track("feedback", props);
 
     expect(vercelTrack).toHaveBeenCalledWith("feedback", props);
-    expect(capture).toHaveBeenCalledWith("feedback", props);
-    expect(gtag).toHaveBeenCalledWith("event", "feedback", props);
-    expect(plausible).toHaveBeenCalledWith("feedback", { props });
+    // Queued SDK objects take the name and the properties.
+    for (const sdk of [
+      fns.capture,
+      fns.mixpanel,
+      fns.heap,
+      fns.analytics,
+      fns.htevents,
+      fns.amplitude,
+      fns.LogRocket,
+      fns._satellite,
+    ]) {
+      expect(sdk).toHaveBeenCalledWith("feedback", props);
+    }
+    expect(fns.gtag).toHaveBeenCalledWith("event", "feedback", props);
+    expect(fns.dataLayer).toHaveBeenCalledWith({ ...props, event: "feedback" });
+    expect(fns.plausible).toHaveBeenCalledWith("feedback", { props });
+    expect(fns.fathom).toHaveBeenCalledWith("feedback");
+    expect(fns.pirsch).toHaveBeenCalledWith("feedback", { meta: props });
+    expect(fns.clarity).toHaveBeenCalledWith("event", "feedback");
+    expect(fns.hj).toHaveBeenCalledWith("event", "feedback");
     expect(dispatched).toHaveLength(1);
     expect(dispatched[0]?.type).toBe("blume:track");
     expect(dispatched[0]?.detail).toEqual({ event: "feedback", props });

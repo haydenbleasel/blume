@@ -55,11 +55,13 @@ export const cloudflare = (options: CloudflareOptions): CloudflareAdapter => ({
  * option object as its `data-cf-beacon` JSON. The beacon tracks history
  * changes itself, so client-router navigations need no extra hook.
  */
-export const cloudflareHead = (options: CloudflareOptions): HeadScript => ({
-  attributes: {
-    "data-cf-beacon": JSON.stringify(options),
-    defer: true,
-    src: CLOUDFLARE_BEACON_SRC,
+export const cloudflareHead = (options: CloudflareOptions): HeadScript[] => [
+  {
+    attributes: {
+      "data-cf-beacon": JSON.stringify(options),
+      defer: true,
+      src: CLOUDFLARE_BEACON_SRC,
+    },
+    content: null,
   },
-  content: null,
-});
+];

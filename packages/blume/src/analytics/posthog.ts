@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AdapterDescriptor, JsonValue } from "../core/adapter.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
 import type { HeadScript } from "./head.ts";
+import { inlineJson, spaPageviews } from "./inline.ts";
 
 /** PostHog Cloud US, the ingestion host `posthog()` uses when `host` is unset. */
 export const POSTHOG_DEFAULT_HOST = "https://us.i.posthog.com";
@@ -53,29 +54,25 @@ export const posthog = (options: PosthogOptions): PosthogAdapter => ({
 const POSTHOG_LOADER =
   '!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug getPageViewId captureTraceFeedback captureTraceMetric".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);';
 
-// PostHog's loader only captures a pageview per real page load, but the client
-// router turns link clicks into in-place swaps — capture those too, keyed off
-// `astro:page-load` with a path-plus-query guard so the initial load (which
-// the loader already counted) and same-page hash moves aren't double-counted,
-// while a query-only navigation (`?tab=a` → `?tab=b`) still is.
-const POSTHOG_SPA_PAGEVIEWS =
-  'document.addEventListener("astro:page-load",function(){var p=window.__blumePhPath,c=location.pathname+location.search;window.__blumePhPath=c;if(p!==undefined&&p!==c){posthog.capture("$pageview");}});';
-
-// `JSON.stringify` leaves `<` alone, so a value like `</script>` would end the
-// inline script element; escape it the way the layouts do for their JSON.
-const inlineJson = (value: JsonValue): string =>
-  JSON.stringify(value).replaceAll("<", "\\u003c");
+// PostHog's loader only captures a pageview per real page load, so the client
+// router's in-place swaps are captured here.
+const POSTHOG_SPA_PAGEVIEWS = spaPageviews(
+  "__blumePosthogPath",
+  'posthog.capture("$pageview");'
+);
 
 /**
  * The inline loader-plus-init snippet. `key` and `host` are the options Blume
  * maps (`host` becomes `api_host`); everything else lands in `posthog.init`'s
  * options verbatim, after the mapped host so a raw `api_host` still wins.
  */
-export const posthogHead = (options: PosthogOptions): HeadScript => {
+export const posthogHead = (options: PosthogOptions): HeadScript[] => {
   const { host, key, ...init } = options;
   const initOptions = { api_host: host ?? POSTHOG_DEFAULT_HOST, ...init };
-  return {
-    attributes: {},
-    content: `${POSTHOG_LOADER}posthog.init(${inlineJson(key)},${inlineJson(initOptions)});${POSTHOG_SPA_PAGEVIEWS}`,
-  };
+  return [
+    {
+      attributes: {},
+      content: `${POSTHOG_LOADER}posthog.init(${inlineJson(key)},${inlineJson(initOptions)});${POSTHOG_SPA_PAGEVIEWS}`,
+    },
+  ];
 };

@@ -47,14 +47,14 @@ export const script = (options: ScriptOptions): ScriptAdapter => ({
 });
 
 /** The tag. Explicit `src`/`strategy` win over a same-named spread attribute. */
-export const scriptHead = (options: ScriptOptions): HeadScript => {
+export const scriptHead = (options: ScriptOptions): HeadScript[] => {
   const attributes: HeadScript["attributes"] = { ...options.attributes };
   if (!options.src) {
-    return { attributes, content: options.content ?? "" };
+    return [{ attributes, content: options.content ?? "" }];
   }
   if (options.strategy) {
     attributes[options.strategy] = true;
   }
   attributes.src = options.src;
-  return { attributes, content: null };
+  return [{ attributes, content: null }];
 };

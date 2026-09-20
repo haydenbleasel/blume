@@ -1,7 +1,22 @@
+import { adobeHead } from "./adobe.ts";
+import { amplitudeHead } from "./amplitude.ts";
+import { clarityHead } from "./clarity.ts";
+import { clearbitHead } from "./clearbit.ts";
 import { cloudflareHead } from "./cloudflare.ts";
+import { fathomHead } from "./fathom.ts";
+import { googleAnalyticsHead } from "./google-analytics.ts";
+import { googleTagManagerHead } from "./google-tag-manager.ts";
+import { heapHead } from "./heap.ts";
+import { hightouchHead } from "./hightouch.ts";
+import { hotjarHead } from "./hotjar.ts";
+import { logrocketHead } from "./logrocket.ts";
+import { mixpanelHead } from "./mixpanel.ts";
+import { pirschHead } from "./pirsch.ts";
+import { plausibleHead } from "./plausible.ts";
 import { posthogHead } from "./posthog.ts";
 import type { AnalyticsAdapter } from "./schema.ts";
 import { scriptHead } from "./script.ts";
+import { segmentHead } from "./segment.ts";
 import type { VercelOptions } from "./vercel.ts";
 
 /** One `<script>` tag an adapter emits into `<head>`. */
@@ -26,11 +41,75 @@ export type HeadNode =
   | { props: VercelOptions; type: "vercel" };
 
 /**
- * Map the configured adapters to what `Analytics.astro` renders, one node per
- * adapter in declared order. Each adapter module owns its snippet; this is the
- * one place that branches on `kind`. A second `vercel()` is dropped — two
- * copies of the component would count every pageview twice — so the first one
- * keeps its position.
+ * The tags one adapter emits. Each adapter module owns its snippet; this is
+ * the one place that branches on `kind`. A provider whose install snippet is
+ * two tags (an SDK plus its init call) emits two.
+ */
+const adapterScripts = (
+  adapter: Exclude<AnalyticsAdapter, { kind: "vercel" }>
+): HeadScript[] => {
+  switch (adapter.kind) {
+    case "adobe": {
+      return adobeHead(adapter.options);
+    }
+    case "amplitude": {
+      return amplitudeHead(adapter.options);
+    }
+    case "clarity": {
+      return clarityHead(adapter.options);
+    }
+    case "clearbit": {
+      return clearbitHead(adapter.options);
+    }
+    case "cloudflare": {
+      return cloudflareHead(adapter.options);
+    }
+    case "fathom": {
+      return fathomHead(adapter.options);
+    }
+    case "google-analytics": {
+      return googleAnalyticsHead(adapter.options);
+    }
+    case "google-tag-manager": {
+      return googleTagManagerHead(adapter.options);
+    }
+    case "heap": {
+      return heapHead(adapter.options);
+    }
+    case "hightouch": {
+      return hightouchHead(adapter.options);
+    }
+    case "hotjar": {
+      return hotjarHead(adapter.options);
+    }
+    case "logrocket": {
+      return logrocketHead(adapter.options);
+    }
+    case "mixpanel": {
+      return mixpanelHead(adapter.options);
+    }
+    case "pirsch": {
+      return pirschHead(adapter.options);
+    }
+    case "plausible": {
+      return plausibleHead(adapter.options);
+    }
+    case "posthog": {
+      return posthogHead(adapter.options);
+    }
+    case "segment": {
+      return segmentHead(adapter.options);
+    }
+    default: {
+      return scriptHead(adapter.options);
+    }
+  }
+};
+
+/**
+ * Map the configured adapters to what `Analytics.astro` renders, in declared
+ * order. A second `vercel()` is dropped — two copies of the component would
+ * count every pageview twice — so the first one keeps its position.
  */
 export const analyticsHead = (adapters: AnalyticsAdapter[]): HeadNode[] => {
   const nodes: HeadNode[] = [];
@@ -41,12 +120,10 @@ export const analyticsHead = (adapters: AnalyticsAdapter[]): HeadNode[] => {
         hasVercel = true;
         nodes.push({ props: adapter.options, type: "vercel" });
       }
-    } else if (adapter.kind === "cloudflare") {
-      nodes.push({ ...cloudflareHead(adapter.options), type: "script" });
-    } else if (adapter.kind === "posthog") {
-      nodes.push({ ...posthogHead(adapter.options), type: "script" });
     } else {
-      nodes.push({ ...scriptHead(adapter.options), type: "script" });
+      for (const tag of adapterScripts(adapter)) {
+        nodes.push({ ...tag, type: "script" });
+      }
     }
   }
   return nodes;

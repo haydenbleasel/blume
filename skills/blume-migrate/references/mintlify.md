@@ -35,8 +35,23 @@ Resolve `$ref` includes first (Mintlify splits config across files). Map only wh
 | `seo.metatags` | **drop** | no equivalent; use per-page `seo` frontmatter |
 | `seo.indexing: "all"` | `search.indexing.includeHiddenPages: true` |  |
 | `variables` (`{{name}}`) | **inline into content** | Blume has no runtime `{{var}}` substitution — replace each `{{name}}` with its value in the pages |
-| `integrations.posthog` (`{ apiKey, apiHost }`) | `posthog({ key, host })` in the `analytics` list | preserve the host verbatim (e.g. `us.posthog.com` — Blume's default is `us.i.posthog.com`); import the adapter from `blume/analytics` |
-| `integrations` (GA, Plausible, Fathom, …) | `script({ src, strategy, attributes })` / `vercel()` in the `analytics` list | one `script()` adapter per provider; no first-class mapping beyond PostHog/Vercel/Cloudflare |
+| `integrations.posthog` (`{ apiKey, apiHost, sessionRecording }`) | `posthog({ key, host })` in the `analytics` list | preserve the host verbatim (e.g. `us.posthog.com` — Blume's default is `us.i.posthog.com`); `sessionRecording: false` → `disable_session_recording: true`; every adapter is imported from `blume/analytics` |
+| `integrations.ga4` (`{ measurementId }`) | `googleAnalytics({ id })` |  |
+| `integrations.gtm` (`{ tagId }`) | `googleTagManager({ id })` |  |
+| `integrations.plausible` (`{ domain, server }`) | `plausible({ domain, host })` | `server` is a bare hostname; `host` is an origin — prepend `https://` |
+| `integrations.fathom` (`{ siteId }`) | `fathom({ site })` |  |
+| `integrations.pirsch` (`{ id }`) | `pirsch({ code })` |  |
+| `integrations.mixpanel` (`{ projectToken, region }`) | `mixpanel({ token, region })` |  |
+| `integrations.amplitude` (`{ apiKey }`) | `amplitude({ key })` |  |
+| `integrations.segment` (`{ key, cdnUrl }`) | `segment({ key, cdn })` |  |
+| `integrations.hightouch` (`{ writeKey, apiHost }`) | `hightouch({ key, host })` |  |
+| `integrations.heap` (`{ appId }`) | `heap({ id })` |  |
+| `integrations.hotjar` (`{ hjid, hjsv }`) | `hotjar({ id, version })` | both numbers |
+| `integrations.clarity` (`{ projectId }`) | `clarity({ id })` |  |
+| `integrations.logrocket` (`{ apiKey }`) | `logrocket({ id })` |  |
+| `integrations.clearbit` (`{ publicApiKey }`) | `clearbit({ key })` |  |
+| `integrations.adobe` (`{ launchUrl }`) | `adobe({ url })` |  |
+| any other `integrations` script | `script({ src, strategy, attributes })` / `vercel()` in the `analytics` list | one `script()` adapter per provider without a factory |
 | `contextual` (`["copy","chatgpt","claude",…]`) | **mostly free** | Copy-as-Markdown and Open-in-chat are default page actions; `mcp` needs `ai.mcp.enabled` + server output (report as a follow-up) |
 | `redirects` | `redirects: [{ from, to }]` | static only — see below |
 | `navigation.languages` | `i18n` | see i18n below |

@@ -1,20 +1,20 @@
 ---
 title: Analytics
-description: First-party web analytics — PostHog, Vercel Web Analytics, Cloudflare Web Analytics, or any custom script — as adapters in blume.config.ts.
+description: First-party web analytics — PostHog, Google Analytics, Plausible, Mixpanel, Segment, and a dozen more — as adapters in blume.config.ts.
 ---
 
-Blume injects analytics for you from an `analytics` list in `blume.config.ts`. Each entry is an adapter imported from `blume/analytics`: `posthog()`, `vercel()`, and `cloudflare()` are first-class, and `script()` covers every other provider — Plausible, Fathom, Google Analytics, Umami, and the rest.
+Blume injects analytics for you from an `analytics` list in `blume.config.ts`. Each entry is an adapter imported from `blume/analytics`: one per provider, plus `script()` for anything without one.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
-import { cloudflare, posthog, script, vercel } from "blume/analytics";
+import { googleAnalytics, plausible, posthog, vercel } from "blume/analytics";
 
 export default defineConfig({
   analytics: [
     posthog({ key: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }),
     vercel(),
-    cloudflare({ token: "0123456789abcdef0123456789abcdef" }),
-    script({ src: "https://plausible.io/js/script.js", strategy: "defer" }),
+    googleAnalytics({ id: "G-XXXXXXXXXX" }),
+    plausible({ domain: "docs.example.com" }),
   ],
 });
 ```
@@ -26,6 +26,34 @@ Analytics loads in **production builds only**. The scripts are emitted by `blume
 :::note
 Analytics is opt-in. With no `analytics` list (or an empty one), Blume injects nothing.
 :::
+
+Every identifier below — a project key, a measurement ID, a site token — is the public, browser-side one from the provider's own install snippet. Each adapter renders that snippet, so it's safe to commit to your docs repository; Blume never asks for a secret.
+
+## Adapters
+
+| Adapter | Provider | Required |
+| --- | --- | --- |
+| `adobe()` | [Adobe Analytics](#adobe-analytics) | `url` |
+| `amplitude()` | [Amplitude](#amplitude) | `key` |
+| `clarity()` | [Microsoft Clarity](#microsoft-clarity) | `id` |
+| `clearbit()` | [Clearbit](#clearbit) | `key` |
+| `cloudflare()` | [Cloudflare Web Analytics](#cloudflare-web-analytics) | `token` |
+| `fathom()` | [Fathom](#fathom) | `site` |
+| `googleAnalytics()` | [Google Analytics 4](#google-analytics-4) | `id` |
+| `googleTagManager()` | [Google Tag Manager](#google-tag-manager) | `id` |
+| `heap()` | [Heap](#heap) | `id` |
+| `hightouch()` | [Hightouch](#hightouch) | `key` |
+| `hotjar()` | [Hotjar](#hotjar) | `id` |
+| `logrocket()` | [LogRocket](#logrocket) | `id` |
+| `mixpanel()` | [Mixpanel](#mixpanel) | `token` |
+| `pirsch()` | [Pirsch](#pirsch) | `code` |
+| `plausible()` | [Plausible](#plausible) | `domain` |
+| `posthog()` | [PostHog](#posthog) | `key` |
+| `segment()` | [Segment](#segment) | `key` |
+| `vercel()` | [Vercel Web Analytics](#vercel-web-analytics) | — |
+| `script()` | [Anything else](#custom-scripts) | `src` or `content` |
+
+Blume's docs use a client-side router, so most navigation is an in-page swap rather than a full page load. Every adapter counts those as pageviews: providers whose script follows history changes on its own need nothing extra, and for the ones that only count real loads (PostHog, Segment, Hightouch) Blume sends the pageview itself. The two exceptions are the tag managers — [Google Tag Manager](#google-tag-manager) and [Adobe](#adobe-analytics) load a container whose own rules decide what fires, so give it a history-change trigger.
 
 ## PostHog
 
@@ -40,9 +68,7 @@ analytics: [
 ];
 ```
 
-`key` and `host` are the two options Blume maps (`host` becomes `api_host`). Anything else you pass — `persistence`, `capture_pageview`, `autocapture`, and every other `posthog.init` option — is forwarded to `posthog.init` verbatim.
-
-The project API key is safe to ship to the browser — it's a public, write-only key. Client-router navigations are captured as pageviews, so in-page link clicks count without extra wiring.
+`key` and `host` are the two options Blume maps (`host` becomes `api_host`). Anything else you pass — `persistence`, `capture_pageview`, `autocapture`, `disable_session_recording`, and every other `posthog.init` option — is forwarded to `posthog.init` verbatim.
 
 ## Vercel Web Analytics
 
@@ -70,25 +96,240 @@ analytics: [
 ];
 ```
 
-The token is safe to ship to the browser — it only identifies the site. The whole option object becomes the beacon's `data-cf-beacon` JSON, so any other beacon setting (`spa`, …) passes straight through. The beacon tracks history changes on its own, so client-router navigations count without any extra wiring.
+The whole option object becomes the beacon's `data-cf-beacon` JSON, so any other beacon setting (`spa`, …) passes straight through.
 
-## Custom scripts
+## Google Analytics 4
 
-Use `script()` to load any other analytics provider. Each adapter renders one `<script>` tag and must set **exactly one** of `src` (external) or `content` (inline).
+Pass the **measurement ID** of your GA4 web data stream (`G-…`, under the stream's details in the property's Admin → Data Streams) to `googleAnalytics()`. Blume renders the Google tag exactly as the stream's install instructions do: the async `gtag.js` loader plus the `dataLayer` bootstrap and `config` call.
 
 ```ts blume.config.ts lineNumbers
 analytics: [
-  // Plausible
-  script({
-    src: "https://plausible.io/js/script.js",
-    strategy: "defer",
-    attributes: { "data-domain": "example.com" },
+  googleAnalytics({
+    id: "G-XXXXXXXXXX",
+    anonymize_ip: true, // optional: any other `config` parameter
   }),
-  // Fathom
+];
+```
+
+`id` is the one option Blume maps. Anything else you pass rides on the `gtag('config', …)` call verbatim (`send_page_view`, `cookie_domain`, `debug_mode`, …). GA4's enhanced measurement counts history changes as page views by default, so client-side navigations are tracked without any extra setup. Google Analytics takes a day or two to show new data; the [Google Analytics Debugger](https://chrome.google.com/webstore/detail/google-analytics-debugger/jnkmfdileelhofjcijamephohjechhna) extension shows requests as they happen.
+
+## Google Tag Manager
+
+Pass your **container ID** (`GTM-…`, shown in the workspace header) to `googleTagManager()`. Blume renders the `<head>` half of the container snippet; the `<noscript>` iframe is for browsers without JavaScript, which never run analytics anyway.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  googleTagManager({
+    id: "GTM-XXXXXXX",
+    dataLayer: "dataLayer", // optional, this is the default
+  }),
+];
+```
+
+Which tags fire, and on what, is the container's configuration. Client-side navigations reach the container as history changes, so fire pageview tags from a **History Change** trigger rather than the page-load one. Cookie consent banners are yours to set up in the container too.
+
+## Plausible
+
+Pass the **domain** you added in [Plausible](https://plausible.io) to `plausible()`. For a self-hosted or proxied instance, set `host` to its origin; the default is Plausible Cloud.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  plausible({
+    domain: "docs.example.com",
+    host: "https://plausible.example.com", // optional, defaults to https://plausible.io
+  }),
+];
+```
+
+`domain` becomes `data-domain` and `host` picks where `/js/script.js` loads from. Any other option becomes its own `data-` attribute on the tag (`api: "/api/event"` → `data-api`). Script variants with extra behavior baked into the filename (`script.outbound-links.js`, …) are a different tag; load those with [`script()`](#custom-scripts).
+
+## Fathom
+
+Pass your **site ID** (from the site's script settings in [Fathom](https://usefathom.com)) to `fathom()`.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  fathom({
+    site: "ABCDEFGH",
+    "honor-dnt": "true", // optional: any other `data-` setting
+  }),
+];
+```
+
+`site` becomes `data-site`. Any other option becomes its own `data-` attribute on the tag (`spa`, `honor-dnt`, `excluded-domains`, `canonical`, …), as strings.
+
+## Pirsch
+
+Pass your **identification code** (Settings → Developer → Identification Code in [Pirsch](https://pirsch.io)) to `pirsch()`.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  pirsch({
+    code: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  }),
+];
+```
+
+`code` becomes `data-code`, and Blume gives the tag the `pianjs` id Pirsch's script finds itself by. Any other option becomes its own `data-` attribute (`dev`, `exclude`, `include`, `domain`, `endpoint`, …).
+
+## Mixpanel
+
+Pass your **project token** (project settings → Access Keys in [Mixpanel](https://mixpanel.com)) to `mixpanel()`. If the project uses EU or India data residency, set `region` to match, or Mixpanel drops the events.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  mixpanel({
+    token: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    region: "eu", // optional: "us" (default), "eu", or "in"
+  }),
+];
+```
+
+`token` and `region` are the options Blume maps (`region` becomes `api_host`). Blume also sets `track_pageview` to `"url-with-path-and-query-string"`, so the library tracks each navigation itself. Anything else you pass — including `track_pageview` — is forwarded to `mixpanel.init` verbatim (`persistence`, `autocapture`, `record_sessions_percent`, …).
+
+## Amplitude
+
+Pass your **project API key** (project settings in [Amplitude](https://amplitude.com)) to `amplitude()`. Blume renders the Browser SDK's script-loader snippet: the keyed SDK bundle plus the `init` call.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  amplitude({
+    key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    serverZone: "EU", // optional: any other `init` option
+  }),
+];
+```
+
+`key` is the one option Blume maps. The `init` options start from what the dashboard snippet ships — `autocapture: true` and `fetchRemoteConfig: true` — and anything else you pass is merged over them verbatim. Autocapture covers page views and history changes, so client-side navigations count.
+
+## Segment
+
+Pass the **write key** of your JavaScript source in [Segment](https://segment.com) to `segment()`. If you serve analytics.js from a [custom domain](https://segment.com/docs/connections/custom-domain/) to sidestep ad blockers, set `cdn` to that origin.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  segment({
+    key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    cdn: "https://cdn.example.com", // optional, defaults to https://cdn.segment.com
+  }),
+];
+```
+
+`key` and `cdn` are the options Blume maps: the snippet loads the library from `cdn` and tells it to fetch its integrations from there too. Anything else you pass is forwarded as the `analytics.load` options verbatim (`integrations`, …).
+
+## Hightouch
+
+Pass the **write key** of your event source in [Hightouch](https://hightouch.com) to `hightouch()`. The events API host defaults to the US East region; set `host` (without a scheme) if your workspace uses another.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  hightouch({
+    key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    host: "us-east-1.hightouch-events.com", // optional, this is the default
+  }),
+];
+```
+
+`key` and `host` are the options Blume maps (`host` becomes `apiHost`). Anything else you pass is forwarded as the `htevents.load` options verbatim.
+
+## Heap
+
+Pass your **app ID** (the environment ID under the project's install settings in [Heap](https://heap.io)) to `heap()`.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  heap({
+    id: "1234567890",
+    disableTextCapture: true, // optional: any other `heap.load` option
+  }),
+];
+```
+
+`id` is the one option Blume maps. Anything else you pass becomes the config object of `heap.load` verbatim.
+
+## Hotjar
+
+Pass your **site ID** (the number in the site's tracking code in [Hotjar](https://hotjar.com)) to `hotjar()`.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  hotjar({
+    id: 1234567,
+    version: 6, // optional, this is the default
+  }),
+];
+```
+
+`id` is `hjid` and `version` is `hjsv` in Hotjar's tracking code; the adapter takes nothing else.
+
+## Microsoft Clarity
+
+Pass your **project ID** (from the project's tracking code in [Clarity](https://clarity.microsoft.com)) to `clarity()`.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  clarity({
+    id: "xxxxxxxxxx",
+  }),
+];
+```
+
+The adapter takes nothing else; Clarity's settings live in its dashboard.
+
+## LogRocket
+
+Pass your **app ID** (`org/app`, from the project settings in [LogRocket](https://logrocket.com)) to `logrocket()`. Blume renders the install snippet: the SDK plus the guarded `LogRocket.init` call.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  logrocket({
+    id: "your-org/your-app",
+    release: "1.2.0", // optional: any other `init` option
+  }),
+];
+```
+
+`id` is the one option Blume maps. Anything else you pass is forwarded to `LogRocket.init` verbatim (`release`, `console`, `network`, `dom`, …). A request or response sanitizer is a function and can't travel through config; for those, drop the adapter and call `LogRocket.init` yourself from a [`script()`](#custom-scripts) adapter.
+
+## Clearbit
+
+Pass your **publishable API key** (`pk_…`) to `clearbit()`. Blume renders the Clearbit tag, which loads whatever tags — Reveal, forms — you manage in Clearbit.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  clearbit({
+    key: "pk_xxxxxxxxxxxxxxxx",
+  }),
+];
+```
+
+The adapter takes nothing else.
+
+## Adobe Analytics
+
+Pass the **embed script URL** of your Launch (Adobe Experience Platform Tags) environment to `adobe()`. Copy it from the environment's install instructions under Environments in Data Collection; the production one looks like `https://assets.adobedtm.com/…/launch-….min.js`.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  adobe({
+    url: "https://assets.adobedtm.com/xxxxxxxx/launch-xxxxxxxx.min.js",
+  }),
+];
+```
+
+Blume loads the script asynchronously; what it tracks is the property's rules. Client-side navigations don't reload the page, so give the property a rule on history changes (or call `_satellite.track` from a [`script()`](#custom-scripts) adapter).
+
+## Custom scripts
+
+Use `script()` to load any provider without an adapter, or a provider's tag in a form its adapter doesn't render. Each one renders one `<script>` tag and must set **exactly one** of `src` (external) or `content` (inline).
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  // Umami
   script({
-    src: "https://cdn.usefathom.com/script.js",
+    src: "https://cloud.umami.is/script.js",
     strategy: "defer",
-    attributes: { "data-site": "ABCDEFG" },
+    attributes: { "data-website-id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
   }),
   // An inline snippet
   script({
@@ -103,15 +344,48 @@ analytics: [
 
 | Adapter | Option | Default | Description |
 | --- | --- | --- | --- |
+| `adobe()` | `url` | — | Launch environment embed script URL. Required. |
+| `amplitude()` | `key` | — | Amplitude project API key. Required. |
+| `amplitude()` | anything else | `autocapture: true`, `fetchRemoteConfig: true` | Merged into the `amplitude.init` options verbatim. |
+| `clarity()` | `id` | — | Clarity project ID. Required. |
+| `clearbit()` | `key` | — | Clearbit publishable API key. Required. |
+| `cloudflare()` | `token` | — | Cloudflare Web Analytics site token (manual setup). Required. |
+| `cloudflare()` | anything else | — | Forwarded in the beacon's `data-cf-beacon` JSON verbatim. |
+| `fathom()` | `site` | — | Fathom site ID. Required. |
+| `fathom()` | anything else | — | Rendered as a `data-` attribute on the tag. |
+| `googleAnalytics()` | `id` | — | GA4 measurement ID. Required. |
+| `googleAnalytics()` | anything else | — | Forwarded on the `gtag('config', …)` call verbatim. |
+| `googleTagManager()` | `id` | — | Tag Manager container ID. Required. |
+| `googleTagManager()` | `dataLayer` | `dataLayer` | Name of the data layer global the container reads. |
+| `heap()` | `id` | — | Heap app ID. Required. |
+| `heap()` | anything else | — | Forwarded as the `heap.load` config verbatim. |
+| `hightouch()` | `key` | — | Hightouch event source write key. Required. |
+| `hightouch()` | `host` | `us-east-1.hightouch-events.com` | Events API host, without a scheme. |
+| `hightouch()` | anything else | — | Forwarded as the `htevents.load` options verbatim. |
+| `hotjar()` | `id` | — | Hotjar site ID (`hjid`). Required. |
+| `hotjar()` | `version` | `6` | Tracking-code version (`hjsv`). |
+| `logrocket()` | `id` | — | LogRocket app ID (`org/app`). Required. |
+| `logrocket()` | anything else | — | Forwarded to `LogRocket.init` verbatim. |
+| `mixpanel()` | `token` | — | Mixpanel project token. Required. |
+| `mixpanel()` | `region` | `us` | Data residency region: `us`, `eu`, or `in`. |
+| `mixpanel()` | anything else | `track_pageview: "url-with-path-and-query-string"` | Merged into the `mixpanel.init` options verbatim. |
+| `pirsch()` | `code` | — | Pirsch identification code. Required. |
+| `pirsch()` | anything else | — | Rendered as a `data-` attribute on the tag. |
+| `plausible()` | `domain` | — | The site's domain in Plausible. Required. |
+| `plausible()` | `host` | `https://plausible.io` | Origin of a self-hosted or proxied instance. |
+| `plausible()` | anything else | — | Rendered as a `data-` attribute on the tag. |
 | `posthog()` | `key` | — | PostHog project API key. Required. |
 | `posthog()` | `host` | `https://us.i.posthog.com` | PostHog ingestion host (EU Cloud or self-hosted). |
 | `posthog()` | anything else | — | Forwarded to `posthog.init` verbatim. |
+| `segment()` | `key` | — | Segment source write key. Required. |
+| `segment()` | `cdn` | `https://cdn.segment.com` | Origin of a custom domain proxying Segment's CDN. |
+| `segment()` | anything else | — | Forwarded as the `analytics.load` options verbatim. |
 | `vercel()` | `mode`, `debug`, … | — | Forwarded to the official Astro component as props. |
-| `cloudflare()` | `token` | — | Cloudflare Web Analytics site token (manual setup). Required. |
-| `cloudflare()` | anything else | — | Forwarded in the beacon's `data-cf-beacon` JSON verbatim. |
 | `script()` | `src` | — | External script URL. Mutually exclusive with `content`. |
 | `script()` | `content` | — | Inline script body. Mutually exclusive with `src`. |
 | `script()` | `strategy` | — | `async` or `defer` for an external script. |
 | `script()` | `attributes` | — | Extra HTML attributes spread onto the `<script>` tag. |
 
-Custom events sent through Blume's page feedback reach every configured adapter that has a client API. For deploying your built site, see [Deployment](/docs/deployment).
+## Custom events
+
+Blume's page feedback sends a custom event through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Fathom, Pirsch, Clarity, Hotjar, and Vercel. Cloudflare and Clearbit have no event API. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. For deploying your built site, see [Deployment](/docs/deployment).
