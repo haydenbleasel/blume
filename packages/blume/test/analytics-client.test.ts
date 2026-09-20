@@ -89,4 +89,50 @@ describe("track", () => {
     expect(vercelTrack).toHaveBeenCalledTimes(1);
     expect(dispatched).toHaveLength(1);
   });
+
+  it("isolates a provider that throws from the rest and the caller", () => {
+    // A consent shim that stubs `gtag` with a raise must neither starve
+    // Plausible and the custom event nor surface in the feedback handler.
+    const dispatched: CustomEvent[] = [];
+    const plausible = mock(() => {
+      // no-op
+    });
+    setWindow({
+      dispatchEvent: (event) => {
+        dispatched.push(event);
+        return true;
+      },
+      gtag: mock(() => {
+        throw new Error("consent blocked");
+      }),
+      plausible,
+    });
+
+    expect(() => track("feedback", { helpful: "yes" })).not.toThrow();
+    expect(plausible).toHaveBeenCalledTimes(1);
+    expect(dispatched).toHaveLength(1);
+  });
+
+  it("keeps local properties off the providers and on the custom event", () => {
+    const dispatched: CustomEvent[] = [];
+    const capture = mock(() => {
+      // no-op
+    });
+    setWindow({
+      dispatchEvent: (event) => {
+        dispatched.push(event);
+        return true;
+      },
+      posthog: { capture },
+    });
+
+    track("ask", { path: "/x" }, { question: "sk-live-… returns 401?" });
+
+    expect(vercelTrack).toHaveBeenCalledWith("ask", { path: "/x" });
+    expect(capture).toHaveBeenCalledWith("ask", { path: "/x" });
+    expect(dispatched[0]?.detail).toEqual({
+      event: "ask",
+      props: { path: "/x", question: "sk-live-… returns 401?" },
+    });
+  });
 });
