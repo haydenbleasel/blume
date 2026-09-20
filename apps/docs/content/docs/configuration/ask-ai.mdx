@@ -245,7 +245,7 @@ With an [analytics provider](/docs/configuration/analytics) configured, the assi
 | `ask_answer` | The answer finishes streaming | `question`, `path`, `ms`, `chars` |
 | `ask_error` | The request fails or returns an error | `question`, `path`, `ms`, `status` (the HTTP status; `0` for no response) |
 
-`path` is the page the reader asked from, `ms` the time from sending the question to the last chunk, and `chars` the answer's length. Clearing the conversation mid-answer reports neither outcome. The question text travels with the event, so it reaches every provider you configure. A custom chat UI built on `useAskAI` from `blume/hooks` reports the same events, and with no provider configured the calls are no-ops.
+`path` is the page the reader asked from, `ms` the time from sending the question to the last chunk, and `chars` the answer's length. Clearing the conversation mid-answer reports neither outcome. The question text travels with the event, so it reaches every provider you configure. A custom chat UI built on `useAskAI` from `blume/hooks` reports the same events. With no provider configured the built-in provider calls are no-ops, but the `blume:track` DOM event still fires, so a custom integration listening for it receives them.
 
 ## Rate limiting
 
