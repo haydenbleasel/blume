@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-Publish an AI Catalog / ARD (Agentic Resource Discovery) manifest at `/.well-known/ai-catalog.json`, mirrored at `/.well-known/ard.json`, so agent registries can index a site's agent-facing resources from its domain alone. The catalog is generated from what the site already publishes: the MCP server card, each agent skill, the JSON docs API's OpenAPI document, each rendered API reference, and `llms.txt`, each with a domain-anchored `urn:air:` identifier, media type, and representative queries for semantic search. It's on by default whenever a `deployment.site` is configured; `ai.catalog: false` turns it off, and `ai.catalog.queries` replaces the generated queries for any entry. The manifest is advertised through the homepage `Link` header, the `<link rel="ai-catalog">` and `<link rel="ard">` in every page's head, `llms.txt`, and `agent-readability.json`, and every `.well-known` discovery document (the catalog, the RFC 9727 API catalog, the MCP discovery files) now carries `Access-Control-Allow-Origin: *` on Netlify, Cloudflare, and Vercel so registries can fetch them cross-origin.

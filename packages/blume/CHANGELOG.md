@@ -1,5 +1,15 @@
 # blume
 
+## 1.7.3
+
+### Patch Changes
+
+- afbe83b: Publish an AI Catalog / ARD (Agentic Resource Discovery) manifest at `/.well-known/ai-catalog.json`, mirrored at `/.well-known/ard.json`, so agent registries can index a site's agent-facing resources from its domain alone. The catalog is generated from what the site already publishes: the MCP server card, each agent skill, the JSON docs API's OpenAPI document, each rendered API reference, and `llms.txt`, each with a domain-anchored `urn:air:` identifier, media type, and representative queries for semantic search. It's on by default whenever a `deployment.site` is configured; `ai.catalog: false` turns it off, and `ai.catalog.queries` replaces the generated queries for any entry. The manifest is advertised through the homepage `Link` header, the `<link rel="ai-catalog">` and `<link rel="ard">` in every page's head, `llms.txt`, and `agent-readability.json`, and every `.well-known` discovery document (the catalog, the RFC 9727 API catalog, the MCP discovery files) now carries `Access-Control-Allow-Origin: *` on Netlify, Cloudflare, and Vercel so registries can fetch them cross-origin.
+- 89b7618: Report Ask AI usage through the configured analytics providers, the way page feedback already is: `ask` when a question is sent, `ask_answer` when the answer finishes (with latency and length), and `ask_error` when the request fails, breaks mid-stream, or comes back empty (with the HTTP status, or `0` when no response exists). Events carry the page's served pathname and the question's length; the question text itself travels only on the `blume:track` DOM event, so a site decides where reader input goes. Custom chat UIs built on `useAskAI` report the same events, and a throwing analytics provider no longer starves the providers after it.
+- c6189a3: A generated sidebar group whose folder has an `index` page now links its row to that page, the way an explicit sidebar group's `root` already did. Clicking the section name in the sidebar opens the section's landing page instead of only toggling the disclosure, in every display mode. The index page keeps its own row beneath the header; set `sidebar.hidden: true` on it to drop the duplicate label, and the header stays the link to it.
+- 194e8f9: Style `<kbd>` as a bordered key badge, matching the search dialog's shortcut hints, everywhere in the content column. Keys inside `<Steps>`, `<Callout>`, `<Card>`, and other components previously rendered as plain text because the typography plugin skips them, and keys in ordinary prose used the plugin's near-black text and shadow, which disappeared in dark mode.
+- ddf0a60: Write the Pagefind index files from the build itself instead of asking Pagefind to write them. Pagefind's service mode reports the files as written while the bytes are still buffered, and closing the backend right after could leave a truncated `pagefind-entry.json` or UI asset on a busy CI host, so search failed to load on the deployed site. The build now fetches the finished index and writes every file to disk before Pagefind shuts down.
+
 ## 1.7.2
 
 ### Patch Changes
