@@ -24,3 +24,29 @@ export const sharedSourceOptionsSchema = z.strictObject({
   pollInterval: z.number().positive().optional(),
   prefix: z.string().optional(),
 });
+
+/** Field paths mapping a CMS document onto Blume meta + body. */
+export interface SourceFieldMap {
+  /** Field holding the renderable body (rich text, or a Markdown string). */
+  body?: string;
+  /** Field holding the page description. */
+  description?: string;
+  /** Field holding the last-modified date. */
+  lastModified?: string;
+  /** Field holding the page slug. */
+  slug?: string;
+  /** Field holding the page title. */
+  title?: string;
+}
+
+/** The schema for {@link SourceFieldMap}. */
+export const sourceFieldMapSchema = z.strictObject({
+  body: z.string().optional(),
+  description: z.string().optional(),
+  lastModified: z.string().optional(),
+  slug: z.string().optional(),
+  title: z.string().optional(),
+});
+
+/** Extra query parameters a REST-backed adapter appends to its request. */
+export const queryParamsSchema = z.record(z.string(), z.string());

@@ -29,6 +29,8 @@ export type {
   SourceEntry,
   SourceLoadResult,
 } from "../core/sources/types.ts";
+export { contentful } from "./contentful.ts";
+export type { ContentfulAdapter, ContentfulOptions } from "./contentful.ts";
 export { custom } from "./custom.ts";
 export type { CustomAdapter } from "./custom.ts";
 export { filesystem } from "./filesystem.ts";
@@ -44,6 +46,8 @@ export { notion } from "./notion.ts";
 export type { NotionAdapter, NotionOptions } from "./notion.ts";
 export { obsidian } from "./obsidian.ts";
 export type { ObsidianAdapter, ObsidianOptions } from "./obsidian.ts";
+export { payload } from "./payload.ts";
+export type { PayloadAdapter, PayloadOptions } from "./payload.ts";
 export type {
   AnySourceAdapter,
   ContentSourceAdapter,
@@ -51,4 +55,6 @@ export type {
 } from "./registry.ts";
 export { sanity } from "./sanity.ts";
 export type { SanityAdapter, SanityOptions } from "./sanity.ts";
-export type { SharedSourceOptions } from "./shared.ts";
+export type { SharedSourceOptions, SourceFieldMap } from "./shared.ts";
+export { strapi } from "./strapi.ts";
+export type { StrapiAdapter, StrapiOptions } from "./strapi.ts";

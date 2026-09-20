@@ -22,12 +22,15 @@ import { blumePackageJson, toPackageName } from "../src/core/package-json.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { getBlumeVersion } from "../src/core/version.ts";
 import {
+  contentful,
   filesystem,
   githubReleases,
   mdxRemote,
   notion,
   obsidian,
+  payload,
   sanity,
+  strapi,
 } from "../src/sources/index.ts";
 
 const tempDirs: string[] = [];
@@ -57,12 +60,15 @@ const answersWith = (overrides: Partial<InitAnswers> = {}): InitAnswers => ({
 /** Evaluate the generated `blume.config.ts` down to its config object. */
 /** The `blume/sources` factories a generated config may import, by name. */
 const FACTORIES = {
+  contentful,
   filesystem,
   githubReleases,
   mdxRemote,
   notion,
   obsidian,
+  payload,
   sanity,
+  strapi,
 };
 
 const evalConfig = (config: string): BlumeConfig => {
@@ -270,6 +276,9 @@ export default defineConfig({
           "github-releases",
           "notion",
           "sanity",
+          "contentful",
+          "payload",
+          "strapi",
           "mdx-remote",
         ],
       }),

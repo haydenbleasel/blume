@@ -1,6 +1,6 @@
 ---
 title: Content sources
-description: Pull docs from local files, a remote repository, or any custom backend — and mix several sources into one static-first site read at build time.
+description: Pull docs from local files, a remote repository, a CMS, or any custom backend — and mix several sources into one static-first site read at build time.
 ---
 
 By default Blume reads a folder of `.md`/`.mdx` files. **Content sources** let you pull pages from somewhere else — a remote repository, a CMS, or any custom backend — and mix several sources into a single site. Sources are read at build time; Blume stays static-first.
@@ -195,11 +195,98 @@ export default defineConfig({
 
 The integration token comes from the `NOTION_TOKEN` environment variable (share the database with your integration); the adapter declares it, so a build without it warns. By default every page is imported; set `publishedValue` to make the `Status` property a publish gate — any other value then maps to `draft: true`, which production builds drop. **Notion image and video URLs are signed and expire**, so the adapter downloads them at build time into the site's assets and rewrites the references — a CMS asset never rots a static build. API calls are paced through a small request pool (3 at a time, matching Notion's per-integration rate limit) so databases with hundreds of pages import without tripping `429` responses; set `concurrency` on the source to tune it.
 
+## Contentful
+
+The built-in `contentful()` adapter reads the entries of one content type through the Content Delivery API and lowers each entry's rich text body to Markdown: headings, marks, links, lists, quotes, tables, and embedded assets map to their Markdown equivalents, and a body held in a Markdown long-text field passes through as written. Nothing to install — the adapter speaks the REST API directly.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+import { contentful, filesystem } from "blume/sources";
+
+export default defineConfig({
+  content: {
+    sources: [
+      filesystem({ root: "docs" }),
+      contentful({
+        prefix: "guides",
+        space: "abc123",
+        contentType: "guide",
+        // environment: "master", locale: "en-US"
+        // Field ids default to title / description / slug / body, and the
+        // date to sys.updatedAt
+        fields: { body: "content" },
+        // Extra Delivery API query parameters
+        params: { "fields.section": "sdk" },
+      }),
+    ],
+  },
+});
+```
+
+The Delivery API token comes from the `CONTENTFUL_ACCESS_TOKEN` environment variable, which the adapter declares. Under `--preview` the adapter reads drafts through the Preview API with `CONTENTFUL_PREVIEW_TOKEN` (falling back to the delivery token). Assets are referenced from Contentful's CDN rather than downloaded — their URLs are stable. An embedded entry maps to a Blume component through the engine's `serializers` option, keyed by content type id, when you construct `contentfulSource` directly and pass it to [`custom()`](#custom-sources); without a serializer it is noted in a comment. A link to another entry renders as plain text, since there is no route to point at.
+
+## Payload
+
+The built-in `payload()` adapter reads a collection through the Payload REST API (`/api/<collection>`) and lowers each document's Lexical body to Markdown: paragraphs, headings, bullet, numbered, and check lists, quotes, links, uploads, and horizontal rules. A body held in a text field passes through as Markdown. Nothing to install.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+import { filesystem, payload } from "blume/sources";
+
+export default defineConfig({
+  content: {
+    sources: [
+      filesystem({ root: "docs" }),
+      payload({
+        prefix: "handbook",
+        url: "https://cms.example.com",
+        collection: "docs",
+        // Field paths default to title / description / slug / content / updatedAt
+        fields: { body: "richText" },
+        // Extra query parameters: where[...], sort
+        params: { sort: "title" },
+      }),
+    ],
+  },
+});
+```
+
+The API key comes from the `PAYLOAD_API_KEY` environment variable and is sent as `users API-Key <key>`; set `authCollection` when the key belongs to another auth-enabled collection. Only published documents are imported — `--preview` requests drafts and stages them with `draft: true`. Documents are fetched with `depth: 1` so uploads carry their URLs, and a relative upload path (`/media/x.png`) resolves against `url`. A `block` or `inlineBlock` node maps to a Blume component through the engine's `serializers` option, keyed by `blockType`, when you construct `payloadSource` directly and pass it to [`custom()`](#custom-sources).
+
+## Strapi
+
+The built-in `strapi()` adapter reads a content type through the Strapi REST API (`/api/<pluralApiId>`) and lowers each entry's Blocks body to Markdown: paragraphs, headings, lists, quotes, code blocks, images, and links. A Markdown rich text field passes through as written. Strapi 5 responses are read as-is, and the Strapi 4 `attributes` envelope is flattened so the same field paths apply. Nothing to install.
+
+```ts blume.config.ts
+import { defineConfig } from "blume";
+import { filesystem, strapi } from "blume/sources";
+
+export default defineConfig({
+  content: {
+    sources: [
+      filesystem({ root: "docs" }),
+      strapi({
+        prefix: "guides",
+        url: "https://cms.example.com",
+        contentType: "guides",
+        // locale: "en"
+        // Field paths default to title / description / slug / content / updatedAt
+        fields: { body: "body" },
+        // Extra query parameters: filters[...], sort
+        params: { "filters[section][$eq]": "sdk" },
+      }),
+    ],
+  },
+});
+```
+
+The API token comes from the `STRAPI_API_TOKEN` environment variable, sent as a bearer token. Entries are fetched with `populate=*` so images carry their URLs (set `populate` to narrow it), and a relative upload path (`/uploads/x.png`) resolves against `url`. Only published entries are imported — `--preview` requests `status=draft` and stages unpublished entries with `draft: true`.
+
 ## Preview and sync
 
 Two flags control how remote content is fetched and what's included:
 
-- **`--preview`** on `blume dev` or `blume build` renders drafts and pulls unpublished CMS content — Sanity switches to its `previewDrafts` perspective, and Notion stops filtering by `Status`. Production builds without the flag exclude drafts as usual, so a preview build is a safe way to review unpublished work before it ships.
+- **`--preview`** on `blume dev` or `blume build` renders drafts and pulls unpublished CMS content — Sanity switches to its `previewDrafts` perspective, Notion stops filtering by `Status`, Contentful reads through the Preview API, and Payload and Strapi request drafts. Production builds without the flag exclude drafts as usual, so a preview build is a safe way to review unpublished work before it ships.
 - **`blume sync`** re-fetches every remote source and regenerates the runtime. Dev is cache-first — a remote source is fetched once and served from `.blume/cache` on restart (fast and offline-tolerant), so `blume sync` is how you pull the latest CMS content without restarting the dev server (a running server hot-reloads). Add `--force` to drop the cache first, or set `pollInterval` on a source to refresh automatically.
 
 ```sh

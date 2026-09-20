@@ -47,7 +47,8 @@ import type { Diagnostic } from "./types.ts";
  * **Content & navigation**
  * - `content` — where content lives: adapters from `blume/sources` under
  *   `sources` (`filesystem({ root })`, `mdxRemote({…})`, `githubReleases({…})`,
- *   `sanity({…})`, `notion({…})`, `obsidian({…})`, or `custom(source)`), or the
+ *   `sanity({…})`, `notion({…})`, `contentful({…})`, `payload({…})`,
+ *   `strapi({…})`, `obsidian({…})`, or `custom(source)`), or the
  *   zero-config shorthand `root`/`include`/`exclude`, which desugars to one
  *   `filesystem()` source and can't be combined with `sources`.
  * - `navigation` — sidebar, header `tabs`, `selectors` (version/language/product

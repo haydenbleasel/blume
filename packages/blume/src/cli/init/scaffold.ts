@@ -5,12 +5,15 @@ import { detect } from "package-manager-detector/detect";
 import { basename, dirname, isAbsolute, join, relative } from "pathe";
 
 import { blumePackageJson, toPackageName } from "../../core/package-json.ts";
+import { contentful } from "../../sources/contentful.ts";
 import { githubReleases } from "../../sources/github-releases.ts";
 import { mdxRemote } from "../../sources/mdx-remote.ts";
 import { notion } from "../../sources/notion.ts";
 import { obsidian } from "../../sources/obsidian.ts";
+import { payload } from "../../sources/payload.ts";
 import type { AnySourceAdapter } from "../../sources/registry.ts";
 import { sanity } from "../../sources/sanity.ts";
+import { strapi } from "../../sources/strapi.ts";
 
 export const TEMPLATES = ["docs", "api", "sdk", "changelog"] as const;
 export type Template = (typeof TEMPLATES)[number];
@@ -25,6 +28,9 @@ export const SOURCE_KINDS = [
   "github-releases",
   "notion",
   "sanity",
+  "contentful",
+  "payload",
+  "strapi",
   "mdx-remote",
 ] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
@@ -226,12 +232,15 @@ const needsExplicitSources = (sources: SourceKind[]): boolean =>
 
 /** The `blume/sources` factory each source kind is written with. */
 const SOURCE_FACTORIES = {
+  contentful: "contentful",
   filesystem: "filesystem",
   "github-releases": "githubReleases",
   "mdx-remote": "mdxRemote",
   notion: "notion",
   obsidian: "obsidian",
+  payload: "payload",
   sanity: "sanity",
+  strapi: "strapi",
 } satisfies Record<SourceKind, string>;
 
 /**
@@ -240,6 +249,11 @@ const SOURCE_FACTORIES = {
  * sets up are read off the adapter rather than kept in a parallel table.
  */
 const SOURCE_DESCRIPTORS = {
+  contentful: contentful({
+    contentType: "doc",
+    prefix: "contentful",
+    space: "your-space-id",
+  }),
   "github-releases": githubReleases({
     owner: "your-org",
     prefix: "changelog",
@@ -251,11 +265,21 @@ const SOURCE_DESCRIPTORS = {
   }),
   notion: notion({ database: "your-database-id", prefix: "notion" }),
   obsidian: obsidian({ prefix: "notes", vault: "vault" }),
+  payload: payload({
+    collection: "docs",
+    prefix: "payload",
+    url: "https://cms.example.com",
+  }),
   sanity: sanity({
     dataset: "production",
     prefix: "sanity",
     projectId: "your-project-id",
     query: '*[_type == "doc"]',
+  }),
+  strapi: strapi({
+    contentType: "docs",
+    prefix: "strapi",
+    url: "https://cms.example.com",
   }),
 } satisfies Record<Exclude<SourceKind, "filesystem">, AnySourceAdapter>;
 
@@ -264,6 +288,13 @@ const SOURCE_DESCRIPTORS = {
  * replace and comments naming the env var each source authenticates with.
  */
 const SOURCE_SNIPPETS = {
+  contentful: `      // Entries of a Contentful content type. Reads CONTENTFUL_ACCESS_TOKEN
+      // from the environment.
+      contentful({
+        space: "your-space-id",
+        contentType: "doc",
+        prefix: "contentful",
+      }),`,
   "github-releases": `      // Changelog entries from GitHub Releases. Private repos read
       // GITHUB_TOKEN from the environment.
       githubReleases({
@@ -289,6 +320,13 @@ const SOURCE_SNIPPETS = {
         vault: "vault",
         prefix: "notes",
       }),`,
+  payload: `      // Documents from a Payload collection. Reads PAYLOAD_API_KEY from
+      // the environment.
+      payload({
+        url: "https://cms.example.com",
+        collection: "docs",
+        prefix: "payload",
+      }),`,
   sanity: `      // Documents from a Sanity dataset. Private datasets read SANITY_TOKEN
       // from the environment.
       sanity({
@@ -296,6 +334,13 @@ const SOURCE_SNIPPETS = {
         dataset: "production",
         query: \`*[_type == "doc"]\`,
         prefix: "sanity",
+      }),`,
+  strapi: `      // Entries of a Strapi content type. Reads STRAPI_API_TOKEN from
+      // the environment.
+      strapi({
+        url: "https://cms.example.com",
+        contentType: "docs",
+        prefix: "strapi",
       }),`,
 } satisfies Record<Exclude<SourceKind, "filesystem">, string>;
 

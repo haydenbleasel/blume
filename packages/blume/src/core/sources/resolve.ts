@@ -5,12 +5,15 @@ import { openApiSource } from "../../openapi/source.ts";
 import type { ContentSourceAdapter } from "../../sources/registry.ts";
 import type { ResolvedConfig } from "../schema.ts";
 import type { ProjectContext } from "../types.ts";
+import { contentfulSource } from "./contentful.ts";
 import { filesystemSource } from "./filesystem.ts";
 import { githubReleasesSource } from "./github-releases.ts";
 import { mdxRemoteSource } from "./mdx-remote.ts";
 import { notionSource } from "./notion.ts";
 import { obsidianSource } from "./obsidian.ts";
+import { payloadSource } from "./payload.ts";
 import { sanitySource } from "./sanity.ts";
+import { strapiSource } from "./strapi.ts";
 import type { ContentSource, SourceContext } from "./types.ts";
 
 export {
@@ -102,6 +105,24 @@ const buildSource = (
     }
     case "notion": {
       return notionSource(
+        { ...adapter.options, name },
+        sourceContext(context, name, runtime)
+      );
+    }
+    case "contentful": {
+      return contentfulSource(
+        { ...adapter.options, name },
+        sourceContext(context, name, runtime)
+      );
+    }
+    case "payload": {
+      return payloadSource(
+        { ...adapter.options, name },
+        sourceContext(context, name, runtime)
+      );
+    }
+    case "strapi": {
+      return strapiSource(
         { ...adapter.options, name },
         sourceContext(context, name, runtime)
       );

@@ -120,6 +120,13 @@ export const collectAnswers = async (
       { hint: "A Notion database", label: "notion", value: "notion" },
       { hint: "A Sanity dataset", label: "sanity", value: "sanity" },
       {
+        hint: "A Contentful content type",
+        label: "contentful",
+        value: "contentful",
+      },
+      { hint: "A Payload collection", label: "payload", value: "payload" },
+      { hint: "A Strapi content type", label: "strapi", value: "strapi" },
+      {
         hint: "MDX fetched from a GitHub repo",
         label: "mdx-remote",
         value: "mdx-remote",

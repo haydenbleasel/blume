@@ -19,13 +19,16 @@ import {
 import type { ContentSource } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 import {
+  contentful,
   custom,
   filesystem,
   githubReleases,
   mdxRemote,
   notion,
   obsidian,
+  payload,
   sanity,
+  strapi,
 } from "../src/sources/index.ts";
 import type { AnySourceAdapter } from "../src/sources/index.ts";
 
@@ -67,6 +70,21 @@ const BUILT_IN: {
     adapter: notion({ database: "db1" }),
     deps: ["@notionhq/client"],
     secrets: ["NOTION_TOKEN"],
+  },
+  {
+    adapter: contentful({ contentType: "doc", space: "s1" }),
+    deps: [],
+    secrets: ["CONTENTFUL_ACCESS_TOKEN"],
+  },
+  {
+    adapter: payload({ collection: "docs", url: "https://cms.test" }),
+    deps: [],
+    secrets: ["PAYLOAD_API_KEY"],
+  },
+  {
+    adapter: strapi({ contentType: "docs", url: "https://cms.test" }),
+    deps: [],
+    secrets: ["STRAPI_API_TOKEN"],
   },
   {
     adapter: obsidian({ vault: "vault" }),
@@ -168,6 +186,9 @@ describe("content.sources schema", () => {
       "github-releases",
       "sanity",
       "notion",
+      "contentful",
+      "payload",
+      "strapi",
       "obsidian",
       "custom",
     ]);
@@ -431,6 +452,9 @@ describe("resolveSources", () => {
       githubReleases({ owner: "a", repo: "b" }),
       sanity({ dataset: "d", projectId: "p", query: "*" }),
       notion({ database: "db", prefix: "handbook" }),
+      contentful({ contentType: "doc", space: "s1" }),
+      payload({ collection: "docs", url: "https://cms.test" }),
+      strapi({ contentType: "docs", url: "https://cms.test" }),
       obsidian({ pollInterval: 5, vault: "vault" }),
       custom(memory),
       custom({ ...memory }),
@@ -442,18 +466,21 @@ describe("resolveSources", () => {
       "github-releases",
       "sanity",
       "handbook",
+      "contentful",
+      "payload",
+      "strapi",
       "obsidian",
       "memory",
       "memory-2",
     ]);
     expect(sources.map((source) => source.staged)).toStrictEqual([
       false,
-      ...Array.from({ length: 7 }, () => true),
+      ...Array.from({ length: 10 }, () => true),
     ]);
     // The first custom instance is passed through untouched; the second is
     // renamed to keep ids unique.
-    expect(sources[6]).toBe(memory);
-    expect(sources[7]).not.toBe(memory);
+    expect(sources[9]).toBe(memory);
+    expect(sources[10]).not.toBe(memory);
   });
 
   it("threads the filesystem options through to the source", () => {
@@ -467,7 +494,14 @@ describe("resolveSources", () => {
 });
 
 describe("descriptor consumers", () => {
-  const KEYS = ["GITHUB_TOKEN", "NOTION_TOKEN", "SANITY_TOKEN"];
+  const KEYS = [
+    "CONTENTFUL_ACCESS_TOKEN",
+    "GITHUB_TOKEN",
+    "NOTION_TOKEN",
+    "PAYLOAD_API_KEY",
+    "SANITY_TOKEN",
+    "STRAPI_API_TOKEN",
+  ];
   const saved = new Map(KEYS.map((key) => [key, process.env[key]]));
 
   afterEach(() => {
@@ -507,12 +541,18 @@ describe("descriptor consumers", () => {
       githubReleases({ owner: "a", repo: "b" }),
       notion({ database: "db" }),
       sanity({ dataset: "d", projectId: "p", query: "*" }),
+      contentful({ contentType: "doc", space: "s1" }),
+      payload({ collection: "docs", url: "https://cms.test" }),
+      strapi({ contentType: "docs", url: "https://cms.test" }),
     ]);
     const messages = checkRequiredSecrets(config).map((d) => d.message);
     expect(messages).toStrictEqual([
       "Content source (github-releases) is enabled but GITHUB_TOKEN is not set.",
       "Content source (notion) is enabled but NOTION_TOKEN is not set.",
       "Content source (sanity) is enabled but SANITY_TOKEN is not set.",
+      "Content source (contentful) is enabled but CONTENTFUL_ACCESS_TOKEN is not set.",
+      "Content source (payload) is enabled but PAYLOAD_API_KEY is not set.",
+      "Content source (strapi) is enabled but STRAPI_API_TOKEN is not set.",
     ]);
     for (const key of KEYS) {
       process.env[key] = "set";

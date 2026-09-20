@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { contentful, contentfulAdapterSchema } from "./contentful.ts";
+import type { ContentfulAdapter } from "./contentful.ts";
 import { custom, customAdapterSchema } from "./custom.ts";
 import type { CustomAdapter } from "./custom.ts";
 import { filesystem, filesystemAdapterSchema } from "./filesystem.ts";
@@ -15,8 +17,12 @@ import { notion, notionAdapterSchema } from "./notion.ts";
 import type { NotionAdapter } from "./notion.ts";
 import { obsidian, obsidianAdapterSchema } from "./obsidian.ts";
 import type { ObsidianAdapter } from "./obsidian.ts";
+import { payload, payloadAdapterSchema } from "./payload.ts";
+import type { PayloadAdapter } from "./payload.ts";
 import { sanity, sanityAdapterSchema } from "./sanity.ts";
 import type { SanityAdapter } from "./sanity.ts";
+import { strapi, strapiAdapterSchema } from "./strapi.ts";
+import type { StrapiAdapter } from "./strapi.ts";
 
 /** Every descriptor a `blume/sources` factory can return. */
 export type AnySourceAdapter =
@@ -25,6 +31,9 @@ export type AnySourceAdapter =
   | GithubReleasesAdapter
   | SanityAdapter
   | NotionAdapter
+  | ContentfulAdapter
+  | PayloadAdapter
+  | StrapiAdapter
   | ObsidianAdapter
   | CustomAdapter;
 
@@ -38,6 +47,9 @@ const adapterVariants = [
   githubReleasesAdapterSchema,
   sanityAdapterSchema,
   notionAdapterSchema,
+  contentfulAdapterSchema,
+  payloadAdapterSchema,
+  strapiAdapterSchema,
   obsidianAdapterSchema,
   customAdapterSchema,
 ] as const;
@@ -67,7 +79,7 @@ const FACTORY_FOR_TYPE = new Map([
 ]);
 
 const FACTORIES_HINT =
-  'content.sources takes adapters imported from "blume/sources" — filesystem({ root }), mdxRemote({ github }), githubReleases({ owner, repo }), sanity({ projectId, dataset, query }), notion({ database }), obsidian({ vault }), or custom(source).';
+  'content.sources takes adapters imported from "blume/sources" — filesystem({ root }), mdxRemote({ github }), githubReleases({ owner, repo }), sanity({ projectId, dataset, query }), notion({ database }), contentful({ space, contentType }), payload({ url, collection }), strapi({ url, contentType }), obsidian({ vault }), or custom(source).';
 
 const ARRAY_HINT = `content.sources is a list of adapters — e.g. \`sources: [filesystem({ root: "docs" }), githubReleases({ owner, repo, prefix: "changelog" })]\`, imported from "blume/sources".`;
 
@@ -116,6 +128,15 @@ export const resolvedSourceAdapterSchema = sourceAdapterUnion.transform(
       }
       case "notion": {
         return { ...notion(value.options), options: value.options };
+      }
+      case "contentful": {
+        return { ...contentful(value.options), options: value.options };
+      }
+      case "payload": {
+        return { ...payload(value.options), options: value.options };
+      }
+      case "strapi": {
+        return { ...strapi(value.options), options: value.options };
       }
       case "obsidian": {
         return { ...obsidian(value.options), options: value.options };

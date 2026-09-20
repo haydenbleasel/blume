@@ -127,7 +127,9 @@ export interface ContentConfig {
    * Content source adapters from `blume/sources`, read in order:
    * `filesystem({ root })`, `mdxRemote({ github })`, `githubReleases({ owner,
    * repo })`, `sanity({ projectId, dataset, query })`, `notion({ database })`,
-   * `obsidian({ vault })`, or `custom(source)` for any `ContentSource`
+   * `contentful({ space, contentType })`, `payload({ url, collection })`,
+   * `strapi({ url, contentType })`, `obsidian({ vault })`, or `custom(source)`
+   * for any `ContentSource`
    * implementation. When set it replaces the implicit filesystem source, so
    * list a `filesystem()` entry for local docs.
    */

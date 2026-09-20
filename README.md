@@ -39,7 +39,7 @@ Blume works with any package manager and never requires you to set up Astro or T
 - **Local search** — Orama runs in dev and production with no hosted service; FlexSearch, Pagefind, Algolia, Typesense, Orama Cloud, and Mixedbread are one setting away.
 - **AI-ready** — `llms.txt` / `llms-full.txt`, raw Markdown at any `.md` URL, Copy as Markdown, Open in chat, an optional Ask AI assistant, and a hosted MCP server so coding agents can search and read your docs directly.
 - **Agent skills** — Blume ships [agent skills](https://useblume.dev/docs/advanced/skills) that teach a coding agent to scaffold, write, and maintain your docs site.
-- **Content sources** — mix local files with remote MDX, GitHub Releases, Notion, Sanity, or any custom backend into a single site.
+- **Content sources** — mix local files with remote MDX, GitHub Releases, Notion, Sanity, Contentful, Payload, Strapi, or any custom backend into a single site.
 - **Internationalization** — drop translated files into place for locale-aware routing, per-language navigation, translated UI, and SEO.
 - **SEO** — metadata, Open Graph images (rendered at build with Takumi), sitemap, `robots.txt`, RSS feeds, and JSON-LD, built in.
 - **API reference** — render an OpenAPI or AsyncAPI spec as an interactive reference (schemas, auth, request playground) via Scalar.

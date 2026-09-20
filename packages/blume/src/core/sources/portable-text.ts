@@ -4,6 +4,7 @@
  * user-supplied serializer or are skipped with a noted comment. Output is
  * Markdown text that flows through Blume's normal pipeline.
  */
+import { escapeMarkdownText } from "./lower.ts";
 
 /**
  * A field value on a Portable Text node: the arbitrary JSON the CMS query
@@ -62,18 +63,6 @@ const HEADING_STYLES = new Map([
   ["h6", "###### "],
 ]);
 
-// Markdown/raw-HTML structure characters. Portable Text spans are *plain
-// text* — formatting arrives as marks, never as syntax in the text — so a
-// literal `*`, `_`, `[`, backtick, `~`, or `<` typed in the CMS must render
-// as itself. Unescaped, it opened emphasis or a code span mid-paragraph, and
-// `<` let CMS prose inject raw HTML into the rendered page. CommonMark
-// backslash-escapes every ASCII punctuation character, so `\*` is always the
-// literal asterisk.
-const MARKDOWN_SPECIALS = /[\\`*_[\]~<]/gu;
-
-const escapeText = (text: string): string =>
-  text.replaceAll(MARKDOWN_SPECIALS, String.raw`\$&`);
-
 /** Wrap a span's text in Markdown for its marks (decorators + link defs). */
 const renderSpan = (
   span: PortableTextSpan,
@@ -82,7 +71,7 @@ const renderSpan = (
   // Code spans stay verbatim: their text is literal inside the backticks,
   // and backslash escapes would render as backslashes.
   const isCode = span.marks?.includes("code") ?? false;
-  let text = isCode ? (span.text ?? "") : escapeText(span.text ?? "");
+  let text = isCode ? (span.text ?? "") : escapeMarkdownText(span.text ?? "");
   if (!span.marks || span.marks.length === 0) {
     return text;
   }

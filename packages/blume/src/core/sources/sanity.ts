@@ -8,6 +8,8 @@ import {
   pollingWatch,
   snapshotCache,
 } from "./cache.ts";
+import type { JsonObject } from "./json.ts";
+import { asString, getPath } from "./json.ts";
 import { slugify, slugifyPath } from "./normalize.ts";
 import { portableTextToMarkdown } from "./portable-text.ts";
 import type { PortableTextBlock } from "./portable-text.ts";
@@ -59,56 +61,14 @@ export interface SanitySourceOptions {
 
 const IMAGE_REF = /^image-(?<id>[a-f0-9]+)-(?<dims>\d+x\d+)-(?<ext>\w+)$/u;
 
-/** A value in a fetched document: arbitrary JSON the GROQ query returned. */
-type SanityValue =
-  | string
-  | number
-  | boolean
-  | null
-  | SanityValue[]
-  | { [key: string]: SanityValue };
-
 /** A document as the GROQ query returns it. */
-interface SanityDocument {
-  [key: string]: SanityValue;
-}
+type SanityDocument = JsonObject;
 
 /** The frontmatter fields this adapter maps from a document. */
 interface SanityFrontmatter {
   description?: string;
   title?: string;
 }
-
-/**
- * A node a dot path can descend into. Arrays pass too (matching their runtime
- * string-key indexing, e.g. `items.0`), so the predicate types them as the
- * keyed form both traverse through.
- */
-const isTraversable = (
-  value: SanityValue | undefined
-): value is SanityDocument => typeof value === "object" && value !== null;
-
-/** Resolve a dot path (`slug.current`) against a document. */
-const getPath = (
-  doc: SanityDocument,
-  path: string
-): SanityValue | undefined => {
-  let current: SanityValue | undefined = doc;
-  for (const key of path.split(".")) {
-    if (isTraversable(current)) {
-      current = current[key];
-    } else {
-      return;
-    }
-  }
-  return current;
-};
-
-const isStringValue = (value: SanityValue | undefined): value is string =>
-  typeof value === "string";
-
-const asString = (value: SanityValue | undefined): string | undefined =>
-  isStringValue(value) ? value : undefined;
 
 /** Build a Sanity CDN URL from an image asset `_ref`. */
 const imageUrlFromRef = (
