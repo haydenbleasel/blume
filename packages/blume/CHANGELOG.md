@@ -1,5 +1,13 @@
 # blume
 
+## 1.7.2
+
+### Patch Changes
+
+- 93e31fc: Add `ai.ask.cors` to let listed origins (or `"*"`) call the generated Ask AI endpoint from another site. The route answers the browser's preflight and names a listed origin on every response, the streamed answer and error statuses alike, so a marketing page can embed an ask box without an external endpoint or an eject.
+- 53d75a2: Add `ai.ask.reasoning` to set how much the Ask AI model reasons before answering, from `none` to `xhigh`. The level is sent as each backend's own reasoning-effort control: the AI SDK's `reasoning` option on the gateway, `reasoning.effort` on OpenRouter, and `reasoning_effort` on OpenAI-compatible endpoints. Leaving it unset keeps the model's default.
+- 7f0c91e: Fix grouped sidebar sections 404ing on first open when header tabs are configured. On a page outside every tab, the sidebar hides the tab-owned sections, and that pruned view lost its groups' stable ids, so their deferred fragments were requested by a positional name no route serves. Untouched groups are now kept by identity (which also keeps their build-time render cache warm). A container that loses a nested tab section renders in full instead of deferring, since a shared fragment would show the section again.
+
 ## 1.7.1
 
 ### Patch Changes
