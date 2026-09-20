@@ -1,4 +1,4 @@
-import type { AdapterDescriptor, JsonValue } from "../../core/adapter.ts";
+import type { AdapterDescriptor } from "../../core/adapter.ts";
 
 /**
  * How a search adapter integrates with the generated runtime.
@@ -21,13 +21,13 @@ export type SearchAdapterMode =
   | "none";
 
 /**
- * Options for an adapter that needs none. Any key given still rides along to
- * the generated client verbatim, like every adapter's options. JSON values
- * only: the descriptor is inlined into the generated project as a literal.
+ * Options for an adapter that takes none. The generated client never reads
+ * them — the static engines are configured from `i18n`, and Pagefind indexes
+ * the built HTML — so unknown keys fail config validation instead of passing
+ * silently. Adding a real option later is then additive, never a behavior
+ * change for a key that used to be ignored.
  */
-export interface KeylessSearchOptions {
-  [option: string]: JsonValue;
-}
+export type KeylessSearchOptions = Record<string, never>;
 
 /**
  * The descriptor a search adapter factory returns and `blume.config.ts`

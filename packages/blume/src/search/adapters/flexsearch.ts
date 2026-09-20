@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { KeylessSearchOptions, SearchAdapter } from "./types.ts";
 
-/** FlexSearch needs no options; any extra keys ride along to the client verbatim. */
+/** FlexSearch takes no options; unknown keys fail config validation. */
 export type FlexsearchOptions = KeylessSearchOptions;
 
 export type FlexsearchAdapter = SearchAdapter<
@@ -11,7 +11,7 @@ export type FlexsearchAdapter = SearchAdapter<
   FlexsearchOptions
 >;
 
-export const flexsearchOptionsSchema = z.object({}).catchall(z.json());
+export const flexsearchOptionsSchema = z.strictObject({});
 
 /**
  * A second keyless, client-side engine. It loads the same `/blume-search.json`

@@ -206,6 +206,31 @@ describe("search config schema", () => {
     ).toBe(false);
   });
 
+  it("rejects unknown keys on the keyless adapters, with a path", () => {
+    // The static and Pagefind clients never read `options`, so an unknown key
+    // would otherwise pass validation and do nothing.
+    for (const adapter of [orama(), flexsearch(), pagefind()]) {
+      // The options type rejects the key, so the descriptor is spread instead.
+      const result = blumeConfigSchema.safeParse({
+        search: { ...adapter, options: { probe: 1 } },
+      });
+      expect(result.success, `${adapter.kind} should reject`).toBe(false);
+      // Zod anchors an unrecognized-keys issue at the object and lists the
+      // offending keys on it, rather than one issue per key.
+      expect(result.error?.issues[0]).toMatchObject({
+        code: "unrecognized_keys",
+        keys: ["probe"],
+        path: ["search", "provider", "options"],
+      });
+    }
+  });
+
+  it("still accepts the keyless adapters with no options", () => {
+    for (const adapter of [orama(), flexsearch(), pagefind()]) {
+      expect(parse(adapter).search.provider).toStrictEqual(adapter);
+    }
+  });
+
   it("accepts an adapter directly as shorthand for the object form", () => {
     const shorthand = parse(algolia(ALGOLIA)).search;
     const object = parse({ provider: algolia(ALGOLIA) }).search;

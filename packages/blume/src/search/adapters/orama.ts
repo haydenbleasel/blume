@@ -2,12 +2,12 @@ import { z } from "zod";
 
 import type { KeylessSearchOptions, SearchAdapter } from "./types.ts";
 
-/** Orama needs no options; any extra keys ride along to the client verbatim. */
+/** Orama takes no options; unknown keys fail config validation. */
 export type OramaOptions = KeylessSearchOptions;
 
 export type OramaAdapter = SearchAdapter<"orama", "static", OramaOptions>;
 
-export const oramaOptionsSchema = z.object({}).catchall(z.json());
+export const oramaOptionsSchema = z.strictObject({});
 
 /**
  * Blume's default search: a JSON index built from the source files, served

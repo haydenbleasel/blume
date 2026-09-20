@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { KeylessSearchOptions, SearchAdapter } from "./types.ts";
 
-/** Pagefind needs no options; any extra keys ride along to the client verbatim. */
+/** Pagefind takes no options; unknown keys fail config validation. */
 export type PagefindOptions = KeylessSearchOptions;
 
 export type PagefindAdapter = SearchAdapter<
@@ -11,7 +11,7 @@ export type PagefindAdapter = SearchAdapter<
   PagefindOptions
 >;
 
-export const pagefindOptionsSchema = z.object({}).catchall(z.json());
+export const pagefindOptionsSchema = z.strictObject({});
 
 /**
  * Pagefind indexes the built HTML after `blume build` and loads the index in
