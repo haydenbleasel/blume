@@ -195,6 +195,30 @@ describe("analyticsHead", () => {
     });
   });
 
+  it("counts query-only client navigations but not hash moves", () => {
+    const [node] = analyticsHead([posthog({ key: "k" })]);
+    expect(node).toMatchObject({
+      content: expect.stringContaining("location.pathname+location.search"),
+    });
+    expect(node).not.toMatchObject({
+      content: expect.stringContaining("location.hash"),
+    });
+  });
+
+  it("escapes < in the inline init JSON so an option can't close the script", () => {
+    const [node] = analyticsHead([
+      posthog({ key: "</script><script>alert(1)</script>", probe: "<b>" }),
+    ]);
+    if (node?.type !== "script") {
+      throw new Error("expected a script node");
+    }
+    expect(node.content).not.toContain("</script>");
+    expect(node.content).toContain(
+      'posthog.init("\\u003c/script>\\u003cscript>alert(1)\\u003c/script>"'
+    );
+    expect(node.content).toContain('"probe":"\\u003cb>"');
+  });
+
   it("hands the Vercel component its props verbatim", () => {
     expect(
       analyticsHead([vercel({ debug: true, mode: "production" })])

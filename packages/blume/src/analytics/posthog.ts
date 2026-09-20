@@ -55,10 +55,16 @@ const POSTHOG_LOADER =
 
 // PostHog's loader only captures a pageview per real page load, but the client
 // router turns link clicks into in-place swaps — capture those too, keyed off
-// `astro:page-load` with a pathname guard so the initial load (which the
-// loader already counted) and same-page hash moves aren't double-counted.
+// `astro:page-load` with a path-plus-query guard so the initial load (which
+// the loader already counted) and same-page hash moves aren't double-counted,
+// while a query-only navigation (`?tab=a` → `?tab=b`) still is.
 const POSTHOG_SPA_PAGEVIEWS =
-  'document.addEventListener("astro:page-load",function(){var p=window.__blumePhPath;window.__blumePhPath=location.pathname;if(p!==undefined&&p!==location.pathname){posthog.capture("$pageview");}});';
+  'document.addEventListener("astro:page-load",function(){var p=window.__blumePhPath,c=location.pathname+location.search;window.__blumePhPath=c;if(p!==undefined&&p!==c){posthog.capture("$pageview");}});';
+
+// `JSON.stringify` leaves `<` alone, so a value like `</script>` would end the
+// inline script element; escape it the way the layouts do for their JSON.
+const inlineJson = (value: JsonValue): string =>
+  JSON.stringify(value).replaceAll("<", "\\u003c");
 
 /**
  * The inline loader-plus-init snippet. `key` and `host` are the options Blume
@@ -70,6 +76,6 @@ export const posthogHead = (options: PosthogOptions): HeadScript => {
   const initOptions = { api_host: host ?? POSTHOG_DEFAULT_HOST, ...init };
   return {
     attributes: {},
-    content: `${POSTHOG_LOADER}posthog.init(${JSON.stringify(key)},${JSON.stringify(initOptions)});${POSTHOG_SPA_PAGEVIEWS}`,
+    content: `${POSTHOG_LOADER}posthog.init(${inlineJson(key)},${inlineJson(initOptions)});${POSTHOG_SPA_PAGEVIEWS}`,
   };
 };
