@@ -279,8 +279,15 @@ const applyDescriptorProperty = (
       );
       return;
     }
+    const shorthand = property.name.text;
+    if (shorthand === "client" || shorthand === "media") {
+      context.errors.push(
+        `${label} writes \`${shorthand}\` as a shorthand property; only \`component\` may be shorthand, \`${shorthand}\` must be a string literal.`
+      );
+      return;
+    }
     context.errors.push(
-      `${label} has a \`${property.name.text}\` field; ${ALLOWED_FIELDS}`
+      `${label} has a \`${shorthand}\` field; ${ALLOWED_FIELDS}`
     );
     return;
   }

@@ -415,7 +415,19 @@ describe("analyzeComponentOverrides rejected forms", () => {
       rejection(
         'export default { mdx: { X: { component: "./X.tsx", client } } };'
       ).message
-    ).toContain("mdx.X has a `client` field; only `component`");
+    ).toContain(
+      "mdx.X writes `client` as a shorthand property; only `component` may be shorthand, `client` must be a string literal."
+    );
+    expect(
+      rejection(
+        'export default { mdx: { X: { component: "./X.tsx", media } } };'
+      ).message
+    ).toContain("mdx.X writes `media` as a shorthand property");
+    expect(
+      rejection(
+        'export default { mdx: { X: { component: "./X.tsx", props } } };'
+      ).message
+    ).toContain("mdx.X has a `props` field; only `component`");
     expect(
       rejection(
         'export default { mdx: { X: { component: "./X.tsx", ["cl" + "ient"]: "load" } } };'
