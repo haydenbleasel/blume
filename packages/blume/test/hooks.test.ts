@@ -1,8 +1,9 @@
-import { afterAll, describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 
 // Type-only: erased at runtime, so the module mocks below still apply when
 // hooks.ts is actually imported.
 import type { BlumeClientData } from "../src/components/islands/hooks.ts";
+import type { TrackProps } from "../src/components/layout/analytics-client.ts";
 
 /**
  * Tests for the `blume/hooks` island hooks (`src/components/islands/hooks.ts`).
@@ -87,12 +88,28 @@ const freshRender = <T>(hook: () => T): T => {
   return render(hook);
 };
 
-// `currentPath()` reads window.location; give the hooks a page to ground on.
-// SAFETY: installs a test-only window stub on the global; the hooks read only
-// `location.pathname` from it.
-(globalThis as { window?: unknown }).window = {
+/**
+ * Analytics events the hooks report, captured through the PostHog global the
+ * real `track()` helper fans out to (module-mocking the helper would leak into
+ * its own test file, since Bun shares module mocks across a run).
+ */
+const tracked: { event: string; props: TrackProps }[] = [];
+
+// `currentPath()` reads window.location; give the hooks a page to ground on,
+// and `track()` a PostHog stub plus the `dispatchEvent` its universal hook
+// needs.
+const windowStub = {
+  dispatchEvent: () => true,
   location: { pathname: "/guide" },
+  posthog: {
+    capture: (event: string, props: TrackProps): void => {
+      tracked.push({ event, props });
+    },
+  },
 };
+// SAFETY: installs a test-only window stub on the global; the hooks read only
+// `location.pathname` from it and the analytics helper only the stubs above.
+(globalThis as { window?: unknown }).window = windowStub;
 
 const originalFetch = globalThis.fetch;
 
@@ -272,6 +289,10 @@ describe("useAskAI", () => {
   const ERROR_MESSAGE =
     "Something went wrong answering that. Please try again.";
 
+  beforeEach(() => {
+    tracked.length = 0;
+  });
+
   it("streams the answer into the assistant message", async () => {
     const requests: { init?: RequestInit; url: string }[] = [];
     setFetch((url, init) => {
@@ -280,6 +301,19 @@ describe("useAskAI", () => {
     });
     const { ask } = freshRender(useAskAI);
     await ask("What is Blume?");
+    // The question and its outcome reach analytics, like page feedback.
+    expect(tracked).toStrictEqual([
+      { event: "ask", props: { path: "/guide", question: "What is Blume?" } },
+      {
+        event: "ask_answer",
+        props: {
+          chars: 11,
+          ms: expect.any(Number),
+          path: "/guide",
+          question: "What is Blume?",
+        },
+      },
+    ]);
     expect(requests[0]?.url).toBe("/api/ask");
     const body = JSON.parse(String(requests[0]?.init?.body));
     expect(body.page).toStrictEqual({ path: "/guide" });
@@ -304,6 +338,14 @@ describe("useAskAI", () => {
       { content: "broken?", role: "user" },
       { content: ERROR_MESSAGE, role: "assistant" },
     ]);
+    expect(tracked.map((entry) => entry.event)).toStrictEqual([
+      "ask",
+      "ask_error",
+    ]);
+    expect(tracked[1]?.props).toMatchObject({
+      question: "broken?",
+      status: 500,
+    });
   });
 
   it("recovers when fetch itself throws (offline)", async () => {
@@ -318,6 +360,29 @@ describe("useAskAI", () => {
       { content: "offline?", role: "user" },
       { content: ERROR_MESSAGE, role: "assistant" },
     ]);
+    // No response at all reports status 0.
+    expect(tracked[1]).toMatchObject({
+      event: "ask_error",
+      props: { question: "offline?", status: 0 },
+    });
+  });
+
+  it("still answers when an analytics provider throws", async () => {
+    const { capture } = windowStub.posthog;
+    windowStub.posthog.capture = () => {
+      throw new Error("provider down");
+    };
+    try {
+      setFetch(() => Promise.resolve(streamResponse(["fine"])));
+      const { ask } = freshRender(useAskAI);
+      await ask("still works?");
+      expect(render(useAskAI).messages).toStrictEqual([
+        { content: "still works?", role: "user" },
+        { content: "fine", role: "assistant" },
+      ]);
+    } finally {
+      windowStub.posthog.capture = capture;
+    }
   });
 
   it("ignores empty questions", async () => {
@@ -330,6 +395,7 @@ describe("useAskAI", () => {
     await ask("   ");
     expect(called).toBe(false);
     expect(render(useAskAI).messages).toStrictEqual([]);
+    expect(tracked).toStrictEqual([]);
   });
 
   it("resets the conversation", async () => {
@@ -382,6 +448,9 @@ describe("useAskAI", () => {
     const after = render(useAskAI);
     expect(after.messages).toStrictEqual([]);
     expect(after.loading).toBe(false);
+    // A reset revokes the outcome along with the UI update: the question was
+    // asked, but it was neither answered nor failed.
+    expect(tracked.map((entry) => entry.event)).toStrictEqual(["ask"]);
   });
 
   it("does not resurrect pre-reset history through the error path", async () => {

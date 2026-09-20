@@ -235,6 +235,18 @@ ai: {
 
 The value is sent as the backend's own reasoning-effort control. Through the gateway it travels as the [AI SDK's `reasoning` option](https://ai-sdk.dev/docs/ai-sdk-core/reasoning), which the gateway maps to the model's setting — OpenAI's `reasoning_effort`, for example. On OpenRouter it is sent as `reasoning.effort`, and on LLMGateway or a custom `openai-compatible` endpoint as `reasoning_effort` in the request, so the endpoint has to accept that parameter. The model has to support the level you pick: OpenAI rejects a level a model doesn't offer (`"none"` and `"xhigh"` exist only on some), so check the model's documentation before setting one. Inkeep runs its own QA pipeline and has no reasoning control, so setting `reasoning` with that backend is a config error. Leave it unset to keep the model's default. Like [retrieval size](#retrieval-size), it trades thoroughness for time-to-first-token, and answers stay grounded either way.
 
+## Analytics
+
+With an [analytics provider](/docs/configuration/analytics) configured, the assistant reports its usage through the same `track()` the page feedback widget uses, so questions land next to your pageviews:
+
+| Event | When | Properties |
+| --- | --- | --- |
+| `ask` | A question is sent | `question`, `path` |
+| `ask_answer` | The answer finishes streaming | `question`, `path`, `ms`, `chars` |
+| `ask_error` | The request fails or returns an error | `question`, `path`, `ms`, `status` (the HTTP status; `0` for no response) |
+
+`path` is the page the reader asked from, `ms` the time from sending the question to the last chunk, and `chars` the answer's length. Clearing the conversation mid-answer reports neither outcome. The question text travels with the event, so it reaches every provider you configure. A custom chat UI built on `useAskAI` from `blume/hooks` reports the same events, and with no provider configured the calls are no-ops.
+
 ## Rate limiting
 
 The `POST /api/ask` endpoint is **unauthenticated** — it has to be, so the in-page assistant can call it. Blume validates each request — rejecting malformed bodies, capping it to 1–40 messages, and accepting only `user`/`assistant` roles so a caller can't inject their own system prompt and repurpose the route as a general LLM proxy — to bound how much a single call can spend against your model, but it can't stop someone from calling the endpoint repeatedly. If cost abuse is a concern, put the route behind a rate limiter — your host's (e.g. Vercel's) edge rate limiting, a middleware, or your model provider's per-key spend limits.

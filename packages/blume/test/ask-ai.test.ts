@@ -195,6 +195,8 @@ const fakeWindow = {
   addEventListener(type: string, listener: Listener) {
     windowListeners.set(type, [...(windowListeners.get(type) ?? []), listener]);
   },
+  // `track()` in `useAskAI` dispatches its universal hook on the window.
+  dispatchEvent: () => true,
   location: { pathname: "/guide" },
   matchMedia: (_query: string) => ({
     addEventListener(_type: string, listener: Listener) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { BlumeClientData } from "../../core/data.ts";
+import { track } from "../layout/analytics-client.ts";
 import type { SearchFn, SearchResult } from "../layout/search/types.ts";
 import { joinBase, stripBase } from "./base-path.ts";
 
@@ -196,6 +197,27 @@ export const useAskAI = (options: UseAskAIOptions = {}): UseAskAI => {
       const controller = new AbortController();
       abortRef.current = controller;
       const live = () => current === generation.current;
+      const path = currentPath();
+      const startedAt = Date.now();
+      // Usage reaches the configured analytics providers the same way page
+      // feedback does: the question now, its outcome once the stream settles.
+      // A reset mid-answer revokes the outcome along with the UI update. A
+      // provider that throws must not turn the answer into an error notice.
+      const report = (
+        event: "ask" | "ask_answer" | "ask_error",
+        props: Record<string, number | string>
+      ) => {
+        try {
+          track(event, { ...props, path, question: trimmed });
+        } catch {
+          // Analytics never breaks asking.
+        }
+      };
+      report("ask", {});
+      const outcome = (
+        event: "ask_answer" | "ask_error",
+        props: Record<string, number>
+      ) => report(event, { ...props, ms: Date.now() - startedAt });
       const history: AskMessage[] = [
         ...messages,
         { content: trimmed, role: "user" },
@@ -207,7 +229,7 @@ export const useAskAI = (options: UseAskAIOptions = {}): UseAskAI => {
         const response = await fetch(endpoint, {
           body: JSON.stringify({
             messages: history,
-            page: { path: currentPath() },
+            page: { path },
           }),
           headers: { "content-type": "application/json" },
           method: "POST",
@@ -217,6 +239,7 @@ export const useAskAI = (options: UseAskAIOptions = {}): UseAskAI => {
           // An error body (JSON, HTML error page) must not stream in as the
           // assistant's answer.
           if (live()) {
+            outcome("ask_error", { status: response.status });
             assistant.content = errorMessage;
             setMessages([...history, { ...assistant }]);
           }
@@ -243,11 +266,15 @@ export const useAskAI = (options: UseAskAIOptions = {}): UseAskAI => {
             }
           }
         }
+        if (live()) {
+          outcome("ask_answer", { chars: assistant.content.length });
+        }
       } catch {
         // A thrown fetch (offline, DNS failure, CORS) must not strand the
         // pre-appended empty assistant message as a stuck placeholder. A
         // reset's abort lands here too — the guard keeps it silent.
         if (live()) {
+          outcome("ask_error", { status: 0 });
           assistant.content = errorMessage;
           setMessages([...history, { ...assistant }]);
         }
