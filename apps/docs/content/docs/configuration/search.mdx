@@ -92,7 +92,7 @@ search:
 
 ## Adapters
 
-The client-side adapters are keyless and take no options. The hosted ones take **public** credentials (safe to ship to the browser) and read their **secret** admin key from an environment variable at build time — the secret never lands in the config or the client bundle. Every option you pass is kept verbatim and handed to the adapter's client, so an option Blume doesn't name still reaches the SDK.
+The client-side adapters are keyless and take no options. The hosted ones take **public** credentials (safe to ship to the browser) and read their **secret** admin key from an environment variable at build time — the secret never lands in the config or the client bundle. Every option you pass is kept verbatim and handed to the adapter's client, so an option Blume doesn't name still reaches the SDK. Options must be JSON values — the descriptor is inlined into the generated project as a literal, so a function, `undefined`, or a bigint fails config validation with a path instead of vanishing on the way.
 
 ### Orama (default)
 

@@ -169,6 +169,43 @@ describe("search config schema", () => {
     });
   });
 
+  it("accepts nested JSON in a passthrough option", () => {
+    const result = blumeConfigSchema.safeParse({
+      search: algolia({
+        ...ALGOLIA,
+        facets: { tags: ["a", "b"], weights: [1, null] },
+      }),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects passthrough values JSON would drop or choke on, with a path", () => {
+    const cases = [
+      ["bigint", 10n],
+      ["fn", () => 1],
+      ["nan", Number.NaN],
+      ["undefined", undefined],
+    ] as const;
+    for (const [name, value] of cases) {
+      const result = blumeConfigSchema.safeParse({
+        search: { ...algolia(ALGOLIA), options: { ...ALGOLIA, probe: value } },
+      });
+      expect(result.success, `${name} should be rejected`).toBe(false);
+      // The shorthand normalizes to the object form, hence `provider`.
+      expect(result.error?.issues[0]?.path).toEqual([
+        "search",
+        "provider",
+        "options",
+        "probe",
+      ]);
+    }
+    expect(
+      blumeConfigSchema.safeParse({
+        search: { ...orama(), options: { probe: () => 1 } },
+      }).success
+    ).toBe(false);
+  });
+
   it("accepts an adapter directly as shorthand for the object form", () => {
     const shorthand = parse(algolia(ALGOLIA)).search;
     const object = parse({ provider: algolia(ALGOLIA) }).search;

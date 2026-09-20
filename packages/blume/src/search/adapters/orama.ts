@@ -7,7 +7,7 @@ export type OramaOptions = KeylessSearchOptions;
 
 export type OramaAdapter = SearchAdapter<"orama", "static", OramaOptions>;
 
-export const oramaOptionsSchema = z.looseObject({});
+export const oramaOptionsSchema = z.object({}).catchall(z.json());
 
 /**
  * Blume's default search: a JSON index built from the source files, served

@@ -11,7 +11,7 @@ export type PagefindAdapter = SearchAdapter<
   PagefindOptions
 >;
 
-export const pagefindOptionsSchema = z.looseObject({});
+export const pagefindOptionsSchema = z.object({}).catchall(z.json());
 
 /**
  * Pagefind indexes the built HTML after `blume build` and loads the index in

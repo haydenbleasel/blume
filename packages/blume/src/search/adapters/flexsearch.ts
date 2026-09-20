@@ -11,7 +11,7 @@ export type FlexsearchAdapter = SearchAdapter<
   FlexsearchOptions
 >;
 
-export const flexsearchOptionsSchema = z.looseObject({});
+export const flexsearchOptionsSchema = z.object({}).catchall(z.json());
 
 /**
  * A second keyless, client-side engine. It loads the same `/blume-search.json`

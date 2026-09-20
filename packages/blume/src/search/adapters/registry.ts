@@ -94,7 +94,7 @@ export type SearchAdapterInput = z.input<(typeof adapterVariants)[number]>;
 export const resolvedSearchAdapterSchema = z
   .discriminatedUnion("kind", [
     ...adapterVariants,
-    descriptor("none", "none", z.looseObject({})),
+    descriptor("none", "none", z.object({}).catchall(z.json())),
   ])
   .transform((value): ResolvedSearchAdapter => {
     switch (value.kind) {

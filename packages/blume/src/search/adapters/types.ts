@@ -1,4 +1,4 @@
-import type { AdapterDescriptor } from "../../core/adapter.ts";
+import type { AdapterDescriptor, JsonValue } from "../../core/adapter.ts";
 
 /**
  * How a search adapter integrates with the generated runtime.
@@ -22,11 +22,11 @@ export type SearchAdapterMode =
 
 /**
  * Options for an adapter that needs none. Any key given still rides along to
- * the generated client verbatim, like every adapter's options.
+ * the generated client verbatim, like every adapter's options. JSON values
+ * only: the descriptor is inlined into the generated project as a literal.
  */
 export interface KeylessSearchOptions {
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- mirrors the schema's `looseObject` (the drift guard requires it); extra options pass through to the client verbatim
-  [option: string]: unknown;
+  [option: string]: JsonValue;
 }
 
 /**

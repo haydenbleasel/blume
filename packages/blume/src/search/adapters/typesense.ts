@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { JsonValue } from "../../core/adapter.ts";
 import type { SearchAdapter } from "./types.ts";
 
 /**
@@ -8,7 +9,7 @@ import type { SearchAdapter } from "./types.ts";
  * recreates the collection with `TYPESENSE_ADMIN_API_KEY`, which never enters
  * the config.
  */
-export interface TypesenseOptions {
+export interface TypesenseNamedOptions {
   /** The search-only API key (public — it ships to the browser). */
   apiKey: string;
   collection: string;
@@ -17,9 +18,15 @@ export interface TypesenseOptions {
   port?: number;
   /** Defaults to `https`. */
   protocol?: "http" | "https";
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- mirrors the schema's `looseObject` (the drift guard requires it); extra options pass through to the client verbatim
-  [option: string]: unknown;
 }
+
+/**
+ * Options for {@link typesense}: the named options plus any other client
+ * option, forwarded to the browser verbatim. JSON values only.
+ */
+export type TypesenseOptions = TypesenseNamedOptions & {
+  [option: string]: JsonValue;
+};
 
 export type TypesenseAdapter = SearchAdapter<
   "typesense",
@@ -27,13 +34,15 @@ export type TypesenseAdapter = SearchAdapter<
   TypesenseOptions
 >;
 
-export const typesenseOptionsSchema = z.looseObject({
-  apiKey: z.string(),
-  collection: z.string(),
-  host: z.string(),
-  port: z.number().int().positive().optional(),
-  protocol: z.enum(["http", "https"]).optional(),
-});
+export const typesenseOptionsSchema = z
+  .object({
+    apiKey: z.string(),
+    collection: z.string(),
+    host: z.string(),
+    port: z.number().int().positive().optional(),
+    protocol: z.enum(["http", "https"]).optional(),
+  })
+  .catchall(z.json());
 
 /**
  * Hosted search on Typesense. Each `blume build` drops and recreates the

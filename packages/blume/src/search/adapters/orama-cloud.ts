@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { JsonValue } from "../../core/adapter.ts";
 import type { SearchAdapter } from "./types.ts";
 
 /**
@@ -7,15 +8,21 @@ import type { SearchAdapter } from "./types.ts";
  * public `apiKey`; the build-time sync pushes records to `indexId` with
  * `ORAMA_PRIVATE_API_KEY`, which never enters the config.
  */
-export interface OramaCloudOptions {
+export interface OramaCloudNamedOptions {
   /** The public API key (it ships to the browser). */
   apiKey: string;
   endpoint: string;
   /** Index id used by the build-time sync; omit to skip syncing. */
   indexId?: string;
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- mirrors the schema's `looseObject` (the drift guard requires it); extra options pass through to the client verbatim
-  [option: string]: unknown;
 }
+
+/**
+ * Options for {@link oramaCloud}: the named options plus any other client
+ * option, forwarded to the browser verbatim. JSON values only.
+ */
+export type OramaCloudOptions = OramaCloudNamedOptions & {
+  [option: string]: JsonValue;
+};
 
 export type OramaCloudAdapter = SearchAdapter<
   "orama-cloud",
@@ -23,11 +30,13 @@ export type OramaCloudAdapter = SearchAdapter<
   OramaCloudOptions
 >;
 
-export const oramaCloudOptionsSchema = z.looseObject({
-  apiKey: z.string(),
-  endpoint: z.string(),
-  indexId: z.string().optional(),
-});
+export const oramaCloudOptionsSchema = z
+  .object({
+    apiKey: z.string(),
+    endpoint: z.string(),
+    indexId: z.string().optional(),
+  })
+  .catchall(z.json());
 
 /**
  * Hosted Orama. The browser queries your index endpoint directly; each
