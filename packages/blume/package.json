@@ -30,6 +30,7 @@
     "bin",
     "docs",
     "skills",
+    "AGENTS.md",
     "CHANGELOG.md"
   ],
   "type": "module",
