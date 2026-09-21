@@ -51,6 +51,11 @@ const UNKNOWN_EXT = ".bin";
 const NON_MEDIA_TYPE =
   /^(?:text\/|application\/(?:[\w.-]+\+)?(?:json|xml|javascript))/u;
 const PART_SUFFIX = ".part";
+/** In-process deduplication prevents two callers from publishing one asset at once. */
+const inFlightDownloads = new WeakMap<
+  typeof fetch,
+  Map<string, Promise<string>>
+>();
 // Generous enough for a multi-hundred-megabyte recording on an ordinary
 // connection; its job is to fail a stalled download rather than hang the build.
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -189,9 +194,9 @@ export const materializeAssets = async (
     // megabytes where an image was a hundred kilobytes. Write to a temporary
     // name unique to this attempt and rename on completion, so a download that
     // dies midway never leaves a truncated file the next run would trust as
-    // complete, and two pages fetching the same asset at once (the gate bounds
-    // concurrency, it doesn't dedupe) never write into each other's file —
-    // both publish identical bytes and the last rename wins.
+    // complete. The in-flight map below also makes concurrent callers share one
+    // publication; this matters on Windows, where rename cannot replace an
+    // existing file.
     const part = `${target}.${randomUUID()}${PART_SUFFIX}`;
     try {
       await writeFile(part, res.body);
@@ -203,11 +208,34 @@ export const materializeAssets = async (
     return file;
   };
 
+  const downloadOnce = async (url: string): Promise<string> => {
+    const stem = hashText(url.split("?")[0] ?? url);
+    const key = `${ctx.assetsDir}\u0000${stem}`;
+    let pendingDownloads = inFlightDownloads.get(doFetch);
+    if (!pendingDownloads) {
+      pendingDownloads = new Map();
+      inFlightDownloads.set(doFetch, pendingDownloads);
+    }
+    const pending = pendingDownloads.get(key);
+    if (pending) {
+      return await pending;
+    }
+    const created = download(url);
+    pendingDownloads.set(key, created);
+    try {
+      return await created;
+    } finally {
+      if (pendingDownloads.get(key) === created) {
+        pendingDownloads.delete(key);
+      }
+    }
+  };
+
   const rewrites = new Map<string, string>();
   await Promise.all(
     [...urls].map(async (url) => {
       try {
-        const file = await limit(() => download(url));
+        const file = await limit(() => downloadOnce(url));
         rewrites.set(url, `${ctx.assetsBaseUrl}/${file}`);
       } catch (error) {
         // SAFETY: everything thrown in this block is an Error — the manual

@@ -95,7 +95,9 @@ const runNode = async (cwd: string, ...args: string[]) => {
 
 describe("CLI bundle", () => {
   it("keeps the whole bundle under cli/ and every command's dependencies out of the entry's static imports", () => {
-    const outputs = [...new Bun.Glob("**/*").scanSync({ cwd: outdir })];
+    const outputs = [...new Bun.Glob("**/*").scanSync({ cwd: outdir })].map(
+      (file) => file.replaceAll("\\", "/")
+    );
     expect(outputs).toContain("cli/index.js");
     expect(outputs.filter((file) => !file.startsWith("cli/"))).toEqual([]);
     expect(

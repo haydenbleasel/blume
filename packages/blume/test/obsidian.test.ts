@@ -255,7 +255,11 @@ describe("obsidianSource", () => {
     const root = await makeVault({ "Kept.md": "# Kept\n" });
     // A broken symlink is listed by the walk and gone by the read — the same
     // window Obsidian opens every time it renames or deletes a note in dev.
-    await symlink(join(root, "gone.md"), join(root, "Ghost.md"));
+    await symlink(
+      join(root, "gone.md"),
+      join(root, "Ghost.md"),
+      process.platform === "win32" ? "junction" : "file"
+    );
     const { entries } = await sourceFor(root).load();
     expect(entries.map((entry) => entry.ref)).toEqual(["Kept.md"]);
   });
@@ -264,16 +268,28 @@ describe("obsidianSource", () => {
     const root = await makeVault({ "Kept.md": "# Kept\n" });
     // A self-referential symlink is listed by the walk and yields ELOOP, not
     // ENOENT — a real read failure the load must not swallow.
-    await symlink("Loop.md", join(root, "Loop.md"));
+    await symlink(
+      "Loop.md",
+      join(root, "Loop.md"),
+      process.platform === "win32" ? "junction" : "file"
+    );
     await expect(sourceFor(root).load()).rejects.toThrow();
   });
 
   it("follows a symlinked folder into the vault, like the filesystem source", async () => {
     const shared = await makeVault({ "Linked.md": "# Linked\n" });
     const root = await makeVault({ "Note.md": "See [[Linked]].\n" });
-    await symlink(shared, join(root, "shared"));
+    await symlink(
+      shared,
+      join(root, "shared"),
+      process.platform === "win32" ? "junction" : "dir"
+    );
     // A dangling directory link is neither a folder nor a note: skipped.
-    await symlink(join(root, "gone"), join(root, "missing"));
+    await symlink(
+      join(root, "gone"),
+      join(root, "missing"),
+      process.platform === "win32" ? "junction" : "dir"
+    );
     const { diagnostics, entries } = await sourceFor(root).load();
     const note = entries.find((entry) => entry.ref === "Note.md");
     // `Dirent.isDirectory()` is false for a symlink, which silently dropped

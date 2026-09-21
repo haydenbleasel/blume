@@ -20,6 +20,18 @@ jobs:
       - name: Test
         run: bun run test
 
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Test Blume package
+        run: bun test
+        working-directory: packages/blume
+
   coverage:
     runs-on: ubuntu-latest
     steps:

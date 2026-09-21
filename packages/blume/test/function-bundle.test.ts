@@ -181,8 +181,9 @@ describe("auditFunctionBundle", () => {
       "utf-8"
     );
     await symlink(
-      join(".store", "ufo@1.0.0", "ufo"),
-      join(funcDir, "node_modules", "ufo")
+      process.platform === "win32" ? store : join(".store", "ufo@1.0.0", "ufo"),
+      join(funcDir, "node_modules", "ufo"),
+      process.platform === "win32" ? "junction" : "file"
     );
     // A package installed *above* the function root is not part of the
     // bundle and must not count.

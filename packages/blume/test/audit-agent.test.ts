@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
@@ -11,6 +11,7 @@ import {
   writeAgentReport,
 } from "../src/audit/agent.ts";
 import type { AuditResult } from "../src/audit/run.ts";
+import { writeExecutable } from "./process-fixture.ts";
 
 /** The `--claude`/`--codex` handoff: the report file, the prompt, the launch. */
 
@@ -87,21 +88,26 @@ describe("fixPrompt", () => {
 
 describe("launchAgent", () => {
   it("resolves with the agent's exit code", async () => {
-    expect(await launchAgent("true", "prompt")).toBe(0);
-    expect(await launchAgent("false", "prompt")).toBe(1);
+    const dir = await mkdtemp(join(tmpdir(), "blume-audit-agent-"));
+    dirs.push(dir);
+    const succeeds = await writeExecutable(dir, "succeeds", "process.exit(0);");
+    const fails = await writeExecutable(dir, "fails", "process.exit(1);");
+    expect(await launchAgent(succeeds, "prompt")).toBe(0);
+    expect(await launchAgent(fails, "prompt")).toBe(1);
   });
 
   it("passes the prompt as the agent's first argument", async () => {
     const dir = await mkdtemp(join(tmpdir(), "blume-audit-agent-"));
     dirs.push(dir);
-    const bin = join(dir, "agent");
-    await writeFile(
-      bin,
-      `#!/bin/sh\nprintf '%s' "$1" > "$(dirname "$0")/prompt.txt"\n`
+    const bin = await writeExecutable(
+      dir,
+      "agent",
+      'require("node:fs").writeFileSync(require("node:path").join(__dirname, "prompt.txt"), process.argv[2] ?? "");'
     );
-    await chmod(bin, 0o755);
 
-    expect(await launchAgent(bin, "fix the site")).toBe(0);
+    // Keep this assertion about argv transport rather than the Windows prompt
+    // file handoff, which has its own regression test below.
+    expect(await launchAgent(bin, "fix the site", "linux")).toBe(0);
     expect(await readFile(join(dir, "prompt.txt"), "utf-8")).toBe(
       "fix the site"
     );
@@ -118,16 +124,15 @@ describe("launchAgent", () => {
   it("hands the prompt over as a file on Windows", async () => {
     // npm installs the agent CLIs as `.cmd` shims there, which only run
     // through a shell — and a shell argv can't carry the multi-line prompt.
-    // The launch degrades to a one-line pointer at a prompt file; the shell
-    // quoting is exercised for real here, /bin/sh standing in for cmd.exe.
+    // The launch degrades to a one-line pointer at a prompt file, and the
+    // cross-platform fixture executes the resulting Windows shim for real.
     const dir = await mkdtemp(join(tmpdir(), "blume-audit-agent-"));
     dirs.push(dir);
-    const bin = join(dir, "agent");
-    await writeFile(
-      bin,
-      `#!/bin/sh\nprintf '%s' "$1" > "$(dirname "$0")/prompt.txt"\n`
+    const bin = await writeExecutable(
+      dir,
+      "agent",
+      'require("node:fs").writeFileSync(require("node:path").join(__dirname, "prompt.txt"), process.argv[2] ?? "");'
     );
-    await chmod(bin, 0o755);
 
     const prompt = "fix the site\nthen verify with `blume audit`";
     expect(await launchAgent(bin, prompt, "win32")).toBe(0);

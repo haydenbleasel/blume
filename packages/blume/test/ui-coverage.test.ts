@@ -588,7 +588,7 @@ const astroImportersOf = async (component: string): Promise<string[]> => {
   for await (const file of new Bun.Glob("**/*.astro").scan(srcRoot)) {
     const source = await readFile(join(srcRoot, file), "utf-8");
     if (importPattern.test(source)) {
-      importers.push(file);
+      importers.push(file.replaceAll("\\", "/"));
     }
   }
   return importers;

@@ -1,15 +1,10 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
+
+import { pathWithBin, writeExecutable } from "./process-fixture.ts";
 
 /**
  * `blume eval` end-to-end as a subprocess, with fake `claude`/`codex`
@@ -65,29 +60,33 @@ const fixture = async (
 const fakeClaude = async (root: string): Promise<string> => {
   const bin = join(root, "bin");
   await mkdir(bin, { recursive: true });
-  const script = `#!/bin/sh
-headless=0
-reader=0
-for arg in "$@"; do
-  [ "$arg" = "-p" ] && headless=1
-  [ "$arg" = "--mcp-config" ] && reader=1
-done
-if [ "$headless" = "0" ]; then
-  printf '%s' "$1" > "${root}/interactive-prompt.txt"
-  exit "\${FAKE_INTERACTIVE_EXIT:-0}"
-fi
-cat > /dev/null
-if [ "$reader" = "1" ]; then
-  printf '%s' '{"is_error":false,"result":"The docs say Node 22.12 or newer.","total_cost_usd":0.1}'
-elif [ -n "$FAKE_VERDICT" ]; then
-  printf '%s' "$FAKE_VERDICT"
-else
-  printf '%s' '{"is_error":false,"result":"{\\"pass\\": true, \\"score\\": 1, \\"missing\\": []}"}'
-fi
-`;
-  const path = join(bin, "claude");
-  await writeFile(path, script);
-  await chmod(path, 0o755);
+  await writeExecutable(
+    bin,
+    "claude",
+    `const fs = require("node:fs");
+const path = require("node:path");
+const root = ${JSON.stringify(root)};
+const args = process.argv.slice(2);
+if (!args.includes("-p")) {
+  const handoff = args[0] ?? "";
+  const pointer = /^Read (.+) and follow its instructions exactly\\.$/u.exec(handoff)?.[1];
+  const prompt = pointer ? fs.readFileSync(pointer, "utf8") : handoff;
+  fs.writeFileSync(path.join(root, "interactive-prompt.txt"), prompt);
+  process.exit(Number(process.env.FAKE_INTERACTIVE_EXIT ?? "0"));
+}
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", () => {});
+process.stdin.on("end", () => {
+  const reader = args.includes("--mcp-config");
+  const output = reader
+    ? JSON.stringify({ is_error: false, result: "The docs say Node 22.12 or newer.", total_cost_usd: 0.1 })
+    : process.env.FAKE_VERDICT ?? JSON.stringify({
+        is_error: false,
+        result: JSON.stringify({ pass: true, score: 1, missing: [] }),
+      });
+  process.stdout.write(output);
+});`
+  );
   return bin;
 };
 
@@ -107,7 +106,7 @@ const run = async (
   env: Record<string, string>,
   ...args: string[]
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> => {
-  const path = binDir ? `${binDir}:${process.env.PATH ?? ""}` : "/usr/bin:/bin";
+  const path = binDir ? pathWithBin(binDir) : dirname(process.execPath);
   const proc = Bun.spawn([process.execPath, CLI, "eval", ...args], {
     cwd,
     env: { ...process.env, ...env, PATH: path },

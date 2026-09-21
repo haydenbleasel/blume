@@ -66,6 +66,15 @@ const resolvesAstro = (fromDir: string): boolean => {
   }
 };
 
+const normalizeSlashes = (value: string): string => value.replaceAll("\\", "/");
+
+const expectLinkTarget = async (
+  link: string,
+  target: string
+): Promise<void> => {
+  expect(normalizeSlashes(await readlink(link))).toBe(normalizeSlashes(target));
+};
+
 // An isolated-linker layout: Blume sits in a virtual store with its deps as
 // siblings, and `.blume/` lives in a project that can't walk up to them.
 const isolatedFixture = async (): Promise<{
@@ -134,7 +143,7 @@ describe("symlinkDir", () => {
 
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(target);
+    await expectLinkTarget(link, target);
     expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
   });
 
@@ -169,7 +178,7 @@ describe("symlinkDir", () => {
     expect(types).toEqual(["dir", "junction"]);
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(target);
+    await expectLinkTarget(link, target);
     expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
   });
 
@@ -231,7 +240,7 @@ describe("ensureDepsLink", () => {
     const link = join(outDir, "node_modules");
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(store);
+    await expectLinkTarget(link, store);
     // Every bare specifier the generated config names now resolves through the
     // link — including scoped integrations that live as store siblings.
     expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
@@ -269,7 +278,7 @@ describe("ensureDepsLink", () => {
     const link = join(outDir, "node_modules");
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(store);
+    await expectLinkTarget(link, store);
     expect(existsSync(join(link, "@astrojs", "mdx", "package.json"))).toBe(
       true
     );
@@ -305,7 +314,7 @@ describe("ensureDepsLink", () => {
     const link = join(outDir, "node_modules");
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(store);
+    await expectLinkTarget(link, store);
   });
 
   it("is a no-op when Astro already resolves (hoisted install)", async () => {
@@ -349,7 +358,7 @@ describe("ensureDepsLink", () => {
     const link = join(outDir, "node_modules");
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(depsDir);
+    await expectLinkTarget(link, depsDir);
     expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
     expect(existsSync(join(link, "@astrojs", "mdx", "package.json"))).toBe(
       true
@@ -371,7 +380,7 @@ describe("ensureDepsLink", () => {
     const link = join(outDir, "node_modules");
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(nestedDeps);
+    await expectLinkTarget(link, nestedDeps);
     expect(existsSync(join(link, "@astrojs", "mdx", "package.json"))).toBe(
       true
     );
@@ -390,13 +399,13 @@ describe("ensureDepsLink", () => {
     const { nestedDeps, outDir, pkgDir } = await npmSplitFixture();
     await ensureDepsLink(outDir, pkgDir);
     const link = join(outDir, "node_modules");
-    expect(await readlink(link)).toBe(nestedDeps);
+    await expectLinkTarget(link, nestedDeps);
 
     await ensureDepsLink(outDir, pkgDir);
 
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(nestedDeps);
+    await expectLinkTarget(link, nestedDeps);
   });
 
   it("warns (without linking) on a split layout the symlink can't fix", async () => {
@@ -478,7 +487,7 @@ describe("ensureDepsLink", () => {
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
     // Re-pointed from the stale target to Blume's real store directory.
-    expect(await readlink(link)).toBe(store);
+    await expectLinkTarget(link, store);
     expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
   });
 
@@ -509,7 +518,7 @@ describe("ensureDepsLink", () => {
 
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(store);
+    await expectLinkTarget(link, store);
     // `blume` now resolves to the running package, not the superseded one.
     expect(await realpath(join(link, "blume"))).toBe(await realpath(pkgDir));
   });
@@ -527,13 +536,13 @@ describe("ensureDepsLink", () => {
     await mkdir(outDir, { recursive: true });
     await ensureDepsLink(outDir, pkgDir);
     const link = join(outDir, "node_modules");
-    expect(await readlink(link)).toBe(depsDir);
+    await expectLinkTarget(link, depsDir);
 
     await ensureDepsLink(outDir, pkgDir);
 
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(depsDir);
+    await expectLinkTarget(link, depsDir);
   });
 
   it("leaves a real node_modules directory untouched", async () => {
@@ -572,7 +581,7 @@ describe("prerenderDepsPlugin", () => {
     const link = join(dir, "node_modules");
     const stats = await lstat(link);
     expect(stats.isSymbolicLink()).toBe(true);
-    expect(await readlink(link)).toBe(store);
+    await expectLinkTarget(link, store);
     // The externalized specifiers Node walks up to find now resolve.
     expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
     expect(resolvesAstro(join(dir, "chunks"))).toBe(true);

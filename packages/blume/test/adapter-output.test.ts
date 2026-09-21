@@ -1,13 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  readlink,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
@@ -244,19 +237,28 @@ describe("surfaceAdapterOutput", () => {
     const root = await mkdtemp(join(tmpdir(), "blume-surface-"));
     await seed(root);
     const fn = join(root, ".blume", ".netlify", "v1", "functions", "f");
-    const store = join(fn, "node_modules", ".store", "dep");
+    // A relative directory symlink needs Windows symlink privilege. A junction
+    // is the permission-independent equivalent there, so keep its target
+    // outside `.blume` (the tree that is deleted after the move).
+    const store =
+      process.platform === "win32"
+        ? join(root, "store", "dep")
+        : join(fn, "node_modules", ".store", "dep");
     await mkdir(store, { recursive: true });
     await writeFile(join(store, "index.js"), "export default 1;", "utf-8");
-    await symlink("./.store/dep", join(fn, "node_modules", "dep"), "dir");
+    const linkTarget = process.platform === "win32" ? store : "./.store/dep";
+    await mkdir(join(fn, "node_modules"), { recursive: true });
+    await symlink(
+      linkTarget,
+      join(fn, "node_modules", "dep"),
+      process.platform === "win32" ? "junction" : "dir"
+    );
 
     await surfaceUnderNode(root);
 
     const moved = join(root, ".netlify", "v1", "functions", "f");
-    // The link still names its target relatively, and resolves through to the
-    // package where the bundle landed — self-contained wherever it deploys to.
-    expect(await readlink(join(moved, "node_modules", "dep"))).toBe(
-      "./.store/dep"
-    );
+    // The preserved link on POSIX, or the dereferenced directory on Windows,
+    // must both resolve to the package where the bundle landed.
     expect(
       await readFile(join(moved, "node_modules", "dep", "index.js"), "utf-8")
     ).toBe("export default 1;");

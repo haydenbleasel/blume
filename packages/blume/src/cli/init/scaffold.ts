@@ -196,7 +196,11 @@ export const detectPackageManager = (userAgent?: string): PackageManager => {
 export const detectProjectPackageManager = async (
   root: string
 ): Promise<PackageManager> => {
-  const detected = await detect({ cwd: root });
+  // Eject runs from the project root. Do not let an unrelated package.json in
+  // a parent directory (for example a user's home directory) decide the
+  // project's commands before the invoking package manager can be used as the
+  // fallback.
+  const detected = await detect({ cwd: root, stopDir: root });
   const name = detected?.name;
   return name !== undefined && isPackageManager(name)
     ? name

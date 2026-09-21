@@ -713,8 +713,8 @@ describe("materializeAssets: video sources", () => {
   });
 
   it("lets two pages fetch the same asset at once without corrupting it", async () => {
-    // The Notion source runs pages concurrently through one gate that bounds
-    // but does not dedupe, so the same URL can be in flight twice.
+    // The Notion source runs pages concurrently through one gate, so the same
+    // URL can be published by two callers at once.
     const bytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
     const fetchImpl = asFetch(async () => {
       await sleep(5);

@@ -1,16 +1,11 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
+
+import { pathWithBin, writeExecutable } from "./process-fixture.ts";
 
 /**
  * `blume translate` end-to-end as a subprocess, with a fake `claude`
@@ -88,14 +83,18 @@ const fakeClaude = async (
       total_cost_usd: 0.05,
     })
   );
-  const script = `#!/bin/sh
-cat > /dev/null
-echo run >> "${root}/calls.txt"
-cat "${root}/reply.json"
-`;
-  const path = join(bin, "claude");
-  await writeFile(path, script);
-  await chmod(path, 0o755);
+  await writeExecutable(
+    bin,
+    "claude",
+    `const fs = require("node:fs");
+const path = require("node:path");
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", () => {});
+process.stdin.on("end", () => {
+  fs.appendFileSync(path.join(${JSON.stringify(root)}, "calls.txt"), "run\\n");
+  process.stdout.write(fs.readFileSync(path.join(${JSON.stringify(root)}, "reply.json"), "utf8"));
+});`
+  );
   return bin;
 };
 
@@ -113,7 +112,7 @@ const run = async (
   binDir: string | undefined,
   ...args: string[]
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> => {
-  const path = binDir ? `${binDir}:${process.env.PATH ?? ""}` : "/usr/bin:/bin";
+  const path = binDir ? pathWithBin(binDir) : dirname(process.execPath);
   const proc = Bun.spawn([process.execPath, CLI, "translate", ...args], {
     cwd,
     env: { ...process.env, PATH: path },

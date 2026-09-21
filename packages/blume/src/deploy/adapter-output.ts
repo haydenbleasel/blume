@@ -95,8 +95,15 @@ export const surfaceAdapterOutput = async (
   // links leave the deployed function dying on its first external import with
   // ERR_MODULE_NOT_FOUND. Verbatim, the links stay relative and internal to the
   // bundle, surviving both this move and the platform's own (Vercel mounts the
-  // bundle at `/var/task`).
-  await cp(from, to, { recursive: true, verbatimSymlinks: true });
+  // bundle at `/var/task`). Windows cannot create replacement symlinks without
+  // developer-mode/admin privileges, so it dereferences traced links into
+  // ordinary directories instead.
+  const cpOptions = {
+    dereference: process.platform === "win32",
+    recursive: true,
+    verbatimSymlinks: process.platform !== "win32",
+  };
+  await cp(from, to, cpOptions);
   await rm(from, { force: true, recursive: true });
   return { from, moved: true, to };
 };

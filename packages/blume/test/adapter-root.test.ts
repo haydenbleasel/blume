@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import { tmpdir } from "node:os";
+import nodePath from "node:path";
+import { pathToFileURL } from "node:url";
 
 import type { AstroIntegration } from "astro";
+import { join } from "pathe";
 
 import { withAdapterRoot } from "../src/astro/adapter-root.ts";
 
@@ -52,6 +56,10 @@ const noop = (): void => {
   // A hook that reads no config; used to prove non-root-aware hooks pass through.
 };
 
+const ADAPTER_ROOT = join(tmpdir(), "blume-adapter-project");
+const ADAPTER_ROOT_URL = pathToFileURL(`${ADAPTER_ROOT}${nodePath.sep}`).href;
+const RUNTIME_ROOT_URL = new URL(".blume/", ADAPTER_ROOT_URL).href;
+
 const call = async (
   integration: AstroIntegration,
   root: string,
@@ -73,38 +81,45 @@ const call = async (
 describe("withAdapterRoot", () => {
   it("overrides root in both hooks that receive a config", async () => {
     const seen: Seen = {};
-    const wrapped = withAdapterRoot(spyIntegration(seen), "/proj");
+    const wrapped = withAdapterRoot(spyIntegration(seen), ADAPTER_ROOT);
 
-    await call(wrapped, "file:///proj/.blume/");
+    await call(wrapped, RUNTIME_ROOT_URL);
 
     // Both hooks see the project root, never the `.blume` runtime Astro roots at.
-    expect(seen.setup?.href).toBe("file:///proj/");
-    expect(seen.done?.href).toBe("file:///proj/");
+    expect(seen.setup?.href).toBe(ADAPTER_ROOT_URL);
+    expect(seen.done?.href).toBe(ADAPTER_ROOT_URL);
   });
 
   it("always presents root as a directory URL", async () => {
     // nft and `new URL('.vercel/output/', root)` both resolve *relative* to
     // root, so a missing trailing slash would silently drop the last segment.
     const seen: Seen = {};
-    const wrapped = withAdapterRoot(spyIntegration(seen), "/proj/");
+    const wrapped = withAdapterRoot(
+      spyIntegration(seen),
+      `${ADAPTER_ROOT}${nodePath.sep}`
+    );
 
-    await call(wrapped, "file:///proj/.blume/");
+    await call(wrapped, RUNTIME_ROOT_URL);
 
-    expect(seen.setup?.href).toBe("file:///proj/");
+    expect(seen.setup?.href).toBe(ADAPTER_ROOT_URL);
     expect(new URL(".vercel/output/", seen.setup).href).toBe(
-      "file:///proj/.vercel/output/"
+      new URL(".vercel/output/", ADAPTER_ROOT_URL).href
     );
   });
 
   it("collapses any run of trailing slashes to a single directory slash", async () => {
-    // The trim runs on library-supplied input, so it must stay linear no matter
-    // how many trailing slashes arrive — and still yield one clean directory URL.
+    // Normalization runs on library-supplied input, so it must stay linear no
+    // matter how many trailing separators arrive — and still yield one clean
+    // directory URL.
     const seen: Seen = {};
-    const wrapped = withAdapterRoot(spyIntegration(seen), "/proj////");
+    const wrapped = withAdapterRoot(
+      spyIntegration(seen),
+      `${ADAPTER_ROOT}${nodePath.sep}${nodePath.sep}${nodePath.sep}${nodePath.sep}`
+    );
 
-    await call(wrapped, "file:///proj/.blume/");
+    await call(wrapped, RUNTIME_ROOT_URL);
 
-    expect(seen.setup?.href).toBe("file:///proj/");
+    expect(seen.setup?.href).toBe(ADAPTER_ROOT_URL);
   });
 
   it("passes the rest of the hook options through untouched", async () => {
@@ -118,7 +133,7 @@ describe("withAdapterRoot", () => {
       name: "spy",
     };
 
-    await call(withAdapterRoot(integration, "/proj"), "file:///proj/.blume/", {
+    await call(withAdapterRoot(integration, ADAPTER_ROOT), RUNTIME_ROOT_URL, {
       srcDir: "/proj/.blume/src",
     });
 
@@ -133,7 +148,7 @@ describe("withAdapterRoot", () => {
       name: "spy",
     };
 
-    const wrapped = withAdapterRoot(integration, "/proj");
+    const wrapped = withAdapterRoot(integration, ADAPTER_ROOT);
 
     expect(wrapped.hooks["astro:config:setup"]).toBeUndefined();
     expect(wrapped.hooks["astro:config:done"]).toBeUndefined();
@@ -144,16 +159,16 @@ describe("withAdapterRoot", () => {
     const seen: Seen = {};
     const wrapped = withAdapterRoot(
       spyIntegration(seen, ["astro:config:done"]),
-      "/proj"
+      ADAPTER_ROOT
     );
 
-    await call(wrapped, "file:///proj/.blume/");
+    await call(wrapped, RUNTIME_ROOT_URL);
 
     expect(wrapped.hooks["astro:config:setup"]).toBeUndefined();
-    expect(seen.done?.href).toBe("file:///proj/");
+    expect(seen.done?.href).toBe(ADAPTER_ROOT_URL);
   });
 
   it("preserves the integration's name", () => {
-    expect(withAdapterRoot(spyIntegration({}), "/proj").name).toBe("spy");
+    expect(withAdapterRoot(spyIntegration({}), ADAPTER_ROOT).name).toBe("spy");
   });
 });

@@ -1,15 +1,10 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
+
+import { pathWithBin, writeExecutable } from "./process-fixture.ts";
 
 /**
  * `blume audit` end-to-end as a subprocess.
@@ -82,12 +77,17 @@ const agentBin = async (
 ): Promise<string> => {
   const dir = join(root, "agent-bin");
   await mkdir(dir, { recursive: true });
-  const bin = join(dir, name);
-  await writeFile(
-    bin,
-    `#!/bin/sh\nprintf '%s' "$1" > "$(dirname "$0")/prompt.txt"\nexit ${exitCode}\n`
+  await writeExecutable(
+    dir,
+    name,
+    `const fs = require("node:fs");
+const path = require("node:path");
+const handoff = process.argv[2] ?? "";
+const pointer = /^Read (.+) and follow its instructions exactly\\.$/u.exec(handoff)?.[1];
+const prompt = pointer ? fs.readFileSync(pointer, "utf8") : handoff;
+fs.writeFileSync(path.join(__dirname, "prompt.txt"), prompt);
+process.exit(${exitCode});`
   );
-  await chmod(bin, 0o755);
   return dir;
 };
 
@@ -271,7 +271,7 @@ describe("blume audit", () => {
     const bin = await agentBin(root, "claude");
     const { exitCode, stderr, stdout } = await auditEnv(
       root,
-      { PATH: `${bin}:${process.env.PATH}` },
+      { PATH: pathWithBin(bin) },
       "--claude"
     );
 
@@ -281,8 +281,10 @@ describe("blume audit", () => {
     expect(stderr + stdout).toContain("Claude Code");
 
     const prompt = await readFile(join(bin, "prompt.txt"), "utf-8");
-    const reportPath = /(?<path>\/\S+\/report\.json)/u.exec(prompt)?.groups
-      ?.path;
+    const reportPath =
+      /(?:The full audit report is at |Read )(?<path>.+?report\.json)/u.exec(
+        prompt
+      )?.groups?.path;
     expect(reportPath).toBeDefined();
 
     // The prompt points at the machine report, and the report carries every
@@ -302,7 +304,7 @@ describe("blume audit", () => {
     const bin = await agentBin(root, "codex", 7);
     const { exitCode, stderr, stdout } = await auditEnv(
       root,
-      { PATH: `${bin}:${process.env.PATH}` },
+      { PATH: pathWithBin(bin) },
       "--codex"
     );
     expect(exitCode).toBe(7);
@@ -314,7 +316,7 @@ describe("blume audit", () => {
     const bin = await agentBin(root, "claude");
     const { exitCode, stderr } = await auditEnv(
       root,
-      { PATH: `${bin}:${process.env.PATH}` },
+      { PATH: pathWithBin(bin) },
       "--claude",
       "--only",
       "link_to_broken"

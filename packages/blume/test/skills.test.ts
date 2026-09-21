@@ -161,7 +161,9 @@ describe("collectSkills", () => {
       "SKILL.md",
       "scripts/run.sh",
     ]);
-    expect(files[1]?.mode).toBe(0o755);
+    // NTFS does not expose POSIX execute bits, so chmod cannot mark the
+    // fixture executable on Windows.
+    expect(files[1]?.mode).toBe(process.platform === "win32" ? 0o644 : 0o755);
   });
 
   it("warns about invalid skills instead of publishing them", async () => {

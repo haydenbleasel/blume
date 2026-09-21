@@ -74,10 +74,13 @@ describe("dev lock", () => {
   it("refuses to claim over another live process's lock", async () => {
     const dir = await outDir();
     acquireDevLock(dir)();
-    // PID 1 (init/launchd) is always alive and never ours.
+    // The parent test process is alive on both POSIX and Windows; PID 1 is not
+    // a portable liveness probe on Windows.
+    const otherPid = process.ppid;
+    expect(otherPid).not.toBe(process.pid);
     writeFileSync(
       join(dir, "dev.lock"),
-      JSON.stringify({ pid: 1, port: 3001 })
+      JSON.stringify({ pid: otherPid, port: 3001 })
     );
     let thrown: unknown;
     try {
@@ -89,11 +92,11 @@ describe("dev lock", () => {
     // SAFETY: the toBeInstanceOf assertion above has already thrown if
     // `thrown` is anything but a DevLockHeldError.
     expect((thrown as DevLockHeldError).lock).toStrictEqual({
-      pid: 1,
+      pid: otherPid,
       port: 3001,
     });
     // The live holder's lock survives the refused attempt.
-    expect(readDevLock(dir)?.pid).toBe(1);
+    expect(readDevLock(dir)?.pid).toBe(otherPid);
   });
 
   it("reclaims a stale lock atomically", async () => {

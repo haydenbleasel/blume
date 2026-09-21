@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import nodePath from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { dirname, join } from "pathe";
@@ -254,7 +255,9 @@ interface InjectedTypes {
 }
 
 /** A project root + codegen dir pair for the config hooks. */
-const CONFIG_ROOT = "file:///proj/.blume/";
+const CONFIG_ROOT = pathToFileURL(
+  `${join(tmpdir(), "blume-integration-project")}${nodePath.sep}`
+).href;
 const CODEGEN_DIR = new URL(".astro/integrations/blume/", CONFIG_ROOT);
 
 /**

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
@@ -19,6 +19,7 @@ import {
   readerPrompt,
 } from "../src/eval/prompts.ts";
 import type { EvalQuestion } from "../src/eval/schema.ts";
+import { writeExecutable } from "./process-fixture.ts";
 
 const dirs: string[] = [];
 
@@ -34,13 +35,15 @@ const scratch = async (): Promise<string> => {
   return dir;
 };
 
-/** A fake agent executable whose behavior is the given shell script body. */
-const fakeBin = async (dir: string, body: string): Promise<string> => {
-  const path = join(dir, "fake-agent");
-  await writeFile(path, `#!/bin/sh\n${body}\n`);
-  await chmod(path, 0o755);
-  return path;
-};
+/** A fake agent executable that works without a platform shell. */
+const fakeBin = (dir: string, behavior: "echo" | "sleep"): Promise<string> =>
+  writeExecutable(
+    dir,
+    "fake-agent",
+    behavior === "echo"
+      ? 'let input = ""; process.stdin.setEncoding("utf8"); process.stdin.on("data", (chunk) => { input += chunk; }); process.stdin.on("end", () => { process.stdout.write(input); process.stderr.write("warned\\n"); process.exit(3); });'
+      : 'process.chdir(require("node:os").tmpdir()); setTimeout(() => process.exit(0), 300);'
+  );
 
 const QUESTION: EvalQuestion = {
   expected: ["Node 22.12 or newer"],
@@ -54,7 +57,7 @@ const QUESTION: EvalQuestion = {
 describe("runAgentHeadless", () => {
   it("delivers the prompt on stdin and captures stdout, stderr, and the exit code", async () => {
     const dir = await scratch();
-    const bin = await fakeBin(dir, `cat\nprintf 'warned\\n' >&2\nexit 3`);
+    const bin = await fakeBin(dir, "echo");
     const result = await runAgentHeadless(bin, [], {
       cwd: dir,
       prompt: "the prompt text",
@@ -68,7 +71,7 @@ describe("runAgentHeadless", () => {
 
   it("kills a run at the deadline and reports the timeout", async () => {
     const dir = await scratch();
-    const bin = await fakeBin(dir, "sleep 30");
+    const bin = await fakeBin(dir, "sleep");
     const result = await runAgentHeadless(bin, [], {
       cwd: dir,
       prompt: "",
