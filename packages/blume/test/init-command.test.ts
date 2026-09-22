@@ -1,15 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import {
-  chmod,
-  mkdtemp,
-  readFile,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
+
+import { pathWithBin, writeExecutable } from "./process-fixture.ts";
 
 const CLI = join(import.meta.dir, "..", "src", "cli", "index.ts");
 
@@ -48,7 +43,7 @@ const runInit = async (
   const childEnv = {
     ...process.env,
     ...env,
-    PATH: `${bin}:${process.env.PATH}`,
+    PATH: pathWithBin(bin),
   };
   // `bun test` sets NODE_ENV=test, which lowers consola's default log level
   // and silences the install progress and next-steps box asserted on below.
@@ -75,12 +70,15 @@ const exists = (path: string): Promise<boolean> =>
 
 beforeAll(async () => {
   bin = await tempDir("blume-init-command-bin-");
-  const script = join(bin, "npm");
-  await writeFile(
-    script,
-    '#!/bin/sh\n: > "$PWD/installed.marker"\necho "fake npm $*"\n[ -n "$FAKE_NPM_EXIT" ] && exit "$FAKE_NPM_EXIT"\nexit 0\n'
+  await writeExecutable(
+    bin,
+    "npm",
+    `const fs = require("node:fs");
+const path = require("node:path");
+fs.writeFileSync(path.join(process.cwd(), "installed.marker"), "");
+process.stdout.write("fake npm " + process.argv.slice(2).join(" ") + "\\n");
+process.exit(Number(process.env.FAKE_NPM_EXIT ?? "0"));`
   );
-  await chmod(script, 0o755);
 });
 
 afterAll(async () => {

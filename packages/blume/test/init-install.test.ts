@@ -1,14 +1,18 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
-import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
 import { installDependencies } from "../src/cli/init/install.ts";
+import { pathWithBin, writeExecutable } from "./process-fixture.ts";
 
 /**
  * A fake `npm` on PATH: writes a marker in its cwd, echoes, and exits with
  * the code the test asks for through the FAKE_NPM_EXIT environment variable.
+ * It goes first on the real PATH rather than replacing it: the script runs
+ * through a `node` shebang (POSIX) or a `.cmd` shim (Windows), so the
+ * runtime must stay findable.
  */
 let bin: string;
 let project: string;
@@ -17,12 +21,16 @@ const originalPath = process.env.PATH;
 beforeAll(async () => {
   bin = await mkdtemp(join(tmpdir(), "blume-init-install-bin-"));
   project = await mkdtemp(join(tmpdir(), "blume-init-install-project-"));
-  const script = join(bin, "npm");
-  await writeFile(
-    script,
-    '#!/bin/sh\n: > "$PWD/installed.marker"\necho "fake npm $*"\necho "fake warning" >&2\n[ -n "$FAKE_NPM_EXIT" ] && exit "$FAKE_NPM_EXIT"\nexit 0\n'
+  await writeExecutable(
+    bin,
+    "npm",
+    `const fs = require("node:fs");
+const path = require("node:path");
+fs.writeFileSync(path.join(process.cwd(), "installed.marker"), "");
+process.stdout.write("fake npm " + process.argv.slice(2).join(" ") + "\\n");
+process.stderr.write("fake warning\\n");
+process.exit(Number(process.env.FAKE_NPM_EXIT ?? "0"));`
   );
-  await chmod(script, 0o755);
 });
 
 afterEach(() => {
@@ -39,7 +47,7 @@ afterAll(async () => {
 
 describe("installDependencies", () => {
   it("runs the package manager's install in the project root", async () => {
-    process.env.PATH = bin;
+    process.env.PATH = pathWithBin(bin);
     const outcome = await installDependencies(project, "npm", { quiet: true });
     expect(outcome).toEqual({ command: "npm install" });
     const marker = await stat(join(project, "installed.marker"));
@@ -47,7 +55,7 @@ describe("installDependencies", () => {
   });
 
   it("streams output when not quiet", async () => {
-    process.env.PATH = bin;
+    process.env.PATH = pathWithBin(bin);
     const outcome = await installDependencies(project, "npm", {
       quiet: false,
     });
@@ -55,7 +63,7 @@ describe("installDependencies", () => {
   });
 
   it("reports a non-zero exit with the captured output", async () => {
-    process.env.PATH = bin;
+    process.env.PATH = pathWithBin(bin);
     process.env.FAKE_NPM_EXIT = "7";
     const outcome = await installDependencies(project, "npm", { quiet: true });
     expect(outcome).toEqual({
