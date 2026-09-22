@@ -975,8 +975,17 @@ describe("scanProject: git last-modified branch", () => {
     git(["config", "user.name", "Blume Test"]);
     git(["add", "-A"]);
     git(["-c", "commit.gpgsign=false", "commit", "-m", "init"]);
+    // Scan from the root as git spells it: the dates come back keyed by paths
+    // git prints, and the temp dir's own spelling can differ (macOS `/var`
+    // vs `/private/var`; Windows 8.3 short names such as `RUNNER~1`).
+    const toplevel = execFileSync(
+      // oxlint-disable-next-line sonarjs/no-os-command-from-path
+      "git",
+      ["-C", root, "rev-parse", "--show-toplevel"],
+      { encoding: "utf-8", env }
+    ).trim();
 
-    const project = await scanProject(root, { mode: "build" });
+    const project = await scanProject(toplevel, { mode: "build" });
     expect(project.manifest.routes[0]?.lastModified).toMatch(
       /^\d{4}-\d{2}-\d{2}T/u
     );

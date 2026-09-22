@@ -1,17 +1,9 @@
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 
 import { detect } from "package-manager-detector/detect";
-import {
-  basename,
-  dirname,
-  isAbsolute,
-  join,
-  normalize,
-  relative,
-} from "pathe";
+import { basename, dirname, isAbsolute, join, relative } from "pathe";
 
-import { gitRepositoryRoot } from "../../core/last-modified.ts";
 import { blumePackageJson, toPackageName } from "../../core/package-json.ts";
 import { contentful } from "../../sources/contentful.ts";
 import { githubReleases } from "../../sources/github-releases.ts";
@@ -193,20 +185,23 @@ export const detectPackageManager = (userAgent?: string): PackageManager => {
   return name !== undefined && isPackageManager(name) ? name : "npm";
 };
 
-/** One spelling for a directory on every platform: symlinks resolved, `/` separators. */
-const canonicalDir = (dir: string): string => normalize(realpathSync(dir));
-
 /**
- * The last directory the package-manager lookup may inspect. A workspace
- * package keeps its lockfile and `packageManager` field at the repository
- * root, so the walk must climb that far — but no further, or a `package.json`
- * in an unrelated ancestor (a user's home directory, say) decides the
- * project's commands. Outside a repository the project root is the only
- * directory that can be trusted.
+ * The nearest directory at or above `root` holding `.git` (a directory, or
+ * the file a worktree or submodule carries), or null outside a repository.
+ * Checked by presence rather than by asking git, so no path spelling is ever
+ * compared: git prints its toplevel with symlinks and Windows 8.3 short
+ * names resolved, which nothing in Node canonicalizes to.
  */
-const detectionBoundary = (root: string): ((dir: string) => boolean) => {
-  const boundary = canonicalDir(gitRepositoryRoot(root) ?? root);
-  return (dir) => canonicalDir(dir) === boundary;
+const repositoryRootOf = (root: string): string | null => {
+  let dir = root;
+  while (!existsSync(join(dir, ".git"))) {
+    const parent = dirname(dir);
+    if (parent === dir) {
+      return null;
+    }
+    dir = parent;
+  }
+  return dir;
 };
 
 /**
@@ -220,9 +215,14 @@ const detectionBoundary = (root: string): ((dir: string) => boolean) => {
 export const detectProjectPackageManager = async (
   root: string
 ): Promise<PackageManager> => {
+  // A workspace package keeps its lockfile and `packageManager` field at the
+  // repository root, so the walk climbs that far — but no further, or a
+  // `package.json` in an unrelated ancestor (a user's home directory, say)
+  // decides the project's commands. Outside a repository the project root is
+  // the only directory that can be trusted.
   const detected = await detect({
     cwd: root,
-    stopDir: detectionBoundary(root),
+    stopDir: repositoryRootOf(root) ?? root,
   });
   const name = detected?.name;
   return name !== undefined && isPackageManager(name)

@@ -4,7 +4,7 @@ import { realpathSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
-import { dirname, join, normalize } from "pathe";
+import { dirname, join } from "pathe";
 
 import {
   gitLastModifiedTimes,
@@ -41,19 +41,28 @@ const fixtureGitEnv = (): NodeJS.ProcessEnv =>
     Object.entries(process.env).filter(([key]) => !GIT_LOCATION_VARS.has(key))
   );
 
-const runGit = (root: string, args: string[]): void => {
+const runGit = (root: string, args: string[]): string =>
   // Test fixture drives a real git repo; `git` is expected on PATH in CI/dev.
   // oxlint-disable-next-line sonarjs/no-os-command-from-path
   execFileSync("git", ["-C", root, ...args], {
+    encoding: "utf-8",
     env: fixtureGitEnv(),
-    stdio: "ignore",
-  });
-};
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
 
-const initRepo = (root: string): void => {
-  runGit(root, ["init"]);
-  runGit(root, ["config", "user.email", "test@blume.dev"]);
-  runGit(root, ["config", "user.name", "Blume Test"]);
+/**
+ * Init a fixture repository and return its root as git spells it — the
+ * spelling every path git prints is compared against. Neither `realpathSync`
+ * nor pathe gets there: macOS routes `/var` through `/private/var`, and
+ * Windows hands the temp dir out under an 8.3 short name (`RUNNER~1` for
+ * `runneradmin`) that git expands. Fixture paths derive from this root, never
+ * from the one `mkdtemp` returned.
+ */
+const initRepo = (dir: string): string => {
+  runGit(dir, ["init"]);
+  runGit(dir, ["config", "user.email", "test@blume.dev"]);
+  runGit(dir, ["config", "user.name", "Blume Test"]);
+  return runGit(dir, ["rev-parse", "--show-toplevel"]);
 };
 
 describe("resolveLastModifiedConfig", () => {
@@ -153,7 +162,7 @@ describe("scanProject lastModified", () => {
     // The git pathspec must follow the source's own root ("documentation");
     // pointing it at the default `content.root` ("docs") silently dated
     // nothing — `git log -- docs` exits 0 with empty output.
-    const root = realpathSync(
+    const root = initRepo(
       await makeProject({
         "blume.config.ts": [
           "export default {",
@@ -165,7 +174,6 @@ describe("scanProject lastModified", () => {
         "documentation/index.md": "# Home\n",
       })
     );
-    initRepo(root);
     runGit(root, ["add", "-A"]);
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add docs"]);
 
@@ -179,7 +187,7 @@ describe("scanProject lastModified", () => {
     // The vault is a real on-disk tree, so its root must join the git pathspec
     // even though the source is staged — otherwise every vault page stays
     // undated no matter how deep the clone is.
-    const root = realpathSync(
+    const root = initRepo(
       await makeProject({
         "blume.config.ts": [
           "export default {",
@@ -192,7 +200,6 @@ describe("scanProject lastModified", () => {
         "vault/Welcome.md": "# Welcome\n",
       })
     );
-    initRepo(root);
     // `Draft.md` stays untracked: an undated page beside a dated one drives
     // the undated count down the covered-roots path.
     runGit(root, ["add", "vault/Welcome.md"]);
@@ -214,7 +221,7 @@ describe("gitRepositoryRoot", () => {
   const dirs: string[] = [];
 
   const makeDir = async (): Promise<string> => {
-    const root = realpathSync(await mkdtemp(join(tmpdir(), "blume-gitroot-")));
+    const root = await mkdtemp(join(tmpdir(), "blume-gitroot-"));
     dirs.push(root);
     return root;
   };
@@ -226,13 +233,10 @@ describe("gitRepositoryRoot", () => {
   });
 
   it("finds the toplevel of the repository containing root", async () => {
-    const root = await makeDir();
-    initRepo(root);
+    const root = initRepo(await makeDir());
     const nested = join(root, "docs");
     await mkdir(nested, { recursive: true });
-    // Git prints the toplevel with forward slashes on every platform, so
-    // compare against the normalized fixture path rather than the OS one.
-    expect(gitRepositoryRoot(nested)).toBe(normalize(root));
+    expect(gitRepositoryRoot(nested)).toBe(root);
   });
 
   it("is null outside a repository", async () => {
@@ -244,10 +248,10 @@ describe("gitRepositoryRoot", () => {
 describe("gitLastModifiedTimes", () => {
   const dirs: string[] = [];
 
-  // `realpathSync` canonicalizes the temp dir (macOS routes `/var` through
-  // `/private/var`) so the paths we pass match `git rev-parse --show-toplevel`.
-  const makeRepoDir = async (): Promise<string> => {
-    const root = realpathSync(await mkdtemp(join(tmpdir(), "blume-gitmod-")));
+  // A plain temp dir; tests that need a repository init one and adopt git's
+  // spelling of its root (see `initRepo`).
+  const makeDir = async (): Promise<string> => {
+    const root = await mkdtemp(join(tmpdir(), "blume-gitmod-"));
     dirs.push(root);
     return root;
   };
@@ -264,10 +268,9 @@ describe("gitLastModifiedTimes", () => {
     // empty pathspec and logs the entire repository — which in this fixture
     // would happily date the tracked file. An empty map proves the scan was
     // skipped, not merely that git failed.
-    const root = await makeRepoDir();
+    const root = initRepo(await makeDir());
     const tracked = join(root, "note.md");
     await writeFile(tracked, "# Note\n");
-    initRepo(root);
     runGit(root, ["add", "-A"]);
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add note"]);
 
@@ -286,12 +289,11 @@ describe("gitLastModifiedTimes", () => {
   });
 
   it("reads the most recent commit date for a tracked file", async () => {
-    const root = await makeRepoDir();
+    const root = initRepo(await makeDir());
     const contentRoot = join(root, "docs");
     const tracked = join(contentRoot, "index.md");
     await mkdir(contentRoot, { recursive: true });
     await writeFile(tracked, "# Home\n");
-    initRepo(root);
     runGit(root, ["add", "-A"]);
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add docs"]);
 
@@ -311,12 +313,11 @@ describe("gitLastModifiedTimes", () => {
     // Git hooks (husky pre-commit, post-merge) run with GIT_DIR exported; an
     // inherited absolute GIT_DIR overrides `-C` discovery, so without the env
     // sanitizing every call would read the parent's repository instead.
-    const root = await makeRepoDir();
+    const root = initRepo(await makeDir());
     const contentRoot = join(root, "docs");
     const tracked = join(contentRoot, "index.md");
     await mkdir(contentRoot, { recursive: true });
     await writeFile(tracked, "# Home\n");
-    initRepo(root);
     runGit(root, ["add", "-A"]);
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add docs"]);
 
@@ -337,14 +338,13 @@ describe("gitLastModifiedTimes", () => {
   it("returns an empty map when the log fails on an out-of-repo root", async () => {
     // Callers filter these out, but the function still defends itself: a
     // pathspec outside the repository makes `git log` fail outright.
-    const root = await makeRepoDir();
+    const root = initRepo(await makeDir());
     const tracked = join(root, "note.md");
     await writeFile(tracked, "# Note\n");
-    initRepo(root);
     runGit(root, ["add", "-A"]);
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add note"]);
 
-    const outside = await makeRepoDir();
+    const outside = await makeDir();
     const times = gitLastModifiedTimes(
       root,
       [join(outside, "vault")],
@@ -354,7 +354,7 @@ describe("gitLastModifiedTimes", () => {
   });
 
   it("returns an empty map outside a git repository", async () => {
-    const root = await makeRepoDir();
+    const root = await makeDir();
     const times = gitLastModifiedTimes(
       root,
       [join(root, "docs")],
@@ -365,7 +365,7 @@ describe("gitLastModifiedTimes", () => {
 
   it("skips the git scan entirely when there is nothing to date", async () => {
     // An empty pathspec list would otherwise log the whole repository.
-    const root = await makeRepoDir();
+    const root = await makeDir();
     expect(gitLastModifiedTimes(root, [], []).size).toBe(0);
   });
 });

@@ -565,8 +565,15 @@ describe("buildRssFeeds — pages without a date", () => {
   });
 });
 
-const componentSource = (path: string): Promise<string> =>
-  readFile(new URL(`../src/components/${path}`, import.meta.url), "utf-8");
+const componentSource = async (path: string): Promise<string> => {
+  const source = await readFile(
+    new URL(`../src/components/${path}`, import.meta.url),
+    "utf-8"
+  );
+  // A Windows checkout may carry CRLF line endings; the assertions below
+  // quote multi-line source as it is authored.
+  return source.replaceAll("\r\n", "\n");
+};
 
 const layoutSource = (name: string): Promise<string> =>
   componentSource(`layout/${name}`);
