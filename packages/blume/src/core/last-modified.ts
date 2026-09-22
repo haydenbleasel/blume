@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
 
 import { relative } from "pathe";
 
@@ -67,14 +66,13 @@ export const parseGitLog = (output: string): Map<string, string> => {
  */
 export const gitRepositoryRoot = (root: string): string | null => {
   try {
-    const found = execFileSync(
+    return execFileSync(
       // oxlint-disable-next-line sonarjs/no-os-command-from-path -- git is a required dev-tool dependency resolved from PATH
       "git",
       ["-C", root, "rev-parse", "--show-toplevel"],
       // stderr silenced: outside a repository the probe fails by design.
       { encoding: "utf-8", env: gitEnv(), stdio: ["ignore", "pipe", "ignore"] }
     ).trim();
-    return found ? realpathSync(found) : null;
   } catch {
     return null;
   }

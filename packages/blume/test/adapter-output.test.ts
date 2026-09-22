@@ -1,6 +1,15 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import * as fsPromises from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readlink,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
@@ -239,7 +248,9 @@ describe("surfaceAdapterOutput", () => {
     const fn = join(root, ".blume", ".netlify", "v1", "functions", "f");
     // A relative directory symlink needs Windows symlink privilege. A junction
     // is the permission-independent equivalent there, so keep its target
-    // outside `.blume` (the tree that is deleted after the move).
+    // outside `.blume` (the tree that is deleted after the move). Recreating
+    // it verbatim needs that same privilege, which is where the copy falls
+    // back to copying through the link.
     const store =
       process.platform === "win32"
         ? join(root, "store", "dep")
@@ -262,6 +273,82 @@ describe("surfaceAdapterOutput", () => {
     expect(
       await readFile(join(moved, "node_modules", "dep", "index.js"), "utf-8")
     ).toBe("export default 1;");
+    if (process.platform !== "win32") {
+      // The link still names its target relatively — self-contained wherever
+      // the bundle deploys to — rather than being copied through.
+      expect(await readlink(join(moved, "node_modules", "dep"))).toBe(
+        "./.store/dep"
+      );
+    }
+  });
+
+  it("copies through the links when the platform refuses to recreate them", async () => {
+    // Windows without symlink privilege answers EPERM to the verbatim copy;
+    // the bundle is then copied with links dereferenced so it still runs. On
+    // POSIX the verbatim copy never fails that way, so it is made to here.
+    const root = await mkdtemp(join(tmpdir(), "blume-surface-"));
+    await seed(root);
+    const fn = join(root, ".blume", ".netlify", "v1", "functions", "f");
+    const store = join(fn, "node_modules", ".store", "dep");
+    await mkdir(store, { recursive: true });
+    await writeFile(join(store, "index.js"), "export default 1;", "utf-8");
+    await symlink("./.store/dep", join(fn, "node_modules", "dep"), "dir");
+    const realCp = fsPromises.cp;
+    const attempts: boolean[] = [];
+    const spy = spyOn(fsPromises, "cp").mockImplementation(
+      (from, to, options) => {
+        attempts.push(options?.dereference === true);
+        return options?.verbatimSymlinks
+          ? Promise.reject(
+              Object.assign(
+                new Error("EPERM: operation not permitted, symlink"),
+                {
+                  code: "EPERM",
+                }
+              )
+            )
+          : realCp(from, to, options);
+      }
+    );
+    try {
+      await surfaceAdapterOutput(config(netlify()), context(root));
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(attempts).toEqual([false, true]);
+    const moved = join(root, ".netlify", "v1", "functions", "f");
+    const dep = join(moved, "node_modules", "dep");
+    const stats = await lstat(dep);
+    expect(stats.isSymbolicLink()).toBe(false);
+    expect(await readFile(join(dep, "index.js"), "utf-8")).toBe(
+      "export default 1;"
+    );
+    expect(existsSync(fn)).toBe(false);
+  });
+
+  it("surfaces any other copy failure instead of copying through links", async () => {
+    const root = await mkdtemp(join(tmpdir(), "blume-surface-"));
+    await seed(root);
+    let attempts = 0;
+    const spy = spyOn(fsPromises, "cp").mockImplementation(() => {
+      attempts += 1;
+      return Promise.reject(
+        Object.assign(new Error("EACCES: permission denied"), {
+          code: "EACCES",
+        })
+      );
+    });
+    try {
+      await expect(
+        surfaceAdapterOutput(config(netlify()), context(root))
+      ).rejects.toThrow("EACCES");
+    } finally {
+      spy.mockRestore();
+    }
+    expect(attempts).toBe(1);
+    // The bundle is still where it was, for the next attempt.
+    expect(existsSync(join(root, ".blume", ".netlify", "v1"))).toBe(true);
   });
 
   it("replaces a stale destination bundle", async () => {

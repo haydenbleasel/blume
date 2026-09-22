@@ -22,6 +22,9 @@ jobs:
 
   test-windows:
     runs-on: windows-latest
+    # The suite includes dev-server e2e tests; a wedged Astro dev server must
+    # fail the job, not run out the six-hour default.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2

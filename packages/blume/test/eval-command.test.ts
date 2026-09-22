@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
 
-import { pathWithBin, writeExecutable } from "./process-fixture.ts";
+import {
+  pathWithBin,
+  pathWithoutAgents,
+  writeExecutable,
+} from "./process-fixture.ts";
 
 /**
  * `blume eval` end-to-end as a subprocess, with fake `claude`/`codex`
@@ -106,7 +110,7 @@ const run = async (
   env: Record<string, string>,
   ...args: string[]
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> => {
-  const path = binDir ? pathWithBin(binDir) : dirname(process.execPath);
+  const path = binDir ? pathWithBin(binDir) : await pathWithoutAgents();
   const proc = Bun.spawn([process.execPath, CLI, "eval", ...args], {
     cwd,
     env: { ...process.env, ...env, PATH: path },

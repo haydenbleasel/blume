@@ -1,9 +1,17 @@
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 
 import { detect } from "package-manager-detector/detect";
-import { basename, dirname, isAbsolute, join, relative } from "pathe";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+} from "pathe";
 
+import { gitRepositoryRoot } from "../../core/last-modified.ts";
 import { blumePackageJson, toPackageName } from "../../core/package-json.ts";
 import { contentful } from "../../sources/contentful.ts";
 import { githubReleases } from "../../sources/github-releases.ts";
@@ -185,6 +193,22 @@ export const detectPackageManager = (userAgent?: string): PackageManager => {
   return name !== undefined && isPackageManager(name) ? name : "npm";
 };
 
+/** One spelling for a directory on every platform: symlinks resolved, `/` separators. */
+const canonicalDir = (dir: string): string => normalize(realpathSync(dir));
+
+/**
+ * The last directory the package-manager lookup may inspect. A workspace
+ * package keeps its lockfile and `packageManager` field at the repository
+ * root, so the walk must climb that far — but no further, or a `package.json`
+ * in an unrelated ancestor (a user's home directory, say) decides the
+ * project's commands. Outside a repository the project root is the only
+ * directory that can be trusted.
+ */
+const detectionBoundary = (root: string): ((dir: string) => boolean) => {
+  const boundary = canonicalDir(gitRepositoryRoot(root) ?? root);
+  return (dir) => canonicalDir(dir) === boundary;
+};
+
 /**
  * Detect an existing project's package manager from its lockfile /
  * `packageManager` field (package-manager-detector), falling back to the
@@ -196,11 +220,10 @@ export const detectPackageManager = (userAgent?: string): PackageManager => {
 export const detectProjectPackageManager = async (
   root: string
 ): Promise<PackageManager> => {
-  // Eject runs from the project root. Do not let an unrelated package.json in
-  // a parent directory (for example a user's home directory) decide the
-  // project's commands before the invoking package manager can be used as the
-  // fallback.
-  const detected = await detect({ cwd: root, stopDir: root });
+  const detected = await detect({
+    cwd: root,
+    stopDir: detectionBoundary(root),
+  });
   const name = detected?.name;
   return name !== undefined && isPackageManager(name)
     ? name

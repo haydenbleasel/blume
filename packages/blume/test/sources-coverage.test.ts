@@ -712,21 +712,29 @@ describe("materializeAssets: video sources", () => {
     expect(second.markdown).toBe(first.markdown);
   });
 
-  it("lets two pages fetch the same asset at once without corrupting it", async () => {
+  it("lets two pages share one download of the same asset", async () => {
     // The Notion source runs pages concurrently through one gate, so the same
-    // URL can be published by two callers at once.
+    // URL can be published by two callers at once; sharing the in-flight
+    // table means only one of them fetches, and only one attempt ever
+    // publishes the file (Windows refuses to rename over an open target).
     const bytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+    let fetches = 0;
     const fetchImpl = asFetch(async () => {
+      fetches += 1;
       await sleep(5);
       return new Response(bytes);
     });
     const dir = await tempDir();
-    const limit = pLimit(4);
+    const shared = {
+      inFlight: new Map<string, Promise<string>>(),
+      limit: pLimit(4),
+    };
     const body = '<video controls src="https://cdn.example.com/shared.mp4" />';
     const [a, b] = await Promise.all([
-      materializeAssets(body, { ...assetCtx(dir, fetchImpl), limit }),
-      materializeAssets(body, { ...assetCtx(dir, fetchImpl), limit }),
+      materializeAssets(body, { ...assetCtx(dir, fetchImpl), ...shared }),
+      materializeAssets(body, { ...assetCtx(dir, fetchImpl), ...shared }),
     ]);
+    expect(fetches).toBe(1);
     expect(a.diagnostics).toStrictEqual([]);
     expect(b.diagnostics).toStrictEqual([]);
     expect(a.markdown).toBe(b.markdown);
@@ -735,6 +743,63 @@ describe("materializeAssets: video sources", () => {
     expect(
       new Uint8Array(await readFile(join(dir, "assets", files[0] ?? "")))
     ).toStrictEqual(bytes);
+  });
+
+  it("does not let a page waiting on a shared download hold a gate slot", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const fetchImpl = asFetch(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await sleep(10);
+      inFlight -= 1;
+      return okBytes();
+    });
+    const dir = await tempDir();
+    const shared = {
+      inFlight: new Map<string, Promise<string>>(),
+      limit: pLimit(2),
+    };
+    const hero = '<video controls src="https://cdn.example.com/hero.mp4" />';
+    const other = '<video controls src="https://cdn.example.com/other.mp4" />';
+    // Page B joins A's download of the hero; with two slots, its own asset
+    // must still start at once rather than queue behind an idle waiter.
+    await Promise.all([
+      materializeAssets(hero, { ...assetCtx(dir, fetchImpl), ...shared }),
+      materializeAssets(`${hero}\n${other}`, {
+        ...assetCtx(dir, fetchImpl),
+        ...shared,
+      }),
+    ]);
+    expect(peak).toBe(2);
+  });
+
+  it("lets a page retry on its own when the download it joined fails", async () => {
+    let fetches = 0;
+    const fetchImpl = asFetch(async () => {
+      fetches += 1;
+      await sleep(5);
+      return fetches === 1 ? new Response(null, { status: 503 }) : okBytes();
+    });
+    const dir = await tempDir();
+    const shared = {
+      inFlight: new Map<string, Promise<string>>(),
+      limit: pLimit(4),
+    };
+    const body = '<video controls src="https://cdn.example.com/flaky.mp4" />';
+    const [a, b] = await Promise.all([
+      materializeAssets(body, { ...assetCtx(dir, fetchImpl), ...shared }),
+      materializeAssets(body, { ...assetCtx(dir, fetchImpl), ...shared }),
+    ]);
+    // The page that started the download reports its failure; the page that
+    // joined it makes an attempt of its own instead of inheriting the error.
+    expect(fetches).toBe(2);
+    expect(a.diagnostics.map((d) => d.code)).toStrictEqual([
+      "BLUME_ASSET_FETCH_FAILED",
+    ]);
+    expect(b.diagnostics).toStrictEqual([]);
+    expect(b.markdown).toContain("/assets/");
+    expect(shared.inFlight.size).toBe(0);
   });
 
   it("runs downloads through the shared gate", async () => {

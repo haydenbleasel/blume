@@ -4,7 +4,7 @@ import { realpathSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
-import { dirname, join } from "pathe";
+import { dirname, join, normalize } from "pathe";
 
 import {
   gitLastModifiedTimes,
@@ -230,7 +230,9 @@ describe("gitRepositoryRoot", () => {
     initRepo(root);
     const nested = join(root, "docs");
     await mkdir(nested, { recursive: true });
-    expect(gitRepositoryRoot(nested)).toBe(root);
+    // Git prints the toplevel with forward slashes on every platform, so
+    // compare against the normalized fixture path rather than the OS one.
+    expect(gitRepositoryRoot(nested)).toBe(normalize(root));
   });
 
   it("is null outside a repository", async () => {

@@ -264,17 +264,20 @@ describe("obsidianSource", () => {
     expect(entries.map((entry) => entry.ref)).toEqual(["Kept.md"]);
   });
 
-  it("still fails on a read error that is not a missing file", async () => {
-    const root = await makeVault({ "Kept.md": "# Kept\n" });
-    // A self-referential symlink is listed by the walk and yields ELOOP, not
-    // ENOENT — a real read failure the load must not swallow.
-    await symlink(
-      "Loop.md",
-      join(root, "Loop.md"),
-      process.platform === "win32" ? "junction" : "file"
-    );
-    await expect(sourceFor(root).load()).rejects.toThrow();
-  });
+  // A junction cannot point at itself (Windows resolves its target against
+  // the process cwd, leaving a dangling link that reads as ENOENT), and a
+  // file symlink needs a privilege the CI runner lacks — there is no way to
+  // provoke ELOOP there, so the case is POSIX-only.
+  it.skipIf(process.platform === "win32")(
+    "still fails on a read error that is not a missing file",
+    async () => {
+      const root = await makeVault({ "Kept.md": "# Kept\n" });
+      // A self-referential symlink is listed by the walk and yields ELOOP,
+      // not ENOENT — a real read failure the load must not swallow.
+      await symlink("Loop.md", join(root, "Loop.md"), "file");
+      await expect(sourceFor(root).load()).rejects.toThrow();
+    }
+  );
 
   it("follows a symlinked folder into the vault, like the filesystem source", async () => {
     const shared = await makeVault({ "Linked.md": "# Linked\n" });

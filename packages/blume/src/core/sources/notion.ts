@@ -369,6 +369,8 @@ export const notionSource = (
   // limited API, and a slow video must not hold API slots. One gate per source
   // bounds the fan-out across every page, not just within one.
   const downloads = pLimit(ASSET_DOWNLOAD_CONCURRENCY);
+  // Shared with the gate so two pages naming one asset share one download.
+  const inFlight = new Map<string, Promise<string>>();
   // Every Notion API call goes through the limiter, inside the retry — so a
   // call sleeping through a backoff doesn't hold a slot while it waits.
   const notionCall = <T>(call: () => Promise<T>): Promise<T> =>
@@ -568,6 +570,7 @@ export const notionSource = (
       assetsBaseUrl,
       assetsDir,
       fetchImpl: options.fetchImpl,
+      inFlight,
       limit: downloads,
     });
     const raw = matter.stringify(assets.markdown, data);

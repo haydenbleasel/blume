@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
@@ -115,6 +116,38 @@ describe("detectPackageManager", () => {
   });
 });
 
+/**
+ * Init a fixture repository with the repo-locating GIT_* variables a parent
+ * git process exports to its hooks stripped out, so `-C` discovery is not
+ * overridden by an absolute GIT_DIR under a pre-commit hook.
+ */
+const initRepo = (root: string): void => {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key]) => !key.startsWith("GIT_") || key === "GIT_CONFIG_NOSYSTEM"
+    )
+  );
+  // oxlint-disable-next-line sonarjs/no-os-command-from-path -- fixture drives a real git repo
+  execFileSync("git", ["-C", root, "init", "-q"], { env, stdio: "ignore" });
+};
+
+const withUserAgent = async (
+  userAgent: string,
+  run: () => Promise<void>
+): Promise<void> => {
+  const previous = process.env.npm_config_user_agent;
+  process.env.npm_config_user_agent = userAgent;
+  try {
+    await run();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.npm_config_user_agent;
+    } else {
+      process.env.npm_config_user_agent = previous;
+    }
+  }
+};
+
 describe("detectProjectPackageManager", () => {
   it("reads an existing project's manager from its lockfile", async () => {
     const dir = await mkdtemp(join(tmpdir(), "blume-pm-"));
@@ -131,17 +164,56 @@ describe("detectProjectPackageManager", () => {
 
   it("falls back to the user agent when no lockfile is found", async () => {
     const dir = await mkdtemp(join(tmpdir(), "blume-pm-"));
-    const previous = process.env.npm_config_user_agent;
-    process.env.npm_config_user_agent = "yarn/4.0.0 npm/? node/v20.0.0";
     try {
-      expect(await detectProjectPackageManager(dir)).toBe("yarn");
+      await withUserAgent("yarn/4.0.0 npm/? node/v20.0.0", async () => {
+        expect(await detectProjectPackageManager(dir)).toBe("yarn");
+      });
     } finally {
-      if (previous === undefined) {
-        delete process.env.npm_config_user_agent;
-      } else {
-        process.env.npm_config_user_agent = previous;
-      }
       await rm(dir, { force: true, recursive: true });
+    }
+  });
+
+  it("climbs to the repository root for a workspace package", async () => {
+    const repo = await mkdtemp(join(tmpdir(), "blume-pm-"));
+    try {
+      initRepo(repo);
+      // A monorepo keeps one lockfile at its root; `apps/docs` has none.
+      await writeFile(join(repo, "package.json"), "{}");
+      await writeFile(join(repo, "pnpm-lock.yaml"), "");
+      const dir = join(repo, "apps", "docs");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "package.json"), "{}");
+      await withUserAgent("npm/10.0.0 node/v22.0.0", async () => {
+        expect(await detectProjectPackageManager(dir)).toBe("pnpm");
+      });
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  it("ignores a package.json above the project that is not its repository", async () => {
+    const home = await mkdtemp(join(tmpdir(), "blume-pm-"));
+    try {
+      // A user's home directory with a stray `packageManager` field must not
+      // decide the commands for a project it has nothing to do with.
+      await writeFile(
+        join(home, "package.json"),
+        JSON.stringify({ packageManager: "pnpm@9.0.0" })
+      );
+      const dir = join(home, "project");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "package.json"), "{}");
+      await withUserAgent("yarn/4.0.0 npm/? node/v20.0.0", async () => {
+        expect(await detectProjectPackageManager(dir)).toBe("yarn");
+      });
+      // Nor when the project is its own repository and the stray file sits
+      // one level above the toplevel.
+      initRepo(dir);
+      await withUserAgent("yarn/4.0.0 npm/? node/v20.0.0", async () => {
+        expect(await detectProjectPackageManager(dir)).toBe("yarn");
+      });
+    } finally {
+      await rm(home, { force: true, recursive: true });
     }
   });
 });
