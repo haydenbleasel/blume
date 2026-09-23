@@ -22,8 +22,12 @@ jobs:
     if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
 
     steps:
+      # changesets/action pushes through the GitHub API with its own
+      # `github-token`, so git never needs the token checkout would persist.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Prepare repository
         run: git fetch --unshallow --tags
@@ -33,9 +37,10 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      # Ensure npm 11.5.1 or later is installed (required for OIDC publishing).
+      # OIDC publishing needs npm 11.5.1 or later. Pinned so a new npm release
+      # never runs with publish rights before it has been reviewed.
       - name: Update npm
-        run: npm install -g npm@latest
+        run: npm install -g npm@12.0.2
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         name: Install Bun

@@ -21,6 +21,7 @@ jobs:
         with:
           # The baseline is checked out as a worktree, so its ref must be here.
           fetch-depth: 0
+          persist-credentials: false
       # `blume build` is timed on the Node CLI bundle, the way it ships.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
