@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-`blume eject` no longer overwrites an app it already ejected: run again, it stops before touching `astro.config.mjs` or `src/`, since a fresh copy would discard every edit made since, and `--force` is the explicit way through. In an ejected app, `blume dev` and `blume build` stop too, pointing at the app's own `npm run dev`/`npm run build` (in the project's package manager), instead of regenerating `.blume/` and running that copy while the app's edits are ignored. An app ejected by Blume 1 is recognized as well. A config `blume eject` can't load, such as one still using Blume 1 fields, is now reported as the same diagnostics other commands print rather than a stack trace, and the summary box `blume build` prints lines its "Server features" row up with the others. Only the header `blume eject` writes (or the one Blume 1's eject wrote) marks a project as ejected, so a project with its own `astro.config.mjs` and a codegen `src/generated/` folder still runs through Blume.

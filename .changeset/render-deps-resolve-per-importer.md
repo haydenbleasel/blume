@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-A built site now loads each package Blume, Astro, and the deploy adapter import from the copy the importing package declared, instead of whichever copy the package manager hoisted to the project root. Under npm, `blume build` failed with "does not provide an export named 'binaryTag'" once another package put `js-yaml@4` at the root, and installing `@astrojs/netlify` or `@astrojs/cloudflare` was enough to do that. Yarn Classic failed the same way, and Yarn Berry failed on a `cookie` conflict. Under pnpm, a `netlify()` build crashed in the adapter's file trace, a `vercel()` build failed its function-bundle check, and a `node()` server built but couldn't start ("Cannot find package 'zod'"). Each server-side build output now carries a `node_modules` of links to exactly the packages its bundles import. A project installed with Yarn Plug'n'Play, which creates no `node_modules`, now stops with a `BLUME_YARN_PNP` error naming the fix (`nodeLinker: node-modules` in `.yarnrc.yml`) instead of an error that read like a bug in Blume.
