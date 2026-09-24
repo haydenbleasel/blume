@@ -29,6 +29,7 @@ interface AnalyticsWindow {
   analytics?: { track?: (event: string, props?: TrackProps) => void };
   clarity?: (command: "event", event: string) => void;
   dataLayer?: DataLayer;
+  databuddy?: { track?: (event: string, props?: TrackProps) => void };
   fathom?: { trackEvent?: (event: string) => void };
   gtag?: (command: "event", event: string, props?: TrackProps) => void;
   heap?: { track?: (event: string, props?: TrackProps) => void };
@@ -82,6 +83,7 @@ const trackGlobals = (
   attempt(() => (w.__blumeGtmLayer ?? w.dataLayer)?.push({ ...props, event }));
   // Privacy-first counters take a name, some with properties.
   attempt(() => w.plausible?.(event, { props }));
+  attempt(() => w.databuddy?.track?.(event, props));
   attempt(() => w.fathom?.trackEvent?.(event));
   // Pirsch stringifies `meta` values in place, so it gets its own copy and
   // the `blume:track` listeners still see the original types.

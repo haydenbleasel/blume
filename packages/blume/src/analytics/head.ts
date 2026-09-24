@@ -3,6 +3,7 @@ import { amplitudeHead } from "./amplitude.ts";
 import { clarityHead } from "./clarity.ts";
 import { clearbitHead } from "./clearbit.ts";
 import { cloudflareHead } from "./cloudflare.ts";
+import { databuddyHead } from "./databuddy.ts";
 import { fathomHead } from "./fathom.ts";
 import { googleAnalyticsHead } from "./google-analytics.ts";
 import { googleTagManagerHead } from "./google-tag-manager.ts";
@@ -63,6 +64,9 @@ const adapterScripts = (
     }
     case "cloudflare": {
       return cloudflareHead(adapter.options);
+    }
+    case "databuddy": {
+      return databuddyHead(adapter.options);
     }
     case "fathom": {
       return fathomHead(adapter.options);

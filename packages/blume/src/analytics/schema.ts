@@ -5,6 +5,7 @@ import { amplitudeAdapterSchema } from "./amplitude.ts";
 import { clarityAdapterSchema } from "./clarity.ts";
 import { clearbitAdapterSchema } from "./clearbit.ts";
 import { cloudflareAdapterSchema } from "./cloudflare.ts";
+import { databuddyAdapterSchema } from "./databuddy.ts";
 import { fathomAdapterSchema } from "./fathom.ts";
 import { googleAnalyticsAdapterSchema } from "./google-analytics.ts";
 import { googleTagManagerAdapterSchema } from "./google-tag-manager.ts";
@@ -27,6 +28,7 @@ export const analyticsAdapterSchema = z.discriminatedUnion("kind", [
   clarityAdapterSchema,
   clearbitAdapterSchema,
   cloudflareAdapterSchema,
+  databuddyAdapterSchema,
   fathomAdapterSchema,
   googleAnalyticsAdapterSchema,
   googleTagManagerAdapterSchema,

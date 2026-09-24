@@ -21,6 +21,7 @@ interface WindowStub {
   blumeLayer?: { push: Fn };
   clarity?: Fn;
   dataLayer?: { push: Fn };
+  databuddy?: { track?: Fn };
   dispatchEvent: (event: CustomEvent) => boolean;
   fathom?: { trackEvent?: Fn };
   gtag?: Fn;
@@ -71,6 +72,7 @@ describe("track", () => {
       capture: mock(noop),
       clarity: mock(noop),
       dataLayer: mock(noop),
+      databuddy: mock(noop),
       fathom: mock(noop),
       gtag: mock(noop),
       heap: mock(noop),
@@ -87,6 +89,7 @@ describe("track", () => {
       analytics: { track: fns.analytics },
       clarity: fns.clarity,
       dataLayer: { push: fns.dataLayer },
+      databuddy: { track: fns.databuddy },
       dispatchEvent: (event) => {
         dispatched.push(event);
         return true;
@@ -122,6 +125,7 @@ describe("track", () => {
     expect(fns.gtag).toHaveBeenCalledWith("event", "feedback", props);
     expect(fns.dataLayer).toHaveBeenCalledWith({ ...props, event: "feedback" });
     expect(fns.plausible).toHaveBeenCalledWith("feedback", { props });
+    expect(fns.databuddy).toHaveBeenCalledWith("feedback", props);
     expect(fns.fathom).toHaveBeenCalledWith("feedback");
     expect(fns.pirsch).toHaveBeenCalledWith("feedback", { meta: props });
     expect(fns.clarity).toHaveBeenCalledWith("event", "feedback");

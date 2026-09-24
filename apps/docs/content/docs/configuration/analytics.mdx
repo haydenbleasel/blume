@@ -38,6 +38,7 @@ Every identifier below — a project key, a measurement ID, a site token — is 
 | `clarity()` | [Microsoft Clarity](#microsoft-clarity) | `id` |
 | `clearbit()` | [Clearbit](#clearbit) | `key` |
 | `cloudflare()` | [Cloudflare Web Analytics](#cloudflare-web-analytics) | `token` |
+| `databuddy()` | [Databuddy](#databuddy) | `clientId` |
 | `fathom()` | [Fathom](#fathom) | `site` |
 | `googleAnalytics()` | [Google Analytics 4](#google-analytics-4) | `id` |
 | `googleTagManager()` | [Google Tag Manager](#google-tag-manager) | `id` |
@@ -171,6 +172,21 @@ analytics: [
 ```
 
 `code` becomes `data-code`, and Blume gives the tag the `pianjs` id Pirsch's script finds itself by. Any other option becomes its own `data-` attribute (`dev`, `exclude`, `include`, `domain`, `endpoint`, …).
+
+## Databuddy
+
+Pass your **client ID** (from the website's settings in [Databuddy](https://databuddy.cc)) to `databuddy()`.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  databuddy({
+    clientId: "xxxxxxxxxxxxxxxxxxxxx",
+    "track-web-vitals": "true", // optional: any other `data-` setting
+  }),
+],
+```
+
+`clientId` becomes `data-client-id`. Any other option becomes its own `data-` attribute on the tag (`track-web-vitals`, `track-errors`, `track-outgoing-links`, `api-url`, …), as strings.
 
 ## Mixpanel
 
@@ -351,6 +367,8 @@ analytics: [
 | `clearbit()` | `key` | — | Clearbit publishable API key. Required. |
 | `cloudflare()` | `token` | — | Cloudflare Web Analytics site token (manual setup). Required. |
 | `cloudflare()` | anything else | — | Forwarded in the beacon's `data-cf-beacon` JSON verbatim. |
+| `databuddy()` | `clientId` | — | Databuddy client ID. Required. |
+| `databuddy()` | anything else | — | Rendered as a `data-` attribute on the tag. |
 | `fathom()` | `site` | — | Fathom site ID. Required. |
 | `fathom()` | `spa` | `"auto"` | Fathom's history-change tracking (`data-spa`). |
 | `fathom()` | anything else | — | Rendered as a `data-` attribute on the tag. |
@@ -389,4 +407,4 @@ analytics: [
 
 ## Custom events
 
-Blume's page feedback sends a custom event through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Fathom, Pirsch, Clarity, Hotjar, and Vercel. Cloudflare and Clearbit have no event API. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. For deploying your built site, see [Deployment](/docs/deployment).
+Blume's page feedback sends a custom event through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, Fathom, Pirsch, Clarity, Hotjar, and Vercel. Cloudflare and Clearbit have no event API. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. For deploying your built site, see [Deployment](/docs/deployment).

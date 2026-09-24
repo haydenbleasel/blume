@@ -30,6 +30,8 @@ export { clearbit } from "./clearbit.ts";
 export type { ClearbitAdapter, ClearbitOptions } from "./clearbit.ts";
 export { cloudflare } from "./cloudflare.ts";
 export type { CloudflareAdapter, CloudflareOptions } from "./cloudflare.ts";
+export { databuddy } from "./databuddy.ts";
+export type { DatabuddyAdapter, DatabuddyOptions } from "./databuddy.ts";
 export { fathom } from "./fathom.ts";
 export type { FathomAdapter, FathomOptions } from "./fathom.ts";
 export { googleAnalytics } from "./google-analytics.ts";
