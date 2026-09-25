@@ -182,11 +182,12 @@ analytics: [
   databuddy({
     clientId: "xxxxxxxxxxxxxxxxxxxxx",
     "track-web-vitals": "true", // optional: any other `data-` setting
+    "skip-patterns": '["/admin/*"]',
   }),
 ],
 ```
 
-`clientId` becomes `data-client-id`. Any other option becomes its own `data-` attribute on the tag (`track-web-vitals`, `track-errors`, `track-outgoing-links`, `api-url`, …), as strings.
+`clientId` becomes `data-client-id`. Any other option becomes its own `data-` attribute on the tag, so name it the way the attribute reads, in kebab-case (`track-web-vitals`, `track-errors`, `track-outgoing-links`, `api-url`, …). Databuddy ignores a camelCase name like `trackWebVitals`. Values are strings: `"true"` or `"false"` for a switch, and a JSON array for `skip-patterns` and `mask-patterns`. Databuddy reads any other list value as empty.
 
 ## Mixpanel
 

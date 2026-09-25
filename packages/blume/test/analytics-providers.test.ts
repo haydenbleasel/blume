@@ -104,12 +104,16 @@ describe("provider adapter factories", () => {
         amplitude({ key: "amp", serverZone: "EU" }),
         fathom({ site: "S", spa: "auto" }),
         mixpanel({ persistence: "localStorage", region: "eu", token: "t" }),
+        databuddy({ clientId: "c", "track-web-vitals": "true" }),
       ],
     });
-    expect(config.analytics).toHaveLength(19);
+    expect(config.analytics).toHaveLength(20);
     expect(config.analytics[16]?.options).toMatchObject({ serverZone: "EU" });
     expect(config.analytics[17]?.options).toMatchObject({ spa: "auto" });
     expect(config.analytics[18]?.options).toMatchObject({ region: "eu" });
+    expect(config.analytics[19]?.options).toMatchObject({
+      "track-web-vitals": "true",
+    });
   });
 
   it("reject an empty identifier on every adapter", () => {
@@ -140,6 +144,14 @@ describe("provider adapter factories", () => {
     expect(
       analyticsConfigSchema.safeParse([
         { ...fathom({ site: "S" }), options: { site: "S", spa: true } },
+      ]).success
+    ).toBe(false);
+    expect(
+      analyticsConfigSchema.safeParse([
+        {
+          ...databuddy({ clientId: "c" }),
+          options: { clientId: "c", "track-errors": true },
+        },
       ]).success
     ).toBe(false);
     expect(
