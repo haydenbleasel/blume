@@ -653,7 +653,8 @@ describe("operationModel", () => {
       requestBody: { content: { "text/plain": { example: "hi" } } },
     });
     expect(plain.body?.contentType).toBe("text/plain");
-    expect(plain.body?.example).toBe('"hi"');
+    // A raw media type's string example is the body as written, not JSON.
+    expect(plain.body?.example).toBe("hi");
     expect(plain.body?.fields).toBeUndefined();
     expect(plain.body?.schema).toBeUndefined();
     const multi = buildModel({

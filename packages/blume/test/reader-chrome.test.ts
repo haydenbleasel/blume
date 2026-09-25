@@ -175,7 +175,7 @@ describe("header", () => {
     expect(menu).toContain("installDropdownClamp();");
     // The drawer variant expands in place, open on the tab's own section.
     expect(menu).toContain('<details class="group" open={active}>');
-    expect(menu).toContain("href={withBase(item.path)}");
+    expect(menu).toContain("href={withMountedBase(item.path)}");
   });
 
   it("routes the banner link through the locale's navigation", async () => {

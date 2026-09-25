@@ -3,6 +3,7 @@ import data from "blume:data";
 
 import { highlightCode } from "../../markdown/index.ts";
 import {
+  type ComponentsLike,
   responseExample,
   type SchemaLike,
   type SpecValue,
@@ -24,13 +25,15 @@ interface ResponseLike {
 }
 
 interface Props {
+  /** The document's `components`, which `$ref`'d examples resolve against. */
+  components?: ComponentsLike;
   sample: RequestSample;
   languages: SampleLanguage[];
   responses: Record<string, ResponseLike>;
   schemas: Record<string, SchemaLike>;
 }
 
-const { sample, languages, responses, schemas } = Astro.props;
+const { components, sample, languages, responses, schemas } = Astro.props;
 
 const requestPanels = await languageSamplePanels(
   languages,
@@ -44,7 +47,7 @@ const responsePanels = await Promise.all(
       Object.entries(response.content ?? {}).find(([type]) =>
         type.includes("json")
       )?.[1] ?? Object.values(response.content ?? {})[0];
-    const example = media ? responseExample(media, schemas) : undefined;
+    const example = media ? responseExample(media, schemas, components) : undefined;
     const html =
       example === undefined || example === null
         ? null

@@ -146,9 +146,9 @@ const runPageItem = async (
   // SAFETY: `targets` maps every configured locale, and work items only carry
   // configured locale codes.
   const target = context.targets.get(item.locale) as LocaleConfig;
-  // A hand-authored translation can live at a non-canonical name (see
-  // WorkStatus); the disk probe finds only canonical targets, and a miss just
-  // means the prompt goes out without a style precedent.
+  // A stale item's target is the existing translation's own file, even at a
+  // non-canonical name (see `PageWorkItem.targetPath`), so it's the style
+  // precedent and the file rewritten; a missing item has nothing to read.
   const previousTranslation = existsSync(item.targetPath)
     ? await readFile(item.targetPath, "utf-8")
     : undefined;

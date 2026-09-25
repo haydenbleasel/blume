@@ -26,7 +26,7 @@ Every page accepts the following frontmatter. All fields are optional.
     slug: {
       type: "string",
       description:
-        "Set the page's full route from the content root (guides/setup). It replaces the whole path the file's location gives the page, not just the last segment.",
+        "Set the page's full route from the content root (guides/setup). It replaces the whole path the file's location gives the page, not just the last segment. A . or .. segment is an error: browsers resolve it away, so no link could reach the page.",
     },
     draft: {
       type: "boolean",

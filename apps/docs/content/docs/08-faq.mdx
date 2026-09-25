@@ -45,7 +45,7 @@ No. A folder of Markdown is a complete site — navigation, search, and theming 
 
 ## Can I use React components and MDX?
 
-Yes. Any page can be `.md` or `.mdx`, and MDX lets you drop in the [built-in components](/docs/content/components) with no imports. You can also add your own `.tsx`/`.jsx` [islands](/docs/content/islands) — Blume auto-enables React only for the pages that use them, so the core theme stays JavaScript-free everywhere else.
+Yes. Any page can be `.md` or `.mdx`, and MDX lets you drop in the [built-in components](/docs/content/components) with no imports. You can also add your own `.tsx`/`.jsx` [islands](/docs/content/islands). Blume switches React on only when your project uses it — any `.tsx` or `.jsx` file in the project (your islands included), a React [`<Component>`](/docs/content/components#component) example, a [component override](/docs/configuration/customization), or the [assistant](/docs/configuration/assistant) — so a site with none of those ships no framework JavaScript.
 
 ## Where can I deploy it?
 

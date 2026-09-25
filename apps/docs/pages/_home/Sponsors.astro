@@ -3,6 +3,7 @@
 // on the left, the wordmarks on the right, over a hairline into the footer. Wordmarks are inlined so they
 // inherit currentColor and need no extra assets; Cloudflare keeps its
 // brand-orange cloud.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
 import TextLink from "./TextLink.astro";
 ---
 
@@ -23,8 +24,7 @@ import TextLink from "./TextLink.astro";
       aria-label="CodeRabbit"
       class="hover:opacity-80"
       href="https://www.coderabbit.ai/"
-      rel="noopener noreferrer"
-      target="_blank"
+      {...NEW_TAB_ATTRS}
     >
       <svg
         aria-hidden="true"
@@ -85,8 +85,7 @@ import TextLink from "./TextLink.astro";
       aria-label="Cloudflare"
       class="hover:opacity-80"
       href="https://www.cloudflare.com/"
-      rel="noopener noreferrer"
-      target="_blank"
+      {...NEW_TAB_ATTRS}
     >
       <!-- Cloudflare's horizontal lockup, composed from its stacked logo's own
            paths: the cloud on the left (shifted to the origin), the wordmark

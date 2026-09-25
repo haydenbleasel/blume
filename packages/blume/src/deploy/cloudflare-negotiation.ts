@@ -84,7 +84,7 @@ import {
   API_PAGES_PATH,
   OPENAPI_PATH,
 } from "../ai/api/paths.ts";
-import { normalizePath } from "../core/base-path.ts";
+import { normalizeBasePath, normalizePath } from "../core/base-path.ts";
 import { CONTENT_ASSETS_ROOT, SVG_ASSET_HEADERS } from "./headers.ts";
 import type { NotFoundVariants } from "./vercel-negotiation.ts";
 
@@ -132,14 +132,6 @@ const STATIC_EXEMPTIONS = [
   API_NAVIGATION_PATH,
 ];
 
-/**
- * The deployment base as a rule/URL prefix: trailing slash stripped, empty
- * for a root deploy — the same normalization the dev middleware applies in
- * `astro/markdown-negotiation.ts`.
- */
-const basePrefix = (base?: string): string =>
-  base && base !== "/" ? base.replace(/\/$/u, "") : "";
-
 /** A value as `JSON.parse` produces it (the wrangler config's value space). */
 type JsonValue =
   | string
@@ -180,7 +172,7 @@ const ruleBody = (rule: string): string =>
  * status (see the module comment).
  */
 export const buildRunWorkerFirstRules = (base?: string): string[] => {
-  const prefix = encodeURI(basePrefix(base));
+  const prefix = encodeURI(normalizeBasePath(base));
   const exemptions = STATIC_EXEMPTIONS.map((path) => `!${prefix}${path}`);
   return prefix
     ? [prefix, `${prefix}/*`, ...exemptions]
@@ -282,7 +274,7 @@ export const buildNegotiationWorker = (
   const routes = JSON.stringify(options.routePaths);
   const pageJson = JSON.stringify(options.pageJsonPaths ?? []);
   const binding = JSON.stringify(options.assetsBinding);
-  const prefix = JSON.stringify(encodeURI(basePrefix(options.base)));
+  const prefix = JSON.stringify(encodeURI(normalizeBasePath(options.base)));
   const homeLinkHeader = JSON.stringify(options.homeLinkHeader ?? null);
   const homeTokens = JSON.stringify(
     options.homeTokens === undefined ? null : String(options.homeTokens)
@@ -680,7 +672,7 @@ export const injectWorkerNegotiation = (
   // The content-route guard compares against redirect `from`s, which carry the
   // full `{deployment.base}{basePath}` stack; the routes carry only
   // `basePath`, so the deployment base is applied here.
-  const deployPrefix = basePrefix(options.base);
+  const deployPrefix = normalizeBasePath(options.base);
   const guardRoutes = new Set(
     contentRoutePaths.map((route) =>
       normalizePath(

@@ -1,6 +1,6 @@
 ---
 import type { DiscoveryHeadLinks } from "../../core/data.ts";
-import { withBase } from "../islands/base-path.ts";
+import { withMountedBase } from "../islands/base-path.ts";
 // Emits the agent-discovery <link>s for the document <head>, on every page and
 // not just the root: an agent that enters on a deep page (a search result, a
 // shared link) never sees the homepage HTTP `Link` header (see
@@ -32,7 +32,7 @@ const { discovery, markdownMirror } = Astro.props;
 {
   discovery?.agentReadability && (
     <link
-      href={withBase("/agent-readability.json")}
+      href={withMountedBase("/agent-readability.json")}
       rel="describedby"
       type="application/json"
     />
@@ -40,7 +40,11 @@ const { discovery, markdownMirror } = Astro.props;
 }
 {
   discovery?.llmsTxt && (
-    <link href={withBase("/llms.txt")} rel="describedby" type="text/plain" />
+    <link
+      href={withMountedBase("/llms.txt")}
+      rel="describedby"
+      type="text/plain"
+    />
   )
 }
 {/* The AI Catalog / ARD manifest under both relations its two specs define:
@@ -50,12 +54,12 @@ const { discovery, markdownMirror } = Astro.props;
   discovery?.aiCatalog && (
     <>
       <link
-        href={withBase("/.well-known/ai-catalog.json")}
+        href={withMountedBase("/.well-known/ai-catalog.json")}
         rel="ai-catalog"
         type="application/ai-catalog+json"
       />
       <link
-        href={withBase("/.well-known/ard.json")}
+        href={withMountedBase("/.well-known/ard.json")}
         rel="ard"
         type="application/json"
       />

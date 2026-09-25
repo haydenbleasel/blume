@@ -1687,6 +1687,20 @@ const DATE_FORM_FIELDS = [
   "day",
 ] as const;
 
+/**
+ * Whether `Intl` knows a time zone. An unknown one (`Asia/Tokio`) throws a
+ * RangeError the first time a date is formatted, deep in a page render, so it
+ * is caught here where the error can point at `dateFormat.timeZone`.
+ */
+const isKnownTimeZone = (timeZone: string): boolean => {
+  try {
+    Intl.DateTimeFormat("en", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const dateFormatConfigSchema = z
   .strictObject({
     /** Calendar system (e.g. `japanese`, `buddhist`). */
@@ -1702,7 +1716,13 @@ const dateFormatConfigSchema = z
     /** Numbering system (e.g. `latn`, `arab`). */
     numberingSystem: z.string().optional(),
     /** IANA time zone (e.g. `Asia/Tokyo`). Defaults to `UTC`. */
-    timeZone: z.string().optional(),
+    timeZone: z
+      .string()
+      .refine(isKnownTimeZone, {
+        message:
+          'Unknown time zone; use an IANA name like "Asia/Tokyo" or "UTC".',
+      })
+      .optional(),
     /** Weekday representation. */
     weekday: z.enum(["long", "short", "narrow"]).optional(),
     /** Year representation. */

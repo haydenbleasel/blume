@@ -9,7 +9,7 @@
  */
 import type { JsonObject } from "./json.ts";
 import { asString, getPath, objectsIn } from "./json.ts";
-import type { InlineMarks } from "./lower.ts";
+import type { InlineMarks, InlinePart } from "./lower.ts";
 import {
   absoluteUrl,
   blockquote,
@@ -17,10 +17,10 @@ import {
   headingPrefix,
   image,
   joinBlocks,
+  linkParts,
   listItem,
   markdownDocument,
   renderInline,
-  renderLink,
   unsupported,
   writesMdx,
 } from "./lower.ts";
@@ -139,44 +139,49 @@ const embeddedEntry = (
   );
 };
 
-const renderInlines = (
+const inlineParts = (
   nodes: JsonObject[],
   options: ContentfulRichTextOptions
-): string =>
-  nodes
-    // oxlint-disable-next-line no-use-before-define -- mutual recursion: a link's label is itself inline content
-    .map((node) => renderInlineNode(node, options))
-    .join("");
+): InlinePart[] =>
+  // oxlint-disable-next-line no-use-before-define -- mutual recursion: a link's label is itself inline content
+  nodes.flatMap((node) => inlineNodeParts(node, options));
 
-const renderInlineNode = (
+const inlineNodeParts = (
   node: JsonObject,
   options: ContentfulRichTextOptions
-): string => {
+): InlinePart[] => {
   switch (asString(node.nodeType)) {
     case "text": {
-      return renderInline(asString(node.value) ?? "", marksOf(node));
+      return [{ marks: marksOf(node), text: asString(node.value) ?? "" }];
     }
     case "hyperlink": {
-      return renderLink(
-        renderInlines(children(node), options),
+      return linkParts(
+        inlineParts(children(node), options),
         asString(getPath(node, "data.uri"))
       );
     }
     case "asset-hyperlink": {
-      return renderLink(
-        renderInlines(children(node), options),
+      return linkParts(
+        inlineParts(children(node), options),
         linkedAsset(node, options)?.url
       );
     }
     case "embedded-entry-inline": {
-      return embeddedEntry(node, options);
+      return [{ markdown: embeddedEntry(node, options) }];
     }
     default: {
       // entry-hyperlink (no route to point at) and anything unknown: the label.
-      return renderInlines(children(node), options);
+      return inlineParts(children(node), options);
     }
   }
 };
+
+/** A block's inline children as Markdown, guarded as one block. */
+const blockText = (
+  node: JsonObject,
+  options: ContentfulRichTextOptions
+): string =>
+  guardBlockStart(renderInline(inlineParts(children(node), options)));
 
 const renderList = (
   items: JsonObject[],
@@ -198,12 +203,14 @@ const renderList = (
     )
     .join("\n");
 
+// Each of a cell's paragraphs is a block as much as a page's is, so it goes
+// through the same guard: two struck runs in one still meet as `~~~~`.
 const cellText = (
   cell: JsonObject,
   options: ContentfulRichTextOptions
 ): string =>
   children(cell)
-    .map((paragraph) => renderInlines(children(paragraph), options))
+    .map((paragraph) => blockText(paragraph, options))
     .join(" ")
     .replaceAll(CELL_BREAK, " ")
     .replaceAll(CELL_PIPE, String.raw`\|`);
@@ -235,11 +242,11 @@ const renderBlock = (
   const type = asString(node.nodeType) ?? "";
   const heading = HEADING.exec(type)?.groups?.level;
   if (heading) {
-    return `${headingPrefix(Number(heading))}${guardBlockStart(renderInlines(children(node), options))}`;
+    return `${headingPrefix(Number(heading))}${blockText(node, options)}`;
   }
   switch (type) {
     case "paragraph": {
-      return guardBlockStart(renderInlines(children(node), options));
+      return blockText(node, options);
     }
     case "blockquote": {
       return blockquote(

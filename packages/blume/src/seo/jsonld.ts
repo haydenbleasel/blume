@@ -1,5 +1,9 @@
 import type { Crumb } from "../components/layout/nav-utils.ts";
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import {
+  mountBasePath,
+  normalizeBasePath,
+  withBasePath,
+} from "../core/base-path.ts";
 
 /** A date-ish value carried through frontmatter (string, YAML Date, or unset). */
 type DateInput = string | Date | null;
@@ -301,7 +305,7 @@ const breadcrumbNode = (
     "@type": "BreadcrumbList",
     itemListElement: linked.map((crumb, index) => ({
       "@type": "ListItem",
-      item: absolute(base, withBasePath(deployBase, crumb.route)),
+      item: absolute(base, mountBasePath(deployBase, crumb.route)),
       name: crumb.label,
       position: index + 1,
     })),
@@ -323,7 +327,7 @@ export const buildStructuredData = (
   // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top
   // so JSON-LD URLs match the served location.
   const deployBase = normalizeBasePath(input.base);
-  const pageUrl = absolute(base, withBasePath(deployBase, input.route));
+  const pageUrl = absolute(base, mountBasePath(deployBase, input.route));
   const rootUrl = absolute(base, deployBase);
   const graph: JsonLdNode[] = [];
 

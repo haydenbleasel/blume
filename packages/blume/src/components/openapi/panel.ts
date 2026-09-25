@@ -40,10 +40,12 @@ class BlumePanelTabs extends HTMLElement {
       // wrap, Home and End jump to the ends, and focus follows selection.
       tab.addEventListener("keydown", (event) => {
         const last = tabs.length - 1;
+        // The strip runs right to left under dir="rtl", so the arrows swap.
+        const rtl = getComputedStyle(this).direction === "rtl";
         let next: number | undefined;
-        if (event.key === "ArrowRight") {
+        if (event.key === (rtl ? "ArrowLeft" : "ArrowRight")) {
           next = index === last ? 0 : index + 1;
-        } else if (event.key === "ArrowLeft") {
+        } else if (event.key === (rtl ? "ArrowRight" : "ArrowLeft")) {
           next = index === 0 ? last : index - 1;
         } else if (event.key === "Home") {
           next = 0;

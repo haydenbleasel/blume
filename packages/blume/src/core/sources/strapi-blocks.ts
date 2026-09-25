@@ -5,6 +5,7 @@
  */
 import type { JsonObject, JsonValue } from "./json.ts";
 import { asNumber, asObject, asString, objectsIn } from "./json.ts";
+import type { InlinePart } from "./lower.ts";
 import {
   absoluteUrl,
   blockquote,
@@ -12,10 +13,10 @@ import {
   guardBlockStart,
   headingPrefix,
   image,
+  linkParts,
   listItem,
   markdownDocument,
   renderInline,
-  renderLink,
   unsupported,
 } from "./lower.ts";
 
@@ -28,34 +29,37 @@ const children = (node: JsonObject): JsonObject[] => objectsIn(node.children);
 
 const typeOf = (node: JsonObject): string => asString(node.type) ?? "";
 
-const renderInlines = (nodes: JsonObject[]): string =>
-  nodes
-    // oxlint-disable-next-line no-use-before-define -- mutual recursion: a link's label is itself inline content
-    .map((node) => renderInlineNode(node))
-    .join("");
+const inlineParts = (nodes: JsonObject[]): InlinePart[] =>
+  // oxlint-disable-next-line no-use-before-define -- mutual recursion: a link's label is itself inline content
+  nodes.flatMap((node) => inlineNodeParts(node));
 
-const renderInlineNode = (node: JsonObject): string => {
+const inlineNodeParts = (node: JsonObject): InlinePart[] => {
   switch (typeOf(node)) {
     case "text": {
-      return renderInline(asString(node.text) ?? "", {
-        bold: node.bold === true,
-        code: node.code === true,
-        italic: node.italic === true,
-        strike: node.strikethrough === true,
-      });
+      return [
+        {
+          marks: {
+            bold: node.bold === true,
+            code: node.code === true,
+            italic: node.italic === true,
+            strike: node.strikethrough === true,
+          },
+          text: asString(node.text) ?? "",
+        },
+      ];
     }
     case "link": {
-      return renderLink(renderInlines(children(node)), asString(node.url));
+      return linkParts(inlineParts(children(node)), asString(node.url));
     }
     default: {
-      return renderInlines(children(node));
+      return inlineParts(children(node));
     }
   }
 };
 
 /** A text block's inline nodes, joined and guarded as one block. */
 const blockText = (nodes: JsonObject[]): string =>
-  guardBlockStart(renderInlines(nodes));
+  guardBlockStart(renderInline(inlineParts(nodes)));
 
 const renderList = (node: JsonObject): string => {
   const ordered = asString(node.format) === "ordered";

@@ -88,6 +88,17 @@ export const defaultMessageValues = (model: MessageModel): MessageValues => ({
 const PARAM_TEMPLATE = /\{(?<name>[^{}]+)\}/gu;
 
 /**
+ * Protocols whose channel address is a URL path, where a parameter value must
+ * be percent-encoded. Everywhere else — a Kafka or MQTT topic, an AMQP routing
+ * key — the address is a name the value goes into as written: `sensor 1`,
+ * not `sensor%201`.
+ */
+const URL_PROTOCOLS = { http: true, https: true, ws: true } satisfies Record<
+  string,
+  true
+>;
+
+/**
  * A free-text base URL lowered onto the server shape the snippet builders and
  * the connect URL read. A full URL contributes its scheme, host, and path.
  * Anything without an authority — a bare `host:port`, which is how broker
@@ -114,7 +125,8 @@ const customServer = (url: string): AsyncApiServerObject => {
 /**
  * THE one message builder: the composer's samples, its copy buttons, and the
  * live WebSocket frame all consume its output. Parameter values are
- * URL-encoded into the address; a parameter left blank keeps its `{name}`
+ * URL-encoded into the address when the protocol addresses channels by URL
+ * (see {@link URL_PROTOCOLS}); a parameter left blank keeps its `{name}`
  * template so the sample still reads as a template rather than a broken
  * address. Payload text that doesn't parse yields no payload — the editor is
  * showing the reader a validation error at that moment, and neither a sample
@@ -126,6 +138,9 @@ export const buildMessage = (
 ): MessageSample => {
   const custom = values.customUrl.trim();
   const picked = model.servers[values.server] ?? model.servers[0];
+  const encode = Object.hasOwn(URL_PROTOCOLS, model.protocol ?? "")
+    ? encodeURIComponent
+    : (value: string) => value;
   let payload: unknown;
   try {
     // SAFETY: JSON.parse returns `any`; widening it to `unknown` claims
@@ -138,7 +153,7 @@ export const buildMessage = (
     action: model.action,
     address: model.address.replaceAll(PARAM_TEMPLATE, (template, name) => {
       const value = values.params[String(name)] ?? "";
-      return value === "" ? template : encodeURIComponent(value);
+      return value === "" ? template : encode(value);
     }),
     payload,
     server: custom === "" ? picked?.server : customServer(custom),

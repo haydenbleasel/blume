@@ -112,6 +112,14 @@ export interface DeployPlatform {
   readsHeaderFiles: Record<DeployOutput, boolean>;
   /** The redirect files a static build writes, beside the manifest. */
   redirectFiles: RedirectFile[];
+  /**
+   * Whether the adapter moves a server build's client output under
+   * `deployment.base` (`dist/client/<base>/`, the directory Astro then hands
+   * `astro:build:done`) while the platform keeps serving `serverStaticDir`
+   * as the assets root. The files the platform reads there, like `_headers`,
+   * belong above the directory Astro reports.
+   */
+  serverClientUnderBase: boolean;
   /** Where a server build's deploy bundle lands. */
   serverOutputDir: (context: ProjectContext) => string;
   /** The directory a server build serves as static files. */

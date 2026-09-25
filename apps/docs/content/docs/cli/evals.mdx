@@ -99,9 +99,9 @@ This writes the full JSON report to a file and opens the agent interactively wit
 ## Flags
 
 - `--agent codex|claude` — which agent CLI runs the reader and judge. Defaults to `codex`.
-- `--file <path>` — the evals file. Defaults to `evals.yaml`.
-- `--threshold <0..1>` — minimum passing fraction before the run exits non-zero, with `severity: warning` misses counted as passing. Defaults to `1`.
-- `--timeout <seconds>` — reader time limit per question. Defaults to `180`.
+- `--file <path>` — the evals file, relative to the project root or absolute. Defaults to `evals.yaml`.
+- `--threshold <0..1>` — minimum passing fraction before the run exits non-zero, with `severity: warning` misses counted as passing. Defaults to `1`. An empty value is an error, so `--threshold "$EVAL_THRESHOLD"` with the variable unset can't switch the gate off.
+- `--timeout <seconds>` — reader time limit per question. Defaults to `180`, and can be at most `2147483` (about 24 days), the longest a timer can wait.
 - `--json` — emit the report as JSON on stdout.
 - `--fix` — after a failing run, hand the report to the agent to fix the docs interactively.
 - `--verbose` — include the reader's full answer under each failure.

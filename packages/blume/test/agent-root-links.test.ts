@@ -11,9 +11,10 @@ import { scanProject } from "../src/core/project-graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 
 /**
- * Root-relative page links on the agent surfaces get what the rendered page
- * gives them: the `deployment.base` + `basePath` prefix, and — on a page in a
- * prefixed locale — that locale's copy of the route when it is served.
+ * Root-relative links on the agent surfaces get what the rendered page gives
+ * them: a page link the `deployment.base` + `basePath` prefix, and — on a page
+ * in a prefixed locale — that locale's copy of the route when it is served; a
+ * public file or an image the `deployment.base` alone.
  */
 
 const dirs: string[] = [];
@@ -71,7 +72,9 @@ describe("root-relative links under a base path", () => {
         "See [Install](/sub/docs/guides/install), [again](/sub/docs/guides/install?tab=npm#top), and [by hand](/sub/docs/guides/install)."
       );
       expect(text).toContain(
-        "Get [the spec](/files/spec.pdf), ![the logo](/logo.png), [elsewhere](https://example.com/x), or [a host](//cdn.example.com/a)."
+        // A public file and an image gain the deployment base alone, never
+        // `basePath`, as the rendered page's do.
+        "Get [the spec](/sub/files/spec.pdf), ![the logo](/sub/logo.png), [elsewhere](https://example.com/x), or [a host](//cdn.example.com/a)."
       );
       expect(text).toContain("`[shown](/guides/install)` stays.");
       expect(text).toContain("[ref]: /sub/docs/guides/install");

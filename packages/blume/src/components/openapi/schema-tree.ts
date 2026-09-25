@@ -55,6 +55,11 @@ export type SchemaNode =
       kind: "branches";
       label: "One of" | "Any of";
       branches: { label: string; slot: SchemaSlot }[];
+      /**
+       * Properties the schema declares beside its `oneOf`/`anyOf`, which
+       * every variant shares; absent when it declares none.
+       */
+      rows?: SchemaRow[];
     }
   | { kind: "properties"; rows: SchemaRow[] }
   | { kind: "type"; label: string };
@@ -125,19 +130,6 @@ export const schemaTree = (
           : { itemsLabel: typeLabel({}), kind: "array" },
       };
     }
-    const branches = schema.oneOf ?? schema.anyOf;
-    if (branches) {
-      return {
-        node: {
-          branches: branches.map((branch, index) => ({
-            label: typeLabel(branch) || `Option ${index + 1}`,
-            slot: table(branch, ancestors),
-          })),
-          kind: "branches",
-          label: schema.oneOf ? "One of" : "Any of",
-        },
-      };
-    }
     // A row discloses nested structure — never a model inside itself.
     const rowChildren = (property: SchemaLike): SchemaSlot | undefined => {
       if (
@@ -155,18 +147,32 @@ export const schemaTree = (
         : undefined;
     };
     const { properties, required } = objectProperties(schema, schemas);
-    if (properties.length > 0) {
-      return {
-        node: {
-          kind: "properties",
-          rows: properties.map(([name, property]) => ({
-            children: rowChildren(property),
-            name,
-            required: required.has(name),
-            schema: property,
-          })),
-        },
+    const rows: SchemaRow[] = properties.map(([name, property]) => ({
+      children: rowChildren(property),
+      name,
+      required: required.has(name),
+      schema: property,
+    }));
+    // Shared properties beside a `oneOf`/`anyOf` (`amount` and `currency`
+    // next to `Card | BankAccount`) render above the variants, planned first
+    // as they read first.
+    const branches = schema.oneOf ?? schema.anyOf;
+    if (branches) {
+      const node: Extract<SchemaNode, { kind: "branches" }> = {
+        branches: branches.map((branch, index) => ({
+          label: typeLabel(branch) || `Option ${index + 1}`,
+          slot: table(branch, ancestors),
+        })),
+        kind: "branches",
+        label: schema.oneOf ? "One of" : "Any of",
       };
+      if (rows.length > 0) {
+        node.rows = rows;
+      }
+      return { node };
+    }
+    if (rows.length > 0) {
+      return { node: { kind: "properties", rows } };
     }
     return { node: { kind: "type", label: typeLabel(schema) } };
   };

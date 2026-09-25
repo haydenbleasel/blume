@@ -22,7 +22,7 @@ export default function Counter() {
 Here's a live counter: <Counter />
 ```
 
-The filename is the component name, so it **must be a PascalCase identifier** — letters, digits, and underscores only (`Counter.tsx` → `<Counter />`). Lowercase filenames, names with dashes/dots/spaces (like `Time-Picker.tsx`), and two islands that resolve to the same name are skipped with a build warning.
+The filename is the component name, so it **must be a PascalCase identifier** — letters, digits, and underscores only (`Counter.tsx` → `<Counter />`). Lowercase filenames and names with dashes/dots/spaces (like `Time-Picker.tsx`) are skipped with a build warning. When two islands resolve to the same name — `Counter.tsx` and `Counter.vue`, or two `Counter.tsx` files in different subfolders — Blume keeps the first by file path and ignores the other, with a build warning.
 
 :::note
 Islands are for **interactive** UI. For a static component you reuse across pages (a styled callout, a pricing table), use an [MDX override](/docs/configuration/customization) instead — it ships no JavaScript.

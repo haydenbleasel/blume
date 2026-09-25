@@ -11,12 +11,17 @@ export const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 export const money = (cost: number | undefined): string =>
   cost === undefined ? "" : `$${cost.toFixed(2)}`;
 
-/** Milliseconds as `12.3s` under a minute, `4m 12s` from there up. */
+/**
+ * Milliseconds as `12.3s` under a minute, `4m 12s` from there up. Rounding
+ * happens before the split, so a value just under a boundary carries over
+ * (`59_990` → `1m 0s`, `119_700` → `2m 0s`) instead of printing `60.0s` or
+ * `1m 60s`.
+ */
 export const duration = (ms: number): string => {
-  if (ms < 60_000) {
-    return seconds(ms);
+  const tenths = Math.round(ms / 100);
+  if (tenths < 600) {
+    return `${(tenths / 10).toFixed(1)}s`;
   }
-  const minutes = Math.floor(ms / 60_000);
-  const rest = Math.round((ms % 60_000) / 1000);
-  return `${minutes}m ${rest}s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}m ${total % 60}s`;
 };

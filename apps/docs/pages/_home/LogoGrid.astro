@@ -13,6 +13,8 @@
 // renders twice so the loop is seamless; the copy is
 // hidden from assistive tech and the tab order. Hover or focus pauses it, and
 // reduced motion swaps it for a static, centered wrap of the first row.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+
 const logos = [
   {
     href: "https://ui.neon.com/installation",
@@ -123,9 +125,8 @@ const logos = [
               aria-label={logo.name}
               class="flex shrink-0 items-center justify-center text-muted-foreground/50 hover:text-foreground"
               href={logo.href}
-              rel="noopener noreferrer"
               tabindex={copy ? -1 : undefined}
-              target="_blank"
+              {...NEW_TAB_ATTRS}
             >
               <span
                 aria-hidden="true"

@@ -54,8 +54,10 @@ describe("neutralizeUnsafeLinks", () => {
     ].join("\n");
     expect(neutralizeUnsafeLinks(markdown)).toBe(
       [
-        "See [docs](https://x.dev), evil, javascript:alert(2),",
-        "encoded, and nested \\[x\\](javascript:y).",
+        // A reduced label is escaped as CMS text is, so its colon can't open
+        // an MDX text directive.
+        "See [docs](https://x.dev), evil, javascript\\:alert(2),",
+        "encoded, and nested \\[x\\](javascript\\:y).",
         "Code `[c](javascript:no)` and [rel](./x) stay.",
         "",
         "",

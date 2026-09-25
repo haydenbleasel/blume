@@ -29,7 +29,7 @@ navigation: {
 ```
 
 :::note
-Operations are indexed for search by their **summary and tag**. The rendered schema tables and code samples aren't full-text indexed; search matches an operation's title and section, then links to its own page.
+Operations are indexed for search by their **summary, description, tag, and endpoint** (`GET /pets/{id}`). The rendered schema tables and code samples aren't full-text indexed; search matches an operation's title, prose, section, and path, then links to its own page.
 :::
 
 ## A local spec
@@ -69,9 +69,11 @@ reference: [
 
 ## Try it playground
 
-Operation pages rendered natively ship an interactive **Try it** panel by default. Blume generates the form from the operation itself: an input per path, query, and header parameter, a body editor built from the request-body schema, everything prefilled from the spec's examples. A server picker lists the operation's servers (its own `servers`, else its path's, else the spec's, with each `{variable}` at its `default`), with a free-text field for any other base URL, and auth inputs match the operation's [resolved security](#authorization) — bearer token, API key, and basic credentials, with OAuth2 as a token paste field (bring an access token; Blume doesn't run the flow).
+Operation pages rendered natively ship an interactive **Try it** panel by default. Blume generates the form from the operation itself: an input per path, query, and header parameter, a body editor built from the request-body schema, everything prefilled from the spec's examples. Values go on the wire the way the spec describes them: array and object parameters follow their `style` and `explode` (`tags=dog&tags=cat` in a query, `1,2` in a path, `filter[color]=red` for `deepObject`), and an `application/x-www-form-urlencoded` or `multipart/form-data` body is sent as form fields rather than JSON. A server picker lists the operation's servers (its own `servers`, else its path's, else the spec's, with each `{variable}` at its `default`), with a free-text field for any other base URL, and auth inputs match the operation's [resolved security](#authorization) — bearer token, API key, and basic credentials, with OAuth2 as a token paste field (bring an access token; Blume doesn't run the flow).
 
 The panel and the code samples stay in lockstep: values typed into the form update the generated samples live, so a copied curl command always matches exactly what **Send** would do. And it stays out of the way — the panel is server-rendered collapsed, and its JavaScript loads only when a reader first opens it. Readers who never touch it download none of it.
+
+The one method a browser can't send is `TRACE`: `fetch` refuses it, so on a `trace` operation **Send** says so instead of sending, and the JavaScript sample (built on `fetch`) is a note rather than code. The cURL and Python samples send it fine.
 
 `playground: false` is the entire off switch:
 
@@ -98,7 +100,7 @@ reference: [
 ],
 ```
 
-The built-in proxy only forwards requests to the origins your specs declare in `servers` (at the document, path, or operation level, with variables at their defaults) — including across redirects — so a public docs deployment can't be aimed at other hosts on its network. A **Custom base URL** typed into the panel isn't a documented server: with the proxy enabled, requests to it are refused with a 403. It reads a request body only up to 4 MB (anything larger gets a `413`), and every response it relays carries `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff`, and `Cross-Origin-Resource-Policy: same-origin` — plus `Content-Disposition: attachment` for HTML or SVG — so an API error page that echoes its input can't run script on the docs origin.
+The built-in proxy only forwards requests to the origins your specs declare in `servers` (at the document, path, or operation level, with variables at their defaults) — including across redirects — so a public docs deployment can't be aimed at other hosts on its network. A **Custom base URL** typed into the panel isn't a documented server: with the proxy enabled, requests to it are refused with a 403. It forwards only the headers the panel sets itself — the credentials and header parameters filled in, and the body's `Content-Type` — so cookies, credentials the browser attaches for the docs site (HTTP Basic auth on a password-protected preview, say), and headers your host adds (`X-Forwarded-For`, `CF-*`, `X-Vercel-*`) never reach the API. It reads a request body only up to 4 MB (anything larger gets a `413`), and every response it relays carries `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff`, and `Cross-Origin-Resource-Policy: same-origin` — plus `Content-Disposition: attachment` for HTML or SVG — so an API error page that echoes its input can't run script on the docs origin.
 
 ## Multiple specs
 

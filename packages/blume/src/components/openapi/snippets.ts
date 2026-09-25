@@ -11,9 +11,18 @@ export interface RequestSample {
   method: string;
   url: string;
   headers: Record<string, string>;
-  /** JSON-stringified request body, when the operation takes one. */
+  /**
+   * The request body as sent, when the operation takes one: JSON text,
+   * form-urlencoded pairs, or a raw media type's text.
+   */
   body?: string;
   bodyValue?: unknown;
+  /**
+   * A `multipart/form-data` body's parts as `[name, value]` pairs, set
+   * instead of `body`. The request carries no Content-Type of its own for
+   * them: the client writes one with the parts' boundary.
+   */
+  formData?: [string, string][];
 }
 
 const headerLines = (
@@ -40,7 +49,11 @@ const stringLiteral = (value: string): string => JSON.stringify(value);
 
 const curlSnippet = (sample: RequestSample): string => {
   const lines = [
-    `curl -X ${sample.method} ${shellQuote(sample.url)}`,
+    // `-X HEAD` sends a HEAD but still waits for the body the response
+    // announces, so the command hangs; `--head` knows there is none.
+    sample.method === "HEAD"
+      ? `curl --head ${shellQuote(sample.url)}`
+      : `curl -X ${sample.method} ${shellQuote(sample.url)}`,
     ...headerLines(
       sample.headers,
       (key, value) => `  -H ${shellQuote(`${key}: ${value}`)}`
@@ -49,10 +62,37 @@ const curlSnippet = (sample: RequestSample): string => {
   if (sample.body) {
     lines.push(`  -d ${shellQuote(sample.body)}`);
   }
+  // `--form-string`, not `-F`: `-F` reads a value starting with `@` or `<` as
+  // a file to upload.
+  for (const [name, value] of sample.formData ?? []) {
+    lines.push(`  --form-string ${shellQuote(`${name}=${value}`)}`);
+  }
   return lines.join(" \\\n");
 };
 
+/**
+ * Whether fetch refuses to send `method` (an upper-case HTTP method). TRACE is
+ * one of the Fetch standard's forbidden methods, and the only one an OpenAPI
+ * spec can declare: browsers and Node's fetch alike throw a TypeError before
+ * any request goes out.
+ */
+export const fetchRefusesMethod = (method: string): boolean =>
+  method === "TRACE";
+
+/**
+ * The JavaScript sample for a method fetch refuses: a note in place of a call
+ * that could only throw.
+ */
+const FETCH_REFUSED_NOTE = [
+  "// fetch() refuses the TRACE method: browsers and Node both throw before",
+  "// sending, so there's no fetch sample for this operation. Send it with",
+  "// curl or another HTTP client instead.",
+].join("\n");
+
 const fetchSnippet = (sample: RequestSample): string => {
+  if (fetchRefusesMethod(sample.method)) {
+    return FETCH_REFUSED_NOTE;
+  }
   const options = [`  method: ${stringLiteral(sample.method)}`];
   if (Object.keys(sample.headers).length > 0) {
     const headers = headerLines(
@@ -71,10 +111,34 @@ const fetchSnippet = (sample: RequestSample): string => {
     // text that isn't JSON yet.
     options.push(`  body: ${stringLiteral(sample.body)}`);
   }
-  return `const response = await fetch(${stringLiteral(sample.url)}, {\n${options.join(
+  // A FormData body: fetch writes the multipart Content-Type and boundary.
+  let form = "";
+  if (sample.formData) {
+    form = [
+      "const form = new FormData();\n",
+      ...sample.formData.map(
+        ([name, value]) =>
+          `form.append(${stringLiteral(name)}, ${stringLiteral(value)});\n`
+      ),
+      "\n",
+    ].join("");
+    options.push("  body: form");
+  }
+  return `${form}const response = await fetch(${stringLiteral(sample.url)}, {\n${options.join(
     ",\n"
   )}\n});`;
 };
+
+/** The methods `requests` has a module-level helper for. */
+const PYTHON_METHODS = new Set([
+  "delete",
+  "get",
+  "head",
+  "options",
+  "patch",
+  "post",
+  "put",
+]);
 
 const pythonSnippet = (sample: RequestSample): string => {
   const args = [`    ${stringLiteral(sample.url)}`];
@@ -91,9 +155,24 @@ const pythonSnippet = (sample: RequestSample): string => {
     // `1e400` as `Infinity` and would otherwise diverge from the live send.
     args.push(`    data=${stringLiteral(sample.body)}`);
   }
-  return `import requests\n\nresponse = requests.${sample.method.toLowerCase()}(\n${args.join(
-    ",\n"
-  )},\n)`;
+  if (sample.formData) {
+    // `files=` is what makes requests encode multipart; a `(None, value)`
+    // tuple is a plain field rather than an upload.
+    const parts = sample.formData.map(
+      ([name, value]) =>
+        `        (${stringLiteral(name)}, (None, ${stringLiteral(value)})),\n`
+    );
+    args.push(`    files=[\n${parts.join("")}    ]`);
+  }
+  // requests has a helper per common method; anything else (TRACE) goes
+  // through `requests.request` with the method named.
+  const method = sample.method.toLowerCase();
+  let call = `requests.${method}`;
+  if (!PYTHON_METHODS.has(method)) {
+    call = "requests.request";
+    args.unshift(`    ${stringLiteral(sample.method)}`);
+  }
+  return `import requests\n\nresponse = ${call}(\n${args.join(",\n")},\n)`;
 };
 
 /** A code-sample language: config id -> label, Shiki lang, and builder. */

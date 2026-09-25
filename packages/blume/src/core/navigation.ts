@@ -115,11 +115,29 @@ const numericOrder = (segment: string): number => {
   return value ? Math.trunc(Number(value)) : Number.POSITIVE_INFINITY;
 };
 
+/**
+ * The name inside a group folder's parentheses — `(guides)`, or `01-(guides)`
+ * with its ordering prefix outside them — else undefined. A prefix written
+ * inside (`(01-guides)`) stays in the name, where it sorts and drops like any
+ * folder's.
+ */
+const groupName = (raw: string): string | undefined =>
+  (raw.match(GROUP_FOLDER) ?? stripOrderingPrefix(raw).match(GROUP_FOLDER))
+    ?.groups?.label;
+
+/**
+ * A folder's sidebar order: its ordering prefix, or — for a group folder
+ * without one outside the parentheses — the prefix inside them, so
+ * `01-(guides)` and `(01-guides)` both sort like `01-guides`.
+ */
+const folderOrder = (raw: string): number =>
+  numericOrder(
+    orderingPrefix(raw) === undefined ? (groupName(raw) ?? raw) : raw
+  );
+
 /** The nav key of a raw path segment: group label or numeric-stripped name. */
-const segmentKey = (raw: string): string => {
-  const group = raw.match(GROUP_FOLDER)?.groups?.label;
-  return stripOrderingPrefix(group ?? raw);
-};
+const segmentKey = (raw: string): string =>
+  stripOrderingPrefix(groupName(raw) ?? raw);
 
 /**
  * Whether a filename stem is a directory index, ignoring an ordering prefix:
@@ -221,8 +239,8 @@ const ensureGroup = (
   const group = createGroup(
     segmentKey(rawSegment),
     path,
-    humanize(rawSegment.match(GROUP_FOLDER)?.groups?.label ?? rawSegment),
-    numericOrder(rawSegment)
+    humanize(groupName(rawSegment) ?? rawSegment),
+    folderOrder(rawSegment)
   );
   parent.index.set(rawSegment, group);
   parent.children.push(group);
@@ -722,7 +740,9 @@ const buildFileSystemSidebar = (
     const folderParts = isIndexStem(stem)
       ? routeSegments
       : routeSegments.slice(0, -1);
-    const routeDirCount = dirs.filter((dir) => !GROUP_FOLDER.test(dir)).length;
+    const routeDirCount = dirs.filter(
+      (dir) => groupName(dir) === undefined
+    ).length;
     const offset = Math.max(0, folderParts.length - routeDirCount);
     // A frontmatter `slug` publishes the page away from its folder, so its
     // route says nothing about where the folder lives (`guides/a.md` with
@@ -744,7 +764,7 @@ const buildFileSystemSidebar = (
     const folders: string[] = [];
     for (const dir of dirs) {
       parent = ensureGroup(parent, dir);
-      if (!GROUP_FOLDER.test(dir)) {
+      if (groupName(dir) === undefined) {
         consumed += 1;
         folders.push(stripOrderingPrefix(dir));
       }

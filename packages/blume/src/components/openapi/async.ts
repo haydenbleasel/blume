@@ -265,6 +265,32 @@ export const channelServers = (
   return servers;
 };
 
+/** A protocol-keyed `bindings` map, whatever object it sits on. */
+type BindingMap = Record<string, AsyncApiSpecValue>;
+
+const BINDINGS_REF =
+  /^#\/components\/(?<section>(?:server|channel|operation|message)Bindings)\/(?<name>[^/]+)$/u;
+
+/**
+ * A `bindings` map as declared: inline, or — which AsyncAPI allows in its
+ * place — a `$ref` to a `#/components/*Bindings` entry, resolved here. Read
+ * as-is, a referenced map's only key is `$ref`, which would pass for the
+ * protocol. `undefined` when a ref resolves to nothing.
+ */
+export const resolveBindings = (
+  bindings: BindingMap | undefined,
+  components?: Components
+): BindingMap | undefined => {
+  const ref = bindings?.$ref;
+  if (!isString(ref)) {
+    return bindings;
+  }
+  const groups = BINDINGS_REF.exec(ref)?.groups;
+  const target =
+    components?.[groups?.section ?? ""]?.[unescapePointer(groups?.name ?? "")];
+  return isObject(target) ? target : undefined;
+};
+
 /** Normalize protocol spellings onto the binding key they document. */
 const PROTOCOL_ALIASES = {
   "kafka-secure": "kafka",
@@ -277,15 +303,17 @@ const PROTOCOL_ALIASES = {
 /**
  * The protocol an operation speaks, for binding-aware code samples: the first
  * operation/channel binding key, else the first relevant server's `protocol`.
+ * `components` resolves bindings given as a `$ref`.
  */
 export const protocolOf = (
   operation: AsyncApiOperationObject | undefined,
   channel: AsyncApiChannelObject | undefined,
-  servers: AsyncApiServerObject[]
+  servers: AsyncApiServerObject[],
+  components?: Components
 ): string | undefined => {
   const declared =
-    Object.keys(operation?.bindings ?? {})[0] ??
-    Object.keys(channel?.bindings ?? {})[0] ??
+    Object.keys(resolveBindings(operation?.bindings, components) ?? {})[0] ??
+    Object.keys(resolveBindings(channel?.bindings, components) ?? {})[0] ??
     servers.find((server) => isString(server.protocol))?.protocol;
   if (!isString(declared) || declared === "") {
     return undefined;
@@ -338,13 +366,17 @@ export interface BindingGroup {
 /**
  * Binding maps flattened for display, `bindingVersion` (metadata, not
  * behavior) dropped. Values stay unformatted — the component renders schema-ish
- * objects as nested schema tables and everything else as code.
+ * objects as nested schema tables and everything else as code. `components`
+ * resolves a map given as a `$ref`.
  */
 export const bindingGroups = (
-  bindings?: AsyncApiChannelObject["bindings"]
+  bindings?: BindingMap,
+  components?: Components
 ): BindingGroup[] => {
   const groups: BindingGroup[] = [];
-  for (const [protocol, fields] of Object.entries(bindings ?? {})) {
+  for (const [protocol, fields] of Object.entries(
+    resolveBindings(bindings, components) ?? {}
+  )) {
     if (!isObject(fields)) {
       continue;
     }

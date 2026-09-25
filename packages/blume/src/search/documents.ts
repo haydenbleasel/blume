@@ -23,7 +23,12 @@ import { HTML_COMMENT } from "../core/sources/normalize.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode, PageRecord } from "../core/types.ts";
 import { parseCodeTitle } from "../markdown/code-title.ts";
-import { MARKDOWN_FEATURES, MDX_FEATURES } from "../markdown/features.ts";
+import { directiveSource } from "../markdown/directives.ts";
+import type { DirectiveNode } from "../markdown/directives.ts";
+import {
+  MARKDOWN_BODY_FEATURES,
+  MDX_BODY_FEATURES,
+} from "../markdown/features.ts";
 import { pageFacets } from "./facets.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
@@ -94,7 +99,6 @@ const INLINE_PARENTS = new Set([
   "strong",
   "subscript",
   "superscript",
-  "textDirective",
 ]);
 
 // Nodes that never render as prose: image alt text was never indexed, MDX
@@ -120,9 +124,9 @@ interface Walk {
 
 // Front matter is already off (core/frontmatter.ts) by the time a body gets
 // here, so a body that opens with a `---` divider must read as a thematic
-// break rather than a second front matter block.
-const MD_PARSE = { features: { ...MARKDOWN_FEATURES, frontmatter: false } };
-const MDX_PARSE = { features: { ...MDX_FEATURES, frontmatter: false } };
+// break rather than a second front matter block — as the renderer reads it.
+const MD_PARSE = { features: MARKDOWN_BODY_FEATURES };
+const MDX_PARSE = { features: MDX_BODY_FEATURES };
 
 const parseMdx = (markdown: string): Nodes | undefined => {
   try {
@@ -169,6 +173,25 @@ const collectCode = (
   // The trailing space keeps the fence apart from what follows it.
   out.push(node.value, " ");
 };
+
+/**
+ * A text or leaf directive as the page shows it. Blume renders neither (see
+ * `markdown/directives.ts`), and prose is full of text that parses as one —
+ * `16:9`, `og:image` — so the page shows the source the author wrote, and the
+ * index reads the same text rather than dropping the `:name` part.
+ */
+const directiveText = (
+  node: Extract<Nodes, { type: "leafDirective" | "textDirective" }>,
+  walk: Walk
+): string =>
+  directiveSource(
+    // SAFETY: DirectiveNode is a structural subset of Satteri's directive
+    // nodes — a `name`, optional attributes and children, and a position.
+    node as DirectiveNode,
+    node.type === "textDirective" ? ":" : "::",
+    // The walked tree was parsed from this text, so its offsets index into it.
+    walk.downlevel.source
+  );
 
 // Block boundaries separate words; so does an empty inline element (`<br />`,
 // a self-closing icon), which otherwise fuses its neighbors.
@@ -223,28 +246,17 @@ const collectText = (node: Nodes, out: string[], walk: Walk): void => {
       out.push(" ");
       return;
     }
-    // Trailing heading markers (`[#custom-id]`, `{#custom-id}`, `[!toc]`,
-    // `[toc]`) are anchor
-
-    // metadata, not prose — strip them so they never pollute the index. Only
-    // a marker that ends the heading's final plain-text child counts,
-    // mirroring the renderer: a heading ending in inline code or an image
-    // keeps its bracketed text on the page (so it stays searchable), and a
-    // heading that is nothing but markers renders them literally.
+    case "textDirective": {
+      out.push(directiveText(node, walk));
+      return;
+    }
+    case "leafDirective": {
+      out.push(directiveText(node, walk), " ");
+      return;
+    }
     case "heading": {
-      const last = node.children.at(-1);
-      const trailing = last?.type === "text" ? last : undefined;
-      const inner: string[] = [];
-      const kept = trailing ? node.children.slice(0, -1) : node.children;
-      for (const child of kept) {
-        collectText(child, inner, walk);
-      }
-      if (trailing) {
-        const stripped = parseHeadingMarkers(trailing.value).text;
-        const literal = stripped === "" && node.children.length === 1;
-        inner.push(literal ? trailing.value : stripped);
-      }
-      out.push(inner.join("").trimEnd(), " ");
+      // oxlint-disable-next-line no-use-before-define -- mutual recursion: a heading's children are walked like any others
+      collectHeading(node, out, walk);
       return;
     }
     default: {
@@ -263,6 +275,35 @@ const collectText = (node: Nodes, out: string[], walk: Walk): void => {
       out.push(" ");
     }
   }
+};
+
+/**
+ * Fold a heading into the accumulator. Trailing heading markers
+ * (`[#custom-id]`, `{#custom-id}`, `[!toc]`, `[toc]`) are anchor metadata,
+ * not prose — strip them so they never pollute the index. Only a marker that
+ * ends the heading's final plain-text child counts, mirroring the renderer: a
+ * heading ending in inline code or an image keeps its bracketed text on the
+ * page (so it stays searchable), and a heading that is nothing but markers
+ * renders them literally.
+ */
+const collectHeading = (
+  node: Extract<Nodes, { type: "heading" }>,
+  out: string[],
+  walk: Walk
+): void => {
+  const last = node.children.at(-1);
+  const trailing = last?.type === "text" ? last : undefined;
+  const inner: string[] = [];
+  const kept = trailing ? node.children.slice(0, -1) : node.children;
+  for (const child of kept) {
+    collectText(child, inner, walk);
+  }
+  if (trailing) {
+    const stripped = parseHeadingMarkers(trailing.value).text;
+    const literal = stripped === "" && node.children.length === 1;
+    inner.push(literal ? trailing.value : stripped);
+  }
+  out.push(inner.join("").trimEnd(), " ");
 };
 
 /**

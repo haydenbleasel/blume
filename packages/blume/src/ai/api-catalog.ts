@@ -1,4 +1,8 @@
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import {
+  mountBasePath,
+  normalizeBasePath,
+  withBasePath,
+} from "../core/base-path.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { absoluteUrl } from "../core/site-url.ts";
 import { resolveReferences } from "../openapi/references.ts";
@@ -39,7 +43,7 @@ const linksetEntries = (config: ResolvedConfig): LinksetEntry[] => {
   const site = config.deployment.options.site ?? null;
   const deployBase = normalizeBasePath(config.deployment.options.base);
   const abs = (path: string): string => {
-    const based = withBasePath(deployBase, path);
+    const based = mountBasePath(deployBase, path);
     return site ? absoluteUrl(site, based) : based;
   };
 

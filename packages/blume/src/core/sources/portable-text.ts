@@ -4,11 +4,12 @@
  * user-supplied serializer or are skipped with a noted comment. Output is
  * Markdown text that flows through Blume's normal pipeline.
  */
+import type { InlineRun } from "./lower.ts";
 import {
   guardBlockStart,
   image,
+  linkParts,
   renderInline,
-  renderLink,
   unsupported,
   writesMdx,
 } from "./lower.ts";
@@ -73,38 +74,54 @@ const HEADING_STYLES = new Map([
   ["h6", "###### "],
 ]);
 
-/**
- * A span as Markdown for its marks, through the shared lowering every CMS
- * uses: prose is escaped, a code span outruns the backticks inside it, edge
- * whitespace stays outside emphasis, and a link def wraps last (so its label
- * keeps emphasis) only when its destination is safe to click.
- */
-const renderSpan = (
-  span: PortableTextSpan,
-  defs: Map<string, PortableTextMarkDef>
-): string => {
+/** A span's text and the marks Markdown has syntax for. */
+const spanRun = (span: PortableTextSpan): InlineRun => {
   const marks = span.marks ?? [];
-  const link = marks
-    .map((mark) => defs.get(mark))
-    .findLast((def) => def?._type === "link");
-  return renderLink(
-    renderInline(span.text ?? "", {
+  return {
+    marks: {
       bold: marks.includes("strong"),
       code: marks.includes("code"),
       italic: marks.includes("em"),
       strike: marks.includes("strike-through"),
-    }),
-    link?.href
-  );
+    },
+    text: span.text ?? "",
+  };
 };
 
-/** Render the inline children of a block to a single Markdown string. */
+/** Neighboring spans under one link def (or none), and that def. */
+interface LinkedSpans {
+  link?: PortableTextMarkDef;
+  runs: InlineRun[];
+}
+
+/**
+ * Render the inline children of a block to a single Markdown string, through
+ * the shared lowering every CMS uses: prose is escaped, a code span outruns
+ * the backticks inside it, edge whitespace stays outside emphasis, neighbors
+ * share their marks' delimiters, and neighbors under one link def share one
+ * link — wrapped last (so its label keeps emphasis), and only when its
+ * destination is safe to click.
+ */
 const renderChildren = (block: PortableTextBlock): string => {
   const defs = new Map(
     (block.markDefs ?? []).map((def) => [def._key, def] as const)
   );
+  const linked: LinkedSpans[] = [];
+  for (const span of block.children ?? []) {
+    const link = (span.marks ?? [])
+      .map((mark) => defs.get(mark))
+      .findLast((def) => def?._type === "link");
+    const last = linked.at(-1);
+    if (last && last.link === link) {
+      last.runs.push(spanRun(span));
+    } else {
+      linked.push({ link, runs: [spanRun(span)] });
+    }
+  }
   return guardBlockStart(
-    (block.children ?? []).map((span) => renderSpan(span, defs)).join("")
+    renderInline(
+      linked.flatMap(({ link, runs }) => linkParts(runs, link?.href))
+    )
   );
 };
 

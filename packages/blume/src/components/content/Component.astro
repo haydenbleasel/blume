@@ -13,7 +13,7 @@ import data from "blume:data";
 import { CODE_PADDING_BLOCK_REM } from "../../theme/code-block-padding.ts";
 
 import { highlightCode } from "../../markdown/index.ts";
-import { withBase } from "../islands/base-path.ts";
+import { withMountedBase } from "../islands/base-path.ts";
 import { contentStrings } from "./content-strings.ts";
 import { EXAMPLE_PANE_MIN_PX } from "./example-pane.ts";
 import Tab from "./Tab.astro";
@@ -35,7 +35,7 @@ const { content: strings } = contentStrings(data, Astro.currentLocale);
 // by their own design system (e.g. shadcn, via the configured `examples.css`).
 // The frame syncs its theme with this document before first paint.
 const previewSrc = entry
-  ? withBase(
+  ? withMountedBase(
       `${examplesBase}/${path.split("/").map(encodeURIComponent).join("/")}`
     )
   : undefined;

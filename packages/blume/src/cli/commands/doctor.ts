@@ -187,7 +187,9 @@ export const doctorCommand = defineCommand({
       logger.success("No problems found.");
     }
     if (hadErrors) {
-      process.exit(1);
+      // Set the code and return rather than `process.exit`, which doesn't wait
+      // for a piped stderr: a long diagnostic list would be cut off.
+      process.exitCode = 1;
     }
   },
 });

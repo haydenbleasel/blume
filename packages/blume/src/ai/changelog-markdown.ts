@@ -1,4 +1,4 @@
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
@@ -29,7 +29,7 @@ const parseDate = (value: string | undefined): Date | null => {
 /** A row's link: absolute under a configured site, like llms.txt. */
 const entryUrl = (project: BlumeProject, route: string): string => {
   const { base, site } = project.config.deployment.options;
-  const path = withBasePath(normalizeBasePath(base), route);
+  const path = mountBasePath(normalizeBasePath(base), route);
   return encodeURI(site ? absoluteUrl(site, path) : path);
 };
 

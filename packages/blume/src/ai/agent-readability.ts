@@ -1,4 +1,4 @@
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import { repoUrl } from "../core/github.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ContentSignalPolicy, ContentSignals } from "../core/schema.ts";
@@ -173,7 +173,7 @@ export const buildAgentReadability = (
   // `site`; concatenate rather than `new URL()` so the subpath is preserved.
   const deployBase = normalizeBasePath(config.deployment.options.base);
   const abs = (path: string): string => {
-    const based = withBasePath(deployBase, path);
+    const based = mountBasePath(deployBase, path);
     return site ? absoluteUrl(site, based) : based;
   };
 

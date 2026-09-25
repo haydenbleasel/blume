@@ -29,7 +29,10 @@ type StoreEntry = ReturnType<LoaderContext["store"]["entries"]>[number][1];
 /** Meta-store key holding the recorded partials digest of an includer. */
 const stateKey = (id: string): string => `blume:include-state:${id}`;
 
-/** The generated include graph: absolute partial → absolute including pages. */
+/**
+ * The generated include graph: partial → including pages, absolute in the
+ * hidden runtime and relative to the project root in an ejected app.
+ */
 type IncludeGraph = Record<string, string[]>;
 
 /**
@@ -47,14 +50,22 @@ const readGraph = (graphPath: string): IncludeGraph => {
   }
 };
 
-/** Invert the graph: absolute including page → its partials, sorted. */
-const partialsByPage = (graph: IncludeGraph): Map<string, string[]> => {
+/**
+ * Invert the graph: absolute including page → its absolute partials, sorted.
+ * Each path resolves against the Astro root, which leaves the hidden runtime's
+ * absolute paths as they are.
+ */
+const partialsByPage = (
+  graph: IncludeGraph,
+  root: string
+): Map<string, string[]> => {
   const byPage = new Map<string, string[]>();
   for (const [partial, pages] of Object.entries(graph)) {
     for (const page of pages) {
-      const partials = byPage.get(page) ?? [];
-      partials.push(partial);
-      byPage.set(page, partials);
+      const abs = resolve(root, page);
+      const partials = byPage.get(abs) ?? [];
+      partials.push(resolve(root, partial));
+      byPage.set(abs, partials);
     }
   }
   for (const partials of byPage.values()) {
@@ -123,11 +134,11 @@ export const evictStaleIncluders = (
   context: LoaderContext,
   graphPath: string
 ): string[] => {
-  const byPage = partialsByPage(readGraph(graphPath));
+  const root = fileURLToPath(context.config.root);
+  const byPage = partialsByPage(readGraph(graphPath), root);
   if (byPage.size === 0) {
     return [];
   }
-  const root = fileURLToPath(context.config.root);
   const evicted: string[] = [];
   for (const [id, entry] of context.store.entries()) {
     if (evictIfStale(context, byPage, root, id, entry)) {

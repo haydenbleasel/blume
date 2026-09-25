@@ -5,7 +5,8 @@ import { badgeColorName } from "../src/components/content/badge-color.ts";
 describe(badgeColorName, () => {
   it("maps each documented variant to its hue", () => {
     expect(badgeColorName("default")).toBe("gray");
-    expect(badgeColorName("accent")).toBe("blue");
+    // The theme accent, not a fixed hue.
+    expect(badgeColorName("accent")).toBe("accent");
     expect(badgeColorName("success")).toBe("green");
     expect(badgeColorName("warning")).toBe("orange");
     expect(badgeColorName("danger")).toBe("red");

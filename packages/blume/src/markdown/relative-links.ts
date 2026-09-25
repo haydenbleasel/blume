@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { dirname, normalize, relative, resolve } from "pathe";
 
+import { mountBasePath } from "../core/base-path.ts";
 import { isIndexFileName, resolveRelativeHref } from "../core/links.ts";
 import type { RelativeLinkBase } from "../core/links.ts";
 import type { MdastNode, MdastValue } from "./mdast.ts";
@@ -130,6 +131,8 @@ export interface RelativeLinksPluginOptions {
    * to publish the snapshot, the plugin reads the file eject writes instead.
    */
   dataFile?: string;
+  /** Astro's `deployment.base` subdirectory (`""` or `/seg`). */
+  deployBase?: string;
 }
 
 /**
@@ -145,9 +148,11 @@ export interface RelativeLinksPluginOptions {
  * entries (remote sources) by the longest trailing path that names one. A file
  * the snapshot doesn't know keeps its links as written.
  *
- * Runs before the base-links plugin, whose `basePath` layering is idempotent,
- * so a rewritten route (which already carries `basePath`) only gains the
- * `deployment.base` prefix.
+ * A rewritten route already carries `basePath`, and the `deployment.base`
+ * prefix goes on here, unconditionally: the route is one Blume serves, so
+ * `guides/setup.md` under base `/guides` is linked at `/guides/guides/setup`.
+ * The base-links plugin that runs next is idempotent per layer, so it leaves
+ * the based route alone.
  */
 export const relativeLinksPlugin = (
   options: RelativeLinksPluginOptions = {}
@@ -155,6 +160,7 @@ export const relativeLinksPlugin = (
   const contentRoot = options.contentRoot
     ? resolve(options.contentRoot)
     : undefined;
+  const deployBase = options.deployBase ?? "";
   const readSnapshot = routeSnapshotReader(options.dataFile);
 
   // Parsed once per published snapshot: the CLI republishes on regeneration,
@@ -245,7 +251,9 @@ export const relativeLinksPlugin = (
     const next = resolveRelativeHref(url, page, page.routeOf, (route) =>
       page.routes.has(route)
     );
-    return next === url ? undefined : next;
+    return next === undefined || next === url
+      ? undefined
+      : mountBasePath(deployBase, next);
   };
 
   const rewrite = (node: UrlNode, ctx: RelativeLinksContext): void => {

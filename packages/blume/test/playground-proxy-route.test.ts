@@ -7,7 +7,7 @@ import { join } from "pathe";
 
 import { generateRuntime } from "../src/astro/generate.ts";
 import { readRuntimeModule } from "../src/astro/runtime-modules.ts";
-import { prefixBase } from "../src/components/islands/base-path.ts";
+import { mountBase } from "../src/components/islands/base-path.ts";
 import { packageRoot } from "../src/core/package-root.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import type { OpenApiData } from "../src/openapi/model.ts";
@@ -90,24 +90,25 @@ describe("built-in playground proxy route", () => {
     expect(astroConfig).toContain('base: "/sub",');
     expect(injected).toBe("/_api-proxy");
     expect(proxy).toBe("/_api-proxy");
-    // The playground layers the base on at render time (`withBase`), which
-    // lands on the served endpoint and leaves an external proxy URL alone.
-    expect(prefixBase("/sub", proxy || "")).toBe("/sub/_api-proxy");
-    expect(prefixBase("/sub", "https://proxy.example/cors")).toBe(
+    // The playground layers the base on at render time (`withMountedBase`),
+    // which lands on the served endpoint and leaves an external proxy URL
+    // alone.
+    expect(mountBase("/sub", proxy || "")).toBe("/sub/_api-proxy");
+    expect(mountBase("/sub", "https://proxy.example/cors")).toBe(
       "https://proxy.example/cors"
     );
   }, 30_000);
 
-  it("renders the proxy URL through withBase in the playground", () => {
+  it("renders the proxy URL through withMountedBase in the playground", () => {
     const source = readFileSync(
       join(packageRoot(), "src/components/openapi/Playground.astro"),
       "utf-8"
     );
     expect(source).toContain(
-      'import { withBase } from "../islands/base-path.ts";'
+      'import { withMountedBase } from "../islands/base-path.ts";'
     );
     expect(source).toContain(
-      "const proxyUrl = proxy ? withBase(proxy) : undefined;"
+      "const proxyUrl = proxy ? withMountedBase(proxy) : undefined;"
     );
     expect(source).toContain("data-proxy={proxyUrl}");
   });

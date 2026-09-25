@@ -49,6 +49,25 @@ export const STROKE = {
   yellow: "border-yellow-500/40 text-yellow-800 dark:text-yellow-300",
 } satisfies Record<Hue, string>;
 
+/**
+ * The theme accent's label color: the accent mixed halfway toward the
+ * foreground. The accent is whatever the site configures (a preset, any CSS
+ * color, or the neutral black/white default), so no fixed shade can promise
+ * the contrast rule above, and the raw accent as text misses it (every preset
+ * sits under 3.5:1 over its tint in light mode). Pulling it toward the
+ * foreground darkens it in light mode and lightens it in dark, since the
+ * foreground contrasts with the page by construction: every preset clears
+ * 7:1 over its 15% tint in both modes.
+ */
+const ACCENT_LABEL =
+  "text-[color-mix(in_oklab,var(--blume-accent)_50%,var(--blume-foreground))]";
+
+/** `TINT` for the theme accent (`<Badge variant="accent">`). */
+export const ACCENT_TINT = `bg-accent/15 ${ACCENT_LABEL}`;
+
+/** `STROKE` for the theme accent. */
+export const ACCENT_STROKE = `border-accent/40 ${ACCENT_LABEL}`;
+
 /** The neutral fallback every table falls through to. */
 export const MUTED = "bg-muted text-muted-foreground";
 

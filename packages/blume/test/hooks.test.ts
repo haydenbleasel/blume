@@ -23,7 +23,13 @@ process.env.BASE_URL = "/";
 
 let cells: unknown[] = [];
 let cursor = 0;
-let effects: (() => void)[] = [];
+/** What the mocked useEffect stores: an effect returning an optional cleanup. */
+type Effect = () => (() => void) | undefined;
+/** A queued effect and whether its deps (`[]`) limit it to the first render. */
+let effects: { effect: Effect; once: boolean }[] = [];
+let cleanups: (() => void)[] = [];
+/** Whether the current component has rendered (and run its mount effects). */
+let mounted = false;
 
 /** Distinguish the updater form `setState(fn)` from a plain `setState(value)`. */
 const isStateUpdater = <T>(
@@ -32,8 +38,8 @@ const isStateUpdater = <T>(
 
 mock.module("react", () => ({
   useCallback: <T>(fn: T) => fn,
-  useEffect: (effect: () => void) => {
-    effects.push(effect);
+  useEffect: (effect: Effect, deps?: unknown[]) => {
+    effects.push({ effect, once: deps?.length === 0 });
   },
   useRef: <T>(value: T) => ({ current: value }),
   useState: <T>(initial: T) => {
@@ -71,20 +77,40 @@ mock.module("blume:search-client", () => ({
   createSearch: () => (query: string) => searchImpl(query),
 }));
 
-/** Run one "render": reset the cell cursor, call the hook, flush effects. */
+/** Run every collected effect cleanup, as an unmount would. */
+const unmount = () => {
+  for (const cleanup of cleanups) {
+    cleanup();
+  }
+  cleanups = [];
+};
+
+/**
+ * Run one "render": reset the cell cursor, call the hook, flush effects. A
+ * mount-only effect (`[]` deps) runs on the component's first render alone, so
+ * a later render can't mask a subscription the hook forgot to make.
+ */
 const render = <T>(hook: () => T): T => {
   cursor = 0;
   effects = [];
   const value = hook();
-  for (const effect of effects) {
-    effect();
+  for (const { effect, once } of effects) {
+    if (!(once && mounted)) {
+      const cleanup = effect();
+      if (cleanup) {
+        cleanups.push(cleanup);
+      }
+    }
   }
+  mounted = true;
   return value;
 };
 
 /** First render of a fresh component (empty state cells). */
 const freshRender = <T>(hook: () => T): T => {
+  unmount();
   cells = [];
+  mounted = false;
   return render(hook);
 };
 
@@ -168,6 +194,52 @@ const setFetch = (
  */
 const flush = (): Promise<void> => Bun.sleep(0);
 
+/** The snapshot `<script>` tag as the hooks read it; `null` when absent. */
+interface SnapshotTag {
+  textContent: string;
+}
+
+/** Document listeners the snapshot hooks subscribed (the client-router swap). */
+const documentListeners = new Map<string, Set<() => void>>();
+
+/** Install a document whose `#blume-client-data` lookup answers `tag`. */
+const stubDocument = (tag: SnapshotTag | null) => {
+  documentListeners.clear();
+  // SAFETY: a document stub answering the querySelector call and the swap
+  // subscription the hooks make.
+  (globalThis as { document?: unknown }).document = {
+    addEventListener: (type: string, listener: () => void) => {
+      const listeners = documentListeners.get(type) ?? new Set();
+      listeners.add(listener);
+      documentListeners.set(type, listeners);
+    },
+    querySelector: () => tag,
+    removeEventListener: (type: string, listener: () => void) => {
+      documentListeners.get(type)?.delete(listener);
+    },
+  };
+};
+
+/** Deliver a document event to the hooks' live listeners. */
+const dispatchDocument = (type: string) => {
+  for (const listener of documentListeners.get(type) ?? []) {
+    listener();
+  }
+};
+
+/** A page's snapshot: the shared config, its navigation, and its route. */
+const snapshotFor = (
+  route: string,
+  title: string,
+  sidebar: BlumeClientData["navigation"]["sidebar"] = []
+): BlumeClientData => ({
+  // SAFETY: useBlume surfaces the injected config verbatim, so a title-only
+  // stub stands in for the full client config.
+  config: { title: "Docs" } as BlumeClientData["config"],
+  navigation: { featured: [], selectors: [], sidebar, tabs: [] },
+  page: { route, title },
+});
+
 describe("useBlume / usePage", () => {
   it("returns null without the injected snapshot", () => {
     // No `document` in this runtime yet — the SSR guard path.
@@ -176,38 +248,20 @@ describe("useBlume / usePage", () => {
   });
 
   it("returns null when the snapshot script is missing", () => {
-    // SAFETY: a document stub answering the one querySelector call the hook
-    // makes.
-    (globalThis as { document?: unknown }).document = {
-      querySelector: () => null,
-    };
+    stubDocument(null);
     freshRender(useBlume);
     expect(render(useBlume)).toBeNull();
   });
 
   it("returns null when the snapshot is not valid JSON", () => {
-    // SAFETY: a document stub answering the one querySelector call the hook
-    // makes.
-    (globalThis as { document?: unknown }).document = {
-      querySelector: () => ({ textContent: "not json" }),
-    };
+    stubDocument({ textContent: "not json" });
     freshRender(usePage);
     expect(render(usePage)).toBeNull();
   });
 
   it("reads config, navigation, and page from the snapshot", () => {
-    const snapshot: BlumeClientData = {
-      // SAFETY: useBlume surfaces the injected config verbatim, so a
-      // title-only stub stands in for the full client config.
-      config: { title: "Docs" } as BlumeClientData["config"],
-      navigation: { featured: [], selectors: [], sidebar: [], tabs: [] },
-      page: { route: "/guide", title: "Guide" },
-    };
-    // SAFETY: a document stub answering the one querySelector call the hook
-    // makes.
-    (globalThis as { document?: unknown }).document = {
-      querySelector: () => ({ textContent: JSON.stringify(snapshot) }),
-    };
+    const snapshot = snapshotFor("/guide", "Guide");
+    stubDocument({ textContent: JSON.stringify(snapshot) });
     freshRender(useBlume);
     expect(render(useBlume)).toStrictEqual({
       config: snapshot.config,
@@ -215,7 +269,49 @@ describe("useBlume / usePage", () => {
     });
     // The parsed snapshot is memoized; a second hook reads the cache.
     freshRender(usePage);
-    expect(render(usePage)).toStrictEqual(snapshot.page);
+    const page = render(usePage);
+    expect(page).toStrictEqual(snapshot.page);
+    freshRender(usePage);
+    expect(render(usePage)).toBe(page);
+  });
+
+  it("reads the next page's snapshot after a client-router navigation", () => {
+    const guide = snapshotFor("/guide", "Guide");
+    const tag = { textContent: JSON.stringify(guide) };
+    stubDocument(tag);
+    freshRender(usePage);
+    expect(render(usePage)).toStrictEqual(guide.page);
+
+    // The swap installs /api's body, and with it /api's own snapshot. An
+    // island on /api mounts fresh and must read that, not the cached /guide.
+    const api = snapshotFor("/api", "API", [
+      { kind: "page", label: "API", pageId: "api", route: "/api" },
+    ]);
+    tag.textContent = JSON.stringify(api);
+    freshRender(usePage);
+    expect(render(usePage)).toStrictEqual(api.page);
+    freshRender(useBlume);
+    expect(render(useBlume)?.navigation).toStrictEqual(api.navigation);
+  });
+
+  it("updates a persisted island's hooks when a swap brings a new snapshot", () => {
+    const guide = snapshotFor("/guide", "Guide");
+    const tag = { textContent: JSON.stringify(guide) };
+    stubDocument(tag);
+    freshRender(usePage);
+    expect(render(usePage)).toStrictEqual(guide.page);
+
+    // A `transition:persist` island stays mounted across the navigation, so
+    // no mount effect re-runs; only the swap subscription can refresh it.
+    const api = snapshotFor("/api", "API");
+    tag.textContent = JSON.stringify(api);
+    expect(render(usePage)).toStrictEqual(guide.page);
+    dispatchDocument("astro:after-swap");
+    expect(render(usePage)).toStrictEqual(api.page);
+
+    // Unmounting drops the subscription.
+    unmount();
+    expect(documentListeners.get("astro:after-swap")?.size).toBe(0);
   });
 });
 

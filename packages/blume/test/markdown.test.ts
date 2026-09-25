@@ -45,13 +45,11 @@ import { ts2jsPlugin } from "../src/markdown/ts2js.ts";
 /** Run a plugin visitor and capture the node it replaces, if any. */
 const captureReplacement = (
   run: (ctx: MdastVisitorContext) => void
-): MdastNode | undefined => {
-  let replacement: MdastNode | undefined;
+): MdastNode | MdastNode[] | undefined => {
+  let replacement: MdastNode | MdastNode[] | undefined;
   run({
     replaceNode: (_node, value) => {
-      // SAFETY: Blume's MDAST plugins only ever replace nodes with the mdast
-      // builders' output (jsxFlowElement/jsxTextElement/codeBlock results).
-      replacement = value as MdastNode;
+      replacement = value;
     },
   });
   return replacement;
@@ -540,7 +538,7 @@ describe("directiveToCalloutPlugin", () => {
     expect(title?.value).toBe("Read this now");
   });
 
-  it("leaves a non-callout directive untouched", () => {
+  it("keeps a non-callout directive's body between its literal fences", () => {
     const node = {
       children: [body],
       name: "figure",
@@ -549,7 +547,11 @@ describe("directiveToCalloutPlugin", () => {
     const result = captureReplacement((ctx) =>
       directiveToCalloutPlugin().containerDirective(node, ctx)
     );
-    expect(result).toBeUndefined();
+    expect(result).toStrictEqual([
+      { children: [{ type: "text", value: ":::figure" }], type: "paragraph" },
+      body,
+      { children: [{ type: "text", value: ":::" }], type: "paragraph" },
+    ]);
   });
 
   it("handles an empty directive (`children: null`) without throwing", () => {

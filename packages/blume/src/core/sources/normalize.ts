@@ -1,8 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 
 import GithubSlugger from "github-slugger";
+import type { Nodes } from "mdast";
 import { extname } from "pathe";
+import { markdownToMdast } from "satteri";
 
+import { MARKDOWN_FEATURES } from "../../markdown/features.ts";
 import { mountBasePath } from "../base-path.ts";
 import { nextFenceState } from "../code-fences.ts";
 import type { FenceState } from "../code-fences.ts";
@@ -32,6 +35,14 @@ const stripNumericPrefix = (segment: string): string =>
 /** Detect a group folder `(name)` and return its label, else null. */
 const groupLabel = (segment: string): string | null =>
   segment.match(GROUP_FOLDER)?.groups?.label ?? null;
+
+/**
+ * {@link groupLabel} for a file or folder name, which may carry its ordering
+ * prefix outside the parentheses: `01-(guides)` is the `guides` group, sorted
+ * first, the way `01-guides` is the `guides` folder.
+ */
+const orderedGroupLabel = (segment: string): string | null =>
+  groupLabel(segment) ?? groupLabel(stripNumericPrefix(segment));
 
 /**
  * Slugify a content/route slug (Sanity, Notion, frontmatter `slug`). Heading
@@ -74,11 +85,46 @@ const titleCase = (value: string): string =>
  * scheme (`Guide: Architecture.md` → `guide:`), which crashes Astro's
  * prerender write with "The URL must be of scheme file"; control characters
  * (an embedded newline in a filename) are silently dropped by the URL parser,
- * desyncing the route from its output path. Both are legal in macOS/Linux
- * filenames, so they are removed here rather than rejected.
+ * desyncing the route from its output path. `#` and `?` start a URL's
+ * fragment and query, so an unescaped `/sdks/c#` link lands on `/sdks/c`
+ * while Astro writes the page to `c%23/`; a `%` starts an escape, and a bare
+ * one is an invalid URL Astro can't decode (and one it escapes, `%25`, finds
+ * no static path). All are legal in macOS/Linux filenames, so they are
+ * removed here rather than rejected: `100%.md` publishes at `/100`, and a
+ * slug of `sdks/c#` at `/sdks/c`. A file whose own path holds `#` or `?`
+ * never gets this far — Astro can't load it (see
+ * {@link unloadablePathDiagnostic}).
  */
 const sanitizeSegment = (segment: string): string =>
-  segment.replaceAll(/[:\p{Cc}]/gu, "");
+  segment.replaceAll(/[:#?%\p{Cc}]/gu, "");
+
+// Astro's content loader reads each entry at `new URL("./" + encodeURI(entry),
+// base)`. `encodeURI` escapes `%` but leaves `#` and `?` alone, so in a path
+// they start the URL's fragment and query, and the read misses the file.
+const UNLOADABLE_PATH = /[#?]/u;
+
+/**
+ * The error for a content file Astro's content loader can't read, or
+ * undefined when it can. A `#` or `?` anywhere in the path the loader is
+ * handed (`sdks/c#.md`, `faq/why?.md`) truncates the file URL it reads
+ * through, so the read fails with ENOENT and the page renders "Page not
+ * found" at its route. A source leaves such a file out of its scan and
+ * reports this instead of publishing a route that can never render.
+ */
+export const unloadablePathDiagnostic = (
+  path: string,
+  file: string
+): Diagnostic | undefined =>
+  UNLOADABLE_PATH.test(path)
+    ? {
+        code: "BLUME_UNLOADABLE_FILE_NAME",
+        file,
+        message: `"${path}" has a "#" or "?" in its path, which Astro's content loader reads as the start of a URL fragment or query, so it can't load the file. It was left out of the site.`,
+        severity: "error",
+        suggestion:
+          'Rename the file (or its folder) without "#" or "?". Both are dropped from the page\'s URL anyway, so the page keeps its route.',
+      }
+    : undefined;
 
 /**
  * Fold one raw path part into the accumulating route segments/groups.
@@ -95,7 +141,7 @@ const addRouteSegment = (
   if (part === "") {
     return;
   }
-  const group = groupLabel(part);
+  const group = ordered ? orderedGroupLabel(part) : groupLabel(part);
   if (group !== null) {
     groups.push(group);
     return;
@@ -166,7 +212,6 @@ const SETEXT_UNDERLINE = /^ {0,3}(?<marker>=+|-+)\s*$/u;
 const PARAGRAPH_INTERRUPT = /^ {0,3}(?:[-+*][ \t]|\d{1,9}[.)][ \t]|>)/u;
 const THEMATIC_BREAK =
   /^ {0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/u;
-const FRONT_MATTER_CLOSE = /^(?:-{3}|\.{3})\s*$/u;
 // `<Prompt>` renders its children into a permanently `hidden` DOM node (see
 // `Prompt.astro`) — the agent-facing prompt text is never visible page
 // content, only read by client JS for the copy button. Any `##` inside it
@@ -183,41 +228,13 @@ const PROMPT_OPEN = /^<Prompt(?![\w-])/u;
 // children text (`...copy this.</Prompt>`), not just sit on its own line.
 const PROMPT_CLOSE = /<\/Prompt>/u;
 
-/**
- * The body lines, minus a leading front matter block, plus the height of the
- * block that was dropped (`offset`) so line numbers can be reported against
- * the whole body. Bodies from the normalize pipeline are already
- * frontmatter-stripped, but `scanBody` also runs on raw documents — where a
- * leading `---` block (closed by `---` or `...`) is front matter, not a
- * thematic break whose closing `---` would underline the last metadata line
- * into a phantom setext heading.
- */
-const linesWithoutFrontMatter = (body: string) => {
-  const lines = body.split("\n");
-  if (!/^-{3}\s*$/u.test(lines[0] ?? "")) {
-    return { lines, offset: 0 };
-  }
-  // A blank line directly after the dashes means the body *opens* with a
-  // thematic break, not front matter — YAML metadata starts on the very next
-  // line. Treating it as an unclosed block ate everything up to the next
-  // `---`/`...` line of an already-stripped body.
-  if ((lines[1] ?? "").trim() === "") {
-    return { lines, offset: 0 };
-  }
-  const close = lines.findIndex(
-    (line, index) => index > 0 && FRONT_MATTER_CLOSE.test(line)
-  );
-  return close === -1
-    ? { lines, offset: 0 }
-    : { lines: lines.slice(close + 1), offset: close + 1 };
-};
-
 // A trailing `{#id}` heading marker written without a backslash escape. Both
-// pipelines resolve escapes before parsing markers (see `ESCAPED_PUNCTUATION`),
-// so `\{#id\}` is the same marker — and the only spelling that survives the
-// MDX parser, where a bare `{…}` is a JSX expression and `#id` is not a valid
-// one (`Could not parse expression with acorn`). Further bracket markers may
-// follow the brace (`{#id} [toc]`), nothing else.
+// pipelines resolve escapes before parsing markers (the scan parses each
+// heading with the renderer's grammar — see `renderHeading`), so `\{#id\}` is
+// the same marker — and the only spelling that survives the MDX parser, where
+// a bare `{…}` is a JSX expression and `#id` is not a valid one (`Could not
+// parse expression with acorn`). Further bracket markers may follow the brace
+// (`{#id} [toc]`), nothing else.
 const BARE_CURLY_MARKER =
   /(?<!\\)\{#(?<id>[^\s}]+)\}(?:\s*\[(?:#[^\s\]]+|!?toc)\])*\s*$/u;
 
@@ -311,12 +328,31 @@ const finishPromptTag = (
  * collapses `--`; github-slugger keeps it) and resolves repeated headings the
  * same way (`setup`, `setup-1`).
  */
-// CommonMark's escapable ASCII punctuation. The renderer only ever sees
-// heading text *after* the Markdown parser has resolved backslash escapes, so
-// `\[toc]` reaches the hast as plain `[toc]` and the marker still applies;
-// resolving escapes here keeps the two pipelines identical (there is no
-// inline way to write a literal trailing marker — use inline code instead).
-const ESCAPED_PUNCTUATION = /\\(?<char>[!-/:-@[-`{-~])/gu;
+// A heading's inline Markdown is parsed with the renderer's own grammar:
+// Blume's `.md` feature set plus the Astro defaults Blume never turns off, GFM
+// and smart punctuation (Astro's `smartypants`). Front matter is off — the
+// source is a lone heading. The display text is read without smart
+// punctuation (see `toHeading`).
+const HEADING_FEATURES = {
+  ...MARKDOWN_FEATURES,
+  frontmatter: false,
+  gfm: true,
+};
+const HEADING_PARSE = {
+  features: { ...HEADING_FEATURES, smartPunctuation: true },
+};
+const HEADING_TEXT_PARSE = {
+  features: { ...HEADING_FEATURES, smartPunctuation: false },
+};
+
+// Characters that can make a heading's rendered text differ from its source:
+// escapes, code spans, emphasis/strikethrough/sub/superscript markers, link and
+// image brackets, raw HTML and autolinks, entities, and the quotes, dashes, and
+// ellipses smart punctuation rewrites. A heading with none of them renders as
+// written, so it skips the parse.
+const INLINE_MARKUP = /[\\`*_~^[\]<&'"]|--|\.\.\./u;
+// The subset smart punctuation rewrites (`"a"` → `“a”`, `--` → `–`, `...` → `…`).
+const SMART_PUNCTUATION = /['"]|--|\.\.\./u;
 
 // The start of a link-reference definition, as the renderer accepts it:
 // `[label]:` after up to 3 leading spaces, optionally inside block-quote or
@@ -334,10 +370,13 @@ const REF_DEFINITION =
 
 /**
  * The normalized labels of every link-reference definition in the body
- * (outside fenced code). A trailing heading bracket whose label is defined is
- * a CommonMark shortcut link, not a marker — the renderer leaves it in the
- * heading as an `<a>`, so the marker parse must skip it too. Labels match
- * case-insensitively with collapsed internal whitespace (CommonMark).
+ * (outside fenced code), footnote definitions (`^1`) included. A heading
+ * bracket whose label is defined is a CommonMark reference link —
+ * `[text][label]`, or a shortcut `[label]` that would otherwise read as a
+ * trailing `[toc]`/`[#id]` marker — or a GFM footnote reference, so each
+ * heading is parsed together with the definitions it names (see
+ * {@link definitionsFor}). Labels match case-insensitively with collapsed
+ * internal whitespace (CommonMark).
  *
  * Only a *valid* definition defines a label: the label must contain a
  * non-whitespace character, and a destination must follow — on the same line
@@ -369,14 +408,179 @@ const refDefinitionLabels = (lines: readonly string[]): Set<string> => {
 };
 
 /**
- * A heading record from raw heading text: escapes resolved and trailing
- * markers stripped, exactly as the renderer sees them. A `[#custom-id]` pin
- * becomes the slug verbatim and — matching the renderer — occupies its id in
- * the slugger, so a later heading whose auto-slug collides disambiguates
- * (`setup` → `setup-1`). `[!toc]`/`[toc]` headings stay in the record: their
- * ids exist in the rendered page, so links to them are valid anchors
- * regardless of TOC visibility. A heading that is nothing but markers keeps
- * them as literal text, mirroring the renderer.
+ * The link-reference and footnote definitions a heading's brackets may name,
+ * as source lines to parse the heading with. A definition the heading doesn't
+ * use changes nothing, so matching is loose (the label anywhere in the folded
+ * text). A footnote label (`^1`) is defined too, so `[^1]` parses as the
+ * footnote reference it renders as, not as literal text.
+ */
+const definitionsFor = (raw: string, labels: ReadonlySet<string>): string => {
+  if (!raw.includes("[")) {
+    return "";
+  }
+  const folded = raw.replaceAll(/\s+/gu, " ").toLowerCase();
+  let definitions = "";
+  for (const label of labels) {
+    if (folded.includes(label)) {
+      definitions += `\n\n[${label}]: /`;
+    }
+  }
+  return definitions;
+};
+
+/**
+ * The number each footnote renders as, keyed by identifier. GFM numbers
+ * footnotes in the order the body first references them, whatever order their
+ * definitions sit in, so a `[^b]` cited before `[^a]` renders as 1. A
+ * reference inside a footnote definition is left out: the renderer reaches
+ * those only after the body.
+ */
+const footnoteNumbers = (body: string): Map<string, number> => {
+  const numbers = new Map<string, number>();
+  const visit = (nodes: readonly Nodes[]): void => {
+    for (const node of nodes) {
+      if (node.type === "footnoteReference") {
+        if (!numbers.has(node.identifier)) {
+          numbers.set(node.identifier, numbers.size + 1);
+        }
+      } else if (node.type !== "footnoteDefinition" && "children" in node) {
+        visit(node.children);
+      }
+    }
+  };
+  const tree = markdownToMdast(body, HEADING_PARSE);
+  visit("children" in tree ? tree.children : []);
+  return numbers;
+};
+
+/** What reading one heading needs from the rest of its body. */
+interface HeadingContext {
+  /**
+   * The number each footnote renders as (see {@link footnoteNumbers}),
+   * computed on first use: only a heading that cites a footnote needs it.
+   */
+  footnotes: () => ReadonlyMap<string, number>;
+  /** The body's link-reference and footnote definition labels. */
+  labels: ReadonlySet<string>;
+}
+
+/**
+ * The text content of mdast inline nodes, the way the rendered heading reads
+ * it: link and emphasis text, code-span contents, decoded entities, and a
+ * footnote reference's number. Raw HTML tags add no text (the text between
+ * them is its own node), and an image's alt is an attribute rather than text
+ * content.
+ */
+const inlineText = (nodes: readonly Nodes[], context: HeadingContext): string =>
+  nodes
+    .map((node) => {
+      if (
+        node.type === "html" ||
+        node.type === "image" ||
+        node.type === "imageReference"
+      ) {
+        return "";
+      }
+      if (node.type === "break") {
+        return "\n";
+      }
+      if (node.type === "footnoteReference") {
+        // A reference the body's own parse never numbered (a heading the scan
+        // finds inside an HTML block) is no footnote to the renderer either.
+        const number = context.footnotes().get(node.identifier);
+        return number === undefined
+          ? `[^${node.label ?? node.identifier}]`
+          : String(number);
+      }
+      if ("children" in node) {
+        return inlineText(node.children, context);
+      }
+      return "value" in node ? node.value : "";
+    })
+    .join("");
+
+/** A heading's rendered text plus the trailing markers the renderer strips. */
+interface RenderedHeading {
+  /** Author-pinned anchor id from `[#id]`/`{#id}`, used verbatim. */
+  id?: string;
+  /** The text content the renderer slugs, markers stripped, untrimmed. */
+  text: string;
+  toc?: "hide" | "only";
+}
+
+/** A heading whose source is its text: one text node, markers stripped. */
+const plainHeading = (raw: string): RenderedHeading => {
+  const markers = parseHeadingMarkers(raw);
+  // A heading that is nothing but markers keeps them as literal text.
+  return markers.text === ""
+    ? { text: raw }
+    : { id: markers.id, text: markers.text, toc: markers.toc };
+};
+
+/**
+ * Parse a heading's inline Markdown and read it the way
+ * `markdown/heading-anchors` does: the heading's text content, with trailing
+ * markers stripped from its last node only when that node is text (a heading
+ * ending in inline code or a link has no marker position) and some heading
+ * text remains. Parsing (rather than regex-stripping) resolves escapes —
+ * `\[toc]` still reaches the marker parse as `[toc]` — and emphasis the way
+ * CommonMark does, so `snake_case` stays whole while `_note_` loses its
+ * underscores.
+ */
+const renderHeading = (
+  raw: string,
+  form: "atx" | "setext",
+  context: HeadingContext,
+  parse: typeof HEADING_PARSE
+): RenderedHeading => {
+  if (!INLINE_MARKUP.test(raw)) {
+    return plainHeading(raw);
+  }
+  const source = form === "atx" ? `# ${raw}` : `${raw}\n=`;
+  const tree = markdownToMdast(
+    `${source}${definitionsFor(raw, context.labels)}`,
+    parse
+  );
+  const heading = "children" in tree ? tree.children.at(0) : undefined;
+  // The scan's paragraph tracking is coarser than the parser's: underlined
+  // text that opens with an HTML block or a definition is no heading to the
+  // renderer. It is read as written.
+  if (heading?.type !== "heading") {
+    return plainHeading(raw);
+  }
+  const { children } = heading;
+  const text = inlineText(children, context);
+  const last = children.at(-1);
+  if (last?.type !== "text") {
+    return { text };
+  }
+  const markers = parseHeadingMarkers(last.value);
+  const stripped = last.value.length - markers.text.length;
+  if (stripped === 0 || (markers.text === "" && children.length === 1)) {
+    return { text };
+  }
+  return {
+    id: markers.id,
+    text: text.slice(0, text.length - stripped),
+    toc: markers.toc,
+  };
+};
+
+/**
+ * A heading record from raw heading text, read exactly as the renderer reads
+ * it: inline Markdown reduced to its rendered text (see {@link renderHeading})
+ * and trailing markers stripped. The slug is the renderer's slug of that text.
+ * A `[#custom-id]` pin becomes the slug verbatim and — matching the renderer —
+ * occupies its id in the slugger, so a later heading whose auto-slug collides
+ * disambiguates (`setup` → `setup-1`). `[!toc]`/`[toc]` headings stay in the
+ * record: their ids exist in the rendered page, so links to them are valid
+ * anchors regardless of TOC visibility.
+ *
+ * The record's `text` — a page's fallback title and sidebar label — is the
+ * same rendered text with whitespace collapsed, but read without smart
+ * punctuation: it keeps the straight quotes and double hyphens the author
+ * typed, the way a frontmatter `title` does, and the way an Obsidian
+ * `[[Note#It's here]]` heading link spells the heading it resolves against.
  */
 /** A scanned heading plus whether its id came from an author pin. */
 interface ScannedHeading {
@@ -387,23 +591,23 @@ interface ScannedHeading {
 const toHeading = (
   depth: number,
   raw: string,
+  form: "atx" | "setext",
   slugger: GithubSlugger,
-  isRefDefined: (label: string) => boolean
+  context: HeadingContext
 ): ScannedHeading => {
-  const unescaped = raw.replaceAll(ESCAPED_PUNCTUATION, "$<char>");
-  const markers = parseHeadingMarkers(unescaped, isRefDefined);
-  const text = markers.text.trim();
-  if (text === "" && (markers.id !== undefined || markers.toc !== undefined)) {
-    return {
-      heading: { depth, slug: slugger.slug(unescaped), text: unescaped },
-      pinned: false,
-    };
+  const rendered = renderHeading(raw, form, context, HEADING_PARSE);
+  const display = SMART_PUNCTUATION.test(raw)
+    ? renderHeading(raw, form, context, HEADING_TEXT_PARSE).text
+    : rendered.text;
+  const text = display.replaceAll(/[\t\n\f\r ]+/gu, " ").trim();
+  if (rendered.id !== undefined) {
+    occupySlug(slugger, rendered.id);
+    return { heading: { depth, slug: rendered.id, text }, pinned: true };
   }
-  if (markers.id !== undefined) {
-    occupySlug(slugger, markers.id);
-    return { heading: { depth, slug: markers.id, text }, pinned: true };
-  }
-  return { heading: { depth, slug: slugger.slug(text), text }, pinned: false };
+  return {
+    heading: { depth, slug: slugger.slug(rendered.text), text },
+    pinned: false,
+  };
 };
 
 /** Record a heading and where a trailing marker would be written for it. */
@@ -435,7 +639,7 @@ const scanContentLine = (
   state: HeadingScanState,
   slugger: GithubSlugger,
   headings: Heading[],
-  isRefDefined: (label: string) => boolean
+  context: HeadingContext
 ): void => {
   // Inline code is masked so a documented `<a id="…">` isn't an anchor.
   state.anchorLines.push(line.replaceAll(INLINE_CODE, ""));
@@ -446,7 +650,7 @@ const scanContentLine = (
     pushHeading(
       headings,
       state,
-      toHeading(depth, text, slugger, isRefDefined),
+      toHeading(depth, text, "atx", slugger, context),
       state.line
     );
     noteCurlyMarker(text, state.line, state);
@@ -456,15 +660,17 @@ const scanContentLine = (
   const setext = line.match(SETEXT_UNDERLINE);
   if (setext?.groups && state.paragraph.length > 0) {
     // Setext wins over thematic break when it closes a paragraph (CommonMark);
-    // a multi-line paragraph renders as one heading, soft breaks as spaces.
+    // a multi-line paragraph renders as one heading. Its lines keep their line
+    // breaks, which the rendered text content keeps too (and the slugger
+    // drops, so `Multi\nline` anchors as `multiline`).
     const depth = setext.groups.marker?.startsWith("=") ? 1 : 2;
-    const text = state.paragraph.join(" ").trim();
+    const text = state.paragraph.join("\n");
     // A setext heading's markers trail its last text line, just above the
     // underline — that is where a pin is appended.
     pushHeading(
       headings,
       state,
-      toHeading(depth, text, slugger, isRefDefined),
+      toHeading(depth, text, "setext", slugger, context),
       state.line - 1
     );
     noteCurlyMarker(text, state.paragraphStart, state);
@@ -533,7 +739,7 @@ const scanHeadingLine = (
   state: HeadingScanState,
   slugger: GithubSlugger,
   headings: Heading[],
-  isRefDefined: (label: string) => boolean
+  context: HeadingContext
 ): void => {
   // Comments hide fences too, and fences and prompts hide comments. A comment
   // line still goes to the anchor pass, which strips HTML comments itself.
@@ -577,7 +783,7 @@ const scanHeadingLine = (
     state.paragraph = [];
     return;
   }
-  scanContentLine(line, state, slugger, headings, isRefDefined);
+  scanContentLine(line, state, slugger, headings, context);
 };
 
 /** Where a heading's text ends in the scanned text, for appending a marker. */
@@ -607,7 +813,10 @@ export interface BodyScan {
 /**
  * Scan a body for its headings, explicit HTML anchors, and unescaped `{#id}`
  * markers in one fence-aware walk (the same walk `extractHeadings` exposes for
- * headings alone).
+ * headings alone). The body is the page's content with its front matter
+ * already stripped — the renderers read front matter off the page and never
+ * again from its body — so a leading `---` block is a thematic break and
+ * content, in `.md` and `.mdx` alike.
  */
 export const scanBody = (body: string): BodyScan => {
   const headings: Heading[] = [];
@@ -625,13 +834,18 @@ export const scanBody = (body: string): BodyScan => {
     sites: [],
   };
 
-  const { lines, offset } = linesWithoutFrontMatter(body);
-  const definedLabels = refDefinitionLabels(lines);
-  const isRefDefined = (label: string): boolean =>
-    definedLabels.has(label.toLowerCase());
+  const lines = body.split("\n");
+  let footnotes: Map<string, number> | undefined;
+  const context: HeadingContext = {
+    footnotes: () => {
+      footnotes ??= footnoteNumbers(lines.join("\n"));
+      return footnotes;
+    },
+    labels: refDefinitionLabels(lines),
+  };
   for (const [index, line] of lines.entries()) {
-    state.line = index + offset + 1;
-    scanHeadingLine(line, state, slugger, headings, isRefDefined);
+    state.line = index + 1;
+    scanHeadingLine(line, state, slugger, headings, context);
   }
 
   const anchors = new Set<string>();
@@ -961,7 +1175,7 @@ const deriveTitle = (
   // content root's own index has no folder to borrow from.
   const folder = stem === "index" ? parts.at(-2) : undefined;
   if (folder !== undefined) {
-    return titleCase(stripNumericPrefix(groupLabel(folder) ?? folder));
+    return titleCase(stripNumericPrefix(orderedGroupLabel(folder) ?? folder));
   }
   return titleCase(stem);
 };
@@ -1180,6 +1394,25 @@ const validateCustomKeys = (
   };
 };
 
+// A `.` or `..` path segment, which a browser resolves away before requesting.
+const DOT_SEGMENT = /(?:^|\/)\.{1,2}(?:\/|$)/u;
+
+/**
+ * A frontmatter `slug` with a `.` or `..` segment names no reachable URL: a
+ * browser normalizes the link (`guides/./x` → `guides/x`, `../x` → `/x`)
+ * before requesting it, and `..` would have Astro write the page outside the
+ * build output. Rejected alongside the schema's own errors.
+ */
+const slugIssues = (slug: string | undefined): CustomKeyIssue[] =>
+  slug !== undefined && DOT_SEGMENT.test(slug)
+    ? [
+        {
+          message: `"${slug}" has a "." or ".." segment, which browsers resolve away, so no link could reach the page. Write the route out from the content root.`,
+          path: ["slug"],
+        },
+      ]
+    : [];
+
 /**
  * Parse an entry's frontmatter: built-in keys through the strict page schema,
  * custom keys (`frontmatter.extend` plus the page type's
@@ -1218,8 +1451,12 @@ const parseEntryMeta = (
 
   const result = pageMetaSchema.safeParse(known);
   const customResult = extend ? validateCustomKeys(entry.data, extend) : null;
+  const issues = [
+    ...(result.success ? slugIssues(result.data.slug) : []),
+    ...(customResult?.issues ?? []),
+  ];
 
-  if (result.success && (customResult?.issues.length ?? 0) === 0) {
+  if (result.success && issues.length === 0) {
     return { custom: customResult?.custom, meta: result.data };
   }
 
@@ -1239,9 +1476,7 @@ const parseEntryMeta = (
   return {
     diagnostics: [
       ...(result.success ? [] : diagnosticsFromZod(result.error, location)),
-      ...(customResult
-        ? diagnosticsFromIssues(customResult.issues, location)
-        : []),
+      ...diagnosticsFromIssues(issues, location),
     ],
   };
 };

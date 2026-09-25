@@ -50,11 +50,15 @@ export interface StandardSchema<Input = unknown, Output = Input> {
  * Whether a config-supplied value implements the `~standard` contract. Generic
  * so it can decode any input at the config boundary (`z.custom` hands it the
  * raw config value) while narrowing whatever type the caller holds.
+ *
+ * The contract is the `~standard` property, whatever carries it: Zod and
+ * Valibot schemas are objects, but an ArkType type is a callable function. The
+ * optional-chained probe reads the property off either, and off `null`,
+ * `undefined`, or a primitive it finds nothing.
  */
 export const isStandardSchema = <T>(value: T): value is T & StandardSchema =>
-  typeof value === "object" &&
-  value !== null &&
-  // SAFETY: the assertion only widens the checked object for property probing;
-  // the trailing typeof check is what verifies `~standard.validate` exists.
-  typeof (value as { "~standard"?: { validate?: unknown } })["~standard"]
-    ?.validate === "function";
+  // SAFETY: the assertion only widens the value for property probing; the
+  // typeof check is what verifies `~standard.validate` exists.
+  typeof (
+    value as { "~standard"?: { validate?: unknown } } | null | undefined
+  )?.["~standard"]?.validate === "function";

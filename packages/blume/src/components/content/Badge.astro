@@ -1,5 +1,5 @@
 ---
-import { STROKE, TINT } from "../colors.ts";
+import { ACCENT_STROKE, ACCENT_TINT, STROKE, TINT } from "../colors.ts";
 import Icon from "../Icon.astro";
 import { badgeColorName } from "./badge-color.ts";
 
@@ -38,10 +38,11 @@ const isDisabled = disabled === true || disabled === "true";
 const colorName = badgeColorName(variant, color);
 const customColor = colorName.startsWith("#") ? colorName : null;
 
-// The hue rows come from the shared table (see colors.ts for the contrast
-// rule); the neutral and surface rows are Badge's own.
+// The hue and theme-accent rows come from the shared table (see colors.ts for
+// the contrast rule); the neutral and surface rows are Badge's own.
 const filledColorClass: Record<string, string> = {
   ...TINT,
+  accent: ACCENT_TINT,
   gray: "bg-muted text-muted-foreground",
   surface: "bg-background text-muted-foreground ring-1 ring-border",
   "surface-destructive":
@@ -53,6 +54,7 @@ const filledColorClass: Record<string, string> = {
 
 const strokeColorClass: Record<string, string> = {
   ...STROKE,
+  accent: ACCENT_STROKE,
   gray: "border-border text-muted-foreground",
   surface: "border-border text-muted-foreground",
   "surface-destructive": "border-red-500/40 text-red-700 dark:text-red-300",

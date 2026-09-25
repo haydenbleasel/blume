@@ -4,8 +4,8 @@ import {
   examplesPageTemplate,
   notFoundPageTemplate,
 } from "../src/astro/templates.ts";
-import { prefixBase } from "../src/components/islands/base-path.ts";
-import { withBasePath } from "../src/core/base-path.ts";
+import { mountBase } from "../src/components/islands/base-path.ts";
+import { mountBasePath } from "../src/core/base-path.ts";
 
 // The inline scripts generated pages ship, run against a hand-built scope:
 // `with (scope)` resolves the page globals they read (`document`, `location`,
@@ -60,8 +60,8 @@ const fakeNode = (attrs: Record<string, string> = {}): FakeNode => {
 
 /**
  * The 404 page's build-time `data-base` and a locale's home link, evaluated
- * from the template's own frontmatter lines with `withBase` bound to
- * `deployBase` (it is `prefixBase` over Astro's `BASE_URL`).
+ * from the template's own frontmatter lines with `withMountedBase` bound to
+ * `deployBase` (it is `mountBase` over Astro's `BASE_URL`).
  */
 const notFoundBases = (
   template: string,
@@ -76,8 +76,8 @@ const notFoundBases = (
   const scope = {
     basePath,
     l: { code: "ja" },
-    withBase: (route: string) => prefixBase(deployBase, route),
-    withBasePath,
+    mountBasePath,
+    withMountedBase: (route: string) => mountBase(deployBase, route),
   };
   return {
     dataBase: evaluate(

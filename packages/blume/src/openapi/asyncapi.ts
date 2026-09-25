@@ -46,7 +46,8 @@ export interface AsyncApiChannelObject {
   messages?: Record<string, AsyncApiRefLike>;
   parameters?: Record<string, AsyncApiRefLike>;
   servers?: AsyncApiRefLike[];
-  bindings?: Record<string, Record<string, AsyncApiSpecValue>>;
+  /** Protocol-keyed binding objects, or a `$ref` to a components entry. */
+  bindings?: Record<string, AsyncApiSpecValue>;
   [key: string]: AsyncApiSpecValue;
 }
 
@@ -61,7 +62,8 @@ export interface AsyncApiOperationObject {
   tags?: { name?: string; description?: string }[];
   security?: AsyncApiRefLike[];
   messages?: AsyncApiRefLike[];
-  bindings?: Record<string, Record<string, AsyncApiSpecValue>>;
+  /** Protocol-keyed binding objects, or a `$ref` to a components entry. */
+  bindings?: Record<string, AsyncApiSpecValue>;
   [key: string]: AsyncApiSpecValue;
 }
 

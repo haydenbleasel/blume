@@ -194,6 +194,7 @@ export const vercelPlatform: DeployPlatform = {
   previewDeploy: "vercel deploy",
   readsHeaderFiles: { server: false, static: false },
   redirectFiles: [VERCEL_JSON_FILE],
+  serverClientUnderBase: false,
   serverOutputDir: buildOutputDir,
   serverStaticDir: (context) => join(buildOutputDir(context), "static"),
 };

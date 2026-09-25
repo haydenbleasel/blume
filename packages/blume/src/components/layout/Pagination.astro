@@ -1,5 +1,5 @@
 ---
-import { withBase } from "../islands/base-path.ts";
+import { withMountedBase } from "../islands/base-path.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { FlatPage } from "./nav-utils.ts";
@@ -31,7 +31,7 @@ const s = { ...EN_UI.page, ...strings };
       {prev ? (
         <a
           class="flex max-w-[48%] flex-1 items-center gap-2 rounded-blume border border-border px-4 py-3 text-foreground transition-colors hover:border-foreground"
-          href={withBase(prev.route)}
+          href={withMountedBase(prev.route)}
         >
           <Icon class="rtl:-scale-x-100" name="arrow-left" size={16} />
           <span class="min-w-0">
@@ -47,7 +47,7 @@ const s = { ...EN_UI.page, ...strings };
       {next && (
         <a
           class="ms-auto flex max-w-[48%] flex-1 items-center justify-end gap-2 rounded-blume border border-border px-4 py-3 text-end text-foreground transition-colors hover:border-foreground"
-          href={withBase(next.route)}
+          href={withMountedBase(next.route)}
         >
           <span class="min-w-0">
             <span class="block text-muted-foreground text-xs">

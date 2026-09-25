@@ -51,18 +51,26 @@ export const baselineScanIgnore = (): string[] =>
  */
 export const BLUME_WATCH_IGNORE_DIRS = BLUME_IGNORE_DIRS;
 
-/** Extract single-segment ignore dirs (`foo`) from `foo/**`-style excludes. */
+/**
+ * Extract root-anchored ignore dirs (`/foo`) from `foo/**`-style excludes. The
+ * scan's glob `foo/**` matches `foo` at the source root only, so the watcher
+ * skips that one directory: a nested `guides/foo/` is still content, and an
+ * edit there must still reload.
+ */
 export const excludeDirSegments = (patterns: readonly string[]): string[] =>
   patterns
     .map((pattern) => /^(?<dir>[^*/]+)\/\*\*$/u.exec(pattern)?.groups?.dir)
-    .filter((dir): dir is string => dir !== undefined);
+    .filter((dir): dir is string => dir !== undefined)
+    .map((dir) => `/${dir}`);
 
 /**
  * Build a recursive-watch listener that fires `onChange` for content changes but
- * ignores events whose path crosses an ignored directory segment — one in
- * `ignoreDirs`, or one `ignoreSegment` rejects, for a scan whose skip rule is
- * a shape (every dot-name) rather than a list. A missing `filename` — rare;
- * the platform couldn't name the changed path — falls through to `onChange`
+ * ignores events whose path crosses an ignored directory — a segment named in
+ * `ignoreDirs` at any depth, or one `ignoreSegment` rejects, for a scan whose
+ * skip rule is a shape (every dot-name) rather than a list. An entry written
+ * with a leading slash (`/drafts`, see {@link excludeDirSegments}) names a
+ * directory at the watched root only. A missing `filename` — rare; the
+ * platform couldn't name the changed path — falls through to `onChange`
  * rather than silently dropping a real edit. Exported for testing.
  */
 export const ignoringWatchListener = (
@@ -76,7 +84,12 @@ export const ignoringWatchListener = (
       filename !== null &&
       filename
         .split(/[/\\]/u)
-        .some((segment) => ignore.has(segment) || ignoreSegment(segment))
+        .some(
+          (segment, index) =>
+            ignore.has(segment) ||
+            (index === 0 && ignore.has(`/${segment}`)) ||
+            ignoreSegment(segment)
+        )
     ) {
       return;
     }

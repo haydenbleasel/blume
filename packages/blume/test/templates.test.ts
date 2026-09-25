@@ -53,7 +53,7 @@ import {
   stagedContentDir,
   staticJsonEndpointTemplate,
 } from "../src/astro/templates.ts";
-import { stripBasePath, withBasePath } from "../src/core/base-path.ts";
+import { mountBasePath, stripBasePath } from "../src/core/base-path.ts";
 import type { BlumeConfig } from "../src/core/config-input.ts";
 import { TOC_HIDDEN_KEY } from "../src/core/heading-markers.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
@@ -160,7 +160,7 @@ describe("catchAllPageTemplate", () => {
     // The base helpers are the manifest's own, imported rather than re-spelled
     // in the emitted frontmatter.
     expect(out).toContain(
-      'import { stripBasePath, withBasePath } from "blume/core/base-path.ts"'
+      'import { mountBasePath, stripBasePath } from "blume/core/base-path.ts"'
     );
     expect(out).toContain(
       "href: alt ? alt.path : mountLocalized(logicalRoute, l.code)"
@@ -177,7 +177,7 @@ describe("catchAllPageTemplate", () => {
     expect(mountStart).toBeGreaterThan(localeEnd);
     expect(mountEnd).toBeGreaterThan(mountStart);
     const snippet = new Bun.Transpiler({ loader: "ts" }).transformSync(
-      `const targetsFor = (i18n, data, route, locale, withBasePath, stripBasePath) => {
+      `const targetsFor = (i18n, data, route, locale, mountBasePath, stripBasePath) => {
 ${out.slice(localeStart, localeEnd)}
 ${out.slice(mountStart, mountEnd)}
 return i18n.locales.map((l) => mountLocalized(logicalRoute, l.code));
@@ -192,7 +192,7 @@ return i18n.locales.map((l) => mountLocalized(logicalRoute, l.code));
       data: { config: { basePath: string } },
       route: string,
       locale: string,
-      mount: typeof withBasePath,
+      mount: typeof mountBasePath,
       strip: typeof stripBasePath
     ) => string[];
     // SAFETY: the generated snippet wrapped above declares `targetsFor` with
@@ -212,7 +212,7 @@ return i18n.locales.map((l) => mountLocalized(logicalRoute, l.code));
         { config: { basePath } },
         route,
         locale,
-        withBasePath,
+        mountBasePath,
         stripBasePath
       );
     // Regression: `route` carries the base path, locale prefixes do not. A page
@@ -235,6 +235,14 @@ return i18n.locales.map((l) => mountLocalized(logicalRoute, l.code));
       "/docs",
       "/docs/ja",
       "/docs/ko",
+    ]);
+    // A page under a folder named like the base (`docs/reference.md` under
+    // `basePath: "/docs"`) keeps its folder segment: the base is re-mounted
+    // unconditionally, as the manifest mounts it.
+    expect(under("/docs", "/docs/docs/reference", "en")).toEqual([
+      "/docs/docs/reference",
+      "/docs/ja/docs/reference",
+      "/docs/ko/docs/reference",
     ]);
     // Without a base path the composition is the pre-fix behavior.
     expect(under("", "/ja/reference", "ja")).toEqual([
@@ -503,16 +511,16 @@ describe("changelogIndexTemplate", () => {
   it("canonicalizes under the deployment base, like the catch-all", () => {
     const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
     expect(out).toContain(
-      'import { withBase } from "blume/components/islands/base-path.ts"'
+      'import { withMountedBase } from "blume/components/islands/base-path.ts"'
     );
-    expect(out).toContain('const basedRoute = withBase("/changelog");');
+    expect(out).toContain('const basedRoute = withMountedBase("/changelog");');
     expect(out).toContain("const canonical = base ? base + basedRoute : null;");
   });
 
   it("wires the generated OG card, gated on og.enabled", () => {
     const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
     expect(out).toContain(
-      'const ogPath = data.config.og.enabled ? withBase("/og/changelog.png") : null;'
+      'const ogPath = data.config.og.enabled ? withMountedBase("/og/changelog.png") : null;'
     );
     expect(out).toContain("ogImage={ogImage}");
     expect(out).toContain("ogGenerated={Boolean(ogImage)}");
@@ -548,7 +556,7 @@ describe("changelogIndexTemplate", () => {
       "(defaultLocale === null || routeByEntry.has(entry.id))"
     );
     expect(out).toContain("const route = routeByEntry.get(entry.id);");
-    expect(out).toContain("href: route ? withBase(route) : null,");
+    expect(out).toContain("href: route ? withMountedBase(route) : null,");
     expect(out).toContain('href={item.href ?? "#" + item.id}');
   });
 
@@ -647,13 +655,13 @@ describe("notFoundPageTemplate", () => {
     // Tabs link to their resolved target (a section without an index page
     // resolves to its first page), falling back to the section path.
     expect(out).toContain(
-      "...data.navigation.tabs.map((tab) => ({\n    href: withBase(tab.href ?? tab.path),\n    label: tab.label,\n  }))"
+      "...data.navigation.tabs.map((tab) => ({\n    href: withMountedBase(tab.href ?? tab.path),\n    label: tab.label,\n  }))"
     );
     expect(out).toContain(
-      '...(data.config.discovery.sitemap\n    ? [{ href: withBase("/sitemap.xml"), label: nf.sitemap }]\n    : [])'
+      '...(data.config.discovery.sitemap\n    ? [{ href: withMountedBase("/sitemap.xml"), label: nf.sitemap }]\n    : [])'
     );
     expect(out).toContain(
-      '...(data.config.discovery.llmsTxt\n    ? [{ href: withBase("/llms.txt"), label: nf.llms }]\n    : [])'
+      '...(data.config.discovery.llmsTxt\n    ? [{ href: withMountedBase("/llms.txt"), label: nf.llms }]\n    : [])'
     );
     // Rendered as a labeled nav under its own heading, and skipped entirely
     // when nothing is linkable.
@@ -664,12 +672,12 @@ describe("notFoundPageTemplate", () => {
     expect(out).toContain("<span>{link.label}</span>");
   });
 
-  it("routes the home link through withBase, like the catch-all", () => {
+  it("routes the home link through withMountedBase, like the catch-all", () => {
     const out = notFoundPageTemplate();
     expect(out).toContain(
-      'import { withBase } from "blume/components/islands/base-path.ts"'
+      'import { withMountedBase } from "blume/components/islands/base-path.ts"'
     );
-    expect(out).toContain('href={withBase("/")}');
+    expect(out).toContain('href={withMountedBase("/")}');
   });
 
   it("passes default-locale lang/dir with the UI dictionary, like the catch-all", () => {
@@ -725,12 +733,12 @@ describe("notFoundMarkdownTemplate", () => {
   it("makes internal links absolute when the site is known, leaving external hrefs alone", () => {
     const out = notFoundMarkdownTemplate();
     expect(out).toContain(
-      'import { withBase } from "blume/components/islands/base-path.ts"'
+      'import { withMountedBase } from "blume/components/islands/base-path.ts"'
     );
     expect(out).toContain(
       'import { absoluteUrl } from "blume/core/site-url.ts"'
     );
-    expect(out).toContain("const based = withBase(path);");
+    expect(out).toContain("const based = withMountedBase(path);");
     expect(out).toContain(
       'return data.config.site && based.startsWith("/") && !based.startsWith("//")\n    ? absoluteUrl(data.config.site, based)\n    : based;'
     );
@@ -1032,8 +1040,10 @@ describe("astroConfigTemplate", () => {
     // package root would leave that entry unoptimized. Astro's client-router
     // virtual modules must stay OUT of this list: pre-bundling strips the
     // `define`-injected constants they read. See the optimizeDeps comment.
+    // The default search adapter's client library rides along (see
+    // test/dev-optimize-deps.test.ts).
     expect(out).toContain(
-      'include: ["blume > mermaid","blume > epub-gen-memory/bundle"]'
+      'include: ["blume > mermaid","blume > epub-gen-memory/bundle","blume > @orama/orama"]'
     );
     // Without a pages dir or aliases, the optimizer scan still covers the
     // convention islands dir so their deps land in the initial optimization.
@@ -2314,7 +2324,7 @@ describe("static endpoint templates", () => {
       navFragments: true,
     });
     expect(withFragments).toContain(
-      `navFragmentBase={withBase(\`/blume-nav/\${version || "current"}/\${i18n && localePrefix(locale) ? locale : "default"}\`)}`
+      `navFragmentBase={withMountedBase(\`/blume-nav/\${version || "current"}/\${i18n && localePrefix(locale) ? locale : "default"}\`)}`
     );
     expect(
       catchAllPageTemplate({ ...exportOpts, mathEnabled: false })

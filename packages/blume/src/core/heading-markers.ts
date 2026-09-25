@@ -55,17 +55,12 @@ export interface HeadingMarkers {
  * the heading count (mid-text brackets are ordinary prose); when a marker kind
  * repeats, the last one written wins.
  *
- * `isRefDefined` reports whether a link-reference definition exists for a
- * bracket's label (`toc`, `!toc`, `#id`): a defined bracket is a CommonMark
- * shortcut link, not a marker — the renderer sees a resolved `<a>` element
- * there and strips nothing at or before it, so the parse stops the same way.
- * The render-time hast plugin never passes it (resolved links are already
- * elements by the time it runs); the raw-source scanner does.
+ * Callers pass the heading's trailing text node after a Markdown parse, so a
+ * bracket that a link-reference definition turns into a CommonMark shortcut
+ * link (`[toc]` with a `[toc]: …` definition) is already an element there and
+ * never reaches this parse.
  */
-export const parseHeadingMarkers = (
-  text: string,
-  isRefDefined?: (label: string) => boolean
-): HeadingMarkers => {
+export const parseHeadingMarkers = (text: string): HeadingMarkers => {
   let remaining = text;
   let id: string | undefined;
   let toc: HeadingMarkers["toc"];
@@ -75,14 +70,6 @@ export const parseHeadingMarkers = (
     match = MARKER.exec(remaining)
   ) {
     const explicitId = match.groups.curlyId ?? match.groups.id;
-    const label =
-      explicitId === undefined
-        ? `${match.groups.hide ?? ""}toc`
-        : `#${explicitId}`;
-    // A `{#id}` is never a shortcut link, whatever the definitions say.
-    if (match.groups.curlyId === undefined && isRefDefined?.(label)) {
-      break;
-    }
     remaining = remaining.slice(0, match.index);
     if (explicitId === undefined) {
       // Stripping runs right-to-left, so keeping the first capture of each

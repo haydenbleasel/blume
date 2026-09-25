@@ -19,9 +19,12 @@ export type MdastValue =
   | MdastValue[]
   | { [key: string]: MdastValue };
 
-/** The visitor context Blume's plugins use to mutate the tree. */
+/**
+ * The visitor context Blume's plugins use to mutate the tree. A list of
+ * nodes takes the replaced node's place in order.
+ */
 export interface MdastVisitorContext {
-  replaceNode: (node: MdastNode, replacement: MdastNode) => void;
+  replaceNode: (node: MdastNode, replacement: MdastNode | MdastNode[]) => void;
 }
 
 /** Any MDAST node, keyed loosely since we build a small subset by hand. */

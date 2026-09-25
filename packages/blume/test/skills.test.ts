@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync } from "node:fs";
 import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { gunzipSync } from "node:zlib";
@@ -35,12 +36,15 @@ const readTarGz = (
   const tar = new Uint8Array(gunzipSync(bytes));
   const files: { content: string; mode: number; path: string }[] = [];
   let offset = 0;
+  // A PAX extended header's `path` overrides the next entry's ustar name.
+  let paxPath: string | undefined;
   while (offset < tar.length) {
     const header = tar.subarray(offset, offset + 512);
-    const path = field(header.subarray(0, 100));
-    if (!path) {
+    const name = field(header.subarray(0, 100));
+    if (!name) {
       break;
     }
+    const prefix = field(header.subarray(345, 500));
     const mode = Number.parseInt(field(header.subarray(100, 108)), 8);
     const size = Number.parseInt(field(header.subarray(124, 136)), 8);
     // Validate the checksum the way a tar reader does.
@@ -54,8 +58,18 @@ const readTarGz = (
     const content = decoder.decode(
       tar.subarray(offset + 512, offset + 512 + size)
     );
-    files.push({ content, mode, path });
     offset += 512 + Math.ceil(size / 512) * 512;
+    if (header[156] === 0x78) {
+      const record = /^(?<length>\d+) path=(?<path>.*)\n$/su.exec(content);
+      expect(Number(record?.groups?.length)).toBe(
+        new TextEncoder().encode(content).length
+      );
+      paxPath = record?.groups?.path;
+      continue;
+    }
+    const path = paxPath ?? (prefix ? `${prefix}/${name}` : name);
+    paxPath = undefined;
+    files.push({ content, mode, path });
   }
   return files;
 };
@@ -108,7 +122,7 @@ describe("buildTarGz", () => {
     );
   });
 
-  it("rejects escaping and oversized paths", () => {
+  it("rejects escaping paths", () => {
     const content = new Uint8Array(0);
     expect(() => buildTarGz([{ content, path: "../evil" }])).toThrow(
       "archive-relative"
@@ -116,10 +130,74 @@ describe("buildTarGz", () => {
     expect(() => buildTarGz([{ content, path: "/abs" }])).toThrow(
       "archive-relative"
     );
-    expect(() => buildTarGz([{ content, path: `${"a".repeat(101)}` }])).toThrow(
-      "exceeds"
-    );
   });
+
+  // Paths past the 100-byte ustar `name` field: split across `prefix` up to
+  // 255 bytes, then a PAX extended header. Components stay under the 255-byte
+  // filename limit so the archive also extracts onto a real filesystem.
+  const longEntries = [
+    { content: "short\n", path: "SKILL.md" },
+    // 134 bytes, split as `references` + name.
+    { content: "split\n", path: `references/${"a".repeat(120)}.md` },
+    // 250 bytes, the longest head that fits `prefix` (150 bytes).
+    {
+      content: "max split\n",
+      executable: true,
+      path: `${"d".repeat(150)}/${"n".repeat(99)}`,
+    },
+    // 181 bytes whose only split leaves a 160-byte head: PAX.
+    { content: "unsplittable\n", path: `${"s".repeat(160)}/${"t".repeat(20)}` },
+    // 316 bytes: PAX.
+    {
+      content: "pax\n",
+      path: `references/${"x".repeat(100)}/${"y".repeat(100)}/${"z".repeat(100)}.md`,
+    },
+    // 275 bytes of multi-byte characters: PAX, with a UTF-8 record length.
+    {
+      content: "unicode\n",
+      path: `${"文".repeat(30)}/${"文".repeat(30)}/${"文".repeat(30)}.md`,
+    },
+  ];
+  const longArchive = (): Uint8Array =>
+    buildTarGz(
+      longEntries.map((entry) => ({
+        ...entry,
+        content: new TextEncoder().encode(entry.content),
+      }))
+    );
+
+  it("archives paths longer than the ustar name field", () => {
+    const files = readTarGz(longArchive());
+    expect(files.map(({ content, path }) => ({ content, path }))).toEqual(
+      longEntries.map(({ content, path }) => ({ content, path }))
+    );
+    expect(files[2]?.mode).toBe(0o755);
+  });
+
+  // Windows tar and MAX_PATH make long-path extraction host-dependent there;
+  // the in-process reader above still checks the layout on every platform.
+  it.skipIf(process.platform === "win32")(
+    "extracts long paths with the system tar",
+    async () => {
+      const dir = join(root, "long-paths");
+      await mkdir(join(dir, "out"), { recursive: true });
+      await writeFile(join(dir, "skill.tar.gz"), longArchive());
+      const result = spawnSync(
+        "tar",
+        ["-xzf", join(dir, "skill.tar.gz"), "-C", join(dir, "out")],
+        { encoding: "utf-8" }
+      );
+      expect(result.stderr).toBe("");
+      expect(result.status).toBe(0);
+      for (const entry of longEntries) {
+        const target = join(dir, "out", entry.path);
+        expect(readFileSync(target, "utf-8")).toBe(entry.content);
+        const { mode } = statSync(target);
+        // oxlint-disable-next-line no-bitwise -- testing the owner-execute mode bit
+        expect((mode & 0o100) !== 0).toBe(entry.executable === true);
+      }
+    }
+  );
 });
 
 describe("collectSkills", () => {
@@ -187,6 +265,32 @@ describe("collectSkills", () => {
     expect(warnings.join(" ")).toContain("invalid name");
     expect(warnings.join(" ")).toContain("missing the required");
     expect(warnings.join(" ")).toContain("unparsable");
+  });
+
+  it("publishes one entry when two directories declare the same name", async () => {
+    const dir = join(root, "colliding");
+    // `alpha` sorts first and keeps the name; `beta` would otherwise write a
+    // second index entry over the same artifact path.
+    await mkdir(join(dir, "alpha"), { recursive: true });
+    await writeFile(join(dir, "alpha", "SKILL.md"), skillMd("shared"));
+    await mkdir(join(dir, "beta", "scripts"), { recursive: true });
+    await writeFile(join(dir, "beta", "SKILL.md"), skillMd("shared"));
+    await writeFile(join(dir, "beta", "scripts", "run.sh"), "echo beta\n");
+
+    const { skills, warnings } = await collectSkills(dir);
+    expect(skills.map((skill) => [skill.name, skill.type, skill.path])).toEqual(
+      [["shared", "skill-md", "shared/SKILL.md"]]
+    );
+    expect(new TextDecoder().decode(skills[0]?.content)).toBe(
+      skillMd("shared")
+    );
+    const expected = createHash("sha256")
+      .update(skills[0]?.content ?? new Uint8Array())
+      .digest("hex");
+    expect(skills[0]?.digest).toBe(`sha256:${expected}`);
+    expect(warnings).toEqual([
+      'Skills "alpha" and "beta" both declare the name "shared"; publishing "alpha" and skipping "beta".',
+    ]);
   });
 });
 

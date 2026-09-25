@@ -57,8 +57,9 @@ describe("search.popular config", () => {
 });
 
 describe("resolveSearchPopular", () => {
-  // `deployment.base` is never applied here — `prefixBase` adds it in the Search
-  // island at click time, so a resolved route must stay deploy-base-less.
+  // `deployment.base` is never applied here — the Search component adds it
+  // (`withBase`) when it renders the entry, so a resolved route must stay
+  // deploy-base-less.
   it("keeps hrefs as routes when no basePath is set", () => {
     expect(
       resolveSearchPopular(

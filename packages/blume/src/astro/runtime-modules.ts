@@ -8,11 +8,11 @@
  * generated pages through aliases or relative paths. `generateRuntime` now
  * publishes them here and `runtimeModulesPlugin` serves them to Vite as
  * virtual modules, so a regeneration never round-trips the disk or waits on a
- * file watcher: publishing invalidates the changed modules in every live dev
- * server (Vite walks the importers, so the pages that render them re-evaluate
- * on the next request) and asks the browser to reload — the same effect a JSON
- * file change used to reach through the watcher, minus the write and the
- * watch debounce.
+ * file watcher: publishing invalidates the changed modules in every Vite
+ * environment of every live dev server (Vite walks the importers, so the
+ * pages that render them re-evaluate on the next request) and asks the
+ * browser to reload — the same effect a JSON file change used to reach
+ * through the watcher, minus the write and the watch debounce.
  *
  * The registry hangs off `globalThis`, not module state. On a published
  * install the CLI bundle (`dist/cli`) carries its own copy of this module,
@@ -61,18 +61,29 @@ interface RuntimeModuleNode {
   id: string | null;
 }
 
+/** One Vite environment's module graph, as far as the registry touches it. */
+interface RuntimeModuleGraph {
+  getModuleById: (id: string) => RuntimeModuleNode | undefined;
+  invalidateModule: (mod: RuntimeModuleNode) => void;
+}
+
 /**
  * The Vite dev-server slice the registry touches (structurally typed, like
  * every Blume-authored Vite plugin — see `includeHmrPlugin`).
  */
 export interface RuntimeModuleServer {
+  /**
+   * Every Vite environment, each with its own module graph. `moduleGraph` on
+   * the server itself is Vite's backward-compatible view of only `client`
+   * and `ssr`, and those are not the only environments that render: with
+   * `@astrojs/cloudflare` the `ssr` environment runs in workerd, so Astro
+   * renders the prerendered pages (every content page) in its `prerender`
+   * environment instead.
+   */
+  environments: Record<string, { moduleGraph: RuntimeModuleGraph }>;
   httpServer?: {
     once: (event: "close", listener: () => void) => void;
   } | null;
-  moduleGraph: {
-    getModuleById: (id: string) => RuntimeModuleNode | undefined;
-    invalidateModule: (mod: RuntimeModuleNode) => void;
-  };
   ws: { send: (payload: { type: "full-reload" }) => void };
 }
 
@@ -131,10 +142,14 @@ export const publishRuntimeModules = (
     return changed;
   }
   for (const server of servers) {
-    for (const id of changed) {
-      const mod = server.moduleGraph.getModuleById(`${RESOLVED_PREFIX}${id}`);
-      if (mod) {
-        server.moduleGraph.invalidateModule(mod);
+    // Every environment that loaded a module holds its own copy, and any of
+    // them may be the one rendering pages on this adapter.
+    for (const { moduleGraph } of Object.values(server.environments)) {
+      for (const id of changed) {
+        const mod = moduleGraph.getModuleById(`${RESOLVED_PREFIX}${id}`);
+        if (mod) {
+          moduleGraph.invalidateModule(mod);
+        }
       }
     }
     server.ws.send({ type: "full-reload" });

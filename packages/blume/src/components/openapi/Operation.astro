@@ -127,6 +127,7 @@ const security = resolveSecurity(
 const model =
   ref && operation
     ? operationModel({
+        components,
         method: ref.method,
         parameters: params,
         path: ref.path,
@@ -195,6 +196,7 @@ const languages = sampleLanguages(spec?.codeSamples ?? []);
               />
             )}
             <RequestPanel
+              components={components}
               languages={languages}
               responses={responses}
               sample={sample}

@@ -12,7 +12,7 @@ import {
 } from "../src/core/sources/watch.ts";
 
 describe("excludeDirSegments", () => {
-  it("extracts single-segment dir prefixes from `foo/**` excludes", () => {
+  it("extracts root-anchored dirs from `foo/**` excludes", () => {
     expect(
       excludeDirSegments([
         "node_modules/**",
@@ -20,7 +20,7 @@ describe("excludeDirSegments", () => {
         "snippets/**",
         "public/**",
       ])
-    ).toEqual(["node_modules", ".blume", "snippets", "public"]);
+    ).toEqual(["/node_modules", "/.blume", "/snippets", "/public"]);
   });
 
   it("ignores glob/file excludes that aren't a plain dir prefix", () => {
@@ -71,6 +71,27 @@ describe("ignoringWatchListener", () => {
     listener("change", ".blume/.astro/data-store.json");
     listener("change", "dist/index.html");
     expect(calls).toBe(1);
+  });
+
+  it("skips an excluded dir only at the watched root, as the scan does", () => {
+    let calls = 0;
+    // `exclude: ["drafts/**"]` globs `drafts/` at the source root only, so a
+    // nested `guides/drafts/` is still content and its edits must reload.
+    const listener = ignoringWatchListener(
+      () => {
+        calls += 1;
+      },
+      excludeDirSegments(["drafts/**"])
+    );
+
+    listener("change", "drafts/wip.md");
+    listener("change", "drafts\\wip.md");
+    listener("rename", "drafts");
+    expect(calls).toBe(0);
+
+    listener("change", "guides/drafts/intro.md");
+    listener("change", "guides\\drafts\\intro.md");
+    expect(calls).toBe(2);
   });
 
   it("honors a segment predicate alongside the ignore set", () => {

@@ -90,6 +90,38 @@ const withinInclude = (
   );
 
 /**
+ * The folder-meta files a filesystem source contributes: `patterns` (every
+ * meta module name, shared `meta.$.*` included, by default) under the source's
+ * root, minus its `exclude` globs, dependencies, and build output, and only in
+ * folders its `include` globs reach. `blume translate` finds the meta files it
+ * translates through this too, so it covers exactly the ones the scan reads.
+ */
+export const findFolderMetaFiles = async (
+  source: FolderMetaSource,
+  patterns: readonly string[] = META_FILES
+): Promise<string[]> => {
+  const found = await glob([...patterns], {
+    absolute: true,
+    cwd: source.root,
+    // Never descend into dependencies or build output — relevant when the
+    // root is the project root (e.g. a `.`-rooted or all-staged project).
+    // The source's own `exclude` applies too: a `meta.ts` under an excluded
+    // folder (`src/lib/meta.ts` beside `exclude: ["src/**"]`) is application
+    // code, not folder meta, and importing it would fail.
+    ignore: [
+      ...(source.exclude ?? []),
+      "**/node_modules/**",
+      "**/.blume/**",
+      "**/dist/**",
+    ],
+    onlyFiles: true,
+  });
+  return found.filter((file) =>
+    withinInclude(relative(source.root, dirname(file)), source.include)
+  );
+};
+
+/**
  * The folder-meta key for a directory. Mirrors the sidebar group path: the
  * source's route prefix (`docs`) followed by the directory relative to the
  * source root (`provider`) — so `docs/provider/meta.ts` under a `prefix: "docs"`
@@ -155,25 +187,7 @@ export const discoverFolderMeta = async (
   // `content.root` still contributes its folder meta.
   const perSource = await Promise.all(
     list.map(async (source) => {
-      const found = await glob(META_FILES, {
-        absolute: true,
-        cwd: source.root,
-        // Never descend into dependencies or build output — relevant when the
-        // root is the project root (e.g. a `.`-rooted or all-staged project).
-        // The source's own `exclude` applies too: a `meta.ts` under an
-        // excluded folder (`src/lib/meta.ts` beside `exclude: ["src/**"]`)
-        // is application code, not folder meta, and importing it would fail.
-        ignore: [
-          ...(source.exclude ?? []),
-          "**/node_modules/**",
-          "**/.blume/**",
-          "**/dist/**",
-        ],
-        onlyFiles: true,
-      });
-      const files = found.filter((file) =>
-        withinInclude(relative(source.root, dirname(file)), source.include)
-      );
+      const files = await findFolderMetaFiles(source);
       const loaded = await Promise.all(
         files.map(
           async (

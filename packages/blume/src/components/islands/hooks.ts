@@ -23,27 +23,29 @@ import { joinBase, stripBase } from "./base-path.ts";
 
 export type { BlumeClientData } from "../../core/data.ts";
 
-let cachedData: BlumeClientData | null = null;
+/**
+ * The last parsed snapshot, keyed by the script text it came from. Each page
+ * renders its own snapshot (its route and title, its locale's navigation), and
+ * a client-router navigation swaps in the new page's tag, so the cache is only
+ * reused while the tag's text is unchanged.
+ */
+let cached: { data: BlumeClientData; text: string } | null = null;
 
-/** Read + parse the injected snapshot (memoized); null on the server. */
+/** Read + parse the current page's injected snapshot (memoized per text). */
 const readClientData = (): BlumeClientData | null => {
-  if (cachedData) {
-    return cachedData;
-  }
-  // `document` is undeclared on the server; probing `globalThis` avoids both
-  // the bare-reference ReferenceError and a `typeof` sniff.
-  if (!("document" in globalThis)) {
+  const text = document.querySelector("#blume-client-data")?.textContent;
+  if (!text) {
     return null;
   }
-  const element = document.querySelector("#blume-client-data");
-  if (!element?.textContent) {
-    return null;
+  if (cached?.text === text) {
+    return cached.data;
   }
   try {
     // SAFETY: the layout serialized this script tag's JSON from the same
     // `BlumeClientData` snapshot this reads back.
-    cachedData = JSON.parse(element.textContent) as BlumeClientData;
-    return cachedData;
+    const data = JSON.parse(text) as BlumeClientData;
+    cached = { data, text };
+    return data;
   } catch {
     return null;
   }
@@ -51,15 +53,29 @@ const readClientData = (): BlumeClientData | null => {
 
 /**
  * Read the injected snapshot after mount. `null` on the server and on the first
- * client render (so hydration matches), then the data once mounted.
+ * client render (so hydration matches), then the data once mounted, re-read
+ * after every client-router swap.
  */
 const useClientData = (): BlumeClientData | null => {
   const [data, setData] = useState<BlumeClientData | null>(null);
-  // Intentional post-mount hydration guard: `null` on the server and first
-  // client render so hydration matches, then the snapshot once mounted. The
-  // extra render is required; do not seed the initial value from the DOM.
-  // oxlint-disable-next-line react/react-compiler, react/set-state-in-effect, react-doctor/no-initialize-state -- deliberate SSR hydration guard
-  useEffect(() => setData(readClientData()), []);
+  useEffect(() => {
+    // `document` is undeclared on the server; probing `globalThis` avoids both
+    // the bare-reference ReferenceError and a `typeof` sniff.
+    if (!("document" in globalThis)) {
+      return;
+    }
+    const sync = () => setData(readClientData());
+    // Intentional post-mount hydration guard: `null` on the server and first
+    // client render so hydration matches, then the snapshot once mounted. The
+    // extra render is required; do not seed the initial value from the DOM.
+    // oxlint-disable-next-line react/react-compiler, react/set-state-in-effect, react-doctor/no-initialize-state -- deliberate SSR hydration guard
+    sync();
+    // An island kept across navigations (`transition:persist`) outlives the
+    // page it mounted on; the swap brings the next page's snapshot, so read
+    // it again or the hook keeps answering with the first page's data.
+    document.addEventListener("astro:after-swap", sync);
+    return () => document.removeEventListener("astro:after-swap", sync);
+  }, []);
   return data;
 };
 

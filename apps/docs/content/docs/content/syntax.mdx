@@ -609,6 +609,20 @@ The core theme ships no client framework JS.
 
 The names `caution`, `error`, `important`, and `warn` are accepted as aliases for `warning`, `danger`, `note`, and `warning` respectively.
 
+Any other name isn't a callout. Its content still renders — between its `:::` lines, which stay on the page as written — so a `:::details` carried over from another docs tool, or a typo like `:::warnig`, never hides what's inside it. `blume dev`, `blume build`, and `blume check` warn about it as `BLUME_UNKNOWN_DIRECTIVE`, naming the callout types above.
+
+To put a callout inside another, give the outer one a longer fence:
+
+```md
+::::note
+Blume regenerates `.blume/` on every run.
+
+:::tip
+Commit `blume.config.ts`, not `.blume/`.
+:::
+::::
+```
+
 ## Math
 
 Render LaTeX with KaTeX as centered blocks — useful for math-heavy or scientific docs. Wrap a formula in `$$…$$`:

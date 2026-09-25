@@ -32,7 +32,10 @@ interface FrontmatterData {
   [key: string]: FrontmatterValue;
 }
 
-const FRONTMATTER_OPEN = /^---\r?\n/u;
+// gray-matter strips a leading byte order mark before it looks for the fence,
+// so a BOM-prefixed file still has frontmatter — this test must agree, or the
+// reconstruction below writes the body alone and the metadata is lost.
+const FRONTMATTER_OPEN = /^﻿?---\r?\n/u;
 const FENCE_LINE = /^\s*(?:```|~~~)/u;
 
 /**

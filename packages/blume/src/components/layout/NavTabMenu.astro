@@ -10,7 +10,7 @@
 // delegate from `document`, so client-router swaps need no re-init.
 import type { NavTab } from "../../core/types.ts";
 import Icon from "../Icon.astro";
-import { withBase } from "../islands/base-path.ts";
+import { withMountedBase } from "../islands/base-path.ts";
 
 interface Props {
   tab: NavTab;
@@ -60,7 +60,7 @@ const drawerRowClass =
           <a
             aria-current={itemCurrent(item.path)}
             class={barRowClass}
-            href={withBase(item.path)}
+            href={withMountedBase(item.path)}
           >
             {item.icon && <Icon class="mt-0.5" name={item.icon} size={16} />}
             <span class="flex-1">
@@ -102,7 +102,7 @@ const drawerRowClass =
             <a
               aria-current={itemCurrent(item.path)}
               class={drawerRowClass}
-              href={withBase(item.path)}
+              href={withMountedBase(item.path)}
             >
               {item.icon && (
                 <Icon class="shrink-0" name={item.icon} size={14} />

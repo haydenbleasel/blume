@@ -14,6 +14,9 @@ import { isServed, normalizePath, resolveHref, siteOrigin } from "../url.ts";
 /** Browser-magic fragments that scroll without needing a matching id. */
 const MAGIC_FRAGMENTS = new Set(["", "top"]);
 
+/** Where a fragment's directives (text fragments) start. */
+const FRAGMENT_DIRECTIVE = ":~:";
+
 /** Whether a fragment lands on an id of the target page. */
 const anchorResolves = (target: PageSnapshot, fragment: string): boolean => {
   if (MAGIC_FRAGMENTS.has(fragment)) {
@@ -65,8 +68,12 @@ export const linkChecks: CheckModule = {
       page: PageSnapshot,
       link: SnapshotLink,
       target: PageSnapshot,
-      fragment: string
+      hash: string
     ): void => {
+      // A text fragment (`#:~:text=…`) is a directive the browser strips
+      // before it looks for an id; only the part in front of `:~:` names an
+      // element, and an empty one scrolls to the text instead.
+      const [fragment = ""] = hash.split(FRAGMENT_DIRECTIVE);
       if (anchorResolves(target, fragment)) {
         return;
       }

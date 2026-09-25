@@ -1,5 +1,5 @@
 ---
-import { withBase } from "../islands/base-path.ts";
+import { withMountedBase } from "../islands/base-path.ts";
 
 /**
  * A schema name (or full type display like `[Pet!]!`) rendered as a link when
@@ -21,7 +21,7 @@ const { name, route, class: className } = Astro.props;
   route ? (
     <a
       class:list={["font-mono text-accent hover:underline", className]}
-      href={withBase(route)}
+      href={withMountedBase(route)}
     >
       {name}
     </a>

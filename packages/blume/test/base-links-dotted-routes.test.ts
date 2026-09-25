@@ -75,7 +75,7 @@ const LINKS = [
 ].join("\n\n");
 
 describe("base-path rewrite of dotted routes", () => {
-  it("bases a served dotted route and leaves an asset at the root", async () => {
+  it("bases a served dotted route and leaves an asset out of basePath", async () => {
     publishData(
       snapshot(["/docs/guide", "/docs/releases/v1.2", "/docs/releases/café.1"])
     );
@@ -84,7 +84,8 @@ describe("base-path rewrite of dotted routes", () => {
     // Routes are stored decoded; the href keeps the author's encoding.
     expect(html).toContain('href="/sub/docs/releases/caf%C3%A9.1"');
     expect(html).toContain('href="/sub/docs/guide"');
-    expect(html).toContain('href="/spec.pdf"');
+    // A public file gains the deployment base, never `basePath`.
+    expect(html).toContain('href="/sub/spec.pdf"');
     // An unchanged snapshot is reused, and a republished one read again.
     expect(
       await render("[Release](/releases/v1.2)", { basePath: "/docs" })

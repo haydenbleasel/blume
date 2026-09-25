@@ -39,7 +39,7 @@ import {
 } from "../../og/dimensions.ts";
 import { buildStructuredData, toIso } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
-import { withBase } from "../islands/base-path.ts";
+import { withBase, withMountedBase } from "../islands/base-path.ts";
 import { isExternalUrl } from "../../core/base-path.ts";
 import { NEW_TAB_HINT_ID, newTabAttrs } from "../../core/new-tab.ts";
 import Analytics from "./Analytics.astro";
@@ -401,12 +401,12 @@ const formattedLastModified =
 // not a content route and has none.
 const markdownMirror = isBare
   ? null
-  : withBase(page.route === "/" ? "/index.md" : `${page.route}.md`);
+  : withMountedBase(page.route === "/" ? "/index.md" : `${page.route}.md`);
 
 // The hosted MCP server's absolute URL, used by the page-actions install menu.
 // Needs a configured site to be useful, so the menu is hidden without one.
 const mcpUrl =
-  mcp && siteUrl ? new URL(withBase(mcp.route), siteUrl).href : null;
+  mcp && siteUrl ? new URL(withMountedBase(mcp.route), siteUrl).href : null;
 
 // Scope the sidebar (and the breadcrumbs/pagination derived from it) to the
 // active tab's section, so a multi-section site drills each tab into its own
@@ -540,7 +540,7 @@ createIconSprite(Astro.locals);
     {
       feeds?.map((feed) => (
         <link
-          href={withBase(feed.href)}
+          href={withMountedBase(feed.href)}
           rel="alternate"
           title={feed.title}
           type="application/rss+xml"
@@ -689,7 +689,7 @@ createIconSprite(Astro.locals);
                       <a
                         aria-current={tab === activeTab ? "page" : undefined}
                         class="flex items-center gap-2 rounded-[0.65rem] px-2.5 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
-                        href={withBase(tab.href ?? tab.path)}
+                        href={withMountedBase(tab.href ?? tab.path)}
                       >
                         {tab.icon && (
                           <Icon class="shrink-0" name={tab.icon} size={14} />

@@ -70,7 +70,7 @@ const serverSetup = (
     ...options,
   }).hooks["astro:server:setup"]?.({
     refreshContent,
-    server: { middlewares: { stack }, ...server },
+    server: { environments: {}, middlewares: { stack }, ...server },
   } as never);
   return stack;
 };

@@ -1,4 +1,4 @@
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ContentSignalPolicy, ContentSignals } from "../core/schema.ts";
 import { absoluteUrl } from "../core/site-url.ts";
@@ -49,7 +49,7 @@ export const buildRobots = (project: BlumeProject): string | null => {
 
   const { site } = config.deployment.options;
   if (site && config.seo.sitemap) {
-    const sitemapPath = withBasePath(
+    const sitemapPath = mountBasePath(
       normalizeBasePath(config.deployment.options.base),
       "/sitemap.xml"
     );

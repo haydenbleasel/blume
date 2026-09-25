@@ -626,26 +626,6 @@ describe(extractHeadings, () => {
     expect(extractHeadings(body).map((h) => h.text)).toStrictEqual(["After"]);
   });
 
-  it("keeps headings when the body opens with a thematic break", () => {
-    // A leading `---` followed by a blank line is a thematic break, not front
-    // matter — treating it as an unclosed block would eat every heading up to
-    // the next `---` line.
-    const body = ["---", "", "# First", "", "---", "", "## Second"].join("\n");
-    expect(extractHeadings(body).map((h) => h.text)).toStrictEqual([
-      "First",
-      "Second",
-    ]);
-  });
-
-  it("still strips real front matter from a raw document", () => {
-    // YAML starts directly on the line after the dashes; the `#` line inside
-    // the block is a YAML comment and must not surface as a heading.
-    const body = ["---", "title: x", "# a yaml comment", "---", "# Real"].join(
-      "\n"
-    );
-    expect(extractHeadings(body).map((h) => h.text)).toStrictEqual(["Real"]);
-  });
-
   it("does not open a fence on a line-leading inline code span", () => {
     // ```inline``` is a paragraph-level code span (a backtick fence's info
     // string cannot contain a backtick) — opening a phantom fence on it would
@@ -694,18 +674,15 @@ describe(extractHeadings, () => {
   });
 
   it("joins a multi-line paragraph into one setext heading", () => {
+    // The rendered text keeps the line break, which github-slugger drops.
     const body = ["Long", "title", "===="].join("\n");
     expect(extractHeadings(body)).toStrictEqual([
-      { depth: 1, slug: "long-title", text: "Long title" },
+      { depth: 1, slug: "longtitle", text: "Long title" },
     ]);
   });
 
-  it("does not misread front matter, breaks, lists, or tables as setext", () => {
+  it("does not misread breaks, lists, or tables as setext", () => {
     const body = [
-      "---",
-      "title: Foo",
-      "---",
-      "",
       "Intro paragraph.",
       "",
       "---",
@@ -717,9 +694,10 @@ describe(extractHeadings, () => {
       "| a |",
       "| --- |",
     ].join("\n");
-    // Front matter delimiters, a thematic break after a blank line, a break
-    // closing a list or blockquote, and a table delimiter row are all
-    // underline look-alikes that must not produce headings.
+    // A thematic break after a blank line, a break closing a list or
+    // blockquote, and a table delimiter row are all underline look-alikes that
+    // must not produce headings. (Bodies arrive with their front matter already
+    // stripped — see scan-front-matter.test.ts.)
     expect(extractHeadings(body)).toStrictEqual([]);
   });
 
@@ -782,10 +760,10 @@ describe(extractHeadings, () => {
 
   it("keeps a bracket with a matching link-reference definition, like CommonMark", () => {
     // With a definition anywhere in the doc, the rendered heading ends in a
-    // shortcut reference link, not a marker — the bracket is heading text.
+    // shortcut reference link, not a marker — its text is heading text.
     const body = ["## Overview [toc]", "", "[toc]: /url"].join("\n");
     expect(extractHeadings(body)).toStrictEqual([
-      { depth: 2, slug: "overview-toc", text: "Overview [toc]" },
+      { depth: 2, slug: "overview-toc", text: "Overview toc" },
     ]);
   });
 
@@ -839,12 +817,13 @@ describe(extractHeadings, () => {
 
   it("stops at a defined bracket but still strips markers to its right", () => {
     // The renderer's trailing text node is " [toc]", so that marker strips;
-    // `[#privacy]` resolves as a link and stays in the text and the slug.
+    // `[#privacy]` resolves as a link, whose text stays in the heading's
+    // text and slug.
     const body = ["## X [#privacy] [toc]", "", "[#privacy]: /url"].join("\n");
     expect(extractHeadings(body)[0]).toStrictEqual({
       depth: 2,
       slug: "x-privacy",
-      text: "X [#privacy]",
+      text: "X #privacy",
     });
   });
 
@@ -912,8 +891,9 @@ describe(extractHeadings, () => {
 
   it("keeps a heading whose text mentions <Prompt>", () => {
     const body = ["## The <Prompt> component", "## After"].join("\n");
+    // The tag renders no text of its own; the heading itself survives.
     expect(extractHeadings(body).map((h) => h.text)).toStrictEqual([
-      "The <Prompt> component",
+      "The component",
       "After",
     ]);
   });

@@ -19,13 +19,18 @@ type StringifyArgs = Parameters<typeof baseMatter.stringify>;
 /** Front matter data as gray-matter types it (`GrayMatterFile["data"]`). */
 type FrontMatterData = ReturnType<typeof baseMatter>["data"];
 
+/** A YAML load result: a mapping (or list) Astro keeps as front matter data. */
+const isYamlCollection = (
+  value: ReturnType<typeof load>
+): value is FrontMatterData => typeof value === "object" && value !== null;
+
 const yamlEngine = {
-  // SAFETY: gray-matter's engine contract expects an object; a front matter
-  // block is a YAML mapping, and js-yaml returns a scalar only for degenerate
-  // input, which gray-matter treats the same way its bundled engine's output
-  // is treated.
-  parse: (input: string): object =>
-    (load(input, { schema: YAML_SCHEMA }) ?? {}) as object,
+  // A block that loads to a scalar (`title` alone, or prose between two
+  // `---` lines) is no metadata: Astro reads it as `{}`, and so does Blume.
+  parse: (input: string): FrontMatterData => {
+    const value = load(input, { schema: YAML_SCHEMA });
+    return isYamlCollection(value) ? value : {};
+  },
   stringify: (data: FrontMatterData): string => dump(data),
 };
 
@@ -45,22 +50,20 @@ const withYamlEngine = <O extends { engines?: object } | undefined>(
 
 /**
  * True when a document's leading `---` line is a CommonMark thematic break,
- * not a front matter fence. Two shapes qualify (mirroring
- * `linesWithoutFrontMatter` in `sources/normalize.ts`):
- *   - the next line is blank (or absent) — YAML metadata starts on the very
- *     next line, so a gap means the body *opens* with a divider (e.g. a
- *     Notion page whose first block is one);
- *   - no closing `---` line follows — gray-matter would swallow the whole
- *     document as one unclosed YAML block and hand it to js-yaml, which
- *     crashes on ordinary Markdown (`> quote` → "a line break is expected").
+ * not a front matter fence: no closing `---` line follows. Astro's own front
+ * matter match requires that close too, while gray-matter would swallow the
+ * whole document as one unclosed YAML block and hand it to js-yaml, which
+ * crashes on ordinary Markdown (`> quote` → "a line break is expected").
+ *
+ * A blank line after the opening `---` is still front matter: Astro strips
+ * the block from the page either way, so reading it as a divider here would
+ * ignore its `draft`, `slug`, and `hidden` while its YAML leaked into search
+ * and llms.txt.
  */
 const opensWithThematicBreak = (input: string): boolean => {
-  const [first = "", second] = input.split(/\r?\n/u, 2);
+  const [first = ""] = input.split(/\r?\n/u, 1);
   if (!/^-{3}\s*$/u.test(first)) {
     return false;
-  }
-  if (second === undefined || second.trim() === "") {
-    return true;
   }
   // gray-matter closes the block at the next line-leading `---`; matching its
   // search exactly keeps this guard from firing on any document it parses.

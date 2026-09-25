@@ -6,13 +6,16 @@
  *
  * The active heading is chosen by rect (the last heading at or above a trigger
  * line just below the sticky header), so it stays correct for sections taller
- * than the viewport and at the bottom of the page. An IntersectionObserver is the
+ * than the viewport and at the bottom of the page; headings that aren't rendered
+ * (inside a hidden tab panel) are skipped (see toc-active.ts). An IntersectionObserver is the
  * cheap primary trigger — it only fires as headings cross the band near the top —
  * and a passive, rAF-throttled scroll listener covers the one case it can't: a
  * final section too short to push its heading past the trigger line.
  *
  * Imported for its side effect (registers the element) from RootLayout's script.
  */
+
+import { activeTocEntry } from "./toc-active.ts";
 
 interface TocEntry {
   heading: HTMLElement;
@@ -93,19 +96,10 @@ class BlumeToc extends HTMLElement {
     const scrolledToBottom =
       window.innerHeight + window.scrollY >=
       document.documentElement.scrollHeight - 2;
-    if (scrolledToBottom) {
-      return this.#entries.at(-1)?.link ?? null;
-    }
-
-    // Headings are in document order, so the last one whose top has reached the
-    // trigger line is the section currently being read; default to the first.
-    let active = this.#entries[0]?.link ?? null;
-    for (const { heading, link } of this.#entries) {
-      if (heading.getBoundingClientRect().top <= TRIGGER_OFFSET) {
-        active = link;
-      }
-    }
-    return active;
+    return (
+      activeTocEntry(this.#entries, TRIGGER_OFFSET, scrolledToBottom)?.link ??
+      null
+    );
   }
 }
 

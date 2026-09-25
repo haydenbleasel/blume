@@ -196,8 +196,13 @@ export const buildSnapshot = (options: {
     scripts: collectAssets(document, "script[src]", "src"),
     source: route?.sourcePath,
     styles: collectAssets(document, 'link[rel="stylesheet"][href]', "href"),
+    // Only the document's own titles: an accessible inline SVG carries a
+    // `<title>` of its own (an SVG-namespace element, not the page title), and
+    // counting it would flag BLUME_AUDIT_TITLE_MULTIPLE — or stand in for a
+    // head `<title>` that is genuinely missing.
     titles: document
       .querySelectorAll("title")
+      .filter((title) => !title.closest("svg"))
       .map((title) => title.text.trim())
       .filter((text) => text.length > 0),
     twitter: prefixedMeta(document, "name", "twitter:"),

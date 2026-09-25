@@ -6,6 +6,8 @@ import { glob } from "tinyglobby";
 
 import { BlumeError } from "../diagnostics.ts";
 import matter from "../frontmatter.ts";
+import type { Diagnostic } from "../types.ts";
+import { unloadablePathDiagnostic } from "./normalize.ts";
 import type { ContentSource, SourceEntry, SourceLoadResult } from "./types.ts";
 import {
   baselineScanIgnore,
@@ -54,8 +56,24 @@ export const filesystemSource = (
     });
     files.sort();
 
+    // A file Astro's content loader can't read would publish a route that
+    // only ever renders "Page not found"; it is reported and left out.
+    const diagnostics: Diagnostic[] = [];
+    const loadable: string[] = [];
+    for (const file of files) {
+      const unloadable = unloadablePathDiagnostic(
+        relative(contentRoot, file),
+        file
+      );
+      if (unloadable) {
+        diagnostics.push(unloadable);
+      } else {
+        loadable.push(file);
+      }
+    }
+
     const entries = await Promise.all(
-      files.map(async (file): Promise<SourceEntry> => {
+      loadable.map(async (file): Promise<SourceEntry> => {
         const source = await readFile(file, "utf-8");
         const ext = extname(file).toLowerCase();
         const format = ext === ".mdx" ? "mdx" : "md";
@@ -73,7 +91,7 @@ export const filesystemSource = (
       })
     );
 
-    return { diagnostics: [], entries };
+    return { diagnostics, entries };
   };
 
   const validate = (): void => {

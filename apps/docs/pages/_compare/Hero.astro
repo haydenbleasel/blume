@@ -6,6 +6,7 @@
 // its label across the top, then the two answers side by side, each tagged. The
 // command box uses the page-level delegated `data-blume-copy-install` handler.
 import Icon from "blume/components/Icon.astro";
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
 import data from "blume:data";
 import CommandText from "../_home/CommandText.astro";
 import TextLink from "../_home/TextLink.astro";
@@ -163,8 +164,7 @@ const reportHref = config.repoUrl
             <a
               class="underline decoration-foreground/20 underline-offset-2 hover:text-foreground hover:decoration-foreground/50"
               href={source.href}
-              rel="noopener noreferrer"
-              target="_blank"
+              {...NEW_TAB_ATTRS}
             >
               {source.label}
             </a>
@@ -178,8 +178,7 @@ const reportHref = config.repoUrl
             <a
               class="inline-flex items-center gap-0.5 font-medium text-accent hover:text-foreground"
               href={reportHref}
-              rel="noopener noreferrer"
-              target="_blank"
+              {...NEW_TAB_ATTRS}
             >
               Let us know
               <svg

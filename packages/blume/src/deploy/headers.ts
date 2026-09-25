@@ -201,6 +201,13 @@ export interface VercelHeader {
 const SOURCE_SYNTAX = /[\\(){}?+:]/gu;
 
 /**
+ * A literal path as `path-to-regexp` source text — what a `vercel.json`
+ * `source` is — with each syntax character escaped, so it matches only itself.
+ */
+export const escapeVercelSource = (path: string): string =>
+  path.replaceAll(SOURCE_SYNTAX, String.raw`\$&`);
+
+/**
  * A `_headers` path as a `vercel.json` `source`, which `path-to-regexp` reads:
  * the literal parts are escaped, and a `*` glob becomes the `(.*)` group that
  * spans path segments as the glob does. An exact directory path (the homepage
@@ -209,10 +216,7 @@ const SOURCE_SYNTAX = /[\\(){}?+:]/gu;
 const vercelSource = (path: string): string => {
   const trimmed =
     path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
-  return trimmed
-    .split("*")
-    .map((part) => part.replaceAll(SOURCE_SYNTAX, String.raw`\$&`))
-    .join("(.*)");
+  return trimmed.split("*").map(escapeVercelSource).join("(.*)");
 };
 
 /**

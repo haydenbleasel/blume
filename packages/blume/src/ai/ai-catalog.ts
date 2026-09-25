@@ -1,5 +1,9 @@
 import { apiNamePhrase } from "../core/api-name.ts";
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import {
+  mountBasePath,
+  normalizeBasePath,
+  withBasePath,
+} from "../core/base-path.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { absoluteUrl } from "../core/site-url.ts";
 import { resolveReferences } from "../openapi/references.ts";
@@ -227,7 +231,7 @@ export const buildAiCatalog = (
   }
   const deployBase = normalizeBasePath(config.deployment.options.base);
   const abs = (path: string): string =>
-    absoluteUrl(site, withBasePath(deployBase, path));
+    absoluteUrl(site, mountBasePath(deployBase, path));
   const host = publisherHost(site);
   const entries = entrySeeds(config, skills, abs).map((seed): CatalogEntry => {
     const entry: CatalogEntry = {

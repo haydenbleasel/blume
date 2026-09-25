@@ -8,6 +8,7 @@
 // border color; the score sits inside the arc as HTML so it uses the page's
 // type, and competitors' scores sit on the same arc as dots at their angle,
 // each with a hover/focus tooltip naming them.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
 import SectionHeading from "./SectionHeading.astro";
 import { glyph } from "./shared.ts";
 import TextLink from "./TextLink.astro";
@@ -102,8 +103,7 @@ const link =
               <a
                 class={link}
                 href={item.href}
-                rel="noopener noreferrer"
-                target="_blank"
+                {...NEW_TAB_ATTRS}
               >
                 View report
                 <svg

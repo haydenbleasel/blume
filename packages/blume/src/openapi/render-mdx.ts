@@ -126,6 +126,45 @@ const mdxSafe = (text: string): string => {
   return out + escapeProse(text.slice(cursor));
 };
 
+// A fence opener: up to three columns of indentation, then a run of three or
+// more backticks or tildes.
+const FENCE_OPEN = /^ {0,3}(?<fence>`{3,}|~{3,})/u;
+
+/**
+ * Close a fenced code block the text leaves open. An unclosed fence runs to
+ * the end of the document, so the component appended after a description
+ * would render as code, and the page would lose its parameters, responses,
+ * and playground. Only the last top-level block can run that far — a fence in
+ * a quote or list closes with its container — and it's read from the same
+ * `<`-masked parse as `mdxSafe`, since the emitted MDX has no HTML blocks to
+ * hide a fence in.
+ */
+const closeOpenFence = (text: string): string => {
+  const last = fromMarkdown(text.replaceAll("<", HTML_MASK)).children.at(-1);
+  if (last?.type !== "code") {
+    return text;
+  }
+  // fromMarkdown always stamps positions; 0 is an unreachable guard.
+  const block = text.slice(last.position?.start.offset ?? 0);
+  const fence = FENCE_OPEN.exec(block)?.groups?.fence;
+  // No fence: indented code, which MDX reads as a paragraph.
+  if (!fence) {
+    return text;
+  }
+  const lines = block.split("\n");
+  const closer = new RegExp(
+    `^ {0,3}${fence[0]}{${fence.length},}[ \\t\\r]*$`,
+    "u"
+  );
+  return lines.length > 1 && closer.test(lines.at(-1) ?? "")
+    ? text
+    : `${text}\n${fence}`;
+};
+
+/** Spec prose as MDX that is safe to follow with a component. */
+const descriptionMdx = (text: string): string =>
+  mdxSafe(closeOpenFence(text.trim()));
+
 /**
  * Frontmatter emitted for one operation or overview page. Boolean flags are
  * assigned only when set, so absent keys stay absent in the staged MDX.
@@ -249,7 +288,7 @@ const operationDescription = (
 /** Prepend a markdown description (if any) above a component invocation. */
 const withDescription = (description: string, component: string): string =>
   description.trim()
-    ? `${mdxSafe(description.trim())}\n\n${component}`
+    ? `${descriptionMdx(description)}\n\n${component}`
     : component;
 
 export const operationMdx = (
@@ -365,7 +404,7 @@ export const overviewMdx = (
       continue;
     }
     const description = tag.description.trim()
-      ? [mdxSafe(tag.description.trim())]
+      ? [descriptionMdx(tag.description)]
       : [];
     tagSections.push(
       [

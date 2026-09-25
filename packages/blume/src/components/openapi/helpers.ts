@@ -335,12 +335,17 @@ const isRecord = (value: SpecValue): value is Record<string, SpecValue> =>
 
 /**
  * The example a parameter or media type declares: its `example`, else the
- * first inline `value` in its `examples` map. Scalar's upgrade moves every
- * OpenAPI 3.0 and Swagger 2.0 `example` into `examples.default.value`, and
- * 3.1 authors write that map directly, so reading `example` alone would drop
- * them all. `undefined` when nothing is declared.
+ * first `value` in its `examples` map — inline, or behind a `$ref` to
+ * `#/components/examples`, resolved against `components`. Scalar's upgrade
+ * moves every OpenAPI 3.0 and Swagger 2.0 `example` into
+ * `examples.default.value`, and 3.1 authors write that map directly, so
+ * reading `example` alone would drop them all. `undefined` when nothing is
+ * declared.
  */
-export const declaredExample = (carrier: ExampleCarrier): SpecValue => {
+export const declaredExample = (
+  carrier: ExampleCarrier,
+  components?: ComponentsLike
+): SpecValue => {
   if (carrier.example !== undefined) {
     return carrier.example;
   }
@@ -349,8 +354,11 @@ export const declaredExample = (carrier: ExampleCarrier): SpecValue => {
     return undefined;
   }
   for (const entry of Object.values(examples)) {
-    if (isRecord(entry) && entry.value !== undefined) {
-      return entry.value;
+    const example = isRecord(entry)
+      ? resolveComponentRef(entry, components, "examples")
+      : undefined;
+    if (example?.value !== undefined) {
+      return example.value;
     }
   }
   return undefined;
@@ -363,9 +371,11 @@ export const declaredExample = (carrier: ExampleCarrier): SpecValue => {
  */
 export const responseExample = (
   media: ExampleCarrier & { schema?: SchemaLike },
-  schemas: Record<string, SchemaLike>
+  schemas: Record<string, SchemaLike>,
+  components?: ComponentsLike
 ): SpecValue =>
-  declaredExample(media) ?? exampleValue(media.schema, schemas, "response");
+  declaredExample(media, components) ??
+  exampleValue(media.schema, schemas, "response");
 
 /** Pretty-print a JSON value for an example/code block. */
 export const toJson = <T>(value: T): string => JSON.stringify(value, null, 2);

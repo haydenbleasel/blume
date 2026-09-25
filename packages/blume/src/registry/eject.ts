@@ -3,10 +3,13 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 
 import { join, relative } from "pathe";
 
+import { OPENAPI_PATH } from "../ai/api/paths.ts";
+import { buildApiSpec } from "../ai/api/spec.ts";
 import { buildAskData } from "../ai/ask-data.ts";
 import { resolveAskBackend } from "../ai/ask.ts";
 import { buildRawMarkdown } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
+import type { McpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
 import { planComponentSlots } from "../astro/component-slots.ts";
 import {
@@ -31,6 +34,11 @@ import {
 import { discoverIslands } from "../astro/islands.ts";
 import { customOgRoutes, discoverPages, routeIsTaken } from "../astro/pages.ts";
 import {
+  apiNavigationTemplate,
+  apiNotFoundTemplate,
+  apiPagesIndexTemplate,
+  apiPageTemplate,
+  apiSearchTemplate,
   askComponentTemplate,
   askEndpointTemplate,
   astroConfigTemplate,
@@ -46,6 +54,8 @@ import {
   mcpEndpointTemplate,
   mcpPageFile,
   mixedbreadSearchEndpointTemplate,
+  notFoundJsonTemplate,
+  notFoundMarkdownTemplate,
   notFoundPageTemplate,
   ogEndpointTemplate,
   playgroundProxyTemplate,
@@ -238,21 +248,33 @@ const playgroundProxyFiles = (
     : [];
 
 /**
- * The MCP data snapshot, server endpoint, and `.well-known` discovery
- * documents, mirroring `writeMcpFiles` in generate.ts. Empty when the server
- * is disabled or its route is already owned by a page.
+ * The agent data snapshot (`blume:mcp-data`) behind the MCP server and the
+ * JSON docs API, mirroring `publishAgentData` in generate.ts: built when
+ * either is on, null when neither needs it.
  */
-const mcpFiles = async (
+const ejectAgentData = async (
+  project: BlumeProject,
+  userPages: { pattern: string }[]
+): Promise<McpData | null> =>
+  hostsMcp(project, userPages) || project.config.agents.api
+    ? await buildMcpData(project)
+    : null;
+
+/**
+ * The MCP server endpoint and `.well-known` discovery documents, mirroring
+ * `writeMcpFiles` in generate.ts. Empty when the server is disabled or its
+ * route is already owned by a page.
+ */
+const mcpFiles = (
   project: BlumeProject,
   userPages: { pattern: string }[],
   srcDir: string,
-  genDir: string
-): Promise<{ content: string; path: string }[]> => {
-  if (!hostsMcp(project, userPages)) {
+  data: McpData | null
+): { content: string; path: string }[] => {
+  if (!(data && hostsMcp(project, userPages))) {
     return [];
   }
   const { route } = project.config.agents.mcp;
-  const data = await buildMcpData(project);
   const discoveryInput = {
     base: data.base,
     name: data.name,
@@ -261,10 +283,6 @@ const mcpFiles = async (
     version: data.version,
   };
   return [
-    {
-      content: `${JSON.stringify(data)}\n`,
-      path: join(genDir, "mcp-data.json"),
-    },
     {
       content: mcpEndpointTemplate(),
       path: join(srcDir, "pages", mcpPageFile(route)),
@@ -278,6 +296,87 @@ const mcpFiles = async (
       path: join(srcDir, "blume-mcp", "server-card.ts"),
     },
   ];
+};
+
+/**
+ * The JSON docs API, mirroring `planApi` and `writeApiFiles` in generate.ts:
+ * the prerendered page index, per-page documents, and navigation; on server
+ * output the search endpoint and, unless a user page or a content page already
+ * lives under `/api/`, the JSON 404 catch-all; and `/openapi.json`, unless a
+ * `public/openapi.json` or a page owns that route. The ejected `llms.txt`,
+ * homepage `Link` header, and 404 page advertise these routes, so the ejected
+ * app serves them. Empty when `agents.api` is off.
+ */
+const apiFiles = (
+  project: BlumeProject,
+  userPages: { pattern: string }[],
+  root: string,
+  srcDir: string,
+  data: McpData | null
+): { content: string; path: string }[] => {
+  const { config } = project;
+  if (!(data && config.agents.api)) {
+    return [];
+  }
+  const server = config.deployment.options.output === "server";
+  const apiDir = join(srcDir, "pages", "api");
+  const files = [
+    {
+      content: apiPagesIndexTemplate(),
+      path: join(apiDir, "docs", "pages.json.ts"),
+    },
+    {
+      content: apiPageTemplate(),
+      path: join(apiDir, "docs", "pages", "[...route].json.ts"),
+    },
+    {
+      content: apiNavigationTemplate(),
+      path: join(apiDir, "docs", "navigation.json.ts"),
+    },
+  ];
+  if (server) {
+    files.push({
+      content: apiSearchTemplate(),
+      path: join(apiDir, "docs", "search.ts"),
+    });
+  }
+  const apiOwned =
+    userPages.some((page) => page.pattern.startsWith("/api/[")) ||
+    project.graph.pages.some(
+      (page) => page.route === "/api" || page.route.startsWith("/api/")
+    );
+  if (server && !apiOwned) {
+    files.push({
+      content: apiNotFoundTemplate({ base: data.base, site: data.site }),
+      path: join(apiDir, "[...path].ts"),
+    });
+  }
+  if (
+    !(
+      routeIsTaken(userPages, project.graph.pages, OPENAPI_PATH) ||
+      existsSync(join(root, "public", "openapi.json"))
+    )
+  ) {
+    files.push({
+      content: staticJsonEndpointTemplate(
+        buildApiSpec({
+          agentReadability: config.agents.agentReadability,
+          base: data.base,
+          description: config.description,
+          llmsTxt: config.agents.llmsTxt.enabled,
+          mcpRoute: hostsMcp(project, userPages)
+            ? config.agents.mcp.route
+            : null,
+          name: config.title,
+          search: server,
+          site: data.site,
+          version: data.version,
+        })
+      ),
+      path: join(srcDir, "pages", "openapi.json.ts"),
+    });
+  }
+  return files;
 };
 
 /**
@@ -345,6 +444,25 @@ const contentAssetFiles = async (
     },
   ];
 };
+
+/**
+ * The partial → including-pages map with every path relative to the project
+ * root, like every other path in the ejected app, so it holds in any checkout.
+ * Its readers (`includeHmrPlugin`, `withIncludeRefresh`) resolve each path
+ * against the app's root, which after eject is the project itself.
+ */
+const portableIncludeGraph = (
+  project: BlumeProject,
+  root: string
+): Record<string, string[]> =>
+  Object.fromEntries(
+    Object.entries(buildIncludeGraph(project.graph.pages)).map(
+      ([partial, includers]) => [
+        toPosix(relative(root, partial)),
+        includers.map((page) => toPosix(relative(root, page))),
+      ]
+    )
+  );
 
 /** Contents of the configured `examples.css`, or `""` when unset/absent. */
 /**
@@ -655,7 +773,7 @@ export const eject = async (
       // hot update's read would silently no-op and partial edits would serve
       // stale pages. A snapshot like the rest of `src/generated`: the ejected
       // app owns (and may regenerate or prune) it.
-      content: `${JSON.stringify(buildIncludeGraph(project.graph.pages))}\n`,
+      content: `${JSON.stringify(portableIncludeGraph(project, root))}\n`,
       path: join(genDir, "includes.json"),
     },
     {
@@ -694,22 +812,43 @@ export const eject = async (
     });
   }
 
-  // The hosted MCP server and the playground's built-in proxy, mirrored from
-  // the generated runtime (`[]` when each is off).
+  // The hosted MCP server, the JSON docs API, and the playground's built-in
+  // proxy, mirrored from the generated runtime (`[]` when each is off). The
+  // server and the API share one agent data snapshot.
+  const agentData = await ejectAgentData(project, pages);
+  if (agentData) {
+    files.push({
+      content: `${JSON.stringify(agentData)}\n`,
+      path: join(genDir, "mcp-data.json"),
+    });
+  }
   files.push(
-    ...(await mcpFiles(project, pages, srcDir, genDir)),
+    ...mcpFiles(project, pages, srcDir, agentData),
+    ...apiFiles(project, pages, root, srcDir, agentData),
     ...changelog,
     ...playgroundProxyFiles(config, openApiData, srcDir)
   );
 
-  // Default 404 page, unless the project already owns `/404` (a custom
-  // `pages/404.astro` or a `404.md` content page). The ejected project owns the
-  // file afterwards and can edit or remove it.
+  // Default 404 page and its Markdown (`/404.md`) and JSON (`/404.json`)
+  // twins, mirroring `writeNotFoundPage` in generate.ts: all three are skipped
+  // when the project already owns `/404` (a custom `pages/404.astro` or a
+  // `404.md` content page). The ejected project owns the files afterwards and
+  // can edit or remove them.
   if (!routeIsTaken(pages, project.graph.pages, "/404")) {
-    files.push({
-      content: notFoundPageTemplate(),
-      path: join(srcDir, "pages", "404.astro"),
-    });
+    files.push(
+      {
+        content: notFoundPageTemplate(),
+        path: join(srcDir, "pages", "404.astro"),
+      },
+      {
+        content: notFoundMarkdownTemplate(),
+        path: join(srcDir, "pages", "404.md.ts"),
+      },
+      {
+        content: notFoundJsonTemplate(),
+        path: join(srcDir, "pages", "404.json.ts"),
+      }
+    );
   }
 
   // The client-feature loaders behind the `blume:features` alias, and the

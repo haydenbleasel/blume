@@ -823,9 +823,9 @@ describe("notionSource (video blocks)", () => {
     // The caption is the Frame's caption, as for an upload; the iframe's
     // accessible name is its plain text.
     expect(body).toContain(
-      `<Frame caption={"Launch demo"}>\n<YouTube title={"Launch demo"} url="${SAMPLE_WATCH_URL}" />\n</Frame>`
+      `<Frame caption={"Launch demo"}>\n<YouTube title={"Launch demo"} url={"${SAMPLE_WATCH_URL}"} />\n</Frame>`
     );
-    expect(body).toContain(`<YouTube url="${SAMPLE_SHORT_URL}" />`);
+    expect(body).toContain(`<YouTube url={"${SAMPLE_SHORT_URL}"} />`);
   });
 
   it("emits a url the player resolves to the sample video's embed", async () => {
@@ -834,9 +834,9 @@ describe("notionSource (video blocks)", () => {
     // through the same helpers `<YouTube>` uses, so the assertion covers what
     // the component will actually put in the iframe rather than just the
     // string the source wrote.
-    const urls = [...body.matchAll(/<YouTube[^>]*\surl="(?<url>[^"]+)"/gu)].map(
-      (match) => match.groups?.url ?? ""
-    );
+    const urls = [
+      ...body.matchAll(/<YouTube[^>]*\surl=\{"(?<url>[^"]+)"\}/gu),
+    ].map((match) => match.groups?.url ?? "");
     expect(urls).toHaveLength(3);
     for (const url of urls) {
       const id = parseYouTubeId(url);
@@ -877,7 +877,7 @@ describe("notionSource (video blocks)", () => {
 
   it("only treats a YouTube hostname as an embed", async () => {
     const { body } = await loadVideos();
-    expect(body).not.toContain('<YouTube url="https://cdn.example.com');
+    expect(body).not.toContain('<YouTube url={"https://cdn.example.com');
     expect(body).toContain('<video controls src="/blume-assets/handbook/');
     expect(body).not.toContain("live/promo-video.mp4");
   });

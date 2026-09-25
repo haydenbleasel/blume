@@ -171,7 +171,12 @@ export const initComposer = (root: HTMLElement): void => {
       return;
     }
     if (state === "error") {
-      setStatus(ERROR_MESSAGE, ERROR_TEXT);
+      // A detail is the browser refusing the URL before dialing; a failed
+      // handshake carries none.
+      setStatus(
+        detail ? `Couldn't connect: ${detail}` : ERROR_MESSAGE,
+        ERROR_TEXT
+      );
       return;
     }
     setStatus(

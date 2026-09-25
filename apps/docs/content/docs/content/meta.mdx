@@ -23,7 +23,7 @@ export default defineMeta({
 
 Every field is optional — set only what you want to override.
 
-Blume only reads `meta.ts` files from folders your content covers: one under a folder your content `exclude` globs skip, or outside every `include` glob, is never imported. With `root: "."` and `exclude: ["src/**"]`, an unrelated `src/lib/meta.ts` is left alone.
+Blume only reads `meta.ts` files from folders your content covers: one under a folder your content `exclude` globs skip, or outside every `include` glob, is never imported. With `root: "."` and `exclude: ["**/_*", "**/.*", "src/**"]`, an unrelated `src/lib/meta.ts` is left alone. An `exclude` replaces the default `["**/_*", "**/.*"]` rather than adding to it, so list those two as well to keep `_`-prefixed partials and dot-files unpublished.
 
 ## Fields
 
@@ -37,6 +37,8 @@ Blume only reads `meta.ts` files from folders your content covers: one under a f
 | `pages` | `string[]` | Explicit order for the group's children, by slug. |
 
 The `pages` array lists children by slug — the folder or file name with its numeric prefix and any parentheses stripped (so `01-quickstart.mdx` is `"quickstart"`). Each listed child takes its position in the array as its order (`0`, `1`, `2`, …). Children you leave out still appear, sorted by their own order: an `index` page stays first, a child with a `sidebar.order`, a numeric prefix, or its own `meta.ts` `order` sorts by that number among the listed ones, and a child with none of these goes after them. List every child when the array should be the whole order.
+
+The array orders pages among pages and groups among groups, but it doesn't interleave the two where loose pages list above groups: at the top of the sidebar (and of each [tab](/docs/content/navigation#tabs) section), and in any group with a [`flat`](/docs/content/navigation#display-modes) subgroup, whose header would otherwise seem to own the pages after it. There, `pages: ["advanced", "intro"]` still lists the `intro` page above the `advanced` group.
 
 How groups render — flat headers, collapsible disclosures, or drill-in panels — defaults to the sidebar-wide `navigation.sidebar.display`; set `display` here to override it for this group alone. A folder's `index` page can also set it from frontmatter, which wins over `meta.ts` — see [per-group overrides](/docs/content/navigation#per-group-overrides).
 

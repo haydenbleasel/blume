@@ -35,6 +35,13 @@ const node = planned ?? schemaTree(schema, schemas);
     </div>
   ) : node.kind === "branches" ? (
     <div class="flex flex-col gap-3">
+      {node.rows && (
+        <div class="not-prose">
+          {node.rows.map((row) => (
+            <SchemaProperty row={row} schemas={schemas} expandAll={expandAll} />
+          ))}
+        </div>
+      )}
       <div class="text-muted-foreground text-xs">{node.label}:</div>
       {node.branches.map((branch) => (
         <div class="rounded-blume border border-border p-3">

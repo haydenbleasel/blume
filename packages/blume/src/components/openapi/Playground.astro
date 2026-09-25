@@ -1,6 +1,6 @@
 ---
 import { stableId } from "../content/tooltip-id.ts";
-import { withBase } from "../islands/base-path.ts";
+import { withMountedBase } from "../islands/base-path.ts";
 
 import { paramKey, type PlaygroundModel } from "./request.ts";
 
@@ -25,9 +25,9 @@ interface Props {
 const { model, proxy, slug, operation } = Astro.props;
 
 // The built-in proxy route carries the site `basePath` but, like every
-// internal URL in the spec data, not `deployment.base`; `withBase` adds it
-// and passes an external proxy URL through untouched.
-const proxyUrl = proxy ? withBase(proxy) : undefined;
+// internal URL in the spec data, not `deployment.base`; `withMountedBase`
+// adds it and passes an external proxy URL through untouched.
+const proxyUrl = proxy ? withMountedBase(proxy) : undefined;
 
 // `</script>`-proof embedding: `<` only ever occurs inside JSON strings,
 // where the \u escape is equivalent, so a spec description can never close

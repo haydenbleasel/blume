@@ -92,7 +92,7 @@ Trailing heading markers — `[#custom-id]` (pinned anchor), `[!toc]` (hide from
 
 ## i18n
 
-A `loader({ i18n })` setup (locale-suffixed files or locale dirs) → Blume `i18n: { defaultLocale, locales: [{ code, label }] }`. Locale **directories** match Blume's `dir` parser as-is; locale **file suffixes** (`page.cn.mdx`) need restructuring into locale folders. Report whichever transform you apply.
+A `loader({ i18n })` setup (locale-suffixed files or locale dirs) → Blume `i18n: { defaultLocale, locales: [{ code, label }] }`. Locale **directories** match Blume's default `dir` parser as-is; locale **file suffixes** (`page.cn.mdx` beside an unsuffixed default-locale `page.mdx`) match the `dot` parser as-is — add `parser: "dot"`, no file moves. Under `dot` a folder's `meta.ts` serves every locale, so build it from the default locale's `meta.json` and report any translated folder titles in `meta.<lang>.json`. Report whichever transform you apply.
 
 ## Package.json & teardown
 

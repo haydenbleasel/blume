@@ -219,10 +219,15 @@ const topKey = (line) => {
   return { key: m.groups.key, value: (m.groups.rest ?? "").trim() };
 };
 
-// The line index range [start, endExclusive) of a top-level key's block.
+// The line index range [start, endExclusive) of a top-level key's block: its
+// indented lines plus any `- ` sequence items written flush at column 0,
+// which YAML also reads as the key's value (`keywords:` then `- one`).
 const blockRange = (fm, start) => {
   let end = start + 1;
-  while (end < fm.length && (fm[end] === "" || /^\s/u.test(fm[end]))) {
+  while (
+    end < fm.length &&
+    (fm[end] === "" || /^\s/u.test(fm[end]) || /^-(?:\s|$)/u.test(fm[end]))
+  ) {
     end += 1;
   }
   // Trim trailing blank lines back out so the gap before the next key survives.

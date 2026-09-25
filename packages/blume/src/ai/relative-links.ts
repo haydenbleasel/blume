@@ -2,9 +2,10 @@ import { basename } from "pathe";
 
 import {
   isInternalPath,
+  mountBasePath,
   normalizeBasePath,
+  withAuthoredBasePath,
   withBasePath,
-  withComposedBasePath,
 } from "../core/base-path.ts";
 import { nextFenceState } from "../core/code-fences.ts";
 import type { FenceState } from "../core/code-fences.ts";
@@ -16,7 +17,7 @@ import {
   routeOfLinkedFile,
 } from "../core/links.ts";
 import type { RelativeLinkBase } from "../core/links.ts";
-import { localizeHref } from "../core/locale-links.ts";
+import { localizeHref, servesRoute } from "../core/locale-links.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { extractLinks } from "../core/sources/normalize.ts";
 
@@ -27,14 +28,16 @@ import { extractLinks } from "../core/sources/normalize.ts";
  * link lands on `/install`; the rendered page rewrites it to the route it
  * means (`markdown/relative-links.ts`), and the Markdown an agent reads gets
  * the same rewrite from the same resolver (`resolveRelativeHref`), so both
- * point at one page. Root-relative page links (`[x](/guide)`,
- * `<Card href="/guide">`) get what the rendered page gives them too: the
- * `deployment.base` + `basePath` prefix (`markdown/base-links.ts`,
- * `components/content/base-href.ts`) and, on a page in a prefixed locale,
+ * point at one page. Root-relative links (`[x](/guide)`,
+ * `<Card href="/guide">`, `![logo](/logo.png)`) get what the rendered page
+ * gives them too (`markdown/base-links.ts`,
+ * `components/content/base-href.ts`): a page link the `deployment.base` +
+ * `basePath` prefix, a public file (`/spec.pdf`) or image the
+ * `deployment.base` alone, and, on a page in a prefixed locale, a page link
  * that locale's copy of the route when it is served
- * (`components/layout/LocaleLinks.astro`). Inline links, component `href`s,
- * and reference definitions are rewritten; fenced and inline code, images,
- * asset links, and external URLs are left as written.
+ * (`components/layout/LocaleLinks.astro`). Inline links, images, component
+ * `href`s, and reference definitions are rewritten; fenced and inline code,
+ * relative images and asset links, and external URLs are left as written.
  */
 
 /** The page a Markdown text was written for. */
@@ -66,13 +69,6 @@ const MAYBE_RELATIVE =
  */
 const MAYBE_PAGE_LINK =
   /\]\([\t ]*<?(?![a-z][\d+.a-z-]*:|\/\/|#)|^ {0,3}\[[^\]\n]+\]:[\t ]*<?(?![a-z][\d+.a-z-]*:|\/\/|#)|\shref=["'](?![a-z][\d+.a-z-]*:|\/\/|#)/imu;
-
-/**
- * A path whose final segment carries a file extension — a `public/` asset or
- * a raw `.md` twin, which the rendered page neither bases nor localizes (see
- * `markdown/base-links.ts`).
- */
-const ASSET_PATH = /\.[\da-z]+$/iu;
 
 interface Splice {
   column: number;
@@ -109,18 +105,23 @@ const definitionSplice = (
   return { column: lead.length + angled, length: target.length, text: route };
 };
 
-/** Every routed splice in `text`, by 0-based line: links, then definitions. */
+/**
+ * Every routed splice in `text`, by 0-based line: links and images, then
+ * definitions. An image target goes through `imaged`, everything else through
+ * `routed`.
+ */
 const collectSplices = (
   text: string,
   lines: readonly string[],
-  routed: (target: string) => string | undefined
+  routed: (target: string) => string | undefined,
+  imaged: (target: string) => string | undefined
 ): Map<number, Splice[]> => {
   const splices = new Map<number, Splice[]>();
   const add = (index: number, splice: Splice): void => {
     splices.set(index, [...(splices.get(index) ?? []), splice]);
   };
   for (const link of extractLinks(text)) {
-    const route = link.image ? undefined : routed(link.target);
+    const route = (link.image ? imaged : routed)(link.target);
     if (route !== undefined) {
       add(link.line - 1, {
         column: link.column - 1,
@@ -186,13 +187,18 @@ export const relativeLinkRewriter = (
     const navPath = navPathBySource.get(sourcePath) ?? basename(sourcePath);
     const resolveFile = (path: string): string | undefined =>
       routeOfLinkedFile(fileRoutes, { navPath, sourcePath }, path);
+    // A resolved route is one Blume serves, so the deployment base goes on
+    // unconditionally — even over a route that starts with the base's name.
     return (target) => {
       const route = resolveRelativeHref(target, from, resolveFile, (path) =>
         routes.has(path)
       );
-      return route === undefined ? undefined : withBasePath(deployBase, route);
+      return route === undefined ? undefined : mountBasePath(deployBase, route);
     };
   };
+
+  /** Whether a page is served at a based, fragment-less path. */
+  const servesPage = (route: string): boolean => servesRoute(routes, route);
 
   return (text, page) => {
     const locale = localeByRoute.get(page.route);
@@ -212,21 +218,31 @@ export const relativeLinkRewriter = (
       return text;
     }
     const relative = relativeRoute(page);
-    // What the rendered page makes of `/guide`: based, then moved into the
+    // What the rendered page makes of `/guide`: based (a public file like
+    // `/spec.pdf` under the deployment base alone), then moved into the
     // page's locale when that route is served.
     const rooted = (target: string): string | undefined => {
-      if (ASSET_PATH.test(target.replace(/[#?].*$/u, ""))) {
-        return undefined;
-      }
-      const based = withComposedBasePath(deployBase, basePath, target);
+      const based = withAuthoredBasePath(
+        deployBase,
+        basePath,
+        target,
+        servesPage
+      );
       const href = localize ? localizeHref(based, localize) : based;
       return href === target ? undefined : href;
     };
     const routed = (target: string): string | undefined =>
       isInternalPath(target) ? rooted(target) : relative?.(target);
+    // An image is always a file: `public/` (or a generated asset endpoint),
+    // served under the deployment base but never `basePath`. A relative one
+    // is left to `core/content-assets.ts`.
+    const imaged = (target: string): string | undefined => {
+      const based = withBasePath(deployBase, target);
+      return based === target ? undefined : based;
+    };
 
     const lines = text.split("\n");
-    const splices = collectSplices(text, lines, routed);
+    const splices = collectSplices(text, lines, routed, imaged);
 
     return lines
       .map((line, index) => {

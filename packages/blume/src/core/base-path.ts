@@ -74,27 +74,45 @@ export const isExternalUrl = (target: string): boolean =>
   /^https?:\/\//iu.test(target) || target.startsWith("//");
 
 /**
+ * The path part of a root-relative target, before any `?query` or `#fragment`
+ * (`/docs#install` -> `/docs`).
+ */
+const pathPart = (target: string): string => {
+  const at = target.search(/[#?]/u);
+  return at === -1 ? target : target.slice(0, at);
+};
+
+/**
+ * Whether `route`'s path already equals or sits under `base`. Only the path
+ * part is compared, so a fragment or query (`/docs#install`) doesn't hide a
+ * base written by hand.
+ */
+const isUnderBase = (base: string, route: string): boolean => {
+  const path = pathPart(route);
+  return path === base || path.startsWith(`${base}/`);
+};
+
+/**
  * Idempotently prepend `basePath` to a root-relative route. A route already
  * equal to or nested under the base is returned unchanged, so authors who write
- * the base by hand (`/docs/x`) aren't double-prefixed to `/docs/docs/x`.
+ * the base by hand (`/docs/x`, `/docs#install`) aren't double-prefixed to
+ * `/docs/docs/x`.
  */
 export const withBasePath = (basePath: string, route: string): string => {
-  if (!basePath || !isInternalPath(route)) {
-    return route;
-  }
-  if (route === basePath || route.startsWith(`${basePath}/`)) {
+  if (!basePath || !isInternalPath(route) || isUnderBase(basePath, route)) {
     return route;
   }
   return route === "/" ? basePath : `${basePath}${route}`;
 };
 
 /**
- * Mount a route Blume generates from content under `basePath`,
- * unconditionally. {@link withBasePath} leaves a route that already starts
- * with the base alone, which is right for a link an author based by hand but
- * wrong for a content route: with `basePath: "/docs"`, `docs/guide.md` routes
- * to `/docs/guide` before the base and publishes at `/docs/docs/guide`, not on
- * top of the root `guide.md`.
+ * Mount a route Blume generates under a base, unconditionally: `basePath` for
+ * a content route, `deployment.base` for any generated URL (a sitemap entry,
+ * a feed item). {@link withBasePath} leaves a route that already starts with
+ * the base alone, which is right for a link an author based by hand but wrong
+ * for a generated route: with `basePath: "/docs"`, `docs/guide.md` routes to
+ * `/docs/guide` before the base and publishes at `/docs/docs/guide`, not on
+ * top of the root `guide.md` — and likewise under `deployment.base: "/docs"`.
  */
 export const mountBasePath = (basePath: string, route: string): string => {
   if (!basePath) {
@@ -117,14 +135,42 @@ export const withComposedBasePath = (
   route: string
 ): string => {
   const composed = `${deployBase}${basePath}`;
-  if (
-    composed &&
-    isInternalPath(route) &&
-    (route === composed || route.startsWith(`${composed}/`))
-  ) {
+  if (composed && isInternalPath(route) && isUnderBase(composed, route)) {
     return route;
   }
   return withBasePath(deployBase, withBasePath(basePath, route));
+};
+
+/**
+ * A path whose final segment carries a file extension (`/spec.pdf`,
+ * `/logo.svg`) — a public asset, unless a page is served there.
+ */
+const DOTTED_PATH = /\.[a-z0-9]+$/iu;
+
+/**
+ * Base a root-relative link an author wrote as if mounted at root — a content
+ * link (`markdown/base-links.ts`, `components/content/base-href.ts`) or a
+ * redirect target (`deploy/redirects.ts`) — by what it names. A page gains the
+ * composed stack ({@link withComposedBasePath}). A public asset — a path whose
+ * final segment carries a file extension, with no page served there (a dotted
+ * route like `/releases/v1.2` is still a page) — gains the deployment base
+ * alone: Astro serves `public/` under `deployment.base`, but never under
+ * `basePath`. `servesPage` answers whether a page is served at a
+ * `basePath`-prefixed, fragment-less path. Other targets pass through.
+ */
+export const withAuthoredBasePath = (
+  deployBase: string,
+  basePath: string,
+  target: string,
+  servesPage: (route: string) => boolean
+): string => {
+  if (!isInternalPath(target)) {
+    return target;
+  }
+  const path = pathPart(target);
+  return DOTTED_PATH.test(path) && !servesPage(withBasePath(basePath, path))
+    ? withBasePath(deployBase, target)
+    : withComposedBasePath(deployBase, basePath, target);
 };
 
 /**

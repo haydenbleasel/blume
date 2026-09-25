@@ -11,15 +11,40 @@ import type {
   RuntimeModuleServer,
 } from "../src/astro/runtime-modules.ts";
 
-/** A minimal dev server double recording what the registry does to it. */
+/**
+ * A minimal dev server double recording what the registry does to it. `known`
+ * seeds the `ssr` environment's graph; `environments` names what every other
+ * environment has loaded, for the tests that span several.
+ */
 const fakeServer = (
-  options: { known?: string[]; httpServer?: boolean } = {}
+  options: {
+    environments?: Record<string, string[]>;
+    known?: string[];
+    httpServer?: boolean;
+  } = {}
 ) => {
-  const known = new Set(options.known);
   const invalidated: string[] = [];
+  const invalidatedIn: Record<string, string[]> = {};
   const sent: string[] = [];
   let onClose: (() => void) | undefined;
+  const graphs = { ssr: options.known ?? [], ...options.environments };
+  const environments: RuntimeModuleServer["environments"] = {};
+  for (const [name, ids] of Object.entries(graphs)) {
+    const known = new Set(ids);
+    const log: string[] = [];
+    invalidatedIn[name] = log;
+    environments[name] = {
+      moduleGraph: {
+        getModuleById: (id) => (known.has(id) ? { id } : undefined),
+        invalidateModule: (mod) => {
+          invalidated.push(mod.id ?? "");
+          log.push(mod.id ?? "");
+        },
+      },
+    };
+  }
   const server: RuntimeModuleServer = {
+    environments,
     httpServer:
       options.httpServer === false
         ? null
@@ -28,12 +53,6 @@ const fakeServer = (
               onClose = listener;
             },
           },
-    moduleGraph: {
-      getModuleById: (id) => (known.has(id) ? { id } : undefined),
-      invalidateModule: (mod) => {
-        invalidated.push(mod.id ?? "");
-      },
-    },
     ws: {
       send: (payload) => {
         sent.push(payload.type);
@@ -43,6 +62,7 @@ const fakeServer = (
   return {
     close: () => onClose?.(),
     invalidated,
+    invalidatedIn,
     sent,
     server,
   };
@@ -137,6 +157,45 @@ describe("publishRuntimeModules", () => {
     for (const { sent } of [full, partial, cold]) {
       expect(sent).toEqual(["full-reload"]);
     }
+  });
+
+  it("invalidates the changed modules in every environment's graph", () => {
+    // Each Vite environment keeps its own module graph. With
+    // @astrojs/cloudflare the content pages render in `prerender` (the `ssr`
+    // environment runs in workerd), so invalidating only the graphs Vite's
+    // legacy `server.moduleGraph` covers (`client` and `ssr`) left every page
+    // on its startup data: a new page 404ed and a sidebar label never moved.
+    publishRuntimeModules(
+      modules([
+        ["blume:data", "1"],
+        ["blume:raw-markdown", "1"],
+      ])
+    );
+    const cloudflare = fakeServer({
+      environments: {
+        astro: [],
+        client: [],
+        prerender: ["\0blume:data", "\0blume:raw-markdown"],
+      },
+      known: ["\0blume:data"],
+    });
+    runtimeModulesPlugin().configureServer(cloudflare.server);
+
+    publishRuntimeModules(
+      modules([
+        ["blume:data", "2"],
+        ["blume:raw-markdown", "2"],
+      ])
+    );
+
+    expect(cloudflare.invalidatedIn).toEqual({
+      astro: [],
+      client: [],
+      prerender: ["\0blume:data", "\0blume:raw-markdown"],
+      ssr: ["\0blume:data"],
+    });
+    // Still one reload for the whole publication, not one per environment.
+    expect(cloudflare.sent).toEqual(["full-reload"]);
   });
 
   it("stops touching a server once it closes", () => {

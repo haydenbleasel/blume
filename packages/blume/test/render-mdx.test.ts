@@ -51,7 +51,7 @@ describe("operationMdx descriptions", () => {
         "See [the guide](https://x.dev/g), [a trap](javascript:alert(1)), <javascript:alert(2)>, and [`code` {x}](data:text/html,hi). Code `[k](javascript:no)` stays.",
     });
     expect(page.body).toContain(
-      String.raw`See [the guide](https://x.dev/g), a trap, javascript:alert(2), and code \{x\}.`
+      String.raw`See [the guide](https://x.dev/g), a trap, javascript\:alert(2), and code \{x\}.`
     );
     expect(page.body).not.toContain("data:text/html");
     // Code outside a link stays verbatim, even when it reads like one.

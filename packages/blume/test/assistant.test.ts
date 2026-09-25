@@ -181,6 +181,8 @@ interface FakeEventInit {
   detail?: { query?: string };
   key?: string;
   metaKey?: boolean;
+  /** The incoming page an `astro:before-swap` carries. */
+  newDocument?: { body: FakeBody };
   preventDefault?: () => void;
   target?: { closest: (selector: string) => object | null };
 }
@@ -672,6 +674,12 @@ describe("Assistant open/close", () => {
     // astro:after-swap subscription must adopt the new body and re-stamp it
     // while the panel is open.
     const swappedBody: FakeBody = { children: [], dataset: {} };
+    // The incoming body is stamped before the swap installs it, so it never
+    // paints unpushed and the padding transition doesn't replay.
+    dispatchDocument("astro:before-swap", {
+      newDocument: { body: swappedBody },
+    });
+    expect(swappedBody.dataset.blumeAssistant).toBe("open");
     fakeDocument.body = swappedBody;
     dispatchDocument("astro:after-swap", {});
     tree = render();
@@ -682,6 +690,10 @@ describe("Assistant open/close", () => {
     dispatch("keydown", { ctrlKey: false, key: "Escape", metaKey: false });
     tree = render();
     const closedSwapBody: FakeBody = { children: [], dataset: {} };
+    dispatchDocument("astro:before-swap", {
+      newDocument: { body: closedSwapBody },
+    });
+    expect(closedSwapBody.dataset.blumeAssistant).toBeUndefined();
     fakeDocument.body = closedSwapBody;
     dispatchDocument("astro:after-swap", {});
     tree = render();

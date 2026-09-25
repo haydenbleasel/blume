@@ -25,6 +25,7 @@ export const staticPlatform: DeployPlatform = {
   previewDeploy: null,
   readsHeaderFiles: { server: false, static: true },
   redirectFiles: [REDIRECTS_FILE, VERCEL_JSON_FILE],
+  serverClientUnderBase: false,
   serverOutputDir: distDir,
   serverStaticDir: distDir,
 };

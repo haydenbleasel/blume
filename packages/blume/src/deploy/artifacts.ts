@@ -25,6 +25,7 @@ import {
   buildSignaturesDirectory,
   SIGNATURES_DIRECTORY_PATH,
 } from "../ai/web-bot-auth.ts";
+import { normalizeBasePath } from "../core/base-path.ts";
 import { discoverPagesSync } from "../core/custom-pages.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
@@ -51,10 +52,12 @@ import { buildSitemapFiles, describeSitemapFiles } from "./sitemap.ts";
  * Written from the integration's `astro:build:done` hook — Astro's channel
  * for exactly this kind of post-build work — into the directory Astro
  * reports as the client output (`dist/`, or `dist/client` for a server
- * build). The Vercel adapter copies that directory into its Build Output
- * static tree in a later hook, so the artifacts ride along; every other
- * adapter serves it directly. Running inside the hook rather than after
- * `astro build` returns means an ejected project keeps producing them.
+ * build, or `dist/client/<base>/` on Cloudflare, whose `_headers` goes to
+ * the root the platform serves above it). The Vercel adapter copies that
+ * directory into its Build Output static tree in a later hook, so the
+ * artifacts ride along; every other adapter serves it directly. Running
+ * inside the hook rather than after `astro build` returns means an ejected
+ * project keeps producing them.
  *
  * Every file yields to one the user ships in `public/` (Astro copied it into
  * the output before this runs).
@@ -88,7 +91,7 @@ const emitRedirectFiles = async (
     return;
   }
   const platform = deployPlatform(config.deployment);
-  const redirects = platformRedirects(config);
+  const redirects = platformRedirects(project);
   const vercelHeaders = platform.redirectFiles.includes(VERCEL_JSON_FILE)
     ? buildVercelHeaders(
         config,
@@ -125,6 +128,24 @@ const emitRedirectFiles = async (
     );
   }
   logger.info(`Emitted redirect files for ${redirects.length} redirect(s)`);
+};
+
+/**
+ * The root of the static assets the platform serves, where it reads
+ * `_headers`: `distDir` itself, except on a server build whose adapter moved
+ * the client output under `deployment.base` (`@astrojs/cloudflare` hands
+ * `astro:build:done` `dist/client/<base>/` but serves `dist/client`). A file
+ * left in `distDir` there would never be read, and would be served publicly
+ * at `<base>/_headers`.
+ */
+const assetsRoot = (config: ResolvedConfig, distDir: string): string => {
+  const base = normalizeBasePath(config.deployment.options.base);
+  const nested =
+    config.deployment.options.output === "server" &&
+    deployPlatform(config.deployment).serverClientUnderBase;
+  // One `..` per base segment climbs back out of `dist/client/<base>/`.
+  const depth = base.split("/").length - 1;
+  return nested && base ? join(distDir, "../".repeat(depth)) : distDir;
 };
 
 /**
@@ -179,7 +200,7 @@ export const emitHeaderFiles = async (
   // An adapter may have written its own rules here already (Cloudflare adds an
   // immutable Cache-Control for /_astro/*). Keep them and append ours: both
   // sets are wanted, and `_headers` has no merge semantics beyond order.
-  const target = join(distDir, "_headers");
+  const target = join(assetsRoot(config, distDir), "_headers");
   const existing = existsSync(target) ? await readFile(target, "utf-8") : "";
   await writeFile(
     target,

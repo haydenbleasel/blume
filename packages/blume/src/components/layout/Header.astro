@@ -1,7 +1,7 @@
 ---
 import Ask from "blume:ask";
 import data from "blume:data";
-import { withBase } from "../islands/base-path.ts";
+import { withBase, withMountedBase } from "../islands/base-path.ts";
 import { NEW_TAB_ATTRS, newTabAttrs } from "../../core/new-tab.ts";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
@@ -229,7 +229,7 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
             <a
               aria-current={tab === activeTab ? "page" : undefined}
               class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:text-foreground"
-              href={withBase(tab.href ?? tab.path)}
+              href={withMountedBase(tab.href ?? tab.path)}
             >
               {tab.icon && (
                 <Icon class="shrink-0" name={tab.icon} size={14} />

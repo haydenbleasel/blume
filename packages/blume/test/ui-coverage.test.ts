@@ -956,7 +956,7 @@ describe("layout chrome sources", () => {
     // while any other custom route (no mirror) must not advertise one.
     const source = await layoutSource("PageLayout.astro");
     expect(source).toContain(
-      'const markdownMirror = route === "/" ? withBase("/index.md") : null;'
+      'const markdownMirror = route === "/" ? withMountedBase("/index.md") : null;'
     );
     // The documented homepage examples omit `page.route`; a non-root page that
     // copies them must resolve its own route from the request URL, or it

@@ -1,4 +1,4 @@
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import { rewriteRelativeImages } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
@@ -17,13 +17,21 @@ import type { SkillArtifact } from "./skills.ts";
 import { applyAgentVisibility } from "./visibility.ts";
 
 // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top —
-// with or without a `site` (the mcp.json convention) — so the emitted URL
-// matches where the page is served. Encoded like the sitemap: a route with
-// spaces or non-ASCII must still yield a valid Markdown link.
+// with or without a `site` (the mcp.json convention), and even over a route
+// that starts with the base's own name — so the emitted URL matches where the
+// page is served. Encoded like the sitemap: a route with spaces or non-ASCII
+// must still yield a valid Markdown link.
 const pageUrl = (route: string, site?: string, base = ""): string => {
-  const path = withBasePath(base, route);
+  const path = mountBasePath(base, route);
   return encodeURI(site ? absoluteUrl(site, path) : path);
 };
+
+/**
+ * A title as Markdown link text. An unescaped bracket in it — `[Beta] Webhooks`
+ * — closes or nests the text early, and the line stops being a link.
+ */
+const linkText = (title: string): string =>
+  title.replaceAll(/[\\[\]]/gu, String.raw`\$&`);
 
 /** Inputs only the build has: the published skills, collected once per build. */
 export interface LlmsIndexOptions {
@@ -176,7 +184,7 @@ export const buildLlmsIndex = (
   const line = (page: PageRecord): string => {
     seen.add(page.route);
     const summary = page.description ? `: ${page.description}` : "";
-    return `- [${page.title}](${pageUrl(page.route, site, base)})${summary}`;
+    return `- [${linkText(page.title)}](${pageUrl(page.route, site, base)})${summary}`;
   };
 
   // One nav level -> Markdown blocks: the level's loose pages as a link list,
@@ -259,7 +267,10 @@ export const buildLlmsIndex = (
     blocks.push(
       "## RSS Feeds",
       feeds
-        .map((feed) => `- [${feed.title}](${pageUrl(feed.path, site, base)})`)
+        .map(
+          (feed) =>
+            `- [${linkText(feed.title)}](${pageUrl(feed.path, site, base)})`
+        )
         .join("\n")
     );
   }

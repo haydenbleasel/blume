@@ -262,7 +262,7 @@ const menuRowClass =
 <script>
   import { copyDeferredText, copyText, flashLabel } from "../copy-feedback.ts";
   import { installDropdownDismiss } from "../dropdown-dismiss.ts";
-  import { prefixBase } from "../islands/base-path.ts";
+  import { mountBase } from "../islands/base-path.ts";
   import { rafThrottle } from "../raf-throttle.ts";
 
   const CHAT_URLS: Record<string, (q: string) => string> = {
@@ -390,9 +390,10 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
 
     // `data-md` is the base-less logical route; the raw-markdown endpoint is a
     // generated page route, so it's served under the deployment base like any
-    // other page. Prefix at emit time (the Search-island pattern).
+    // other page, even when it starts with the base's own name. Mount it at
+    // emit time (the Search-island pattern).
     const mdRoute = root.getAttribute("data-md") ?? "";
-    const md = prefixBase(import.meta.env.BASE_URL, mdRoute);
+    const md = mountBase(import.meta.env.BASE_URL, mdRoute);
     const copiedLabel = root.getAttribute("data-i18n-copied") || "Copied!";
     const copyFailedLabel =
       root.getAttribute("data-i18n-copy-failed") || "Copy failed";

@@ -1,3 +1,4 @@
+import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import type { ApiOperationRef, OpenApiData } from "../openapi/model.ts";
 import { operationOf, specAddresses, specOf } from "../openapi/model.ts";
 import { asSentence } from "../openapi/sentence.ts";
@@ -20,10 +21,14 @@ const inlineText = (text: string): string =>
     .replaceAll(/\s+/gu, " ")
     .replaceAll(/[\\`*_[\]<>~]/gu, String.raw`\$&`);
 
-/** One operation as a link, for the tag listings. */
+/**
+ * One operation as a link, for the tag listings. `href` is the operation's
+ * served URL: its route under the deployment base.
+ */
 const listItem = (
   signature: string,
-  operation: Pick<ApiOperationRef, "deprecated" | "route" | "summary">
+  href: string,
+  operation: Pick<ApiOperationRef, "deprecated" | "summary">
 ): string => {
   const tail = [
     // Title-like summaries ("Get a flag") need their own period before the
@@ -33,7 +38,7 @@ const listItem = (
   ]
     .filter(Boolean)
     .join(" ");
-  return `- [${inlineCode(signature)}](${linkDestination(operation.route)})${tail ? ` — ${tail}` : ""}`;
+  return `- [${inlineCode(signature)}](${linkDestination(href)})${tail ? ` — ${tail}` : ""}`;
 };
 
 /**
@@ -60,9 +65,16 @@ const listItem = (
  * endpoint and what it does is the part that was missing altogether.
  *
  * `specs` is the parsed `blume:openapi` data — empty when the project has no
- * API reference, in which case every serializer declines.
+ * API reference, in which case every serializer declines. `deployBase` is the
+ * configured `deployment.base`: operation routes carry `basePath` but not it,
+ * and the links written here are made after the agent surfaces rebase the
+ * page's own links, so they take it here, as the rendered page's do.
  */
-export const openapiComponentSerializers = (specs: OpenApiData) => {
+export const openapiComponentSerializers = (
+  specs: OpenApiData,
+  deployBase?: string
+) => {
+  const base = normalizeBasePath(deployBase);
   const spec = (source: EvaluatedValue) =>
     isString(source) ? specOf(specs, source) : undefined;
 
@@ -97,7 +109,11 @@ export const openapiComponentSerializers = (specs: OpenApiData) => {
       const items = Object.values(data.operations)
         .filter((operation) => operation.tagSlug === tag)
         .map((operation) =>
-          listItem(operationSignature(data, operation), operation)
+          listItem(
+            operationSignature(data, operation),
+            mountBasePath(base, operation.route),
+            operation
+          )
         );
       return items.length > 0 ? items.join("\n") : null;
     },

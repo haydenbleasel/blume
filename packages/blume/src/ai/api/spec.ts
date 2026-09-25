@@ -1,5 +1,5 @@
 import { apiNamePhrase } from "../../core/api-name.ts";
-import { withBasePath } from "../../core/base-path.ts";
+import { mountBasePath } from "../../core/base-path.ts";
 import { absoluteUrl, siteRoot } from "../../core/site-url.ts";
 import {
   API_NAVIGATION_PATH,
@@ -688,7 +688,7 @@ export const buildApiSpec = (input: ApiSpecInput): ApiSpecDocument => {
   if (input.site) {
     document.externalDocs = {
       description: `${input.name} documentation`,
-      url: absoluteUrl(input.site, withBasePath(input.base, "/")),
+      url: absoluteUrl(input.site, mountBasePath(input.base, "/")),
     };
   }
   return document;

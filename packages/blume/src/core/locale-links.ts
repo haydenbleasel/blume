@@ -1,5 +1,6 @@
 import {
   isInternalPath,
+  mountBasePath,
   normalizePath,
   stripBasePath,
   withBasePath,
@@ -120,7 +121,10 @@ export const localizeHref = (
   if (localized === based) {
     return href;
   }
-  return `${withBasePath(options.deployBase, localized)}${suffix}`;
+  // The base came off above, so it goes back on unconditionally: a localized
+  // path that starts with the base's own name (`/ja/…` under base `/ja`) is
+  // still served under it.
+  return `${mountBasePath(options.deployBase, localized)}${suffix}`;
 };
 
 /** Every `<a …>` opening tag; `\s` keeps `<abbr>`/`<astro-island>` out. */

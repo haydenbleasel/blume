@@ -83,7 +83,23 @@ Anything the audit did not run is reported as skipped rather than silently passi
 
 ## Check catalog
 
-Every check `blume audit` can report, grouped by category, with its default severity, the tier it runs in, and the fix the report suggests. `--only` and `--skip` accept these ids (without the `BLUME_AUDIT_` prefix is fine too) or the category names.
+Every check `blume audit` can report, grouped by category, with its default severity, the tier it runs in, and the fix the report suggests. `--only` and `--skip` accept these ids (without the `BLUME_AUDIT_` prefix is fine too) or a category's key. The key isn't always the category's heading, so use this table: `blume audit --only i18n`, not `--only Internationalization`.
+
+| Category             | Key               |
+| -------------------- | ----------------- |
+| Content              | `content`         |
+| Duplicates           | `duplicates`      |
+| Indexability         | `indexability`    |
+| Links                | `links`           |
+| Redirects            | `redirects`       |
+| Social cards         | `social`          |
+| Internationalization | `i18n`            |
+| Assets               | `assets`          |
+| Sitemap              | `sitemap`         |
+| robots.txt           | `robots`          |
+| AI discoverability   | `ai`              |
+| Structured data      | `structured-data` |
+| Live deployment      | `network`         |
 
 ### Content
 

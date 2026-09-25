@@ -125,4 +125,28 @@ describe("buildHomeLinkHeader", () => {
     );
     expect(buildHomeLinkHeader(configWith(), [])).not.toContain("service-desc");
   });
+
+  it("advertises only what the dev server serves on the dev surface", () => {
+    // Every feature on: the build surface lists all six targets, but the
+    // catalogs, the manifest, and llms.txt are files `blume build` writes, so
+    // the dev server would answer each with a 404.
+    const everything = configWith({
+      api: true,
+      base: "/base",
+      catalog: true,
+      mcp: true,
+    });
+    expect(buildHomeLinkHeader(everything, ["/"], "dev")).toBe(
+      [
+        '</base/openapi.json>; rel="service-desc"; type="application/json"',
+        '</base/index.md>; rel="alternate"; type="text/markdown"',
+      ].join(", ")
+    );
+    expect(buildHomeLinkHeader(everything, ["/"])).toBe(
+      buildHomeLinkHeader(everything, ["/"], "build")
+    );
+    expect(buildHomeLinkHeader(everything, ["/"])?.split(", ")).toHaveLength(6);
+    // Nothing the dev server serves is left to advertise.
+    expect(buildHomeLinkHeader(configWith(), ["/docs"], "dev")).toBeNull();
+  });
 });

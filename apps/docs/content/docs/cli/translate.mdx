@@ -33,8 +33,8 @@ A first translation has no precedent to match, so pin the choice up front with [
 
 ## What gets translated
 
-- **Pages** — `.md`/`.mdx` files in the default locale. The agent translates the prose and only the human-visible frontmatter values (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Targets follow your parser: `fr/guides/install.mdx` under `dir`, `guides/install.fr.mdx` under `dot`.
-- **Folder navigation titles** — under the `dir` parser, each locale's needed [`meta.ts`](/docs/content/meta) titles are translated in one batched call, and the generated per-locale `meta.ts` copies every other key (`order`, `pages`, `icon`, `collapsed`) verbatim so the locale's sidebar keeps its ordering.
+- **Pages** — `.md`/`.mdx` files in the default locale. The agent translates the prose and only the human-visible frontmatter values (`title`, `description`, `sidebar.label`, `sidebar.badge`, `seo.title`, `seo.description`). Targets follow your parser: `fr/guides/install.mdx` under `dir`, `guides/install.fr.mdx` under `dot`. A translation that already exists is rewritten where it lives, even under another name (a hand-written `fr/guides/install.md`), so a retranslation never adds a second copy of the page.
+- **Folder navigation titles** — under the `dir` parser, each locale's needed [`meta.ts`](/docs/content/meta) titles are translated in one batched call, and the generated per-locale `meta.ts` copies every other key (`order`, `pages`, `icon`, `collapsed`) verbatim so the locale's sidebar keeps its ordering. It goes in the locale's folder as it exists on disk (`pt-br/` for a configured `pt-BR`), and a `meta.js` or `meta.mjs` already there is rewritten instead of gaining a `meta.ts` beside it.
 
 Translations you wrote by hand are **adopted, never overwritten**: a translation that exists but has no ledger entry is stamped as current and left alone. Only `--force` retranslates it.
 
@@ -77,5 +77,5 @@ The JSON report carries the same `diagnostics` + `summary` shape as `blume valid
 - `--concurrency <n>` — parallel agent sessions. Defaults to `4`, max `16`.
 - `--locale <codes>` — comma-separated target locales (defaults to every non-default locale).
 - `--force` — retranslate everything, up-to-date and hand-authored files included.
-- `--timeout <seconds>` — agent time limit per file. Defaults to `600`; the ceiling exists to catch hung agents, so large pages have room to finish.
+- `--timeout <seconds>` — agent time limit per file. Defaults to `600`; the ceiling exists to catch hung agents, so large pages have room to finish. At most `2147483` (about 24 days), the longest a timer can wait.
 - `--json` — emit the report as JSON on stdout, in both modes.

@@ -6,7 +6,7 @@ import {
   discoverPagesSync,
   hasGeneratedChangelog,
 } from "../astro/pages.ts";
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { siteRoot } from "../core/site-url.ts";
 
@@ -78,7 +78,9 @@ export const buildSitemapFiles = (
   }
 
   const base = siteRoot(site);
-  // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top.
+  // Routes carry `basePath`; a `deployment.base` subdirectory is mounted on
+  // top of every one, even a route whose first segment matches it: under base
+  // `/guides`, `guides/setup.md` is served at `/guides/guides/setup`.
   const deployBase = normalizeBasePath(project.config.deployment.options.base);
 
   // Archived-version pages leave the sitemap when the version is noindexed,
@@ -135,7 +137,7 @@ export const buildSitemapFiles = (
     ) {
       continue;
     }
-    pushUrl(withBasePath(deployBase, page.route), page.lastModified);
+    pushUrl(mountBasePath(deployBase, page.route), page.lastModified);
   }
   // Custom `.astro` pages and the generated changelog index mount outside
   // `basePath` (they're injected at their pattern — see `blumeIntegration`), so
@@ -150,7 +152,7 @@ export const buildSitemapFiles = (
     extraRoutes.push("/changelog");
   }
   for (const route of extraRoutes) {
-    pushUrl(withBasePath(deployBase, route));
+    pushUrl(mountBasePath(deployBase, route));
   }
   urls.sort();
 
@@ -169,7 +171,7 @@ export const buildSitemapFiles = (
     // Chunks sit next to sitemap.xml, so their URLs layer the same deployment
     // base robots.txt uses for the index.
     const loc = escapeXml(
-      encodeURI(`${base}${withBasePath(deployBase, `/${name}`)}`)
+      encodeURI(`${base}${mountBasePath(deployBase, `/${name}`)}`)
     );
     references.push(`  <sitemap><loc>${loc}</loc></sitemap>`);
   }

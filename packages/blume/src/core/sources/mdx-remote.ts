@@ -9,6 +9,7 @@ import {
   pollingWatch,
   snapshotCache,
 } from "./cache.ts";
+import { REMOTE_TIMEOUT_MS } from "./remote.ts";
 import type {
   ContentSource,
   SourceContext,
@@ -64,6 +65,38 @@ const githubHeaders = (url: string): Record<string, string> => {
   return GITHUB_HOSTS.has(host) ? { authorization: `Bearer ${token}` } : {};
 };
 
+/**
+ * GET `url`'s body, giving up after {@link REMOTE_TIMEOUT_MS}: a server that
+ * accepts the connection and never finishes answering would otherwise hold the
+ * scan, and so the build or every dev rescan, indefinitely. A timeout rejects
+ * with an error naming the URL and the limit, so the skip or offline
+ * diagnostic says what stalled instead of only that an operation was aborted.
+ */
+const fetchText = async (
+  url: string,
+  doFetch: typeof fetch
+): Promise<string> => {
+  try {
+    // The signal bounds the body read too, not only the response headers.
+    const res = await doFetch(url, {
+      headers: githubHeaders(url),
+      signal: AbortSignal.timeout(REMOTE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      throw new Error(`${url} -> ${res.status}`);
+    }
+    return await res.text();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new Error(
+        `${url} did not respond within ${REMOTE_TIMEOUT_MS / 1000}s`,
+        { cause: error }
+      );
+    }
+    throw error;
+  }
+};
+
 interface GithubTreeEntry {
   path: string;
   type: string;
@@ -78,13 +111,10 @@ const enumerateGithub = async (
   const { owner, repo, ref } = github;
   const base = github.path.replaceAll(/^\/|\/$/gu, "");
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${ref}?recursive=1`;
-  const res = await doFetch(treeUrl, { headers: githubHeaders(treeUrl) });
-  if (!res.ok) {
-    throw new Error(`${treeUrl} -> ${res.status}`);
-  }
+  const text = await fetchText(treeUrl, doFetch);
   // SAFETY: GitHub's git/trees endpoint returns this envelope; a missing or
   // differently-typed field falls through the `?? []` and blob filters below.
-  const body = (await res.json()) as {
+  const body = JSON.parse(text) as {
     tree?: GithubTreeEntry[];
     truncated?: boolean;
   };
@@ -157,13 +187,7 @@ export const mdxRemoteSource = (
   };
 
   const fetchEntry = async (item: RemoteRef): Promise<SourceEntry> => {
-    const res = await doFetch(item.fetchUrl, {
-      headers: githubHeaders(item.fetchUrl),
-    });
-    if (!res.ok) {
-      throw new Error(`${item.fetchUrl} -> ${res.status}`);
-    }
-    const text = await res.text();
+    const text = await fetchText(item.fetchUrl, doFetch);
     const parsed = matter(text);
     const format = item.ref.toLowerCase().endsWith(".mdx") ? "mdx" : "md";
     return {
@@ -193,16 +217,19 @@ export const mdxRemoteSource = (
             severity: "warning",
           });
         }
+        const reasons: string[] = [];
         const settled = await Promise.all(
           refs.map(async (ref) => {
             try {
               return await fetchEntry(ref);
             } catch (error) {
+              // SAFETY: fetch and decode failures throw Error instances;
+              // only the message is read for the skip diagnostic.
+              const reason = (error as Error).message;
+              reasons.push(reason);
               skipped.push({
                 code: "BLUME_SOURCE_FETCH_FAILED",
-                // SAFETY: fetch and decode failures throw Error instances;
-                // only the message is read for the skip diagnostic.
-                message: `Source "${options.name}" skipped "${ref.ref}" (${(error as Error).message}); the rest were imported.`,
+                message: `Source "${options.name}" skipped "${ref.ref}" (${reason}); the rest were imported.`,
                 severity: "warning",
               });
               return null;
@@ -215,9 +242,13 @@ export const mdxRemoteSource = (
         // Only a total wipeout is a hard failure — let loadWithCache fall back
         // to cache or fail loudly rather than silently importing nothing. A
         // partial failure keeps the healthy pages and warns about the rest.
+        // The first failure's reason rides along, so a server that timed out
+        // on every file says so.
         if (refs.length > 0 && entries.length === 0) {
           skipped.length = 0;
-          throw new Error(`all ${refs.length} remote file(s) failed to fetch`);
+          throw new Error(
+            `all ${refs.length} remote file(s) failed to fetch (${reasons[0]})`
+          );
         }
         return entries;
       },
@@ -243,6 +274,10 @@ export const mdxRemoteSource = (
   return {
     load,
     name: options.name,
+    // Refs are the remote tree's file and folder names, so an ordering prefix
+    // (`01-getting-started/02-install.mdx`) sorts the sidebar and drops from
+    // the route, the way it does in a local content folder.
+    orderedNames: true,
     prefix: options.prefix,
     read,
     staged: true,

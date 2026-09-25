@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import { copyText } from "../copy-feedback.ts";
-import { joinBase, prefixBase } from "./base-path.ts";
+import { joinBase, mountBase } from "./base-path.ts";
 import { useAssistant } from "./hooks.ts";
 
 /** A resolved empty-state prompt; `icon` is ready-to-inline SVG (or null). */
@@ -65,11 +65,12 @@ const markdown = new Marked({
   breaks: true,
   gfm: true,
   // The model cites pages as base-less logical routes (`[Title](/route)`); rewrite
-  // link targets to served URLs so citations resolve under `deployment.base`.
-  // `prefixBase` leaves external URLs and fragments untouched and is idempotent.
+  // link targets to served URLs so citations resolve under `deployment.base`,
+  // even a route that starts with the base's own name. `mountBase` leaves
+  // external URLs and fragments untouched.
   walkTokens: (token) => {
     if (token.type === "link") {
-      token.href = prefixBase(import.meta.env.BASE_URL, token.href);
+      token.href = mountBase(import.meta.env.BASE_URL, token.href);
     }
   },
 });
@@ -260,6 +261,22 @@ const Assistant = ({
     return () => {
       delete document.body.dataset.blumeAssistant;
     };
+  }, [open]);
+
+  // Stamp the incoming body before the swap installs it, as the theme and
+  // banner scripts do for <html>. Stamped only after the swap (below, in a
+  // passive effect), the new body would first paint without the push padding,
+  // replaying its transition on every navigation with the panel docked.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onBeforeSwap = (event: DocumentEventMap["astro:before-swap"]) => {
+      event.newDocument.body.dataset.blumeAssistant = "open";
+    };
+    document.addEventListener("astro:before-swap", onBeforeSwap);
+    return () =>
+      document.removeEventListener("astro:before-swap", onBeforeSwap);
   }, [open]);
 
   // Re-stamp the push attribute after a swap while the panel is open — the new

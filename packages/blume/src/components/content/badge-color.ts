@@ -1,6 +1,9 @@
-/** The named color each documented Badge `variant` paints with. */
+/**
+ * The named color each documented Badge `variant` paints with; `accent` is
+ * the site's theme accent rather than a fixed hue.
+ */
 const VARIANT_COLOR = new Map([
-  ["accent", "blue"],
+  ["accent", "accent"],
   ["danger", "red"],
   ["default", "gray"],
   ["success", "green"],

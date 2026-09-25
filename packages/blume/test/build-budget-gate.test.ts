@@ -69,6 +69,10 @@ const runGate = (
     console.log("GATE_PASSED");
   `);
 
+// Each case cold-starts `bun -e` and imports the whole build command, which
+// usually takes 1-2s on the Windows runner but has spiked past Bun's 5s
+// default, so every case gets an explicit timeout like the other command
+// suites.
 describe("runClientAssetChecks", () => {
   it("exits non-zero when the JavaScript budget is exceeded", async () => {
     const dist = await distFixture();
@@ -76,14 +80,14 @@ describe("runClientAssetChecks", () => {
     expect(output).toContain("JavaScript budget exceeded");
     expect(output).not.toContain("GATE_PASSED");
     expect(exitCode).toBe(1);
-  });
+  }, 30_000);
 
   it("exits non-zero when the CSS budget is exceeded", async () => {
     const dist = await distFixture();
     const { exitCode, output } = await runGate(dist, `{ "budget-css": "1" }`);
     expect(output).toContain("CSS budget exceeded");
     expect(exitCode).toBe(1);
-  });
+  }, 30_000);
 
   it("passes budgets under the limit", async () => {
     const dist = await distFixture();
@@ -95,7 +99,7 @@ describe("runClientAssetChecks", () => {
     expect(output).toContain("CSS budget: 2.0 kB / 100 kB");
     expect(output).toContain("GATE_PASSED");
     expect(exitCode).toBe(0);
-  });
+  }, 30_000);
 
   it("reports bundle sizes with --analyze", async () => {
     const dist = await distFixture();
@@ -103,14 +107,14 @@ describe("runClientAssetChecks", () => {
     expect(output).toContain("Client JavaScript");
     expect(output).toContain("index.abc123.js");
     expect(exitCode).toBe(0);
-  });
+  }, 30_000);
 
   it("notes a zero-JS site with --analyze and no assets", async () => {
     const dist = await distFixture(false);
     const { exitCode, output } = await runGate(dist, `{ "analyze": true }`);
     expect(output).toContain("No client JavaScript emitted");
     expect(exitCode).toBe(0);
-  });
+  }, 30_000);
 
   it("is a no-op without analyze or budget flags", async () => {
     const dist = await distFixture();
@@ -118,5 +122,5 @@ describe("runClientAssetChecks", () => {
     expect(output).not.toContain("budget");
     expect(output).toContain("GATE_PASSED");
     expect(exitCode).toBe(0);
-  });
+  }, 30_000);
 });

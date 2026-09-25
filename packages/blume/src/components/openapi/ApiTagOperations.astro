@@ -1,7 +1,7 @@
 ---
 import specs from "blume:openapi";
 import { specOf } from "../../openapi/model.ts";
-import { withBase } from "../islands/base-path.ts";
+import { withMountedBase } from "../islands/base-path.ts";
 import MethodBadge from "./MethodBadge.astro";
 
 // The operation-link list for one tag section of an API overview page. The
@@ -27,7 +27,7 @@ const operations = Object.values(specOf(specs, source)?.operations ?? {}).filter
         <li>
           <a
             class="flex items-start gap-3 rounded-blume border border-border p-3 text-inherit no-underline! transition-colors hover:border-accent hover:bg-muted hover:no-underline!"
-            href={withBase(operation.route)}
+            href={withMountedBase(operation.route)}
           >
             <MethodBadge class="mt-0.5 shrink-0" method={operation.method} />
             {/* Title over path, stacked, so a long summary and a long route each

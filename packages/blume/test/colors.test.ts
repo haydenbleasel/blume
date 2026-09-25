@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  ACCENT_STROKE,
+  ACCENT_TINT,
   ADMONITION_ICON,
   ADMONITION_ICON_CLASS,
   admonitionType,
@@ -55,6 +57,22 @@ describe("tinted label colors", () => {
     for (const [hue, classes] of Object.entries(STROKE)) {
       expect(classes).toMatch(new RegExp(`^border-${hue}-500/\\d+ `, "u"));
     }
+  });
+});
+
+describe("theme accent label colors", () => {
+  // The accent is site-configured, so its label mixes the accent token toward
+  // the foreground token rather than naming a fixed hue that could drift from
+  // the theme (the accent badge once rendered as a hard-coded blue).
+  const label =
+    "text-[color-mix(in_oklab,var(--blume-accent)_50%,var(--blume-foreground))]";
+
+  it("tints the fill from the accent token and mixes the label toward the foreground", () => {
+    expect(ACCENT_TINT).toBe(`bg-accent/15 ${label}`);
+  });
+
+  it("strokes with the accent token and the same label", () => {
+    expect(ACCENT_STROKE).toBe(`border-accent/40 ${label}`);
   });
 });
 

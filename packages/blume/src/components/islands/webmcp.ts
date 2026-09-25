@@ -1,7 +1,7 @@
 import { unescape } from "html-escaper";
 
 import type { SearchFn } from "../layout/search/types.ts";
-import { joinBase, prefixBase } from "./base-path.ts";
+import { joinBase, mountBase, prefixBase } from "./base-path.ts";
 
 /**
  * WebMCP (W3C Web Machine Learning CG): in-page tools an agentic browser can
@@ -144,7 +144,7 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
             hits
               .map(
                 (hit) =>
-                  `${plain(hit.title)} — ${prefixBase(options.base, hit.url)}\n${plain(hit.excerpt)}`
+                  `${plain(hit.title)} — ${mountBase(options.base, hit.url)}\n${plain(hit.excerpt)}`
               )
               .join("\n\n")
           );
@@ -175,6 +175,8 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
       }
       const trimmed = route.length > 1 ? route.replace(/\/+$/u, "") : route;
       const target = trimmed === "/" ? "/index" : trimmed;
+      // The agent may hand back a served URL `search_docs` returned, base
+      // included, so a path already under the base keeps it (`prefixBase`).
       const response = await fetchFn(
         `${prefixBase(options.base, target)}.md`
       ).catch(() => null);

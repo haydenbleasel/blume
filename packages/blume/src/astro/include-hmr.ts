@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 
+import { resolve } from "pathe";
+
 import { refreshBlumeContent } from "./integration.ts";
 
 /**
@@ -18,12 +20,21 @@ import { refreshBlumeContent } from "./integration.ts";
  */
 
 /** The Vite module-graph slice the plugin touches (structurally typed, like
- * every Blume-authored Vite plugin — see `serverAppResolvePlugin`). */
+ * every Blume-authored Vite plugin — see `serverAppResolvePlugin`). Every
+ * environment keeps its own graph, and the server's own `moduleGraph` only
+ * covers `client` and `ssr`: with `@astrojs/cloudflare` the content pages
+ * render in the `prerender` environment instead. */
 interface IncludeHmrServer {
-  moduleGraph: {
-    getModulesByFile: (file: string) => Set<unknown> | undefined;
-    invalidateModule: (mod: never) => void;
-  };
+  config: { root: string };
+  environments: Record<
+    string,
+    {
+      moduleGraph: {
+        getModulesByFile: (file: string) => Set<unknown> | undefined;
+        invalidateModule: (mod: never) => void;
+      };
+    }
+  >;
   ws: { send: (payload: { type: "full-reload" }) => void };
 }
 
@@ -51,16 +62,24 @@ export const includeHmrPlugin = (graphPath: string): IncludeHmrPlugin => ({
       // No graph yet (first run) — nothing to invalidate.
       return;
     }
-    const includers = graph[ctx.file];
+    // An ejected app's graph is relative to the project, its Vite root; the
+    // hidden runtime's is absolute, which resolving leaves as it is.
+    const { config, environments, ws } = ctx.server;
+    const includers = Object.entries(graph).find(
+      ([partial]) => resolve(config.root, partial) === ctx.file
+    )?.[1];
     if (!includers || includers.length === 0) {
       return;
     }
-    const { moduleGraph, ws } = ctx.server;
-    for (const includer of includers) {
-      for (const mod of moduleGraph.getModulesByFile(includer) ?? []) {
-        // SAFETY: the module came out of this module graph; `never` only
-        // reflects that the structural slice doesn't model the node type.
-        moduleGraph.invalidateModule(mod as never);
+    for (const { moduleGraph } of Object.values(environments)) {
+      for (const includer of includers) {
+        for (const mod of moduleGraph.getModulesByFile(
+          resolve(config.root, includer)
+        ) ?? []) {
+          // SAFETY: the module came out of this module graph; `never` only
+          // reflects that the structural slice doesn't model the node type.
+          moduleGraph.invalidateModule(mod as never);
+        }
       }
     }
     // Plain `.md` pages have no Vite module: their HTML lives in the

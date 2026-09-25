@@ -18,7 +18,8 @@ export const projectComponentSerializers = (
   ({
     ...exampleComponentSerializers(project.examples ?? {}),
     ...openapiComponentSerializers(
-      project.sources.find(isOpenApiSource)?.openApiData() ?? {}
+      project.sources.find(isOpenApiSource)?.openApiData() ?? {},
+      project.config.deployment.options.base
     ),
     ...project.config.agents.markdownComponents,
   }) satisfies Record<string, ComponentMarkdown>;

@@ -518,9 +518,11 @@ describe("obsidianSource", () => {
     });
     const { entries, diagnostics } = await sourceFor(root).load();
     const links = entries.find((entry) => entry.ref === "Links.md");
-    // A hand slugify collapses `--` to one dash; github-slugger — the slugger
-    // the renderer uses — keeps every one, so only this id exists on the page.
-    expect(links?.body.text).toContain("(/notes#the-read----write-fallback)");
+    // The renderer's smart punctuation turns `--` into an en dash, which
+    // github-slugger — the slugger the renderer uses — drops while keeping
+    // both spaces as dashes; a hand slugify would collapse them to one, and
+    // only this id exists on the page.
+    expect(links?.body.text).toContain("(/notes#the-read--write-fallback)");
     expect(diagnostics).toEqual([]);
   });
 
@@ -1024,10 +1026,10 @@ describe("obsidianSource", () => {
       "[**Bold** heading](/other#bold-heading)"
     );
     expect(links?.body.text).toContain(
-      "[Read the docs now](/other#read-the-docsdocs-now)"
+      "[Read the docs now](/other#read-the-docs-now)"
     );
     expect(links?.body.text).toContain(
-      "[Use snake_case](/other#use-_snake_case_)"
+      "[Use snake_case](/other#use-snake_case)"
     );
     expect(diagnostics).toEqual([]);
   });

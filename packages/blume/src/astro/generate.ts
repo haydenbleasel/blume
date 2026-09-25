@@ -1887,7 +1887,7 @@ export const generateRuntime = async (
   // `astro.config.mjs` — which would restart the dev server in place.
   const contentRoutes = markdownRoutePaths(project);
   const homeLinkHeader =
-    buildHomeLinkHeader(config, contentRoutes) ?? undefined;
+    buildHomeLinkHeader(config, contentRoutes, "dev") ?? undefined;
 
   const assistantEnabled = config.ai.assistant?.enabled ?? false;
   const exportPdf = config.export.pdf;

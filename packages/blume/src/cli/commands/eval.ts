@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 
 import { defineCommand } from "citty";
-import { join } from "pathe";
+import { resolve } from "pathe";
 
 import { AGENTS, launchAgent } from "../../audit/agent.ts";
 import type { AgentKind } from "../../audit/agent.ts";
@@ -22,6 +22,7 @@ import {
 import { passFraction, runEval } from "../../eval/run.ts";
 import type { EvalResult } from "../../eval/run.ts";
 import { EvalsFileError, loadEvalsFile } from "../../eval/schema.ts";
+import { parseTimeoutSeconds } from "../args.ts";
 import { commandMeta } from "../command-meta.ts";
 import { reportInternalError } from "../internal-error.ts";
 import { flushStdout, logger, reportDiagnostics } from "../log.ts";
@@ -88,16 +89,18 @@ const parseFlags = (args: EvalFlags) => {
     process.exit(1);
   }
   const threshold = args.threshold === undefined ? 1 : Number(args.threshold);
-  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+  // A bare `--threshold` (or `--threshold $UNSET_VAR`) arrives as "", which
+  // `Number` reads as 0 — a gate that passes every run — so it's rejected.
+  if (
+    args.threshold?.trim() === "" ||
+    !Number.isFinite(threshold) ||
+    threshold < 0 ||
+    threshold > 1
+  ) {
     logger.error(`Invalid --threshold "${args.threshold}" (use 0..1).`);
     process.exit(1);
   }
-  const timeoutS =
-    args.timeout === undefined ? DEFAULT_TIMEOUT_S : Number(args.timeout);
-  if (!Number.isInteger(timeoutS) || timeoutS <= 0) {
-    logger.error(`Invalid --timeout "${args.timeout}" (whole seconds).`);
-    process.exit(1);
-  }
+  const timeoutS = parseTimeoutSeconds(args.timeout, DEFAULT_TIMEOUT_S);
   return { agent: args.agent, threshold, timeoutS };
 };
 
@@ -125,7 +128,7 @@ const runFixHandoff = async (
 
 /** `blume eval init`: draft a starter evals file via the interactive agent. */
 const runInit = async (agent: AgentKind, file: string): Promise<void> => {
-  const path = join(process.cwd(), file);
+  const path = resolve(process.cwd(), file);
   if (existsSync(path)) {
     logger.error(
       `${file} already exists — edit it directly, or pass --file to draft elsewhere.`
@@ -193,7 +196,9 @@ export const evalCommand = defineCommand({
       // and never regenerates the runtime, so it doesn't contend with a
       // running dev server. Same reasoning as `blume audit`.
       const project = await scanProject(root, { mode: "build" });
-      const evalsPath = join(root, args.file);
+      // `resolve`, not `join`: an absolute `--file` (`/ci/evals.yaml`) is
+      // used as given instead of being nested under the project root.
+      const evalsPath = resolve(root, args.file);
       const { evals, raw } = await loadEvalsFile(evalsPath);
 
       process.stderr.write(`${headerLine(evals.questions.length, agent)}\n\n`);
@@ -270,7 +275,10 @@ export const evalCommand = defineCommand({
     }
 
     if (failed) {
-      process.exit(1);
+      // Set the code and return rather than `process.exit`, which doesn't wait
+      // for a piped stderr: a long `--verbose` report was cut off mid-write, in
+      // exactly the CI logs that need to show every failure.
+      process.exitCode = 1;
     }
   },
 });

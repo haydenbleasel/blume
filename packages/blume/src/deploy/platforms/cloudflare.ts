@@ -11,6 +11,7 @@ import {
   markdownRoutePaths,
   markdownTokenCount,
 } from "../../ai/markdown.ts";
+import { normalizeBasePath } from "../../core/base-path.ts";
 import type { BlumeProject } from "../../core/project-graph.ts";
 import type { ProjectContext } from "../../core/types.ts";
 import { CLOUDFLARE_ADAPTER_PACKAGE } from "../adapters/cloudflare.ts";
@@ -90,8 +91,13 @@ export const emitCloudflareNegotiation = async (
   const home = rawMarkdown["/"];
   // The 404 twins the wrapper may substitute for the HTML shell; only wired
   // when the build actually emitted them (a project that owns `/404` gets
-  // neither), like the Vercel routing config.
-  const staticDir = clientDir(context);
+  // neither), like the Vercel routing config. The adapter writes the
+  // prerendered files under the deployment base (`dist/client/<base>/`),
+  // where the wrapper fetches them from.
+  const staticDir = join(
+    clientDir(context),
+    normalizeBasePath(config.deployment.options.base)
+  );
   const injected = injectWorkerNegotiation(
     await readFile(wranglerPath, "utf-8"),
     {
@@ -119,7 +125,7 @@ export const emitCloudflareNegotiation = async (
       // based the same way the platform files are — it answers any the
       // worker-first rules claim, where `_redirects` is never consulted and
       // Astro would default their status.
-      redirects: platformRedirects(config),
+      redirects: platformRedirects(project),
       routePaths,
     }
   );
@@ -308,6 +314,9 @@ export const cloudflarePlatform: DeployPlatform = {
   previewDeploy: null,
   readsHeaderFiles: { server: true, static: true },
   redirectFiles: [REDIRECTS_FILE],
+  // The adapter points `build.client` at `dist/client/<base>/` for a server
+  // build, and hoists its own `_headers`/`_redirects` back up to `dist/client`.
+  serverClientUnderBase: true,
   serverOutputDir: distDir,
   serverStaticDir: clientDir,
 };

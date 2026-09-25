@@ -1,4 +1,4 @@
-import { withBasePath } from "../../core/base-path.ts";
+import { mountBasePath } from "../../core/base-path.ts";
 import { absoluteUrl, siteRoot } from "../../core/site-url.ts";
 import { trimChar } from "../../core/trim.ts";
 import { MCP_TOOLS } from "./tools.ts";
@@ -18,7 +18,7 @@ export interface McpDiscoveryInput {
 const serverUrl = (input: McpDiscoveryInput): string => {
   // The endpoint is a generated Astro page, so it's served under
   // `deployment.base` like every other route (the sitemap/llms.txt convention).
-  const path = withBasePath(input.base, input.route);
+  const path = mountBasePath(input.base, input.route);
   // Concatenate rather than `new URL(path, site)` — a root-absolute path
   // would drop the base path of a subpath deployment (`acme.com/docs`).
   return input.site ? absoluteUrl(input.site, path) : path;

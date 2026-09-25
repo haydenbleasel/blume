@@ -39,7 +39,7 @@ import {
 import { buildStructuredData } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
 import Icon from "../Icon.astro";
-import { stripBase, withBase } from "../islands/base-path.ts";
+import { stripBase, withBase, withMountedBase } from "../islands/base-path.ts";
 import { pageDirection, pageLocale } from "./page-locale.ts";
 import { searchLocaleFor } from "./search-locale.ts";
 import "blume:theme";
@@ -219,7 +219,7 @@ const activeTab = currentTabForRoute(navigation.tabs, route, navigation.root);
 // llms.txt index), and the homepage HTTP `Link` header already advertises it,
 // so the head is its HTML counterpart on hosts that can't set that header.
 // Advertising a mirror for any other custom route would 404.
-const markdownMirror = route === "/" ? withBase("/index.md") : null;
+const markdownMirror = route === "/" ? withMountedBase("/index.md") : null;
 
 // Derive canonical + og:image from the site URL the same way the catch-all does
 // for content pages, so a custom page gets both for free. The matching OG card
@@ -230,8 +230,9 @@ const markdownMirror = route === "/" ? withBase("/index.md") : null;
 const ogSlug = route === "/" ? "index" : route.slice(1);
 const ogCardGenerated = !Astro.routePattern.includes("[");
 // Absolute URLs carry the deployment base too (`site + base + route`), since the
-// page is served under it. `withBase` handles a root base as a no-op.
-const basedRoute = withBase(route);
+// page is served under it — even when the route starts with the base's own
+// name. `withMountedBase` handles a root base as a no-op.
+const basedRoute = withMountedBase(route);
 // The schema accepts a trailing-slash site URL (`https://docs.example.com/`);
 // strip it before joining with the root-relative route so canonical/og URLs
 // don't come out double-slashed — the catch-all strips it the same way.
@@ -253,7 +254,7 @@ const absolutizeOgImage = (value: string): string =>
 const resolvedOgImage = ogImage
   ? absolutizeOgImage(ogImage)
   : ogEnabled && ogCardGenerated && siteBase
-    ? `${siteBase}${encodeURI(withBase(`/og/${ogSlug}.png`))}`
+    ? `${siteBase}${encodeURI(withMountedBase(`/og/${ogSlug}.png`))}`
     : null;
 // Only the generated card has a known size and format, so its dimensions are
 // declared for crawlers; a user-supplied `ogImage` could be any image.
@@ -439,7 +440,7 @@ createIconSprite(Astro.locals);
                       <a
                         aria-current={tab === activeTab ? "page" : undefined}
                         class="flex items-center gap-2 rounded-[0.65rem] px-2.5 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
-                        href={withBase(tab.href ?? tab.path)}
+                        href={withMountedBase(tab.href ?? tab.path)}
                       >
                         {tab.icon && (
                           <Icon class="shrink-0" name={tab.icon} size={14} />

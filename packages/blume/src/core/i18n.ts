@@ -220,10 +220,30 @@ export const localeTargetPath = (
 };
 
 /**
+ * The warning for a top-level folder named after the default locale
+ * (`docs/en/` when `defaultLocale` is `en`). Only non-default codes are
+ * locale folders — the default locale lives at the content root — so the
+ * folder is ordinary default-locale content, published one level down at
+ * `/en/…` (`/en/en/…` with the default prefix shown) and filled into every
+ * other locale at `/fr/en/…`.
+ */
+const defaultLocaleFolderDiagnostic = (
+  folder: string,
+  i18n: ResolvedI18nConfig
+): Diagnostic => ({
+  code: "BLUME_I18N_DEFAULT_LOCALE_FOLDER",
+  message: `Folder "${folder}/" is named after the default locale, but "${i18n.defaultLocale}" pages live at the content root — its pages publish at ${localizeRoute(`/${folder}`, i18n.defaultLocale, i18n)}/… instead.`,
+  severity: "warning",
+  suggestion: `Move the contents of "${folder}/" up to the content root; only the other locales get a folder.`,
+});
+
+/**
  * Warn about top-level content folders that look like a locale (a code Blume
  * recognizes) but aren't declared in `i18n.locales`. Without this they're
  * silently treated as default-locale content under a `/<code>/…` route, which
  * is almost never intended — usually a translation that wasn't registered.
+ * A folder named after the default locale gets the same treatment (see
+ * {@link defaultLocaleFolderDiagnostic}).
  */
 export const i18nDiagnostics = (
   pages: PageRecord[],
@@ -242,9 +262,17 @@ export const i18nDiagnostics = (
     // Inside a version snapshot the locale dir sits one level deeper
     // (`v1.0/fr/guide.md`), so a configured version segment is skipped first.
     const parts = page.source.ref.split("/");
-    const first = (
-      parts[0] && versionDirs.has(parts[0]) ? parts[1] : parts[0]
-    )?.toLowerCase();
+    const folder = parts[0] && versionDirs.has(parts[0]) ? parts[1] : parts[0];
+    const first = folder?.toLowerCase();
+    if (
+      folder !== undefined &&
+      first === i18n.defaultLocale.toLowerCase() &&
+      !seen.has(first)
+    ) {
+      seen.add(first);
+      diagnostics.push(defaultLocaleFolderDiagnostic(folder, i18n));
+      continue;
+    }
     if (
       first &&
       !seen.has(first) &&

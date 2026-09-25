@@ -70,7 +70,7 @@ const security = resolveAsyncApiSecurity(
 );
 const parameters = channelParameters(channel, document);
 const messages = operation ? operationMessages(operation, channel, document) : [];
-const protocol = protocolOf(operation, channel, servers);
+const protocol = protocolOf(operation, channel, servers, document.components);
 
 /** Declared example first, else a sampled value from the payload schema. */
 const exampleOf = (message: (typeof messages)[number]["message"]): unknown =>
@@ -115,8 +115,8 @@ const samplePanels = sample
   ? await languageSamplePanels(languages, sample, data.config.codeThemes)
   : [];
 
-const operationBindings = bindingGroups(operation?.bindings);
-const channelBindings = bindingGroups(channel?.bindings);
+const operationBindings = bindingGroups(operation?.bindings, document.components);
+const channelBindings = bindingGroups(channel?.bindings, document.components);
 ---
 
 {
@@ -144,7 +144,10 @@ const channelBindings = bindingGroups(channel?.bindings);
             // Headers may be multi-format too; undefined with `headers`
             // present means an inline-unrenderable schema format.
             const headers = schemaOf(named.message.headers);
-            const messageBindings = bindingGroups(named.message.bindings);
+            const messageBindings = bindingGroups(
+              named.message.bindings,
+              document.components
+            );
             return (
               <section class="mt-6">
                 <div

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 
-import { relative } from "pathe";
+import { normalize, relative } from "pathe";
 
 import type { Diagnostic } from "./types.ts";
 
@@ -59,6 +60,23 @@ export const parseGitLog = (output: string): Map<string, string> => {
 };
 
 /**
+ * `path` with every symlink resolved, the spelling git prints paths in: a
+ * project opened through a link (`/tmp/site` on macOS, where `/tmp` links to
+ * `/private/tmp`) gets `/private/tmp/site` from `rev-parse --show-toplevel`,
+ * so the project's own spelling would compare as outside the repository and
+ * every page would go undated. The native realpath also expands a Windows
+ * 8.3 short name (`RUNNER~1`), which git does too. A path that doesn't exist
+ * stays as written.
+ */
+export const realPath = (path: string): string => {
+  try {
+    return normalize(realpathSync.native(path));
+  } catch {
+    return path;
+  }
+};
+
+/**
  * The toplevel of the repository containing `root`, or null when git is
  * unavailable or the project isn't a repo. Callers use it to decide which
  * content roots a `git log` pathspec can cover at all — a root outside the
@@ -108,6 +126,10 @@ export const gitLastModifiedTimes = (
   if (gitRoot === null) {
     return new Map();
   }
+  // Git names paths by their real location, so the pathspecs and the paths
+  // read back against the log are compared in that spelling too (see
+  // `realPath`).
+  const top = realPath(gitRoot);
   try {
     const output = execFileSync(
       // oxlint-disable-next-line sonarjs/no-os-command-from-path -- git is a required dev-tool dependency resolved from PATH
@@ -121,14 +143,14 @@ export const gitLastModifiedTimes = (
         "--format=%x00%cI",
         "--name-only",
         "--",
-        ...contentRoots,
+        ...contentRoots.map(realPath),
       ],
       { encoding: "utf-8", env: gitEnv(), maxBuffer: 256 * 1024 * 1024 }
     );
     const byRepoPath = parseGitLog(output);
     const result = new Map<string, string>();
     for (const sourcePath of sourcePaths) {
-      const iso = byRepoPath.get(relative(gitRoot, sourcePath));
+      const iso = byRepoPath.get(relative(top, realPath(sourcePath)));
       if (iso) {
         result.set(sourcePath, iso);
       }

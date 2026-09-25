@@ -21,6 +21,7 @@ import {
   resolveEntryRoute,
   slugifyPath,
   strippedLineOffset,
+  unloadablePathDiagnostic,
 } from "./normalize.ts";
 import type {
   ContentSource,
@@ -587,10 +588,11 @@ const transformBody = (
  * `[#custom-id]` pin and the `setup-1` a later collision gets are honored
  * rather than re-slugged. When no heading holds anything the rewrite changes,
  * the raw body's headings are the staged body's; otherwise the body is lowered
- * once more so the headings are scanned exactly as they ship. A link inside a
- * heading is rewritten here before the other notes' anchors are known, so its
- * own anchor is left off; that only moves the manifest id of a heading that
- * itself holds a heading link, which the docs already flag as unaddressable.
+ * once more so the headings are scanned exactly as they ship. A heading link
+ * inside a heading is rewritten here before every note's anchors are known,
+ * so its href may still lack the anchor it ships with. That moves no id: a
+ * heading is slugged by its rendered text, where the link is its label alone,
+ * so the heading stays as addressable as any other.
  */
 const fillAnchors = (pair: IndexedPair, index: LinkIndex): void => {
   const raw = extractHeadings(pair.note.content);
@@ -958,7 +960,19 @@ export const obsidianSource = (
   const exclude = new Set([...BLUME_IGNORE_DIRS, ...(options.exclude ?? [])]);
 
   const load = async (): Promise<SourceLoadResult> => {
-    const files = await walkVault(vaultDir, vaultDir, exclude);
+    // A note is staged under its vault path, where Astro's content loader
+    // can't read a name holding `#` or `?`; such a note is reported and left
+    // out, and links to it degrade like links to any missing note.
+    const skipped: Diagnostic[] = [];
+    const files: string[] = [];
+    for (const rel of await walkVault(vaultDir, vaultDir, exclude)) {
+      const unloadable = unloadablePathDiagnostic(rel, join(vaultDir, rel));
+      if (unloadable) {
+        skipped.push(unloadable);
+      } else {
+        files.push(rel);
+      }
+    }
     const read = await Promise.all(
       files.map((rel) => readNote(vaultDir, rel, options))
     );
@@ -971,7 +985,10 @@ export const obsidianSource = (
       noteToEntry(pair, index, options, unresolved)
     );
     return {
-      diagnostics: unresolvedDiagnostics(options.name, unresolved),
+      diagnostics: [
+        ...skipped,
+        ...unresolvedDiagnostics(options.name, unresolved),
+      ],
       entries,
     };
   };

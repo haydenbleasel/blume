@@ -237,6 +237,10 @@ const { content: strings } = contentStrings(data, Astro.currentLocale);
           }
           trigger.id = `blume-tab-${slug}-${instance}`;
           trigger.setAttribute("aria-controls", panel.id);
+          // The role rides with the labelling tab: adopted panels (CodeGroup
+          // fences, ts2js pairs, nested groups) have none of their own, and
+          // dropdown mode renders no tabs, so its panels take no role.
+          panel.setAttribute("role", "tabpanel");
           panel.setAttribute("aria-labelledby", trigger.id);
           trigger.setAttribute(
             "aria-selected",

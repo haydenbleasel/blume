@@ -10,7 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import { withBasePath } from "../../core/base-path.ts";
+import { mountBasePath } from "../../core/base-path.ts";
 import { readCappedText } from "../../core/request-body.ts";
 import type { McpData } from "./data.ts";
 import {
@@ -104,7 +104,7 @@ interface PageResource {
 const resourceUri = (route: string, data: McpData): string =>
   data.site
     ? urlFor(route, data)
-    : `${LOCAL_RESOURCE_SCHEME}${withBasePath(data.base, route)}`;
+    : `${LOCAL_RESOURCE_SCHEME}${mountBasePath(data.base, route)}`;
 
 /** The `pages` key a resource URI (either form, or a bare route) names. */
 const resourceRoute = (uri: string, data: McpData): string =>

@@ -43,6 +43,8 @@ docs/
 | `docs/guides/quickstart.mdx`    | `/guides/quickstart`    |
 | `docs/fr/guides/quickstart.mdx` | `/fr/guides/quickstart` |
 
+Don't give the default locale a folder of its own: only the other codes are locale folders, so `docs/en/` with an `en` default is ordinary content that publishes at `/en/…` (and at `/fr/en/…` as a French fallback). Blume warns when it finds one.
+
 You only translate the files you want — everything else falls back automatically (see [Fallbacks](#fallbacks)).
 
 ### Filename suffixes

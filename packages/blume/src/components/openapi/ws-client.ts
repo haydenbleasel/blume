@@ -57,7 +57,10 @@ export interface WsClientOptions {
   /** Clock for frame timestamps; defaults to `Date.now`. */
   now?: () => number;
   onFrame: (frame: WsFrame) => void;
-  /** State transitions, with an optional human detail (close reason/code). */
+  /**
+   * State transitions, with an optional human detail: the close reason/code,
+   * or why a URL couldn't be dialed at all.
+   */
   onState: (state: WsState, detail?: string) => void;
 }
 
@@ -125,7 +128,20 @@ export const createWsClient = (options: WsClientOptions): WsClient => {
       return;
     }
     transition("connecting");
-    const next = create(url);
+    let next: SocketLike;
+    try {
+      next = create(url);
+    } catch (error) {
+      // `new WebSocket` throws synchronously on a URL it can't dial (a bad
+      // scheme, a malformed host), before any event could settle the state:
+      // left alone, the panel would say "Connecting…" forever with nothing to
+      // disconnect.
+      transition(
+        "error",
+        error instanceof Error ? error.message : String(error)
+      );
+      return;
+    }
     socket = next;
     // Every listener below is scoped to the socket it was wired for: a browser
     // can deliver a discarded socket's error/close/message after `disconnect`

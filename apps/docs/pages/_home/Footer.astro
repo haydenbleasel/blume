@@ -2,6 +2,7 @@
 // Larger landing footer: link columns generated from the docs navigation, so
 // they stay in sync with the sidebar, over a subfooter row with the logo,
 // copyright, and GitHub and X links.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
 import data from "blume:data";
 
 const { config } = data;
@@ -127,8 +128,7 @@ for (const node of roots) {
               aria-label="GitHub"
               class="relative inline-flex text-muted-foreground transition-colors hover:text-foreground"
               href={repoUrl}
-              rel="noreferrer"
-              target="_blank"
+              {...NEW_TAB_ATTRS}
             >
               <span
                 aria-hidden="true"
@@ -151,8 +151,7 @@ for (const node of roots) {
           aria-label="X"
           class="relative inline-flex text-muted-foreground transition-colors hover:text-foreground"
           href="https://x.com/haydenbleasel"
-          rel="noreferrer"
-          target="_blank"
+          {...NEW_TAB_ATTRS}
         >
           <span
             aria-hidden="true"

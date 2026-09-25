@@ -124,7 +124,7 @@ export const nodeRedirects = (project: BlumeProject): NodeRedirects => {
     )
   );
   return Object.fromEntries(
-    platformRedirects(config)
+    platformRedirects(project)
       .filter((redirect) => !pages.has(normalizePath(redirect.from)))
       .map((redirect) => [
         normalizePath(redirect.from),

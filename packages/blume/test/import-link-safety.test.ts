@@ -3,9 +3,18 @@ import { describe, expect, it } from "bun:test";
 import { isSafeHref } from "../src/core/safe-href.ts";
 import { neutralizeUnsafeLinks } from "../src/core/safe-links.ts";
 import type { JsonObject } from "../src/core/sources/json.ts";
-import { destination, image, renderLink } from "../src/core/sources/lower.ts";
+import {
+  destination,
+  image,
+  linkParts,
+  renderInline,
+} from "../src/core/sources/lower.ts";
 import { portableTextToMarkdown } from "../src/core/sources/portable-text.ts";
 import { documentEntry } from "../src/core/sources/remote.ts";
+
+/** A link over a plain label, as a lowerer renders one. */
+const renderLink = (label: string, href?: string): string =>
+  renderInline(linkParts([{ marks: {}, text: label }], href));
 
 describe("isSafeHref: Markdown decoding", () => {
   it("refuses a scheme spelled with escapes or character references", () => {

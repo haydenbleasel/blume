@@ -2,6 +2,7 @@
 // The page's secondary action: medium-weight text with a trailing chevron,
 // matching the agent-native section's links. `inverse` is the white take for
 // the dark CLI panel and the cornflower CTA.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
 import { glyph } from "./shared.ts";
 
 interface Props {
@@ -24,8 +25,7 @@ const { class: className, external = false, href, tone = "accent" } =
     className,
   ]}
   href={href}
-  rel={external ? "noopener noreferrer" : undefined}
-  target={external ? "_blank" : undefined}
+  {...(external ? NEW_TAB_ATTRS : {})}
 >
   <slot />
   <svg

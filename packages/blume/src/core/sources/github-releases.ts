@@ -16,6 +16,7 @@ import {
   snapshotCache,
 } from "./cache.ts";
 import { destination, escapeMarkdownText } from "./lower.ts";
+import { REMOTE_TIMEOUT_MS } from "./remote.ts";
 import type {
   ContentSource,
   SourceContext,
@@ -358,15 +359,33 @@ export const githubReleasesSource = (
     (options.drafts || !release.draft) &&
     (options.prereleases || !release.prerelease);
 
+  // Each page gets {@link REMOTE_TIMEOUT_MS}, body included: an API that
+  // accepts the connection and never answers would otherwise hold the scan,
+  // and so the build or every dev rescan, indefinitely. The timeout's error
+  // names the URL and the limit, so the empty-changelog warning says what
+  // stalled instead of only that an operation was aborted.
   const fetchPage = async (page: number): Promise<GithubRelease[]> => {
     const url = `${base}/repos/${options.owner}/${options.repo}/releases?per_page=${PER_PAGE}&page=${page}`;
-    const res = await doFetch(url, { headers: githubHeaders() });
-    if (!res.ok) {
-      throw new Error(`${url} -> ${res.status}`);
+    try {
+      const res = await doFetch(url, {
+        headers: githubHeaders(),
+        signal: AbortSignal.timeout(REMOTE_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        throw new Error(`${url} -> ${res.status}`);
+      }
+      // SAFETY: GitHub's releases endpoint returns a JSON array of release
+      // objects; `GithubRelease` models only the fields the adapter reads.
+      return (await res.json()) as GithubRelease[];
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new Error(
+          `${url} did not respond within ${REMOTE_TIMEOUT_MS / 1000}s`,
+          { cause: error }
+        );
+      }
+      throw error;
     }
-    // SAFETY: GitHub's releases endpoint returns a JSON array of release
-    // objects; `GithubRelease` models only the fields the adapter reads.
-    return (await res.json()) as GithubRelease[];
   };
 
   const fetchReleases = async (): Promise<GithubRelease[]> => {

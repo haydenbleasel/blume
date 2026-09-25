@@ -21,7 +21,10 @@ import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
 import type { OgCache } from "../og/cache.ts";
 import type { OgFont, OgFontFamilies } from "../og/card.ts";
 import type { MixedbreadOptions } from "../search/adapters/mixedbread.ts";
-import type { ResolvedSearchAdapter } from "../search/adapters/registry.ts";
+import type {
+  ResolvedSearchAdapter,
+  SearchAdapterKind,
+} from "../search/adapters/registry.ts";
 import { buildFontEntries, fontLocaleCodes } from "../theme/fonts.ts";
 import { importSpecifier, wrapperPropsType } from "./component-slots.ts";
 import type { ExampleSpec } from "./examples.ts";
@@ -398,14 +401,32 @@ export interface ClientFeatures {
 /** Every feature on: what a checkout that predates the detection shipped. */
 const ALL_CLIENT_FEATURES: ClientFeatures = { epub: true, mermaid: true };
 
+/**
+ * The npm module each browser-queried search adapter's client imports (see
+ * `components/layout/search/`). The `<Search>` dialog lazy-imports that client
+ * on first open, after the dev dep optimizer's startup run, so the first
+ * search of a fresh `blume dev` session discovered the library, re-ran the
+ * optimizer, and reloaded the page. Pagefind loads its script from the build
+ * output and Mixedbread queries through the server, so neither has one.
+ */
+const SEARCH_CLIENT_DEPS: Partial<Record<SearchAdapterKind, string>> = {
+  algolia: "algoliasearch/lite",
+  flexsearch: "flexsearch",
+  orama: "@orama/orama",
+  "orama-cloud": "@oramacloud/client",
+  typesense: "typesense",
+};
+
 const resolveOptimizeDeps = (options: {
   aliases: Record<string, string> | undefined;
   context: ProjectContext;
   features: ClientFeatures;
   needsReact: boolean;
   reactCompilerPath: string | null | undefined;
+  searchKind: SearchAdapterKind;
 }): OptimizeDepsConfig => {
   const { context, features } = options;
+  const searchDep = SEARCH_CLIENT_DEPS[options.searchKind];
   const optimizeDepsEntries = [
     ...(context.pagesRoot ? [`${context.pagesRoot}/**/*.astro`] : []),
     `${context.root}/islands/**/*.{jsx,svelte,tsx,vue}`,
@@ -418,6 +439,8 @@ const resolveOptimizeDeps = (options: {
     // Mermaid costs the dev server seconds at startup for nothing otherwise.
     ...(features.mermaid ? ["blume > mermaid"] : []),
     ...(features.epub ? ["blume > epub-gen-memory/bundle"] : []),
+    // Only the configured search adapter's client library.
+    ...(searchDep ? [`blume > ${searchDep}`] : []),
     // Astro's own client-router/prefetch virtual modules are deliberately NOT
     // forced in here: they read Vite `define`-injected constants
     // (__PREFETCH_PREFETCH_ALL__ and friends) that a pre-bundled copy loses,
@@ -538,7 +561,7 @@ const blumeIntegrationOptions = (options: {
         buildArtifactsRoot: ".",
         contentRoutes: options.contentRoutes,
         homeLinkHeader:
-          buildHomeLinkHeader(options.config, options.contentRoutes) ??
+          buildHomeLinkHeader(options.config, options.contentRoutes, "dev") ??
           undefined,
         pages: options.pages,
       }
@@ -623,6 +646,7 @@ export const astroConfigTemplate = (options: {
     features,
     needsReact,
     reactCompilerPath: options.reactCompilerPath,
+    searchKind: config.search.provider.kind,
   });
 
   const {
@@ -660,7 +684,8 @@ export const astroConfigTemplate = (options: {
   const basedRedirects = applyBaseToAstroRedirects(
     config.redirects,
     config.basePath,
-    deployment.options.base ?? ""
+    deployment.options.base ?? "",
+    new Set(contentRoutes)
   );
   const redirectsOption =
     basedRedirects.length > 0
@@ -892,6 +917,10 @@ ${userConfigSetup}export default defineConfig({
     // \`/bundle\` subpath that is actually imported: optimizing the package
     // root leaves that entry out. Production (Rollup) already handles the
     // interop, so all of this only affects dev.
+    //
+    // The search adapter's client library rides the list for the same reason
+    // as the compiler runtime: the search dialog lazy-imports it on first
+    // open, and discovering it then re-optimizes and reloads the page.
     optimizeDeps: {
       entries: ${JSON.stringify(optimizeDepsEntries)},
       include: ${JSON.stringify(optimizeDepsInclude)},
@@ -1246,9 +1275,15 @@ export const askEndpointTemplate = (
     "messages",
     ...backend.template.fields,
   ];
+  // The request's signal aborts when the reader closes the panel mid-answer
+  // (the client drops the connection): passing it on stops the model call,
+  // which otherwise kept generating, and billing, to completion into a closed
+  // connection. `streamText` ends an aborted call through its abort path, not
+  // `onError`, so the reader leaving is never logged as a provider error.
   const call = `    const result = streamText({
       ${streamFields.join(",\n      ")},
 ${onError}
+      abortSignal: request.signal,
     });`;
   const stream = grounded
     ? `    const instructions =
@@ -1792,7 +1827,7 @@ export const navFragmentTemplate = (): string =>
   `---
 // Generated by Blume. Do not edit.
 import NavTree from "blume/components/layout/NavTree.astro";
-import { withBase } from "blume/components/islands/base-path.ts";
+import { withMountedBase } from "blume/components/islands/base-path.ts";
 import {
   hiddenDefaultLocale,
   navGroupIds,
@@ -1831,7 +1866,7 @@ if (!(variant && node && node.kind === "group")) {
 }
 const strings =
   locale === "default" ? data.ui.nav : (data.uiByLocale[locale] ?? data.ui).nav;
-const fragmentBase = withBase(\`/blume-nav/\${version}/\${locale}\`);
+const fragmentBase = withMountedBase(\`/blume-nav/\${version}/\${locale}\`);
 ---
 
 <NavTree
@@ -2153,8 +2188,8 @@ export const catchAllPageTemplate = (options: {
 import { getEntry, render } from "astro:content";
 import type { CollectionKey } from "astro:content";
 import RootLayout from "blume/components/layout/RootLayout.astro";
-import { withBase } from "blume/components/islands/base-path.ts";
-import { stripBasePath, withBasePath } from "blume/core/base-path.ts";
+import { withBase, withMountedBase } from "blume/components/islands/base-path.ts";
+import { mountBasePath, stripBasePath } from "blume/core/base-path.ts";
 import { resolveSlot } from "blume/components/layout/overrides.ts";
 ${componentImports}
 import data from "blume:data";
@@ -2219,12 +2254,16 @@ const base = data.config.site ? data.config.site.replace(/\\/$/, "") : null;
 const ogPath = data.config.og.enabled
   ? encodeURI(\`/og/\${route === "/" ? "index" : route.slice(1)}.png\`)
   : null;
-const ogRel = seo.image ?? ogPath;
 // Absolute URLs also carry the deployment base (the page is served under it):
 // \`site + base + path\`. Only absolutize root-relative paths: \`seo.image\` may be
-// an external URL, which passes through verbatim (mirrors PageLayout).
-const ogImage =
-  ogRel && base && ogRel.startsWith("/") ? \`\${base}\${withBase(ogRel)}\` : ogRel;
+// an external URL, which passes through verbatim (mirrors PageLayout). An
+// authored \`seo.image\` keeps a base written by hand; the generated card is
+// always mounted under it.
+const absoluteOg = (path: string, based: (path: string) => string) =>
+  base && path.startsWith("/") ? \`\${base}\${based(path)}\` : path;
+const ogImage = seo.image
+  ? absoluteOg(seo.image, withBase)
+  : ogPath && absoluteOg(ogPath, withMountedBase);
 // Blume's generated card has known dimensions the layout can declare; a user's
 // \`seo.image\` could be any size or format, so it gets none.
 const ogGenerated = !seo.image && Boolean(ogPath);
@@ -2233,7 +2272,7 @@ const ogGenerated = !seo.image && Boolean(ogPath);
 // itself (a guest post crediting its own author) over the configured default.
 const x = { ...data.config.x, ...(seo.x?.creator ? { creator: seo.x.creator } : {}) };
 
-const basedRoute = withBase(route);
+const basedRoute = withMountedBase(route);
 
 // Locale resolution. With i18n on, pick the active locale's nav + dictionary,
 // build hreflang alternates, and derive the language-switcher targets.
@@ -2281,7 +2320,7 @@ const contentDir = i18n
   : "ltr";
 // The root route keeps its trailing slash (\`https://site/\`) so canonical and
 // hreflang URLs byte-match the sitemap's <loc> for the home page.
-const absolute = (path: string) => base + withBase(path);
+const absolute = (path: string) => base + withMountedBase(path);
 
 // A fallback page renders the fallback locale's page at this locale's URL, so
 // its canonical names the page it copies, and search engines never rank the
@@ -2326,7 +2365,7 @@ const xDefault = defaultAlt && base ? absolute(defaultAlt.path) : null;
 // carries sits *after* the base (\`/docs/ja/guide\`), while \`localePrefix\` is
 // base-less (\`/ja\`). Stripping and re-adding a locale therefore happen in
 // base-less space, with the base re-applied at the end — the same
-// \`withBasePath(basePath, localizeRoute(...))\` composition the manifest uses to
+// \`mountBasePath(basePath, localizeRoute(...))\` composition the manifest uses to
 // build every real route. Done in based space, \`stripLocale\` matches nothing
 // and \`localizeRoute\` prepends a second prefix (\`/ja/docs/ja/guide\`). Only a
 // switcher entry for a locale with no real translation reaches this fallback:
@@ -2334,7 +2373,7 @@ const xDefault = defaultAlt && base ? absolute(defaultAlt.path) : null;
 // generated reference (which has no \`alternates\` at all) for every locale
 // but its own.
 const mountLocalized = (logical: string, codeArg: string) =>
-  withBasePath(data.config.basePath, localizeRoute(logical, codeArg));
+  mountBasePath(data.config.basePath, localizeRoute(logical, codeArg));
 const logicalRoute = i18n
   ? stripLocale(stripBasePath(data.config.basePath, route), locale)
   : route;
@@ -2363,7 +2402,7 @@ const versionRootFor = (id: string) => {
   const logical = id ? \`/\${id}\` : "/";
   return i18n
     ? mountLocalized(logical, locale)
-    : withBasePath(data.config.basePath, logical);
+    : mountBasePath(data.config.basePath, logical);
 };
 const samePageSwitch = versionsConfig
   ? versionsConfig.switcher.redirect === "same-page"
@@ -2463,7 +2502,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   exportEpub={${options.exportEpub}}${
     options.navFragments
       ? `
-  navFragmentBase={withBase(\`/blume-nav/\${version || "current"}/\${i18n && localePrefix(locale) ? locale : "default"}\`)}`
+  navFragmentBase={withMountedBase(\`/blume-nav/\${version || "current"}/\${i18n && localePrefix(locale) ? locale : "default"}\`)}`
       : ""
   }
   openInChat={data.config.openInChat}
@@ -2516,7 +2555,7 @@ export const changelogIndexTemplate = (options: {
 // Generated by Blume. Do not edit.
 import { getCollection } from "astro:content";
 import RootLayout from "blume/components/layout/RootLayout.astro";
-import { withBase } from "blume/components/islands/base-path.ts";
+import { withMountedBase } from "blume/components/islands/base-path.ts";
 import { resolveSlot } from "blume/components/layout/overrides.ts";
 import { resolveDateFormatOptions } from "blume/core/date-format.ts";
 import { layoutOverrides } from "../generated/components.ts";
@@ -2615,7 +2654,7 @@ const items = changelogEntries.map((entry) => {
   return {
     date: date ? formatRowDate(date) : null,
     dateTime: date ? date.toISOString().slice(0, 10) : null,
-    href: route ? withBase(route) : null,
+    href: route ? withMountedBase(route) : null,
     id: slugify(label),
     label,
     tag: entry.data.changelog?.category ?? null,
@@ -2651,14 +2690,14 @@ for (const item of items) {
 
 const base = data.config.site ? data.config.site.replace(/\\/$/, "") : null;
 // The canonical URL carries the deployment base (the page is served under it),
-// matching how the catch-all canonicalizes via \`withBase(route)\`.
-const basedRoute = withBase("/changelog");
+// matching how the catch-all canonicalizes via \`withMountedBase(route)\`.
+const basedRoute = withMountedBase("/changelog");
 const canonical = base ? base + basedRoute : null;
 
 // The generated OG card for this route (the /og endpoint emits it alongside
 // the content-route cards), absolutized like the catch-all's so crawlers get
 // a full URL when the site is known.
-const ogPath = data.config.og.enabled ? withBase("/og/changelog.png") : null;
+const ogPath = data.config.og.enabled ? withMountedBase("/og/changelog.png") : null;
 const ogImage = ogPath && base ? base + ogPath : ogPath;
 
 // The page chrome (h1, title, description) comes from the translatable
@@ -2780,8 +2819,8 @@ export const notFoundPageTemplate = (): string => `---
 // Generated by Blume. Do not edit. Override by adding \`pages/404.astro\`.
 import Icon from "blume/components/Icon.astro";
 import PageLayout from "blume/components/layout/PageLayout.astro";
-import { withBase } from "blume/components/islands/base-path.ts";
-import { withBasePath } from "blume/core/base-path.ts";
+import { withMountedBase } from "blume/components/islands/base-path.ts";
+import { mountBasePath } from "blume/core/base-path.ts";
 import data from "blume:data";
 
 export const prerender = true;
@@ -2805,14 +2844,14 @@ const htmlLang = i18n ? i18n.defaultLocale : "en";
 // their resolved target when the section has no index page of its own.
 const suggestions = [
   ...data.navigation.tabs.map((tab) => ({
-    href: withBase(tab.href ?? tab.path),
+    href: withMountedBase(tab.href ?? tab.path),
     label: tab.label,
   })),
   ...(data.config.discovery.sitemap
-    ? [{ href: withBase("/sitemap.xml"), label: nf.sitemap }]
+    ? [{ href: withMountedBase("/sitemap.xml"), label: nf.sitemap }]
     : []),
   ...(data.config.discovery.llmsTxt
-    ? [{ href: withBase("/llms.txt"), label: nf.llms }]
+    ? [{ href: withMountedBase("/llms.txt"), label: nf.llms }]
     : []),
 ];
 
@@ -2824,7 +2863,7 @@ const suggestions = [
 // Localized routes sit under both bases (\`{deployment.base}/{basePath}/ar/…\`),
 // so the script strips the two together, trailing slash included.
 const { basePath } = data.config;
-const siteRoot = withBase(withBasePath(basePath, "/"));
+const siteRoot = withMountedBase(mountBasePath(basePath, "/"));
 const localeBase = siteRoot.endsWith("/") ? siteRoot : siteRoot + "/";
 const localized = Object.fromEntries(
   (i18n?.locales ?? [])
@@ -2837,7 +2876,7 @@ const localized = Object.fromEntries(
           description: strings.description,
           dir: l.dir ?? "ltr",
           home: strings.home,
-          homeHref: withBase(withBasePath(basePath, "/" + l.code)),
+          homeHref: withMountedBase(mountBasePath(basePath, "/" + l.code)),
           suggestions: strings.suggestions,
           title: strings.title,
         },
@@ -2887,7 +2926,7 @@ const localizedJson = JSON.stringify(localized).replaceAll("<", "\\\\u003c");
       <a
         class="mt-8 inline-flex items-center gap-1.5 rounded-full bg-accent py-2 pe-4 ps-3.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
         data-nf-home
-        href={withBase("/")}
+        href={withMountedBase("/")}
       >
         <Icon class="rtl:-scale-x-100" name="arrow-left" size={14} />
         <span data-nf="home">{nf.home}</span>
@@ -2969,7 +3008,7 @@ const localizedJson = JSON.stringify(localized).replaceAll("<", "\\\\u003c");
  */
 export const notFoundMarkdownTemplate =
   (): string => `// Generated by Blume. Do not edit. Override by adding \`pages/404.astro\`.
-import { withBase } from "blume/components/islands/base-path.ts";
+import { withMountedBase } from "blume/components/islands/base-path.ts";
 import { absoluteUrl } from "blume/core/site-url.ts";
 import data from "blume:data";
 
@@ -2980,7 +3019,7 @@ const nf = data.ui.notFound;
 // Absolute for internal routes when the site is known; an external tab href
 // passes through untouched.
 const href = (path: string): string => {
-  const based = withBase(path);
+  const based = withMountedBase(path);
   return data.config.site && based.startsWith("/") && !based.startsWith("//")
     ? absoluteUrl(data.config.site, based)
     : based;
@@ -3039,7 +3078,7 @@ export function GET() {
 export const notFoundJsonTemplate =
   (): string => `// Generated by Blume. Do not edit. Override by adding \`pages/404.astro\`.
 import { problem } from "blume/ai/api/problem.ts";
-import { withBase } from "blume/components/islands/base-path.ts";
+import { withMountedBase } from "blume/components/islands/base-path.ts";
 import { absoluteUrl } from "blume/core/site-url.ts";
 import data from "blume:data";
 
@@ -3050,7 +3089,7 @@ const nf = data.ui.notFound;
 // Absolute for internal routes when the site is known; an external tab href
 // passes through untouched.
 const href = (path: string): string => {
-  const based = withBase(path);
+  const based = withMountedBase(path);
   return data.config.site && based.startsWith("/") && !based.startsWith("//")
     ? absoluteUrl(data.config.site, based)
     : based;
@@ -3225,7 +3264,7 @@ ${wrapperPropsType("Example")}
 /**
  * The route prefix `<Component />` preview frames are served under:
  * `{basePath}/blume-examples/<example path>`. `deployment.base` is layered on
- * top by Astro (components apply it with `withBase`).
+ * top by Astro (components apply it with `withMountedBase`).
  */
 export const examplesRouteBase = (basePath: string): string =>
   `${basePath}/blume-examples`;

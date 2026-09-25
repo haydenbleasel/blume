@@ -721,6 +721,86 @@ describe("send + response rendering", () => {
     await inFlight;
     expect(fixture.sendButton.disabled).toBe(false);
   });
+
+  it("names the headers it set to the built-in proxy, and only to it", async () => {
+    // The built-in proxy forwards exactly these, never a credential the
+    // browser attaches on its own for the docs origin.
+    const proxied = createFixture(bearerModel(), "/_api-proxy");
+    init(proxied);
+    must(proxied.auth.bearerAuth).value = "sekret";
+    must(proxied.params["X-Trace"]).value = "t-1";
+    await clickSend(proxied);
+    // SAFETY: the client assembles `init.headers` as a plain string-keyed
+    // object literal, never a `Headers` instance or entry array.
+    const sent = must(fetchCalls[0]).init.headers as Record<string, string>;
+    expect(sent["X-Blume-Proxy-Headers"]).toBe("Authorization, X-Trace");
+
+    // An external proxy on another origin gets no extra header to preflight.
+    const external = createFixture(bearerModel(), "https://cors.example.com/");
+    init(external);
+    await clickSend(external);
+    expect(must(fetchCalls[1]).init.headers).not.toHaveProperty(
+      "X-Blume-Proxy-Headers"
+    );
+  });
+
+  it("sends a multipart body as FormData, naming fetch's Content-Type", async () => {
+    const model: PlaygroundModel = {
+      auth: [],
+      authOptional: true,
+      body: {
+        contentType: "multipart/form-data",
+        example: '{ "name": "Rex", "tags": ["a", "b"] }',
+      },
+      method: "post",
+      params: [],
+      path: "/pets",
+      servers: ["https://api.example.com"],
+    };
+    const fixture = createFixture(model, "/_api-proxy");
+    init(fixture);
+    edit(fixture, must(fixture.bodyArea));
+    await clickSend(fixture);
+    const { init: sent } = must(fetchCalls[0]);
+    expect(sent.body).toBeInstanceOf(FormData);
+    // SAFETY: asserted to be FormData just above.
+    expect([...(sent.body as FormData).entries()]).toStrictEqual([
+      ["name", "Rex"],
+      ["tags", "a"],
+      ["tags", "b"],
+    ]);
+    // fetch writes the multipart type with its boundary; the request sets
+    // none of its own, but the proxy must still forward fetch's.
+    expect(sent.headers).not.toHaveProperty("Content-Type");
+    expect(sent.headers).toHaveProperty(
+      "X-Blume-Proxy-Headers",
+      "Content-Type"
+    );
+    expect(fixture.curlCode.textContent).toContain("--form-string 'tags=b'");
+  });
+
+  it("sends a raw text body as written, without JSON validation", async () => {
+    const model: PlaygroundModel = {
+      auth: [],
+      authOptional: true,
+      body: {
+        contentType: "text/plain",
+        example: "hello",
+        schema: { type: "string" },
+      },
+      method: "post",
+      params: [],
+      path: "/notes",
+      servers: ["https://api.example.com"],
+    };
+    const fixture = createFixture(model);
+    init(fixture);
+    must(fixture.bodyArea).value = "<note>not JSON</note>";
+    edit(fixture, must(fixture.bodyArea));
+    expect(must(fixture.bodyErrors).children).toHaveLength(0);
+    await clickSend(fixture);
+    expect(must(fetchCalls[0]).init.body).toBe("<note>not JSON</note>");
+  });
 });
 
 describe("remember on this device", () => {

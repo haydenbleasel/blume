@@ -168,6 +168,9 @@ describe("createPlaygroundProxyHandler", () => {
           cookie: "session=reader",
           origin: "http://docs.local",
           referer: "http://docs.local/reference",
+          // Even named by the playground, these never go upstream.
+          "x-blume-proxy-headers":
+            "Accept, Accept-Encoding, Authorization, Cookie, Origin, Referer",
         },
       })
     );
@@ -298,7 +301,10 @@ describe("createPlaygroundProxyHandler", () => {
     const response = await handler(
       proxyRequest("http://api.example/pets", {
         body: '{"name":"Rex"}',
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-blume-proxy-headers": "Content-Type",
+        },
         method: "POST",
       })
     );

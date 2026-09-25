@@ -1,4 +1,4 @@
-import { withBasePath } from "../../core/base-path.ts";
+import { mountBasePath } from "../../core/base-path.ts";
 import { absoluteUrl } from "../../core/site-url.ts";
 import type { Navigation } from "../../core/types.ts";
 import type { McpData, McpRoute } from "../mcp/data.ts";
@@ -88,7 +88,7 @@ export const jsonResponse = (payload: ApiPayload, status = 200): Response =>
 
 /** The absolute (or root-relative) URL for a base-less path. */
 const siteUrl = (path: string, context: ApiSiteContext): string => {
-  const based = withBasePath(context.base, path);
+  const based = mountBasePath(context.base, path);
   return context.site ? absoluteUrl(context.site, based) : based;
 };
 

@@ -4,7 +4,7 @@ import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { NavNode } from "../../core/types.ts";
 import { methodColor } from "../colors.ts";
 import Icon from "../Icon.astro";
-import { withBase } from "../islands/base-path.ts";
+import { withBase, withMountedBase } from "../islands/base-path.ts";
 import Self from "./NavTree.astro";
 import NavTreeCache from "./NavTreeCache.astro";
 import NavTreeScript from "./NavTreeScript.astro";
@@ -81,6 +81,16 @@ const n = { ...EN_UI.nav, ...strings };
 
 /** The DOM id of a drill-in panel, which its drill button controls. */
 const navPanelId = (id: string): string => `blume-nav-panel-${id}`;
+
+/**
+ * A page row's href. A row backed by a page links a route Blume generates, so
+ * the deployment base always goes on — even over a route that starts with the
+ * base's own name. A config `href` link (no backing page) is authored, and
+ * keeps a base written by hand. Group rows link their index page the same way
+ * a backed page row does.
+ */
+const pageHref = (item: Extract<NavNode, { kind: "page" }>): string =>
+  item.pageId ? withMountedBase(item.route) : withBase(item.route);
 
 const badgeBase =
   "shrink-0 rounded-full px-1.5 py-0.5 font-medium text-[0.65rem] leading-none";
@@ -191,7 +201,7 @@ const initialId =
                       : undefined
                   }
                   class="flex-1 truncate rounded-[0.65rem] px-1 py-1 font-semibold text-foreground text-sm transition-colors hover:bg-muted"
-                  href={withBase(panel.route)}
+                  href={withMountedBase(panel.route)}
                 >
                   {panel.label}
                 </a>
@@ -257,7 +267,7 @@ const initialId =
                 <a
                   aria-current={current}
                   class="blume-nav-link truncate"
-                  href={withBase(item.route)}
+                  href={pageHref(item)}
                 >
                   {item.label}
                 </a>
@@ -269,7 +279,7 @@ const initialId =
               <a
                 aria-current={current}
                 class="blume-nav-link"
-                href={withBase(item.route)}
+                href={pageHref(item)}
               >
                 <span class="flex items-center gap-2">
                   {item.icon && (
@@ -348,7 +358,7 @@ const initialId =
                           : undefined
                       }
                       class="blume-nav-summary-link"
-                      href={withBase(item.route)}
+                      href={withMountedBase(item.route)}
                     >
                       {item.icon && (
                         <Icon
@@ -432,7 +442,7 @@ const initialId =
                     isGroupRowCurrent(item, currentRoute) ? "page" : undefined
                   }
                   class="blume-nav-heading-link"
-                  href={withBase(item.route)}
+                  href={withMountedBase(item.route)}
                 >
                   {item.icon && (
                     <Icon

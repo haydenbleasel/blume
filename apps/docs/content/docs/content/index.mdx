@@ -29,6 +29,8 @@ Each file maps to a route by its path under the content root:
 
 Nested folders become nested routes, and an `index.mdx` inside a folder becomes that folder's own page.
 
+Characters that would break a page's URL — `#`, `?`, `%`, and `:` — are dropped from its route, so `100%.mdx` publishes at `/100`. Keep `#` and `?` out of file and folder names altogether: Astro's content loader can't read such a file, so Blume reports it as an error and leaves it out of the site. Rename `sdks/c#.mdx` to `sdks/c.mdx` and it publishes at `/sdks/c`, the route the characters would have been dropped from anyway.
+
 ## Ordering with numeric prefixes
 
 Prefix a file or folder with a number and a `-`, `_`, or `.` to control its order in the sidebar. The prefix is stripped from the URL, so you can reorder pages without breaking links:
@@ -50,7 +52,7 @@ Wrap a folder name in parentheses to group its pages in the sidebar **without** 
 docs/(internal)/security.mdx  ->  /security
 ```
 
-The pages share an “Internal” sidebar group but keep flat, parenthesis-free URLs.
+The pages share an “Internal” sidebar group but keep flat, parenthesis-free URLs. A group folder takes a [numeric prefix](#ordering-with-numeric-prefixes) like any folder, inside or outside the parentheses: `(01-internal)` and `01-(internal)` both sort first and route like `(internal)`.
 
 ## Drafts
 
@@ -84,7 +86,7 @@ The type is independent of where the file lives, but by convention blog posts go
 
 ## Feeds
 
-Blume generates an RSS feed automatically for each content type listed in [`rss.types`](/docs/discoverability/rss) — `blog` and `changelog` by default — as long as it has at least one page. Feeds are served at `/<type>/rss.xml`:
+Blume generates an RSS feed automatically for each content type listed in [`seo.rss.types`](/docs/discoverability/rss) — `blog` and `changelog` by default — as long as it has at least one page. Feeds are served at `/<type>/rss.xml`:
 
 | Type        | Feed                 |
 | ----------- | -------------------- |

@@ -6,14 +6,21 @@ import {
   resolveSchema,
   toJson,
 } from "./helpers.ts";
-import type { ParameterLike, SchemaLike, SpecValue } from "./helpers.ts";
+import type {
+  ComponentsLike,
+  ParameterLike,
+  SchemaLike,
+  SpecValue,
+} from "./helpers.ts";
 import {
   declaredTypes,
   inputValue,
   scalarType,
   validationSchema,
 } from "./playground-schema.ts";
+import { bodyEncoding } from "./request.ts";
 import type {
+  ParamSerialization,
   PlaygroundAuthInput,
   PlaygroundBody,
   PlaygroundBodyField,
@@ -34,6 +41,7 @@ interface MediaTypeLike {
   schema?: SchemaLike;
   example?: SpecValue;
   examples?: SpecValue;
+  encoding?: SpecValue;
 }
 
 /** A server entry: its URL template and the variables that fill it. */
@@ -70,6 +78,45 @@ const isExampleObject = (
 ): value is Record<string, SpecValue> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+const isString = (value: SpecValue): value is string =>
+  typeof value === "string";
+
+const isBoolean = (value: SpecValue): value is boolean =>
+  typeof value === "boolean";
+
+/**
+ * The `style`/`explode` a parameter or form-body encoding declares, kept only
+ * when declared so the embedded model stays small; the request builder
+ * applies the OpenAPI defaults for the rest.
+ */
+const serialization = (node: Record<string, SpecValue>): ParamSerialization => {
+  const rule: ParamSerialization = {};
+  if (isString(node.style)) {
+    rule.style = node.style;
+  }
+  if (isBoolean(node.explode)) {
+    rule.explode = node.explode;
+  }
+  return rule;
+};
+
+/** A form body's declared per-field `encoding`, when it names any style. */
+const formEncoding = (
+  encoding: SpecValue
+): PlaygroundBody["encoding"] | undefined => {
+  if (!isExampleObject(encoding)) {
+    return undefined;
+  }
+  const fields: NonNullable<PlaygroundBody["encoding"]> = {};
+  for (const [name, entry] of Object.entries(encoding)) {
+    const rule = isExampleObject(entry) ? serialization(entry) : {};
+    if (Object.keys(rule).length > 0) {
+      fields[name] = rule;
+    }
+  }
+  return Object.keys(fields).length > 0 ? fields : undefined;
+};
+
 /**
  * Playground inputs for the operation's parameters. Cookie params are skipped
  * (not supported in v1 — browsers won't let a page set arbitrary cookies).
@@ -80,7 +127,8 @@ const isExampleObject = (
  */
 const modelParams = (
   parameters: ParameterLike[],
-  schemas: Record<string, SchemaLike>
+  schemas: Record<string, SchemaLike>,
+  components: ComponentsLike | undefined
 ): PlaygroundParam[] => {
   const params: PlaygroundParam[] = [];
   for (const param of parameters) {
@@ -102,9 +150,11 @@ const modelParams = (
       type: scalarType(param.schema, schemas),
       value: required
         ? inputValue(
-            declaredExample(param) ?? exampleValue(param.schema, schemas)
+            declaredExample(param, components) ??
+              exampleValue(param.schema, schemas)
           )
         : "",
+      ...serialization(param),
     });
   }
   return params;
@@ -165,10 +215,16 @@ const bodyFields = (
   return fields;
 };
 
-/** The playground's body editor state, when the operation takes a request body. */
+/**
+ * The playground's body editor state, when the operation takes a request body.
+ * JSON, form-urlencoded, and multipart bodies are edited as JSON (typed fields
+ * when flat) and serialized for their media type on send; any other media
+ * type is raw text, prefilled with a string example as written.
+ */
 const modelBody = (
   requestBody: { content?: Record<string, MediaTypeLike> } | undefined,
-  schemas: Record<string, SchemaLike>
+  schemas: Record<string, SchemaLike>,
+  components: ComponentsLike | undefined
 ): PlaygroundBody | undefined => {
   const media = jsonContentType(requestBody?.content);
   if (!media) {
@@ -176,13 +232,25 @@ const modelBody = (
   }
   const [contentType, mediaType] = media;
   const exampleData =
-    declaredExample(mediaType) ?? exampleValue(mediaType.schema, schemas);
-  return {
+    declaredExample(mediaType, components) ??
+    exampleValue(mediaType.schema, schemas);
+  const encoding = bodyEncoding(contentType);
+  const raw = encoding === "raw";
+  const body: PlaygroundBody = {
     contentType,
-    example: toJson(exampleData) ?? "",
-    fields: bodyFields(mediaType.schema, schemas, exampleData),
+    example:
+      raw && isString(exampleData) ? exampleData : (toJson(exampleData) ?? ""),
+    fields: raw
+      ? undefined
+      : bodyFields(mediaType.schema, schemas, exampleData),
     schema: validationSchema(mediaType.schema, schemas),
   };
+  const fieldEncoding =
+    encoding === "form" ? formEncoding(mediaType.encoding) : undefined;
+  if (fieldEncoding) {
+    body.encoding = fieldEncoding;
+  }
+  return body;
 };
 
 const AUTHORIZATION_HEADER = { in: "header", name: "Authorization" } as const;
@@ -272,6 +340,8 @@ export const operationModel = (args: {
   /** The operation's effective servers (`effectiveServers` output). */
   servers: ServerLike[];
   schemas: Record<string, SchemaLike>;
+  /** The document's `components`, which `$ref`'d examples resolve against. */
+  components?: ComponentsLike;
   security: OperationSecurity;
 }): PlaygroundModel => ({
   // First alternative only — the spec's preferred way to authorize, matching
@@ -281,9 +351,9 @@ export const operationModel = (args: {
     return input ? [input] : [];
   }),
   authOptional: args.security.optional,
-  body: modelBody(args.requestBody, args.schemas),
+  body: modelBody(args.requestBody, args.schemas, args.components),
   method: args.method.toUpperCase(),
-  params: modelParams(args.parameters, args.schemas),
+  params: modelParams(args.parameters, args.schemas, args.components),
   path: args.path,
   // Variables resolve to their defaults: the samples and Send need a real URL.
   servers: args.servers.map((server) =>

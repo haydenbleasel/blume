@@ -12,7 +12,7 @@ blume version v1.0
 That does four things:
 
 1. **Copies the content tree** into a folder named after the id (`docs/v1.0/`), leaving existing snapshots out of the copy.
-2. **Rewrites root-absolute links inside the copy** so they stay within the snapshot: `/guides/x` becomes `/v1.0/guides/x`. Fenced and inline code are left untouched, and links to pages the snapshot has no copy of — generated API references, remote sources like a changelog — keep pointing at the live pages.
+2. **Rewrites root-absolute links inside the copy** so they stay within the snapshot: `/guides/x` becomes `/v1.0/guides/x`. That covers inline links and images, reference-style definitions (`[x]: /guides/x`), and HTML `href` and `src` attributes in either quote style, and a link that spells out your [`basePath`](/docs/deployment#mount-the-docs-under-a-path) keeps it (`/docs/guides/x` becomes `/docs/v1.0/guides/x`). Fenced and inline code are left untouched, and links to pages the snapshot has no copy of — generated API references, remote sources like a changelog — keep pointing at the live pages.
 3. **Registers the id** in `versions.archived` in `blume.config.ts`. The first cut turns versioning on, adding a `versions` block with the id archived and the live docs labeled "Latest". When the config is shaped in a way it won't edit, it warns and prints the entry to paste instead.
 4. **Reports what it did**: the files copied, the pages whose links were rewritten, and a reminder that archived versions are frozen and that `blume dev` needs a restart to pick the snapshot up.
 

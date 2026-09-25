@@ -37,7 +37,8 @@ Most of this is sharper with an absolute site URL — set [`deployment.site`](/d
 | Raw Markdown mirrors, content negotiation, Copy as Markdown, Open in chat | `/<route>.md` | on | [Markdown for agents](/docs/discoverability/markdown) |
 | JSON API and its OpenAPI description | `/api/docs/…`, `/openapi.json` | on | [JSON API](/docs/discoverability/json-api) |
 | MCP server | `/mcp` | opt-in, server output | [MCP server](/docs/discoverability/mcp) |
-| `agent-readability.json`, `Link` headers, API catalog, AI catalog (ARD), WebMCP, skills, Web Bot Auth | site root, `/.well-known/…` | on | [Agent discovery](/docs/discoverability/agent-discovery) |
+| `agent-readability.json`, `Link` headers, API catalog, AI catalog (ARD), WebMCP | site root, `/.well-known/…` | on | [Agent discovery](/docs/discoverability/agent-discovery) |
+| Agent skills, Web Bot Auth keys | `/.well-known/…` | opt-in | [Agent discovery](/docs/discoverability/agent-discovery#skills-discovery) |
 
 Every generated file yields to one you ship yourself: drop a `robots.txt`, `sitemap.xml`, `llms.txt`, `openapi.json`, or `agent-readability.json` in `public/` and Blume serves yours in its place.
 

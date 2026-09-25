@@ -17,7 +17,8 @@ export interface SearchPopularPage {
  * `page.route`). `withBasePath` is idempotent and skips external URLs.
  *
  * `deployment.base` is deliberately *not* applied: routes stay deploy-base-less
- * so `createLinkRow` can prefix it at click time, same as sidebar-derived pages.
+ * so `Search.astro` can add it when it renders the entry, same as
+ * sidebar-derived pages.
  *
  * `icon` stays a name here (like `navigation.featured`): the icon set is a
  * server-only module, so `Search.astro` resolves it to inline SVG at render.

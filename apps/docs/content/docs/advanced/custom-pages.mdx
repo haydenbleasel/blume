@@ -102,10 +102,10 @@ The module exposes:
       description: "Generated RSS feeds: { href, title }.",
     },
     fontCssVars: {
-      type: "string[]",
+      type: "FontHead[]",
       required: true,
       description:
-        "CSS variable names for the configured fonts (Astro <Font> integration).",
+        "The configured fonts for Astro's <Font> component in the head, one per family: { cssVariable, preloadWeights, preloadSubsets? }.",
     },
     ui: {
       type: "UIStrings",
@@ -290,7 +290,7 @@ Blume ships a default **not found** page out of the box: a centered "404" messag
 
 The page also has a Markdown twin at `/404.md` and a JSON twin at `/404.json` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details) with the same recovery links (absolute URLs once [`deployment.site`](/docs/deployment) is set), plus the [`openapi.json`](/docs/discoverability/json-api) description when the JSON API is on. On a [Vercel or Cloudflare server build](/docs/deployment#server-rendering), a request for a missing page that sends [`Accept: text/markdown`](/docs/discoverability/markdown#content-negotiation) gets the Markdown body with the `404` status instead of the HTML shell, and one that sends `Accept: application/json` gets the problem document — so an agent never has to parse a page of chrome to learn where to go next. On Vercel the same goes for a `.md` or `.json` URL no file backs.
 
-To replace it with your own, add a `pages/404.astro`. It owns the `/404` route the same way `pages/changelog.astro` takes over the changelog — your page wins and the default is dropped. Build it like any other custom page, in `PageLayout` or `RootLayout`:
+To replace it with your own, add a `pages/404.astro`. It owns the `/404` route the same way `pages/changelog.astro` takes over the changelog — your page wins and the default is dropped, along with its `/404.md` and `/404.json` twins. Build it like any other custom page, in `PageLayout` or `RootLayout`:
 
 ```astro pages/404.astro lineNumbers
 ---

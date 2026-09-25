@@ -238,7 +238,10 @@ export const auditCommand = defineCommand({
     process.stderr.write(formatReport(result, root, { verbose: args.verbose }));
 
     if (shouldFail(result, gate)) {
-      process.exit(1);
+      // Set the code and return rather than `process.exit`, which doesn't wait
+      // for a piped stderr: a long report was cut off after the first 64 KiB,
+      // in exactly the CI logs that need to show every finding.
+      process.exitCode = 1;
     }
   },
 });

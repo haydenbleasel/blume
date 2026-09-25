@@ -2,10 +2,12 @@ import { readFile } from "node:fs/promises";
 
 import pMap from "p-map";
 
-import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import { normalizeBasePath } from "../core/base-path.ts";
+import { routeSetFor } from "../core/locale-links.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { Diagnostic } from "../core/types.ts";
 import { deployStaticDir } from "../deploy/adapter-output.ts";
+import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
 import { CHECKS } from "./catalog.ts";
 import type { CheckId } from "./catalog.ts";
 import { assetChecks } from "./checks/assets.ts";
@@ -162,14 +164,15 @@ export const runAudit = async (options: AuditOptions): Promise<AuditResult> => {
     redirects: resolveRedirects(
       // Redirects are authored as if mounted at root; the built page URLs they
       // are checked against carry `basePath` (it's a real directory in the
-      // build), so both sides gain it here — mirroring what
-      // `applyBaseToAstroRedirects` does at build time. `withBasePath` is
-      // idempotent and leaves external `to` URLs untouched.
-      project.config.redirects.map((redirect) => ({
-        ...redirect,
-        from: withBasePath(basePath, redirect.from),
-        to: withBasePath(basePath, redirect.to),
-      })),
+      // build), so both sides gain it here, based exactly as the build bases
+      // them — a `to` naming a public file stays at the root, and external
+      // `to` URLs pass through.
+      applyBaseToAstroRedirects(
+        project.config.redirects,
+        basePath,
+        "",
+        routeSetFor(project.manifest.routes)
+      ),
       // Pages, static files, and server routes alike: a redirect may
       // legitimately land on a served asset (`/old-whitepaper` ->
       // `/files/whitepaper.pdf`), and the same predicate the link and llms.txt

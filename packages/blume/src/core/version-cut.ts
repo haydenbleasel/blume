@@ -3,7 +3,7 @@ import { cp, readdir, readFile, rm } from "node:fs/promises";
 
 import { join, relative } from "pathe";
 
-import { stripBasePath } from "./base-path.ts";
+import { mountBasePath, stripBasePath } from "./base-path.ts";
 import { nextFenceState } from "./code-fences.ts";
 import type { FenceState } from "./code-fences.ts";
 import { writeTextAtomic } from "./fs-atomic.ts";
@@ -45,18 +45,22 @@ export class CutError extends Error {
 // matching so replacements can splice into the real line by index (the mask
 // preserves length). Mirrors the content-assets rewriter.
 const INLINE_CODE = /`[^`]*`/gu;
-// A markdown link/image target or an HTML href/src attribute whose value is
-// root-absolute. Named groups carry the prefix (kept) and target (rewritten).
-const ROOT_LINK = /(?<prefix>\]\(|href="|src=")(?<target>\/[^\s"')]*)/gu;
+// A root-absolute markdown link/image target, reference-style link definition
+// (`[setup]: /guides/setup`, up to three spaces in, never a `[^note]:`
+// footnote), or HTML href/src attribute in either quote style. Named groups
+// carry the prefix (kept) and target (rewritten).
+const ROOT_LINK =
+  /(?<prefix>\]\(|^ {0,3}\[(?!\^)[^\]]+\]:[ \t]*<?|(?:href|src)=["'])(?<target>\/[^\s"'<>)]*)/gu;
 
 /**
  * Build the link-rewrite table: every current-version route (basePath
- * stripped, since authors write root-absolute links as if mounted at root)
- * mapped to the same page's route inside the new snapshot. Only pages the
- * snapshot actually contains qualify — filesystem pages under the content
- * root. Spec-rendered references (`/api`, `/events`) and remote sources
- * aren't copied, so links to them keep pointing at the live pages instead of
- * a 404 inside the snapshot.
+ * stripped, since authors write root-absolute links as if mounted at root;
+ * a link that spells the base out is looked up without it, see
+ * `snapshotTarget`) mapped to the same page's route inside the new snapshot.
+ * Only pages the snapshot actually contains qualify — filesystem pages under
+ * the content root. Spec-rendered references (`/api`, `/events`) and remote
+ * sources aren't copied, so links to them keep pointing at the live pages
+ * instead of a 404 inside the snapshot.
  */
 const buildRouteRewrites = (
   project: BlumeProject,
@@ -105,8 +109,35 @@ const buildRouteRewrites = (
   return rewrites;
 };
 
+/**
+ * The snapshot link a root-absolute path rewrites to, or undefined when the
+ * snapshot has no copy of its page. A path written with the base path by hand
+ * (`/docs/guides/x` under `basePath: "/docs"`) names the same page as
+ * `/guides/x` — rendering leaves an already-based link alone (see
+ * `withBasePath`) — so it is looked up without the base and keeps it.
+ */
+const snapshotTarget = (
+  path: string,
+  rewrites: Map<string, string>,
+  basePath: string
+): string | undefined => {
+  const based =
+    basePath !== "" && (path === basePath || path.startsWith(`${basePath}/`));
+  if (!based) {
+    return rewrites.get(path);
+  }
+  const replacement = rewrites.get(stripBasePath(basePath, path));
+  return replacement === undefined
+    ? undefined
+    : mountBasePath(basePath, replacement);
+};
+
 /** Rewrite one line's root-absolute internal links via the rewrite table. */
-const rewriteLine = (line: string, rewrites: Map<string, string>): string => {
+const rewriteLine = (
+  line: string,
+  rewrites: Map<string, string>,
+  basePath: string
+): string => {
   const masked = line.replaceAll(INLINE_CODE, (span) =>
     " ".repeat(span.length)
   );
@@ -120,7 +151,7 @@ const rewriteLine = (line: string, rewrites: Map<string, string>): string => {
     const path = hash === -1 ? target : target.slice(0, hash);
     const suffix = hash === -1 ? "" : target.slice(hash);
     const bare = path !== "/" && path.endsWith("/") ? path.slice(0, -1) : path;
-    const replacement = rewrites.get(bare);
+    const replacement = snapshotTarget(bare, rewrites, basePath);
     if (replacement === undefined) {
       continue;
     }
@@ -142,10 +173,12 @@ export interface SnapshotRewrite {
  * Rewrite a copied page's root-absolute internal links to their snapshot
  * equivalents, skipping fenced and inline code. Relative links need no
  * rewriting — the whole tree copies together, so they stay self-contained.
+ * `basePath` is the site's, for links that spell it out by hand.
  */
 export const rewriteSnapshotLinks = (
   source: string,
-  rewrites: Map<string, string>
+  rewrites: Map<string, string>,
+  basePath = ""
 ): SnapshotRewrite => {
   let fence: FenceState = null;
   let count = 0;
@@ -156,7 +189,7 @@ export const rewriteSnapshotLinks = (
     if (inFence) {
       return line;
     }
-    const rewrittenLine = rewriteLine(line, rewrites);
+    const rewrittenLine = rewriteLine(line, rewrites, basePath);
     if (rewrittenLine !== line) {
       count += 1;
     }
@@ -416,7 +449,11 @@ export const cutVersion = async (
           return;
         }
         const source = await readFile(abs, "utf-8");
-        const { text, count } = rewriteSnapshotLinks(source, rewrites);
+        const { text, count } = rewriteSnapshotLinks(
+          source,
+          rewrites,
+          project.config.basePath
+        );
         if (count > 0) {
           await writeTextAtomic(abs, text);
           rewritten.push({ count, file: relative(dir, abs) });

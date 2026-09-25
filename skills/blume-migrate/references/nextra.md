@@ -64,7 +64,7 @@ Nextra enables math via `nextra({ latex: true })` (KaTeX or MathJax). In Blume, 
 
 ## i18n
 
-- **v2/v3:** locale **file suffixes** (`index.en.mdx`, `index.zh.mdx`) + `i18n` in `next.config` → restructure into locale **folders** (default locale at the content root, others under `<code>/`), then `i18n: { defaultLocale, locales: [{ code, label }] }`.
+- **v2/v3:** locale **file suffixes** (`index.en.mdx`, `index.zh.mdx`) + `i18n` in `next.config` → match Blume's `dot` parser as-is, default-locale suffix included: `i18n: { defaultLocale, locales: [{ code, label }], parser: "dot" }`, no file moves. Page titles land in each file's own frontmatter, so they stay per-locale, but under `dot` a folder's `meta.ts` serves every locale — build it from the default locale's `_meta` and report translated folder titles from the other locales' `_meta` files.
 - **v4:** `content/<lang>/` dirs already match Blume's `dir` parser — map the locale list, no file moves.
 
 ## Package.json & teardown

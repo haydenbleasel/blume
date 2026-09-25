@@ -58,7 +58,8 @@ export const buildGraph = (
  * Non-indexable pages are excluded — a `noindex` page is *meant* to be
  * unreachable — as is the home page, which is nobody's job to link to. Under a
  * `basePath` the home page's built URL is the base itself, so the caller names
- * it via `homeUrl`.
+ * it via `homeUrl`. An i18n fallback copy is excluded too: it stands in for a
+ * translation nobody has written yet, so the page to link to is the original.
  */
 export const orphanPages = (
   pages: PageSnapshot[],
@@ -68,6 +69,7 @@ export const orphanPages = (
   pages.filter(
     (page) =>
       page.indexable &&
+      page.route?.fallback !== true &&
       page.url !== "/" &&
       page.url !== homeUrl &&
       (graph.contentIn.get(page.url)?.size ?? 0) === 0

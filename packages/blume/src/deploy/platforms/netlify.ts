@@ -124,6 +124,7 @@ export const netlifyPlatform: DeployPlatform = {
   // same rules into that tree's config.
   readsHeaderFiles: { server: false, static: true },
   redirectFiles: [NETLIFY_REDIRECTS_FILE],
+  serverClientUnderBase: false,
   serverOutputDir: distDir,
   serverStaticDir: distDir,
 };

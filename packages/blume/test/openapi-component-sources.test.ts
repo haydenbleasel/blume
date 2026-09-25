@@ -40,9 +40,15 @@ describe("PanelTabs", () => {
 
   it("moves between tabs with the arrow keys, Home, and End", async () => {
     const panel = await source("panel.ts");
-    for (const key of ["ArrowRight", "ArrowLeft", "Home", "End"]) {
+    for (const key of ["Home", "End"]) {
       expect(panel).toContain(`event.key === "${key}"`);
     }
+    // The arrows swap under dir="rtl", as they do in `<Tabs>`.
+    expect(panel).toContain(
+      'const rtl = getComputedStyle(this).direction === "rtl";'
+    );
+    expect(panel).toContain('event.key === (rtl ? "ArrowLeft" : "ArrowRight")');
+    expect(panel).toContain('event.key === (rtl ? "ArrowRight" : "ArrowLeft")');
     expect(panel).toContain("tab.tabIndex = selected ? 0 : -1;");
     expect(panel).toContain("target.focus();");
   });

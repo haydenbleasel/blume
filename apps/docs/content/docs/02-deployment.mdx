@@ -67,6 +67,8 @@ deployment: {
 
 `base` (and `site`) are options of every host adapter too: `vercel({ base: "/docs" })`.
 
+Every page keeps its own path under the base, even in a content folder that shares the base's name: with `base: "/docs"`, `docs/setup.md` is served at `/docs/docs/setup`, and its canonical URL, sidebar link, and `llms.txt` entry point there. A root-relative link you write that already starts with the base is taken to include it and left as written, so link to that page with a relative link (`./docs/setup`) or its full path (`/docs/docs/setup`).
+
 ## Mount the docs under a path
 
 `basePath` mounts every generated route under a segment (`/docs/getting-started`) while leaving the sidebar untouched — the top level is your sections, not a wrapper group. Use it when the docs live at `/docs/*` but the site root stays yours (like Docusaurus `routeBasePath` or Fumadocs `baseUrl`).
@@ -75,7 +77,7 @@ deployment: {
 basePath: "/docs",
 ```
 
-Write links as if mounted at root (`/getting-started`); Blume rewrites them, along with redirects, the sitemap, canonical URLs, Open Graph images, `llms.txt`, and the search index. Public assets (images, files under `public/`) stay at the site root.
+Write links as if mounted at root (`/getting-started`); Blume rewrites them, along with redirects, the sitemap, canonical URLs, Open Graph images, `llms.txt`, and the search index. Public assets (images, files under `public/`) stay at the site root, or under [`base`](#subpath-deploys) when you set one.
 
 This is a distinct concept from the two paths above:
 
@@ -154,7 +156,7 @@ Two hosts need more than the file:
 :::
 
 :::note
-Write both `from` and `to` as if mounted at root, starting with `/` (`to` can also be a full `https://` URL) — under [`base`](#subpath-deploys) and [`basePath`](#mount-the-docs-under-a-path) alike, Blume rewrites both sides for you, so a redirect lands inside the base. A base you've already written into `to` by hand is preserved rather than doubled.
+Write both `from` and `to` as if mounted at root, starting with `/` (`to` can also be a full `https://` URL) — under [`base`](#subpath-deploys) and [`basePath`](#mount-the-docs-under-a-path) alike, Blume rewrites both sides for you, so a redirect lands inside the base. A `to` that names a file in `public/` (`/files/guide.pdf`) gains `base` but not `basePath`, since that's where the file is served. A base you've already written into `to` by hand is preserved rather than doubled.
 :::
 
 ## Content types

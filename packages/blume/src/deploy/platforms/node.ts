@@ -37,6 +37,7 @@ export const nodePlatform: DeployPlatform = {
   previewDeploy: null,
   readsHeaderFiles: { server: false, static: false },
   redirectFiles: [],
+  serverClientUnderBase: false,
   serverOutputDir: distDir,
   serverStaticDir: clientDir,
 };

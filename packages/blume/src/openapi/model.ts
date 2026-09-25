@@ -260,9 +260,18 @@ const isOperation = (
   value: OperationObject | undefined
 ): value is OperationObject => typeof value === "object" && value !== null;
 
-/** A declared tag whose `name` really is a string at runtime, type aside. */
-const hasTagName = (tag: SpecTag): tag is SpecTag =>
-  typeof tag.name === "string";
+/** Whether a spec value is text YAML may have read as a number. */
+const isText = <Value>(value: Value): value is Value & (string | number) =>
+  typeof value === "string" || typeof value === "number";
+
+/**
+ * A spec field that names something, as a string. YAML reads an unquoted
+ * `operationId: 404` or `tags: [2024]` as a number, which still names the
+ * operation or tag; anything else a hand-written spec puts there counts as
+ * absent.
+ */
+const specText = <Value>(value: Value): string | undefined =>
+  isText(value) ? String(value) : undefined;
 
 /**
  * Assign each distinct tag name a unique slug. `slugify` can collapse
@@ -294,9 +303,6 @@ export const tagSlugger = (): ((name: string) => string) => {
 
 /** An operation before the collector assigns its unique key and route. */
 type CollectedOperation = Omit<ApiOperationRef, "route" | "tagSlug">;
-
-/** A document's declared tag entry (`tags[n]`). */
-type SpecTag = NonNullable<ApiDocument["tags"]>[number];
 
 /** The flattened output both extractors produce. */
 export interface CollectedOperations {
@@ -391,9 +397,10 @@ export const extractOperations = (
 ): ExtractedOperations => {
   const warnings: string[] = [];
   const tagMeta = new Map(
-    (document.tags ?? [])
-      .filter(hasTagName)
-      .map((tag) => [tag.name, tag.description ?? ""])
+    (document.tags ?? []).flatMap((tag): [string, string][] => {
+      const name = specText(tag.name);
+      return name === undefined ? [] : [[name, tag.description ?? ""]];
+    })
   );
   const collector = operationCollector(baseRoute, tagMeta);
 
@@ -413,15 +420,16 @@ export const extractOperations = (
       if (!isOperation(operation)) {
         continue;
       }
+      const operationId = specText(operation.operationId);
       collector.add({
         deprecated: operation.deprecated ?? false,
-        description: operation.description ?? "",
-        key: operationKey(method, path, operation.operationId),
+        description: specText(operation.description) ?? "",
+        key: operationKey(method, path, operationId),
         method,
-        operationId: operation.operationId,
+        operationId,
         path,
-        summary: operation.summary ?? "",
-        tag: operation.tags?.[0] ?? UNTAGGED,
+        summary: specText(operation.summary) ?? "",
+        tag: specText(operation.tags?.[0]) ?? UNTAGGED,
       });
     }
   }

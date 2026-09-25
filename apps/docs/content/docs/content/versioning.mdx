@@ -81,7 +81,7 @@ The sitemap follows suit: archived pages whose canonical points at a live equiva
 
 ## Search
 
-The search dialog scopes results to the version being viewed, with an "All versions" toggle (remembered per reader) beside the language one. Cross-version hits name their version on the result row. Orama (the default), FlexSearch, Algolia, and Typesense all honor the scoping — hosted records carry a `version` facet, with the current docs uploaded as `"current"` — while Pagefind stays unscoped, matching its locale behavior.
+The search dialog scopes results to the version being viewed, with an "All versions" toggle (remembered per reader) beside the language one. Cross-version hits name their version on the result row. Orama (the default), FlexSearch, Algolia, and Typesense all honor the scoping — hosted records carry a `version` facet, with the current docs uploaded as `"current"`. Pagefind, Orama Cloud, and Mixedbread don't scope by version: their results span every version, and the dialog leaves out the toggle.
 
 ## Agents
 

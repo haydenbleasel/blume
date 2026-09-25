@@ -1,5 +1,5 @@
 ---
-import { withBase } from "../islands/base-path.ts";
+import { withMountedBase } from "../islands/base-path.ts";
 import Icon from "../Icon.astro";
 
 // The "you're viewing an old version" notice, shared by RootLayout and
@@ -29,7 +29,7 @@ const { notice } = Astro.props;
       <span>{notice.message}</span>
       <a
         class="inline-flex items-center gap-1 font-medium underline underline-offset-2"
-        href={withBase(notice.latestHref)}
+        href={withMountedBase(notice.latestHref)}
       >
         {notice.latestLabel}
         <Icon name="arrow-right" size={14} />

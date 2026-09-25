@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
-import { dirname, extname, join, relative } from "pathe";
+import { extname, join, relative } from "pathe";
 
 import { localeCodes, localeTargetPath } from "../core/i18n.ts";
 import { scanProject } from "../core/project-graph.ts";
@@ -35,7 +35,11 @@ export interface PageWorkItem {
   /** POSIX root-relative source path — the ledger key. */
   sourceRel: string;
   status: WorkStatus;
-  /** Absolute canonical target path (`localeTargetPath`). */
+  /**
+   * Absolute target path: an existing translation's own file (which can sit
+   * at a non-canonical name, like a hand-written `fr/guide.md` for
+   * `guide.mdx`), otherwise the canonical `localeTargetPath`.
+   */
   targetPath: string;
   /** POSIX root-relative target path, for display. */
   targetRel: string;
@@ -49,7 +53,7 @@ export interface PageWorkItem {
 export interface MetaWorkEntry {
   meta: TranslatableMeta;
   status: WorkStatus;
-  /** Absolute path of the generated per-locale `meta.ts`. */
+  /** Absolute path of the per-locale meta module (see `metaTargetPath`). */
   targetPath: string;
 }
 
@@ -284,6 +288,37 @@ const partialWorkItems = async (
 };
 
 /**
+ * Every existing translation, keyed by `translationKey` and locale, with the
+ * file it was read from when that file is on disk in a filesystem source. A
+ * retranslation writes there: an adopted hand-written `fr/guide.md` for a
+ * `guide.mdx` source is replaced in place, never joined by a canonical
+ * `fr/guide.mdx` that would publish the route twice.
+ */
+const existingTranslations = (
+  project: BlumeProject
+): Map<string, string | undefined> => {
+  const writableSources = new Set(
+    project.sources.flatMap((source) =>
+      source.staged || !source.contentRoot ? [] : [source.name]
+    )
+  );
+  const translated = new Map<string, string | undefined>();
+  for (const page of project.graph.pages) {
+    const key = `${page.translationKey}\0${page.locale}`;
+    if (page.fallback || translated.has(key)) {
+      continue;
+    }
+    translated.set(
+      key,
+      page.sourcePath && writableSources.has(page.source.name)
+        ? page.sourcePath
+        : undefined
+    );
+  }
+  return translated;
+};
+
+/**
  * Compute the run's work: which (source, locale) pairs are missing or stale,
  * which existing translations to adopt, and what's already up to date.
  * `force` promotes every pair to work; `locales` narrows the targets.
@@ -310,11 +345,7 @@ export const computeWorkList = async (
       (options.locales === undefined || options.locales.includes(code))
   );
 
-  const translated = new Set(
-    project.graph.pages.flatMap((page) =>
-      page.fallback ? [] : [`${page.translationKey} ${page.locale}`]
-    )
-  );
+  const translated = existingTranslations(project);
 
   const { root } = project.context;
   const knownSources = new Set<string>();
@@ -333,10 +364,13 @@ export const computeWorkList = async (
     const contentRel = relative(contentRoot, sourcePath);
 
     for (const locale of targetLocales) {
-      const targetPath = join(
-        contentRoot,
-        localeTargetPath(contentRel, ext, locale, i18n, folders(contentRoot))
-      );
+      const key = `${page.translationKey}\0${locale}`;
+      const targetPath =
+        translated.get(key) ??
+        join(
+          contentRoot,
+          localeTargetPath(contentRel, ext, locale, i18n, folders(contentRoot))
+        );
       const item = (status: WorkStatus): PageWorkItem => ({
         kind: "page",
         locale,
@@ -346,7 +380,7 @@ export const computeWorkList = async (
         targetPath,
         targetRel: relative(root, targetPath),
       });
-      const exists = translated.has(`${page.translationKey} ${locale}`);
+      const exists = translated.has(key);
       const stamp = ledger.files[sourceRel]?.[locale];
       const outcome = classifyPair(exists, stamp, hash, options.force === true);
       if (outcome === "untracked") {
@@ -380,16 +414,21 @@ export const computeWorkList = async (
     const entries: MetaWorkEntry[] = [];
     for (const source of meta.metas) {
       knownSources.add(source.sourceRel);
-      const targetDir = dirname(metaTargetPath(source, locale));
-      const exists = ["meta.ts", "meta.js", "meta.mjs"].some((name) =>
-        existsSync(join(targetDir, name))
+      // The locale folder's existing meta module when there is one, so a
+      // retranslation rewrites it instead of adding a `meta.ts` beside it.
+      const targetPath = metaTargetPath(
+        source,
+        locale,
+        i18n,
+        folders(source.contentRoot)
       );
+      const exists = existsSync(targetPath);
       const hash = hashSource(source.raw);
       const stamp = ledger.files[source.sourceRel]?.[locale];
       const entry = (status: WorkStatus): MetaWorkEntry => ({
         meta: source,
         status,
-        targetPath: metaTargetPath(source, locale),
+        targetPath,
       });
       const outcome = classifyPair(exists, stamp, hash, options.force === true);
       if (outcome === "untracked") {

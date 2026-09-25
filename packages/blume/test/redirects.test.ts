@@ -16,6 +16,9 @@ const redirects = [
   { from: "/tmp", status: 302 as const, to: "/temp" },
 ];
 
+/** No served page routes: none of these targets is a dotted path anyway. */
+const NO_ROUTES = new Set<string>();
+
 describe("redirect emitters", () => {
   it("writes Netlify `_redirects` lines (from to status)", () => {
     expect(buildNetlifyRedirects(redirects)).toBe(
@@ -52,17 +55,25 @@ describe("redirect emitters", () => {
   });
 
   it("prepends the base path to internal from/to routes", () => {
-    expect(applyBaseToAstroRedirects(redirects, "/docs", "")).toStrictEqual([
+    expect(
+      applyBaseToAstroRedirects(redirects, "/docs", "", NO_ROUTES)
+    ).toStrictEqual([
       { from: "/docs/old", status: 301, to: "/docs/new" },
       { from: "/docs/tmp", status: 302, to: "/docs/temp" },
     ]);
-    expect(applyBaseToPlatformRedirects(redirects, "/docs", "")).toStrictEqual([
+    expect(
+      applyBaseToPlatformRedirects(redirects, "/docs", "", NO_ROUTES)
+    ).toStrictEqual([
       { from: "/docs/old", status: 301, to: "/docs/new" },
       { from: "/docs/tmp", status: 302, to: "/docs/temp" },
     ]);
     // No base of either kind: the redirects pass through untouched.
-    expect(applyBaseToAstroRedirects(redirects, "", "")).toBe(redirects);
-    expect(applyBaseToPlatformRedirects(redirects, "", "")).toBe(redirects);
+    expect(applyBaseToAstroRedirects(redirects, "", "", NO_ROUTES)).toBe(
+      redirects
+    );
+    expect(applyBaseToPlatformRedirects(redirects, "", "", NO_ROUTES)).toBe(
+      redirects
+    );
   });
 
   it("bases redirects from the resolved config via platformRedirects", () => {
@@ -76,8 +87,10 @@ describe("redirect emitters", () => {
       deployment: { options: { base: "/base" } },
       redirects,
     } as ResolvedConfig;
-    expect(platformRedirects(config)).toStrictEqual(
-      applyBaseToPlatformRedirects(redirects, "/docs", "/base")
+    expect(
+      platformRedirects({ config, manifest: { routes: [] } })
+    ).toStrictEqual(
+      applyBaseToPlatformRedirects(redirects, "/docs", "/base", NO_ROUTES)
     );
     // SAFETY: same three fields as above — everything platformRedirects reads.
     const unbased = {
@@ -85,13 +98,17 @@ describe("redirect emitters", () => {
       deployment: { options: {} },
       redirects,
     } as ResolvedConfig;
-    expect(platformRedirects(unbased)).toBe(redirects);
+    expect(
+      platformRedirects({ config: unbased, manifest: { routes: [] } })
+    ).toBe(redirects);
   });
 
   it("bases only `to` for Astro, which applies `base` to `from` itself", () => {
     // Astro matches `from` against a pattern it builds with `base` applied, but
     // passes `to` through without it — so only `to` carries the deploy base.
-    expect(applyBaseToAstroRedirects(redirects, "", "/base")).toStrictEqual([
+    expect(
+      applyBaseToAstroRedirects(redirects, "", "/base", NO_ROUTES)
+    ).toStrictEqual([
       { from: "/old", status: 301, to: "/base/new" },
       { from: "/tmp", status: 302, to: "/base/temp" },
     ]);
@@ -99,7 +116,7 @@ describe("redirect emitters", () => {
 
   it("stacks deployment.base and basePath as {base}/{basePath} for Astro", () => {
     expect(
-      applyBaseToAstroRedirects(redirects, "/docs", "/base")
+      applyBaseToAstroRedirects(redirects, "/docs", "/base", NO_ROUTES)
     ).toStrictEqual([
       { from: "/docs/old", status: 301, to: "/base/docs/new" },
       { from: "/docs/tmp", status: 302, to: "/base/docs/temp" },
@@ -110,12 +127,14 @@ describe("redirect emitters", () => {
     // The host matches these against the real URL, so `from` needs the deploy
     // base that Astro would otherwise add on its own.
     expect(
-      applyBaseToPlatformRedirects(redirects, "/docs", "/base")
+      applyBaseToPlatformRedirects(redirects, "/docs", "/base", NO_ROUTES)
     ).toStrictEqual([
       { from: "/base/docs/old", status: 301, to: "/base/docs/new" },
       { from: "/base/docs/tmp", status: 302, to: "/base/docs/temp" },
     ]);
-    expect(applyBaseToPlatformRedirects(redirects, "", "/base")).toStrictEqual([
+    expect(
+      applyBaseToPlatformRedirects(redirects, "", "/base", NO_ROUTES)
+    ).toStrictEqual([
       { from: "/base/old", status: 301, to: "/base/new" },
       { from: "/base/tmp", status: 302, to: "/base/temp" },
     ]);
@@ -124,11 +143,15 @@ describe("redirect emitters", () => {
   it("normalizes a raw deployment.base before composing", () => {
     // Astro accepts `/base/` and even `base` for its `base` option; a verbatim
     // concatenation would emit `/base//new` or a relative `base/new`.
-    expect(applyBaseToAstroRedirects(redirects, "", "/base/")).toStrictEqual([
+    expect(
+      applyBaseToAstroRedirects(redirects, "", "/base/", NO_ROUTES)
+    ).toStrictEqual([
       { from: "/old", status: 301, to: "/base/new" },
       { from: "/tmp", status: 302, to: "/base/temp" },
     ]);
-    expect(applyBaseToPlatformRedirects(redirects, "", "base")).toStrictEqual([
+    expect(
+      applyBaseToPlatformRedirects(redirects, "", "base", NO_ROUTES)
+    ).toStrictEqual([
       { from: "/base/old", status: 301, to: "/base/new" },
       { from: "/base/tmp", status: 302, to: "/base/temp" },
     ]);
@@ -139,15 +162,15 @@ describe("redirect emitters", () => {
       { from: "/old", status: 301 as const, to: "/base/docs/new" },
       { from: "/away", status: 301 as const, to: "https://example.com/new" },
     ];
-    expect(applyBaseToAstroRedirects(authored, "/docs", "/base")).toStrictEqual(
-      [
-        // Already under the full stack: kept as-is rather than doubled.
-        { from: "/docs/old", status: 301, to: "/base/docs/new" },
-        { from: "/docs/away", status: 301, to: "https://example.com/new" },
-      ]
-    );
     expect(
-      applyBaseToPlatformRedirects(authored, "/docs", "/base")
+      applyBaseToAstroRedirects(authored, "/docs", "/base", NO_ROUTES)
+    ).toStrictEqual([
+      // Already under the full stack: kept as-is rather than doubled.
+      { from: "/docs/old", status: 301, to: "/base/docs/new" },
+      { from: "/docs/away", status: 301, to: "https://example.com/new" },
+    ]);
+    expect(
+      applyBaseToPlatformRedirects(authored, "/docs", "/base", NO_ROUTES)
     ).toStrictEqual([
       { from: "/base/docs/old", status: 301, to: "/base/docs/new" },
       { from: "/base/docs/away", status: 301, to: "https://example.com/new" },

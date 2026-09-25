@@ -107,7 +107,9 @@ export const inlineCode = (text: string): string =>
 export const installCommand = "npx blume init";
 
 // Copy-to-clipboard for the install boxes; briefly swaps the glyph for a check.
+// The button's own glyph is saved on the first click only, and a repeat click
+// restarts the timer, so clicking again mid-swap can't leave the check behind.
 // One delegated handler covers every box on a page. Inlined by each landing
 // page that renders an <InstallBox> (home and /cli) — page-specific, since the
 // docs chrome's copy buttons are separate.
-export const installCopyScript = `(()=>{const CHECK='<svg class="size-4" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="16"><path d="M20 6 9 17l-5-5"/></svg>';document.addEventListener("click",async(e)=>{const b=e.target.closest("[data-blume-copy-install]");if(!b){return;}try{await navigator.clipboard.writeText(b.dataset.command);}catch{return;}const o=b.innerHTML;b.innerHTML=CHECK;setTimeout(()=>{b.innerHTML=o;},1500);});})();`;
+export const installCopyScript = `(()=>{const CHECK='<svg class="size-4" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="16"><path d="M20 6 9 17l-5-5"/></svg>';document.addEventListener("click",async(e)=>{const b=e.target.closest("[data-blume-copy-install]");if(!b){return;}try{await navigator.clipboard.writeText(b.dataset.command);}catch{return;}b.copyOriginal??=b.innerHTML;b.innerHTML=CHECK;clearTimeout(b.copyTimer);b.copyTimer=setTimeout(()=>{b.innerHTML=b.copyOriginal;},1500);});})();`;

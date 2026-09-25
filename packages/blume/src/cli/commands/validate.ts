@@ -119,7 +119,9 @@ export const validateCommand = defineCommand({
       logger.success("No broken links found.");
     }
     if (hadErrors || strictFailure) {
-      process.exit(1);
+      // Set the code and return rather than `process.exit`, which doesn't wait
+      // for a piped stderr: a long diagnostic list would be cut off.
+      process.exitCode = 1;
     }
   },
 });

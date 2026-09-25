@@ -12,24 +12,51 @@
  * network and stays safe to bundle into the generated endpoint file.
  */
 
+import { PROXY_HEADERS_HEADER } from "../components/openapi/request.ts";
 import { readCappedBody } from "../core/request-body.ts";
 
 /**
- * Request headers never forwarded upstream: hop-by-hop headers describe this
- * connection (not the upstream one), `host`/`origin`/`referer` would leak or
- * misattribute the docs site, and `cookie` would forward reader credentials
- * to an arbitrary target. `accept-encoding`/`content-length` are recomputed
- * by the runtime's own fetch.
+ * Request headers never forwarded upstream, even when the playground names
+ * them: hop-by-hop headers describe this connection (not the upstream one),
+ * `host`/`origin`/`referer` would leak or misattribute the docs site, `cookie`
+ * would forward reader credentials to an arbitrary target, and the rest are
+ * set or rewritten by the platform in front of the docs server — the
+ * reader's address, the edge's own identity — whatever the browser sent.
+ * `accept-encoding`/`content-length` are recomputed by the runtime's own
+ * fetch.
  */
 const REQUEST_DROP = {
   "accept-encoding": true,
+  "cdn-loop": true,
   connection: true,
   "content-length": true,
   cookie: true,
+  forwarded: true,
   host: true,
+  "keep-alive": true,
   origin: true,
+  "proxy-authorization": true,
   referer: true,
+  te: true,
+  trailer: true,
+  "transfer-encoding": true,
+  "true-client-ip": true,
+  upgrade: true,
+  via: true,
+  "x-client-ip": true,
+  "x-real-ip": true,
 } satisfies Record<string, true>;
+
+/**
+ * Platform header families, dropped like {@link REQUEST_DROP}: Cloudflare's
+ * (`cf-connecting-ip`, the Access `cf-access-jwt-assertion`), the
+ * `x-forwarded-*` set, Vercel's (`x-vercel-oidc-token`), Netlify's, Fly's,
+ * and AWS load balancers' (`x-amzn-oidc-data`).
+ */
+const PLATFORM_HEADER = /^(?:cf-|x-forwarded-|x-vercel-|x-nf-|fly-|x-amzn-)/u;
+
+/** The {@link PROXY_HEADERS_HEADER} name as `Headers` iterates it. */
+const DECLARED = PROXY_HEADERS_HEADER.toLowerCase();
 
 /**
  * Upstream response headers never returned to the browser: the runtime's
@@ -99,18 +126,43 @@ const DOCUMENT_TYPE =
 const badRequest = (error: string): Response =>
   Response.json({ error }, { status: 400 });
 
-/** Copy headers, skipping the given denylist (names are already lowercase). */
+/**
+ * Copy headers, skipping the given denylist and any name `keep` rejects
+ * (names are already lowercase).
+ */
 const filterHeaders = (
   source: Headers,
-  drop: Record<string, true>
+  drop: Record<string, true>,
+  keep: (name: string) => boolean = () => true
 ): Headers => {
   const headers = new Headers();
   for (const [name, value] of source) {
-    if (!drop[name]) {
+    if (!drop[name] && keep(name)) {
       headers.set(name, value);
     }
   }
   return headers;
+};
+
+/**
+ * The headers to send upstream: only those the playground set itself, which
+ * it names in {@link PROXY_HEADERS_HEADER}. Forwarding everything else minus
+ * a denylist would hand the documented API whatever the browser and the
+ * platform attach on their own — the HTTP Basic credentials of a docs site
+ * behind a password (a same-origin fetch with no `Authorization` of its own
+ * carries them), a Cloudflare Access assertion, a Vercel OIDC token.
+ */
+const forwardedHeaders = (source: Headers): Headers => {
+  const named = new Set(
+    (source.get(DECLARED) ?? "")
+      .split(",")
+      .map((name) => name.trim().toLowerCase())
+  );
+  return filterHeaders(
+    source,
+    REQUEST_DROP,
+    (name) => named.has(name) && !PLATFORM_HEADER.test(name)
+  );
 };
 
 /** A 403 for a target no configured spec declares as one of its servers. */
@@ -186,7 +238,8 @@ const followUpstream = async (args: {
 /**
  * Build the `/_api-proxy` fetch handler. The client sends its REAL method,
  * headers, and body to `?url=<encodeURIComponent(target)>`; the handler
- * forwards them (minus {@link REQUEST_DROP}) and mirrors the upstream response
+ * forwards the method, the body, and the headers the client names (see
+ * {@link forwardedHeaders}), and mirrors the upstream response
  * (minus {@link RESPONSE_DROP}) with an `x-blume-proxy` marker. An unreachable
  * upstream is a 502 with a JSON `error`.
  *
@@ -252,7 +305,7 @@ export const createPlaygroundProxyHandler = (
         allowed,
         body,
         fetchImpl,
-        headers: filterHeaders(request.headers, REQUEST_DROP),
+        headers: forwardedHeaders(request.headers),
         hop: 0,
         method: request.method,
         signal: AbortSignal.timeout(timeoutMs),

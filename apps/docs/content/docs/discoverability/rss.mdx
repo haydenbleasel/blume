@@ -3,7 +3,7 @@ title: RSS feeds
 description: A feed per dated content type — blog and changelog by default — served at /<type>/rss.xml and advertised to feed readers automatically.
 ---
 
-Blume builds an RSS feed for each content type in `rss.types` — `blog` and `changelog` by default — that has pages, served at `/<type>/rss.xml`. See [Feeds](/docs/content#feeds) for authoring blog and changelog entries with dates.
+Blume builds an RSS feed for each content type in `seo.rss.types` — `blog` and `changelog` by default — that has pages, served at `/<type>/rss.xml`. See [Feeds](/docs/content#feeds) for authoring blog and changelog entries with dates.
 
 A feed's links must be absolute, so feeds need a site URL: set [`deployment.site`](/docs/deployment#set-your-site-url), or deploy to a host Blume detects it from (Vercel, Netlify, Cloudflare). Without one, a build emits no feeds at all. During `blume dev` the local server's URL stands in, so feeds show up there either way.
 

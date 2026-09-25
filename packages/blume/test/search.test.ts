@@ -551,8 +551,8 @@ describe("buildSearchDocuments", () => {
       expect(doc?.content).not.toContain("/limits");
       expect(doc?.content).not.toContain("rocket");
       expect(doc?.content).not.toContain("weight");
-      // An inline directive is part of its word.
-      expect(doc?.content).toContain("This is really inline");
+      // A text directive reads as the source the page renders it as.
+      expect(doc?.content).toContain("This is re:abbr[al]ly inline");
       expect(doc?.content).not.toContain("props.count");
       expect(doc?.content).not.toContain("draft");
       expect(doc?.content).not.toContain("<Step");

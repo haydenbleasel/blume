@@ -1,7 +1,7 @@
 import {
   isInternalPath,
+  withAuthoredBasePath,
   withBasePath,
-  withComposedBasePath,
 } from "../core/base-path.ts";
 import { servesRoute } from "../core/locale-links.ts";
 import type { MdastNode } from "./mdast.ts";
@@ -20,18 +20,6 @@ interface MdastUrlContext {
   setProperty: (node: MdastNode, key: "url", value: string) => void;
 }
 
-/**
- * A path whose final segment carries a file extension (`/spec.pdf`, `/logo.svg`)
- * — a public asset, which Blume serves from `public/` at the site root and
- * does *not* move under `basePath`, unless a page is served there: a dotted
- * route (`/releases/v1.2`) is based like any other page link, the same
- * served-route test the link checker and the locale rewrite apply.
- */
-const DOTTED_PATH = /\.[a-z0-9]+$/iu;
-
-/** Strip any `#fragment`/`?query` so only the path is extension-tested. */
-const pathOf = (url: string): string => url.replace(/[#?].*$/u, "");
-
 /** Only a string URL can be rebased; MDAST allows null or absent urls. */
 const isUrl = (url: string | null | undefined): url is string =>
   typeof url === "string";
@@ -45,13 +33,15 @@ export interface BaseLinksPluginOptions {
 }
 
 /**
- * Satteri MDAST plugin that prepends the served-URL base — `deployment.base`
- * layered over the site-wide `basePath` — to root-relative internal page links
- * (`[x](/guide)` -> `/base/docs/guide`), so authors write links as if mounted
- * at root. Idempotent per layer (via `withComposedBasePath`, so a hand-written
- * `/docs/x` isn't double-prefixed) and inert for external URLs, fragments,
- * relative paths, images, and asset links. Only constructed when a base is set
- * (see `markdown/index.ts`).
+ * Satteri MDAST plugin that prepends the served-URL base to root-relative
+ * internal links, so authors write links as if mounted at root. A page link
+ * gains `deployment.base` layered over the site-wide `basePath` (`[x](/guide)`
+ * -> `/base/docs/guide`); a public asset — an image, or a link to a file like
+ * `/spec.pdf` (see `withAuthoredBasePath`) — gains `deployment.base` alone,
+ * since Astro serves `public/` under it but never under `basePath`.
+ * Idempotent per layer (a hand-written `/docs/x` isn't double-prefixed) and
+ * inert for external URLs, fragments, and relative paths. Only constructed
+ * when a base is set (see `markdown/index.ts`).
  */
 export const baseLinksPlugin = (
   deployBase: string,
@@ -78,30 +68,38 @@ export const baseLinksPlugin = (
     return cached.routes;
   };
 
-  /** Whether an internal `url` links a page rather than a public asset. */
-  const isPageLink = (url: string): boolean => {
-    const path = pathOf(url);
-    return (
-      !DOTTED_PATH.test(path) ||
-      servesRoute(servedRoutes(), withBasePath(basePath, path))
-    );
-  };
+  /** Whether a page is served at a based, fragment-less path. */
+  const servesPage = (route: string): boolean =>
+    servesRoute(servedRoutes(), route);
 
-  const rebase = (node: UrlNode, ctx: MdastUrlContext): void => {
+  /** Record `based(url)` on the node when its root-relative URL changes. */
+  const rebase = (
+    node: UrlNode,
+    ctx: MdastUrlContext,
+    based: (url: string) => string
+  ): void => {
     const { url } = node;
-    if (isUrl(url) && isInternalPath(url) && isPageLink(url)) {
-      const next = withComposedBasePath(deployBase, basePath, url);
+    if (isUrl(url) && isInternalPath(url)) {
+      const next = based(url);
       if (next !== url) {
         ctx.setProperty(node, "url", next);
       }
     }
   };
-  // `link` covers inline links; `definition` covers reference-style link
-  // definitions (`[x]: /guide`). `image` is intentionally excluded — images are
-  // public assets served at the site root, unaffected by `basePath`.
+  const rebaseLink = (node: UrlNode, ctx: MdastUrlContext): void =>
+    rebase(node, ctx, (url) =>
+      withAuthoredBasePath(deployBase, basePath, url, servesPage)
+    );
+  // An image is always a file, never a page: `public/` (or a generated asset
+  // endpoint), served under the deployment base but not `basePath`.
+  const rebaseImage = (node: UrlNode, ctx: MdastUrlContext): void =>
+    rebase(node, ctx, (url) => withBasePath(deployBase, url));
+  // `link` covers inline links; `definition` covers reference-style
+  // definitions (`[x]: /guide`), which a link or an image may cite.
   return {
-    definition: rebase,
-    link: rebase,
+    definition: rebaseLink,
+    image: rebaseImage,
+    link: rebaseLink,
     name: "blume-base-links",
   };
 };

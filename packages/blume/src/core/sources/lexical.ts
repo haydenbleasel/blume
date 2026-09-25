@@ -7,7 +7,7 @@
  */
 import type { JsonObject } from "./json.ts";
 import { asNumber, asObject, asString, getPath, objectsIn } from "./json.ts";
-import type { InlineMarks } from "./lower.ts";
+import type { InlineMarks, InlinePart } from "./lower.ts";
 import {
   absoluteUrl,
   blockquote,
@@ -15,10 +15,10 @@ import {
   headingPrefix,
   image,
   indent,
+  linkParts,
   listItem,
   markdownDocument,
   renderInline,
-  renderLink,
   unsupported,
   writesMdx,
 } from "./lower.ts";
@@ -67,48 +67,53 @@ const customBlock = (node: JsonObject, options: LexicalOptions): string => {
   );
 };
 
-const renderInlines = (nodes: JsonObject[], options: LexicalOptions): string =>
-  nodes
-    // oxlint-disable-next-line no-use-before-define -- mutual recursion: a link's label is itself inline content
-    .map((node) => renderInlineNode(node, options))
-    .join("");
+const inlineParts = (
+  nodes: JsonObject[],
+  options: LexicalOptions
+): InlinePart[] =>
+  // oxlint-disable-next-line no-use-before-define -- mutual recursion: a link's label is itself inline content
+  nodes.flatMap((node) => inlineNodeParts(node, options));
 
-const renderInlineNode = (
+const inlineNodeParts = (
   node: JsonObject,
   options: LexicalOptions
-): string => {
+): InlinePart[] => {
   switch (typeOf(node)) {
     case "text": {
-      return renderInline(asString(node.text) ?? "", marksOf(node));
+      return [{ marks: marksOf(node), text: asString(node.text) ?? "" }];
     }
     case "linebreak": {
-      return "\n";
+      return [{ markdown: "\n" }];
     }
     case "tab": {
-      return "\t";
+      return [{ markdown: "\t" }];
     }
     case "link":
     case "autolink": {
       // `fields.url` on Payload 3; `url` on older Lexical payloads. An
       // internal link (`linkType: "internal"`) carries a document, not a
       // URL, so its label stays.
-      return renderLink(
-        renderInlines(children(node), options),
+      return linkParts(
+        inlineParts(children(node), options),
         asString(getPath(node, "fields.url")) ?? asString(node.url)
       );
     }
     case "inlineBlock": {
-      return customBlock(node, options);
+      return [{ markdown: customBlock(node, options) }];
     }
     default: {
-      return renderInlines(children(node), options);
+      return inlineParts(children(node), options);
     }
   }
 };
 
+/** Inline nodes as Markdown, guarded as one block. */
+const inlineText = (nodes: JsonObject[], options: LexicalOptions): string =>
+  guardBlockStart(renderInline(inlineParts(nodes, options)));
+
 /** A text block's inline children, joined and guarded as one block. */
 const blockText = (node: JsonObject, options: LexicalOptions): string =>
-  guardBlockStart(renderInlines(children(node), options));
+  inlineText(children(node), options);
 
 const renderUpload = (node: JsonObject, options: LexicalOptions): string => {
   const value = asObject(node.value);
@@ -145,7 +150,7 @@ const renderList = (node: JsonObject, options: LexicalOptions): string => {
     if (listType === "check") {
       check = item.checked === true ? "[x] " : "[ ] ";
     }
-    const line = `${check}${guardBlockStart(renderInlines(inline, options))}`;
+    const line = `${check}${inlineText(inline, options)}`;
     items.push(listItem(lastMarker, sub ? `${line}\n${sub}` : line));
     index += 1;
   }

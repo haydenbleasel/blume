@@ -151,11 +151,16 @@ const skillMeta = (raw: string, dirName: string): SkillMetaResult => {
  * hold a `SKILL.md` (the layout `npx skills add` consumes). Subdirectories
  * without one are ignored silently — the directory may hold other assets —
  * while a present-but-invalid skill earns a warning so it isn't dropped
- * behind the publisher's back.
+ * behind the publisher's back. Two directories declaring the same `name`
+ * would publish to the same artifact path under two index entries, so the
+ * first directory in sorted order keeps the name and the other is skipped
+ * with a warning naming both.
  */
 export const collectSkills = async (dir: string): Promise<CollectedSkills> => {
   const skills: SkillArtifact[] = [];
   const warnings: string[] = [];
+  /** Skill name → the directory that claimed it first. */
+  const owners = new Map<string, string>();
   const items = await readdir(dir, { withFileTypes: true });
   for (const item of items.toSorted((a, b) => (a.name < b.name ? -1 : 1))) {
     if (!item.isDirectory() || item.name.startsWith(".")) {
@@ -177,6 +182,14 @@ export const collectSkills = async (dir: string): Promise<CollectedSkills> => {
       }
       continue;
     }
+    const owner = owners.get(meta.name);
+    if (owner) {
+      warnings.push(
+        `Skills "${owner}" and "${item.name}" both declare the name "${meta.name}"; publishing "${owner}" and skipping "${item.name}".`
+      );
+      continue;
+    }
+    owners.set(meta.name, item.name);
     // A lone SKILL.md ships verbatim; supporting resources ship as an
     // archive so the skill's relative references resolve after unpacking.
     const single = entries.length === 1;

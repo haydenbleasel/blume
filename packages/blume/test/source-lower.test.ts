@@ -25,12 +25,13 @@ import {
   indent,
   joinBlocks,
   listItem,
+  linkParts,
   markdownDocument,
   renderInline,
-  renderLink,
   unsupported,
   writesMdx,
 } from "../src/core/sources/lower.ts";
+import type { InlineMarks } from "../src/core/sources/lower.ts";
 import {
   documentEntry,
   fetchJson,
@@ -47,6 +48,14 @@ import {
 } from "./cms-fixtures.ts";
 
 afterAll(cleanupTempDirs);
+
+/** One text run as a lowerer renders it. */
+const renderRun = (text: string, marks: InlineMarks): string =>
+  renderInline([{ marks, text }]);
+
+/** A link over a plain label, as a lowerer renders one. */
+const renderLink = (label: string, href?: string): string =>
+  renderInline(linkParts([{ marks: {}, text: label }], href));
 
 describe("json helpers", () => {
   const doc: JsonObject = {
@@ -79,16 +88,16 @@ describe("json helpers", () => {
 
 describe("lowering primitives", () => {
   it("wraps marks around the text and keeps edge whitespace outside", () => {
-    expect(renderInline("bold ", { bold: true })).toBe("**bold** ");
-    expect(renderInline(" both ", { bold: true, italic: true })).toBe(
+    expect(renderRun("bold ", { bold: true })).toBe("**bold** ");
+    expect(renderRun(" both ", { bold: true, italic: true })).toBe(
       " ***both*** "
     );
-    expect(renderInline("gone", { strike: true })).toBe("~~gone~~");
-    expect(renderInline("a*b", { code: true })).toBe("`a*b`");
-    expect(renderInline("x", { bold: true, code: true })).toBe("**`x`**");
-    expect(renderInline("a*b_c<d", {})).toBe(String.raw`a\*b\_c\<d`);
+    expect(renderRun("gone", { strike: true })).toBe("~~gone~~");
+    expect(renderRun("a*b", { code: true })).toBe("`a*b`");
+    expect(renderRun("x", { bold: true, code: true })).toBe("**`x`**");
+    expect(renderRun("a*b_c<d", {})).toBe(String.raw`a\*b\_c\<d`);
     // Braces would open an expression once the entry is written as MDX.
-    expect(renderInline("use {id}", {})).toBe(String.raw`use \{id\}`);
+    expect(renderRun("use {id}", {})).toBe(String.raw`use \{id\}`);
   });
 
   it("keeps a run that starts like block syntax as prose", () => {
@@ -140,7 +149,7 @@ describe("lowering primitives", () => {
     expect(codeSpan("a`b")).toBe("``a`b``");
     expect(codeSpan("`x")).toBe("`` `x ``");
     expect(codeSpan("x`")).toBe("`` x` ``");
-    expect(renderInline("a``b", { code: true })).toBe("```a``b```");
+    expect(renderRun("a``b", { code: true })).toBe("```a``b```");
   });
 
   it("carries a destination with spaces or parentheses in angle brackets", () => {
@@ -153,8 +162,8 @@ describe("lowering primitives", () => {
   });
 
   it("leaves empty and whitespace-only runs alone", () => {
-    expect(renderInline("", { bold: true })).toBe("");
-    expect(renderInline("  ", { bold: true })).toBe("  ");
+    expect(renderRun("", { bold: true })).toBe("");
+    expect(renderRun("  ", { bold: true })).toBe("  ");
   });
 
   it("renders links, headings, quotes, items, and fences", () => {
