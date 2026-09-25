@@ -30,9 +30,9 @@ export const oneDollarStatsOptionsSchema = z
   .object({
     hostname: z
       .string()
-      .regex(/^[^/:\s]+(?::\d+)?$/u, {
+      .regex(/^[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*(?::\d+)?$/u, {
         message:
-          "`hostname` must be a bare host name like `docs.example.com`, without `https://` or a path.",
+          "`hostname` must be a bare host name like `docs.example.com`, without `https://`, a path, a query, or a fragment.",
       })
       .optional(),
   })

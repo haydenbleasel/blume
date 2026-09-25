@@ -170,6 +170,10 @@ describe("provider adapter factories", () => {
     for (const hostname of [
       "https://docs.example.com",
       "docs.example.com/guide",
+      "docs.example.com?ref=x",
+      "docs.example.com#top",
+      "user@docs.example.com",
+      "docs..example.com",
       "",
     ]) {
       expect(
@@ -177,11 +181,16 @@ describe("provider adapter factories", () => {
         `hostname ${JSON.stringify(hostname)} should be rejected`
       ).toBe(false);
     }
-    expect(
-      analyticsConfigSchema.safeParse([
-        oneDollarStats({ hostname: "localhost:4321" }),
-      ]).success
-    ).toBe(true);
+    for (const hostname of [
+      "docs.example.com",
+      "localhost:4321",
+      "bücher.example",
+    ]) {
+      expect(
+        analyticsConfigSchema.safeParse([oneDollarStats({ hostname })]).success,
+        `hostname ${JSON.stringify(hostname)} should be accepted`
+      ).toBe(true);
+    }
     expect(
       analyticsConfigSchema.safeParse([
         { ...mixpanel({ token: "t" }), options: { region: "ap", token: "t" } },
