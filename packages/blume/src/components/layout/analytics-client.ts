@@ -40,6 +40,9 @@ interface AnalyticsWindow {
   pirsch?: (event: string, options?: { meta?: TrackProps }) => void;
   plausible?: (event: string, options?: { props?: TrackProps }) => void;
   posthog?: { capture?: (event: string, props?: TrackProps) => void };
+  stonks?: {
+    event?: (event: string, props?: Record<string, string>) => void;
+  };
 }
 
 /** Run one provider call; its failure must not reach the others or the caller. */
@@ -85,6 +88,15 @@ const trackGlobals = (
   attempt(() => w.plausible?.(event, { props }));
   attempt(() => w.databuddy?.track?.(event, props));
   attempt(() => w.fathom?.trackEvent?.(event));
+  // OneDollarStats only takes string property values.
+  attempt(() =>
+    w.stonks?.event?.(
+      event,
+      Object.fromEntries(
+        Object.entries(props).map(([key, value]) => [key, String(value)])
+      )
+    )
+  );
   // Pirsch stringifies `meta` values in place, so it gets its own copy and
   // the `blume:track` listeners still see the original types.
   attempt(() => w.pirsch?.(event, { meta: { ...props } }));

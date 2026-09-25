@@ -33,6 +33,7 @@ interface WindowStub {
   pirsch?: Fn;
   plausible?: Fn;
   posthog?: { capture?: Fn };
+  stonks?: { event?: Fn };
 }
 
 const noop = () => {
@@ -81,6 +82,7 @@ describe("track", () => {
       mixpanel: mock(noop),
       pirsch: mock(noop),
       plausible: mock(noop),
+      stonks: mock(noop),
     };
     setWindow({
       LogRocket: { track: fns.LogRocket },
@@ -103,6 +105,7 @@ describe("track", () => {
       pirsch: fns.pirsch,
       plausible: fns.plausible,
       posthog: { capture: fns.capture },
+      stonks: { event: fns.stonks },
     });
 
     const props = { helpful: "yes", path: "/docs/intro", title: "Intro" };
@@ -127,6 +130,7 @@ describe("track", () => {
     expect(fns.plausible).toHaveBeenCalledWith("feedback", { props });
     expect(fns.databuddy).toHaveBeenCalledWith("feedback", props);
     expect(fns.fathom).toHaveBeenCalledWith("feedback");
+    expect(fns.stonks).toHaveBeenCalledWith("feedback", props);
     expect(fns.pirsch).toHaveBeenCalledWith("feedback", { meta: props });
     expect(fns.clarity).toHaveBeenCalledWith("event", "feedback");
     expect(fns.hj).toHaveBeenCalledWith("event", "feedback");
@@ -156,6 +160,29 @@ describe("track", () => {
     expect(layerPush).toHaveBeenCalledWith({ ...props, event: "feedback" });
     expect(defaultPush).not.toHaveBeenCalled();
     expect(gtag).toHaveBeenCalledWith("event", "feedback", props);
+  });
+
+  it("hands OneDollarStats string property values only", () => {
+    const event = mock(noop);
+    const dispatched: CustomEvent[] = [];
+    setWindow({
+      dispatchEvent: (custom) => {
+        dispatched.push(custom);
+        return true;
+      },
+      stonks: { event },
+    });
+
+    track("feedback", { helpful: true, rating: 4 });
+
+    expect(event).toHaveBeenCalledWith("feedback", {
+      helpful: "true",
+      rating: "4",
+    });
+    expect(dispatched[0]?.detail).toEqual({
+      event: "feedback",
+      props: { helpful: true, rating: 4 },
+    });
   });
 
   it("still fires Vercel and the custom event when other providers are absent", () => {

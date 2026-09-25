@@ -12,6 +12,7 @@ import { hightouchHead } from "./hightouch.ts";
 import { hotjarHead } from "./hotjar.ts";
 import { logrocketHead } from "./logrocket.ts";
 import { mixpanelHead } from "./mixpanel.ts";
+import { oneDollarStatsHead } from "./one-dollar-stats.ts";
 import { pirschHead } from "./pirsch.ts";
 import { plausibleHead } from "./plausible.ts";
 import { posthogHead } from "./posthog.ts";
@@ -91,6 +92,9 @@ const adapterScripts = (
     }
     case "mixpanel": {
       return mixpanelHead(adapter.options);
+    }
+    case "one-dollar-stats": {
+      return oneDollarStatsHead(adapter.options);
     }
     case "pirsch": {
       return pirschHead(adapter.options);

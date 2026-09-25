@@ -47,6 +47,7 @@ Every identifier below — a project key, a measurement ID, a site token — is 
 | `hotjar()` | [Hotjar](#hotjar) | `id` |
 | `logrocket()` | [LogRocket](#logrocket) | `id` |
 | `mixpanel()` | [Mixpanel](#mixpanel) | `token` |
+| `oneDollarStats()` | [OneDollarStats](#onedollarstats) | — |
 | `pirsch()` | [Pirsch](#pirsch) | `code` |
 | `plausible()` | [Plausible](#plausible) | `domain` |
 | `posthog()` | [PostHog](#posthog) | `key` |
@@ -190,6 +191,20 @@ analytics: [
 ```
 
 `clientId` becomes `data-client-id`. Any other option becomes its own `data-` attribute on the tag, so name it the way the attribute reads, in kebab-case (`track-web-vitals`, `track-errors`, `track-outgoing-links`, `api-url`, …). Databuddy ignores a camelCase name like `trackWebVitals`. Values are strings: `"true"` or `"false"` for a switch, and a JSON array for `skip-patterns` and `mask-patterns`. Databuddy reads any other list value as empty.
+
+## OneDollarStats
+
+Add the site's domain in [OneDollarStats](https://onedollarstats.com), then list `oneDollarStats()`. It needs no key, because OneDollarStats matches events to a site by the domain they come from.
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  oneDollarStats(),
+  // or, with any tracker setting:
+  oneDollarStats({ hostname: "docs.example.com", devmode: "true" }),
+],
+```
+
+Each option becomes its own `data-` attribute on the tag (`hostname`, `devmode`, `url`, `autocollect`, `hash-routing`). Values are strings. On `localhost`, as with a local `blume preview`, the tracker sends nothing unless you set both `hostname` and `devmode: "true"`. Don't set `hash-routing` at all unless you want it: the tracker turns it on whenever the attribute is present, even as `"false"`.
 
 ## Mixpanel
 
@@ -391,6 +406,7 @@ analytics: [
 | `mixpanel()` | `token` | — | Mixpanel project token. Required. |
 | `mixpanel()` | `region` | `us` | Data residency region: `us`, `eu`, or `in`. |
 | `mixpanel()` | anything else | `track_pageview: "url-with-path-and-query-string"` | Merged into the `mixpanel.init` options verbatim. |
+| `oneDollarStats()` | anything | — | Rendered as a `data-` attribute on the tag. |
 | `pirsch()` | `code` | — | Pirsch identification code. Required. |
 | `pirsch()` | anything else | — | Rendered as a `data-` attribute on the tag. |
 | `plausible()` | `domain` | — | The site's domain in Plausible. Required. |
@@ -410,4 +426,4 @@ analytics: [
 
 ## Custom events
 
-Blume's page feedback sends a custom event through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, Fathom, Pirsch, Clarity, Hotjar, and Vercel. Cloudflare and Clearbit have no event API. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. For deploying your built site, see [Deployment](/docs/deployment).
+Blume's page feedback sends a custom event through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (with each property value as a string), Pirsch, Clarity, Hotjar, and Vercel. Cloudflare and Clearbit have no event API. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. For deploying your built site, see [Deployment](/docs/deployment).

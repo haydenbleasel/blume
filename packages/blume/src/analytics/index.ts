@@ -58,6 +58,11 @@ export type {
   MixpanelOptions,
   MixpanelRegion,
 } from "./mixpanel.ts";
+export { oneDollarStats } from "./one-dollar-stats.ts";
+export type {
+  OneDollarStatsAdapter,
+  OneDollarStatsOptions,
+} from "./one-dollar-stats.ts";
 export { pirsch } from "./pirsch.ts";
 export type { PirschAdapter, PirschOptions } from "./pirsch.ts";
 export { plausible } from "./plausible.ts";
