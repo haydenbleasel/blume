@@ -148,7 +148,7 @@ describe("provider adapter factories", () => {
     }
   });
 
-  it("reject a non-string data attribute, an unknown region, and a fractional Hotjar id", () => {
+  it("reject a non-string data attribute, a non-bare OneDollarStats hostname, an unknown region, and a fractional Hotjar id", () => {
     expect(
       analyticsConfigSchema.safeParse([
         { ...fathom({ site: "S" }), options: { site: "S", spa: true } },
@@ -167,6 +167,21 @@ describe("provider adapter factories", () => {
         { ...oneDollarStats(), options: { devmode: true } },
       ]).success
     ).toBe(false);
+    for (const hostname of [
+      "https://docs.example.com",
+      "docs.example.com/guide",
+      "",
+    ]) {
+      expect(
+        analyticsConfigSchema.safeParse([oneDollarStats({ hostname })]).success,
+        `hostname ${JSON.stringify(hostname)} should be rejected`
+      ).toBe(false);
+    }
+    expect(
+      analyticsConfigSchema.safeParse([
+        oneDollarStats({ hostname: "localhost:4321" }),
+      ]).success
+    ).toBe(true);
     expect(
       analyticsConfigSchema.safeParse([
         { ...mixpanel({ token: "t" }), options: { region: "ap", token: "t" } },
@@ -388,6 +403,25 @@ describe("provider adapter heads", () => {
         attributes: {
           "data-autocollect": "false",
           "data-hostname": "d.example",
+          defer: true,
+          src: ONE_DOLLAR_STATS_SCRIPT_SRC,
+        },
+        content: null,
+      },
+    ]);
+  });
+
+  it('one-dollar-stats: leaves data-hash-routing off for "false", since presence turns it on', () => {
+    expect(scripts(oneDollarStats({ "hash-routing": "false" }))).toEqual([
+      {
+        attributes: { defer: true, src: ONE_DOLLAR_STATS_SCRIPT_SRC },
+        content: null,
+      },
+    ]);
+    expect(scripts(oneDollarStats({ "hash-routing": "true" }))).toEqual([
+      {
+        attributes: {
+          "data-hash-routing": "true",
           defer: true,
           src: ONE_DOLLAR_STATS_SCRIPT_SRC,
         },

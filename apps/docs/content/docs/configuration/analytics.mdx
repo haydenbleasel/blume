@@ -197,14 +197,16 @@ analytics: [
 Add the site's domain in [OneDollarStats](https://onedollarstats.com), then list `oneDollarStats()`. It needs no key, because OneDollarStats matches events to a site by the domain they come from.
 
 ```ts blume.config.ts lineNumbers
-analytics: [
-  oneDollarStats(),
-  // or, with any tracker setting:
-  oneDollarStats({ hostname: "docs.example.com", devmode: "true" }),
-],
+analytics: [oneDollarStats()],
 ```
 
-Each option becomes its own `data-` attribute on the tag (`hostname`, `devmode`, `url`, `autocollect`, `hash-routing`). Values are strings. On `localhost`, as with a local `blume preview`, the tracker sends nothing unless you set both `hostname` and `devmode: "true"`. Don't set `hash-routing` at all unless you want it: the tracker turns it on whenever the attribute is present, even as `"false"`.
+Each option becomes its own `data-` attribute on the tag, and values are strings:
+
+- `hostname` reports every event under that host name (`docs.example.com`, with no `https://` or path) on every host, not just `localhost`, so preview deploys and staging count as that site's traffic. Leave it unset unless every build should report under that name.
+- `devmode: "true"` together with `hostname` lets a local `blume preview` send events. On `localhost` the tracker sends nothing without both, so keep them out of the committed config.
+- `url` is the collector endpoint events are posted to (`https://collector.onedollarstats.com/events` by default), not the site's URL.
+- `autocollect: "false"` turns off automatic page views.
+- `"hash-routing": "true"` sends a page view on every navigation, even when only the `#fragment` changes, like a table-of-contents click. Blume leaves the attribute off for `"false"`, because the tracker turns hash routing on whenever it's present.
 
 ## Mixpanel
 
@@ -406,7 +408,8 @@ analytics: [
 | `mixpanel()` | `token` | — | Mixpanel project token. Required. |
 | `mixpanel()` | `region` | `us` | Data residency region: `us`, `eu`, or `in`. |
 | `mixpanel()` | anything else | `track_pageview: "url-with-path-and-query-string"` | Merged into the `mixpanel.init` options verbatim. |
-| `oneDollarStats()` | anything | — | Rendered as a `data-` attribute on the tag. |
+| `oneDollarStats()` | `hostname` | — | Bare host name every event is reported under, on every host. |
+| `oneDollarStats()` | anything else | — | Rendered as a `data-` attribute on the tag (`"hash-routing": "false"` is left off). |
 | `pirsch()` | `code` | — | Pirsch identification code. Required. |
 | `pirsch()` | anything else | — | Rendered as a `data-` attribute on the tag. |
 | `plausible()` | `domain` | — | The site's domain in Plausible. Required. |
