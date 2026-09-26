@@ -7,7 +7,12 @@ import {
   NARRATION_SPEEDS,
   parseSpeed,
   pickVoice,
+  progressAt,
   progressLabel,
+  progressTotal,
+  seekKeyTarget,
+  spokenFraction,
+  stepAtProgress,
   stepsFromManifest,
   stepsFromSegments,
 } from "../src/narration/player.ts";
@@ -159,11 +164,64 @@ const step = (text: string): NarrationStep => ({
   text,
 });
 
-describe(progressLabel, () => {
+describe("progress", () => {
+  const steps = [step("x".repeat(100)), step("x".repeat(200))];
+
+  it("measures playback in characters, through the sentence being read", () => {
+    expect(progressTotal(steps)).toBe(300);
+    expect(progressAt(steps, 0, 0)).toBe(0);
+    expect(progressAt(steps, 1, 0.5)).toBe(200);
+    // The fraction is clamped, and a step past the end adds nothing.
+    expect(progressAt(steps, 1, 2)).toBe(300);
+    expect(progressAt(steps, 0, -1)).toBe(0);
+    expect(progressAt(steps, 2, 0.5)).toBe(300);
+    expect(progressAt(steps, -1, 0.5)).toBe(0);
+  });
+
+  it("finds the step being read at a position", () => {
+    expect(stepAtProgress(steps, 0)).toBe(0);
+    expect(stepAtProgress(steps, 99)).toBe(0);
+    expect(stepAtProgress(steps, 100)).toBe(1);
+    expect(stepAtProgress(steps, 300)).toBe(1);
+    expect(stepAtProgress([], 10)).toBe(0);
+  });
+
+  it("estimates how far a browser voice is through its sentence", () => {
+    // English reads at 15 characters a second.
+    expect(spokenFraction(150, 5000, 1, "en")).toBe(0.5);
+    expect(spokenFraction(150, 5000, 2, "en")).toBe(1);
+    expect(spokenFraction(150, 60_000, 1, "en")).toBe(1);
+    expect(spokenFraction(0, 0, 1, "en")).toBe(1);
+  });
+
   it("estimates time read and total at the speed", () => {
-    const steps = [step("x".repeat(150)), step("x".repeat(150))];
-    expect(progressLabel(steps, 0, 1, "en")).toBe("0:00 / 0:20");
-    expect(progressLabel(steps, 1, 1, "en")).toBe("0:10 / 0:20");
-    expect(progressLabel(steps, 1, 2, "en")).toBe("0:05 / 0:10");
+    const even = [step("x".repeat(150)), step("x".repeat(150))];
+    expect(progressLabel(even, 0, 1, "en")).toBe("0:00 / 0:20");
+    expect(progressLabel(even, 150, 1, "en")).toBe("0:10 / 0:20");
+    expect(progressLabel(even, 225, 1, "en")).toBe("0:15 / 0:20");
+    expect(progressLabel(even, 150, 2, "en")).toBe("0:05 / 0:10");
+  });
+});
+
+describe(seekKeyTarget, () => {
+  it("moves a sentence per arrow key, clamped to the page", () => {
+    expect(seekKeyTarget("ArrowRight", 3, 10, false)).toBe(4);
+    expect(seekKeyTarget("ArrowUp", 3, 10, false)).toBe(4);
+    expect(seekKeyTarget("ArrowLeft", 3, 10, false)).toBe(2);
+    expect(seekKeyTarget("ArrowDown", 3, 10, false)).toBe(2);
+    expect(seekKeyTarget("ArrowLeft", 0, 10, false)).toBe(0);
+    expect(seekKeyTarget("ArrowRight", 9, 10, false)).toBe(9);
+  });
+
+  it("flips the horizontal arrows on right-to-left pages", () => {
+    expect(seekKeyTarget("ArrowLeft", 3, 10, true)).toBe(4);
+    expect(seekKeyTarget("ArrowRight", 3, 10, true)).toBe(2);
+  });
+
+  it("jumps to either end, and leaves other keys to the bar", () => {
+    expect(seekKeyTarget("Home", 3, 10, false)).toBe(0);
+    expect(seekKeyTarget("End", 3, 10, false)).toBe(9);
+    expect(seekKeyTarget("PageUp", 3, 10, false)).toBeNull();
+    expect(seekKeyTarget("End", 0, 0, false)).toBe(0);
   });
 });

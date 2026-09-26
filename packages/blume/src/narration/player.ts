@@ -149,24 +149,101 @@ export const formatClock = (seconds: number): string => {
 };
 
 /**
- * The progress readout at step `index`: the estimated time read so far and in
- * total at `speed`, as `m:ss / m:ss`. An estimate from character counts, since
- * a browser voice reports no duration and a clip's is only known once loaded.
+ * How much of the page `steps` read, in characters. Progress is measured in
+ * characters rather than steps, so a long sentence moves the seek bar and the
+ * readout further than a short one.
+ */
+export const progressTotal = (steps: readonly NarrationStep[]): number =>
+  steps.reduce((total, step) => total + step.text.length, 0);
+
+/**
+ * Where playback is, in characters: every step before `index` in full, plus
+ * `fraction` (0 to 1) of the step being read.
+ */
+export const progressAt = (
+  steps: readonly NarrationStep[],
+  index: number,
+  fraction: number
+): number => {
+  const current = steps[index]?.text.length ?? 0;
+  return (
+    progressTotal(steps.slice(0, Math.max(0, index))) +
+    current * Math.min(1, Math.max(0, fraction))
+  );
+};
+
+/** The step being read at `position` characters (the last step past the end). */
+export const stepAtProgress = (
+  steps: readonly NarrationStep[],
+  position: number
+): number => {
+  let end = 0;
+  for (const [index, step] of steps.entries()) {
+    end += step.text.length;
+    if (position < end) {
+      return index;
+    }
+  }
+  return Math.max(0, steps.length - 1);
+};
+
+/**
+ * How far a browser voice is through `length` characters, `elapsedMs` after it
+ * started them at `speed`. An estimate from the reading rate, since a voice
+ * reports no duration; it holds at the end until the next sentence starts.
+ */
+export const spokenFraction = (
+  length: number,
+  elapsedMs: number,
+  speed: number,
+  lang: string
+): number =>
+  length > 0
+    ? Math.min(
+        1,
+        ((elapsedMs / 1000) * narrationCharsPerSecond(lang) * speed) / length
+      )
+    : 1;
+
+/**
+ * The step a key on the seek bar moves to: one sentence per arrow key (the
+ * horizontal ones flipped for right-to-left pages), or the first or last with
+ * Home and End. `null` for any other key, which the bar handles itself.
+ */
+export const seekKeyTarget = (
+  key: string,
+  index: number,
+  count: number,
+  rtl: boolean
+): number | null => {
+  const forward = rtl ? "ArrowLeft" : "ArrowRight";
+  const back = rtl ? "ArrowRight" : "ArrowLeft";
+  const targets = new Map([
+    ["ArrowDown", index - 1],
+    ["ArrowUp", index + 1],
+    ["End", count - 1],
+    ["Home", 0],
+    [back, index - 1],
+    [forward, index + 1],
+  ]);
+  const target = targets.get(key);
+  return target === undefined
+    ? null
+    : Math.min(Math.max(0, count - 1), Math.max(0, target));
+};
+
+/**
+ * The progress readout at `position` characters: the estimated time read so
+ * far and in total at `speed`, as `m:ss / m:ss`. An estimate from character
+ * counts, since a browser voice reports no duration and a clip's is only
+ * known once loaded.
  */
 export const progressLabel = (
   steps: readonly NarrationStep[],
-  index: number,
+  position: number,
   speed: number,
   lang: string
 ): string => {
   const rate = narrationCharsPerSecond(lang) * speed;
-  let before = 0;
-  let total = 0;
-  for (const [position, step] of steps.entries()) {
-    if (position < index) {
-      before += step.text.length;
-    }
-    total += step.text.length;
-  }
-  return `${formatClock(before / rate)} / ${formatClock(total / rate)}`;
+  return `${formatClock(position / rate)} / ${formatClock(progressTotal(steps) / rate)}`;
 };

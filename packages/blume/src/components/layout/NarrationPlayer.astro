@@ -36,15 +36,17 @@ const cueMap: NarrationCues = {
 };
 
 const iconButton =
-  "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-blume text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+  "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 ---
 
 {/* Stays hidden until the script has read the page: pages too short to
     narrate, and browsers with no voice for the language, never show it. The
     root is a direct child of the article so it can stay pinned under the
-    header while the article scrolls. */}
+    header while the article scrolls. It's also the container the controls
+    are sized against, so they're laid out at the full width while the pill
+    grows to it. */}
 <div
-  class="not-prose z-30 mt-5 mb-6 hidden"
+  class="@container not-prose z-30 mt-5 mb-6 hidden"
   data-audio-base={audioBase}
   data-blume-narration="skip"
   data-blume-narration-player
@@ -53,67 +55,78 @@ const iconButton =
   data-manifest={manifest}
   data-minutes={s.minutes}
 >
-  <button
-    class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3.5 py-1.5 text-foreground text-sm transition-colors hover:border-foreground/40"
-    data-narration-start
-    type="button"
-  >
-    <Icon name="headphones" size={16} />
-    <span>{s.label}</span>
-    <span class="text-muted-foreground tabular-nums" data-narration-duration></span>
-  </button>
+  {/* One pill for both states: it fits the start button, and widens to the
+      article for the controls while one fades into the other. */}
   <div
-    aria-label={s.label}
-    class="hidden flex-wrap items-center gap-x-2 gap-y-1 rounded-blume border border-border bg-background px-2 py-1.5 shadow-sm"
-    data-narration-controls
-    role="group"
+    class="relative flex h-9 w-fit max-w-full items-center rounded-full border border-border bg-background text-foreground transition-colors"
+    data-narration-shell
   >
     <button
-      aria-label={s.pause}
-      class={iconButton}
-      data-label-pause={s.pause}
-      data-label-play={s.play}
-      data-narration-toggle
+      class="inline-flex h-full cursor-pointer items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm"
+      data-narration-start
       type="button"
     >
-      <span data-narration-icon-pause><Icon name="pause" size={16} /></span>
-      <span class="hidden" data-narration-icon-play><Icon name="play" size={16} /></span>
+      <Icon name="headphones" size={16} />
+      <span>{s.label}</span>
+      <span class="text-muted-foreground tabular-nums" data-narration-duration></span>
     </button>
-    <button aria-label={s.previous} class={iconButton} data-narration-previous type="button">
-      <Icon name="skip-back" size={16} />
-    </button>
-    <button aria-label={s.next} class={iconButton} data-narration-next type="button">
-      <Icon name="skip-forward" size={16} />
-    </button>
-    <input
-      aria-label={s.progress}
-      class="h-1.5 min-w-20 flex-1 cursor-pointer accent-accent"
-      data-narration-seek
-      max="0"
-      min="0"
-      step="1"
-      type="range"
-      value="0"
-    />
-    <span class="px-1 text-muted-foreground text-xs tabular-nums" data-narration-time></span>
-    <select
-      aria-label={s.speed}
-      class="h-8 cursor-pointer rounded-blume border border-border bg-background px-1.5 text-foreground text-xs"
-      data-narration-speed
+    <div
+      aria-label={s.label}
+      class="absolute inset-y-0 start-0 flex w-[calc(100cqw-2px)] items-center gap-0.5 px-[3px]"
+      data-narration-controls
+      role="group"
     >
-      {NARRATION_SPEEDS.map((speed) => <option selected={speed === 1} value={String(speed)}>{speed}×</option>)}
-    </select>
-    <button
-      class="hidden h-8 cursor-pointer items-center gap-1.5 rounded-blume px-2 text-accent text-xs transition-colors hover:bg-muted"
-      data-narration-follow
-      type="button"
-    >
-      <Icon name="locate-fixed" size={14} />
-      {s.follow}
-    </button>
-    <button aria-label={s.stop} class={iconButton} data-narration-stop type="button">
-      <Icon name="x" size={16} />
-    </button>
+      <button
+        aria-label={s.pause}
+        class={iconButton}
+        data-label-pause={s.pause}
+        data-label-play={s.play}
+        data-narration-toggle
+        type="button"
+      >
+        <span data-narration-icon-pause><Icon name="pause" size={16} /></span>
+        <span class="hidden" data-narration-icon-play><Icon name="play" size={16} /></span>
+      </button>
+      <button aria-label={s.previous} class={iconButton} data-narration-previous type="button">
+        <Icon name="skip-back" size={16} />
+      </button>
+      <button aria-label={s.next} class={iconButton} data-narration-next type="button">
+        <Icon name="skip-forward" size={16} />
+      </button>
+      <input
+        aria-label={s.progress}
+        class="mx-1.5 h-4 min-w-12 flex-1 cursor-pointer appearance-none bg-transparent"
+        data-narration-seek
+        max="0"
+        min="0"
+        step="1"
+        type="range"
+        value="0"
+      />
+      {/* A narrow pill drops the readout; the seek bar still shows progress. */}
+      <span class="px-1 text-muted-foreground text-xs tabular-nums @max-sm:hidden" data-narration-time></span>
+      <span class="relative inline-flex shrink-0 items-center">
+        <select
+          aria-label={s.speed}
+          class="h-7 cursor-pointer appearance-none rounded-full bg-background ps-2.5 pe-6 text-foreground text-xs transition-colors hover:bg-muted"
+          data-narration-speed
+        >
+          {NARRATION_SPEEDS.map((speed) => <option selected={speed === 1} value={String(speed)}>{speed}×</option>)}
+        </select>
+        <Icon class="pointer-events-none absolute end-2 text-muted-foreground" name="chevron-down" size={12} />
+      </span>
+      <button
+        class="hidden h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2 text-accent text-xs transition-colors hover:bg-muted"
+        data-narration-follow
+        type="button"
+      >
+        <Icon name="locate-fixed" size={14} />
+        <span class="@max-sm:sr-only">{s.follow}</span>
+      </button>
+      <button aria-label={s.stop} class={iconButton} data-narration-stop type="button">
+        <Icon name="x" size={16} />
+      </button>
+    </div>
   </div>
   <p class="mt-2 hidden text-muted-foreground text-sm" data-narration-error role="status">
     {s.error}
@@ -126,14 +139,105 @@ const iconButton =
   ::highlight(blume-narration) {
     background-color: color-mix(in oklab, var(--blume-accent) 24%, transparent);
   }
-  /* While playing, the controls replace the start button and stay pinned
-     under the header as the article scrolls. */
+  /* While playing, the pill spans the article and stays pinned under the
+     header as the article scrolls. */
   [data-blume-narration-player].is-playing {
     position: sticky;
     top: 4.75rem;
   }
-  [data-blume-narration-player].is-playing [data-narration-start] {
-    display: none;
+  [data-blume-narration-player].is-playing [data-narration-shell] {
+    width: 100%;
+  }
+  [data-blume-narration-player]:not(.is-playing) [data-narration-shell]:hover {
+    border-color: color-mix(in oklab, var(--blume-foreground) 40%, transparent);
+  }
+  /* The seek bar: a thin track filled with the accent up to the thumb.
+     Firefox fills it natively; elsewhere the fill is a gradient stopping at
+     the thumb's center, which the script keeps in --narration-progress. */
+  [data-narration-seek] {
+    --narration-fill: var(--blume-accent);
+    --narration-rail: color-mix(in oklab, var(--blume-foreground) 14%, transparent);
+    --narration-direction: to right;
+  }
+  [data-narration-seek]:dir(rtl) {
+    --narration-direction: to left;
+  }
+  [data-narration-seek]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      var(--narration-direction),
+      var(--narration-fill) calc(6px + (100% - 12px) * var(--narration-progress, 0)),
+      var(--narration-rail) 0
+    );
+  }
+  [data-narration-seek]::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    margin-top: -4px;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--narration-fill);
+  }
+  [data-narration-seek]::-moz-range-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--narration-rail);
+  }
+  [data-narration-seek]::-moz-range-progress {
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--narration-fill);
+  }
+  [data-narration-seek]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--narration-fill);
+  }
+  /* Focus rings the thumb, not the whole bar. */
+  [data-narration-seek]:focus-visible {
+    outline: none;
+  }
+  [data-narration-seek]:focus-visible::-webkit-slider-thumb {
+    box-shadow:
+      0 0 0 2px var(--blume-background),
+      0 0 0 4px var(--blume-accent);
+  }
+  [data-narration-seek]:focus-visible::-moz-range-thumb {
+    box-shadow:
+      0 0 0 2px var(--blume-background),
+      0 0 0 4px var(--blume-accent);
+  }
+  /* Whichever of the start button and the controls isn't in use is invisible,
+     and out of the tab order. */
+  [data-narration-start],
+  [data-narration-controls] {
+    opacity: 0;
+    visibility: hidden;
+  }
+  [data-blume-narration-player]:not(.is-playing) [data-narration-start],
+  [data-blume-narration-player].is-playing [data-narration-controls] {
+    opacity: 1;
+    visibility: visible;
+  }
+  /* The one leaving fades out first; the one arriving is visible (so it can
+     take focus) at once, and fades in as the pill resizes. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-narration-start],
+    [data-narration-controls] {
+      transition:
+        opacity 120ms ease,
+        visibility 0s linear 120ms;
+    }
+    [data-blume-narration-player]:not(.is-playing) [data-narration-start],
+    [data-blume-narration-player].is-playing [data-narration-controls] {
+      transition:
+        opacity 180ms ease 100ms,
+        visibility 0s;
+    }
   }
 </style>
 
@@ -143,7 +247,12 @@ const iconButton =
     isInView,
     parseSpeed,
     pickVoice,
+    progressAt,
     progressLabel,
+    progressTotal,
+    seekKeyTarget,
+    spokenFraction,
+    stepAtProgress,
     stepsFromManifest,
     stepsFromSegments,
   } from "../../narration/player.ts";
@@ -169,6 +278,12 @@ const iconButton =
   // How long a scroll the player started is ignored by the "reader scrolled
   // away" check: a smooth scroll fires scroll events until it settles.
   const OWN_SCROLL_MS = 900;
+  // The pill widening to the controls, or narrowing back to the button.
+  const MORPH_MS = 320;
+  const MORPH_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
+  // How long after the click the reading starts, so the pill has finished
+  // widening before the first sentence sounds.
+  const START_DELAY_MS = 500;
 
   const domTree: NarrationTree<Node> = {
     attr: (node, name) =>
@@ -245,6 +360,11 @@ const iconButton =
     }
   };
 
+  const wait = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+
   const required = <T extends Element>(root: Element, selector: string): T => {
     const element = root.querySelector<T>(selector);
     if (!element) {
@@ -259,6 +379,7 @@ const iconButton =
     readonly #lang: string;
     readonly #manifestUrl: string | null;
     readonly #audioBase: string | null;
+    readonly #shell: HTMLElement;
     readonly #start: HTMLButtonElement;
     readonly #controls: HTMLElement;
     readonly #toggle: HTMLButtonElement;
@@ -279,8 +400,20 @@ const iconButton =
     #speed = readSpeed();
     #started = false;
     #playing = false;
+    // Started, and waiting for the pill to widen before reading.
+    #pending = false;
     #following = true;
     #ownScrollUntil = 0;
+    #morphing: Animation | null = null;
+    // Bumped by every start, so a start the reader stopped (or restarted)
+    // while it loaded never begins reading.
+    #session = 0;
+    // What's sounding the current step, and when a browser voice began it:
+    // the readout moves through a sentence from these.
+    #source: "clip" | "voice" | null = null;
+    #spokenAt: number | null = null;
+    #frame = 0;
+    #scrubbing = false;
     // Bumped whenever playback moves or stops, so a late `ended`/`end` from
     // the clip or utterance it replaced can't advance the new one.
     #token = 0;
@@ -291,6 +424,7 @@ const iconButton =
       this.#lang = root.dataset.lang || document.documentElement.lang || "en";
       this.#manifestUrl = root.dataset.manifest || null;
       this.#audioBase = root.dataset.audioBase || null;
+      this.#shell = required(root, "[data-narration-shell]");
       this.#start = required(root, "[data-narration-start]");
       this.#controls = required(root, "[data-narration-controls]");
       this.#toggle = required(root, "[data-narration-toggle]");
@@ -359,7 +493,7 @@ const iconButton =
       });
       this.#toggle.addEventListener(
         "click",
-        () => (this.#playing ? this.#pause() : this.#resume()),
+        () => (this.#playing || this.#pending ? this.#pause() : this.#resume()),
         { signal }
       );
       required(this.#root, "[data-narration-previous]").addEventListener(
@@ -372,11 +506,51 @@ const iconButton =
         () => this.#play(this.#index + 1),
         { signal }
       );
+      // The bar is measured in characters: dragging or clicking it plays the
+      // sentence under the thumb, and the arrow keys move a sentence at a time.
       this.#seek.addEventListener(
         "input",
-        () => this.#play(Number(this.#seek.value)),
+        () => {
+          const target = stepAtProgress(this.#steps, Number(this.#seek.value));
+          if (target === this.#index) {
+            this.#renderProgress();
+          } else {
+            this.#play(target);
+          }
+        },
         { signal }
       );
+      this.#seek.addEventListener(
+        "keydown",
+        (event) => {
+          const target = seekKeyTarget(
+            event.key,
+            this.#index,
+            this.#steps.length,
+            getComputedStyle(this.#seek).direction === "rtl"
+          );
+          if (target !== null) {
+            event.preventDefault();
+            this.#play(target);
+          }
+        },
+        { signal }
+      );
+      this.#seek.addEventListener(
+        "pointerdown",
+        () => {
+          this.#scrubbing = true;
+        },
+        { signal }
+      );
+      const release = () => {
+        if (this.#scrubbing) {
+          this.#scrubbing = false;
+          this.#renderProgress();
+        }
+      };
+      window.addEventListener("pointerup", release, { signal });
+      window.addEventListener("pointercancel", release, { signal });
       this.#speedSelect.addEventListener(
         "change",
         () => this.#setSpeed(Number(this.#speedSelect.value)),
@@ -403,15 +577,18 @@ const iconButton =
 
     async #begin(): Promise<void> {
       this.#started = true;
-      this.#controls.classList.remove("hidden");
-      this.#controls.classList.add("flex");
-      this.#root.classList.add("is-playing");
+      this.#session += 1;
+      const session = this.#session;
+      const current = () => this.#started && session === this.#session;
+      this.#pending = true;
+      this.#render();
+      const widened = this.#morph(true) ? wait(START_DELAY_MS) : null;
       this.#error.classList.add("hidden");
       // The start button just disappeared under focus; hand it to the
       // play/pause button so a keyboard reader keeps their place.
       this.#toggle.focus();
       this.#steps = await this.#loadSteps();
-      if (!this.#started) {
+      if (!current()) {
         return;
       }
       if (this.#steps.length === 0) {
@@ -419,8 +596,15 @@ const iconButton =
         this.#error.classList.remove("hidden");
         return;
       }
-      this.#seek.max = String(this.#steps.length - 1);
+      this.#seek.max = String(progressTotal(this.#steps));
+      this.#index = 0;
+      this.#render();
       track("narration_play", { engine: this.#engine, path: location.pathname });
+      await widened;
+      // Pausing, seeking, or skipping in the meantime already decided.
+      if (!(current() && this.#pending)) {
+        return;
+      }
       this.#play(0);
     }
 
@@ -461,6 +645,7 @@ const iconButton =
       if (!this.#started || this.#steps.length === 0) {
         return;
       }
+      this.#pending = false;
       this.#halt();
       if (target >= this.#steps.length) {
         track("narration_complete", { path: location.pathname });
@@ -474,6 +659,7 @@ const iconButton =
       }
       this.#index = index;
       this.#playing = true;
+      this.#tick();
       const token = this.#token;
       const range = this.#rangeAt(index);
       this.#reveal(range);
@@ -492,6 +678,7 @@ const iconButton =
       // keep playing new sources without another gesture.
       this.#audio ??= new Audio();
       const audio = this.#audio;
+      this.#source = "clip";
       audio.src = src;
       audio.playbackRate = this.#speed;
       audio.onended = () => {
@@ -534,6 +721,13 @@ const iconButton =
       utterance.voice = voice;
       utterance.lang = voice.lang;
       utterance.rate = this.#speed;
+      this.#source = "voice";
+      this.#spokenAt = null;
+      utterance.onstart = () => {
+        if (token === this.#token) {
+          this.#spokenAt = performance.now();
+        }
+      };
       utterance.onend = () => {
         if (token === this.#token) {
           this.#play(this.#index + 1);
@@ -560,6 +754,8 @@ const iconButton =
     #halt(): void {
       this.#token += 1;
       this.#playing = false;
+      // A stopped browser voice starts its sentence over.
+      this.#spokenAt = null;
       if (this.#audio) {
         this.#audio.onended = null;
         this.#audio.onerror = null;
@@ -570,6 +766,7 @@ const iconButton =
     }
 
     #pause(): void {
+      this.#pending = false;
       // A clip pauses in place and resumes mid-sentence; a browser voice has
       // no reliable pause across engines, so it restarts the sentence.
       if (this.#engine === "audio" && this.#audio && !this.#audio.paused) {
@@ -593,6 +790,7 @@ const iconButton =
         this.#playing = true;
         audio.playbackRate = this.#speed;
         void audio.play();
+        this.#tick();
         this.#render();
         return;
       }
@@ -603,15 +801,47 @@ const iconButton =
       const hadFocus = this.#controls.contains(document.activeElement);
       this.#halt();
       this.#started = false;
+      this.#pending = false;
       this.#index = 0;
       setHighlight(null);
       this.#setFollowing(true);
-      this.#root.classList.remove("is-playing");
-      this.#controls.classList.add("hidden");
-      this.#controls.classList.remove("flex");
+      this.#source = null;
+      this.#render();
+      this.#morph(false);
       if (hadFocus) {
         this.#start.focus();
       }
+    }
+
+    // Swap the start button and the controls, animating the pill's width
+    // from where it is now (mid-animation, if it was already moving) to where
+    // the new state puts it. The animation leaves no inline width behind, so
+    // the pill keeps fitting its button, or the article, as the page resizes.
+    // Returns whether it animated.
+    #morph(playing: boolean): boolean {
+      const from = this.#shell.getBoundingClientRect().width;
+      this.#morphing?.cancel();
+      this.#root.classList.toggle("is-playing", playing);
+      const to = this.#shell.getBoundingClientRect().width;
+      if (from === to || reducedMotion()) {
+        return false;
+      }
+      // Clipped only while it moves, so focus rings aren't cut off at rest.
+      this.#shell.style.overflow = "hidden";
+      const animation = this.#shell.animate(
+        { width: [`${from}px`, `${to}px`] },
+        { duration: MORPH_MS, easing: MORPH_EASING }
+      );
+      this.#morphing = animation;
+      const settle = () => {
+        if (this.#morphing === animation) {
+          this.#morphing = null;
+          this.#shell.style.overflow = "";
+        }
+      };
+      animation.addEventListener("finish", settle);
+      animation.addEventListener("cancel", settle);
+      return true;
     }
 
     #setSpeed(speed: number): void {
@@ -629,25 +859,84 @@ const iconButton =
     }
 
     #render(): void {
-      const label = this.#playing
+      const playing = this.#playing || this.#pending;
+      const label = playing
         ? this.#toggle.dataset.labelPause
         : this.#toggle.dataset.labelPlay;
       this.#toggle.setAttribute("aria-label", label ?? "");
       required(this.#toggle, "[data-narration-icon-pause]").classList.toggle(
         "hidden",
-        !this.#playing
+        !playing
       );
       required(this.#toggle, "[data-narration-icon-play]").classList.toggle(
         "hidden",
-        this.#playing
+        playing
       );
-      this.#seek.value = String(this.#index);
-      this.#time.textContent = progressLabel(
+      this.#renderProgress();
+    }
+
+    // How far through the current step playback is: a clip reports its own
+    // time, a browser voice is estimated from when it started the sentence.
+    #fraction(): number {
+      const audio = this.#audio;
+      if (this.#source === "clip" && audio && audio.duration > 0) {
+        return Number.isFinite(audio.duration)
+          ? audio.currentTime / audio.duration
+          : 0;
+      }
+      const step = this.#steps[this.#index];
+      if (this.#source === "voice" && step && this.#spokenAt !== null) {
+        return spokenFraction(
+          step.text.length,
+          performance.now() - this.#spokenAt,
+          this.#speed,
+          this.#lang
+        );
+      }
+      return 0;
+    }
+
+    #renderProgress(): void {
+      const position = progressAt(this.#steps, this.#index, this.#fraction());
+      // While the reader drags the thumb, the bar shows where they are.
+      const shown = this.#scrubbing
+        ? Number(this.#seek.value)
+        : Math.round(position);
+      if (!this.#scrubbing) {
+        this.#seek.value = String(shown);
+      }
+      const total = Number(this.#seek.max);
+      this.#seek.style.setProperty(
+        "--narration-progress",
+        String(total > 0 ? shown / total : 0)
+      );
+      const label = progressLabel(
         this.#steps,
-        this.#index,
+        position,
         this.#speed,
         this.#lang
       );
+      if (this.#time.textContent !== label) {
+        this.#time.textContent = label;
+        this.#seek.setAttribute("aria-valuetext", label);
+      }
+    }
+
+    // Move the bar and readout every frame while reading, and stop once it
+    // pauses or stops.
+    #tick(): void {
+      if (this.#frame !== 0) {
+        return;
+      }
+      const frame = () => {
+        this.#frame = 0;
+        if (!this.#playing) {
+          return;
+        }
+        this.#renderProgress();
+        this.#frame = requestAnimationFrame(frame);
+      };
+      this.#frame = requestAnimationFrame(frame);
     }
 
     #rangeAt(index: number): Range | null {
