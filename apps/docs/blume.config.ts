@@ -162,6 +162,7 @@ export default defineConfig({
         },
         path: "/changelog",
       },
+      { label: "Pricing", path: "/pricing" },
     ],
   },
   redirects: [
@@ -264,6 +265,7 @@ export default defineConfig({
         "/compare/mintlify": "Blume vs Mintlify",
         "/compare/nextra": "Blume vs Nextra",
         "/compare/starlight": "Blume vs Starlight",
+        "/pricing": "Pricing",
       },
     },
     organization: {

@@ -1,0 +1,108 @@
+---
+// "Feature by feature." — what each feature costs on Blume beside Mintlify,
+// including the credits Mintlify meters its AI features in, as the compare
+// pages' at-a-glance table in a tray (below `sm` each row stacks: the label
+// across the top, then the two answers side by side, each tagged). The
+// footnote names every page the prices were checked against, dates them,
+// and links a prefilled GitHub issue for corrections (ReportLink).
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import data from "blume:data";
+import SectionHeading from "../_home/SectionHeading.astro";
+import Tray from "../_home/Tray.astro";
+import { logos, withUniqueIds } from "../_home/migrate-sources.ts";
+import { inlineCode } from "../_home/shared.ts";
+import { checked, costs, sources } from "./prices.ts";
+import ReportLink from "./ReportLink.astro";
+
+const { config } = data;
+const blumeLogo = config.logo?.svg;
+
+---
+
+<section class="flex flex-col gap-12">
+  <SectionHeading
+    tagline="What each one costs on Blume, and on Mintlify."
+    title="Feature by feature."
+  />
+
+  <div class="flex flex-col gap-3">
+    <Tray innerClass="p-2 sm:p-4">
+      <table class="w-full border-collapse text-left">
+        <caption class="sr-only">
+          What each feature costs on Blume and on Mintlify
+        </caption>
+        <thead class="max-sm:hidden">
+          <tr>
+            <td class="w-44 p-4"></td>
+            <th class="p-4 font-medium text-base" scope="col">
+              <span class="flex items-center gap-2">
+                {
+                  blumeLogo && (
+                    <span
+                      aria-hidden="true"
+                      class="inline-flex h-4 text-foreground [&>svg]:h-full [&>svg]:w-auto"
+                      set:html={blumeLogo}
+                    />
+                  )
+                }
+                Blume
+              </span>
+            </th>
+            <th class="p-4 font-medium text-base" scope="col">
+              <span class="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  class="inline-flex size-4 shrink-0"
+                  set:html={withUniqueIds(logos.mintlify)}
+                />
+                Mintlify
+              </span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            costs.map((row) => (
+              <tr class="grid grid-cols-2 border-foreground/5 border-t first:border-t-0 sm:table-row sm:first:border-t">
+                <th
+                  class="col-span-2 px-2 pt-4 pb-2 align-top font-medium text-muted-foreground text-sm sm:table-cell sm:p-4"
+                  scope="row"
+                >
+                  {row.label}
+                </th>
+                <td class="px-2 pb-4 align-top text-pretty text-foreground text-sm sm:table-cell sm:p-4">
+                  <span class="mb-1 block text-muted-foreground text-xs sm:hidden">
+                    Blume
+                  </span>
+                  <span set:html={inlineCode(row.blume)} />
+                </td>
+                <td class="px-2 pb-4 align-top text-pretty text-muted-foreground text-sm sm:table-cell sm:p-4">
+                  <span class="mb-1 block text-xs sm:hidden">Mintlify</span>
+                  <span set:html={inlineCode(row.them)} />
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </Tray>
+    <p class="text-pretty text-muted-foreground text-xs">
+      Prices are from each vendor's own pages as of {checked}:{" "}
+      {
+        sources.map((source, index) => (
+          <Fragment>
+            {index > 0 && ", "}
+            <a
+              class="underline decoration-foreground/20 underline-offset-2 hover:text-foreground hover:decoration-foreground/50"
+              href={source.href}
+              {...NEW_TAB_ATTRS}
+            >
+              {source.label}
+            </a>
+          </Fragment>
+        ))
+      }.{" "}
+      <ReportLink />
+    </p>
+  </div>
+</section>

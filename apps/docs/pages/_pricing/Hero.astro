@@ -1,0 +1,145 @@
+---
+// The /pricing hero: the agents page's centered layout (the two-tone headline,
+// the summary, and two links beneath), over a tray holding the only plan
+// there is. The raised card on the left is the price, the install box, and a
+// sponsor link for anyone who wants to pay anyway; on the right, everything
+// the plan includes, each item checked in cornflower. The install box uses
+// the page-level delegated `data-blume-copy-install` handler.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import data from "blume:data";
+import InstallBox from "../_home/InstallBox.astro";
+import TextLink from "../_home/TextLink.astro";
+import Tray from "../_home/Tray.astro";
+import { glyph, inlineCode } from "../_home/shared.ts";
+import { sponsorUrl } from "./prices.ts";
+
+const { config } = data;
+const blumeLogo = config.logo?.svg;
+const check = glyph("check");
+const chevron = glyph("chevron-right");
+
+const included = [
+  "Unlimited editors, pages, and traffic",
+  "Local search, or Algolia, Typesense, and more",
+  "OpenAPI, AsyncAPI, and GraphQL references",
+  "An in-page assistant on the model you choose",
+  "An MCP server for coding agents",
+  "llms.txt, Markdown mirrors, and a JSON API",
+  "Open Graph images for every page",
+  "Versioned docs with `blume version`",
+  "Every language, filled in by `blume translate`",
+  "Narration, read aloud as readers follow along",
+  "Blog and changelog pages with RSS",
+  "Analytics and cookie consent adapters",
+  "`blume validate`, `audit`, and `eval` for CI",
+  "`blume eject` to a standalone Astro app",
+];
+---
+
+<section class="flex flex-col gap-12 pt-16 sm:pt-24 lg:gap-16">
+  <div class="flex flex-col items-center gap-8 text-center">
+    <h1
+      class="max-w-[20ch] text-balance font-medium text-4xl sm:text-5xl lg:text-6xl"
+    >
+      <span class="block">Blume is free.</span>
+      <span class="block text-muted-foreground">Here's what your docs cost.</span>
+    </h1>
+    <p class="max-w-[60ch] text-pretty text-lg text-muted-foreground">
+      No plans, seats, or credits. Blume is open source and runs on your own
+      host, so you pay only your host and, for AI features, your model
+      provider. Here's how that compares with a hosted platform.
+    </p>
+    <div class="flex flex-wrap items-center justify-center gap-6">
+      <TextLink href="#calculator">Price your docs</TextLink>
+      <TextLink href="/compare/mintlify">Compare with Mintlify</TextLink>
+    </div>
+  </div>
+
+  <Tray innerClass="p-2">
+    <div class="grid gap-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <article
+        class="flex flex-col gap-8 rounded-[20px] bg-background p-6 shadow-[0_12px_32px_-12px_rgb(28_40_64/0.25)] ring-1 ring-foreground/5 sm:p-8 dark:shadow-none"
+      >
+        <p class="flex items-center gap-2 font-medium text-xl">
+          {
+            blumeLogo && (
+              <span
+                aria-hidden="true"
+                class="inline-flex h-5 text-foreground [&>svg]:h-full [&>svg]:w-auto"
+                set:html={blumeLogo}
+              />
+            )
+          }
+          Blume
+        </p>
+        <div class="flex flex-col gap-3">
+          <p class="flex items-baseline gap-2">
+            <span class="font-medium text-7xl tabular-nums tracking-tight">
+              $0
+            </span>
+            <span class="text-muted-foreground">a month</span>
+          </p>
+          <p class="max-w-[40ch] text-pretty text-muted-foreground">
+            For every site, editor, and page, forever. No seat limits, usage
+            caps, or credits to buy.
+          </p>
+        </div>
+        <div class="mt-auto flex flex-col gap-4">
+          <InstallBox />
+          <p class="text-muted-foreground text-sm">
+            Want to pay anyway?{" "}
+            <a
+              class="inline-flex items-center gap-0.5 font-medium text-accent hover:text-foreground"
+              href={sponsorUrl}
+              {...NEW_TAB_ATTRS}
+            >
+              Sponsor Blume on GitHub
+              <svg
+                aria-hidden="true"
+                class="size-3.5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                set:html={chevron}
+              />
+            </a>
+          </p>
+        </div>
+      </article>
+
+      <div class="flex flex-col gap-6 p-6 sm:p-8">
+        <p class="font-medium">Everything's included</p>
+        <ul
+          class="grid gap-x-8 gap-y-3 text-base sm:grid-cols-2 sm:text-sm"
+          data-reveal
+          role="list"
+        >
+          {
+            included.map((item, index) => (
+              <li
+                class="reveal-rise flex gap-3 text-pretty text-muted-foreground"
+                style={`--reveal-delay: ${index * 40}ms`}
+              >
+                <svg
+                  aria-hidden="true"
+                  class="h-lh w-4 shrink-0 text-accent"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.5"
+                  viewBox="0 0 24 24"
+                  set:html={check}
+                />
+                <span set:html={inlineCode(item)} />
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </Tray>
+</section>

@@ -1,0 +1,246 @@
+---
+// "Price your docs." — a split with the inputs on the left (three starting
+// points, a slider per field, and the MCP server) and,
+// on a bloom tray, two receipts on the right: Mintlify's monthly bill and
+// Blume's, itemized, with the yearly difference beneath. The page renders the
+// middle preset, so the numbers are in the HTML for readers without script and
+// for agents; the script only re-runs `estimate` (inlined from prices.ts as
+// `estimateSource`, so both sides share one implementation) and refills the
+// receipts from the line <template>. Astro's ClientRouter runs an inline script once per
+// session, so this delegates from `document`, guarded by a global flag, and
+// refreshes on every `astro:page-load` in case the browser restored the
+// sliders to other positions.
+import data from "blume:data";
+import SectionHeading from "../_home/SectionHeading.astro";
+import Tray from "../_home/Tray.astro";
+import { logos, withUniqueIds } from "../_home/migrate-sources.ts";
+import type { PricingInput } from "./prices.ts";
+import {
+  estimate,
+  estimateSource,
+  fields,
+  presets,
+  prices,
+} from "./prices.ts";
+import Receipt from "./Receipt.astro";
+import ReceiptLine from "./ReceiptLine.astro";
+import ReportLink from "./ReportLink.astro";
+
+const { config } = data;
+const initial = presets[1];
+const result = estimate(initial.input, prices);
+
+const compact = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 1,
+  notation: "compact",
+});
+const sliders = fields.map((field) => ({
+  ...field,
+  index: field.steps.indexOf(initial.input[field.key]),
+  labels: field.steps.map((step) =>
+    field.key === "views" ? compact.format(step) : step.toLocaleString("en-US")
+  ),
+}));
+
+// A preset as slider positions, the form the script applies it in.
+const positions = (input: PricingInput) => ({
+  ...Object.fromEntries(
+    fields.map((field) => [field.key, field.steps.indexOf(input[field.key])])
+  ),
+  mcp: input.mcp,
+});
+
+const assumptions = `Estimates, not quotes. Mintlify is priced on Pro billed annually, with extra credits covered by the cheapest mix of one add-on and overage; Enterprise adds volume discounts it doesn't publish. Blume is priced on Cloudflare, where a server build's Worker answers page views too. An answer is priced on ${prices.model.id} and assumes about ${prices.answer.inputTokens.toLocaleString("en-US")} input and ${prices.answer.outputTokens.toLocaleString("en-US")} output tokens (a search and a page read before it replies), and a narrated page about ${prices.narration.charsPerPage.toLocaleString("en-US")} characters. A custom domain costs the same either way.`;
+
+const pricingScript = `(()=>{if(window.__blumePricing){return;}window.__blumePricing=true;${estimateSource}const prices=${JSON.stringify(prices)};const read=(root)=>{const input={mcp:root.querySelector("[data-mcp]").checked};for(const range of root.querySelectorAll("[data-field]")){const i=Number(range.value);const label=JSON.parse(range.dataset.labels)[i];input[range.dataset.field]=JSON.parse(range.dataset.steps)[i];range.style.setProperty("--pricing-progress",String(i/Number(range.max)));range.setAttribute("aria-valuetext",label);root.querySelector('[data-value-for="'+range.dataset.field+'"]').textContent=label;}return input;};const fill=(root,side,receipt)=>{const card=root.querySelector('[data-receipt="'+side+'"]');const row=root.querySelector("[data-line-template]").content.firstElementChild;card.querySelector("[data-lines]").replaceChildren(...receipt.lines.map((line)=>{const li=row.cloneNode(true);li.querySelector("[data-line-label]").textContent=line.label;li.querySelector("[data-line-amount]").textContent=line.amount;const note=li.querySelector("[data-line-note]");note.textContent=line.note;note.hidden=!line.note;return li;}));card.querySelector("[data-total]").textContent=receipt.total;card.querySelector("[data-yearly]").textContent=receipt.yearly;};const update=(root)=>{const result=estimate(read(root),prices);fill(root,"mintlify",result.mintlify);fill(root,"blume",result.blume);root.querySelector("[data-difference]").textContent=result.difference;};const refresh=()=>{for(const root of document.querySelectorAll("[data-pricing]")){update(root);}};document.addEventListener("input",(e)=>{const root=e.target instanceof Element&&e.target.closest("[data-pricing]");if(!root){return;}for(const b of root.querySelectorAll("[data-preset]")){b.setAttribute("aria-pressed","false");}update(root);});document.addEventListener("click",(e)=>{const button=e.target instanceof Element&&e.target.closest("[data-preset]");const root=button&&button.closest("[data-pricing]");if(!root){return;}const state=JSON.parse(button.dataset.preset);for(const range of root.querySelectorAll("[data-field]")){range.value=String(state[range.dataset.field]);}root.querySelector("[data-mcp]").checked=state.mcp;for(const b of root.querySelectorAll("[data-preset]")){b.setAttribute("aria-pressed",String(b===button));}update(root);});refresh();document.addEventListener("astro:page-load",refresh);})();`;
+---
+
+<section class="flex scroll-mt-24 flex-col gap-12" data-pricing id="calculator">
+  <SectionHeading
+    tagline="Move the sliders. Blume's line stays at $0."
+    title="Pricing that doesn't scale with you."
+  />
+
+  <div
+    class="grid items-start gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+  >
+    <div class="flex flex-col gap-8">
+      <div class="flex flex-col gap-3">
+        <p class="text-muted-foreground text-sm" id="pricing-presets">
+          Start from
+        </p>
+        <div
+          aria-labelledby="pricing-presets"
+          class="flex flex-wrap gap-2"
+          role="group"
+        >
+          {
+            presets.map((preset) => (
+              <button
+                aria-pressed={preset.id === initial.id ? "true" : "false"}
+                class="cursor-pointer rounded-full px-3.5 py-1.5 text-sm ring-1 ring-border hover:bg-muted aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:ring-foreground"
+                data-preset={JSON.stringify(positions(preset.input))}
+                type="button"
+              >
+                {preset.label}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      {
+        sliders.map((slider) => (
+          <div class="flex flex-col gap-3">
+            <div class="flex items-baseline justify-between gap-4">
+              <label class="font-medium text-sm" for={`pricing-${slider.key}`}>
+                {slider.label}
+              </label>
+              <output
+                class="font-medium tabular-nums"
+                data-value-for={slider.key}
+                for={`pricing-${slider.key}`}
+              >
+                {slider.labels[slider.index]}
+              </output>
+            </div>
+            <input
+              aria-valuetext={slider.labels[slider.index]}
+              autocomplete="off"
+              class="pricing-range h-4 w-full cursor-pointer appearance-none bg-transparent"
+              data-field={slider.key}
+              data-labels={JSON.stringify(slider.labels)}
+              data-steps={JSON.stringify(slider.steps)}
+              id={`pricing-${slider.key}`}
+              max={slider.steps.length - 1}
+              min="0"
+              step="1"
+              style={`--pricing-progress: ${slider.index / (slider.steps.length - 1)}`}
+              type="range"
+              value={slider.index}
+            />
+          </div>
+        ))
+      }
+
+      <label class="flex cursor-pointer items-start gap-3 text-sm">
+        <input
+          autocomplete="off"
+          checked={initial.input.mcp}
+          class="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
+          data-mcp
+          type="checkbox"
+        />
+        <span>
+          <span class="font-medium">MCP server</span>
+          <span class="block text-muted-foreground">
+            Lets coding agents search and read your docs
+          </span>
+        </span>
+      </label>
+    </div>
+
+    <div class="flex min-w-0 flex-col gap-6">
+      <Tray innerClass="grid gap-4 p-4 sm:grid-cols-2 sm:p-8" tone="bloom">
+        <Receipt
+          logo={withUniqueIds(logos.mintlify)}
+          name="Mintlify"
+          receipt={result.mintlify}
+          side="mintlify"
+        />
+        <Receipt
+          logo={config.logo?.svg ?? ""}
+          name="Blume"
+          raised
+          receipt={result.blume}
+          side="blume"
+        />
+      </Tray>
+      <p
+        aria-live="polite"
+        class="text-balance font-medium text-2xl"
+        data-difference
+      >
+        {result.difference}
+      </p>
+      <p class="text-pretty text-muted-foreground text-xs">
+        {assumptions}{" "}
+        <ReportLink />
+      </p>
+    </div>
+  </div>
+
+  <template data-line-template>
+    <ReceiptLine line={{ amount: "", label: "", note: "" }} />
+  </template>
+</section>
+
+<script is:inline set:html={pricingScript} />
+
+<style>
+  /* The sliders, drawn like the narration player's seek bar: a thin rail
+     filled with the accent up to the thumb, with no native track or outline.
+     Firefox fills it natively; elsewhere the fill is a gradient stopping at
+     the thumb's center, which the script keeps in --pricing-progress. */
+  .pricing-range {
+    --pricing-fill: var(--blume-accent);
+    --pricing-rail: color-mix(in oklab, var(--blume-foreground) 14%, transparent);
+  }
+
+  .pricing-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--pricing-fill) calc(8px + (100% - 16px) * var(--pricing-progress, 0)),
+      var(--pricing-rail) 0
+    );
+  }
+
+  .pricing-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--pricing-fill);
+  }
+
+  .pricing-range::-moz-range-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--pricing-rail);
+  }
+
+  .pricing-range::-moz-range-progress {
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--pricing-fill);
+  }
+
+  .pricing-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--pricing-fill);
+  }
+
+  /* Focus rings the thumb, not the whole bar. */
+  .pricing-range:focus-visible {
+    outline: none;
+  }
+
+  .pricing-range:focus-visible::-webkit-slider-thumb {
+    box-shadow:
+      0 0 0 2px var(--blume-background),
+      0 0 0 4px var(--blume-accent);
+  }
+
+  .pricing-range:focus-visible::-moz-range-thumb {
+    box-shadow:
+      0 0 0 2px var(--blume-background),
+      0 0 0 4px var(--blume-accent);
+  }
+</style>

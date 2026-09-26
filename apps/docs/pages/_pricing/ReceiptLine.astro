@@ -1,0 +1,33 @@
+---
+// One line on a calculator receipt: the item and its amount joined by a dotted
+// leader, with a muted note beneath. The calculator also renders an empty one
+// inside a <template> and fills clones of it from its script, so this markup
+// is the only copy of a line and the `data-` hooks are its contract.
+import type { ReceiptLine } from "./prices.ts";
+
+interface Props {
+  line: ReceiptLine;
+}
+
+const { line } = Astro.props;
+---
+
+<li class="flex flex-col gap-1">
+  <div class="flex items-baseline gap-2">
+    <span class="text-foreground" data-line-label>{line.label}</span>
+    <span
+      aria-hidden="true"
+      class="min-w-4 flex-1 border-foreground/20 border-b border-dotted"
+    ></span>
+    <span class="text-foreground tabular-nums" data-line-amount>
+      {line.amount}
+    </span>
+  </div>
+  <span
+    class="text-pretty text-[0.6875rem] text-muted-foreground leading-snug"
+    data-line-note
+    hidden={!line.note}
+  >
+    {line.note}
+  </span>
+</li>

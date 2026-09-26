@@ -1,0 +1,92 @@
+---
+// A calculator receipt: one vendor's monthly bill, itemized in mono under its
+// mark, with the total and the yearly figure at the foot and a torn,
+// zig-zag bottom edge. `raised` is Blume's, lifted like the /compare model
+// cards. The drop shadow sits on a wrapper, since the edge's mask would
+// clip one on the receipt itself; in dark mode, where the shadow is dropped,
+// an inset hairline keeps the edge.
+import type { ReceiptLine as Line, Receipt } from "./prices.ts";
+import ReceiptLine from "./ReceiptLine.astro";
+
+interface Props {
+  logo: string;
+  name: string;
+  raised?: boolean;
+  receipt: Receipt;
+  side: string;
+}
+
+const { logo, name, raised = false, receipt, side } = Astro.props;
+---
+
+<div
+  class:list={[
+    "receipt-lift min-w-0",
+    raised && "receipt-lift-raised",
+  ]}
+>
+  <article
+    aria-label={`${name}, estimated monthly bill`}
+    class="receipt flex flex-col bg-background pb-7 font-mono text-xs dark:inset-ring dark:inset-ring-foreground/10"
+    data-receipt={side}
+  >
+    <header
+      class="flex items-center justify-between gap-4 border-border border-b border-dashed px-5 py-4"
+    >
+      <p class="flex items-center gap-2 font-medium font-sans text-foreground text-sm">
+        <span
+          aria-hidden="true"
+          class="inline-flex h-4 shrink-0 text-foreground [&>svg]:h-full [&>svg]:w-auto"
+          set:html={logo}
+        />
+        {name}
+      </p>
+      <p class="text-muted-foreground">Per month</p>
+    </header>
+    <ul class="flex flex-col gap-3 px-5 py-4" data-lines role="list">
+      {receipt.lines.map((line: Line) => <ReceiptLine line={line} />)}
+    </ul>
+    <div class="mx-5 mt-auto border-border border-t border-dashed pt-4">
+      <div class="flex items-baseline justify-between gap-4">
+        <span class="font-medium font-sans text-foreground text-sm">Total</span>
+        <span
+          class:list={[
+            "font-medium font-sans text-2xl tabular-nums",
+            raised ? "text-foreground" : "text-muted-foreground",
+          ]}
+          data-total
+        >
+          {receipt.total}
+        </span>
+      </div>
+      <p class="mt-1 text-right text-muted-foreground">
+        <span class="tabular-nums" data-yearly>{receipt.yearly}</span> a year
+      </p>
+    </div>
+  </article>
+</div>
+
+<style>
+  /* The torn edge: a row of 14px teeth cut into the bottom by a conic mask. */
+  .receipt {
+    mask: conic-gradient(
+        from -45deg at bottom,
+        #0000,
+        #000 1deg 89deg,
+        #0000 90deg
+      )
+      50% / 14px 100%;
+  }
+
+  .receipt-lift {
+    filter: drop-shadow(0 1px 1px rgb(28 40 64 / 0.08));
+  }
+
+  .receipt-lift-raised {
+    filter: drop-shadow(0 16px 24px rgb(28 40 64 / 0.18));
+  }
+
+  :global([data-theme="dark"]) .receipt-lift {
+    filter: none;
+  }
+</style>

@@ -13,7 +13,7 @@ import Footer from "../_home/Footer.astro";
 import InstallCta from "../_home/InstallCta.astro";
 import Migrate from "../_home/Migrate.astro";
 import Motion from "../_home/Motion.astro";
-import { installCopyScript } from "../_home/shared.ts";
+import { faqJsonLd, installCopyScript } from "../_home/shared.ts";
 import CarryOver from "./CarryOver.astro";
 import Faq from "./Faq.astro";
 import Fit from "./Fit.astro";
@@ -27,18 +27,6 @@ interface Props {
 
 const { tool } = Astro.props;
 const { config } = data;
-
-// The questions as schema.org FAQPage structured data, with code-span
-// backticks dropped and `<` escaped so the JSON can't close its script tag.
-const faqJsonLd = JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  mainEntity: tool.faq.map((item) => ({
-    "@type": "Question",
-    acceptedAnswer: { "@type": "Answer", text: item.answer.replaceAll("`", "") },
-    name: item.question,
-  })),
-}).replaceAll("<", "\\u003c");
 ---
 
 <PageLayout
@@ -76,13 +64,20 @@ const faqJsonLd = JSON.stringify({
       <Migrate initial={tool.id} />
     </div>
 
-    <Faq tool={tool} />
+    <Faq
+      items={tool.faq}
+      tagline={`About moving from ${tool.source.name} to Blume.`}
+    />
 
     <InstallCta />
   </div>
   <!-- After the sections, so their reveal containers exist when it arms -->
   <Motion />
   <script is:inline set:html={installCopyScript} />
-  <script is:inline set:html={faqJsonLd} type="application/ld+json" />
+  <script
+    is:inline
+    set:html={faqJsonLd(tool.faq)}
+    type="application/ld+json"
+  />
   <Footer slot="footer" />
 </PageLayout>

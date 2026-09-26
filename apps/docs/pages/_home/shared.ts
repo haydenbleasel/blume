@@ -5,6 +5,7 @@
 // ready-to-inline, self-styled SVG inner markup; the section templates wrap it
 // in an `<svg viewBox="0 0 24 24">` root.
 
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
 import { resolveIcon } from "blume/theme/icons.ts";
 
 // Resolve a Lucide name to its inline body, or empty markup if it ever drops
@@ -101,6 +102,44 @@ export const inlineCode = (text: string): string =>
       .map((word) => `<span class="whitespace-nowrap">${word}</span>`);
     return `<code class="font-mono text-[0.925em] text-foreground">${words.join(" ")}</code>`;
   });
+
+// A Markdown-style link in data copy: `[label](href)`.
+const LINK = /\[(?<label>[^\]]+)\]\((?<href>[^)\s]+)\)/gu;
+
+const newTabAttrs = Object.entries(NEW_TAB_ATTRS)
+  .map(([name, value]) => ` ${name}="${value}"`)
+  .join("");
+
+// `inlineCode`, plus Markdown-style links (`[label](href)`), for data copy that
+// points somewhere, like the FAQ answers. An external link opens in a new tab,
+// as NEW_TAB_ATTRS does elsewhere.
+export const inlineMarkup = (text: string): string =>
+  inlineCode(text).replaceAll(
+    LINK,
+    (_match, label: string, href: string) =>
+      `<a class="text-foreground underline decoration-foreground/20 underline-offset-2 hover:decoration-foreground/60" href="${href}"${href.startsWith("http") ? newTabAttrs : ""}>${label}</a>`
+  );
+
+// A page's questions as schema.org FAQPage structured data (the compare pages
+// and /pricing), with code-span backticks dropped, links written out as
+// "label (href)", and `<` escaped so the JSON can't close its script tag.
+export const faqJsonLd = (
+  items: { answer: string; question: string }[]
+): string =>
+  JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer
+          .replaceAll("`", "")
+          .replaceAll(LINK, "$<label> ($<href>)"),
+      },
+      name: item.question,
+    })),
+  }).replaceAll("<", "\\u003c");
 
 // The command shown in the install box (rendered by InstallBox.astro), shared
 // with the hero and install CTA so they stay identical.

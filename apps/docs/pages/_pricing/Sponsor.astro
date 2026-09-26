@@ -1,0 +1,71 @@
+---
+// "Want to pay anyway?" — the page's one set of price tags, all optional: a
+// split like the compare pages' carry-over section, with the heading, why to
+// sponsor, and the current sponsors' wordmarks on the left, centered against
+// the GitHub Sponsors tiers on the right as cards in a tray, each linking to
+// the sponsor page (hovering lifts it, like the /compare directory cards).
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import SectionHeading from "../_home/SectionHeading.astro";
+import SponsorLogos from "../_home/SponsorLogos.astro";
+import TextLink from "../_home/TextLink.astro";
+import Tray from "../_home/Tray.astro";
+import { sponsorTiers, sponsorUrl } from "./prices.ts";
+---
+
+<section
+  class="grid scroll-mt-24 items-center gap-x-16 gap-y-12 lg:grid-cols-2"
+  id="sponsor"
+>
+  <div class="flex flex-col items-start gap-10">
+    <SectionHeading
+      tagline="Sponsor Blume on GitHub."
+      title="Want to pay anyway?"
+    />
+    <div class="flex flex-col items-start gap-6">
+      <p class="max-w-[48ch] text-balance text-lg text-muted-foreground">
+        Blume stays free either way. If it saves your team money, sponsoring
+        its maintainer on GitHub helps keep it maintained, monthly or once.
+      </p>
+      <TextLink external href={sponsorUrl}>Become a sponsor</TextLink>
+    </div>
+    <div class="flex w-full flex-col gap-5 border-border border-t pt-8">
+      <p class="text-muted-foreground text-sm">Thanks to our sponsors</p>
+      <SponsorLogos />
+    </div>
+  </div>
+
+  <Tray innerClass="p-2">
+    <ul
+      class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
+      data-reveal
+      role="list"
+    >
+      {
+        sponsorTiers.map((tier, index) => (
+          <li
+            class="reveal-rise"
+            style={`--reveal-delay: ${index * 60}ms`}
+          >
+            <a
+              class="flex h-full flex-col gap-10 rounded-[20px] bg-background p-6 shadow-[0_1px_2px_rgb(28_40_64/0.06)] ring-1 ring-foreground/5 hover:shadow-[0_12px_32px_-12px_rgb(28_40_64/0.25)] motion-safe:transition-shadow dark:shadow-none dark:hover:ring-foreground/15"
+              href={sponsorUrl}
+              {...NEW_TAB_ATTRS}
+            >
+              <span class="flex items-baseline gap-1.5">
+                <span class="font-medium text-2xl tabular-nums">
+                  {tier.price}
+                </span>
+                {index > 0 && (
+                  <span class="text-muted-foreground text-sm">a month</span>
+                )}
+              </span>
+              <span class="mt-auto text-pretty text-muted-foreground text-sm">
+                {tier.perk}
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </Tray>
+</section>

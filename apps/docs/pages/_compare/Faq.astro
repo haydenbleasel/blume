@@ -1,28 +1,29 @@
 ---
-// Frequently asked questions for a compare page: a split with the two-tone
-// heading on the left and the questions as native disclosures on the right
-// (the first open), so the answers are in the HTML for readers, crawlers,
-// and agents alike. The page also emits them as FAQPage JSON-LD.
+// Frequently asked questions for a compare page or /pricing: a split with the
+// two-tone heading on the left and the questions as native disclosures on the
+// right (the first open), so the answers are in the HTML for readers,
+// crawlers, and agents alike. The page also emits them as FAQPage JSON-LD
+// (`faqJsonLd` in _home/shared.ts).
 import SectionHeading from "../_home/SectionHeading.astro";
-import { glyph, inlineCode } from "../_home/shared.ts";
-import type { CompareTool } from "./tools.ts";
+import { glyph, inlineMarkup } from "../_home/shared.ts";
 
 interface Props {
-  tool: CompareTool;
+  items: { answer: string; question: string }[];
+  tagline: string;
 }
 
-const { tool } = Astro.props;
+const { items, tagline } = Astro.props;
 const chevron = glyph("chevron-down");
 ---
 
 <section class="grid items-start gap-x-16 gap-y-10 lg:grid-cols-2">
   <SectionHeading
-    tagline={`About moving from ${tool.source.name} to Blume.`}
+    tagline={tagline}
     title="Questions, answered."
   />
   <div class="divide-y divide-border border-border border-y">
     {
-      tool.faq.map((item, index) => (
+      items.map((item, index) => (
         <details class="group py-2" open={index === 0}>
           <summary class="flex cursor-pointer list-none items-center justify-between gap-4 py-3 font-medium text-base text-foreground sm:text-sm [&::-webkit-details-marker]:hidden">
             {item.question}
@@ -40,7 +41,7 @@ const chevron = glyph("chevron-down");
           </summary>
           <p
             class="max-w-[60ch] pb-4 text-pretty text-base text-muted-foreground sm:text-sm"
-            set:html={inlineCode(item.answer)}
+            set:html={inlineMarkup(item.answer)}
           />
         </details>
       ))

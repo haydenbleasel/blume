@@ -1,0 +1,49 @@
+---
+// "Something out of date? Let us know" for the /pricing footnotes, as on the
+// compare pages: a new GitHub issue prefilled with this page and prompts for
+// what changed and where, so readers can keep the prices honest. Renders
+// nothing when the site has no repository.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import data from "blume:data";
+import { glyph } from "../_home/shared.ts";
+
+const { config } = data;
+
+const query = new URLSearchParams({
+  body: [
+    `Page: ${config.site ?? ""}/pricing`,
+    "",
+    "What's out of date:",
+    "",
+    "Where the current details are (a link helps):",
+  ].join("\n"),
+  title: "Pricing page: something is out of date",
+});
+const href = config.repoUrl ? `${config.repoUrl}/issues/new?${query}` : null;
+---
+
+{
+  href && (
+    <Fragment>
+      Something out of date?{" "}
+      <a
+        class="inline-flex items-center gap-0.5 font-medium text-accent hover:text-foreground"
+        href={href}
+        {...NEW_TAB_ATTRS}
+      >
+        Let us know
+        <svg
+          aria-hidden="true"
+          class="size-3 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          set:html={glyph("chevron-right")}
+        />
+      </a>
+    </Fragment>
+  )
+}

@@ -1,0 +1,50 @@
+---
+// "Your host sets the price." — where a Blume site can run and what each host
+// charges, as a hairline grid like the compare pages' fit section: one column
+// per host, its mark and name over its free plan, then its paid one. The
+// deployment guide link covers static and server builds on each.
+import SectionHeading from "../_home/SectionHeading.astro";
+import TextLink from "../_home/TextLink.astro";
+import { hosts } from "./prices.ts";
+---
+
+<section class="flex flex-col gap-12">
+  <SectionHeading
+    tagline="Static builds run free on most of them."
+    title="Your host sets the price."
+  >
+    <TextLink href="/docs/deployment">Read the deployment guide</TextLink>
+  </SectionHeading>
+  <div class="grid gap-x-16 md:grid-cols-2 xl:grid-cols-4" data-reveal>
+    {
+      hosts.map((host, index) => (
+        <article
+          class="reveal-rise flex flex-col gap-4 border-border border-t py-6 text-base sm:text-sm"
+          style={`--reveal-delay: ${index * 100}ms`}
+        >
+          <div class="flex flex-col gap-3">
+            <svg
+              aria-hidden="true"
+              class="size-6 shrink-0 text-foreground"
+              fill={host.logo.color}
+              viewBox="0 0 24 24"
+            >
+              <path d={host.logo.path} />
+            </svg>
+            <h3 class="font-medium text-foreground">{host.name}</h3>
+          </div>
+          <dl class="flex flex-col gap-4">
+            <div>
+              <dt class="text-muted-foreground text-xs">Free plan</dt>
+              <dd class="mt-1 text-pretty text-foreground">{host.free}</dd>
+            </div>
+            <div>
+              <dt class="text-muted-foreground text-xs">Paid plans</dt>
+              <dd class="mt-1 text-pretty text-muted-foreground">{host.paid}</dd>
+            </div>
+          </dl>
+        </article>
+      ))
+    }
+  </div>
+</section>
