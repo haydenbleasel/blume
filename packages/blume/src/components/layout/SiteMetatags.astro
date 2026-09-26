@@ -1,0 +1,16 @@
+---
+import { metatagAttributes } from "../../seo/metatags.ts";
+
+/**
+ * The site's own `seo.metatags` in a page's head, after the tags Blume
+ * writes (see seo/metatags.ts). Every layout renders it, so a verification
+ * token or `theme-color` reaches every page.
+ */
+interface Props {
+  tags: Record<string, string> | null | undefined;
+}
+
+const { tags } = Astro.props;
+---
+
+{metatagAttributes(tags).map((attributes) => <meta {...attributes} />)}

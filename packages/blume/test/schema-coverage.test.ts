@@ -191,7 +191,6 @@ describe("pruned Mintlify-compat config fields", () => {
     const cases = {
       navigation: { chromeVariants: [] },
       search: { prompt: "Ask" },
-      seo: { metatags: {} },
       theme: { backgroundDecoration: "grid" },
     };
     for (const [field, value] of Object.entries(cases)) {

@@ -66,6 +66,7 @@ import { currentTabForRoute } from "./nav-utils.ts";
 import NavTabMenu from "./NavTabMenu.astro";
 import DrawerSwitchers from "./DrawerSwitchers.astro";
 import SiteFooter from "./SiteFooter.astro";
+import SiteMetatags from "./SiteMetatags.astro";
 import WebMcp from "./WebMcp.astro";
 
 interface Props {
@@ -403,6 +404,7 @@ const localeRedirect = localeTargets
     {description && <meta content={description} name="twitter:description" />}
     {xSite && <meta content={xSite} name="twitter:site" />}
     {xCreator && <meta content={xCreator} name="twitter:creator" />}
+    <SiteMetatags tags={data.config.metatags} />
     {/* Agent discovery on every page, so a custom page built on PageLayout is
         covered without passing a prop, the same way the docs pages are. */}
     <DiscoveryLinks discovery={discovery} markdownMirror={markdownMirror} />

@@ -30,6 +30,7 @@ import {
 import Header from "./Header.astro";
 import { pageDirection, pageLocale } from "./page-locale.ts";
 import { searchLocaleFor } from "./search-locale.ts";
+import SiteMetatags from "./SiteMetatags.astro";
 
 // A minimal shell for the Scalar API/AsyncAPI reference: Blume's banner + navbar
 // on top, then a full-height region the reference mounts into. Unlike RootLayout
@@ -128,6 +129,7 @@ createIconSprite(Astro.locals);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     {noindex && <meta name="robots" content="noindex" />}
     <title>{pageTitle}</title>
+    <SiteMetatags tags={data.config.metatags} />
     <Favicon favicon={favicon} appleIcon={appleIcon} />
     <Fonts cssVars={fontCssVars ?? []} />
     <DiscoveryLinks discovery={discovery} />

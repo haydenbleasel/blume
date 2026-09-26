@@ -188,6 +188,10 @@ export default defineConfig({
     ],
   },
   seo: {
+    metatags: {
+      "apple-mobile-web-app-title": "Blume Sandbox",
+      "theme-color": "#7c3aed",
+    },
     x: { creator: "@haydenbleasel", handle: "@haydenbleasel" },
   },
   theme: {

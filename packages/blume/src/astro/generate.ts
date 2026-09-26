@@ -1235,6 +1235,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
             route: config.agents.mcp.route,
           }
         : null,
+      metatags: config.seo.metatags ?? null,
       narration: config.narration.enabled
         ? { generated: config.narration.provider !== null }
         : null,

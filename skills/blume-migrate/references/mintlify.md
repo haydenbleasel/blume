@@ -32,7 +32,7 @@ Resolve `$ref` includes first (Mintlify splits config across files). Map only wh
 | `styling.latex: true` | **drop the field** — block math `$$…$$` renders in `.mdx` with no config | there is **no** `markdown.math` field; Blume writes inline math with two dollar signs too — convert each inline `$…$` to `$$…$$` inside the sentence, checking every pair is math and not currency or a shell variable |
 | `styling.codeblocks.theme` | `markdown.code.theme` (`{ light, dark }`) |  |
 | `search.prompt` | **drop** | no equivalent |
-| `seo.metatags` | **drop** | no equivalent; use per-page `seo` frontmatter |
+| `seo.metatags` | `seo.metatags`, minus the tags Blume writes itself | keep verification tokens, `theme-color`, and the like as written; Blume refuses `description`, `robots`, `og:title`/`og:description`/`og:image`/`og:url`/`og:type`/`og:site_name`, `twitter:*` card tags, and `article:*` dates, so move those to their settings (`og:image` → `seo.og` or a page's `seo.image`, `twitter:site` → `seo.x.handle`) and drop the rest. `seo.paths` (folder tags) has no equivalent: set per-page `seo` frontmatter |
 | `seo.indexing: "all"` | `search.indexing.includeHiddenPages: true` |  |
 | `variables` (`{{name}}`) | `variables` | same syntax and names (letters, digits, `_`, `-`); pages keep their `{{name}}` references unchanged |
 | `integrations.posthog` (`{ apiKey, apiHost, sessionRecording }`) | `posthog({ key, host })` in the `analytics` list | preserve the host verbatim (e.g. `us.posthog.com` — Blume's default is `us.i.posthog.com`); `sessionRecording: false` → `disable_session_recording: true`; every adapter is imported from `blume/analytics` |
@@ -187,4 +187,4 @@ Per-language `banner`, `navbar`, and `footer` (on `navigation.languages[]`) merg
 
 - **A group's `boost`** (on a `navigation` group, inherited by its pages) → no inherited boost; set `search.boost` on the pages that need it.
 - **Authentication** (password or SSO, set in the Mintlify dashboard) → Blume has none of its own; point the user at host-level protection (Vercel Deployment Protection, Netlify password protection, Cloudflare Access), per the deployment docs' **Private docs** section. It covers the whole site, so a mix of public and private pages needs two sites.
-- **`<Update>`** changelog components, `iconType`, `background.decoration`, `search.prompt`, `seo.metatags`.
+- **`<Update>`** changelog components, `iconType`, `background.decoration`, `search.prompt`.

@@ -94,6 +94,7 @@ import { searchLocaleFor } from "./search-locale.ts";
 import PageActions from "./PageActions.astro";
 import PageFeedback from "./PageFeedback.astro";
 import SiteFooter from "./SiteFooter.astro";
+import SiteMetatags from "./SiteMetatags.astro";
 import Pagination from "./Pagination.astro";
 import TableOfContents from "./TableOfContents.astro";
 import VersionBanner from "./VersionBanner.astro";
@@ -641,6 +642,7 @@ const localeRedirect = localeTargets
     {description && <meta name="twitter:description" content={description} />}
     {xSite && <meta name="twitter:site" content={xSite} />}
     {xCreator && <meta name="twitter:creator" content={xCreator} />}
+    <SiteMetatags tags={data.config.metatags} />
     {
       feeds?.map((feed) => (
         <link

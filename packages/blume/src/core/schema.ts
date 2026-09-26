@@ -31,6 +31,7 @@ import {
   resolvedSearchAdapterSchema,
 } from "../search/adapters/registry.ts";
 import type { SearchAdapterInput } from "../search/adapters/registry.ts";
+import { ownedMetatag } from "../seo/metatags.ts";
 import { normalizeXHandle } from "../seo/x-handle.ts";
 import { filesystem } from "../sources/filesystem.ts";
 import {
@@ -1617,6 +1618,26 @@ type SoftwareResolved = z.output<typeof softwareConfigSchema>;
 
 /** Discoverability features: OG images, feeds, sitemap, structured data. */
 const seoConfigFields = {
+  /**
+   * Meta tags written into every page's head, name to content: site
+   * verification, `theme-color`, and anything else Blume has no setting for.
+   * A tag Blume writes itself is refused with the setting that controls it.
+   */
+  metatags: z
+    .record(z.string().min(1), z.string())
+    .optional()
+    .superRefine((tags, ctx) => {
+      for (const name of Object.keys(tags ?? {})) {
+        const owner = ownedMetatag(name);
+        if (owner) {
+          ctx.addIssue({
+            code: "custom",
+            message: `seo.metatags can't set "${name}": Blume writes that tag. Set it with ${owner}.`,
+            path: [name],
+          });
+        }
+      }
+    }),
   og: ogConfigSchema.default({}),
   /** The organization behind the site, as an `Organization` JSON-LD node. */
   organization: organizationConfigSchema.optional(),

@@ -1170,6 +1170,23 @@ export interface SoftwareConfig {
 
 /** Discoverability: OG images, feeds, sitemap, robots, and structured data. */
 export interface SeoConfig {
+  /**
+   * Meta tags written into every page's head, name to content: site
+   * verification tokens, `theme-color`, an app banner, and anything else
+   * Blume has no setting for. `og:*`, `fb:*`, and `article:*` tags render
+   * with `property`, the rest with `name`. A tag Blume writes itself
+   * (`description`, `robots`, `og:image`, `twitter:card`, …) is refused.
+   *
+   * ```ts
+   * seo: {
+   *   metatags: {
+   *     "google-site-verification": "abc123",
+   *     "theme-color": "#0b5fff",
+   *   },
+   * }
+   * ```
+   */
+  metatags?: Record<string, string>;
   /** Per-page Open Graph image generation. */
   og?: OgConfig;
   /**

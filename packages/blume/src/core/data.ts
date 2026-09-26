@@ -208,6 +208,8 @@ export interface BlumeDataConfig {
   logo: BlumeLogo | null;
   /** Hosted MCP server, or `null` when MCP is off. */
   mcp: { name: string; route: string } | null;
+  /** `seo.metatags`: the site's own tags for every page's head, or `null`. */
+  metatags: Record<string, string> | null;
   /**
    * "Listen to this page": `generated` when a `narration.provider` makes
    * `blume build` write audio clips the player should look for, else the
