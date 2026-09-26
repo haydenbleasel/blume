@@ -1481,6 +1481,26 @@ describe("render-mdx", () => {
     });
   });
 
+  it("closes a description whose first paragraph introduces a list", () => {
+    const operation = operationMdx(specData({ title: "Example API" }), {
+      deprecated: false,
+      description:
+        "Delete pets in bulk. Supports two modes:\n\n- **Explicit IDs**: pass the IDs\n- **Select all**: set `select_all`",
+      key: "op",
+      method: "delete",
+      operationId: "op",
+      path: "/pets/bulk",
+      route: "/api/pets/op",
+      summary: "Bulk delete pets",
+      tag: "pet",
+      tagSlug: "pet",
+    });
+    expect(operation.data.seo).toStrictEqual({
+      description:
+        "Delete pets in bulk. Supports two modes. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+    });
+  });
+
   it("does not repeat API when the spec title already includes it", () => {
     const spec = specData({ title: "Example API" });
     const overview = overviewMdx(spec);
