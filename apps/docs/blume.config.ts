@@ -58,6 +58,14 @@ export default defineConfig({
   description:
     "The open-source docs framework for humans and agents. Drop Markdown into a folder and ship a fast, searchable docs site.",
   export: true,
+  // Docs pages only: the landing, CLI, and Agents pages pass their own
+  // footer (pages/_home/Footer.astro), which takes its place.
+  footer: {
+    socials: {
+      github: "https://github.com/haydenbleasel/blume",
+      x: "https://x.com/haydenbleasel",
+    },
+  },
   github: {
     dir: "apps/docs",
     owner: "haydenbleasel",
