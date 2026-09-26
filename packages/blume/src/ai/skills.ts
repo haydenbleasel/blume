@@ -29,7 +29,7 @@ const AGENT_SKILLS_SCHEMA =
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const SKILL_NAME_MAX = 64;
 /** The Agent Skills spec caps `description` at 1024 characters. */
-const DESCRIPTION_MAX = 1024;
+export const SKILL_DESCRIPTION_MAX = 1024;
 
 /** One publishable skill artifact plus its index entry. */
 export interface SkillArtifact {
@@ -142,7 +142,7 @@ const skillMeta = (raw: string, dirName: string): SkillMetaResult => {
     };
   }
   return {
-    meta: { description: description.slice(0, DESCRIPTION_MAX), name },
+    meta: { description: description.slice(0, SKILL_DESCRIPTION_MAX), name },
   };
 };
 
@@ -205,6 +205,39 @@ export const collectSkills = async (dir: string): Promise<CollectedSkills> => {
   }
   return { skills, warnings };
 };
+
+/** A skill that is one `SKILL.md`, published verbatim. */
+export const skillMdArtifact = (
+  name: string,
+  description: string,
+  markdown: string
+): SkillArtifact => {
+  const content = new TextEncoder().encode(markdown);
+  return {
+    content,
+    description: description.slice(0, SKILL_DESCRIPTION_MAX),
+    digest: sha256(content),
+    name,
+    path: `${name}/SKILL.md`,
+    type: "skill-md",
+  };
+};
+
+/**
+ * Whether the build generates the site's own skill (`agents.skillMd`): on,
+ * and with a `deployment.site` to make its links absolute, since an installed
+ * skill is read away from the site.
+ */
+export const generatesSiteSkill = (config: ResolvedConfig): boolean =>
+  config.agents.skillMd && Boolean(config.deployment.options.site);
+
+/**
+ * Whether a skills discovery index is served: from `agents.skills`, or for
+ * the generated site skill alone. On an advertised config (see
+ * `advertisedConfig`), both are already switched off when nothing published.
+ */
+export const servesSkillsIndex = (config: ResolvedConfig): boolean =>
+  Boolean(config.agents.skills) || generatesSiteSkill(config);
 
 /**
  * The discovery index (v0.2.0 schema). Artifact URLs are path-absolute under

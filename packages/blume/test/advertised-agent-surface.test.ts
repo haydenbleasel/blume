@@ -74,7 +74,9 @@ const build = async (
 const SKILLS_INDEX = "/.well-known/agent-skills/index.json";
 
 describe("agent skills in the discovery documents", () => {
-  const config = `export default { agents: { skills: "skills" }, deployment: ${deployment("netlify", "static")} };\n`;
+  // The generated site skill would publish an index on its own; these cases
+  // are about `agents.skills`.
+  const config = `export default { agents: { skillMd: false, skills: "skills" }, deployment: ${deployment("netlify", "static")} };\n`;
 
   it("advertises the skills index when a skill was published", async () => {
     const { file } = await build({

@@ -15,6 +15,11 @@ import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { buildLlmsFiles } from "../ai/llms.ts";
 import { markdownRoutePaths } from "../ai/markdown.ts";
 import {
+  buildSiteSkill,
+  SKILL_MD_PATH,
+  siteSkillName,
+} from "../ai/site-skill.ts";
+import {
   AGENT_SKILLS_DIR,
   AGENT_SKILLS_INDEX_PATH,
   buildSkillsIndex,
@@ -213,7 +218,8 @@ export const emitHeaderFiles = async (
 
 /**
  * Collect the Agent Skills `agents.skills` publishes, once per build, so both the
- * skills surface and llms.txt (which lists them) read the same set. Empty
+ * skills surface and llms.txt (which lists them) read the same set (the
+ * generated site skill joins them in {@link publishedSkills}). Empty
  * when the feature is off, the directory is missing, nothing in it is
  * publishable (each with a warning), or a user-shipped
  * `public/.well-known/agent-skills/index.json` already owns the surface.
@@ -247,6 +253,57 @@ const collectConfiguredSkills = async (
     );
   }
   return skills;
+};
+
+/**
+ * Every skill the build publishes: the `agents.skills` ones, plus the
+ * generated site skill unless one of those shares its name (the hand-written
+ * one wins) or a user-shipped index owns the surface.
+ */
+const publishedSkills = async (
+  project: BlumeProject,
+  distDir: string,
+  surface: { mcp: boolean; userIndex: boolean },
+  logger: ArtifactLogger
+): Promise<SkillArtifact[]> => {
+  const configured = await collectConfiguredSkills(project, distDir, logger);
+  // The skill lists the MCP server only when the build serves it.
+  const site = surface.userIndex
+    ? null
+    : buildSiteSkill({
+        ...project,
+        config: advertisedConfig(project.config, {
+          mcp: surface.mcp,
+          skills: true,
+        }),
+      });
+  return site && !configured.some((skill) => skill.name === site.name)
+    ? [site, ...configured]
+    : configured;
+};
+
+/**
+ * Serve the site skill at `/skill.md` too, the path agents try first: the
+ * generated one, or a same-named hand-written skill that is a lone
+ * `SKILL.md` (an archive's relative references need its other files). A
+ * `public/skill.md` wins.
+ */
+const emitSkillMd = async (
+  project: BlumeProject,
+  distDir: string,
+  skills: readonly SkillArtifact[],
+  logger: ArtifactLogger
+): Promise<void> => {
+  const target = join(distDir, SKILL_MD_PATH.slice(1));
+  const name = siteSkillName(project);
+  const skill = skills.find(
+    (candidate) => candidate.name === name && candidate.type === "skill-md"
+  );
+  if (!(project.config.agents.skillMd && skill) || existsSync(target)) {
+    return;
+  }
+  await writeFile(target, skill.content);
+  logger.info(`Generated ${SKILL_MD_PATH.slice(1)} (the "${name}" skill)`);
 };
 
 /**
@@ -399,18 +456,24 @@ export const publishBuildArtifacts = async (
   const userSkillsIndex = existsSync(
     join(distDir, AGENT_SKILLS_INDEX_PATH.slice(1))
   );
-  const skills = await collectConfiguredSkills(project, distDir, logger);
+  const mcp = servesMcp(
+    project,
+    project.context.pagesRoot
+      ? discoverPagesSync(project.context.pagesRoot)
+      : []
+  );
+  const skills = await publishedSkills(
+    project,
+    distDir,
+    { mcp, userIndex: userSkillsIndex },
+    logger
+  );
   // The discovery documents advertise what this build serves: no MCP server
   // when a page took its route, no skills index when nothing was published.
   const advertised: BlumeProject = {
     ...project,
     config: advertisedConfig(project.config, {
-      mcp: servesMcp(
-        project,
-        project.context.pagesRoot
-          ? discoverPagesSync(project.context.pagesRoot)
-          : []
-      ),
+      mcp,
       skills: skills.length > 0 || userSkillsIndex,
     }),
   };
@@ -449,6 +512,7 @@ export const publishBuildArtifacts = async (
 
   await emitWellKnownFiles(advertised.config, distDir, skills, logger);
   await emitAgentSkills(project, distDir, skills, logger);
+  await emitSkillMd(project, distDir, skills, logger);
 
   await emitRedirectFiles(advertised, distDir, logger);
   await emitHeaderFiles(advertised, distDir, logger);

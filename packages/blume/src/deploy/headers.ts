@@ -4,6 +4,7 @@ import {
   API_CATALOG_TYPE,
   hasApiCatalog,
 } from "../ai/api-catalog.ts";
+import { servesSkillsIndex } from "../ai/skills.ts";
 import {
   SIGNATURES_DIRECTORY_PATH,
   SIGNATURES_DIRECTORY_TYPE,
@@ -128,7 +129,7 @@ export const headerRules = (
   }
   // Published skills live at the deployment base, and the RFC wants their
   // archives served as application/gzip explicitly.
-  if (config.agents.skills) {
+  if (servesSkillsIndex(config)) {
     rules.push(
       {
         name: "Content-Type",

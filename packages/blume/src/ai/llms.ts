@@ -12,7 +12,11 @@ import { API_PAGES_PATH, OPENAPI_PATH } from "./api/paths.ts";
 import { downlevelComponents } from "./component-markdown.ts";
 import { relativeLinkRewriter } from "./relative-links.ts";
 import { projectComponentSerializers } from "./serializers.ts";
-import { AGENT_SKILLS_DIR, AGENT_SKILLS_INDEX_PATH } from "./skills.ts";
+import {
+  AGENT_SKILLS_DIR,
+  AGENT_SKILLS_INDEX_PATH,
+  servesSkillsIndex,
+} from "./skills.ts";
 import type { SkillArtifact } from "./skills.ts";
 import { applyAgentVisibility } from "./visibility.ts";
 
@@ -75,7 +79,7 @@ const agentResourceLines = (project: BlumeProject): string[] => {
       `- [MCP server](${url(config.agents.mcp.route)}): Streamable HTTP Model Context Protocol server with search_docs, get_page, list_pages, and get_navigation tools, plus every page as a resource. Discovery document: ${url("/.well-known/mcp.json")}`
     );
   }
-  if (config.agents.skills) {
+  if (servesSkillsIndex(config)) {
     lines.push(
       `- [Agent skills](${url(AGENT_SKILLS_INDEX_PATH)}): Agent Skills discovery index of the skills this site publishes.`
     );

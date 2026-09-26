@@ -11,7 +11,8 @@ export interface EmittedAgentSurface {
   mcp: boolean;
   /**
    * A skills discovery index is served: generated from `agents.skills` (at
-   * least one valid skill), or shipped by the user in `public/`.
+   * least one valid skill) or the site skill (`agents.skillMd`), or shipped
+   * by the user in `public/`.
    */
   skills: boolean;
 }
@@ -33,12 +34,12 @@ export const servesMcp = (
   );
 
 /**
- * The config the discovery documents are built from: `agents.mcp` and
- * `agents.skills` switched off when the build didn't emit them, so llms.txt,
- * agent-readability.json, the catalogs, and the header rules only point at
- * what is there. A config flag says what was asked for; the MCP server is
- * skipped when a page owns its route, and skills publish nothing when their
- * directory is missing or holds no valid skill.
+ * The config the discovery documents are built from: `agents.mcp`,
+ * `agents.skills`, and `agents.skillMd` switched off when the build didn't
+ * emit them, so llms.txt, agent-readability.json, the catalogs, and the
+ * header rules only point at what is there. A config flag says what was asked
+ * for; the MCP server is skipped when a page owns its route, and skills
+ * publish nothing when their directory is missing or holds no valid skill.
  */
 export const advertisedConfig = (
   config: ResolvedConfig,
@@ -51,6 +52,7 @@ export const advertisedConfig = (
       ...config.agents.mcp,
       enabled: config.agents.mcp.enabled && emitted.mcp,
     },
+    skillMd: config.agents.skillMd && emitted.skills,
     skills: emitted.skills ? config.agents.skills : undefined,
   },
 });

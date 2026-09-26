@@ -1712,6 +1712,14 @@ const agentsConfigSchema = z.strictObject({
   /** Expose the docs as an MCP server for connecting agents. */
   mcp: mcpConfigSchema.prefault({}),
   /**
+   * Generate the site's own agent skill: a `SKILL.md` named after the site,
+   * built from its navigation, page descriptions, and agent surfaces, served
+   * at `/skill.md` and in the skills discovery index. Needs a
+   * `deployment.site`. A skill in `agents.skills` with the same name replaces
+   * it. On by default.
+   */
+  skillMd: z.boolean().default(true),
+  /**
    * Publish Agent Skills for discovery: a directory (resolved against the
    * project root) whose subdirectories each hold a `SKILL.md`. The build
    * copies each skill under `/.well-known/agent-skills/` — a lone `SKILL.md`

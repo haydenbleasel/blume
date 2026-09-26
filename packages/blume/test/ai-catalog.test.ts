@@ -87,8 +87,14 @@ describe("buildAiCatalog", () => {
     expect(hasAiCatalog(configWith({ agents: { catalog: false } }))).toBe(
       false
     );
-    const bare = configWith({ agents: { api: false, llmsTxt: false } });
+    const bare = configWith({
+      agents: { api: false, llmsTxt: false, skillMd: false },
+    });
     expect(hasAiCatalog(bare)).toBe(false);
+    // The generated site skill alone is publishable.
+    expect(
+      hasAiCatalog(configWith({ agents: { api: false, llmsTxt: false } }))
+    ).toBe(true);
     expect(buildAiCatalog(bare, [])).toBeNull();
   });
 

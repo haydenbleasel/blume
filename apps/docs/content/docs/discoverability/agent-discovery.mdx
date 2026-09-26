@@ -1,6 +1,6 @@
 ---
 title: Agent discovery
-description: How agents find your machine-readable surface without guessing — the agent-readability manifest, Link headers, the RFC 9727 API catalog, WebMCP, published skills, DNS-based discovery, and Web Bot Auth keys.
+description: How agents find your machine-readable surface without guessing — the agent-readability manifest, Link headers, the RFC 9727 API catalog, WebMCP, your site's generated skill and published skills, DNS-based discovery, and Web Bot Auth keys.
 ---
 
 Publishing `llms.txt`, Markdown mirrors, a JSON API, and an MCP server is only half the job — an agent still has to find them. Blume advertises the whole surface through the conventions agents actually probe: a manifest at the site root, `Link` headers and `<link>` tags, well-known files, and the browser's own model context. Everything here is on by default and derived from what you've already enabled.
@@ -228,6 +228,25 @@ agents: {
 }
 ```
 
+## Your site's skill
+
+Every build writes an [agent skill](https://agentskills.io) for your docs, a `SKILL.md` a coding agent can install to work with your product. It's served at `/skill.md` and listed in the [skills index](#skills-discovery). Blume builds it from what it already knows about the site, without calling a model, so it costs nothing and changes whenever your docs do. It holds:
+
+- the site's title and description, and when an agent should use the skill
+- how to read any page as Markdown, plus `llms.txt`, `llms-full.txt`, the [MCP server](/docs/discoverability/mcp), the JSON API, and the changelog, when the site serves them
+- your API references
+- a map of the docs in sidebar order, linking each page's Markdown with its one-line description
+
+The skill is named after your site's `title` (`Acme Docs` becomes `acme-docs`). It covers the current version in the default language, leaves out API operation pages and changelog entries (each has one line of its own above the map), and lists up to 200 pages, pointing at `llms.txt` for the rest. The links are absolute, so the skill needs [`deployment.site`](/docs/deployment); a build without one skips it.
+
+The generated skill is a guide to your docs, not a summary of your product. To write that yourself, add a skill with the same name to [`agents.skills`](#skills-discovery). It replaces the generated one in the index, and at `/skill.md` too when it's a lone `SKILL.md`. A `public/skill.md` you ship wins over both. To turn the skill off:
+
+```ts blume.config.ts lineNumbers
+agents: {
+  skillMd: false,
+}
+```
+
 ## Skills discovery
 
 If your project ships [agent skills](https://agentskills.io) — the [Blume repo itself does](/docs/advanced/skills) — point `agents.skills` at the directory that holds them, and the build publishes them for discovery per the [Agent Skills Discovery RFC](https://github.com/cloudflare/agent-skills-discovery-rfc):
@@ -240,7 +259,7 @@ agents: {
 
 The path resolves against your project root, and each subdirectory with a `SKILL.md` becomes a published skill. A skill that's a lone `SKILL.md` is copied verbatim to `/.well-known/agent-skills/<name>/SKILL.md` (`type: "skill-md"`); a skill with supporting resources (`scripts/`, `references/`, `assets/`) is bundled into a deterministic `.tar.gz` (`type: "archive"`) so its relative references resolve after unpacking, with script execute bits preserved. The discovery index at `/.well-known/agent-skills/index.json` carries the v0.2.0 `$schema` and, per skill, its name, type, description (from the `SKILL.md` frontmatter), artifact URL, and the SHA-256 digest clients verify downloads against.
 
-Skills with a missing or spec-invalid `name`/`description` are skipped with a build warning rather than published broken, and a `public/.well-known/agent-skills/index.json` you ship yourself takes over the whole surface. Published skills are also listed in [`llms.txt`](/docs/discoverability/llms-txt#generated-sections).
+Skills with a missing or spec-invalid `name`/`description` are skipped with a build warning rather than published broken, and a `public/.well-known/agent-skills/index.json` you ship yourself takes over the whole surface. Published skills, [your site's own](#your-sites-skill) included, are also listed in [`llms.txt`](/docs/discoverability/llms-txt#generated-sections).
 
 ## DNS-based discovery (DNS-AID)
 

@@ -14,6 +14,7 @@ import { downlevelComponents } from "./component-markdown.ts";
 import { buildLlmsIndex } from "./llms.ts";
 import { relativeLinkRewriter } from "./relative-links.ts";
 import { projectComponentSerializers } from "./serializers.ts";
+import { servesSkillsIndex } from "./skills.ts";
 import { applyAgentVisibility } from "./visibility.ts";
 
 /** One route's raw-Markdown variants. */
@@ -115,7 +116,7 @@ export const buildRawMarkdown = async (
         config: advertisedConfig(project.config, {
           mcp: servesMcp(project, userPages),
           // Skills are collected at the end of the build, after this runs.
-          skills: Boolean(project.config.agents.skills),
+          skills: servesSkillsIndex(project.config),
         }),
       }),
     };

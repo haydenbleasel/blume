@@ -1743,15 +1743,20 @@ describe("agent-readability.json", () => {
     );
   });
 
-  it("advertises the agent-skills index only when skills are configured", () => {
+  it("advertises the agent-skills index when skills are configured or generated", () => {
     const manifest = buildAgentReadability(
-      makeProject([], { agents: { skills: "./skills" } })
+      makeProject([], { agents: { skillMd: false, skills: "./skills" } })
     );
     expect(manifest?.artifacts).toMatchObject({
       agentSkills: "https://example.com/.well-known/agent-skills/index.json",
     });
+    // The generated site skill publishes an index on its own.
+    expect(buildAgentReadability(makeProject([]))?.artifacts).toHaveProperty(
+      "agentSkills"
+    );
     expect(
-      buildAgentReadability(makeProject([]))?.artifacts
+      buildAgentReadability(makeProject([], { agents: { skillMd: false } }))
+        ?.artifacts
     ).not.toHaveProperty("agentSkills");
   });
 

@@ -175,6 +175,7 @@ describe("agents", () => {
       llmsTxt: { enabled: true, openapi: true },
       markdownComponents: {},
       mcp: { enabled: false, route: "/mcp" },
+      skillMd: true,
       webBotAuth: { keys: [] },
       webmcp: true,
     });

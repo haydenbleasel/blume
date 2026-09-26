@@ -978,6 +978,13 @@ export interface AgentsConfig {
   /** Expose the docs as an MCP server for agents. */
   mcp?: McpConfig;
   /**
+   * Generate the site's own agent skill: a `SKILL.md` named after the site,
+   * built from its navigation and page descriptions, served at `/skill.md`
+   * and in the skills discovery index. Needs `deployment.site`. A skill in
+   * `agents.skills` with the same name replaces it. Defaults to `true`.
+   */
+  skillMd?: boolean;
+  /**
    * Publish Agent Skills for discovery: a directory (resolved against the
    * project root) whose subdirectories each hold a `SKILL.md`. Skills are
    * copied under `/.well-known/agent-skills/` — single-file skills verbatim,

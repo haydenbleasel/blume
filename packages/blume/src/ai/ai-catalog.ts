@@ -10,7 +10,7 @@ import { resolveReferences } from "../openapi/references.ts";
 import { API_CATALOG_PATH, hasApiCatalog } from "./api-catalog.ts";
 import { OPENAPI_PATH } from "./api/paths.ts";
 import { asciiSlugify } from "./mcp/discovery.ts";
-import { AGENT_SKILLS_DIR } from "./skills.ts";
+import { AGENT_SKILLS_DIR, servesSkillsIndex } from "./skills.ts";
 import type { SkillArtifact } from "./skills.ts";
 
 /**
@@ -86,7 +86,7 @@ export const hasAiCatalog = (config: ResolvedConfig): boolean =>
   (config.agents.mcp.enabled ||
     config.agents.api ||
     config.agents.llmsTxt.enabled ||
-    Boolean(config.agents.skills) ||
+    servesSkillsIndex(config) ||
     resolveReferences(config).length > 0);
 
 /**
@@ -118,7 +118,10 @@ const NAMES_DOCS = /\b(?:docs|documentation)$/iu;
  * reads "the Acme documentation" and "Acme Docs" reads "the Acme Docs", not
  * "the Acme Docs docs".
  */
-const docsPhrase = (title: string, noun: "docs" | "documentation"): string =>
+export const docsPhrase = (
+  title: string,
+  noun: "docs" | "documentation"
+): string =>
   NAMES_DOCS.test(title.trim()) ? `the ${title}` : `the ${title} ${noun}`;
 
 const entrySeeds = (

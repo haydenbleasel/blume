@@ -8,6 +8,7 @@ import { buildRssFeeds } from "../deploy/rss.ts";
 import { AI_CATALOG_PATH, hasAiCatalog } from "./ai-catalog.ts";
 import { hasApiCatalog } from "./api-catalog.ts";
 import { API_PAGES_PATH, API_SEARCH_PATH, OPENAPI_PATH } from "./api/paths.ts";
+import { servesSkillsIndex } from "./skills.ts";
 
 /** Token map for the machine-readable content-usage echo. */
 const USAGE_TOKENS: [keyof ContentSignalPolicy, string][] = [
@@ -145,7 +146,7 @@ const wellKnownArtifacts = (
   if (hasApiCatalog(config)) {
     artifacts.apiCatalog = abs("/.well-known/api-catalog");
   }
-  if (config.agents.skills) {
+  if (servesSkillsIndex(config)) {
     artifacts.agentSkills = abs("/.well-known/agent-skills/index.json");
   }
   return artifacts;
