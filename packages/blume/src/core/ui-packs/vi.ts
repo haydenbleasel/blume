@@ -33,6 +33,7 @@ export const vi: UIStringsOverride = {
     error: "Xin lỗi, đã xảy ra sự cố.",
     explainCode: "Giải thích đoạn mã này.",
     label: "Đặt câu hỏi",
+    open: "Mở trợ lý",
     placeholder: "Đặt câu hỏi…",
     rateLimited: "Bạn đã hỏi rất nhiều câu hỏi. Hãy thử lại sau vài phút.",
     removeCode: "Xóa mã",

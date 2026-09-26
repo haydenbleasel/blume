@@ -34,6 +34,7 @@ export const hu: UIStringsOverride = {
     error: "Sajnáljuk, valami hiba történt.",
     explainCode: "Magyarázd el ezt a kódot.",
     label: "Tegyél fel egy kérdést",
+    open: "Asszisztens megnyitása",
     placeholder: "Tegyél fel egy kérdést…",
     rateLimited: "Sok kérdést tett fel. Próbálja újra néhány perc múlva.",
     removeCode: "Kód eltávolítása",

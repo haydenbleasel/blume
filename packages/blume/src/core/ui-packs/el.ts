@@ -34,6 +34,7 @@ export const el: UIStringsOverride = {
     error: "Λυπούμαστε, κάτι πήγε στραβά.",
     explainCode: "Εξήγησε αυτόν τον κώδικα.",
     label: "Κάντε μια ερώτηση",
+    open: "Άνοιγμα βοηθού",
     placeholder: "Κάντε μια ερώτηση…",
     rateLimited: "Κάνατε πολλές ερωτήσεις. Δοκιμάστε ξανά σε λίγα λεπτά.",
     removeCode: "Αφαίρεση κώδικα",

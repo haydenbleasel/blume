@@ -33,6 +33,7 @@ export const fa: UIStringsOverride = {
     error: "متأسفیم، مشکلی پیش آمد.",
     explainCode: "این کد را توضیح بده.",
     label: "یک سؤال بپرسید",
+    open: "باز کردن دستیار",
     placeholder: "یک سؤال بپرسید…",
     rateLimited: "سؤال‌های زیادی پرسیده‌اید. چند دقیقه دیگر دوباره امتحان کنید.",
     removeCode: "حذف کد",

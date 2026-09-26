@@ -34,6 +34,7 @@ export const nl: UIStringsOverride = {
     error: "Sorry, er is iets misgegaan.",
     explainCode: "Leg deze code uit.",
     label: "Stel een vraag",
+    open: "Assistent openen",
     placeholder: "Stel een vraag…",
     rateLimited:
       "Je hebt veel vragen gesteld. Probeer het over een paar minuten opnieuw.",

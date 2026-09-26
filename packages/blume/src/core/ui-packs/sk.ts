@@ -33,6 +33,7 @@ export const sk: UIStringsOverride = {
     error: "Ospravedlňujeme sa, niečo sa pokazilo.",
     explainCode: "Vysvetli tento kód.",
     label: "Položiť otázku",
+    open: "Otvoriť asistenta",
     placeholder: "Položiť otázku…",
     rateLimited: "Položili ste veľa otázok. Skúste to znova o pár minút.",
     removeCode: "Odstrániť kód",

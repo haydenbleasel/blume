@@ -33,6 +33,7 @@ export const da: UIStringsOverride = {
     error: "Beklager, noget gik galt.",
     explainCode: "Forklar denne kode.",
     label: "Stil et spørgsmål",
+    open: "Åbn assistenten",
     placeholder: "Stil et spørgsmål…",
     rateLimited:
       "Du har stillet mange spørgsmål. Prøv igen om et par minutter.",

@@ -55,8 +55,12 @@ if (variant === "drawer") {
 const summaryLabel =
   label === selector.label ? selector.label : `${selector.label}: ${label}`;
 
-const iconButton =
-  "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground";
+// Borderless in the header, like the icon buttons and the language switcher;
+// bordered in the drawer, where the trigger spans it.
+const triggerClass =
+  variant === "bar"
+    ? "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground group-open:bg-muted group-open:text-foreground"
+    : "inline-flex h-9 w-full cursor-pointer items-center gap-1.5 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground";
 const menuRowClass =
   "flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=true]:text-foreground";
 ---
@@ -69,11 +73,7 @@ const menuRowClass =
     >
       <summary
         aria-label={summaryLabel}
-        class:list={[
-          iconButton,
-          "list-none [&::-webkit-details-marker]:hidden",
-          variant === "drawer" && "w-full",
-        ]}
+        class:list={[triggerClass, "list-none [&::-webkit-details-marker]:hidden"]}
       >
         {active?.icon && <Icon name={active.icon} size={16} />}
         <span class={labelClass}>{label}</span>

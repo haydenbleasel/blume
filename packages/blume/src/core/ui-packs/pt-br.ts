@@ -34,6 +34,7 @@ export const ptBR: UIStringsOverride = {
     error: "Desculpe, algo deu errado.",
     explainCode: "Explique este código.",
     label: "Faça uma pergunta",
+    open: "Abrir assistente",
     placeholder: "Faça uma pergunta…",
     rateLimited:
       "Você fez muitas perguntas. Tente novamente em alguns minutos.",

@@ -61,10 +61,51 @@ export default defineConfig({
   // Docs pages only: the landing, CLI, and Agents pages pass their own
   // footer (pages/_home/Footer.astro), which takes its place.
   footer: {
-    socials: {
-      github: "https://github.com/haydenbleasel/blume",
-      x: "https://x.com/haydenbleasel",
-    },
+    links: [
+      {
+        href: "/changelog",
+        label: {
+          de: "Änderungen",
+          en: "Changelog",
+          hi: "चेंजलॉग",
+          ja: "変更履歴",
+          pt: "Alterações",
+        },
+      },
+      { href: "https://www.npmjs.com/package/blume", label: "npm" },
+      {
+        href: "https://github.com/sponsors/haydenbleasel",
+        label: {
+          de: "Sponsern",
+          en: "Sponsor",
+          hi: "प्रायोजक बनें",
+          ja: "スポンサー",
+          pt: "Patrocinar",
+        },
+      },
+      {
+        href: "https://github.com/haydenbleasel/blume/issues",
+        label: {
+          de: "Problem melden",
+          en: "Report an issue",
+          hi: "समस्या बताएं",
+          ja: "問題を報告",
+          pt: "Reportar um problema",
+        },
+      },
+      {
+        href: "https://github.com/haydenbleasel/blume/blob/main/LICENSE",
+        label: {
+          de: "MIT-Lizenz",
+          en: "MIT License",
+          hi: "MIT लाइसेंस",
+          ja: "MIT ライセンス",
+          pt: "Licença MIT",
+        },
+      },
+    ],
+    // The repository link comes first on its own, from `github`.
+    socials: { x: "https://x.com/haydenbleasel" },
   },
   github: {
     dir: "apps/docs",

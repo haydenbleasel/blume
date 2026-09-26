@@ -34,6 +34,7 @@ export const ro: UIStringsOverride = {
     error: "Ne pare rău, ceva nu a mers bine.",
     explainCode: "Explică acest cod.",
     label: "Pune o întrebare",
+    open: "Deschide asistentul",
     placeholder: "Pune o întrebare…",
     rateLimited:
       "Ai pus multe întrebări. Încearcă din nou peste câteva minute.",

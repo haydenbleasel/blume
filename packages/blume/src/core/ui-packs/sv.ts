@@ -34,6 +34,7 @@ export const sv: UIStringsOverride = {
     error: "Tyvärr, något gick fel.",
     explainCode: "Förklara den här koden.",
     label: "Ställ en fråga",
+    open: "Öppna assistenten",
     placeholder: "Ställ en fråga…",
     rateLimited: "Du har ställt många frågor. Försök igen om några minuter.",
     removeCode: "Ta bort koden",

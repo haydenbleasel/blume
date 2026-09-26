@@ -33,6 +33,7 @@ export const ar: UIStringsOverride = {
     error: "عذراً، حدث خطأ ما.",
     explainCode: "اشرح هذه الشيفرة.",
     label: "اطرح سؤالاً",
+    open: "فتح المساعد",
     placeholder: "اطرح سؤالاً…",
     rateLimited: "لقد طرحت الكثير من الأسئلة. حاول مرة أخرى بعد بضع دقائق.",
     removeCode: "إزالة الشيفرة",

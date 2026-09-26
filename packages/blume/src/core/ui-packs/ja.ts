@@ -34,6 +34,7 @@ export const ja: UIStringsOverride = {
     error: "申し訳ありません。問題が発生しました。",
     explainCode: "このコードを説明してください。",
     label: "質問する",
+    open: "アシスタントを開く",
     placeholder: "質問を入力…",
     rateLimited: "質問の回数が多すぎます。数分後にもう一度お試しください。",
     removeCode: "コードを削除",

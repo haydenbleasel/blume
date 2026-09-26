@@ -33,6 +33,7 @@ export const he: UIStringsOverride = {
     error: "מצטערים, משהו השתבש.",
     explainCode: "הסבר את הקוד הזה.",
     label: "שאל שאלה",
+    open: "פתיחת העוזר",
     placeholder: "שאל שאלה…",
     rateLimited: "שאלתם הרבה שאלות. נסו שוב בעוד כמה דקות.",
     removeCode: "הסרת הקוד",

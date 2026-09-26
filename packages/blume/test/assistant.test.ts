@@ -577,6 +577,7 @@ describe("Assistant empty state", () => {
         error: "Broke.",
         explainCode: "Explain.",
         label: "Type here",
+        open: "Open it",
         placeholder: "Go on…",
         rateLimited: "Slow down.",
         removeCode: "Drop code",

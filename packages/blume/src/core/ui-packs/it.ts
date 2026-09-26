@@ -33,6 +33,7 @@ export const it: UIStringsOverride = {
     error: "Spiacenti, qualcosa è andato storto.",
     explainCode: "Spiega questo codice.",
     label: "Fai una domanda",
+    open: "Apri l'assistente",
     placeholder: "Fai una domanda…",
     rateLimited: "Hai fatto molte domande. Riprova tra qualche minuto.",
     removeCode: "Rimuovi codice",

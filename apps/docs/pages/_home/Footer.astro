@@ -10,6 +10,9 @@ const title = config.title;
 const logoSvg = config.logo?.svg;
 const repoUrl = config.repoUrl;
 const year = new Date().getFullYear();
+// Round icon buttons, like the header's and the docs pages' footer.
+const iconButton =
+  "relative inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
 interface FooterLink {
   href: string;
@@ -121,12 +124,12 @@ for (const node of roots) {
       </p>
       <!-- Social links, icon-only; each carries its name for assistive tech
            and a 48px touch target on coarse pointers. -->
-      <div class="flex items-center gap-4 sm:justify-self-end">
+      <div class="-my-[9px] flex items-center gap-1 sm:-me-[9px] sm:justify-self-end">
         {
           repoUrl && (
             <a
               aria-label="GitHub"
-              class="relative inline-flex text-muted-foreground transition-colors hover:text-foreground"
+              class={iconButton}
               href={repoUrl}
               {...NEW_TAB_ATTRS}
             >
@@ -149,7 +152,7 @@ for (const node of roots) {
         }
         <a
           aria-label="X"
-          class="relative inline-flex text-muted-foreground transition-colors hover:text-foreground"
+          class={iconButton}
           href="https://x.com/haydenbleasel"
           {...NEW_TAB_ATTRS}
         >

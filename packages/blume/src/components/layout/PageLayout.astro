@@ -456,7 +456,12 @@ const localeRedirect = localeTargets
       Astro.slots.has("footer") ? (
         <slot name="footer" />
       ) : (
-        <SiteFooter footer={data.config.footer} locale={locale} ui={strings} />
+        <SiteFooter
+          footer={data.config.footer}
+          locale={locale}
+          navigation={navigation}
+          ui={strings}
+        />
       )
     }
     <WebMcp />

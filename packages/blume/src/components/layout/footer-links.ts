@@ -4,19 +4,13 @@ import type { RouteSet } from "../../core/locale-links.ts";
 import { resolveLocalizable } from "../../core/localizable.ts";
 import type { ResolvedConfig } from "../../core/schema.ts";
 
-/** The configured `footer.links` columns. */
-type FooterColumns = NonNullable<ResolvedConfig["footer"]>["links"];
+/** The configured `footer.links`. */
+type FooterLinks = NonNullable<ResolvedConfig["footer"]>["links"];
 
 /** A footer link, ready to render. */
 export interface FooterLinkItem {
   href: string;
   label: string;
-}
-
-/** A footer column, ready to render. */
-export interface FooterColumnItem {
-  items: FooterLinkItem[];
-  label?: string;
 }
 
 /** What resolving needs from the site and the page. */
@@ -30,15 +24,15 @@ export interface FooterContext {
 }
 
 /**
- * The footer's columns in the page's locale: a label written as a per-locale
+ * The footer's links in the page's locale: a label written as a per-locale
  * map shows that locale's entry (see `core/localizable.ts`), and an internal
  * link moves into the locale when it serves that page, the way content and
  * header links do, so a reader on `/fr/…` stays in French.
  */
-export const footerColumns = (
-  columns: FooterColumns,
+export const footerLinks = (
+  links: FooterLinks,
   context: FooterContext
-): FooterColumnItem[] => {
+): FooterLinkItem[] => {
   const { i18n, locale } = context;
   const defaultLocale = i18n?.defaultLocale;
   const localize = (href: string): string =>
@@ -52,14 +46,8 @@ export const footerColumns = (
           routes: context.routes,
         })
       : href;
-  return columns.map((column) => ({
-    items: column.items.map((item) => ({
-      href: localize(item.href),
-      label: resolveLocalizable(item.label, locale, defaultLocale),
-    })),
-    label:
-      column.label === undefined
-        ? undefined
-        : resolveLocalizable(column.label, locale, defaultLocale),
+  return links.map((link) => ({
+    href: localize(link.href),
+    label: resolveLocalizable(link.label, locale, defaultLocale),
   }));
 };

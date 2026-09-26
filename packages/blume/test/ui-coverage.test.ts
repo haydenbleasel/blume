@@ -1038,7 +1038,9 @@ describe("layout chrome sources", () => {
       '<span dir="auto">{content}</span>'
     );
     const search = await layoutSource("Search.astro");
-    expect(search.match(/dir="ltr">⌘[JK]<\/kbd/gu)).toHaveLength(2);
+    expect(search.match(/dir="ltr">⌘J<\/kbd/gu)).toHaveLength(1);
+    // The trigger's tooltip isolates its chord left to right.
+    expect(search).toContain("(\\u2066⌘K\\u2069)");
     const selector = await layoutSource("NavSelector.astro");
     expect(selector).toContain("data-blume-dropdown-panel");
     expect(selector).toContain("max-w-[calc(100vw-1rem)]");

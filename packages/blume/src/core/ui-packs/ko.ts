@@ -34,6 +34,7 @@ export const ko: UIStringsOverride = {
     error: "죄송합니다. 문제가 발생했습니다.",
     explainCode: "이 코드를 설명해 주세요.",
     label: "질문하기",
+    open: "어시스턴트 열기",
     placeholder: "질문하기…",
     rateLimited: "질문을 너무 많이 하셨습니다. 몇 분 후에 다시 시도해 주세요.",
     removeCode: "코드 제거",

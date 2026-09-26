@@ -1,0 +1,5 @@
+---
+"blume": minor
+---
+
+Slim the header down to icon buttons, making room in it. Search is now an icon button beside the theme toggle and the assistant, in place of the search field, and each icon button names itself in a tooltip on hover and keyboard focus: "Search (⌘K)" (`Ctrl K` off Apple devices), "Toggle theme", and "Open assistant". The GitHub link leaves the header for the new site footer, which is now the one place the site links its repository and social profiles; `navigation.repo` works as before and applies there. The header's tabs now sit at its center on wide screens. The version and language pickers lose their border to match the icon buttons, the header's right-hand controls sit closer together, and the language switcher drops its globe icon and always shows the language's name. Its menu now widens to fit, so a long language name no longer runs into the "Not translated" note beside it. A `Header` override is unaffected. The "Open assistant" tooltip is a new `assistant.open` UI string, translated in every built-in language pack.

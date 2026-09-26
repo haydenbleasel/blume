@@ -8,14 +8,20 @@ import { FOOTER_SOCIALS } from "../src/core/footer.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 
 /**
- * The site footer (`footer` in blume.config.ts): social profile icons and up
- * to four link columns, validated by the schema and rendered by
- * `SiteFooter.astro` from the links `footerSocialLinks` resolves.
+ * The site footer (`footer` in blume.config.ts): a row of links and social
+ * profile icons, validated by the schema and rendered by `SiteFooter.astro`
+ * from the links `footerSocialLinks` resolves.
  */
 
-/** A footer as written, valid or not. */
+/** A footer link as written. */
+interface LinkInput {
+  href: string;
+  label: string;
+}
+
+/** A footer as written, valid or not: a Mintlify-style column isn't. */
 interface FooterInput {
-  links?: { items: { href: string; label: string }[]; label?: string }[];
+  links?: (LinkInput | { items: LinkInput[]; label: string })[];
   socials?: Record<string, string>;
 }
 
@@ -30,12 +36,15 @@ const footerIssues = (footer: FooterInput): string[] => {
 };
 
 describe("the footer config", () => {
-  it("takes socials and link columns, and leaves the footer off when unset", () => {
+  it("takes socials and a row of links, and leaves the footer off when unset", () => {
     const { footer } = blumeConfigSchema.parse({
       footer: {
         links: [
-          { items: [{ href: "/docs", label: "Docs" }], label: "Product" },
-          { items: [{ href: "https://acme.dev/blog", label: "Blog" }] },
+          { href: "/docs", label: "Docs" },
+          {
+            href: "https://acme.dev/blog",
+            label: { en: "Blog", fr: "Blogue" },
+          },
         ],
         socials: { github: "https://github.com/acme", x: "https://x.com/acme" },
       },
@@ -48,17 +57,16 @@ describe("the footer config", () => {
     expect(blumeConfigSchema.parse({}).footer).toBeUndefined();
   });
 
-  it("rejects an unknown platform, a fifth column, and an empty one", () => {
+  it("rejects an unknown platform, and a column of links", () => {
     expect(footerIssues({ socials: { twitter: "https://x.com/a" } })).toEqual([
       'footer.socials: Unrecognized key: "twitter"',
     ]);
-    const column = { items: [{ href: "/a", label: "A" }] };
+    // Links are one row: a Mintlify-style column doesn't fit.
     expect(
-      footerIssues({ links: [column, column, column, column, column] })
-    ).toEqual(["footer.links: footer.links holds at most 4 columns."]);
-    expect(
-      footerIssues({ links: [{ items: [], label: "Empty" }] })
-    ).toHaveLength(1);
+      footerIssues({
+        links: [{ items: [{ href: "/a", label: "A" }], label: "Product" }],
+      })
+    ).toContain('footer.links.0: Unrecognized key: "items"');
   });
 });
 
@@ -87,6 +95,24 @@ describe(footerSocialLinks, () => {
         path: SOCIAL_ICONS.github.path,
       },
     ]);
+  });
+
+  it("leads with the site's repository, unless a GitHub link is set", () => {
+    const repo = { href: "https://github.com/acme/docs", label: "Repository" };
+    expect(footerSocialLinks({ x: "https://x.com/acme" }, repo)).toEqual([
+      { ...repo, path: SOCIAL_ICONS.github.path },
+      { href: "https://x.com/acme", label: "X", path: SOCIAL_ICONS.x.path },
+    ]);
+    expect(
+      footerSocialLinks({ github: "https://github.com/acme" }, repo)
+    ).toEqual([
+      {
+        href: "https://github.com/acme",
+        label: "GitHub",
+        path: SOCIAL_ICONS.github.path,
+      },
+    ]);
+    expect(footerSocialLinks({}, null)).toEqual([]);
   });
 
   it("skips an empty URL", () => {

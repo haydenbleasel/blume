@@ -34,6 +34,7 @@ export const de: UIStringsOverride = {
     error: "Entschuldigung, etwas ist schiefgelaufen.",
     explainCode: "Erkläre diesen Code.",
     label: "Eine Frage stellen",
+    open: "Assistenten öffnen",
     placeholder: "Eine Frage stellen…",
     rateLimited:
       "Du hast viele Fragen gestellt. Versuch es in ein paar Minuten noch einmal.",

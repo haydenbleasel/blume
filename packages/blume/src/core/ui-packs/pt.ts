@@ -34,6 +34,7 @@ export const pt: UIStringsOverride = {
     error: "Lamentamos, algo correu mal.",
     explainCode: "Explique este código.",
     label: "Faça uma pergunta",
+    open: "Abrir assistente",
     placeholder: "Faça uma pergunta…",
     rateLimited:
       "Fez muitas perguntas. Tente novamente dentro de alguns minutos.",

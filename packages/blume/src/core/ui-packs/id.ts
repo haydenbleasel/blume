@@ -34,6 +34,7 @@ export const id: UIStringsOverride = {
     error: "Maaf, terjadi kesalahan.",
     explainCode: "Jelaskan kode ini.",
     label: "Ajukan pertanyaan",
+    open: "Buka asisten",
     placeholder: "Ajukan pertanyaan…",
     rateLimited:
       "Anda sudah mengajukan banyak pertanyaan. Coba lagi dalam beberapa menit.",

@@ -59,12 +59,29 @@ export interface FooterSocialLink extends SocialIcon {
 const isFooterSocial = (key: string): key is FooterSocial =>
   Object.hasOwn(SOCIAL_ICONS, key);
 
-/** The configured socials, in the order written, each with its icon. */
+/** The site's repository, as the footer links it. */
+export interface FooterRepoLink {
+  href: string;
+  /** Its accessible name, in the page's language ("GitHub repository"). */
+  label: string;
+}
+
+/**
+ * The footer's social links, in the order written, each with its icon. The
+ * footer is the only place the site links its repository, so `repo` (from
+ * `github` in the config) leads as the GitHub link, unless `socials.github`
+ * names one itself.
+ */
 export const footerSocialLinks = (
-  socials: Partial<Record<FooterSocial, string>>
-): FooterSocialLink[] =>
-  Object.entries(socials).flatMap(([platform, href]) =>
+  socials: Partial<Record<FooterSocial, string>>,
+  repo?: FooterRepoLink | null
+): FooterSocialLink[] => {
+  const links = Object.entries(socials).flatMap(([platform, href]) =>
     isFooterSocial(platform) && href
       ? [{ ...SOCIAL_ICONS[platform], href }]
       : []
   );
+  return repo && !socials.github
+    ? [{ ...SOCIAL_ICONS.github, ...repo }, ...links]
+    : links;
+};

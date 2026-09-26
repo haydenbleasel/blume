@@ -53,6 +53,7 @@ const DEFAULT_ASK: UIStrings["assistant"] = {
   error: "Sorry, something went wrong.",
   explainCode: "Explain this code.",
   label: "Ask a question",
+  open: "Open assistant",
   placeholder: "Ask a question…",
   rateLimited: "You've asked a lot of questions. Try again in a few minutes.",
   removeCode: "Remove code",
@@ -646,6 +647,8 @@ const Assistant = ({
         aria-expanded={open}
         aria-label={t.title}
         className={TRIGGER_CLASS}
+        // Named by the header's tooltip, like the buttons beside it.
+        data-blume-tooltip={t.open}
         onClick={() => setOpen((value) => !value)}
         ref={triggerRef}
         type="button"

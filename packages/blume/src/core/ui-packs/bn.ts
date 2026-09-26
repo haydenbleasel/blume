@@ -33,6 +33,7 @@ export const bn: UIStringsOverride = {
     error: "দুঃখিত, কিছু একটা ভুল হয়েছে।",
     explainCode: "এই কোডটি ব্যাখ্যা করুন।",
     label: "একটি প্রশ্ন করুন",
+    open: "সহকারী খুলুন",
     placeholder: "একটি প্রশ্ন করুন…",
     rateLimited: "আপনি অনেক প্রশ্ন করেছেন। কয়েক মিনিট পরে আবার চেষ্টা করুন।",
     removeCode: "কোড সরান",

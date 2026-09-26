@@ -34,6 +34,7 @@ export const ca: UIStringsOverride = {
     error: "Ho sentim, alguna cosa ha anat malament.",
     explainCode: "Explica aquest codi.",
     label: "Fes una pregunta",
+    open: "Obre l'assistent",
     placeholder: "Fes una pregunta…",
     rateLimited:
       "Has fet moltes preguntes. Torna-ho a provar d'aquí a uns minuts.",

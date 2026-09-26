@@ -34,6 +34,7 @@ export const tr: UIStringsOverride = {
     error: "Üzgünüz, bir şeyler ters gitti.",
     explainCode: "Bu kodu açıkla.",
     label: "Bir soru sorun",
+    open: "Asistanı aç",
     placeholder: "Bir soru sorun…",
     rateLimited:
       "Çok sayıda soru sordunuz. Birkaç dakika sonra yeniden deneyin.",

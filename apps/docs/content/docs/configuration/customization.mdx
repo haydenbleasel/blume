@@ -100,9 +100,9 @@ Wired slots:
 | `Feedback` | The "Was this page helpful?" rating below the article (rendered only when [`feedback`](/docs/configuration#page-feedback) is on) | `strings`, `comments` |
 | `PageHeader` | An injection point above the article (no built-in) | `page`, `headings`, `route` |
 | `PageFooter` | An injection point below the article (no built-in) | `page`, `headings`, `route` |
-| `Footer` | The site footer after the content grid (built in when [`footer`](/docs/configuration#footer) or [`consent`](/docs/configuration/consent) is set) | `footer`, `locale`, `site`, `navigation`, `ui` |
+| `Footer` | The [site footer](/docs/configuration#footer) after the content grid: links, social profiles, the repository link, and Cookie settings | `footer`, `locale`, `site`, `navigation`, `ui` |
 
-`PageHeader` and `PageFooter` have no built-in component — they render nothing until you set them, which makes them handy injection points for a promo banner or a "last updated" note. The built-in `Footer` renders only when `footer` or `consent` is configured, so a `Footer` override is the place for a marketing footer the config can't express. With `consent` set, keep a way to reopen it: any element with `data-blume-consent-open` works as the [Cookie settings](/docs/configuration/consent#changing-an-answer) link.
+`PageHeader` and `PageFooter` have no built-in component — they render nothing until you set them, which makes them handy injection points for a promo banner or a "last updated" note. The built-in `Footer` holds the only links to your repository and social profiles, so a `Footer` override (the place for a marketing footer the config can't express) should keep them. With `consent` set, also keep a way to reopen it: any element with `data-blume-consent-open` works as the [Cookie settings](/docs/configuration/consent#changing-an-answer) link.
 
 Layout slots accept the same [three reference forms](#reference-form) as MDX overrides, so a slot can be a path string or a hydrated descriptor (`{ component, client }`) when you want an interactive header or footer.
 

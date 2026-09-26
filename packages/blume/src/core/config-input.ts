@@ -133,7 +133,7 @@ export interface ApiConfig {
   server?: string;
 }
 
-/** A link in a footer column. */
+/** A link in the footer's row. */
 export interface FooterLink {
   /** Link target (internal route or external URL). An external href opens in a new tab. */
   href: string;
@@ -141,21 +141,13 @@ export interface FooterLink {
   label: LocalizableLabel;
 }
 
-/** A footer link column. */
-export interface FooterColumn {
-  /** Links in the column, top to bottom. */
-  items: FooterLink[];
-  /** Column heading, or a map of locale code to heading. */
-  label?: LocalizableLabel;
-}
-
 /**
- * The site footer: social profile icons and link columns, rendered below the
- * content on every page.
+ * The site footer, below the content on every page: a row of links on one
+ * side, and social profile icons on the other.
  */
 export interface FooterConfig {
-  /** Link columns, at most four, left to right. */
-  links?: FooterColumn[];
+  /** Links in one row, left to right. */
+  links?: FooterLink[];
   /**
    * Social profiles, platform to URL, shown as icons in the order written:
    * `{ github: "https://github.com/acme", x: "https://x.com/acme" }`.
@@ -382,7 +374,7 @@ export interface NavigationConfig {
   /** Pinned links shown above the generated sidebar sections. */
   featured?: FeaturedLink[];
   /**
-   * The GitHub link in the header. `true` derives it from `github` (the
+   * The GitHub link in the footer. `true` derives it from `github` (the
    * default), `false` hides it, and an absolute URL points it anywhere on
    * GitHub — an organization, say, when the docs repo itself is private.
    */

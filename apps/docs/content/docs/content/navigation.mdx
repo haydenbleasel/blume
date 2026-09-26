@@ -310,17 +310,17 @@ An `http(s)` or protocol-relative href opens in a new tab; a route stays in the 
 
 ## Repository link
 
-When you set [`github`](/docs/configuration) in your config, Blume shows a GitHub icon in the header — beside the theme toggle — that links to your repository. It's on by default; hide it with `navigation.repo`:
+When you set [`github`](/docs/configuration) in your config, Blume shows a GitHub icon in the [footer](/docs/configuration#footer), ahead of your social profiles, that links to your repository. It's on by default; hide it with `navigation.repo`:
 
 ```ts blume.config.ts lineNumbers
 navigation: {
-  repo: false, // hide the header GitHub link (default: true)
+  repo: false, // hide the footer's GitHub link (default: true)
 }
 ```
 
 The link only appears when `github` is configured, so projects without a repo are unaffected either way.
 
-`repo` also takes an absolute URL, which points the header mark anywhere on GitHub:
+`repo` also takes an absolute URL, which points the GitHub mark anywhere on GitHub:
 
 ```ts blume.config.ts lineNumbers
 navigation: {
@@ -328,7 +328,7 @@ navigation: {
 }
 ```
 
-That's for a project whose docs repo is private. `github` drives the per-page edit link, the header mark and the [agent manifest](/docs/discoverability/agent-discovery)'s repository together, so such a project has to leave `github` unset — and a URL is what lets it still show a mark pointing somewhere public. The icon stays the GitHub mark, so a link to another host belongs in [`actions`](#header-actions).
+That's for a project whose docs repo is private. `github` drives the per-page edit link, the GitHub mark and the [agent manifest](/docs/discoverability/agent-discovery)'s repository together, so such a project has to leave `github` unset — and a URL is what lets it still show a mark pointing somewhere public. A `footer.socials.github` URL takes the mark's place, and a link to another host belongs in the footer's `links` or [`actions`](#header-actions).
 
 ## Breadcrumbs and pagination
 

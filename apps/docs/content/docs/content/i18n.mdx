@@ -85,7 +85,7 @@ i18n: {
 
 Each language gets its own sidebar, built from that locale's files — so translations can diverge in structure, ordering, or labels. Folder [`meta.ts`](/docs/content/meta) files resolve per locale, too: under the default `dir` parser, put a `meta.ts` under `fr/guides/` to order the French group independently. Until a locale has one (or a shared `meta.$.ts`), its group mirrors the [fallback](#fallbacks) locale's — that folder's `meta.ts` and the `sidebar.display` its index page sets — so pages that fall back keep the same titles, order, and collapsible groups. Under the `dot` parser translations sit next to the originals, so a folder's `meta.ts` applies to every locale. Everything else about [navigation](/docs/content/navigation) works the same, per language.
 
-Header tabs, header links, and the footer are configured, not derived from content, so their labels localize in `blume.config.ts`. Every configured label accepts a per-locale map (`{ en: "Docs", fr: "Documentation" }`) alongside the plain-string form, falling back to the default locale's entry for locales you haven't filled in: tab and dropdown labels ([Tabs](/docs/content/navigation#tabs)), [featured links](/docs/content/navigation#featured-links), [header actions](/docs/content/navigation#header-actions) and the call to action, [footer](/docs/configuration#footer) column headings and links, and the [banner](/docs/configuration#banner)'s text and link text.
+Header tabs, header links, and the footer are configured, not derived from content, so their labels localize in `blume.config.ts`. Every configured label accepts a per-locale map (`{ en: "Docs", fr: "Documentation" }`) alongside the plain-string form, falling back to the default locale's entry for locales you haven't filled in: tab and dropdown labels ([Tabs](/docs/content/navigation#tabs)), [featured links](/docs/content/navigation#featured-links), [header actions](/docs/content/navigation#header-actions) and the call to action, [footer](/docs/configuration#footer) links, and the [banner](/docs/configuration#banner)'s text and link text.
 
 ```ts blume.config.ts lineNumbers
 navigation: {
@@ -96,10 +96,7 @@ navigation: {
 },
 footer: {
   links: [
-    {
-      label: { en: "Company", fr: "Entreprise" },
-      items: [{ label: "Blog", href: "https://acme.dev/blog" }],
-    },
+    { label: { en: "Pricing", fr: "Tarifs" }, href: "https://acme.dev/pricing" },
   ],
 },
 ```

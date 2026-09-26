@@ -34,6 +34,7 @@ export const hr: UIStringsOverride = {
     error: "Žao nam je, nešto je pošlo po zlu.",
     explainCode: "Objasni ovaj kod.",
     label: "Postavi pitanje",
+    open: "Otvori asistenta",
     placeholder: "Postavite pitanje…",
     rateLimited:
       "Postavili ste mnogo pitanja. Pokušajte ponovno za nekoliko minuta.",

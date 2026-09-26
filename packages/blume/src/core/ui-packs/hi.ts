@@ -33,6 +33,7 @@ export const hi: UIStringsOverride = {
     error: "क्षमा करें, कुछ गलत हो गया।",
     explainCode: "इस कोड को समझाइए।",
     label: "एक प्रश्न पूछें",
+    open: "सहायक खोलें",
     placeholder: "एक प्रश्न पूछें…",
     rateLimited: "आपने बहुत सारे प्रश्न पूछे हैं। कुछ मिनट बाद फिर से प्रयास करें।",
     removeCode: "कोड हटाएँ",

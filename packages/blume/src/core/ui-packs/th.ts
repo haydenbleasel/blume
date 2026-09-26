@@ -33,6 +33,7 @@ export const th: UIStringsOverride = {
     error: "ขออภัย เกิดข้อผิดพลาดบางอย่าง",
     explainCode: "อธิบายโค้ดนี้",
     label: "ถามคำถาม",
+    open: "เปิดผู้ช่วย",
     placeholder: "ถามคำถาม…",
     rateLimited: "คุณถามคำถามจำนวนมากแล้ว โปรดลองอีกครั้งในอีกไม่กี่นาที",
     removeCode: "นำโค้ดออก",

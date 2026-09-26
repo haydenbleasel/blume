@@ -34,6 +34,7 @@ export const no: UIStringsOverride = {
     error: "Beklager, noe gikk galt.",
     explainCode: "Forklar denne koden.",
     label: "Still et spørsmål",
+    open: "Åpne assistenten",
     placeholder: "Still et spørsmål…",
     rateLimited: "Du har stilt mange spørsmål. Prøv igjen om noen minutter.",
     removeCode: "Fjern koden",

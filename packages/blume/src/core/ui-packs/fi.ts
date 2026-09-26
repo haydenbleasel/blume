@@ -33,6 +33,7 @@ export const fi: UIStringsOverride = {
     error: "Pahoittelut, jokin meni pieleen.",
     explainCode: "Selitä tämä koodi.",
     label: "Kysy kysymys",
+    open: "Avaa avustaja",
     placeholder: "Kysy kysymys…",
     rateLimited:
       "Olet esittänyt paljon kysymyksiä. Yritä uudelleen muutaman minuutin kuluttua.",

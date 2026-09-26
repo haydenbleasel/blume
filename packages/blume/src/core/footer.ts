@@ -24,6 +24,3 @@ export const FOOTER_SOCIALS = [
 
 /** A platform `footer.socials` links to. */
 export type FooterSocial = (typeof FOOTER_SOCIALS)[number];
-
-/** The most link columns a footer holds, as Mintlify's does. */
-export const MAX_FOOTER_COLUMNS = 4;

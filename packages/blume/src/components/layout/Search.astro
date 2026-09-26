@@ -93,23 +93,19 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
   data-version={version ?? undefined}
   data-versioned={version === null ? undefined : ""}
 >
-  {/* The label and shortcut hint wait until `lg`: below it the hamburger and
-      inline tab bar share the header row, and a full-width search field would
-      press into the language switcher. */}
+  {/* An icon button like the theme toggle beside it, named with its shortcut
+      by the header's tooltip. The chord reads left to right in every locale
+      ("⌘K", never "K⌘"), and the script swaps in Ctrl off Apple devices. */}
   <button
+    aria-keyshortcuts="Meta+K Control+K"
     aria-label={s.button}
-    class="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground lg:min-w-40"
+    class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
     data-blume-search-open
+    data-blume-tooltip={`${s.button} (\u2066⌘K\u2069)`}
+    data-label={s.button}
     type="button"
   >
-    <Icon name="search" size={16} />
-    <span class="flex-1 text-start max-lg:hidden">{s.button}</span>
-    {/* A key chord reads left to right in every locale ("⌘K", never "K⌘"). */}
-    <kbd
-      class="font-mono text-[0.7rem] max-lg:hidden"
-      data-blume-search-kbd
-      dir="ltr">⌘K</kbd
-    >
+    <Icon name="search" size={18} />
   </button>
 
   <dialog
@@ -474,11 +470,13 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         }
 
         // The handlers accept both ⌘ and Ctrl chords; show the right modifier
-        // per platform on the button hint and the footer's preview hint.
+        // per platform in the button's tooltip and the footer's preview hint.
         const isApple = /mac|iphone|ipad|ipod/iu.test(navigator.platform);
-        const hint = this.querySelector("[data-blume-search-kbd]");
-        if (hint) {
-          hint.textContent = isApple ? "⌘K" : "Ctrl K";
+        const trigger = this.querySelector<HTMLElement>(
+          "[data-blume-search-open]"
+        );
+        if (trigger && !isApple) {
+          trigger.dataset.blumeTooltip = `${trigger.dataset.label ?? ""} (\u2066Ctrl K\u2069)`;
         }
         const previewHint = this.querySelector(
           "[data-blume-search-preview-kbd]"

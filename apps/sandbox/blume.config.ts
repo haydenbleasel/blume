@@ -82,37 +82,18 @@ export default defineConfig({
   footer: {
     links: [
       {
-        items: [
-          {
-            href: "/docs",
-            label: { de: "Erste Schritte", en: "Getting started" },
-          },
-          {
-            href: "/docs/components",
-            label: { de: "Komponenten", en: "Components" },
-          },
-          { href: "/changelog", label: "Changelog" },
-        ],
-        label: { de: "Doku", en: "Docs" },
+        href: "/docs",
+        label: { de: "Erste Schritte", en: "Getting started" },
       },
       {
-        items: [
-          { href: "/api", label: "REST API" },
-          { href: "/graphql", label: "GraphQL" },
-          { href: "/events", label: "Events" },
-        ],
-        label: "References",
+        href: "/docs/components",
+        label: { de: "Komponenten", en: "Components" },
       },
-      {
-        items: [
-          { href: "https://github.com/haydenbleasel/blume", label: "GitHub" },
-          { href: "https://useblume.dev", label: "useblume.dev" },
-        ],
-        label: "Project",
-      },
+      { href: "/api", label: "REST API" },
+      { href: "/changelog", label: "Changelog" },
+      { href: "https://useblume.dev", label: "useblume.dev" },
     ],
     socials: {
-      github: "https://github.com/haydenbleasel/blume",
       website: "https://useblume.dev",
       x: "https://x.com/haydenbleasel",
     },

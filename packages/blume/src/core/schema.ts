@@ -40,7 +40,7 @@ import {
 } from "../sources/registry.ts";
 import { FONT_SLUGS, isFontSlug } from "../theme/fonts.ts";
 import { isExternalUrl, normalizeBasePath } from "./base-path.ts";
-import { FOOTER_SOCIALS, MAX_FOOTER_COLUMNS } from "./footer.ts";
+import { FOOTER_SOCIALS } from "./footer.ts";
 import { PUBLIC_HOST_URL } from "./github.ts";
 import { uiLocaleOverridesSchema } from "./i18n-ui.ts";
 import { openInChatProviders } from "./open-in-chat.ts";
@@ -473,25 +473,13 @@ const apiConfigSchema = z.strictObject({
 });
 
 /**
- * The site footer: social profile icons and up to four link columns. Unset,
- * the site has no footer (a `components.ts` `Footer` still renders).
+ * The site footer: a row of links, and social profile icons. Unset, the site
+ * has no footer (a `components.ts` `Footer` still renders).
  */
 const footerConfigSchema = z.strictObject({
-  /** Link columns, each an optional heading over its links. */
+  /** Links in one row, in the order written. */
   links: z
-    .array(
-      z.strictObject({
-        items: z
-          .array(
-            z.strictObject({ href: z.string(), label: localizableLabelSchema })
-          )
-          .min(1),
-        label: localizableLabelSchema.optional(),
-      })
-    )
-    .max(MAX_FOOTER_COLUMNS, {
-      message: `footer.links holds at most ${MAX_FOOTER_COLUMNS} columns.`,
-    })
+    .array(z.strictObject({ href: z.string(), label: localizableLabelSchema }))
     .default([]),
   /** Social profiles, platform to URL, shown as icons in the order written. */
   socials: z.partialRecord(z.enum(FOOTER_SOCIALS), z.string()).default({}),
@@ -1126,7 +1114,7 @@ const navigationConfigSchema = z.strictObject({
   /** Pinned links shown above the generated sidebar sections. */
   featured: z.array(featuredLinkSchema).default([]),
   /**
-   * The GitHub link in the header. `true` derives it from `github`, `false`
+   * The GitHub link in the footer. `true` derives it from `github`, `false`
    * hides it, and an absolute URL points it anywhere on GitHub — an
    * organization, say, when the docs repo itself is private and `github` has
    * to stay unset. The mark stays the GitHub one, so a URL elsewhere belongs in

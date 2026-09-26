@@ -316,7 +316,7 @@ export interface Navigation {
   cta?: HeaderAction | null;
   /** Pinned links shown above the sidebar sections, unscoped by tab. */
   featured: FeaturedLink[];
-  /** Repo URL for the header link, or null when hidden (`navigation.repo`). */
+  /** Repo URL for the footer's GitHub link, or null when hidden (`navigation.repo`). */
   repoUrl?: string | null;
   /**
    * Where the header's brand link points in this locale: `logo.href` moved

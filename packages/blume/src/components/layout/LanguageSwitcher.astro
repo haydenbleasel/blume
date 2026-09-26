@@ -8,9 +8,8 @@ interface Props {
   label: string;
   untranslatedLabel: string;
   /**
-   * `bar` (the default) for the header, where the language name collapses to
-   * the globe below `lg`; `drawer` for the top of the nav drawer, where the
-   * trigger spans the drawer, shows the name, and opens a panel as wide as
+   * `bar` (the default) for the header; `drawer` for the top of the nav
+   * drawer, where the trigger spans the drawer and opens a panel as wide as
    * itself, so nothing reaches past the drawer edge.
    */
   variant?: "bar" | "drawer";
@@ -22,10 +21,15 @@ const current = options.find((option) => option.current);
 // label in name), so a voice-control user can say "English" to open it.
 const summaryLabel = current ? `${label}: ${current.label}` : label;
 
-const iconButton =
-  "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground";
+// In the header the trigger is styled like the icon buttons beside it: no
+// border, a background on hover and while open. The drawer's spans the
+// drawer, where the border marks it as a control.
+const triggerClass =
+  variant === "bar"
+    ? "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground group-open:bg-muted group-open:text-foreground"
+    : "inline-flex h-9 w-full cursor-pointer items-center gap-1.5 rounded-full border border-border bg-background px-3 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground";
 const menuRowClass =
-  "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=true]:text-foreground";
+  "flex w-full items-center gap-4 rounded-md px-2 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=true]:text-foreground";
 ---
 
 {
@@ -36,15 +40,9 @@ const menuRowClass =
     >
       <summary
         aria-label={summaryLabel}
-        class:list={[
-          iconButton,
-          "list-none [&::-webkit-details-marker]:hidden",
-          variant === "drawer" && "w-full",
-        ]}
+        class:list={[triggerClass, "list-none [&::-webkit-details-marker]:hidden"]}
       >
-        <Icon name="globe" size={16} />
-        {/* Collapses to the globe icon below `lg`, matching the search field. */}
-        <span class={variant === "bar" ? "max-lg:hidden" : "flex-1 text-start"}>
+        <span class:list={[variant === "drawer" && "flex-1 text-start"]}>
           {current?.label ?? label}
         </span>
         <Icon
@@ -56,7 +54,11 @@ const menuRowClass =
       <div
         class:list={[
           "absolute z-50 mt-2 rounded-blume border border-border bg-background p-1 shadow-xl",
-          variant === "bar" ? "end-0 min-w-44" : "inset-x-0",
+          // As wide as its longest row: the panel hangs from a narrow trigger,
+          // so it wouldn't otherwise grow past its minimum.
+          variant === "bar"
+            ? "end-0 w-max min-w-44 max-w-[calc(100vw-1rem)]"
+            : "inset-x-0",
         ]}
       >
         {options.map((option) => (
@@ -68,13 +70,19 @@ const menuRowClass =
             hreflang={option.code}
             lang={option.code}
           >
-            <span class="flex-1">{option.label}</span>
-            {option.untranslated && (
-              <span class="text-muted-foreground text-xs italic">
-                {untranslatedLabel}
+            {/* The name keeps its full width, so the panel grows to fit the
+                longest row; the note and check sit at the far end. */}
+            <span>{option.label}</span>
+            {(option.untranslated || option.current) && (
+              <span class="ms-auto flex items-center gap-2.5">
+                {option.untranslated && (
+                  <span class="text-muted-foreground text-xs italic">
+                    {untranslatedLabel}
+                  </span>
+                )}
+                {option.current && <Icon name="check" size={14} />}
               </span>
             )}
-            {option.current && <Icon name="check" size={14} />}
           </a>
         ))}
       </div>

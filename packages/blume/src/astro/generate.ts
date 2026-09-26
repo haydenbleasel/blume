@@ -754,12 +754,12 @@ const isStringShorthand = <T>(value: T | string): value is string =>
   typeof value === "string";
 
 /**
- * The URL behind the header's repo mark. A string is used as-is: `github`
- * drives the per-page edit link, the header mark and the manifest's
+ * The URL behind the footer's repo mark. A string is used as-is: `github`
+ * drives the per-page edit link, the footer mark and the manifest's
  * `repository` together, so a project whose docs repo is private has to unset
  * all three, and would otherwise have no way to point the mark at anything.
  */
-const headerRepoUrl = (
+const footerRepoUrl = (
   repo: boolean | string,
   derived: string | null
 ): string | null => {
@@ -1130,10 +1130,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
 
   const { i18n } = config;
 
-  // Resolve the header repo link per locale. API references no longer add a tab
+  // Resolve the footer's repo link per locale. API references no longer add a tab
   // automatically — authors point a `navigation.tabs` entry at the reference
   // route to surface it (see `referenceRoutes`).
-  const markUrl = headerRepoUrl(config.navigation.repo, repoUrl);
+  const markUrl = footerRepoUrl(config.navigation.repo, repoUrl);
   const withRepoUrl = (nav: Navigation): Navigation => ({
     ...nav,
     repoUrl: markUrl,

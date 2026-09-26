@@ -33,6 +33,7 @@ export const zh: UIStringsOverride = {
     error: "抱歉，出了点问题。",
     explainCode: "解释这段代码。",
     label: "提出问题",
+    open: "打开助手",
     placeholder: "提出问题…",
     rateLimited: "你提的问题太多了，请几分钟后再试。",
     removeCode: "移除代码",

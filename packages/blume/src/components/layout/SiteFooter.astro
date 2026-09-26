@@ -1,19 +1,21 @@
 ---
-// The site footer `footer` in blume.config.ts configures: social profile
-// icons and up to four link columns, below the content on every page. With
-// `consent` configured it also holds the Cookie settings link, which reopens
-// the reader's consent choices. Renders nothing when neither is set; a
-// `components.ts` `Footer` replaces it.
+// The site footer, below the content on every page: one row, as tall as the
+// header, with `footer.links` on one side and the social profile icons on the
+// other. The site's repository (`github`, unless `navigation.repo` hides it)
+// is the first icon; the footer is the only place it's linked. With `consent` configured the links end with the
+// Cookie settings link, which reopens the reader's consent choices. Renders
+// nothing when there's none of these; a `components.ts` `Footer` replaces it.
 import data from "blume:data";
 
 import type { BlumeDataConfig } from "../../core/data.ts";
+import type { Navigation } from "../../core/types.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import { routeSetFor } from "../../core/locale-links.ts";
 import { newTabAttrs } from "../../core/new-tab.ts";
 import Icon from "../Icon.astro";
 import { withBase } from "../islands/base-path.ts";
-import { footerColumns } from "./footer-links.ts";
+import { footerLinks } from "./footer-links.ts";
 import { footerSocialLinks } from "./footer-socials.ts";
 
 interface Props {
@@ -23,13 +25,22 @@ interface Props {
    * entry, and internal links move into it (see `footer-links.ts`).
    */
   locale?: string;
+  /** The page's navigation: its `repoUrl` is the repository link. */
+  navigation?: Navigation;
   /** Localized UI strings; the Cookie settings label comes from `consent`. */
   ui?: UIStrings;
 }
 
-const { footer, locale, ui } = Astro.props;
-const socials = footer ? footerSocialLinks(footer.socials) : [];
-const columns = footerColumns(footer?.links ?? [], {
+const { footer, locale, navigation, ui } = Astro.props;
+// `github`, as `navigation.repo` leaves it: hidden, or pointed elsewhere.
+const repoUrl = navigation?.repoUrl;
+const socials = footerSocialLinks(
+  footer?.socials ?? {},
+  repoUrl
+    ? { href: repoUrl, label: { ...EN_UI.nav, ...ui?.nav }.githubRepository }
+    : null
+);
+const links = footerLinks(footer?.links ?? [], {
   basePath: data.config.basePath,
   i18n: data.config.i18n,
   locale,
@@ -38,35 +49,53 @@ const columns = footerColumns(footer?.links ?? [], {
 const consentSettings = data.config.consent
   ? { ...EN_UI.consent, ...ui?.consent }.settings
   : null;
-// Literal classes, so Tailwind's scan sees every one.
-const COLUMN_CLASSES = [
-  "sm:grid-cols-1",
-  "sm:grid-cols-2",
-  "sm:grid-cols-3",
-  "sm:grid-cols-4",
-];
 const linkClass =
   "text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground";
+// Round icon buttons, like the header's.
+const iconButton =
+  "inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:text-foreground";
+const hasLinks = links.length > 0 || consentSettings !== null;
 ---
 
 {
-  (socials.length > 0 || columns.length > 0 || consentSettings) && (
-    <footer
-      class:list={[
-        "border-border border-t px-4 md:px-6",
-        socials.length > 0 || columns.length > 0 ? "py-10" : "py-6",
-      ]}
-      data-blume-footer
-    >
-      {(socials.length > 0 || columns.length > 0) && (
-      <div class="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
+  (hasLinks || socials.length > 0) && (
+    <footer class="border-border border-t px-4 md:px-6" data-blume-footer>
+      <div class="flex min-h-16 flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3">
+        {hasLinks && (
+          <ul class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            {links.map((link) => (
+              <li>
+                <a
+                  class={linkClass}
+                  href={withBase(link.href)}
+                  {...newTabAttrs(link.href)}
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))}
+            {consentSettings && (
+              <li>
+                <button
+                  class:list={[linkClass, "cursor-pointer"]}
+                  data-blume-consent-open
+                  type="button"
+                >
+                  {consentSettings}
+                </button>
+              </li>
+            )}
+          </ul>
+        )}
+        {/* Pulled out by the buttons' padding, so the glyphs line up with the
+            footer's edge, and pushed to the far side even with no links. */}
         {socials.length > 0 && (
-          <ul class="flex flex-wrap items-center gap-4">
+          <ul class="-me-[9px] -my-[9px] ms-auto flex flex-wrap items-center gap-1">
             {socials.map((social) => (
               <li>
                 <a
                   aria-label={social.label}
-                  class:list={[linkClass, "flex"]}
+                  class={iconButton}
                   href={withBase(social.href)}
                   title={social.label}
                   {...newTabAttrs(social.href)}
@@ -89,60 +118,7 @@ const linkClass =
             ))}
           </ul>
         )}
-        {columns.length > 0 && (
-          <div
-            class:list={[
-              "grid grid-cols-2 gap-8 text-sm",
-              COLUMN_CLASSES[columns.length - 1],
-            ]}
-          >
-            {columns.map((column, index) => (
-              <div class="flex flex-col gap-3">
-                {column.label && (
-                  <p
-                    class="font-medium text-foreground"
-                    id={`blume-footer-column-${index}`}
-                  >
-                    {column.label}
-                  </p>
-                )}
-                <ul
-                  aria-labelledby={
-                    column.label ? `blume-footer-column-${index}` : undefined
-                  }
-                  class="flex flex-col gap-2"
-                >
-                  {column.items.map((item) => (
-                    <li>
-                      <a
-                        class={linkClass}
-                        href={withBase(item.href)}
-                        {...newTabAttrs(item.href)}
-                      >
-                        {item.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
-      )}
-      {consentSettings && (
-        <button
-          class:list={[
-            linkClass,
-            "text-sm",
-            (socials.length > 0 || columns.length > 0) && "mt-10",
-          ]}
-          data-blume-consent-open
-          type="button"
-        >
-          {consentSettings}
-        </button>
-      )}
     </footer>
   )
 }

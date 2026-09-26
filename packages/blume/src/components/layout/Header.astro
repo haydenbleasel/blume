@@ -2,7 +2,7 @@
 import Ask from "blume:ask";
 import data from "blume:data";
 import { withBase, withMountedBase } from "../islands/base-path.ts";
-import { NEW_TAB_ATTRS, newTabAttrs } from "../../core/new-tab.ts";
+import { newTabAttrs } from "../../core/new-tab.ts";
 import type { ComponentOverride } from "../../core/define-components.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
@@ -11,7 +11,6 @@ import type {
   Navigation,
   NavSelector as NavSelectorConfig,
 } from "../../core/types.ts";
-import { GITHUB_MARK } from "../github-mark.ts";
 import Icon from "../Icon.astro";
 import LanguageSwitcher from "./LanguageSwitcher.astro";
 import Logo from "./Logo.astro";
@@ -194,37 +193,44 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
 ---
 
 <header
-  class="sticky top-0 z-40 flex h-16 items-center gap-2 bg-background/90 px-4 backdrop-blur sm:gap-3 md:px-6"
+  class="sticky top-0 z-40 flex h-16 items-center gap-2 bg-background/90 px-4 backdrop-blur sm:gap-3 md:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)]"
   data-blume-header
   data-blume-header-transparent={transparent ? "" : undefined}
 >
-  {
-    showNavToggle && (
-      <button
-        aria-controls="blume-nav-drawer"
-        aria-expanded="false"
-        aria-label={n.toggleNavigation}
-        class={`${iconButton} lg:hidden`}
-        data-blume-nav-toggle
-        type="button"
-      >
-        <Icon name="menu" size={20} />
-      </button>
-    )
-  }
-  <LogoSlot locale={locale} logo={logo} site={site} />
-  {
-    navigation.selectors.length > 0 && (
-      <div class:list={["flex items-center gap-1.5", switcherClass]}>
-        {navigation.selectors.map((selector) => (
-          <NavSelector route={route} selector={selector} />
-        ))}
-      </div>
-    )
-  }
+  {/* From `lg` the header is three columns, so the tabs sit at its center:
+      the logo side and the controls side share the rest equally. The logo
+      side may shrink to nothing (its title truncates, as on phones); the
+      controls never shrink, so when they need more than half, the tabs move
+      over rather than overlap. Below `lg` it's one row, tabs after the logo. */}
+  <div class="flex min-w-0 items-center gap-2 sm:gap-3 lg:col-start-1">
+    {
+      showNavToggle && (
+        <button
+          aria-controls="blume-nav-drawer"
+          aria-expanded="false"
+          aria-label={n.toggleNavigation}
+          class={`${iconButton} lg:hidden`}
+          data-blume-nav-toggle
+          type="button"
+        >
+          <Icon name="menu" size={20} />
+        </button>
+      )
+    }
+    <LogoSlot locale={locale} logo={logo} site={site} />
+    {
+      navigation.selectors.length > 0 && (
+        <div class:list={["flex items-center gap-1.5", switcherClass]}>
+          {navigation.selectors.map((selector) => (
+            <NavSelector route={route} selector={selector} />
+          ))}
+        </div>
+      )
+    }
+  </div>
   {
     navigation.tabs.length > 0 && (
-      <nav aria-label={n.sections} class={tabsNavClass}>
+      <nav aria-label={n.sections} class:list={[tabsNavClass, "lg:col-start-2"]}>
         {navigation.tabs.map((tab) =>
           tab.items && tab.items.length > 0 ? (
             <NavTabMenu
@@ -249,42 +255,31 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
       </nav>
     )
   }
-  <div class="flex-1"></div>
-  {
-    /* Right-aligned next to the language switcher: the spacer absorbs its
-       width, so pages without a version selector (blog, generated references)
-       keep the logo, tabs, and the rest of this cluster in place — no layout
-       shift when crossing into the docs. */
-    versionSelector && (
-      <div class={switcherClass}>
-        <NavSelector align="end" route={route} selector={versionSelector} />
-      </div>
-    )
-  }
-  {
-    localeSwitch && localeSwitch.length > 1 && (
-      <div class={switcherClass}>
-        <LanguageSwitcher
-          label={switcherStrings?.label ?? "Language"}
-          options={localeSwitch}
-          untranslatedLabel={switcherStrings?.untranslated ?? "Not translated"}
-        />
-      </div>
-    )
-  }
-  {
-    searchEnabled && (
-      <SearchSlot
-        assistantEnabled={assistantEnabled}
-        locale={searchLocale}
-        navigation={navigation}
-        popularPages={data.config.search.popular}
-        strings={searchStrings}
-        version={searchVersion}
-      />
-    )
-  }
-  <div class="flex shrink-0 items-center gap-2">
+  <div class="flex-1 lg:hidden"></div>
+  {/* Everything on the right sits in one group with a tight gap: the version
+      and language pickers, the header links, and the icon buttons. Below `lg`
+      the spacer absorbs its width, so pages without a version selector (blog,
+      generated references) keep the logo and tabs in place — no layout shift
+      when crossing into the docs. */}
+  <div class="flex shrink-0 items-center gap-1 lg:col-start-3 lg:justify-self-end">
+    {
+      versionSelector && (
+        <div class={switcherClass}>
+          <NavSelector align="end" route={route} selector={versionSelector} />
+        </div>
+      )
+    }
+    {
+      localeSwitch && localeSwitch.length > 1 && (
+        <div class={switcherClass}>
+          <LanguageSwitcher
+            label={switcherStrings?.label ?? "Language"}
+            options={localeSwitch}
+            untranslatedLabel={switcherStrings?.untranslated ?? "Not translated"}
+          />
+        </div>
+      )
+    }
     {
       /* Plain links first, then the one filled button: the reader's eye lands
          on the button because nothing beside it competes. */
@@ -311,29 +306,24 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
       )
     }
     {
-      navigation.repoUrl && (
-        <a
-          aria-label={n.githubRepository}
-          class={iconButton}
-          href={navigation.repoUrl}
-          {...NEW_TAB_ATTRS}
-        >
-          <svg
-            aria-hidden="true"
-            fill="currentColor"
-            height="18"
-            set:html={GITHUB_MARK}
-            viewBox="0 0 16 16"
-            width="18"
-            xmlns="http://www.w3.org/2000/svg"
-          />
-        </a>
+      /* The icon buttons, each named by a tooltip. The site's repository and
+         social profiles live in the footer. */
+      searchEnabled && (
+        <SearchSlot
+          assistantEnabled={assistantEnabled}
+          locale={searchLocale}
+          navigation={navigation}
+          popularPages={data.config.search.popular}
+          strings={searchStrings}
+          version={searchVersion}
+        />
       )
     }
     <button
       aria-label={n.toggleTheme}
       class={iconButton}
       data-blume-theme-toggle
+      data-blume-tooltip={n.toggleTheme}
       type="button"
     >
       <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
@@ -346,6 +336,46 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
 {transparent && <script is:inline set:html={transparentScript} />}
 
 <style is:global>
+  /* The header's icon buttons are named by a tooltip below them, shown on hover
+     (where there is one) and on keyboard focus. It hangs from the button's end
+     edge, so the last button's tooltip never runs past the viewport, and it
+     keeps the page's own colors under a transparent header. */
+  [data-blume-tooltip] {
+    position: relative;
+  }
+  [data-blume-tooltip]::after {
+    content: attr(data-blume-tooltip);
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    inset-inline-end: 0;
+    z-index: 50;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    background-color: var(--blume-header-foreground);
+    color: var(--blume-header-background);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 120ms ease,
+      visibility 0s linear 120ms;
+  }
+  [data-blume-tooltip]:focus-visible::after {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 120ms ease;
+  }
+  @media (hover: hover) {
+    [data-blume-tooltip]:hover::after {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 120ms ease 400ms;
+    }
+  }
   /* Transparent header (PageLayout `transparentHeader`): at the top of the
      page the bar has no background and its chrome renders in white so it can
      sit over a dark hero; once scrolled it is the frosted bar again. The color

@@ -101,7 +101,7 @@ export default defineConfig({
 | `description` | — | Default meta description, used for SEO and OG. |
 | `logo` | — | Brand mark and/or wordmark shown in the header. |
 | `banner` | — | Site-wide announcement bar above the header. |
-| `footer` | — | Social profile icons and link columns below the content. |
+| `footer` | — | A row of links and social profile icons below the content. |
 
 ### Logo
 
@@ -204,34 +204,25 @@ A translated banner keys dismissal on the default locale's text, so one dismissa
 
 ### Footer
 
-Add a footer below the content on every page, with social profile icons and up to four columns of links:
+Every page ends with a footer: one row, as tall as the header, with your links on one side and social profile icons on the other. The footer is the only place Blume links your social profiles and repository, so the [`github`](#github) repository comes first among the icons whenever it's set. `footer` adds the rest:
 
 ```ts blume.config.ts lineNumbers
 footer: {
+  links: [
+    { label: "Pricing", href: "https://acme.dev/pricing" },
+    { label: "Changelog", href: "/changelog" },
+    { label: "Blog", href: "https://acme.dev/blog" },
+  ],
   socials: {
-    github: "https://github.com/acme",
     x: "https://x.com/acme",
     discord: "https://discord.gg/acme",
   },
-  links: [
-    {
-      label: "Product",
-      items: [
-        { label: "Pricing", href: "https://acme.dev/pricing" },
-        { label: "Changelog", href: "/changelog" },
-      ],
-    },
-    {
-      label: "Company",
-      items: [{ label: "Blog", href: "https://acme.dev/blog" }],
-    },
-  ],
 },
 ```
 
-`socials` maps a platform to its profile URL, and the icons appear in the order you write them. The platforms are `bluesky`, `discord`, `facebook`, `github`, `hacker-news`, `instagram`, `linkedin`, `medium`, `podcast`, `reddit`, `slack`, `telegram`, `threads`, `website`, `x`, and `youtube`. Each column in `links` takes an optional `label` heading over its `items`. Write internal links as if mounted at root; an external link opens in a new tab. On a [multilingual](/docs/content/i18n#per-locale-navigation) site, any `label` can be a map of locale code to text, and an internal link moves into the reader's locale whenever that locale serves the page.
+`links` appear in the order you write them. Write internal links as if mounted at root; an external link opens in a new tab. On a [multilingual](/docs/content/i18n#per-locale-navigation) site, a `label` can be a map of locale code to text, and an internal link moves into the reader's locale whenever that locale serves the page. `socials` maps a platform to its profile URL, and the icons appear in the order you write them. The platforms are `bluesky`, `discord`, `facebook`, `github`, `hacker-news`, `instagram`, `linkedin`, `medium`, `podcast`, `reddit`, `slack`, `telegram`, `threads`, `website`, `x`, and `youtube`. A `github` social replaces the repository link; hide that link with [`navigation.repo`](/docs/content/navigation#repository-link).
 
-Leave `footer` unset for no footer. Custom pages built on `PageLayout` show it too, unless they fill the layout's own `footer` slot. To replace it entirely, override the [`Footer` layout slot](/docs/configuration/customization#layout-slots).
+A site with no links, profiles, or repository has no footer. Custom pages built on `PageLayout` show it too, unless they fill the layout's own `footer` slot. To replace it entirely, override the [`Footer` layout slot](/docs/configuration/customization#layout-slots).
 
 ## Content
 
@@ -320,7 +311,7 @@ A key can be declared site-wide or per-type, not both. See [Per-type keys](/docs
 
 ## GitHub
 
-Point Blume at your repository with `github`. It powers the header [repository link](/docs/content/navigation#repository-link) and the **Edit on GitHub** [page action](/docs/content/navigation#page-actions):
+Point Blume at your repository with `github`. It powers the footer's [repository link](/docs/content/navigation#repository-link) and the **Edit on GitHub** [page action](/docs/content/navigation#page-actions):
 
 ```ts blume.config.ts lineNumbers
 github: {
