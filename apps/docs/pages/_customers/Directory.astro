@@ -1,0 +1,32 @@
+---
+// The /customers hero: the compare index's centered layout (the two-tone
+// headline, the summary, and its two links beneath), over every story's panel,
+// stacked, newest first. The panels come from customers.ts, so a new story
+// there lands here and on the homepage carousel too.
+import TextLink from "../_home/TextLink.astro";
+import { stories } from "./customers.ts";
+import StoryPanel from "./StoryPanel.astro";
+---
+
+<section class="flex flex-col gap-12 pt-8 sm:pt-12 lg:gap-16">
+  <div class="flex flex-col items-center gap-8 text-center">
+    <h1
+      class="max-w-[20ch] text-balance font-medium text-4xl sm:text-5xl lg:text-6xl"
+    >
+      <span class="block">Customer stories.</span>
+      <span class="block text-muted-foreground">Docs teams on Blume.</span>
+    </h1>
+    <p class="max-w-[56ch] text-pretty text-lg text-muted-foreground">
+      How product teams and open-source projects moved their docs to Blume, and
+      what changed for their readers and their agents once they did.
+    </p>
+    <div class="flex flex-wrap items-center justify-center gap-6">
+      <TextLink href="/docs/quickstart">Start your docs</TextLink>
+      <TextLink href="/compare">Compare Blume</TextLink>
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-4">
+    {stories.map((story) => <StoryPanel level="h2" story={story} />)}
+  </div>
+</section>

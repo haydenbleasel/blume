@@ -1,0 +1,122 @@
+---
+// Customer stories: a row of story panels (see _customers/StoryPanel.astro)
+// that scrolls sideways, each panel snapping to the start with the next one
+// peeking in at the edge. The heading's action links to /customers and, with
+// more than one story, steps the row a panel at a time; the row also swipes
+// and scrolls natively, and the buttons follow it, disabling at either end.
+// Bound once per session (Astro's ClientRouter runs inline scripts once) and
+// re-synced on every `astro:page-load`.
+import { stories } from "../_customers/customers.ts";
+import StoryPanel from "../_customers/StoryPanel.astro";
+import SectionHeading from "./SectionHeading.astro";
+import TextLink from "./TextLink.astro";
+import { glyph } from "./shared.ts";
+
+const stepped = stories.length > 1;
+const panelWidth = stepped
+  ? "w-[calc(100%-2.5rem)] sm:w-[calc(100%-5rem)]"
+  : "w-full";
+const stepButton =
+  "relative inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground inset-ring inset-ring-foreground/10 hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
+
+const stepScript = `(() => {
+  if (window.__blumeStories) { return; }
+  window.__blumeStories = true;
+  const sync = (track) => {
+    const end = track.scrollWidth - track.clientWidth - 1;
+    for (const button of document.querySelectorAll('[data-story-step][aria-controls="' + track.id + '"]')) {
+      button.disabled = Number(button.dataset.storyStep) < 0 ? track.scrollLeft <= 1 : track.scrollLeft >= end;
+    }
+  };
+  const syncAll = () => { for (const track of document.querySelectorAll("[data-story-track]")) { sync(track); } };
+  document.addEventListener("click", (event) => {
+    const button = event.target instanceof Element && event.target.closest("[data-story-step]");
+    const track = button && document.getElementById(button.getAttribute("aria-controls"));
+    if (!track || !track.firstElementChild) { return; }
+    const gap = Number.parseFloat(getComputedStyle(track).columnGap) || 0;
+    track.scrollBy({
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      left: Number(button.dataset.storyStep) * (track.firstElementChild.offsetWidth + gap),
+    });
+  });
+  document.addEventListener("scroll", (event) => {
+    if (event.target instanceof Element && event.target.matches("[data-story-track]")) { sync(event.target); }
+  }, { capture: true, passive: true });
+  addEventListener("resize", syncAll, { passive: true });
+  document.addEventListener("astro:page-load", syncAll);
+  syncAll();
+})();`;
+---
+
+<section class="flex flex-col gap-10 lg:gap-12" data-reveal>
+  <SectionHeading
+    tagline="Here's what changed for them."
+    title="Teams ship their docs with Blume."
+  >
+    <div class="flex items-center gap-6">
+      <TextLink href="/customers">All customer stories</TextLink>
+      {
+        stepped && (
+          <div class="flex items-center gap-2">
+            <button
+              aria-controls="customer-stories"
+              aria-label="Previous story"
+              class={stepButton}
+              data-story-step="-1"
+              disabled
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="size-4"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                set:html={glyph("chevron-left")}
+              />
+            </button>
+            <button
+              aria-controls="customer-stories"
+              aria-label="Next story"
+              class={stepButton}
+              data-story-step="1"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="size-4"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                set:html={glyph("chevron-right")}
+              />
+            </button>
+          </div>
+        )
+      }
+    </div>
+  </SectionHeading>
+
+  <!-- The row runs into the page gutter so the next panel peeks from the
+       edge; scroll padding keeps a snapped panel aligned with the heading. -->
+  <div
+    aria-label="Customer stories"
+    class="reveal-rise -mx-6 flex snap-x snap-mandatory scroll-px-6 gap-4 overflow-x-auto px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    data-story-track
+    id="customer-stories"
+    role="region"
+  >
+    {
+      stories.map((story) => (
+        <StoryPanel class={`shrink-0 snap-start ${panelWidth}`} story={story} />
+      ))
+    }
+  </div>
+</section>
+<script is:inline set:html={stepScript} />

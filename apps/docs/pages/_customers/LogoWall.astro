@@ -1,0 +1,62 @@
+---
+// Every team on Blume, story or not: a muted tray of tiles, each the
+// customer's wordmark over its docs' hostname, linking out to the site. A last
+// tile invites the reader to be next. The list is the homepage marquee's
+// (customers.ts), so the two never drift.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import SectionHeading from "../_home/SectionHeading.astro";
+import Tray from "../_home/Tray.astro";
+import { glyph } from "../_home/shared.ts";
+import CustomerLogo from "./CustomerLogo.astro";
+import { logoWall } from "./customers.ts";
+
+const tile =
+  "group flex h-full min-h-32 flex-col items-center justify-center gap-4 rounded-[20px] bg-background p-6 shadow-[0_1px_2px_rgb(28_40_64/0.06)] ring-1 ring-foreground/5 hover:shadow-[0_12px_32px_-12px_rgb(28_40_64/0.25)] motion-safe:transition-shadow dark:shadow-none dark:hover:ring-foreground/15";
+---
+
+<section class="flex flex-col gap-10 lg:gap-12">
+  <SectionHeading
+    tagline="From infrastructure platforms to open-source libraries."
+    title="More teams building on Blume."
+  />
+
+  <Tray innerClass="p-2">
+    <ul class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" role="list">
+      {
+        logoWall.map((customer) => (
+          <li>
+            <a class={tile} href={customer.href} {...NEW_TAB_ATTRS}>
+              <CustomerLogo
+                class="h-6 max-w-full text-foreground/80 group-hover:text-foreground sm:h-7"
+                customer={customer}
+              />
+              <span class="text-muted-foreground text-xs">
+                <span class="sr-only">{customer.name}, </span>
+                {new URL(customer.href).hostname.replace(/^www\./u, "")}
+              </span>
+            </a>
+          </li>
+        ))
+      }
+      <li>
+        <a class:list={[tile, "text-center"]} href="/docs/quickstart">
+          <span class="font-medium text-foreground">Yours next?</span>
+          <span class="inline-flex items-center gap-1 font-medium text-accent text-sm group-hover:text-foreground">
+            Start your docs
+            <svg
+              aria-hidden="true"
+              class="size-3.5 shrink-0 group-hover:translate-x-0.5 motion-safe:transition-transform"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              set:html={glyph("chevron-right")}
+            />
+          </span>
+        </a>
+      </li>
+    </ul>
+  </Tray>
+</section>

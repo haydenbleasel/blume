@@ -1,0 +1,30 @@
+---
+// A customer's wordmark, drawn as a CSS mask over `currentColor` (see
+// customers.ts) so it takes the color of whatever it sits on: white on a story
+// panel, the foreground on the logo wall. Size it by height; its aspect ratio
+// comes from the logo's viewBox. Decorative unless `label` is set, for the
+// places where no link or heading already names the customer.
+import type { Customer } from "./customers.ts";
+
+interface Props {
+  class?: string;
+  customer: Customer;
+  label?: boolean;
+}
+
+const { class: className, customer, label = false } = Astro.props;
+---
+
+<span
+  aria-hidden={label ? undefined : "true"}
+  aria-label={label ? customer.name : undefined}
+  class:list={["customer-logo block bg-current", className]}
+  role={label ? "img" : undefined}
+  style={`aspect-ratio: ${customer.logo.width} / ${customer.logo.height}; --logo: url(${customer.logo.src})`}
+></span>
+
+<style>
+  .customer-logo {
+    mask: var(--logo) center / contain no-repeat;
+  }
+</style>

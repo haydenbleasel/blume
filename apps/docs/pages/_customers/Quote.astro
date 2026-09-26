@@ -1,0 +1,42 @@
+---
+// A pull quote inside a story's body: the line set large in the headings'
+// display face, in the page's two-tone voice (the words in the foreground,
+// the attribution muted beneath), breaking out of the prose styles so the
+// typography plugin's blockquote rule and curly-quote pseudo-elements stay
+// off it. An `avatar` (a square photo in `public/customers/`) puts the
+// speaker's face beside their name and role.
+interface Props {
+  avatar?: string;
+  name: string;
+  role: string;
+}
+
+const { avatar, name, role } = Astro.props;
+---
+
+<figure class="not-prose my-12 flex flex-col gap-6 sm:my-16">
+  <blockquote
+    class="text-balance font-medium text-2xl text-foreground sm:text-3xl sm:leading-snug [font-family:var(--font-display)] tracking-[-0.05em]"
+  >
+    <p>“<slot />”</p>
+  </blockquote>
+  <figcaption class="flex items-center gap-3 text-sm">
+    {
+      avatar && (
+        <img
+          alt=""
+          class="size-10 shrink-0 rounded-full object-cover ring-1 ring-foreground/10"
+          decoding="async"
+          height="40"
+          loading="lazy"
+          src={avatar}
+          width="40"
+        />
+      )
+    }
+    <span class="flex flex-col">
+      <span class="font-medium text-foreground">{name}</span>
+      <span class="text-muted-foreground">{role}</span>
+    </span>
+  </figcaption>
+</figure>

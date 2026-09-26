@@ -1,0 +1,100 @@
+---
+// A customer story as one panel, split down the middle: on the left, the
+// customer's brand color (the story fill, see story.css) carries the
+// wordmark, the two-tone headline, two headline numbers, and a "Read the
+// story" button; on the right, the story's photo runs flush to the panel's
+// edges. Below `lg` the photo sits on top. The button stretches over the whole
+// panel, so anywhere on it opens the story. Shared by the homepage carousel,
+// the /customers index, and a story page's next story.
+import "../_home/bloom.css";
+import "./story.css";
+import { glyph } from "../_home/shared.ts";
+import CustomerLogo from "./CustomerLogo.astro";
+import type { CustomerStory } from "./customers.ts";
+
+interface Props {
+  /** The headline's level, to fit the page's outline. */
+  level?: "h2" | "h3";
+  class?: string;
+  story: CustomerStory;
+}
+
+const { class: className, level: Heading = "h3", story } = Astro.props;
+---
+
+<article
+  class:list={[
+    "story-fill group relative isolate grid overflow-hidden rounded-[28px] text-white inset-ring inset-ring-white/10 lg:grid-cols-2",
+    className,
+  ]}
+  style={`--story: ${story.color}`}
+>
+  <div class="flex flex-col items-start gap-8 p-6 sm:p-10 lg:p-12">
+    <CustomerLogo class="h-6 sm:h-7" customer={story.customer} />
+    <Heading
+      class="max-w-[24ch] text-balance font-medium text-2xl sm:text-3xl lg:text-4xl lg:leading-[1.15]"
+    >
+      {story.title}{" "}
+      <span class="text-white/65">{story.tagline}</span>
+    </Heading>
+    <dl class="grid w-full max-w-md grid-cols-2 gap-x-8 gap-y-6">
+      {
+        story.stats.map((stat) => (
+          <div class="flex flex-col-reverse justify-end gap-2">
+            <dt class="text-pretty text-sm text-white/80">{stat.label}</dt>
+            <dd class="font-medium text-4xl sm:text-5xl [font-family:var(--font-display)] tracking-[-0.05em]">
+              {stat.value}
+            </dd>
+          </div>
+        ))
+      }
+    </dl>
+    <a
+      class="story-cta mt-auto inline-flex items-center gap-1 rounded-full bg-white py-2.5 pr-4 pl-5 font-medium text-sm after:absolute after:inset-0 after:z-10 after:rounded-[28px]"
+      href={`/customers/${story.id}`}
+    >
+      Read the story
+      <span class="sr-only">of how {story.title}</span>
+      <svg
+        aria-hidden="true"
+        class="size-3.5 shrink-0 group-hover:translate-x-0.5 motion-safe:transition-transform"
+        fill="none"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        set:html={glyph("chevron-right")}
+      />
+    </a>
+  </div>
+
+  <div
+    class="relative aspect-[16/10] overflow-hidden max-lg:order-first lg:aspect-auto"
+  >
+    <img
+      alt={story.image.alt}
+      class="story-image absolute inset-0 size-full object-cover"
+      decoding="async"
+      loading="lazy"
+      src={story.image.src}
+    />
+  </div>
+</article>
+
+<style>
+  .story-cta {
+    color: var(--story);
+  }
+
+  /* The photo drifts a little closer while the panel is hovered. */
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .story-image {
+      transition: scale 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+
+    .group:hover .story-image {
+      scale: 1.03;
+    }
+  }
+</style>

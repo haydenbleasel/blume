@@ -1,0 +1,41 @@
+---
+import Quote from "../_customers/Quote.astro";
+import StoryPage from "../_customers/StoryPage.astro";
+import { storyById } from "../_customers/customers.ts";
+---
+
+<!-- PLACEHOLDER BODY: replace with the real story. -->
+<StoryPage story={storyById("quiverai")}>
+  <h2>The challenge</h2>
+  <p>
+    [Where QuiverAI's docs were before Blume: the tool, the pain, and what the team
+    wanted from its docs that it wasn't getting.]
+  </p>
+  <p>
+    [A second paragraph on the stakes: who reads the docs, humans and agents,
+    and what a bad page cost them.]
+  </p>
+
+  <h2>Why Blume</h2>
+  <p>
+    [What tipped the decision: zero config, owning the output, the agent-facing
+    surface, or the migration path.]
+  </p>
+
+  <Quote name="[Name]" role="[Role], QuiverAI">
+    [A line from the QuiverAI team about what changed once the docs moved to
+    Blume.]
+  </Quote>
+
+  <h2>The move</h2>
+  <p>
+    [How the migration went: how long it took, what carried over as-is, and what
+    the team rewrote.]
+  </p>
+
+  <h2>The results</h2>
+  <p>
+    [What changed after launch, with the numbers from the panel above in
+    context.]
+  </p>
+</StoryPage>

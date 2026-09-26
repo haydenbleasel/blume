@@ -1,0 +1,134 @@
+---
+// Specific's story, from Iman Radjavi's answers (2026-09-26).
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import Quote from "../_customers/Quote.astro";
+import StoryPage from "../_customers/StoryPage.astro";
+import { storyById } from "../_customers/customers.ts";
+---
+
+<StoryPage story={storyById("specific")}>
+  <p>
+    <a href="https://specific.dev" {...NEW_TAB_ATTRS}>Specific</a> (YC F25) is
+    the cloud platform built for coding agents. Your agent already writes your
+    code; Specific lets it build the infrastructure to run it too. The agent
+    defines the resources an app needs in a config file, spins up the whole
+    stack locally with one command, tests against isolated production data in
+    preview environments, and ships with a single command or through GitHub.
+    When something breaks, it queries logs and metrics, finds the root cause,
+    and ships the fix.
+  </p>
+  <p>
+    The team runs as much as it can on Specific: the landing page, the
+    dashboard, the docs, and Hermes, its internal agent. That way it hits the
+    same problems its customers do, first.
+  </p>
+
+  <h2>The challenge</h2>
+  <p>
+    Specific wanted two things from its docs: a beautiful site out of the box,
+    and preview environments, so the team could check what its agents changed
+    before shipping. The docs site isn't Specific's primary surface, since
+    agents mostly read the docs that ship inside its CLI, so anything beyond
+    that was a bonus.
+  </p>
+  <p>
+    Mintlify did both. But it was a closed, hosted product, so the docs were
+    the one part of Specific not running on Specific, and at $500 a month it
+    cost a lot for what the team needed.
+  </p>
+
+  <Quote
+    avatar="/customers/iman-radjavi.webp"
+    name="Iman Radjavi"
+    role="Co-founder, Specific"
+  >
+    Our docs were the one part of Specific not running on Specific. Blume fixed
+    that in an afternoon.
+  </Quote>
+
+  <h2>The move</h2>
+  <p>
+    When Blume came out, the choice was easy: open source and self-hostable
+    meant Specific could run it on Specific. Iman handed the migration to
+    Claude, and a couple of hours later, on July 14, 2026, the switch was made.
+  </p>
+  <p>
+    The whole deployment is one <code>specific.hcl</code> of about 30 lines: a
+    build step, a service running the{" "}
+    <a href="/docs/deployment#server-rendering">Node server</a> Blume builds, a
+    public endpoint with a health check, and one secret for the assistant. Every branch
+    gets a preview environment out of the box, which covered the other half of
+    what the team wanted.
+  </p>
+
+  <h2>The assistant, out of the box</h2>
+  <p>
+    Since agents mostly read the docs in Specific's CLI, what the team values
+    in Blume isn't any single AI feature but how cheap they are to turn on. The{" "}
+    <a href="/docs/discoverability/mcp">MCP server</a> at <code>/mcp</code> is
+    on because it was one line of config.
+  </p>
+  <p>
+    The <a href="/docs/configuration/assistant">assistant</a> is the one that paid
+    off. Blume ships an assistant endpoint grounded in the docs, so any page can
+    call it. After seeing Gustavo's "infinite FAQ" demo on X, Iman{" "}
+    <a
+      href="https://x.com/imanradjavi/status/2101674436210434246"
+      {...NEW_TAB_ATTRS}>built one for specific.dev</a
+    > the same day: the FAQ on Specific's landing page ends with an empty row where
+    a visitor types their own question and gets an answer from the docs, two to
+    five sentences long, citing at most two pages.
+  </p>
+  <p>
+    It needed two small options Blume didn't have yet:{" "}
+    <a href="/docs/configuration/assistant#cross-origin-callers">CORS</a>, for
+    a caller on another origin, and a{" "}
+    <a href="/docs/configuration/assistant#reasoning">reasoning level</a>. Iman
+    sent two pull requests, and both were merged and released the same day.
+    Iman calls that turnaround the real feature.
+  </p>
+
+  <Quote
+    avatar="/customers/iman-radjavi.webp"
+    name="Iman Radjavi"
+    role="Co-founder, Specific"
+  >
+    When a feature was missing, I could contribute it myself and see it land in
+    the next release.
+  </Quote>
+
+  <h2>The results</h2>
+  <p>
+    On the first Blume deploy, before any tuning, Lighthouse performance went
+    from 87 to 100, and every score is now 96 or above. Both runs were on the
+    same URL on July 14, 2026 (<a
+      href="https://x.com/imanradjavi/status/2077040598721175972"
+      {...NEW_TAB_ATTRS}>before and after</a
+    >).
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Lighthouse</th>
+        <th scope="col">Mintlify</th>
+        <th scope="col">Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Performance</th><td>87</td><td>100</td></tr>
+      <tr><th scope="row">Accessibility</th><td>95</td><td>98</td></tr>
+      <tr><th scope="row">Best Practices</th><td>96</td><td>96</td></tr>
+      <tr><th scope="row">SEO</th><td>100</td><td>100</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Docs hosting went from $500 a month to a couple dollars of compute, and the
+    migration took a couple of hours of agent time. Iman{" "}
+    <a
+      href="https://www.linkedin.com/posts/iman-radjavi_we-saved-500-a-month-moving-our-docs-from-share-7503076122100785152-HYWD/"
+      {...NEW_TAB_ATTRS}>announced the move on LinkedIn</a
+    >, and the new docs are live at{" "}
+    <a href="https://docs.specific.dev" {...NEW_TAB_ATTRS}>docs.specific.dev</a
+    >.
+  </p>
+</StoryPage>

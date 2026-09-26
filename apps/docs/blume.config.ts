@@ -151,6 +151,7 @@ export default defineConfig({
       { label: "CLI", path: "/cli" },
       { label: "Agents", path: "/agents" },
       { label: "Compare", path: "/compare" },
+      { label: "Customers", path: "/customers" },
       {
         label: {
           de: "Änderungen",

@@ -1,0 +1,45 @@
+/* A story's brand-color surface, shared by its panel and its page's art: set
+   `--story` to the customer's color (from customers.ts). The color deepens
+   toward the top-left, where the type sits, under a faint hex lattice of
+   white dots (the Blume mark's petals, see bloom.css) that fades out toward
+   the photo. Give the element `position: relative` and `isolation: isolate`
+   so the lattice stays under its content. Import bloom.css beside it. */
+
+.story-fill {
+  background-color: var(--story);
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in oklab, var(--story), black 30%) 0%,
+    transparent 70%
+  );
+}
+
+.story-fill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: white;
+  mask-image:
+    var(--bloom-dots), radial-gradient(60% 90% at 15% 40%, black, transparent);
+  mask-composite: intersect;
+  mask-size:
+    var(--bloom-dots-size),
+    100% 100%;
+  opacity: 0.14;
+}
+
+/* A story's body reads as long-form: a size up from the docs' prose
+   (0.875rem, set on `.prose` by the theme), which is tuned for scanning
+   reference pages. Paired with `.prose`, so it wins over the theme's rule. */
+.story-body.prose {
+  font-size: 1.125rem;
+  line-height: 1.75;
+}
+
+/* The story's first line starts level with the facts beside it. */
+.story-body.prose > :first-child {
+  margin-top: 0;
+}

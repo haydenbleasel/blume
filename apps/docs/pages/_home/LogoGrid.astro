@@ -2,7 +2,8 @@
 // Customer logos — one row of faded wordmarks drifting past as a marquee,
 // shown right under the product preview, so the strip never wraps however
 // many customers it holds. Each links to that customer's Blume-built site.
-// The wordmarks are single-color SVG files in `public/logos/`, drawn as CSS
+// The list lives in _customers/customers.ts, shared with the /customers logo
+// wall. The wordmarks are single-color SVG files in `public/logos/`, drawn as CSS
 // masks over `currentColor` rather than inlined: inlined (and doubled for the
 // loop) they were a third of the homepage's HTML, which pulled its
 // text-to-markup ratio under what agent-readiness scanners expect. The mask
@@ -14,88 +15,7 @@
 // hidden from assistive tech and the tab order. Hover or focus pauses it, and
 // reduced motion swaps it for a static, centered wrap of the first row.
 import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
-
-const logos = [
-  {
-    href: "https://ui.neon.com/installation",
-    name: "Neon",
-    src: "/logos/neon.svg",
-    width: 157,
-    height: 45,
-  },
-  {
-    href: "https://v2.orpc.dev/docs/getting-started",
-    name: "oRPC",
-    src: "/logos/orpc.svg",
-    width: 527,
-    height: 152,
-  },
-  {
-    href: "https://docs.quiver.ai",
-    name: "QuiverAI",
-    src: "/logos/quiverai.svg",
-    width: 100,
-    height: 16,
-  },
-  {
-    href: "https://docs.specific.dev/",
-    name: "Specific",
-    src: "/logos/specific.svg",
-    width: 838,
-    height: 168,
-  },
-  {
-    href: "https://docs.stagewise.io/",
-    name: "Stagewise",
-    src: "/logos/stagewise.svg",
-    width: 893,
-    height: 152,
-  },
-  {
-    href: "https://www.ultracite.ai/",
-    name: "Ultracite",
-    src: "/logos/ultracite.svg",
-    width: 703,
-    height: 152,
-  },
-  {
-    href: "https://files-sdk.dev/",
-    name: "Files SDK",
-    src: "/logos/files-sdk.svg",
-    width: 768,
-    height: 152,
-  },
-  {
-    href: "https://better-result.dev/",
-    name: "Better Result",
-    src: "/logos/better-result.svg",
-    width: 925,
-    height: 152,
-  },
-  {
-    href: "https://infra-ts.dev/",
-    name: "infrats",
-    src: "/logos/infrats.svg",
-    width: 621,
-    height: 152,
-  },
-  {
-    href: "https://www.chatjs.dev/docs",
-    name: "ChatJS",
-    src: "/logos/chatjs.svg",
-    width: 631,
-    height: 152,
-  },
-  {
-    // Composed from the official telemetry.dev mark plus its Geist SemiBold
-    // wordmark, converted to outlines so it renders identically everywhere.
-    href: "https://telemetry.dev/",
-    name: "Telemetry",
-    src: "/logos/telemetry.svg",
-    width: 753,
-    height: 115,
-  },
-];
+import { logoWall } from "../_customers/customers.ts";
 ---
 
 <!-- Logo marquee: two identical rows sliding left by their own width. -->
@@ -120,18 +40,18 @@ const logos = [
               : "motion-reduce:w-full motion-reduce:shrink motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:gap-y-10 motion-reduce:pr-0",
           ]}
         >
-          {logos.map((logo) => (
+          {logoWall.map((customer) => (
             <a
-              aria-label={logo.name}
+              aria-label={customer.name}
               class="flex shrink-0 items-center justify-center text-muted-foreground/50 hover:text-foreground"
-              href={logo.href}
+              href={customer.href}
               tabindex={copy ? -1 : undefined}
               {...NEW_TAB_ATTRS}
             >
               <span
                 aria-hidden="true"
                 class="logo-mark block h-6 bg-current sm:h-7"
-                style={`aspect-ratio: ${logo.width} / ${logo.height}; --logo: url(${logo.src})`}
+                style={`aspect-ratio: ${customer.logo.width} / ${customer.logo.height}; --logo: url(${customer.logo.src})`}
               />
             </a>
           ))}

@@ -1,0 +1,233 @@
+---
+// A customer story's page, rendered from its entry in customers.ts with the
+// story's own words in the default slot: a centered stack of the wordmark,
+// the two-tone headline, and the summary, with the link back to /customers
+// at its top-left; then the panel's split, the headline numbers on the story
+// fill (story.css) beside the story's photo; the body in long-form prose
+// (`story-body`), centered on the page, with the facts (industry, their docs,
+// what they moved from, the Blume features they lean on) pinned at the
+// panel's left edge; the next story's panel; and the install CTA. Each story
+// has its own static route file under customers/ rather than one `[story]`
+// route, so every page gets a generated OG card and a sitemap entry, like the
+// compare pages.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import data from "blume:data";
+import "../_home/bloom.css";
+import Footer from "../_home/Footer.astro";
+import InstallCta from "../_home/InstallCta.astro";
+import Motion from "../_home/Motion.astro";
+import SectionHeading from "../_home/SectionHeading.astro";
+import TextLink from "../_home/TextLink.astro";
+import { sourceById, withUniqueIds } from "../_home/migrate-sources.ts";
+import { glyph, installCopyScript } from "../_home/shared.ts";
+import CustomerLogo from "./CustomerLogo.astro";
+import { type CustomerStory, stories } from "./customers.ts";
+import "./story.css";
+import StoryPanel from "./StoryPanel.astro";
+
+interface Props {
+  story: CustomerStory;
+}
+
+const { story } = Astro.props;
+const { config } = data;
+const migratedFrom = story.facts.migratedFrom
+  ? sourceById(story.facts.migratedFrom)
+  : null;
+const docsHost = new URL(story.customer.href).hostname.replace(/^www\./u, "");
+// The story after this one, wrapping to the first, so every page ends on
+// another; none when this is the only story.
+const index = stories.findIndex((entry) => entry.id === story.id);
+const next = stories.length > 1 ? stories[(index + 1) % stories.length] : null;
+---
+
+<PageLayout
+  analytics={config.analytics}
+  banner={config.banner}
+  favicon={config.favicon}
+  fontCssVars={data.fontCssVars}
+  logo={config.logo}
+  navigation={data.navigation}
+  ogEnabled={config.og.enabled}
+  page={{
+    description: story.meta.description,
+    route: `/customers/${story.id}`,
+    title: story.meta.title,
+  }}
+  searchEnabled={config.search.enabled}
+  site={{ description: config.description, title: config.title }}
+  siteUrl={config.site}
+  structuredDataEnabled={config.structuredData}
+  themeMode={config.theme.mode}
+  x={config.x}
+>
+  <div
+    class="mx-auto grid max-w-[1400px] gap-24 px-6 pb-20 sm:pb-24 lg:gap-32 xl:gap-40"
+  >
+    <article class="flex flex-col gap-12 pt-8 sm:pt-12 lg:gap-16">
+      <!-- The back link floats at the header's top-left from `lg` up, flush
+           with the photo panel's edge and level with the wordmark; below
+           that it leads the stack on its own line. -->
+      <header class="relative flex flex-col items-center gap-6 text-center">
+        <a
+          class="inline-flex items-center gap-1 self-start text-muted-foreground text-sm hover:text-foreground max-lg:mb-2 lg:absolute lg:top-1.5 lg:left-0"
+          href="/customers"
+        >
+          <svg
+            aria-hidden="true"
+            class="size-3.5 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            set:html={glyph("chevron-left")}
+          />
+          Customer stories
+        </a>
+        <CustomerLogo
+          class="h-8 text-foreground"
+          customer={story.customer}
+          label
+        />
+        <h1
+          class="max-w-[22ch] text-balance font-medium text-4xl sm:text-5xl lg:text-6xl"
+        >
+          {story.title}{" "}
+          <span class="text-muted-foreground">{story.tagline}</span>
+        </h1>
+        <p
+          class="max-w-[52ch] text-pretty text-lg text-muted-foreground sm:text-xl"
+        >
+          {story.summary}
+        </p>
+      </header>
+
+      <!-- The headline numbers on the story fill beside the photo, the
+           homepage panel's split -->
+      <div
+        class="story-fill relative isolate grid overflow-hidden rounded-[28px] text-white inset-ring inset-ring-white/10 lg:grid-cols-[2fr_3fr]"
+        style={`--story: ${story.color}`}
+      >
+        <dl
+          class="grid grid-cols-2 content-end gap-x-8 gap-y-8 p-6 sm:p-10 lg:grid-cols-1 lg:p-12"
+        >
+          {
+            story.stats.map((stat) => (
+              <div class="flex flex-col-reverse justify-end gap-2">
+                <dt class="text-pretty text-sm text-white/80 sm:text-base">
+                  {stat.label}
+                </dt>
+                <dd class="font-medium text-5xl sm:text-6xl [font-family:var(--font-display)] tracking-[-0.05em]">
+                  {stat.value}
+                </dd>
+              </div>
+            ))
+          }
+        </dl>
+        <div
+          class="relative aspect-[16/10] max-lg:order-first lg:aspect-auto lg:min-h-[30rem]"
+        >
+          <img
+            alt={story.image.alt}
+            class="absolute inset-0 size-full object-cover"
+            decoding="async"
+            src={story.image.src}
+          />
+        </div>
+      </div>
+
+      <!-- From `lg` up the story sits in the page's center column and the
+           facts in the left one, flush with the photo panel's edge and
+           pinned while the story scrolls; the right column stays empty so
+           the story stays centered. Below `lg` the facts sit above it, two
+           to a row. -->
+      <div
+        class="grid gap-x-12 gap-y-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,40rem)_minmax(0,1fr)]"
+      >
+        <aside
+          class="max-lg:mx-auto max-lg:w-full max-lg:max-w-[40rem] lg:sticky lg:top-28 lg:max-w-56 lg:self-start"
+        >
+          <dl class="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-1">
+            <div class="flex flex-col gap-1">
+              <dt class="text-muted-foreground text-sm">Industry</dt>
+              <dd class="text-foreground">{story.facts.industry}</dd>
+            </div>
+            <div class="flex flex-col gap-1">
+              <dt class="text-muted-foreground text-sm">Their docs</dt>
+              <dd>
+                <a
+                  class="text-foreground underline decoration-foreground/20 underline-offset-4 hover:decoration-foreground"
+                  href={story.customer.href}
+                  {...NEW_TAB_ATTRS}
+                >
+                  {docsHost}
+                </a>
+              </dd>
+            </div>
+            {
+              migratedFrom && (
+                <div class="flex flex-col gap-1">
+                  <dt class="text-muted-foreground text-sm">Moved from</dt>
+                  <dd class="flex items-center gap-2 text-foreground">
+                    <span
+                      aria-hidden="true"
+                      class="inline-flex size-4 shrink-0"
+                      set:html={withUniqueIds(migratedFrom.logo)}
+                    />
+                    {migratedFrom.name}
+                  </dd>
+                </div>
+              )
+            }
+            <div class="flex flex-col gap-1">
+              <dt class="text-muted-foreground text-sm">Built with</dt>
+              <dd>
+                <ul class="flex flex-col gap-1" role="list">
+                  {
+                    story.facts.features.map((feature) => (
+                      <li>
+                        <a
+                          class="text-foreground underline decoration-foreground/20 underline-offset-4 hover:decoration-foreground"
+                          href={feature.href}
+                        >
+                          {feature.label}
+                        </a>
+                      </li>
+                    ))
+                  }
+                </ul>
+              </dd>
+            </div>
+          </dl>
+        </aside>
+
+        <div class="story-body prose max-w-[40rem] max-lg:mx-auto max-lg:w-full">
+          <slot />
+        </div>
+      </div>
+    </article>
+
+    {
+      next && (
+        <section class="flex flex-col gap-10 lg:gap-12">
+          <SectionHeading
+            tagline="Or see every team on Blume."
+            title="Read another story."
+          >
+            <TextLink href="/customers">All customer stories</TextLink>
+          </SectionHeading>
+          <StoryPanel story={next} />
+        </section>
+      )
+    }
+
+    <InstallCta />
+  </div>
+  <!-- After the sections, so their reveal containers exist when it arms -->
+  <Motion />
+  <script is:inline set:html={installCopyScript} />
+  <Footer slot="footer" />
+</PageLayout>
