@@ -773,6 +773,12 @@ export interface I18nConfig {
   /** `dir`: locale directories (`fr/page.mdx`). `dot`: filename suffix (`page.fr.mdx`). */
   parser?: "dir" | "dot";
   /**
+   * Send a visitor who lands on the default language's home page to the home
+   * page in their browser's preferred language, until they pick a language
+   * with the switcher. Defaults to `false`.
+   */
+  routeByBrowserLanguage?: boolean;
+  /**
    * Per-locale UI string overrides, e.g.
    * `{ fr: { search: { button: "Rechercher" } } }`.
    */

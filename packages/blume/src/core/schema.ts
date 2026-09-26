@@ -1244,6 +1244,12 @@ const i18nConfigSchema = z
     locales: z.array(localeSchema).min(1),
     /** `"dir"`: locale directories (`fr/page.mdx`). `"dot"`: filename suffix (`page.fr.mdx`). */
     parser: z.enum(["dir", "dot"]).default("dir"),
+    /**
+     * Send a visitor who lands on the default language's home page to the
+     * home page in their browser's preferred language, until they pick a
+     * language with the switcher. Off by default.
+     */
+    routeByBrowserLanguage: z.boolean().default(false),
     /** Per-locale UI string overrides: `{ fr: { search: { button: "…" } } }`. */
     ui: uiLocaleOverridesSchema.optional(),
   })

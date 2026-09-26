@@ -1215,6 +1215,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
               dir,
               label,
             })),
+            routeByBrowserLanguage: i18n.routeByBrowserLanguage,
           }
         : null,
       // `undefined` members drop out of the JSON snapshot; the null keeps the

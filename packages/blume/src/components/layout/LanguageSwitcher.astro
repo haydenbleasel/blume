@@ -63,6 +63,7 @@ const menuRowClass =
           <a
             aria-current={option.current ? "true" : undefined}
             class={menuRowClass}
+            data-blume-locale-choice
             href={withMountedBase(option.href)}
             hreflang={option.code}
             lang={option.code}
@@ -83,8 +84,11 @@ const menuRowClass =
 
 <script>
   import { installDropdownDismiss } from "../dropdown-dismiss.ts";
+  import { rememberLocaleChoice } from "./locale-redirect.ts";
 
   // Outside-click / Escape / focus-out dismissal, shared with the nav
   // selectors and the page actions.
   installDropdownDismiss();
+  // A language picked here stops routing by browser language.
+  rememberLocaleChoice(document);
 </script>

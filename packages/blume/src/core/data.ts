@@ -77,6 +77,8 @@ export interface BlumeDataI18n {
   fallbackLocale: string | null;
   hideDefaultLocalePrefix: boolean;
   locales: BlumeDataLocale[];
+  /** Send visitors from the default home page to their browser's language. */
+  routeByBrowserLanguage: boolean;
 }
 
 /** A single content route, with the metadata custom pages can read. */

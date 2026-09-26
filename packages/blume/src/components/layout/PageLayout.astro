@@ -40,6 +40,11 @@ import { buildStructuredData } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
 import Icon from "../Icon.astro";
 import { stripBase, withBase, withMountedBase } from "../islands/base-path.ts";
+import { routeSetFor } from "../../core/locale-links.ts";
+import {
+  browserLanguageTargets,
+  LOCALE_REDIRECT_SCRIPT,
+} from "./locale-redirect.ts";
 import { pageDirection, pageLocale } from "./page-locale.ts";
 import { searchLocaleFor } from "./search-locale.ts";
 import "blume:theme";
@@ -297,6 +302,25 @@ const bannerKey = banner?.dismissible ? banner.key : null;
 // Start the page's icon sprite before anything renders an icon (see
 // icon-sprite.ts); <IconSprite /> at the end of the body emits it.
 createIconSprite(Astro.locals);
+
+// A visitor landing on the default language's home page goes to their
+// browser's language (`i18n.routeByBrowserLanguage`, see locale-redirect.ts).
+const localeTargets = browserLanguageTargets({
+  basePath: data.config.basePath,
+  i18n: data.config.i18n,
+  route,
+  routes: routeSetFor(data.routes),
+});
+const localeRedirect = localeTargets
+  ? JSON.stringify(
+      Object.fromEntries(
+        Object.entries(localeTargets).map(([code, path]) => [
+          code,
+          withMountedBase(path),
+        ])
+      )
+    )
+  : null;
 ---
 
 <!doctype html>
@@ -304,6 +328,16 @@ createIconSprite(Astro.locals);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {
+      localeRedirect && (
+        <script
+          data-default={data.config.i18n?.defaultLocale}
+          data-targets={localeRedirect}
+          is:inline
+          set:html={LOCALE_REDIRECT_SCRIPT}
+        />
+      )
+    }
     {/* Client-side navigation, matching RootLayout: same-origin link clicks
         swap the DOM in place instead of tearing the document down, so no
         browser paints a blank frame between pages. */}

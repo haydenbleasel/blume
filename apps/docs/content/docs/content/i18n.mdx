@@ -145,6 +145,25 @@ Blume validates each result's structure — frontmatter, code fences, links — 
 
 When i18n is on, a language switcher appears in the header automatically, generated from your `locales`. For each page it links the matching translation in every language; where a translation is missing it links the fallback page and marks it as not translated. There's nothing to configure. Pages from a [GitHub Releases](/docs/content/sources#github-releases) source are the exception: release notes exist in one language only, so those pages render without a switcher.
 
+## Routing by browser language
+
+To send visitors to their own language, turn on `routeByBrowserLanguage`:
+
+```ts blume.config.ts lineNumbers
+i18n: {
+  defaultLocale: "en",
+  locales: [
+    { code: "en", label: "English" },
+    { code: "fr", label: "Français" },
+  ],
+  routeByBrowserLanguage: true,
+}
+```
+
+A visitor who lands on the default language's home page from outside the site then goes to the home page in their browser's preferred language, when the site has it. Blume tries each language the browser prefers, in order, matching an exact code first and then the base language (`fr-CA` finds `fr`). If the default language comes first, the visitor stays. Once a reader picks a language with the switcher, Blume remembers the pick and stops routing them. Only the home page routes; a link to any other page opens as written.
+
+The redirect runs in the browser before the page paints, so it works on any host, static builds included. It's off by default because search engines crawl in one language: with it on, keep the [`hreflang` alternates](#seo) Blume emits so each language's pages are still indexed.
+
 ## Translated UI
 
 Blume ships built-in translations for its own interface chrome — “On this page”, “Search”, “Edit on GitHub”, and the rest — so a locale with a built-in pack gets translated UI out of the box. **You only translate your content.**

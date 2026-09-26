@@ -134,6 +134,7 @@ export default defineConfig({
       { code: "en", label: "English" },
       { code: "de", label: "Deutsch", style: "Informal du-form" },
     ],
+    routeByBrowserLanguage: true,
   },
   lastModified: "git",
   logo: "/logo.svg",

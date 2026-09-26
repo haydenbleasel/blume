@@ -24,6 +24,7 @@ const i18nFor = (parser: "dir" | "dot"): ResolvedI18nConfig => ({
     { code: "pt-BR", dir: "ltr", label: "Português" },
   ],
   parser,
+  routeByBrowserLanguage: false,
 });
 
 describe("localeTargetPath locale folder casing", () => {
