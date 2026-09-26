@@ -69,6 +69,7 @@ export const fa: UIStringsOverride = {
     preview: "پیش‌نمایش",
     prop: "ویژگی",
     selectTab: "انتخاب زبانه",
+    selectView: "انتخاب نما",
     showLess: "نمایش کمتر",
     showMore: "نمایش بیشتر",
     stars: "ستاره‌ها",

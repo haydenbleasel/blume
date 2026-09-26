@@ -23,6 +23,7 @@ import { deployPlatform } from "../deploy/platforms/index.ts";
 import { adapterRoot, distDir } from "../deploy/platforms/paths.ts";
 import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
 import { API_RAIL_KEY } from "../markdown/api-rail.ts";
+import { VIEWS_KEY } from "../markdown/views.ts";
 import type { OgCache } from "../og/cache.ts";
 import type { OgFont, OgFontFamilies, OgGoogleFont } from "../og/card.ts";
 import { RATE_LIMIT_BINDING } from "../ratelimit/cloudflare.ts";
@@ -2294,11 +2295,13 @@ import TreeRoot from "blume/components/content/Tree.astro";
 import TreeFile from "blume/components/content/TreeFile.astro";
 import TreeFolder from "blume/components/content/TreeFolder.astro";
 import TypeTable from "blume/components/content/TypeTable.astro";
+import View from "blume/components/content/View.astro";
 import Visibility from "blume/components/content/Visibility.astro";
 import YouTube from "blume/components/content/YouTube.astro";
 import Icon from "blume/components/Icon.astro";
 import LocaleLinks from "blume/components/layout/LocaleLinks.astro";
 import NarrationPlayer from "blume/components/layout/NarrationPlayer.astro";
+import ViewSwitcher from "blume/components/content/ViewSwitcher.astro";
 import ApiOverview from "blume/components/openapi/ApiOverview.astro";
 import ApiTagOperations from "blume/components/openapi/ApiTagOperations.astro";
 import Operation from "blume/components/openapi/Operation.astro";
@@ -2343,6 +2346,7 @@ ${mathImport}import { mdxComponents as userMdx, layoutOverrides } from "../gener
   Tooltip,
   Tree,
   TypeTable,
+  View,
   Visibility,
   YouTube,
   ${mathEntry}...userMdx,
@@ -2425,6 +2429,13 @@ const { Content, headings: allHeadings, remarkPluginFrontmatter } = await render
 // frontmatter (see markdown/heading-anchors.ts). Only the plugin's array
 // counts: \`frontmatter.extend\` can declare the same key, and on a page with
 // no headings that user-supplied value would pass straight through.
+// A page written in \`<View>\` blocks gets their picker above the content;
+// the views plugin lists them through the render's frontmatter (see
+// markdown/views.ts), and only a list of titled entries counts.
+const viewsRaw = remarkPluginFrontmatter?.${VIEWS_KEY};
+const views = Array.isArray(viewsRaw)
+  ? viewsRaw.filter((view) => typeof view?.title === "string")
+  : [];
 const tocHiddenRaw = remarkPluginFrontmatter?.${TOC_HIDDEN_KEY};
 const tocHidden = new Set(Array.isArray(tocHiddenRaw) ? tocHiddenRaw : []);
 const headings =
@@ -2727,6 +2738,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
       strings={ui.narration}
     />
   )}
+  {views.length > 1 && <ViewSwitcher label={ui.content.selectView} views={views} />}
   <LocaleLinks locale={locale}>
     <Content components={components} />
   </LocaleLinks>

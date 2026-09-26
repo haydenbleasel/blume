@@ -71,6 +71,7 @@ export const fr: UIStringsOverride = {
     preview: "Aperçu",
     prop: "Propriété",
     selectTab: "Sélectionner un onglet",
+    selectView: "Sélectionner une vue",
     showLess: "Afficher moins",
     showMore: "Afficher plus",
     stars: "Étoiles",

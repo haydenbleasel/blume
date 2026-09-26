@@ -1,0 +1,48 @@
+---
+title: Views
+description: One page written for two languages. Pick a view above the content, and the page and its table of contents follow.
+---
+
+Everyone reads this paragraph. The sections below change with the view you pick, and so does the table of contents on the right.
+
+<View title="JavaScript" icon="braces">
+
+## Install the client
+
+```bash
+npm install @acme/commerce
+```
+
+## Create an order
+
+```js
+import { Acme } from "@acme/commerce";
+
+const acme = new Acme({ token: process.env.ACME_TOKEN });
+await acme.orders.create({ items: [{ sku: "tee", quantity: 1 }] });
+```
+
+</View>
+
+<View title="Python" icon="terminal">
+
+## Install the client
+
+```bash
+pip install acme-commerce
+```
+
+## Create an order
+
+```python
+from acme import Acme
+
+acme = Acme(token=os.environ["ACME_TOKEN"])
+acme.orders.create(items=[{"sku": "tee", "quantity": 1}])
+```
+
+</View>
+
+## Next steps
+
+Read the [REST reference](/api) for every endpoint. The view you picked is remembered on other pages written in views.

@@ -5,6 +5,6 @@ export default defineMeta({
   display: "group",
   icon: "book-open",
   order: 5,
-  pages: ["writing", "reuse", "endpoint", "publishing"],
+  pages: ["writing", "reuse", "views", "endpoint", "publishing"],
   title: "Guides",
 });

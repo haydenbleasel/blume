@@ -68,6 +68,7 @@ export const cs: UIStringsOverride = {
     preview: "Náhled",
     prop: "Vlastnost",
     selectTab: "Vybrat kartu",
+    selectView: "Vybrat zobrazení",
     showLess: "Zobrazit méně",
     showMore: "Zobrazit více",
     stars: "Hvězdy",

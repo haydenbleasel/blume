@@ -69,6 +69,7 @@ export const fi: UIStringsOverride = {
     preview: "Esikatselu",
     prop: "Ominaisuus",
     selectTab: "Valitse välilehti",
+    selectView: "Valitse näkymä",
     showLess: "Näytä vähemmän",
     showMore: "Näytä lisää",
     stars: "Tähdet",

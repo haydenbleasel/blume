@@ -67,6 +67,7 @@ export const th: UIStringsOverride = {
     preview: "ตัวอย่าง",
     prop: "คุณสมบัติ",
     selectTab: "เลือกแท็บ",
+    selectView: "เลือกมุมมอง",
     showLess: "แสดงน้อยลง",
     showMore: "แสดงเพิ่มเติม",
     stars: "ดาว",

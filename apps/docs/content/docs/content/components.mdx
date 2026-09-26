@@ -89,6 +89,36 @@ The active tab is written to the URL hash, so a link opens on it; pass `hash={fa
 </Tabs>
 ```
 
+## View
+
+Write one page for several audiences, such as readers of different programming languages or frameworks, with `<View>` blocks. Each distinct `title` becomes an option in a picker above the page's content, and only the chosen view's blocks show. The table of contents follows: headings inside hidden views drop out of it. Prose outside any `<View>` shows in every view, and blocks sharing a title show and hide together, so a page can alternate shared and view-specific sections. `icon` shows beside the view's name in the picker.
+
+````mdx lineNumbers
+Everyone reads this paragraph.
+
+<View title="JavaScript" icon="braces">
+
+## Install the client
+
+```bash
+npm install @acme/commerce
+```
+
+</View>
+
+<View title="Python" icon="terminal">
+
+## Install the client
+
+```bash
+pip install acme-commerce
+```
+
+</View>
+````
+
+The first view shows until the reader picks another. Blume remembers that pick across pages written in views, and writes it to the URL as `?view=Python`, so a link opens on the same view. A link to a heading inside a view opens that view. Use `<View>` when most of the page changes with the choice, and [Tabs](#tabs) when only one part of the page does. The agent-facing Markdown includes every view, each under its name.
+
 ## Badge
 
 A small inline label for status or metadata — version tags, “new” or “beta” markers, stability levels. The `variant` tunes the color to the meaning.

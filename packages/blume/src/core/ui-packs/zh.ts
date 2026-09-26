@@ -67,6 +67,7 @@ export const zh: UIStringsOverride = {
     preview: "预览",
     prop: "属性",
     selectTab: "选择标签页",
+    selectView: "选择视图",
     showLess: "显示更少",
     showMore: "显示更多",
     stars: "星标",

@@ -70,6 +70,7 @@ export const hr: UIStringsOverride = {
     preview: "Pregled",
     prop: "Svojstvo",
     selectTab: "Odaberi karticu",
+    selectView: "Odaberi prikaz",
     showLess: "Prikaži manje",
     showMore: "Prikaži više",
     stars: "Zvjezdice",

@@ -69,6 +69,7 @@ export const ko: UIStringsOverride = {
     preview: "미리보기",
     prop: "속성",
     selectTab: "탭 선택",
+    selectView: "보기 선택",
     showLess: "간략히 보기",
     showMore: "더 보기",
     stars: "스타",

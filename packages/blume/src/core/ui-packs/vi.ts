@@ -69,6 +69,7 @@ export const vi: UIStringsOverride = {
     preview: "Xem trước",
     prop: "Thuộc tính",
     selectTab: "Chọn tab",
+    selectView: "Chọn chế độ xem",
     showLess: "Ẩn bớt",
     showMore: "Hiển thị thêm",
     stars: "Sao",

@@ -70,6 +70,7 @@ export const ru: UIStringsOverride = {
     preview: "Предпросмотр",
     prop: "Свойство",
     selectTab: "Выбрать вкладку",
+    selectView: "Выбрать представление",
     showLess: "Показать меньше",
     showMore: "Показать ещё",
     stars: "Звёзды",

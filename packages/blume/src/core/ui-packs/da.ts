@@ -69,6 +69,7 @@ export const da: UIStringsOverride = {
     preview: "Forhåndsvisning",
     prop: "Egenskab",
     selectTab: "Vælg fane",
+    selectView: "Vælg visning",
     showLess: "Vis mindre",
     showMore: "Vis mere",
     stars: "Stjerner",

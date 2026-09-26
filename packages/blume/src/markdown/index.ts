@@ -30,6 +30,7 @@ import { DEFAULT_CODE_THEMES } from "./themes.ts";
 import type { CodeThemes } from "./themes.ts";
 import { ts2jsPlugin } from "./ts2js.ts";
 import { variablesPlugin } from "./variables.ts";
+import { viewsPlugin } from "./views.ts";
 
 export type { CodeTheme, CodeThemes } from "./themes.ts";
 
@@ -391,5 +392,6 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
       asMdastPlugin(mathPlugin()),
       ...blumeSharedMdastPlugins(options),
       asMdastPlugin(apiRailPlugin()),
+      asMdastPlugin(viewsPlugin()),
     ],
   });

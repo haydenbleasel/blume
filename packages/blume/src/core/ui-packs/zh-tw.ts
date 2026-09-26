@@ -67,6 +67,7 @@ export const zhTW: UIStringsOverride = {
     preview: "預覽",
     prop: "屬性",
     selectTab: "選擇分頁",
+    selectView: "選擇檢視",
     showLess: "顯示較少",
     showMore: "顯示更多",
     stars: "星標",

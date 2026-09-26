@@ -1,0 +1,21 @@
+---
+/**
+ * One view of a page written for several (`<View title="Python">`), as
+ * Mintlify writes them. Each distinct title is an option of the page's view
+ * picker, and blocks sharing a title show and hide together, so a page can
+ * alternate between prose everyone reads and view-specific sections. The
+ * picker and the hiding live in `ViewSwitcher.astro`; `icon` shows beside
+ * the view's name there.
+ */
+interface Props {
+  class?: string;
+  icon?: string;
+  title: string;
+}
+
+const { class: className, title } = Astro.props;
+---
+
+<div class={className} data-blume-view={title}>
+  <slot />
+</div>

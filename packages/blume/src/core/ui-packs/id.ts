@@ -70,6 +70,7 @@ export const id: UIStringsOverride = {
     preview: "Pratinjau",
     prop: "Properti",
     selectTab: "Pilih tab",
+    selectView: "Pilih tampilan",
     showLess: "Tampilkan lebih sedikit",
     showMore: "Tampilkan lebih banyak",
     stars: "Bintang",

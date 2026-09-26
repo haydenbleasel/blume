@@ -70,6 +70,7 @@ export const pl: UIStringsOverride = {
     preview: "Podgląd",
     prop: "Właściwość",
     selectTab: "Wybierz kartę",
+    selectView: "Wybierz widok",
     showLess: "Pokaż mniej",
     showMore: "Pokaż więcej",
     stars: "Gwiazdki",

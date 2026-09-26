@@ -399,6 +399,18 @@ const tabs: ComponentMarkdown = ({ childComponents, children }) => {
     .join("\n\n");
 };
 
+/**
+ * A `<View>` block: its content under its view's name, so an agent reading
+ * the Markdown sees every view and which one each part belongs to.
+ */
+const view: ComponentMarkdown = ({ children, props }) => {
+  const title = isString(props.title) && props.title !== "" ? props.title : "";
+  if (!title) {
+    return children;
+  }
+  return children ? `**${title}**\n\n${children}` : `**${title}**`;
+};
+
 /** Escape the brackets that would end a link's text early. */
 const linkText = (value: string): string =>
   value.replaceAll(/[[\]]/gu, String.raw`\$&`);
@@ -894,6 +906,7 @@ const SERIALIZERS = {
   "Tree.Folder": treeFolder,
   TypeTable: typeTable,
   Update: update,
+  View: view,
   YouTube: youtube,
 } satisfies Record<string, ComponentMarkdown>;
 

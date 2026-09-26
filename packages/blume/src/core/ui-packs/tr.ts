@@ -70,6 +70,7 @@ export const tr: UIStringsOverride = {
     preview: "Önizleme",
     prop: "Özellik",
     selectTab: "Sekme seç",
+    selectView: "Görünüm seç",
     showLess: "Daha az göster",
     showMore: "Daha fazla göster",
     stars: "Yıldızlar",

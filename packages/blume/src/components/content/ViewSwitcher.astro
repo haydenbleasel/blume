@@ -1,0 +1,168 @@
+---
+import type { PageView } from "../../markdown/views.ts";
+import Icon from "../Icon.astro";
+import { VIEW_INIT_SCRIPT, viewStyle } from "./view-switcher.ts";
+
+/**
+ * The picker for a page written in `<View>` blocks, rendered above the
+ * content with the page's views (collected by `markdown/views.ts`). The
+ * style hides every other view's blocks and table of contents entries, and
+ * the inline script applies a linked or remembered choice before the views
+ * paint (see `view-switcher.ts`).
+ */
+interface Props {
+  /** The select's accessible name (`content.selectView`). */
+  label: string;
+  views: PageView[];
+}
+
+const { label, views } = Astro.props;
+const titles = views.map((view) => view.title);
+---
+
+<blume-view-switcher
+  class="not-prose mt-4 mb-8 flex items-center gap-2"
+  data-views={JSON.stringify(titles)}
+>
+  <style is:inline set:html={viewStyle(titles)} />
+  {
+    views.map(
+      (view) =>
+        view.icon && (
+          <span
+            class="inline-flex shrink-0 text-muted-foreground"
+            data-blume-view={view.title}
+          >
+            <Icon name={view.icon} size={16} />
+          </span>
+        )
+    )
+  }
+  <select
+    aria-label={label}
+    class="cursor-pointer rounded-blume border border-border bg-background px-3 py-1.5 font-medium text-foreground text-sm"
+  >
+    {views.map((view) => <option value={view.title}>{view.title}</option>)}
+  </select>
+  <script is:inline set:html={VIEW_INIT_SCRIPT} />
+</blume-view-switcher>
+
+<script>
+  import {
+    chooseView,
+    VIEW_PARAM,
+    VIEW_STORAGE_KEY,
+  } from "./view-switcher.ts";
+
+  const HEADINGS = "h2[id], h3[id], h4[id], h5[id], h6[id]";
+
+  const stored = (): string | null => {
+    try {
+      return localStorage.getItem(VIEW_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  };
+
+  /** The view holding the element a `#hash` link points at, if any. */
+  const linkedView = (): string | undefined => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const target = id ? document.getElementById(id) : null;
+    return (
+      target?.closest<HTMLElement>("article [data-blume-view]")?.dataset
+        .blumeView ?? undefined
+    );
+  };
+
+  /**
+   * Tag each table of contents entry with the view its heading is in, so the
+   * page's view style hides it with the view.
+   */
+  const tagTableOfContents = () => {
+    const views = new Map<string, string>();
+    for (const view of document.querySelectorAll<HTMLElement>(
+      "article [data-blume-view]"
+    )) {
+      for (const heading of view.querySelectorAll(HEADINGS)) {
+        views.set(heading.id, view.dataset.blumeView ?? "");
+      }
+    }
+    for (const link of document.querySelectorAll<HTMLAnchorElement>(
+      'blume-toc a[href^="#"]'
+    )) {
+      const id = decodeURIComponent(link.getAttribute("href")?.slice(1) ?? "");
+      const item = link.closest("li");
+      const title = views.get(id);
+      if (item && title) {
+        item.dataset.blumeView = title;
+      }
+    }
+  };
+
+  class BlumeViewSwitcher extends HTMLElement {
+    #titles: string[] = [];
+
+    connectedCallback() {
+      try {
+        this.#titles = JSON.parse(this.dataset.views ?? "[]");
+      } catch {
+        this.#titles = [];
+      }
+      tagTableOfContents();
+      this.#show(
+        chooseView(this.#titles, [
+          linkedView(),
+          new URL(location.href).searchParams.get(VIEW_PARAM),
+          stored(),
+        ])
+      );
+      this.querySelector("select")?.addEventListener("change", this.#onPick);
+      window.addEventListener("hashchange", this.#onHash);
+    }
+
+    disconnectedCallback() {
+      this.querySelector("select")?.removeEventListener("change", this.#onPick);
+      window.removeEventListener("hashchange", this.#onHash);
+    }
+
+    #show(title: string | undefined) {
+      if (title === undefined) {
+        return;
+      }
+      document.body.dataset.blumeView = title;
+      const select = this.querySelector("select");
+      if (select) {
+        select.value = title;
+      }
+    }
+
+    #onPick = (event: Event) => {
+      // SAFETY: the listener is only added to this picker's <select>.
+      const { value } = event.currentTarget as HTMLSelectElement;
+      this.#show(value);
+      try {
+        localStorage.setItem(VIEW_STORAGE_KEY, value);
+      } catch {
+        // Storage can be off; the choice still holds for this page.
+      }
+      // replaceState: the link stays shareable without a history entry per
+      // pick, and the client router needs the entry's state kept.
+      const url = new URL(location.href);
+      url.searchParams.set(VIEW_PARAM, value);
+      history.replaceState(history.state, "", url);
+    };
+
+    // An in-page link to a heading in another view switches to that view.
+    #onHash = () => {
+      const view = linkedView();
+      if (view && view !== document.body.dataset.blumeView) {
+        this.#show(view);
+        document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
+      }
+    };
+  }
+
+  if (!customElements.get("blume-view-switcher")) {
+    customElements.define("blume-view-switcher", BlumeViewSwitcher);
+  }
+</script>

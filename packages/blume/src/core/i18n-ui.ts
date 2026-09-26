@@ -127,6 +127,8 @@ const uiStringsObject = z.object({
       prop: z.string().default("Prop"),
       // `<Tabs dropdown>`: the accessible name of the tab picker.
       selectTab: z.string().default("Select tab"),
+      // `<View>`: the accessible name of the page's view picker.
+      selectView: z.string().default("Select view"),
       // An expanded `expandable` code block's toggle.
       showLess: z.string().default("Show less"),
       // `<Expandable>`'s toggle when it sets no `title`, and a collapsed

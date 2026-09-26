@@ -70,6 +70,7 @@ export const el: UIStringsOverride = {
     preview: "Προεπισκόπηση",
     prop: "Ιδιότητα",
     selectTab: "Επιλογή καρτέλας",
+    selectView: "Επιλογή προβολής",
     showLess: "Εμφάνιση λιγότερων",
     showMore: "Εμφάνιση περισσότερων",
     stars: "Αστέρια",

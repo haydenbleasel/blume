@@ -68,6 +68,7 @@ export const hi: UIStringsOverride = {
     preview: "पूर्वावलोकन",
     prop: "प्रॉप",
     selectTab: "टैब चुनें",
+    selectView: "व्यू चुनें",
     showLess: "कम दिखाएँ",
     showMore: "और दिखाएँ",
     stars: "स्टार",

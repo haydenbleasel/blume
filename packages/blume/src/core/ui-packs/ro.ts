@@ -70,6 +70,7 @@ export const ro: UIStringsOverride = {
     preview: "Previzualizare",
     prop: "Proprietate",
     selectTab: "Selectează fila",
+    selectView: "Selectează vizualizarea",
     showLess: "Afișează mai puțin",
     showMore: "Afișează mai mult",
     stars: "Stele",

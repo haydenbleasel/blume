@@ -70,6 +70,7 @@ export const bg: UIStringsOverride = {
     preview: "Преглед",
     prop: "Свойство",
     selectTab: "Избери раздел",
+    selectView: "Избери изглед",
     showLess: "Покажи по-малко",
     showMore: "Покажи още",
     stars: "Звезди",
