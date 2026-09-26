@@ -1914,6 +1914,7 @@ describe("api reference (scalar)", () => {
         kind: "openapi",
         label: "API Reference",
         noindex: false,
+        overlays: [],
         route: "/reference",
         seoDescriptionSuffix: true,
         slug: "reference",

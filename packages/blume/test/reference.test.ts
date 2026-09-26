@@ -182,6 +182,7 @@ describe("referenceAdapterSchema", () => {
         includeInLlms: true,
         includeInSearch: true,
         noindex: false,
+        overlays: [],
         seoDescriptionSuffix: true,
         spec: "./one.json",
       },
@@ -267,8 +268,8 @@ describe("referenceAdapterSchema", () => {
       hideTestRequestButton: true,
       route: "/reference",
       sources: [
-        { noindex: false, spec: "./one.json" },
-        { label: "Two", noindex: false, spec: "./two.json" },
+        { noindex: false, overlays: [], spec: "./one.json" },
+        { label: "Two", noindex: false, overlays: [], spec: "./two.json" },
       ],
     });
     const result = referenceConfigSchema.safeParse([

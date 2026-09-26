@@ -4,13 +4,15 @@ import type { AdapterDescriptor } from "../core/adapter.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
 import {
   liftSpec,
-  referenceSourceSchema,
+  openapiSourceSchema,
+  overlaysHaveSpec,
+  overlaysNeedSpecIssue,
   hasSources,
   missingSourcesIssue,
   rendererRemovedHint,
   sharedOptions,
 } from "./options.ts";
-import type { PlaygroundOptions, ReferenceSourceOptions } from "./options.ts";
+import type { OpenApiSourceOptions, PlaygroundOptions } from "./options.ts";
 
 /** Options for {@link openapi}. */
 export interface OpenApiOptions {
@@ -30,10 +32,15 @@ export interface OpenApiOptions {
    * `vercel()` in `deployment`).
    */
   playground?: PlaygroundOptions;
+  /**
+   * OpenAPI Overlay documents for `spec`, applied in order before it renders.
+   * With `sources`, each source takes its own `overlays`.
+   */
+  overlays?: string[];
   /** Where the reference mounts. Defaults to `/reference`. */
   route?: string;
   /** One or more specs; each renders on its own route by default. */
-  sources?: ReferenceSourceOptions[];
+  sources?: OpenApiSourceOptions[];
   /** Shorthand for a single source: `sources: [{ spec }]`. */
   spec?: string;
 }
@@ -47,12 +54,15 @@ export const openapiOptionsSchema = z
       }),
       /** Start nested schema rows expanded rather than collapsed (Blume renderer). */
       expandSchemas: z.boolean().default(false),
+      /** Overlays for the `spec` shorthand. */
+      overlays: z.array(z.string()).optional(),
       /** One or more specs; each renders on its own route by default. */
-      sources: z.array(referenceSourceSchema).default([]),
+      sources: z.array(openapiSourceSchema).default([]),
     },
     rendererRemovedHint
   )
-  .transform(liftSpec(referenceSourceSchema))
+  .refine(overlaysHaveSpec, overlaysNeedSpecIssue)
+  .transform(liftSpec(openapiSourceSchema))
   .refine(hasSources, missingSourcesIssue("openapi"));
 
 /** `openapi()` options with every default applied and `spec` folded into `sources`. */

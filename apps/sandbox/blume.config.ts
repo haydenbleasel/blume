@@ -10,8 +10,8 @@ import { z } from "zod";
 
 /**
  * Kitchen-sink sandbox: every Blume feature enabled in one project, for
- * exercising the framework end to end — including the native OpenAPI and
- * AsyncAPI renderers, search, the assistant, MCP, i18n, export, OG images,
+ * exercising the framework end to end — including the native OpenAPI (with
+ * an overlay) and AsyncAPI renderers, search, the assistant, MCP, i18n, export, OG images,
  * narration, content variables, pattern redirects, the site footer, written
  * feedback, rate limiting, and cookie consent (the `script()` analytics logs to the console,
  * with every tracked event, only once a reader accepts).
@@ -167,6 +167,7 @@ export default defineConfig({
   reference: [
     openapi({
       expandSchemas: true,
+      overlays: ["./specs/public.overlay.yaml"],
       route: "/api",
       spec: "./specs/openapi.yaml",
     }),

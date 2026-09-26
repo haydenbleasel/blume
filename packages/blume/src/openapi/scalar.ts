@@ -6,6 +6,7 @@ import { scalarReferenceTemplate } from "../astro/templates.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { trimChar } from "../core/trim.ts";
 import { resolveAccent, resolveRadius } from "../theme/palette.ts";
+import { readOverlaidSpec } from "./parse.ts";
 import { resolveReferences } from "./references.ts";
 import type { ReferenceSource } from "./references.ts";
 
@@ -53,14 +54,44 @@ const themeConfiguration = (config: ResolvedConfig, override?: string) => {
   };
 };
 
+/** A source's Scalar spec config, or none when its overlays failed. */
+interface SpecConfiguration {
+  config?: { content: string } | { url: string };
+  warning?: string;
+}
+
+/**
+ * The spec with its overlays applied, inlined: Scalar can't apply overlays
+ * itself. A failed overlay skips the page rather than embed the spec without
+ * it, since an overlay is often what hides the internal operations.
+ */
+const overlaidConfiguration = async (
+  ref: ReferenceSource,
+  root: string
+): Promise<SpecConfiguration> => {
+  try {
+    const { text, warnings } = await readOverlaidSpec(ref.spec, root, {
+      overlays: ref.overlays,
+    });
+    return { config: { content: text }, warning: warnings[0] };
+  } catch (error) {
+    // SAFETY: reading, parsing, and overlaying throw Error instances.
+    const { message } = error as Error;
+    return {
+      warning: `API reference ${ref.route} was skipped: its overlays couldn't be applied to "${ref.spec}" (${message}).`,
+    };
+  }
+};
+
 /** Build the Scalar spec config for a source: inline `content` or remote `url`. */
 const specConfiguration = async (
-  spec: string,
+  ref: ReferenceSource,
   root: string
-): Promise<{
-  config: { content: string } | { url: string };
-  warning?: string;
-}> => {
+): Promise<SpecConfiguration> => {
+  const { spec } = ref;
+  if (ref.overlays?.length) {
+    return await overlaidConfiguration(ref, root);
+  }
   if (URL_SPEC.test(spec)) {
     return { config: { url: spec } };
   }
@@ -133,7 +164,7 @@ export const buildReferenceFiles = async (options: {
   const built = await Promise.all(
     accepted.map(async (ref) => ({
       ref,
-      spec: await specConfiguration(ref.spec, root),
+      spec: await specConfiguration(ref, root),
     }))
   );
 
@@ -141,6 +172,9 @@ export const buildReferenceFiles = async (options: {
   for (const { ref, spec } of built) {
     if (spec.warning) {
       warnings.push(spec.warning);
+    }
+    if (!spec.config) {
+      continue;
     }
     const pagePath = referencePagePath(ref.route);
     // `theme` is the one option Blume maps (a named theme replaces the

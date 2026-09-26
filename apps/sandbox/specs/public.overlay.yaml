@@ -1,0 +1,17 @@
+# Docs-only changes to openapi.yaml, applied at build (OpenAPI Overlay 1.1).
+overlay: 1.1.0
+info:
+  title: Public docs
+  version: 1.0.0
+actions:
+  - description: Hide staff-only operations.
+    target: $.paths.*[?@['x-internal'] == true]
+    remove: true
+  - description: Point readers at the sandbox too.
+    target: $.servers
+    update:
+      - url: https://sandbox.api.acme.dev/v1
+        description: Sandbox
+  - target: $.paths['/orders'].get
+    update:
+      description: Returns orders newest-first, paginated. This sentence comes from specs/public.overlay.yaml.

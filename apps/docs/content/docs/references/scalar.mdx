@@ -33,6 +33,8 @@ reference: [
 ],
 ```
 
+[Overlays](/docs/references/openapi#overlays) work here too: list `overlays` beside `spec`, or on each source. The embed then inlines the spec with the overlays applied, so a remote spec with overlays is fetched at build time rather than from the browser. If an overlay doesn't apply, the build warns and leaves that page out rather than embed the spec without it.
+
 A Scalar embed and native pages can sit side by side in the list — an `openapi()` adapter for the current API and a `scalar()` adapter for a legacy one, say — as long as their routes differ. Like every reference, the embed doesn't add a header tab on its own; point a [navigation tab](/docs/content/navigation#tabs) at its route to surface it.
 
 ## What the embed doesn't do
@@ -43,7 +45,7 @@ The embed does follow Blume's light/dark toggle: it's pinned to the page's theme
 
 ## Passing Scalar options
 
-`theme` is the one option most people reach for, but Scalar supports many more. Every key you pass to `scalar()` beyond `spec`, `sources`, `route`, and `theme` is forwarded verbatim as [Scalar configuration](https://github.com/scalar/scalar/blob/main/documentation/configuration.md) to the embedded reference — Blume doesn't gate the keys, so anything Scalar accepts flows through (JSON values only, since the configuration is inlined into the generated page):
+`theme` is the one option most people reach for, but Scalar supports many more. Every key you pass to `scalar()` beyond `spec`, `overlays`, `sources`, `route`, and `theme` is forwarded verbatim as [Scalar configuration](https://github.com/scalar/scalar/blob/main/documentation/configuration.md) to the embedded reference — Blume doesn't gate the keys, so anything Scalar accepts flows through (JSON values only, since the configuration is inlined into the generated page):
 
 ```ts blume.config.ts lineNumbers
 reference: [

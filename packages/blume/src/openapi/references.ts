@@ -68,6 +68,11 @@ export interface ReferenceSource {
   /** Local path or `http(s)` URL, verbatim from config. */
   spec: string;
   /**
+   * OpenAPI Overlay documents applied to `spec` in order (`openapi()` and
+   * `scalar()` only).
+   */
+  overlays?: string[];
+  /**
    * URL of the live GraphQL endpoint the playground and code samples target
    * (GraphQL only — a schema, unlike an OpenAPI document, names no server).
    */
@@ -184,6 +189,7 @@ interface SourceRow {
   route?: string;
   seoDescriptionSuffix: boolean;
   spec: string;
+  overlays?: string[];
 }
 
 /**
@@ -254,6 +260,9 @@ const referencesFor = (
     }
     if (source.endpoint !== undefined) {
       reference.endpoint = source.endpoint;
+    }
+    if (source.overlays !== undefined) {
+      reference.overlays = source.overlays;
     }
     return reference;
   });

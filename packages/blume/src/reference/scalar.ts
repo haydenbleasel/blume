@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import type { AdapterDescriptor, JsonValue } from "../core/adapter.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
-import { hasSources, missingSourcesIssue } from "./options.ts";
+import {
+  hasSources,
+  missingSourcesIssue,
+  overlaysHaveSpec,
+  overlaysNeedSpecIssue,
+  overlaysSchema,
+} from "./options.ts";
 
 /**
  * What the generated Scalar page imports. Declared on every `scalar()`
@@ -22,6 +28,11 @@ export const scalarSourceSchema = z.strictObject({
   label: z.string().optional(),
   /** Emit noindex metadata and omit the page from the sitemap. */
   noindex: z.boolean().default(false),
+  /**
+   * OpenAPI Overlay documents applied in order to the document before it's
+   * embedded (inlined, so a remote spec with overlays is fetched at build).
+   */
+  overlays: overlaysSchema,
   /** Per-source route; defaults to the adapter's `route` (or a derived path). */
   route: z.string().optional(),
   /** Local path or `http(s)` URL to the OpenAPI or AsyncAPI document. */
@@ -34,6 +45,8 @@ export interface ScalarSourceOptions {
   label?: string;
   /** Emit noindex metadata and omit the page from the sitemap. Defaults to `false`. */
   noindex?: boolean;
+  /** OpenAPI Overlay documents applied in order to the document before it's embedded. */
+  overlays?: string[];
   /** Per-source route; defaults to the adapter's `route` (or a derived path). */
   route?: string;
   /** Local path or `http(s)` URL to the OpenAPI or AsyncAPI document. */
@@ -55,6 +68,8 @@ export type ResolvedScalarOptions = {
 
 /** The options {@link scalar} maps itself. */
 export interface ScalarNamedOptions {
+  /** OpenAPI Overlay documents for `spec`; with `sources`, each takes its own. */
+  overlays?: string[];
   /** Where the reference mounts. Defaults to `/reference`. */
   route?: string;
   /** One or more documents; each renders on its own route by default. */
@@ -87,6 +102,8 @@ export type ScalarOptions = ScalarNamedOptions & {
  */
 export const scalarOptionsSchema = z
   .object({
+    /** Overlays for the `spec` shorthand. */
+    overlays: z.array(z.string()).optional(),
     /** Where the reference mounts. */
     route: z.string().default("/reference"),
     /** One or more documents; each renders on its own route by default. */
@@ -97,13 +114,21 @@ export const scalarOptionsSchema = z
     theme: z.string().optional(),
   })
   .catchall(z.json())
-  .transform(({ spec, sources, ...options }): ResolvedScalarOptions => ({
-    ...options,
-    sources:
-      spec === undefined
-        ? sources
-        : [scalarSourceSchema.parse({ spec }), ...sources],
-  }))
+  .refine(overlaysHaveSpec, overlaysNeedSpecIssue)
+  .transform(
+    ({ overlays, spec, sources, ...options }): ResolvedScalarOptions => ({
+      ...options,
+      sources:
+        spec === undefined
+          ? sources
+          : [
+              scalarSourceSchema.parse(
+                overlays ? { overlays, spec } : { spec }
+              ),
+              ...sources,
+            ],
+    })
+  )
   .refine(hasSources, missingSourcesIssue("scalar"));
 
 export type ScalarAdapter = AdapterDescriptor<"scalar", ScalarOptions>;

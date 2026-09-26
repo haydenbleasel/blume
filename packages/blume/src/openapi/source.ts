@@ -250,7 +250,7 @@ const parseReference = async (
   const { document, warnings } = await parseSpec(
     reference.spec,
     ctx.projectRoot,
-    options
+    { ...options, overlays: reference.overlays }
   );
   const extracted = extractOperations(document, reference.route);
   return {

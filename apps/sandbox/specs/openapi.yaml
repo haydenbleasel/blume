@@ -156,6 +156,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Customer"
+  /internal/reindex:
+    post:
+      operationId: reindexSearch
+      x-internal: true
+      tags:
+        - Orders
+      summary: Rebuild the order search index
+      description: Staff-only. The public docs drop this with specs/public.overlay.yaml.
+      responses:
+        "202":
+          description: Reindex started.
 webhooks:
   orderPaid:
     post:

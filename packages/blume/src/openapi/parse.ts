@@ -18,6 +18,7 @@ import { normalizeAsyncApiDocument } from "./asyncapi.ts";
 import { buildGraphqlDocument } from "./graphql-build.ts";
 import type { GraphqlDocument } from "./graphql.ts";
 import type { ApiDocument } from "./model.ts";
+import { applyOverlay, isJsonObject, overlayDocument } from "./overlay.ts";
 import { SpecDependencyError } from "./spec-dependency-error.ts";
 
 /**
@@ -75,6 +76,11 @@ export class InvalidSpecError extends Error {
 
 /** Where and whether to cache a remote spec's text between runs. */
 export interface SpecFetchOptions {
+  /**
+   * Overlay documents (local paths or `http(s)` URLs) applied in order to
+   * the parsed spec, before it's upgraded. See `overlay.ts`.
+   */
+  overlays?: readonly string[];
   /** Dir for a last-good on-disk copy of a remote spec (offline fallback). */
   cacheDir?: string;
   /**
@@ -310,13 +316,60 @@ const readSpecText = async (
 const isApiDocument = <Value>(value: Value): value is Value & ApiDocument =>
   typeof value === "object" && value !== null;
 
+/**
+ * Read a spec and apply its overlays, in order, to the parsed document as
+ * written (before any upgrade: an overlay targets its spec's own version).
+ * The overlays are read like the spec, local or remote, cached alike.
+ */
+const readOverlaid = async (
+  spec: string,
+  root: string,
+  options: SpecFetchOptions
+): Promise<{ document: ReturnType<typeof normalize>; warnings: string[] }> => {
+  const [read, ...overlays] = await Promise.all(
+    [spec, ...(options.overlays ?? [])].map((path) =>
+      readSpecText(path, root, options)
+    )
+  );
+  const document = normalize(read?.text ?? "");
+  for (const [index, overlay] of overlays.entries()) {
+    const name = options.overlays?.[index] ?? "";
+    const parsed = overlayDocument(normalize(overlay.text), name);
+    // A spec that isn't a mapping has nothing to overlay; the caller
+    // rejects it as it would without overlays.
+    if (isJsonObject(document)) {
+      applyOverlay(document, parsed, name);
+    }
+  }
+  return {
+    document,
+    warnings: [read, ...overlays].flatMap((entry) => entry?.warnings ?? []),
+  };
+};
+
+/**
+ * A spec with its overlays applied, as JSON text: what the Scalar embed
+ * inlines, since it can't apply overlays itself.
+ */
+export const readOverlaidSpec = async (
+  spec: string,
+  root: string,
+  options: SpecFetchOptions
+): Promise<{ text: string; warnings: string[] }> => {
+  const { document, warnings } = await readOverlaid(spec, root, options);
+  return { text: JSON.stringify(document), warnings };
+};
+
 export const parseSpec = async (
   spec: string,
   root: string,
   options: SpecFetchOptions = {}
 ): Promise<ParsedSpec> => {
-  const { text, warnings } = await readSpecText(spec, root, options);
-  const normalized = normalize(text);
+  const { document: normalized, warnings } = await readOverlaid(
+    spec,
+    root,
+    options
+  );
   const { specification } = upgrade(normalized);
   // Reject a non-mapping here so the renderer never sees a non-document.
   if (!isApiDocument(specification)) {

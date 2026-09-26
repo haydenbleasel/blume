@@ -66,6 +66,40 @@ export interface ReferenceSourceOptions {
 export type ResolvedReferenceSource = z.output<typeof referenceSourceSchema>;
 
 /**
+ * [OpenAPI Overlay](https://spec.openapis.org/overlay/latest.html) documents
+ * (local paths or `http(s)` URLs) applied in order to an OpenAPI spec before
+ * it renders: changes to a spec you don't edit by hand.
+ */
+export const overlaysSchema = z.array(z.string()).default([]);
+
+/** Whether adapter-level `overlays` has the `spec` it belongs to. */
+export const overlaysHaveSpec = (options: {
+  overlays?: string[];
+  spec?: string;
+}): boolean => !options.overlays || options.spec !== undefined;
+
+/** The refinement issue for `overlays` set beside `sources` instead of `spec`. */
+export const overlaysNeedSpecIssue = {
+  message:
+    "`overlays` belongs to the `spec` shorthand; with `sources`, give each source its own `overlays`.",
+  path: ["overlays"],
+};
+
+/** An OpenAPI spec source: the shared shape plus its `overlays`. */
+export const openapiSourceSchema = referenceSourceSchema.extend({
+  overlays: overlaysSchema,
+});
+
+/** One OpenAPI spec source, as `openapi()` accepts it. */
+export interface OpenApiSourceOptions extends ReferenceSourceOptions {
+  /**
+   * OpenAPI Overlay documents (local paths or `http(s)` URLs) applied in
+   * order to the spec before it renders.
+   */
+  overlays?: string[];
+}
+
+/**
  * A single GraphQL schema: the shared source shape plus `endpoint`, the live
  * GraphQL API URL the playground and code samples target (a schema, unlike an
  * OpenAPI document, names no server).
@@ -173,8 +207,9 @@ export const sharedOptions = (defaults: {
 });
 
 /**
- * Resolve the `spec` shorthand into `sources` so downstream code reads one
- * field: the shorthand becomes the first source (with the source defaults
+ * Resolve the `spec` shorthand (and, on OpenAPI kinds, the `overlays` beside
+ * it) into `sources` so downstream code reads one field: the shorthand becomes
+ * the first source (with the source defaults
  * applied through the source schema itself, so the two can never drift) and
  * the `spec` key is dropped. An adapter with neither renders nothing, which
  * is a config mistake rather than a choice — `refine` it away with
@@ -184,15 +219,19 @@ export const liftSpec =
   <Source extends { spec: string }>(
     sourceSchema: z.ZodType<Source, { spec: string }>
   ) =>
-  <Options extends { sources: Source[]; spec?: string }>({
+  <Options extends { sources: Source[]; spec?: string; overlays?: string[] }>({
+    overlays,
     spec,
     ...options
-  }: Options): Omit<Options, "spec"> => ({
+  }: Options): Omit<Options, "spec" | "overlays"> => ({
     ...options,
     sources:
       spec === undefined
         ? options.sources
-        : [sourceSchema.parse({ spec }), ...options.sources],
+        : [
+            sourceSchema.parse(overlays ? { overlays, spec } : { spec }),
+            ...options.sources,
+          ],
   });
 
 /** Whether an adapter has anything to render; pairs with {@link missingSourcesIssue}. */
