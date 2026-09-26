@@ -81,6 +81,11 @@ const main = defineCommand({
       () => import("./commands/preview.ts"),
       "previewCommand"
     ),
+    skill: lazyCommand(
+      commandMeta.skill,
+      () => import("./commands/skill.ts"),
+      "skillCommand"
+    ),
     sync: lazyCommand(
       commandMeta.sync,
       () => import("./commands/sync.ts"),

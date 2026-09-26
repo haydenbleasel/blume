@@ -62,6 +62,11 @@ export const commandMeta = {
     description: "Preview the last production build.",
     name: "preview",
   },
+  skill: {
+    description:
+      "Write the docs site's agent skill with a coding agent, in place of the generated one.",
+    name: "skill",
+  },
   sync: {
     description: "Re-fetch remote content sources and regenerate the runtime.",
     name: "sync",

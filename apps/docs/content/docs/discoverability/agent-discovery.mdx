@@ -239,7 +239,15 @@ Every build writes an [agent skill](https://agentskills.io) for your docs, a `SK
 
 The skill is named after your site's `title` (`Acme Docs` becomes `acme-docs`). It covers the current version in the default language, leaves out API operation pages and changelog entries (each has one line of its own above the map), and lists up to 200 pages, pointing at `llms.txt` for the rest. The links are absolute, so the skill needs [`deployment.site`](/docs/deployment); a build without one skips it.
 
-The generated skill is a guide to your docs, not a summary of your product. To write that yourself, add a skill with the same name to [`agents.skills`](#skills-discovery). It replaces the generated one in the index, and at `/skill.md` too when it's a lone `SKILL.md`. A `public/skill.md` you ship wins over both. To turn the skill off:
+The generated skill is a guide to your docs, not a summary of your product. For one that teaches an agent your product — setup, core concepts, common tasks, and gotchas — have your coding agent write it from the docs:
+
+```bash
+blume skill --claude   # or --codex
+```
+
+`blume skill` opens Claude Code or Codex on the [`blume-write-skill`](/docs/advanced/skills#writing-your-sites-skill) skill, which writes a `SKILL.md` under your [`agents.skills`](#skills-discovery) folder (`./skills` when it isn't set, adding it to your config), named after your site so it replaces the generated one. You review and commit it like any other file; it costs your agent's tokens once, not on every build. Run it again after a big docs change, since a hand-written skill doesn't update itself. Without a flag, `blume skill` prints where the skill would go and how to point another agent at it.
+
+Any skill of the same name in `agents.skills`, however you write it, replaces the generated one in the index, and at `/skill.md` too when it's a lone `SKILL.md`. A `public/skill.md` you ship wins over both. To turn the skill off:
 
 ```ts blume.config.ts lineNumbers
 agents: {

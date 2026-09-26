@@ -61,6 +61,8 @@ It bumps `blume` in `package.json`, installs, and lists every config change stil
 
 To move a Mintlify, Fumadocs, Docusaurus, Starlight, or Nextra site to Blume, the user runs `npx blume migrate [source] --codex` (or `--claude`) from that project, which opens an agent on the `blume-migrate` skill. When you are that agent, or the user asks you to migrate directly, follow `skills/blume-migrate/SKILL.md` in the installed package instead of this file.
 
+Every build publishes a generated agent skill for the site at `/skill.md` (`agents.skillMd`). To write a richer one from the docs, the user runs `blume skill --codex` (or `--claude`), which opens an agent on the `blume-write-skill` skill. When you are that agent, or the user asks you to write the site's skill directly, follow `skills/blume-write-skill/SKILL.md` in the installed package.
+
 ## What's included
 
 - **Components** — callouts, cards, steps, tabs, accordions, badges, file trees, and parameter tables, usable in MDX with no imports.

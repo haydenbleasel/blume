@@ -34,3 +34,17 @@ Blume doesn't host the automation — wire the skill into a scheduled task in Cl
 ```text
 Use the blume-update-docs skill. Review the PRs merged within the last 7 days and compare them to the docs content. Ignore work behind feature flags. If docs need updates, make them, verify the docs build, and open a blume/* PR. If not, report what you checked and do not open a PR.
 ```
+
+## Writing your site's skill
+
+`blume-write-skill` writes the [agent skill for your own docs](/docs/discoverability/agent-discovery#your-sites-skill): one `SKILL.md`, grounded in the docs, that teaches a coding agent to use your product — setup, core concepts, common tasks, and gotchas — with each topic linked to its page. It takes the place of the page map Blume generates at `/skill.md`. The quickest way to run it is `blume skill`, which works out where the skill goes and opens Codex or Claude Code on the copy bundled in the package:
+
+```bash
+blume skill --claude   # or --codex
+```
+
+To use it from another agent, install it:
+
+```bash
+npx skills add haydenbleasel/blume --skill blume-write-skill
+```
