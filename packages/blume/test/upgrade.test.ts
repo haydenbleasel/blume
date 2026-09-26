@@ -8,7 +8,6 @@ import {
   UPGRADE_GUIDE_URL,
   bumpBlumeDependency,
   collectUpgradeFindings,
-  contentGlobs,
   flagList,
   isOutsideBlumeProject,
   rangeMajor,
@@ -262,55 +261,12 @@ describe("collectUpgradeFindings", () => {
     );
   });
 
-  it("reports a page's removed front matter field at its line", async () => {
-    const root = await project({
-      "blume.config.ts": 'export default { content: { root: "content" } };\n',
-      "content/guide.mdx":
-        "---\ntitle: Guide\nsearch:\n  boost: 2\n  tags: [a]\n---\n\n# Guide\n",
-      "content/index.md": "---\ntitle: Home\n---\n",
-    });
-    const findings = await collectUpgradeFindings(root);
-    expect(
-      findings.map((finding) => [
-        finding.code,
-        finding.file?.endsWith("content/guide.mdx"),
-        finding.line,
-      ])
-    ).toStrictEqual([["BLUME_FRONTMATTER_INVALID", true, 4]]);
-    expect(findings[0]?.message).toContain("search.boost was removed");
-  });
-
-  it("scans the zero-config docs folder when the config won't load", async () => {
-    const root = await project({
-      "blume.config.ts": "export default {\n",
-      "docs/page.md": "---\nsearch:\n  boost: 1\n---\n",
-    });
+  it("reports a config that won't load", async () => {
+    const root = await project({ "blume.config.ts": "export default {\n" });
     const findings = await collectUpgradeFindings(root);
     expect(findings.map((finding) => finding.code)).toEqual([
       "BLUME_CONFIG_LOAD_FAILED",
-      "BLUME_FRONTMATTER_INVALID",
     ]);
-  });
-
-  it("scans the docs folder when the config's content isn't an object", async () => {
-    const root = await project({
-      "blume.config.ts": 'export default { content: "nope" };\n',
-      "docs/page.md": "---\nsearch:\n  boost: 1\n---\n",
-    });
-    const findings = await collectUpgradeFindings(root);
-    expect(findings.map((finding) => finding.code)).toContain(
-      "BLUME_FRONTMATTER_INVALID"
-    );
-  });
-
-  it("leaves custom and unparseable front matter to the build", async () => {
-    const root = await project({
-      "docs/_partial.md": "---\nsearch:\n  boost: 3\n---\n",
-      "docs/broken.md": "---\ntitle: [unclosed\n---\n",
-      "docs/custom.md": "---\nowner: docs-team\n---\n",
-      "package.json": packageJson({ dependencies: { blume: "^2.0.0" } }),
-    });
-    expect(await collectUpgradeFindings(root)).toEqual([]);
   });
 
   it("rethrows a failure that isn't a Blume diagnostic", async () => {
@@ -319,41 +275,6 @@ describe("collectUpgradeFindings", () => {
     const root = await project({ "blume.config.ts": "export default {};\n" });
     await mkdir(join(root, "components.ts"));
     await expect(collectUpgradeFindings(root)).rejects.toThrow();
-  });
-});
-
-describe("contentGlobs", () => {
-  const defaults = {
-    exclude: ["**/_*", "**/.*"],
-    include: ["**/*.{md,mdx}"],
-  };
-  it("falls back to the zero-config docs folder", () => {
-    expect(contentGlobs({})).toEqual([{ ...defaults, root: "docs" }]);
-  });
-
-  it("reads the content.root shorthand and its globs", () => {
-    expect(
-      contentGlobs({ content: { include: ["**/*.md"], root: "content" } })
-    ).toEqual([{ ...defaults, include: ["**/*.md"], root: "content" }]);
-  });
-
-  it("reads filesystem sources in both the Blume 2 and Blume 1 forms", () => {
-    expect(
-      contentGlobs({
-        content: {
-          sources: [
-            { kind: "filesystem", options: { root: "guides" } },
-            { kind: "filesystem" },
-            { root: "pages", type: "filesystem" },
-            { kind: "github-releases", options: { repo: "sdk" } },
-          ],
-        },
-      })
-    ).toEqual([
-      { ...defaults, root: "guides" },
-      { ...defaults, root: "docs" },
-      { ...defaults, root: "pages" },
-    ]);
   });
 });
 

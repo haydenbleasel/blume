@@ -57,6 +57,9 @@ export const syncTypesense = async (
       { name: "description", optional: true, type: "string" },
       { name: "content", type: "string" },
       { name: "url", type: "string" },
+      { name: "keywords", optional: true, type: "string[]" },
+      // The dialog sorts close matches by it (search.boost, 1 by default).
+      { name: "boost", type: "float" },
       { facet: true, name: "tag", optional: true, type: "string" },
       // Carried as facets so hosted results can filter per language and per
       // docs version (the SearchRecord contract; current docs = "current").
@@ -67,9 +70,11 @@ export const syncTypesense = async (
   });
 
   const documents = records.map((record) => ({
+    boost: record.boost,
     content: record.content,
     description: record.description,
     id: record._id,
+    keywords: record.keywords ?? [],
     locale: record.locale,
     tag: record.tag,
     title: record.title,

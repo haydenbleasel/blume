@@ -16,6 +16,9 @@ export type AlgoliaSyncConfig = Pick<AlgoliaOptions, "appId" | "indexName">;
  */
 const FILTER_ATTRIBUTES = ["locale", "version"] as const;
 
+/** The custom ranking rule that orders close matches by `search.boost`. */
+const BOOST_RANKING = "desc(boost)";
+
 /** A faceting declaration's attribute: `filterOnly(locale)` → `locale`. */
 const facetAttribute = (declaration: string): string =>
   declaration.replace(/^\w+\((?<name>.*)\)$/u, "$<name>");
@@ -48,12 +51,17 @@ export const syncAlgolia = async (
     indexName,
     objects: records.map((record) => ({ ...record, objectID: record._id })),
   });
-  const { attributesForFaceting = [] } = await client.getSettings({
-    indexName,
-  });
+  const { attributesForFaceting = [], customRanking = [] } =
+    await client.getSettings({ indexName });
   const declared = new Set(attributesForFaceting.map(facetAttribute));
   const missing = FILTER_ATTRIBUTES.filter((name) => !declared.has(name));
-  if (missing.length === 0) {
+  // Every record carries `boost` (search.boost, 1 by default): ranking by it
+  // after textual relevance puts boosted pages first among close matches.
+  // A ranking the site set in the dashboard keeps its place ahead of it.
+  const ranksByBoost = customRanking.some((rule) =>
+    /^(?:asc|desc)\(boost\)$/u.test(rule)
+  );
+  if (missing.length === 0 && ranksByBoost) {
     return;
   }
   const { taskID } = await client.setSettings({
@@ -63,6 +71,9 @@ export const syncAlgolia = async (
         ...attributesForFaceting,
         ...missing.map((name) => `filterOnly(${name})`),
       ],
+      customRanking: ranksByBoost
+        ? customRanking
+        : [...customRanking, BOOST_RANKING],
     },
   });
   await client.waitForTask({ indexName, taskID });

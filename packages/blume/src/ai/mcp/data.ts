@@ -130,6 +130,12 @@ export const buildMcpData = async (project: BlumeProject): Promise<McpData> => {
       if (doc.facets) {
         document.facets = doc.facets;
       }
+      if (doc.boost !== undefined) {
+        document.boost = doc.boost;
+      }
+      if (doc.keywords) {
+        document.keywords = doc.keywords;
+      }
       return document;
     }),
     instructions: config.agents.mcp.instructions,

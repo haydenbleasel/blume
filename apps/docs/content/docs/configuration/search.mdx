@@ -90,6 +90,28 @@ search:
   tags: [api, reference]
 ```
 
+## Ranking
+
+Two frontmatter fields shape how a page ranks. `search.keywords` lists extra terms the page is found by, even when its text doesn't use them. It suits a page readers search for by an old name, an acronym, or a competitor's term. `search.boost` multiplies the page's relevance: above 1 moves it up, below 1 moves it down.
+
+```yaml
+search:
+  keywords: [install, setup, getting started]
+  boost: 3
+```
+
+Keep boosts to a few pages readers most often need, such as a quickstart or an overview, with values from 2 to 5. Use a value below 1, like `0.5`, for a page that should rank under others that match as well, such as a legacy guide. Keep boosts under 10: past that a boost drowns out how well a page matches, and the page tops searches it barely matches.
+
+How much a boost moves a page depends on the adapter:
+
+- **Orama** (the default) and **FlexSearch** multiply every match by its page's boost before sorting, so a boost of 3 counts exactly three times. The [MCP server](/docs/discoverability/mcp) and the [assistant](/docs/configuration/assistant)'s search rank the same way.
+- **Pagefind** weighs a boosted page's text more heavily. It damps repeated matches, so the lift is smaller than the multiplier: a boost of 5 ranks the page higher, but closer to twice as high. Pagefind counts a boost over 10 as 10.
+- **Algolia** and **Typesense** sort by boost among results that match about equally well, so a boost settles close calls without lifting a weaker match over a strong one. On Algolia, the sync adds `desc(boost)` to the index's custom ranking, after any ranking you set.
+- **Orama Cloud** fetches a wider set of results and re-sorts them by relevance times boost.
+- **Mixedbread** searches your own store, which Blume doesn't upload to, so boosts and keywords don't reach it.
+
+Keywords are searched on every adapter except Mixedbread.
+
 ## Search analytics
 
 With an [analytics adapter](/docs/configuration/analytics) configured, search reports what readers look for. A query is recorded once it settles, after a second without typing or when the reader picks a result or closes the dialog, as a `search` event with the `query`, the number of `results`, and the `path` it was searched from. A query with no results shows up with `results: 0`, so filtering on it lists what your docs don't cover yet. Picking a result sends a `search_select` event with the `query`, the result's 1-based `position`, and its `url`, for click-through.

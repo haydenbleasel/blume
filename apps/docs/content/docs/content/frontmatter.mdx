@@ -171,7 +171,11 @@ seo:
 search:
   exclude: false
   tags: [api]
+  keywords: [install, setup]
+  boost: 3
 ```
+
+`exclude` keeps the page out of search, and `tags` groups it under a filter in the search dialog. `keywords` are extra terms the page is found by, beyond its own text. `boost` multiplies the page's relevance: above 1 ranks it higher, below 1 lower. See [Ranking](/docs/configuration/search#ranking).
 
 ## AI
 

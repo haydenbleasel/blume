@@ -45,6 +45,10 @@ import { normalizeXHandle } from "../../seo/x-handle.ts";
 import { withBase, withMountedBase } from "../islands/base-path.ts";
 import { routeSetFor } from "../../core/locale-links.ts";
 import {
+  KEYWORDS_ATTRIBUTE,
+  pagefindRanking,
+} from "../../search/pagefind-ranking.ts";
+import {
   browserLanguageTargets,
   LOCALE_REDIRECT_SCRIPT,
 } from "./locale-redirect.ts";
@@ -147,6 +151,11 @@ interface Props {
   pagination?: boolean;
   /** The page's `related` frontmatter: pages to suggest at its foot. */
   related?: RelatedEntry[] | false;
+  /**
+   * The page's `search.boost` and `search.keywords`, for Pagefind, which
+   * reads them from the built page (see search/pagefind-ranking.ts).
+   */
+  search?: { boost?: number; keywords?: string[] };
   exportPdf?: boolean;
   exportEpub?: boolean;
   /**
@@ -281,6 +290,7 @@ const {
   feedbackComments = false,
   pagination = true,
   related,
+  search,
   exportPdf,
   exportEpub,
   openInChat,
@@ -529,6 +539,8 @@ const bannerKey = banner?.dismissible ? banner.key : null;
 // Start the page's icon sprite before anything renders an icon (see
 // icon-sprite.ts); <IconSprite /> at the end of the body emits it.
 createIconSprite(Astro.locals);
+
+const pagefind = pagefindRanking(search ?? {});
 
 // A visitor landing on the default language's home page goes to their
 // browser's language (`i18n.routeByBrowserLanguage`, see locale-redirect.ts).
@@ -873,9 +885,17 @@ const localeRedirect = localeTargets
         <article
           class:list={[articleClass]}
           data-pagefind-body={indexable && !isBare ? "" : undefined}
+          data-pagefind-weight={pagefind.weight}
           dir={contentDir}
           lang={articleLang}
         >
+          {pagefind.keywords && (
+            <span
+              data-pagefind-index-attrs={KEYWORDS_ATTRIBUTE}
+              {...{ [KEYWORDS_ATTRIBUTE]: pagefind.keywords }}
+              hidden
+            />
+          )}
           <slot />
         </article>
         {

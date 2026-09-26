@@ -179,16 +179,18 @@ const seoMetaSchema = z.strictObject({
   x: z.strictObject({ creator: xHandleSchema }).optional(),
 });
 
-const searchMetaSchema = z.strictObject(
-  {
-    exclude: z.boolean().default(false),
-    tags: z.array(z.string()).optional(),
-  },
-  removedKeysHint({
-    boost:
-      "search.boost was removed: search never read it, so the page ranked the same without it. Delete the field.",
-  })
-);
+const searchMetaSchema = z.strictObject({
+  /**
+   * Multiply the page's search relevance: above 1 ranks it higher, below 1
+   * lower. Keep it to a few key pages, and under 10: a large boost floats a
+   * page over better matches.
+   */
+  boost: z.number().positive().optional(),
+  exclude: z.boolean().default(false),
+  /** Extra terms the page is found by, beyond its own text. */
+  keywords: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+});
 
 const aiMetaSchema = z.strictObject({
   /** Exclude this page from llms.txt and llms-full.txt. */

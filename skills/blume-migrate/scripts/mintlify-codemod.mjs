@@ -156,14 +156,7 @@ const ICONS = {
 
 // --- Frontmatter field policy ----------------------------------------------
 // Top-level keys Blume's strict schema rejects: delete the whole block, report.
-const DROP = new Set([
-  "groups",
-  "hideApiMarker",
-  "iconType",
-  "keywords",
-  "public",
-  "rss",
-]);
+const DROP = new Set(["groups", "hideApiMarker", "iconType", "public", "rss"]);
 
 // Keys whose fate depends on their value: the source value (and its line) →
 // the line that replaces it, the line itself to keep it, or `null` to drop it
@@ -174,11 +167,20 @@ const REPLACE = {
   mode: (value, line) => (value === "assistant" ? null : line),
 };
 
-// Mintlify-only keys → Blume nested target. `[parent, child]`.
+// Mintlify-only keys → Blume nested target. `[parent, child]`, plus a value
+// mapper where the meaning flips: it returns the new value, or `null` to drop a
+// value that restates Blume's default.
 const RENAME = {
+  boost: ["search", "boost"],
   canonical: ["seo", "canonical"],
+  keywords: ["search", "keywords"],
   "og:image": ["seo", "image"],
   ogImage: ["seo", "image"],
+  searchable: [
+    "search",
+    "exclude",
+    (value) => (value === "false" ? "true" : null),
+  ],
   sidebarTitle: ["sidebar", "label"],
   tag: ["sidebar", "badge"],
 };
@@ -376,7 +378,7 @@ const rewriteFields = (fm) => {
     if (!target) {
       continue;
     }
-    const [parent, child] = target;
+    const [parent, child, map] = target;
     const [start, end] = blockRange(fm, i);
     if (end - start !== 1 || tk.value === "") {
       // Multi-line or valueless source — too structured to move safely.
@@ -386,12 +388,18 @@ const rewriteFields = (fm) => {
       });
       continue;
     }
+    const value = map ? map(tk.value) : tk.value;
+    if (value === null) {
+      fm.splice(start, 1);
+      changes.push({ detail: `${tk.key}: ${tk.value}`, kind: "drop" });
+      continue;
+    }
     // Remove the source line before inserting: setNested splices into the
     // parent block, and when that block sits above the source key the insert
     // would otherwise shift `start` onto the wrong line. Failure paths don't
     // mutate `fm`, so the line can be restored as-is on conflict.
     const [removed] = fm.splice(start, 1);
-    const placed = setNested(fm, parent, child, tk.value);
+    const placed = setNested(fm, parent, child, value);
     if (placed.ok) {
       if (placed.index < start) {
         // The insert above the cursor pushed the unvisited lines down one

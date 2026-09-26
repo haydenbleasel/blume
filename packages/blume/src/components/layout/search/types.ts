@@ -53,7 +53,27 @@ export interface IndexedDocument {
   section?: string;
   locale?: string;
   version?: string;
+  /** The page's relevance multiplier (`search.boost`). */
+  boost?: number;
+  /** Extra terms the page is found by (`search.keywords`). */
+  keywords?: string[];
 }
+
+/** Something ranked with a relevance score, and the page it belongs to. */
+export interface ScoredMatch<Match> {
+  boost?: number;
+  match: Match;
+  score: number;
+}
+
+/**
+ * Re-rank matches by score times their page's `search.boost`. The sort is
+ * stable, so equal scores keep the provider's order.
+ */
+export const byBoost = <Match>(scored: ScoredMatch<Match>[]): Match[] =>
+  scored
+    .toSorted((a, b) => b.score * (b.boost ?? 1) - a.score * (a.boost ?? 1))
+    .map(({ match }) => match);
 
 /** Max results surfaced in the dialog. */
 export const SEARCH_LIMIT = 12;

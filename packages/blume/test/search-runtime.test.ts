@@ -46,6 +46,7 @@ interface SaveObjectsArgs {
 /** The slice of an Algolia index's settings the sync reads and writes. */
 interface AlgoliaSettings {
   attributesForFaceting?: string[];
+  customRanking?: string[];
 }
 /** One `setSettings` call the Algolia sync made, and whether it was awaited. */
 interface AlgoliaSettingsWrite {
@@ -58,6 +59,7 @@ interface TypesenseSearchParams {
   per_page: number;
   q: string;
   query_by: string;
+  sort_by?: string;
 }
 interface TypesenseCollectionSchema {
   fields: { facet?: boolean; name: string; optional?: boolean; type: string }[];
@@ -70,6 +72,8 @@ interface OramaCloudSearchParams {
 }
 /** The subset of an uploaded sync record the assertions read back. */
 interface SyncedRecord {
+  boost?: number;
+  keywords?: string[];
   content: string;
   description: string;
   id: string;
@@ -100,6 +104,7 @@ interface ConstructedClients {
 }
 interface CapturedTypesenseSync {
   created?: boolean;
+  schema?: TypesenseCollectionSchema;
   deleted?: boolean;
   docs?: SyncedRecord[];
   options?: { action: string };
@@ -240,6 +245,12 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+/** An Orama Cloud hit for `url` with its score and page boost. */
+const cloudHit = (url: string, score: number, boost?: number) => ({
+  document: { boost, content: "", description: "", title: url, url },
+  score,
+});
+
 describe("client loaders", () => {
   it("orama builds an index from the JSON and ranks title matches", async () => {
     stubFetch(() => Promise.resolve(Response.json(INDEX)));
@@ -259,6 +270,37 @@ describe("client loaders", () => {
     const search = await createSearch({ indexUrl: "/blume-search.json" });
     const { hits } = await search("beta");
     expect(hits.map((hit) => hit.url)).toContain("/b");
+  });
+
+  it("flexsearch ranks a boosted page above the pages it ties with", async () => {
+    stubFetch(() =>
+      Promise.resolve(
+        Response.json([
+          { content: "widget", description: "", route: "/a", title: "A" },
+          {
+            boost: 5,
+            content: "widget",
+            description: "",
+            route: "/b",
+            title: "B",
+          },
+          {
+            content: "",
+            description: "",
+            keywords: ["gizmo"],
+            route: "/c",
+            title: "C",
+          },
+        ])
+      )
+    );
+    const { createSearch } =
+      await import("../src/components/layout/search/flexsearch.ts");
+    const search = await createSearch({ indexUrl: "/blume-search.json" });
+    const widget = await search("widget");
+    expect(widget.hits.map((hit) => hit.url)).toStrictEqual(["/b", "/a"]);
+    const gizmo = await search("gizmo");
+    expect(gizmo.hits.map((hit) => hit.url)).toStrictEqual(["/c"]);
   });
 
   it("endpoint posts the query and returns the server's hits", async () => {
@@ -357,6 +399,24 @@ describe("client loaders", () => {
     expect(captured.value?.where).toStrictEqual({ locale: "fr" });
   });
 
+  it("orama-cloud re-ranks a pool of hits by each page's boost", async () => {
+    const captured: Captured<OramaCloudSearchParams> = {};
+    oramaCloudSearch = (query) => {
+      captured.value = query;
+      return Promise.resolve({
+        hits: [cloudHit("/a", 3), cloudHit("/b", 2, 2), cloudHit("/c", 1)],
+      });
+    };
+    const { createSearch } =
+      await import("../src/components/layout/search/orama-cloud.ts");
+    const { hits } = await createSearch({ apiKey: "k", endpoint: "https://x" })(
+      "q"
+    );
+    // /b's 2 × 2 beats /a's 3: the pool is fetched past the visible limit.
+    expect(hits.map((each) => each.url)).toStrictEqual(["/b", "/a", "/c"]);
+    expect(captured.value?.limit).toBeGreaterThan(12);
+  });
+
   it("typesense searches the collection by the indexed fields", async () => {
     const captured: Captured<TypesenseSearchParams> = {};
     typesenseSearch = (params) => {
@@ -393,7 +453,10 @@ describe("client loaders", () => {
     });
     const result = await search("q");
     expect(captured.value?.q).toBe("q");
-    expect(captured.value?.query_by).toContain("title");
+    expect(captured.value?.query_by).toBe("title,keywords,description,content");
+    expect(captured.value?.sort_by).toBe(
+      "_text_match(buckets: 10):desc,boost:desc"
+    );
     // No locale option means no filter — every language matches.
     expect(captured.value?.filter_by).toBeUndefined();
     expect(result.hits[0]?.url).toBe("/t");
@@ -475,8 +538,10 @@ describe("hosted sync uploads", () => {
   const records = [
     {
       _id: "/a",
+      boost: 2,
       content: "c",
       description: "d",
+      keywords: ["setup"],
       locale: "en",
       tag: "guides",
       title: "A",
@@ -516,6 +581,8 @@ describe("hosted sync uploads", () => {
             "filterOnly(locale)",
             "filterOnly(version)",
           ],
+          // Close matches order by search.boost.
+          customRanking: ["desc(boost)"],
         },
         waited: true,
       },
@@ -535,13 +602,36 @@ describe("hosted sync uploads", () => {
       algoliaSettingsWrites[0]?.indexSettings.attributesForFaceting
     ).toStrictEqual(["filterOnly(locale)", "filterOnly(version)"]);
 
+    // The site's own ranking keeps its place ahead of the boost.
+    algoliaSettings = {
+      attributesForFaceting: ["filterOnly(locale)", "filterOnly(version)"],
+      customRanking: ["desc(popularity)"],
+    };
+    algoliaSettingsWrites.length = 0;
+    await syncAlgolia(records, { appId: "app", indexName: "docs" });
+    expect(algoliaSettingsWrites[0]?.indexSettings.customRanking).toStrictEqual(
+      ["desc(popularity)", "desc(boost)"]
+    );
+
     // Already declared: the settings are left alone.
+    algoliaSettings = {
+      attributesForFaceting: ["filterOnly(locale)", "filterOnly(version)"],
+      customRanking: ["asc(boost)"],
+    };
+    algoliaSettingsWrites.length = 0;
+    await syncAlgolia(records, { appId: "app", indexName: "docs" });
+    expect(algoliaSettingsWrites).toStrictEqual([]);
+
+    // Facets declared but no boost ranking: only the ranking is added.
     algoliaSettings = {
       attributesForFaceting: ["filterOnly(locale)", "filterOnly(version)"],
     };
     algoliaSettingsWrites.length = 0;
     await syncAlgolia(records, { appId: "app", indexName: "docs" });
-    expect(algoliaSettingsWrites).toStrictEqual([]);
+    expect(algoliaSettingsWrites[0]?.indexSettings).toStrictEqual({
+      attributesForFaceting: ["filterOnly(locale)", "filterOnly(version)"],
+      customRanking: ["desc(boost)"],
+    });
   });
 
   it("orama-cloud snapshots the records and deploys", async () => {
@@ -560,6 +650,8 @@ describe("hosted sync uploads", () => {
     await syncOramaCloud(records, { indexId: "idx" });
     const first = captured.snapshot?.[0];
     expect(first?.id).toBe("/a");
+    expect(first?.boost).toBe(2);
+    expect(first?.keywords).toStrictEqual(["setup"]);
     expect(captured.deployed).toBe(true);
   });
 
@@ -573,6 +665,7 @@ describe("hosted sync uploads", () => {
     };
     typesenseCreate = (schema) => {
       captured.created = true;
+      captured.schema = schema;
       return Promise.resolve(schema);
     };
     typesenseImport = (docs, options) => {
@@ -586,7 +679,34 @@ describe("hosted sync uploads", () => {
     expect(captured.deleted).toBeUndefined();
     expect(captured.created).toBe(true);
     expect(captured.options?.action).toBe("upsert");
-    expect(captured.docs?.[0]?.id).toBe("/a");
+    expect(captured.docs?.[0]).toMatchObject({
+      boost: 2,
+      id: "/a",
+      keywords: ["setup"],
+    });
+    // The collection sorts by boost and searches keywords.
+    expect(
+      captured.schema?.fields.filter((field) =>
+        ["boost", "keywords"].includes(field.name)
+      )
+    ).toStrictEqual([
+      { name: "keywords", optional: true, type: "string[]" },
+      { name: "boost", type: "float" },
+    ]);
+
+    // A record without keywords uploads an empty list.
+    const bare = {
+      _id: "/b",
+      boost: 1,
+      content: "",
+      description: "",
+      locale: "en",
+      title: "B",
+      url: "/b",
+      version: "current",
+    };
+    await syncTypesense([bare], { collection: "docs", host: "h" });
+    expect(captured.docs?.[0]?.keywords).toStrictEqual([]);
   });
 
   it("typesense drops an existing collection before recreating it", async () => {

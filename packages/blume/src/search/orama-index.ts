@@ -31,6 +31,10 @@ export interface OramaDoc {
    * but not indexed, so they ride along on the returned document untouched. */
   breadcrumb?: string[];
   section?: string;
+  /** The page's relevance multiplier (`search.boost`); stored, not indexed. */
+  boost?: number;
+  /** Extra terms the page is found by (`search.keywords`). */
+  keywords?: string[];
 }
 
 const SCHEMA = {
@@ -42,6 +46,7 @@ const SCHEMA = {
   // serves every project's facet keys, with `containsAll` matching a filter
   // set. Derived from `facets` at insert time.
   facetTerms: "enum[]",
+  keywords: "string[]",
   locale: "enum",
   route: "string",
   title: "string",
@@ -52,8 +57,21 @@ const SCHEMA = {
 const toFacetTerms = (facets: Record<string, string>): string[] =>
   Object.entries(facets).map(([key, value]) => `${key}:${value}`);
 
-/** Title and description outrank body text, matching the search dialog. */
-const BOOST = { description: 2, title: 3 };
+/**
+ * Title and description outrank body text, matching the search dialog; a
+ * page's keywords count as much as its title, since its author chose them.
+ */
+const BOOST = { description: 2, keywords: 3, title: 3 };
+
+/** Databases holding a boosted page, which rank by boosted score. */
+const boostedDatabases = new WeakSet<AnyOrama>();
+
+/** A search match as Orama's sort function sees it: id, score, document. */
+type RankedMatch = [unknown, number, OramaDoc];
+
+/** Rank matches by relevance times the page's `search.boost`. */
+const byBoostedScore = (a: RankedMatch, b: RankedMatch): number =>
+  b[1] * (b[2].boost ?? 1) - a[1] * (a[2].boost ?? 1);
 
 /**
  * The script whose text Orama's default tokenizer keeps mostly intact. Its
@@ -322,6 +340,9 @@ export const buildOramaIndex = async (
       doc.facets ? { ...doc, facetTerms: toFacetTerms(doc.facets) } : doc
     )
   );
+  if (documents.some((doc) => (doc.boost ?? 1) !== 1)) {
+    boostedDatabases.add(db);
+  }
   return db;
 };
 
@@ -391,10 +412,14 @@ export const queryOramaIndex = async (
   if (facetTerms.length > 0) {
     where.facetTerms = { containsAll: facetTerms };
   }
+  // Boosts multiply every match's score before the limit applies (Orama
+  // sorts the whole match set with a sort function), so a boosted page can
+  // rise past matches outside the first page.
   const unfiltered = {
     boost: BOOST,
     limit,
-    properties: ["title", "description", "content"],
+    properties: ["title", "keywords", "description", "content"],
+    ...(boostedDatabases.has(db) && { sortBy: byBoostedScore }),
     term,
   };
   const params =

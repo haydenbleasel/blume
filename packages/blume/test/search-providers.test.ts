@@ -513,6 +513,7 @@ describe("toSearchRecords", () => {
     expect(toSearchRecords(docs)).toStrictEqual([
       {
         _id: "/a",
+        boost: 1,
         content: "body",
         description: "desc",
         locale: "en",
@@ -522,6 +523,25 @@ describe("toSearchRecords", () => {
         version: "current",
       },
     ]);
+  });
+
+  it("carries a page's boost and keywords", () => {
+    const [record] = toSearchRecords([
+      {
+        boost: 4,
+        breadcrumb: [],
+        content: "",
+        contentType: "doc",
+        description: "",
+        keywords: ["setup"],
+        locale: "en",
+        route: "/x",
+        section: "Docs",
+        title: "X",
+        version: "",
+      },
+    ]);
+    expect(record).toMatchObject({ boost: 4, keywords: ["setup"] });
   });
 
   it("omits the tag when there are none", () => {

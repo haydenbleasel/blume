@@ -6,7 +6,7 @@ sidebar:
   order: 2.5
 ---
 
-Blume 2 changes configuration, not content: your Markdown and MDX pages need no edits, unless one sets the removed `search.boost` frontmatter field (see [Frontmatter](#frontmatter)). Settings that used to be a named string or a keyed block — the search provider, the deployment target, content sources, API references, analytics, and the assistant's model backend — are now **adapters** you import from a `blume/*` subpath and call. Ask AI is renamed the assistant, so `ai.ask` becomes `ai.assistant`. The machine-readable settings move from `ai` to a new `agents` key, and `components.ts` overrides are checked before the build. A zero-config site, or one that sets none of these, only needs the version bump.
+Blume 2 changes configuration, not content: your Markdown and MDX pages need no edits (see [Frontmatter](#frontmatter) for one field that now does something). Settings that used to be a named string or a keyed block — the search provider, the deployment target, content sources, API references, analytics, and the assistant's model backend — are now **adapters** you import from a `blume/*` subpath and call. Ask AI is renamed the assistant, so `ai.ask` becomes `ai.assistant`. The machine-readable settings move from `ai` to a new `agents` key, and `components.ts` overrides are checked before the build. A zero-config site, or one that sets none of these, only needs the version bump.
 
 ## Upgrade with one command
 
@@ -290,7 +290,7 @@ export default defineConfig({
 
 ## Frontmatter
 
-One frontmatter field is gone: `search.boost`. Blume 1 accepted it, but search never read it, so a page ranked the same without it. Delete it wherever it appears; a page that still sets it fails validation with a hint, and `blume upgrade` lists each one with its file and line.
+Pages keep their frontmatter. One field changes what it does: `search.boost`. Blume 1 accepted it, but search never read it, so a page ranked the same without it. It now multiplies the page's search relevance (see [Ranking](/docs/configuration/search#ranking)). Check any page that sets it: a boost you added and forgot now moves the page up.
 
 ## Component overrides
 

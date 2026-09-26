@@ -36,6 +36,12 @@ export const buildAskData = async (project: BlumeProject): Promise<AskData> => {
       if (versioned) {
         document.version = doc.version;
       }
+      if (doc.boost !== undefined) {
+        document.boost = doc.boost;
+      }
+      if (doc.keywords) {
+        document.keywords = doc.keywords;
+      }
       return document;
     }),
     site: project.config.deployment.options.site ?? null,

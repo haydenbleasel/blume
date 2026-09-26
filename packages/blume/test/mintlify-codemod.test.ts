@@ -42,7 +42,7 @@ describe("mintlify-codemod", () => {
       [
         "---",
         "title: Hello",
-        "keywords:",
+        "rss:",
         "- one",
         "- two",
         "groups:",
@@ -57,7 +57,7 @@ describe("mintlify-codemod", () => {
     );
 
     const report = runCodemod("--write", file);
-    expect(report).toContain("dropped: keywords");
+    expect(report).toContain("dropped: rss");
     expect(report).toContain("dropped: groups");
 
     const text = await readFile(file, "utf-8");
@@ -69,6 +69,38 @@ describe("mintlify-codemod", () => {
     expect(matter(text).data).toEqual({ tags: ["kept"], title: "Hello" });
     // Idempotent: nothing left to drop on a second pass.
     expect(runCodemod(file)).toContain("0 file(s) with findings");
+  });
+
+  it("moves search keys into the search block, flipping searchable", async () => {
+    const file = join(root, "search.mdx");
+    await writeFile(
+      file,
+      [
+        "---",
+        "title: Search",
+        "boost: 5",
+        'keywords: ["install", "setup"]',
+        "searchable: false",
+        "---",
+        "",
+      ].join("\n")
+    );
+    const report = runCodemod("--write", file);
+    expect(report).toContain("boost → search.boost");
+    expect(matter(await readFile(file, "utf-8")).data).toEqual({
+      search: { boost: 5, exclude: true, keywords: ["install", "setup"] },
+      title: "Search",
+    });
+
+    const shown = join(root, "searchable.mdx");
+    await writeFile(
+      shown,
+      ["---", "title: Shown", "searchable: true", "---", ""].join("\n")
+    );
+    expect(runCodemod("--write", shown)).toContain("dropped: searchable: true");
+    expect(matter(await readFile(shown, "utf-8")).data).toEqual({
+      title: "Shown",
+    });
   });
 
   it("maps hideFooterPagination and mode by value, and keeps api pages", async () => {

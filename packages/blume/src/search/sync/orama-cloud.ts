@@ -31,9 +31,12 @@ export const syncOramaCloud = async (
   const index = manager.index(config.indexId);
   await index.snapshot(
     records.map((record) => ({
+      // The dialog multiplies each hit's score by it (search.boost).
+      boost: record.boost,
       content: record.content,
       description: record.description,
       id: record._id,
+      keywords: record.keywords ?? [],
       // Carried so an i18n site can filter hosted results per language.
       locale: record.locale,
       tag: record.tag,

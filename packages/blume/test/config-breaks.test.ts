@@ -376,12 +376,8 @@ describe("the 1.x reference blocks", () => {
 });
 
 describe("search.boost frontmatter", () => {
-  it("rejects the removed field with a hint", () => {
-    const result = pageMetaSchema.safeParse({ search: { boost: 2 } });
-    expect(result.success).toBe(false);
-    expect(result.error?.issues.map((issue) => issue.message)).toEqual([
-      "search.boost was removed: search never read it, so the page ranked the same without it. Delete the field.",
-    ]);
+  it("is a relevance multiplier again, not a removed field", () => {
+    expect(pageMetaSchema.parse({ search: { boost: 2 } }).search.boost).toBe(2);
   });
 
   it("keeps the other search keys", () => {

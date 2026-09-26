@@ -54,6 +54,10 @@ export interface SearchDocument {
    * Filterable through the MCP tools' `filters` input.
    */
   facets?: Record<string, string>;
+  /** Frontmatter `search.boost`: the page's relevance multiplier, when set. */
+  boost?: number;
+  /** Frontmatter `search.keywords`: extra terms the page is found by. */
+  keywords?: string[];
 }
 
 /**
@@ -77,6 +81,13 @@ export interface SearchRecord {
   version: string;
   /** Single faceting tag (the first frontmatter tag, when present). */
   tag?: string;
+  /**
+   * The page's relevance multiplier, 1 unless `search.boost` sets it: a
+   * ranking attribute every record carries, so the backend can sort by it.
+   */
+  boost: number;
+  /** Extra terms the page is found by (`search.keywords`). */
+  keywords?: string[];
 }
 
 // Tag-shaped only: a name (or closing slash/fragment) right after `<`, and no
@@ -414,6 +425,17 @@ const pageBody = async (
   });
 };
 
+/** The ranking a page asks for: its `search.boost` and `search.keywords`. */
+const rankingFields = (
+  search: PageRecord["meta"]["search"] | undefined
+): Pick<SearchDocument, "boost" | "keywords"> => {
+  const { boost, keywords } = search ?? {};
+  return {
+    ...(boost !== undefined && boost !== 1 && { boost }),
+    ...(keywords && keywords.length > 0 && { keywords }),
+  };
+};
+
 /**
  * Build search documents from the content graph. Only indexable pages are
  * included (per the route manifest), and content comes from the source files,
@@ -531,7 +553,7 @@ export const buildSearchDocuments = async (
       if (facets) {
         document.facets = facets;
       }
-      return document;
+      return { ...document, ...rankingFields(page?.meta?.search) };
     })
   );
 };
@@ -539,13 +561,15 @@ export const buildSearchDocuments = async (
 /**
  * Map per-page search documents to the flat record shape hosted backends
  * ingest. One record per page, keyed by route; the first tag becomes the
- * faceting `tag`.
+ * faceting `tag`, and every record carries a `boost` (1 by default).
  */
 export const toSearchRecords = (documents: SearchDocument[]): SearchRecord[] =>
   documents.map((doc) => ({
     _id: doc.route,
+    boost: doc.boost ?? 1,
     content: doc.content,
     description: doc.description,
+    ...(doc.keywords && { keywords: doc.keywords }),
     locale: doc.locale,
     tag: doc.tags?.[0],
     title: doc.title,

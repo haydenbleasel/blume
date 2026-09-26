@@ -157,7 +157,9 @@ Mintlify page frontmatter → Blume's strict schema. **`scripts/mintlify-codemod
 | `related` (a list) | kept as written: root-relative paths, URLs, and `{ Title: link }` entries render as Related pages cards | left; `related: true` has no equivalent (Blume has no automatic related pages), so drop it (report) |
 | `mode` | `mode`, as written | `default`, `wide`, `center`, `custom`, and `frame` carry over; `assistant` has no equivalent → drop (report) |
 | `hideFooterPagination: true` | `pagination: false` | renames (`false` drops, since the links show by default) |
-| `public`, `rss`, `groups`, `keywords`, `hideApiMarker`, `iconType` | **drop** (report) | drops |
+| `keywords`, `boost` | `search.keywords`, `search.boost` | renames |
+| `searchable: false` | `search.exclude: true` | renames (`searchable: true` drops, since pages are searchable by default) |
+| `public`, `rss`, `groups`, `hideApiMarker`, `iconType` | **drop** (report) | drops |
 
 The codemod leaves the source key in place and reports a conflict rather than clobbering data when a rename target already exists (e.g. a page already has `sidebar.label`) or the value is too structured to move safely — resolve those by hand. Remove any duplicate H1 in the body — `title` renders the H1. (The codemod only edits frontmatter; it never touches the body.)
 
@@ -183,5 +185,6 @@ Per-language `banner`, `navbar`, and `footer` (on `navigation.languages[]`) merg
 
 ## Dropped — report these
 
+- **A group's `boost`** (on a `navigation` group, inherited by its pages) → no inherited boost; set `search.boost` on the pages that need it.
 - **Authentication** (password or SSO, set in the Mintlify dashboard) → Blume has none of its own; point the user at host-level protection (Vercel Deployment Protection, Netlify password protection, Cloudflare Access), per the deployment docs' **Private docs** section. It covers the whole site, so a mix of public and private pages needs two sites.
 - **`<Update>`** changelog components, `iconType`, `background.decoration`, `search.prompt`, `seo.metatags`.

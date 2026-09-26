@@ -1,6 +1,6 @@
 import { Document } from "flexsearch";
 
-import { buildResult, RESULT_POOL } from "./types.ts";
+import { buildResult, byBoost, RESULT_POOL } from "./types.ts";
 import type { IndexedDocument, SearchFn } from "./types.ts";
 
 /**
@@ -11,7 +11,7 @@ import type { IndexedDocument, SearchFn } from "./types.ts";
 type SearchDocument = Pick<
   IndexedDocument,
   "content" | "description" | "route" | "title"
->;
+> & { keywords: string };
 
 /**
  * FlexSearch: reuse the same static `blume-search.json` Orama ships, but build
@@ -29,11 +29,14 @@ export const createSearch = async (opts: {
   const byRoute = new Map(documents.map((doc) => [doc.route, doc]));
 
   const index = new Document<SearchDocument>({
-    document: { id: "route", index: ["title", "description", "content"] },
+    document: {
+      id: "route",
+      index: ["title", "keywords", "description", "content"],
+    },
     tokenize: "forward",
   });
   for (const doc of documents) {
-    index.add(doc);
+    index.add({ ...doc, keywords: doc.keywords?.join(" ") ?? "" });
   }
 
   // FlexSearch's in-memory search is synchronous, so the SearchFn resolves
@@ -63,6 +66,15 @@ export const createSearch = async (opts: {
         }
       }
     }
-    return Promise.resolve(buildResult(matched, query, options?.section));
+    // FlexSearch returns an order, not scores: rank by position, then apply
+    // each page's `search.boost` to that.
+    const ranked = byBoost(
+      matched.map((doc, position) => ({
+        boost: doc.boost,
+        match: doc,
+        score: 1 / (position + 1),
+      }))
+    );
+    return Promise.resolve(buildResult(ranked, query, options?.section));
   };
 };

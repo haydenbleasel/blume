@@ -2708,6 +2708,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   feedbackComments={data.config.feedbackComments}
   pagination={frontmatter.pagination}
   related={frontmatter.related}
+  search={frontmatter.search}
   exportPdf={${options.exportPdf}}
   exportEpub={${options.exportEpub}}${
     options.navFragments
