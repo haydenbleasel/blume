@@ -2,6 +2,7 @@ import { adobeHead } from "./adobe.ts";
 import { amplitudeHead } from "./amplitude.ts";
 import { clarityHead } from "./clarity.ts";
 import { clearbitHead } from "./clearbit.ts";
+import { clicsHead } from "./clics.ts";
 import { cloudflareHead } from "./cloudflare.ts";
 import { databuddyHead } from "./databuddy.ts";
 import { fathomHead } from "./fathom.ts";
@@ -47,6 +48,7 @@ export type HeadNode =
  * the one place that branches on `kind`. A provider whose install snippet is
  * two tags (an SDK plus its init call) emits two.
  */
+// oxlint-disable-next-line complexity -- each adapter has one exhaustive, type-narrowed dispatch case
 const adapterScripts = (
   adapter: Exclude<AnalyticsAdapter, { kind: "vercel" }>
 ): HeadScript[] => {
@@ -59,6 +61,9 @@ const adapterScripts = (
     }
     case "clarity": {
       return clarityHead(adapter.options);
+    }
+    case "clics": {
+      return clicsHead(adapter.options);
     }
     case "clearbit": {
       return clearbitHead(adapter.options);

@@ -38,6 +38,7 @@ Every identifier below — a project key, a measurement ID, a site token — is 
 | `adobe()` | [Adobe Analytics](#adobe-analytics) | `url` |
 | `amplitude()` | [Amplitude](#amplitude) | `key` |
 | `clarity()` | [Microsoft Clarity](#microsoft-clarity) | `id` |
+| `clics()` | [Clics](#clics) | `projectId` |
 | `clearbit()` | [Clearbit](#clearbit) | `key` |
 | `cloudflare()` | [Cloudflare Web Analytics](#cloudflare-web-analytics) | `token` |
 | `databuddy()` | [Databuddy](#databuddy) | `clientId` |
@@ -148,6 +149,20 @@ analytics: [
 ```
 
 `domain` becomes `data-domain` and `host` picks where `/js/script.js` loads from. Any other option becomes its own `data-` attribute on the tag (`api: "/api/event"` → `data-api`). Script variants with extra behavior baked into the filename (`script.outbound-links.js`, …) are a different tag; load those with [`script()`](#custom-scripts).
+
+## Clics
+
+Pass the **project ID** from Configure → Tracking in the [Clics dashboard](https://platform.clics.dev) to `clics()`. Blume adds the [Clics browser tracker](https://docs.clics.dev/installation-guides) with the required `data-project-id` attribute.
+
+```ts blume.config.ts lineNumbers
+import { clics } from "blume/analytics";
+
+analytics: [clics({ projectId: "YOUR_PROJECT_ID" })],
+```
+
+The tracker counts page loads and client-side navigations automatically, including Blume's client router, so don't add a second pageview hook. It also tracks outbound links by default. Set `disableOutboundLinks: true` to turn those events off. For a production build previewed on localhost, set `allowLocalhost: true`; ordinary `blume dev` does not load analytics.
+
+Clics custom events use the [`track()` helper](https://docs.clics.dev/custom-events) from `@clicsdev/tracker` in your own client code. The browser tracker does not expose a global custom-event function, so Blume's built-in feedback, search, and narration events are not forwarded to Clics by this adapter.
 
 ## Fathom
 
@@ -386,6 +401,9 @@ analytics: [
 | `amplitude()` | `key` | — | Amplitude project API key. Required. |
 | `amplitude()` | anything else | `autocapture: true`, `fetchRemoteConfig: true` | Merged into the `amplitude.init` options verbatim. |
 | `clarity()` | `id` | — | Clarity project ID. Required. |
+| `clics()` | `projectId` | — | Public Clics project ID. Required. |
+| `clics()` | `allowLocalhost` | `false` | Emit `data-allow-localhost` for local previews of a production build. |
+| `clics()` | `disableOutboundLinks` | `false` | Emit `data-disable-outbound-links` to stop outbound-link tracking. |
 | `clearbit()` | `key` | — | Clearbit publishable API key. Required. |
 | `cloudflare()` | `token` | — | Cloudflare Web Analytics site token (manual setup). Required. |
 | `cloudflare()` | anything else | — | Forwarded in the beacon's `data-cf-beacon` JSON verbatim. |

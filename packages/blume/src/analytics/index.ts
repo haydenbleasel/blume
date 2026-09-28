@@ -26,6 +26,8 @@ export { amplitude } from "./amplitude.ts";
 export type { AmplitudeAdapter, AmplitudeOptions } from "./amplitude.ts";
 export { clarity } from "./clarity.ts";
 export type { ClarityAdapter, ClarityOptions } from "./clarity.ts";
+export { clics } from "./clics.ts";
+export type { ClicsAdapter, ClicsOptions } from "./clics.ts";
 export { clearbit } from "./clearbit.ts";
 export type { ClearbitAdapter, ClearbitOptions } from "./clearbit.ts";
 export { cloudflare } from "./cloudflare.ts";
