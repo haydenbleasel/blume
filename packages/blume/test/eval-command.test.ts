@@ -112,9 +112,11 @@ const run = async (
   ...args: string[]
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> => {
   const path = binDir ? pathWithBin(binDir) : await pathWithoutAgents();
+  // The report colors its glyphs on GitHub Actions and Windows, splitting
+  // "⚠ docs/…" with escape codes; assertions read the plain text.
   const proc = Bun.spawn([process.execPath, CLI, "eval", ...args], {
     cwd,
-    env: envWith({ ...env, PATH: path }),
+    env: envWith({ NO_COLOR: "1", ...env, PATH: path }),
     stderr: "pipe",
     stdout: "pipe",
   });
