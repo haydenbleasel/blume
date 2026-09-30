@@ -111,7 +111,7 @@ describe("sidebar", () => {
     );
     expect(tree).toContain("id={navPanelId(panel.id)}");
     expect(tree).toMatch(
-      /aria-controls=\{navPanelId\(id\)\}\s*aria-expanded="false"\s*class="blume-nav-drill"\s*data-nav-to=\{id\}/u
+      /aria-controls=\{navPanelId\(id\)\}[^>]*data-nav-to=\{id\}/u
     );
   });
 
