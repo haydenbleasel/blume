@@ -147,13 +147,16 @@ const response = () => {
 /** Write the wrapper beside the fake entry and import it fresh. */
 const importWrapper = async (
   autostart: string | null,
-  mode = "standalone"
+  mode = "standalone",
+  poweredBy = true
 ): Promise<WrapperModule> => {
   const dir = await scratch();
   await writeFile(join(dir, NODE_ASTRO_ENTRY_FILE), FAKE_ASTRO_ENTRY, "utf-8");
   await writeFile(
     join(dir, NODE_ENTRY_FILE),
-    nodeEntryWrapper(nodeHeaderRules(blumeConfigSchema.parse(SERVER_CONFIG))),
+    nodeEntryWrapper(nodeHeaderRules(blumeConfigSchema.parse(SERVER_CONFIG)), {
+      poweredBy,
+    }),
     "utf-8"
   );
   const previous = process.env.ASTRO_NODE_AUTOSTART;
@@ -227,6 +230,13 @@ describe("nodeHeaderRules", () => {
 });
 
 describe("nodeEntryWrapper", () => {
+  it("leaves out the powered-by header when disabled", async () => {
+    const wrapper = await importWrapper("disabled", "standalone", false);
+    const responseWithNoPoweredBy = response();
+    wrapper.handler({ url: "/docs/guide" }, responseWithNoPoweredBy.res);
+    expect(responseWithNoPoweredBy.headers).toStrictEqual({});
+  });
+
   it("sets a rule's headers, then hands the request to Astro", async () => {
     const wrapper = await importWrapper("disabled");
     expect(wrapper.options).toStrictEqual({ mode: "standalone" });

@@ -575,7 +575,10 @@ const blumeIntegrationOptions = (options: {
   pages: BlumePageRoute[];
   redirects: CompiledRedirect[];
 }): BlumeIntegrationOptions => {
-  const shared: BlumeIntegrationOptions = { pages: options.pages };
+  const shared: BlumeIntegrationOptions = {
+    pages: options.pages,
+    poweredBy: options.config.poweredBy,
+  };
   if (options.redirects.length > 0) {
     shared.redirects = options.redirects;
   }

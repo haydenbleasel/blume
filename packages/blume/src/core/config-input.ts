@@ -1585,6 +1585,8 @@ export interface BlumeConfig {
   narration?: NarrationConfig;
   /** Header, sidebar, tabs, and switchers. */
   navigation?: NavigationConfig;
+  /** Send `X-Powered-By: Blume` with responses. Defaults to `true`. */
+  poweredBy?: boolean;
   /**
    * Limit how often one reader (by IP address) can call the server routes —
    * the assistant, the API playground proxy, server-side search — with an

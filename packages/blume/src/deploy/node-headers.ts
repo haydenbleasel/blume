@@ -159,6 +159,8 @@ export const nodePatternRedirects = (
 export interface NodeEntryOptions {
   /** `deployment.base`, normalized (`""` at the root). */
   base?: string;
+  /** Whether responses identify Blume with `X-Powered-By`. Defaults to `true`. */
+  poweredBy?: boolean;
   /** The configured redirects, from {@link nodeRedirects}. */
   redirects?: NodeRedirects;
   /** The configured pattern redirects, from {@link nodePatternRedirects}. */
@@ -198,6 +200,7 @@ export const nodeEntryWrapper = (
 import { posix } from "node:path";
 
 const BASE = ${JSON.stringify(options.base ?? "")};
+const POWERED_BY = ${JSON.stringify(options.poweredBy !== false)};
 const RULES = new Map(${JSON.stringify(exactRules(rules))});
 const PATTERNS = ${JSON.stringify(patternRules(rules))};
 const REDIRECTS = ${JSON.stringify(options.redirects ?? {})};
@@ -222,7 +225,9 @@ const servedPath = (req) => {
   return BASE + (rest || "/");
 };
 const applyHeaders = (req, res) => {
-  res.setHeader("X-Powered-By", "Blume");
+  if (POWERED_BY) {
+    res.setHeader("X-Powered-By", "Blume");
+  }
   const path = servedPath(req);
   const lower = path.toLowerCase();
   const headers =
@@ -341,6 +346,14 @@ export const wrapNodeEntry = async (
   ];
   const redirects = nodeRedirects(project);
   const patternRedirects = nodePatternRedirects(project);
+  if (
+    !project.config.poweredBy &&
+    rules.length === 0 &&
+    Object.keys(redirects).length === 0 &&
+    patternRedirects.length === 0
+  ) {
+    return;
+  }
   const serverDir = join(distDir(project.context), "server");
   const entry = join(serverDir, NODE_ENTRY_FILE);
   if (!existsSync(entry)) {
@@ -359,6 +372,7 @@ export const wrapNodeEntry = async (
     nodeEntryWrapper(rules, {
       base: normalizeBasePath(project.config.deployment.options.base),
       patternRedirects,
+      poweredBy: project.config.poweredBy,
       redirects,
     }),
     "utf-8"

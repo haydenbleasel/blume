@@ -17,6 +17,7 @@ const configWith = (
     mcp: boolean;
     site: string;
     skills: string;
+    poweredBy: boolean;
     webBotAuthKeys: { kty: string }[];
   }>
 ): ResolvedConfig => {
@@ -39,10 +40,17 @@ const configWith = (
     },
     basePath: overrides.basePath ?? "",
     deployment: { ...base.deployment, options },
+    poweredBy: overrides.poweredBy ?? base.poweredBy,
   };
 };
 
 describe("buildNetlifyHeaders", () => {
+  it("omits the powered-by header when disabled", () => {
+    expect(buildNetlifyHeaders(configWith({ poweredBy: false }))).not.toContain(
+      "X-Powered-By"
+    );
+  });
+
   it("pins a UTF-8 Content-Type onto each raw endpoint extension", () => {
     expect(buildNetlifyHeaders(configWith({ api: false }))).toBe(
       [
