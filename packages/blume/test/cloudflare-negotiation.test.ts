@@ -269,6 +269,26 @@ describe("negotiation worker — parity with the dev middleware helpers", () => 
 });
 
 describe("negotiation worker — responses", () => {
+  it("adds X-Powered-By only when configured", async () => {
+    const enabled = await loadWorker(workerText({ poweredBy: true }));
+    const disabled = await loadWorker(workerText({ poweredBy: false }));
+    const enabledEnv = makeEnv();
+    const disabledEnv = makeEnv();
+    const enabledResponse = await enabled.fetch(
+      new Request("https://site.test/not-a-content-route"),
+      enabledEnv.env,
+      {}
+    );
+    const disabledResponse = await disabled.fetch(
+      new Request("https://site.test/not-a-content-route"),
+      disabledEnv.env,
+      {}
+    );
+
+    expect(enabledResponse.headers.get("x-powered-by")).toBe("Blume");
+    expect(disabledResponse.headers.has("x-powered-by")).toBe(false);
+  });
+
   it("serves known prerendered page JSON before Astro's API catch-all", async () => {
     const worker = await loadWorker(workerText({ base: "/site/" }));
     const { calls, env } = makeEnv();

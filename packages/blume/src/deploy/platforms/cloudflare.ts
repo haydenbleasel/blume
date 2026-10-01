@@ -122,6 +122,7 @@ export const emitCloudflareNegotiation = async (
             )
             .map((route) => pageJsonPath(route.path))
         : [],
+      poweredBy: config.poweredBy,
       // The wrapper Worker matches full served URLs, so the redirects are
       // based the same way the platform files are — it answers any the
       // worker-first rules claim, where `_redirects` is never consulted and
