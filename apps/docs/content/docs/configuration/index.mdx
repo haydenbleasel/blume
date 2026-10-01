@@ -376,6 +376,14 @@ lastModified: 2026-06-20
 
 When enabled, the date is also emitted as schema.org `dateModified` in the page's structured data.
 
+## Powered-by header
+
+Blume sends `X-Powered-By: Blume` by default. Set `poweredBy` to `false` to omit the header:
+
+```ts blume.config.ts
+poweredBy: false,
+```
+
 ## Date format
 
 Both the "Last updated" stamp and the [changelog](/docs/advanced/changelog) timeline render their dates through the same `dateFormat`, so they read alike. Dates always render in the site's locale; `dateFormat` controls the _shape_. It defaults to the long form (`July 21, 2026`, `2026年7月21日`):
