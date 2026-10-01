@@ -505,6 +505,10 @@ export const blumeIntegration = (
           entrypoint: "blume/components/icon-sprite-middleware.ts",
           order: "post",
         });
+        addMiddleware({
+          entrypoint: "blume/components/powered-by-middleware.ts",
+          order: "pre",
+        });
         for (const page of options.pages) {
           injectRoute({
             entrypoint: page.entrypoint,

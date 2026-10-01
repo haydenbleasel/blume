@@ -222,6 +222,7 @@ const servedPath = (req) => {
   return BASE + (rest || "/");
 };
 const applyHeaders = (req, res) => {
+  res.setHeader("X-Powered-By", "Blume");
   const path = servedPath(req);
   const lower = path.toLowerCase();
   const headers =
@@ -282,10 +283,10 @@ if (previous === undefined) {
 }
 export const { options } = astro;
 export const handler = (req, res, ...rest) => {
+  applyHeaders(req, res);
   if (answerRedirect(req, res)) {
     return;
   }
-  applyHeaders(req, res);
   return astro.handler(req, res, ...rest);
 };
 export const startServer = () => {
@@ -298,10 +299,10 @@ export const startServer = () => {
     const astroListeners = httpServer.listeners("request");
     httpServer.removeAllListeners("request");
     httpServer.on("request", (req, res) => {
+      applyHeaders(req, res);
       if (answerRedirect(req, res)) {
         return;
       }
-      applyHeaders(req, res);
       for (const listener of astroListeners) {
         listener.call(httpServer, req, res);
       }
@@ -340,13 +341,6 @@ export const wrapNodeEntry = async (
   ];
   const redirects = nodeRedirects(project);
   const patternRedirects = nodePatternRedirects(project);
-  if (
-    rules.length === 0 &&
-    Object.keys(redirects).length === 0 &&
-    patternRedirects.length === 0
-  ) {
-    return;
-  }
   const serverDir = join(distDir(project.context), "server");
   const entry = join(serverDir, NODE_ENTRY_FILE);
   if (!existsSync(entry)) {

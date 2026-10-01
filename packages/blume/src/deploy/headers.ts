@@ -98,6 +98,10 @@ export const headerRules = (
     path: `${deployBase}/*.${rule.ext}`,
     value: rule.contentType,
   }));
+  rules.push(
+    { name: "X-Powered-By", path: `${deployBase}/`, value: "Blume" },
+    { name: "X-Powered-By", path: `${deployBase}/*`, value: "Blume" }
+  );
   if (homeLinkHeader) {
     rules.push({ name: "Link", path: `${deployBase}/`, value: homeLinkHeader });
   }

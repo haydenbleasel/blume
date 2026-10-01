@@ -347,6 +347,10 @@ describe("blumeIntegration astro:config:setup", () => {
         entrypoint: "blume/components/icon-sprite-middleware.ts",
         order: "post",
       },
+      {
+        entrypoint: "blume/components/powered-by-middleware.ts",
+        order: "pre",
+      },
     ]);
 
     expect(injected).toEqual([
