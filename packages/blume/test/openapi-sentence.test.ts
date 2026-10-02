@@ -21,6 +21,20 @@ describe("asSentence", () => {
     }
   });
 
+  it("closes a lead-in that ends in a colon instead of stacking a period on it", () => {
+    // The first paragraph of "Supports two modes:\n\n- Explicit IDs …" is the lead-in alone.
+    expect(asSentence("Delete in parallel. Supports two modes:")).toBe(
+      "Delete in parallel. Supports two modes."
+    );
+    expect(asSentence("Supports two modes: ")).toBe("Supports two modes.");
+  });
+
+  it("leaves a colon inside the prose alone", () => {
+    expect(asSentence("Scale the ratio to 1:2")).toBe(
+      "Scale the ratio to 1:2."
+    );
+  });
+
   it("keeps empty prose empty", () => {
     expect(asSentence("")).toBe("");
   });
