@@ -4,13 +4,14 @@ import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
-import { anthropic, openai, openrouter } from "../src/ai/ask.ts";
+import { anthropic, gateway, openai, openrouter } from "../src/ai/ask.ts";
 import {
   assistantProviderDependencies,
   deploymentAdapterDependencies,
   islandFrameworkDependencies,
   missingDependencyDiagnostic,
   missingRuntimeDependencies,
+  narrationProviderDependencies,
   searchProviderDependencies,
 } from "../src/astro/runtime-deps.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
@@ -109,6 +110,42 @@ describe("assistantProviderDependencies", () => {
   });
 });
 
+describe("narrationProviderDependencies", () => {
+  it("reports @ai-sdk/openai for openai(), with or without a baseUrl", () => {
+    for (const provider of [
+      openai({ model: "gpt-4o-mini-tts" }),
+      openai({ baseUrl: "http://localhost:8880/v1", model: "kokoro" }),
+    ]) {
+      const { narration } = blumeConfigSchema.parse({
+        narration: { provider },
+      });
+      expect(narrationProviderDependencies(narration, root, root)).toEqual([
+        {
+          dep: "@ai-sdk/openai",
+          install: ["@ai-sdk/openai"],
+          owner: 'Narration provider "openai"',
+        },
+      ]);
+    }
+  });
+
+  it("stays quiet for gateway(), browser voices, and narration turned off", () => {
+    for (const narration of [
+      { provider: gateway() },
+      true,
+      { enabled: false, provider: openai({ model: "gpt-4o-mini-tts" }) },
+    ]) {
+      expect(
+        narrationProviderDependencies(
+          blumeConfigSchema.parse({ narration }).narration,
+          root,
+          root
+        )
+      ).toEqual([]);
+    }
+  });
+});
+
 describe("deploymentAdapterDependencies", () => {
   it("reports the cloudflare adapter package when it isn't installed anywhere", () => {
     const { deployment } = blumeConfigSchema.parse({
@@ -140,6 +177,12 @@ describe("missingDependencyDiagnostic", () => {
   const config = blumeConfigSchema.parse({
     ai: {
       assistant: { enabled: true, provider: openrouter({ model: "x/y" }) },
+    },
+    narration: {
+      provider: openai({
+        baseUrl: "http://localhost:8880/v1",
+        model: "kokoro",
+      }),
     },
     search: algolia({ apiKey: "k", appId: "a", indexName: "i" }),
   });
@@ -177,16 +220,20 @@ describe("missingDependencyDiagnostic", () => {
     ).toEqual({
       code: "BLUME_DEPENDENCY_MISSING",
       message:
-        'These packages aren\'t installed: Search adapter "algolia" needs "algoliasearch"; Assistant provider "openrouter" needs "@openrouter/ai-sdk-provider"; Island framework "svelte" needs "@astrojs/svelte".',
+        'These packages aren\'t installed: Search adapter "algolia" needs "algoliasearch"; Assistant provider "openrouter" needs "@openrouter/ai-sdk-provider"; Narration provider "openai" needs "@ai-sdk/openai"; Island framework "svelte" needs "@astrojs/svelte".',
       severity: "error",
       suggestion:
-        "Install them: `pnpm add algoliasearch @openrouter/ai-sdk-provider @astrojs/svelte svelte`.",
+        "Install them: `pnpm add algoliasearch @openrouter/ai-sdk-provider @ai-sdk/openai @astrojs/svelte svelte`.",
     });
   });
 
   it("checks every adapter the resolved config names", () => {
     expect(
       missingRuntimeDependencies(config, root, [], root).map(({ dep }) => dep)
-    ).toEqual(["algoliasearch", "@openrouter/ai-sdk-provider"]);
+    ).toEqual([
+      "algoliasearch",
+      "@openrouter/ai-sdk-provider",
+      "@ai-sdk/openai",
+    ]);
   });
 });

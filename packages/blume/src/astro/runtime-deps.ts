@@ -104,6 +104,25 @@ export const assistantProviderDependencies = (
     : [];
 
 /**
+ * The narration provider's SDK, when missing: `openai()` speaks through
+ * `@ai-sdk/openai`, which the build loads to generate the clips, while
+ * `gateway()` needs nothing beyond the core `ai` package Blume ships.
+ */
+export const narrationProviderDependencies = (
+  narration: ResolvedConfig["narration"],
+  root: string,
+  pkgDir: string = packageRoot()
+): MissingDependency[] =>
+  narration.enabled && narration.provider
+    ? unresolved(
+        `Narration provider "${narration.provider.kind}"`,
+        narration.provider.runtimeDeps,
+        root,
+        pkgDir
+      )
+    : [];
+
+/**
  * The deployment adapter's package, when missing. Node and Vercel ship with
  * Blume, so theirs always resolve; Netlify and Cloudflare are optional peers.
  * The generated astro.config.mjs imports the package directly, so without it
@@ -152,8 +171,9 @@ export const islandFrameworkDependencies = (
 /**
  * Every package the resolved config's adapters (and the given island
  * frameworks) import that isn't installed: the search SDK, content source
- * SDKs, the assistant provider SDK, the deployment adapter, and island
- * integrations. The adapters' `runtimeDeps` are the one place that knows.
+ * SDKs, the assistant and narration provider SDKs, the deployment adapter,
+ * and island integrations. The adapters' `runtimeDeps` are the one place that
+ * knows.
  */
 export const missingRuntimeDependencies = (
   config: ResolvedConfig,
@@ -164,6 +184,7 @@ export const missingRuntimeDependencies = (
   ...searchProviderDependencies(config.search.provider, root, pkgDir),
   ...sourceAdapterDependencies(config.content.sources, root, pkgDir),
   ...assistantProviderDependencies(config.ai.assistant, root, pkgDir),
+  ...narrationProviderDependencies(config.narration, root, pkgDir),
   ...deploymentAdapterDependencies(config.deployment, root, pkgDir),
   ...islandFrameworkDependencies(frameworks, root),
 ];

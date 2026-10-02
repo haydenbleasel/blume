@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { gateway } from "../src/ai/ask.ts";
+import { anthropic, gateway, openai } from "../src/ai/ask.ts";
 import {
   blumeConfigSchema,
   folderMetaSchema,
@@ -267,10 +267,97 @@ describe("narration config normalization", () => {
     ]);
   });
 
+  it("reads openai() for a speech endpoint, which needs no key with a baseUrl", () => {
+    const { provider } = blumeConfigSchema.parse({
+      narration: {
+        provider: openai({
+          baseUrl: "http://localhost:8880/v1",
+          model: "kokoro",
+        }),
+      },
+    }).narration;
+    // No `apiKeyEnv` default: OPENAI_API_KEY is for OpenAI, not this server.
+    expect(provider).toStrictEqual({
+      kind: "openai",
+      options: {
+        baseUrl: "http://localhost:8880/v1",
+        model: "kokoro",
+        voice: "alloy",
+      },
+      requiredSecrets: [],
+      // Speech goes through OpenAI's own provider, whatever the endpoint.
+      runtimeDeps: ["@ai-sdk/openai"],
+    });
+    const hosted = blumeConfigSchema.parse({
+      narration: { provider: openai({ model: "gpt-4o-mini-tts" }) },
+    }).narration.provider;
+    expect(hosted?.options.apiKeyEnv).toBe("OPENAI_API_KEY");
+    expect(hosted?.requiredSecrets).toStrictEqual(["OPENAI_API_KEY"]);
+    expect(hosted?.runtimeDeps).toStrictEqual(["@ai-sdk/openai"]);
+    const named = blumeConfigSchema.parse({
+      narration: {
+        provider: openai({
+          apiKeyEnv: "LITELLM_API_KEY",
+          baseUrl: "http://litellm.internal/v1",
+          model: "tts",
+        }),
+      },
+    }).narration.provider;
+    expect(named?.requiredSecrets).toStrictEqual(["LITELLM_API_KEY"]);
+  });
+
   it("rejects the assistant's reasoning option on a narration provider", () => {
     expect(
       blumeConfigSchema.safeParse({
         narration: { provider: gateway({ reasoning: "low" }) },
+      }).success
+    ).toBe(false);
+    expect(
+      blumeConfigSchema.safeParse({
+        narration: { provider: openai({ model: "tts-1", reasoning: "low" }) },
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects credentials in an openai() baseUrl, which fetch refuses", () => {
+    const result = blumeConfigSchema.safeParse({
+      narration: {
+        provider: openai({
+          baseUrl: "https://docs:hunter2@tts.example.com/v1",
+          model: "kokoro",
+        }),
+      },
+    });
+    expect(result.error?.issues[0]?.message).toBe(
+      'Credentials go in apiKeyEnv or headers ({ Authorization: "Basic …" }), not in the baseUrl.'
+    );
+    expect(result.error?.issues[0]?.path).toEqual([
+      "narration",
+      "provider",
+      "options",
+      "baseUrl",
+    ]);
+    // A URL that doesn't parse fails as one, not with a thrown TypeError.
+    const invalid = blumeConfigSchema.safeParse({
+      narration: {
+        provider: openai({ baseUrl: "not a url", model: "kokoro" }),
+      },
+    });
+    expect(invalid.success).toBe(false);
+  });
+
+  it("rejects openai()'s name, which speech models don't read", () => {
+    expect(
+      blumeConfigSchema.safeParse({
+        narration: { provider: openai({ model: "tts-1", name: "tts" }) },
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects providers without speech models", () => {
+    expect(
+      blumeConfigSchema.safeParse({
+        narration: { provider: anthropic({ model: "claude-sonnet-5" }) },
       }).success
     ).toBe(false);
   });
@@ -280,6 +367,16 @@ describe("narration config normalization", () => {
       blumeConfigSchema.safeParse({
         ai: {
           assistant: { enabled: true, provider: gateway({ voice: "alloy" }) },
+        },
+      }).success
+    ).toBe(false);
+    expect(
+      blumeConfigSchema.safeParse({
+        ai: {
+          assistant: {
+            enabled: true,
+            provider: openai({ model: "gpt-5.5", voice: "alloy" }),
+          },
         },
       }).success
     ).toBe(false);

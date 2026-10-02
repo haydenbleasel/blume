@@ -68,7 +68,7 @@ Every build publishes a generated agent skill for the site at `/skill.md` (`agen
 - **Components** — callouts, cards, steps, tabs, accordions, badges, file trees, and parameter tables, usable in MDX with no imports.
 - **Local search** — Orama in dev and production, with no hosted index; Pagefind, Algolia, and other backends are one adapter away (`search: pagefind()` from `blume/search`).
 - **AI** — `llms.txt`, raw Markdown URLs, a JSON docs API with an OpenAPI description, Copy as Markdown, Open in chat, an in-page assistant, and an MCP server endpoint served by the docs site itself.
-- **Narration** — a "Listen to this page" player (`narration: true` for browser voices, or `narration: { provider: gateway({ … }) }` from `blume/ai` for voices generated at build).
+- **Narration** — a "Listen to this page" player (`narration: true` for browser voices, or `narration: { provider: gateway({ … }) }` from `blume/ai` for voices generated at build; `openai({ model, voice })` uses OpenAI's speech models instead, and with a `baseUrl` a self-hosted OpenAI-compatible speech server, and needs `@ai-sdk/openai` installed).
 - **Navigation** — inferred from files, refined with `meta.ts` or config.
 - **SEO** — metadata, Open Graph images, RSS feeds, and JSON-LD.
 - **Customization** — component overrides, React islands, custom pages, theme tokens, and a source-component registry via `blume add`.

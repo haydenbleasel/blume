@@ -92,7 +92,8 @@ export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
   }
 
   // Generated narration reads its key at build, not at runtime; without it the
-  // build skips the audio and pages read with browser voices.
+  // build skips the audio and pages read with browser voices. `openai()` with
+  // a `baseUrl` requires only a key it names (see `narrationProviderSchema`).
   const { narration } = config;
   if (narration.enabled && narration.provider) {
     for (const env of narration.provider.requiredSecrets) {
