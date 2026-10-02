@@ -194,7 +194,7 @@
     "zod": "^4.6.2"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^4.0.65",
+    "@ai-sdk/anthropic": "^4.0.68",
     "@ai-sdk/google": "^4.0.82",
     "@ai-sdk/openai": "^4.0.78",
     "@ai-sdk/openai-compatible": "^3.0.48",
