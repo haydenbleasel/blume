@@ -224,7 +224,7 @@
       "devDependencies": {
         "@remotion/eslint-config-flat": "4.0.524",
         "@types/react": "19.3.0",
-        "@types/web": "0.0.356",
+        "@types/web": "0.0.357",
         "eslint": "10.10.0",
         "prettier": "3.9.6",
         "typescript": "5.9.3",
@@ -1243,7 +1243,7 @@
 
     "@types/urijs": ["@types/urijs@1.19.26", "", {}, "sha512-wkXrVzX5yoqLnndOwFsieJA7oKM8cNkOKJtf/3vVGSUFkWDKZvFHpIl9Pvqb/T9UsawBBFMTTD8xu7sK5MWuvg=="],
 
-    "@types/web": ["@types/web@0.0.356", "", {}, "sha512-FjE7SeW2G2It3cSeEuzxRLDZbBhiy6cmHI4506Q7hGVivabw+xz5aQBW2zoHoCWGoIrNMJAhfB7lV1SU3JZrDA=="],
+    "@types/web": ["@types/web@0.0.357", "", {}, "sha512-eRcYGgyyZTtU0kajyxtB83bIGwVPR627r0bAMyyiZbnF32BnUNtEy41cpStMeuRqIsWnIR6sfiEcg33LrK6BKg=="],
 
     "@types/write-file-atomic": ["@types/write-file-atomic@4.0.3", "", { "dependencies": { "@types/node": "*" } }, "sha512-qdo+vZRchyJIHNeuI1nrpsLw+hnkgqP/8mlaN6Wle/NKhydHmUN9l4p3ZE8yP90AJNJW4uB8HQhedb4f1vNayQ=="],
 
