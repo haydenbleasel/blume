@@ -2159,6 +2159,7 @@ export const blumeConfigSchema = z
       markdown: markdownConfigSchema.prefault({}),
       narration: narrationConfigSchema.prefault(false),
       navigation: navigationConfigSchema.prefault({}),
+      poweredBy: z.boolean().default(true),
       // An adapter from `blume/ratelimit`, `memory()` by default; `false` is off.
       rateLimit: rateLimitConfigSchema,
       react: reactConfigSchema.prefault({}),

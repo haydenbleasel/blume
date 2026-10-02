@@ -317,6 +317,8 @@ export type BlumePageRoute = CustomPageRoute;
 
 export interface BlumeIntegrationOptions {
   pages: BlumePageRoute[];
+  /** Whether runtime responses identify Blume with `X-Powered-By`. */
+  poweredBy?: boolean;
   /**
    * Page routes that have a raw-Markdown variant (the content manifest). The
    * hidden runtime leaves this out: the CLI publishes the live set through
@@ -505,6 +507,12 @@ export const blumeIntegration = (
           entrypoint: "blume/components/icon-sprite-middleware.ts",
           order: "post",
         });
+        if (options.poweredBy !== false) {
+          addMiddleware({
+            entrypoint: "blume/components/powered-by-middleware.ts",
+            order: "pre",
+          });
+        }
         for (const page of options.pages) {
           injectRoute({
             entrypoint: page.entrypoint,

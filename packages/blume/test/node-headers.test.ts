@@ -147,13 +147,16 @@ const response = () => {
 /** Write the wrapper beside the fake entry and import it fresh. */
 const importWrapper = async (
   autostart: string | null,
-  mode = "standalone"
+  mode = "standalone",
+  poweredBy = true
 ): Promise<WrapperModule> => {
   const dir = await scratch();
   await writeFile(join(dir, NODE_ASTRO_ENTRY_FILE), FAKE_ASTRO_ENTRY, "utf-8");
   await writeFile(
     join(dir, NODE_ENTRY_FILE),
-    nodeEntryWrapper(nodeHeaderRules(blumeConfigSchema.parse(SERVER_CONFIG))),
+    nodeEntryWrapper(nodeHeaderRules(blumeConfigSchema.parse(SERVER_CONFIG)), {
+      poweredBy,
+    }),
     "utf-8"
   );
   const previous = process.env.ASTRO_NODE_AUTOSTART;
@@ -218,7 +221,7 @@ describe("nodeHeaderRules", () => {
     ).toContain("application/http-message-signatures-directory");
   });
 
-  it("has nothing to set for a site without discovery files", () => {
+  it("has no discovery-specific rules when none are configured", () => {
     // The JSON API alone puts an API catalog on every default site.
     expect(
       nodeHeaderRules(blumeConfigSchema.parse({ agents: { api: false } }))
@@ -227,6 +230,13 @@ describe("nodeHeaderRules", () => {
 });
 
 describe("nodeEntryWrapper", () => {
+  it("leaves out the powered-by header when disabled", async () => {
+    const wrapper = await importWrapper("disabled", "standalone", false);
+    const responseWithNoPoweredBy = response();
+    wrapper.handler({ url: "/docs/guide" }, responseWithNoPoweredBy.res);
+    expect(responseWithNoPoweredBy.headers).toStrictEqual({});
+  });
+
   it("sets a rule's headers, then hands the request to Astro", async () => {
     const wrapper = await importWrapper("disabled");
     expect(wrapper.options).toStrictEqual({ mode: "standalone" });
@@ -246,6 +256,7 @@ describe("nodeEntryWrapper", () => {
       "Access-Control-Allow-Origin": "*",
       "Content-Type":
         'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"',
+      "X-Powered-By": "Blume",
     });
     expect(state().calls).toStrictEqual([
       { next: "next", url: "/docs/.well-known/api-catalog?x=1" },
@@ -254,7 +265,7 @@ describe("nodeEntryWrapper", () => {
     const other = response();
     wrapper.handler({ url: "/docs/guide" }, other.res);
     wrapper.handler({}, other.res);
-    expect(other.headers).toStrictEqual({});
+    expect(other.headers).toStrictEqual({ "X-Powered-By": "Blume" });
   });
 
   it("still starts when the adapter exposes no HTTP server to hook", async () => {
@@ -280,6 +291,7 @@ describe("nodeEntryWrapper", () => {
     started?.listener({ url: "/docs/.well-known/mcp.json" }, served.res);
     expect(served.headers).toStrictEqual({
       "Access-Control-Allow-Origin": "*",
+      "X-Powered-By": "Blume",
     });
     expect(state().calls).toStrictEqual([
       { next: "server", url: "/docs/.well-known/mcp.json" },
@@ -328,7 +340,7 @@ describe("wrapNodeEntry", () => {
     expect(recorded.warn[0]).toContain("Could not find the Node server entry");
   });
 
-  it("leaves Astro's entry alone when there are no rules", async () => {
+  it("wraps Astro's entry to add the powered-by response header", async () => {
     const root = await scratch();
     const serverDir = join(root, "dist", "server");
     await mkdir(serverDir, { recursive: true });
@@ -338,8 +350,8 @@ describe("wrapNodeEntry", () => {
       projectAt(root, { agents: { api: false }, deployment: node() }),
       log
     );
-    expect(await readFile(join(serverDir, NODE_ENTRY_FILE), "utf-8")).toBe(
-      "// astro\n"
+    expect(await readFile(join(serverDir, NODE_ENTRY_FILE), "utf-8")).toContain(
+      'res.setHeader("X-Powered-By", "Blume")'
     );
     expect(recorded.warn).toStrictEqual([]);
   });
@@ -375,10 +387,11 @@ describe("wrapNodeEntry", () => {
       expect(svg.headers).toStrictEqual({
         "Content-Security-Policy": "sandbox",
         "X-Content-Type-Options": "nosniff",
+        "X-Powered-By": "Blume",
       });
       const png = response();
       module.handler({ url: "/blume-assets/sanity/abc.png" }, png.res);
-      expect(png.headers).toStrictEqual({});
+      expect(png.headers).toStrictEqual({ "X-Powered-By": "Blume" });
     } finally {
       delete process.env.ASTRO_NODE_AUTOSTART;
     }

@@ -17,6 +17,7 @@ const configWith = (
     mcp: boolean;
     site: string;
     skills: string;
+    poweredBy: boolean;
     webBotAuthKeys: { kty: string }[];
   }>
 ): ResolvedConfig => {
@@ -39,10 +40,17 @@ const configWith = (
     },
     basePath: overrides.basePath ?? "",
     deployment: { ...base.deployment, options },
+    poweredBy: overrides.poweredBy ?? base.poweredBy,
   };
 };
 
 describe("buildNetlifyHeaders", () => {
+  it("omits the powered-by header when disabled", () => {
+    expect(buildNetlifyHeaders(configWith({ poweredBy: false }))).not.toContain(
+      "X-Powered-By"
+    );
+  });
+
   it("pins a UTF-8 Content-Type onto each raw endpoint extension", () => {
     expect(buildNetlifyHeaders(configWith({ api: false }))).toBe(
       [
@@ -52,6 +60,10 @@ describe("buildNetlifyHeaders", () => {
         "  Content-Type: text/markdown; charset=utf-8",
         "/*.txt",
         "  Content-Type: text/plain; charset=utf-8",
+        "/",
+        "  X-Powered-By: Blume",
+        "/*",
+        "  X-Powered-By: Blume",
         "/blume-assets/*.svg",
         "  Content-Security-Policy: sandbox",
         "/blume-assets/*.svg",
@@ -83,6 +95,12 @@ describe("buildNetlifyHeaders", () => {
     expect(out).toContain("/base/*.mdx\n");
     expect(out).toContain("/base/*.txt\n");
     expect(out).not.toContain("/base/docs/*.");
+  });
+
+  it("adds the powered-by header at the deployment base and below it", () => {
+    const out = buildNetlifyHeaders(configWith({ base: "/docs" }));
+    expect(out).toContain("/docs/\n  X-Powered-By: Blume");
+    expect(out).toContain("/docs/*\n  X-Powered-By: Blume");
   });
 
   it("normalizes a trailing slash on deployment.base", () => {
@@ -192,6 +210,9 @@ describe("buildVercelHeaders", () => {
     ]);
     expect(bySource.get("/docs/(.*).txt")).toStrictEqual([
       { key: "Content-Type", value: "text/plain; charset=utf-8" },
+    ]);
+    expect(bySource.get("/docs/(.*)")).toStrictEqual([
+      { key: "X-Powered-By", value: "Blume" },
     ]);
     // The homepage rule drops its trailing slash, the URL Vercel serves.
     expect(bySource.get("/docs")).toStrictEqual([
