@@ -285,6 +285,29 @@ const articleNode = (
 };
 
 /**
+ * The homepage as a `WebPage` node: not an article, but the page still has a
+ * last-modified date, and without a machine-readable one search engines pick
+ * up whatever other date the page shows.
+ */
+const webPageNode = (
+  input: StructuredDataInput,
+  context: { base: string; pageUrl: string }
+): JsonLdNode => {
+  const node: JsonLdNode = {
+    "@id": `${context.pageUrl}#page`,
+    "@type": "WebPage",
+    isPartOf: { "@id": `${context.base}#website` },
+    name: input.title,
+    url: context.pageUrl,
+  };
+  const modified = toIso(input.modified);
+  if (modified) {
+    node.dateModified = modified;
+  }
+  return node;
+};
+
+/**
  * The breadcrumb trail, or null when it is too short to be one. Google
  * requires `item` on every ListItem except the last; sidebar groups without
  * an index page produce route-less crumbs, so those are dropped (positions
@@ -315,7 +338,8 @@ const breadcrumbNode = (
 /**
  * Build a schema.org JSON-LD `@graph` for a page: site identity (the WebSite,
  * plus the configured Organization everywhere and the SoftwareApplication on
- * the homepage), the page as an article, and its breadcrumb trail. Returns
+ * the homepage), the page as a WebPage (homepage) or an article, and its
+ * breadcrumb trail. Returns
  * null when there is nothing useful to emit (e.g. the homepage without a
  * configured site). URLs are absolute when `siteUrl` is set, otherwise
  * route-relative.
@@ -365,9 +389,13 @@ export const buildStructuredData = (
     );
   }
 
-  // The homepage is described by the WebSite node (and the product, when one
-  // is configured); deeper pages get an article node plus a breadcrumb trail.
+  // The homepage is described by the WebSite node, a WebPage node carrying
+  // its dates, and the product when one is configured; deeper pages get an
+  // article node plus a breadcrumb trail.
   if (input.route === "/") {
+    if (base) {
+      graph.push(webPageNode(input, { base, pageUrl }));
+    }
     if (software && base) {
       graph.push(
         softwareNode(software, {

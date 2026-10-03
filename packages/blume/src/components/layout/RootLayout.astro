@@ -929,7 +929,10 @@ const localeRedirect = localeTargets
               />
               {formattedLastModified && (
                 <p class="mx-auto mt-10 max-w-content text-muted-foreground text-sm">
-                  {strings.page.lastUpdated} {formattedLastModified}
+                  {strings.page.lastUpdated}{" "}
+                  <time datetime={toIso(lastModified)}>
+                    {formattedLastModified}
+                  </time>
                 </p>
               )}
               {feedback && (

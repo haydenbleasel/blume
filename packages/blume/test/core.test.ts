@@ -1306,7 +1306,7 @@ describe("rss feeds", () => {
 });
 
 describe("structured data", () => {
-  it("emits only a WebSite node for the homepage", () => {
+  it("emits a WebSite and an undated WebPage node for the homepage", () => {
     const data = buildStructuredData({
       breadcrumbs: [],
       route: "/",
@@ -1314,7 +1314,28 @@ describe("structured data", () => {
       siteUrl: "https://x.com",
       title: "Home",
     });
-    expect(graphOf(data).map((n) => n["@type"])).toStrictEqual(["WebSite"]);
+    const graph = graphOf(data);
+    expect(graph.map((n) => n["@type"])).toStrictEqual(["WebSite", "WebPage"]);
+    expect(graph[1]).toStrictEqual({
+      "@id": "https://x.com/#page",
+      "@type": "WebPage",
+      isPartOf: { "@id": "https://x.com#website" },
+      name: "Home",
+      url: "https://x.com/",
+    });
+  });
+
+  it("gives the homepage WebPage its dateModified", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [],
+      modified: "2026-10-01T09:00:00Z",
+      route: "/",
+      siteName: "Docs",
+      siteUrl: "https://x.com",
+      title: "Home",
+    });
+    const page = graphOf(data).find((n) => n["@type"] === "WebPage");
+    expect(page?.dateModified).toBe("2026-10-01T09:00:00.000Z");
   });
 
   it("emits a BlogPosting with absolute url, datePublished, and breadcrumbs", () => {
