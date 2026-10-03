@@ -115,7 +115,7 @@
     "@astrojs/markdown-satteri": "^0.4.1",
     "@astrojs/mdx": "^8.0.1",
     "@astrojs/node": "^11.1.5",
-    "@astrojs/react": "^6.0.5",
+    "@astrojs/react": "^7.0.0",
     "@astrojs/vercel": "^11.0.11",
     "@clack/prompts": "^1.8.0",
     "@iconify-json/lucide": "^1.2.131",
