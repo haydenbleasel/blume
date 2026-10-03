@@ -67,6 +67,15 @@
   const deferredIn = (element: Element | null): HTMLElement | null =>
     element instanceof HTMLElement && element.dataset.navSrc ? element : null;
 
+  /**
+   * Whether a drill row opens its panel in place. A row linked to its
+   * section's page navigates there instead (that page renders with the panel
+   * open), unless the current page is already in the panel — the row reads as
+   * current — where sliding back in shows the same state without a reload.
+   */
+  const drillsInPlace = (drill: Element): boolean =>
+    !drill.hasAttribute("href") || drill.hasAttribute("aria-current");
+
   // Delegated at the document so the handlers survive client-router swaps
   // (the document persists; only its tree is replaced). Module scripts run
   // once per real load, and the flag keeps a second copy of this module —
@@ -112,7 +121,7 @@
       }
       const drill = target.closest("[data-nav-to]");
       const nav = drill?.closest("blume-nav");
-      if (drill && nav instanceof BlumeNav) {
+      if (drill && drillsInPlace(drill) && nav instanceof BlumeNav) {
         const panel = deferredIn(nav.panel(drill.getAttribute("data-nav-to") ?? ""));
         if (panel?.dataset.navSrc) {
           void loadFragment(panel.dataset.navSrc).catch(() => undefined);
@@ -139,8 +148,17 @@
         }
         const drill = target.closest("[data-nav-to]");
         if (drill && this.contains(drill)) {
+          // A modified click on a linked row (new tab, new window) is the
+          // browser's, and a row that navigates leaves the panel to its page.
+          const modified =
+            event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
           const id = drill.getAttribute("data-nav-to");
-          if (id && this.panel(id)) {
+          if (
+            id &&
+            this.panel(id) &&
+            drillsInPlace(drill) &&
+            !(modified && drill.hasAttribute("href"))
+          ) {
             event.preventDefault();
             void this.show(id, true);
           }

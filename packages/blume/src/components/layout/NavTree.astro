@@ -310,16 +310,32 @@ const initialId =
         // `page`: a single row that drills into this group's panel. It
         // controls that panel; NavTreeScript keeps `aria-expanded` in step
         // with the panel shown (static markup, since cached subtrees and
-        // fragments can't carry per-page state).
+        // fragments can't carry per-page state). A group with an index page
+        // links its row to that page, like the `group` summary and the `flat`
+        // heading, so the row opens the section even when the index hides its
+        // own row; its page renders with the panel open. Without one, the row
+        // stays a plain drill button so it never links a missing page.
+        // `aria-current` marks the row whose panel holds the current page
+        // (`page` on the section's own page), so the parent panel still shows
+        // where the reader is after the back arrow. Only rows on the active
+        // path carry it, and those always render live, never from a cache.
         if (display === "page") {
+          const Row = item.route ? "a" : "button";
+          const current = isGroupRowCurrent(item, currentRoute)
+            ? "page"
+            : hasActivePage(item)
+              ? "true"
+              : undefined;
           return (
             <li class={spacing}>
-              <button
+              <Row
                 aria-controls={navPanelId(id)}
+                aria-current={current}
                 aria-expanded="false"
                 class="blume-nav-drill"
                 data-nav-to={id}
-                type="button"
+                href={item.route ? withMountedBase(item.route) : undefined}
+                type={item.route ? undefined : "button"}
               >
                 {item.icon && (
                   <Icon
@@ -335,7 +351,7 @@ const initialId =
                   name="chevron-right"
                   size={14}
                 />
-              </button>
+              </Row>
             </li>
           );
         }
