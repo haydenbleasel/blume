@@ -2372,22 +2372,20 @@ describe("resolveReactCompiler", () => {
   // SAFETY: same partial-config shortcut as `compilerOn`.
   const compilerOff = { react: { compiler: false } } as ResolvedConfig;
 
-  it("resolves Blume's shipped babel plugin as an absolute path", () => {
-    expect(resolveReactCompiler(compilerOn, true)).toContain(
-      "babel-plugin-react-compiler"
-    );
+  it("resolves Blume's shipped compiler through @vitejs/plugin-react", () => {
+    expect(resolveReactCompiler(compilerOn, true)).toBe(true);
   });
 
-  it("returns null when React isn't needed or the compiler is off", () => {
-    expect(resolveReactCompiler(compilerOn, false)).toBeNull();
-    expect(resolveReactCompiler(compilerOff, true)).toBeNull();
+  it("is false when React isn't needed or the compiler is off", () => {
+    expect(resolveReactCompiler(compilerOn, false)).toBe(false);
+    expect(resolveReactCompiler(compilerOff, true)).toBe(false);
   });
 
-  it("returns null when the plugin doesn't resolve from the package dir", () => {
+  it("is false when the chain doesn't resolve from the package dir", () => {
     // An empty temp dir has no node_modules anywhere up its ancestor chain
-    // that could hold the plugin, so resolution throws and the helper
-    // degrades to null instead of failing the build.
-    expect(resolveReactCompiler(compilerOn, true, srcDir)).toBeNull();
+    // that could hold @astrojs/react, so resolution throws and the helper
+    // degrades to false instead of failing the build.
+    expect(resolveReactCompiler(compilerOn, true, srcDir)).toBe(false);
   });
 });
 
@@ -2396,16 +2394,16 @@ describe("reactCompilerWarnings", () => {
   // config is all it needs.
   const compilerOn = { react: { compiler: true } } as ResolvedConfig;
 
-  it("warns when the compiler was requested but its plugin is missing", () => {
-    const warnings = reactCompilerWarnings(compilerOn, true, null);
+  it("warns when the compiler was requested but doesn't resolve", () => {
+    const warnings = reactCompilerWarnings(compilerOn, true, false);
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("babel-plugin-react-compiler");
+    expect(warnings[0]).toContain("oxc-transform-react");
     expect(warnings[0]).toContain("react: { compiler: false }");
   });
 
-  it("stays quiet when the plugin resolved or React isn't in play", () => {
-    expect(reactCompilerWarnings(compilerOn, true, "/some/path")).toEqual([]);
-    expect(reactCompilerWarnings(compilerOn, false, null)).toEqual([]);
+  it("stays quiet when the compiler resolved or React isn't in play", () => {
+    expect(reactCompilerWarnings(compilerOn, true, true)).toEqual([]);
+    expect(reactCompilerWarnings(compilerOn, false, false)).toEqual([]);
   });
 });
 
