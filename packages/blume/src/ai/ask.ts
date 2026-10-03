@@ -110,7 +110,8 @@ export interface AssistantGatewayOptions extends AssistantAdapterOptions {
    * How much the model reasons before answering. Sent as the AI SDK's
    * top-level `reasoning` option, which the gateway maps to the model's own
    * control (OpenAI's `reasoning_effort`, for example); the model has to
-   * offer the level you pick. Omitted keeps the model's default.
+   * offer the level you pick. Omitted keeps the model's default. Assistant
+   * only.
    */
   reasoning?: AssistantReasoning;
   /** Narration only: the speech model's voice. Defaults to `alloy`. */
@@ -153,32 +154,47 @@ export const gateway = (
 // openai()
 // ---------------------------------------------------------------------------
 
-const OPENAI_API_KEY_ENV = "OPENAI_API_KEY";
+export const OPENAI_API_KEY_ENV = "OPENAI_API_KEY";
 
 /** Options for {@link openai}. */
 export interface AssistantOpenAIOptions extends AssistantAdapterOptions {
+  /**
+   * Name of the env var holding the key. Defaults to `OPENAI_API_KEY`, except
+   * for narration with a `baseUrl`, which sends only a key named here.
+   */
+  apiKeyEnv?: string;
   /**
    * An OpenAI-compatible endpoint to call instead of OpenAI
    * (`https://llm.internal.example.com/v1`): a self-hosted model or an
    * internal gateway. The route then talks Chat Completions through
    * `@ai-sdk/openai-compatible`, and the docs tools are off unless
    * `ai.assistant.tools` turns them on, since the model may not call tools.
+   * For narration, a server with OpenAI's speech API (`/audio/speech`),
+   * called through `@ai-sdk/openai` and sent only the key `apiKeyEnv` names,
+   * if any.
    */
   baseUrl?: string;
-  /** The model id (`gpt-5.5`). */
+  /**
+   * Narration only: how the voice should sound, for speech models that take
+   * instructions ("Read calmly, like a teacher").
+   */
+  instructions?: string;
+  /** The model id (`gpt-5.5`, or a speech model like `gpt-4o-mini-tts`). */
   model: string;
   /**
    * The provider name the AI SDK reports, which a custom endpoint also reads
    * its `providerOptions` under. Defaults to `openai`, or `openai-compatible`
-   * with a `baseUrl`.
+   * with a `baseUrl`. Assistant only.
    */
   name?: string;
   /**
    * How much the model reasons before answering, sent as `reasoning_effort`;
    * with a `baseUrl`, the endpoint has to accept that parameter. Omitted
-   * keeps the model's default.
+   * keeps the model's default. Assistant only.
    */
   reasoning?: AssistantReasoning;
+  /** Narration only: the speech model's voice. Defaults to `alloy`. */
+  voice?: string;
 }
 
 const openaiOptionsSchema = z.strictObject({
@@ -203,7 +219,9 @@ export const openaiAdapterSchema = adapterDescriptorSchema(
  * Route the assistant to OpenAI, or to any OpenAI-compatible endpoint with
  * `baseUrl`. Reads `OPENAI_API_KEY` and needs `@ai-sdk/openai` installed; a
  * custom endpoint needs `@ai-sdk/openai-compatible` instead, since most
- * don't serve OpenAI's Responses API.
+ * don't serve OpenAI's Responses API. Narration generates audio with it
+ * through `@ai-sdk/openai` either way, and with a `baseUrl` sends only the key
+ * `apiKeyEnv` names.
  */
 export const openai = (
   options: AssistantOpenAIOptions

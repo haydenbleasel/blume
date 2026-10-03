@@ -1206,10 +1206,10 @@ const feedbackConfigSchema = z
 
 // "Listen to this page". Off by default. `true` reads pages aloud with the
 // reader's browser voices, which needs no key and works on any host; an object
-// with a `provider` (`gateway()` from `blume/ai`) generates neural audio at
-// build instead, one cached clip per sentence, and falls back to the browser's
-// voices where no clips exist (`blume dev`, a build without the key). Both
-// normalize to `{ enabled, provider }`.
+// with a `provider` (`gateway()` or `openai()` from `blume/ai`) generates
+// neural audio at build instead, one cached clip per sentence, and falls back
+// to the browser's voices where no clips exist (`blume dev`, a build without
+// the key). Both normalize to `{ enabled, provider }`.
 const narrationConfigSchema = z
   .union([
     z.boolean(),

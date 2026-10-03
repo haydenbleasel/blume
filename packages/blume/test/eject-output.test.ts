@@ -71,6 +71,29 @@ describe("eject dependencies", () => {
     expect(read(root, "src/generated/features.ts")).not.toContain(
       "epub-gen-memory"
     );
+    expect(dependencies).not.toContain("@ai-sdk/openai");
+  });
+
+  it("declares the SDK an openai() narration provider generates with", async () => {
+    // The ejected app's `astro build` still generates the clips, and under a
+    // strict linker Blume only loads the SDK when the project lists it.
+    const root = await project({
+      "blume.config.ts": `export default {
+  narration: {
+    provider: {
+      kind: "openai",
+      options: { baseUrl: "http://localhost:8880/v1", model: "kokoro" },
+      requiredSecrets: ["OPENAI_API_KEY"],
+      runtimeDeps: ["@ai-sdk/openai-compatible"],
+    },
+  },
+};
+`,
+      "docs/index.md": "---\ntitle: Home\n---\n# Home\n",
+    });
+    const { dependencies } = await eject(root);
+    expect(dependencies).toContain("@ai-sdk/openai");
+    expect(dependencies).not.toContain("@ai-sdk/openai-compatible");
   });
 });
 

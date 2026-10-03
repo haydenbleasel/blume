@@ -13,17 +13,27 @@ import { tmpdir } from "node:os";
 import { parse, TextNode } from "node-html-parser";
 import { dirname, join } from "pathe";
 
-import { gateway } from "../src/ai/ask.ts";
+import { gateway, openai } from "../src/ai/ask.ts";
+import type {
+  AssistantGatewayOptions,
+  AssistantOpenAIOptions,
+} from "../src/ai/ask.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import {
   buildNarration,
   clipKey,
   gatewaySpeaker,
   htmlTree,
+  missingKey,
   narrationCacheDir,
+  openaiSpeaker,
   readPlayerPage,
 } from "../src/narration/build.ts";
 import { narrationProviderSchema } from "../src/narration/provider.ts";
+import type {
+  GatewayNarrationProvider,
+  OpenAINarrationProvider,
+} from "../src/narration/provider.ts";
 import type { NarrationCues } from "../src/narration/script.ts";
 
 /**
@@ -33,7 +43,13 @@ import type { NarrationCues } from "../src/narration/script.ts";
  */
 
 const dirs: string[] = [];
-const KEYS = ["AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN", "NARRATION_TEST_KEY"];
+const KEYS = [
+  "AI_GATEWAY_API_KEY",
+  "OPENAI_API_KEY",
+  "OPENAI_BASE_URL",
+  "VERCEL_OIDC_TOKEN",
+  "NARRATION_TEST_KEY",
+];
 const saved = new Map(KEYS.map((key) => [key, process.env[key]]));
 
 afterEach(() => {
@@ -129,6 +145,19 @@ const PROVIDER_CONFIG = `export default {
 };
 `;
 
+// What `openai({ baseUrl, model, voice })` returns, written out for a config.
+const OPENAI_CONFIG = `export default {
+  narration: {
+    provider: {
+      kind: "openai",
+      options: { baseUrl: "http://localhost:8880/v1", model: "kokoro", voice: "af_heart" },
+      requiredSecrets: ["OPENAI_API_KEY"],
+      runtimeDeps: ["@ai-sdk/openai-compatible"],
+    },
+  },
+};
+`;
+
 interface Log {
   info: string[];
   warn: string[];
@@ -138,6 +167,91 @@ const logger = (log: Log) => ({
   info: (message: string) => log.info.push(message),
   warn: (message: string) => log.warn.push(message),
 });
+
+/** A parsed `gateway()` narration provider. */
+const gatewayProvider = (
+  options?: AssistantGatewayOptions
+): GatewayNarrationProvider => {
+  const provider = narrationProviderSchema.parse(gateway(options));
+  if (provider.kind !== "gateway") {
+    throw new Error("expected a gateway() provider");
+  }
+  return provider;
+};
+
+/** A parsed `openai()` narration provider. */
+const openaiProvider = (
+  options: AssistantOpenAIOptions
+): OpenAINarrationProvider => {
+  const provider = narrationProviderSchema.parse(openai(options));
+  if (provider.kind !== "openai") {
+    throw new Error("expected an openai() provider");
+  }
+  return provider;
+};
+
+/** The JSON body of an OpenAI speech request. */
+interface SpeechBody {
+  input: string;
+  instructions?: string;
+  model: string;
+  response_format: string;
+  speed?: number;
+  voice: string;
+}
+
+interface SpeechRequest {
+  authorization: string | null;
+  body: SpeechBody;
+  headers: Headers;
+  url: string;
+}
+
+/**
+ * Run `task` against a fake OpenAI speech endpoint that answers every
+ * request with `mp3!` as `contentType` (no type at all for `null`), returning
+ * what it was sent. Fails on any warning the AI SDK would log, which it does
+ * for every clip of an unsupported setting.
+ */
+const withSpeechServer = async (
+  task: () => Promise<void>,
+  contentType: string | null = "audio/mpeg"
+): Promise<SpeechRequest[]> => {
+  const requests: SpeechRequest[] = [];
+  const warnings: unknown[] = [];
+  const originalFetch = globalThis.fetch;
+  const originalLogger = globalThis.AI_SDK_LOG_WARNINGS;
+  globalThis.AI_SDK_LOG_WARNINGS = (options) => {
+    warnings.push(...options.warnings);
+  };
+  const fakeFetch = async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1]
+  ): Promise<Response> => {
+    const headers = new Headers(init?.headers);
+    requests.push({
+      authorization: headers.get("authorization"),
+      body: JSON.parse(String(init?.body ?? "{}")),
+      headers,
+      url: String(input),
+    });
+    await Promise.resolve();
+    return new Response(new TextEncoder().encode("mp3!"), {
+      headers: contentType === null ? {} : { "content-type": contentType },
+    });
+  };
+  // SAFETY: the fake implements the call shape the OpenAI provider uses;
+  // `fetch.preconnect` is never touched.
+  globalThis.fetch = fakeFetch as typeof fetch;
+  try {
+    await task();
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.AI_SDK_LOG_WARNINGS = originalLogger;
+  }
+  expect(warnings).toEqual([]);
+  return requests;
+};
 
 /** A speaker that records what it was asked to say. */
 const recorder = () => {
@@ -205,19 +319,69 @@ describe(clipKey, () => {
     const other = narrationProviderSchema.parse(gateway({ voice: "nova" }));
     expect(clipKey(other, "en", "Hello.")).not.toBe(key);
   });
+
+  it("keeps the keys gateway() clips were cached under", () => {
+    // Keys from before narration took openai(): changing them would
+    // regenerate (and bill) every cached clip.
+    expect(clipKey(provider, "en", "Hello.")).toBe(
+      "c614df04bc0d8f736de2f4c1ec4702d2"
+    );
+    const tuned = narrationProviderSchema.parse(
+      gateway({
+        instructions: "Read calmly.",
+        providerOptions: { openai: { speed: 1.2 } },
+        voice: "nova",
+      })
+    );
+    expect(clipKey(tuned, "de-AT", "Hallo.")).toBe(
+      "cf7d36833ceb18dce563ca35a3d0a070"
+    );
+  });
+
+  it("follows the provider and endpoint that speak", () => {
+    Reflect.deleteProperty(process.env, "OPENAI_BASE_URL");
+    const hosted = narrationProviderSchema.parse(
+      openai({ model: "openai/tts-1-hd" })
+    );
+    const keys = [
+      provider,
+      hosted,
+      narrationProviderSchema.parse(
+        openai({
+          baseUrl: "http://localhost:8880/v1",
+          model: "openai/tts-1-hd",
+        })
+      ),
+      narrationProviderSchema.parse(
+        openai({ baseUrl: "http://tts.internal/v1", model: "openai/tts-1-hd" })
+      ),
+    ].map((each) => clipKey(each, "en", "Hello."));
+    expect(new Set(keys).size).toBe(keys.length);
+    // OPENAI_BASE_URL moves openai() to another server, so the key follows.
+    process.env.OPENAI_BASE_URL = "http://llm-proxy.internal/v1";
+    expect(clipKey(hosted, "en", "Hello.")).not.toBe(keys[1]);
+    // A trailing slash names the same server.
+    const slashed = narrationProviderSchema.parse(
+      openai({ baseUrl: "http://tts.internal/v1/", model: "openai/tts-1-hd" })
+    );
+    const unslashed = narrationProviderSchema.parse(
+      openai({ baseUrl: "http://tts.internal/v1", model: "openai/tts-1-hd" })
+    );
+    expect(clipKey(slashed, "en", "Hello.")).toBe(
+      clipKey(unslashed, "en", "Hello.")
+    );
+  });
 });
 
 describe(gatewaySpeaker, () => {
   it("asks the gateway's speech model for MP3 in the page's language", async () => {
     process.env.NARRATION_TEST_KEY = "test-key";
-    const provider = narrationProviderSchema.parse(
-      gateway({
-        apiKeyEnv: "NARRATION_TEST_KEY",
-        instructions: "Read calmly.",
-        model: "openai/tts-1",
-        voice: "nova",
-      })
-    );
+    const provider = gatewayProvider({
+      apiKeyEnv: "NARRATION_TEST_KEY",
+      instructions: "Read calmly.",
+      model: "openai/tts-1",
+      voice: "nova",
+    });
     const requests: { body: string; model: string | null; url: string }[] = [];
     const originalFetch = globalThis.fetch;
     const fakeFetch = async (
@@ -252,6 +416,160 @@ describe(gatewaySpeaker, () => {
       text: "Hallo.",
       voice: "nova",
     });
+  });
+});
+
+describe(openaiSpeaker, () => {
+  it("asks a custom endpoint for MP3 without a key", async () => {
+    // OpenAI's key is never sent to a server that didn't name it.
+    process.env.OPENAI_API_KEY = "sk-openai";
+    const speak = openaiSpeaker(
+      openaiProvider({
+        baseUrl: "http://localhost:8880/v1",
+        headers: { "x-team": "docs" },
+        model: "kokoro",
+        providerOptions: { openai: { speed: 1.25 } },
+        voice: "af_heart",
+      })
+    );
+    let audio: Uint8Array = new Uint8Array();
+    const requests = await withSpeechServer(async () => {
+      audio = await speak("Hallo.", "de-AT");
+    });
+    expect(new TextDecoder().decode(audio)).toBe("mp3!");
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe("http://localhost:8880/v1/audio/speech");
+    // No key, so no bearer token at all rather than an empty one.
+    expect(requests[0]?.authorization).toBeNull();
+    expect(requests[0]?.headers.get("x-team")).toBe("docs");
+    // OpenAI's speech API takes no language (sending one warns on every
+    // clip, which `withSpeechServer` fails on): the model or voice decides it.
+    expect(requests[0]?.body).toEqual({
+      input: "Hallo.",
+      model: "kokoro",
+      response_format: "mp3",
+      speed: 1.25,
+      voice: "af_heart",
+    });
+  });
+
+  it("sends the key it names, or an Authorization header of its own", async () => {
+    process.env.NARRATION_TEST_KEY = "test-key";
+    process.env.OPENAI_API_KEY = "sk-openai";
+    Reflect.deleteProperty(process.env, "OPENAI_BASE_URL");
+    const hosted = openaiSpeaker(
+      openaiProvider({
+        instructions: "Read calmly.",
+        model: "gpt-4o-mini-tts",
+      })
+    );
+    const named = openaiSpeaker(
+      openaiProvider({
+        apiKeyEnv: "NARRATION_TEST_KEY",
+        baseUrl: "http://litellm.internal/v1",
+        model: "tts",
+      })
+    );
+    const ownAuth = openaiSpeaker(
+      openaiProvider({
+        baseUrl: "http://localhost:8880/v1",
+        headers: { Authorization: "Basic ZG9jczpkb2Nz" },
+        model: "kokoro",
+      })
+    );
+    const requests = await withSpeechServer(async () => {
+      await hosted("Hello.", "en");
+      await named("Hello.", "en");
+      await ownAuth("Hello.", "en");
+    });
+    expect(requests[0]?.url).toBe("https://api.openai.com/v1/audio/speech");
+    expect(requests[0]?.authorization).toBe("Bearer sk-openai");
+    expect(requests[0]?.body).toMatchObject({
+      instructions: "Read calmly.",
+      voice: "alloy",
+    });
+    expect(requests[1]?.url).toBe("http://litellm.internal/v1/audio/speech");
+    expect(requests[1]?.authorization).toBe("Bearer test-key");
+    expect(requests[2]?.authorization).toBe("Basic ZG9jczpkb2Nz");
+  });
+
+  it("fails a clip the server didn't answer with audio", async () => {
+    const speak = openaiSpeaker(
+      openaiProvider({ baseUrl: "http://localhost:8880/v1", model: "kokoro" })
+    );
+    await withSpeechServer(async () => {
+      await expect(speak("Hello.", "en")).rejects.toThrow(
+        "The speech server answered with text/html; charset=utf-8, not audio"
+      );
+    }, "text/html; charset=utf-8");
+    // A generic binary type is still taken as the clip, and so is a response
+    // with no type, which can't be told apart.
+    for (const type of ["application/octet-stream", null]) {
+      let audio: Uint8Array = new Uint8Array();
+      // oxlint-disable-next-line no-await-in-loop -- one fake server at a time
+      await withSpeechServer(async () => {
+        audio = await speak("Hello.", "en");
+      }, type);
+      expect(new TextDecoder().decode(audio)).toBe("mp3!");
+    }
+  });
+
+  it("goes where OPENAI_BASE_URL points without a baseUrl, as OpenAI's SDKs do", async () => {
+    process.env.OPENAI_API_KEY = "sk-proxy";
+    process.env.OPENAI_BASE_URL = "http://llm-proxy.internal/v1";
+    const viaEnv = openaiSpeaker(openaiProvider({ model: "tts-1" }));
+    const configured = openaiSpeaker(
+      openaiProvider({ baseUrl: "http://localhost:8880/v1", model: "kokoro" })
+    );
+    const requests = await withSpeechServer(async () => {
+      await viaEnv("Hello.", "en");
+      await configured("Hello.", "en");
+    });
+    expect(requests[0]?.url).toBe("http://llm-proxy.internal/v1/audio/speech");
+    expect(requests[0]?.authorization).toBe("Bearer sk-proxy");
+    // A `baseUrl` in the config wins.
+    expect(requests[1]?.url).toBe("http://localhost:8880/v1/audio/speech");
+  });
+});
+
+describe(missingKey, () => {
+  it("names the key a build can't generate without", () => {
+    Reflect.deleteProperty(process.env, "AI_GATEWAY_API_KEY");
+    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    Reflect.deleteProperty(process.env, "VERCEL_OIDC_TOKEN");
+    Reflect.deleteProperty(process.env, "NARRATION_TEST_KEY");
+    expect(missingKey(gatewayProvider())).toBe("AI_GATEWAY_API_KEY");
+    expect(missingKey(openaiProvider({ model: "tts-1" }))).toBe(
+      "OPENAI_API_KEY"
+    );
+    // A key named for a custom endpoint is required too.
+    expect(
+      missingKey(
+        openaiProvider({
+          apiKeyEnv: "NARRATION_TEST_KEY",
+          baseUrl: "http://litellm.internal/v1",
+          model: "tts",
+        })
+      )
+    ).toBe("NARRATION_TEST_KEY");
+  });
+
+  it("is null with the key, Vercel's OIDC token, or a custom endpoint naming none", () => {
+    Reflect.deleteProperty(process.env, "AI_GATEWAY_API_KEY");
+    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    expect(
+      missingKey(
+        openaiProvider({ baseUrl: "http://localhost:8880/v1", model: "kokoro" })
+      )
+    ).toBeNull();
+    process.env.VERCEL_OIDC_TOKEN = "oidc";
+    expect(missingKey(gatewayProvider())).toBeNull();
+    // The OIDC token only authenticates the gateway.
+    expect(missingKey(openaiProvider({ model: "tts-1" }))).toBe(
+      "OPENAI_API_KEY"
+    );
+    process.env.OPENAI_API_KEY = "sk-test";
+    expect(missingKey(openaiProvider({ model: "tts-1" }))).toBeNull();
   });
 });
 
@@ -301,6 +619,58 @@ describe(buildNarration, () => {
       "Narration audio was not generated: NARRATION_TEST_KEY is not set, so pages will be read with browser voices."
     );
     expect(existsSync(join(dist, "blume-narration"))).toBe(false);
+  });
+
+  it("warns without OPENAI_API_KEY when openai() has no baseUrl", async () => {
+    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    const { dist, root } = await fixture(
+      OPENAI_CONFIG.replace('baseUrl: "http://localhost:8880/v1", ', ""),
+      { "guide/index.html": page({ route: "/guide" }) }
+    );
+    const project = await scanProject(root, { mode: "build" });
+    const log: Log = { info: [], warn: [] };
+    expect(await buildNarration(project, dist, logger(log))).toBeNull();
+    expect(log.warn[0]).toBe(
+      "Narration audio was not generated: OPENAI_API_KEY is not set, so pages will be read with browser voices."
+    );
+  });
+
+  it("generates through a custom endpoint without a key", async () => {
+    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    const { dist, root } = await fixture(OPENAI_CONFIG, {
+      "guide/index.html": page({ route: "/guide" }),
+    });
+    const project = await scanProject(root, { mode: "build" });
+    const log: Log = { info: [], warn: [] };
+    let result: Awaited<ReturnType<typeof buildNarration>> = null;
+    const requests = await withSpeechServer(async () => {
+      result = await buildNarration(project, dist, logger(log));
+    });
+    expect(log.warn).toEqual([]);
+    expect(result).toMatchObject({ failed: 0, pages: 1, reused: 0 });
+    expect(requests.length).toBeGreaterThan(0);
+    // Every clip goes to the configured server, with no key and its voice.
+    const sent = requests.map(({ authorization, body, url }) => ({
+      authorization,
+      url,
+      voice: body.voice,
+    }));
+    expect(sent).toEqual(
+      requests.map(() => ({
+        authorization: null,
+        url: "http://localhost:8880/v1/audio/speech",
+        voice: "af_heart",
+      }))
+    );
+    expect(log.info[0]).toEndWith("with kokoro");
+    const manifest = JSON.parse(
+      await readFile(join(dist, "blume-narration", "guide.json"), "utf-8")
+    );
+    const clip = await readFile(
+      join(dist, "blume-narration", "audio", manifest.segments[0].audio),
+      "utf-8"
+    );
+    expect(clip).toBe("mp3!");
   });
 
   it("writes a clip per sentence and a manifest per page, then reuses them", async () => {

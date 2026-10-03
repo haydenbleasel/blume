@@ -1,29 +1,106 @@
 import { z } from "zod";
 
-import { GATEWAY_API_KEY_ENV, sharedOptions } from "../ai/ask.ts";
+import {
+  GATEWAY_API_KEY_ENV,
+  OPENAI_API_KEY_ENV,
+  sharedOptions,
+} from "../ai/ask.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
 
 /** The speech model narration uses when `gateway()` names none. */
 export const DEFAULT_NARRATION_MODEL = "openai/tts-1-hd";
 
-/** The voice narration uses when `gateway()` names none. */
+/** The voice narration uses when the provider names none. */
 export const DEFAULT_NARRATION_VOICE = "alloy";
 
 /**
- * `narration.provider`: the `gateway()` descriptor from `blume/ai`, read with
- * speech defaults. `reasoning` is an assistant option and is rejected here;
- * `voice` and `instructions` are narration options and are rejected by the
- * assistant.
+ * The AI SDK provider `openai()` narration speaks through, with or without a
+ * `baseUrl`: `@ai-sdk/openai-compatible` has no speech models.
  */
-export const narrationProviderSchema = adapterDescriptorSchema(
+export const OPENAI_SPEECH_DEP = "@ai-sdk/openai";
+
+/** The narration options both providers take on top of the shared ones. */
+const speechOptions = {
+  instructions: z.string().min(1).optional(),
+  voice: z.string().min(1).default(DEFAULT_NARRATION_VOICE),
+};
+
+const gatewayNarrationSchema = adapterDescriptorSchema(
   "gateway",
   z.strictObject({
     ...sharedOptions(GATEWAY_API_KEY_ENV),
-    instructions: z.string().min(1).optional(),
+    ...speechOptions,
     model: z.string().min(1).default(DEFAULT_NARRATION_MODEL),
-    voice: z.string().min(1).default(DEFAULT_NARRATION_VOICE),
   })
 );
 
+const openaiNarrationSchema = adapterDescriptorSchema(
+  "openai",
+  z.strictObject({
+    ...sharedOptions(OPENAI_API_KEY_ENV),
+    ...speechOptions,
+    // Replaces the shared default: whether it's OPENAI_API_KEY depends on
+    // the `baseUrl` (see below).
+    apiKeyEnv: z.string().min(1).optional(),
+    // `fetch` refuses a URL with credentials in it, and the build's warning
+    // would then print them. An unparsable URL is left to `z.url()`.
+    baseUrl: z
+      .url()
+      .refine(
+        (url) => {
+          const parsed = URL.parse(url);
+          return !(parsed?.username || parsed?.password);
+        },
+        {
+          message:
+            'Credentials go in apiKeyEnv or headers ({ Authorization: "Basic …" }), not in the baseUrl.',
+        }
+      )
+      .optional(),
+    model: z.string().min(1),
+  })
+);
+
+/**
+ * `narration.provider`: the `gateway()` or `openai()` descriptor from
+ * `blume/ai`, read with speech defaults. `reasoning` (and `openai()`'s
+ * `name`, which speech models don't read) are assistant options and are
+ * rejected here; `voice` and `instructions` are narration options and are
+ * rejected by the assistant.
+ *
+ * `openai()` is read for what narration needs, not what the assistant does:
+ * it speaks through `@ai-sdk/openai` whatever the `baseUrl`, and a custom
+ * endpoint gets only the key `apiKeyEnv` names, never `OPENAI_API_KEY` by
+ * default, so it may take none at all. A key that is named is required.
+ */
+export const narrationProviderSchema = z
+  .discriminatedUnion("kind", [gatewayNarrationSchema, openaiNarrationSchema])
+  .transform((provider) => {
+    if (provider.kind !== "openai") {
+      return provider;
+    }
+    const { options } = provider;
+    const apiKeyEnv =
+      options.apiKeyEnv ?? (options.baseUrl ? undefined : OPENAI_API_KEY_ENV);
+    return {
+      ...provider,
+      options: apiKeyEnv ? { ...options, apiKeyEnv } : options,
+      requiredSecrets: apiKeyEnv ? [apiKeyEnv] : [],
+      runtimeDeps: [OPENAI_SPEECH_DEP],
+    };
+  });
+
 /** A validated narration provider, defaults filled in. */
 export type NarrationProvider = z.output<typeof narrationProviderSchema>;
+
+/** A validated `gateway()` narration provider. */
+export type GatewayNarrationProvider = Extract<
+  NarrationProvider,
+  { kind: "gateway" }
+>;
+
+/** A validated `openai()` narration provider. */
+export type OpenAINarrationProvider = Extract<
+  NarrationProvider,
+  { kind: "openai" }
+>;

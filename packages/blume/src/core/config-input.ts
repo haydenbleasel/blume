@@ -2,7 +2,11 @@ import type { AstroIntegration } from "astro";
 import type { z } from "zod";
 
 import type { AskRetrievalOptions } from "../ai/ask-context.ts";
-import type { AssistantAdapter, AssistantGatewayAdapter } from "../ai/ask.ts";
+import type {
+  AssistantAdapter,
+  AssistantGatewayAdapter,
+  AssistantOpenAIAdapter,
+} from "../ai/ask.ts";
 import type { ComponentMarkdown } from "../ai/component-markdown.ts";
 import type { AnalyticsAdapter } from "../analytics/schema.ts";
 import type { CaptchaAdapter } from "../captcha/schema.ts";
@@ -1399,9 +1403,11 @@ export type NarrationConfig =
       /**
        * Generate audio at build with a speech model:
        * `gateway({ model: "openai/tts-1-hd", voice: "alloy" })` from
-       * `blume/ai`. Without it, pages are read with browser voices.
+       * `blume/ai`, or `openai({ model, voice })` for OpenAI or, with a
+       * `baseUrl`, any OpenAI-compatible speech endpoint. Without it, pages
+       * are read with browser voices.
        */
-      provider?: AssistantGatewayAdapter;
+      provider?: AssistantGatewayAdapter | AssistantOpenAIAdapter;
     };
 
 /**

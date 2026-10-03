@@ -10,15 +10,23 @@ import {
   writeFile,
 } from "node:fs/promises";
 
+import type * as OpenAISdk from "@ai-sdk/openai";
 import { createGateway, generateSpeech } from "ai";
+import type { SpeechModel } from "ai";
 import { HTMLElement, parse, TextNode } from "node-html-parser";
 import type { Node } from "node-html-parser";
 import { dirname, join } from "pathe";
 
 import { normalizeBasePath } from "../core/base-path.ts";
+import { nodeRequire } from "../core/node-require.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ProjectContext } from "../core/types.ts";
-import type { NarrationProvider } from "./provider.ts";
+import { OPENAI_SPEECH_DEP } from "./provider.ts";
+import type {
+  GatewayNarrationProvider,
+  NarrationProvider,
+  OpenAINarrationProvider,
+} from "./provider.ts";
 import {
   extractNarration,
   isNarratable,
@@ -37,10 +45,11 @@ import type {
  * carries the player exactly as the browser will (same walker, same blocks),
  * split it into sentences, and give each sentence a clip from the configured
  * speech model. Clips are cached by what decides their sound (text, language,
- * model, voice, instructions, provider options), so a rebuild only pays for
- * sentences that changed, and one sentence shared by many pages is generated
- * once. Each page gets a manifest listing its clips; the player plays them in
- * order and falls back to browser voices wherever a manifest is missing.
+ * model, voice, instructions, provider options, endpoint), so a rebuild only
+ * pays for sentences that changed, and one sentence shared by many pages is
+ * generated once. Each page gets a manifest listing its clips; the player
+ * plays them in order and falls back to browser voices wherever a manifest is
+ * missing.
  */
 
 /** How the build logs: the integration's Astro logger. */
@@ -66,6 +75,12 @@ export interface NarrationBuildResult {
 
 // Bump to regenerate every clip: part of every cache key.
 const CLIP_FORMAT = 1;
+
+// Where `openai()` speaks with neither a `baseUrl` nor `OPENAI_BASE_URL`.
+const OPENAI_API_URL = "https://api.openai.com/v1";
+
+// What a speech server's clip may be served as.
+const AUDIO_TYPE = /^(?:audio\/|application\/octet-stream)/iu;
 
 // Parallel speech requests. Low enough to stay inside provider rate limits on
 // a first build of a large site, where every sentence is new.
@@ -145,6 +160,19 @@ const speechLanguage = (lang: string): string =>
   lang.toLowerCase().replaceAll("_", "-").split("-")[0] ?? lang;
 
 /**
+ * The server `openai()` speaks to: its `baseUrl`, else `OPENAI_BASE_URL` as
+ * OpenAI's SDKs read it, else OpenAI, without a trailing slash, which the SDK
+ * drops too. Resolved here rather than left to the SDK, so the clip key names
+ * the server the clips come from.
+ */
+const openaiEndpoint = (provider: OpenAINarrationProvider): string =>
+  (
+    provider.options.baseUrl ||
+    process.env.OPENAI_BASE_URL ||
+    OPENAI_API_URL
+  ).replace(/\/+$/u, "");
+
+/**
  * A clip's cache key: a digest of everything that decides how it sounds. The
  * Blume version is deliberately left out, unlike the OG card's: an upgrade
  * shouldn't pay to regenerate audio that would sound the same.
@@ -155,9 +183,16 @@ export const clipKey = (
   text: string
 ): string => {
   const { instructions, model, providerOptions, voice } = provider.options;
+  // Which server speaks: none for `gateway()`, which JSON drops, so its clips
+  // keep the keys they had before narration took other providers.
+  const endpoint =
+    provider.kind === "gateway"
+      ? undefined
+      : { baseUrl: openaiEndpoint(provider), kind: provider.kind };
   return createHash("sha256")
     .update(
       JSON.stringify({
+        endpoint,
         format: CLIP_FORMAT,
         instructions,
         lang: speechLanguage(lang),
@@ -172,7 +207,7 @@ export const clipKey = (
 };
 
 /** Speak through the Vercel AI Gateway with the provider's model and voice. */
-export const gatewaySpeaker = (provider: NarrationProvider): Speak => {
+export const gatewaySpeaker = (provider: GatewayNarrationProvider): Speak => {
   const { apiKeyEnv, headers, instructions, model, providerOptions, voice } =
     provider.options;
   const gateway = createGateway({ apiKey: process.env[apiKeyEnv], headers });
@@ -188,6 +223,86 @@ export const gatewaySpeaker = (provider: NarrationProvider): Speak => {
     });
     return audio.uint8Array;
   };
+};
+
+/**
+ * `fetch` for a keyless request: `createOpenAI` always sends the key as a
+ * bearer token, so an empty one would arrive as a bare `Bearer` that servers
+ * and proxies checking auth can reject. An `Authorization` from `headers`
+ * stays.
+ */
+const withoutEmptyBearer = async (
+  input: Parameters<typeof fetch>[0],
+  init?: RequestInit
+): Promise<Response> => {
+  const headers = new Headers(init?.headers);
+  if (headers.get("authorization") === "Bearer") {
+    headers.delete("authorization");
+  }
+  return await fetch(input, { ...init, headers });
+};
+
+/**
+ * Speak through OpenAI's speech API, or with `baseUrl` through any server
+ * that serves it (`POST /audio/speech`): Kokoro-FastAPI, Speaches, LiteLLM.
+ * That API takes no language, so none is sent and the model or voice
+ * decides it. Without a key, no bearer token is sent (an `Authorization` in
+ * `headers` still is).
+ */
+export const openaiSpeaker = (provider: OpenAINarrationProvider): Speak => {
+  const { apiKeyEnv, headers, instructions, model, providerOptions, voice } =
+    provider.options;
+  // `require`, not `import()`: this runs in `astro:build:done` (see
+  // `core/node-require.ts`).
+  const { createOpenAI }: typeof OpenAISdk = nodeRequire(OPENAI_SPEECH_DEP);
+  const apiKey = apiKeyEnv ? process.env[apiKeyEnv] : undefined;
+  const openai = createOpenAI({
+    // Never undefined: the SDK would fall back to OPENAI_API_KEY and send
+    // that to a custom endpoint that names no key.
+    apiKey: apiKey ?? "",
+    baseURL: openaiEndpoint(provider),
+    // SAFETY: the SDK only calls it, so Bun's `fetch.preconnect` (which its
+    // `typeof fetch` adds) is never read.
+    fetch: apiKey ? undefined : (withoutEmptyBearer as typeof fetch),
+    headers,
+  });
+  return async (text) => {
+    const { audio, responses } = await generateSpeech({
+      instructions,
+      // SAFETY: both sides are the same `SpeechModelV4` spec. `ai` and
+      // `@ai-sdk/openai` each pin their own `@ai-sdk/provider`, and the type
+      // only differs between those copies, not in what `generateSpeech` calls.
+      model: openai.speech(model) as SpeechModel,
+      outputFormat: "mp3",
+      providerOptions,
+      text,
+      voice,
+    });
+    // The SDK takes any 2xx body as audio, so a page a redirect led to (an
+    // SSO proxy's sign-in, say) would be cached as a clip and reused on every
+    // build after: fail the clip instead. A response with no type is trusted.
+    const type = responses[0]?.headers?.["content-type"];
+    if (type && !AUDIO_TYPE.test(type)) {
+      throw new Error(`The speech server answered with ${type}, not audio`);
+    }
+    return audio.uint8Array;
+  };
+};
+
+/**
+ * The env var a build needs to generate with `provider` and doesn't have, or
+ * `null` when it can go ahead: the key is set, Vercel's OIDC token stands in
+ * for the gateway's, or the provider names no key (`openai()` with a
+ * `baseUrl` and no `apiKeyEnv`).
+ */
+export const missingKey = (provider: NarrationProvider): string | null => {
+  const env = provider.options.apiKeyEnv;
+  if (env === undefined || process.env[env]) {
+    return null;
+  }
+  return provider.kind === "gateway" && process.env.VERCEL_OIDC_TOKEN
+    ? null
+    : env;
 };
 
 /** Every `.html` file under `dir`. */
@@ -278,7 +393,7 @@ const manifestFor = (plan: PagePlan): NarrationManifest => ({
  * Generate the narration for a built site in `distDir`: a clip per sentence
  * and a manifest per page. Does nothing unless `narration.provider` is set,
  * and warns instead of generating when the provider's key is missing (the
- * pages then read with browser voices). `speak` replaces the gateway call.
+ * pages then read with browser voices). `speak` replaces the provider call.
  */
 export const buildNarration = async (
   project: BlumeProject,
@@ -291,14 +406,18 @@ export const buildNarration = async (
   if (!(narration.enabled && provider)) {
     return null;
   }
-  const env = provider.options.apiKeyEnv;
-  if (!(speak || process.env[env] || process.env.VERCEL_OIDC_TOKEN)) {
+  const env = speak ? null : missingKey(provider);
+  if (env) {
     logger.warn(
       `Narration audio was not generated: ${env} is not set, so pages will be read with browser voices.`
     );
     return null;
   }
-  const say = speak ?? gatewaySpeaker(provider);
+  const say =
+    speak ??
+    (provider.kind === "gateway"
+      ? gatewaySpeaker(provider)
+      : openaiSpeaker(provider));
   const base = normalizeBasePath(project.config.deployment.options.base);
 
   // Read every page first, so the log can say what generation will cost

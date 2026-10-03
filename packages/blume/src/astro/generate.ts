@@ -1818,13 +1818,14 @@ export const diagnosticWarning = (diagnostic: Diagnostic): string =>
 
 /**
  * Missing-dependency preflight: the search provider's SDK, content source
- * SDKs, the assistant backend's provider SDK, the deployment adapter's package,
- * and — since React ships with Blume while Vue/Svelte don't — any island
- * framework's Astro integration. A build fails here, before anything is
- * written, with the install command for the project's package manager —
- * otherwise Vite dies later on an opaque unresolved import from the hidden
- * runtime. Dev warns and keeps serving: only the pages and routes that import
- * the package break, and installing it is picked up on the next restart.
+ * SDKs, the assistant backend's and narration provider's SDKs, the deployment
+ * adapter's package, and — since React ships with Blume while Vue/Svelte
+ * don't — any island framework's Astro integration. A build fails here,
+ * before anything is written, with the install command for the project's
+ * package manager — otherwise Vite dies later on an opaque unresolved import
+ * from the hidden runtime. Dev warns and keeps serving: only the pages and
+ * routes that import the package break (narration's SDK only loads at build),
+ * and installing it is picked up on the next restart.
  */
 const dependencyPreflight = async (
   project: BlumeProject,

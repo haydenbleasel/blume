@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { gateway } from "../src/ai/ask.ts";
+import { gateway, openai } from "../src/ai/ask.ts";
 import { checkRequiredSecrets } from "../src/cli/required-secrets.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { mixedbread } from "../src/search/adapters/index.ts";
 
 const KEYS = [
   "AI_GATEWAY_API_KEY",
+  "LITELLM_API_KEY",
+  "OPENAI_API_KEY",
   "OPENROUTER_API_KEY",
   "OR_KEY",
   "MIXEDBREAD_API_KEY",
@@ -53,6 +55,39 @@ describe("checkRequiredSecrets", () => {
     expect(
       checkRequiredSecrets(blumeConfigSchema.parse({ narration: true }))
     ).toEqual([]);
+  });
+
+  it("needs no narration key for an openai() endpoint with a baseUrl", () => {
+    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    const selfHosted = blumeConfigSchema.parse({
+      narration: {
+        provider: openai({
+          baseUrl: "http://localhost:8880/v1",
+          model: "kokoro",
+        }),
+      },
+    });
+    expect(checkRequiredSecrets(selfHosted)).toEqual([]);
+    const hosted = blumeConfigSchema.parse({
+      narration: { provider: openai({ model: "gpt-4o-mini-tts" }) },
+    });
+    expect(checkRequiredSecrets(hosted)[0]?.message).toBe(
+      "Narration audio is enabled but OPENAI_API_KEY is not set (read at build; without it pages use browser voices)."
+    );
+    // A key named for the endpoint is required.
+    Reflect.deleteProperty(process.env, "LITELLM_API_KEY");
+    const named = blumeConfigSchema.parse({
+      narration: {
+        provider: openai({
+          apiKeyEnv: "LITELLM_API_KEY",
+          baseUrl: "http://litellm.internal/v1",
+          model: "tts",
+        }),
+      },
+    });
+    expect(checkRequiredSecrets(named)[0]?.message).toBe(
+      "Narration audio is enabled but LITELLM_API_KEY is not set (read at build; without it pages use browser voices)."
+    );
   });
 
   it("is satisfied when the key is set", () => {
