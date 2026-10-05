@@ -758,6 +758,8 @@ describe("layout chrome sources", () => {
     // in the theme, and the tree references each of them.
     for (const utility of [
       "blume-nav-drill",
+      "blume-nav-drill-link",
+      "blume-nav-drill-toggle",
       "blume-nav-summary",
       "blume-nav-summary-link",
       "blume-nav-heading",

@@ -64,7 +64,7 @@ navigation: {
 
 - **`flat`** (default) — a non-collapsible header with its pages listed beneath. Pages that aren't in any group always list first, above the group sections, so they can't be mistaken for a group's children.
 - **`group`** — a collapsible `<details>` disclosure per group. Groups start collapsed by default; a group containing the current page always starts open, so only the section you're in is expanded. Set `collapsed: false` in [folder meta](/docs/content/meta) to force a group open regardless.
-- **`page`** — each group is a single row that, when clicked, slides the sidebar into a sub-panel showing only that group's items, with a back arrow at the top. The panel is route-aware, so landing directly on a page inside the group opens straight to it. After the back arrow, the row of the section you're in stays highlighted.
+- **`page`** — each group is a single row whose chevron slides the sidebar into a sub-panel showing only that group's items, with a back arrow at the top. A group with an index page links the row's name to that page, and a group without one slides the panel in from anywhere on the row. The panel is route-aware, so landing directly on a page inside the group opens straight to it. After the back arrow, the row of the section you're in stays highlighted.
 
 :::tip
 `page` mode keeps deep sections tidy — reach for it when groups have many children and you'd rather drill into them than scroll past them.
@@ -100,7 +100,7 @@ A generated group's effective mode resolves highest priority first:
 3. The global `navigation.sidebar.display`
 4. The Blume default (`flat`)
 
-A group's `display` applies to that group only — nested subgroups resolve their own value through the same chain. A `page`-mode group with an index page links its row to that page, so clicking the row opens the landing page with its sub-panel already open; the panel's title links back to it, and the index page lists as the panel's first item unless it's [hidden](#hidden-pages). A `page`-mode group without an index page has nothing to open, so its row only slides the panel in.
+A group's `display` applies to that group only — nested subgroups resolve their own value through the same chain. A `page`-mode group with an index page links its row's name to that page, so clicking the name opens the landing page with its sub-panel already open, while the chevron beside it slides the panel in without leaving the current page. The panel's title links back to the landing page, and the index page lists as the panel's first item unless it's [hidden](#hidden-pages). A `page`-mode group without an index page has nothing to open, so its whole row slides the panel in.
 
 `sidebar.display` means nothing anywhere else — on a non-index page, on the content root's own `index` page (the root isn't a group; use `navigation.sidebar.display`), or on any page when an [explicit sidebar](#explicit-sidebar) is configured (its items own each group's mode) — so Blume reports a `BLUME_SIDEBAR_DISPLAY_IGNORED` warning instead of silently dropping it. `collapsed` remains specific to `group` mode; it's inert when a group resolves to `flat` or `page`.
 

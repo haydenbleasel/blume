@@ -307,35 +307,63 @@ const initialId =
         const spacing =
           index === 0 ? "mt-0" : display === "flat" ? "mt-6" : "mt-0.5";
 
-        // `page`: a single row that drills into this group's panel. It
-        // controls that panel; NavTreeScript keeps `aria-expanded` in step
-        // with the panel shown (static markup, since cached subtrees and
+        // `page`: a single row that drills into this group's panel. Its drill
+        // button controls that panel; NavTreeScript keeps `aria-expanded` in
+        // step with the panel shown (static markup, since cached subtrees and
         // fragments can't carry per-page state). A group with an index page
-        // links its row to that page, like the `group` summary and the `flat`
-        // heading, so the row opens the section even when the index hides its
-        // own row; its page renders with the panel open. Without one, the row
-        // stays a plain drill button so it never links a missing page.
-        // `aria-current` marks the row whose panel holds the current page
-        // (`page` on the section's own page), so the parent panel still shows
-        // where the reader is after the back arrow. Only rows on the active
-        // path carry it, and those always render live, never from a cache.
+        // splits the row, like the `group` summary: the label links that page
+        // (which renders with the panel open), so the row opens the section
+        // even when the index hides its own row, and the chevron stays a
+        // button that slides the panel in without leaving the page. Without
+        // one, the whole row is the drill button, so it never links a missing
+        // page. `aria-current` marks the row whose panel holds the current
+        // page (`page` on the section's own page), so the parent panel still
+        // shows where the reader is after the back arrow. Only rows on the
+        // active path carry it, and those always render live, never from a
+        // cache.
         if (display === "page") {
-          const Row = item.route ? "a" : "button";
-          const current = isGroupRowCurrent(item, currentRoute)
-            ? "page"
-            : hasActivePage(item)
-              ? "true"
-              : undefined;
-          return (
+          const current = hasActivePage(item)
+            ? isGroupRowCurrent(item, currentRoute)
+              ? "page"
+              : "true"
+            : undefined;
+          return item.route ? (
+            <li class={`flex items-center gap-0.5 ${spacing}`}>
+              <a
+                aria-current={current}
+                class="blume-nav-drill-link"
+                href={withMountedBase(item.route)}
+              >
+                {item.icon && (
+                  <Icon
+                    class="shrink-0 text-muted-foreground"
+                    name={item.icon}
+                    size={14}
+                  />
+                )}
+                <span class="flex-1 truncate">{item.label}</span>
+                {item.badge && <span class={badgeClassFor(item.badge)}>{item.badge}</span>}
+              </a>
+              <button
+                aria-controls={navPanelId(id)}
+                aria-expanded="false"
+                aria-label={item.label}
+                class="blume-nav-drill-toggle"
+                data-nav-to={id}
+                type="button"
+              >
+                <Icon class="rtl:-scale-x-100" name="chevron-right" size={14} />
+              </button>
+            </li>
+          ) : (
             <li class={spacing}>
-              <Row
+              <button
                 aria-controls={navPanelId(id)}
                 aria-current={current}
                 aria-expanded="false"
                 class="blume-nav-drill"
                 data-nav-to={id}
-                href={item.route ? withMountedBase(item.route) : undefined}
-                type={item.route ? undefined : "button"}
+                type="button"
               >
                 {item.icon && (
                   <Icon
@@ -351,7 +379,7 @@ const initialId =
                   name="chevron-right"
                   size={14}
                 />
-              </Row>
+              </button>
             </li>
           );
         }

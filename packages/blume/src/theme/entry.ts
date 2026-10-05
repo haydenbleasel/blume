@@ -263,13 +263,24 @@ ${THEME_MAPPING}
    so a large site's HTML is mostly this markup — one utility per row kind
    instead of the dozen classes each expands to keeps every page (and the
    build's HTML output) small. Kept in sync with NavTree.astro: a page row,
-   a page-mode group's drill-in row, a collapsible group's summary and
-   the link inside it, and a flat group's heading and the link inside it. */
+   a page-mode group's drill-in row (or, when the group has a page, the
+   link and chevron button it splits into), a collapsible group's summary
+   and the link inside it, and a flat group's heading and the link inside
+   it. */
 @utility blume-nav-link {
   @apply block rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground;
 }
 @utility blume-nav-drill {
-  @apply flex w-full items-center gap-2 rounded-[0.65rem] px-2.5 py-1.5 text-start font-medium text-foreground text-sm transition-colors hover:bg-muted aria-[current=page]:bg-muted aria-[current=true]:bg-muted;
+  @apply flex w-full items-center gap-2 rounded-[0.65rem] px-2.5 py-1.5 text-start font-medium text-foreground text-sm transition-colors hover:bg-muted aria-[current]:bg-muted;
+}
+/* A routed drill row's label and chevron are separate pills, like a panel's
+   back button and title, so each shows which one the pointer is on. The
+   chevron's padding matches the drill row's, so chevrons line up. */
+@utility blume-nav-drill-link {
+  @apply flex min-w-0 flex-1 items-center gap-2 rounded-[0.65rem] px-2.5 py-1.5 font-medium text-foreground text-sm transition-colors hover:bg-muted aria-[current]:bg-muted;
+}
+@utility blume-nav-drill-toggle {
+  @apply flex shrink-0 items-center justify-center self-stretch rounded-[0.65rem] px-2.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground;
 }
 @utility blume-nav-summary {
   @apply flex cursor-pointer list-none items-center gap-1.5 rounded-[0.65rem] px-2.5 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden;

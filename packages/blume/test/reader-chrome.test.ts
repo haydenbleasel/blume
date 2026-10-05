@@ -110,9 +110,29 @@ describe("sidebar", () => {
       `const navPanelId = (id: string): string => \`blume-nav-panel-\${id}\`;`
     );
     expect(tree).toContain("id={navPanelId(panel.id)}");
+    // A routeless page-mode group's whole row drills in. A routed one links
+    // its label to the index page and keeps the chevron as the drill button.
     expect(tree).toMatch(
-      /aria-controls=\{navPanelId\(id\)\}[^>]*data-nav-to=\{id\}/u
+      /<button\s+aria-controls=\{navPanelId\(id\)\}\s+aria-current=\{current\}\s+aria-expanded="false"\s+class="blume-nav-drill"\s+data-nav-to=\{id\}\s+type="button"/u
     );
+    expect(tree).toMatch(
+      /<a\s+aria-current=\{current\}\s+class="blume-nav-drill-link"\s+href=\{withMountedBase\(item\.route\)\}\s*>/u
+    );
+    expect(tree).toMatch(
+      /<button\s+aria-controls=\{navPanelId\(id\)\}\s+aria-expanded="false"\s+aria-label=\{item\.label\}\s+class="blume-nav-drill-toggle"\s+data-nav-to=\{id\}\s+type="button"/u
+    );
+  });
+
+  it("drills in only from buttons, so a link always navigates", async () => {
+    // A drill row that was itself a link either navigated (no way to open
+    // the panel without loading the page, and on mobile the drawer closed)
+    // or had its click cancelled, so it never reached the page it named.
+    const tree = await source("components/layout/NavTree.astro");
+    const drills = [...tree.matchAll(/<(?<tag>\w+)\s[^>]*data-nav-to=/gu)];
+    expect(drills.map((match) => match.groups?.tag)).toEqual([
+      "button",
+      "button",
+    ]);
   });
 
   it("moves focus into the panel it shows and syncs aria-expanded", async () => {
