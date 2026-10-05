@@ -125,7 +125,7 @@
     "@orama/orama": "^3.1.18",
     "@pierre/diffs": "^1.5.1",
     "@scalar/astro": "^0.4.26",
-    "@scalar/openapi-parser": "^0.29.1",
+    "@scalar/openapi-parser": "^0.29.11",
     "@scalar/openapi-types": "^0.9.5",
     "@shikijs/transformers": "^4.4.3",
     "@shikijs/twoslash": "^4.4.3",
