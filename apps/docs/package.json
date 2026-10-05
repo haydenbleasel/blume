@@ -18,7 +18,7 @@
     "blume": "workspace:*"
   },
   "devDependencies": {
-    "@astrojs/cloudflare": "^14.3.1",
+    "@astrojs/cloudflare": "^14.3.3",
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "sharp": "^0.35.4",
