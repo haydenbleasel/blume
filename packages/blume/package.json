@@ -142,7 +142,7 @@
     "consola": "^3.4.2",
     "cross-spawn": "^7.0.6",
     "dompurify": "^3.4.16",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.5",
     "epub-gen-memory": "^1.1.2",
     "es-module-lexer": "^3.0.2",
     "fast-xml-parser": "^5.11.1",
