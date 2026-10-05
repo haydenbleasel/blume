@@ -49,7 +49,7 @@
     },
     "packages/blume": {
       "name": "blume",
-      "version": "2.1.0",
+      "version": "2.1.2",
       "bin": {
         "blume": "bin/blume.mjs",
       },
@@ -223,7 +223,7 @@
         "tw-animate-css": "^1.4.0",
       },
       "devDependencies": {
-        "@remotion/eslint-config-flat": "4.0.530",
+        "@remotion/eslint-config-flat": "4.0.532",
         "@types/react": "19.3.0",
         "@types/web": "0.0.357",
         "eslint": "10.10.0",
@@ -876,7 +876,7 @@
 
     "@remotion/elevenlabs": ["@remotion/elevenlabs@4.0.530", "", { "dependencies": { "@remotion/captions": "4.0.530", "zod": "4.5.4" } }, "sha512-NbYbB9El/FfCaXRK0WueeLep/mYGL+rw+26JyW5oVyRBFt/M5nxOpIUL/kz+0oCUyKiFMBoRA4skBpvgiE2HWw=="],
 
-    "@remotion/eslint-config-flat": ["@remotion/eslint-config-flat@4.0.530", "", { "dependencies": { "typescript-eslint": "8.21.0" }, "peerDependencies": { "eslint": ">=9" } }, "sha512-rELmB0ZtfTEK8cYFC37CnBSXMHKPoHXQrQ5AEXjVo51IJqdN0HzIJx4O76zHsWporRLXs8U5PkB/jK2yBm9CsQ=="],
+    "@remotion/eslint-config-flat": ["@remotion/eslint-config-flat@4.0.532", "", { "dependencies": { "typescript-eslint": "8.21.0" }, "peerDependencies": { "eslint": ">=9" } }, "sha512-InNLyUhSo/H0pjOOJ7E96YJDXHlOrS7CJ+44aOk+MiHAbNmT6EKuogNJS52/G4cdThNw4l1du+wHkgBfwraVpA=="],
 
     "@remotion/google-fonts": ["@remotion/google-fonts@4.0.530", "", { "dependencies": { "remotion": "4.0.530" } }, "sha512-y5BZZP6fXf32lq2QH+6gORjMtxTB/WXE9Z8bQjzEecbQwFp+iTxl6TLA6wCWffG68kI29Dk1FA4gcH0GnhS8GQ=="],
 
