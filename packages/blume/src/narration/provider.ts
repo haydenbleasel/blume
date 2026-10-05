@@ -19,6 +19,16 @@ export const DEFAULT_NARRATION_VOICE = "alloy";
  */
 export const OPENAI_SPEECH_DEP = "@ai-sdk/openai";
 
+/**
+ * Whether `url` carries a username or password, which `fetch` refuses to
+ * send and whose error message would print them. A URL that doesn't parse
+ * has none.
+ */
+export const hasCredentials = (url: string): boolean => {
+  const parsed = URL.parse(url);
+  return Boolean(parsed?.username || parsed?.password);
+};
+
 /** The narration options both providers take on top of the shared ones. */
 const speechOptions = {
   instructions: z.string().min(1).optional(),
@@ -42,20 +52,13 @@ const openaiNarrationSchema = adapterDescriptorSchema(
     // Replaces the shared default: whether it's OPENAI_API_KEY depends on
     // the `baseUrl` (see below).
     apiKeyEnv: z.string().min(1).optional(),
-    // `fetch` refuses a URL with credentials in it, and the build's warning
-    // would then print them. An unparsable URL is left to `z.url()`.
+    // An unparsable URL is left to `z.url()`.
     baseUrl: z
       .url()
-      .refine(
-        (url) => {
-          const parsed = URL.parse(url);
-          return !(parsed?.username || parsed?.password);
-        },
-        {
-          message:
-            'Credentials go in apiKeyEnv or headers ({ Authorization: "Basic …" }), not in the baseUrl.',
-        }
-      )
+      .refine((url) => !hasCredentials(url), {
+        message:
+          "Credentials don't go in the baseUrl: name the env var holding the key in apiKeyEnv.",
+      })
       .optional(),
     model: z.string().min(1),
   })

@@ -207,15 +207,22 @@ interface SpeechRequest {
   url: string;
 }
 
+// An MPEG Layer III frame header: what `generateSpeech` sniffs to call a body
+// MP3.
+const MP3 = Uint8Array.of(0xff, 0xf3, 0x44, 0xc4, 0x00, 0x00);
+
 /**
  * Run `task` against a fake OpenAI speech endpoint that answers every
- * request with `mp3!` as `contentType` (no type at all for `null`), returning
- * what it was sent. Fails on any warning the AI SDK would log, which it does
- * for every clip of an unsupported setting.
+ * request with `body` (an MP3 frame by default) as `contentType` (no type at
+ * all for `null`), returning what it was sent. Fails on any warning the AI
+ * SDK would log, which it does for every clip of an unsupported setting.
  */
 const withSpeechServer = async (
   task: () => Promise<void>,
-  contentType: string | null = "audio/mpeg"
+  {
+    body = MP3,
+    contentType = "audio/mpeg",
+  }: { body?: Uint8Array<ArrayBuffer>; contentType?: string | null } = {}
 ): Promise<SpeechRequest[]> => {
   const requests: SpeechRequest[] = [];
   const warnings: unknown[] = [];
@@ -236,7 +243,7 @@ const withSpeechServer = async (
       url: String(input),
     });
     await Promise.resolve();
-    return new Response(new TextEncoder().encode("mp3!"), {
+    return new Response(body, {
       headers: contentType === null ? {} : { "content-type": contentType },
     });
   };
@@ -371,6 +378,20 @@ describe(clipKey, () => {
       clipKey(unslashed, "en", "Hello.")
     );
   });
+
+  it("shares openai() clips across languages, since none is sent", () => {
+    Reflect.deleteProperty(process.env, "OPENAI_BASE_URL");
+    const hosted = narrationProviderSchema.parse(openai({ model: "tts-1" }));
+    const key = clipKey(hosted, "en", "API.");
+    expect(clipKey(hosted, "de", "API.")).toBe(key);
+    // The endpoint a build resolved once is the one the key follows.
+    expect(clipKey(hosted, "en", "API.", "https://api.openai.com/v1")).toBe(
+      key
+    );
+    expect(clipKey(hosted, "en", "API.", "http://tts.internal/v1")).not.toBe(
+      key
+    );
+  });
 });
 
 describe(gatewaySpeaker, () => {
@@ -436,7 +457,7 @@ describe(openaiSpeaker, () => {
     const requests = await withSpeechServer(async () => {
       audio = await speak("Hallo.", "de-AT");
     });
-    expect(new TextDecoder().decode(audio)).toBe("mp3!");
+    expect(audio).toEqual(MP3);
     expect(requests).toHaveLength(1);
     expect(requests[0]?.url).toBe("http://localhost:8880/v1/audio/speech");
     // No key, so no bearer token at all rather than an empty one.
@@ -493,25 +514,57 @@ describe(openaiSpeaker, () => {
     expect(requests[2]?.authorization).toBe("Basic ZG9jczpkb2Nz");
   });
 
-  it("fails a clip the server didn't answer with audio", async () => {
+  it("fails a clip the server didn't answer with MP3", async () => {
     const speak = openaiSpeaker(
       openaiProvider({ baseUrl: "http://localhost:8880/v1", model: "kokoro" })
     );
-    await withSpeechServer(async () => {
-      await expect(speak("Hello.", "en")).rejects.toThrow(
-        "The speech server answered with text/html; charset=utf-8, not audio"
-      );
-    }, "text/html; charset=utf-8");
-    // A generic binary type is still taken as the clip, and so is a response
-    // with no type, which can't be told apart.
-    for (const type of ["application/octet-stream", null]) {
-      let audio: Uint8Array = new Uint8Array();
+    // A sign-in page a redirect led to, WAV from a server that ignored
+    // `response_format`, and bytes nothing recognizes (raw PCM).
+    const answers = [
+      {
+        body: new TextEncoder().encode("<!doctype html><title>Sign in</title>"),
+        contentType: "text/html; charset=utf-8",
+      },
+      {
+        body: new TextEncoder().encode("RIFF\0\0\0\0WAVEfmt "),
+        contentType: "audio/wav",
+      },
+      { body: Uint8Array.of(1, 2, 3, 4, 5, 6), contentType: null },
+    ];
+    for (const answer of answers) {
       // oxlint-disable-next-line no-await-in-loop -- one fake server at a time
       await withSpeechServer(async () => {
-        audio = await speak("Hello.", "en");
-      }, type);
-      expect(new TextDecoder().decode(audio)).toBe("mp3!");
+        await expect(speak("Hello.", "en")).rejects.toThrow(
+          `The speech server answered with ${answer.contentType ?? "no content type"}, not MP3 audio`
+        );
+      }, answer);
     }
+    // MP3 bytes are the clip whatever type they're served as.
+    for (const contentType of ["application/octet-stream", null]) {
+      let audio: Uint8Array = new Uint8Array();
+      // oxlint-disable-next-line no-await-in-loop -- one fake server at a time
+      await withSpeechServer(
+        async () => {
+          audio = await speak("Hello.", "en");
+        },
+        { contentType }
+      );
+      expect(audio).toEqual(MP3);
+    }
+  });
+
+  it("fails a clip, sending nothing, when OPENAI_BASE_URL has credentials", async () => {
+    process.env.OPENAI_API_KEY = "sk-proxy";
+    process.env.OPENAI_BASE_URL = "http://docs:hunter2@llm-proxy.internal/v1";
+    const speak = openaiSpeaker(openaiProvider({ model: "tts-1" }));
+    const requests = await withSpeechServer(async () => {
+      const failure = await speak("Hello.", "en").catch((error) => error);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure.message).toBe(
+        "OPENAI_BASE_URL has credentials in it, which fetch won't send: name the env var holding the key in apiKeyEnv instead"
+      );
+    });
+    expect(requests).toEqual([]);
   });
 
   it("goes where OPENAI_BASE_URL points without a baseUrl, as OpenAI's SDKs do", async () => {
@@ -614,11 +667,54 @@ describe(buildNarration, () => {
     });
     const project = await scanProject(root, { mode: "build" });
     const log: Log = { info: [], warn: [] };
-    expect(await buildNarration(project, dist, logger(log))).toBeNull();
-    expect(log.warn[0]).toBe(
-      "Narration audio was not generated: NARRATION_TEST_KEY is not set, so pages will be read with browser voices."
+    const result = await buildNarration(project, dist, logger(log));
+    expect(result).toMatchObject({ generated: 0, pages: 0, reused: 0 });
+    expect(result?.failed).toBeGreaterThan(0);
+    expect(log.warn).toEqual([
+      "Narration audio was not generated: NARRATION_TEST_KEY is not set, so pages missing clips will be read with browser voices.",
+    ]);
+    expect(existsSync(join(dist, "blume-narration", "guide.json"))).toBe(false);
+  });
+
+  it("ships cached clips without the key, warning only when one is missing", async () => {
+    const { dist, root } = await fixture(PROVIDER_CONFIG, {
+      "guide/index.html": page({ route: "/guide" }),
+    });
+    const project = await scanProject(root, { mode: "build" });
+    const { said, speak } = recorder();
+    await buildNarration(project, dist, logger({ info: [], warn: [] }), speak);
+    await rm(join(dist, "blume-narration"), { force: true, recursive: true });
+
+    // A fork's pull request: the cache is restored, the key isn't set.
+    Reflect.deleteProperty(process.env, "NARRATION_TEST_KEY");
+    Reflect.deleteProperty(process.env, "VERCEL_OIDC_TOKEN");
+    const log: Log = { info: [], warn: [] };
+    expect(await buildNarration(project, dist, logger(log))).toEqual({
+      failed: 0,
+      generated: 0,
+      pages: 1,
+      reused: said.length,
+    });
+    expect(log.warn).toEqual([]);
+    expect(existsSync(join(dist, "blume-narration", "guide.json"))).toBe(true);
+
+    // A new page needs clips the cache doesn't have: it alone goes without.
+    await mkdir(join(dist, "new"), { recursive: true });
+    await writeFile(
+      join(dist, "new", "index.html"),
+      page({
+        body: `<p>${"A sentence no other page has, so nothing cached reads it. ".repeat(6)}</p>`,
+        route: "/new",
+      }),
+      "utf-8"
     );
-    expect(existsSync(join(dist, "blume-narration"))).toBe(false);
+    const result = await buildNarration(project, dist, logger(log));
+    expect(result).toMatchObject({ generated: 0, pages: 1 });
+    expect(result?.failed).toBeGreaterThan(0);
+    expect(log.warn).toEqual([
+      "Narration audio was not generated: NARRATION_TEST_KEY is not set, so pages missing clips will be read with browser voices.",
+    ]);
+    expect(existsSync(join(dist, "blume-narration", "new.json"))).toBe(false);
   });
 
   it("warns without OPENAI_API_KEY when openai() has no baseUrl", async () => {
@@ -629,10 +725,32 @@ describe(buildNarration, () => {
     );
     const project = await scanProject(root, { mode: "build" });
     const log: Log = { info: [], warn: [] };
-    expect(await buildNarration(project, dist, logger(log))).toBeNull();
+    expect(await buildNarration(project, dist, logger(log))).toMatchObject({
+      generated: 0,
+      pages: 0,
+    });
     expect(log.warn[0]).toBe(
-      "Narration audio was not generated: OPENAI_API_KEY is not set, so pages will be read with browser voices."
+      "Narration audio was not generated: OPENAI_API_KEY is not set, so pages missing clips will be read with browser voices."
     );
+  });
+
+  it("keeps OPENAI_BASE_URL's credentials out of the build log", async () => {
+    process.env.OPENAI_API_KEY = "sk-proxy";
+    process.env.OPENAI_BASE_URL = "http://docs:hunter2@llm-proxy.internal/v1";
+    const { dist, root } = await fixture(
+      OPENAI_CONFIG.replace('baseUrl: "http://localhost:8880/v1", ', ""),
+      { "guide/index.html": page({ route: "/guide" }) }
+    );
+    const project = await scanProject(root, { mode: "build" });
+    const log: Log = { info: [], warn: [] };
+    const requests = await withSpeechServer(async () => {
+      await buildNarration(project, dist, logger(log));
+    });
+    expect(requests).toEqual([]);
+    expect(log.warn).toEqual([
+      "Narration stopped generating after a clip failed (OPENAI_BASE_URL has credentials in it, which fetch won't send: name the env var holding the key in apiKeyEnv instead). Pages missing clips will be read with browser voices.",
+    ]);
+    expect([...log.info, ...log.warn].join("\n")).not.toContain("hunter2");
   });
 
   it("generates through a custom endpoint without a key", async () => {
@@ -667,10 +785,9 @@ describe(buildNarration, () => {
       await readFile(join(dist, "blume-narration", "guide.json"), "utf-8")
     );
     const clip = await readFile(
-      join(dist, "blume-narration", "audio", manifest.segments[0].audio),
-      "utf-8"
+      join(dist, "blume-narration", "audio", manifest.segments[0].audio)
     );
-    expect(clip).toBe("mp3!");
+    expect(new Uint8Array(clip)).toEqual(MP3);
   });
 
   it("writes a clip per sentence and a manifest per page, then reuses them", async () => {

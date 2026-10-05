@@ -222,11 +222,6 @@ export const runtimeDependencies = (options: {
   if (config.ai.assistant?.enabled && !config.ai.assistant.endpoint) {
     deps.push(...config.ai.assistant.provider.runtimeDeps);
   }
-  // The narration provider's SDK, which the build loads to generate the clips
-  // (`gateway()` declares none).
-  if (config.narration.enabled && config.narration.provider) {
-    deps.push(...config.narration.provider.runtimeDeps);
-  }
   // The deployment adapter's `@astrojs/*` package, for a server build; the
   // descriptor declares it (and nothing for a static build).
   deps.push(...config.deployment.runtimeDeps);

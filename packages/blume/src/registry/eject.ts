@@ -529,12 +529,15 @@ const examplesPreviewFiles = (
  * eject declares the ones its generated files import directly: the AI SDK the
  * assistant route streams through (unless `ai.assistant.endpoint` points
  * elsewhere, when no route is written) and the EPUB generator's browser bundle
- * `features.ts` loads (only named there when `export.epub` is on).
+ * `features.ts` loads (only named there when `export.epub` is on). The
+ * narration provider's SDK (`openai()`'s `@ai-sdk/openai`) is no runtime
+ * import, but the ejected app's `astro build` loads it to generate the clips.
  */
 const ejectDependencies = (
   options: Parameters<typeof runtimeDependencies>[0]
 ): string[] => {
   const { assistant } = options.config.ai;
+  const { narration } = options.config;
   return [
     ...new Set([
       "astro",
@@ -545,6 +548,7 @@ const ejectDependencies = (
       ...runtimeDependencies(options),
       ...(options.needsReact ? ["react", "react-dom"] : []),
       ...(assistant?.enabled && !assistant.endpoint ? ["ai"] : []),
+      ...(narration.enabled ? (narration.provider?.runtimeDeps ?? []) : []),
       ...(options.config.export.epub ? ["epub-gen-memory"] : []),
     ]),
   ];

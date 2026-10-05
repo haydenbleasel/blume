@@ -329,7 +329,7 @@ describe("narration config normalization", () => {
       },
     });
     expect(result.error?.issues[0]?.message).toBe(
-      'Credentials go in apiKeyEnv or headers ({ Authorization: "Basic …" }), not in the baseUrl.'
+      "Credentials don't go in the baseUrl: name the env var holding the key in apiKeyEnv."
     );
     expect(result.error?.issues[0]?.path).toEqual([
       "narration",

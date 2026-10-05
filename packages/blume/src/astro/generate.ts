@@ -1817,16 +1817,20 @@ export const diagnosticWarning = (diagnostic: Diagnostic): string =>
  * before anything is written, with the install command for the project's
  * package manager — otherwise Vite dies later on an opaque unresolved import
  * from the hidden runtime. Dev warns and keeps serving: only the pages and
- * routes that import the package break (narration's SDK only loads at build),
- * and installing it is picked up on the next restart.
+ * routes that import the package break, and installing it is picked up on
+ * the next restart. Dev leaves narration's SDK out, since only a build
+ * generates the clips.
  */
 const dependencyPreflight = async (
   project: BlumeProject,
   frameworks: Set<string>
 ): Promise<string[]> => {
   const build = project.mode === "build";
+  const { config } = project;
   const diagnostic = await missingDependencyDiagnostic(
-    project.config,
+    build
+      ? config
+      : { ...config, narration: { ...config.narration, provider: null } },
     project.context.root,
     build ? "error" : "warning",
     frameworks
