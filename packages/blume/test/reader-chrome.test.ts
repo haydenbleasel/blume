@@ -135,6 +135,19 @@ describe("sidebar", () => {
     ]);
   });
 
+  it("slides the current section back in from its name", async () => {
+    // After the back arrow, the name of the section on screen followed its
+    // link and reloaded the page it was already on to reopen the panel.
+    const script = await source("components/layout/NavTreeScript.astro");
+    expect(script).toContain(
+      `target.closest('.blume-nav-drill-link[aria-current="page"]')`
+    );
+    expect(script).toContain(
+      "!(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)"
+    );
+    expect(script).toContain("void this.show(ownId, true);");
+  });
+
   it("moves focus into the panel it shows and syncs aria-expanded", async () => {
     const script = await source("components/layout/NavTreeScript.astro");
     expect(script).toContain(

@@ -146,6 +146,24 @@
           }
           return;
         }
+        // After the back arrow, the current section's name links the page
+        // already on screen, so a plain click slides its panel back in rather
+        // than reloading that page. Modified clicks stay the browser's.
+        const own = target.closest('.blume-nav-drill-link[aria-current="page"]');
+        const ownId = own?.parentElement
+          ?.querySelector("[data-nav-to]")
+          ?.getAttribute("data-nav-to");
+        if (
+          own &&
+          ownId &&
+          this.contains(own) &&
+          this.panel(ownId) &&
+          !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+        ) {
+          event.preventDefault();
+          void this.show(ownId, true);
+          return;
+        }
         const back = target.closest("[data-nav-back]");
         if (back && this.contains(back)) {
           event.preventDefault();
