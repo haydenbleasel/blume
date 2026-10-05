@@ -65,6 +65,9 @@ describe("stripOuterFence", () => {
   });
 });
 
+const withSeo = (seo: string): string =>
+  SOURCE.replace("slug: install\n", `slug: install\nseo:\n${seo}`);
+
 describe("validateTranslation", () => {
   it("accepts a faithful translation and reassembles from the source data", () => {
     const agent = `---
@@ -125,8 +128,6 @@ npm install blume
   });
 
   it("leaves the source's seo.canonical out of the translation", () => {
-    const withSeo = (seo: string): string =>
-      SOURCE.replace("slug: install\n", `slug: install\nseo:\n${seo}`);
     const agent = (seo: string): string =>
       withSeo(seo)
         .replace("# Install\n", "# Installation\n")

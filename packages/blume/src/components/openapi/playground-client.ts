@@ -271,6 +271,59 @@ const line = (className: string, text: string): HTMLElement => {
   return el;
 };
 
+/** Render one settled HTTP exchange: status + time, headers, pretty body. */
+const renderResponse = (
+  region: HTMLElement,
+  res: Response,
+  ms: number,
+  text: string
+): void => {
+  region.textContent = "";
+  region.append(
+    line(
+      "font-mono font-semibold text-foreground text-sm",
+      `${res.status} ${res.statusText} \u00B7 ${ms} ms`.trim()
+    )
+  );
+  const table = document.createElement("table");
+  table.className = "w-full text-start text-xs";
+  for (const [name, value] of res.headers) {
+    const row = document.createElement("tr");
+    const header = document.createElement("th");
+    header.setAttribute("scope", "row");
+    header.className = "pe-3 align-top font-medium text-muted-foreground";
+    header.textContent = name;
+    const cell = document.createElement("td");
+    cell.className = "break-all font-mono text-foreground";
+    cell.textContent = value;
+    row.append(header, cell);
+    table.append(row);
+  }
+  region.append(table);
+  const pre = document.createElement("pre");
+  pre.className =
+    "overflow-x-auto rounded-blume border border-border p-3 font-mono text-foreground text-xs";
+  const code = document.createElement("code");
+  code.textContent = prettyBody(text);
+  pre.append(code);
+  region.append(pre);
+  // At xl the panel is its own scroll region capped to the viewport, so a
+  // response appended under a tall form can land below the panel's fold
+  // where nothing brings it into view. Scroll the panel alone — "nearest",
+  // by hand — and never the document: below xl the panel does not scroll,
+  // and a document scroll would carry the form (Send, the body editor, its
+  // errors) off the top on a phone.
+  const panel = region.closest<HTMLElement>("[data-operation-panel]");
+  if (panel && panel.scrollHeight > panel.clientHeight) {
+    const box = panel.getBoundingClientRect();
+    const target = region.getBoundingClientRect();
+    const delta = Math.min(target.bottom - box.bottom, target.top - box.top);
+    if (delta > 0) {
+      panel.scrollBy({ top: delta });
+    }
+  }
+};
+
 /**
  * Wire the playground inside `root` (the `<blume-playground>` element). Reads
  * the server-rendered model JSON, keeps the request samples in sync with the
@@ -467,59 +520,6 @@ export const initPlayground = (root: HTMLElement): void => {
     } catch {
       // A corrupt entry (older format, manual edit) must not break init.
       removeStored(storageKey);
-    }
-  };
-
-  /** Render one settled HTTP exchange: status + time, headers, pretty body. */
-  const renderResponse = (
-    region: HTMLElement,
-    res: Response,
-    ms: number,
-    text: string
-  ): void => {
-    region.textContent = "";
-    region.append(
-      line(
-        "font-mono font-semibold text-foreground text-sm",
-        `${res.status} ${res.statusText} \u00B7 ${ms} ms`.trim()
-      )
-    );
-    const table = document.createElement("table");
-    table.className = "w-full text-start text-xs";
-    for (const [name, value] of res.headers) {
-      const row = document.createElement("tr");
-      const header = document.createElement("th");
-      header.setAttribute("scope", "row");
-      header.className = "pe-3 align-top font-medium text-muted-foreground";
-      header.textContent = name;
-      const cell = document.createElement("td");
-      cell.className = "break-all font-mono text-foreground";
-      cell.textContent = value;
-      row.append(header, cell);
-      table.append(row);
-    }
-    region.append(table);
-    const pre = document.createElement("pre");
-    pre.className =
-      "overflow-x-auto rounded-blume border border-border p-3 font-mono text-foreground text-xs";
-    const code = document.createElement("code");
-    code.textContent = prettyBody(text);
-    pre.append(code);
-    region.append(pre);
-    // At xl the panel is its own scroll region capped to the viewport, so a
-    // response appended under a tall form can land below the panel's fold
-    // where nothing brings it into view. Scroll the panel alone — "nearest",
-    // by hand — and never the document: below xl the panel does not scroll,
-    // and a document scroll would carry the form (Send, the body editor, its
-    // errors) off the top on a phone.
-    const panel = region.closest<HTMLElement>("[data-operation-panel]");
-    if (panel && panel.scrollHeight > panel.clientHeight) {
-      const box = panel.getBoundingClientRect();
-      const target = region.getBoundingClientRect();
-      const delta = Math.min(target.bottom - box.bottom, target.top - box.top);
-      if (delta > 0) {
-        panel.scrollBy({ top: delta });
-      }
     }
   };
 

@@ -874,16 +874,16 @@ describe("buildNavigation — explicit config sidebar", () => {
   });
 });
 
-describe("buildNavigation — page icons", () => {
-  const withIcons = (
-    id: string,
-    route: string,
-    meta: PageMetaInput
-  ): PageRecord => ({
-    ...page(id, route, id),
-    meta: pageMetaSchema.parse(meta),
-  });
+const withIcons = (
+  id: string,
+  route: string,
+  meta: PageMetaInput
+): PageRecord => ({
+  ...page(id, route, id),
+  meta: pageMetaSchema.parse(meta),
+});
 
+describe("buildNavigation — page icons", () => {
   it("falls back to the top-level icon shorthand when sidebar.icon is unset", () => {
     const nav = buildNavigation(
       [withIcons("install.md", "/install", { icon: "download" })],
@@ -1059,6 +1059,11 @@ describe("buildNavigation — index title / folder meta title diagnostics", () =
   });
 });
 
+const undated = (ref: string, title: string): PageRecord => ({
+  ...changelogPage(ref, title, "2024-01-01"),
+  meta: pageMetaSchema.parse({ type: "changelog" }),
+});
+
 describe("buildNavigation — duplicate sidebar order diagnostics", () => {
   it("warns when two pages share an explicit sidebar.order", () => {
     const diagnostics: Diagnostic[] = [];
@@ -1153,10 +1158,6 @@ describe("buildNavigation — duplicate sidebar order diagnostics", () => {
   it("does not warn for undated changelog entries with date-prefixed filenames", () => {
     // With no date, the order falls back to the numeric filename prefix — a
     // date stamp (`2024-...`), not an authored rank, so the tie isn't flagged.
-    const undated = (ref: string, title: string): PageRecord => ({
-      ...changelogPage(ref, title, "2024-01-01"),
-      meta: pageMetaSchema.parse({ type: "changelog" }),
-    });
     const diagnostics: Diagnostic[] = [];
     buildNavigation(
       [

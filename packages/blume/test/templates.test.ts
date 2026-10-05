@@ -1821,6 +1821,28 @@ describe("astroConfigTemplate", () => {
   });
 });
 
+const fsAllowFor = (root: string): string => {
+  const out = astroConfigTemplate({
+    askPath: ASK_PATH,
+    config,
+    consentClientPath: CONSENT_CLIENT_PATH,
+    contentRoutes: [],
+    context: context({
+      contentRoot: join(root, "docs"),
+      outDir: join(root, ".blume"),
+      root,
+    }),
+    examplesPath: EXAMPLES_PATH,
+    examplesThemePath: EXAMPLES_THEME_PATH,
+    featuresPath: FEATURES_PATH,
+    needsReact: false,
+    pages: [],
+    searchClientPath: SEARCH_CLIENT_PATH,
+    themePath: THEME_PATH,
+  });
+  return out;
+};
+
 describe("astroConfigTemplate workspace root", () => {
   const dirs: string[] = [];
 
@@ -1835,28 +1857,6 @@ describe("astroConfigTemplate workspace root", () => {
       dirs.map((dir) => rm(dir, { force: true, recursive: true }))
     );
   });
-
-  const fsAllowFor = (root: string): string => {
-    const out = astroConfigTemplate({
-      askPath: ASK_PATH,
-      config,
-      consentClientPath: CONSENT_CLIENT_PATH,
-      contentRoutes: [],
-      context: context({
-        contentRoot: join(root, "docs"),
-        outDir: join(root, ".blume"),
-        root,
-      }),
-      examplesPath: EXAMPLES_PATH,
-      examplesThemePath: EXAMPLES_THEME_PATH,
-      featuresPath: FEATURES_PATH,
-      needsReact: false,
-      pages: [],
-      searchClientPath: SEARCH_CLIENT_PATH,
-      themePath: THEME_PATH,
-    });
-    return out;
-  };
 
   it("uses a package.json workspaces field as the workspace root", async () => {
     const root = await makeRoot();
@@ -2761,23 +2761,23 @@ describe("package / tsconfig templates", () => {
   });
 });
 
-describe("astroConfigTemplate image config", () => {
-  const render = (parsed: typeof config) =>
-    astroConfigTemplate({
-      askPath: ASK_PATH,
-      config: parsed,
-      consentClientPath: CONSENT_CLIENT_PATH,
-      contentRoutes: [],
-      context: context(),
-      examplesPath: EXAMPLES_PATH,
-      examplesThemePath: EXAMPLES_THEME_PATH,
-      featuresPath: FEATURES_PATH,
-      needsReact: false,
-      pages: [],
-      searchClientPath: SEARCH_CLIENT_PATH,
-      themePath: THEME_PATH,
-    });
+const render = (parsed: typeof config) =>
+  astroConfigTemplate({
+    askPath: ASK_PATH,
+    config: parsed,
+    consentClientPath: CONSENT_CLIENT_PATH,
+    contentRoutes: [],
+    context: context(),
+    examplesPath: EXAMPLES_PATH,
+    examplesThemePath: EXAMPLES_THEME_PATH,
+    featuresPath: FEATURES_PATH,
+    needsReact: false,
+    pages: [],
+    searchClientPath: SEARCH_CLIENT_PATH,
+    themePath: THEME_PATH,
+  });
 
+describe("astroConfigTemplate image config", () => {
   it("emits no image block by default", () => {
     expect(render(config)).not.toContain("image:");
   });

@@ -113,6 +113,16 @@ const mergedLanguages = (created: CreatedInstance[]) =>
     merged: merged.map(({ options }) => options.language),
   }));
 
+/** The languages merged into a search created for a page in `lang`. */
+const merged = async (lang: string) => {
+  page.lang = lang;
+  const { created, url } = await bundle();
+  await (
+    await createSearch({ url })
+  )("q");
+  return mergedLanguages(created);
+};
+
 describe("Pagefind search client", () => {
   it("maps results to the dialog's slashless, base-less routes", async () => {
     page.lang = "en";
@@ -181,14 +191,6 @@ describe("Pagefind search client", () => {
 
   it("leaves out the index Pagefind loads for a page with none of its own", async () => {
     entry = entryFile({ en: 3, ja: 5, pt: 1 });
-    const merged = async (lang: string) => {
-      page.lang = lang;
-      const { created, url } = await bundle();
-      await (
-        await createSearch({ url })
-      )("q");
-      return mergedLanguages(created);
-    };
     // Pagefind falls back to the base language, then to the largest index.
     expect(await merged("pt-BR")).toStrictEqual([
       { language: "pt-BR", merged: ["en", "ja"] },

@@ -55,6 +55,7 @@ import {
   referenceSpecFiles,
   resolveReferences,
 } from "../src/openapi/references.ts";
+import type { RenderedPageData } from "../src/openapi/render-mdx.ts";
 import { operationMdx, overviewMdx } from "../src/openapi/render-mdx.ts";
 import { buildReferenceFiles } from "../src/openapi/scalar.ts";
 import { isOpenApiSource, openApiSource } from "../src/openapi/source.ts";
@@ -1043,26 +1044,52 @@ describe("parse.parseSpec remote hardening", () => {
   });
 });
 
-describe("render-mdx", () => {
-  const specData = (over: Partial<ApiSpecData> = {}): ApiSpecData =>
-    // SAFETY: render-mdx never reads `kind` — the only ApiSpecData field these
-    // defaults omit.
-    ({
-      codeSamples: [],
-      description: "",
-      document: SPEC_3_1,
-      expandSchemas: false,
-      label: "API",
-      operations: {},
-      playground: { enabled: true, proxy: false },
-      route: "/api",
-      slug: "api",
-      tags: [],
-      title: "API",
-      version: "1",
-      ...over,
-    }) as ApiSpecData;
+const specData = (over: Partial<ApiSpecData> = {}): ApiSpecData =>
+  // SAFETY: render-mdx never reads `kind` — the only ApiSpecData field these
+  // defaults omit.
+  ({
+    codeSamples: [],
+    description: "",
+    document: SPEC_3_1,
+    expandSchemas: false,
+    label: "API",
+    operations: {},
+    playground: { enabled: true, proxy: false },
+    route: "/api",
+    slug: "api",
+    tags: [],
+    title: "API",
+    version: "1",
+    ...over,
+  }) as ApiSpecData;
 
+const describeOperation = (
+  description: string,
+  seoDescriptionSuffix = true
+): RenderedPageData["seo"] =>
+  operationMdx(
+    specData({ title: "Example API" }),
+    {
+      deprecated: false,
+      description,
+      key: "op",
+      method: "delete",
+      operationId: "op",
+      path: "/pets/bulk",
+      route: "/api/pets/op",
+      summary: "Bulk delete pets",
+      tag: "pet",
+      tagSlug: "pet",
+    },
+    {
+      includeInLlms: true,
+      includeInSearch: true,
+      noindex: false,
+      seoDescriptionSuffix,
+    }
+  ).data.seo;
+
+describe("render-mdx", () => {
   it("renders an operation page with searchable frontmatter and a component body", () => {
     const { operations } = extractOperations(SPEC_3_1, "/api");
     const addPet = operations.find((op) => op.key === "add-pet");
@@ -1514,6 +1541,87 @@ describe("render-mdx", () => {
     const bare = overviewMdx(specData({ title: "Petstore" }));
     expect(bare.data.seo).toStrictEqual({
       description: "Petstore API reference.",
+    });
+  });
+
+  describe("a first paragraph that ends in a colon", () => {
+    it("is followed by the items of the list it introduces", () => {
+      expect(
+        describeOperation(
+          "Delete pets in bulk. Supports two modes:\n\n- Explicit IDs\n- Select all"
+        )
+      ).toStrictEqual({
+        description:
+          "Delete pets in bulk. Supports two modes: Explicit IDs; Select all. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+      // Items lose their own closing mark where they join; a bold lead-in and
+      // an ordered list read the same.
+      expect(
+        describeOperation("**Supports:**\n\n1. Pets.\n2. Owners.")
+      ).toStrictEqual({
+        description:
+          "Supports: Pets; Owners. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+      // A nested list's lead-in closes like any other.
+      expect(
+        describeOperation("Supports:\n\n- Modes:\n  - Explicit IDs")
+      ).toStrictEqual({
+        description:
+          "Supports: Modes. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+    });
+
+    it("closes as a sentence when no list prose follows", () => {
+      expect(
+        describeOperation(
+          'Delete pets in bulk. Example:\n\n```json\n{ "ids": [1] }\n```'
+        )
+      ).toStrictEqual({
+        description:
+          "Delete pets in bulk. Example. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+      // A list of code blocks has no item prose to fold in.
+      expect(
+        describeOperation("Supports:\n\n- ```\n  ids\n  ```")
+      ).toStrictEqual({
+        description:
+          "Supports. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+    });
+
+    it("keeps punctuation that closes inline code", () => {
+      expect(
+        describeOperation("Keys are prefixed with `tenant:`")
+      ).toStrictEqual({
+        description:
+          "Keys are prefixed with tenant:. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+      // A list item's closing mark is dropped only when it's prose.
+      expect(
+        describeOperation("Runs:\n\n- `SELECT 1;`\n- A ping.", false)
+      ).toStrictEqual({ description: "Runs: SELECT 1;; A ping" });
+    });
+
+    it("resolves the lead-in with the suffix off and on the overview", () => {
+      expect(
+        describeOperation(
+          "Supports two modes:\n\n- Explicit IDs\n- Select all",
+          false
+        )
+      ).toStrictEqual({
+        description: "Supports two modes: Explicit IDs; Select all",
+      });
+      expect(
+        describeOperation(
+          "Delete pets in bulk. Example:\n\n```\n{}\n```",
+          false
+        )
+      ).toStrictEqual({ description: "Delete pets in bulk. Example." });
+      expect(
+        overviewMdx(
+          specData({ description: "This API supports:\n\n- Pets\n- Owners" })
+        ).data.seo
+      ).toStrictEqual({ description: "This API supports: Pets; Owners" });
     });
   });
 
@@ -2437,6 +2545,12 @@ describe("security", () => {
     tls: { type: "mutualTLS" },
   };
 
+  const resolved = (key: keyof typeof SCHEMES) => ({
+    key,
+    scheme: SCHEMES[key],
+    scopes: [],
+  });
+
   it("prefers the operation's security and treats [] as public", () => {
     const root = [{ bearerAuth: [] }];
     expect(effectiveSecurity(undefined, root)).toStrictEqual(root);
@@ -2507,11 +2621,6 @@ describe("security", () => {
   });
 
   it("labels schemes and locates their credential", () => {
-    const resolved = (key: keyof typeof SCHEMES) => ({
-      key,
-      scheme: SCHEMES[key],
-      scopes: [],
-    });
     expect(schemeLabel(resolved("bearerAuth"))).toBe("Bearer token (JWT)");
     expect(schemeLabel(resolved("basicAuth"))).toBe("Basic auth");
     expect(schemeLabel(resolved("apiHeader"))).toBe("API key");

@@ -5,6 +5,7 @@ import {
   AMPLITUDE_SCRIPT_ORIGIN,
 } from "../src/analytics/amplitude.ts";
 import { CLEARBIT_TAG_ORIGIN } from "../src/analytics/clearbit.ts";
+import { CLICS_SCRIPT_SRC } from "../src/analytics/clics.ts";
 import { DATABUDDY_SCRIPT_SRC } from "../src/analytics/databuddy.ts";
 import { FATHOM_SCRIPT_SRC } from "../src/analytics/fathom.ts";
 import { GOOGLE_TAG_SRC } from "../src/analytics/google-analytics.ts";
@@ -17,6 +18,7 @@ import {
   amplitude,
   clarity,
   clearbit,
+  clics,
   databuddy,
   fathom,
   googleAnalytics,
@@ -47,6 +49,7 @@ const all = () => [
   amplitude({ key: "amp" }),
   clarity({ id: "abc123" }),
   clearbit({ key: "pk_1a1882" }),
+  clics({ projectId: "project-id" }),
   databuddy({ clientId: "client" }),
   fathom({ site: "YSVMSDAY" }),
   googleAnalytics({ id: "G-XXXX" }),
@@ -81,6 +84,7 @@ describe("provider adapter factories", () => {
       "amplitude",
       "clarity",
       "clearbit",
+      "clics",
       "databuddy",
       "fathom",
       "google-analytics",
@@ -112,14 +116,14 @@ describe("provider adapter factories", () => {
         oneDollarStats({ hostname: "docs.example.com" }),
       ],
     });
-    expect(config.analytics).toHaveLength(22);
-    expect(config.analytics[17]?.options).toMatchObject({ serverZone: "EU" });
-    expect(config.analytics[18]?.options).toMatchObject({ spa: "auto" });
-    expect(config.analytics[19]?.options).toMatchObject({ region: "eu" });
-    expect(config.analytics[20]?.options).toMatchObject({
+    expect(config.analytics).toHaveLength(23);
+    expect(config.analytics[18]?.options).toMatchObject({ serverZone: "EU" });
+    expect(config.analytics[19]?.options).toMatchObject({ spa: "auto" });
+    expect(config.analytics[20]?.options).toMatchObject({ region: "eu" });
+    expect(config.analytics[21]?.options).toMatchObject({
       "track-web-vitals": "true",
     });
-    expect(config.analytics[21]?.options).toMatchObject({
+    expect(config.analytics[22]?.options).toMatchObject({
       hostname: "docs.example.com",
     });
   });
@@ -130,6 +134,7 @@ describe("provider adapter factories", () => {
       amplitude({ key: "" }),
       clarity({ id: "" }),
       clearbit({ key: "" }),
+      clics({ projectId: "" }),
       databuddy({ clientId: "" }),
       fathom({ site: "" }),
       googleAnalytics({ id: "" }),
@@ -250,6 +255,47 @@ describe("provider adapter heads", () => {
         content: null,
       },
     ]);
+  });
+
+  it("clics: emits the documented tracker tag and presence-only flags", () => {
+    expect(scripts(clics({ projectId: "project-id" }))).toEqual([
+      {
+        attributes: {
+          "data-project-id": "project-id",
+          defer: true,
+          src: CLICS_SCRIPT_SRC,
+        },
+        content: null,
+      },
+    ]);
+
+    const [tag] = scripts(
+      clics({
+        allowLocalhost: true,
+        disableOutboundLinks: true,
+        projectId: "project-id",
+      })
+    );
+    expect(tag?.attributes["data-allow-localhost"]).toBe(true);
+    expect(tag?.attributes["data-disable-outbound-links"]).toBe(true);
+
+    const [disabled] = scripts(
+      clics({
+        allowLocalhost: false,
+        disableOutboundLinks: false,
+        projectId: "project-id",
+      })
+    );
+    expect(disabled?.attributes["data-allow-localhost"]).toBeUndefined();
+    expect(disabled?.attributes["data-disable-outbound-links"]).toBeUndefined();
+    expect(
+      analyticsConfigSchema.safeParse([
+        {
+          ...clics({ projectId: "project-id" }),
+          options: { allowLocalhost: "yes", projectId: "project-id" },
+        },
+      ]).success
+    ).toBe(false);
   });
 
   it("fathom: tracks history changes by default, unless spa is set", () => {

@@ -78,13 +78,13 @@ describe(searchDocs, () => {
   });
 });
 
+const localeFrom = (data: AskData, path?: string) =>
+  readerScope(data, byRoute, path === undefined ? undefined : { path }).filters
+    .locale;
+
 describe(readerScope, () => {
   /** The same snapshot on a site whose default locale is English. */
   const I18N: AskData = { ...DATA, defaultLocale: "en" };
-
-  const localeFrom = (data: AskData, path?: string) =>
-    readerScope(data, byRoute, path === undefined ? undefined : { path })
-      .filters.locale;
 
   it("keeps a question from outside the docs to the default locale", () => {
     // The homepage and a custom page aren't in the snapshot, and a
@@ -283,6 +283,9 @@ afterAll(async () => {
   );
 });
 
+const resolve = (specifier: string): string =>
+  JSON.stringify(pathToFileURL(Bun.resolveSync(specifier, PKG_ROOT)).href);
+
 const loadRoute = async (): Promise<AskRoute> => {
   const parsed = blumeConfigSchema.parse({
     ai: {
@@ -304,8 +307,6 @@ const loadRoute = async (): Promise<AskRoute> => {
   dirs.push(dir);
   const dataFile = join(dir, "ask-data.json");
   await writeFile(dataFile, JSON.stringify(DATA), "utf-8");
-  const resolve = (specifier: string): string =>
-    JSON.stringify(pathToFileURL(Bun.resolveSync(specifier, PKG_ROOT)).href);
   const source = askEndpointTemplate(backend, {
     tools: parsed.ai.assistant?.tools,
   })

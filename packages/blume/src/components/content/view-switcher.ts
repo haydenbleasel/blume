@@ -42,6 +42,10 @@ const cssString = (value: string): string =>
     .replaceAll("<", String.raw`\3c `)
     .replaceAll(/[\n\r\f]/gu, " ")}"`;
 
+/** Everything tagged with a view other than `title`. */
+const otherViews = (title: string): string =>
+  `[data-blume-view]:not([data-blume-view=${cssString(title)}])`;
+
 /**
  * The page's view CSS: with a view chosen on `<body>`, everything tagged with
  * another is hidden; before a choice, everything but the first view is.
@@ -51,12 +55,11 @@ export const viewStyle = (titles: readonly string[]): string => {
   if (first === undefined) {
     return "";
   }
-  const other = (title: string): string =>
-    `[data-blume-view]:not([data-blume-view=${cssString(title)}])`;
   const selectors = [
-    `body:not([data-blume-view]) ${other(first)}`,
+    `body:not([data-blume-view]) ${otherViews(first)}`,
     ...titles.map(
-      (title) => `body[data-blume-view=${cssString(title)}] ${other(title)}`
+      (title) =>
+        `body[data-blume-view=${cssString(title)}] ${otherViews(title)}`
     ),
   ];
   return `${selectors.join(",")}{display:none!important}`;

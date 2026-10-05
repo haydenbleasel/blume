@@ -479,21 +479,21 @@ const errorRecorder = () => {
   return { errors, log };
 };
 
-describe("Vercel server build under a base", () => {
-  const vercelProject = async (
-    base: string,
-    files: Record<string, string>
-  ): Promise<BlumeProject> =>
-    await project(
-      `{ deployment: ${JSON.stringify(vercel({ base }))}, redirects: ${JSON.stringify(
-        [
-          { from: "/old-intro", status: 301, to: "/intro" },
-          { from: "/beta/:slug*", status: 302, to: "/intro" },
-        ]
-      )} }`,
-      files
-    );
+const vercelProject = async (
+  base: string,
+  files: Record<string, string>
+): Promise<BlumeProject> =>
+  await project(
+    `{ deployment: ${JSON.stringify(vercel({ base }))}, redirects: ${JSON.stringify(
+      [
+        { from: "/old-intro", status: 301, to: "/intro" },
+        { from: "/beta/:slug*", status: 302, to: "/intro" },
+      ]
+    )} }`,
+    files
+  );
 
+describe("Vercel server build under a base", () => {
   const BUILT = {
     ".vercel/output/static/404.md": "# Page not found\n",
     ".vercel/output/static/_astro/page.js": "export {};\n",

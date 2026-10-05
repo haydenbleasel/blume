@@ -170,6 +170,16 @@ const navGroup = (
   display: "flat" | "group" | "page" = "flat"
 ): NavNode => ({ children, display, kind: "group", label });
 
+// SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
+// selectors, root) is irrelevant to the variant walk.
+const tree = (label: string) =>
+  ({
+    root: "/",
+    selectors: [],
+    sidebar: [navGroup(label, [])],
+    tabs: [],
+  }) as never;
+
 describe("navGroupIds", () => {
   it("numbers every group by pre-order position, keyed by identity", () => {
     const nested = navGroup("Nested", [navPage("/a/b")], "group");
@@ -184,15 +194,6 @@ describe("navGroupIds", () => {
   });
 
   it("lists every navigation tree by version and locale segment", () => {
-    // SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
-    // selectors, root) is irrelevant to the variant walk.
-    const tree = (label: string) =>
-      ({
-        root: "/",
-        selectors: [],
-        sidebar: [navGroup(label, [])],
-        tabs: [],
-      }) as never;
     const variants = navVariants({
       navigation: tree("default"),
       navigationByLocale: { ja: tree("ja") },
@@ -208,15 +209,6 @@ describe("navGroupIds", () => {
     // a segment while that locale is unprefixed, so `/blume-nav/…/de/…` is
     // never emitted for it: its current tree is `navigation` already, and its
     // archived trees take the `default` segment too.
-    // SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
-    // selectors, root) is irrelevant to the variant walk.
-    const tree = (label: string) =>
-      ({
-        root: "/",
-        selectors: [],
-        sidebar: [navGroup(label, [])],
-        tabs: [],
-      }) as never;
     const variants = navVariants(
       {
         navigation: tree("de"),

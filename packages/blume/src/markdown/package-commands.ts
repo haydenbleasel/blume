@@ -205,6 +205,9 @@ const buildCommand = (manager: PackageManager, intent: Intent): string => {
   return words.join(" ");
 };
 
+const normalizeCommand = (command: string): string =>
+  command.replaceAll(WHITESPACE_RUN, " ").trim();
+
 /**
  * Convert an install command into the equivalent for every supported package
  * manager. Accepts a bare package list (`react`) or a full command
@@ -212,14 +215,12 @@ const buildCommand = (manager: PackageManager, intent: Intent): string => {
  */
 export const toPackageCommands = (input: string) => {
   const intent = parseIntent(input);
-  const normalize = (command: string): string =>
-    command.replaceAll(WHITESPACE_RUN, " ").trim();
   return {
-    aube: normalize(buildCommand("aube", intent)),
-    bun: normalize(buildCommand("bun", intent)),
-    npm: normalize(buildCommand("npm", intent)),
-    nub: normalize(buildCommand("nub", intent)),
-    pnpm: normalize(buildCommand("pnpm", intent)),
-    yarn: normalize(buildCommand("yarn", intent)),
+    aube: normalizeCommand(buildCommand("aube", intent)),
+    bun: normalizeCommand(buildCommand("bun", intent)),
+    npm: normalizeCommand(buildCommand("npm", intent)),
+    nub: normalizeCommand(buildCommand("nub", intent)),
+    pnpm: normalizeCommand(buildCommand("pnpm", intent)),
+    yarn: normalizeCommand(buildCommand("yarn", intent)),
   } satisfies Record<PackageManager, string>;
 };

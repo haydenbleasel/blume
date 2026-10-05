@@ -1,4 +1,4 @@
-import type { Nodes, Root } from "mdast";
+import type { List, Nodes, Paragraph, Root } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { toString as mdastToString } from "mdast-util-to-string";
 import stringWidth from "string-width";
@@ -10,7 +10,7 @@ import type { GraphqlMember } from "./graphql.ts";
 import { isGraphqlOperationKind } from "./graphql.ts";
 import type { ApiOperationRef, ApiSpecData } from "./model.ts";
 import type { ReferenceSource } from "./references.ts";
-import { asSentence } from "./sentence.ts";
+import { asSentence, closeSentence, endsInLeadIn } from "./sentence.ts";
 import { operationSignature } from "./signature.ts";
 
 /**
@@ -193,6 +193,51 @@ export interface RenderedPage {
 const META_DESCRIPTION_MAX = 160;
 const WHITESPACE = /\s+/gu;
 const TRAILING_WORD = /\s+\S*$/u;
+// A list item's own closing mark, dropped where the items join into one line.
+const ITEM_END = /[.;。；]$/u;
+
+/** Markdown as single-line plain text. */
+const flatten = (node: Nodes): string =>
+  mdastToString(node).replace(WHITESPACE, " ").trim();
+
+/** The innermost last node of `node`: the one its text ends in. */
+const lastLeaf = (node: Nodes): Nodes => {
+  const last = "children" in node ? node.children.at(-1) : undefined;
+  return last ? lastLeaf(last) : node;
+};
+
+/**
+ * Whether a paragraph ends in a lead-in colon. Only a colon in the prose
+ * counts: one closing inline code (`tenant:`) is part of the literal.
+ */
+const leadsIn = (paragraph: Paragraph): boolean => {
+  const leaf = lastLeaf(paragraph);
+  return leaf.type === "text" && endsInLeadIn(leaf.value);
+};
+
+/** A list as one line: each item's first paragraph, joined by semicolons. */
+const listProse = (list: List): string =>
+  list.children
+    .map((item) => {
+      const paragraph = item.children.find(
+        (child) => child.type === "paragraph"
+      );
+      if (!paragraph) {
+        return "";
+      }
+      const text = flatten(paragraph);
+      // A closing mark in inline code (`SELECT 1;`) is part of the literal.
+      if (lastLeaf(paragraph).type !== "text") {
+        return text;
+      }
+      // A nested list's lead-in ("Modes:") closes like any other.
+      return (leadsIn(paragraph) ? asSentence(text) : text).replace(
+        ITEM_END,
+        ""
+      );
+    })
+    .filter(Boolean)
+    .join("; ");
 
 /**
  * Flatten markdown prose to its first paragraph as single-line plain text,
@@ -200,12 +245,25 @@ const TRAILING_WORD = /\s+\S*$/u;
  * was lossy on literal prose — `snake_case` → `snakecase`, `C#` → `C` — and
  * these strings ship as `seo.description` meta tags. A description with no
  * paragraph (say, only a heading or list) falls back to its first block.
+ *
+ * A first paragraph that leads in to a list ("Supports two modes:") is cut
+ * from what it introduces, so the list's items follow it on the same line. A
+ * lead-in to anything else, such as a code block, is closed as a sentence.
  */
 const plainProse = (markdown: string): string => {
-  const tree = fromMarkdown(markdown);
-  const first =
-    tree.children.find((node) => node.type === "paragraph") ?? tree.children[0];
-  return first ? mdastToString(first).replace(WHITESPACE, " ").trim() : "";
+  const { children } = fromMarkdown(markdown);
+  const index = children.findIndex((node) => node.type === "paragraph");
+  const paragraph = children[index];
+  if (paragraph?.type !== "paragraph") {
+    return children[0] ? flatten(children[0]) : "";
+  }
+  const text = flatten(paragraph);
+  if (!leadsIn(paragraph)) {
+    return text;
+  }
+  const next = children[index + 1];
+  const items = next?.type === "list" ? listProse(next) : "";
+  return items ? `${text} ${items}` : asSentence(text);
 };
 
 /** Cap `text` at `max` display columns, cutting on a word boundary. */
@@ -274,14 +332,16 @@ const operationDescription = (
     subject = `${operation.method.toUpperCase()} ${operation.path} ${operation.webhook ? "webhook" : "endpoint"}`;
   }
   const suffix = `Reference for the ${subject} in the ${apiPhrase(spec)}.`;
-  // Room for the joining space and the period `asSentence` may add, so a
+  // Room for the joining space and the period `closeSentence` may add, so a
   // title-like summary ("Get a flag") ends before the suffix begins.
   const prose = clip(
     plainProse(operation.description || operation.summary),
     META_DESCRIPTION_MAX - stringWidth(suffix) - 2
   );
+  // `plainProse` has already closed a lead-in colon, so one still at the end
+  // is a literal (`tenant:`) and keeps its period after it.
   return clip(
-    [asSentence(prose), suffix].filter(Boolean).join(" "),
+    [closeSentence(prose), suffix].filter(Boolean).join(" "),
     META_DESCRIPTION_MAX
   );
 };

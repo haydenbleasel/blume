@@ -31,13 +31,13 @@
     "astro": "^7.3.2",
     "html-escaper": "^3.0.3",
     "husky": "^9.1.7",
-    "oxfmt": "^0.67.0",
-    "oxlint": "^1.82.0",
+    "oxfmt": "^0.71.0",
+    "oxlint": "^1.86.0",
     "sharp": "^0.35.4",
     "turbo": "^2.10.12",
     "typescript": "^6.0.3",
     "ufo": "^1.6.4",
-    "ultracite": "^7.11.1",
+    "ultracite": "^7.12.2",
     "zod": "^4.6.2"
   },
   "engines": {
@@ -45,6 +45,6 @@
   },
   "packageManager": "bun@1.4.2",
   "patchedDependencies": {
-    "oxfmt@0.67.0": "patches/oxfmt@0.67.0.patch"
+    "oxfmt@0.71.0": "patches/oxfmt@0.71.0.patch"
   }
 }

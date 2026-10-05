@@ -54,6 +54,9 @@ describe("portableTextToMarkdown: code marks", () => {
   });
 });
 
+const item = (text: string, listItem: string, level: number) =>
+  ptBlock([span(text)], { level, listItem });
+
 describe("portableTextToMarkdown: emphasis and lists", () => {
   it("keeps a span's edge whitespace outside its emphasis", () => {
     const md = portableTextToMarkdown([
@@ -63,8 +66,6 @@ describe("portableTextToMarkdown: emphasis and lists", () => {
   });
 
   it("indents a nested item to its parent's content column", () => {
-    const item = (text: string, listItem: string, level: number) =>
-      ptBlock([span(text)], { level, listItem });
     const md = portableTextToMarkdown([
       item("one", "number", 1),
       item("child", "number", 2),

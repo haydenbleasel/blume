@@ -190,13 +190,13 @@ This is a **manual step — do not fabricate the patch contents.** Leave the use
 
 If the repo uses (or the user wants to adopt) **[Ultracite](https://www.ultracite.ai)** for formatting — an `ultracite check` / `ultracite fix` script, an `ultracite` dev dep, or oxlint/oxfmt in the toolchain — it will format the migrated `.md`/`.mdx` **and break Blume's `:::` directives.** Ultracite's formatter is **oxfmt**, and under `proseWrap` oxfmt joins the opening/closing `:::` fence line into the surrounding prose, which invalidates the directive (`:::note` … `:::` callouts, titled fences like `:::warning[Heads up]`, tabs, steps — the exact syntax you convert callouts _into_ in step 5). Blume's own repo hits this and pins a patched oxfmt; a migrated repo needs the same patch or every directive silently degrades to literal text on the next `ultracite fix`.
 
-The fix is a committed **pnpm patch** (`patches/oxfmt@0.67.0.patch`), shipped with this skill at `assets/oxfmt@0.67.0.patch` — the same diff Blume's own repo applies, covering titled fences as well as bare ones. Unlike the Astro/Vite patch, this one is a **known, deterministic diff** — copy it in, don't regenerate it:
+The fix is a committed **pnpm patch** (`patches/oxfmt@0.71.0.patch`), shipped with this skill at `assets/oxfmt@0.71.0.patch` — the same diff Blume's own repo applies, covering titled fences as well as bare ones. Unlike the Astro/Vite patch, this one is a **known, deterministic diff** — copy it in, don't regenerate it:
 
 ```bash
 # 1. Copy the shipped patch into the target repo's patches/ dir (keep the exact filename;
 #    <skill> = this skill's directory, the one containing SKILL.md):
 mkdir -p patches
-cp "<skill>/assets/oxfmt@0.67.0.patch" patches/oxfmt@0.67.0.patch
+cp "<skill>/assets/oxfmt@0.71.0.patch" patches/oxfmt@0.71.0.patch
 ```
 
 Then register it under `patchedDependencies` — `pnpm-workspace.yaml` on pnpm 10+, or root `package.json` (`pnpm.patchedDependencies`) on pnpm 9:
@@ -204,12 +204,12 @@ Then register it under `patchedDependencies` — `pnpm-workspace.yaml` on pnpm 1
 ```yaml
 # pnpm-workspace.yaml
 patchedDependencies:
-  oxfmt@0.67.0: patches/oxfmt@0.67.0.patch
+  oxfmt@0.71.0: patches/oxfmt@0.71.0.patch
 ```
 
 Commit **both** the patch file and the `patchedDependencies` entry, then re-run `pnpm install`.
 
-- **The patch is pinned to `oxfmt@0.67.0`** (the version Blume's own repo pins). pnpm requires an exact version match, and the diff targets a file whose name is hashed per oxfmt release (`dist/markdown-*.js`), so it won't apply to any other version. If `pnpm why oxfmt` reports a different one, pin `oxfmt` to `0.67.0` as a direct dev dependency (Ultracite accepts any `oxfmt` ≥ 0.40 as a peer). If the repo can't take that pin, tell the user and fall back to keeping directive-heavy files out of the formatter's globs.
+- **The patch is pinned to `oxfmt@0.71.0`** (the version Blume's own repo pins). pnpm requires an exact version match, and the diff targets a file whose name is hashed per oxfmt release (`dist/markdown-*.js`), so it won't apply to any other version. If `pnpm why oxfmt` reports a different one, pin `oxfmt` to `0.71.0` as a direct dev dependency (Ultracite accepts any `oxfmt` ≥ 0.59 as a peer). If the repo can't take that pin, tell the user and fall back to keeping directive-heavy files out of the formatter's globs.
 - **Not on pnpm?** The patch mechanism is pnpm-specific. For npm/yarn, either pin oxfmt and apply the diff with `patch-package`, or exclude `.md`/`.mdx` from Ultracite formatting so it never touches the directives — report whichever you chose.
 
 ---
@@ -221,5 +221,5 @@ Commit **both** the patch file and the `patchedDependencies` entry, then re-run 
 - [ ] Ran plain `pnpm install`; committed `pnpm-lock.yaml` with the `package.json` change; verified `pnpm install --frozen-lockfile` is clean.
 - [ ] Wrote `apps/docs/vercel.json` + package scripts; told the user to set Root Directory + Node 22 in the Vercel project.
 - [ ] Checked for a workspace Vite override; if the build crashes inside Astro/Vite, gave the pnpm-patch recipe.
-- [ ] Uses Ultracite/oxfmt? Shipped `patches/oxfmt@0.67.0.patch` + registered it under `patchedDependencies` so formatting doesn't mangle `:::` directives.
+- [ ] Uses Ultracite/oxfmt? Shipped `patches/oxfmt@0.71.0.patch` + registered it under `patchedDependencies` so formatting doesn't mangle `:::` directives.
 - [ ] Reported every repo-specific edit and every manual step left to the user.

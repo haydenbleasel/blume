@@ -972,16 +972,16 @@ describe("mdxRemoteSource (github mode)", () => {
   });
 });
 
-describe("scanProject composition", () => {
-  const withConfig = async (
-    files: Record<string, string>,
-    config: string
-  ): Promise<string> => {
-    const root = await makeProject(files);
-    await writeFile(join(root, "blume.config.ts"), config);
-    return root;
-  };
+const withConfig = async (
+  files: Record<string, string>,
+  config: string
+): Promise<string> => {
+  const root = await makeProject(files);
+  await writeFile(join(root, "blume.config.ts"), config);
+  return root;
+};
 
+describe("scanProject composition", () => {
   it("merges multiple filesystem sources and namespaces by prefix", async () => {
     const root = await withConfig(
       {

@@ -557,6 +557,8 @@ const pnpmWorkspaceSchema = z.looseObject({
 // A glob's leading `./` and trailing `/`, which pnpm ignores.
 const GLOB_EDGES = /^\.\/|\/+$/gu;
 
+const globPattern = (glob: string): string => glob.replaceAll(GLOB_EDGES, "");
+
 /** Whether any of `globs` matches the workspace-relative path `at`. */
 const matchesAny = (globs: string[], at: string): boolean =>
   globs.length > 0 && picomatch(globs)(at);
@@ -589,11 +591,12 @@ const listsPackage = (workspace: string, root: string): boolean => {
     return true;
   }
   const globs = parsed.data.packages;
-  const pattern = (glob: string): string => glob.replaceAll(GLOB_EDGES, "");
-  const included = globs.filter((glob) => !glob.startsWith("!")).map(pattern);
+  const included = globs
+    .filter((glob) => !glob.startsWith("!"))
+    .map(globPattern);
   const excluded = globs
     .filter((glob) => glob.startsWith("!"))
-    .map((glob) => pattern(glob.slice(1)));
+    .map((glob) => globPattern(glob.slice(1)));
   return matchesAny(included, at) && !matchesAny(excluded, at);
 };
 

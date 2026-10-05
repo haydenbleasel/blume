@@ -24,6 +24,21 @@ interface MdastUrlContext {
 const isUrl = (url: string | null | undefined): url is string =>
   typeof url === "string";
 
+/** Record `based(url)` on the node when its root-relative URL changes. */
+const rebase = (
+  node: UrlNode,
+  ctx: MdastUrlContext,
+  based: (url: string) => string
+): void => {
+  const { url } = node;
+  if (isUrl(url) && isInternalPath(url)) {
+    const next = based(url);
+    if (next !== url) {
+      ctx.setProperty(node, "url", next);
+    }
+  }
+};
+
 export interface BaseLinksPluginOptions {
   /**
    * The `blume:data` JSON file, for an ejected app: with no CLI in the process
@@ -72,20 +87,6 @@ export const baseLinksPlugin = (
   const servesPage = (route: string): boolean =>
     servesRoute(servedRoutes(), route);
 
-  /** Record `based(url)` on the node when its root-relative URL changes. */
-  const rebase = (
-    node: UrlNode,
-    ctx: MdastUrlContext,
-    based: (url: string) => string
-  ): void => {
-    const { url } = node;
-    if (isUrl(url) && isInternalPath(url)) {
-      const next = based(url);
-      if (next !== url) {
-        ctx.setProperty(node, "url", next);
-      }
-    }
-  };
   const rebaseLink = (node: UrlNode, ctx: MdastUrlContext): void =>
     rebase(node, ctx, (url) =>
       withAuthoredBasePath(deployBase, basePath, url, servesPage)

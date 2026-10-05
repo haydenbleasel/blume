@@ -28,6 +28,8 @@ export { clarity } from "./clarity.ts";
 export type { ClarityAdapter, ClarityOptions } from "./clarity.ts";
 export { clearbit } from "./clearbit.ts";
 export type { ClearbitAdapter, ClearbitOptions } from "./clearbit.ts";
+export { clics } from "./clics.ts";
+export type { ClicsAdapter, ClicsOptions } from "./clics.ts";
 export { cloudflare } from "./cloudflare.ts";
 export type { CloudflareAdapter, CloudflareOptions } from "./cloudflare.ts";
 export { databuddy } from "./databuddy.ts";

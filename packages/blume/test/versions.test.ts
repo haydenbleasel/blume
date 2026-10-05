@@ -860,27 +860,27 @@ describe("version-scoped search", () => {
   });
 });
 
-describe("agent surfaces with versions", () => {
-  const versionedProject = async () => {
-    const contentRoot = await tempContent({
-      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n\nCurrent guide.\n",
-      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n\nOld guide.\n",
-      "v1.0/old-only.mdx": "---\ntitle: Old Only\n---\n# Old\n\nLegacy.\n",
-    });
-    const root = dirname(contentRoot);
-    await writeFile(
-      join(root, "blume.config.ts"),
-      `export default {
-        deployment: { site: "https://example.com" },
-        versions: {
-          archived: [{ id: "v1.0", label: "1.0" }],
-          current: { label: "2.0" },
-        },
-      };\n`
-    );
-    return await scanProject(root, { mode: "build" });
-  };
+const versionedProject = async () => {
+  const contentRoot = await tempContent({
+    "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n\nCurrent guide.\n",
+    "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n\nOld guide.\n",
+    "v1.0/old-only.mdx": "---\ntitle: Old Only\n---\n# Old\n\nLegacy.\n",
+  });
+  const root = dirname(contentRoot);
+  await writeFile(
+    join(root, "blume.config.ts"),
+    `export default {
+      deployment: { site: "https://example.com" },
+      versions: {
+        archived: [{ id: "v1.0", label: "1.0" }],
+        current: { label: "2.0" },
+      },
+    };\n`
+  );
+  return await scanProject(root, { mode: "build" });
+};
 
+describe("agent surfaces with versions", () => {
   it("sections llms.txt by version and keeps llms-full.txt current-only", async () => {
     const project = await versionedProject();
     const { index, full } = await buildLlmsFiles(project);
