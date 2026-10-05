@@ -30,6 +30,8 @@ Der Server stellt schreibgeschützte Tools bereit — `search_docs`, `get_page`,
 
 `search_docs` betreibt einen eigenen Volltextindex und funktioniert daher unabhängig von deinem [Such](/docs/configuration/search)-Provider — und selbst mit `search: false`. Der MCP-Server ist ein von der seitenbasierten Suche getrenntes Feature.
 
+[Versteckte Seiten](/docs/content/navigation#hidden-pages) erscheinen nicht in `list_pages` und `resources/list` und auch nicht in `search_docs`, sofern [`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) nicht aktiviert ist — genau wie sie auch in der Site-Suche und in `llms.txt` fehlen. `get_page` und `resources/read` geben eine versteckte Seite über ihre Route trotzdem zurück: Versteckt heißt nicht privat, und die Seite wird weiterhin unter ihrer URL und als Markdown ausgeliefert.
+
 Dieselben Tools stehen über einfaches HTTP als [JSON-API](/docs/discoverability/json-api) zur Verfügung — für Frameworks, die kein MCP sprechen.
 
 Der Endpunkt liest einen Request-Body nur bis 64 KB und beantwortet alles Größere mit `413`. Ein Aufruf eines Tools, das nicht existiert, oder mit `arguments`, die kein Objekt sind, erhält den JSON-RPC-Fehler „Invalid params“ (`-32602`).
@@ -49,6 +51,8 @@ Beide Tools akzeptieren außerdem ein `filters`-Objekt, das gegen die Facetten a
 ```
 
 Jeder `filters`-Eintrag muss zutreffen (Ergebnisse führen ihre Facettenwerte mit, und `list_pages` zeigt sie für jede Seite), sodass eine Wissensdatenbank Agent-Workflows nach dem Prinzip der schrittweisen Offenlegung antreiben kann — die durchgesetzten Standards auflisten, nur innerhalb davon suchen — ganz ohne eigenen Server.
+
+Ein Wert muss exakt so übereinstimmen, wie `list_pages` ihn anzeigt, inklusive Groß- und Kleinschreibung: `"enforced"` trifft nicht auf eine Seite zu, deren `status` `Enforced` ist. Facettenwerte sind Strings, daher wird eine Zahl oder ein Boolean in `filters` mit seiner String-Form abgeglichen (`{"priority": 1}` findet `priority: 1`), und ein Wert jeder anderen Form, etwa eine Liste, wird ignoriert, statt zu filtern.
 
 ## Server-Ausgabe erforderlich [#server-output-required]
 

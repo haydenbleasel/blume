@@ -18,7 +18,8 @@ export default defineConfig({
         prefix: "handbook",
         url: "https://cms.example.com",
         collection: "docs",
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "richText" },
         // Extra query parameters: where[...], sort
         params: { sort: "title" },
@@ -28,4 +29,4 @@ export default defineConfig({
 });
 ```
 
-Der API-Schlüssel kommt aus der Umgebungsvariable `PAYLOAD_API_KEY` und wird als `users API-Key <key>` gesendet. Setze `authCollection`, wenn der Schlüssel zu einer anderen Collection mit aktivierter Authentifizierung gehört. Importiert werden nur veröffentlichte Dokumente. Mit `--preview` werden auch Entwürfe abgefragt und mit `draft: true` bereitgestellt. Dokumente werden mit `depth: 1` abgerufen, damit Uploads ihre URLs mitbringen. Ein relativer Upload-Pfad (`/media/x.png`) wird relativ zu `url` aufgelöst. Ein `block`- oder `inlineBlock`-Knoten wird über die `serializers`-Option der Engine einer Blume-Komponente zugeordnet. Der Schlüssel dafür ist `blockType`. Das funktioniert, wenn du `payloadSource` direkt erstellst und an [`custom()`](/docs/content/sources/custom) übergibst. Wenn du `serializers` setzt, werden die Seiten der Quelle als MDX geschrieben, damit die zurückgegebenen Komponenten gerendert werden. Ein Body in einem Markdown-Textfeld bleibt Markdown.
+Der API-Schlüssel kommt aus der Umgebungsvariable `PAYLOAD_API_KEY` und wird als `users API-Key <key>` gesendet. Setze `authCollection`, wenn der Schlüssel zu einer anderen Collection mit aktivierter Authentifizierung gehört. Importiert werden nur veröffentlichte Dokumente. Mit `--preview` werden auch Entwürfe abgefragt und mit `draft: true` bereitgestellt. Dokumente werden mit `depth: 1` abgerufen, damit Uploads ihre URLs mitbringen. Ein relativer Upload-Pfad (`/media/x.png`) wird relativ zu `url` aufgelöst. Uploads werden über diese URL eingebunden statt heruntergeladen, da sie anders als bei Notion nicht abläuft. Die Browser deiner Leser laden sie also von deinem Payload-Server oder dessen Speicher. Wenn Blume sie stattdessen beim Build herunterladen und optimieren soll, autorisiere den Host in [`image.domains`](/docs/configuration#images). Ein `block`- oder `inlineBlock`-Knoten wird über die `serializers`-Option der Engine einer Blume-Komponente zugeordnet. Der Schlüssel dafür ist `blockType`. Das funktioniert, wenn du `payloadSource` direkt erstellst und an [`custom()`](/docs/content/sources/custom) übergibst. Wenn du `serializers` setzt, werden die Seiten der Quelle als MDX geschrieben, damit die zurückgegebenen Komponenten gerendert werden. Ein Body in einem Markdown-Textfeld bleibt Markdown. Ein Knoten ohne Markdown-Entsprechung oder ein Block ohne Serializer wird ausgelassen und als Kommentar vermerkt. Die Quelle gibt dann die Warnung `BLUME_SOURCE_UNSUPPORTED_NODE` aus und nennt darin den Knoten und die Seite.

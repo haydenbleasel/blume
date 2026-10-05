@@ -41,7 +41,7 @@ navigation: {
 
 ## 生成される例 [#generated-examples]
 
-すべてのオペレーションページには、完全で有効なオペレーション例が含まれます。この例では、引数ごとにスキーマに基づいて型付けされた変数が 1 つずつ定義されます。また、戻り値の型に対しては、深さを制限した選択セットが付きます。これに対応する変数の例と、同じ選択セットを反映したレスポンスの例も含まれます。コードサンプルには、設定した各言語で実際の HTTP リクエスト（`{ query, variables }` の JSON `POST`）がそのまま表示されます。`openapi()` と同じ[言語](/docs/references/openapi#code-samples-and-schemas)を使用でき、`codeSamples: false` を指定するとコードサンプルは表示されません：
+すべてのオペレーションページには、完全で有効なオペレーション例が含まれます。この例では、引数ごとにスキーマに基づいて型付けされた変数が 1 つずつ定義されます。また、戻り値の型に対しては、深さを制限した選択セットが付きます。これに対応する変数の例と、同じ選択セットを反映したレスポンスの例も含まれます。引数にデフォルト値が宣言されている場合、その変数の初期値はそのデフォルト値になります。また、選択セットには非推奨のフィールドは含まれません。コードサンプルには、設定した各言語で実際の HTTP リクエスト（`{ query, variables }` の JSON `POST`）がそのまま表示されます。`openapi()` と同じ[言語](/docs/references/openapi#code-samples-and-schemas)を使用でき、`codeSamples: false` を指定するとコードサンプルは表示されません：
 
 ```ts blume.config.ts lineNumbers
 reference: [
@@ -82,6 +82,18 @@ reference: [
 ## Try it プレイグラウンド [#try-it-playground]
 
 クエリとミューテーションのページには、インタラクティブなパネルが表示されます。このパネルでは、リクエストボディ（クエリと変数）を編集できます。送信先にはエンドポイントかカスタム URL を指定して、そのまま送信できます。コードサンプルはリアルタイムで更新されるため、コピーした内容は実際に送信した内容とバイト単位で一致します。パネルを無効にするには、`playground: false` を指定します。サブスクリプションのページには、パネルの代わりに、生成されたオペレーションとイベントの例が表示されます。サブスクリプションはステートフルなトランスポート（WebSocket または SSE）上で動作するため、プレイグラウンドの単一の HTTP `POST` では扱えません。
+
+スキーマには API の認証方法が記述されていません。そのため、`auth` を指定するまで、パネルは認証情報を送信しません。`auth` の形式は、手書きのエンドポイントページで使用する [`api.auth`](/docs/references/api-pages#site-defaults) と同じです。`method` には `bearer`、`basic`、`key`（ヘッダーで渡す API キー）、`none` のいずれかを指定します。`name` には API キーを入れるヘッダーを指定します（デフォルトは `x-api-key`）。指定すると、すべてのオペレーションページに **Authorization** セクションが追加されます。また、パネルには [OpenAPI のもの](/docs/references/openapi#credentials)と同じように動作する認証情報フィールドが追加され、コードサンプルにはプレースホルダーの認証情報が表示されます。ソースごとに `auth` を指定すると、アダプターの `auth` よりも優先されます：
+
+```ts blume.config.ts lineNumbers
+reference: [
+  graphql({
+    spec: "./schema.graphql",
+    endpoint: "https://api.example.com/graphql",
+    auth: { method: "bearer" },
+  }),
+],
+```
 
 GraphQL API がドキュメントサイトからのクロスオリジンリクエストを許可していない場合は、CORS プロキシを経由して送信してください。独自のプロキシの URL を指定するか、`true` を指定して組み込みの `/_api-proxy` エンドポイント（`basePath` を設定している場合はその配下）を使用します。組み込みのプロキシを使うには[サーバー出力](/docs/deployment#server-rendering)が必要です。具体的には、`blume/deploy` の `deployment: vercel()` のようなホストアダプターを設定します。組み込みのプロキシは、ドキュメント化された仕様で宣言されているオリジンにのみ転送します。転送先は、設定された各 GraphQL の `endpoint` と、ドキュメント化された [OpenAPI 仕様](/docs/references/openapi)に記述された絶対 URL の `servers[].url` です。そのため、公開されたドキュメントのデプロイを悪用して、他のホストにリクエストを送ることはできません。つまり、プロキシを動作させるには `endpoint` の指定が必須です。指定しない場合、このリファレンスで許可されるオリジンがないため、プロキシはすべての送信を拒否します（この場合、ビルド時に警告が表示されます）。リクエストボディのサイズ制限、ヘッダーの転送ルール、レスポンスヘッダーは、[OpenAPI のプロキシ](/docs/references/openapi#try-it-playground)と同じものが適用されます。
 

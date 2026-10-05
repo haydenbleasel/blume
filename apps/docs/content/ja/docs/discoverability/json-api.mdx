@@ -14,6 +14,8 @@ description: >-
 | `/api/docs/search?q=` | 全文検索。`search_docs` と同じ `limit`、`contentTypes`、`locale`、`version`、`filters[key]` によるスコープ指定が可能です。サーバー出力でのみ利用できます。 |
 | `/openapi.json` | 機械可読なサーフェス全体の OpenAPI 3.1 記述。 |
 
+ページインデックスには[非表示ページ](/docs/content/navigation#hidden-pages)は含まれず、それらのページにはページごとのドキュメントも生成されません。ただし、非表示は非公開を意味しないため、`get_page` とそのページの `.md` ミラーは引き続きドキュメントを提供します。`seo.noindex`、`ai.exclude`、`search.exclude` が設定されたページは、他のページと同様に一覧に含まれます。ページドキュメントの `markdown` は、エージェントが読む形でのページのソースであり、先頭のフロントマターブロックもそのまま保持されます。
+
 ページインデックス、ページごとのドキュメント、ナビゲーションはプリレンダリングされるため、静的サイトであればどのホストからでもファイルとして配信できます。検索はライブエンドポイントで、[サーバー出力](/docs/deployment#server-rendering)でのみ存在し、そこでは `search_docs` と同じインデックスを実行します。
 
 ## エラー [#errors]

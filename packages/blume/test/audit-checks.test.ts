@@ -59,6 +59,13 @@ const manifestRoute = (
   ...over,
 });
 
+/** The content-check codes for a page with only `description` under test. */
+const descriptionCodes = (description: string) =>
+  run(
+    contentChecks,
+    context({ pages: [snapshot({ descriptions: [description] })] })
+  );
+
 describe("content checks", () => {
   it("is silent on a healthy page", () => {
     expect(run(contentChecks, context())).toEqual([]);
@@ -140,14 +147,11 @@ describe("content checks", () => {
   it("scores ASCII text exactly as a character count would", () => {
     // Every ASCII character is one column, so nothing about an English site's
     // findings changes: 60 characters short, 200 long, 120 fine.
-    const at = (description: string) =>
-      run(
-        contentChecks,
-        context({ pages: [snapshot({ descriptions: [description] })] })
-      );
-    expect(at("x".repeat(60))).toContain("DESCRIPTION_LENGTH");
-    expect(at("x".repeat(200))).toContain("DESCRIPTION_LENGTH");
-    expect(at("x".repeat(120))).not.toContain("DESCRIPTION_LENGTH");
+    expect(descriptionCodes("x".repeat(60))).toContain("DESCRIPTION_LENGTH");
+    expect(descriptionCodes("x".repeat(200))).toContain("DESCRIPTION_LENGTH");
+    expect(descriptionCodes("x".repeat(120))).not.toContain(
+      "DESCRIPTION_LENGTH"
+    );
   });
 
   it("counts a decomposed combining mark as zero columns", () => {
@@ -155,13 +159,12 @@ describe("content checks", () => {
     // character count saw 2, so ASCII-exact parity does not extend to NFD —
     // at the 110 floor, 108 x's plus an NFD é is 110 characters but only 109
     // columns, and the page now (correctly) reads as one column short.
-    const at = (description: string) =>
-      run(
-        contentChecks,
-        context({ pages: [snapshot({ descriptions: [description] })] })
-      );
-    expect(at(`${"x".repeat(108)}e\u0301`)).toContain("DESCRIPTION_LENGTH");
-    expect(at(`${"x".repeat(109)}e\u0301`)).not.toContain("DESCRIPTION_LENGTH");
+    expect(descriptionCodes(`${"x".repeat(108)}e\u0301`)).toContain(
+      "DESCRIPTION_LENGTH"
+    );
+    expect(descriptionCodes(`${"x".repeat(109)}e\u0301`)).not.toContain(
+      "DESCRIPTION_LENGTH"
+    );
   });
 
   it("measures a title on its collapsed whitespace", () => {
@@ -1265,12 +1268,12 @@ describe("robots checks", () => {
   });
 });
 
-describe("robots rule matching (robots-parser semantics)", () => {
-  const blocked = (raw: string, url: string): boolean =>
-    run(robotsChecks, robotsCtx(raw, [url])).includes(
-      "ROBOTS_DISALLOWS_INDEXABLE"
-    );
+const blocked = (raw: string, url: string): boolean =>
+  run(robotsChecks, robotsCtx(raw, [url])).includes(
+    "ROBOTS_DISALLOWS_INDEXABLE"
+  );
 
+describe("robots rule matching (robots-parser semantics)", () => {
   it("matches prefixes, wildcards, and end anchors", () => {
     expect(blocked("User-agent: *\nDisallow: /docs\n", `${SITE}/docs/x`)).toBe(
       true
@@ -1312,13 +1315,13 @@ describe("robots rule matching (robots-parser semantics)", () => {
   });
 });
 
-describe("robots rules aimed at one crawler", () => {
-  const crawlerFindings = (raw: string, urls: string[]) =>
-    // SAFETY: the robots checks run synchronously.
-    (robotsChecks.run(robotsCtx(raw, urls)) as Diagnostic[])
-      .filter((d) => d.code === "BLUME_AUDIT_ROBOTS_BLOCKS_CRAWLER")
-      .map((d) => [d.severity, d.line, d.message]);
+const crawlerFindings = (raw: string, urls: string[]) =>
+  // SAFETY: the robots checks run synchronously.
+  (robotsChecks.run(robotsCtx(raw, urls)) as Diagnostic[])
+    .filter((d) => d.code === "BLUME_AUDIT_ROBOTS_BLOCKS_CRAWLER")
+    .map((d) => [d.severity, d.line, d.message]);
 
+describe("robots rules aimed at one crawler", () => {
   it("warns once per crawler, at the rule that blocks it", () => {
     const raw = [
       "User-agent: *",

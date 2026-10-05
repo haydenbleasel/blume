@@ -10,16 +10,20 @@ O `blume doctor` analisa o projeto exatamente como o `blume build` faria e infor
 blume doctor
 ```
 
+O `blume init` também o adiciona ao `package.json` como um script `doctor`. Com pnpm, rode-o como `pnpm run doctor` (`pnpm --filter <workspace> run doctor` a partir da raiz de um monorepo): um `pnpm doctor` sozinho executa o comando `doctor` embutido do próprio pnpm em vez do script.
+
 ## O que ele verifica [#what-it-checks]
 
 - **A versão do Node**, comparada com o intervalo que o pacote `blume` instalado suporta, lido do próprio campo `engines` dele. Uma versão fora desse intervalo gera um aviso: as coisas podem funcionar, mas essa não é uma combinação que o Blume testa.
 - **`blume.config.ts`**, com a mesma validação que um build executa. Uma chave removida ou renomeada falha com uma dica que indica a substituta, em vez de um simples "unrecognized key".
 - **Cada página de conteúdo e meta de pasta**: os diagnósticos que o `blume dev` e o `blume build` exibem ao carregar o projeto (frontmatter inválido, problemas de navegação, alvos de include ausentes e o resto), reunidos em um único relatório.
+- **Navegação que não leva a lugar nenhum**: uma aba, um item de seletor, um link em destaque, uma ação do cabeçalho ou uma chamada para ação cujo caminho não corresponde a nenhuma página, página `.astro` personalizada, rota gerada ou referência: um aviso (`BLUME_NAV_MISSING_PAGE`), o mesmo que o `blume dev` e o `blume build` exibem.
+- **Exemplos de [`<Component>`](/docs/content/components#component) que não existem**: um `path` que não indica nenhum arquivo em `examples`, que a página mostraria como uma caixa "No example found": um aviso (`BLUME_EXAMPLE_NOT_FOUND`) na linha correspondente, do mesmo jeito que o `blume dev` e o `blume build` o exibem. Um override em `components.ts` ou uma island chamada `Component` substitui o componente embutido e não é verificado.
 - **Recursos que precisam de um servidor** em um site configurado para saída estática, como o assistente, o servidor MCP, o proxy embutido do playground Try it ou a busca em modo servidor (Mixedbread): um erro que indica o recurso e o adapter de deploy para o qual você deve trocar (ou, quando um adapter de host está definido com `output: "static"`, que diz para você remover essa opção).
 - **Pacotes que a sua config precisa** e que não estão instalados, como o SDK que um adapter de busca, de fonte de conteúdo ou do assistente importa, o pacote `@astrojs/*` de um adapter de deploy ou o renderizador para islands Vue ou Svelte: um erro para cada pacote, com o comando de instalação para o seu gerenciador de pacotes. O `blume build` para na mesma verificação.
 - **Overrides em `components.ts`** que o Blume não consegue planejar, como uma entrada inline ou computada, ou um import cujo arquivo não existe: um erro para cada um, na linha correspondente.
 - **Uma pasta com formato de versão** (`v1.0/`) em um site sem `versions` configuradas, que de outra forma seria compilada como conteúdo comum: um aviso apontando para [`blume version`](/docs/cli/version).
-- **Secrets lidos por um recurso habilitado** que não estão definidos, como `MIXEDBREAD_API_KEY` ou `OPENROUTER_API_KEY`: um aviso com o nome da variável. O doctor carrega `.env` e `.env.local` primeiro, assim como o `blume dev` e o `blume build`.
+- **Secrets lidos por um recurso habilitado** que não estão definidos, como `MIXEDBREAD_API_KEY` ou `OPENROUTER_API_KEY`: um aviso com o nome da variável. O doctor carrega `.env` e `.env.local` primeiro, assim como o `blume dev` e o `blume build`, e faz a verificação antes que qualquer fonte de conteúdo remota busque dados, então o aviso continua aparecendo quando uma fonte depois falha por falta do token.
 
 ## O resumo [#the-summary]
 

@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { stripVTControlCharacters } from "node:util";
 
 import { dirname, join } from "pathe";
 
@@ -170,7 +171,10 @@ describe("blume eval", () => {
       FAKE_VERDICT: FAIL_VERDICT,
     });
     expect(exitCode).toBe(0);
-    expect(stderr).toContain("⚠ docs/guides/install.md");
+    // CI forces color, which wraps the ⚠ in its own escape codes.
+    expect(stripVTControlCharacters(stderr)).toContain(
+      "⚠ docs/guides/install.md"
+    );
     expect(stderr).toContain("0 passed · 1 warned");
     expect(stderr).not.toContain("fix:");
     expect(stderr).not.toContain("failed");

@@ -10,10 +10,10 @@ description: >-
 blume validate
 ```
 
-- **Interne Seitenlinks** (`/guides/intro`, `./sibling`) müssen auf eine echte Seite verweisen – kaputte Links werden als Fehler gemeldet. Ein String-`href` einer Komponente (`<Card href="./install">`) wird genauso geprüft, ein `href={…}`-Ausdruck dagegen nicht.
+- **Interne Seitenlinks** (`/guides/intro`, `./sibling`) müssen auf eine echte Seite verweisen – kaputte Links werden als Fehler gemeldet. Gelesen wird jede Linkform, die Markdown und MDX rendern: Inline-Links, auch solche, deren Beschriftung in die nächste Zeile umbricht; Referenz-Links, die an ihrer Definition `[label]: /target` geprüft werden; Autolinks (`<https://…>`, in `.md`); und ein String-`href` einer Komponente (`<Card href="./install">`). Ein kleingeschriebenes HTML-`<a href>` wird genau so ausgeliefert, wie es geschrieben ist. Deshalb wird es so geprüft, wie ein Browser es liest: Ein relativer Pfad wird relativ zur URL der Seite aufgelöst, und es wird kein [`basePath`](/docs/deployment#mount-the-docs-under-a-path) hinzugefügt. Ein `href={…}`-Ausdruck wird nicht geprüft.
 - **Anker-Links** (`#section`, `/guides/intro#setup`) müssen zu einem Anker auf der Zielseite passen – der ID einer Überschrift (generiert oder [festgelegt](/docs/content/syntax#custom-anchors)) oder dem `id`-Attribut eines rohen HTML-Elements. Treffer, die fehlen, werden als Warnungen gemeldet. IDs in Codeblöcken, Inline-Code, HTML-Kommentaren und `<Prompt>`-Blöcken zählen nicht.
 - **Asset-Links** werden dort geprüft, wo die Datei liegt: ein absoluter Pfad (`/logo.png`) im Verzeichnis `public/`, ein relatives eingebettetes Bild (`![](./diagram.png)`) im Ordner der jeweiligen Seite. Ein normaler Link auf einen relativen Pfad wird weiterhin als Route der Website aufgelöst – nur eingebettete Bilder durchlaufen die Bild-Pipeline.
-- **Externe Links** werden nur mit [`--external`](#flags) geprüft (standardmäßig deaktiviert, da dafür Netzwerkzugriff nötig ist). Tote Links (404/410/nicht erreichbar) sind Fehler, während Antworten mit Rate-Limit oder vorübergehenden Problemen (403/429/5xx/Timeout) Warnungen sind.
+- **Externe Links** werden nur mit [`--external`](#flags) geprüft (standardmäßig deaktiviert, da dafür Netzwerkzugriff nötig ist). Ein toter Link ist ein Fehler: ein 404 oder 410 oder ein Hostname, der sich nicht auflösen lässt. Alles andere, was fehlschlägt, ist eine Warnung, da es häufiger an der anderen Website oder am Netzwerk liegt als am Link: jeder andere Fehlerstatus (ein 401 oder 403 von einer Website, die Bots abweist, ein 429-Rate-Limit, ein 5xx-Ausfall), eine abgelehnte oder abgebrochene Verbindung oder keine Antwort innerhalb von 10 Sekunden. Um URLs auszulassen, die sich von dort, wo der Befehl läuft, nicht prüfen lassen – etwa eine Platzhalter-Domain, einen lokalen Server oder eine Website, die Bots abweist –, übergib [`--ignore`](#flags). Eine nackte URL, die GitHub-flavored Markdown von sich aus verlinkt, ohne Link-Syntax drumherum, wird nicht gelesen; [`blume audit --external`](/docs/cli/audit) prüft sie in der gebauten Website.
 
 ## Was als Seite zählt [#what-counts-as-a-page]
 
@@ -22,6 +22,7 @@ Links werden gegen alles aufgelöst, was die gebaute Website ausliefert, nicht n
 ## Flags
 
 - `--external` – prüft zusätzlich externe `http(s)`-Links über das Netzwerk.
+- `--ignore <glob>` – fragt mit `--external` keinen externen Link ab, dessen URL zum Glob passt, und meldet für ihn nichts. Der Glob wird mit der vollständigen URL des Links abgeglichen, inklusive Schema: `*` passt innerhalb eines Pfadsegments und `**` über Segmente hinweg. So überspringt `--ignore "https://api.acme.example/**"` jeden Link zu diesem Host und `--ignore "http://localhost:*/**"` jeden lokalen Server. Wiederhole das Flag für weitere Muster und setze jedes in Anführungszeichen, damit deine Shell es nicht expandiert. Interne Links werden immer geprüft: Sie werden gegen deine eigenen Seiten aufgelöst, also behebe einen kaputten Link oder füge eine [Weiterleitung](/docs/deployment#redirects) hinzu.
 - `--strict` – beendet sich auch bei Warnungen mit einem Exit-Code ungleich null. Hinweise der Stufe „info“ bleiben rein informativ.
 - `--json` – gibt die Diagnosen als JSON auf stdout aus statt als Terminal-Bericht.
 
@@ -33,7 +34,7 @@ Links werden gegen alles aufgelöst, was die gebaute Website ausliefert, nicht n
 | `BLUME_BROKEN_ANCHOR` | warning | Die Seite existiert, hat aber keinen Anker, der zum Fragment passt. |
 | `BLUME_BROKEN_ASSET` | warning | Ein absoluter Pfad liegt nicht in `public/`, oder ein relatives eingebettetes Bild liegt nicht neben der Seite. |
 | `BLUME_ASSETS_UNCHECKED` | info | Es gibt kein Verzeichnis `public/`, daher wurden absolute Asset-Pfade nicht geprüft. |
-| `BLUME_DEAD_LINK` | error oder warning | Ein externer Link (mit `--external`) hat 404/410 zurückgegeben oder war nicht erreichbar (error), oder er lieferte vorübergehend 403/429/5xx/Timeout (warning). |
+| `BLUME_DEAD_LINK` | error oder warning | Ein externer Link (mit `--external`) hat 404/410 zurückgegeben oder sein Host lässt sich nicht auflösen (error), oder er bekam einen anderen Fehlerstatus, keine Verbindung oder nicht rechtzeitig eine Antwort (warning). |
 
 Der Exit-Code ist der Vertrag: Bei Fehlern wird mit einem Wert ungleich null beendet, und `--strict` sorgt dafür, dass Warnungen dasselbe bewirken.
 

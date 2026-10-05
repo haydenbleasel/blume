@@ -586,13 +586,13 @@ export default defineComponents({
   });
 });
 
-describe("blumeSourceGlob", () => {
-  const makeRoot = async (): Promise<string> => {
-    const root = await mkdtemp(join(tmpdir(), "blume-source-"));
-    ejectDirs.push(root);
-    return root;
-  };
+const makeRoot = async (): Promise<string> => {
+  const root = await mkdtemp(join(tmpdir(), "blume-source-"));
+  ejectDirs.push(root);
+  return root;
+};
 
+describe("blumeSourceGlob", () => {
   it("keeps the portable glob when blume is in the project's node_modules", async () => {
     const root = await makeRoot();
     await mkdir(join(root, "node_modules", "blume"), { recursive: true });

@@ -10,16 +10,20 @@ description: >-
 blume doctor
 ```
 
+`blume init` fügt es außerdem als `doctor`-Skript zur `package.json` hinzu. Mit pnpm führst du es als `pnpm run doctor` aus (`pnpm --filter <workspace> run doctor` vom Root eines Monorepos aus): Ein bloßes `pnpm doctor` führt statt des Skripts den eingebauten `doctor`-Befehl von pnpm aus.
+
 ## Was geprüft wird [#what-it-checks]
 
 - **Die Node-Version** gegen den Bereich, den das installierte `blume`-Paket unterstützt. Dieser wird aus dem eigenen `engines`-Feld des Pakets gelesen. Liegt die Version außerhalb, gibt es eine Warnung: Es kann funktionieren, aber Blume testet diese Kombination nicht.
 - **`blume.config.ts`**, mit derselben Validierung, die auch ein Build durchführt. Ein entfernter oder umbenannter Schlüssel schlägt mit einem Hinweis auf seinen Ersatz fehl statt mit einem bloßen „unrecognized key“.
 - **Jede Inhaltsseite und jede Ordner-Meta**: die Diagnosen, die `blume dev` und `blume build` beim Laden des Projekts ausgeben – ungültiges Frontmatter, Navigationsprobleme, fehlende Include-Ziele und alles Weitere –, gesammelt in einem Bericht.
+- **Navigation, die ins Leere führt**: ein Tab, ein Selector-Eintrag, ein Featured-Link, eine Header-Aktion oder ein Call-to-Action, dessen Pfad zu keiner Seite, keiner eigenen `.astro`-Seite, keiner generierten Route und keiner Referenz passt: eine Warnung (`BLUME_NAV_MISSING_PAGE`), dieselbe, die `blume dev` und `blume build` ausgeben.
+- **[`<Component>`](/docs/content/components#component)-Beispiele, die nicht existieren**: ein `path`, der keine Datei unter `examples` benennt und den die Seite als „No example found“-Box anzeigen würde: eine Warnung (`BLUME_EXAMPLE_NOT_FOUND`) in der entsprechenden Zeile, so wie `blume dev` und `blume build` sie ausgeben. Eine Überschreibung in `components.ts` oder ein Island namens `Component` ersetzt die eingebaute Komponente und wird nicht geprüft.
 - **Features, die einen Server brauchen**, auf einer Site, die für statische Ausgabe konfiguriert ist – der Assistent, der MCP-Server, der eingebaute Proxy des Try-it-Playgrounds oder die Suche im Server-Modus (Mixedbread): ein Fehler, der das Feature benennt, zusammen mit dem Deployment-Adapter, zu dem du wechseln solltest (oder, wenn ein Host-Adapter auf `output: "static"` gesetzt ist, mit dem Hinweis, diese Option zu entfernen).
 - **Pakete, die deine Konfiguration braucht**, die aber nicht installiert sind – das SDK, das ein Such-, Content-Source- oder Assistenten-Adapter importiert, das `@astrojs/*`-Paket eines Deployment-Adapters oder der Renderer für Vue- oder Svelte-Islands: ein Fehler, der jedes Paket benennt, zusammen mit dem Installationsbefehl für deinen Paketmanager. `blume build` bricht bei derselben Prüfung ab.
 - **Überschreibungen in `components.ts`**, die Blume nicht einplanen kann – ein Inline- oder berechneter Eintrag oder ein Import, dessen Datei nicht existiert: jeweils ein Fehler in der entsprechenden Zeile.
 - **Ein Ordner, der wie eine Version aussieht** (`v1.0/`), auf einer Site ohne konfigurierte `versions`, der sonst als gewöhnlicher Inhalt gebaut würde: eine Warnung mit Verweis auf [`blume version`](/docs/cli/version).
-- **Secrets, die ein aktiviertes Feature liest**, die aber nicht gesetzt sind, etwa `MIXEDBREAD_API_KEY` oder `OPENROUTER_API_KEY`: eine Warnung, die die Variable benennt. Doctor lädt zuerst `.env` und `.env.local`, genau wie `blume dev` und `blume build`.
+- **Secrets, die ein aktiviertes Feature liest**, die aber nicht gesetzt sind, etwa `MIXEDBREAD_API_KEY` oder `OPENROUTER_API_KEY`: eine Warnung, die die Variable benennt. Doctor lädt zuerst `.env` und `.env.local`, genau wie `blume dev` und `blume build`, und prüft, bevor eine entfernte Content-Source etwas abruft. So wird die Warnung auch dann ausgegeben, wenn eine Quelle anschließend ohne ihr Token fehlschlägt.
 
 ## Die Zusammenfassung [#the-summary]
 

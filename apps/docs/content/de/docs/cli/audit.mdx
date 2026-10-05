@@ -26,8 +26,9 @@ Befunde werden nach Check gruppiert statt pro Seite aufgelistet, sodass sich der
 ## Flags
 
 - `--fail-on error|warning|info` – das CI-Gate: beendet sich ab diesem Schweregrad mit einem Exit-Code ungleich null. Standard ist `error`; `--strict` ist ein Alias für `--fail-on warning`.
-- `--url <origin>` – prüft zusätzlich ein Live-Deployment auf Statuscodes, Response-Header und Redirect-Ketten.
+- `--url <origin>` – prüft zusätzlich ein Live-Deployment auf Statuscodes, Response-Header und konfigurierte Weiterleitungen.
 - `--external` – prüft ausgehende Links über das Netzwerk.
+- `--ignore <glob>` – zusammen mit `--external`: prüft keinen ausgehenden Link, dessen URL auf den Glob passt, etwa `--ignore "https://api.acme.example/**"`. Wiederhole das Flag für weitere Muster. Der Abgleich funktioniert genauso wie bei [`blume validate --ignore`](/docs/cli/validate#flags), und interne Links werden immer geprüft.
 - `--only <check|category>` / `--skip <check|category>` – beschränkt den Bericht auf diese Checks oder Kategorien bzw. schließt sie aus (kommagetrennt). Ein Begriff, der weder einen Check noch eine Kategorie bezeichnet, führt zu einem Fehler, der den nächstliegenden Treffer vorschlägt – so kann ein Tippfehler den Bericht nicht unbemerkt leeren.
 - `--list-checks` – gibt jeden Check aus, den das Audit melden kann, und beendet sich dann.
 - `--verbose` – listet jede betroffene Seite mit allen Details jedes Befunds auf statt nur der ersten paar.
@@ -45,14 +46,18 @@ blume audit --fail-on warning    # also fails on warnings
 
 ## Ein Live-Deployment prüfen [#checking-a-live-deployment]
 
-Manches kann dir nur der echte Server sagen: ob eine Seite, die in `dist/` existiert, hinter einem fehlerhaften Rewrite tatsächlich einen 404 liefert, ob Antworten komprimiert werden und ob ein `X-Robots-Tag`-Header still und leise eine Seite deindexiert, deren HTML völlig in Ordnung aussieht. Richte das Audit auf ein Deployment, um diese Checks hinzuzufügen:
+Manches kann dir nur der echte Server sagen: ob eine Seite, die in `dist/` existiert, hinter einem fehlerhaften Rewrite tatsächlich einen 404 liefert, ob Antworten komprimiert werden, ob ein `X-Robots-Tag`-Header still und leise eine Seite deindexiert, deren HTML völlig in Ordnung aussieht, und ob jede alte URL in [`redirects`](/docs/deployment#redirects) wirklich dorthin weiterleitet, wo du es konfiguriert hast. Richte das Audit auf ein Deployment, um diese Checks hinzuzufügen:
 
 ```bash
 blume audit --url https://docs.example.com
 blume audit --url https://docs.example.com --external   # also probe outbound links
 ```
 
-Ausgehende Links werden abgestuft bewertet, statt pauschal als Fehler zu gelten: Ein 404 ist ein kaputter Link, den du beheben kannst, während ein 403 oder 5xx meist auf Rate Limiting oder einen Ausfall bei jemand anderem zurückgeht und als Warnung gemeldet wird.
+Diese Anfragen gehen als gewöhnlicher HTTP-Client raus, nicht als Crawler: Das Audit sendet nicht den User-Agent von Googlebot oder einem KI-Crawler, da der Bot-Schutz eines Hosts einen Client blockieren kann, der sich als einer ausgibt. Eine Firewall- oder CDN-Regel, die Crawler anders behandelt, wird dabei also nicht mitgeprüft – teste sie deshalb mit den eigenen Tools des Crawlers, etwa der URL-Prüfung der Google Search Console.
+
+Das Audit ruft die alte URL jeder exakten Weiterleitung ab (ein Muster nennt keine einzelne URL, die sich abrufen ließe). Liefert sie einen 404, ist das ein Fehler. Antwortet sie mit 200, ist das eine Warnung: Ein Host, der die vom Build geschriebene Weiterleitungsdatei nicht liest, liefert dort statt einer HTTP-Weiterleitung die Meta-Refresh-Seite des Builds aus – der folgen Leser, Crawler aber womöglich nicht. Unter [Weiterleitungen](/docs/deployment#redirects) erfährst du, was welcher Host liest.
+
+Ausgehende Links werden abgestuft bewertet, statt pauschal als Fehler zu gelten: Ein 404 oder 410 oder ein Hostname, der sich nicht auflösen lässt, ist ein kaputter Link, den du beheben kannst, während jeder andere Fehlerstatus (ein 401 oder 403 von einer Site, die Bots abweist, ein 429, ein 5xx), eine abgelehnte Verbindung oder eine Zeitüberschreitung meist auf Rate Limiting oder einen Ausfall bei jemand anderem zurückgeht und als Warnung gemeldet wird. URLs, die das Audit von dort aus, wo es läuft, nicht prüfen kann – etwa eine Platzhalter-Domain oder einen lokalen Server –, lässt du mit `--ignore` aus.
 
 ## Befunde mit einem Agenten beheben [#fixing-the-findings-with-an-agent]
 
@@ -79,7 +84,7 @@ Diese Grenzen solltest du klar kennen:
 Alles, was das Audit nicht ausgeführt hat, wird als übersprungen gemeldet, statt stillschweigend als bestanden zu gelten:
 
 ```
-⊘ network      skipped — pass --url <origin> (11 checks)
+⊘ network      skipped — pass --url <origin> (12 checks)
 ⊘ external     skipped — pass --external (2 checks)
 ```
 
@@ -196,7 +201,7 @@ Behebung: Gib jeder Seite eine eigene `description`.
 
 `BLUME_AUDIT_DUPLICATE_CONTENT` · Warnung · aus dem gebauten HTML
 
-Behebung: Führe die Seiten zusammen oder setze `seo.canonical` auf allen außer einer.
+Behebung: Führe die Seiten zusammen oder lass `seo.canonical` auf allen außer einer auf die Seite zeigen, die indexiert werden soll.
 
 ### Indexierbarkeit [#indexability]
 
@@ -274,6 +279,8 @@ Behebung: Entferne den X-Robots-Tag-Header oder gleiche ihn an das Robots-Meta d
 
 Behebung: Korrigiere das Linkziel oder erstelle die Seite, auf die der Link zeigt.
 
+Ist [`deployment.base`](/docs/deployment#subpath-deploys) gesetzt, wird hier ein root-relativer Link ohne die Base gemeldet, da der Host dort nichts von diesem Build ausliefert. Eine vollständige URL auf demselben Host außerhalb der Base wird nicht gemeldet: Auf diese Weise verlinkt eine Seite auf eine andere App, die der Host neben der Dokumentation ausliefert.
+
 #### Seite enthält Links auf eine Weiterleitung [#link-to-redirect]
 
 `BLUME_AUDIT_LINK_TO_REDIRECT` · Warnung · aus dem gebauten HTML
@@ -346,13 +353,21 @@ Behebung: Verwende statt eines Meta-Refresh eine echte Weiterleitung in `blume.c
 
 `BLUME_AUDIT_REDIRECT_SOURCE_IS_PAGE` · Fehler · aus dem gebauten HTML
 
-Behebung: Entferne die Weiterleitung oder lösche die Seite, mit der sie kollidiert – die Seite gewinnt, und die Weiterleitung greift nie.
+Behebung: Entferne die Weiterleitung oder lösche die Seite, mit der sie kollidiert – ein Pfad kann nicht beides sein, und welches von beiden Leser erhalten, hängt vom Host ab.
 
 #### Weiterleitung von HTTPS auf HTTP [#redirect-to-http]
 
 `BLUME_AUDIT_REDIRECT_TO_HTTP` · Fehler · benötigt `--url`
 
 Behebung: Leite auf die HTTPS-URL weiter.
+
+#### Live-Site leitet nicht wie konfiguriert weiter [#redirect-not-served]
+
+`BLUME_AUDIT_REDIRECT_NOT_SERVED` · Fehler · benötigt `--url`
+
+Behebung: Deploye die Weiterleitungsdatei, die dein Host liest (siehe Weiterleitungen in der Deployment-Dokumentation), oder gib den Host in `deployment` an.
+
+Eine Warnung statt eines Fehlers, wenn die alte URL mit 200 antwortet (die Meta-Refresh-Seite) oder auf ein anderes als das konfigurierte Ziel weiterleitet.
 
 ### Social Cards
 
@@ -510,7 +525,7 @@ Behebung: Lade die Subressource über HTTPS – Browser blockieren Mixed Content
 
 `BLUME_AUDIT_INDEXABLE_PAGE_NOT_IN_SITEMAP` · Warnung · aus dem gebauten HTML
 
-Behebung: Entferne `draft`/`hidden`/`noindex` aus dem Frontmatter der Seite, wenn sie indexiert werden soll.
+Behebung: Entferne `draft`/`hidden`/`noindex` aus dem Frontmatter der Seite, wenn sie indexiert werden soll. Eine `public/sitemap.xml` ersetzt die generierte Sitemap – füge die Seite also dort hinzu oder lösche diese Datei.
 
 #### Noindex-Seite in der Sitemap [#noindex-in-sitemap]
 
@@ -579,6 +594,14 @@ Behebung: Jede Zeile in robots.txt muss eine `Field: value`-Direktive oder ein K
 `BLUME_AUDIT_ROBOTS_DISALLOWS_INDEXABLE` · Fehler · aus dem gebauten HTML
 
 Behebung: Eine Seite kann nicht gleichzeitig in robots.txt gesperrt und in der Sitemap aufgeführt sein.
+
+#### robots.txt sperrt einen einzelnen Crawler für Seiten, die in der Sitemap stehen [#robots-blocks-crawler]
+
+`BLUME_AUDIT_ROBOTS_BLOCKS_CRAWLER` · Warnung · aus dem gebauten HTML
+
+Behebung: Schränke die Regel in der `User-agent`-Gruppe dieses Crawlers ein oder entferne sie, wenn er diese Seiten lesen soll. Einen KI-Crawler absichtlich auszusperren ist in Ordnung; überspringe in dem Fall diesen Check.
+
+Ein Crawler, der in einer eigenen `User-agent`-Gruppe genannt wird, folgt nur dieser Gruppe – eine Regel dort (`User-agent: GPTBot`, gefolgt von `Disallow: /`) sperrt ihn also aus, während jeder andere Crawler die Seite liest. Das Audit meldet jeden Crawler nur einmal, und zwar bei der Regel, die seine erste Seite blockiert.
 
 #### robots.txt verweist nicht auf die Sitemap [#robots-sitemap-missing]
 

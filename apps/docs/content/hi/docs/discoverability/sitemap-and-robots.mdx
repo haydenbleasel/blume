@@ -8,7 +8,7 @@ description: >-
 
 ## साइटमैप [#sitemap]
 
-Blume बिल्ड समय पर हर इंडेक्स-योग्य पृष्ठ का एक `sitemap.xml` लिखता है। इसके लिए एक निरपेक्ष [`deployment.site`](/docs/deployment) आवश्यक है और यह ड्राफ़्ट, छिपे हुए, और [`noindex`](/docs/discoverability/metadata#per-page-overrides) पृष्ठों को छोड़कर हर पृष्ठ को सूचीबद्ध करता है। किसी [संस्करणीकृत](/docs/content/versioning) साइट पर, वे संग्रहीत पृष्ठ भी छोड़ दिए जाते हैं जिनका canonical उनके लाइव समतुल्य की ओर संकेत करता है — इंडेक्स करने योग्य पृष्ठ लाइव पृष्ठ ही है। डिफ़ॉल्ट रूप से चालू:
+Blume बिल्ड समय पर हर इंडेक्स-योग्य पृष्ठ का एक `sitemap.xml` लिखता है। इसके लिए एक निरपेक्ष [`deployment.site`](/docs/deployment) आवश्यक है और यह ड्राफ़्ट, छिपे हुए, और [`noindex`](/docs/discoverability/metadata#per-page-overrides) पृष्ठों, तथा उन पृष्ठों को छोड़कर जिनका `seo.canonical` किसी अन्य URL को निर्दिष्ट करता है, हर पृष्ठ को सूचीबद्ध करता है। किसी [संस्करणीकृत](/docs/content/versioning) साइट पर, वे संग्रहीत पृष्ठ भी छोड़ दिए जाते हैं जिनका canonical उनके लाइव समतुल्य की ओर संकेत करता है — इंडेक्स करने योग्य पृष्ठ लाइव पृष्ठ ही है। डिफ़ॉल्ट रूप से चालू:
 
 ```ts blume.config.ts lineNumbers
 seo: {

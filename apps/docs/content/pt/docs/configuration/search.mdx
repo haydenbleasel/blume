@@ -6,7 +6,7 @@ description: >-
 
 O Blume inclui busca local sem infraestrutura hospedada e sem chaves de API. Ela roda no navegador, funciona tanto em `blume dev` quanto em `blume build` e indexa apenas o seu conteúdo real — elementos de navegação e páginas excluídas são ignorados. Quando ela deixar de ser suficiente, você pode migrar para um backend hospedado ou semântico sem mudar a aparência ou o comportamento da busca — só muda o adaptador que você passa para `search`.
 
-Cada backend é um **adaptador** importado de `blume/search`: **Orama** (o padrão), **FlexSearch**, **Pagefind**, **Algolia**, **Orama Cloud**, **Typesense** e **Mixedbread**. Cada adaptador cuida das próprias opções, da sua dependência de runtime e dos segredos de que precisa, então somente o SDK do adaptador configurado é instalado no seu projeto — escolher um backend nunca traz os outros junto.
+Cada backend é um **adaptador** importado de `blume/search`: **Orama** (o padrão), **FlexSearch**, **Pagefind**, **Algolia**, **Orama Cloud**, **Typesense** e **Mixedbread**. Cada adaptador cuida das próprias opções, da sua dependência de runtime e dos segredos de que precisa. Orama e Pagefind já vêm com o Blume; o SDK de cada um dos outros adaptadores é uma dependência peer opcional que você mesmo instala, então escolher um backend nunca traz os outros junto. Se ele estiver faltando, o `blume build` para antes de o Vite rodar, indicando o pacote e o comando que o instala, e o [`blume doctor`](/docs/cli/doctor) também acusa a falta.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -21,7 +21,7 @@ export default defineConfig({
 });
 ```
 
-Um adaptador é uma descrição simples do backend — não um cliente ativo —, então o Blume consegue embuti-lo no site gerado e em um projeto ejetado. Passe o adaptador diretamente ou use a forma de objeto quando também quiser definir as opções de [links populares](#popular-pages) ou de [indexação](#whats-indexed) ao lado dele:
+Um adaptador é uma descrição simples do backend — não um cliente ativo —, então o Blume consegue embuti-lo no site gerado e em um projeto ejetado. Passe o adaptador diretamente ou use a forma de objeto quando também quiser definir as opções de [links populares](#popular-pages), de [indexação](#whats-indexed) ou de [analytics](#search-analytics) ao lado dele:
 
 ```ts blume.config.ts lineNumbers
 import { pagefind } from "blume/search";
@@ -79,18 +79,22 @@ search: {
 },
 ```
 
-O corpo e o título de cada bloco cercado (`blume.config.ts`, acima) se tornam pesquisáveis; a linguagem e os marcadores do bloco, não. Em páginas `.mdx`, o índice lê os componentes como o texto que eles exibem — o título de um Card, o rótulo de uma Tab, as descrições de uma TypeTable — usando os mesmos serializadores das [superfícies de agente](/docs/discoverability/markdown), então uma entrada em `agents.markdownComponents` cobre também os seus próprios componentes. A opção não tem efeito no Pagefind nem no Mixedbread. Espere que o índice cresça junto com o conteúdo cercado — o índice do cliente é enviado a todos os leitores, os adaptadores hospedados limitam o tamanho do registro (o Algolia rejeita o lote de sincronização quando o registro de uma página excede o limite do seu plano, mantendo o índice anterior no ar) e uma correspondência dentro de um bloco cercado exibe o código achatado no trecho do resultado.
+O corpo e o título de cada bloco cercado (`blume.config.ts`, acima) se tornam pesquisáveis; a linguagem e os marcadores do bloco, não. Em páginas `.mdx`, o índice lê os componentes como o texto que eles exibem — o título de um Card, o rótulo de uma Tab, as descrições de uma TypeTable — usando os mesmos serializadores das [superfícies de agente](/docs/discoverability/markdown), então uma entrada em `agents.markdownComponents` cobre também os seus próprios componentes. A opção não tem efeito no Pagefind nem no Mixedbread. Espere que o índice cresça junto com o conteúdo cercado — o índice do cliente é enviado a todos os leitores, os adaptadores hospedados armazenam mais (a sincronização do [Algolia](#algolia) divide uma página longa em vários registros) e uma correspondência dentro de um bloco cercado exibe o código achatado no trecho do resultado.
 
 Em um site com [versionamento](/docs/content/versioning), os resultados ficam restritos por padrão à versão que está sendo visualizada, com um botão "Todas as versões" no rodapé do diálogo (memorizado por leitor). As correspondências de outras versões indicam sua versão na linha. Orama, FlexSearch, Algolia e Typesense respeitam esse escopo — os registros hospedados carregam uma faceta `version`, com a documentação atual enviada como `"current"`. Pagefind, Orama Cloud e Mixedbread não restringem por versão: os resultados deles abrangem todas as versões, e o diálogo não exibe o botão.
 
+Em um site com [`i18n`](/docs/content/i18n), os resultados ficam restritos por padrão ao idioma da página que está sendo visualizada, com um botão "Todos os idiomas" ao lado (também memorizado por leitor). Orama e FlexSearch filtram o próprio índice no navegador, e Algolia, Orama Cloud e Typesense filtram pelo `locale` que cada registro carrega. O Pagefind mantém um índice por idioma: ele busca no índice do idioma da página e, com "Todos os idiomas", incorpora os demais, nos quais passa a buscar com a redução de palavras ao radical (stemming) do idioma da página. O Mixedbread não restringe por idioma: os resultados dele abrangem todos os idiomas, e o diálogo não exibe o botão.
+
 ## Tags
 
-Adicione `search.tags` ao frontmatter de uma página para agrupá-la sob um filtro no diálogo de busca — os leitores podem restringir os resultados a uma tag com um clique. As tags também se tornam uma faceta nos adaptadores hospedados.
+Adicione `search.tags` ao frontmatter de uma página para rotulá-la para um adaptador hospedado. A primeira tag da página é enviada como um campo `tag` no registro dela no Algolia, no Orama Cloud e no Typesense, onde você pode filtrar por ela no painel do provedor ou na sua própria interface de busca. O Typesense declara `tag` como faceta; no Algolia, adicione-a você mesmo aos `attributesForFaceting` do índice, e a sincronização a mantém lá.
 
 ```yaml
 search:
   tags: [api, reference]
 ```
+
+O diálogo de busca não lê as tags. Os filtros dele agrupam os resultados pela seção da barra lateral em que cada página está e aparecem com o Orama e o FlexSearch, cujos índices carregam a seção de cada página.
 
 ## Classificação [#ranking]
 
@@ -108,7 +112,8 @@ O quanto um boost move uma página depende do adaptador:
 
 - O **Orama** (o padrão) e o **FlexSearch** multiplicam cada correspondência pelo boost da página antes de ordenar, então um boost de 3 conta exatamente três vezes. A busca do [servidor MCP](/docs/discoverability/mcp) e a do [assistente](/docs/configuration/assistant) classificam da mesma forma.
 - O **Pagefind** dá mais peso ao texto de uma página com boost. Ele atenua correspondências repetidas, então o ganho é menor que o multiplicador: um boost de 5 classifica a página mais acima, mas algo mais próximo do dobro. O Pagefind trata um boost acima de 10 como 10.
-- O **Algolia** e o **Typesense** ordenam pelo boost entre resultados com correspondência mais ou menos equivalente, então um boost desempata casos próximos sem colocar uma correspondência mais fraca acima de uma forte. No Algolia, a sincronização adiciona `desc(boost)` ao ranking personalizado do índice, depois de qualquer ranking que você tenha definido.
+- O **Algolia** ordena pelo boost entre resultados com correspondência mais ou menos equivalente, então um boost desempata casos próximos sem colocar uma correspondência mais fraca acima de uma forte. A sincronização adiciona `desc(boost)` ao ranking personalizado do índice, depois de qualquer ranking que você tenha definido.
+- O **Typesense** ordena pela relevância e, depois, pelo boost entre resultados com a mesma pontuação de relevância, então um boost resolve empates sem colocar uma correspondência mais fraca acima de uma forte.
 - O **Orama Cloud** busca um conjunto maior de resultados e os reordena pela relevância multiplicada pelo boost.
 - O **Mixedbread** busca no seu próprio store, para o qual o Blume não envia nada, então boosts e palavras-chave não chegam até ele.
 
@@ -116,13 +121,23 @@ As palavras-chave são pesquisadas em todos os adaptadores, exceto no Mixedbread
 
 ## Análise de buscas [#search-analytics]
 
-Com um [adaptador de analytics](/docs/configuration/analytics) configurado, a busca informa o que os leitores procuram. Uma consulta é registrada quando se estabiliza, após um segundo sem digitação ou quando o leitor escolhe um resultado ou fecha o diálogo, como um evento `search` com a `query`, o número de `results` e o `path` de onde a busca foi feita. Uma consulta sem resultados aparece com `results: 0`, então filtrar por esse valor lista o que a sua documentação ainda não cobre. Escolher um resultado envia um evento `search_select` com a `query`, a `position` do resultado (começando em 1) e a `url` dele, para medir a taxa de cliques.
+Com um [adaptador de analytics](/docs/configuration/analytics) configurado, a busca informa o que os leitores procuram. Uma consulta é registrada quando se estabiliza, após um segundo sem digitação ou quando o leitor escolhe um resultado ou fecha o diálogo, como um evento `search` com a `query`, o número de `results` e o `path` de onde a busca foi feita. Uma consulta sem resultados aparece com `results: 0`, então filtrar por esse valor lista o que a sua documentação ainda não cobre. Escolher um resultado envia um evento `search_select` com a `query`, a `position` do resultado (começando em 1), a `url` dele e o `path` de onde ele foi escolhido, para medir a taxa de cliques.
 
-As consultas são enviadas exatamente como foram digitadas, com até 100 caracteres. A sua ferramenta de analytics as recebe da mesma forma que recebe os termos de busca de qualquer página, então trate-as como entrada do leitor. Com o [consentimento de cookies](/docs/configuration/consent) ativado, apenas os leitores que permitiram analytics são contabilizados.
+As consultas são enviadas exatamente como foram digitadas, com até 100 caracteres. A sua ferramenta de analytics as recebe da mesma forma que recebe os termos de busca de qualquer página, então trate-as como entrada do leitor: um leitor pode colar um endereço de e-mail ou uma chave na caixa, e o Google Analytics e o Plausible proíbem o envio de dados pessoais. Para manter o texto das consultas longe dos seus provedores, desative-o:
+
+```ts blume.config.ts lineNumbers
+search: {
+  analytics: { queries: false },
+},
+```
+
+Os eventos `search` e `search_select` passam então a carregar `queryChars`, o tamanho da consulta, no lugar de `query`. O texto trafega apenas no evento DOM [`blume:track`](/docs/configuration/analytics#custom-events), como `query` em `detail.props`, para que um listener escrito por você possa encaminhá-lo para onde você decidir, da mesma forma que o [assistente](/docs/configuration/assistant#analytics) lida com as perguntas. Com o [consentimento de cookies](/docs/configuration/consent) ativado, apenas os leitores que permitiram analytics são contabilizados.
 
 ## Adaptadores [#adapters]
 
 Os adaptadores do lado do cliente dispensam chaves e não precisam de opções — seus clientes são configurados a partir de `i18n` (ou, no caso do Pagefind, a partir do HTML compilado), então uma chave desconhecida é rejeitada pela validação da configuração em vez de ser ignorada. Os hospedados recebem credenciais **públicas** (seguras para enviar ao navegador) e leem sua chave de administração **secreta** de uma variável de ambiente no momento do build — o segredo nunca chega à configuração nem ao bundle do cliente. Toda opção que você passa para um adaptador hospedado é mantida exatamente como está e repassada ao cliente de busca dele no navegador (ou, no caso do Mixedbread, ao endpoint de busca), então uma opção que o Blume não nomeia ainda chega ao SDK — o `liteClient` do Algolia, o `Client` do Typesense ou o `OramaClient`. Essas opções precisam ser valores JSON — o descritor é embutido no projeto gerado como um literal, então uma função, `undefined` ou um bigint faz a validação da configuração falhar apontando o caminho da opção, em vez de se perder no trajeto.
+
+Algolia, Orama Cloud e Typesense enviam suas páginas para o índice deles ao final de cada `blume build`. Quando a chave de administração não está definida, o build emite um aviso e pula o envio, então um build sem segredos, como um local, continua funcionando. Quando a chave está definida e o envio falha (uma chave errada, um host inacessível, um registro rejeitado), o build falha com `BLUME_SEARCH_SYNC_FAILED` em vez de publicar com um índice que ele não atualizou.
 
 ### Orama (padrão) [#orama-default]
 
@@ -136,7 +151,7 @@ search: orama(),
 
 #### Escritas não latinas [#non-latin-scripts]
 
-O tokenizador padrão do Orama mantém apenas letras latinas básicas, dígitos e um punhado de vogais acentuadas, então textos em qualquer outra escrita — japonês, chinês, coreano e tailandês, mas igualmente russo, grego, hebraico e híndi — não produziriam nenhuma correspondência. O Blume cuida disso para você: quando [`i18n.defaultLocale`](/docs/content/i18n) corresponde a uma escrita não latina, o índice passa a usar um tokenizador que segmenta palavras (baseado no `Intl.Segmenter`, nativo do navegador e do Node). Basta declarar o idioma do seu site:
+O tokenizador padrão do Orama mantém apenas letras latinas básicas, dígitos e um punhado de vogais acentuadas, então textos em qualquer outra escrita — japonês, chinês, coreano e tailandês, mas igualmente russo, grego, hebraico e híndi — não produziriam nenhuma correspondência. O Blume cuida disso para você: páginas em um idioma que corresponde a uma escrita não latina são indexadas com um tokenizador que segmenta palavras (baseado no `Intl.Segmenter`, nativo do navegador e do Node). Basta declarar os idiomas do seu site:
 
 ```ts blume.config.ts lineNumbers
 i18n: {
@@ -145,13 +160,13 @@ i18n: {
 }
 ```
 
-O mesmo tokenizador atende o diálogo de busca, a ferramenta `search_docs` do servidor MCP e o embasamento do assistente. Quem decide é a escrita, não o nome do idioma — `az-Cyrl` é segmentado, enquanto `sr-Latn` não é — e é o idioma padrão que decide por todo o índice: em um site com vários idiomas, todas as páginas compartilham o tokenizador do idioma padrão. Com um padrão não latino, isso é seguro, porque as palavras latinas sobrevivem intactas à segmentação, então páginas em inglês permanecem pesquisáveis ao lado do idioma padrão. O contrário não vale: traduções não latinas em um site com padrão latino não são pesquisáveis. Idiomas de escrita latina que dependem bastante de diacríticos (vietnamita, ou sérvio em escrita latina) também se saem pior no tokenizador padrão, que normaliza apenas algumas vogais acentuadas e divide as palavras no restante.
+Os mesmos tokenizadores atendem o diálogo de busca, a ferramenta `search_docs` do servidor MCP e o embasamento do assistente. Quem decide é a escrita, não o nome do idioma — `az-Cyrl` é segmentado, enquanto `sr-Latn` não é. Com um padrão não latino, todas as páginas compartilham o tokenizador do idioma padrão: as palavras latinas sobrevivem intactas à segmentação, então páginas em inglês permanecem pesquisáveis ao lado do idioma padrão. Com um padrão latino, as páginas em escrita latina mantêm o tokenizador padrão e cada tradução em uma escrita não latina recebe o tokenizador do próprio idioma, então as páginas em japonês e em híndi de um site em inglês são pesquisáveis a partir do próprio idioma e em uma busca em todos os idiomas. Idiomas de escrita latina que dependem bastante de diacríticos (vietnamita, ou sérvio em escrita latina) também se saem pior no tokenizador padrão, que normaliza apenas algumas vogais acentuadas e divide as palavras no restante.
 
 Japonês e chinês vão um passo além. A segmentação sozinha indexa um termo composto como suas partes — 資金決済法 como 資金, 決済 e 法 — o que permite que uma página que mencione cada parte em algum lugar seja melhor classificada do que a página que realmente trata do termo. Por isso, Han, Hiragana e Katakana são indexados como pares de caracteres sobrepostos, e as consultas sobre esses índices preferem páginas que contenham os pares de um termo juntos, afrouxando para a correspondência de qualquer par quando nenhuma página os contém todos, de modo que digitar uma frase inteira ainda retorna as páginas mais próximas. Coreano e tailandês mantêm suas palavras segmentadas.
 
 ### FlexSearch
 
-Uma segunda opção do lado do cliente e sem chaves. Ela reutiliza o mesmo índice `/blume-search.json` que o Orama gera e constrói um índice de documentos do [FlexSearch](https://github.com/nextapps-de/flexsearch) no navegador. Funciona em `blume dev` e `blume build`.
+Uma segunda opção do lado do cliente e sem chaves (instale `flexsearch`). Ela reutiliza o mesmo índice `/blume-search.json` que o Orama gera e constrói um índice de documentos do [FlexSearch](https://github.com/nextapps-de/flexsearch) no navegador. Funciona em `blume dev` e `blume build`.
 
 O FlexSearch não tem um mecanismo equivalente de segmentação, então, para sites em escritas não latinas, prefira o Orama (o padrão) ou o [Pagefind](#pagefind), cujo binário `pagefind_extended` indexa um conjunto amplo de idiomas e segmenta chinês, japonês e coreano nativamente.
 
@@ -175,7 +190,9 @@ O Pagefind só é executado durante o `blume build`, então a busca não fica di
 
 ### Algolia
 
-O navegador consulta o [Algolia](https://www.algolia.com) diretamente com sua chave somente de busca. Cada `blume build` substitui o índice usando a chave de administração de `ALGOLIA_ADMIN_API_KEY` (o build emite um aviso e pula o envio se ela não estiver definida). Todo o índice é substituído a cada sincronização, então páginas que você excluir ou renomear não permanecem como resultados desatualizados. A sincronização também adiciona `filterOnly(locale)` e `filterOnly(version)` aos `attributesForFaceting` do índice, mantendo as facetas que você mesmo declarou, porque o diálogo restringe os resultados por idioma e por versão da documentação, e, no Algolia, um filtro sobre um atributo que não foi declarado para facetas não corresponde a nada.
+Instale `algoliasearch`. O navegador consulta o [Algolia](https://www.algolia.com) diretamente com sua chave somente de busca. Cada `blume build` substitui o índice usando a chave de administração de `ALGOLIA_ADMIN_API_KEY` (o build emite um aviso e pula o envio se ela não estiver definida). Todo o índice é substituído a cada sincronização, então páginas que você excluir ou renomear não permanecem como resultados desatualizados. A sincronização também adiciona `filterOnly(locale)` e `filterOnly(version)` aos `attributesForFaceting` do índice, mantendo as facetas que você mesmo declarou, porque o diálogo restringe os resultados por idioma e por versão da documentação, e, no Algolia, um filtro sobre um atributo que não foi declarado para facetas não corresponde a nada.
+
+O Algolia limita cada registro a 10 KB nos planos Build e Grow, então a sincronização divide uma página mais longa em vários registros, cada um com o título, a descrição e a URL da página e um trecho do texto dela. Em seguida, ela define o `attributeForDistinct` do índice como `url`, a menos que você tenha definido o seu, para que uma página dividida apareça uma única vez nos resultados, no registro com a melhor correspondência.
 
 ```ts blume.config.ts lineNumbers
 import { algolia } from "blume/search";
@@ -189,7 +206,7 @@ search: algolia({
 
 ### Orama Cloud
 
-Orama hospedado. O navegador consulta o endpoint do seu índice com a chave de API pública; o `blume build` envia registros para o índice usando `ORAMA_PRIVATE_API_KEY`. Defina `indexId` para habilitar a sincronização.
+Orama hospedado (instale `@oramacloud/client`). O navegador consulta o endpoint do seu índice com a chave de API pública; o `blume build` envia registros para o índice usando `ORAMA_PRIVATE_API_KEY`. Defina `indexId` para habilitar a sincronização; sem ele, o build emite um aviso e pula a sincronização mesmo com a chave definida.
 
 ```ts blume.config.ts lineNumbers
 import { oramaCloud } from "blume/search";
@@ -203,7 +220,7 @@ search: oramaCloud({
 
 ### Typesense
 
-[Typesense](https://typesense.org) auto-hospedado ou na nuvem. O navegador consulta a coleção com a chave somente de busca; o `blume build` recria a coleção e importa os documentos usando `TYPESENSE_ADMIN_API_KEY`. A coleção é descartada e reconstruída a cada sincronização, para que páginas excluídas ou renomeadas não permaneçam como resultados desatualizados — se você ajustar manualmente as configurações da coleção, reaplique-as após um build.
+[Typesense](https://typesense.org) auto-hospedado ou na nuvem. Instale `typesense`. O navegador consulta a coleção com a chave somente de busca. Cada `blume build` importa suas páginas para uma nova coleção usando `TYPESENSE_ADMIN_API_KEY`, depois aponta para ela um [alias](https://typesense.org/docs/latest/api/collection-alias.html) com o nome definido em `collection` e descarta a coleção que foi substituída. As buscas continuam lendo a coleção anterior até que a nova esteja completa, e páginas excluídas ou renomeadas não permanecem como resultados desatualizados. Se a sincronização falhar, o build falha e o alias continua servindo a última sincronização completa. A chave de administração precisa ter permissão para gerenciar coleções e aliases. Na primeira sincronização, uma coleção que já tenha o nome de `collection` (de uma versão anterior do Blume) é substituída pelo alias, e as chaves de busca restritas a esse nome continuam funcionando. Configurações que você ajustar manualmente em uma coleção não são levadas para a próxima, então reaplique-as após um build.
 
 ```ts blume.config.ts lineNumbers
 import { typesense } from "blume/search";
@@ -216,9 +233,13 @@ search: typesense({
 }),
 ```
 
+O tokenizador padrão do Typesense divide o texto nos espaços, então, em chinês, japonês ou tailandês, uma consulta só corresponde a partir do início de um trecho contínuo de texto. Defina `locale` como o idioma das suas páginas em um código de duas letras (`locale: "ja"`, `"zh"`, `"th"`), e a sincronização tokeniza os campos pesquisados para esse idioma; palavras em escrita latina nesses campos continuam correspondendo. Uma única coleção abriga todos os idiomas, então a configuração se aplica a todos eles.
+
 ### Mixedbread
 
-Busca semântica via [Mixedbread](https://www.mixedbread.com). As consultas passam por um endpoint `/api/search` gerado que guarda sua chave, então esse adaptador **exige saída de servidor**: um adaptador de hospedagem como `deployment: vercel()` de `blume/deploy` (veja [Renderização no servidor](/docs/deployment#server-rendering)). O endpoint lê `MIXEDBREAD_API_KEY`. Sincronize seu conteúdo com o store usando a CLI do Mixedbread no seu build, por exemplo, `mxbai vs sync <STORE_ID> ./content --ci`.
+Busca semântica via [Mixedbread](https://www.mixedbread.com) (instale `@mixedbread/sdk`). As consultas passam por um endpoint `/api/search` gerado que guarda sua chave, então esse adaptador **exige saída de servidor**: um adaptador de hospedagem como `deployment: vercel()` de `blume/deploy` (veja [Renderização no servidor](/docs/deployment#server-rendering)). O endpoint lê `MIXEDBREAD_API_KEY`. O Blume não envia nada para o store: sincronize sua pasta de conteúdo usando a [CLI do Mixedbread](https://www.npmjs.com/package/@mixedbread/cli) no seu build, por exemplo, `mxbai store sync <STORE_ID> ./docs --yes` (a CLI lê a chave dela de `MXBAI_API_KEY`).
+
+Cada resultado aponta para a página que o arquivo dele renderiza, identificada pelo caminho que a CLI registra para o arquivo, então execute a sincronização a partir da raiz do seu projeto ou de uma pasta acima dela, como a raiz de um monorepo. Uma página aparece uma única vez, no trecho com a melhor correspondência, e trechos de arquivos que não são páginas, ou de páginas excluídas da busca, ficam de fora.
 
 ```ts blume.config.ts lineNumbers
 import { mixedbread } from "blume/search";
@@ -227,6 +248,8 @@ search: mixedbread({
   storeId: "YOUR_STORE_ID",
 }),
 ```
+
+O diálogo de busca espera o leitor fazer uma pausa na digitação antes de enviar uma consulta e descarta as consultas que o leitor já deixou para trás ao continuar digitando. Cada consulta enviada conta para o [limite de taxa](/docs/configuration/rate-limiting) do endpoint.
 
 ### Desativando a busca [#disabling-search]
 

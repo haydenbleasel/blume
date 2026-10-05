@@ -26,7 +26,7 @@ export default defineConfig({
 });
 ```
 
-O token da integração vem da variável de ambiente `NOTION_TOKEN` (compartilhe o banco de dados com a sua integração). O adaptador declara essa variável, então um build sem ela gera um aviso.
+O token da integração vem da variável de ambiente `NOTION_TOKEN` (compartilhe o banco de dados com a sua integração). Sem ela, a fonte é interrompida antes de chamar o Notion, com um erro `BLUME_MISSING_SECRET` que informa o nome da variável, a menos que tenha um [snapshot em cache](/docs/content/sources#caching-and-offline-builds) para servir no lugar.
 
 Por padrão, a propriedade `Status` controla a publicação. Uma página cujo Status (uma propriedade do tipo status ou select) tenha qualquer valor diferente de `publishedValue`, que por padrão é `Published`, é importada com `draft: true`, e os builds de produção descartam os rascunhos. Uma página sem valor de Status é publicada, e um banco de dados sem essa propriedade publica todas as páginas. As opções de status padrão do Notion são Not started, In progress e Done. Um banco de dados que usa essas opções não tem nenhum valor `Published` e não publica nada até você definir `publishedValue: "Done"` (ou a opção que significa publicado no seu caso). Use `properties.status` para indicar uma propriedade com outro nome. Para importar todas as páginas independentemente do status, aponte essa opção para uma propriedade que o banco de dados não tem.
 

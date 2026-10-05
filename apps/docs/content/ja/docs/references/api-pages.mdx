@@ -42,7 +42,7 @@ Creates a user and sends them an invite.
 
 ## プレイグラウンドとサンプル [#the-playground-and-samples]
 
-仕様内のオペレーションのパラメーターと同じように、ページの `ParamField` は Try it パネルの入力項目になります。`path`、`query`、`header` フィールドはパラメーターになり、`body` フィールドは JSON ボディを構成します。フィールドの中にネストされたフィールド（その [`Expandable`](/docs/content/components#expandable) 内のもの）は、オブジェクトのプロパティになります。`type` が `string[]` の場合は配列として扱われ、`enum<string>` のように JSON の型ではないものは文字列として送信されます。フィールドの `default` はボディの初期値になり、`placeholder` はサンプルに表示される例の値になります。
+仕様内のオペレーションのパラメーターと同じように、ページの `ParamField` は Try it パネルの入力項目になります。`path`、`query`、`header` フィールドはパラメーターになり、`body` フィールドは JSON ボディを構成します。フィールドの中にネストされたフィールド（その [`Expandable`](/docs/content/components#expandable) 内のもの）は、オブジェクトのプロパティになります。`type` が `string[]` の場合は配列として扱われ、`enum<string>` のように JSON の型ではないものは文字列として送信されます。フィールドの `default` はボディの初期値になり、`placeholder` はサンプルに表示される例の値になります。どちらも持たない省略可能なボディフィールドは空の状態で始まり、読者が値を入力するまでリクエストには含まれません。
 
 パネルの横には、cURL、JavaScript、Python のリクエストサンプルが表示されます。独自の `RequestExample` を持つページでは、これらの代わりにその内容が表示されます。
 

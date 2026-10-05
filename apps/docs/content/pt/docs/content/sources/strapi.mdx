@@ -19,7 +19,8 @@ export default defineConfig({
         url: "https://cms.example.com",
         contentType: "guides",
         // locale: "en"
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "body" },
         // Extra query parameters: filters[...], sort
         params: { "filters[section][$eq]": "sdk" },
@@ -29,4 +30,4 @@ export default defineConfig({
 });
 ```
 
-O token da API vem da variável de ambiente `STRAPI_API_TOKEN` e é enviado como bearer token. As entradas são buscadas com `populate=*` para que as imagens venham com suas URLs (defina `populate` para restringir isso), e um caminho de upload relativo (`/uploads/x.png`) é resolvido a partir de `url`. Só as entradas publicadas são importadas. Com `--preview`, os rascunhos são solicitados (`status=draft` no Strapi 5, `publicationState=preview` no Strapi 4) e cada documento que nunca foi publicado entra com `draft: true`. Já um documento publicado mostra o rascunho mais recente dele no preview.
+O token da API vem da variável de ambiente `STRAPI_API_TOKEN` e é enviado como bearer token. As entradas são buscadas com `populate=*` para que as imagens venham com suas URLs (defina `populate` para restringir isso), e um caminho de upload relativo (`/uploads/x.png`) em um campo Blocks é resolvido a partir de `url`. Um campo em Markdown é mantido como foi escrito, então um caminho relativo nele continua relativo ao seu site de documentação e quebra: use URLs absolutas de imagem nos campos em Markdown, que é como o editor de Markdown do Strapi as insere. Só as entradas publicadas são importadas. Com `--preview`, os rascunhos são solicitados (`status=draft` no Strapi 5, `publicationState=preview` no Strapi 4) e cada documento que nunca foi publicado entra com `draft: true`. Já um documento publicado mostra o rascunho mais recente dele no preview.

@@ -460,7 +460,7 @@ export default defineConfig({
 });
 ```
 
-Die Antwort einer Leserin bzw. eines Lesers wird als `feedback`-[Custom Event](/docs/configuration/analytics#custom-events) gesendet — mit `helpful` (`"yes"` oder `"no"`), `path` und `title` —, und zwar über jeden konfigurierten Analytics-Adapter, der eine Event-API besitzt, sowie als `blume:track`-Event auf `window`. Ohne Analytics-Adapter wird die Antwort nirgendwo erfasst, und ist die [Cookie-Einwilligung](/docs/configuration/consent) aktiviert, wird die Bewertung nur Lesenden angezeigt, die Analytics erlaubt haben, da eine Antwort von allen anderen ohnehin nirgendwo ankäme. Die Frage und der Dankestext sind UI-Zeichenketten, die du mit [`i18n.ui`](/docs/content/i18n#translated-ui) übersetzen kannst.
+Die Antwort einer Leserin bzw. eines Lesers wird als `feedback`-[Custom Event](/docs/configuration/analytics#custom-events) gesendet — mit `helpful` (`"yes"` oder `"no"`), `path` und `title` —, und zwar über jeden konfigurierten Analytics-Adapter, der eine Event-API besitzt, sowie als `blume:track`-Event auf `window`. Fathom, Microsoft Clarity und Hotjar erfassen nur den Namen eines Events, ohne dessen Properties — sie zählen Bewertungen also, können ein Ja aber nicht von einem Nein unterscheiden. Ohne Analytics-Adapter wird die Antwort nirgendwo erfasst, und ist die [Cookie-Einwilligung](/docs/configuration/consent) aktiviert, wird die Bewertung nur Lesenden angezeigt, die Analytics erlaubt haben, da eine Antwort von allen anderen ohnehin nirgendwo ankäme. Die Frage und der Dankestext sind UI-Zeichenketten, die du mit [`i18n.ui`](/docs/content/i18n#translated-ui) übersetzen kannst.
 
 ### Schriftliches Feedback [#written-feedback]
 
@@ -472,7 +472,7 @@ export default defineConfig({
 });
 ```
 
-Ein Kommentar wird als `feedback_comment`-Event gesendet — mit denselben Werten für `helpful`, `path` und `title` wie die Bewertung, plus dem `comment` der Leserin bzw. des Lesers (bis zu 1.000 Zeichen). Er läuft über dieselben Adapter wie die Bewertung, du liest Kommentare also dort, wo du auch deine Events liest. Anbieter begrenzen die Länge von Property-Werten, daher kann ein langer Kommentar gekürzt ankommen: Google Analytics behält 100 Zeichen und Mixpanel 255, während PostHog und Segment Kommentare vollständig übernehmen. Plausible gruppiert identische Werte, statt jeden Kommentar einzeln aufzulisten, und eignet sich daher besser für Bewertungen als für Kommentare. Lesende können beliebigen Text in das Feld schreiben, behandle Kommentare also so, als könnten sie personenbezogene Daten enthalten.
+Ein Kommentar wird als `feedback_comment`-Event gesendet — mit denselben Werten für `helpful`, `path` und `title` wie die Bewertung, plus dem `comment` der Leserin bzw. des Lesers (bis zu 1.000 Zeichen). Er läuft über dieselben Adapter wie die Bewertung, du liest Kommentare also dort, wo du auch deine Events liest. Anbieter begrenzen die Länge von Property-Werten, daher kann ein langer Kommentar gekürzt ankommen: Google Analytics behält 100 Zeichen, Mixpanel 255 Bytes (weniger Zeichen bei einer Schrift, die mehrere Bytes pro Zeichen benötigt, etwa Japanisch), und Vercel Web Analytics nimmt Werte bis zu 255 Zeichen entgegen, während PostHog und Segment Kommentare vollständig übernehmen. Fathom, Clarity und Hotjar erhalten überhaupt keinen Kommentartext. Plausible gruppiert identische Werte, statt jeden Kommentar einzeln aufzulisten, und eignet sich daher besser für Bewertungen als für Kommentare. Lesende können beliebigen Text in das Feld schreiben, behandle Kommentare also so, als könnten sie personenbezogene Daten enthalten.
 
 Die Beschriftung und die Schaltfläche des Felds sind ebenfalls UI-Zeichenketten (`feedback.comment` und `feedback.send`).
 
@@ -506,6 +506,7 @@ Zu jeder dieser Optionen gibt es eine eigene Anleitung. Das Konfigurationsfeld i
 | `react` | Verhalten von React-Islands — die automatische Memoisierung des React Compilers | [Islands](/docs/content/islands#frameworks) |
 | `variables` | Werte, die `{{name}}` auf jeder Seite ausliest | [Variablen](/docs/content/variables) |
 | `feedback` | Die Bewertung „War diese Seite hilfreich?“ am Ende jeder Seite (Standard `true`) und optionale schriftliche Kommentare im Anschluss daran | [Seiten-Feedback](#page-feedback) |
+| `changelog` | Titel und Beschreibung des generierten `/changelog`-Index, jeweils als Zeichenkette oder als Zuordnung pro Sprache | [Changelogs](/docs/advanced/changelog#the-index-page) |
 
 ## Rangfolge [#precedence]
 

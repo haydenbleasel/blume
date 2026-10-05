@@ -44,6 +44,7 @@ As traduções que você escreveu à mão são **adotadas, nunca sobrescritas**:
 A estrutura nunca fica nas mãos do agente. Antes de gravar, o Blume verifica cada resposta e reconstrói o arquivo a partir da origem:
 
 - O frontmatter é reconstruído a partir dos dados do arquivo de origem, e só os seis valores traduzíveis são substituídos — chaves inventadas pelo agente são descartadas, chaves que ele apagou são restauradas, e `slug`, `icon`, `order` e datas são, por construção, idênticos aos da origem.
+- `seo.canonical` é a única chave da origem que fica de fora. Ela aponta para uma página no idioma de origem, e uma tradução cuja URL canônica aponta para outro idioma some da busca no próprio idioma, então a tradução recebe a canônica padrão: a própria URL dela.
 - O número de blocos de código precisa bater com o da origem, o corpo não pode estar vazio e o frontmatter precisa ser válido.
 - Cada título é fixado ao id de âncora do título correspondente na origem com um [marcador `[#id]`](/docs/content/syntax#custom-anchors) no final, a menos que a tradução já fixe um, para que links com `#fragment` funcionem da mesma forma em todos os idiomas. Os títulos são pareados pela posição, então uma tradução cuja estrutura de títulos não bate com a da origem não recebe nenhum marcador.
 

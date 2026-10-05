@@ -1331,8 +1331,8 @@ export interface MarkdownConfig {
 export interface ReactConfig {
   /**
    * Auto-memoize React components/hooks with the React Compiler
-   * (`babel-plugin-react-compiler`). On by default whenever React is enabled;
-   * set to `false` to skip the compiler's babel pass. Defaults to `true`.
+   * (`oxc-transform-react`). On by default whenever React is enabled;
+   * set to `false` to skip the compiler pass. Defaults to `true`.
    */
   compiler?: boolean;
 }

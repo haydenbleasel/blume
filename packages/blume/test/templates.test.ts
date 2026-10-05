@@ -1020,9 +1020,9 @@ describe("runtimeDependencies", () => {
     ).toContain("probe-analytics-sdk");
   });
 
-  it("never declares the React Compiler plugin as a runtime dep (it's resolved by absolute path)", () => {
+  it("never declares the React Compiler as a runtime dep (it's a build-time transform)", () => {
     expect(runtimeDependencies({ config, needsReact: true })).not.toContain(
-      "babel-plugin-react-compiler"
+      "oxc-transform-react"
     );
   });
 });
@@ -1250,10 +1250,10 @@ describe("astroConfigTemplate", () => {
     expect(out).toContain('import react from "@astrojs/react"');
     expect(out).toContain('import vue from "@astrojs/vue"');
     expect(out).toContain('import svelte from "@astrojs/svelte"');
-    // No reactCompilerPath passed, so react() carries no babel block
-    // (compiler off) — only the pre-bundle exclude.
+    // No reactCompiler passed, so react() leaves the compiler off — only the
+    // pre-bundle exclude.
     expect(out).toContain(
-      String.raw`react({ exclude: [/\/node_modules\/\.vite\//, /\/\.cache\/vite\//] })`
+      String.raw`react({ exclude: [/\/\.cache\/vite\//] })`
     );
     expect(out).toContain("vue()");
     expect(out).toContain("svelte()");
@@ -1366,9 +1366,7 @@ describe("astroConfigTemplate", () => {
     expect(out).toContain('"/manual/new"');
   });
 
-  it("carries the React Compiler babel plugin when a compiler path is given", () => {
-    const compilerPath =
-      "/abs/node_modules/babel-plugin-react-compiler/dist/index.js";
+  it("turns the React Compiler on when asked", () => {
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
       config,
@@ -1380,21 +1378,21 @@ describe("astroConfigTemplate", () => {
       featuresPath: FEATURES_PATH,
       needsReact: true,
       pages: [],
-      reactCompilerPath: compilerPath,
+      reactCompiler: true,
       searchClientPath: SEARCH_CLIENT_PATH,
       themePath: THEME_PATH,
     });
     expect(out).toContain(
-      `react({ babel: { plugins: [[${JSON.stringify(compilerPath)}, { target: "19" }]] }, ${String.raw`exclude: [/\/node_modules\/\.vite\//, /\/\.cache\/vite\//]`} })`
+      String.raw`react({ compiler: true, exclude: [/\/\.cache\/vite\//] })`
     );
-    // The Babel-injected `react/compiler-runtime` import is invisible to the
+    // The compiler-injected `react/compiler-runtime` import is invisible to the
     // optimizer's source scan, so it must ride the include list — otherwise its
     // first request triggers a mid-session re-optimization whose new generation
     // duplicates React and tears down every hydrated island (#157).
     expect(out).toContain('"react/compiler-runtime"');
   });
 
-  it("omits the compiler babel plugin when no compiler path is given", () => {
+  it("leaves the React Compiler off when not asked", () => {
     const out = astroConfigTemplate({
       askPath: ASK_PATH,
       config,
@@ -1411,9 +1409,9 @@ describe("astroConfigTemplate", () => {
     });
     expect(out).toContain('import react from "@astrojs/react"');
     expect(out).toContain(
-      String.raw`react({ exclude: [/\/node_modules\/\.vite\//, /\/\.cache\/vite\//] })`
+      String.raw`react({ exclude: [/\/\.cache\/vite\//] })`
     );
-    expect(out).not.toContain("babel-plugin-react-compiler");
+    expect(out).not.toContain("compiler: true");
     // No compiler, no injected runtime import — keep it out of the optimizer.
     expect(out).not.toContain('"react/compiler-runtime"');
   });
@@ -1823,6 +1821,28 @@ describe("astroConfigTemplate", () => {
   });
 });
 
+const fsAllowFor = (root: string): string => {
+  const out = astroConfigTemplate({
+    askPath: ASK_PATH,
+    config,
+    consentClientPath: CONSENT_CLIENT_PATH,
+    contentRoutes: [],
+    context: context({
+      contentRoot: join(root, "docs"),
+      outDir: join(root, ".blume"),
+      root,
+    }),
+    examplesPath: EXAMPLES_PATH,
+    examplesThemePath: EXAMPLES_THEME_PATH,
+    featuresPath: FEATURES_PATH,
+    needsReact: false,
+    pages: [],
+    searchClientPath: SEARCH_CLIENT_PATH,
+    themePath: THEME_PATH,
+  });
+  return out;
+};
+
 describe("astroConfigTemplate workspace root", () => {
   const dirs: string[] = [];
 
@@ -1837,28 +1857,6 @@ describe("astroConfigTemplate workspace root", () => {
       dirs.map((dir) => rm(dir, { force: true, recursive: true }))
     );
   });
-
-  const fsAllowFor = (root: string): string => {
-    const out = astroConfigTemplate({
-      askPath: ASK_PATH,
-      config,
-      consentClientPath: CONSENT_CLIENT_PATH,
-      contentRoutes: [],
-      context: context({
-        contentRoot: join(root, "docs"),
-        outDir: join(root, ".blume"),
-        root,
-      }),
-      examplesPath: EXAMPLES_PATH,
-      examplesThemePath: EXAMPLES_THEME_PATH,
-      featuresPath: FEATURES_PATH,
-      needsReact: false,
-      pages: [],
-      searchClientPath: SEARCH_CLIENT_PATH,
-      themePath: THEME_PATH,
-    });
-    return out;
-  };
 
   it("uses a package.json workspaces field as the workspace root", async () => {
     const root = await makeRoot();
@@ -2763,23 +2761,23 @@ describe("package / tsconfig templates", () => {
   });
 });
 
-describe("astroConfigTemplate image config", () => {
-  const render = (parsed: typeof config) =>
-    astroConfigTemplate({
-      askPath: ASK_PATH,
-      config: parsed,
-      consentClientPath: CONSENT_CLIENT_PATH,
-      contentRoutes: [],
-      context: context(),
-      examplesPath: EXAMPLES_PATH,
-      examplesThemePath: EXAMPLES_THEME_PATH,
-      featuresPath: FEATURES_PATH,
-      needsReact: false,
-      pages: [],
-      searchClientPath: SEARCH_CLIENT_PATH,
-      themePath: THEME_PATH,
-    });
+const render = (parsed: typeof config) =>
+  astroConfigTemplate({
+    askPath: ASK_PATH,
+    config: parsed,
+    consentClientPath: CONSENT_CLIENT_PATH,
+    contentRoutes: [],
+    context: context(),
+    examplesPath: EXAMPLES_PATH,
+    examplesThemePath: EXAMPLES_THEME_PATH,
+    featuresPath: FEATURES_PATH,
+    needsReact: false,
+    pages: [],
+    searchClientPath: SEARCH_CLIENT_PATH,
+    themePath: THEME_PATH,
+  });
 
+describe("astroConfigTemplate image config", () => {
   it("emits no image block by default", () => {
     expect(render(config)).not.toContain("image:");
   });

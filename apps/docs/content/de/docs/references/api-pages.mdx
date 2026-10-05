@@ -43,7 +43,7 @@ Creates a user and sends them an invite.
 
 ## Playground und Samples [#the-playground-and-samples]
 
-Die `ParamField`s der Seite werden zu den Eingabefeldern des Try-it-Panels, so wie die Parameter einer Operation in einer Spec. `path`-, `query`- und `header`-Felder sind Parameter, und `body`-Felder bilden zusammen einen JSON-Body. Die verschachtelten Felder eines Felds (innerhalb seines [`Expandable`](/docs/content/components#expandable)) werden dabei zu den Properties eines Objekts. Ein `type` von `string[]` ist ein Array. Ein Typ, der kein JSON-Typ ist, etwa `enum<string>`, wird als String gesendet. Der `default` eines Felds füllt den Body, und sein `placeholder` ist der Beispielwert, den die Samples anzeigen.
+Die `ParamField`s der Seite werden zu den Eingabefeldern des Try-it-Panels, so wie die Parameter einer Operation in einer Spec. `path`-, `query`- und `header`-Felder sind Parameter, und `body`-Felder bilden zusammen einen JSON-Body. Die verschachtelten Felder eines Felds (innerhalb seines [`Expandable`](/docs/content/components#expandable)) werden dabei zu den Properties eines Objekts. Ein `type` von `string[]` ist ein Array. Ein Typ, der kein JSON-Typ ist, etwa `enum<string>`, wird als String gesendet. Der `default` eines Felds füllt den Body, und sein `placeholder` ist der Beispielwert, den die Samples anzeigen. Ein optionales Body-Feld, das keins von beiden hat, ist zunächst leer und wird erst in den Request übernommen, wenn es jemand ausfüllt.
 
 Neben dem Panel bekommt die Seite Request-Samples in cURL, JavaScript und Python. Hat eine Seite ein eigenes `RequestExample`, wird stattdessen dieses angezeigt.
 

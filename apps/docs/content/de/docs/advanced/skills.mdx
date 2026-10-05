@@ -24,7 +24,7 @@ npx skills add haydenbleasel/blume --skill blume-migrate
 
 ## Selbstaktualisierende Dokumentation [#self-updating-docs]
 
-`blume-update-docs` hält deine Dokumentation mit dem Produkt synchron, das sie beschreibt. Bei jedem Durchlauf — typischerweise nach einem Zeitplan, den du in deinem Agent-Runner konfigurierst — prüft der Skill kürzlich gemergte PRs, Changelogs, Config-Schemas und CLI-Hilfetexte gegen die Doku-Inhalte, aktualisiert nur Seiten, die inhaltlich veraltet sind (Arbeiten hinter Feature-Flags werden ignoriert), verifiziert das Ergebnis mit `blume build` und öffnet oder aktualisiert einen `blume/*`-Pull-Request. Wenn sich nichts verändert hat, meldet er einen sauberen No-Op, statt einen störenden PR zu öffnen.
+`blume-update-docs` hält deine Dokumentation mit dem Produkt synchron, das sie beschreibt. Bei jedem Durchlauf — typischerweise nach einem Zeitplan, den du in deinem Agent-Runner konfigurierst — prüft der Skill kürzlich gemergte PRs, Changelogs, Config-Schemas und CLI-Hilfetexte gegen die Doku-Inhalte, aktualisiert nur Seiten, die inhaltlich veraltet sind (Arbeiten hinter Feature-Flags werden ignoriert), verifiziert das Ergebnis mit `blume build` und `blume validate` und öffnet oder aktualisiert einen `blume/*`-Pull-Request. Wenn sich nichts verändert hat, meldet er einen sauberen No-Op, statt einen störenden PR zu öffnen.
 
 ```bash
 npx skills add haydenbleasel/blume --skill blume-update-docs

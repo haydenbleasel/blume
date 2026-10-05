@@ -4,7 +4,7 @@ description: >-
   Lies einen Contentful-Content-Type mit der Quelle contentful() über die Delivery API und wandle Rich-Text-Inhalte in Markdown um – ganz ohne Installation.
 ---
 
-Der eingebaute Adapter `contentful()` liest die Einträge eines Content Types über die Content Delivery API und wandelt den Rich-Text-Inhalt jedes Eintrags in Markdown um. Überschriften, Formatierungen, Links, Listen, Zitate, Tabellen und eingebettete Assets werden zu ihren Markdown-Entsprechungen. Steht der Inhalt in einem Markdown-Langtextfeld, wird er unverändert übernommen. Es gibt eine Ausnahme: Ist ein Link weder eine Web-, Mail- oder Telefonadresse noch eine relative Adresse (etwa eine `javascript:`-URL), bleibt nur sein Linktext erhalten, genau wie im Rich Text. Du musst nichts installieren, denn der Adapter spricht direkt mit der REST API.
+Der eingebaute Adapter `contentful()` liest die Einträge eines Content Types über die Content Delivery API und wandelt den Rich-Text-Inhalt jedes Eintrags in Markdown um. Überschriften, Formatierungen, Links, Listen, Zitate und Tabellen werden zu ihren Markdown-Entsprechungen. Ein eingebettetes Bild-Asset wird zu einem Bild und jede andere eingebettete Datei (etwa ein PDF) zu einem Link darauf. Steht der Inhalt in einem Markdown-Langtextfeld, wird er unverändert übernommen. Es gibt eine Ausnahme: Ist ein Link weder eine Web-, Mail- oder Telefonadresse noch eine relative Adresse (etwa eine `javascript:`-URL), bleibt nur sein Linktext erhalten, genau wie im Rich Text. Du musst nichts installieren, denn der Adapter spricht direkt mit der REST API.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -20,14 +20,17 @@ export default defineConfig({
         contentType: "guide",
         // environment: "master", locale: "en-US"
         // Field ids default to title / description / slug / body, and the
-        // date to sys.updatedAt
-        fields: { body: "content" },
+        // date to sys.updatedAt; order (no default) sets the sidebar order
+        fields: { body: "content", order: "position" },
         // Extra Delivery API query parameters
         params: { "fields.section": "sdk" },
+        // A space with EU data residency:
+        // host: "cdn.eu.contentful.com",
+        // previewHost: "preview.eu.contentful.com",
       }),
     ],
   },
 });
 ```
 
-Das Delivery-API-Token kommt aus der Umgebungsvariable `CONTENTFUL_ACCESS_TOKEN`, die der Adapter deklariert. Mit `--preview` liest der Adapter Entwürfe über die Preview API und verwendet dabei `CONTENTFUL_PREVIEW_TOKEN`. Die Preview API akzeptiert keine Delivery-Tokens. Fehlt das Preview-Token, bricht `--preview` deshalb mit einer klaren Fehlermeldung ab und greift nicht auf `CONTENTFUL_ACCESS_TOKEN` zurück. Assets werden nicht heruntergeladen, sondern direkt vom CDN von Contentful eingebunden, da ihre URLs stabil sind. Du kannst einen eingebetteten Eintrag einer Blume-Komponente zuordnen, indem du `contentfulSource` direkt erstellst und an [`custom()`](/docs/content/sources/custom) übergibst. Die Zuordnung legst du über die Engine-Option `serializers` fest, jeweils anhand der Content-Type-ID. Wenn du `serializers` setzt, werden die Seiten der Quelle als MDX geschrieben, damit die zurückgegebenen Komponenten gerendert werden. Gibt es für einen eingebetteten Eintrag keinen Serializer, wird er in einem Kommentar vermerkt. Ein Link auf einen anderen Eintrag erscheint als reiner Text, weil es keine Route gibt, auf die er zeigen könnte.
+Das Delivery-API-Token kommt aus der Umgebungsvariable `CONTENTFUL_ACCESS_TOKEN`, die der Adapter deklariert. Fehlt sie, bricht die Quelle schon vor ihrer ersten Anfrage mit einem `BLUME_MISSING_SECRET`-Fehler ab und nicht erst mit dem `401` von Contentful. Das gilt nicht, wenn sie stattdessen einen [zwischengespeicherten Snapshot](/docs/content/sources#caching-and-offline-builds) ausliefern kann. Mit `--preview` liest der Adapter Entwürfe über die Preview API und verwendet dabei `CONTENTFUL_PREVIEW_TOKEN`. Die Preview API akzeptiert keine Delivery-Tokens. Fehlt das Preview-Token, bricht `--preview` deshalb mit einer klaren Fehlermeldung ab und greift nicht auf `CONTENTFUL_ACCESS_TOKEN` zurück. Ein Space mit EU-Datenresidenz wird über andere Hosts ausgeliefert. Setze dafür `host` auf `cdn.eu.contentful.com` und `previewHost` auf `preview.eu.contentful.com`. Wenn du `fields.order` einem Zahlenfeld zuordnest, legst du damit die Position jeder Seite in der Sidebar fest. Einen Standardwert gibt es dafür nicht. Assets werden nicht heruntergeladen, sondern direkt vom CDN von Contentful eingebunden, da ihre URLs stabil sind. Ein Link auf einen anderen Eintrag vom `contentType` der Quelle zeigt auf die Seite dieses Eintrags. Er führt zu der Route, unter der die Seite gebaut wird, also zu ihrem Slug unter dem `prefix` der Quelle. Manche Einträge werden von der Quelle nicht zu Seiten gemacht, etwa Einträge eines anderen Content Types oder Einträge, die dein `params`-Filter aussortiert. Ein Link auf einen solchen Eintrag behält nur seinen Text. Unveröffentlichte, archivierte oder gelöschte Assets und Einträge lässt die Delivery API in ihrer Antwort weg. Eine Seite, die so ein Asset oder so einen Eintrag einbettet oder verlinkt, wird deshalb ohne ihn gerendert (ein Link behält seinen Text), und die Quelle gibt eine Warnung mit `BLUME_SOURCE_UNRESOLVED_LINK` aus. Du kannst einen eingebetteten Eintrag einer Blume-Komponente zuordnen, indem du `contentfulSource` direkt erstellst und an [`custom()`](/docs/content/sources/custom) übergibst. Die Zuordnung legst du über die Engine-Option `serializers` fest, jeweils anhand der Content-Type-ID. Wenn du `serializers` setzt, werden die Seiten der Quelle als MDX geschrieben, damit die zurückgegebenen Komponenten gerendert werden. Gibt es für einen eingebetteten Eintrag keinen Serializer, wird er in einem Kommentar vermerkt.

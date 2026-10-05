@@ -481,6 +481,22 @@ describe("deep body validation", () => {
   });
 });
 
+/** The CORS message a panel rendered for `config` shows. */
+const corsText = async (config: string): Promise<string> => {
+  const fixture = createFixture(bearerModel(), undefined, config);
+  init(fixture);
+  // The send fails and the probe answers: the CORS wall.
+  let calls = 0;
+  fetchImpl = () => {
+    calls += 1;
+    return calls === 1
+      ? Promise.reject(new TypeError("Failed to fetch"))
+      : Promise.resolve(new Response(null));
+  };
+  await clickSend(fixture);
+  return fixture.response.textContent;
+};
+
 describe("send + response rendering", () => {
   it("renders status, timing, headers, and pretty JSON", async () => {
     const fixture = createFixture(deepModel());
@@ -678,21 +694,6 @@ describe("send + response rendering", () => {
   });
 
   it("names the proxy setting for the surface the panel is on", async () => {
-    /** The CORS message a panel rendered for `config` shows. */
-    const corsText = async (config: string): Promise<string> => {
-      const fixture = createFixture(bearerModel(), undefined, config);
-      init(fixture);
-      // The send fails and the probe answers: the CORS wall.
-      let calls = 0;
-      fetchImpl = () => {
-        calls += 1;
-        return calls === 1
-          ? Promise.reject(new TypeError("Failed to fetch"))
-          : Promise.resolve(new Response(null));
-      };
-      await clickSend(fixture);
-      return fixture.response.textContent;
-    };
     expect(await corsText("graphql")).toContain(
       "Set `playground: { proxy: true }` on the `graphql()` reference in the Blume config"
     );

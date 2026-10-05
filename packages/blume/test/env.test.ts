@@ -29,18 +29,18 @@ afterEach(async () => {
   );
 });
 
+const load = async (content: string): Promise<string> => {
+  const base = await tempDir();
+  await mkdir(join(base, ".git"), { recursive: true });
+  await writeFile(join(base, ".env"), content, "utf-8");
+  loadEnvFiles(base);
+  return base;
+};
+
 // Parsing itself is dotenv's; these pin the behaviors Blume relies on
 // end-to-end through the file loader — the format contract with Vite (which
 // parses the identical file with the same library at build time).
 describe("loadEnvFiles parsing (dotenv contract)", () => {
-  const load = async (content: string): Promise<string> => {
-    const base = await tempDir();
-    await mkdir(join(base, ".git"), { recursive: true });
-    await writeFile(join(base, ".env"), content, "utf-8");
-    loadEnvFiles(base);
-    return base;
-  };
-
   it("parses exports, quotes, comments, and inline equals", async () => {
     track(
       "BLUME_ENVTEST_EXPORTED",

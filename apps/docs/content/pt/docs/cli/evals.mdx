@@ -26,7 +26,7 @@ blume eval  4 question(s) · Codex
 
 ## Como funciona [#how-it-works]
 
-Cada pergunta passa por duas sessões de agente, usando uma CLI de agente que você já tem instalada — [Codex](https://developers.openai.com/codex/cli) por padrão, ou [Claude Code](https://claude.com/claude-code) com `--agent claude`. O Blume não guarda nenhuma chave de API e não chama nenhum modelo por conta própria. Com o Codex, as duas sessões também rodam sem as ferramentas de shell, de comandos e de imagens do Codex, e não herdam nenhuma das suas variáveis de ambiente.
+Cada pergunta passa por duas sessões de agente, usando uma CLI de agente que você já tem instalada — [Codex](https://developers.openai.com/codex/cli) por padrão, ou [Claude Code](https://claude.com/claude-code) com `--agent claude`. O Blume não guarda nenhuma chave de API e não chama nenhum modelo por conta própria. Com o Codex, as duas sessões também rodam sem as ferramentas de shell, de comandos e de imagens do Codex, e não herdam nenhuma das suas variáveis de ambiente. Com o Claude Code, as duas sessões rodam com todas as ferramentas nativas desativadas e ignoram seus arquivos de configuração do Claude Code e o `CLAUDE.md`, então seus hooks, plugins e memória não conseguem contar ao leitor o que a documentação não diz. Seu login do Claude Code continua funcionando; defina qualquer outra coisa de que ele precise, como `ANTHROPIC_API_KEY`, no seu shell em vez de no `settings.json`.
 
 1. **O leitor** responde à pergunta usando _só_ a sua documentação. Ele roda em um diretório vazio, com as ferramentas de arquivo, shell e web desativadas, conectado a um [servidor MCP](/docs/discoverability/mcp) privado que serve a sua documentação — as mesmas ferramentas `search_docs`/`get_page` que um agente real usa no seu site publicado. Ele não consegue ler o seu repositório, então vivencia a documentação exatamente como um usuário novo: o que não está escrito não existe.
 2. **O juiz** avalia a resposta com base nos fatos que você listou, sem nenhuma ferramenta. Paráfrases passam; um fato ausente ou contradito falha — e "a documentação não diz" também falha.
@@ -83,9 +83,9 @@ blume eval --threshold 0.8    # at least 80% must pass
 blume eval --json             # machine-readable report on stdout
 ```
 
-O relatório JSON tem o mesmo formato `diagnostics` + `summary` de `blume validate --json` e `blume audit --json`, junto com os resultados por pergunta (resposta, pontuação, fatos ausentes, custo).
+O relatório JSON tem o mesmo formato `diagnostics` + `summary` de `blume validate --json` e `blume audit --json`, junto com os resultados por pergunta (resposta, pontuação, fatos ausentes e, com o Claude Code, custo).
 
-Como cada pergunta envolve duas sessões de modelo, uma execução de eval custa dinheiro de verdade e leva alguns minutos — o gasto por pergunta é exibido durante a execução. Uma configuração sensata de CI roda `blume eval` quando a documentação muda, e não a cada push.
+Como cada pergunta envolve duas sessões de modelo, uma execução de eval custa dinheiro de verdade e leva alguns minutos. Com o Claude Code, o gasto por pergunta é exibido durante a execução e totalizado no resumo; o Codex não informa o próprio gasto, então uma execução com o Codex não mostra nenhum. Uma configuração sensata de CI roda `blume eval` quando a documentação muda, e não a cada push.
 
 ## Corrigindo os problemas encontrados [#fixing-the-findings]
 
@@ -95,7 +95,7 @@ Cada falha aponta os fatos ausentes e a página que deveria afirmá-los. Se pref
 blume eval --fix
 ```
 
-Isso grava o relatório JSON completo em um arquivo e abre o agente no modo interativo, com um prompt que o guia por cada pergunta que falhou: ler a página indicada, adicionar os fatos ausentes no tom da página e rodar `blume eval` de novo até tudo passar. A sessão é interativa de propósito — você revisa as edições pelo próprio fluxo de permissões do agente — e o agente é instruído a nunca apagar perguntas nem enfraquecer os fatos esperados só para ficar tudo verde.
+Isso grava o relatório JSON completo em um arquivo e abre o agente no modo interativo, com um prompt que o guia por cada pergunta que falhou: ler a página indicada, adicionar os fatos ausentes no tom da página e rodar `blume eval` de novo, com os mesmos `--agent`, `--file`, `--threshold` e `--timeout` da execução, até tudo passar. A sessão é interativa de propósito — você revisa as edições pelo próprio fluxo de permissões do agente — e o agente é instruído a nunca apagar perguntas nem enfraquecer os fatos esperados só para ficar tudo verde.
 
 ## Flags
 

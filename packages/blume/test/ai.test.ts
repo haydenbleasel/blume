@@ -508,14 +508,14 @@ describe("buildLlmsFiles — navigation structure", () => {
   });
 });
 
-describe("buildLlmsFiles — agents.llmsTxt.openapi", () => {
-  const apiPage = (): PageRecord =>
-    makePage("openapi:reference/get-pet.mdx", "/reference/get-pet", "Get Pet", {
-      body: { format: "mdx", text: "API operation body." },
-      navPath: "reference/get-pet.mdx",
-      source: { name: "openapi", ref: "reference/get-pet.mdx" },
-    });
+const apiPage = (): PageRecord =>
+  makePage("openapi:reference/get-pet.mdx", "/reference/get-pet", "Get Pet", {
+    body: { format: "mdx", text: "API operation body." },
+    navPath: "reference/get-pet.mdx",
+    source: { name: "openapi", ref: "reference/get-pet.mdx" },
+  });
 
+describe("buildLlmsFiles — agents.llmsTxt.openapi", () => {
   it("includes generated API reference pages by default", async () => {
     const { full, index } = await buildLlmsFiles(
       makeProject([makePage("a.md", "/a", "Alpha"), apiPage()])
@@ -748,10 +748,10 @@ describe("markdownRoutePaths", () => {
   });
 });
 
-describe("component downleveling in agent surfaces", () => {
-  const tableProject = (): BlumeProject =>
-    makeProject([makePage("t.md", "/t", "Table")]);
+const tableProject = (): BlumeProject =>
+  makeProject([makePage("t.md", "/t", "Table")]);
 
+describe("component downleveling in agent surfaces", () => {
   it("stores a downleveled md variant beside the verbatim source", async () => {
     const raw = await buildRawMarkdown(tableProject());
     expect(raw["/t"]?.mdx).toContain('<Callout type="warning">');
@@ -829,10 +829,10 @@ describe("component downleveling in agent surfaces", () => {
   });
 });
 
-describe("agent-facing markdown honors <Visibility>", () => {
-  const visProject = (): BlumeProject =>
-    makeProject([makePage("v.md", "/v", "Vis")]);
+const visProject = (): BlumeProject =>
+  makeProject([makePage("v.md", "/v", "Vis")]);
 
+describe("agent-facing markdown honors <Visibility>", () => {
   it("filters llms-full.txt: web removed, agents unwrapped, fences kept", async () => {
     const { full } = await buildLlmsFiles(visProject());
     expect(full).not.toContain("Web-only body.");

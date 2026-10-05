@@ -192,7 +192,7 @@ test.describe("dropdowns", () => {
     page,
   }) => {
     await page.goto("/docs/quickstart");
-    // The rail's block: the mobile "On this page" copy is hidden at this width.
+    // In the rail at this width (below it, the block moves into "On this page").
     const actions = page.locator("[data-blume-toc] [data-blume-page-actions]");
     const dropdown = actions.locator("details").first();
     const open = actions.locator("details[open]");
@@ -220,7 +220,7 @@ test.describe("dropdowns", () => {
     page,
   }) => {
     await page.goto("/docs/quickstart");
-    // The rail's block: the mobile "On this page" copy is hidden at this width.
+    // In the rail at this width (below it, the block moves into "On this page").
     const actions = page.locator("[data-blume-toc] [data-blume-page-actions]");
     const dropdown = actions.locator("details").first();
     const open = actions.locator("details[open]");
@@ -236,6 +236,41 @@ test.describe("dropdowns", () => {
     await expect(lastItem).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(open).toHaveCount(0);
+  });
+
+  test("page actions move into the On this page dropdown below 1,280px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 800, width: 480 });
+    await page.goto("/docs/quickstart");
+    // The page renders the block once, and below the rail's breakpoint the
+    // script moves it into the dropdown's mount.
+    const actions = page.locator("[data-blume-page-actions]");
+    await expect(actions).toHaveCount(1);
+    await expect(
+      page.locator("[data-blume-page-actions-mount] [data-blume-page-actions]")
+    ).toHaveCount(1);
+    await page.locator("#blume-content > details > summary").click();
+    await expect(actions.locator("[data-blume-scroll-top]")).toBeHidden();
+
+    // Its groups expand in place, one at a time, and stay open on an outside
+    // press.
+    const groups = actions.locator("details");
+    const open = actions.locator("details[open]");
+    await groups.first().locator("summary").click();
+    await groups.nth(1).locator("summary").click();
+    await expect(open).toHaveCount(1);
+    await expect(groups.nth(1)).toHaveAttribute("open");
+    await page.locator("#blume-content h1").click();
+    await expect(open).toHaveCount(1);
+
+    // Back at the rail's width, it is the rail's floating dropdowns again.
+    await page.setViewportSize({ height: 800, width: 1280 });
+    await expect(
+      page.locator("[data-blume-toc] [data-blume-page-actions]")
+    ).toHaveCount(1);
+    await expect(open).toHaveCount(0);
+    await expect(groups.first()).toHaveAttribute("data-blume-dropdown", "");
   });
 
   test("the header language switcher closes on an outside click", async ({

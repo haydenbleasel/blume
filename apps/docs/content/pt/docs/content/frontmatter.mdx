@@ -6,6 +6,8 @@ description: >-
 
 Toda página aceita o frontmatter a seguir. Todos os campos são opcionais.
 
+O frontmatter é YAML, então coloque entre aspas um valor que contenha dois-pontos seguidos de espaço, como `description: "Setup: the easy way"`. Sem aspas, o YAML interpreta o segundo sinal de dois-pontos como o início de uma chave aninhada, e o Blume aponta o arquivo e a linha com o erro `BLUME_FRONTMATTER_INVALID`.
+
 <TypeTable
   type={{
     title: { type: "string", description: "Page title." },
@@ -164,7 +166,7 @@ seo:
     creator: "@jane"
 ```
 
-`noindex` emite um `noindex` para robôs, tira a página do sitemap e omite os dados estruturados dela. `x.creator` atribui a página a uma conta do X (`twitter:creator`), como o autor de um post convidado, por exemplo. Veja [Metadados](/docs/discoverability/metadata#per-page-overrides) para conhecer todos os campos.
+`noindex` emite um `noindex` para robôs, tira a página do sitemap e omite os dados estruturados dela. Um `canonical` que aponte para outra URL também tira a página do sitemap, já que o sitemap lista só URLs canônicas. `x.creator` atribui a página a uma conta do X (`twitter:creator`), como o autor de um post convidado, por exemplo. Veja [Metadados](/docs/discoverability/metadata#per-page-overrides) para conhecer todos os campos.
 
 ## Busca [#search]
 
@@ -176,7 +178,7 @@ search:
   boost: 3
 ```
 
-`exclude` deixa a página fora da busca, e `tags` a agrupa sob um filtro na caixa de diálogo de busca. `keywords` são termos extras pelos quais a página pode ser encontrada, além do próprio texto dela. `boost` multiplica a relevância da página: acima de 1, ela sobe no ranking; abaixo de 1, desce. Veja [Classificação](/docs/configuration/search#ranking).
+`exclude` deixa a página fora da busca, e `tags` rotula o registro dela para que um adaptador de busca hospedada possa filtrar por ele (veja [Tags](/docs/configuration/search#tags)). `keywords` são termos extras pelos quais a página pode ser encontrada, além do próprio texto dela. `boost` multiplica a relevância da página: acima de 1, ela sobe no ranking; abaixo de 1, desce. Veja [Classificação](/docs/configuration/search#ranking).
 
 ## IA [#ai]
 
@@ -185,7 +187,7 @@ ai:
   exclude: true
 ```
 
-`ai.exclude` deixa a página fora do [`llms.txt` e do `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page). A página continua sendo renderizada, aparece na busca e mantém seu lugar no sitemap.
+`ai.exclude` deixa a página fora do [`llms.txt` e do `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page) e do mapa de páginas da [skill do seu site](/docs/discoverability/agent-discovery#your-sites-skill). A página continua sendo renderizada, segue disponível na busca, no [servidor MCP](/docs/discoverability/mcp) e na [API JSON](/docs/discoverability/json-api) e mantém seu lugar no sitemap.
 
 ## Changelog
 

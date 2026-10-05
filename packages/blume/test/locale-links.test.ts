@@ -119,10 +119,9 @@ describe(localizeHref, () => {
   });
 });
 
-describe(localizeContentLinks, () => {
-  const rewrite = (href: string) =>
-    localizeHref(href, { ...fr, deployBase: "" });
+const rewrite = (href: string) => localizeHref(href, { ...fr, deployBase: "" });
 
+describe(localizeContentLinks, () => {
   it("rewrites every anchor href, whichever quote style and attribute order", () => {
     const html = [
       '<p><a href="/guide">Guide</a> and <a class="x" href="/guide/setup" target="_blank">Setup</a></p>',

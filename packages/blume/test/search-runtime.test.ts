@@ -619,6 +619,20 @@ const syncProject = (search: BlumeConfigInput["search"]): BlumeProject => {
   };
 };
 
+/** Every object the next Algolia sync uploads, captured. */
+const captureAlgolia = (): Captured<SaveObjectsArgs> => {
+  const captured: Captured<SaveObjectsArgs> = {};
+  algoliaSave = (args) => {
+    captured.value = args;
+    return Promise.resolve();
+  };
+  return captured;
+};
+
+/** The sync's calls, with each timestamped collection name as `docs_<n>`. */
+const typesenseCalls = (): string[] =>
+  typesenseServer.calls.map((call) => call.replaceAll(/_\d+/gu, "_<n>"));
+
 describe("hosted sync uploads", () => {
   const page = {
     _id: "/a",
@@ -647,15 +661,6 @@ describe("hosted sync uploads", () => {
     expect(captured.value?.objects[0]?.objectID).toBe("/a");
   });
 
-  /** Every object the next Algolia sync uploads, captured. */
-  const captureAlgolia = (): Captured<SaveObjectsArgs> => {
-    const captured: Captured<SaveObjectsArgs> = {};
-    algoliaSave = (args) => {
-      captured.value = args;
-      return Promise.resolve();
-    };
-    return captured;
-  };
   const DECLARED: AlgoliaSettings = {
     attributesForFaceting: ["filterOnly(locale)", "filterOnly(version)"],
     customRanking: ["desc(boost)"],
@@ -827,10 +832,6 @@ describe("hosted sync uploads", () => {
     expect(first?.keywords).toStrictEqual(["setup"]);
     expect(captured.deployed).toBe(true);
   });
-
-  /** The sync's calls, with each timestamped collection name as `docs_<n>`. */
-  const typesenseCalls = (): string[] =>
-    typesenseServer.calls.map((call) => call.replaceAll(/_\d+/gu, "_<n>"));
 
   it("typesense imports into a new collection and points the alias at it", async () => {
     process.env.TYPESENSE_ADMIN_API_KEY = "admin";

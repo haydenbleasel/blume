@@ -26,25 +26,25 @@ const alternates = (paths: Record<string, string>, xDefault: string) => [
   { href: `${SITE}${xDefault}`, lang: "x-default" },
 ];
 
-describe("hreflang on i18n fallback copies", () => {
-  // `/guide` exists only in English; Blume renders a fallback copy at
-  // `/fr/guide` whose hreflang names the real translations (English only)
-  // and whose canonical names the page it copies. The real page never names
-  // the copy back — by design, it isn't a translation.
-  const pages = (fallback: boolean) => [
-    snapshot({
-      hreflang: alternates({ en: "/guide" }, "/guide"),
-      url: "/guide",
-    }),
-    snapshot({
-      canonical: `${SITE}/guide`,
-      hreflang: alternates({ en: "/guide" }, "/guide"),
-      lang: "fr",
-      route: manifestRoute({ fallback, locale: "fr", path: "/fr/guide" }),
-      url: "/fr/guide",
-    }),
-  ];
+// `/guide` exists only in English; Blume renders a fallback copy at
+// `/fr/guide` whose hreflang names the real translations (English only)
+// and whose canonical names the page it copies. The real page never names
+// the copy back — by design, it isn't a translation.
+const pages = (fallback: boolean) => [
+  snapshot({
+    hreflang: alternates({ en: "/guide" }, "/guide"),
+    url: "/guide",
+  }),
+  snapshot({
+    canonical: `${SITE}/guide`,
+    hreflang: alternates({ en: "/guide" }, "/guide"),
+    lang: "fr",
+    route: manifestRoute({ fallback, locale: "fr", path: "/fr/guide" }),
+    url: "/fr/guide",
+  }),
+];
 
+describe("hreflang on i18n fallback copies", () => {
   it("skips the fallback copy's hreflang cluster", () => {
     expect(run(context({ pages: pages(true), site: SITE }))).toEqual([]);
   });

@@ -238,7 +238,7 @@ Todo build escreve uma [agent skill](https://agentskills.io) para a sua document
 - suas referências de API
 - um mapa da documentação na ordem da barra lateral, com um link para o Markdown de cada página junto da sua descrição de uma linha
 
-A skill leva o nome do `title` do seu site (`Acme Docs` vira `acme-docs`). Ela cobre a versão atual no idioma padrão, deixa de fora as páginas de operações de API e as entradas do changelog (cada um desses tem uma linha própria acima do mapa) e lista até 200 páginas, apontando para o `llms.txt` para o restante. Os links são absolutos, então a skill precisa de [`deployment.site`](/docs/deployment); um build sem ele a pula.
+A skill leva o nome do `title` do seu site (`Acme Docs` vira `acme-docs`). Ela cobre a versão atual no idioma padrão, deixa de fora as páginas de operações de API e as entradas do changelog (cada um desses tem uma linha própria acima do mapa), pula as mesmas páginas que o `llms.txt` pula (rascunhos, páginas ocultas e `noindex`, e páginas com [`ai.exclude`](/docs/discoverability/llms-txt#excluding-a-page)) e lista até 200 páginas, apontando para o `llms.txt` para o restante. Os links são absolutos, então a skill precisa de [`deployment.site`](/docs/deployment); um build sem ele a pula.
 
 A skill gerada é um guia da sua documentação, não um resumo do seu produto. Para ter uma que ensine o seu produto a um agente — configuração, conceitos centrais, tarefas comuns e armadilhas —, peça ao seu agente de código que a escreva a partir da documentação:
 

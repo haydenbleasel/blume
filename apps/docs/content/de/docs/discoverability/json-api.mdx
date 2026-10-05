@@ -14,6 +14,8 @@ Jede Blume-Site liefert ihre Dokumentation zusätzlich als kleine, schreibgesch�
 | `/api/docs/search?q=` | Volltextsuche, mit derselben Eingrenzung über `limit`, `contentTypes`, `locale`, `version` und `filters[key]` wie bei `search_docs`. Nur bei Server-Output. |
 | `/openapi.json` | Die OpenAPI-3.1-Beschreibung der gesamten maschinenlesbaren Oberfläche. |
 
+Der Seitenindex lässt [versteckte Seiten](/docs/content/navigation#hidden-pages) weg, die auch kein Dokument pro Seite erhalten; `get_page` und der `.md`-Spiegel der Seite liefern trotzdem eines aus, denn versteckt heißt nicht privat. Seiten mit `seo.noindex`, `ai.exclude` oder `search.exclude` werden wie alle anderen aufgeführt. Das `markdown` eines Seitendokuments ist der Quelltext der Seite, so wie Agents ihn lesen, wobei der Frontmatter-Block oben erhalten bleibt.
+
 Der Seitenindex, die Dokumente pro Seite und die Navigation werden vorgerendert, sodass eine statische Site sie von jedem Host als Dateien ausliefert. Die Suche ist ein Live-Endpunkt und existiert nur bei [Server-Output](/docs/deployment#server-rendering), wo sie denselben Index nutzt wie `search_docs`.
 
 ## Fehler [#errors]

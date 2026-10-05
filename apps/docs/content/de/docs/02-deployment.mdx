@@ -17,7 +17,16 @@ sidebar:
 | Ausgabeverzeichnis | `dist`           |
 | Node-Version       | 22.12 oder neuer |
 
-Diese Einstellungen funktionieren auf Vercel, Netlify, Cloudflare Pages, GitHub Pages, Amazon S3 + CloudFront oder in jedem Bucket bzw. CDN. Stelle sicher, dass `blume` eine Abhängigkeit ist, damit der Host den Build ausführen kann.
+Diese Einstellungen funktionieren auf Vercel, Netlify, Cloudflare Pages, GitHub Pages oder in jedem Bucket bzw. CDN. Stelle sicher, dass `blume` eine Abhängigkeit ist, damit der Host den Build ausführen kann.
+
+Amazon S3 hinter CloudFront mit einem privaten Bucket, der über Origin Access Control gelesen wird, benötigt zwei weitere Bausteine, da der S3-REST-Endpunkt jeden Schlüssel exakt nachschlägt und jede Datei mit dem Typ ausliefert, mit dem sie hochgeladen wurde:
+
+- Eine CloudFront Function für Viewer-Requests, die jede Seiten-URL der `index.html` zuordnet, die Blume dafür schreibt: `/quickstart` zu `/quickstart/index.html` und `/` (oder jeden Pfad, der auf `/` endet) zu seiner `index.html`. Lass einen Pfad, dessen letztes Segment einen Punkt enthält (`/quickstart.md`, `/_astro/app.js`), unverändert, und halte die Funktion von `/.well-known/*` fern, dessen `api-catalog` keine Dateiendung hat. Ohne sie beantwortet S3 `/quickstart` mit einem `403` oder `404`.
+- Uploads, die die Typen setzen, die eine Ableitung aus der Dateiendung falsch ermittelt oder ohne Charset lässt: `text/markdown; charset=utf-8` für `.md` und `.mdx`, `text/plain; charset=utf-8` für `.txt` und `application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"` für `.well-known/api-catalog`. `dist/_headers` führt jede Regel auf, die dein Build benötigt.
+
+Der [Leitfaden zu S3 und CloudFront](/guides/s3-cloudfront-documentation-site) enthält eine CloudFormation-Vorlage mit der Funktion und ein Deploy-Skript, das mit diesen Typen hochlädt.
+
+Auf Cloudflare Workers, das einen statischen Build als statische Assets ausliefert, setze `"html_handling": "drop-trailing-slash"` unter `assets` in deiner Wrangler-Konfiguration. Blume schreibt jede Seite als `<route>/index.html` und verlinkt sie ohne abschließenden Schrägstrich, und die Standardeinstellung von Cloudflare (`auto-trailing-slash`) beantwortet `/quickstart` mit einem `307` auf `/quickstart/`. Ein [`cloudflare()`-Server-Build](#server-rendering) leitet jede Seite durch seinen Worker, der `/quickstart` bei beiden Einstellungen ausliefert; dort spielt die Einstellung also nur eine Rolle, wenn der Build mit `Could not wire Accept: text/markdown negotiation` warnt und die statische Ebene die Seiten selbst ausliefert.
 
 Ein statischer Build enthält:
 
@@ -41,9 +50,13 @@ deployment: {
 }
 ```
 
-Auf Vercel und Netlify bevorzugt die automatische Erkennung deine stabile Produktionsdomain gegenüber Preview-URLs einzelner Deployments, sodass der kanonische Origin über Deployments hinweg gleich bleibt. Cloudflare Pages stellt nur die URL des aktuellen Deployments bereit (`CF_PAGES_URL`), die sich mit jedem Deployment ändert, setze dort also `site`.
+Auf Vercel und Netlify bevorzugt die automatische Erkennung deine stabile Produktionsdomain gegenüber Preview-URLs einzelner Deployments, sodass der kanonische Origin über Deployments hinweg gleich bleibt. Cloudflare Pages stellt nur die URL des aktuellen Deployments bereit (`CF_PAGES_URL`), die sich mit jedem Deployment ändert, setze dort also `site`. Cloudflare Workers stellt gar keine bereit, setze `site` also auch auf Workers.
 
 Während `blume dev` fällt die Site-URL auf deinen lokalen Dev-Server zurück (z. B. `http://localhost:4321`), wenn keine gesetzt ist, damit Site-abhängige Funktionen — Open-Graph-Bilder, Canonicals, die Sitemap — sofort funktionieren. Builds verwenden diesen Fallback nie, sodass die Produktionsausgabe niemals auf localhost verweist.
+
+### Monorepos
+
+Stelle den Dokumentations-Workspace als eigenes Projekt bereit, wobei das Stammverzeichnis des Hosts auf ihn gesetzt ist (**Root Directory** bei Vercel, **Base directory** bei Netlify), und verwende die obigen Einstellungen. Lass auf Vercel **Include source files outside of the Root Directory in the Build Step** aktiviert — das ist die Standardeinstellung —, wann immer die Dokumentation Dateien außerhalb ihres Workspace liest: [Komponentenbeispiele](/docs/content/components#component) oder ein Workspace-Paket, das sie importiert, einen `@source`-Pfad in `theme.css` oder eine Spezifikation an anderer Stelle im Repository. Ist die Option deaktiviert, kann der Build diese Dateien nicht erreichen. Der [Monorepo-Leitfaden](/guides/monorepo-documentation-site) führt Schritt für Schritt durch ein Setup mit pnpm und Turborepo.
 
 ## Lokale Vorschau [#preview-locally]
 
@@ -66,7 +79,7 @@ deployment: {
 }
 ```
 
-`base` (und `site`) sind auch Optionen jedes Host-Adapters: `vercel({ base: "/docs" })`.
+`base` (und `site`) sind auch Optionen jedes Host-Adapters: `vercel({ base: "/docs" })`. `@astrojs/vercel` ignoriert die Basis, daher verschiebt ein `vercel()`-Server-Build selbst die statischen Dateien nach `.vercel/output/static/docs/` sowie die Routen und Weiterleitungen in `.vercel/output/config.json` unter `/docs`.
 
 Jede Seite behält ihren eigenen Pfad unter der Basis, selbst in einem Inhaltsordner, der denselben Namen wie die Basis trägt: Mit `base: "/docs"` wird `docs/setup.md` unter `/docs/docs/setup` ausgeliefert, und ihre kanonische URL, ihr Seitenleisten-Link und ihr `llms.txt`-Eintrag verweisen dorthin. Ein wurzelrelativer Link, den du schreibst und der bereits mit der Basis beginnt, gilt als Link, der die Basis schon enthält, und bleibt unverändert — verlinke diese Seite also mit einem relativen Link (`./docs/setup`) oder ihrem vollständigen Pfad (`/docs/docs/setup`).
 
@@ -113,9 +126,9 @@ deployment: vercel({
 | `vercel()` | `@astrojs/vercel` | Vercel — der ausgereifteste Weg |
 | `netlify()` | `@astrojs/netlify` | Netlify Functions |
 | `node()` | `@astrojs/node` | Selbst gehostete Node-Server, Container |
-| `cloudflare()` | `@astrojs/cloudflare` | Cloudflare Workers und Pages |
+| `cloudflare()` | `@astrojs/cloudflare` | Cloudflare Workers |
 
-`vercel()` und `node()` sind in Blume enthalten — die Auswahl eines der beiden funktioniert einfach. Für `netlify()` und `cloudflare()` muss das jeweilige Paket in deinem Projekt installiert sein (z. B. `bun add -d @astrojs/netlify`). Fehlt es, bricht `blume build` mit dem Installationsbefehl für deinen Paketmanager ab, `blume dev` warnt, und [`blume doctor`](/docs/cli/doctor) meldet es. Ab pnpm 10 musst du außerdem die Build-Skripte, die diese Pakete mitbringen (`sharp` sowie `workerd` für Cloudflare), unter `allowBuilds` in `pnpm-workspace.yaml` freigeben, sonst bricht pnpm die Installation ab.
+`vercel()` und `node()` sind in Blume enthalten — die Auswahl eines der beiden funktioniert einfach. Für `netlify()` und `cloudflare()` muss das jeweilige Paket in deinem Projekt installiert sein (z. B. `bun add -d @astrojs/netlify`). Fehlt es, bricht `blume build` mit dem Installationsbefehl für deinen Paketmanager ab, `blume dev` warnt, und [`blume doctor`](/docs/cli/doctor) meldet es. Mit pnpm musst du außerdem die Build-Skripte, die diese Pakete mitbringen, unter `allowBuilds` in `pnpm-workspace.yaml` freigeben, neben dem `esbuild`-Eintrag, den `blume init` schreibt: `sharp` für Netlify, dessen Adapter eine eigene Kopie mitbringt, und `workerd` für Cloudflare. Ab pnpm 11 bricht pnpm die Installation mit `ERR_PNPM_IGNORED_BUILDS` ab, bis du sie freigibst; pnpm 10 überspringt die Skripte mit einer Warnung. `allowBuilds` erfordert pnpm 10.26 oder neuer.
 
 Die Angabe eines Adapters stellt den Build auf Server-Ausgabe um. Um auf diesem Host einen statischen Build beizubehalten — mit seiner Site-Erkennung und den Plattformdateien, die er liest —, übergib `output: "static"`:
 
@@ -123,9 +136,9 @@ Die Angabe eines Adapters stellt den Build auf Server-Ausgabe um. Um auf diesem 
 deployment: netlify({ output: "static" }),
 ```
 
-Ein Server-Build enthält alles, was ein statischer Build enthält, sowie alle Astro-Endpunkte oder Middleware, die du hinzufügst. Der `node()`-Adapter erzeugt einen eigenständigen Server, den du direkt mit `node dist/server/entry.mjs` ausführen kannst. Er lauscht auf `localhost:4321`, sofern du beim Start nicht die Umgebungsvariablen `HOST` und `PORT` setzt (`HOST=0.0.0.0 PORT=8080 node dist/server/entry.mjs`); an `node()` übergebene `host`- und `port`-Werte haben keine Wirkung, da `@astrojs/node` sie durch Astros eigene Servereinstellungen ersetzt. Der Server löst seine Pakete über Links in das `node_modules` deines Projekts auf, deploye das Projekt also mit seinen installierten Abhängigkeiten und nicht nur `dist/`. Wenn die Site Discovery-Dateien veröffentlicht, von einer Inhaltsquelle heruntergeladene Bilder ausliefert oder Weiterleitungen konfiguriert, setzt Blume einen kleinen Wrapper vor den Einstiegspunkt von Astro (der daneben nach `astro-entry.mjs` verschoben wird). Er liefert die `.well-known`-Discovery-Dateien mit ihren Medientypen und CORS-Headern sowie heruntergeladene SVGs in einer Sandbox aus — was der statische Handler des eigenständigen Servers nicht selbst leisten kann — und beantwortet jede Weiterleitung mit ihrem konfigurierten Status.
+Ein Server-Build enthält alles, was ein statischer Build enthält, sowie alle Astro-Endpunkte oder Middleware, die du hinzufügst. Der `node()`-Adapter erzeugt einen eigenständigen Server, den du direkt mit `node dist/server/entry.mjs` ausführen kannst. Er lauscht auf `localhost:4321`, sofern du beim Start nicht die Umgebungsvariablen `HOST` und `PORT` setzt (`HOST=0.0.0.0 PORT=8080 node dist/server/entry.mjs`); an `node()` übergebene `host`- und `port`-Werte haben keine Wirkung, da `@astrojs/node` sie durch Astros eigene Servereinstellungen ersetzt. Setze hinter einem Reverse Proxy `allowedDomains`, damit die [Ratenbegrenzung](/docs/configuration/rate-limiting#behind-a-reverse-proxy) jeden Leser einzeln zählt. Der Server löst seine Pakete über Links in das `node_modules` deines Projekts auf, deploye das Projekt also mit seinen installierten Abhängigkeiten und nicht nur `dist/`. Wenn die Site Discovery-Dateien veröffentlicht, von einer Inhaltsquelle heruntergeladene Bilder ausliefert oder Weiterleitungen konfiguriert, setzt Blume einen kleinen Wrapper vor den Einstiegspunkt von Astro (der daneben nach `astro-entry.mjs` verschoben wird). Er liefert die `.well-known`-Discovery-Dateien mit ihren Medientypen und CORS-Headern sowie heruntergeladene SVGs in einer Sandbox aus — was der statische Handler des eigenständigen Servers nicht selbst leisten kann — und beantwortet jede Weiterleitung mit ihrem konfigurierten Status.
 
-Ein `cloudflare()`-Server-Build wird nach `blume build` mit `npx wrangler deploy` aus dem Projektstammverzeichnis deployt: Blume schreibt die umgeleitete Wrangler-Konfiguration nach `.wrangler/deploy/` (und fügt `.wrangler/` zur `.gitignore` hinzu) und benennt den Worker nach deinem Projekt — nach dem `name` aus `package.json`, andernfalls nach dem Hostnamen der Site, andernfalls nach dem Ordner —, sofern nicht eine eigene `wrangler.jsonc` im Projektstammverzeichnis `name` setzt.
+Ein `cloudflare()`-Server-Build läuft nur auf Cloudflare Workers, da `@astrojs/cloudflare` die Unterstützung für Cloudflare Pages in Version 13 eingestellt hat; ein statischer Build lädt das Paket nicht, daher lässt sich sein `dist/` weiterhin auf Pages deployen. Der Server-Build wird nach `blume build` mit `npx wrangler deploy` aus dem Projektstammverzeichnis deployt: Blume schreibt die umgeleitete Wrangler-Konfiguration nach `.wrangler/deploy/` (und fügt `.wrangler/` zur `.gitignore` hinzu) und benennt den Worker nach deinem Projekt — nach dem `name` aus `package.json`, andernfalls nach dem Hostnamen der Site, andernfalls nach dem Ordner —, sofern nicht eine eigene `wrangler.jsonc` im Projektstammverzeichnis `name` setzt.
 
 Auf Vercel und Cloudflare aktiviert ein Server-Build außerdem die [Content Negotiation über `Accept: text/markdown`](/docs/discoverability/markdown#content-negotiation), sodass ein Agent, der eine beliebige Inhaltsseite mit diesem Header anfragt, unter derselben URL deren Roh-Markdown-Spiegelung erhält. Auf Vercel fügt Blume header-abhängige Rewrites in die Routing-Konfiguration des Deployments ein; auf Cloudflare erzeugt es einen kleinen Worker vor dem Astro-Worker und richtet `assets.run_worker_first` auf jeden Pfad außer den mit Fingerprint versehenen Build-Assets und den rohen `.md`-, `.txt`-, `.json`- und `.well-known`-Dateien aus, da die Plattform andernfalls die vorgerenderten Seiten — und ihre `404.html` für eine URL, hinter der keine Seite steht — ausliefern würde, bevor Servercode ausgeführt wird; diese ausgenommenen Dateien behalten ihren schnellen Pfad ohne Worker. Dieser Worker beantwortet außerdem Anfragen nach den vorgerenderten JSON-Dokumenten pro Seite (`/api/docs/pages/{route}.json`), die bei ihm ankommen, direkt aus dem Asset-Binding, da Astro sie andernfalls an die `/api/`-Catch-all-Route weiterleiten würde.
 
@@ -162,7 +175,9 @@ Ordne alte URLs in `blume.config.ts` neuen zu:
 redirects: [{ from: "/old", to: "/new", status: 301 }],
 ```
 
-`status` akzeptiert `301`, `302`, `307` oder `308` (Standard `301`). Server-Builds beantworten Weiterleitungen zur Anfragezeit mit dem konfigurierten Status. Statische Builds erzeugen Weiterleitungsseiten **und** die Plattformdateien, die dein Host liest, damit er eine echte HTTP-Weiterleitung ausgibt: `_redirects` für `netlify()` und `cloudflare()`, `vercel.json` für `vercel()` und — wenn kein Host angegeben ist — beide sowie `blume-redirects.json`, ein strukturiertes Manifest für alles Übrige (nginx-/Apache-Regeln, ein Edge Worker). Eine `_redirects` oder `vercel.json`, die du in `public/` mitlieferst, bleibt unangetastet.
+`status` akzeptiert `301`, `302`, `307` oder `308` (Standard `301`). Server-Builds beantworten Weiterleitungen zur Anfragezeit mit dem konfigurierten Status, ebenso `blume dev`. Statische Builds erzeugen Weiterleitungsseiten **und** die Plattformdateien, die dein Host liest, damit er eine echte HTTP-Weiterleitung ausgibt: `_redirects` für `netlify()` und `cloudflare()`, `vercel.json` für `vercel()` und — wenn kein Host angegeben ist — beide sowie `blume-redirects.json`, ein strukturiertes Manifest für alles Übrige (nginx-/Apache-Regeln, ein Edge Worker). Eine `_redirects` oder `vercel.json`, die du in `public/` mitlieferst, bleibt unangetastet.
+
+Eine Weiterleitung, die eine Seite auf eine andere verschiebt, nimmt das [Roh-Markdown](/docs/discoverability/markdown#raw-markdown) der Seite mit: `/old.md` und `/old.mdx` leiten mit demselben Status auf `/new.md` und `/new.mdx` weiter, in `blume dev` und in jedem Build.
 
 Zwei Hosts benötigen mehr als die Datei:
 
@@ -194,7 +209,7 @@ redirects: [
 
 Jeder Host erhält die Muster in seiner eigenen Syntax: Splats in `_redirects`, `path-to-regexp`-Quellen in `vercel.json` und in der Routing-Konfiguration eines `vercel()`- oder `netlify()`-Server-Builds. Die Server von `node()` und `cloudflare()` gleichen sie selbst ab, ebenso `blume dev`. Ein statischer Build schreibt für ein Muster keine Weiterleitungsseite, da er eine für jeden Pfad bräuchte, den das Muster abdeckt; ein Host, der keine dieser Dateien liest (etwa GitHub Pages), wendet daher nur die exakten Weiterleitungen an; `blume-redirects.json` führt die Muster so auf, wie du sie geschrieben hast.
 
-Ein Muster darf nicht zugleich auf eine Seite passen: Hosts sind sich uneinig, welche der beiden antwortet, daher bricht der Build mit `BLUME_REDIRECT_MATCHES_PAGE` ab und nennt die Seite. Grenze das Muster auf die Pfade ein, die verschoben wurden.
+Ein Muster darf nicht zugleich auf eine Seite passen: Hosts sind sich uneinig, welche der beiden antwortet, daher bricht der Build mit `BLUME_REDIRECT_MATCHES_PAGE` ab und nennt die Seite. Grenze das Muster auf die Pfade ein, die verschoben wurden. Eine exakte Weiterleitung von der eigenen URL einer Seite antwortet auf jedem Host gleich und übernimmt die URL, sodass die Seite nie veröffentlicht wird; derselbe Code ist dort daher eine Warnung: Lösche die Seite, falls sie verschoben wurde, oder entferne die Weiterleitung.
 
 ## Inhaltstypen [#content-types]
 
@@ -202,16 +217,19 @@ Wo der Host eine solche Datei liest, erzeugt ein Build außerdem eine `_headers`
 
 ## Umgebungsvariablen [#environment-variables]
 
-Wenn eine Funktion ein Laufzeit-Secret benötigt, warnt Blume bei `blume dev`/`build`, falls es fehlt — so tritt das Problem früh zutage statt erst bei der ersten Anfrage:
+Wenn eine Funktion ein Secret benötigt, warnt Blume bei `blume dev`/`build`, falls es fehlt — so tritt das Problem früh zutage statt erst bei der ersten Anfrage:
 
 | Funktion | Variable |
 | --- | --- |
 | Assistent (AI Gateway) | `AI_GATEWAY_API_KEY` (oder Vercel OIDC) |
 | Assistent (andere Adapter) | die Standard-Schlüssel-Umgebungsvariable des Adapters (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`, `LLMGATEWAY_API_KEY`, `INKEEP_API_KEY`) oder das `apiKeyEnv`, das du ihm übergeben hast |
+| [Bot-Schutz des Assistenten](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY` (`turnstile()`), `HCAPTCHA_SECRET_KEY` (`hcaptcha()`) |
+| [Ratenbegrenzung](/docs/configuration/rate-limiting) (`upstash()`) | `UPSTASH_REDIS_REST_URL` und `UPSTASH_REDIS_REST_TOKEN` |
 | Mixedbread-Suche | `MIXEDBREAD_API_KEY` |
-| [Inhaltsquellen](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()` sowie `mdxRemote()` beim Lesen aus GitHub) |
+| [Sprachausgabe](/docs/configuration/narration) (generierte Stimmen) | `AI_GATEWAY_API_KEY` (oder Vercel OIDC) oder das `apiKeyEnv`, das du `gateway()` übergeben hast |
+| [Inhaltsquellen](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, dazu `CONTENTFUL_PREVIEW_TOKEN` für `--preview`, das ohne ihn fehlschlägt), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()` sowie `mdxRemote()` beim Lesen aus GitHub) |
 
-Setze sie in `.env.local` für die lokale Entwicklung und in der Umgebung deines Hosts für die Produktion. Eine Inhaltsquelle liest ihr Token beim Abrufen, also während `blume dev` und `blume build`, setze es daher dort, wo deine Site gebaut wird. Vor fehlenden Build-Zeit-Secrets für die Synchronisierung des Suchindex (Algolia, Orama Cloud, Typesense) wird separat während des Sync-Schritts gewarnt.
+Setze sie in `.env.local` für die lokale Entwicklung und in der Umgebung deines Hosts für die Produktion. Eine Inhaltsquelle liest ihr Token beim Abrufen, also während `blume dev` und `blume build`, und die Sprachausgabe liest ihren Schlüssel während `blume build`, setze diese daher dort, wo deine Site gebaut wird. Build-Zeit-Secrets für die Synchronisierung des Suchindex (`ALGOLIA_ADMIN_API_KEY`, `ORAMA_PRIVATE_API_KEY`, `TYPESENSE_ADMIN_API_KEY`) prüft der Sync-Schritt selbst: Ist eines nicht gesetzt, warnt der Build und überspringt die Synchronisierung; ist es gesetzt, [lässt eine fehlgeschlagene Synchronisierung den Build fehlschlagen](/docs/configuration/search#adapters). Die [GitHub-Info](/docs/content/components#github-info)-Karte sendet außerdem `GITHUB_TOKEN`, sofern gesetzt, um die API-Ratenbegrenzung von GitHub anzuheben.
 
 ## Build-Cache [#build-cache]
 
@@ -223,7 +241,7 @@ Blume verwendet zwei Caches, die ein Build wiederverwenden kann. Die Caches von 
 - **GitHub Actions** und andere Runner, die du selbst verwaltest, behalten nichts, es sei denn, du cachst das Verzeichnis selbst:
 
 ```yaml
-- uses: actions/cache@v4
+- uses: actions/cache@v6
   with:
     path: node_modules/.cache/blume/og
     key: blume-og-${{ runner.os }}-${{ hashFiles('**/bun.lock', '**/package-lock.json', '**/pnpm-lock.yaml') }}

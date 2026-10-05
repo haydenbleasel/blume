@@ -291,18 +291,14 @@ const renderUserAliases = (
     .join("");
 
 /**
- * Excludes Vite's pre-bundled dep cache from @vitejs/plugin-react. Astro's
- * react() replaces the plugin's default `/node_modules/` exclude with just
- * `/\.astro$/`, so without this Babel re-parses every optimized dep chunk
- * served from `.vite/deps` — a 500KB+ vendor bundle per chunk, re-done on each
- * re-optimization. A blanket `/node_modules/` exclude would instead switch the
- * React Compiler off for Blume's own components in published installs (they
- * resolve under `node_modules/blume/src`, and exclude beats include in the
- * plugin's filter), so only the pre-bundle cache is excluded. The hidden runtime
- * relocates that cache to `<runtime>/.cache/vite` (see `cacheOptions`), so both
- * the default and the relocated path are excluded.
+ * Excludes the hidden runtime's pre-bundled dep cache from @vitejs/plugin-react.
+ * Astro's react() already excludes `/node_modules/`, which covers Vite's
+ * default `node_modules/.vite` cache, but the hidden runtime relocates that
+ * cache to `<runtime>/.cache/vite` (see `cacheOptions`). Without this the React
+ * Compiler re-transforms every optimized dep chunk served from there — a 500KB+
+ * vendor bundle per chunk, re-done on each re-optimization.
  */
-const REACT_EXCLUDE = String.raw`exclude: [/\/node_modules\/\.vite\//, /\/\.cache\/vite\//]`;
+const REACT_EXCLUDE = String.raw`exclude: [/\/\.cache\/vite\//]`;
 
 /**
  * The `cacheDir` entries for the generated config's top level and its `vite`
@@ -332,17 +328,14 @@ const runtimeCacheOptions = (
 };
 
 /**
- * The `react()` integration call. When `compilerPath` is set (the resolved
- * absolute path to `babel-plugin-react-compiler`), react() carries the compiler
- * as the first babel plugin — an absolute path, because @vitejs/plugin-react
- * resolves babel plugins from the *project* root, not `.blume/`, so a bare
- * specifier wouldn't resolve in a user project. `target: "19"` matches Blume's
- * React pin. `null`/`undefined` (compiler off or unresolvable) omits the babel
- * block. Both variants carry the pre-bundle exclude above.
+ * The `react()` integration call. `compiler` turns on @astrojs/react's React
+ * Compiler, which runs on `oxc-transform-react` and targets the installed
+ * React major; false/absent (compiler off or unresolvable) leaves it out. Both
+ * variants carry the pre-bundle exclude above.
  */
-const reactIntegration = (compilerPath: string | null | undefined): string =>
-  compilerPath
-    ? `react({ babel: { plugins: [[${JSON.stringify(compilerPath)}, { target: "19" }]] }, ${REACT_EXCLUDE} })`
+const reactIntegration = (compiler: boolean | undefined): string =>
+  compiler
+    ? `react({ compiler: true, ${REACT_EXCLUDE} })`
     : `react({ ${REACT_EXCLUDE} })`;
 
 interface IntegrationBridgeOptions {
@@ -396,11 +389,10 @@ interface OptimizeDepsConfig {
  * the Vite root is the generated runtime, so user pages, convention islands,
  * and alias-reachable components all live outside it and are otherwise only
  * crawled when first requested. The compiler runtime rides the include list
- * because it is Babel-injected and no source scan can see it. @vitejs/plugin-react
- * would add it itself, but only when the babel plugin is passed by its bare
- * name (`getReactCompilerPlugin` is an exact string match) — Blume passes an
- * absolute path (see `reactIntegration`), which that check never matches. See
- * the optimizeDeps comment in the generated config for the failure this prevents.
+ * because the compiler injects its import and no source scan can see it. The
+ * compiler plugin in `@vitejs/plugin-react` lists it too; Blume keeps it
+ * explicit so the guard doesn't hinge on that plugin's internals. See the
+ * optimizeDeps comment in the generated config for the failure this prevents.
  */
 /**
  * The client-side libraries a site needs, decided at generation time. A
@@ -440,7 +432,7 @@ const resolveOptimizeDeps = (options: {
   context: ProjectContext;
   features: ClientFeatures;
   needsReact: boolean;
-  reactCompilerPath: string | null | undefined;
+  reactCompiler: boolean | undefined;
   searchKind: SearchAdapterKind;
 }): OptimizeDepsConfig => {
   const { context, features } = options;
@@ -464,7 +456,7 @@ const resolveOptimizeDeps = (options: {
     // (__PREFETCH_PREFETCH_ALL__ and friends) that a pre-bundled copy loses,
     // throwing ReferenceError on every page. Astro manages their optimization
     // itself, without a mid-session reload.
-    ...(options.needsReact && options.reactCompilerPath
+    ...(options.needsReact && options.reactCompiler
       ? ["react/compiler-runtime"]
       : []),
   ];
@@ -620,11 +612,10 @@ export const astroConfigTemplate = (options: {
    */
   generatedModulesDir?: string;
   /**
-   * Absolute path to `babel-plugin-react-compiler` when the React Compiler is
-   * enabled (resolved from Blume's package root by the caller); null/absent
-   * disables the compiler and emits a bare `react()`.
+   * Turn on the React Compiler (the caller checked that `oxc-transform-react`
+   * resolves); false/absent emits `react()` without it.
    */
-  reactCompilerPath?: string | null;
+  reactCompiler?: boolean;
   /** Project tsconfig path aliases (`find` -> absolute dir), e.g. `@` -> src. */
   aliases?: Record<string, string>;
   /**
@@ -672,7 +663,7 @@ export const astroConfigTemplate = (options: {
     context,
     features,
     needsReact,
-    reactCompilerPath: options.reactCompilerPath,
+    reactCompiler: options.reactCompiler,
     searchKind: config.search.provider.kind,
   });
 
@@ -851,7 +842,7 @@ export const astroConfigTemplate = (options: {
     `mdx({ processor: blumeMdxProcessor(${processorOptions}) })`,
   ];
   if (needsReact) {
-    integrations.push(reactIntegration(options.reactCompilerPath));
+    integrations.push(reactIntegration(options.reactCompiler));
   }
   if (needsVue) {
     integrations.push("vue()");
@@ -945,8 +936,8 @@ ${userConfigSetup}export default defineConfig({
     // Everything hydration can reach must be part of the dev dep optimizer's
     // FIRST run. The Vite root is the generated runtime, so user pages,
     // islands, and aliased components live outside it and are only crawled
-    // when first requested — and \`react/compiler-runtime\` is Babel-injected,
-    // so no source scan can ever see it. A dependency discovered after
+    // when first requested — and \`react/compiler-runtime\` is injected by the
+    // React Compiler, so no source scan can ever see it. A dependency discovered after
     // hydration begins triggers a mid-session re-optimization whose new
     // generation imports React through new \`?v=\` URLs; the browser then
     // evaluates a second React copy and every island tears down with

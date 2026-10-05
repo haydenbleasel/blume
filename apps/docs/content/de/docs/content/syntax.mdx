@@ -28,7 +28,7 @@ Anker-IDs werden aus dem Überschriftentext erzeugt, eine umformulierte Übersch
 
 Verlinke darauf als `/page#setup`. Die Syntax entspricht der von Fumadocs, migrierte Inhalte funktionieren also wortwörtlich.
 
-Die von Pandoc, kramdown und Markdown-basierten Spezifikations-Toolchains verwendete Form `{#custom-id}` wird in `.md`-Dateien als gleichwertig akzeptiert. In `.mdx` ist ein nacktes `{…}` ein JSX-Ausdruck und die Seite lässt sich nicht kompilieren — `blume check` meldet den Marker als `BLUME_MDX_CURLY_ANCHOR` —, schreibe dort also `[#custom-id]` oder escape die geschweiften Klammern. Die escapte Form nagelt in beiden Formaten denselben Anker fest, was sie zur richtigen Schreibweise für ein Partial macht, das `.mdx`-Seiten [einbinden](/docs/content/includes):
+Die von Pandoc, kramdown und Markdown-basierten Spezifikations-Toolchains verwendete Form `{#custom-id}` wird in `.md`-Dateien als gleichwertig akzeptiert. Nur diese Schreibweise ohne Leerzeichen nagelt einen Anker fest: Das `{ #custom-id }` mit Leerzeichen und das `{: #custom-id }` von kramdown (beide aus `attr_list` von MkDocs) bleiben im Überschriftentext stehen. In `.mdx` ist ein nacktes `{…}` ein JSX-Ausdruck und die Seite lässt sich nicht kompilieren — `blume check` meldet alle drei Schreibweisen als `BLUME_MDX_CURLY_ANCHOR` —, schreibe dort also `[#custom-id]` oder escape die geschweiften Klammern. Die escapte Form nagelt in beiden Formaten denselben Anker fest, was sie zur richtigen Schreibweise für ein Partial macht, das `.mdx`-Seiten [einbinden](/docs/content/includes):
 
 ```md
 ## Getting started \{#setup\}
@@ -458,7 +458,7 @@ flowchart LR
 ```
 ````
 
-Diagramme werden im Client gerendert, daher ist dies eine reine MDX-Funktion, und die Mermaid-Bibliothek wird nur auf Seiten geladen, die eines enthalten; eine Site ohne Diagramm liefert sie überhaupt nicht aus. Diagramme verwenden standardmäßig das dagre-Layout und den klassischen Look von Mermaid; über Mermaid-Frontmatter (einen `config:`-Block mit `layout: elk` oder `look: neo`) stellst du ein einzelnes Diagramm auf ein anderes Layout oder einen anderen Look um, und die ELK-Engine wird nur für Diagramme geladen, die sie anfordern. Der Rest dieses Abschnitts ist eine Galerie gängiger Typen — die vollständige Liste findest du in der [Mermaid-Dokumentation](https://mermaid.js.org/intro/).
+Diagramme werden im Client gerendert, daher ist dies eine reine MDX-Funktion, und die Mermaid-Bibliothek wird nur auf Seiten geladen, die eines enthalten; eine Site ohne Diagramm liefert sie überhaupt nicht aus. Diagramme verwenden standardmäßig das dagre-Layout und den klassischen Look von Mermaid; über Mermaid-Frontmatter (einen `config:`-Block mit `layout: elk` oder `look: neo`) stellst du ein einzelnes Diagramm auf ein anderes Layout oder einen anderen Look um, und die ELK-Engine wird nur für Diagramme geladen, die sie anfordern. Ein Diagramm, das Mermaid nicht parsen kann, zeigt an seiner Stelle „Could not render this diagram.“ an; der Parser-Fehler von Mermaid samt der Zeile, an der er stehen geblieben ist, landet in der Browser-Konsole, und `blume dev` gibt ihn zusätzlich unter der Meldung aus. Der Rest dieses Abschnitts ist eine Galerie gängiger Typen — die vollständige Liste findest du in der [Mermaid-Dokumentation](https://mermaid.js.org/intro/).
 
 ### Flussdiagramm [#flowchart]
 

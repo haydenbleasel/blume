@@ -34,6 +34,10 @@ mdxRemote({
 });
 ```
 
+`include` (Standard: `["**/*.{md,mdx}"]`) filtert die Dateien nach ihrem Pfad unterhalb von `path`, genau wie das `include` einer `filesystem()`-Quelle: Ein Muster, das mit `!` beginnt, schließt alles aus, worauf es passt (`["**/*.mdx", "!drafts/**"]`). Mit `github` listet die Quelle den gesamten Baum des Repositorys bei `ref` auf und behält die Dateien unterhalb von `path`. Liegt bei diesem Ref nichts unter `path`, liest die Quelle keine Seiten und warnt mit `BLUME_SOURCE_PATH_MISSING`. GitHub begrenzt die Auflistung (100.000 Einträge oder 7 MB für das gesamte Repository, unabhängig von `path`). Wird diese Grenze überschritten, warnt die Quelle mit `BLUME_SOURCE_TRUNCATED` – liste die Dateien dann stattdessen mit `url` und `files` auf.
+
+Ein relativer Link zwischen Remote-Dateien (`[Errors](./02-errors.mdx)`) führt zu der Seite, unter der die verlinkte Datei veröffentlicht wird. Ihr Sortierpräfix entfällt dabei in der Route. `blume validate` prüft solche Links auf dieselbe Weise.
+
 Das Token für ein privates Repo wird aus der Umgebungsvariable `GITHUB_TOKEN` gelesen. Der Adapter deklariert sie, deshalb warnen `blume dev` und `blume build`, wenn sie nicht gesetzt ist. Das Token landet nie direkt in deiner Konfiguration oder in der generierten Ausgabe. Es wird außerdem nur an GitHubs eigene Hosts (`api.github.com`, `raw.githubusercontent.com`) gesendet, niemals an eine eigene `url`-Basis. Ein öffentliches Repo funktioniert auch ohne Token.
 
 Remote-Seiten werden vollständig als MDX mit allen Komponenten gerendert. Ihr Inhalt wird dafür in ein verstecktes Staging-Verzeichnis geschrieben und zusammen mit deinen lokalen Docs über Astro gerendert. So funktionieren Callouts, Tabs und alle anderen Blume-Komponenten weiterhin.

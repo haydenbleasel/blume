@@ -84,7 +84,7 @@ export default defineComponents({
 });
 ```
 
-配線済みのスロット:
+配線済みのスロット（名前は大文字と小文字が区別されます。`layout` 配下のそれ以外のキーはどこにもレンダリングされず、Blume が警告を出します）:
 
 | スロット | 置き換え対象 | プロップ |
 | --- | --- | --- |
@@ -95,12 +95,14 @@ export default defineComponents({
 | `Sidebar` | 主要なナビゲーションツリー | `items`、`currentRoute` |
 | `MobileNav` | モバイルドロワー内のナビゲーション（デフォルトは `Sidebar`） | `items`、`currentRoute` |
 | `Breadcrumbs` | パンくずリスト | `crumbs` |
-| `TableOfContents` | このページの目次 | `headings`、`title`、`variant` |
+| `TableOfContents` | 右側のレール（`variant: "desktop"`）と、狭い画面ではコンテンツ上部のドロップダウン（`"mobile"`）に表示される、このページの目次 | `headings`、`title`、`variant` |
 | `Pagination` | 前後のページへのフッターリンク | `prev`、`next`、`strings` |
 | `Feedback` | 記事の下にある「このページは役に立ちましたか？」の評価（[`feedback`](/docs/configuration#page-feedback) が有効な場合のみレンダリングされます） | `strings`、`comments` |
 | `PageHeader` | 記事の上部への挿入ポイント（組み込みなし） | `page`、`headings`、`route` |
 | `PageFooter` | 記事の下部への挿入ポイント（組み込みなし） | `page`、`headings`、`route` |
 | `Footer` | コンテンツグリッドの後に配置される[サイトフッター](/docs/configuration#footer)（リンク、ソーシャルプロフィール、リポジトリへのリンク、Cookie 設定） | `footer`、`locale`、`site`、`navigation`、`ui` |
+
+`mobile` バリアントは [ページアクション](/docs/content/navigation#page-actions) も子要素として受け取ります（幅 1,280px 未満で右側のレールからアクションが移動してくる空の要素です）。そのため、狭い画面でもアクションを表示し続けるには、その中で `<slot />` をレンダリングしてください。見出しのないページでも `headings` が空の状態でレンダリングされるため、そうしたページでもアクションは表示されます。
 
 `PageHeader` と `PageFooter` には組み込みコンポーネントがありません。設定するまで何もレンダリングされないため、プロモーションバナーや「最終更新日」の注記などの便利な挿入ポイントになります。組み込みの `Footer` はリポジトリとソーシャルプロフィールへの唯一のリンクを保持しているため、`Footer` の上書き（設定では表現できないマーケティング用フッターを置く場所）でもそれらを残してください。`consent` を設定している場合は、それを再び開く手段も残してください。`data-blume-consent-open` を持つ任意の要素が [Cookie 設定](/docs/configuration/consent#changing-an-answer) のリンクとして機能します。
 

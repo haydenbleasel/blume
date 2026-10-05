@@ -16,10 +16,12 @@ Von einem leeren Ordner zu einer laufenden Doku-Website in wenigen Befehlen. Blu
     `blume init` stellt ein paar Fragen – wo das Projekt erstellt werden soll, wie deine
     Doku-Website heißt, welches Template verwendet wird und wo deine Inhalte liegen – und
     erzeugt dann das Nötigste: einen Inhaltsordner, eine Konfigurationsdatei und eine
-    `package.json` mit den Skripten `dev` und `build`. Die Abhängigkeiten installiert es
-    mit dem Paketmanager, mit dem du es ausgeführt hast. Übergib `--yes`, um die Abfragen
-    zu überspringen und die Standardwerte zu übernehmen, oder `--no-install`, um nur die
-    Dateien zu schreiben.
+    `package.json` mit den Skripten `dev`, `build` und `doctor`, dazu eine
+    `.gitignore`, die `node_modules/`, das generierte `.blume/`, `dist/` und
+    `.env.local` (wo lokale Secrets hingehören) aus der Versionskontrolle heraushält.
+    Die Abhängigkeiten installiert es mit dem Paketmanager, mit dem du es ausgeführt hast.
+    Übergib `--yes`, um die Abfragen zu überspringen und die Standardwerte zu übernehmen,
+    oder `--no-install`, um nur die Dateien zu schreiben.
 
     ```package-install
     npx blume init

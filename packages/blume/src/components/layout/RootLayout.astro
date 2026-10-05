@@ -471,19 +471,6 @@ const markdownMirror = isBare
 const mcpUrl =
   mcp && siteUrl ? new URL(withMountedBase(mcp.route), siteUrl).href : null;
 
-// One set of page actions, rendered in the rail and in the mobile "On this
-// page" dropdown.
-const pageActions = {
-  editUrl,
-  exportEpub,
-  exportPdf,
-  mcpName: mcp?.name,
-  mcpUrl,
-  openInChat,
-  route: page.route,
-  strings: strings.actions,
-};
-
 // Scope the sidebar (and the breadcrumbs/pagination derived from it) to the
 // active tab's section, so a multi-section site drills each tab into its own
 // pages. Without tabs — or on a route under none — this is the full sidebar.
@@ -883,7 +870,9 @@ const localeRedirect = localeTargets
         }
         {/* Below `xl`, where the rail is hidden, the page actions ride in
             the "On this page" dropdown, so it renders wherever the rail
-            would, with or without headings. */}
+            would, with or without headings. They render once, in the rail:
+            the dropdown gets an empty mount the actions script moves them
+            into (see PageActions.astro). */}
         {
           showToc && (
             <TableOfContentsSlot
@@ -891,7 +880,7 @@ const localeRedirect = localeTargets
               title={strings.toc.title}
               variant="mobile"
             >
-              <PageActions {...pageActions} variant="mobile" />
+              <div data-blume-page-actions-mount />
             </TableOfContentsSlot>
           )
         }
@@ -970,7 +959,17 @@ const localeRedirect = localeTargets
                 variant="desktop"
               />
             )}
-            <PageActions {...pageActions} divider={hasToc} />
+            <PageActions
+              divider={hasToc}
+              editUrl={editUrl}
+              exportEpub={exportEpub}
+              exportPdf={exportPdf}
+              mcpName={mcp?.name}
+              mcpUrl={mcpUrl}
+              openInChat={openInChat}
+              route={page.route}
+              strings={strings.actions}
+            />
           </aside>
         )
       }

@@ -6,7 +6,7 @@ description: >-
 
 Cada chamada às rotas de servidor que um leitor pode acessar tem um custo para você: o [assistente](/docs/configuration/assistant) gasta tokens do modelo, o proxy do [playground da API](/docs/references/openapi#cors-and-the-proxy) repassa requisições para a sua API e a [busca do Mixedbread](/docs/configuration/search#mixedbread) faz uma consulta paga. O Blume limita com que frequência um mesmo leitor, identificado pelo endereço IP, pode chamar cada uma dessas rotas. Quem passa do limite recebe `429 Too Many Requests` com um cabeçalho `Retry-After`, e o assistente avisa para tentar de novo em alguns minutos.
 
-O limite de requisições vem ativado por padrão, com 30 requisições por leitor por rota a cada 10 minutos. É o suficiente para uma pessoa nunca chegar ao limite e pouco o bastante para barrar um script. Ele só faz diferença em um build com servidor, já que um site estático não tem rotas de servidor para limitar.
+O limite de requisições vem ativado por padrão, com 30 requisições por leitor por rota a cada 10 minutos. É bem mais do que uma pessoa envia ao assistente ou ao playground, e pouco o bastante para barrar um script. A busca conta de outro jeito. A janela de busca envia uma consulta toda vez que o leitor faz uma pausa enquanto digita, então uma única busca pode gerar várias requisições, e um leitor que busca sem parar por alguns minutos pode chegar ao limite. Se o seu site usa a busca do Mixedbread, aumente `requests`, que vale para todas as rotas. O limite de requisições só faz diferença em um build com servidor, já que um site estático não tem rotas de servidor para limitar.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -39,12 +39,18 @@ rateLimit: memory({ requests: 60, window: 600 }),
 
 ### Upstash
 
-`upstash()` guarda a contagem no Upstash Redis, compartilhado por todas as instâncias. Crie um banco de dados (na Vercel, adicione o Upstash pelo Marketplace) e defina o endpoint REST e o token dele como `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`. O Blume se comunica com a API REST do Upstash, então você não precisa instalar nada. Enquanto as duas variáveis não estiverem definidas, as rotas contam em memória e o `blume build` mostra um aviso.
+`upstash()` guarda a contagem no Upstash Redis, compartilhado por todas as instâncias. Crie um banco de dados e defina o endpoint REST e o token dele como `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`. O Blume se comunica com a API REST do Upstash, então você não precisa instalar nada. Enquanto as duas variáveis não estiverem definidas, as rotas contam em memória e o `blume build` mostra um aviso.
 
 ```ts blume.config.ts lineNumbers
 import { upstash } from "blume/ratelimit";
 
 rateLimit: upstash(),
+```
+
+Já um banco de dados adicionado pelo Marketplace da Vercel define o endpoint e o token como `KV_REST_API_URL` e `KV_REST_API_TOKEN`, com o prefixo que você tiver escolhido ao conectá-lo. Indique os nomes das variáveis com `urlEnv` e `tokenEnv`:
+
+```ts blume.config.ts lineNumbers
+rateLimit: upstash({ urlEnv: "KV_REST_API_URL", tokenEnv: "KV_REST_API_TOKEN" }),
 ```
 
 ### Cloudflare
@@ -62,6 +68,21 @@ export default defineConfig({
 ```
 
 O namespace do binding é definido a partir do nome do Worker, então dois sites na mesma conta não compartilham a contagem. Se quiser escolher o namespace você mesmo, defina `namespaceId`.
+
+## Atrás de um proxy reverso [#behind-a-reverse-proxy]
+
+Vercel, Netlify e Cloudflare informam ao Blume o endereço de cada leitor. Já um servidor `node()` atrás de um proxy reverso, como nginx ou Caddy, vê todas as requisições chegando do proxy. Assim, todos os leitores compartilham uma única contagem, e um site movimentado atinge o limite para todo mundo. Liste em `allowedDomains` o host que o proxy atende:
+
+```ts blume.config.ts lineNumbers
+import { node } from "blume/deploy";
+
+deployment: node({
+  site: "https://docs.example.com",
+  allowedDomains: [{ hostname: "docs.example.com" }],
+}),
+```
+
+Essa é a opção [`security.allowedDomains`](https://docs.astro.build/en/reference/configuration-reference/#securityalloweddomains) do Astro: quando o cabeçalho `Host` ou `X-Forwarded-Host` de uma requisição corresponde a uma das entradas, o Astro pega o endereço do leitor do primeiro valor de `X-Forwarded-For`. Configure o proxy para repassar o host do site e substituir qualquer `X-Forwarded-For` enviado pelo leitor pelo endereço que o proxy enxerga, como faz o `proxy_set_header X-Forwarded-For $remote_addr;` do nginx. Um proxy que, em vez disso, acrescenta valores ao cabeçalho deixa o leitor escolher o próprio endereço e ganhar uma contagem nova a cada requisição. Deixe `allowedDomains` sem definir quando os leitores acessam o servidor diretamente.
 
 ## Como desativar [#turning-it-off]
 

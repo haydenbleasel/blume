@@ -460,7 +460,7 @@ export default defineConfig({
 });
 ```
 
-A resposta do leitor é enviada como um [evento personalizado](/docs/configuration/analytics#custom-events) `feedback` — com `helpful` (`"yes"` ou `"no"`), `path` e `title` — por meio de cada adaptador de analytics configurado que tenha uma API de eventos, e como um evento `blume:track` em `window`. Sem um adaptador de analytics, a resposta não é registrada em lugar nenhum e, com o [consentimento de cookies](/docs/configuration/consent) ativado, a avaliação só aparece para os leitores que permitiram analytics, já que a resposta de qualquer outro leitor não chegaria a lugar algum. A pergunta e o texto de agradecimento são strings da interface que você pode traduzir com [`i18n.ui`](/docs/content/i18n#translated-ui).
+A resposta do leitor é enviada como um [evento personalizado](/docs/configuration/analytics#custom-events) `feedback` — com `helpful` (`"yes"` ou `"no"`), `path` e `title` — por meio de cada adaptador de analytics configurado que tenha uma API de eventos, e como um evento `blume:track` em `window`. O Fathom, o Microsoft Clarity e o Hotjar recebem apenas o nome do evento, sem as propriedades, então eles contam as avaliações, mas não conseguem distinguir um sim de um não. Sem um adaptador de analytics, a resposta não é registrada em lugar nenhum e, com o [consentimento de cookies](/docs/configuration/consent) ativado, a avaliação só aparece para os leitores que permitiram analytics, já que a resposta de qualquer outro leitor não chegaria a lugar algum. A pergunta e o texto de agradecimento são strings da interface que você pode traduzir com [`i18n.ui`](/docs/content/i18n#translated-ui).
 
 ### Feedback por escrito [#written-feedback]
 
@@ -472,7 +472,7 @@ export default defineConfig({
 });
 ```
 
-Um comentário é enviado como um evento `feedback_comment` com os mesmos `helpful`, `path` e `title` da avaliação, além do `comment` do leitor (até 1.000 caracteres). Ele passa pelos mesmos adaptadores que a avaliação, então leia os comentários onde você lê os eventos. Os provedores limitam o tamanho do valor de uma propriedade, então um comentário longo pode chegar cortado: o Google Analytics mantém 100 caracteres e o Mixpanel, 255, enquanto o PostHog e o Segment repassam os comentários inteiros. O Plausible agrupa valores idênticos em vez de listar cada comentário, então ele serve melhor para avaliações do que para comentários. Os leitores podem escrever qualquer coisa na caixa, então trate os comentários como algo que pode conter dados pessoais.
+Um comentário é enviado como um evento `feedback_comment` com os mesmos `helpful`, `path` e `title` da avaliação, além do `comment` do leitor (até 1.000 caracteres). Ele passa pelos mesmos adaptadores que a avaliação, então leia os comentários onde você lê os eventos. Os provedores limitam o tamanho do valor de uma propriedade, então um comentário longo pode chegar cortado: o Google Analytics mantém 100 caracteres, o Mixpanel, 255 bytes (menos caracteres em um sistema de escrita que usa vários bytes por caractere, como o japonês), e o Vercel Web Analytics aceita valores de até 255 caracteres, enquanto o PostHog e o Segment repassam os comentários inteiros. O Fathom, o Clarity e o Hotjar não recebem nenhum texto do comentário. O Plausible agrupa valores idênticos em vez de listar cada comentário, então ele serve melhor para avaliações do que para comentários. Os leitores podem escrever qualquer coisa na caixa, então trate os comentários como algo que pode conter dados pessoais.
 
 O rótulo e o botão da caixa também são strings da interface (`feedback.comment` e `feedback.send`).
 
@@ -506,6 +506,7 @@ Cada uma delas tem seu próprio guia. O campo de configuração é o ponto de en
 | `react` | Comportamento das ilhas React — a memoização automática do React Compiler | [Ilhas](/docs/content/islands#frameworks) |
 | `variables` | Valores que `{{name}}` lê em qualquer página | [Variáveis](/docs/content/variables) |
 | `feedback` | A avaliação "Esta página foi útil?" no rodapé de cada página (padrão `true`) e os comentários por escrito opcionais depois dela | [Feedback da página](#page-feedback) |
+| `changelog` | O título e a descrição do índice `/changelog` gerado, cada um sendo uma string ou um mapa por locale | [Changelogs](/docs/advanced/changelog#the-index-page) |
 
 ## Precedência [#precedence]
 

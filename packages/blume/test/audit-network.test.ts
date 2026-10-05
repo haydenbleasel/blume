@@ -236,30 +236,30 @@ describe("network checks", () => {
 /** A configured 301 redirect. */
 const redirect = (from: string, to: string) => ({ from, status: 301, to });
 
-describe("live redirects", () => {
-  /** The live-redirect findings for `redirects`, as [url, severity, message]. */
-  const liveFindings = async (
-    redirects: { from: string; status: number; to: string }[],
-    base?: string
-  ) => {
-    const ctx = {
-      ...context({
-        base,
-        pages: [
-          snapshot({ url: "/" }),
-          snapshot({ url: "/plain" }),
-          snapshot({ url: "/based" }),
-        ],
-        redirects,
-      }),
-      origin: ORIGIN,
-    };
-    const found = await networkChecks.run(ctx);
-    return found
-      .filter((d) => d.code === "BLUME_AUDIT_REDIRECT_NOT_SERVED")
-      .map((d) => [d.url, d.severity, d.message]);
+/** The live-redirect findings for `redirects`, as [url, severity, message]. */
+const liveFindings = async (
+  redirects: { from: string; status: number; to: string }[],
+  base?: string
+) => {
+  const ctx = {
+    ...context({
+      base,
+      pages: [
+        snapshot({ url: "/" }),
+        snapshot({ url: "/plain" }),
+        snapshot({ url: "/based" }),
+      ],
+      redirects,
+    }),
+    origin: ORIGIN,
   };
+  const found = await networkChecks.run(ctx);
+  return found
+    .filter((d) => d.code === "BLUME_AUDIT_REDIRECT_NOT_SERVED")
+    .map((d) => [d.url, d.severity, d.message]);
+};
 
+describe("live redirects", () => {
   it("requests each old URL and is silent when it redirects as configured", async () => {
     expect(
       await liveFindings([

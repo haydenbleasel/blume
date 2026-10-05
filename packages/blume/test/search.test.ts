@@ -360,6 +360,16 @@ describe("pageFacets", () => {
   });
 });
 
+const mdxProject = (
+  id: string,
+  config: z.input<typeof blumeConfigSchema> = {}
+) =>
+  projectWith(
+    [page({ id })],
+    [route({ id, sourcePath: join(root, id) })],
+    config
+  );
+
 describe("buildSearchDocuments", () => {
   it("emits declared facet values and omits the field elsewhere", async () => {
     // SAFETY: `buildSearchDocuments` reads only `config`, `graph.pages`, and
@@ -517,16 +527,6 @@ describe("buildSearchDocuments", () => {
   });
 
   describe("MDX pages", () => {
-    const mdxProject = (
-      id: string,
-      config: z.input<typeof blumeConfigSchema> = {}
-    ) =>
-      projectWith(
-        [page({ id })],
-        [route({ id, sourcePath: join(root, id) })],
-        config
-      );
-
     it("indexes prose inside components, however indented, and skips JSX/ESM", async () => {
       const [doc] = await buildSearchDocuments(mdxProject("code.mdx"));
       expect(doc?.content).toContain("Prose before");
@@ -685,20 +685,20 @@ describe("buildSearchDocuments", () => {
   });
 });
 
-describe("buildSearchDocuments — <Visibility> audiences", () => {
-  const visProject = (): BlumeProject =>
-    projectWith(
-      [page({ id: "vis.md" })],
-      [
-        route({
-          id: "vis.md",
-          path: "/vis",
-          sourcePath: join(root, "vis.md"),
-          title: "V",
-        }),
-      ]
-    );
+const visProject = (): BlumeProject =>
+  projectWith(
+    [page({ id: "vis.md" })],
+    [
+      route({
+        id: "vis.md",
+        path: "/vis",
+        sourcePath: join(root, "vis.md"),
+        title: "V",
+      }),
+    ]
+  );
 
+describe("buildSearchDocuments — <Visibility> audiences", () => {
   it("web (default): keeps web-only content, drops agents-only blocks", async () => {
     // The dialog must never surface content the rendered page hides.
     const [doc] = await buildSearchDocuments(visProject());
@@ -731,31 +731,31 @@ describe("buildSearchDocuments — <Visibility> audiences", () => {
   });
 });
 
+const projectNoSearch = (
+  over: z.input<typeof pageMetaSchema> = {}
+): BlumeProject =>
+  // SAFETY: `buildSearchDocuments` reads only `config`, `graph.pages`,
+  // `manifest.routes`, and `sources` from the project.
+  ({
+    config: blumeConfigSchema.parse({ search: false }),
+    graph: {
+      pages: [
+        page({
+          description: "Desc A",
+          id: "a.md",
+          meta: pageMetaSchema.parse(over),
+        }),
+      ],
+    },
+    manifest: {
+      routes: [route({ id: "a.md", indexable: false, path: "/a" })],
+    },
+    sources: NO_SOURCES,
+  }) as BlumeProject;
+
 // When the search provider is "none" every route is non-indexable, but the MCP
 // server is a separate feature and should still index docs.
 describe("buildSearchDocuments with includeWhenDisabled", () => {
-  const projectNoSearch = (
-    over: z.input<typeof pageMetaSchema> = {}
-  ): BlumeProject =>
-    // SAFETY: `buildSearchDocuments` reads only `config`, `graph.pages`,
-    // `manifest.routes`, and `sources` from the project.
-    ({
-      config: blumeConfigSchema.parse({ search: false }),
-      graph: {
-        pages: [
-          page({
-            description: "Desc A",
-            id: "a.md",
-            meta: pageMetaSchema.parse(over),
-          }),
-        ],
-      },
-      manifest: {
-        routes: [route({ id: "a.md", indexable: false, path: "/a" })],
-      },
-      sources: NO_SOURCES,
-    }) as BlumeProject;
-
   it("indexes nothing by default when search is disabled", async () => {
     const docs = await buildSearchDocuments(projectNoSearch());
     expect(docs).toHaveLength(0);

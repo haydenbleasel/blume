@@ -14,6 +14,8 @@ Todo site Blume também serve sua documentação como uma pequena **API JSON** s
 | `/api/docs/search?q=` | Busca em texto completo, com o mesmo escopo de `limit`, `contentTypes`, `locale`, `version` e `filters[key]` que `search_docs`. Somente em saída de servidor. |
 | `/openapi.json` | A descrição OpenAPI 3.1 de toda a superfície legível por máquina. |
 
+O índice de páginas deixa de fora as [páginas ocultas](/docs/content/navigation#hidden-pages), que também não ganham documento por página; `get_page` e o espelho `.md` da página continuam servindo a página, já que oculta não quer dizer privada. Páginas com `seo.noindex`, `ai.exclude` ou `search.exclude` são listadas como qualquer outra. O `markdown` de um documento de página é o código-fonte da página do jeito que os agentes o leem, com o bloco de frontmatter mantido no topo.
+
 O índice de páginas, os documentos por página e a navegação são pré-renderizados, então um site estático os serve como arquivos a partir de qualquer host. A busca é um endpoint ao vivo e existe apenas sob [saída de servidor](/docs/deployment#server-rendering), onde ela roda o mesmo índice que `search_docs` usa.
 
 ## Erros [#errors]

@@ -6,6 +6,8 @@ description: >-
 
 すべてのページは次のフロントマターを受け付けます。すべてのフィールドは任意です。
 
+フロントマターは YAML なので、コロンの後にスペースが続く値は `description: "Setup: the easy way"` のように引用符で囲んでください。引用符で囲まないと、YAML は 2 つ目のコロンをネストされたキーの始まりとして解釈し、Blume はそのファイルと行を `BLUME_FRONTMATTER_INVALID` として報告します。
+
 <TypeTable
   type={{
     title: { type: "string", description: "Page title." },
@@ -164,7 +166,7 @@ seo:
     creator: "@jane"
 ```
 
-`noindex` は robots の `noindex` を出力し、ページをサイトマップから除外し、構造化データも出力しません。`x.creator` はページを X アカウント（`twitter:creator`）の作成として示します。たとえばゲスト投稿の著者を示すときに使います。すべてのフィールドについては [メタデータ](/docs/discoverability/metadata#per-page-overrides) を参照してください。
+`noindex` は robots の `noindex` を出力し、ページをサイトマップから除外し、構造化データも出力しません。`canonical` に別の URL を指定した場合も、ページはサイトマップから除外されます。サイトマップには正規 URL だけが掲載されるためです。`x.creator` はページを X アカウント（`twitter:creator`）の作成として示します。たとえばゲスト投稿の著者を示すときに使います。すべてのフィールドについては [メタデータ](/docs/discoverability/metadata#per-page-overrides) を参照してください。
 
 ## 検索 [#search]
 
@@ -176,7 +178,7 @@ search:
   boost: 3
 ```
 
-`exclude` はページを検索対象から除外し、`tags` は検索ダイアログのフィルターでページをグループ化します。`keywords` には、ページ本文に含まれない語句でもページが見つかるようにするための追加の語句を指定します。`boost` はページの関連度に掛ける倍率で、1 より大きいと上位に、1 より小さいと下位に表示されます。[ランキング](/docs/configuration/search#ranking) を参照してください。
+`exclude` はページを検索対象から除外し、`tags` はホスト型の検索アダプターがフィルタリングに使えるように、ページのレコードにラベルを付けます（[タグ](/docs/configuration/search#tags) を参照）。`keywords` には、ページ本文に含まれない語句でもページが見つかるようにするための追加の語句を指定します。`boost` はページの関連度に掛ける倍率で、1 より大きいと上位に、1 より小さいと下位に表示されます。[ランキング](/docs/configuration/search#ranking) を参照してください。
 
 ## AI
 
@@ -185,7 +187,7 @@ ai:
   exclude: true
 ```
 
-`ai.exclude` はページを [`llms.txt` と `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page) から除外します。ページは引き続きレンダリングされ、検索対象にも残り、サイトマップにも掲載されたままです。
+`ai.exclude` はページを [`llms.txt` と `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page) から除外し、[サイトのスキル](/docs/discoverability/agent-discovery#your-sites-skill) のページマップからも除外します。ページは引き続きレンダリングされ、検索、[MCP サーバー](/docs/discoverability/mcp)、[JSON API](/docs/discoverability/json-api) の対象にも残り、サイトマップにも掲載されたままです。
 
 ## 変更履歴 [#changelog]
 

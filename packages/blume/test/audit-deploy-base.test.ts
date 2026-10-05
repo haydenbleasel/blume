@@ -76,12 +76,12 @@ describe("resolveHref under a deployment base", () => {
   });
 });
 
-describe("link checks under a deployment base", () => {
-  const pages = (href: string, content: boolean) => [
-    snapshot({ links: [link(href, content)], url: "/a" }),
-    snapshot({ url: "/guide" }),
-  ];
+const pages = (href: string, content: boolean) => [
+  snapshot({ links: [link(href, content)], url: "/a" }),
+  snapshot({ url: "/guide" }),
+];
 
+describe("link checks under a deployment base", () => {
   it("reports a body link that forgot the base", async () => {
     const [finding] = await findings(
       linkChecks,

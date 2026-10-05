@@ -561,16 +561,17 @@ describe("ensureDepsLink", () => {
   });
 });
 
+const prerenderDir = async (): Promise<string> => {
+  const dir = join(root, "dist", ".prerender");
+  await mkdir(dir, { recursive: true });
+  return dir;
+};
+
 describe("prerenderDepsPlugin", () => {
   // Called directly (no Vite environment), the plugin handles only Astro's
   // `.prerender/` output: it gives it a `node_modules` whose links reach
   // Blume's deps under an isolated linker. `render-deps.test.ts` covers the
   // per-import links an environment-aware build records.
-  const prerenderDir = async (): Promise<string> => {
-    const dir = join(root, "dist", ".prerender");
-    await mkdir(dir, { recursive: true });
-    return dir;
-  };
 
   it("links Blume's deps into the prerender output under an isolated linker", async () => {
     const { pkgDir, store } = await isolatedFixture();

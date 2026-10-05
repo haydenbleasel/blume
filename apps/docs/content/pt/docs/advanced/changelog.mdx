@@ -63,6 +63,17 @@ Assim que você tiver pelo menos uma entrada `type: changelog`, o Blume gera aut
 - A data segue o [`dateFormat`](/docs/configuration#date-format) configurado, sem o ano que o grupo da linha já mostra.
 - Os rascunhos e as entradas com `sidebar.hidden` são ignorados.
 
+A página tem o título **Changelog** (em inglês), com uma descrição de uma linha logo abaixo. Defina os seus com `changelog` na sua configuração; eles também viram o `<title>` da página, a meta description e o card OG, além do topo do espelho em Markdown dela em `/changelog.md`:
+
+```ts blume.config.ts
+changelog: {
+  title: "Release notes",
+  description: "Every Acme SDK release, newest first.",
+},
+```
+
+Cada um também aceita um mapa de código de idioma para texto, como um [rótulo de aba do cabeçalho](/docs/content/i18n#per-locale-navigation). O índice é renderizado no idioma padrão, então mostra a entrada desse idioma. Se você deixar algum deles sem definir, ele mantém o texto integrado, que pode ser substituído por uma [sobrescrita de strings da interface](/docs/content/i18n#translated-ui) (`changelog.title` e `changelog.description` em `i18n.ui`).
+
 A página só aparece quando nada já ocupa a rota `/changelog`. Para substituí-la pelo seu próprio design, adicione uma [página personalizada](/docs/advanced/custom-pages) em `pages/changelog.astro` — ela assume o controle e o Blume para de gerar o índice padrão. O componente `<Update>`, com o qual a cronologia anterior era construída, continua disponível para uma página escrita à mão que queira as notas de lançamento embutidas. Ele não faz parte dos componentes MDX, então importe-o na própria página `.astro`: `import Update from "blume/components/content/Update.astro";`.
 
 Uma [aba](/docs/content/navigation#tabs) do cabeçalho que aponta para `/changelog` abre esse índice — sem precisar de `href`.

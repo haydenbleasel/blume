@@ -8,7 +8,7 @@ description: >-
 
 ## サイトマップ [#sitemap]
 
-Blume はビルド時に、インデックス対象となるすべてのページを含む `sitemap.xml` を書き出します。絶対 URL の [`deployment.site`](/docs/deployment) が必要で、下書き・非表示・[`noindex`](/docs/discoverability/metadata#per-page-overrides) のページを除くすべてのページを列挙します。[バージョン管理された](/docs/content/versioning)サイトでは、canonical が現行版を指しているアーカイブページも除外されます — インデックスすべきなのは現行のページだからです。デフォルトで有効です:
+Blume はビルド時に、インデックス対象となるすべてのページを含む `sitemap.xml` を書き出します。絶対 URL の [`deployment.site`](/docs/deployment) が必要で、下書き・非表示・[`noindex`](/docs/discoverability/metadata#per-page-overrides) のページ、および `seo.canonical` で別の URL を指定しているページを除くすべてのページを列挙します。[バージョン管理された](/docs/content/versioning)サイトでは、canonical が現行版を指しているアーカイブページも除外されます — インデックスすべきなのは現行のページだからです。デフォルトで有効です:
 
 ```ts blume.config.ts lineNumbers
 seo: {

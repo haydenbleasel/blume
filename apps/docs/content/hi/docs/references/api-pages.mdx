@@ -43,7 +43,7 @@ Creates a user and sends them an invite.
 
 ## Playground और नमूने [#the-playground-and-samples]
 
-Spec में जैसे किसी operation के पैरामीटर Try it पैनल के इनपुट बनते हैं, वैसे ही यहाँ पेज के `ParamField` बनते हैं। `path`, `query` और `header` फ़ील्ड पैरामीटर होते हैं। `body` फ़ील्ड मिलकर JSON body बनाते हैं। किसी फ़ील्ड के भीतर नेस्ट किए गए फ़ील्ड (उसके [`Expandable`](/docs/content/components#expandable) के अंदर) एक object की properties बनते हैं। `string[]` वाला `type` एक array होता है। जो type JSON type नहीं है, जैसे `enum<string>`, वह string के रूप में भेजा जाता है। किसी फ़ील्ड का `default` मान body में भरा जाता है, और उसका `placeholder` वह उदाहरण मान है जो नमूनों में दिखता है।
+Spec में जैसे किसी operation के पैरामीटर Try it पैनल के इनपुट बनते हैं, वैसे ही यहाँ पेज के `ParamField` बनते हैं। `path`, `query` और `header` फ़ील्ड पैरामीटर होते हैं। `body` फ़ील्ड मिलकर JSON body बनाते हैं। किसी फ़ील्ड के भीतर नेस्ट किए गए फ़ील्ड (उसके [`Expandable`](/docs/content/components#expandable) के अंदर) एक object की properties बनते हैं। `string[]` वाला `type` एक array होता है। जो type JSON type नहीं है, जैसे `enum<string>`, वह string के रूप में भेजा जाता है। किसी फ़ील्ड का `default` मान body में भरा जाता है, और उसका `placeholder` वह उदाहरण मान है जो नमूनों में दिखता है। जिस वैकल्पिक body फ़ील्ड में इन दोनों में से कोई भी न हो, वह खाली रहता है और तब तक अनुरोध में शामिल नहीं होता जब तक पाठक उसे भर न दे।
 
 पैनल के बगल में पेज पर cURL, JavaScript और Python में अनुरोध के नमूने दिखते हैं। अगर पेज का अपना `RequestExample` हो, तो इन नमूनों की जगह वही दिखता है।
 

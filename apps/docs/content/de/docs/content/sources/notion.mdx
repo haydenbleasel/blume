@@ -26,7 +26,7 @@ export default defineConfig({
 });
 ```
 
-Das Integrations-Token kommt aus der Umgebungsvariable `NOTION_TOKEN`. Teile die Datenbank dafür mit deiner Integration. Der Adapter deklariert die Variable, deshalb gibt ein Build ohne sie eine Warnung aus.
+Das Integrations-Token kommt aus der Umgebungsvariable `NOTION_TOKEN`. Teile die Datenbank dafür mit deiner Integration. Fehlt die Variable, bricht die Quelle ab, bevor sie Notion aufruft, und meldet einen `BLUME_MISSING_SECRET`-Fehler mit dem Namen der Variable. Das passiert nur dann nicht, wenn sie stattdessen einen [zwischengespeicherten Snapshot](/docs/content/sources#caching-and-offline-builds) ausliefern kann.
 
 Die Eigenschaft `Status` steuert standardmäßig, ob eine Seite veröffentlicht wird. Hat der Status einer Seite (eine Status- oder Select-Eigenschaft) einen anderen Wert als `publishedValue`, wird sie mit `draft: true` importiert. Der Standardwert von `publishedValue` ist `Published`. Produktions-Builds lassen Entwürfe weg. Eine Seite ohne Status-Wert wird veröffentlicht, und in einer Datenbank ohne diese Eigenschaft wird jede Seite veröffentlicht. Die Standard-Statusoptionen von Notion sind Not started, In progress und Done. Eine Datenbank mit diesen Optionen hat also keinen Wert `Published` und veröffentlicht nichts, bis du `publishedValue: "Done"` setzt (oder die Option, die bei dir für „veröffentlicht“ steht). Heißt die Eigenschaft bei dir anders, gib ihren Namen mit `properties.status` an. Wenn du jede Seite unabhängig von ihrem Status importieren willst, lass `properties.status` auf eine Eigenschaft zeigen, die es in der Datenbank nicht gibt.
 

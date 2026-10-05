@@ -16,8 +16,8 @@ interface Props {
 
 const { headings, title, variant } = Astro.props;
 // The mobile dropdown also holds what the layout passes as children (the
-// page actions, which the hidden rail would otherwise keep from narrow
-// viewports), so a page with actions but no headings still gets it.
+// mount the page actions move into below `xl`, where the rail that renders
+// them is hidden), so a page with actions but no headings still gets it.
 const hasChildren = Astro.slots.has("default");
 ---
 

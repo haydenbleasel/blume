@@ -2040,9 +2040,9 @@ const markdownConfigSchema = z.strictObject(
 const reactConfigSchema = z.strictObject({
   /**
    * Auto-memoize React components/hooks with the React Compiler
-   * (`babel-plugin-react-compiler`). On by default whenever React is enabled
+   * (`oxc-transform-react`). On by default whenever React is enabled
    * (a project `.tsx`/`.jsx`, a React island/example/override, or the assistant); set
-   * to `false` to skip the compiler's babel pass.
+   * to `false` to skip the compiler pass.
    */
   compiler: z.boolean().default(true),
 });

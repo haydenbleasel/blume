@@ -6,6 +6,8 @@ description: >-
 
 Jede Seite akzeptiert die folgenden Frontmatter-Felder. Alle Felder sind optional.
 
+Frontmatter ist YAML. Setz einen Wert deshalb in Anführungszeichen, wenn er einen Doppelpunkt gefolgt von einem Leerzeichen enthält, etwa `description: "Setup: the easy way"`. Ohne Anführungszeichen liest YAML den zweiten Doppelpunkt als Beginn eines verschachtelten Schlüssels, und Blume meldet Datei und Zeile als `BLUME_FRONTMATTER_INVALID`.
+
 <TypeTable
   type={{
     title: { type: "string", description: "Page title." },
@@ -164,7 +166,7 @@ seo:
     creator: "@jane"
 ```
 
-`noindex` gibt ein robots-`noindex` aus, entfernt die Seite aus der Sitemap und lässt ihre strukturierten Daten weg. `x.creator` schreibt die Seite einem X-Account zu (`twitter:creator`) — etwa der Person, die einen Gastbeitrag verfasst hat. Alle Felder findest du unter [Metadaten](/docs/discoverability/metadata#per-page-overrides).
+`noindex` gibt ein robots-`noindex` aus, entfernt die Seite aus der Sitemap und lässt ihre strukturierten Daten weg. Ein `canonical`, das auf eine andere URL verweist, entfernt die Seite ebenfalls aus der Sitemap, da die Sitemap nur kanonische URLs auflistet. `x.creator` schreibt die Seite einem X-Account zu (`twitter:creator`) — etwa der Person, die einen Gastbeitrag verfasst hat. Alle Felder findest du unter [Metadaten](/docs/discoverability/metadata#per-page-overrides).
 
 ## Suche [#search]
 
@@ -176,7 +178,7 @@ search:
   boost: 3
 ```
 
-`exclude` hält die Seite aus der Suche heraus, und `tags` ordnet sie im Suchdialog einem Filter zu. `keywords` sind zusätzliche Begriffe, über die die Seite neben ihrem eigenen Text gefunden wird. `boost` multipliziert die Relevanz der Seite: Werte über 1 ranken sie höher, Werte unter 1 niedriger. Mehr dazu findest du unter [Ranking](/docs/configuration/search#ranking).
+`exclude` hält die Seite aus der Suche heraus, und `tags` versieht ihren Eintrag mit Labels, nach denen ein gehosteter Such-Adapter filtern kann (siehe [Tags](/docs/configuration/search#tags)). `keywords` sind zusätzliche Begriffe, über die die Seite neben ihrem eigenen Text gefunden wird. `boost` multipliziert die Relevanz der Seite: Werte über 1 ranken sie höher, Werte unter 1 niedriger. Mehr dazu findest du unter [Ranking](/docs/configuration/search#ranking).
 
 ## KI [#ai]
 
@@ -185,7 +187,7 @@ ai:
   exclude: true
 ```
 
-`ai.exclude` hält die Seite aus [`llms.txt` und `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page) heraus. Die Seite wird trotzdem gerendert, bleibt in der Suche und behält ihren Platz in der Sitemap.
+`ai.exclude` hält die Seite aus [`llms.txt` und `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page) und aus der Seitenübersicht im [Skill deiner Website](/docs/discoverability/agent-discovery#your-sites-skill) heraus. Die Seite wird trotzdem gerendert, bleibt in der Suche, im [MCP-Server](/docs/discoverability/mcp) und in der [JSON-API](/docs/discoverability/json-api) und behält ihren Platz in der Sitemap.
 
 ## Changelog
 

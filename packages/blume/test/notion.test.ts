@@ -939,43 +939,43 @@ describe("notionSource (video blocks)", () => {
   });
 });
 
-describe("notionSource (request pacing)", () => {
-  /**
-   * A client whose block fetches report how many are in flight at once. Each
-   * call parks for a tick so overlapping requests are actually observed
-   * overlapping — with 429 fan-out this is exactly the burst the limiter caps.
-   */
-  const trackingClient = (
-    pageCount: number,
-    onRequest: (inFlight: number) => void
-  ): NotionClientLike => {
-    let inFlight = 0;
-    return {
-      blocks: {
-        children: {
-          list: async () => {
-            inFlight += 1;
-            onRequest(inFlight);
-            await sleep(5);
-            inFlight -= 1;
-            return { has_more: false, next_cursor: null, results: [] };
-          },
+/**
+ * A client whose block fetches report how many are in flight at once. Each
+ * call parks for a tick so overlapping requests are actually observed
+ * overlapping — with 429 fan-out this is exactly the burst the limiter caps.
+ */
+const trackingClient = (
+  pageCount: number,
+  onRequest: (inFlight: number) => void
+): NotionClientLike => {
+  let inFlight = 0;
+  return {
+    blocks: {
+      children: {
+        list: async () => {
+          inFlight += 1;
+          onRequest(inFlight);
+          await sleep(5);
+          inFlight -= 1;
+          return { has_more: false, next_cursor: null, results: [] };
         },
       },
-      dataSources: {
-        query: () =>
-          Promise.resolve({
-            has_more: false,
-            next_cursor: null,
-            results: Array.from({ length: pageCount }, (_, i) =>
-              pageStub(`p${i}`)
-            ),
-          }),
-      },
-      databases,
-    };
+    },
+    dataSources: {
+      query: () =>
+        Promise.resolve({
+          has_more: false,
+          next_cursor: null,
+          results: Array.from({ length: pageCount }, (_, i) =>
+            pageStub(`p${i}`)
+          ),
+        }),
+    },
+    databases,
   };
+};
 
+describe("notionSource (request pacing)", () => {
   it("bounds concurrent API requests to the default pool of 3", async () => {
     let peak = 0;
     const source = notionSource(

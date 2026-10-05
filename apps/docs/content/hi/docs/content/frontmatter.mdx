@@ -6,6 +6,8 @@ description: >-
 
 हर पेज निम्नलिखित फ़्रंटमैटर स्वीकार करता है। सभी फ़ील्ड वैकल्पिक हैं।
 
+फ़्रंटमैटर YAML होता है। इसलिए जिस मान में कोलन के बाद स्पेस हो, उसे उद्धरण चिह्नों में रखें, जैसे `description: "Setup: the easy way"`। उद्धरण चिह्नों के बिना YAML दूसरे कोलन को एक नेस्टेड कुंजी की शुरुआत मानता है, और Blume उस फ़ाइल और पंक्ति की रिपोर्ट `BLUME_FRONTMATTER_INVALID` के रूप में करता है।
+
 <TypeTable
   type={{
     title: { type: "string", description: "Page title." },
@@ -164,7 +166,7 @@ seo:
     creator: "@jane"
 ```
 
-`noindex` एक robots `noindex` जोड़ता है, पेज को साइटमैप से हटा देता है, और उसका स्ट्रक्चर्ड डेटा नहीं बनाता। `x.creator` पेज का श्रेय किसी X खाते (`twitter:creator`) को देता है, जैसे किसी गेस्ट पोस्ट के लेखक को। सभी फ़ील्ड के लिए [मेटाडेटा](/docs/discoverability/metadata#per-page-overrides) देखें।
+`noindex` एक robots `noindex` जोड़ता है, पेज को साइटमैप से हटा देता है, और उसका स्ट्रक्चर्ड डेटा नहीं बनाता। जो `canonical` किसी दूसरे URL की ओर संकेत करता है, वह भी पेज को साइटमैप से हटा देता है, क्योंकि साइटमैप में केवल कैनॉनिकल URL ही सूचीबद्ध होते हैं। `x.creator` पेज का श्रेय किसी X खाते (`twitter:creator`) को देता है, जैसे किसी गेस्ट पोस्ट के लेखक को। सभी फ़ील्ड के लिए [मेटाडेटा](/docs/discoverability/metadata#per-page-overrides) देखें।
 
 ## खोज [#search]
 
@@ -176,7 +178,7 @@ search:
   boost: 3
 ```
 
-`exclude` पेज को खोज से बाहर रखता है, और `tags` उसे खोज डायलॉग में एक फ़िल्टर के अंतर्गत समूहित करता है। `keywords` ऐसे अतिरिक्त शब्द हैं जिनसे पेज, अपने स्वयं के टेक्स्ट के अलावा, खोजा जा सकता है। `boost` पेज की प्रासंगिकता को गुणा करता है: 1 से अधिक मान उसे ऊँची रैंक देता है, और 1 से कम मान नीची। [रैंकिंग](/docs/configuration/search#ranking) देखें।
+`exclude` पेज को खोज से बाहर रखता है। `tags` पेज के रिकॉर्ड को लेबल करता है, ताकि कोई होस्टेड खोज एडैप्टर उन लेबल के आधार पर फ़िल्टर कर सके ([टैग](/docs/configuration/search#tags) देखें)। `keywords` ऐसे अतिरिक्त शब्द हैं जिनसे पेज, अपने स्वयं के टेक्स्ट के अलावा, खोजा जा सकता है। `boost` पेज की प्रासंगिकता को गुणा करता है: 1 से अधिक मान उसे ऊँची रैंक देता है, और 1 से कम मान नीची। [रैंकिंग](/docs/configuration/search#ranking) देखें।
 
 ## AI
 
@@ -185,7 +187,7 @@ ai:
   exclude: true
 ```
 
-`ai.exclude` पेज को [`llms.txt` और `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page) से बाहर रखता है। पेज फिर भी रेंडर होता है, खोज में बना रहता है, और साइटमैप में भी बना रहता है।
+`ai.exclude` पेज को [`llms.txt` और `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page) से बाहर रखता है। यह पेज को आपकी [साइट की स्किल](/docs/discoverability/agent-discovery#your-sites-skill) के पेज मैप से भी बाहर रखता है। पेज फिर भी रेंडर होता है। वह खोज, [MCP सर्वर](/docs/discoverability/mcp) और [JSON API](/docs/discoverability/json-api) में बना रहता है, और साइटमैप में भी उसका स्थान बना रहता है।
 
 ## चेंजलॉग [#changelog]
 

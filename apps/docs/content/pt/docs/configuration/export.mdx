@@ -27,7 +27,7 @@ Qualquer formato que você omitir (ou definir como `false`) fica de fora do menu
 
 ## PDF
 
-**Exportar para PDF** abre a caixa de diálogo de impressão do navegador com uma folha de estilo de impressão que remove os elementos da interface do site — cabeçalho, barras laterais, navegação — deixando apenas o artigo. Escolha **Salvar como PDF** para concluir.
+**Exportar para PDF** abre a caixa de diálogo de impressão do navegador com uma folha de estilo de impressão que remove os elementos da interface do site — cabeçalho, barras laterais, navegação e tudo o que vem depois do artigo (última atualização, feedback, links de anterior e próxima, o rodapé do site), além dos botões de copiar dos blocos de código —, deixando apenas o artigo. Os blocos de código [`expandable`](/docs/content/syntax#long-lines-and-long-blocks) recolhidos são impressos por completo, e uma página lida no tema escuro é impressa no tema claro. Escolha **Salvar como PDF** para concluir. A mesma folha de estilo é aplicada quando um leitor imprime pelo próprio menu do navegador.
 
 Como imprime a página ao vivo e totalmente estilizada, o resultado mantém o texto nítido e selecionável, fontes reais e código com realce de sintaxe. Não requer dependências e funciona da mesma forma em desenvolvimento, em produção e em hospedagens estáticas.
 
@@ -39,11 +39,13 @@ A exportação para PDF passa pela caixa de diálogo de impressão nativa do nav
 
 **Exportar para EPUB** gera um `.epub` autocontido da página atual no navegador e o baixa — pronto para o Apple Books, o Calibre ou qualquer leitor de e-books. O gerador só é carregado quando um leitor clica em Exportar, então ele nunca pesa no restante do seu site.
 
-Para manter o arquivo legível em um dispositivo sem folha de estilo ou JavaScript próprios, o Blume reescreve a página em HTML limpo e independente: o código com realce de sintaxe vira monoespaçado simples, ícones decorativos e botões de copiar são removidos, e uma folha de estilo integrada para leitores de e-books cuida do espaçamento, dos blocos de código e das tabelas.
+Para manter o arquivo legível em um dispositivo sem folha de estilo ou JavaScript próprios, o Blume reescreve a página em HTML limpo e independente: o código com realce de sintaxe vira monoespaçado simples, ícones decorativos e botões de copiar são removidos, e uma folha de estilo integrada para leitores de e-books cuida do espaçamento, dos blocos de código e das tabelas. Links para outras páginas apontam para o seu site no ar, já que o livro contém apenas esta página.
+
+O livro recebe o título do cabeçalho da página, adota o idioma da página e indica o [`title`](/docs/configuration#site) do seu site como autor e editora. As imagens são baixadas para dentro do livro; uma imagem que o navegador não consegue baixar, como uma hospedada em outro host que não permite requisições de origem cruzada, fica de fora, com um aviso no console do navegador.
 
 ## O que é exportado [#what-gets-exported]
 
-Ambos os formatos exportam a **única página** que o leitor está visualizando — não o site inteiro — o que condiz com o lugar onde a ação fica, abaixo do sumário daquela página.
+Ambos os formatos exportam a **única página** que o leitor está visualizando — não o site inteiro — o que condiz com o lugar onde a ação fica, abaixo do sumário daquela página. Assim como as outras [ações de página](/docs/content/navigation#page-actions), ela fica na coluna da direita em janelas com pelo menos 1.280px de largura, e no menu suspenso “Nesta página” acima do conteúdo em janelas mais estreitas e em celulares.
 
 :::note
 Em um EPUB não há JavaScript para alternar abas, então o conteúdo em abas — como os blocos [package-install](/docs/content/syntax) e os grupos de código — é expandido para mostrar todos os painéis de uma vez. Embeds renderizados no cliente, como diagramas Mermaid, não são incluídos.

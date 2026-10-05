@@ -18,7 +18,8 @@ export default defineConfig({
         prefix: "handbook",
         url: "https://cms.example.com",
         collection: "docs",
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "richText" },
         // Extra query parameters: where[...], sort
         params: { sort: "title" },
@@ -28,4 +29,4 @@ export default defineConfig({
 });
 ```
 
-A chave de API vem da variável de ambiente `PAYLOAD_API_KEY` e é enviada como `users API-Key <key>`. Defina `authCollection` quando a chave pertencer a outra coleção com autenticação habilitada. Só documentos publicados são importados: `--preview` busca também os rascunhos e os inclui marcados com `draft: true`. Os documentos são buscados com `depth: 1` para que os uploads tragam suas URLs, e um caminho de upload relativo (`/media/x.png`) é resolvido em relação a `url`. Quando você cria `payloadSource` diretamente e o passa para [`custom()`](/docs/content/sources/custom), um nó `block` ou `inlineBlock` é mapeado para um componente do Blume pela opção `serializers` do engine, usando o `blockType` como chave. Definir `serializers` faz a fonte gravar suas páginas como MDX para que os componentes retornados sejam renderizados. Um corpo armazenado em um campo de texto Markdown continua sendo Markdown.
+A chave de API vem da variável de ambiente `PAYLOAD_API_KEY` e é enviada como `users API-Key <key>`. Defina `authCollection` quando a chave pertencer a outra coleção com autenticação habilitada. Só documentos publicados são importados: `--preview` busca também os rascunhos e os inclui marcados com `draft: true`. Os documentos são buscados com `depth: 1` para que os uploads tragam suas URLs, e um caminho de upload relativo (`/media/x.png`) é resolvido em relação a `url`. Os uploads são referenciados por essa URL em vez de serem baixados, já que ela não expira como as do Notion, então os navegadores dos leitores os carregam do seu servidor Payload ou do armazenamento dele. Se você preferir que o Blume os baixe e otimize no build, autorize o host em [`image.domains`](/docs/configuration#images). Quando você cria `payloadSource` diretamente e o passa para [`custom()`](/docs/content/sources/custom), um nó `block` ou `inlineBlock` é mapeado para um componente do Blume pela opção `serializers` do engine, usando o `blockType` como chave. Definir `serializers` faz a fonte gravar suas páginas como MDX para que os componentes retornados sejam renderizados. Um corpo armazenado em um campo de texto Markdown continua sendo Markdown. Um nó sem equivalente em Markdown, ou um bloco sem serializador, é deixado de fora como comentário, e a fonte emite o aviso `BLUME_SOURCE_UNSUPPORTED_NODE` indicando o nó e a página.

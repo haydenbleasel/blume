@@ -30,6 +30,8 @@ O servidor expõe ferramentas somente leitura — `search_docs`, `get_page`, `li
 
 `search_docs` roda seu próprio índice de texto completo, então funciona independentemente do seu provedor de [busca](/docs/configuration/search) — e até mesmo com `search: false`. O servidor MCP é um recurso separado da busca na página.
 
+[Páginas ocultas](/docs/content/navigation#hidden-pages) ficam de fora de `list_pages` e `resources/list`, e de `search_docs` a menos que [`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) esteja ativado, assim como ficam de fora da busca do site e do `llms.txt`. `get_page` e `resources/read` ainda retornam uma página oculta pela sua rota: oculta não quer dizer privada, e a página continua sendo servida na sua URL e como Markdown.
+
 As mesmas ferramentas estão disponíveis via HTTP simples como a [API JSON](/docs/discoverability/json-api), para frameworks que não falam MCP.
 
 O endpoint lê o corpo da requisição somente até 64 KB e responde a qualquer coisa maior com `413`. Uma chamada a uma ferramenta que não existe, ou com `arguments` que não sejam um objeto, recebe o erro Invalid params do JSON-RPC (`-32602`).
@@ -49,6 +51,8 @@ As duas ferramentas também aceitam um objeto `filters` que faz correspondência
 ```
 
 Cada entrada de `filters` precisa corresponder (os resultados carregam seus valores de faceta, e `list_pages` mostra os de cada página), então uma base de conhecimento pode conduzir fluxos de trabalho de agentes com divulgação progressiva — enumerar os padrões aplicados, buscar somente dentro deles — sem nenhum servidor próprio.
+
+Um valor precisa corresponder exatamente ao que `list_pages` mostra, incluindo maiúsculas e minúsculas: `"enforced"` não corresponde a uma página cujo `status` é `Enforced`. Valores de faceta são strings, então um número ou booleano em `filters` corresponde à sua forma em string (`{"priority": 1}` encontra `priority: 1`), e um valor de qualquer outro formato, como uma lista, é ignorado em vez de filtrar.
 
 ## Saída de servidor obrigatória [#server-output-required]
 

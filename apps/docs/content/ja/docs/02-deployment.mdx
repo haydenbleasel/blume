@@ -17,7 +17,16 @@ sidebar:
 | 出力ディレクトリ | `dist`        |
 | Node バージョン  | 22.12 以降    |
 
-これらの設定は Vercel、Netlify、Cloudflare Pages、GitHub Pages、Amazon S3 + CloudFront、その他あらゆるバケットや CDN で動作します。ホストがビルドを実行できるよう、`blume` が依存関係に含まれていることを確認してください。
+これらの設定は Vercel、Netlify、Cloudflare Pages、GitHub Pages、その他あらゆるバケットや CDN で動作します。ホストがビルドを実行できるよう、`blume` が依存関係に含まれていることを確認してください。
+
+CloudFront の背後に Amazon S3 を置き、オリジンアクセスコントロール（origin access control）経由でプライベートバケットを読み取る構成では、さらに 2 つの設定が必要です。S3 の REST エンドポイントは各キーを完全一致で検索し、各ファイルをアップロード時に指定されたタイプで配信するためです:
+
+- ビューアーリクエストで実行される CloudFront Function。各ページの URL を、Blume がそのページ用に書き出す `index.html` にマッピングします: `/quickstart` は `/quickstart/index.html` に、`/`（または `/` で終わる任意のパス）はその `index.html` にマッピングします。最後のセグメントにドットを含むパス（`/quickstart.md`、`/_astro/app.js`）は変更せず、`/.well-known/*` にはこの関数を適用しないでください。その配下の `api-catalog` には拡張子がないためです。この関数がないと、S3 は `/quickstart` に対して `403` または `404` を返します。
+- ファイル拡張子からの推測では誤るか charset が付かないタイプを設定するアップロード: `.md` と `.mdx` には `text/markdown; charset=utf-8`、`.txt` には `text/plain; charset=utf-8`、`.well-known/api-catalog` には `application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"` を設定します。ビルドに必要なすべてのルールは `dist/_headers` に記載されています。
+
+[S3 と CloudFront のガイド](/guides/s3-cloudfront-documentation-site) には、この関数を含む CloudFormation テンプレートと、これらのタイプを指定してアップロードするデプロイスクリプトが用意されています。
+
+静的ビルドを静的アセットとして配信する Cloudflare Workers では、Wrangler の設定の `assets` 配下に `"html_handling": "drop-trailing-slash"` を設定してください。Blume は各ページを `<route>/index.html` として書き出し、末尾のスラッシュなしでリンクしますが、Cloudflare のデフォルト（`auto-trailing-slash`）は `/quickstart` に対して `/quickstart/` への `307` を返します。[`cloudflare()` のサーバービルド](#server-rendering) はすべてのページを Worker 経由でルーティングし、Worker はどちらの設定でも `/quickstart` を配信します。そのため、サーバービルドでこの設定が問題になるのは、ビルドが `Could not wire Accept: text/markdown negotiation` という警告を出し、静的レイヤーがページを直接配信する場合のみです。
 
 静的ビルドには次のものが含まれます:
 
@@ -41,9 +50,13 @@ deployment: {
 }
 ```
 
-Vercel と Netlify では、自動検出の際に Blume はデプロイごとのプレビュー URL よりも安定した本番ドメインを優先するため、canonical オリジンはデプロイをまたいで変わりません。Cloudflare Pages が公開するのは現在のデプロイの URL（`CF_PAGES_URL`）のみで、これはデプロイのたびに変わるため、Cloudflare Pages では `site` を設定してください。
+Vercel と Netlify では、自動検出の際に Blume はデプロイごとのプレビュー URL よりも安定した本番ドメインを優先するため、canonical オリジンはデプロイをまたいで変わりません。Cloudflare Pages が公開するのは現在のデプロイの URL（`CF_PAGES_URL`）のみで、これはデプロイのたびに変わるため、Cloudflare Pages では `site` を設定してください。Cloudflare Workers は URL を一切公開しないため、Workers でも `site` を設定してください。
 
 `blume dev` の実行中、サイト URL が未設定の場合はローカル開発サーバー（例: `http://localhost:4321`）にフォールバックするため、サイト URL に依存する機能 — Open Graph 画像、canonical、サイトマップ — がそのまま動作します。ビルドではこのフォールバックは使われないため、本番の出力が localhost を指すことはありません。
+
+### モノレポ [#monorepos]
+
+ドキュメントのワークスペースを独立したプロジェクトとしてデプロイし、ホストのルートディレクトリをそのワークスペースに設定して（Vercel の **Root Directory**、Netlify の **Base directory**）、上記の設定を使ってください。Vercel では、ドキュメントがワークスペース外のファイルを読み取る場合 — [コンポーネントの例](/docs/content/components#component) やインポートするワークスペースパッケージ、`theme.css` 内の `@source` パス、リポジトリ内の別の場所にある仕様ファイルなど — は、**Include source files outside of the Root Directory in the Build Step** をオンのままにしてください（デフォルトはオンです）。オフにすると、ビルドがそれらのファイルにアクセスできません。[モノレポガイド](/guides/monorepo-documentation-site) では、pnpm と Turborepo を使ったセットアップを順を追って説明しています。
 
 ## ローカルでプレビューする [#preview-locally]
 
@@ -66,7 +79,7 @@ deployment: {
 }
 ```
 
-`base`（および `site`）は、すべてのホストアダプターのオプションでもあります: `vercel({ base: "/docs" })`。
+`base`（および `site`）は、すべてのホストアダプターのオプションでもあります: `vercel({ base: "/docs" })`。`@astrojs/vercel` はベースを無視するため、`vercel()` のサーバービルドは自ら静的ファイルを `.vercel/output/static/docs/` に移動し、`.vercel/output/config.json` 内のルートとリダイレクトを `/docs` 配下に移します。
 
 ベースと同じ名前のコンテンツフォルダー内にあるページでも、各ページはベース配下で自身のパスを維持します: `base: "/docs"` の場合、`docs/setup.md` は `/docs/docs/setup` で配信され、その canonical URL、サイドバーのリンク、`llms.txt` のエントリーもそこを指します。書いたルート相対のリンクがすでにベースで始まっている場合は、ベースを含むものとみなされ、書いたとおりに残されます。そのため、そのページへは相対リンク（`./docs/setup`）か完全なパス（`/docs/docs/setup`）でリンクしてください。
 
@@ -113,9 +126,9 @@ deployment: vercel({
 | `vercel()` | `@astrojs/vercel` | Vercel — 最も洗練された選択肢 |
 | `netlify()` | `@astrojs/netlify` | Netlify Functions |
 | `node()` | `@astrojs/node` | セルフホストの Node サーバー、コンテナ |
-| `cloudflare()` | `@astrojs/cloudflare` | Cloudflare Workers と Pages |
+| `cloudflare()` | `@astrojs/cloudflare` | Cloudflare Workers |
 
-`vercel()` と `node()` は Blume に同梱されています — 選ぶだけで動きます。`netlify()` と `cloudflare()` はプロジェクトへのパッケージのインストールが必要です（例: `bun add -d @astrojs/netlify`）。パッケージが見つからない場合、`blume build` はお使いのパッケージマネージャー用のインストールコマンドを表示して停止し、`blume dev` は警告を出し、[`blume doctor`](/docs/cli/doctor) はそれを報告します。pnpm 10 以降では、これらのパッケージが持ち込むビルドスクリプト（`sharp`、Cloudflare の場合は `workerd`）も `pnpm-workspace.yaml` の `allowBuilds` で承認してください。承認しないと pnpm がインストールを停止します。
+`vercel()` と `node()` は Blume に同梱されています — 選ぶだけで動きます。`netlify()` と `cloudflare()` はプロジェクトへのパッケージのインストールが必要です（例: `bun add -d @astrojs/netlify`）。パッケージが見つからない場合、`blume build` はお使いのパッケージマネージャー用のインストールコマンドを表示して停止し、`blume dev` は警告を出し、[`blume doctor`](/docs/cli/doctor) はそれを報告します。pnpm を使う場合は、これらのパッケージが持ち込むビルドスクリプトも、`blume init` が書き込む `esbuild` のエントリーと並べて `pnpm-workspace.yaml` の `allowBuilds` で承認してください: Netlify では `sharp`（アダプターが独自のコピーを持ち込むため）、Cloudflare では `workerd` です。pnpm 11 以降では承認するまで `ERR_PNPM_IGNORED_BUILDS` でインストールが停止し、pnpm 10 では警告を出してスクリプトをスキップします。`allowBuilds` には pnpm 10.26 以降が必要です。
 
 アダプターを指定すると、ビルドはサーバー出力に切り替わります。そのホスト上で静的ビルドを維持する — ホストのサイト URL 検出や、ホストが読み取るプラットフォーム用ファイルは引き続き利用する — には、`output: "static"` を渡します:
 
@@ -123,9 +136,9 @@ deployment: vercel({
 deployment: netlify({ output: "static" }),
 ```
 
-サーバービルドには静的ビルドのすべてに加えて、追加した Astro のエンドポイントやミドルウェアが含まれます。`node()` アダプターは、`node dist/server/entry.mjs` で直接実行できるスタンドアロンのサーバーを生成します。起動時に環境変数 `HOST` と `PORT` を設定しない限り、サーバーは `localhost:4321` で待ち受けます（`HOST=0.0.0.0 PORT=8080 node dist/server/entry.mjs`）。`node()` に渡した `host` と `port` は効果がありません。`@astrojs/node` がそれらを Astro 自身のサーバー設定で置き換えるためです。このサーバーはプロジェクトの `node_modules` へのリンクを通じてパッケージを解決するため、`dist/` だけでなく、依存関係をインストールした状態のプロジェクトごとデプロイしてください。サイトがディスカバリーファイルを公開している場合、コンテンツソースがダウンロードした画像を配信する場合、またはリダイレクトを設定している場合、Blume は Astro のエントリー（同じ場所の `astro-entry.mjs` に移動されます）の手前に小さなラッパーを配置します。このラッパーは `.well-known` のディスカバリーファイルを適切なメディアタイプと CORS ヘッダー付きで配信し、ダウンロードした SVG をサンドボックス化して配信します。これらはスタンドアロンサーバーの静的ハンドラーだけではできないためです。また、各リダイレクトには設定されたステータスで応答します。
+サーバービルドには静的ビルドのすべてに加えて、追加した Astro のエンドポイントやミドルウェアが含まれます。`node()` アダプターは、`node dist/server/entry.mjs` で直接実行できるスタンドアロンのサーバーを生成します。起動時に環境変数 `HOST` と `PORT` を設定しない限り、サーバーは `localhost:4321` で待ち受けます（`HOST=0.0.0.0 PORT=8080 node dist/server/entry.mjs`）。`node()` に渡した `host` と `port` は効果がありません。`@astrojs/node` がそれらを Astro 自身のサーバー設定で置き換えるためです。リバースプロキシの背後では、[レート制限](/docs/configuration/rate-limiting#behind-a-reverse-proxy) が閲覧者ごとに個別にカウントされるよう `allowedDomains` を設定してください。このサーバーはプロジェクトの `node_modules` へのリンクを通じてパッケージを解決するため、`dist/` だけでなく、依存関係をインストールした状態のプロジェクトごとデプロイしてください。サイトがディスカバリーファイルを公開している場合、コンテンツソースがダウンロードした画像を配信する場合、またはリダイレクトを設定している場合、Blume は Astro のエントリー（同じ場所の `astro-entry.mjs` に移動されます）の手前に小さなラッパーを配置します。このラッパーは `.well-known` のディスカバリーファイルを適切なメディアタイプと CORS ヘッダー付きで配信し、ダウンロードした SVG をサンドボックス化して配信します。これらはスタンドアロンサーバーの静的ハンドラーだけではできないためです。また、各リダイレクトには設定されたステータスで応答します。
 
-`cloudflare()` のサーバービルドは、`blume build` の後にプロジェクトのルートで `npx wrangler deploy` を実行してデプロイします: Blume は Wrangler のリダイレクト設定（redirected config）を `.wrangler/deploy/` に書き出し（`.gitignore` に `.wrangler/` も追加します）、Worker にはプロジェクトに基づいた名前を付けます — `package.json` の `name`、なければサイトのホスト名、それもなければフォルダー名です — ただし、プロジェクトのルートに置いた独自の `wrangler.jsonc` で `name` を設定している場合を除きます。
+`cloudflare()` のサーバービルドは Cloudflare Workers でのみ動作します。`@astrojs/cloudflare` がバージョン 13 で Cloudflare Pages のサポートを終了したためです。静的ビルドはこのパッケージを読み込まないため、その `dist/` は引き続き Pages にデプロイできます。サーバービルドは、`blume build` の後にプロジェクトのルートで `npx wrangler deploy` を実行してデプロイします: Blume は Wrangler のリダイレクト設定（redirected config）を `.wrangler/deploy/` に書き出し（`.gitignore` に `.wrangler/` も追加します）、Worker にはプロジェクトに基づいた名前を付けます — `package.json` の `name`、なければサイトのホスト名、それもなければフォルダー名です — ただし、プロジェクトのルートに置いた独自の `wrangler.jsonc` で `name` を設定している場合を除きます。
 
 Vercel と Cloudflare では、サーバービルドによって [`Accept: text/markdown` のコンテンツネゴシエーション](/docs/discoverability/markdown#content-negotiation) も有効になり、そのヘッダー付きで任意のコンテンツページをリクエストしたエージェントは、同じ URL で生の Markdown 版を受け取れます。Vercel では、Blume がデプロイのルーティング設定にヘッダー条件付きのリライトを挿入します。Cloudflare では、Astro の Worker の手前に小さな Worker を生成し、フィンガープリント付きのビルドアセットと生の `.md`、`.txt`、`.json`、`.well-known` ファイルを除くすべてのパスに `assets.run_worker_first` を適用します — そうしないと、プラットフォームはサーバーコードが実行される前に事前レンダリング済みページ（および対応するページがない URL に対しては `404.html`）を配信してしまうためです。除外されたファイルは Worker を介さない高速パスを維持します。また、事前レンダリング済みのページごとの JSON ドキュメント（`/api/docs/pages/{route}.json`）へのリクエストがこの Worker に届いた場合も、Worker がアセットバインディングから応答します。そうしないと、Astro がそのリクエストを `/api/` のキャッチオールにルーティングしてしまうためです。
 
@@ -162,7 +175,9 @@ Blume 自体にはサインイン機能がありません。静的ビルドは�
 redirects: [{ from: "/old", to: "/new", status: 301 }],
 ```
 
-`status` は `301`、`302`、`307`、`308` を受け付けます（デフォルトは `301`）。サーバービルドではリダイレクトをリクエスト時に、設定されたステータスで処理します。静的ビルドではリダイレクトページ**に加えて**ホストが読み取るプラットフォーム用のファイルも出力するため、ホストが本物の HTTP リダイレクトを返せます: `netlify()` と `cloudflare()` には `_redirects`、`vercel()` には `vercel.json`、そしてホストを指定していない場合はその両方に加えて `blume-redirects.json` — その他の環境（nginx/Apache のルール、エッジワーカーなど）向けの構造化マニフェストです。`public/` に配置した `_redirects` や `vercel.json` はそのまま維持されます。
+`status` は `301`、`302`、`307`、`308` を受け付けます（デフォルトは `301`）。サーバービルドではリダイレクトをリクエスト時に、設定されたステータスで処理します。`blume dev` も同様です。静的ビルドではリダイレクトページ**に加えて**ホストが読み取るプラットフォーム用のファイルも出力するため、ホストが本物の HTTP リダイレクトを返せます: `netlify()` と `cloudflare()` には `_redirects`、`vercel()` には `vercel.json`、そしてホストを指定していない場合はその両方に加えて `blume-redirects.json` — その他の環境（nginx/Apache のルール、エッジワーカーなど）向けの構造化マニフェストです。`public/` に配置した `_redirects` や `vercel.json` はそのまま維持されます。
+
+あるページを別のページへ移動するリダイレクトは、そのページの [生の Markdown](/docs/discoverability/markdown#raw-markdown) も一緒に移動します: `blume dev` とすべてのビルドで、`/old.md` と `/old.mdx` は同じステータスで `/new.md` と `/new.mdx` にリダイレクトされます。
 
 次の 2 つのホストでは、ファイルを出力するだけでは不十分です:
 
@@ -194,7 +209,7 @@ redirects: [
 
 各ホストには、それぞれの構文でパターンが渡されます: `_redirects` ではスプラット、`vercel.json` では `path-to-regexp` 形式のソース、そして `vercel()` または `netlify()` のサーバービルドではルーティング設定です。`node()` と `cloudflare()` のサーバーは自身でパターンをマッチングし、`blume dev` も同様です。静的ビルドはパターンに対してリダイレクトページを書き出しません。パターンがカバーするすべてのパスに 1 ページずつ必要になるためです。そのため、これらのファイルをいずれも読み取らないホスト（GitHub Pages など）では、完全一致のリダイレクトのみが適用されます。`blume-redirects.json` には、パターンが記述したとおりに記載されます。
 
-パターンがページにもマッチすることはできません: 両者のどちらが応答するかはホストによって異なるため、ビルドはそのページを示して `BLUME_REDIRECT_MATCHES_PAGE` で停止します。パターンを移動したパスだけに絞り込んでください。
+パターンがページにもマッチすることはできません: 両者のどちらが応答するかはホストによって異なるため、ビルドはそのページを示して `BLUME_REDIRECT_MATCHES_PAGE` で停止します。パターンを移動したパスだけに絞り込んでください。ページ自身の URL からの完全一致のリダイレクトはどのホストでも同じように応答し、その URL を引き継ぐためページは公開されません。そのため、この場合は同じコードが警告として出されます: ページを移動した場合はページを削除し、そうでなければリダイレクトを削除してください。
 
 ## コンテンツタイプ [#content-types]
 
@@ -208,10 +223,13 @@ redirects: [
 | --- | --- |
 | アシスタント（AI Gateway） | `AI_GATEWAY_API_KEY`（または Vercel OIDC） |
 | アシスタント（その他のアダプター） | アダプターのデフォルトのキー環境変数（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`XAI_API_KEY`、`OPENROUTER_API_KEY`、`LLMGATEWAY_API_KEY`、`INKEEP_API_KEY`）、またはアダプターに渡した `apiKeyEnv` |
+| [アシスタントのボット対策](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY`（`turnstile()`）、`HCAPTCHA_SECRET_KEY`（`hcaptcha()`） |
+| [レート制限](/docs/configuration/rate-limiting)（`upstash()`） | `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` |
 | Mixedbread 検索 | `MIXEDBREAD_API_KEY` |
-| [コンテンツソース](/docs/content/sources) | `NOTION_TOKEN`（`notion()`）、`SANITY_TOKEN`（`sanity()`）、`CONTENTFUL_ACCESS_TOKEN`（`contentful()`）、`PAYLOAD_API_KEY`（`payload()`）、`STRAPI_API_TOKEN`（`strapi()`）、`GITHUB_TOKEN`（`githubReleases()`、および GitHub から読み込む `mdxRemote()`） |
+| [ナレーション](/docs/configuration/narration)（生成音声） | `AI_GATEWAY_API_KEY`（または Vercel OIDC）、または `gateway()` に渡した `apiKeyEnv` |
+| [コンテンツソース](/docs/content/sources) | `NOTION_TOKEN`（`notion()`）、`SANITY_TOKEN`（`sanity()`）、`CONTENTFUL_ACCESS_TOKEN`（`contentful()`。`--preview` には `CONTENTFUL_PREVIEW_TOKEN` も必要で、ない場合は失敗します）、`PAYLOAD_API_KEY`（`payload()`）、`STRAPI_API_TOKEN`（`strapi()`）、`GITHUB_TOKEN`（`githubReleases()`、および GitHub から読み込む `mdxRemote()`） |
 
-ローカル開発では `.env.local` に、本番ではホストの環境に設定してください。コンテンツソースは `blume dev` と `blume build` の実行中、コンテンツを取得する際にトークンを読み取るため、サイトをビルドする環境に設定してください。検索インデックスの同期（Algolia、Orama Cloud、Typesense）に必要なビルド時のシークレットについては、同期ステップで個別に警告されます。
+ローカル開発では `.env.local` に、本番ではホストの環境に設定してください。コンテンツソースは `blume dev` と `blume build` の実行中、コンテンツを取得する際にトークンを読み取り、ナレーションは `blume build` の実行中にキーを読み取るため、これらはサイトをビルドする環境に設定してください。検索インデックスの同期に必要なビルド時のシークレット（`ALGOLIA_ADMIN_API_KEY`、`ORAMA_PRIVATE_API_KEY`、`TYPESENSE_ADMIN_API_KEY`）は、同期ステップ自体がチェックします: 未設定の場合、ビルドは警告を出して同期をスキップし、設定されている場合は、同期が失敗すると [ビルドも失敗します](/docs/configuration/search#adapters)。[GitHub info](/docs/content/components#github-info) カードも、`GITHUB_TOKEN` が設定されている場合は GitHub の API レート制限を緩和するためにそれを送信します。
 
 ## ビルドキャッシュ [#build-cache]
 
@@ -223,7 +241,7 @@ Blume は、ビルドで再利用できる 2 つのキャッシュを保持し�
 - **GitHub Actions** やその他の自前で管理するランナーは、自分でディレクトリをキャッシュしない限り何も保持しません:
 
 ```yaml
-- uses: actions/cache@v4
+- uses: actions/cache@v6
   with:
     path: node_modules/.cache/blume/og
     key: blume-og-${{ runner.os }}-${{ hashFiles('**/bun.lock', '**/package-lock.json', '**/pnpm-lock.yaml') }}

@@ -41,7 +41,7 @@ navigation: {
 
 ## Exemplos gerados [#generated-examples]
 
-Toda página de operação traz uma operação de exemplo completa e válida. Ela tem uma variável por argumento, tipada a partir do schema, e um selection set de profundidade limitada sobre o tipo de retorno. A página também traz variáveis de exemplo e uma resposta de exemplo que segue a mesma seleção. Os exemplos de código mostram a requisição HTTP exata (um `POST` JSON de `{ query, variables }`) em cada linguagem configurada. As mesmas [linguagens](/docs/references/openapi#code-samples-and-schemas) do `openapi()` estão disponíveis, e `codeSamples: false` não mostra nenhum exemplo:
+Toda página de operação traz uma operação de exemplo completa e válida. Ela tem uma variável por argumento, tipada a partir do schema, e um selection set de profundidade limitada sobre o tipo de retorno. A página também traz variáveis de exemplo e uma resposta de exemplo que segue a mesma seleção. Quando o argumento declara um valor padrão, a variável começa com esse valor, e a seleção deixa de fora os fields depreciados. Os exemplos de código mostram a requisição HTTP exata (um `POST` JSON de `{ query, variables }`) em cada linguagem configurada. As mesmas [linguagens](/docs/references/openapi#code-samples-and-schemas) do `openapi()` estão disponíveis, e `codeSamples: false` não mostra nenhum exemplo:
 
 ```ts blume.config.ts lineNumbers
 reference: [
@@ -82,6 +82,18 @@ reference: [
 ## Playground Try it [#try-it-playground]
 
 As páginas de query e mutation mostram um painel interativo. Edite o corpo da requisição (a query e as variáveis), aponte para o seu endpoint ou para uma URL personalizada e envie. Os exemplos de código são atualizados em tempo real, então o que você copia é exatamente, byte a byte, o que foi enviado. Desative com `playground: false`. As páginas de subscription mostram a operação gerada e um evento de exemplo no lugar do painel. Isso acontece porque subscriptions rodam sobre um transporte com estado (WebSocket ou SSE), e o playground só envia um único `POST` HTTP.
+
+Um schema não diz como a API dele faz autenticação. Por isso, o painel não envia nenhuma credencial até que o `auth` diga. Ele tem o mesmo formato do [`api.auth`](/docs/references/api-pages#site-defaults) das páginas de endpoint escritas à mão: `method` pode ser `bearer`, `basic`, `key` (uma chave de API em um header) ou `none`, e `name` é o header onde vai a chave de API (`x-api-key` por padrão). Com isso, toda página de operação ganha uma seção **Autorização**, o painel ganha um campo de credencial que funciona como o [do OpenAPI](/docs/references/openapi#credentials) e os exemplos de código ganham uma credencial de placeholder. Um `auth` definido na source substitui o do adapter:
+
+```ts blume.config.ts lineNumbers
+reference: [
+  graphql({
+    spec: "./schema.graphql",
+    endpoint: "https://api.example.com/graphql",
+    auth: { method: "bearer" },
+  }),
+],
+```
 
 Se a sua API GraphQL não aceita requisições cross-origin vindas do site de docs, faça os envios passarem por um proxy CORS. Use uma URL sua ou `true` para o endpoint embutido `/_api-proxy` (dentro do seu `basePath`, se você tiver definido um). O proxy embutido exige [output de servidor](/docs/deployment#server-rendering), ou seja, um adapter de host como `deployment: vercel()` de `blume/deploy`. O proxy embutido só encaminha requisições para as origens declaradas nas suas specs documentadas: cada `endpoint` GraphQL configurado e qualquer `servers[].url` absoluta de uma [spec OpenAPI](/docs/references/openapi) documentada. Assim, ninguém consegue usar um deploy público de docs para mandar requisições a outros hosts. Por isso, o `endpoint` é obrigatório para o proxy funcionar. Sem ele, o proxy não tem nenhuma origem liberada para esta referência e recusa todos os envios (o build avisa sobre isso). O limite de tamanho do corpo, o encaminhamento de headers e os headers de resposta são os mesmos do [proxy OpenAPI](/docs/references/openapi#try-it-playground).
 

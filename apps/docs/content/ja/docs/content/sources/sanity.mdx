@@ -4,7 +4,7 @@ description: >-
   sanity() ソースを使って Sanity データセットからドキュメントを取得します。GROQ クエリでドキュメントを選択し、その Portable Text 本文は Markdown に変換されます。
 ---
 
-組み込みの `sanity()` アダプターは GROQ クエリを実行し、各ドキュメントのフィールドをフロントマターに、Portable Text の本文を Markdown にマッピングします。このアダプターはランタイム依存関係として `@sanity/client` を宣言しています。これはオプションのピア依存関係であるため、このソースを使用する場合にのみインストールしてください。
+組み込みの `sanity()` アダプターは GROQ クエリを実行し、各ドキュメントのフィールドをフロントマターに、Portable Text の本文を Markdown にマッピングします。Markdown 文字列フィールドに格納された本文は記述されたとおりにそのまま渡されます。ただし、Web、メール、電話、相対アドレスのいずれでもないリンク（たとえば `javascript:` URL）は、ラベルのみが残ります。このアダプターはランタイム依存関係として `@sanity/client` を宣言しています。これはオプションのピア依存関係であるため、このソースを使用する場合にのみインストールしてください。
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -27,4 +27,4 @@ export default defineConfig({
 });
 ```
 
-非公開データセット用の読み取りトークンは、アダプターが宣言している `SANITY_TOKEN` 環境変数から取得されます。カスタムの Portable Text ブロックタイプは、エンジンの `serializers` オプションを通じて Blume コンポーネントにマッピングされます。このオプションは、`sanitySource` を直接構築して [`custom()`](/docs/content/sources/custom) に渡す場合に利用できます。`serializers` を設定すると、そのソースのページは MDX として書き出されるため、シリアライザーが返すコンポーネントやディレクティブがレンダリングされます。
+非公開データセット用の読み取りトークンは、`SANITY_TOKEN` 環境変数から取得されます。この環境変数はアダプターが宣言しているため、未設定の場合は `blume dev` と `blume build` が警告を出します。公開データセットはトークンがなくても動作します。Sanity は、トークンなしで実行された非公開データセットのクエリに対して、エラーではなくドキュメントが 0 件の結果を返します。そのため、クエリで何も見つからず、かつトークンが未設定の場合、ソースはその旨を伝える `BLUME_MISSING_SECRET` 警告を追加します。`--preview` 指定時、アダプターは `previewDrafts` パースペクティブで下書きを読み込みます。`@sanity/client` 8 はこのパースペクティブが `drafts` に名称変更されたと報告しますが、旧名称も引き続き動作します。また、`@sanity/client` 6 は旧名称のみを受け付けます。カスタムの Portable Text ブロックタイプは、エンジンの `serializers` オプションを通じて Blume コンポーネントにマッピングされます。このオプションは、`sanitySource` を直接構築して [`custom()`](/docs/content/sources/custom) に渡す場合に利用できます。`serializers` を設定すると、そのソースのページは MDX として書き出されるため、シリアライザーが返すコンポーネントやディレクティブがレンダリングされます。

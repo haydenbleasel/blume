@@ -63,6 +63,17 @@ A big batch of components landed this release — columns, frames, trees, and to
 - तिथि कॉन्फ़िगर किए गए [`dateFormat`](/docs/configuration#date-format) का पालन करती है, उस वर्ष को छोड़कर जिसे पंक्ति का समूह पहले से दिखाता है।
 - ड्राफ़्ट और `sidebar.hidden` एंट्रियाँ छोड़ दी जाती हैं।
 
+पेज का शीर्षक **Changelog** (अंग्रेज़ी में) होता है, जिसके नीचे एक पंक्ति का विवरण होता है। अपने कॉन्फ़िग में `changelog` के साथ अपना स्वयं का शीर्षक और विवरण सेट करें; ये पेज का `<title>`, मेटा विवरण और OG कार्ड भी बन जाते हैं, और `/changelog.md` पर उसके Markdown मिरर का शीर्ष भाग भी:
+
+```ts blume.config.ts
+changelog: {
+  title: "Release notes",
+  description: "Every Acme SDK release, newest first.",
+},
+```
+
+दोनों ही, एक [हेडर टैब लेबल](/docs/content/i18n#per-locale-navigation) की तरह, लोकेल कोड से टेक्स्ट का एक मैप भी स्वीकार करते हैं। इंडेक्स डिफ़ॉल्ट लोकेल में रेंडर होता है, इसलिए यह उसी लोकेल की प्रविष्टि दिखाता है। यदि आप इनमें से किसी को सेट नहीं करते, तो वह अंतर्निर्मित टेक्स्ट ही बनाए रखता है, जिसे एक [UI स्ट्रिंग ओवरराइड](/docs/content/i18n#translated-ui) (`i18n.ui` के अंतर्गत `changelog.title` और `changelog.description`) बदल देता है।
+
 यह पेज केवल तभी दिखाई देता है जब `/changelog` रूट पर पहले से कुछ न हो। इसे अपने स्वयं के डिज़ाइन से बदलने के लिए, `pages/changelog.astro` पर एक [कस्टम पेज](/docs/advanced/custom-pages) जोड़ें — वह नियंत्रण ले लेता है और Blume डिफ़ॉल्ट इंडेक्स जनरेट करना बंद कर देता है। `<Update>` कंपोनेंट, जिससे पिछली टाइमलाइन बनाई गई थी, अब भी ऐसे हाथ से लिखे गए पेज के लिए उपलब्ध है जिसमें रिलीज़ नोट्स इनलाइन चाहिए। यह MDX कंपोनेंट्स में से एक नहीं है, इसलिए इसे `.astro` पेज में ही इम्पोर्ट करें: `import Update from "blume/components/content/Update.astro";`।
 
 `/changelog` की ओर इशारा करने वाला हेडर [टैब](/docs/content/navigation#tabs) इसी इंडेक्स को खोलता है — किसी `href` की आवश्यकता नहीं।

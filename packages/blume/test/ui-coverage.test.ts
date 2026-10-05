@@ -170,6 +170,16 @@ const navGroup = (
   display: "flat" | "group" | "page" = "flat"
 ): NavNode => ({ children, display, kind: "group", label });
 
+// SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
+// selectors, root) is irrelevant to the variant walk.
+const tree = (label: string) =>
+  ({
+    root: "/",
+    selectors: [],
+    sidebar: [navGroup(label, [])],
+    tabs: [],
+  }) as never;
+
 describe("navGroupIds", () => {
   it("numbers every group by pre-order position, keyed by identity", () => {
     const nested = navGroup("Nested", [navPage("/a/b")], "group");
@@ -184,15 +194,6 @@ describe("navGroupIds", () => {
   });
 
   it("lists every navigation tree by version and locale segment", () => {
-    // SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
-    // selectors, root) is irrelevant to the variant walk.
-    const tree = (label: string) =>
-      ({
-        root: "/",
-        selectors: [],
-        sidebar: [navGroup(label, [])],
-        tabs: [],
-      }) as never;
     const variants = navVariants({
       navigation: tree("default"),
       navigationByLocale: { ja: tree("ja") },
@@ -208,15 +209,6 @@ describe("navGroupIds", () => {
     // a segment while that locale is unprefixed, so `/blume-nav/…/de/…` is
     // never emitted for it: its current tree is `navigation` already, and its
     // archived trees take the `default` segment too.
-    // SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
-    // selectors, root) is irrelevant to the variant walk.
-    const tree = (label: string) =>
-      ({
-        root: "/",
-        selectors: [],
-        sidebar: [navGroup(label, [])],
-        tabs: [],
-      }) as never;
     const variants = navVariants(
       {
         navigation: tree("de"),
@@ -885,37 +877,51 @@ describe("layout chrome sources", () => {
   });
 
   it("puts the page actions in the mobile On this page dropdown", async () => {
-    // The rail only shows at `xl`, so below it the same actions ride in the
+    // The rail only shows at `xl`, so below it the actions ride in the
     // outline's dropdown, which renders wherever the rail would, headings or
-    // not.
+    // not. They render once, in the rail: the dropdown gets an empty mount.
     const root = await layoutSource("RootLayout.astro");
     expect(root).toMatch(
-      /showToc && \(\s*<TableOfContentsSlot[^>]*variant="mobile"\s*>\s*<PageActions \{\.\.\.pageActions\} variant="mobile" \/>\s*<\/TableOfContentsSlot>/u
+      /showToc && \(\s*<TableOfContentsSlot[^>]*variant="mobile"\s*>\s*<div data-blume-page-actions-mount \/>\s*<\/TableOfContentsSlot>/u
     );
-    expect(root).toContain("<PageActions {...pageActions} divider={hasToc} />");
+    expect(root.match(/<PageActions\b/gu)).toHaveLength(1);
+    expect(root).toMatch(
+      /<PageActions\s+divider=\{hasToc\}[^>]*\/>\s*<\/aside>/u
+    );
     const toc = await layoutSource("TableOfContents.astro");
     expect(toc).toContain(
       '(headings.length > 0 || hasChildren) && variant === "mobile" && ('
     );
     expect(toc).toMatch(/<slot \/>\s*<\/details>/u);
-    // In there the groups expand in place: no light-dismiss, no placement.
+    // The script moves the one block between the rail and the mount at the
+    // rail's breakpoint, on load, on a breakpoint change, and after a swap.
     const actions = await layoutSource("PageActions.astro");
+    expect(actions).not.toContain("variant?:");
     expect(actions).toContain(
-      'const groupAttrs = mobile ? {} : { "data-blume-dropdown": "" };'
+      'const railQuery = window.matchMedia("(min-width: 80rem)");'
     );
     expect(actions).toContain(
-      'const panelAttrs = mobile ? {} : { "data-blume-menu": "" };'
-    );
-    // Both blocks bind on every load and swap, and a group open in place is
-    // never taken for the floating dropdown the resize handler places.
-    expect(actions).toContain(
-      'for (const root of document.querySelectorAll("[data-blume-page-actions]")) {'
+      'rail ? "[data-blume-toc]" : "[data-blume-page-actions-mount]"'
     );
     expect(actions).toContain(
-      'document.addEventListener("astro:after-swap", initAllPageActions);'
+      'document.addEventListener("astro:after-swap", placeActions);'
+    );
+    expect(actions).toContain(
+      'railQuery.addEventListener("change", placeActions);'
+    );
+    // In the mount the groups expand in place: they leave the light-dismiss
+    // and the placement, and the styles key on the mount.
+    expect(actions).toContain(
+      'details.toggleAttribute("data-blume-dropdown", rail);'
     );
     expect(actions).toContain(
       '"[data-blume-page-actions] details[data-blume-dropdown][open]"'
+    );
+    expect(actions).toContain(
+      "[data-blume-page-actions-mount] [data-blume-scroll-top] {"
+    );
+    expect(actions).toContain(
+      "[data-blume-page-actions-mount] [data-blume-menu] {"
     );
   });
 

@@ -8,7 +8,7 @@ Suchmaschinen-Crawler und KI-Crawler starten beide bei denselben zwei Dateien im
 
 ## Sitemap
 
-Blume schreibt zur Build-Zeit eine `sitemap.xml` mit allen indexierbaren Seiten. Dafür wird eine absolute [`deployment.site`](/docs/deployment) benötigt, und es werden alle Seiten aufgelistet außer Entwürfen, versteckten und [`noindex`](/docs/discoverability/metadata#per-page-overrides)-Seiten. Auf einer [versionierten](/docs/content/versioning) Website bleiben auch archivierte Seiten außen vor, deren Canonical auf ihr Live-Pendant zeigt — die Live-Seite ist diejenige, die indexiert werden soll. Standardmäßig aktiviert:
+Blume schreibt zur Build-Zeit eine `sitemap.xml` mit allen indexierbaren Seiten. Dafür wird eine absolute [`deployment.site`](/docs/deployment) benötigt, und es werden alle Seiten aufgelistet außer Entwürfen, versteckten und [`noindex`](/docs/discoverability/metadata#per-page-overrides)-Seiten sowie Seiten, deren `seo.canonical` eine andere URL angibt. Auf einer [versionierten](/docs/content/versioning) Website bleiben auch archivierte Seiten außen vor, deren Canonical auf ihr Live-Pendant zeigt — die Live-Seite ist diejenige, die indexiert werden soll. Standardmäßig aktiviert:
 
 ```ts blume.config.ts lineNumbers
 seo: {

@@ -26,8 +26,9 @@ Os achados são agrupados por verificação em vez de listados por página, ent�
 ## Flags
 
 - `--fail-on error|warning|info`: o gate de CI. Sai com código diferente de zero a partir dessa severidade. O padrão é `error`; `--strict` é um alias para `--fail-on warning`.
-- `--url <origin>`: também sonda um deploy ao vivo para verificar códigos de status, headers de resposta e cadeias de redirecionamento.
+- `--url <origin>`: também sonda um deploy ao vivo para verificar códigos de status, headers de resposta e redirecionamentos configurados.
 - `--external`: sonda os links externos pela rede.
+- `--ignore <glob>`: junto com `--external`, não sonda um link externo cuja URL corresponda ao glob, como `--ignore "https://api.acme.example/**"`. Repita a flag para adicionar mais padrões. A correspondência funciona do mesmo jeito que em [`blume validate --ignore`](/docs/cli/validate#flags), e os links internos são sempre verificados.
 - `--only <check|category>` / `--skip <check|category>`: restringe o relatório a essas verificações ou categorias, ou as exclui dele (separadas por vírgula). Um termo que não corresponde a nenhuma verificação ou categoria gera um erro que sugere a mais próxima, então um erro de digitação não esvazia o relatório sem você perceber.
 - `--list-checks`: imprime todas as verificações que a auditoria pode reportar e sai.
 - `--verbose`: lista cada página afetada com o detalhe completo de cada achado, em vez de só as primeiras.
@@ -45,14 +46,18 @@ blume audit --fail-on warning    # also fails on warnings
 
 ## Verificando um deploy ao vivo [#checking-a-live-deployment]
 
-Algumas coisas só o servidor real consegue dizer: se uma página que existe em `dist/` na verdade retorna 404 por causa de um rewrite errado, se as respostas estão comprimidas e se um header `X-Robots-Tag` está desindexando silenciosamente uma página cujo HTML parece perfeitamente normal. Aponte a auditoria para um deploy para adicionar essas verificações:
+Algumas coisas só o servidor real consegue dizer: se uma página que existe em `dist/` na verdade retorna 404 por causa de um rewrite errado, se as respostas estão comprimidas, se um header `X-Robots-Tag` está desindexando silenciosamente uma página cujo HTML parece perfeitamente normal e se cada URL antiga em [`redirects`](/docs/deployment#redirects) realmente redireciona para onde você configurou. Aponte a auditoria para um deploy para adicionar essas verificações:
 
 ```bash
 blume audit --url https://docs.example.com
 blume audit --url https://docs.example.com --external   # also probe outbound links
 ```
 
-Os links externos são classificados, em vez de simplesmente reprovados. Um 404 é um link quebrado que você pode corrigir, enquanto um 403 ou 5xx geralmente é rate limiting ou uma instabilidade no site de outra pessoa, e é reportado como aviso.
+Essas requisições saem como as de um cliente HTTP comum, e não como as de um crawler: a auditoria não envia o user agent do Googlebot nem o de um crawler de IA, já que a proteção contra bots de um host pode bloquear um cliente que finge ser um deles. Uma regra de firewall ou de CDN que trata crawlers de forma diferente não é testada, então verifique-a com as ferramentas do próprio crawler, como a Inspeção de URL do Google Search Console.
+
+A auditoria faz uma requisição para a URL antiga de cada redirecionamento exato (um padrão não indica uma URL única para requisitar). Se ela retornar 404, é um erro. Se responder 200, é um aviso: um host que não lê o arquivo de redirecionamentos que o build gerou serve ali a página de meta refresh do build em vez de um redirecionamento HTTP, e os leitores seguem essa página, mas os crawlers talvez não. Veja [Redirecionamentos](/docs/deployment#redirects) para saber o que cada host lê.
+
+Os links externos são classificados, em vez de simplesmente reprovados. Um 404 ou 410, ou um nome de host que não resolve, é um link quebrado que você pode corrigir. Já qualquer outro status de erro (um 401 ou 403 de um site que barra bots, um 429, um 5xx), uma conexão recusada ou um tempo esgotado geralmente é rate limiting ou uma instabilidade no site de outra pessoa, e é reportado como aviso. Use `--ignore` para deixar de fora as URLs que a auditoria não consegue verificar de onde ela roda, como um domínio de exemplo ou um servidor local.
 
 ## Corrigindo os achados com um agente [#fixing-the-findings-with-an-agent]
 
@@ -79,7 +84,7 @@ Limites que vale deixar claros:
 Tudo o que a auditoria não executou é reportado como ignorado, em vez de passar silenciosamente:
 
 ```
-⊘ network      skipped — pass --url <origin> (11 checks)
+⊘ network      skipped — pass --url <origin> (12 checks)
 ⊘ external     skipped — pass --external (2 checks)
 ```
 
@@ -196,7 +201,7 @@ Correção: dê a cada página uma `description` diferente.
 
 `BLUME_AUDIT_DUPLICATE_CONTENT` · aviso · a partir do HTML gerado
 
-Correção: mescle as páginas ou defina `seo.canonical` em todas menos uma.
+Correção: mescle as páginas ou, em todas menos uma, aponte `seo.canonical` para a página que deve ser indexada.
 
 ### Indexabilidade [#indexability]
 
@@ -274,6 +279,8 @@ Correção: remova o header X-Robots-Tag ou alinhe-o com a meta robots da págin
 
 Correção: corrija o destino do link ou crie a página para a qual ele aponta.
 
+Com [`deployment.base`](/docs/deployment#subpath-deploys), um link relativo à raiz sem a base é reportado aqui, já que o host não serve nada deste build nesse caminho. Uma URL completa no mesmo host, mas fora da base, não é reportada: é assim que uma página aponta para outro app que o host serve ao lado da documentação.
+
 #### Página tem links para um redirecionamento [#link-to-redirect]
 
 `BLUME_AUDIT_LINK_TO_REDIRECT` · aviso · a partir do HTML gerado
@@ -346,13 +353,21 @@ Correção: use um redirecionamento de verdade no `blume.config.ts` em vez de um
 
 `BLUME_AUDIT_REDIRECT_SOURCE_IS_PAGE` · erro · a partir do HTML gerado
 
-Correção: remova o redirecionamento ou apague a página que ele encobre. A página tem prioridade, então o redirecionamento nunca é acionado.
+Correção: remova o redirecionamento ou apague a página que ele encobre. Um caminho não pode ser as duas coisas, e o que os leitores recebem depende do host.
 
 #### Redirecionamento de HTTPS para HTTP [#redirect-to-http]
 
 `BLUME_AUDIT_REDIRECT_TO_HTTP` · erro · requer `--url`
 
 Correção: redirecione para a URL HTTPS.
+
+#### Site ao vivo não redireciona como configurado [#redirect-not-served]
+
+`BLUME_AUDIT_REDIRECT_NOT_SERVED` · erro · requer `--url`
+
+Correção: faça o deploy do arquivo de redirecionamentos que o seu host lê (veja Redirecionamentos na documentação de deploy) ou indique o host em `deployment`.
+
+Vira um aviso quando a URL antiga responde 200 (a página de meta refresh) ou redireciona para um lugar diferente do destino configurado.
 
 ### Cards sociais [#social-cards]
 
@@ -510,7 +525,7 @@ Correção: carregue o sub-recurso via HTTPS. Os navegadores bloqueiam conteúdo
 
 `BLUME_AUDIT_INDEXABLE_PAGE_NOT_IN_SITEMAP` · aviso · a partir do HTML gerado
 
-Correção: remova `draft`/`hidden`/`noindex` do frontmatter da página se ela deve ser indexada.
+Correção: remova `draft`/`hidden`/`noindex` do frontmatter da página se ela deve ser indexada. Um `public/sitemap.xml` substitui o sitemap gerado, então adicione a página nele ou apague esse arquivo.
 
 #### Página noindex no sitemap [#noindex-in-sitemap]
 
@@ -579,6 +594,14 @@ Correção: cada linha do robots.txt deve ser uma diretiva `Field: value` ou um 
 `BLUME_AUDIT_ROBOTS_DISALLOWS_INDEXABLE` · erro · a partir do HTML gerado
 
 Correção: uma página não pode ser bloqueada no robots.txt e anunciada no sitemap ao mesmo tempo.
+
+#### robots.txt bloqueia um crawler específico em páginas que estão no sitemap [#robots-blocks-crawler]
+
+`BLUME_AUDIT_ROBOTS_BLOCKS_CRAWLER` · aviso · a partir do HTML gerado
+
+Correção: restrinja ou remova a regra no grupo `User-agent` desse crawler se ele deve ler essas páginas. Se você bloqueou um crawler de IA de propósito, tudo bem: é só pular esta verificação.
+
+Um crawler que tem o próprio grupo `User-agent` segue só esse grupo, então uma regra ali (`User-agent: GPTBot` seguido de `Disallow: /`) o bloqueia enquanto todos os outros crawlers leem a página. A auditoria reporta cada crawler uma vez, na regra que bloqueia a primeira página dele.
 
 #### robots.txt não referencia o sitemap [#robots-sitemap-missing]
 

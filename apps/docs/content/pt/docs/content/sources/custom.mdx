@@ -9,6 +9,7 @@ Qualquer objeto que implemente a interface `ContentSource` pode ser passado para
 ```ts blume.config.ts
 import { defineConfig } from "blume";
 import { custom, filesystem } from "blume/sources";
+import { escapeMarkdownText } from "blume/sources/lower.ts";
 import { sanitySource } from "blume/sources/sanity.ts";
 
 export default defineConfig({
@@ -24,7 +25,8 @@ export default defineConfig({
           query: `*[_type == "guide"]`,
           // Map custom Portable Text blocks to Blume components
           serializers: {
-            callout: (block) => `<Callout>${block.text}</Callout>`,
+            callout: (block) =>
+              `<Callout>${escapeMarkdownText(String(block.text ?? ""))}</Callout>`,
           },
         })
       ),
@@ -33,8 +35,10 @@ export default defineConfig({
 });
 ```
 
-Uma fonte criada com uma das factories de engine do Blume, como a `sanitySource` acima, é reconstruída com o contexto do comando em execução. Assim, ela lê rascunhos com `--preview` e guarda o snapshot em `.blume/cache`, do mesmo jeito que o adapter integrado. Uma fonte feita por você pode fazer o mesmo implementando `withContext(ctx)` e retornando a si mesma reconstruída com esse contexto.
+O valor retornado por um serializer entra na página como MDX, do jeito que está. Por isso, o texto que ele pega do CMS precisa ser escapado: sem isso, um `{` no texto de um editor seria executado como uma expressão e quebraria o build, e um `<b>` seria renderizado como HTML. A `escapeMarkdownText` faz o escape do mesmo jeito que a conversão integrada do Blume, então o texto aparece exatamente como foi escrito.
 
-`custom()` recebe uma instância de `ContentSource` em vez de um objeto de opções, então não tem onde passar as [opções compartilhadas](/docs/content/sources#adapters) `prefix` ou `pollInterval`. A própria fonte define a propriedade `prefix`, e a nova busca dos dados funciona do jeito que o método `watch` dela implementar. Como ela carrega uma instância viva em vez de dados simples, não declara nenhuma dependência de runtime nem secret própria — a instância cuida disso sozinha.
+Uma fonte criada com uma das factories de engine do Blume, como a `sanitySource` acima, é reconstruída com o contexto do comando em execução. Assim, ela lê rascunhos com `--preview` e guarda o snapshot em `.blume/cache`, do mesmo jeito que o adapter integrado. Uma fonte feita por você pode fazer o mesmo implementando `withContext(ctx)` e retornando a si mesma reconstruída com esse contexto. Diferente do snapshot de um adapter integrado, o de uma fonte `custom()` é guardado apenas por modo de preview, e não por conjunto de opções, já que o Blume enxerga uma instância em vez das opções dela. O `blume dev` continua servindo esse snapshot depois que você edita a query, os campos ou os serializers da fonte, então rode `blume sync` para buscar os dados de novo.
+
+`custom()` recebe uma instância de `ContentSource` em vez de um objeto de opções, então não tem onde passar as [opções compartilhadas](/docs/content/sources#adapters) `prefix` ou `pollInterval`. A própria fonte define a propriedade `prefix`, e a nova busca dos dados funciona do jeito que o método `watch` dela implementar. Como ela carrega uma instância viva em vez de dados simples, não declara nenhuma dependência de runtime nem secret própria — a instância cuida disso sozinha. O `blume dev` e o `blume build` não avisam quando falta definir uma variável que uma fonte `custom()` lê. Em vez disso, um engine cuja API exige o token (`notionSource`, `contentfulSource`) para antes da primeira requisição com `BLUME_MISSING_SECRET`.
 
 Uma fonte personalizada que lê arquivos locais deve definir `sourcePath` em cada entrada e `contentRoot` na própria fonte. O `sourcePath` identifica o arquivo nos diagnósticos e resolve imagens relativas ao lado dele. Já o `contentRoot` limita o `log` do git usado para datar as páginas. Sem ele, as páginas da fonte ficam sem a [data de "Última atualização"](/docs/configuration#last-modified) obtida pelo git.

@@ -546,7 +546,7 @@ Uma grade **Prop / Tipo** em que cada linha se expande para revelar sua descriç
 
 ### Tabela de tipos automática [#auto-type-table]
 
-Gere uma tabela de tipos a partir de um tipo do TypeScript, para que a documentação permaneça em sincronia com o código-fonte. Aponte o `AutoTypeTable` para um arquivo com `path` (resolvido a partir da raiz do seu projeto) e um `name` de tipo. As descrições vêm de comentários JSDoc, os valores padrão de tags `@default`, e as propriedades opcionais (`?`) são marcadas conforme o caso.
+Gere uma tabela de tipos a partir de um tipo do TypeScript, para que a documentação permaneça em sincronia com o código-fonte. Aponte o `AutoTypeTable` para um arquivo com `path` (resolvido a partir da raiz do seu projeto, a pasta em que você executa o `blume`) e um `name` de tipo. As descrições vêm de comentários JSDoc, os valores padrão de tags `@default`, e as propriedades opcionais (`?`) são marcadas conforme o caso.
 
 ```astro
 <AutoTypeTable path="./src/button.ts" name="ButtonProps" />
@@ -687,7 +687,7 @@ O card lê a instância a partir de [`github.host`](/docs/configuration#github-e
 
 ## Component
 
-O `Component` renderiza um arquivo de exemplo do diretório `examples/` do seu projeto como uma prévia ao vivo ao lado do seu código-fonte destacado, em abas. Aponte-o para um arquivo com `path` — sua localização dentro de `examples/`, sem a extensão (portanto `examples/counter.tsx` fica `path="counter"`). Exemplos em React, Vue, Svelte e Astro são todos suportados; exemplos de frameworks hidratam, os de Astro renderizam estaticamente. Ele mantém a prévia e o código em sincronia a partir de um único arquivo.
+O `Component` renderiza um arquivo de exemplo do diretório `examples/` do seu projeto como uma prévia ao vivo ao lado do seu código-fonte destacado, em abas. Aponte-o para um arquivo com `path` — sua localização dentro de `examples/`, sem a extensão (portanto `examples/counter.tsx` fica `path="counter"`). Exemplos em React, Vue, Svelte e Astro são todos suportados; exemplos de frameworks hidratam, os de Astro renderizam estaticamente. Ele mantém a prévia e o código em sincronia a partir de um único arquivo. Um `path` que não corresponde a nenhum exemplo renderiza, em vez disso, uma caixa “Nenhum exemplo encontrado”, e `blume dev`, `blume build` e [`blume doctor`](/docs/cli/doctor) emitem um aviso sobre isso (`BLUME_EXAMPLE_NOT_FOUND`) na linha correspondente.
 
 A prévia é renderizada em um frame isolado que os estilos da documentação nunca alcançam — nenhuma margem de texto, tipografia ou elemento visual do tema vaza para o seu componente. O frame recebe o Tailwind (preflight + utilitários varridos do seu projeto e do seu diretório de exemplos), os tokens de design do Blume, para que classes como `bg-background` sigam a paleta do site por padrão, e ele acompanha ao vivo a alternância claro/escuro do site. O painel se dimensiona conforme o exemplo renderizado — e continua acompanhando caso o exemplo cresça ou encolha após o carregamento — com as abas Prévia e Código compartilhando uma mesma altura, de modo que alterná-las nunca desloca a página.
 

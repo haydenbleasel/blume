@@ -21,12 +21,20 @@ export default defineConfig({
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
+        // baseUrl: "https://github.acme.com/api/v3", // GitHub Enterprise Server
       }),
     ],
   },
 });
 ```
 
-Cada release é mapeada automaticamente para os campos do changelog: o nome (ou a tag) vira o título, a data de publicação define a ordem na timeline, a tag vira `changelog.version`, e as prereleases recebem a tag `Prerelease` (as demais, `Release`). As notas são renderizadas como o corpo da entrada, com duas mudanças nos links: um link que não seja um endereço web, de e-mail, de telefone ou relativo (uma URL `javascript:`, por exemplo) mantém só o texto, e um link que aponta para o seu próprio [`deployment.site`](/docs/deployment) é reescrito para o caminho relativo à raiz, então ele acompanha os deploys de preview e a base do seu deployment. Defina um `prefix` na source para que as páginas de release fiquem aninhadas em uma rota como `/changelog/v1-2-0`.
+Cada release é mapeada automaticamente para os campos do changelog: o nome (ou a tag) vira o título, a data de publicação define a ordem na timeline, a tag vira `changelog.version`, e as prereleases recebem a tag `Prerelease`, os drafts (quando `drafts` os inclui) recebem `Draft` e as demais, `Release`. Um draft é publicado como qualquer outra release, então inclua drafts só em um build que os leitores não vejam. Um resumo das notas vira a meta description da página, que o feed RSS do changelog também usa como descrição do item. As notas são renderizadas como o corpo da entrada, com duas mudanças nos links: um link que não seja um endereço web, de e-mail, de telefone ou relativo (uma URL `javascript:`, por exemplo) mantém só o texto, e um link que aponta para o seu próprio [`deployment.site`](/docs/deployment) é reescrito para o caminho relativo à raiz, então ele acompanha os deploys de preview e a base do seu deployment. Defina um `prefix` na source para que as páginas de release fiquem aninhadas em uma rota como `/changelog/v1-2-0`. A timeline em `/changelog` pega o título e a descrição da config [`changelog`](/docs/advanced/changelog#the-index-page) de nível superior, e não da source:
 
-Um repositório privado se autentica com a variável de ambiente `GITHUB_TOKEN` — o mesmo token usado pelos outros recursos do GitHub, nunca colocado direto na sua config; o adapter declara essa variável, então um build sem ela gera um aviso. Como [toda source remota](/docs/content/sources#caching-and-offline-builds), ela fica em cache em `.blume/cache/<source>/` e é servida offline se a API estiver inacessível. Como o changelog é um conteúdo complementar, uma falha na busca sem cache (por exemplo, um build de CI sem token) resulta em um changelog vazio com um aviso, em vez de quebrar o build — defina `GITHUB_TOKEN` nos seus ambientes de CI e de deploy para preenchê-lo.
+```ts blume.config.ts
+changelog: {
+  title: "SDK releases",
+  description: "Every release of the Acme SDK, from GitHub.",
+},
+```
+
+Um repositório privado se autentica com a variável de ambiente `GITHUB_TOKEN` — o mesmo token usado pelos outros recursos do GitHub, nunca colocado direto na sua config; o adapter declara essa variável, então um build sem ela gera um aviso. Para um repositório no GitHub Enterprise Server, defina `baseUrl` como a API REST dele (`https://<host>/api/v3`); o `GITHUB_TOKEN` é enviado para lá, então ele precisa ser um token desse servidor. Como [toda source remota](/docs/content/sources#caching-and-offline-builds), ela fica em cache em `.blume/cache/<source>/` e é servida offline se a API estiver inacessível. Como o changelog é um conteúdo complementar, uma falha na busca sem cache (por exemplo, um build de CI sem token) resulta em um changelog vazio com um aviso, em vez de quebrar o build — defina `GITHUB_TOKEN` nos seus ambientes de CI e de deploy para preenchê-lo.

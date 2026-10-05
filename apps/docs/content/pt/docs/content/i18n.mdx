@@ -141,7 +141,7 @@ O Blume valida a estrutura de cada resultado — frontmatter, blocos de código,
 
 ## O seletor de idiomas [#the-language-switcher]
 
-Quando a i18n está ativada, um seletor de idiomas aparece automaticamente no cabeçalho, gerado a partir dos seus `locales`. Para cada página, ele aponta para a tradução correspondente em todos os idiomas; onde falta uma tradução, ele aponta para a página de fallback e a marca como não traduzida. Não há nada para configurar. Páginas de uma fonte [GitHub Releases](/docs/content/sources/github-releases) são a exceção: as notas de versão existem em um único idioma, então essas páginas são renderizadas sem seletor.
+Quando a i18n está ativada, um seletor de idiomas aparece automaticamente no cabeçalho, gerado a partir dos seus `locales`. Para cada página, ele aponta para a tradução correspondente em todos os idiomas; onde falta uma tradução, ele aponta para a página de fallback e a marca como não traduzida. Com os fallbacks desativados (`fallbackLocale: null`), não há página para a qual apontar, então o seletor deixa esse idioma de fora. Não há nada para configurar. Páginas de uma fonte [GitHub Releases](/docs/content/sources/github-releases) são a exceção: as notas de versão existem em um único idioma, então essas páginas são renderizadas sem seletor.
 
 ## Roteamento pelo idioma do navegador [#routing-by-browser-language]
 
@@ -194,7 +194,7 @@ Defina [`deployment.site`](/docs/deployment) para que isso possa ser emitido com
 
 ## Busca [#search]
 
-A busca é limitada ao idioma ativo: em uma página `/fr/…`, o diálogo retorna resultados em francês, com uma opção **Todos os idiomas** para buscar em todos os locales de uma vez. Os índices padrão (Orama) e FlexSearch filtram no navegador; provedores hospedados carregam uma faceta `locale` em cada registro.
+A busca é limitada ao idioma ativo: em uma página `/fr/…`, o diálogo retorna resultados em francês, com uma opção **Todos os idiomas** para buscar em todos os locales de uma vez. Os índices padrão (Orama) e FlexSearch filtram no navegador, o Pagefind mantém um índice por idioma, e o Algolia, o Orama Cloud e o Typesense carregam um campo `locale` em cada registro. O Mixedbread não consegue limitar a busca por idioma, então com ele toda busca abrange todos os locales e o diálogo não exibe essa opção. Veja [Busca](/docs/configuration/search) para saber como cada adaptador lida com isso.
 
 ## Da direita para a esquerda [#right-to-left]
 
