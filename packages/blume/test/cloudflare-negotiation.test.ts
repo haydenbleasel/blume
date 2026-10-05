@@ -271,32 +271,32 @@ describe("negotiation worker — parity with the dev middleware helpers", () => 
   });
 });
 
-describe("negotiation worker — responses", () => {
-  /** X-Powered-By on each kind of answer the wrapper gives. */
-  const poweredByAnswers = async (
-    overrides: Partial<Parameters<typeof buildNegotiationWorker>[0]>
-  ): Promise<(string | null)[]> => {
-    const worker = await loadWorker(
-      workerText({
-        redirects: [{ from: "/docs/old", status: 302, to: "/docs/new" }],
-        ...overrides,
-      })
-    );
-    const { env } = makeEnv();
-    const answers = await Promise.all(
-      [
-        new Request("https://site.test/docs/old"),
-        new Request("https://site.test/api/docs/pages/docs/quickstart.json"),
-        new Request("https://site.test/docs/quickstart", {
-          headers: { accept: "text/markdown" },
-        }),
-        new Request("https://site.test/docs/quickstart"),
-        new Request("https://site.test/mcp", { method: "POST" }),
-      ].map((request) => worker.fetch(request, env, {}))
-    );
-    return answers.map((answer) => answer.headers.get("x-powered-by"));
-  };
+/** X-Powered-By on each kind of answer the wrapper gives. */
+const poweredByAnswers = async (
+  overrides: Partial<Parameters<typeof buildNegotiationWorker>[0]>
+): Promise<(string | null)[]> => {
+  const worker = await loadWorker(
+    workerText({
+      redirects: [{ from: "/docs/old", status: 302, to: "/docs/new" }],
+      ...overrides,
+    })
+  );
+  const { env } = makeEnv();
+  const answers = await Promise.all(
+    [
+      new Request("https://site.test/docs/old"),
+      new Request("https://site.test/api/docs/pages/docs/quickstart.json"),
+      new Request("https://site.test/docs/quickstart", {
+        headers: { accept: "text/markdown" },
+      }),
+      new Request("https://site.test/docs/quickstart"),
+      new Request("https://site.test/mcp", { method: "POST" }),
+    ].map((request) => worker.fetch(request, env, {}))
+  );
+  return answers.map((answer) => answer.headers.get("x-powered-by"));
+};
 
+describe("negotiation worker — responses", () => {
   it("names Blume on every answer unless poweredBy is false", async () => {
     // A redirect, page JSON, a Markdown mirror, a page, and a POST.
     expect(await poweredByAnswers({})).toStrictEqual(
