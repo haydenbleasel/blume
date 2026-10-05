@@ -114,7 +114,7 @@
     "@astrojs/check": "^0.9.10",
     "@astrojs/markdown-satteri": "^0.4.1",
     "@astrojs/mdx": "^8.0.2",
-    "@astrojs/node": "^11.1.5",
+    "@astrojs/node": "^11.1.6",
     "@astrojs/react": "^7.0.0",
     "@astrojs/vercel": "^11.0.11",
     "@clack/prompts": "^1.8.0",
