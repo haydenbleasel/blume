@@ -214,6 +214,18 @@ A pattern can't also match a page: hosts disagree on which of the two answers, s
 
 Where the host reads one, a build also emits a `_headers` file that pins `charset=utf-8` onto the raw AI-ready endpoints — `/<route>.md`, `/<route>.mdx`, and the `.txt` files (`llms.txt`, `llms-full.txt`). Those responses are valid UTF-8, but many static hosts serve them as `text/markdown` / `text/plain` with **no** charset, and browsers then fall back to Windows-1252 — so non-ASCII docs (Japanese, accented Latin, …) render as mojibake when the raw URL is opened directly. HTML pages are unaffected because they carry `<meta charset>`. Netlify reads `_headers` on a static deploy and Cloudflare (Pages, and Workers static assets) on both static and server builds, so those adapters and an unnamed static host get the file; Vercel (whose headers ride the routing config) and Node (whose server ignores the file) don't. A Netlify server build writes the same rules into the `headers` of its Frameworks API config (`.netlify/v1/config.json`) instead. A static Vercel build writes the same rules into `dist/vercel.json` instead, which a Git-connected project doesn't read (see [Redirects](#redirects)). A `_headers` you ship in `public/` is left untouched.
 
+## Powered-by header
+
+Blume names itself in an `X-Powered-By: Blume` response header, so HTTP inspectors and technology detectors can tell what built the site. Set `poweredBy` to `false` to leave it out:
+
+```ts blume.config.ts
+poweredBy: false,
+```
+
+`blume dev` sends it on every response. A server build sends it wherever the host takes its headers from: the `node()` server and the `cloudflare()` Worker set it themselves, a `vercel()` build carries it in its routing config, and a `netlify()` build in the header rules of its Frameworks API config, with Blume's middleware adding it to the pages rendered on demand. A static build lists it in `_headers` and `dist/vercel.json` beside the [content types](#content-types), so it reaches the hosts those files reach: not a Git-connected Vercel project, and not a host that sends no custom headers, such as GitHub Pages.
+
+In an [ejected](/docs/configuration/customization#eject) app, the switch is the `poweredBy` option of `blumeIntegration()` in `astro.config.mjs`. Its build sends the header on server-rendered pages and from `_headers`; the server-entry wrapper and routing configs that carry it elsewhere are `blume build` steps.
+
 ## Environment variables
 
 When a feature needs a secret, Blume warns at `blume dev`/`build` if it's missing — so the problem surfaces early instead of at the first request:

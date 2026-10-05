@@ -1,6 +1,6 @@
 import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { pathToFileURL } from "node:url";
@@ -73,6 +73,9 @@ const serverSetup = (
   blumeIntegration({
     contentRoutes: [],
     pages: [],
+    // Off unless a test asks for it: its middleware would sit ahead of the
+    // one under test.
+    poweredBy: false,
     ...options,
   }).hooks["astro:server:setup"]?.({
     refreshContent,
@@ -180,7 +183,18 @@ describe("blumeIntegration astro:build:done", () => {
     const log = await buildDone({ buildArtifactsRoot: "." }, root, dist);
     expect(existsSync(join(dist, "sitemap.xml"))).toBe(true);
     expect(existsSync(join(dist, "robots.txt"))).toBe(true);
+    expect(await readFile(join(dist, "_headers"), "utf-8")).toContain(
+      "X-Powered-By: Blume"
+    );
     expect(log.warn).toEqual([]);
+  });
+
+  it("follows the baked poweredBy over the config file in an ejected app", async () => {
+    const { dist, root } = await projectFixture({ "docs/index.md": HOME });
+    await buildDone({ buildArtifactsRoot: ".", poweredBy: false }, root, dist);
+    expect(await readFile(join(dist, "_headers"), "utf-8")).not.toContain(
+      "X-Powered-By"
+    );
   });
 
   it("surfaces scan diagnostics as warnings instead of failing the build", async () => {
@@ -340,8 +354,8 @@ describe("blumeIntegration astro:config:setup", () => {
       injectRoute: (route: InjectedPageRoute) => injected.push(route),
     } as never);
 
-    // The icon-sprite middleware runs innermost, so a project's own
-    // middleware sees the finished HTML.
+    // Both run innermost, so a project's own middleware sees the finished
+    // HTML and can replace the X-Powered-By value.
     expect(middleware).toEqual([
       {
         entrypoint: "blume/components/icon-sprite-middleware.ts",
@@ -349,7 +363,7 @@ describe("blumeIntegration astro:config:setup", () => {
       },
       {
         entrypoint: "blume/components/powered-by-middleware.ts",
-        order: "pre",
+        order: "post",
       },
     ]);
 
@@ -365,6 +379,50 @@ describe("blumeIntegration astro:config:setup", () => {
         prerender: true,
       },
     ]);
+  });
+
+  it("leaves the powered-by middleware out with poweredBy off", () => {
+    const middleware: string[] = [];
+    // SAFETY: as above.
+    blumeIntegration({ pages: [], poweredBy: false }).hooks[
+      "astro:config:setup"
+    ]?.({
+      addMiddleware: (entry: { entrypoint: string }) =>
+        middleware.push(entry.entrypoint),
+      createCodegenDir: () => CODEGEN_DIR,
+      injectRoute: () => {},
+    } as never);
+    expect(middleware).toEqual(["blume/components/icon-sprite-middleware.ts"]);
+  });
+});
+
+describe("blumeIntegration powered-by header in dev", () => {
+  it("names Blume on every response, ahead of the redirects", () => {
+    const stack = serverSetup({
+      poweredBy: undefined,
+      redirects: compileRedirects([{ from: "/old", status: 302, to: "/new" }]),
+    });
+    // X-Powered-By, then the redirects, then Markdown negotiation.
+    expect(stack).toHaveLength(3);
+    const headers: Record<string, string> = {};
+    let passed = false;
+    handleOf(stack)(
+      { headers: {}, method: "GET", url: "/favicon.svg" },
+      {
+        setHeader: (name, value) => {
+          headers[name] = value;
+        },
+      },
+      () => {
+        passed = true;
+      }
+    );
+    expect(headers).toStrictEqual({ "X-Powered-By": "Blume" });
+    expect(passed).toBe(true);
+  });
+
+  it("adds no middleware for it with poweredBy off", () => {
+    expect(serverSetup({ poweredBy: false })).toHaveLength(1);
   });
 });
 

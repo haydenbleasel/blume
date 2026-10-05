@@ -10,6 +10,7 @@ import {
   SIGNATURES_DIRECTORY_TYPE,
 } from "../ai/web-bot-auth.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
+import { POWERED_BY_HEADERS } from "../core/powered-by.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 
 /**
@@ -98,11 +99,12 @@ export const headerRules = (
     path: `${deployBase}/*.${rule.ext}`,
     value: rule.contentType,
   }));
+  // One rule for the whole site: `/*` matches the homepage too, and a host
+  // that joins the values of overlapping rules would send a second one twice.
   if (config.poweredBy) {
-    rules.push(
-      { name: "X-Powered-By", path: `${deployBase}/`, value: "Blume" },
-      { name: "X-Powered-By", path: `${deployBase}/*`, value: "Blume" }
-    );
+    for (const [name, value] of Object.entries(POWERED_BY_HEADERS)) {
+      rules.push({ name, path: `${deployBase}/*`, value });
+    }
   }
   if (homeLinkHeader) {
     rules.push({ name: "Link", path: `${deployBase}/`, value: homeLinkHeader });
@@ -218,9 +220,15 @@ export const escapeVercelSource = (path: string): string =>
  * A `_headers` path as a `vercel.json` `source`, which `path-to-regexp` reads:
  * the literal parts are escaped, and a `*` glob becomes the `(.*)` group that
  * spans path segments as the glob does. An exact directory path (the homepage
- * rule's `/docs/`) drops its trailing slash, the URL Vercel serves it at.
+ * rule's `/docs/`) drops its trailing slash, the URL Vercel serves it at. A
+ * whole-directory glob (`/docs/*`) becomes an optional group,
+ * `/docs/:path(.*)?`, so it matches that bare URL as well as every path
+ * beneath it.
  */
 const vercelSource = (path: string): string => {
+  if (path.endsWith("/*")) {
+    return `${escapeVercelSource(path.slice(0, -2))}/:path(.*)?`;
+  }
   const trimmed =
     path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
   return trimmed.split("*").map(escapeVercelSource).join("(.*)");

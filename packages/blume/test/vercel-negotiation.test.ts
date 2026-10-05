@@ -230,6 +230,25 @@ const baseConfig = {
   version: 3,
 };
 
+/** Just the `X-Powered-By` route, if asked for, under `base`. */
+const injectPoweredBy = (
+  text: string,
+  base: string,
+  poweredBy?: boolean
+): string =>
+  injectNegotiationRoutes(
+    text,
+    [],
+    null,
+    undefined,
+    undefined,
+    {},
+    [],
+    false,
+    base,
+    poweredBy
+  ) ?? "";
+
 /** The negotiated 404 routes for `dest`, one per condition pair. */
 const negotiatedNotFound = (
   dest: string,
@@ -609,6 +628,40 @@ describe("injectNegotiationRoutes", () => {
     expect(twice).toBe(jsonOnly ?? "");
     const dropped = injectNegotiationRoutes(jsonOnly ?? "", ["/docs/a"]);
     expect(dropped).not.toContain("/404.json");
+  });
+
+  it("names Blume on every response from the head of the routes", () => {
+    const withRedirect = {
+      ...baseConfig,
+      routes: [
+        { headers: { Location: "/docs/new" }, src: "^/docs/old$", status: 308 },
+        ...baseConfig.routes,
+      ],
+    };
+    const once = injectPoweredBy(JSON.stringify(withRedirect), "/docs", true);
+    const { routes } = JSON.parse(once);
+    // Main phase and ahead of the adapter's redirects, so the prerendered
+    // pages, the functions, and the redirects all carry it.
+    expect(routes[0]).toStrictEqual({
+      continue: true,
+      headers: { "x-powered-by": "Blume" },
+      src: "^/docs(?:/.*)?$",
+    });
+    expect(routes[1].status).toBe(308);
+    const source = new RegExp(routes[0].src, "u");
+    expect(
+      ["/docs", "/docs/a/b", "/docsx"].map((path) => source.test(path))
+    ).toStrictEqual([true, true, false]);
+    expect(injectPoweredBy(once, "/docs", true)).toBe(once);
+    // A re-injection with it off takes the route back out.
+    expect(injectPoweredBy(once, "/docs", false)).toBe(
+      injectPoweredBy(JSON.stringify(withRedirect), "/docs")
+    );
+    const root = JSON.parse(
+      injectPoweredBy(JSON.stringify(baseConfig), "", true)
+    );
+    expect(root.routes[0].src).toBe("^(?:/.*)?$");
+    expect(new RegExp(root.routes[0].src, "u").test("/")).toBe(true);
   });
 
   it("returns null when there is nowhere to splice", () => {

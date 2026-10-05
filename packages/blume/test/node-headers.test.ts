@@ -302,6 +302,20 @@ describe("nodeEntryWrapper", () => {
     await importWrapper(null, "middleware");
     expect(state().listeners).toStrictEqual([]);
   });
+
+  it("leaves X-Powered-By to the runtime middleware in middleware mode", async () => {
+    // Astro hands a request it has no route for back to the host app, whose
+    // own response mustn't name Blume.
+    const wrapper = await importWrapper("disabled", "middleware");
+    const matched = response();
+    wrapper.handler({ url: "/docs/.well-known/mcp.json" }, matched.res, "next");
+    expect(matched.headers).toStrictEqual({
+      "Access-Control-Allow-Origin": "*",
+    });
+    const other = response();
+    wrapper.handler({ url: "/api/host-route" }, other.res, "next");
+    expect(other.headers).toStrictEqual({});
+  });
 });
 
 describe("wrapNodeEntry", () => {
@@ -340,7 +354,7 @@ describe("wrapNodeEntry", () => {
     expect(recorded.warn[0]).toContain("Could not find the Node server entry");
   });
 
-  it("wraps Astro's entry to add the powered-by response header", async () => {
+  it("wraps Astro's entry for X-Powered-By alone", async () => {
     const root = await scratch();
     const serverDir = join(root, "dist", "server");
     await mkdir(serverDir, { recursive: true });
@@ -351,9 +365,29 @@ describe("wrapNodeEntry", () => {
       log
     );
     expect(await readFile(join(serverDir, NODE_ENTRY_FILE), "utf-8")).toContain(
-      'res.setHeader("X-Powered-By", "Blume")'
+      'const POWERED_BY = {"X-Powered-By":"Blume"};'
     );
     expect(recorded.warn).toStrictEqual([]);
+  });
+
+  it("leaves Astro's entry alone when there is nothing to set", async () => {
+    const root = await scratch();
+    const serverDir = join(root, "dist", "server");
+    await mkdir(serverDir, { recursive: true });
+    await writeFile(join(serverDir, NODE_ENTRY_FILE), "// astro\n", "utf-8");
+    const { log, recorded } = recorder();
+    await wrapNodeEntry(
+      projectAt(root, {
+        agents: { api: false },
+        deployment: node(),
+        poweredBy: false,
+      }),
+      log
+    );
+    expect(await readFile(join(serverDir, NODE_ENTRY_FILE), "utf-8")).toBe(
+      "// astro\n"
+    );
+    expect(recorded.success).toStrictEqual([]);
   });
 
   it("sandboxes downloaded SVG assets when the build has them", async () => {
@@ -377,6 +411,7 @@ describe("wrapNodeEntry", () => {
     const wrapper = await readFile(join(serverDir, NODE_ENTRY_FILE), "utf-8");
     expect(wrapper).toContain('["/blume-assets/",".svg"');
     process.env.ASTRO_NODE_AUTOSTART = "disabled";
+    globalThis.__fakeMode = "standalone";
     try {
       // SAFETY: the wrapper's exports are the Astro entry contract above.
       const module = (await import(

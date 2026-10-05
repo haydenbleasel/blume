@@ -2,4 +2,4 @@
 "blume": patch
 ---
 
-Add the `X-Powered-By: Blume` response header to runtime and static deployments. Set `poweredBy: false` to disable it.
+Send an `X-Powered-By: Blume` response header from `blume dev` and from every host Blume sets headers on. Set `poweredBy: false` to leave it out.

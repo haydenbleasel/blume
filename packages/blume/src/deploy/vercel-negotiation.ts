@@ -21,6 +21,7 @@
  */
 
 import { mountBasePath } from "../core/base-path.ts";
+import { POWERED_BY_HEADERS } from "../core/powered-by.ts";
 import { SVG_ASSET_HEADERS } from "./headers.ts";
 
 /*
@@ -374,6 +375,31 @@ const svgAssetRoute = (base: string): VercelRoute => ({
   src: svgAssetSource(base),
 });
 
+/** The `src` of the `X-Powered-By` route: the base and every path beneath it. */
+const poweredBySource = (base: string): string =>
+  `^${routePattern(base)}(?:/.*)?$`;
+
+/**
+ * A main-phase `continue` route naming Blume in `X-Powered-By` (see
+ * `core/powered-by.ts`) on every response: the prerendered pages and files
+ * the static layer serves, which Blume's runtime middleware never sees, the
+ * functions, and the redirects.
+ */
+const poweredByRoute = (base: string): VercelRoute => ({
+  continue: true,
+  headers: Object.fromEntries(
+    Object.entries(POWERED_BY_HEADERS).map(([name, value]) => [
+      name.toLowerCase(),
+      value,
+    ])
+  ),
+  src: poweredBySource(base),
+});
+
+/** Whether a route is the {@link poweredByRoute}. */
+const isPoweredByRoute = (route: VercelRoute, base: string): boolean =>
+  route.continue === true && route.src === poweredBySource(base);
+
 /** Whether a route is a `corsRoute` — the same three-field shape test as the others. */
 const isCorsRoute = (route: VercelRoute): boolean =>
   route.continue === true &&
@@ -389,7 +415,8 @@ const isCorsRoute = (route: VercelRoute): boolean =>
  * the one re-added); the homepage `Link` route by its three-field
  * continue-with-link shape (the Build Output config is adapter-generated, so
  * no user-authored route competes in this file); the Markdown 404 routes by
- * their `/404.md` destination.
+ * their `/404.md` destination; the SVG and `X-Powered-By` routes by their
+ * `src`.
  */
 const isNegotiationRoute = (route: VercelRoute, base: string): boolean =>
   route.has?.some((condition) => MARKDOWN_VALUES.has(condition.value)) ===
@@ -407,7 +434,8 @@ const isNegotiationRoute = (route: VercelRoute, base: string): boolean =>
     route.src === homeSource(base) &&
     Object.keys(route).length === 3) ||
   isCorsRoute(route) ||
-  (route.continue === true && route.src === svgAssetSource(base));
+  (route.continue === true && route.src === svgAssetSource(base)) ||
+  isPoweredByRoute(route, base);
 
 /**
  * Splice the negotiation routes into a Build Output `config.json`, plus — when
@@ -426,7 +454,9 @@ const isNegotiationRoute = (route: VercelRoute, base: string): boolean =>
  * phase right before the adapter's `/404.html` fallback — and nowhere when
  * that fallback is absent, since a `dest` with no file behind it would serve
  * nothing. With `svgAssets`, a main-phase route also sandboxes the SVGs a
- * content source downloaded (see {@link svgAssetRoute}). Under a `base`, every
+ * content source downloaded (see {@link svgAssetRoute}). With `poweredBy`, a
+ * route at the head of the config, ahead of the adapter's redirects, names
+ * Blume on every response (see {@link poweredByRoute}). Under a `base`, every
  * route matches and names paths beneath it, and the fallback anchor is the
  * one {@link rebaseAdapterRoutes} moved there. Returns the updated JSON
  * text (tab-indented, like the adapter's own output), or `null` when there is
@@ -442,7 +472,8 @@ export const injectNegotiationRoutes = (
   notFound: NotFoundVariants = {},
   corsPaths: readonly string[] = [],
   svgAssets = false,
-  base = ""
+  base = "",
+  poweredBy = false
 ): string | null => {
   const overrideEntries = Object.entries(contentTypeOverrides ?? {});
   let config: {
@@ -491,6 +522,9 @@ export const injectNegotiationRoutes = (
   // route then terminates (Markdown negotiation on the homepage) still carries
   // the Link header.
   routes.splice(filesystemIndex, 0, ...headerRoutes, ...rewriteRoutes);
+  if (poweredBy) {
+    routes.unshift(poweredByRoute(base));
+  }
   const notFoundRoutes = [
     ...(notFound.markdown ? notFoundMarkdownRoutes(base) : []),
     ...(notFound.json ? notFoundJsonRoutes(base) : []),

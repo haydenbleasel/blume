@@ -7,6 +7,7 @@ import { join, relative, resolve } from "pathe";
 import { loadEnvFiles } from "../cli/env.ts";
 import type { CustomPageRoute } from "../core/custom-pages.ts";
 import { enrichDiagnostic } from "../core/diagnostics.ts";
+import { POWERED_BY_HEADERS } from "../core/powered-by.ts";
 import { scanProject } from "../core/project-graph.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import {
@@ -146,23 +147,33 @@ export const publishBuildProject = (project: BlumeProject | null): void => {
  * the Astro root recorded on `astro:config:done`. Scan diagnostics surface as
  * warnings — there is no `--strict` to honor here, and the build itself has
  * already succeeded. `null` when nothing asked for a scan.
+ *
+ * The app's runtime settings were baked in at eject, `poweredBy` among them
+ * (the integration option that registers the runtime middleware), so the
+ * artifacts follow that option rather than the config file: one switch puts
+ * `X-Powered-By` on the server-rendered responses and in `_headers` alike.
  */
 const scanForArtifacts = async (
   astroRoot: URL | null,
-  artifactsRoot: string | undefined,
+  options: Pick<BlumeIntegrationOptions, "buildArtifactsRoot" | "poweredBy">,
   logger: ArtifactLogger
 ): Promise<BlumeProject | null> => {
-  if (!(astroRoot && artifactsRoot)) {
+  if (!(astroRoot && options.buildArtifactsRoot)) {
     return null;
   }
-  const root = resolve(fileURLToPath(astroRoot), artifactsRoot);
+  const root = resolve(fileURLToPath(astroRoot), options.buildArtifactsRoot);
   // Remote sources read their tokens from the environment during the scan.
   loadEnvFiles(root);
   const project = await scanProject(root, { mode: "build" });
   for (const diagnostic of project.diagnostics) {
     logger.warn(`[${diagnostic.code}] ${diagnostic.message}`);
   }
-  return project;
+  return options.poweredBy === undefined
+    ? project
+    : {
+        ...project,
+        config: { ...project.config, poweredBy: options.poweredBy },
+      };
 };
 
 /**
@@ -317,7 +328,11 @@ export type BlumePageRoute = CustomPageRoute;
 
 export interface BlumeIntegrationOptions {
   pages: BlumePageRoute[];
-  /** Whether runtime responses identify Blume with `X-Powered-By`. */
+  /**
+   * Whether responses name Blume in `X-Powered-By` (see
+   * `core/powered-by.ts`): the dev server's, and the server-rendered ones of
+   * a build, through the runtime middleware. Defaults to `true`.
+   */
   poweredBy?: boolean;
   /**
    * Page routes that have a raw-Markdown variant (the content manifest). The
@@ -431,6 +446,24 @@ const answerRedirects =
     res.end();
   };
 
+/**
+ * Name Blume in `X-Powered-By` on every dev response, as the deployed site
+ * does. It goes on the Node response before anything answers, so the
+ * redirects, the `public/` files Vite serves, and the rendered pages all
+ * carry it, and a page or project middleware that sets its own value
+ * replaces it.
+ */
+const identifyBlume = (
+  _req: IncomingMessage,
+  res: ServerResponse,
+  next: () => void
+): void => {
+  for (const [name, value] of Object.entries(POWERED_BY_HEADERS)) {
+    res.setHeader(name, value);
+  }
+  next();
+};
+
 /** The `.d.ts` the integration injects for the `blume:*` virtual modules. */
 const MODULE_TYPES_FILE = "modules.d.ts";
 
@@ -464,11 +497,7 @@ export const blumeIntegration = (
       "astro:build:done": async ({ dir, logger }) => {
         const project =
           registry().buildProject ??
-          (await scanForArtifacts(
-            astroRoot,
-            options.buildArtifactsRoot,
-            logger
-          ));
+          (await scanForArtifacts(astroRoot, options, logger));
         if (!project) {
           return;
         }
@@ -507,10 +536,13 @@ export const blumeIntegration = (
           entrypoint: "blume/components/icon-sprite-middleware.ts",
           order: "post",
         });
+        // Names Blume on the responses Astro renders (see
+        // components/powered-by-middleware.ts). Innermost too, so a header
+        // the project's own middleware sets wins.
         if (options.poweredBy !== false) {
           addMiddleware({
             entrypoint: "blume/components/powered-by-middleware.ts",
-            order: "pre",
+            order: "post",
           });
         }
         for (const page of options.pages) {
@@ -545,6 +577,13 @@ export const blumeIntegration = (
         if (options.redirects) {
           server.middlewares.stack.unshift({
             handle: answerRedirects(options.redirects),
+            route: "",
+          });
+        }
+        // Ahead of the redirects, so their answers carry it too.
+        if (options.poweredBy !== false) {
+          server.middlewares.stack.unshift({
+            handle: identifyBlume,
             route: "",
           });
         }

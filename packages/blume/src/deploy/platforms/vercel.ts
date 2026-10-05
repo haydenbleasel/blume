@@ -151,7 +151,8 @@ export const emitVercelNegotiation = async (
     // Downloaded content assets are prerendered static files; only a build
     // that has them needs the SVG sandbox route.
     existsSync(join(builtDir, "blume-assets")),
-    base
+    base,
+    config.poweredBy
   );
   if (injected === null) {
     log.warn(
@@ -269,8 +270,8 @@ export const rebaseVercelRoutes = async (
  * hidden runtime silently drops the function's chunks and `node_modules`.
  * Static assets are served from the tree's `static/` half, so the deploy
  * artifacts are written there; headers (the discovery files', the sandbox on
- * downloaded SVGs) arrive through the routing config rather than a
- * `_headers` file, which Vercel never reads. The adapter ignores
+ * downloaded SVGs, `X-Powered-By`) arrive through the routing config rather
+ * than a `_headers` file, which Vercel never reads. The adapter ignores
  * `deployment.base`, so under one the build moves the static files and the
  * routes beneath it.
  */

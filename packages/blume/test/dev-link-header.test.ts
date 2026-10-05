@@ -53,7 +53,10 @@ const homeLinkHeader = (): string | undefined => {
   const stack: { handle: Handle }[] = [];
   // SAFETY: the hook only touches the middleware stack and the fields
   // provided here.
-  blumeIntegration({ pages: [] }).hooks["astro:server:setup"]?.({
+  // With X-Powered-By off, Markdown negotiation is the only middleware.
+  blumeIntegration({ pages: [], poweredBy: false }).hooks[
+    "astro:server:setup"
+  ]?.({
     server: { environments: {}, middlewares: { stack } },
   } as never);
   const headers: Record<string, string> = {};

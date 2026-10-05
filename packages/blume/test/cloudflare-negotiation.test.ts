@@ -28,6 +28,9 @@ const ROUTES = [
 
 const HOME_LINK = '</llms.txt>; rel="describedby"; type="text/plain"';
 
+/** The header Blume's runtime middleware sets on a rendered response. */
+const NAMED = { "x-powered-by": "Blume" };
+
 /**
  * Configured redirects as `deploy/redirects.ts` bases them for a host
  * platform: a retired page and a non-ASCII page, both with non-default
@@ -269,24 +272,53 @@ describe("negotiation worker — parity with the dev middleware helpers", () => 
 });
 
 describe("negotiation worker — responses", () => {
-  it("adds X-Powered-By only when configured", async () => {
-    const enabled = await loadWorker(workerText({ poweredBy: true }));
-    const disabled = await loadWorker(workerText({ poweredBy: false }));
-    const enabledEnv = makeEnv();
-    const disabledEnv = makeEnv();
-    const enabledResponse = await enabled.fetch(
-      new Request("https://site.test/not-a-content-route"),
-      enabledEnv.env,
-      {}
+  /** X-Powered-By on each kind of answer the wrapper gives. */
+  const poweredByAnswers = async (
+    overrides: Partial<Parameters<typeof buildNegotiationWorker>[0]>
+  ): Promise<(string | null)[]> => {
+    const worker = await loadWorker(
+      workerText({
+        redirects: [{ from: "/docs/old", status: 302, to: "/docs/new" }],
+        ...overrides,
+      })
     );
-    const disabledResponse = await disabled.fetch(
-      new Request("https://site.test/not-a-content-route"),
-      disabledEnv.env,
-      {}
+    const { env } = makeEnv();
+    const answers = await Promise.all(
+      [
+        new Request("https://site.test/docs/old"),
+        new Request("https://site.test/api/docs/pages/docs/quickstart.json"),
+        new Request("https://site.test/docs/quickstart", {
+          headers: { accept: "text/markdown" },
+        }),
+        new Request("https://site.test/docs/quickstart"),
+        new Request("https://site.test/mcp", { method: "POST" }),
+      ].map((request) => worker.fetch(request, env, {}))
     );
+    return answers.map((answer) => answer.headers.get("x-powered-by"));
+  };
 
-    expect(enabledResponse.headers.get("x-powered-by")).toBe("Blume");
-    expect(disabledResponse.headers.has("x-powered-by")).toBe(false);
+  it("names Blume on every answer unless poweredBy is false", async () => {
+    // A redirect, page JSON, a Markdown mirror, a page, and a POST.
+    expect(await poweredByAnswers({})).toStrictEqual(
+      Array.from({ length: 5 }, () => "Blume")
+    );
+    expect(await poweredByAnswers({ poweredBy: false })).toStrictEqual(
+      Array.from({ length: 5 }, () => null)
+    );
+  });
+
+  it("keeps an X-Powered-By the response already carries", async () => {
+    const worker = await loadWorker(workerText());
+    const own = new Response("<html>", {
+      headers: { "x-powered-by": "Acme Docs" },
+    });
+    const { env } = makeEnv({ serverResponse: () => own });
+    const response = await worker.fetch(
+      new Request("https://site.test/docs/quickstart"),
+      env,
+      {}
+    );
+    expect(response.headers.get("x-powered-by")).toBe("Acme Docs");
   });
 
   it("serves known prerendered page JSON before Astro's API catch-all", async () => {
@@ -441,7 +473,8 @@ describe("negotiation worker — responses", () => {
 
   it("passes non-content routes and non-GET requests straight through", async () => {
     const worker = await loadWorker(workerText());
-    const untouched = new Response("ok");
+    // Named by Blume's runtime middleware, as every rendered response is.
+    const untouched = new Response("ok", { headers: NAMED });
     const { calls, env } = makeEnv({ serverResponse: () => untouched });
     const passthrough = await worker.fetch(
       new Request("https://site.test/mcp", {
@@ -494,7 +527,7 @@ describe("negotiation worker — responses", () => {
     );
     expect(negotiated.headers.get("link")).toBeNull();
     expect(negotiated.headers.get("x-markdown-tokens")).toBeNull();
-    const untouched = new Response("<html>");
+    const untouched = new Response("<html>", { headers: NAMED });
     const html = makeEnv({ serverResponse: () => untouched });
     const response = await worker.fetch(
       new Request("https://site.test/not-a-route/"),
@@ -643,7 +676,7 @@ describe("negotiation worker — missing pages", () => {
     // found page, whatever the client prefers.
     const worker = await loadWorker(workerText({ notFound: NOT_FOUND }));
     const problem = new Response("{}", {
-      headers: { "content-type": "application/problem+json" },
+      headers: { "content-type": "application/problem+json", ...NAMED },
       status: 404,
     });
     const { calls, env } = makeEnv({ serverResponse: () => problem });

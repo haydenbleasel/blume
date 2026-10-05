@@ -400,7 +400,8 @@ const loadNodeWrapper = async (base: string): Promise<NodeWrapper> => {
           path: `${base}/blume-assets/*.svg`,
         },
       ],
-      { base }
+      // Just the sandbox: node-headers.test.ts covers X-Powered-By.
+      { base, poweredBy: false }
     ),
     "utf-8"
   );

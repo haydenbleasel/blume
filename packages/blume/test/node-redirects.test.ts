@@ -19,7 +19,11 @@ import {
   nodeRedirects,
   wrapNodeEntry,
 } from "../src/deploy/node-headers.ts";
-import type { NodeRedirects } from "../src/deploy/node-headers.ts";
+import type {
+  NodeEntryOptions,
+  NodeHeaderRule,
+  NodeRedirects,
+} from "../src/deploy/node-headers.ts";
 import type { BuildLog } from "../src/deploy/platforms/types.ts";
 
 /**
@@ -125,13 +129,20 @@ interface WrapperModule {
 
 const loadWrapper = async (
   redirects: NodeRedirects,
-  patternRedirects: CompiledRedirect[] = []
+  patternRedirects: CompiledRedirect[] = [],
+  rules: NodeHeaderRule[] = [],
+  options: NodeEntryOptions = {}
 ): Promise<WrapperModule> => {
   const dir = await scratch();
   await writeFile(join(dir, NODE_ASTRO_ENTRY_FILE), FAKE_ASTRO_ENTRY, "utf-8");
   await writeFile(
     join(dir, NODE_ENTRY_FILE),
-    nodeEntryWrapper([], { base: "/docs", patternRedirects, redirects }),
+    nodeEntryWrapper(rules, {
+      base: "/docs",
+      patternRedirects,
+      redirects,
+      ...options,
+    }),
     "utf-8"
   );
   // SAFETY: the wrapper's exports are the Astro entry contract above.
@@ -217,7 +228,7 @@ describe("the entry wrapper's redirects", () => {
       expect(wrapper.handler({ url }, res)).toBeUndefined();
       expect(answer).toStrictEqual({
         ended: true,
-        headers: { location: "/docs/new" },
+        headers: { "X-Powered-By": "Blume", location: "/docs/new" },
         status: 302,
       });
     }
@@ -238,6 +249,24 @@ describe("the entry wrapper's redirects", () => {
       "/docs/%E0%A4%A",
       undefined,
     ]);
+  });
+
+  it("carry X-Powered-By alone, and nothing with poweredBy off", async () => {
+    const rules = [
+      { headers: { "Access-Control-Allow-Origin": "*" }, path: "/docs/old" },
+    ];
+    const named = response();
+    const wrapper = await loadWrapper(REDIRECTS, [], rules);
+    wrapper.handler({ url: "/docs/old" }, named.res);
+    // The path's rule headers belong to a page that isn't served here.
+    expect(named.answer.headers).toStrictEqual({
+      "X-Powered-By": "Blume",
+      location: "/docs/new",
+    });
+    const quiet = response();
+    const off = await loadWrapper(REDIRECTS, [], rules, { poweredBy: false });
+    off.handler({ url: "/docs/old" }, quiet.res);
+    expect(quiet.answer.headers).toStrictEqual({ location: "/docs/new" });
   });
 
   it("answer from the standalone server's listener, which Astro's never sees", async () => {
