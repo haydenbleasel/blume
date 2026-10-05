@@ -282,3 +282,25 @@ describe("content components", () => {
     );
   });
 });
+
+describe("page dates", () => {
+  it("marks up Last updated as a machine-readable <time>", async () => {
+    const layout = await source("components/layout/RootLayout.astro");
+    // Without a `datetime` search engines take whatever other date the page
+    // shows (an example component's epoch date, say) as the page's.
+    expect(layout).toContain(
+      "{strings.page.lastUpdated} <time datetime={lastModifiedIso}>{formattedLastModified}</time>"
+    );
+  });
+
+  it("dates the homepage JSON-LD from both layouts", async () => {
+    const [root, page] = await sources([
+      "components/layout/RootLayout.astro",
+      "components/layout/PageLayout.astro",
+    ]);
+    // A locale's, basePath's, or version's root is its homepage too.
+    expect(root).toContain("homeRoute: navigation.root,");
+    expect(root).toContain("modified: lastModified,");
+    expect(page).toContain("modified: lastModified,");
+  });
+});

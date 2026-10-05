@@ -15,10 +15,8 @@ const base: StructuredDataInput = {
 
 /** The `@graph` nodes of a page's JSON-LD, keyed by `@type`. */
 const graphOf = (input: StructuredDataInput): Record<string, JsonLdNode> => {
-  const data = buildStructuredData(input);
-  // SAFETY: buildStructuredData always returns a `@graph` array of nodes (or
-  // null, which yields an empty graph here).
-  const graph = (data?.["@graph"] ?? []) as JsonLdNode[];
+  // SAFETY: buildStructuredData always returns a `@graph` array of nodes.
+  const graph = buildStructuredData(input)["@graph"] as JsonLdNode[];
   return Object.fromEntries(graph.map((node) => [String(node["@type"]), node]));
 };
 
@@ -113,6 +111,16 @@ describe("buildStructuredData — organization identity", () => {
     expect(graph.Organization?.url).toBe("https://acme.dev/docs");
   });
 
+  it("cites the organization as publisher on the homepage WebPage", () => {
+    const graph = graphOf({
+      ...base,
+      identity: { organization: { contactType: "support", sameAs: [] } },
+    });
+    expect(graph.WebPage?.publisher).toStrictEqual({
+      "@id": "https://acme.dev#organization",
+    });
+  });
+
   it("cites the organization as publisher on article pages too", () => {
     const graph = graphOf({
       ...base,
@@ -127,12 +135,13 @@ describe("buildStructuredData — organization identity", () => {
   });
 
   it("needs a site — identity nodes have absolute ids", () => {
-    const data = buildStructuredData({
+    const home = graphOf({
       ...base,
       identity: { organization: { contactType: "support", sameAs: [] } },
       siteUrl: null,
     });
-    expect(data).toBeNull();
+    expect(Object.keys(home)).toStrictEqual(["WebPage"]);
+    expect(home.WebPage?.publisher).toBeUndefined();
     const graph = graphOf({
       ...base,
       identity: { organization: { contactType: "support", sameAs: [] } },
@@ -228,9 +237,9 @@ describe("buildStructuredData — software identity", () => {
   });
 
   it("is skipped without a site, like the WebSite node", () => {
-    expect(
-      buildStructuredData({ ...base, identity: { software }, siteUrl: null })
-    ).toBeNull();
+    const graph = graphOf({ ...base, identity: { software }, siteUrl: null });
+    expect(graph.SoftwareApplication).toBeUndefined();
+    expect(graph.WebSite).toBeUndefined();
   });
 });
 

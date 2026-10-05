@@ -432,10 +432,13 @@ const description = page.description ?? site.description;
 // pages (and the changelog index, which has no `type`) stay `website`.
 const ogType =
   pageType === "blog" || pageType === "changelog" ? "article" : "website";
+// The last-modified date as ISO 8601, parsed once for every surface that
+// carries it; undefined when absent or unparseable.
+const lastModifiedIso = toIso(lastModified);
 // `article:*` timestamps only belong on an article; a docs page carrying them
 // would be declaring properties its `og:type` doesn't define.
 const articlePublished = ogType === "article" ? toIso(published) : undefined;
-const articleModified = ogType === "article" ? toIso(lastModified) : undefined;
+const articleModified = ogType === "article" ? lastModifiedIso : undefined;
 // X sizes the card from `twitter:card`: a large image needs the wide variant,
 // and a page with no image still gets a card (the compact `summary`) rather
 // than rendering as a bare link.
@@ -448,14 +451,12 @@ const xCreator = normalizeXHandle(x?.creator);
 
 // "Last updated on <date>" — the configured `dateFormat`, in UTC (unless the
 // config names a zone) so it matches the changelog timeline.
-const lastModifiedDate = lastModified ? new Date(lastModified) : null;
-const formattedLastModified =
-  lastModifiedDate && !Number.isNaN(lastModifiedDate.getTime())
-    ? new Intl.DateTimeFormat(
-        locale || "en",
-        resolveDateFormatOptions(dateFormat)
-      ).format(lastModifiedDate)
-    : null;
+const formattedLastModified = lastModifiedIso
+  ? new Intl.DateTimeFormat(
+      locale || "en",
+      resolveDateFormatOptions(dateFormat)
+    ).format(new Date(lastModifiedIso))
+  : null;
 
 // This page's raw-Markdown mirror, advertised as a `text/markdown` alternate
 // in the head. Content routes always have one (see `markdownRoutePaths`, which
@@ -521,6 +522,7 @@ const structuredData =
       base: import.meta.env.BASE_URL,
       breadcrumbs: crumbs,
       description,
+      homeRoute: navigation.root,
       identity: data.config.identity,
       locale,
       modified: lastModified,
@@ -929,10 +931,7 @@ const localeRedirect = localeTargets
               />
               {formattedLastModified && (
                 <p class="mx-auto mt-10 max-w-content text-muted-foreground text-sm">
-                  {strings.page.lastUpdated}{" "}
-                  <time datetime={toIso(lastModified)}>
-                    {formattedLastModified}
-                  </time>
+                  {strings.page.lastUpdated} <time datetime={lastModifiedIso}>{formattedLastModified}</time>
                 </p>
               )}
               {feedback && (

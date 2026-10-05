@@ -1,6 +1,6 @@
 ---
 title: Structured data
-description: The schema.org JSON-LD every page carries — WebSite, article, and breadcrumb nodes — plus the optional Organization and SoftwareApplication blocks that tell search engines and agents who you are.
+description: The schema.org JSON-LD every page carries — WebSite, page, and breadcrumb nodes — plus the optional Organization and SoftwareApplication blocks that tell search engines and agents who you are.
 ---
 
 Blume emits [schema.org](https://schema.org) JSON-LD in every page's `<head>` so search engines understand your content. On by default:
@@ -14,10 +14,12 @@ seo: {
 Each page includes:
 
 - a **WebSite** node for site identity,
-- the page as an **article** — `BlogPosting` for blog posts, `TechArticle` for changelog and docs — with its description and publish date,
-- a **BreadcrumbList** built from the navigation trail.
+- the page itself, with its description, language, and publish date: a **WebPage** on the homepage, and an **article** everywhere else — `BlogPosting` for blog posts, `TechArticle` for changelog and docs,
+- on an article, a **BreadcrumbList** built from the navigation trail.
 
-URLs are absolute when [`deployment.site`](/docs/deployment) is set. Pages marked [`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) are skipped. When [`lastModified`](/docs/configuration#last-modified) is on, each page's date is also emitted as `dateModified`.
+The homepage is the root of the navigation, so each locale's home (`/fr`) and the root of a [`basePath`](/docs/deployment#mount-the-docs-under-a-path) are WebPages too.
+
+URLs are absolute when [`deployment.site`](/docs/deployment) is set. Without it they're route-relative, and the WebSite node, which needs an absolute identifier, is left out. Pages marked [`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) are skipped. When [`lastModified`](/docs/configuration#last-modified) is on, each page's date is also emitted as `dateModified`, and the visible "Last updated" date is marked up as a `<time datetime>`, so search engines read that date rather than some other date on the page.
 
 ## Site identity
 
@@ -42,10 +44,10 @@ seo: {
 }
 ```
 
-`organization` adds an **Organization** node to every page — the WebSite and article nodes cite it as `publisher` — with the email and telephone as a `ContactPoint` (`contactType` defaults to `"customer support"`) and the address as a `PostalAddress`, the two fields business-verification checks look for. `name` and `url` default to the site's; a root-relative `logo` is absolutized like any page URL.
+`organization` adds an **Organization** node to every page — the WebSite and page nodes cite it as `publisher` — with the email and telephone as a `ContactPoint` (`contactType` defaults to `"customer support"`) and the address as a `PostalAddress`, the two fields business-verification checks look for. `name` and `url` default to the site's; a root-relative `logo` is absolutized like any page URL.
 
 `software` adds a **SoftwareApplication** node to the homepage: the product's name and description (defaulting to the site's), `applicationCategory` (default `"DeveloperApplication"`), operating system, license, an `Offer` when `price` is set, and the registry or repository URLs in `sameAs`. Pass `software: true` to take every default. The organization, when configured, is cited as its `publisher`.
 
 ## Custom pages
 
-A custom [`.astro` page](/docs/advanced/custom-pages) rendered through `PageLayout` emits the same `WebSite` graph, so a marketing home page isn't the one URL without structured data. Pass `structuredDataEnabled={config.structuredData}` to keep it in sync with this setting, or `structuredDataEnabled={false}` to turn it off for that page alone.
+A custom [`.astro` page](/docs/advanced/custom-pages) rendered through `PageLayout` emits the same graph, so a marketing home page isn't the one URL without structured data. A custom page has no content file to date, so pass `lastModified` to give it a `dateModified`. Pass `structuredDataEnabled={config.structuredData}` to keep it in sync with this setting, or `structuredDataEnabled={false}` to turn it off for that page alone.

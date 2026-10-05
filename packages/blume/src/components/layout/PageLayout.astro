@@ -126,10 +126,17 @@ interface Props {
   canonical?: string | null;
   /**
    * Emit schema.org JSON-LD for this page (`data.config.structuredData`) — a
-   * WebSite node, plus an article node on non-root routes. Defaults to on,
-   * matching RootLayout.
+   * WebSite node, plus a WebPage node on the homepage and an article node on
+   * other routes. Defaults to on, matching RootLayout.
    */
   structuredDataEnabled?: boolean;
+  /**
+   * When the page last changed, emitted as the JSON-LD `dateModified`. A
+   * custom page has no content file to date, so pass it by hand; without a
+   * machine-readable date, search engines take whatever other date the page
+   * shows.
+   */
+  lastModified?: string | Date | null;
   /**
    * Which agent-discovery resources exist, advertised as `describedby` head
    * links plus the AI Catalog/ARD pair — the same `DiscoveryLinks` partial
@@ -184,6 +191,7 @@ const {
   ogImageSize,
   canonical,
   structuredDataEnabled,
+  lastModified,
   discovery = data.config.discovery,
   x,
   noindex,
@@ -279,7 +287,8 @@ const xSite = normalizeXHandle(x?.handle);
 const xCreator = normalizeXHandle(x?.creator);
 
 // JSON-LD, mirroring RootLayout: skipped when disabled or noindexed. A custom
-// page has no breadcrumb trail; the home route yields the WebSite node alone.
+// page has no breadcrumb trail; the home route is a WebPage, dated by
+// `lastModified` when the page passes one.
 const structuredData =
   structuredDataEnabled === false || noindex
     ? null
@@ -289,6 +298,7 @@ const structuredData =
       description,
       identity: data.config.identity,
       locale,
+      modified: lastModified,
       route,
       siteName: site.title,
       siteUrl: siteUrl ?? null,
