@@ -2,14 +2,14 @@
  * Send a custom analytics event to every analytics platform configured in
  * `blume.config.ts`. Mirrors the adapters `Analytics.astro` wires
  * (`src/analytics/*`): each one with a custom-event API is called through the
- * global its snippet defines (Cloudflare and Clearbit have none to forward
- * to), and the `blume:track` CustomEvent fires unconditionally so a project
- * can bridge the event to anything else — a `script()` adapter, say. Every
- * call no-ops cleanly when a provider isn't present — for example during
- * `blume dev`, where `Analytics.astro` injects nothing — and a provider that
- * throws (a consent shim that stubs `gtag` with a raise, a broken snippet) is
- * isolated so it neither starves the providers after it nor surfaces in the
- * feature that reported the event.
+ * global its snippet defines (Cloudflare, Clearbit, and Clics have none to
+ * forward to), and the `blume:track` CustomEvent fires unconditionally so a
+ * project can bridge the event to anything else — a `script()` adapter, say.
+ * Every call no-ops cleanly when a provider isn't present — for example
+ * during `blume dev`, where `Analytics.astro` injects nothing — and a provider
+ * that throws (a consent shim that stubs `gtag` with a raise, a broken
+ * snippet) is isolated so it neither starves the providers after it nor
+ * surfaces in the feature that reported the event.
  */
 import { track as vercelTrack } from "@vercel/analytics";
 

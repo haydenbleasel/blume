@@ -62,11 +62,11 @@ const adapterScripts = (
     case "clarity": {
       return clarityHead(adapter.options);
     }
-    case "clics": {
-      return clicsHead(adapter.options);
-    }
     case "clearbit": {
       return clearbitHead(adapter.options);
+    }
+    case "clics": {
+      return clicsHead(adapter.options);
     }
     case "cloudflare": {
       return cloudflareHead(adapter.options);

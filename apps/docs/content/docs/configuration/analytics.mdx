@@ -38,8 +38,8 @@ Every identifier below — a project key, a measurement ID, a site token — is 
 | `adobe()` | [Adobe Analytics](#adobe-analytics) | `url` |
 | `amplitude()` | [Amplitude](#amplitude) | `key` |
 | `clarity()` | [Microsoft Clarity](#microsoft-clarity) | `id` |
-| `clics()` | [Clics](#clics) | `projectId` |
 | `clearbit()` | [Clearbit](#clearbit) | `key` |
+| `clics()` | [Clics](#clics) | `projectId` |
 | `cloudflare()` | [Cloudflare Web Analytics](#cloudflare-web-analytics) | `token` |
 | `databuddy()` | [Databuddy](#databuddy) | `clientId` |
 | `fathom()` | [Fathom](#fathom) | `site` |
@@ -162,7 +162,7 @@ analytics: [clics({ projectId: "YOUR_PROJECT_ID" })],
 
 The tracker counts page loads and client-side navigations automatically, including Blume's client router, so don't add a second pageview hook. It also tracks outbound links by default. Set `disableOutboundLinks: true` to turn those events off. For a production build previewed on localhost, set `allowLocalhost: true`; ordinary `blume dev` does not load analytics.
 
-Clics custom events use the [`track()` helper](https://docs.clics.dev/custom-events) from `@clicsdev/tracker` in your own client code. The browser tracker does not expose a global custom-event function, so Blume's built-in feedback, search, and narration events are not forwarded to Clics by this adapter.
+Blume's [custom events](#custom-events) don't reach Clics: its browser tracker has no global event function to forward them to. To send your own events, call the [`track()` helper](https://docs.clics.dev/custom-events) from `@clicsdev/tracker` in your own client code.
 
 ## Fathom
 
@@ -401,10 +401,10 @@ analytics: [
 | `amplitude()` | `key` | — | Amplitude project API key. Required. |
 | `amplitude()` | anything else | `autocapture: true`, `fetchRemoteConfig: true` | Merged into the `amplitude.init` options verbatim. |
 | `clarity()` | `id` | — | Clarity project ID. Required. |
+| `clearbit()` | `key` | — | Clearbit publishable API key. Required. |
 | `clics()` | `projectId` | — | Public Clics project ID. Required. |
 | `clics()` | `allowLocalhost` | `false` | Emit `data-allow-localhost` for local previews of a production build. |
 | `clics()` | `disableOutboundLinks` | `false` | Emit `data-disable-outbound-links` to stop outbound-link tracking. |
-| `clearbit()` | `key` | — | Clearbit publishable API key. Required. |
 | `cloudflare()` | `token` | — | Cloudflare Web Analytics site token (manual setup). Required. |
 | `cloudflare()` | anything else | — | Forwarded in the beacon's `data-cf-beacon` JSON verbatim. |
 | `databuddy()` | `clientId` | — | Databuddy client ID. Required. |
@@ -449,4 +449,4 @@ analytics: [
 
 ## Custom events
 
-Blume's page feedback (`feedback`, and `feedback_comment` when [written feedback](/docs/configuration#written-feedback) is on), [search](/docs/configuration/search#search-analytics) (`search`, `search_select`), [assistant](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), and [narration](/docs/configuration/narration#analytics) player (`narration_play`, `narration_complete`) send custom events through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (with each property value as a string), Pirsch, Clarity, Hotjar, and Vercel. Fathom, Clarity, and Hotjar take an event's name alone, so they count each event without its properties. Cloudflare and Clearbit have no event API. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. The assistant never sends a question's text to a provider, and search sends its queries as typed unless you set [`search.analytics.queries`](/docs/configuration/search#search-analytics) to `false`, which sends each query's length instead; either way the text still reaches the `blume:track` event, for a listener you write to forward. For deploying your built site, see [Deployment](/docs/deployment).
+Blume's page feedback (`feedback`, and `feedback_comment` when [written feedback](/docs/configuration#written-feedback) is on), [search](/docs/configuration/search#search-analytics) (`search`, `search_select`), [assistant](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), and [narration](/docs/configuration/narration#analytics) player (`narration_play`, `narration_complete`) send custom events through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (with each property value as a string), Pirsch, Clarity, Hotjar, and Vercel. Fathom, Clarity, and Hotjar take an event's name alone, so they count each event without its properties. Cloudflare and Clearbit have no event API, and Clics has no global one for Blume to call. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. The assistant never sends a question's text to a provider, and search sends its queries as typed unless you set [`search.analytics.queries`](/docs/configuration/search#search-analytics) to `false`, which sends each query's length instead; either way the text still reaches the `blume:track` event, for a listener you write to forward. For deploying your built site, see [Deployment](/docs/deployment).
