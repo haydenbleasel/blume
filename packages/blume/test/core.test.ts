@@ -1305,6 +1305,22 @@ describe("rss feeds", () => {
   });
 });
 
+/** The node types the French homepage `/fr` gets, given the home route. */
+const frenchHomeTypes = (homeRoute?: string) =>
+  graphOf(
+    buildStructuredData({
+      breadcrumbs: [
+        { label: "Accueil", route: "/fr" },
+        { label: "Guide", route: "/fr/guide" },
+      ],
+      homeRoute,
+      route: "/fr",
+      siteName: "Docs",
+      siteUrl: "https://x.com",
+      title: "Accueil",
+    })
+  ).map((n) => n["@type"]);
+
 describe("structured data", () => {
   it("emits a WebSite and an undated WebPage node for the homepage", () => {
     const data = buildStructuredData({
@@ -1350,23 +1366,13 @@ describe("structured data", () => {
   });
 
   it("treats the navigation root as the homepage under a locale or basePath", () => {
-    const home = (homeRoute?: string) =>
-      graphOf(
-        buildStructuredData({
-          breadcrumbs: [
-            { label: "Accueil", route: "/fr" },
-            { label: "Guide", route: "/fr/guide" },
-          ],
-          homeRoute,
-          route: "/fr",
-          siteName: "Docs",
-          siteUrl: "https://x.com",
-          title: "Accueil",
-        })
-      ).map((n) => n["@type"]);
-    expect(home("/fr")).toStrictEqual(["WebSite", "WebPage"]);
+    expect(frenchHomeTypes("/fr")).toStrictEqual(["WebSite", "WebPage"]);
     // Without one, only `/` is the homepage.
-    expect(home()).toStrictEqual(["WebSite", "TechArticle", "BreadcrumbList"]);
+    expect(frenchHomeTypes()).toStrictEqual([
+      "WebSite",
+      "TechArticle",
+      "BreadcrumbList",
+    ]);
   });
 
   it("emits a BlogPosting with absolute url, datePublished, and breadcrumbs", () => {
