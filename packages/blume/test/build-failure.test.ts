@@ -68,6 +68,22 @@ describe("astroBuildDiagnostics", () => {
     });
   });
 
+  it("keeps the diagnostic of a BlumeError raised inside the build", () => {
+    // An `astro:build:done` hook runs Blume's source, so its BlumeError is a
+    // copy of the class the CLI bundle's `instanceof` doesn't match.
+    const diagnostic = {
+      code: "BLUME_SEARCH_SYNC_FAILED",
+      message: "Search sync to typesense failed: Forbidden",
+      severity: "error",
+      suggestion: "Check TYPESENSE_ADMIN_API_KEY.",
+    } as const;
+    expect(
+      astroBuildDiagnostics(
+        errorWith(diagnostic.message, { diagnostic }, "BlumeError")
+      )
+    ).toEqual([diagnostic]);
+  });
+
   it("drops a location it can't read rather than guessing", () => {
     const [diagnostic] = astroBuildDiagnostics(
       errorWith("Broken", { loc: { file: "/site/a.mdx", line: "eleven" } })
@@ -79,9 +95,10 @@ describe("astroBuildDiagnostics", () => {
 
 /**
  * End to end: a page Blume's own checks pass but Astro's MDX compile rejects
- * fails the build as a build error at that page, not as `BLUME_INTERNAL`.
+ * fails the build as a build error at that page, and a BlumeError raised in
+ * an Astro hook keeps its own code, neither of them as `BLUME_INTERNAL`.
  */
-describe("blume build with MDX Astro can't compile", () => {
+describe("blume build failures", () => {
   const PACKAGE_ROOT = packageRoot();
   const CLI = join(PACKAGE_ROOT, "bin", "blume.mjs");
   const roots: string[] = [];
@@ -118,19 +135,21 @@ describe("blume build with MDX Astro can't compile", () => {
     return root;
   };
 
-  it("reports the page and position, not an internal error", async () => {
-    const root = await writeProject({
-      "blume.config.ts": `export default { theme: { fonts: ${JSON.stringify({
-        body: localFont,
-        display: localFont,
-        mono: localFont,
-      })} } };\n`,
-      "docs/index.mdx":
-        '---\ntitle: Home\n---\n\n<Callout type="info">\nHello\n</Callout>\n\n{oops\n',
-    });
-    const proc = Bun.spawn(["bun", CLI, "build", "--isolated"], {
+  const fonts = `theme: { fonts: ${JSON.stringify({
+    body: localFont,
+    display: localFont,
+    mono: localFont,
+  })} }`;
+
+  /** Run `blume build` in `root`: its exit code and everything it printed. */
+  const build = async (
+    root: string,
+    args: string[],
+    env: Record<string, string> = {}
+  ): Promise<{ exitCode: number; text: string }> => {
+    const proc = Bun.spawn(["bun", CLI, "build", ...args], {
       cwd: root,
-      env: { ...process.env, NO_COLOR: "1" },
+      env: { ...process.env, ...env, NO_COLOR: "1" },
       stderr: "pipe",
       stdout: "pipe",
     });
@@ -146,10 +165,19 @@ describe("blume build with MDX Astro can't compile", () => {
     ]);
     if (exitCode === null) {
       proc.kill("SIGKILL");
-      throw new Error("`blume build --isolated` did not exit within 90s");
+      throw new Error("`blume build` did not exit within 90s");
     }
     const streams = await output;
-    const text = streams.join("\n");
+    return { exitCode, text: streams.join("\n") };
+  };
+
+  it("reports the page and position, not an internal error", async () => {
+    const root = await writeProject({
+      "blume.config.ts": `export default { ${fonts} };\n`,
+      "docs/index.mdx":
+        '---\ntitle: Home\n---\n\n<Callout type="info">\nHello\n</Callout>\n\n{oops\n',
+    });
+    const { exitCode, text } = await build(root, ["--isolated"]);
     expect(exitCode).toBe(1);
     expect(text).toContain("BLUME_BUILD_FAILED MDXError: 9:1:");
     // Under Node the location is the page's 9:1 as well; Bun stamps its own
@@ -158,5 +186,29 @@ describe("blume build with MDX Astro can't compile", () => {
     expect(text).toMatch(/at docs\/index\.mdx:\d+:\d+/u);
     expect(text).not.toContain("BLUME_INTERNAL");
     expect(text).not.toContain("likely a bug in Blume");
+  }, 120_000);
+
+  it("fails with the sync's own code when a hosted search sync fails", async () => {
+    // A Typesense host nothing listens on refuses the connection at once. The
+    // sync runs in `astro:build:done`, which an isolated build skips.
+    const root = await writeProject({
+      "blume.config.ts": `import { typesense } from "blume/search";
+
+export default {
+  search: typesense({ apiKey: "k", collection: "docs", host: "127.0.0.1", port: 1, protocol: "http" }),
+  ${fonts},
+};
+`,
+      "docs/index.md": "# Home\n\nHello.\n",
+    });
+    const { exitCode, text } = await build(root, [], {
+      TYPESENSE_ADMIN_API_KEY: "admin",
+    });
+    expect(exitCode).toBe(1);
+    expect(text).toContain(
+      "BLUME_SEARCH_SYNC_FAILED Search sync to typesense failed:"
+    );
+    expect(text).toContain("unset TYPESENSE_ADMIN_API_KEY");
+    expect(text).not.toContain("BLUME_BUILD_FAILED");
   }, 120_000);
 });

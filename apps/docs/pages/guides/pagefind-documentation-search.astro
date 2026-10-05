@@ -14,11 +14,13 @@
 // apps/docs HTML (five languages) and on hand-rendered, Blume-shaped HTML of
 // the Acme pages below, and queried both from Node. The Acme block code is
 // the exact code that ran: search-check.mjs passed every check over HTTP.
-// Did not run `blume build` or `blume preview`. Review: the slashed result
-// links against Astro's preview middleware (vite-plugin-astro-preview.js), and
-// the language toggle and per-load client cache against Search.astro and the
-// language detection in the pagefind.js Pagefind 1.5.2 emits, from reading
-// code. Not yet run end to end.
+// Did not run `blume build` or `blume preview`. Rechecked on 2026-09-30,
+// from reading code: the dialog's result links, the "All languages" merge,
+// and the per-language client (components/layout/search/pagefind.ts,
+// search/adapters/locale-scope.ts), the indexed-page count (search/build.ts),
+// and the Orama tokenizers (search/orama-index.ts). Ran the dialog's
+// every-language merge over the Acme bundle in Bun: 送信 on an English page
+// found the Japanese guide. Not yet run end to end.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -119,7 +121,7 @@ returns the first message instead of sending a second one.`;
       </tr>
       <tr>
         <td>Languages</td>
-        <td>One tokenizer, chosen by the default locale</td>
+        <td>One file with every language, each non-Latin one segmented</td>
         <td>A separate index for each page language</td>
       </tr>
       <tr>
@@ -142,11 +144,10 @@ returns the first message instead of sending a second one.`;
       search. Pagefind fetches only the chunks a query needs.
     </li>
     <li>
-      <strong>Translations use a different script from your default
-      language.</strong> Orama picks one tokenizer from{" "}
-      <code>i18n.defaultLocale</code>, so on an English-default site, Japanese,
-      Chinese, Korean, or Russian translations aren't searchable. Pagefind
-      indexes each language on its own.
+      <strong>You publish many translations.</strong> Orama's file holds every
+      language, so a reader downloads all of your translations to search one.
+      Pagefind indexes each language on its own and loads the others only when
+      a reader searches across all of them.
     </li>
     <li>
       <strong>Readers search for code.</strong> Option names and error codes
@@ -339,9 +340,9 @@ export default defineConfig({
   <CodeBlock code="npx blume build" lang="bash" />
   <p>
     After the pages render, the log prints <code>Building search index</code>{" "}
-    and then <code>Indexed N page(s) for search</code>. That count covers every
-    HTML file Pagefind read, including the ones it skipped, so it runs higher
-    than what's searchable. The real counts are per language:
+    and then <code>Indexed N page(s) for search</code>, the pages in the index
+    across every language: 4 for the Acme site. The counts per language are in
+    the index's entry file:
   </p>
   <CodeBlock code="cat dist/pagefind/pagefind-entry.json" lang="bash" />
   <p>
@@ -359,10 +360,8 @@ export default defineConfig({
     Open <code>http://localhost:4321</code>, press <kbd>⌘K</kbd> (or{" "}
     <kbd>Ctrl K</kbd>), and type <code>retries</code>. You get up to 12
     results, each with the page title and Pagefind's excerpt, matches
-    highlighted. Selecting one opens a Not Found page in the preview, because
-    Pagefind's links end in a slash (see{" "}
-    <a href="#troubleshooting">Troubleshooting</a>).
-    Keep the preview running.
+    highlighted. Select one and the page opens at its slashless URL, like{" "}
+    <code>/guides/send-a-message</code>. Keep the preview running.
   </p>
 
   <h2>Run the query checklist</h2>
@@ -503,9 +502,10 @@ node search-check.mjs ja`}
   />
   <p>
     Every line should start with <code>pass</code>, and the script exits with
-    an error when any check fails. Pagefind's result URLs end in a slash,
+    an error when any check fails. Pagefind's own result URLs end in a slash,
     because each page is a folder with an <code>index.html</code>, so write
-    your expected URLs the same way.
+    your expected URLs the same way. Blume's dialog drops that slash before it
+    links to a result.
   </p>
 
   <h3>Headings</h3>
@@ -522,12 +522,15 @@ node search-check.mjs ja`}
     Pagefind builds one index per <code>&lt;html lang&gt;</code>, and the
     browser loads the index for the language of the page the reader is on. On
     a <code>/ja/</code> page, search covers Japanese pages only; on an English
-    page, English only. The dialog still shows its "All languages" toggle, but
-    it doesn't widen a Pagefind search. Blume loads Pagefind once per full page
-    load, and Pagefind reads the page's language as it loads, so after you
-    switch language from the language menu, reload the page before you test
-    search. Pagefind's npm package ships its extended build, which splits
-    Chinese, Japanese, and Korean text into words, and{" "}
+    page, English only. Turn on the dialog's "All languages" toggle and Blume
+    merges every other language's index into the search, which then runs with
+    the page language's word stemming: <code>送信</code> on an English page
+    finds the Japanese guide. Blume keeps a Pagefind client for each language,
+    started on that language's first search, so after a reader switches
+    language from the language menu, search follows the new page's language
+    without a reload.
+    Pagefind's npm package ships its extended build, which splits Chinese,
+    Japanese, and Korean text into words, and{" "}
     <a href="/guides/cjk-documentation-search">
       Make docs search work in Chinese, Japanese and Korean
     </a>{" "}
@@ -642,7 +645,7 @@ SITE=https://docs.acme.example node search-check.mjs ja`}
   />
   <p>
     Then select a result on the live site, to confirm your host serves the page
-    at the URL Pagefind links to.
+    at the URL the dialog links to.
   </p>
 
   <h2>Troubleshooting</h2>
@@ -664,17 +667,6 @@ SITE=https://docs.acme.example node search-check.mjs ja`}
     <code>pagefind.js</code> with the new index, and the console warns
     "Pagefind JS version doesn't match the version in your search index."
     Reloading without the cache fixes it.
-  </p>
-
-  <h3>A result opens a Not Found page in blume preview</h3>
-  <p>
-    Pagefind links to each page's folder URL, with a trailing slash, like{" "}
-    <code>/guides/send-a-message/</code>. Blume sites use slashless URLs, and
-    the preview server answers a slashed one with "Not Found (trailingSlash is
-    set to "never")". Remove the slash from the address bar to confirm the page
-    exists, and check result links on your deployed site, where it depends on
-    whether your host serves the folder's <code>index.html</code> at the
-    slashed URL or redirects it to the slashless one.
   </p>
 
   <h3>Results come from an old docs version</h3>

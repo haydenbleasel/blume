@@ -634,24 +634,24 @@ export default {
   });
 });
 
-describe("blume sync", () => {
-  const run = async (root: string, ...args: string[]) => {
-    const proc = Bun.spawn([process.execPath, CLI, "sync", ...args], {
-      cwd: root,
-      // bun test exports NODE_ENV=test, which drops consola's default level to
-      // warnings-only in the child — raise it so success output is visible.
-      env: { ...process.env, CONSOLA_LEVEL: "3" },
-      stderr: "pipe",
-      stdout: "pipe",
-    });
-    const [exitCode, stdout, stderr] = await Promise.all([
-      proc.exited,
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ]);
-    return { exitCode, output: stdout + stderr };
-  };
+const run = async (root: string, ...args: string[]) => {
+  const proc = Bun.spawn([process.execPath, CLI, "sync", ...args], {
+    cwd: root,
+    // bun test exports NODE_ENV=test, which drops consola's default level to
+    // warnings-only in the child — raise it so success output is visible.
+    env: { ...process.env, CONSOLA_LEVEL: "3" },
+    stderr: "pipe",
+    stdout: "pipe",
+  });
+  const [exitCode, stdout, stderr] = await Promise.all([
+    proc.exited,
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  return { exitCode, output: stdout + stderr };
+};
 
+describe("blume sync", () => {
   const sdk = mdxRemote({
     files: ["intro.mdx"],
     prefix: "sdk",

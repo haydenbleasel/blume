@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { AUTH_METHODS } from "../components/content/api-page.ts";
+import type { AuthMethod } from "../components/content/api-page.ts";
 import { unrecognizedKeysMessage } from "../core/unrecognized-keys.ts";
 
 /**
@@ -100,17 +102,43 @@ export interface OpenApiSourceOptions extends ReferenceSourceOptions {
 }
 
 /**
+ * How a GraphQL endpoint authenticates, in the shape the site's `api.auth`
+ * takes for hand-written endpoints: `bearer`, `basic`, or `key` (sent in the
+ * `name` header, `x-api-key` by default). A schema, unlike an OpenAPI
+ * document, declares no security schemes, so this is what gives the Try it
+ * panel its credential field.
+ */
+export const graphqlAuthSchema = z.strictObject({
+  method: z.enum(AUTH_METHODS),
+  /** The header an API key goes in. Defaults to `x-api-key`. */
+  name: z.string().optional(),
+});
+
+/** The `auth` option of `graphql()` and its sources. */
+export interface GraphqlAuthOptions {
+  /** `bearer`, `basic`, `key`, or `none`. */
+  method: AuthMethod;
+  /** The header an API key goes in. Defaults to `x-api-key`. */
+  name?: string;
+}
+
+/**
  * A single GraphQL schema: the shared source shape plus `endpoint`, the live
  * GraphQL API URL the playground and code samples target (a schema, unlike an
- * OpenAPI document, names no server).
+ * OpenAPI document, names no server), and `auth`, how that endpoint
+ * authenticates.
  */
 export const graphqlSourceSchema = referenceSourceSchema.extend({
+  /** How the endpoint authenticates (playground + code samples). */
+  auth: graphqlAuthSchema.optional(),
   /** URL of the live GraphQL endpoint (playground + code samples). */
   endpoint: z.string().optional(),
 });
 
 /** One schema source, as `graphql()` accepts it. */
 export interface GraphqlSourceOptions extends ReferenceSourceOptions {
+  /** How the endpoint authenticates; wins over the adapter's `auth`. */
+  auth?: GraphqlAuthOptions;
   /** URL of the live GraphQL endpoint (playground + code samples); wins over the adapter's `endpoint`. */
   endpoint?: string;
 }

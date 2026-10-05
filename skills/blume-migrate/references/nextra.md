@@ -35,14 +35,17 @@ For each `_meta` entry (`key` = slug, value = string title or `{ title, type, di
 | `href` (external link) | root-level → **`navigation.actions`** (`[{ label, href }]`, plain header links, matching Nextra's navbar placement) or **`navigation.featured`** (`{ label, href, icon? }` — pinned above the sidebar on every route, survives on phones); only drop deep-nested ones (report) |
 | `type: "page"` (subfolder, not root) | drop (only root → tabs) |
 | `theme: { collapsed }` on a folder | `meta.ts` `collapsed` |
-| `theme: { layout: "full" \| sidebar: false \| … }` | drop (report — no per-page layout switches) |
+| `theme: { layout: "full" }` on a page | that page's frontmatter `mode: wide` (full column width, no table of contents — the closest match; report) |
+| other `theme` keys (`sidebar: false`, `toc: false`, `typesetting`, …) | drop (report — no per-page switches for them) |
 | `"*"` wildcard entry | apply its value as the default for unlisted siblings, then drop |
 
 Write each folder's `meta.ts` with its `pages` order (from its own `_meta`) and its `title` (inherited from the parent's `_meta`). A v4 **`_meta.global.*`** file holds the whole tree in one place (folder entries carry `items`) — split it into per-folder `meta.ts` files with the same rules.
 
+**Keep the order with `display: "group"`.** Nextra draws folders as collapsible rows and keeps pages and folders interleaved as `_meta` lists them. Blume's default `flat` display draws a folder as a plain section header, so it lists each level's pages above its subfolders — a page `_meta` puts after a folder jumps above it. Set `navigation.sidebar.display: "group"` (or `display: "group"` in the `meta.ts` of every subfolder at a level whose order must hold — one flat sibling folder reorders the level) to keep the authored order in nested folders. Groups then start closed unless they hold the current page, while Nextra opens every folder shallower than its `defaultMenuCollapseLevel` (default `2`: the top-level folders), so add `collapsed: false` to those folders' `meta.ts`. The top level (and each tab's top level) lists loose pages before folders in every display mode, so a root `_meta` that puts a page after a folder can't be matched — report it.
+
 ## Frontmatter & titles — synthesize, don't just pass through
 
-Most Nextra pages have **no frontmatter**; the title falls back `_meta` title → `sidebarTitle` → `title` → **first body H1** → filename. Blume renders frontmatter `title` as the page H1, so for **every page**: set frontmatter `title` (from the `_meta` title, else the body H1, else a humanized filename), **remove the body H1**, and map `sidebarTitle` → `sidebar.label`. `asIndexPage: true` (v4 folder-index marker) → make the file the folder's `index.mdx` and drop the key. Drop any other non-schema key and report it.
+Most Nextra pages have **no frontmatter**. Nextra keeps two titles apart: the **sidebar label** falls back `_meta` title → `sidebarTitle` → `title` → first body H1 → filename, while the **heading readers see** is the body H1. Blume renders frontmatter `title` as the page H1, so for **every page**: set frontmatter `title` from the body H1 (else frontmatter `title`, else the `_meta` title, else a humanized filename), **remove the body H1**, and set `sidebar.label` to the `_meta` title (else `sidebarTitle`) wherever it differs from `title`. Don't take the `_meta` label as `title` — that renames the page's heading. `asIndexPage: true` (v4 folder-index marker) → make the file the folder's `index.mdx` and drop the key. Drop any other non-schema key and report it.
 
 ## Components
 
@@ -60,12 +63,12 @@ Nextra's fence meta differs from Blume's — rewrite it: `filename="app.js"` →
 
 ## Math
 
-Nextra enables math via `nextra({ latex: true })` (KaTeX or MathJax). In Blume, block math `$$…$$` renders in `.mdx` with **no config** (there is no `markdown.math` field). Convert Nextra's ` ```math ` fences → `$$…$$` blocks (they render as plain code blocks otherwise). Inline `$…$` is **not** supported — convert to display math or drop (report). MathJax-specific macros → report.
+Nextra enables math via `nextra({ latex: true })` (KaTeX or MathJax). In Blume, block math `$$…$$` renders in `.mdx` with **no config** (there is no `markdown.math` field). Convert Nextra's ` ```math ` fences → `$$…$$` blocks (they render as plain code blocks otherwise). Inline math is `$$…$$` too: a single `$` stays literal, so convert each inline `$…$` to `$$…$$` inside its sentence. MathJax-specific macros → report.
 
 ## i18n
 
 - **v2/v3:** locale **file suffixes** (`index.en.mdx`, `index.zh.mdx`) + `i18n` in `next.config` → match Blume's `dot` parser as-is, default-locale suffix included: `i18n: { defaultLocale, locales: [{ code, label }], parser: "dot" }`, no file moves. Page titles land in each file's own frontmatter, so they stay per-locale, but under `dot` a folder's `meta.ts` serves every locale — build it from the default locale's `_meta` and report translated folder titles from the other locales' `_meta` files.
-- **v4:** `content/<lang>/` dirs already match Blume's `dir` parser — map the locale list, no file moves.
+- **v4:** every locale has a `content/<lang>/` dir, the default included, and Nextra serves every locale under its prefix (`/en/…`). Blume's `dir` parser takes the other locales' dirs as-is, but the default locale lives **at the content root**: a `content/en/` dir is ordinary content that publishes at `/en/…` and warns `BLUME_I18N_DEFAULT_LOCALE_FOLDER`. Move the default locale's files (and `_meta`-derived `meta.ts` files) up one level, and set `i18n.hideDefaultLocalePrefix: false` to keep serving them at `/en/…` as Nextra did — or keep Blume's unprefixed default and add a `redirects` entry per page.
 
 ## Package.json & teardown
 
@@ -73,4 +76,4 @@ Repoint `dev`/`build`/`start` scripts to the Blume CLI; remove `next`/`nextra`/`
 
 ## Dropped — report these
 
-Footer content; `primaryHue`-style theming beyond an accent color; `faviconGlyph`; `_meta` separators, menus, `newWindow`; per-page `theme` layout switches; `<Bleed>`; MathJax macros; word-highlight/copy fence meta; any icon you can't reconstruct as a Lucide name.
+Footer content; `primaryHue`-style theming beyond an accent color; `faviconGlyph`; `_meta` separators, menus, `newWindow`; per-page `theme` switches (and `layout: "full"` approximated as `mode: wide`); root-level pages `_meta` ordered after a folder; `<Bleed>`; MathJax macros; word-highlight/copy fence meta; any icon you can't reconstruct as a Lucide name.

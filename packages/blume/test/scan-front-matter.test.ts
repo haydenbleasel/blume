@@ -59,6 +59,18 @@ const BODIES = [
   ["---", "title: x", "# a yaml comment", "---", "# Real"].join("\n"),
 ];
 
+const headingsOf = (format: "md" | "mdx"): string[] => {
+  const [page] = normalizeEntry(
+    {
+      body: { format, text: BODIES[1] ?? "" },
+      data: { title: "Page" },
+      ref: `page.${format}`,
+    },
+    { defaultType: "doc", source: { name: "s", staged: false } }
+  ).pages;
+  return page?.headings.map((heading) => heading.slug) ?? [];
+};
+
 describe("a stripped body that opens with a --- block", () => {
   // Neither renderer reads front matter out of a body a second time, so the
   // block is content — a thematic break, and whatever follows it — and the
@@ -79,17 +91,6 @@ describe("a stripped body that opens with a --- block", () => {
   });
 
   it("gives a page of either format the block's headings", () => {
-    const headingsOf = (format: "md" | "mdx"): string[] => {
-      const [page] = normalizeEntry(
-        {
-          body: { format, text: BODIES[1] ?? "" },
-          data: { title: "Page" },
-          ref: `page.${format}`,
-        },
-        { defaultType: "doc", source: { name: "s", staged: false } }
-      ).pages;
-      return page?.headings.map((heading) => heading.slug) ?? [];
-    };
     expect(headingsOf("md")).toStrictEqual(["intro", "after"]);
     expect(headingsOf("mdx")).toStrictEqual(["intro", "after"]);
   });

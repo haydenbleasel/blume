@@ -545,7 +545,7 @@ Ein **Prop / Type**-Raster, in dem sich jede Zeile ausklappen lässt, um ihre Be
 
 ### Auto type table
 
-Erzeuge eine Typtabelle aus einem TypeScript-Typ, damit die Dokumentation mit dem Quellcode synchron bleibt. Richte `AutoTypeTable` mit `path` (relativ zum Projektstammverzeichnis aufgelöst) und einem Typ-`name` auf eine Datei aus. Beschreibungen stammen aus JSDoc-Kommentaren, Standardwerte aus `@default`-Tags, und optionale Eigenschaften (`?`) werden entsprechend markiert.
+Erzeuge eine Typtabelle aus einem TypeScript-Typ, damit die Dokumentation mit dem Quellcode synchron bleibt. Richte `AutoTypeTable` mit `path` (aufgelöst relativ zu deinem Projektstammverzeichnis, dem Ordner, in dem du `blume` ausführst) und einem Typ-`name` auf eine Datei aus. Beschreibungen stammen aus JSDoc-Kommentaren, Standardwerte aus `@default`-Tags, und optionale Eigenschaften (`?`) werden entsprechend markiert.
 
 ```astro
 <AutoTypeTable path="./src/button.ts" name="ButtonProps" />
@@ -686,7 +686,7 @@ Die Karte liest die Instanz aus [`github.host`](/docs/configuration#github-enter
 
 ## Component
 
-`Component` rendert eine Beispieldatei aus dem Verzeichnis `examples/` deines Projekts als Live-Vorschau neben ihrem hervorgehobenen Quellcode, in Tabs. Richte es mit `path` auf eine Datei aus – ihr Ort unterhalb von `examples/`, ohne Erweiterung (aus `examples/counter.tsx` wird also `path="counter"`). React-, Vue-, Svelte- und Astro-Beispiele werden alle unterstützt; Framework-Beispiele hydrieren, Astro-Beispiele werden statisch gerendert. So bleiben Vorschau und Code aus einer einzigen Datei synchron.
+`Component` rendert eine Beispieldatei aus dem Verzeichnis `examples/` deines Projekts als Live-Vorschau neben ihrem hervorgehobenen Quellcode, in Tabs. Richte es mit `path` auf eine Datei aus – ihr Ort unterhalb von `examples/`, ohne Erweiterung (aus `examples/counter.tsx` wird also `path="counter"`). React-, Vue-, Svelte- und Astro-Beispiele werden alle unterstützt; Framework-Beispiele hydrieren, Astro-Beispiele werden statisch gerendert. So bleiben Vorschau und Code aus einer einzigen Datei synchron. Ein `path`, der auf kein Beispiel verweist, rendert stattdessen einen „No example found“-Kasten, und `blume dev`, `blume build` und [`blume doctor`](/docs/cli/doctor) warnen an der entsprechenden Zeile davor (`BLUME_EXAMPLE_NOT_FOUND`).
 
 Die Vorschau rendert in einem isolierten Rahmen, den die Doku-Styles nie erreichen – keine Fließtext-Abstände, Typografie oder Theme-Elemente sickern in deine Komponente. Der Rahmen erhält Tailwind (Preflight + Utilities, die aus deinem Projekt und deinem Beispielverzeichnis gescannt werden), Blumes Design-Tokens, sodass Klassen wie `bg-background` standardmäßig der Website-Palette folgen, und er folgt der Hell-/Dunkel-Umschaltung der Website in Echtzeit. Der Bereich passt seine Größe an das gerenderte Beispiel an – und verfolgt das weiter, falls das Beispiel nach dem Laden wächst oder schrumpft – wobei die Tabs „Preview“ und „Code“ dieselbe Höhe teilen, sodass das Umschalten die Seite nie verschiebt.
 

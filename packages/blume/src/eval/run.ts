@@ -40,6 +40,8 @@ export interface QuestionResult {
   question: string;
   routes: string[];
   score?: number;
+  /** The question's severity: a `warning` miss is reported as a warning. */
+  severity?: EvalQuestion["severity"];
   status: QuestionStatus;
 }
 
@@ -99,6 +101,7 @@ const errored = (
   missing: [],
   question: question.question,
   routes: question.routes,
+  severity: question.severity,
   status: "error",
 });
 
@@ -177,6 +180,7 @@ const runQuestion = async (
     question: question.question,
     routes: question.routes,
     score: verdict.score,
+    severity: question.severity,
     status: verdict.pass ? "pass" : "fail",
   };
 };
@@ -250,6 +254,7 @@ export const runEval = async (options: EvalRunOptions): Promise<EvalResult> => {
         missing: [],
         question: question.question,
         routes: question.routes,
+        severity: question.severity,
         status: "skip",
       });
       continue;

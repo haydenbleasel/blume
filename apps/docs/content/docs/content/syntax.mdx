@@ -27,7 +27,7 @@ Anchor ids are generated from the heading text, so a reworded heading gets a new
 
 Link to it as `/page#setup`. The syntax matches Fumadocs, so migrated content works verbatim.
 
-The `{#custom-id}` form used by Pandoc, kramdown, and Markdown-based specification toolchains is accepted as an equivalent in `.md` files. In `.mdx`, a bare `{…}` is a JSX expression and the page fails to compile — `blume check` reports the marker as `BLUME_MDX_CURLY_ANCHOR` — so write `[#custom-id]` there, or escape the braces. The escaped form pins the same anchor in both formats, which makes it the right spelling for a partial that `.mdx` pages [include](/docs/content/includes):
+The `{#custom-id}` form used by Pandoc, kramdown, and Markdown-based specification toolchains is accepted as an equivalent in `.md` files. Only that unspaced spelling pins an anchor: the spaced `{ #custom-id }` and kramdown's `{: #custom-id }` (both from MkDocs' `attr_list`) stay in the heading text. In `.mdx`, a bare `{…}` is a JSX expression and the page fails to compile — `blume check` reports all three spellings as `BLUME_MDX_CURLY_ANCHOR` — so write `[#custom-id]` there, or escape the braces. The escaped form pins the same anchor in both formats, which makes it the right spelling for a partial that `.mdx` pages [include](/docs/content/includes):
 
 ```md
 ## Getting started \{#setup\}
@@ -457,7 +457,7 @@ flowchart LR
 ```
 ````
 
-Diagrams render on the client, so this is an MDX-only feature, and the Mermaid library loads only on pages that include one; a site with no diagram doesn't ship it at all. Diagrams use Mermaid's dagre layout and classic look by default; opt a single diagram into another layout or look through Mermaid front matter (a `config:` block with `layout: elk` or `look: neo`), and the ELK engine loads only for diagrams that ask for it. The rest of this section is a gallery of common types — see the [Mermaid docs](https://mermaid.js.org/intro/) for the full list.
+Diagrams render on the client, so this is an MDX-only feature, and the Mermaid library loads only on pages that include one; a site with no diagram doesn't ship it at all. Diagrams use Mermaid's dagre layout and classic look by default; opt a single diagram into another layout or look through Mermaid front matter (a `config:` block with `layout: elk` or `look: neo`), and the ELK engine loads only for diagrams that ask for it. A diagram Mermaid can't parse shows "Could not render this diagram." in its place; Mermaid's parser error, with the line it stopped on, goes to the browser console, and `blume dev` also prints it under the message. The rest of this section is a gallery of common types — see the [Mermaid docs](https://mermaid.js.org/intro/) for the full list.
 
 ### Flowchart
 

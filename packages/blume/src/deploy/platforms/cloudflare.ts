@@ -305,17 +305,21 @@ export const bindCloudflareRateLimit = async (
 };
 
 /**
- * Cloudflare Workers and Pages. A server build emits the Worker into
- * `dist/server` and serves `dist/client` through the ASSETS binding, which
- * honors `_headers` from that directory exactly as Pages does — so the file
- * applies to both output modes here. Without a configured driver the adapter
- * force-enables KV-backed sessions and declares a `SESSION` binding that
- * `wrangler deploy` then demands a namespace for, even though Blume never
- * reads `Astro.session`; `session: false` opts the project out.
+ * Cloudflare. A server build targets Workers only (`@astrojs/cloudflare`
+ * dropped Pages in v13): it emits the Worker into `dist/server` and serves
+ * `dist/client` through the ASSETS binding, which honors `_headers` from that
+ * directory exactly as Pages does — so the file applies to both output modes
+ * here. A static build never loads the adapter; its `dist/` deploys to Pages,
+ * whose build environment `env` detects, or to Workers static assets (Workers
+ * Builds exposes no site URL to detect). Without a configured driver the
+ * adapter force-enables KV-backed sessions and declares a `SESSION` binding
+ * that `wrangler deploy` then demands a namespace for, even though Blume
+ * never reads `Astro.session`; `session: false` opts the project out.
  */
 export const cloudflarePlatform: DeployPlatform = {
   astro: {
-    config: { session: false },
+    config: () => ({ session: false }),
+    configOptions: [],
     options: adapterOptions,
     package: CLOUDFLARE_ADAPTER_PACKAGE,
   },
@@ -350,5 +354,5 @@ export const cloudflarePlatform: DeployPlatform = {
   // build, and hoists its own `_headers`/`_redirects` back up to `dist/client`.
   serverClientUnderBase: true,
   serverOutputDir: distDir,
-  serverStaticDir: clientDir,
+  serverStaticDir: (context, base) => join(clientDir(context), base),
 };

@@ -84,7 +84,7 @@ afterAll(async () => {
 });
 
 describe("blume init", () => {
-  it("ignores installed dependencies in a new project", async () => {
+  it("ignores installed dependencies and local secrets in a new project", async () => {
     const root = await tempDir("blume-init-command-");
     const project = join(root, "site");
 
@@ -96,7 +96,7 @@ describe("blume init", () => {
 
     expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
     expect(await readFile(join(project, ".gitignore"), "utf-8")).toBe(
-      "node_modules/\n.blume/\ndist/\n"
+      "node_modules/\n.blume/\ndist/\n.env.local\n"
     );
     expect(await exists(join(project, "installed.marker"))).toBe(false);
   });

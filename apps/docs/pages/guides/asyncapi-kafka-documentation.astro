@@ -228,6 +228,7 @@ components:
           key:
             type: string
             description: The order ID, the same value as \`orderId\` in the payload.
+            examples: [ord_7Hq2]
           bindingVersion: "0.5.0"
     CancelOrder:
       name: CancelOrder
@@ -248,6 +249,7 @@ components:
           key:
             type: string
             description: The order ID, the same value as \`orderId\` in the payload.
+            examples: [ord_7Hq2]
           bindingVersion: "0.5.0"
   schemas:
     OrderCreatedPayload:
@@ -326,16 +328,17 @@ components:
     A channel's <code>address</code> is the topic name. It's what the page
     heading shows and what the samples connect to. Partition count, replicas,
     and retention go in the channel's <code>kafka</code> binding, which the page
-    lists under Channel bindings. Skip the binding's own <code>topic</code>{" "}
-    field unless it matches the address, since the samples always use the
-    address.
+    lists under Channel bindings. Set the binding's own <code>topic</code>{" "}
+    only when the topic name differs from the address: the samples then use
+    it instead.
   </p>
 
   <h3>Messages carry the contract</h3>
   <p>
     Each message has a payload schema, a <code>headers</code> schema, and a{" "}
     <code>kafka</code> binding whose <code>key</code> documents the message
-    key. The first entry under <code>examples</code> becomes the example
+    key. The key's <code>examples</code> entry is the key the samples send.
+    The message's first entry under <code>examples</code> becomes the example
     payload on the page and the starting value in Try it. Without one, Blume
     samples a value from the schema, which is valid but tells readers less.
   </p>
@@ -396,9 +399,8 @@ export default defineConfig({
     The reference mounts at <code>/events</code> unless you pass{" "}
     <code>route</code>. It never adds a tab on its own, so the Events tab is
     what makes it reachable, and it also scopes the sidebar to the event pages.
-    Start the dev server with <code>npm run dev</code>. It doesn't watch a
-    spec at the project root, so restart it after each edit to{" "}
-    <code>asyncapi.yaml</code>.
+    Start the dev server with <code>npm run dev</code>. It watches{" "}
+    <code>asyncapi.yaml</code>, so the pages update when you save the spec.
   </p>
   <p>Each operation gets its own URL:</p>
   <table>
@@ -444,9 +446,9 @@ export default defineConfig({
     </li>
     <li>
       <strong>Authorization.</strong> <code>scram</code>, labeled
-      SASL/SCRAM-SHA-512 and required, with the scheme's description. It says
-      required even though <code>local</code> has no security: the section
-      lists every scheme the channel's servers declare.
+      SASL/SCRAM-SHA-512 and required on <code>production</code>, with the
+      scheme's description, and a note that <code>local</code> needs no
+      authorization.
     </li>
     <li>
       <strong>Message.</strong> The <code>application/json</code> content type,
@@ -475,36 +477,36 @@ export default defineConfig({
   <h3>The generated samples</h3>
   <p>
     The kcat sample comes from the operation's action and the channel's first
-    server. For the two operations above, it's:
+    server. It keys each message, since the messages declare a key, and passes
+    the SASL settings the <code>production</code> server's security needs,
+    reading the credentials from <code>KAFKA_USERNAME</code> and{" "}
+    <code>KAFKA_PASSWORD</code>. For the two operations above, it's:
   </p>
   <CodeBlock
-    code={`# Order created (SEND): watch the topic
-kcat -b 'kafka.acme.example:9093' -t 'orders.created' -C
+    code={`# Order created (SEND): watch the topic, each key before its message
+kcat -b 'kafka.acme.example:9093' -t 'orders.created' -C -K '|' \\
+  -X security.protocol=SASL_SSL \\
+  -X sasl.mechanisms=SCRAM-SHA-512 \\
+  -X sasl.username="$KAFKA_USERNAME" \\
+  -X sasl.password="$KAFKA_PASSWORD"
 
-# Cancel an order (RECEIVE): produce a request
-echo '{"orderId":"ord_7Hq2","reason":"customer_request","requestedBy":"support-desk"}' | kcat -b 'kafka.acme.example:9093' -t 'orders.cancel-requests' -P`}
+# Cancel an order (RECEIVE): produce a request keyed by order ID
+echo 'ord_7Hq2|{"orderId":"ord_7Hq2","reason":"customer_request","requestedBy":"support-desk"}' | kcat -b 'kafka.acme.example:9093' -t 'orders.cancel-requests' -P -K '|' \\
+  -X security.protocol=SASL_SSL \\
+  -X sasl.mechanisms=SCRAM-SHA-512 \\
+  -X sasl.username="$KAFKA_USERNAME" \\
+  -X sasl.password="$KAFKA_PASSWORD"`}
     lang="bash"
   />
   <p>
     Open Try it to change them. Pick the local server and the broker becomes{" "}
-    <code>localhost:9092</code>. Edit the payload and the <code>echo</code>{" "}
-    line follows, while the editor checks your JSON against the payload schema
-    as you type. What Try it doesn't do on a Kafka page is connect: the panel
-    says live sending isn't possible from a browser and leaves the command to
-    you. Only WebSocket operations get a live connection.
+    <code>localhost:9092</code>, without the SASL settings. Edit the payload
+    and the <code>echo</code> line follows, while the editor checks your JSON
+    against the payload schema as you type. What Try it doesn't do on a Kafka
+    page is connect: the panel says live sending isn't possible from a browser
+    and leaves the command to you. Only WebSocket operations get a live
+    connection.
   </p>
-  <p>
-    The samples carry no credentials and no message key. Against production,
-    add the SASL settings that kcat passes through to librdkafka, and key the
-    message with <code>-K</code> as the contract requires:
-  </p>
-  <CodeBlock
-    code={`echo 'ord_7Hq2|{"orderId":"ord_7Hq2","reason":"customer_request","requestedBy":"support-desk"}' \\
-  | kcat -b kafka.acme.example:9093 -t orders.cancel-requests -P -K '|' \\
-    -X security.protocol=SASL_SSL -X sasl.mechanisms=SCRAM-SHA-512 \\
-    -X sasl.username="$KAFKA_USERNAME" -X sasl.password="$KAFKA_PASSWORD"`}
-    lang="bash"
-  />
 
   <h2>Add a producer and consumer page</h2>
   <p>
@@ -758,9 +760,10 @@ npx blume preview`}
   <h3>The sample uses the wrong broker or topic</h3>
   <p>
     The sample uses the first server the channel is available on, and the
-    channel's <code>address</code> as the topic. List the server readers should
-    see by default first, or give the channel its own <code>servers</code>{" "}
-    list. If the address differs from <code>bindings.kafka.topic</code>, make
-    them match: the samples never read the binding.
+    channel's <code>bindings.kafka.topic</code> as the topic, or its{" "}
+    <code>address</code> when the binding sets none. List the server readers
+    should see by default first, or give the channel its own{" "}
+    <code>servers</code> list. If the topic is still wrong, check whether an
+    old <code>topic</code> in the binding overrides the address.
   </p>
 </GuidePage>

@@ -8,6 +8,7 @@ import {
   createLimiter,
   memoryLimiter,
   rateLimited,
+  UPSTASH_COUNT_SCRIPT,
   upstashLimiter,
 } from "../src/ratelimit/runtime.ts";
 import type { RateLimitContext } from "../src/ratelimit/runtime.ts";
@@ -48,7 +49,7 @@ const clock = () => {
   };
 };
 
-/** An Upstash REST stub answering with `count` and `ttl`. */
+/** An Upstash REST stub whose script answers with `count` and `ttl`. */
 const upstashStub = (count: number | null, ttl: number, ok = true) => {
   const calls: { body: string; headers: HeadersInit; url: string }[] = [];
   const stub = (url: string | URL | Request, init?: RequestInit) => {
@@ -58,9 +59,10 @@ const upstashStub = (count: number | null, ttl: number, ok = true) => {
       url: String(url),
     });
     return Promise.resolve(
-      Response.json([{ result: "OK" }, { result: count }, { result: ttl }], {
-        status: ok ? 200 : 500,
-      })
+      Response.json(
+        { result: count === null ? null : [count, ttl] },
+        { status: ok ? 200 : 500 }
+      )
     );
   };
   // SAFETY: the limiter only calls `fetch(url, init)`, which the stub serves.
@@ -79,6 +81,11 @@ describe("rate limit adapters", () => {
       "UPSTASH_REDIS_REST_URL",
       "UPSTASH_REDIS_REST_TOKEN",
     ]);
+    // Vercel's Marketplace names them its own way.
+    expect(
+      upstash({ tokenEnv: "KV_REST_API_TOKEN", urlEnv: "KV_REST_API_URL" })
+        .requiredSecrets
+    ).toStrictEqual(["KV_REST_API_URL", "KV_REST_API_TOKEN"]);
     expect(cloudflare({ window: 10 }).options).toStrictEqual({ window: 10 });
   });
 
@@ -88,6 +95,14 @@ describe("rate limit adapters", () => {
     expect(
       blumeConfigSchema.parse({ rateLimit: upstash() }).rateLimit
     ).toStrictEqual(upstash());
+    const marketplace = upstash({ urlEnv: "KV_REST_API_URL" });
+    expect(
+      blumeConfigSchema.parse({ rateLimit: marketplace }).rateLimit
+    ).toStrictEqual(marketplace);
+    expect(
+      blumeConfigSchema.safeParse({ rateLimit: upstash({ tokenEnv: "" }) })
+        .error?.issues[0]?.path
+    ).toStrictEqual(["rateLimit", "options", "tokenEnv"]);
   });
 
   it("points anything else at blume/ratelimit, and keeps option errors", () => {
@@ -158,7 +173,7 @@ describe(memoryLimiter, () => {
 });
 
 describe(upstashLimiter, () => {
-  it("counts in one pipeline and reads the window's remaining seconds", async () => {
+  it("counts in one script and reads the window's remaining seconds", async () => {
     const stub = upstashStub(4, 42);
     const limit = upstashLimiter(
       3,
@@ -168,24 +183,33 @@ describe(upstashLimiter, () => {
       stub.fetch
     );
     expect(await limit("k")).toStrictEqual({ allowed: false, retryAfter: 42 });
-    expect(stub.calls[0]?.url).toBe("https://eu.upstash.io/pipeline");
+    expect(stub.calls[0]?.url).toBe("https://eu.upstash.io");
+    // One command, which Redis runs as one step: the key can't expire
+    // between counting and reading it, and come back with no expiry.
     expect(JSON.parse(stub.calls[0]?.body ?? "")).toStrictEqual([
-      ["SET", "k", "0", "EX", "600", "NX"],
-      ["INCR", "k"],
-      ["TTL", "k"],
+      "EVAL",
+      UPSTASH_COUNT_SCRIPT,
+      "1",
+      "k",
+      "600",
     ]);
+    // A key without an expiry, new or left behind, gets the window.
+    expect(UPSTASH_COUNT_SCRIPT).toContain("if ttl < 0 then");
+    expect(UPSTASH_COUNT_SCRIPT).toContain(
+      'redis.call("EXPIRE", KEYS[1], ARGV[1])'
+    );
     expect(stub.calls[0]?.headers).toMatchObject({
       authorization: "Bearer t0k",
     });
   });
 
-  it("falls back to the window when the key has no expiry yet", async () => {
+  it("falls back to the window when no whole second is left", async () => {
     const limit = upstashLimiter(
       3,
       600,
       "https://x",
       "t",
-      upstashStub(1, -1).fetch
+      upstashStub(1, 0).fetch
     );
     expect(await limit("k")).toStrictEqual({ allowed: true, retryAfter: 600 });
   });
@@ -258,6 +282,28 @@ describe(createLimiter, () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it("reads Upstash's secrets from the env vars the adapter names", async () => {
+    const stub = upstashStub(1, 100);
+    const read: string[] = [];
+    const marketplace = createLimiter(
+      upstash({ tokenEnv: "KV_REST_API_TOKEN", urlEnv: "KV_REST_API_URL" }),
+      {
+        fetch: stub.fetch,
+        secret: (name) => {
+          read.push(name);
+          return name.startsWith("KV_") ? `${name}-value` : undefined;
+        },
+      }
+    );
+    expect(await marketplace?.("a")).toMatchObject({ allowed: true });
+    expect(read).toStrictEqual(["KV_REST_API_URL", "KV_REST_API_TOKEN"]);
+    expect(stub.calls[0]?.url).toBe("KV_REST_API_URL-value");
+    expect(stub.calls[0]?.headers).toMatchObject({
+      authorization: "Bearer KV_REST_API_TOKEN-value",
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("counts in memory, and says so, when a shared store isn't set up", async () => {
     const time = clock();
     const noSecrets = createLimiter(upstash({ requests: 1 }), {
@@ -268,9 +314,11 @@ describe(createLimiter, () => {
     expect(await noSecrets?.("a")).toMatchObject({ allowed: false });
     const noBinding = createLimiter(cloudflare({ requests: 1, window: 10 }));
     expect(await noBinding?.("a")).toMatchObject({ retryAfter: 10 });
+    createLimiter(upstash({ urlEnv: "KV_REST_API_URL" }), { secret: () => {} });
     expect(warn.mock.calls.map(([message]) => String(message))).toStrictEqual([
       "Rate limiting counts in memory: set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN to share the count through Upstash.",
       "Rate limiting counts in memory: the Worker has no BLUME_RATE_LIMIT binding.",
+      "Rate limiting counts in memory: set KV_REST_API_URL and UPSTASH_REDIS_REST_TOKEN to share the count through Upstash.",
     ]);
   });
 });

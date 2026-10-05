@@ -9,6 +9,7 @@ Jedes Objekt, das das `ContentSource`-Interface implementiert, kannst du an `cus
 ```ts blume.config.ts
 import { defineConfig } from "blume";
 import { custom, filesystem } from "blume/sources";
+import { escapeMarkdownText } from "blume/sources/lower.ts";
 import { sanitySource } from "blume/sources/sanity.ts";
 
 export default defineConfig({
@@ -24,7 +25,8 @@ export default defineConfig({
           query: `*[_type == "guide"]`,
           // Map custom Portable Text blocks to Blume components
           serializers: {
-            callout: (block) => `<Callout>${block.text}</Callout>`,
+            callout: (block) =>
+              `<Callout>${escapeMarkdownText(String(block.text ?? ""))}</Callout>`,
           },
         })
       ),
@@ -33,8 +35,10 @@ export default defineConfig({
 });
 ```
 
-Eine Quelle, die du mit einer von Blumes Engine-Factories erstellst, wie `sanitySource` oben, wird auf dem Kontext des laufenden Befehls neu aufgebaut. Dadurch liest sie unter `--preview` Entwürfe und legt ihren Snapshot in `.blume/cache` ab, genau wie der eingebaute Adapter. Eine selbst geschriebene Quelle kann dasselbe leisten: Implementiere dafür `withContext(ctx)` und gib die Quelle neu aufgebaut auf diesem Kontext zurück.
+Der Rückgabewert eines Serializers wird unverändert als MDX in die Seite geschrieben. Text, den er aus dem CMS übernimmt, musst du daher escapen. Sonst würde ein `{` in einem redaktionellen Text als Ausdruck ausgeführt und den Build abbrechen, und ein `<b>` würde als HTML gerendert. `escapeMarkdownText` escapt den Text genauso, wie es Blumes eingebautes Lowering tut, sodass er genau so dargestellt wird, wie er geschrieben wurde.
 
-`custom()` nimmt eine `ContentSource`-Instanz statt eines Options-Objekts entgegen. Daher gibt es keine Stelle, an der du die [gemeinsamen Optionen](/docs/content/sources#adapters) `prefix` oder `pollInterval` übergeben könntest. Die Quelle setzt ihre `prefix`-Eigenschaft selbst, und wie sie Daten erneut abruft, bestimmt ihre `watch`-Methode. Weil sie eine Live-Instanz statt reiner Daten enthält, deklariert sie keine eigene Laufzeitabhängigkeit und kein eigenes Secret. Darum kümmert sich die Instanz selbst.
+Eine Quelle, die du mit einer von Blumes Engine-Factories erstellst, wie `sanitySource` oben, wird auf dem Kontext des laufenden Befehls neu aufgebaut. Dadurch liest sie unter `--preview` Entwürfe und legt ihren Snapshot in `.blume/cache` ab, genau wie der eingebaute Adapter. Eine selbst geschriebene Quelle kann dasselbe leisten: Implementiere dafür `withContext(ctx)` und gib die Quelle neu aufgebaut auf diesem Kontext zurück. Anders als bei einem eingebauten Adapter wird der Snapshot einer `custom()`-Quelle nur pro Vorschaumodus gespeichert und nicht pro Kombination von Optionen, denn Blume sieht nur eine Instanz und nicht deren Optionen. Wenn du die Query, die Felder oder die Serializer der Quelle bearbeitest, liefert `blume dev` weiterhin diesen Snapshot aus. Führe deshalb `blume sync` aus, um die Daten neu abzurufen.
+
+`custom()` nimmt eine `ContentSource`-Instanz statt eines Options-Objekts entgegen. Daher gibt es keine Stelle, an der du die [gemeinsamen Optionen](/docs/content/sources#adapters) `prefix` oder `pollInterval` übergeben könntest. Die Quelle setzt ihre `prefix`-Eigenschaft selbst, und wie sie Daten erneut abruft, bestimmt ihre `watch`-Methode. Weil sie eine Live-Instanz statt reiner Daten enthält, deklariert sie keine eigene Laufzeitabhängigkeit und kein eigenes Secret. Darum kümmert sich die Instanz selbst. `blume dev` und `blume build` warnen nicht vor einer nicht gesetzten Variable, die eine `custom()`-Quelle liest. Eine Engine, deren API ihr Token zwingend voraussetzt (`notionSource`, `contentfulSource`), bricht stattdessen vor ihrer ersten Anfrage mit `BLUME_MISSING_SECRET` ab.
 
 Wenn deine eigene Quelle lokale Dateien liest, sollte sie `sourcePath` für jeden Eintrag und `contentRoot` für die Quelle selbst setzen. `sourcePath` nennt die Datei in Diagnosemeldungen und sorgt dafür, dass relative Bilder relativ zu dieser Datei aufgelöst werden. `contentRoot` begrenzt das git-`log`, aus dem die Datumsangaben der Seiten stammen. Ohne `contentRoot` bekommen die Seiten der Quelle kein aus git abgeleitetes [„Zuletzt aktualisiert“-Datum](/docs/configuration#last-modified).

@@ -20,7 +20,9 @@
 // rebuild steps with the other CMS guides (Vercel deploy hooks, VERCEL_ENV,
 // and Deployment Protection checked against Vercel's docs), and corrected the
 // missing-key troubleshooting against cli/prepare.ts and
-// core/sources/cache.ts.
+// core/sources/cache.ts. Rechecked the unsupported-node warning, fields.order,
+// and init's .gitignore against core/sources/payload.ts, lexical.ts,
+// remote.ts, and cli/commands/init.ts.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -365,20 +367,20 @@ export default defineConfig({
   />
   <p>
     The source reads the key from <code>PAYLOAD_API_KEY</code>. Blume loads{" "}
-    <code>.env.local</code> for you, so put both values there and keep the file
-    out of Git:
+    <code>.env.local</code> for you, and <code>blume init</code> already
+    listed it in <code>.gitignore</code>, so put both values there:
   </p>
   <CodeBlock
     code={`echo "PAYLOAD_URL=http://localhost:3000" >> .env.local
-echo "PAYLOAD_API_KEY=paste-your-key-here" >> .env.local
-echo ".env.local" >> .gitignore`}
+echo "PAYLOAD_API_KEY=paste-your-key-here" >> .env.local`}
     lang="bash"
   />
   <p>
     With Payload still running, run <code>npx blume dev</code>. The two
     published pages appear under{" "}
-    <code>/guides/</code> in a Guides sidebar group, sorted by title, since the
-    source maps no order field. Each document's <code>slug</code> is its path
+    <code>/guides/</code> in a Guides sidebar group, sorted by title. To order
+    them, add a number field to Docs and name it in the source's{" "}
+    <code>fields.order</code>. Each document's <code>slug</code> is its path
     under the prefix, and its <code>updatedAt</code> is the date a{" "}
     <a href="/docs/configuration#last-modified">Last updated</a> line shows,
     once you turn that on. The draft stays out.
@@ -438,10 +440,13 @@ echo ".env.local" >> .gitignore`}
   <p>
     Where Blume has no Markdown for a node, it writes a comment into the page
     source, like <code>&lt;!-- unsupported Lexical block: Code --&gt;</code>, and
-    nothing renders there. It doesn't warn, so the "Send a request" section is
-    missing its command, with no error. To list every such node, read the snapshot Blume
-    keeps of the source. Run this in the docs project after{" "}
-    <code>blume dev</code> or <code>blume build</code> has fetched it:
+    nothing renders there, so the "Send a request" section is missing its
+    command. The fetch that finds one warns{" "}
+    <code>BLUME_SOURCE_UNSUPPORTED_NODE</code>, naming the page and the node,
+    but a dev server serving its snapshot doesn't fetch, so doesn't repeat it.
+    To list every such node at any time, read the snapshot Blume keeps of the
+    source. Run this in the docs project after <code>blume dev</code> or{" "}
+    <code>blume build</code> has fetched it:
   </p>
   <CodeBlock
     code={`node -e '
@@ -644,14 +649,16 @@ export const Docs: CollectionConfig = {
     rule turned it away. Check that <code>authCollection</code> is the
     collection that owns the key, that <code>PAYLOAD_API_KEY</code> is set
     where the build runs, and that Payload's secret hasn't changed since you
-    made the key. Blume fetches before it checks for missing variables, so on
-    a fresh build this error is all you see; the{" "}
-    <code>BLUME_MISSING_SECRET</code> warning only prints when a snapshot
-    stands in for the fetch, and never for a <code>custom()</code> source.
+    made the key. A <code>payload()</code> source warns{" "}
+    <code>BLUME_MISSING_SECRET</code> before it fetches when the key is unset,
+    but a <code>custom()</code> source declares no variables, so there the 403
+    is all you see.
   </p>
   <h3>A block renders as nothing</h3>
   <p>
-    It has no serializer. Serializers are keyed by the block's type, exactly as
+    It has no serializer, and the build warned{" "}
+    <code>BLUME_SOURCE_UNSUPPORTED_NODE</code> for it. Serializers are keyed
+    by the block's type, exactly as
     Payload stores it, so Payload's code block needs <code>Code</code>, not{" "}
     <code>code</code>. Run the check under{" "}
     <a href="#check-what-carried-over">Check what carried over</a> to list
@@ -662,9 +669,9 @@ export const Docs: CollectionConfig = {
     Check the image's address. If it starts with <code>localhost</code>, the
     build ran without <code>PAYLOAD_URL</code>. If Payload answers it with an
     error, the Media collection isn't publicly readable. If there's no image
-    at all, the snapshot has an <code>unsupported Lexical upload</code>{" "}
-    comment, which means <code>depth</code> is set to <code>0</code>: leave it
-    at its default of <code>1</code> so uploads carry their URLs.
+    at all, and the fetch warned <code>BLUME_SOURCE_UNSUPPORTED_NODE</code>{" "}
+    for a Lexical upload, <code>depth</code> is set to <code>0</code>: leave
+    it at its default of <code>1</code> so uploads carry their URLs.
   </p>
   <h3>A link to another page renders as plain text</h3>
   <p>

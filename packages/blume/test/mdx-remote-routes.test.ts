@@ -4,11 +4,16 @@ import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
+import { validateLinks } from "../src/core/links.ts";
 import { buildNavigation } from "../src/core/navigation.ts";
 import { mdxRemoteSource } from "../src/core/sources/mdx-remote.ts";
 import { normalizeEntry } from "../src/core/sources/normalize.ts";
 import type { ContentSource } from "../src/core/sources/types.ts";
-import type { Diagnostic, PageRecord } from "../src/core/types.ts";
+import type {
+  ContentGraph,
+  Diagnostic,
+  PageRecord,
+} from "../src/core/types.ts";
 
 const dirs: string[] = [];
 
@@ -19,9 +24,15 @@ afterAll(async () => {
 });
 
 const FILES = new Map([
-  ["01-getting-started/01-index.mdx", "---\ntitle: Getting started\n---\n"],
+  [
+    "01-getting-started/01-index.mdx",
+    "---\ntitle: Getting started\n---\n\n[Install](./02-install.mdx)\n",
+  ],
   ["01-getting-started/02-install.mdx", "---\ntitle: Install\n---\n"],
-  ["01-getting-started/10-configure.mdx", "---\ntitle: Configure\n---\n"],
+  [
+    "01-getting-started/10-configure.mdx",
+    "---\ntitle: Configure\n---\n\n[Reference](../02-reference.mdx)\n",
+  ],
   ["02-reference.mdx", "---\ntitle: Reference\n---\n"],
 ]);
 
@@ -86,5 +97,14 @@ describe("mdxRemoteSource ordering prefixes", () => {
     expect(titles.indexOf('"Install"')).toBeLessThan(
       titles.indexOf('"Configure"')
     );
+
+    // A file link between remote files lands on the route the file publishes
+    // at, prefix dropped, as the rendered link does.
+    // SAFETY: link validation reads only pages and routes.
+    const graph = {
+      pages,
+      routes: new Map(pages.map((page) => [page.route, page.id])),
+    } as ContentGraph;
+    expect(await validateLinks(graph, { publicDir: null })).toStrictEqual([]);
   });
 });

@@ -18,7 +18,7 @@ export default defineConfig({
 });
 ```
 
-That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically. An adapter is a plain description of the reference — not a parsed spec — so Blume can validate it up front and inline it into the generated site; leaving `reference` out (or empty) renders no reference at all. Documenting an event-driven or GraphQL API instead? See [AsyncAPI](/docs/references/asyncapi) and [GraphQL](/docs/references/graphql).
+That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically, and 3.1 and [3.2](#openapi-32) specs are read as written. An adapter is a plain description of the reference — not a parsed spec — so Blume can validate it up front and inline it into the generated site; leaving `reference` out (or empty) renders no reference at all. Documenting an event-driven or GraphQL API instead? See [AsyncAPI](/docs/references/asyncapi) and [GraphQL](/docs/references/graphql).
 
 The reference doesn't add a header tab on its own. To surface it, point a [navigation tab](/docs/content/navigation#tabs) at its route — this also scopes the operations sidebar for the native renderer:
 
@@ -28,17 +28,29 @@ navigation: {
 }
 ```
 
+The sidebar's tag groups and the overview page's sections follow the same order: the order of the spec's top-level `tags` list, then any tag it doesn't declare, in the order operations first use it.
+
 :::note
-Operations are indexed for search by their **summary, description, tag, and endpoint** (`GET /pets/{id}`). The rendered schema tables and code samples aren't full-text indexed; search matches an operation's title, prose, section, and path, then links to its own page.
+Operations are indexed for search by their **summary, description, tag, and endpoint** (`GET /pets/{id}`). The rendered schema tables and generated code samples aren't full-text indexed; search matches an operation's title, prose, section, and path, then links to its own page. [Your own samples](#your-own-samples) are indexed like any code block, only with [`search.indexing.includeCodeBlocks`](/docs/configuration/search).
 :::
 
 ## A local spec
 
-A relative path is resolved from your project root and read at build time. Both JSON and YAML work:
+A relative path is resolved from your project root and read at build time. Both JSON and YAML work, and `blume dev` watches the file, along with any local [overlays](#overlays), so the reference updates when you save the spec:
 
 ```ts blume.config.ts lineNumbers
 reference: [openapi({ spec: "./openapi.yaml" })],
 ```
+
+## OpenAPI 3.2
+
+OpenAPI 3.2 specs render as written. A `query` operation, for the HTTP `QUERY` method (a safe request that carries a body), gets a page, Try it, and code samples like any other method. Fields 3.2 adds that Blume doesn't show, such as a tag's or a response's `summary`, are ignored rather than rejected. Some 3.2 additions don't render yet:
+
+- `additionalOperations`, for methods a path item doesn't name directly (like `COPY`): those operations are left out, with a `BLUME_OPENAPI_UNSUPPORTED` [warning](#spec-warnings).
+- `in: querystring` parameters: they get no row in the parameter table, no Try it input, and no place in the code samples, with the same warning.
+- `itemSchema`, the schema of each item in a streamed body (`text/event-stream`, `application/jsonl`): the page shows no schema for that body unless `schema` is set beside it.
+- Examples written with `dataValue` or `serializedValue` in place of `value`: the page doesn't show them.
+- Nested tags (`parent`) and tag `kind`: tags stay one flat list in the sidebar and the overview.
 
 ## Route
 
@@ -55,7 +67,7 @@ reference: [
 
 ## Code samples and schemas
 
-`codeSamples` picks which languages render per operation, in the order you list them. It defaults to `["curl", "js", "python"]`. `expandSchemas` starts nested schema rows expanded rather than collapsed:
+`codeSamples` picks which languages render per operation, in the order you list them. It defaults to `["curl", "js", "python"]`, and `false` or an empty list shows none. `expandSchemas` starts nested schema rows expanded rather than collapsed:
 
 ```ts blume.config.ts lineNumbers
 reference: [
@@ -92,6 +104,8 @@ Every sample is plain, copy-pasteable code for the request, written with the lan
 
 Each value is quoted by its own language's rules, so a header like `If-Match: "33a64df5"` or a body with a `$` in it reaches the API as written.
 
+Schema tables follow the way the data travels, as the examples do: a request body leaves out `readOnly` properties, which the server sets, and a response leaves out `writeOnly` ones, which it never returns. A [webhook or callback](#webhooks-and-callbacks) body is a request your API sends, so it reads like a response.
+
 ### Your own samples
 
 To show your SDK instead of a raw HTTP call, add `x-codeSamples` to an operation in the spec. It's the extension Redocly defined, and Speakeasy and Stainless can write it for you. Each entry takes a `lang`, the `source`, and an optional `label`:
@@ -111,7 +125,19 @@ paths:
             planter list
 ```
 
-These samples render as their own tabs, ahead of the generated ones, and stay as written when readers change the [Try it](#try-it-playground) form. The older `x-code-samples` spelling works too. To show only your own samples, set `codeSamples: false`.
+These samples render as their own tabs, ahead of the generated ones, and stay as written when readers change the [Try it](#try-it-playground) form. The older `x-code-samples` spelling works too. To show only your own samples, set `codeSamples: false`. Unlike the generated samples, they're also in the operation page's Markdown copy, so `llms-full.txt`, the MCP server, and the assistant see your SDK calls.
+
+A `source` can also be a `$ref` to a file that holds the sample's code, the way Redocly describes keeping samples in files of their own. Blume reads the file relative to the spec, fetching it when the spec is a URL. A `$ref` it can't read, or one that points inside a document (`#/…`), leaves that sample out with a [`BLUME_OPENAPI_CODE_SAMPLE_REF`](#spec-warnings) warning:
+
+```yaml openapi.yaml lineNumbers
+paths:
+  /plants:
+    get:
+      x-codeSamples:
+        - lang: go
+          source:
+            $ref: ./code_samples/go/list_plants.go
+```
 
 ## Try it playground
 
@@ -150,7 +176,7 @@ The built-in proxy only forwards requests to the origins your specs declare in `
 
 ## Multiple specs
 
-Use `sources` to publish more than one spec from one adapter. Each source gets its own overview route and operation pages, and shares the adapter's display options. Give each a `label` (used for the sidebar and to derive its route), or set an explicit `route`:
+Use `sources` to publish more than one spec from one adapter. Each source gets its own overview route and operation pages, and shares the adapter's display options. Give each a `label`, which names its group in the sidebar as written and derives its route, or set an explicit `route`:
 
 ```ts blume.config.ts lineNumbers
 reference: [
@@ -246,7 +272,7 @@ The OpenAPI semantics carry over as written:
 
 ## Webhooks and callbacks
 
-Your API's outgoing requests get documented too. Each [webhook](https://spec.openapis.org/oas/v3.1.0#oas-webhooks) in the spec's top-level `webhooks` gets its own page, like an operation: filed under its first tag, or a **Webhooks** group when it has none. The page shows the payload's schema and the responses your endpoint should send back. In place of the Try it panel and code samples, the rail shows an example payload, since your API sends this request rather than serving it. A webhook page lists only the `security` the webhook declares itself: the spec's root `security` guards calls to your API, so it doesn't apply to requests the API sends.
+Your API's outgoing requests get documented too. Each [webhook](https://spec.openapis.org/oas/v3.1.0#oas-webhooks) in the spec's top-level `webhooks` gets its own page, like an operation: filed under its first tag, or a **Webhooks** group when it has none. The page shows the payload's schema and the responses your endpoint should send back. In place of the Try it panel and code samples, the rail shows an example payload, since your API sends this request rather than serving it. A webhook page lists only the `security` the webhook declares itself: the spec's root `security` guards calls to your API, so it doesn't apply to requests the API sends. A webhook that's a `$ref` to a shared path item is left out, with a [`BLUME_OPENAPI_REF_PATH_ITEM`](#spec-warnings) warning.
 
 ```yaml openapi.yaml lineNumbers
 webhooks:
@@ -263,9 +289,25 @@ webhooks:
           description: Return a 200 to acknowledge the event.
 ```
 
-An operation's [`callbacks`](https://spec.openapis.org/oas/v3.1.0#callback-object), the requests your API makes back to a URL the caller supplied, render in a **Callbacks** section on that operation's page. Each shows the URL expression (`{$request.body#/callbackUrl}`), its method, its request body, and its expected responses. Callbacks declared under `components.callbacks` and referenced with `$ref` work the same way.
+A 3.0 spec's webhooks under the `x-webhooks` extension become `webhooks` when Blume upgrades the spec to 3.1. A spec already at 3.1 or later isn't upgraded, so webhooks it still keeps under `x-webhooks` render nothing, with a [`BLUME_OPENAPI_X_WEBHOOKS`](#spec-warnings) warning: rename the field to `webhooks`.
+
+An operation's [`callbacks`](https://spec.openapis.org/oas/v3.1.0#callback-object), the requests your API makes back to a URL the caller supplied, render in a **Callbacks** section on that operation's page. Each shows the URL expression (`{$request.body#/callbackUrl}`), its method, its parameters (a signature header, say), its request body, and its expected responses. Callbacks declared under `components.callbacks` and referenced with `$ref` work the same way.
 
 Webhook pages are real pages: they're in search, `llms.txt`, and the MCP server, and their Markdown tells agents it's a request the API sends, so an agent won't try to call it.
+
+## Spec warnings
+
+Blume doesn't validate a spec against the OpenAPI schema: run a linter such as [Spectral](https://github.com/stoplightio/spectral) or [oasdiff](https://github.com/oasdiff/oasdiff) in CI for that. It does warn, in `blume dev`, `blume build`, and `blume check`, about mistakes that would otherwise render wrong without any sign, and about parts of a spec it leaves out. Each warning names the spec, and the rest of the reference still builds:
+
+| Code | What's wrong |
+| --- | --- |
+| `BLUME_OPENAPI_PATH_PARAMETER_MISSING` | A `{name}` in an operation's path has no `in: path` parameter of that name, so the page has no input for it, and Try it and the code samples send the placeholder as literal text. |
+| `BLUME_OPENAPI_PATH_PARAMETER_UNUSED` | An `in: path` parameter has no `{name}` in the path, so the value Try it asks for never reaches the URL. |
+| `BLUME_OPENAPI_UNKNOWN_SECURITY_SCHEME` | A `security` requirement names a scheme that `components.securitySchemes` doesn't define, so the [Authorization](#authorization) section can't describe it and requests send no credential for it. |
+| `BLUME_OPENAPI_UNSUPPORTED` | The spec uses an [OpenAPI 3.2](#openapi-32) feature Blume doesn't render yet: `additionalOperations`, which leaves those operations out, or an `in: querystring` parameter, which leaves the query string out of the page, Try it, and the code samples. |
+| `BLUME_OPENAPI_CODE_SAMPLE_REF` | An `x-codeSamples` entry's `source` is a `$ref` Blume can't read, or one that points inside a document, so that [sample](#your-own-samples) is left out. |
+| `BLUME_OPENAPI_X_WEBHOOKS` | A 3.1 or later spec keeps its webhooks under `x-webhooks`, the extension 3.0 tools read, and has no `webhooks`, so none of them render. Rename the field to `webhooks`. |
+| `BLUME_OPENAPI_REF_PATH_ITEM` | A path or webhook is a `$ref` to a shared path item, such as one under `components.pathItems`. Blume doesn't resolve these, so its operations are missing from the reference. Inline the path item under `paths` or `webhooks`; its schemas, parameters, and responses can stay `$ref`s. |
 
 ## Embedding Scalar instead
 

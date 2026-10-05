@@ -681,6 +681,9 @@ const tabs = (
   );
 
 describe("ts2jsPlugin", () => {
+  // The first case pays the plugin's lazy `require("sucrase")`, which usually
+  // takes ~150ms on the Windows runner but has spiked past Bun's 5s default,
+  // so it gets an explicit timeout.
   it("expands a marked ts fence into TypeScript/JavaScript tabs", () => {
     const result = ts2js({
       lang: "ts",
@@ -693,7 +696,7 @@ describe("ts2jsPlugin", () => {
         { lang: "js", meta: null, value: 'const greeting = "hi";' }
       )
     );
-  });
+  }, 30_000);
 
   it("preserves formatting, JSX, and comments; elides type-only imports", () => {
     const value = [
@@ -1052,29 +1055,29 @@ interface TestFrontmatter {
   __blumeTocHidden?: string[];
 }
 
+/** A hast context whose `setProperty` mutates the node so tests can assert. */
+const makeCtx = (): AnchorContext => ({
+  data: { astro: { frontmatter: {} } },
+  setProperty(node, key, value) {
+    node.properties = { ...node.properties, [key]: value };
+  },
+  textContent: textOf,
+});
+
+/** A heading node with text (or element) children. */
+const heading = (
+  tagName: string,
+  ...children: (AnchorNode | string)[]
+): AnchorNode & { properties: NonNullable<AnchorNode["properties"]> } => ({
+  children: children.map((child) =>
+    isString(child) ? { type: "text", value: child } : child
+  ),
+  properties: {},
+  tagName,
+  type: "element",
+});
+
 describe("headingAnchorPlugin", () => {
-  /** A hast context whose `setProperty` mutates the node so tests can assert. */
-  const makeCtx = (): AnchorContext => ({
-    data: { astro: { frontmatter: {} } },
-    setProperty(node, key, value) {
-      node.properties = { ...node.properties, [key]: value };
-    },
-    textContent: textOf,
-  });
-
-  /** A heading node with text (or element) children. */
-  const heading = (
-    tagName: string,
-    ...children: (AnchorNode | string)[]
-  ): AnchorNode & { properties: NonNullable<AnchorNode["properties"]> } => ({
-    children: children.map((child) =>
-      isString(child) ? { type: "text", value: child } : child
-    ),
-    properties: {},
-    tagName,
-    type: "element",
-  });
-
   it("wraps an h2's content in an anchor to its own slug", () => {
     const node = heading("h2", "Getting Started");
     const result = headingAnchorPlugin().element.visit(node, makeCtx());

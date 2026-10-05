@@ -50,6 +50,7 @@ export const ro: UIStringsOverride = {
   banner: { dismiss: "Închide anunțul" },
   changelog: {
     description: "Actualizări ale produsului și note de lansare.",
+    empty: "Încă nu există intrări în jurnalul de modificări.",
     title: "Jurnal de modificări",
   },
   consent: {

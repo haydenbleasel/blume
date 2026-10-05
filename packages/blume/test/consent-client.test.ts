@@ -574,19 +574,19 @@ describe("OSANO_BRIDGE", () => {
   });
 });
 
-describe("ETHYCA_BRIDGE", () => {
-  const fides = (consentValues: Record<string, boolean | string>) => {
-    let modals = 0;
-    const value: FakeFides = {
-      consent: consentValues,
-      initialized: true,
-      showModal: () => {
-        modals += 1;
-      },
-    };
-    return { modals: () => modals, value };
+const fides = (consentValues: Record<string, boolean | string>) => {
+  let modals = 0;
+  const value: FakeFides = {
+    consent: consentValues,
+    initialized: true,
+    showModal: () => {
+      modals += 1;
+    },
   };
+  return { modals: () => modals, value };
+};
 
+describe("ETHYCA_BRIDGE", () => {
   it("reads the analytics notice when Fides is ready and on every update", async () => {
     await runInline(CONSENT_INIT_SCRIPT, { kind: "ethyca" });
     const loaded = fides({ analytics: "opt_in" });

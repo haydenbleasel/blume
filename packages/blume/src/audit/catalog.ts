@@ -161,7 +161,7 @@ export const CHECKS = [
   },
   {
     category: "duplicates",
-    fix: "Merge the pages, or set `seo.canonical` on all but one.",
+    fix: "Merge the pages, or point `seo.canonical` on all but one at the page to index.",
     id: "BLUME_AUDIT_DUPLICATE_CONTENT",
     severity: "warning",
     tier: "static",
@@ -359,7 +359,7 @@ export const CHECKS = [
   },
   {
     category: "redirects",
-    fix: "Remove the redirect, or delete the page it shadows — the page wins and the redirect never fires.",
+    fix: "Remove the redirect, or delete the page it shadows — a path can't be both, and which one readers get depends on the host.",
     id: "BLUME_AUDIT_REDIRECT_SOURCE_IS_PAGE",
     severity: "error",
     tier: "static",
@@ -372,6 +372,14 @@ export const CHECKS = [
     severity: "error",
     tier: "network",
     title: "HTTPS to HTTP redirect",
+  },
+  {
+    category: "redirects",
+    fix: "Deploy the redirect file your host reads (see Redirects in the deployment docs), or name the host in `deployment`.",
+    id: "BLUME_AUDIT_REDIRECT_NOT_SERVED",
+    severity: "error",
+    tier: "network",
+    title: "Live site doesn't redirect as configured",
   },
 
   // Social
@@ -570,7 +578,7 @@ export const CHECKS = [
   // Sitemap
   {
     category: "sitemap",
-    fix: "Remove `draft`/`hidden`/`noindex` from the page's frontmatter if it should be indexed.",
+    fix: "Remove `draft`/`hidden`/`noindex` from the page's frontmatter if it should be indexed. A `public/sitemap.xml` replaces the generated sitemap, so add the page there or delete that file.",
     id: "BLUME_AUDIT_INDEXABLE_PAGE_NOT_IN_SITEMAP",
     severity: "warning",
     tier: "static",
@@ -665,6 +673,14 @@ export const CHECKS = [
     severity: "error",
     tier: "static",
     title: "robots.txt disallows a page that is in the sitemap",
+  },
+  {
+    category: "robots",
+    fix: "Narrow or remove the rule in that crawler's `User-agent` group if it should read these pages. Blocking an AI crawler on purpose is fine; skip this check.",
+    id: "BLUME_AUDIT_ROBOTS_BLOCKS_CRAWLER",
+    severity: "warning",
+    tier: "static",
+    title: "robots.txt blocks one crawler from pages in the sitemap",
   },
   {
     category: "robots",

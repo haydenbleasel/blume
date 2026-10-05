@@ -28,6 +28,13 @@ const { security } = Astro.props;
           Optional — this operation also accepts unauthenticated requests.
         </p>
       )}
+      {security.unauthenticatedServers &&
+        security.unauthenticatedServers.length > 0 && (
+          <p class="mb-2 text-muted-foreground text-sm">
+            No authorization needed on{" "}
+            {security.unauthenticatedServers.join(", ")}.
+          </p>
+        )}
       {security.alternatives.map((alternative, index) => (
         <>
           {index > 0 && (
@@ -47,6 +54,9 @@ const { security } = Astro.props;
                     <span class="text-muted-foreground text-xs">
                       {schemeLabel(resolved)}
                       {carrier ? ` · ${carrier.in}` : ""}
+                      {resolved.servers
+                        ? ` · on ${resolved.servers.join(", ")}`
+                        : ""}
                     </span>
                     {!security.optional && (
                       <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">

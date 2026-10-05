@@ -103,9 +103,9 @@ import { guideById } from "../_guides/guides.ts";
     <code>docs</code> with <code>dev</code>, <code>build</code>, and{" "}
     <code>doctor</code> scripts, a <code>docs/index.mdx</code> home page, a{" "}
     <code>blume.config.ts</code>, and a <code>.gitignore</code> for{" "}
-    <code>node_modules/</code>, <code>.blume/</code>, and <code>dist/</code>.{" "}
-    <code>.blume/</code> is the Astro project Blume generates and drives, so it
-    never gets committed. pnpm, Turborepo, and Vercel all identify workspaces
+    <code>node_modules/</code>, <code>.blume/</code>, <code>dist/</code>, and{" "}
+    <code>.env.local</code>. <code>.blume/</code> is the Astro project Blume
+    generates and drives, so it never gets committed. pnpm, Turborepo, and Vercel all identify workspaces
     by name, so if another package is already called <code>docs</code>,
     rename this one.
   </p>
@@ -499,9 +499,11 @@ jobs:
   </p>
   <h3>The page says "No example found at button"</h3>
   <p>
-    Blume found no file at that path under <code>examples.source</code>. Check
-    that the source is relative to <code>apps/docs</code>, and that the{" "}
-    <code>path</code> leaves off the extension.
+    Blume found no file at that path under <code>examples.source</code>, and{" "}
+    <code>blume doctor</code>, <code>blume dev</code>, and{" "}
+    <code>blume build</code> warn with <code>BLUME_EXAMPLE_NOT_FOUND</code> at
+    the line. Check that the source is relative to <code>apps/docs</code>, and
+    that the <code>path</code> leaves off the extension.
   </p>
   <h3>The preview renders without styles</h3>
   <p>

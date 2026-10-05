@@ -18,9 +18,13 @@
 // Review, 2026-09-27: reran the Orama and Typesense rows (Typesense 30.2
 // locally, Blume's own sync and client) and the chatbot keyword change, with
 // the same results, and measured the served blume-search.json (3.0 MB, 872 KB
-// gzipped). The dialog's toggles, the Pagefind slash, and the Mixedbread
-// failure path were read from Search.astro, search/pagefind.ts, endpoint.ts,
-// and Astro's preview server. Not yet run end to end.
+// gzipped). Rechecked 2026-09-30 against the Pagefind links and language
+// merge, the Typesense alias swap and sort, the Mixedbread result links and
+// errors, the Algolia record split, and the per-locale Orama tokenizers;
+// reran the Typesense row with Blume's own sync and client (Typesense 30.2,
+// same index), and the Japanese, Hindi, and German titles on Orama. Rechecked
+// 2026-09-30 against the failed-sync rule (search/sync/index.ts): with the
+// admin key set, a failed upload fails the build. Not yet run end to end.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -131,7 +135,7 @@ console.log(\`\${candidate}: top 1 \${top1}/\${queries.length}, top 3 \${top3}/\
         <td><code>pagefind()</code></td>
         <td>Local, built from the HTML, loaded in pieces</td>
         <td>No</td>
-        <td>The page's language</td>
+        <td>Scoped</td>
         <td>All versions</td>
         <td>Nothing</td>
       </tr>
@@ -265,14 +269,10 @@ node search-eval.mjs http://localhost:4321 orama`}
   <p>
     Stop the preview before each new build. For Pagefind, set{" "}
     <code>search: pagefind()</code> and repeat. Always test a build, since
-    Pagefind's index doesn't exist in <code>blume dev</code>. Pagefind's result
-    links end in a slash, like <code>/docs/deployment/</code>, which{" "}
-    <code>blume preview</code> answers with Not Found. The script strips the
-    slash before it compares, so the ranks still count; the{" "}
-    <a href="/guides/pagefind-documentation-search#troubleshooting">
-      Pagefind guide
-    </a>{" "}
-    covers what that means on your host.
+    Pagefind's index doesn't exist in <code>blume dev</code>. Its results link
+    to the same slashless routes as every other adapter's, and the{" "}
+    <a href="/guides/pagefind-documentation-search">Pagefind guide</a> has a
+    checklist for what else to test.
   </p>
 
   <h3>A hosted keyword candidate</h3>
@@ -305,7 +305,8 @@ npx blume preview`}
   <p>
     The build log should say <code>Synced 100 record(s) to algolia</code>, with
     your page count. If it says <code>Search sync skipped:</code> instead,
-    nothing was uploaded and the results don't count.
+    nothing was uploaded and the results don't count. If the upload fails with
+    the key set, the build stops with <code>BLUME_SEARCH_SYNC_FAILED</code>.
   </p>
 
   <h3>A semantic candidate</h3>
@@ -351,30 +352,30 @@ npx blume preview`}
   </p>
   <ul>
     <li>
-      <strong>Links.</strong> Blume's Mixedbread route takes each result's link
-      from a <code>url</code> in the metadata Mixedbread generated for the
-      file, which neither <code>mxbai store sync</code> nor Blume sets. A
-      result without one links back to the current page, and the script
-      counts it as a miss. Check what your store returns with{" "}
-      <code>npx mxbai store search acme-docs "dark mode" --return-metadata --format json</code>{" "}
-      before you trust semantic results.
+      <strong>Links.</strong> Blume's Mixedbread route links each result to the
+      page its file renders, matched by the path <code>mxbai store sync</code>{" "}
+      recorded for the file, and drops passages from files that aren't pages.
+      Run the sync from your project root, as above, or a folder above it. If
+      semantic results come back empty or short, check which paths your store
+      holds with{" "}
+      <code>npx mxbai store search acme-docs "dark mode" --return-metadata --format json</code>.
     </li>
     <li>
       <strong>Scoping.</strong> Run the script again from a translated page and
       from a page in an older version, and check that results stay in that
       language and version where the table says they should. The "All
-      languages" toggle shows on every adapter, but changes nothing on
-      Pagefind, which keeps to the page's language, or Mixedbread, which
-      searches every language.
+      languages" toggle widens every adapter that scopes by language, Pagefind
+      included. Mixedbread always searches every language, so the dialog
+      leaves the toggle out.
     </li>
     <li>
       <strong>Freshness.</strong> A local index is rebuilt with the site. A
-      hosted index holds whatever the last successful upload sent, and a
-      failed upload only warns. Typesense is the exception: Blume deletes the
-      collection before it uploads, so searches fail while a sync runs, and a
-      sync that fails partway leaves the collection missing or partial. The
-      Mixedbread store changes only when someone runs{" "}
-      <code>mxbai store sync</code>, so it needs its own CI step.
+      hosted index holds whatever the last successful upload sent. With the
+      admin key set, a failed upload fails the build; without the key, the
+      build skips the upload with a warning. Typesense imports each build into a new
+      collection and moves an alias onto it once it's complete, so searches
+      keep working while a sync runs. The Mixedbread store changes only when
+      someone runs <code>mxbai store sync</code>, so it needs its own CI step.
     </li>
   </ul>
 
@@ -385,8 +386,9 @@ npx blume preview`}
     Typesense ran through Blume's own browser search clients, with Typesense
     30.2 running locally and filled by Blume's upload, and Pagefind 1.5.2
     indexed the pages as the dev server rendered them. The script above gave
-    the same Orama row through the dialog. Mixedbread wasn't measured: it
-    needs an account.
+    the same Orama row through the dialog. The Typesense row comes from a
+    rerun on 2026-09-30 over the same pages, with Blume's current sort.
+    Mixedbread wasn't measured: it needs an account.
   </p>
   <table>
     <thead>
@@ -401,7 +403,7 @@ npx blume preview`}
       <tr><td>Orama, the default</td><td>4</td><td>5</td><td>6</td></tr>
       <tr><td>FlexSearch</td><td>5</td><td>5</td><td>6</td></tr>
       <tr><td>Pagefind</td><td>8</td><td>8</td><td>3</td></tr>
-      <tr><td>Typesense</td><td>2</td><td>3</td><td>6</td></tr>
+      <tr><td>Typesense</td><td>6</td><td>6</td><td>6</td></tr>
     </tbody>
   </table>
   <ul>
@@ -411,18 +413,17 @@ npx blume preview`}
     </li>
     <li>
       Only Pagefind found <code>includeCodeBlocks</code>, which appears only
-      inside a code block, and only Pagefind put the right page first for
-      both typos. Orama found nothing for either.
+      inside a code block. Pagefind and Typesense put the right page first
+      for both typos, and Orama found nothing for either.
     </li>
     <li>
       Adding <code>chatbot</code> to the assistant page's{" "}
       <code>search.keywords</code> moved it to first on Orama.
     </li>
     <li>
-      Typesense's three fifth-place results come from Blume's sort: relevance
-      in ten bands, then <code>search.boost</code>. With every boost at 1, the{" "}
-      <code>llms.txt</code> page landed behind four weaker matches. Sorted by
-      relevance alone, the same index put 6 of 12 first.
+      Typesense, which Blume sorts by relevance and then{" "}
+      <code>search.boost</code>, put every page it found first. Its six misses
+      include all three questions.
     </li>
     <li>
       The Orama index ships whole to each reader on first search, every
@@ -431,13 +432,16 @@ npx blume preview`}
       script.
     </li>
     <li>
-      With English as the default locale, the Japanese and Hindi pages
-      returned nothing on Orama, even for their own titles. German worked.
+      With English as the default locale, Orama found each of 20 Japanese, 20
+      Hindi, and 20 German pages by its own title in the 2026-09-30 rerun:
+      Blume gives each non-Latin translation a word-segmenting tokenizer of
+      its own.
     </li>
     <li>
       As Algolia records, 23 of the 100 pages are over 10 KB. Algolia caps
-      record size by plan, from 10 KB to 100 KB (checked 2026-09-27), and
-      Blume uploads one record per page.
+      record size by plan, from 10 KB to 100 KB (checked 2026-09-27), so
+      Blume's sync splits a longer page across several records and the
+      dialog lists the page once.
     </li>
   </ul>
   <p>
@@ -466,11 +470,12 @@ npx blume preview`}
       Typesense. The others search every version at once.
     </li>
     <li>
-      <strong>Pages in a non-Latin script:</strong> with a non-Latin default
-      language, Orama or Pagefind, not FlexSearch. With translations in
-      another script than the default, like Japanese under English, Orama
-      drops their words: use Pagefind, or Algolia with the index's languages
-      set. The assistant can't search those words either way. See{" "}
+      <strong>Pages in a non-Latin script:</strong> Orama or Pagefind, not
+      FlexSearch. Orama segments a non-Latin default language, and gives each
+      translation in another script than the default, like Japanese under
+      English, a tokenizer of its own; the assistant and the MCP server search
+      the same way. On hosted search, set Algolia's index languages, or{" "}
+      <code>locale</code> on <code>typesense()</code>. See{" "}
       <a href="/guides/cjk-documentation-search">
         Make docs search work in Chinese, Japanese and Korean
       </a>.
@@ -478,9 +483,9 @@ npx blume preview`}
     <li>
       <strong>An index other tools also query, or ranking rules you manage at
       the provider: hosted keyword.</strong> Algolia keeps its index settings
-      across uploads. Blume deletes and recreates the Typesense collection on
-      every build, so settings tuned there need reapplying and searches fail
-      while the sync runs (see{" "}
+      across uploads. Blume moves the Typesense alias onto a new collection on
+      every build, so settings tuned on the old collection need reapplying
+      (see{" "}
       <a href="/guides/typesense-documentation-search">
         Self-host documentation search with Typesense
       </a>). Make sure someone sees the build's upload warning.
@@ -517,21 +522,21 @@ npx blume preview`}
   <p>
     Open the dialog yourself. "Something went wrong. Please try again." means
     the request to the provider failed: check the adapter's public key and
-    host or endpoint. Mixedbread fails differently: when{" "}
-    <code>/api/search</code> errors, the dialog shows no results instead of
-    an error. Read the terminal running <code>blume preview</code>, and check
-    that <code>MIXEDBREAD_API_KEY</code> is set; a build without it warns with{" "}
-    <code>BLUME_MISSING_SECRET</code>.
+    host or endpoint. On Mixedbread, the failing request is{" "}
+    <code>/api/search</code>: read the terminal running{" "}
+    <code>blume preview</code>, and check that <code>MIXEDBREAD_API_KEY</code>{" "}
+    is set; a build without it warns with <code>BLUME_MISSING_SECRET</code>.
   </p>
   <h3>The hosted index is missing new pages</h3>
   <p>
     Look for <code>Search sync skipped:</code> in the build log. It names the
-    cause: an unset admin key, an <code>oramaCloud()</code> without{" "}
-    <code>indexId</code>, or the provider rejecting the upload, such as an
-    Algolia record over your plan's size limit. The build still succeeds, so
-    the dialog keeps serving whatever the provider already holds. On
-    Typesense, that can be a missing or partial collection, so build again
-    once the cause is fixed.
+    cause: an unset admin key, or an <code>oramaCloud()</code> without{" "}
+    <code>indexId</code>. The build still succeeds, so the dialog keeps
+    serving whatever the provider already holds, which on Typesense is the
+    last complete sync. With the key set, the provider rejecting the upload,
+    such as a key without write access, fails the build with{" "}
+    <code>BLUME_SEARCH_SYNC_FAILED</code> instead, and the message says why.
+    Build again once the cause is fixed.
   </p>
   <h3>The build fails with BLUME_SERVER_FEATURE_REQUIRED</h3>
   <p>

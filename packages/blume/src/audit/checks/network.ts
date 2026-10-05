@@ -1,11 +1,16 @@
-import { normalizeBasePath } from "../../core/base-path.ts";
+import { normalizeBasePath, stripBasePath } from "../../core/base-path.ts";
 import { gradeExternal, probeAll } from "../../core/probe.ts";
 import type { ProbeResult } from "../../core/probe.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { finding } from "../catalog.ts";
 import { pageSite } from "../locate.ts";
-import type { AuditContext, CheckModule, PageSnapshot } from "../types.ts";
-import { resolveHref, siteOrigin } from "../url.ts";
+import type {
+  AuditContext,
+  CheckModule,
+  PageSnapshot,
+  RedirectResolution,
+} from "../types.ts";
+import { decodePath, normalizePath, resolveHref, siteOrigin } from "../url.ts";
 
 const CLIENT_ERROR = 400;
 const SERVER_ERROR = 500;
@@ -136,6 +141,79 @@ export const servedPageChecks = (
 };
 
 /**
+ * The configured redirects the live site should answer: only those the static
+ * checks passed. A pattern (`/beta/:slug*`) names no single URL to request, a
+ * loop never lands, and a redirect whose source is also a page never fires.
+ */
+const liveRedirects = (context: AuditContext): RedirectResolution[] =>
+  context.redirects.filter(
+    (redirect) =>
+      (redirect.outcome === "ok" || redirect.outcome === "chain") &&
+      !context.byUrl.has(normalizePath(redirect.from))
+  );
+
+/**
+ * What requesting a redirect's old URL on the live site got wrong, or null
+ * when it redirected to the configured destination.
+ *
+ * The build writes the host's redirect file, but a host that doesn't read it
+ * answers with the meta-refresh page Astro writes at the old URL (a 200:
+ * readers still get there, so it's a warning), and a missing redirect 404s (an
+ * error). An external destination isn't compared: its site may redirect again.
+ */
+export const liveRedirectCheck = (
+  context: AuditContext,
+  redirect: RedirectResolution,
+  result: ProbeResult,
+  deployBase: string
+): Diagnostic | null => {
+  const from = normalizePath(redirect.from);
+  const site = {
+    file: context.project.context.configFile ?? undefined,
+    url: from,
+  };
+  const landed =
+    result.redirected && result.finalUrl
+      ? normalizePath(
+          stripBasePath(
+            deployBase,
+            decodePath(new URL(result.finalUrl).pathname)
+          )
+        )
+      : from;
+
+  // A host that only adds a trailing slash (`/old` → `/old/`) still didn't
+  // redirect to the destination.
+  if (landed === from) {
+    let answer = `could not be reached (${result.error ?? "no response"})`;
+    if (result.timedOut) {
+      answer = "did not respond in time";
+    } else if (result.status !== undefined) {
+      answer = `answered it with HTTP ${result.status} instead`;
+    }
+    const found = finding(
+      "BLUME_AUDIT_REDIRECT_NOT_SERVED",
+      site,
+      `${from} should redirect to ${redirect.to}, but the live site ${answer}.`
+    );
+    return result.ok ? { ...found, severity: "warning" } : found;
+  }
+
+  const destination = redirect.chain.at(-1) ?? from;
+  if (/^https?:\/\//iu.test(destination) || landed === destination) {
+    return null;
+  }
+  return {
+    ...finding(
+      "BLUME_AUDIT_REDIRECT_NOT_SERVED",
+      site,
+      `${from} redirects to ${landed} on the live site, not to ${destination}.`
+    ),
+    severity: "warning",
+  };
+};
+
+/**
  * The built site, checked against a live deployment.
  *
  * Everything here needs the network, which is why it only runs with `--url`: a
@@ -164,8 +242,23 @@ export const networkChecks: CheckModule = {
     // build output, which the host serves under the deployment base.
     const robotsUrl = new URL(`${deployBase}/robots.txt`, origin).toString();
     const sitemapUrl = new URL(`${deployBase}/sitemap.xml`, origin).toString();
+    // Each configured redirect is requested at its old URL, the way a reader
+    // following an old link arrives. Its `from` carries `basePath`; the host
+    // serves it under the deployment base too.
+    const redirects = liveRedirects(context).map(
+      (redirect) =>
+        [
+          redirect,
+          new URL(`${deployBase}${redirect.from}`, origin).toString(),
+        ] as const
+    );
 
-    const results = await probeAll([...targets, robotsUrl, sitemapUrl]);
+    const results = await probeAll([
+      ...targets,
+      robotsUrl,
+      sitemapUrl,
+      ...redirects.map(([, url]) => url),
+    ]);
 
     for (const page of context.pages) {
       const result = results.get(liveUrl(origin, page, deployBase));
@@ -178,6 +271,16 @@ export const networkChecks: CheckModule = {
         continue;
       }
       found.push(...servedPageChecks(context, page, result, origin));
+    }
+
+    for (const [redirect, url] of redirects) {
+      // SAFETY: every redirect URL was in the probed list, and `probeAll`
+      // returns a result for each URL it was given.
+      const result = results.get(url) as ProbeResult;
+      const wrong = liveRedirectCheck(context, redirect, result, deployBase);
+      if (wrong) {
+        found.push(wrong);
+      }
     }
 
     // With `seo.robots: false` Blume writes no robots.txt, so its absence on
@@ -210,7 +313,8 @@ export const networkChecks: CheckModule = {
 };
 
 /**
- * Outbound links, probed over the network (`--external`).
+ * Outbound links, probed over the network (`--external`), except those an
+ * `--ignore` glob matches.
  *
  * Severity is graded rather than flat: a 404 is the author's bug, but a 403 or a
  * 5xx is usually rate limiting or someone else's outage, and failing a build on
@@ -229,7 +333,7 @@ export const externalChecks: CheckModule = {
     for (const page of context.pages) {
       for (const link of page.links) {
         const resolved = resolveHref(page.url, link.href, origin, deployBase);
-        if (resolved.kind !== "external") {
+        if (resolved.kind !== "external" || context.ignore(resolved.url)) {
           continue;
         }
         const pages = linkers.get(resolved.url);

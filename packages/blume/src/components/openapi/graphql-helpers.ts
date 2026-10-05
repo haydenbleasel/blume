@@ -10,8 +10,11 @@ import {
   isGraphqlOperationKind,
 } from "../../openapi/graphql.ts";
 import type { ApiSpecData } from "../../openapi/model.ts";
+import { endpointSecurity } from "../content/api-page.ts";
 import type { SpecValue } from "./helpers.ts";
+import { playgroundAuth } from "./operation-model.ts";
 import type { PlaygroundModel } from "./request.ts";
+import type { OperationSecurity } from "./security.ts";
 
 /**
  * Build-time logic behind the GraphQL reference pages: the generated example
@@ -67,9 +70,10 @@ const isComposite = (document: GraphqlDocument, name: string): boolean => {
 
 /**
  * A valid selection set for a composite type, or undefined for leaves: every
- * scalar/enum field, plus nested composites while `depth` allows. A composite
- * with nothing selectable at this depth falls back to `__typename`, which is
- * legal on any composite — the set must never come out empty.
+ * scalar/enum field, plus nested composites while `depth` allows, deprecated
+ * fields left out so the example doesn't teach them. A composite with nothing
+ * selectable at this depth falls back to `__typename`, which is legal on any
+ * composite — the set must never come out empty.
  */
 export const selectionSet = (
   document: GraphqlDocument,
@@ -85,10 +89,12 @@ export const selectionSet = (
   }
   const selections: GraphqlSelection[] = [];
   for (const field of type.fields ?? []) {
-    // A field with an argument that must be supplied — non-null and no
-    // default — can't ride an example selection; there is nothing valid to
-    // fill it with inline. A defaulted non-null argument is omittable.
+    // A deprecated field stays out of the example. So does a field with an
+    // argument that must be supplied — non-null and no default: there is
+    // nothing valid to fill it with inline. A defaulted non-null argument is
+    // omittable.
     if (
+      field.deprecationReason !== undefined ||
       field.args.some(
         (arg) => arg.type.display.endsWith("!") && arg.default === undefined
       )
@@ -189,10 +195,14 @@ const sampleForRef = (
   if (type?.kind === "enum") {
     named = type.enumValues?.[0]?.name ?? null;
   } else if (type?.kind === "input" && depth > 0) {
+    // A field with a default starts at it, the value a client leaving it
+    // out gets.
     named = Object.fromEntries(
       (type.inputFields ?? []).map((field) => [
         field.name,
-        sampleForRef(document, field.type, depth - 1),
+        field.defaultValue === undefined
+          ? sampleForRef(document, field.type, depth - 1)
+          : field.defaultValue,
       ])
     );
   } else if (type?.kind === "input") {
@@ -203,7 +213,10 @@ const sampleForRef = (
   return wrapLists(ref.display, named);
 };
 
-/** Example `variables` for a root field's arguments; undefined when it has none. */
+/**
+ * Example `variables` for a root field's arguments, each starting at its
+ * declared default when it has one; undefined when it has none.
+ */
 export const exampleVariables = (
   document: GraphqlDocument,
   field: GraphqlField
@@ -212,7 +225,9 @@ export const exampleVariables = (
     ? Object.fromEntries(
         field.args.map((arg) => [
           arg.name,
-          sampleForRef(document, arg.type, VARIABLE_DEPTH),
+          arg.defaultValue === undefined
+            ? sampleForRef(document, arg.type, VARIABLE_DEPTH)
+            : arg.defaultValue,
         ])
       )
     : undefined;
@@ -272,18 +287,26 @@ export const exampleResponse = (
 };
 
 /**
+ * The security every operation of a GraphQL reference enforces: its `auth`
+ * option, read the way a hand-written endpoint reads the site's `api.auth`.
+ */
+export const graphqlSecurity = (spec: ApiSpecData): OperationSecurity =>
+  endpointSecurity(undefined, spec.auth);
+
+/**
  * The playground/request model for one GraphQL operation: a plain POST whose
  * JSON body carries the query and variables. Reusing `PlaygroundModel` means
  * the OpenAPI playground UI, its client module, and `buildRequest` all work
- * unchanged — the samples show byte-for-byte what the Send button transmits.
+ * unchanged — the samples show byte-for-byte what the Send button transmits,
+ * the configured `auth` credential included.
  */
 export const graphqlPlaygroundModel = (
   spec: ApiSpecData,
   query: string,
   variables?: GraphqlSampleObject
 ): PlaygroundModel => ({
-  auth: [],
-  authOptional: true,
+  auth: playgroundAuth(graphqlSecurity(spec)),
+  authOptional: false,
   body: {
     contentType: "application/json",
     example: JSON.stringify(

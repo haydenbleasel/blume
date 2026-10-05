@@ -200,7 +200,9 @@ export default defineConfig({
     Run <code>npx blume dev</code> and open <code>/api</code>. The Internal
     section is gone from the overview, since a tag with no operations left
     gets no section, and <code>/api/internal/replay-message</code> is a 404.
-    The Get a message page shows the new description.
+    The Get a message page shows the new description. The dev server watches
+    local overlay files like it watches the spec, so later edits to the
+    overlay show up without a restart.
   </p>
 
   <h2>Check what you published</h2>

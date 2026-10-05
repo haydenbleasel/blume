@@ -17,12 +17,17 @@ interface Props {
   model: PlaygroundModel;
   /** Proxy route for the send, or false to fetch the API directly. */
   proxy: string | false;
+  /**
+   * Where this panel's proxy is configured, which the CORS message names:
+   * an `openapi()` or `graphql()` reference, or `api` for hand-written pages.
+   */
+  proxyConfig: "api" | "graphql" | "openapi";
   /** Spec slug + operation key form the per-operation localStorage key. */
   slug: string;
   operation: string;
 }
 
-const { model, proxy, slug, operation } = Astro.props;
+const { model, proxy, proxyConfig, slug, operation } = Astro.props;
 
 // The built-in proxy route carries the site `basePath` but, like every
 // internal URL in the spec data, not `deployment.base`; `withMountedBase`
@@ -53,6 +58,7 @@ const CHECKBOX_ROW =
 <blume-playground
   class="mb-6 block"
   data-proxy={proxyUrl}
+  data-proxy-config={proxyConfig}
   data-storage-key={`blume-playground:${slug}:${operation}`}
 >
   <script

@@ -26,16 +26,34 @@ import { fetchRefusesMethod, sampleLanguages } from "./snippets.ts";
 import type { RequestSample } from "./snippets.ts";
 import { validateJson } from "./validate-json.ts";
 
+const OPENAPI_PROXY_SETTING =
+  "`playground: { proxy: true }` on the `openapi()` reference";
+
+/**
+ * The Blume config setting that turns on the proxy for a panel, keyed by the
+ * `data-proxy-config` the rendering surface stamps on it: an `openapi()` or
+ * `graphql()` reference's `playground` option, or `api.playground` for
+ * hand-written API pages.
+ */
+const PROXY_SETTINGS = new Map([
+  ["api", "`api: { playground: { proxy: true } }`"],
+  ["graphql", "`playground: { proxy: true }` on the `graphql()` reference"],
+  ["openapi", OPENAPI_PROXY_SETTING],
+]);
+
 /**
  * A failed fetch surfaces as a TypeError with no status — almost always the
  * browser's CORS wall, not the API being down — so the message explains the
- * one fix docs authors control instead of parroting "failed to fetch".
+ * one fix docs authors control instead of parroting "failed to fetch", naming
+ * the setting for the surface this panel is on and the server output the
+ * built-in proxy needs.
  */
-const CORS_MESSAGE =
+const corsMessage = (config: string): string =>
   "The browser blocked this request before it reached the API — the API " +
   "likely does not allow cross-origin requests from this docs site. Set " +
-  "`playground: { proxy: true }` on the `openapi()` reference in the Blume " +
-  "config to route playground requests through the docs server instead.";
+  `${PROXY_SETTINGS.get(config) ?? OPENAPI_PROXY_SETTING} in the Blume ` +
+  "config to route playground requests through the docs server instead. " +
+  "The proxy needs server output: a host adapter in `deployment`.";
 
 /**
  * `Cookie` is a forbidden header name: a page cannot set it, so a credential
@@ -253,6 +271,59 @@ const line = (className: string, text: string): HTMLElement => {
   return el;
 };
 
+/** Render one settled HTTP exchange: status + time, headers, pretty body. */
+const renderResponse = (
+  region: HTMLElement,
+  res: Response,
+  ms: number,
+  text: string
+): void => {
+  region.textContent = "";
+  region.append(
+    line(
+      "font-mono font-semibold text-foreground text-sm",
+      `${res.status} ${res.statusText} \u00B7 ${ms} ms`.trim()
+    )
+  );
+  const table = document.createElement("table");
+  table.className = "w-full text-start text-xs";
+  for (const [name, value] of res.headers) {
+    const row = document.createElement("tr");
+    const header = document.createElement("th");
+    header.setAttribute("scope", "row");
+    header.className = "pe-3 align-top font-medium text-muted-foreground";
+    header.textContent = name;
+    const cell = document.createElement("td");
+    cell.className = "break-all font-mono text-foreground";
+    cell.textContent = value;
+    row.append(header, cell);
+    table.append(row);
+  }
+  region.append(table);
+  const pre = document.createElement("pre");
+  pre.className =
+    "overflow-x-auto rounded-blume border border-border p-3 font-mono text-foreground text-xs";
+  const code = document.createElement("code");
+  code.textContent = prettyBody(text);
+  pre.append(code);
+  region.append(pre);
+  // At xl the panel is its own scroll region capped to the viewport, so a
+  // response appended under a tall form can land below the panel's fold
+  // where nothing brings it into view. Scroll the panel alone — "nearest",
+  // by hand — and never the document: below xl the panel does not scroll,
+  // and a document scroll would carry the form (Send, the body editor, its
+  // errors) off the top on a phone.
+  const panel = region.closest<HTMLElement>("[data-operation-panel]");
+  if (panel && panel.scrollHeight > panel.clientHeight) {
+    const box = panel.getBoundingClientRect();
+    const target = region.getBoundingClientRect();
+    const delta = Math.min(target.bottom - box.bottom, target.top - box.top);
+    if (delta > 0) {
+      panel.scrollBy({ top: delta });
+    }
+  }
+};
+
 /**
  * Wire the playground inside `root` (the `<blume-playground>` element). Reads
  * the server-rendered model JSON, keeps the request samples in sync with the
@@ -294,6 +365,7 @@ export const initPlayground = (root: HTMLElement): void => {
   const response = root.querySelector<HTMLElement>("[data-response]");
   const storageKey = root.dataset.storageKey ?? "";
   const proxy = root.dataset.proxy ?? "";
+  const proxyConfig = root.dataset.proxyConfig ?? "";
 
   /** True while a send is outstanding, so a second click can't race it. */
   let sending = false;
@@ -451,59 +523,6 @@ export const initPlayground = (root: HTMLElement): void => {
     }
   };
 
-  /** Render one settled HTTP exchange: status + time, headers, pretty body. */
-  const renderResponse = (
-    region: HTMLElement,
-    res: Response,
-    ms: number,
-    text: string
-  ): void => {
-    region.textContent = "";
-    region.append(
-      line(
-        "font-mono font-semibold text-foreground text-sm",
-        `${res.status} ${res.statusText} \u00B7 ${ms} ms`.trim()
-      )
-    );
-    const table = document.createElement("table");
-    table.className = "w-full text-start text-xs";
-    for (const [name, value] of res.headers) {
-      const row = document.createElement("tr");
-      const header = document.createElement("th");
-      header.setAttribute("scope", "row");
-      header.className = "pe-3 align-top font-medium text-muted-foreground";
-      header.textContent = name;
-      const cell = document.createElement("td");
-      cell.className = "break-all font-mono text-foreground";
-      cell.textContent = value;
-      row.append(header, cell);
-      table.append(row);
-    }
-    region.append(table);
-    const pre = document.createElement("pre");
-    pre.className =
-      "overflow-x-auto rounded-blume border border-border p-3 font-mono text-foreground text-xs";
-    const code = document.createElement("code");
-    code.textContent = prettyBody(text);
-    pre.append(code);
-    region.append(pre);
-    // At xl the panel is its own scroll region capped to the viewport, so a
-    // response appended under a tall form can land below the panel's fold
-    // where nothing brings it into view. Scroll the panel alone — "nearest",
-    // by hand — and never the document: below xl the panel does not scroll,
-    // and a document scroll would carry the form (Send, the body editor, its
-    // errors) off the top on a phone.
-    const panel = region.closest<HTMLElement>("[data-operation-panel]");
-    if (panel && panel.scrollHeight > panel.clientHeight) {
-      const box = panel.getBoundingClientRect();
-      const target = region.getBoundingClientRect();
-      const delta = Math.min(target.bottom - box.bottom, target.top - box.top);
-      if (delta > 0) {
-        panel.scrollBy({ top: delta });
-      }
-    }
-  };
-
   /**
    * Send the real request. HTTP error statuses render like any response; only
    * a rejected fetch (the CORS wall) gets the explanatory message. One request
@@ -607,7 +626,7 @@ export const initPlayground = (root: HTMLElement): void => {
         const crossOrigin = !proxy && !sample.url.startsWith("/");
         message =
           crossOrigin && (await reachable(sample.url))
-            ? CORS_MESSAGE
+            ? corsMessage(proxyConfig)
             : UNREACHABLE_MESSAGE;
       }
       response.textContent = "";

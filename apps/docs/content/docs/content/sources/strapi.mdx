@@ -18,7 +18,8 @@ export default defineConfig({
         url: "https://cms.example.com",
         contentType: "guides",
         // locale: "en"
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "body" },
         // Extra query parameters: filters[...], sort
         params: { "filters[section][$eq]": "sdk" },
@@ -28,4 +29,4 @@ export default defineConfig({
 });
 ```
 
-The API token comes from the `STRAPI_API_TOKEN` environment variable, sent as a bearer token. Entries are fetched with `populate=*` so images carry their URLs (set `populate` to narrow it), and a relative upload path (`/uploads/x.png`) resolves against `url`. Only published entries are imported — `--preview` requests drafts (`status=draft` on Strapi 5, `publicationState=preview` on Strapi 4) and stages each document that has never been published with `draft: true`; a published document previews its latest draft.
+The API token comes from the `STRAPI_API_TOKEN` environment variable, sent as a bearer token. Entries are fetched with `populate=*` so images carry their URLs (set `populate` to narrow it), and a relative upload path (`/uploads/x.png`) in a Blocks field resolves against `url`. A Markdown field passes through as written, so a relative path there stays relative to your docs site and breaks: use absolute image URLs in Markdown fields, as Strapi's Markdown editor inserts them. Only published entries are imported — `--preview` requests drafts (`status=draft` on Strapi 5, `publicationState=preview` on Strapi 4) and stages each document that has never been published with `draft: true`; a published document previews its latest draft.

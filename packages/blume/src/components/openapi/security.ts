@@ -32,6 +32,11 @@ export interface ResolvedScheme {
   /** The scheme object; undefined when the requirement names an unknown one. */
   scheme?: SecuritySchemeLike;
   scopes: string[];
+  /**
+   * AsyncAPI: the servers that declare this scheme, set only when the
+   * channel's servers don't all declare the same ones.
+   */
+  servers?: string[];
 }
 
 /** The security state one operation renders. */
@@ -40,6 +45,11 @@ export interface OperationSecurity {
   alternatives: ResolvedScheme[][];
   /** True when an empty requirement also allows unauthenticated calls. */
   optional: boolean;
+  /**
+   * AsyncAPI: the servers that declare no security while others do, so the
+   * schemes apply on the other servers only.
+   */
+  unauthenticatedServers?: string[];
 }
 
 /**

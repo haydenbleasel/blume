@@ -21,12 +21,20 @@ export default defineConfig({
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
+        // baseUrl: "https://github.acme.com/api/v3", // GitHub Enterprise Server
       }),
     ],
   },
 });
 ```
 
-Jedes Release wird automatisch auf die Changelog-Felder abgebildet: Sein Name (oder Tag) wird zum Titel, sein Veröffentlichungsdatum bestimmt die Reihenfolge in der Timeline, der Tag wird zu `changelog.version`, und Prereleases werden mit `Prerelease` gekennzeichnet (alle anderen mit `Release`). Die Release Notes werden als Inhalt des Eintrags gerendert, wobei sich zwei Dinge an ihren Links ändern: Von einem Link, der keine Web-, Mail-, Telefon- oder relative Adresse ist (zum Beispiel eine `javascript:`-URL), bleibt nur der Linktext übrig, und ein Link zurück auf deine eigene [`deployment.site`](/docs/deployment) wird in einen root-relativen Pfad umgeschrieben, damit er mit Preview-Deployments und deinem Deployment-Basispfad funktioniert. Gib der Quelle ein `prefix`, damit ihre Release-Seiten unter einer Route wie `/changelog/v1-2-0` verschachtelt werden.
+Jedes Release wird automatisch auf die Changelog-Felder abgebildet: Sein Name (oder Tag) wird zum Titel, sein Veröffentlichungsdatum bestimmt die Reihenfolge in der Timeline, der Tag wird zu `changelog.version`, und Prereleases werden mit `Prerelease` gekennzeichnet, Entwürfe (sofern `drafts` sie einschließt) mit `Draft` und alle anderen mit `Release`. Ein Entwurf wird wie jedes andere Release veröffentlicht, also schließe Entwürfe nur in einen Build ein, den deine Leser nicht sehen. Eine Zusammenfassung der Release Notes wird zur Meta-Beschreibung der Seite, die der RSS-Feed des Changelogs auch als Beschreibung des Eintrags verwendet. Die Release Notes werden als Inhalt des Eintrags gerendert, wobei sich zwei Dinge an ihren Links ändern: Von einem Link, der keine Web-, Mail-, Telefon- oder relative Adresse ist (zum Beispiel eine `javascript:`-URL), bleibt nur der Linktext übrig, und ein Link zurück auf deine eigene [`deployment.site`](/docs/deployment) wird in einen root-relativen Pfad umgeschrieben, damit er mit Preview-Deployments und deinem Deployment-Basispfad funktioniert. Gib der Quelle ein `prefix`, damit ihre Release-Seiten unter einer Route wie `/changelog/v1-2-0` verschachtelt werden. Die Timeline unter `/changelog` übernimmt ihren Titel und ihre Beschreibung aus der [`changelog`](/docs/advanced/changelog#the-index-page)-Konfiguration auf oberster Ebene, nicht aus der Quelle:
 
-Ein privates Repo authentifiziert sich über die Umgebungsvariable `GITHUB_TOKEN` – dasselbe Token, das auch die anderen GitHub-Features verwenden und das niemals direkt in deine Konfiguration geschrieben wird. Der Adapter deklariert es, sodass ein Build ohne dieses Token eine Warnung ausgibt. Wie [jede Remote-Quelle](/docs/content/sources#caching-and-offline-builds) wird es unter `.blume/cache/<source>/` gecacht und offline ausgeliefert, wenn die API nicht erreichbar ist. Da ein Changelog nur ergänzend ist, führt ein fehlgeschlagener Abruf ohne Cache (etwa bei einem CI-Build ohne Token) nicht zum Abbruch des Builds, sondern nur zu einem leeren Changelog mit einer Warnung. Setze `GITHUB_TOKEN` in deinen CI- und Deployment-Umgebungen, damit das Changelog befüllt wird.
+```ts blume.config.ts
+changelog: {
+  title: "SDK releases",
+  description: "Every release of the Acme SDK, from GitHub.",
+},
+```
+
+Ein privates Repo authentifiziert sich über die Umgebungsvariable `GITHUB_TOKEN` – dasselbe Token, das auch die anderen GitHub-Features verwenden und das niemals direkt in deine Konfiguration geschrieben wird. Der Adapter deklariert es, sodass ein Build ohne dieses Token eine Warnung ausgibt. Für ein Repository auf GitHub Enterprise Server setzt du `baseUrl` auf dessen REST-API (`https://<host>/api/v3`); `GITHUB_TOKEN` wird dorthin gesendet, es muss also ein Token für diesen Server sein. Wie [jede Remote-Quelle](/docs/content/sources#caching-and-offline-builds) wird es unter `.blume/cache/<source>/` gecacht und offline ausgeliefert, wenn die API nicht erreichbar ist. Da ein Changelog nur ergänzend ist, führt ein fehlgeschlagener Abruf ohne Cache (etwa bei einem CI-Build ohne Token) nicht zum Abbruch des Builds, sondern nur zu einem leeren Changelog mit einer Warnung. Setze `GITHUB_TOKEN` in deinen CI- und Deployment-Umgebungen, damit das Changelog befüllt wird.

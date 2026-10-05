@@ -43,6 +43,7 @@ Translations you wrote by hand are **adopted, never overwritten**: a translation
 The agent is never trusted with structure. Before writing, Blume checks each reply and rebuilds the file from the source:
 
 - The frontmatter is reconstructed from the source file's data, with only the six translatable values overlaid — keys the agent invented are dropped, keys it deleted are restored, and `slug`, `icon`, `order`, and dates are source-verbatim by construction.
+- `seo.canonical` is the one source key left out. It names a page in the source language, and a translation that canonicalizes to another language drops out of search in its own, so the translation gets the default canonical, its own URL.
 - The number of code fences must match the source, the body must be non-empty, and the frontmatter must parse.
 - Every heading is pinned to its source heading's anchor id with a trailing [`[#id]` marker](/docs/content/syntax#custom-anchors), unless the translation already pins one, so `#fragment` links resolve identically in every language. Headings pair up positionally, so a translation whose heading structure doesn't match the source gets no pins.
 

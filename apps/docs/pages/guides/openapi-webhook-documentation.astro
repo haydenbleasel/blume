@@ -742,10 +742,10 @@ evt_test_1: duplicate, skipped`}
     Add <code>statusCallbackUrl</code> to <code>SendMessageRequest</code> too,
     as a string with <code>format: uri</code>. Blume shows the callback in a
     Callbacks section on the Send a message page, with its URL expression,
-    method, request body, and responses. It doesn't get a page or a Payload
-    panel of its own. The section doesn't list a callback's parameters, so
-    describe any signature headers in the callback's{" "}
-    <code>description</code>. A callback defined under{" "}
+    method, parameters, request body, and responses. It doesn't get a page or
+    a Payload panel of its own. Declare a signature header as a header
+    parameter on the callback, and it's listed with the rest. A callback
+    defined under{" "}
     <code>components.callbacks</code> and referenced with <code>$ref</code>{" "}
     renders the same way.
   </p>
@@ -759,7 +759,7 @@ evt_test_1: duplicate, skipped`}
     Inline the path item under <code>webhooks</code>. Its schemas, parameters,
     request bodies, and responses can stay as <code>$ref</code>s.
   </p>
-  <h3>Webhooks disappeared when the spec moved to 3.1</h3>
+  <h3>Webhooks disappeared when the spec moved to 3.1, with a BLUME_OPENAPI_X_WEBHOOKS warning</h3>
   <p>
     The spec still uses <code>x-webhooks</code>, an extension some tools
     read for OpenAPI 3.0. Blume upgrades a 3.0 spec as it reads it, and that

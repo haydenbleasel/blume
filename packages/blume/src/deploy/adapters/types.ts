@@ -84,13 +84,17 @@ const NAMED_OPTIONS = new Set(["base", "output", "site"]);
 
 /**
  * The options Blume does not name — what reaches the `@astrojs/*` adapter's
- * constructor verbatim.
+ * constructor verbatim. `configOptions` are the ones a host adapter names
+ * itself, for the Astro config rather than the constructor.
  */
 export const deployPassthrough = (
-  options: DeployOptions
+  options: DeployOptions,
+  configOptions: readonly string[] = []
 ): Record<string, JsonValue> =>
   Object.fromEntries(
-    Object.entries(options).filter(([key]) => !NAMED_OPTIONS.has(key))
+    Object.entries(options).filter(
+      ([key]) => !(NAMED_OPTIONS.has(key) || configOptions.includes(key))
+    )
   );
 
 /**

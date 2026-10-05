@@ -12,7 +12,9 @@
 // Notion prefix joins its sidebar group silently, and broken-link reports in
 // both directions. Notion permission levels and connection capabilities, and
 // GitHub CODEOWNERS, checked against their official docs (September 2026).
-// Not yet run end to end against a real Notion workspace.
+// Rechecked the missing-token error (core/sources/notion.ts) and the exact
+// redirect warning (redirectPageDiagnostics in core/project-graph.ts). Not
+// yet run end to end against a real Notion workspace.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -413,8 +415,11 @@ jobs:
     title="blume.config.ts"
   />
   <p>
-    Blume doesn't flag an exact redirect whose old URL is still a published
-    page, so archive the Notion page before you rely on the redirect.
+    Archive the Notion page in the same change. While it's still published,
+    the redirect takes over its URL, so the page never publishes, and the
+    build warns with <code>BLUME_REDIRECT_MATCHES_PAGE</code>.{" "}
+    <code>blume dev</code> shows drafts, so it keeps that warning until the
+    Notion page is gone.
   </p>
 
   <h2>Troubleshooting</h2>
@@ -442,11 +447,12 @@ jobs:
   </p>
   <h3>A Setup pull request fails on the Notion source</h3>
   <p>
-    A fresh CI runner has no snapshot of Notion to fall back on, so a failed
-    fetch stops the run with <code>BLUME_SOURCE_FETCH_FAILED</code> and
-    Notion's own error. Check that <code>NOTION_TOKEN</code> is set as a
-    repository secret. GitHub doesn't pass secrets to workflows run from a
-    fork, so pull requests from forks can't run these checks.
+    A fresh CI runner has no snapshot of Notion to fall back on, so a missing
+    token stops the run with <code>BLUME_MISSING_SECRET</code>, and a failed
+    fetch with <code>BLUME_SOURCE_FETCH_FAILED</code> and Notion's own error.
+    Check that <code>NOTION_TOKEN</code> is set as a repository secret. GitHub
+    doesn't pass secrets to workflows run from a fork, so pull requests from
+    forks can't run these checks.
   </p>
   <h3>A link between the sections is broken</h3>
   <p>

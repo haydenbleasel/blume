@@ -130,9 +130,10 @@ import { guideById } from "../_guides/guides.ts";
     Wrangler brings two packages with install scripts: <code>esbuild</code>,
     and <code>workerd</code>, the Workers runtime Wrangler runs locally. npm and
     Bun run both without extra setup. pnpm runs a dependency's build script only
-    once you approve it, and fails the install with{" "}
-    <code>ERR_PNPM_IGNORED_BUILDS</code> until you do. Approve both, then run{" "}
-    <code>pnpm install</code> again:
+    once you approve it. pnpm 11 and later fail the install with{" "}
+    <code>ERR_PNPM_IGNORED_BUILDS</code> until you do, and pnpm 10 skips the
+    scripts with a warning. Approve both, then run <code>pnpm install</code>{" "}
+    again:
   </p>
   <CodeBlock
     code={`allowBuilds:

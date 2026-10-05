@@ -15,8 +15,16 @@
 // for `index` and nested slugs. Review: aligned the preview, deploy, and
 // rebuild steps with the other CMS guides (Vercel deploy hooks, VERCEL_ENV,
 // and Deployment Protection checked against Vercel's docs), and corrected the
-// missing-token claims against cli/prepare.ts and core/sources/cache.ts. Not
-// yet run end to end against a real Contentful space.
+// missing-token claims against cli/prepare.ts and core/sources/cache.ts.
+// Rechecked the engine's own token check, unresolved-embed warnings, EU
+// hosts, fields.order, and init's .gitignore against core/sources/contentful.ts,
+// remote.ts, and cli/commands/init.ts. Rechecked entry links (a doc page's
+// route, text for other types, a warning for an unpublished page) against
+// contentful.ts and contentful-rich-text.ts, and the entry-hyperlink
+// linkContentType validation against contentful-migration's schema; reran
+// the migration through its parser (no errors) and the custom() config
+// against mocked published and preview responses. Not yet run end to end
+// against a real Contentful space.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -78,13 +86,12 @@ export default defineConfig({
   </p>
   <p>
     Blume imports content at build time, so there's no live preview pane in
-    Contentful's editor: a change shows up after a sync or a rebuild. The
-    source only calls Contentful's global API hosts and has no option to
-    change them, so it doesn't fit a space on Contentful's EU data residency,
-    which is served from separate hosts like{" "}
-    <code>preview.eu.contentful.com</code>. And if everyone who writes your
-    docs works in Git, plain Markdown files are simpler: that's Blume's
-    default, with no CMS at all.
+    Contentful's editor: a change shows up after a sync or a rebuild. A space
+    on Contentful's EU data residency is served from separate hosts, so set
+    the source's <code>host</code> to <code>cdn.eu.contentful.com</code> and
+    its <code>previewHost</code> to <code>preview.eu.contentful.com</code>.
+    And if everyone who writes your docs works in Git, plain Markdown files
+    are simpler: that's Blume's default, with no CMS at all.
   </p>
 
   <h2>Model technical documentation in Contentful</h2>
@@ -152,6 +159,7 @@ export default defineConfig({
           "blockquote",
           "table",
           "hyperlink",
+          "entry-hyperlink",
           "asset-hyperlink",
           "embedded-asset-block",
           "embedded-entry-block",
@@ -160,6 +168,7 @@ export default defineConfig({
       { enabledMarks: ["bold", "italic", "code", "strikethrough"] },
       {
         nodes: {
+          "entry-hyperlink": [{ linkContentType: ["docPage"] }],
           "embedded-entry-block": [{ linkContentType: ["codeBlock"] }],
         },
       },
@@ -172,9 +181,9 @@ export default defineConfig({
   <p>
     The body's validations are the important part. They leave out Heading 1,
     because the title is already the page's top heading, and they leave out
-    links to entries and inline entries, which don't become working links or
-    content on the site (more on that below). Embedded entries are limited to
-    code blocks.
+    inline entries, which don't become content on the site. Links to entries
+    are limited to doc pages, and embedded entries to code blocks (more on
+    both below).
   </p>
   <p>
     Sign in to the Contentful CLI, which stores a management token in your
@@ -214,21 +223,22 @@ npx contentful-cli@4.0.10 space migration --space-id your-space-id migrations/01
     the environment you read (<code>master</code> by default). Copy three
     values from it: the Space ID, the Content Delivery API access token, and
     the Content Preview API access token. Put both tokens in{" "}
-    <code>.env.local</code>, which Blume loads for you, and keep the file out
-    of Git:
+    <code>.env.local</code>, which Blume loads for you. The{" "}
+    <code>blume init</code> step below adds that file to{" "}
+    <code>.gitignore</code>, so it stays out of Git:
   </p>
   <CodeBlock
     code={`cat >> .env.local <<'EOF'
 CONTENTFUL_ACCESS_TOKEN=paste-the-delivery-token
 CONTENTFUL_PREVIEW_TOKEN=paste-the-preview-token
-EOF
-echo ".env.local" >> .gitignore`}
+EOF`}
     lang="bash"
   />
 
   <h2>Connect Contentful to Blume</h2>
   <p>
-    In an empty folder, run <code>npx blume init</code>. When it asks where
+    In the folder that holds <code>migrations/</code> and{" "}
+    <code>.env.local</code>, run <code>npx blume init</code>. When it asks where
     your content lives, pick both <code>filesystem</code> and{" "}
     <code>contentful</code>: the local <code>docs/</code> folder holds pages
     you'd rather keep in Git, like the home page. The Contentful source calls
@@ -261,8 +271,9 @@ export default defineConfig({
     prefix, so <code>install</code> becomes <code>/guides/install</code>. A
     slug with slashes nests, and the slug <code>index</code> becomes the
     landing page at <code>/guides</code>. The pages sit in a sidebar group of
-    their own, sorted by title, since the source has no order field. To read
-    a locale other than your space's default, set <code>locale</code>.
+    their own, sorted by title; to order them, add a number field to Doc
+    page and name its ID in <code>fields.order</code>. To read a locale other
+    than your space's default, set <code>locale</code>.
   </p>
 
   <h2>How rich text maps to docs pages</h2>
@@ -299,20 +310,30 @@ export default defineConfig({
         </td>
       </tr>
       <tr>
+        <td>Any other embedded file, like a PDF</td>
+        <td>A link to the file, labeled with its title or file name</td>
+      </tr>
+      <tr>
         <td>An embedded code block entry</td>
         <td>An HTML comment, so nothing visible, until you add a serializer</td>
       </tr>
       <tr>
-        <td>A link to another entry</td>
+        <td>A link to another doc page entry</td>
+        <td>A link to that page, at the route Blume builds it at</td>
+      </tr>
+      <tr>
+        <td>A link to an entry of any other type</td>
         <td>The link's text only, with no link</td>
       </tr>
     </tbody>
   </table>
   <p>
-    That last row is why the model disables entry links. The source doesn't
-    know which route another entry lives at, so it keeps the words and drops
-    the link. To link between docs pages, writers use an ordinary link to the
-    page's path, like <code>/guides/quickstart</code>, and{" "}
+    Those last two rows are why the model limits entry links to doc pages.
+    Only an entry of the source's own content type becomes a page, so only a
+    link to one has somewhere to go. Blume builds the link from the linked
+    page's slug, so <code>install</code> becomes{" "}
+    <code>/guides/install</code>. To link to a page from the{" "}
+    <code>docs/</code> folder, writers use an ordinary link to its path, and{" "}
     <code>npx blume validate</code> reports any that point at a page that
     doesn't exist.
   </p>
@@ -335,9 +356,11 @@ export default defineConfig({
     Each code block now renders as a highlighted fence in its language. With a
     serializer set, the source writes its pages as MDX, and it still reads
     drafts under <code>--preview</code> and caches like the built-in adapter.
-    One difference: <code>custom()</code> declares no secrets, so Blume never
-    warns about a missing <code>CONTENTFUL_ACCESS_TOKEN</code>. Without it,
-    the fetch fails with a 401.
+    One difference: <code>custom()</code> declares no secrets, so{" "}
+    <code>blume dev</code> and <code>blume build</code> don't warn about an
+    unset <code>CONTENTFUL_ACCESS_TOKEN</code> up front. The engine still
+    checks: without the token, it stops before its first request with{" "}
+    <code>BLUME_MISSING_SECRET</code>.
   </p>
 
   <h2>Preview drafts</h2>
@@ -406,6 +429,11 @@ npx blume dev`}
         <td>Left out of the page</td>
         <td>Shown</td>
       </tr>
+      <tr>
+        <td>A link to a draft page on a published page</td>
+        <td>Its text only</td>
+        <td>A link</td>
+      </tr>
     </tbody>
   </table>
   <p>
@@ -426,7 +454,9 @@ npx blume preview`}
     The Webhooks page is a 404, and the Install page still lacks the new code
     block. Publish the code block and the page in Contentful, build again, and
     both appear. The Delivery API only resolves published entries and assets,
-    so anything a page embeds has to be published too.
+    so anything a page embeds or links to has to be published too, and the
+    build warns <code>BLUME_SOURCE_UNRESOLVED_LINK</code> for each one that
+    isn't.
   </p>
 
   <h2>Deploy with protected previews</h2>
@@ -523,22 +553,25 @@ npx blume preview`}
   <h3>The build fails with 401 or 404</h3>
   <p>
     <code>BLUME_SOURCE_FETCH_FAILED</code> includes Contentful's status. A 401
-    means the token is missing or wrong where the build runs, or a delivery
-    token went into <code>CONTENTFUL_PREVIEW_TOKEN</code>. A 404 means the
-    space ID is wrong or the API key can't access the environment: give the
-    key access to it in its settings. Blume fetches before it checks for
-    missing variables, so on a fresh build this error comes without a{" "}
-    <code>BLUME_MISSING_SECRET</code> warning.
+    means the token is wrong where the build runs, or a delivery token went
+    into <code>CONTENTFUL_PREVIEW_TOKEN</code>. A 404 means the space ID is
+    wrong or the API key can't access the environment: give the key access to
+    it in its settings. A missing <code>CONTENTFUL_ACCESS_TOKEN</code> never
+    gets as far as a request: the source stops first with{" "}
+    <code>BLUME_MISSING_SECRET</code>.
   </p>
   <h3>A code block or image shows in preview but not on the live site</h3>
   <p>
-    The page is published, but the entry or asset it embeds isn't. Publish
-    it, and the next build includes it.
+    The page is published, but the entry or asset it embeds isn't, and the
+    build warns <code>BLUME_SOURCE_UNRESOLVED_LINK</code> naming its ID.
+    Publish it, and the next build includes it.
   </p>
-  <h3>An embedded file shows as a broken image</h3>
+  <h3>A link to another doc page is plain text</h3>
   <p>
-    Every embedded asset becomes an image, including a PDF or a ZIP. Embed
-    only images, and link other files with a link to the asset instead.
+    If the build warns <code>BLUME_SOURCE_UNRESOLVED_LINK</code> naming the
+    linked entry's ID, that page isn't published: publish it, and the next
+    build links it. With no warning, the entry isn't one the source builds as
+    a page, such as an entry of another content type.
   </p>
   <h3>A code block is missing even in preview</h3>
   <p>

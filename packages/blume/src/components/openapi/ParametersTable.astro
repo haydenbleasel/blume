@@ -2,6 +2,7 @@
 import Description from "./Description.astro";
 import {
   constraints,
+  parameterDescription,
   resolveSchema,
   type SchemaLike,
   typeLabel,
@@ -19,9 +20,11 @@ interface ParamLike {
 interface Props {
   parameters: ParamLike[];
   schemas: Record<string, SchemaLike>;
+  /** The headings' level: 2 on an operation, deeper inside a callback. */
+  level?: number;
 }
 
-const { parameters, schemas } = Astro.props;
+const { parameters, schemas, level = 2 } = Astro.props;
 
 const SECTIONS: { in: string; title: string }[] = [
   { in: "path", title: "Path parameters" },
@@ -42,7 +45,7 @@ const groups = SECTIONS.map((section) => ({
   groups.map((group) => (
     <section class="mt-6">
       <div
-        aria-level="2"
+        aria-level={level}
         class="mb-2 font-semibold text-foreground text-sm"
         role="heading"
       >
@@ -54,6 +57,7 @@ const groups = SECTIONS.map((section) => ({
           const type = param.schema ? typeLabel(param.schema) : "string";
           const limits = constraints(resolved);
           const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
+          const description = parameterDescription(param, schemas);
           return (
             <div class="border-border border-t py-4 first:border-t-0">
               <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -70,8 +74,8 @@ const groups = SECTIONS.map((section) => ({
                   </span>
                 )}
               </div>
-              {param.description && (
-                <Description class="mt-2 text-muted-foreground text-sm" text={param.description} />
+              {description && (
+                <Description class="mt-2 text-muted-foreground text-sm" text={description} />
               )}
               {limits.length > 0 && (
                 <div class="mt-2 text-muted-foreground text-xs">

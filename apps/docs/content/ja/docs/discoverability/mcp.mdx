@@ -30,6 +30,8 @@ agents: {
 
 `search_docs` は独自の全文検索インデックスを実行するため、[search](/docs/configuration/search) プロバイダーに関係なく動作します — `search: false` の場合でも同様です。MCP サーバーはページ内検索とは別の機能です。
 
+[非表示ページ](/docs/content/navigation#hidden-pages) は、サイト内検索や `llms.txt` から除外されるのと同様に、`list_pages` と `resources/list` から除外され、[`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) が有効でない限り `search_docs` からも除外されます。ただし、`get_page` と `resources/read` はルートを指定すれば非表示ページも返します。非表示は非公開という意味ではなく、ページは引き続きその URL で、また Markdown としても配信されます。
+
 MCP に対応していないフレームワーク向けに、同じツールが [JSON API](/docs/discoverability/json-api) としてプレーンな HTTP 経由でも利用できます。
 
 エンドポイントはリクエストボディを 64 KB までしか読み取らず、それより大きいリクエストには `413` を返します。存在しないツールの呼び出しや、`arguments` がオブジェクトではない呼び出しには、JSON-RPC の Invalid params エラー（`-32602`）が返されます。
@@ -49,6 +51,8 @@ MCP に対応していないフレームワーク向けに、同じツールが 
 ```
 
 `filters` のすべてのエントリが一致する必要があります（結果にはそのファセット値が含まれ、`list_pages` は各ページの値を表示します）。そのため、ナレッジベースは独自のサーバーを一切用意せずに、段階的開示型のエージェントワークフロー（適用済みの標準を列挙し、その中だけを検索する）を実現できます。
+
+値は `list_pages` に表示されるとおりに、大文字と小文字の区別も含めて完全一致で照合されます。たとえば `"enforced"` は、`status` が `Enforced` のページには一致しません。ファセット値は文字列であるため、`filters` 内の数値や真偽値はその文字列表現と照合されます（`{"priority": 1}` は `priority: 1` のページに一致します）。また、リストなどそれ以外の形式の値は、フィルターとして使われずに無視されます。
 
 ## サーバー出力が必要です [#server-output-required]
 

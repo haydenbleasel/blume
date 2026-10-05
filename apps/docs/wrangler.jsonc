@@ -14,14 +14,19 @@
   "assets": {
     "binding": "ASSETS",
     // Blume prerenders directory-style pages (/docs/usage/index.html) and links
-    // to them without a trailing slash; the default auto-trailing-slash mode
-    // would 307 every page to /docs/usage/. Drop it to keep the canonical URLs.
+    // to them without a trailing slash. Its run_worker_first rules send every
+    // page through the Worker, which serves /docs/usage under either mode, so
+    // this only reaches pages the static layer serves itself (when the build
+    // couldn't write those rules): there the default auto-trailing-slash mode
+    // would 307 /docs/usage to /docs/usage/.
     "html_handling": "drop-trailing-slash",
     "not_found_handling": "404-page",
-    // With a 404 page configured the static layer answers every request that
-    // has no matching asset itself (a POST gets a bare 405), so the server
-    // endpoints must be routed to the Worker explicitly. Blume merges its own
-    // content-route rules into this list at build time.
+    // Under an explicit list the static layer answers every request outside
+    // it, so a POST to an endpoint left off gets a bare 405. The rules Blume
+    // merges in at build time claim every path except fingerprinted assets,
+    // the raw .md/.mdx/.txt files, fixed-path JSON, and .well-known, /mcp
+    // included; listing it keeps the endpoint on the Worker even if that
+    // merge is skipped.
     "run_worker_first": ["/mcp"],
   },
   "observability": {

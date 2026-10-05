@@ -8,7 +8,7 @@ import { dirname, join } from "pathe";
 import { resolveRedirects } from "../src/audit/redirects.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { scanProject } from "../src/core/project-graph.ts";
-import { cloudflare } from "../src/deploy/adapters/index.ts";
+import { cloudflare, vercel } from "../src/deploy/adapters/index.ts";
 import { emitHeaderFiles } from "../src/deploy/artifacts.ts";
 import {
   buildNegotiationWorker,
@@ -16,6 +16,8 @@ import {
   NEGOTIATION_WORKER_FILE,
 } from "../src/deploy/cloudflare-negotiation.ts";
 import { emitCloudflareNegotiation } from "../src/deploy/platforms/cloudflare.ts";
+import type { BuildLog } from "../src/deploy/platforms/index.ts";
+import { vercelPlatform } from "../src/deploy/platforms/vercel.ts";
 import {
   applyBaseToAstroRedirects,
   applyBaseToPlatformRedirects,
@@ -24,13 +26,20 @@ import {
 } from "../src/deploy/redirects.ts";
 import { buildRssFeeds } from "../src/deploy/rss.ts";
 import { buildSitemapFiles } from "../src/deploy/sitemap.ts";
+import {
+  ACCEPT_MARKDOWN_CONDITIONS,
+  injectNegotiationRoutes,
+  rebaseAdapterRoutes,
+} from "../src/deploy/vercel-negotiation.ts";
+import type { VercelRoute } from "../src/deploy/vercel-negotiation.ts";
 
 // Deploy output under `deployment.base` and `basePath`: generated URLs always
 // mount under the deployment base, a redirect to a public file never gains
-// `basePath`, Vercel reads each redirect `from` as a literal path, and a
+// `basePath`, Vercel reads each redirect `from` as a literal path, a
 // Cloudflare server build keeps `_headers` and the 404 twins where the
 // platform reads them once `@astrojs/cloudflare` moves the client output
-// under the base (`dist/client/<base>/`).
+// under the base (`dist/client/<base>/`), and a Vercel server build moves
+// the static files and routes `@astrojs/vercel` leaves at the root under it.
 
 const dirs: string[] = [];
 
@@ -169,6 +178,9 @@ describe("redirects to public files", () => {
     ).toStrictEqual([
       "/files/whitepaper.pdf",
       "/docs/releases/v1.2",
+      // The page's Markdown copies move with it; a file has none.
+      "/docs/releases/v1.2.md",
+      "/docs/releases/v1.2.mdx",
       "/docs/intro#setup",
     ]);
   });
@@ -301,5 +313,295 @@ describe("Cloudflare server build under a base", () => {
       await readFile(join(serverDir, "wrangler.json"), "utf-8")
     );
     expect(wrangler.assets.run_worker_first[0]).toBe("/docs");
+  });
+});
+
+/**
+ * The routing config `@astrojs/vercel` writes for a server build under
+ * `/docs`, trimmed to one route of each kind: its patterns match base-less
+ * paths, and its redirect from `/old-intro` to the page at `/docs/intro`
+ * lost a slash on one side and doubled the base on the other.
+ */
+const VERCEL_ADAPTER_ROUTES: VercelRoute[] = [
+  { headers: { Location: "/$1" }, src: "^/(.*)/$", status: 308 },
+  {
+    headers: { Location: "/docs/docs/intro" },
+    src: "^/docsold-intro$",
+    status: 301,
+  },
+  { handle: "filesystem" },
+  {
+    continue: true,
+    headers: { "cache-control": "public, max-age=31536000, immutable" },
+    src: "^/_astro/(.*)$",
+  },
+  { dest: "_render", src: "^/_server-islands/([^/]+?)$" },
+  { dest: "_render", src: "^/api(?:/(.*?))?$" },
+  { dest: "_render", src: "^/old-intro$" },
+  { dest: "/404.html", src: "^/.*$", status: 404 },
+];
+
+const vercelConfig = (routes: VercelRoute[]): string =>
+  JSON.stringify({ routes, version: 3 });
+
+const routesOf = (text: string | null): VercelRoute[] =>
+  JSON.parse(text ?? "{}").routes;
+
+const REDIRECT_TO_INTRO: VercelRoute = {
+  headers: { Location: "/docs/intro" },
+  src: "^/docs/old-intro/?$",
+  status: 301,
+};
+
+describe("rebaseAdapterRoutes", () => {
+  it("moves every adapter route under the base and swaps in the redirects", () => {
+    expect(
+      routesOf(
+        rebaseAdapterRoutes(vercelConfig(VERCEL_ADAPTER_ROUTES), "/docs", [
+          REDIRECT_TO_INTRO,
+        ])
+      )
+    ).toStrictEqual([
+      // Strips the slash from any path, base and all.
+      { headers: { Location: "/$1" }, src: "^/(.*)/$", status: 308 },
+      REDIRECT_TO_INTRO,
+      { handle: "filesystem" },
+      {
+        continue: true,
+        headers: { "cache-control": "public, max-age=31536000, immutable" },
+        src: "^/docs/_astro/(.*)$",
+      },
+      { dest: "_render", src: "^/docs/_server-islands/([^/]+?)$" },
+      { dest: "_render", src: "^/docs/api(?:/(.*?))?$" },
+      { dest: "_render", src: "^/docs/old-intro$" },
+      { dest: "/docs/404.html", src: "^/docs/.*$", status: 404 },
+    ]);
+  });
+
+  it("serves the root routes at the base itself", () => {
+    const routes = routesOf(
+      rebaseAdapterRoutes(
+        vercelConfig([
+          // A header route the adapter splices in as a bare pathname.
+          { continue: true, headers: { "x-page": "home" }, src: "/" },
+          { handle: "filesystem" },
+          { dest: "_render", src: "^/$" },
+          { dest: "_render", src: "^(?:/(.*?))?$" },
+        ]),
+        "/my.docs",
+        []
+      )
+    );
+    expect(routes.map((route) => route.src)).toStrictEqual([
+      String.raw`^/my\.docs$`,
+      undefined,
+      String.raw`^/my\.docs$`,
+      String.raw`^/my\.docs(?:/(.*?))?$`,
+    ]);
+  });
+
+  it("refuses a config it can't splice into", () => {
+    expect(rebaseAdapterRoutes("not json", "/docs", [])).toBeNull();
+    expect(rebaseAdapterRoutes("{}", "/docs", [])).toBeNull();
+    expect(
+      rebaseAdapterRoutes(vercelConfig([{ src: "^/$" }]), "/docs", [])
+    ).toBeNull();
+  });
+});
+
+/** Every negotiation route, for the home page and `/intro`, under `/docs`. */
+const injectUnderDocs = (text: string): string | null =>
+  injectNegotiationRoutes(
+    text,
+    ["/", "/intro"],
+    "</docs/llms.txt>",
+    {},
+    12,
+    { json: true, markdown: true },
+    ["/.well-known/ai-catalog.json"],
+    true,
+    "/docs"
+  );
+
+describe("Vercel negotiation under a base", () => {
+  const rebased =
+    rebaseAdapterRoutes(vercelConfig(VERCEL_ADAPTER_ROUTES), "/docs", []) ?? "";
+
+  it("matches and names the served paths", () => {
+    const routes = routesOf(injectUnderDocs(rebased));
+    const bySrc = (src: string) => routes.filter((route) => route.src === src);
+    expect(bySrc("^(?:/docs|/docs/intro)/?$")).toHaveLength(1);
+    // The Link header, then the rewrite once per pair of `accept` conditions.
+    expect(bySrc("^/docs$").map((route) => route.dest)).toStrictEqual([
+      undefined,
+      "/docs/index.md",
+      "/docs/index.md",
+    ]);
+    expect(
+      bySrc("^(/docs/intro)/?$").map((route) => [route.dest, route.missing])
+    ).toStrictEqual([
+      ["$1.md", undefined],
+      ["$1.md", ACCEPT_MARKDOWN_CONDITIONS[1]?.missing],
+    ]);
+    expect(
+      bySrc(String.raw`^/docs/\.well-known/ai-catalog\.json$`)
+    ).toHaveLength(1);
+    expect(bySrc(String.raw`^/docs/blume-assets/.+\.svg$`)).toHaveLength(1);
+    // The 404 twins sit right ahead of the fallback the rebase moved.
+    expect(routes.slice(-7).map((route) => route.dest)).toStrictEqual([
+      "/docs/404.md",
+      "/docs/404.md",
+      "/docs/404.md",
+      "/docs/404.json",
+      "/docs/404.json",
+      "/docs/404.json",
+      "/docs/404.html",
+    ]);
+    expect(routes.at(-3)?.src).toBe("^/docs/.*$");
+    expect(routes.at(-2)?.src).toBe(String.raw`^/docs/.*\.json$`);
+  });
+
+  it("replaces its own routes when injected again", () => {
+    const once = injectUnderDocs(rebased) ?? "";
+    expect(injectUnderDocs(once)).toBe(once);
+  });
+});
+
+/** A build log that keeps the errors. */
+const errorRecorder = () => {
+  const errors: string[] = [];
+  const log: BuildLog = {
+    error: (message) => errors.push(message),
+    info: () => {},
+    success: () => {},
+    warn: () => {},
+  };
+  return { errors, log };
+};
+
+const vercelProject = async (
+  base: string,
+  files: Record<string, string>
+): Promise<BlumeProject> =>
+  await project(
+    `{ deployment: ${JSON.stringify(vercel({ base }))}, redirects: ${JSON.stringify(
+      [
+        { from: "/old-intro", status: 301, to: "/intro" },
+        { from: "/beta/:slug*", status: 302, to: "/intro" },
+      ]
+    )} }`,
+    files
+  );
+
+describe("Vercel server build under a base", () => {
+  const BUILT = {
+    ".vercel/output/static/404.md": "# Page not found\n",
+    ".vercel/output/static/_astro/page.js": "export {};\n",
+    ".vercel/output/static/index.html": "<h1>Home</h1>\n",
+  };
+
+  it("serves the static files and routes from the base", async () => {
+    const built = await vercelProject("/docs", {
+      ...BUILT,
+      ".vercel/output/config.json": vercelConfig(VERCEL_ADAPTER_ROUTES),
+    });
+    const { errors, log } = errorRecorder();
+    expect(
+      await vercelPlatform.finalizeBuild?.({
+        isolated: false,
+        log,
+        project: built,
+      })
+    ).toBe(true);
+    expect(errors).toStrictEqual([]);
+    const outputDir = join(built.context.root, ".vercel", "output");
+    const staticDir = join(outputDir, "static");
+    expect(existsSync(join(staticDir, "docs", "_astro", "page.js"))).toBe(true);
+    expect(existsSync(join(staticDir, "docs", "index.html"))).toBe(true);
+    expect(existsSync(join(staticDir, "index.html"))).toBe(false);
+    const routes = routesOf(
+      await readFile(join(outputDir, "config.json"), "utf-8")
+    );
+    const srcs = routes.map((route) => route.src);
+    expect(srcs).not.toContain("^/docsold-intro$");
+    // The exact redirect and its Markdown copies, rebuilt ahead of the
+    // pattern ones.
+    const redirects = routes.filter((route) => route.headers?.Location);
+    expect(redirects.slice(1)).toStrictEqual([
+      REDIRECT_TO_INTRO,
+      {
+        headers: { Location: "/docs/intro.md" },
+        src: String.raw`^/docs/old-intro\.md/?$`,
+        status: 301,
+      },
+      {
+        headers: { Location: "/docs/intro.mdx" },
+        src: String.raw`^/docs/old-intro\.mdx/?$`,
+        status: 301,
+      },
+      {
+        headers: { Location: "/docs/intro" },
+        src: "^/docs/beta/?$",
+        status: 302,
+      },
+      {
+        headers: { Location: "/docs/intro" },
+        src: "^/docs/beta/(.+?)/?$",
+        status: 302,
+      },
+    ]);
+    expect(srcs).toContain("^/docs/_astro/(.*)$");
+    expect(routes.at(-1)?.dest).toBe("/docs/404.html");
+    expect(routes.at(-2)?.dest).toBe("/docs/404.md");
+  });
+
+  it("moves the static files of a verify build without routing them", async () => {
+    const built = await vercelProject("/a/b/", {
+      ...BUILT,
+      ".vercel/output/config.json": vercelConfig(VERCEL_ADAPTER_ROUTES),
+    });
+    const { log } = errorRecorder();
+    expect(
+      await vercelPlatform.finalizeBuild?.({
+        isolated: true,
+        log,
+        project: built,
+      })
+    ).toBe(true);
+    const outputDir = join(built.context.root, ".vercel", "output");
+    expect(
+      existsSync(join(outputDir, "static", "a", "b", "_astro", "page.js"))
+    ).toBe(true);
+    expect(await readFile(join(outputDir, "config.json"), "utf-8")).toBe(
+      vercelConfig(VERCEL_ADAPTER_ROUTES)
+    );
+  });
+
+  it("passes a build with no routing config", async () => {
+    const built = await vercelProject("/docs", {});
+    const { errors, log } = errorRecorder();
+    expect(
+      await vercelPlatform.finalizeBuild?.({
+        isolated: false,
+        log,
+        project: built,
+      })
+    ).toBe(true);
+    expect(errors).toStrictEqual([]);
+  });
+
+  it("refuses to ship routes it couldn't move under the base", async () => {
+    const built = await vercelProject("/docs", {
+      ".vercel/output/config.json": "not json",
+    });
+    const { errors, log } = errorRecorder();
+    expect(
+      await vercelPlatform.finalizeBuild?.({
+        isolated: false,
+        log,
+        project: built,
+      })
+    ).toBe(false);
+    expect(errors[0]).toContain('deployment base "/docs"');
   });
 });

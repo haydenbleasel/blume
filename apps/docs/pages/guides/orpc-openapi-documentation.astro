@@ -13,7 +13,10 @@
 // by generating with @orpc/* 2.0.0-beta.40. blume dev and blume build were
 // not run on the project. Not yet run end to end. Review: moved Blume out of
 // the API's package into its own docs-site/ project, to match the other
-// framework guides.
+// framework guides. Later: dropped the script's description-copying loop
+// (Blume reads a parameter schema's description, helpers.ts
+// parameterDescription), the dev restart (dev watches local specs), and the
+// 3.1-only note (3.2 renders); checked in source, not re-run.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -50,7 +53,8 @@ import { guideById } from "../_guides/guides.ts";
     current <code>latest</code> release on npm, documented at{" "}
     <a href="https://v1.orpc.dev/docs/openapi/openapi-specification">v1.orpc.dev</a>.
     oRPC 2 moves route metadata to <code>.meta(openapi(...))</code> and writes
-    OpenAPI 3.2 by default; the last troubleshooting entry covers what to change.
+    OpenAPI 3.2 by default, which Blume also renders; the last troubleshooting
+    entry covers what to change.
   </Callout>
 
   <h2>RPC paths and documented paths</h2>
@@ -420,18 +424,6 @@ const spec = await generator.generate(contract, {
   security: [{ bearerAuth: [] }],
 });
 
-// oRPC writes a path or query field's description on the parameter's
-// schema. Copy it onto the parameter, where the parameter tables read it.
-for (const pathItem of Object.values(spec.paths ?? {})) {
-  for (const method of ["get", "put", "post", "patch", "delete"] as const) {
-    for (const parameter of pathItem?.[method]?.parameters ?? []) {
-      if ("in" in parameter && parameter.schema && "description" in parameter.schema) {
-        parameter.description ??= parameter.schema.description;
-      }
-    }
-  }
-}
-
 await writeFile("docs-site/openapi.json", \`\${JSON.stringify(spec, null, 2)}\\n\`);
 console.log("Wrote docs-site/openapi.json");`}
     lang="ts"
@@ -453,18 +445,19 @@ console.log("Wrote docs-site/openapi.json");`}
       an Authorization section on every operation.
     </li>
     <li>
-      <strong>The loop</strong> copies each path and query field's description
-      up to the parameter. Without it, the <code>id</code> parameter on Get a
-      message shows no description.
+      <strong>Path and query fields</strong> keep their descriptions on the
+      parameter's schema, where oRPC writes them. Blume's parameter tables and
+      Try it panel read a description from there when the parameter has none
+      of its own, so the <code>id</code> parameter on Get a message shows its
+      description without any post-processing.
     </li>
   </ul>
   <p>Run it:</p>
   <CodeBlock code="npm run openapi" lang="bash" />
   <p>
     The file starts <code>"openapi": "3.1.1"</code>, the version oRPC 1 writes.
-    That's the version Blume renders: it upgrades Swagger 2.0 and OpenAPI 3.0
-    to 3.1 as it reads them, but it doesn't convert 3.2, and it has no page for
-    3.2's <code>QUERY</code> method.
+    Blume reads 3.1 and 3.2 documents as written, and upgrades Swagger 2.0 and
+    OpenAPI 3.0 to 3.1 as it reads them.
   </p>
 
   <h2>Render the reference with Blume</h2>
@@ -601,16 +594,11 @@ npm run dev`}
     title="src/router.ts"
   />
   <p>
-    Regenerate the spec from the API project, then restart the docs dev
-    server. Blume reads the spec when <code>blume dev</code> starts and doesn't
-    watch it, so a running dev server keeps showing the old one:
+    Regenerate the spec from the API project. <code>blume dev</code> watches{" "}
+    <code>docs-site/openapi.json</code>, so a running docs dev server picks up
+    the new file without a restart:
   </p>
-  <CodeBlock
-    code={`npm run openapi
-cd docs-site
-npm run dev`}
-    lang="bash"
-  />
+  <CodeBlock code="npm run openapi" lang="bash" />
   <p>
     Two things change on the site. A Cancel a message page appears at{" "}
     <code>/api/messages/cancel-message</code>, in the sidebar and in search.
@@ -699,8 +687,12 @@ npm run dev`}
   <h3>The spec says "openapi": "3.2.0"</h3>
   <p>
     You're on oRPC 2. Its generator writes OpenAPI 3.2 unless told otherwise,
-    and Blume renders 3.1. Pass <code>version: "3.1.1"</code> to{" "}
-    <code>generate()</code>. The other oRPC 2 changes: route metadata moves from{" "}
+    and Blume renders 3.2 as written, so the spec itself needs no change. If
+    Blume logs <code>BLUME_OPENAPI_UNSUPPORTED</code>, the spec uses a 3.2
+    addition it doesn't render yet (<code>additionalOperations</code> or an{" "}
+    <code>in: querystring</code> parameter); pass <code>version: "3.1.1"</code>{" "}
+    to <code>generate()</code> to get a 3.1 document instead. The code in this
+    guide needs these oRPC 2 changes: route metadata moves from{" "}
     <code>.route(...)</code> to <code>.meta(openapi(...))</code>, with{" "}
     <code>openapi</code> imported from <code>@orpc/openapi</code>; the
     generator's option is <code>converters</code>, with{" "}

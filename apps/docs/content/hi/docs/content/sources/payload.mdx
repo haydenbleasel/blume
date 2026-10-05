@@ -18,7 +18,8 @@ export default defineConfig({
         prefix: "handbook",
         url: "https://cms.example.com",
         collection: "docs",
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "richText" },
         // Extra query parameters: where[...], sort
         params: { sort: "title" },
@@ -28,4 +29,4 @@ export default defineConfig({
 });
 ```
 
-API कुंजी `PAYLOAD_API_KEY` एनवायरनमेंट वेरिएबल से ली जाती है और `users API-Key <key>` के रूप में भेजी जाती है। यदि कुंजी किसी दूसरे auth-सक्षम कलेक्शन की है, तो `authCollection` सेट करें। केवल प्रकाशित दस्तावेज़ इम्पोर्ट किए जाते हैं। `--preview` ड्राफ़्ट भी माँगता है और उन्हें `draft: true` के साथ स्टेज करता है। दस्तावेज़ `depth: 1` के साथ फ़ेच किए जाते हैं, ताकि अपलोड के साथ उनके URL भी आएँ। सापेक्ष अपलोड पथ (`/media/x.png`) `url` के आधार पर रिज़ॉल्व होता है। यदि आप `payloadSource` को सीधे बनाकर [`custom()`](/docs/content/sources/custom) को पास करते हैं, तो इंजन के `serializers` विकल्प से `block` या `inlineBlock` नोड को किसी Blume कॉम्पोनेंट से मैप किया जा सकता है। यह मैपिंग `blockType` के आधार पर होती है। `serializers` सेट करने पर सोर्स के पेज MDX के रूप में लिखे जाते हैं, ताकि लौटाए गए कॉम्पोनेंट रेंडर हो सकें। Markdown टेक्स्ट फ़ील्ड में रखी गई बॉडी Markdown ही रहती है।
+API कुंजी `PAYLOAD_API_KEY` एनवायरनमेंट वेरिएबल से ली जाती है और `users API-Key <key>` के रूप में भेजी जाती है। यदि कुंजी किसी दूसरे auth-सक्षम कलेक्शन की है, तो `authCollection` सेट करें। केवल प्रकाशित दस्तावेज़ इम्पोर्ट किए जाते हैं। `--preview` ड्राफ़्ट भी माँगता है और उन्हें `draft: true` के साथ स्टेज करता है। दस्तावेज़ `depth: 1` के साथ फ़ेच किए जाते हैं, ताकि अपलोड के साथ उनके URL भी आएँ। सापेक्ष अपलोड पथ (`/media/x.png`) `url` के आधार पर रिज़ॉल्व होता है। अपलोड डाउनलोड नहीं किए जाते। उन्हें उसी URL से संदर्भित किया जाता है, क्योंकि Notion के URL की तरह यह URL समाप्त नहीं होता। इसलिए पाठकों के ब्राउज़र उन्हें आपके Payload सर्वर या उसके स्टोरेज से लोड करते हैं। यदि आप चाहते हैं कि Blume बिल्ड के समय उन्हें डाउनलोड और ऑप्टिमाइज़ करे, तो [`image.domains`](/docs/configuration#images) में होस्ट को अधिकृत करें। यदि आप `payloadSource` को सीधे बनाकर [`custom()`](/docs/content/sources/custom) को पास करते हैं, तो इंजन के `serializers` विकल्प से `block` या `inlineBlock` नोड को किसी Blume कॉम्पोनेंट से मैप किया जा सकता है। यह मैपिंग `blockType` के आधार पर होती है। `serializers` सेट करने पर सोर्स के पेज MDX के रूप में लिखे जाते हैं, ताकि लौटाए गए कॉम्पोनेंट रेंडर हो सकें। Markdown टेक्स्ट फ़ील्ड में रखी गई बॉडी Markdown ही रहती है। जिस नोड का कोई Markdown समकक्ष नहीं है, या जिस ब्लॉक के लिए कोई सीरियलाइज़र नहीं है, उसे छोड़ दिया जाता है और उसकी जगह एक टिप्पणी रखी जाती है। ऐसे में सोर्स `BLUME_SOURCE_UNSUPPORTED_NODE` चेतावनी देता है, जिसमें उस नोड और पेज का नाम होता है।

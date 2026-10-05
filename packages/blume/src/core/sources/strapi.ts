@@ -1,6 +1,6 @@
 import type { JsonObject } from "./json.ts";
 import { asNumber, asObject, asString, getPath, objectsIn } from "./json.ts";
-import type { RemoteFieldMap, RestClient } from "./remote.ts";
+import type { RemoteFieldMap, RemoteFields, RestClient } from "./remote.ts";
 import {
   documentEntry,
   fetchJson,
@@ -38,7 +38,7 @@ export interface StrapiSourceOptions {
 
 const PAGE_SIZE = 100;
 
-const DEFAULT_FIELDS: Required<RemoteFieldMap> = {
+const DEFAULT_FIELDS: RemoteFields = {
   body: "content",
   description: "description",
   lastModified: "updatedAt",

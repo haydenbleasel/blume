@@ -101,6 +101,12 @@ export const linkChecks: CheckModule = {
         return;
       }
       if (resolved.kind === "outside-base") {
+        // A full URL on this host outside the base names another app there
+        // (the navigation docs say to link one that way), not a page of this
+        // build that lost its base.
+        if (resolved.absolute) {
+          return;
+        }
         if (link.content) {
           found.push(
             finding(
@@ -215,11 +221,18 @@ export const linkChecks: CheckModule = {
 
     const homeUrl = normalizeBasePath(context.project.config.basePath) || "/";
     for (const page of orphanPages(context.pages, context.graph, homeUrl)) {
+      // A `sidebar.hidden` page is in no other page's navigation either, so
+      // it isn't reachable from the sidebar at all.
+      const fromNavigation = [
+        ...(context.graph.chromeIn.get(page.url) ?? []),
+      ].some((from) => from !== page.url);
       found.push(
         finding(
           "BLUME_AUDIT_ORPHAN_PAGE",
           pageSite(context, page),
-          "No other page's body links here — it is reachable only from the sidebar."
+          fromNavigation
+            ? "No other page's body links here — it is reachable only from the sidebar."
+            : "No page links here, from its body or from navigation, so readers and crawlers can't reach it."
         )
       );
     }

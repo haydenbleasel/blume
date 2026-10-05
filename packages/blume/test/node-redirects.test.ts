@@ -195,8 +195,12 @@ describe("nodeRedirects", () => {
         { from: "/old", status: 308, to: "/guide" },
       ],
     });
+    // The moved page's Markdown copies follow it, while `/`, still a page,
+    // keeps its own.
     expect(nodeRedirects(project)).toStrictEqual({
       "/docs/old": ["/docs/guide", 308],
+      "/docs/old.md": ["/docs/guide.md", 308],
+      "/docs/old.mdx": ["/docs/guide.mdx", 308],
     });
   });
 

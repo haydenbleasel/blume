@@ -13,9 +13,11 @@
 // upstash() with no secrets (memory fallback and its warning), and an
 // unreachable store (requests let through, error logged). Not yet run end to
 // end with blume dev, a real Upstash database, or a Cloudflare Worker.
-// Review: the stuck-key troubleshooting entry comes from reading
-// upstashLimiter (SET NX EX, INCR, and TTL in a pipeline, not a transaction),
-// not from a run; the Marketplace's KV_REST_API_* names from Upstash's docs.
+// Updated against 400b5ff3: upstash() counts in one EVAL script and takes
+// urlEnv/tokenEnv (ratelimit/upstash.ts), node() takes allowedDomains
+// (deploy/adapters/node.ts, docs rate-limiting.mdx "Behind a reverse
+// proxy"); read, not rerun. The Marketplace's KV_REST_API_* names come from
+// Upstash's docs.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -257,17 +259,17 @@ After the wait: 400  Invalid request: send 1-40 user/assistant messages with str
   <p>
     Create an Upstash Redis database, either from the Vercel Marketplace or in
     the Upstash console. Blume talks to it over Upstash's REST API, so there's
-    no package to install. It reads two variables:{" "}
+    no package to install. By default it reads two variables:{" "}
     <code>UPSTASH_REDIS_REST_URL</code> and{" "}
     <code>UPSTASH_REDIS_REST_TOKEN</code>.
   </p>
   <p>
     The Marketplace connects the database to your project as{" "}
-    <code>KV_REST_API_URL</code> and <code>KV_REST_API_TOKEN</code>, and Blume
-    doesn't read those names. In your project's environment variables, add{" "}
-    <code>UPSTASH_REDIS_REST_URL</code> and{" "}
-    <code>UPSTASH_REDIS_REST_TOKEN</code> with the same values. Then switch the
-    adapter, back at the default numbers:
+    <code>KV_REST_API_URL</code> and <code>KV_REST_API_TOKEN</code> instead,
+    with any prefix you chose when you connected it. Name those variables with{" "}
+    <code>urlEnv</code> and <code>tokenEnv</code> when you switch the adapter,
+    back at the default numbers. For a database from the Upstash console, set
+    the two <code>UPSTASH_</code> variables and leave both options out.
   </p>
   <CodeBlock
     code={`import { defineConfig } from "blume";
@@ -280,7 +282,13 @@ export default defineConfig({
   ai: {
     assistant: { enabled: true },
   },
-  rateLimit: upstash({ requests: 30, window: 600 }),
+  rateLimit: upstash({
+    requests: 30,
+    window: 600,
+    // The names the Vercel Marketplace sets.
+    urlEnv: "KV_REST_API_URL",
+    tokenEnv: "KV_REST_API_TOKEN",
+  }),
 });`}
     lang="ts"
     title="blume.config.ts"
@@ -354,16 +362,18 @@ export default defineConfig({
   </p>
   <p>You can also look at the counters in the database:</p>
   <CodeBlock
-    code={`curl -s -X POST "$UPSTASH_REDIS_REST_URL" \\
-  -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \\
+    code={`curl -s -X POST "$KV_REST_API_URL" \\
+  -H "Authorization: Bearer $KV_REST_API_TOKEN" \\
   -d '["KEYS", "blume:*"]'`}
     lang="bash"
   />
   <p>
     Each key is <code>blume:</code>, then the hostname, the route, and the
     address, like <code>blume:docs.acme.example:ask:203.0.113.7</code>, and it
-    expires when its window ends. Give the counters a database of their own,
-    since <code>KEYS</code> scans everything in it.
+    expires when its window ends. Blume counts a request and sets the key's
+    expiry in one script, so a count can't outlive its window. Give the
+    counters a database of their own, since <code>KEYS</code> scans everything
+    in it.
   </p>
   <p>
     The test uses up your own address's budget, so the production assistant
@@ -405,7 +415,12 @@ export default defineConfig({
       captcha: turnstile({ siteKey: "1x00000000000000000000BB" }),
     },
   },
-  rateLimit: upstash({ requests: 30, window: 600 }),
+  rateLimit: upstash({
+    requests: 30,
+    window: 600,
+    urlEnv: "KV_REST_API_URL",
+    tokenEnv: "KV_REST_API_TOKEN",
+  }),
 });`}
     lang="ts"
     title="blume.config.ts"
@@ -463,45 +478,54 @@ export default defineConfig({
   <h3>The deployed limit lets through more than you set</h3>
   <p>
     Check that the adapter really is shared. Your function logs say "Rate
-    limiting counts in memory: set UPSTASH_REDIS_REST_URL and
-    UPSTASH_REDIS_REST_TOKEN to share the count through Upstash." when the
-    variables didn't reach the deployment, and "Rate limiting failed; letting
+    limiting counts in memory: set KV_REST_API_URL and KV_REST_API_TOKEN to
+    share the count through Upstash." (naming the variables your config reads)
+    when they didn't reach the deployment, and "Rate limiting failed; letting
     the request through" when the store can't be reached. Also check that{" "}
     <code>rateLimit</code> isn't set to <code>false</code>.
   </p>
-  <h3>The build warns BLUME_MISSING_SECRET for UPSTASH_REDIS_REST_URL</h3>
+  <h3>The build warns BLUME_MISSING_SECRET for an Upstash variable</h3>
   <p>
-    The Marketplace names don't count. Add the two <code>UPSTASH_</code>{" "}
-    variables with the same values as <code>KV_REST_API_URL</code> and{" "}
-    <code>KV_REST_API_TOKEN</code>, then redeploy.
+    The warning names the variable Blume looked for. If it says{" "}
+    <code>UPSTASH_REDIS_REST_URL</code> on a Marketplace database, set{" "}
+    <code>urlEnv</code> and <code>tokenEnv</code> as shown above. If it names
+    your <code>KV_REST_API_</code> variables, check their prefix in the
+    project's environment variables, then redeploy.
   </p>
   <h3 id="everyone-hits-the-limit-at-once">Everyone hits the limit at once on a self-hosted server</h3>
   <p>
     On <code>deployment: node()</code> behind a reverse proxy or load balancer,
-    the server can see the proxy's address on every request. Astro only trusts{" "}
-    <code>X-Forwarded-For</code> when the request's host matches its{" "}
-    <code>security.allowedDomains</code> setting, which Blume doesn't set, so
-    every reader shares one count. Limit the route in the proxy instead and set{" "}
-    <code>rateLimit: false</code>.
-  </p>
-  <h3>One reader stays limited long after the window</h3>
-  <p>
-    With <code>upstash()</code>, check that reader's key. Blume opens a window
-    and counts the request in separate commands, so a key that expires
-    between them comes back without an expiry, and that reader's count never
-    resets. A <code>TTL</code> of <code>-1</code> means this happened; delete
-    the key to reset it:
+    the server sees the proxy's address on every request, so every reader
+    shares one count. Astro only reads the reader's address from{" "}
+    <code>X-Forwarded-For</code> for a host listed in its{" "}
+    <code>security.allowedDomains</code>, which <code>node()</code> sets from{" "}
+    <code>allowedDomains</code>. List the host the proxy answers for:
   </p>
   <CodeBlock
-    code={`curl -s -X POST "$UPSTASH_REDIS_REST_URL" \\
-  -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \\
-  -d '["TTL", "blume:docs.acme.example:ask:203.0.113.7"]'
+    code={`import { defineConfig } from "blume";
+import { node } from "blume/deploy";
 
-curl -s -X POST "$UPSTASH_REDIS_REST_URL" \\
-  -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \\
-  -d '["DEL", "blume:docs.acme.example:ask:203.0.113.7"]'`}
-    lang="bash"
+export default defineConfig({
+  title: "Acme Docs",
+  deployment: node({
+    site: "https://docs.acme.example",
+    allowedDomains: [{ hostname: "docs.acme.example" }],
+  }),
+  ai: {
+    assistant: { enabled: true },
+  },
+});`}
+    lang="ts"
+    title="blume.config.ts"
   />
+  <p>
+    Have the proxy pass the site's host through and replace any{" "}
+    <code>X-Forwarded-For</code> the reader sent with the address it sees, like
+    nginx's <code>proxy_set_header X-Forwarded-For $remote_addr;</code>. A
+    proxy that appends to the header lets a reader name their own address and
+    get a fresh count on every request. Leave <code>allowedDomains</code> unset
+    when readers reach the server directly.
+  </p>
   <h3>Readers see "We couldn't check that you're human"</h3>
   <p>
     The bot check failed in the browser or at the route. Make sure the widget's

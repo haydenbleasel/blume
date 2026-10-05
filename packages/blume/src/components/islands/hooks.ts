@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  ASK_MAX_MESSAGES,
+  ASK_MAX_MESSAGES_CHARS,
+} from "../../ai/ask-limits.ts";
 import { captchaToken } from "../../captcha/client.ts";
 import type { CaptchaSettings } from "../../captcha/schema.ts";
 import type { BlumeClientData } from "../../core/data.ts";
@@ -265,6 +269,28 @@ const currentPath = (): string =>
   stripBase(import.meta.env.BASE_URL, window.location.pathname);
 
 /**
+ * The conversation as the route is sent it: all of it while it fits the
+ * route's limits (`ai/ask-limits.ts`), else the latest turns that do, the
+ * oldest dropped first, so a long chat keeps working instead of answering
+ * `400`. The kept turns open with a question, not an answer cut from its
+ * own, and the question being asked always goes, even alone over the limit.
+ */
+const withinAskLimits = (history: AskMessage[]): AskMessage[] => {
+  const last = history.length - 1;
+  let start = Math.max(0, history.length - ASK_MAX_MESSAGES);
+  while (
+    start < last &&
+    JSON.stringify(history.slice(start)).length > ASK_MAX_MESSAGES_CHARS
+  ) {
+    start += 1;
+  }
+  while (start < last && history[start]?.role !== "user") {
+    start += 1;
+  }
+  return history.slice(start);
+};
+
+/**
  * Stream answers from the assistant endpoint. Mirrors the built-in assistant island so
  * a custom chat UI shares the same grounded, page-aware backend.
  */
@@ -366,7 +392,7 @@ export const useAssistant = (
         }
         const payload: AskPayload = {
           captcha: token,
-          messages: history,
+          messages: withinAskLimits(history),
           page: { path },
         };
         const response = await fetch(endpoint, {

@@ -204,10 +204,10 @@ export async function buildApp(options = {}) {
     upgrades Swagger 2.0 and OpenAPI 3.0 as it reads them.
   </p>
   <p>
-    Don't pick <code>"3.2.0"</code>, even though the plugin supports it. Blume
-    doesn't convert 3.2 documents and renders only what 3.1 defines, so{" "}
-    <code>QUERY</code> routes would be missing and nested tags would come out
-    flat.
+    The plugin also supports <code>"3.2.0"</code>, and Blume reads a 3.2
+    document as written, <code>QUERY</code> routes included. A few 3.2
+    additions don't render yet, like nested tags, which come out as one flat
+    list; see <a href="/docs/references/openapi#openapi-32">OpenAPI 3.2</a>.
   </p>
 
   <h2>Define shared schemas and examples</h2>
@@ -670,9 +670,9 @@ await app.register(cors, { origin: ["https://docs.acme.example"] });`}
     The <a href="/docs/deployment">deployment docs</a> cover each host.
   </p>
   <p>
-    The Blume dev server doesn't watch the spec file.
-    After <code>npm run openapi</code>, restart <code>npm run dev</code> to see
-    the new routes.
+    The Blume dev server watches the spec file, so after{" "}
+    <code>npm run openapi</code>, a running <code>npm run dev</code> shows the
+    new routes.
   </p>
   <p>
     To catch a route change that nobody re-exported, run the export in CI and

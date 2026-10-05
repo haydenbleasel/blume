@@ -261,6 +261,54 @@ describe("blume audit", () => {
     expect(skipped.exitCode).toBe(0);
   });
 
+  it("never probes an outbound URL that a repeated --ignore glob matches", async () => {
+    // citty keeps only the last value of a repeated string flag, so this runs
+    // the real CLI: every `--ignore`, in either spelling, has to count.
+    const requested: string[] = [];
+    const server = Bun.serve({
+      fetch(request) {
+        requested.push(new URL(request.url).pathname);
+        return new Response("gone", { status: 404 });
+      },
+      port: 0,
+    });
+    const origin = `http://localhost:${server.port}`;
+    try {
+      const root = await fixture({
+        ...healthyLinks(),
+        "dist/index.html": HOME.replace(
+          '<a href="/broken">The broken page</a>',
+          [
+            '<a href="/broken">The broken page</a>',
+            `<a href="${origin}/placeholder/api">A placeholder</a>`,
+            `<a href="${origin}/local">A local server</a>`,
+            `<a href="${origin}/gone">A dead link</a>`,
+          ].join("\n")
+        ),
+      });
+      const { exitCode, stdout } = await audit(
+        root,
+        "--json",
+        "--external",
+        "--only",
+        "external_link_broken",
+        "--ignore",
+        `${origin}/placeholder/**`,
+        `--ignore=${origin}/local`
+      );
+      const messages = JSON.parse(stdout).diagnostics.map(
+        (d: { message: string }) => d.message
+      );
+      expect(messages).toEqual([
+        `${origin}/gone is unreachable (HTTP 404), linked from 1 page(s).`,
+      ]);
+      expect(requested).toEqual(["/gone"]);
+      expect(exitCode).toBe(1);
+    } finally {
+      server.stop(true);
+    }
+  });
+
   it("filters by category as well as by id", async () => {
     const root = await fixture(site());
     const { stdout } = await audit(root, "--json", "--only", "links");

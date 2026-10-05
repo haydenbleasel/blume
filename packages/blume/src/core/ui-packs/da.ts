@@ -49,6 +49,7 @@ export const da: UIStringsOverride = {
   banner: { dismiss: "Luk meddelelsen" },
   changelog: {
     description: "Produktopdateringer og udgivelsesnoter.",
+    empty: "Ingen poster i ændringsloggen endnu.",
     title: "Ændringslog",
   },
   consent: {

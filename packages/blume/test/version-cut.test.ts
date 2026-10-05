@@ -181,16 +181,15 @@ describe("insertArchivedVersion", () => {
   });
 });
 
-describe("insertVersionsBlock", () => {
-  const insert = async (config: string): Promise<string | false> => {
-    const root = await makeProject({ "blume.config.ts": config });
-    const path = join(root, "blume.config.ts");
-    return (
-      (await insertVersionsBlock(path, "v1.0")) &&
-      (await readFile(path, "utf-8"))
-    );
-  };
+const insert = async (config: string): Promise<string | false> => {
+  const root = await makeProject({ "blume.config.ts": config });
+  const path = join(root, "blume.config.ts");
+  return (
+    (await insertVersionsBlock(path, "v1.0")) && (await readFile(path, "utf-8"))
+  );
+};
 
+describe("insertVersionsBlock", () => {
   it("adds the block as the first property of a defineConfig call", async () => {
     expect(
       await insert(

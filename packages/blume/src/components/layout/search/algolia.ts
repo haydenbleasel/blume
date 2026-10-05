@@ -48,7 +48,16 @@ export const createSearch = (opts: AlgoliaOptions): SearchFn => {
     // shape, so hits returned by that index carry those fields.
     const records =
       first && "hits" in first ? (first.hits as AlgoliaRecord[]) : [];
-    const hits = records.map((record) => ({
+    // The sync splits a long page across records that share its `url`. The
+    // index's `distinct` returns one of them, unless the site set its own
+    // `attributeForDistinct`; either way a page is listed once.
+    const pages = new Set<string>();
+    const unique = records.filter((record) => {
+      const seen = pages.has(record.url);
+      pages.add(record.url);
+      return !seen;
+    });
+    const hits = unique.map((record) => ({
       content: record.content ?? "",
       excerpt: highlight(
         excerptFor(record.description ?? "", record.content ?? "", query),

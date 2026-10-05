@@ -241,7 +241,7 @@ const fumadocs: CompareTool = {
     },
     {
       answer:
-        "Folder descriptions, reversed or extracted page ordering in `meta.json`, full-width `full` pages, and components like `<DynamicCodeBlock>` and `<InlineTOC>`. The agent reports each one so you can decide what to do with it.",
+        "Folder descriptions, reversed or extracted page ordering in `meta.json`, and components like `<DynamicCodeBlock>` and `<InlineTOC>`. The agent reports each one so you can decide what to do with it, and approximates a `full` page with `mode: wide`.",
       question: "What doesn't the migration carry over?",
     },
   ],
@@ -543,7 +543,7 @@ const starlight: CompareTool = {
     },
     {
       answer:
-        "Splash and hero pages, which you rebuild as custom pages, plus `head` entries, non-GitHub social links, starlight-blog's generated index, tag, and author pages, and plugins without a Blume equivalent. The agent reports each one.",
+        "Designed splash and hero pages (the agent gives a splash page `mode: center` and turns its hero into plain content), `head` entries other than meta tags and analytics scripts, social links on platforms the footer doesn't cover, starlight-blog's generated index, tag, and author pages, and plugins without a Blume equivalent. The agent reports each one.",
       question: "What doesn't the migration carry over?",
     },
   ],
@@ -684,7 +684,7 @@ const nextra: CompareTool = {
     },
     {
       answer:
-        "Footer content, per-page layout switches, `_meta` separators and menus, and the `<Bleed>` component. The agent reports each one so you can decide what to do with it.",
+        "Footer content, most per-page `theme` switches (`layout: 'full'` becomes `mode: wide`, the closest layout), `_meta` separators and menus, and the `<Bleed>` component. The agent reports each one so you can decide what to do with it.",
       question: "What doesn't the migration carry over?",
     },
   ],

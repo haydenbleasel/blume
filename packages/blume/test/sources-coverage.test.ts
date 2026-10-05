@@ -207,6 +207,18 @@ describe("cache: loadWithCache", () => {
       "BLUME_SOURCE_FETCH_FAILED"
     );
   });
+
+  it("rethrows a source's own BlumeError as itself when no cache exists", async () => {
+    const cache = snapshotCache(join(await tempDir(), "empty"));
+    const missing = new BlumeError({
+      code: "BLUME_SOURCE_SDK_MISSING",
+      message: 'Source "src" needs "@notionhq/client".',
+      severity: "error",
+    });
+    await expect(
+      loadWithCache("src", cache, () => Promise.reject(missing))
+    ).rejects.toBe(missing);
+  });
 });
 
 describe("mdxRemoteSource", () => {

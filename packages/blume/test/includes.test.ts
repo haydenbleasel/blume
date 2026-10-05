@@ -234,6 +234,35 @@ describe("expandIncludes — wrapped and malformed statements", () => {
     expect(result.text).toContain("<include>");
   });
 
+  it("says props are read when an unquoted attribute breaks a statement", async () => {
+    const root = await fixture({ "p.md": "u", "s.md": "{{plan}}\n" });
+    const result = await expandIncludes(
+      "<include plan=Pro>./s.md</include>\n",
+      {
+        contentRoot: root,
+        sourcePath: join(root, "p.md"),
+      }
+    );
+    expect(result.errors[0]?.code).toBe("BLUME_INCLUDE_MALFORMED");
+    // Include props exist, so "only lang and meta are read" would mislead.
+    expect(result.errors[0]?.suggestion).toContain(
+      "any other is a prop the included file reads as {{name}}"
+    );
+  });
+
+  it("leaves a code include's {{name}} alone: props reach .md and .mdx only", async () => {
+    const root = await fixture({
+      "p.md": "u",
+      "plan.ts": 'export const plan = "{{plan}}";\n',
+    });
+    const result = await expandIncludes(
+      '<include plan="Pro">./plan.ts</include>\n',
+      { contentRoot: root, sourcePath: join(root, "p.md") }
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.text).toContain('export const plan = "{{plan}}";');
+  });
+
   it("leaves a wrapped statement folded into a setext heading alone", async () => {
     const root = await fixture({ "p.md": "u", "s.md": "Spliced.\n" });
     const result = await expandIncludes(

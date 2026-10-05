@@ -1,13 +1,17 @@
 import { existsSync, watch as fsWatch } from "node:fs";
 import { readFile } from "node:fs/promises";
 
+import { YAMLException } from "js-yaml";
 import { extname, isAbsolute, join, relative, resolve } from "pathe";
 import { glob } from "tinyglobby";
 
 import { BlumeError } from "../diagnostics.ts";
 import matter from "../frontmatter.ts";
 import type { Diagnostic } from "../types.ts";
-import { unloadablePathDiagnostic } from "./normalize.ts";
+import {
+  frontmatterYamlDiagnostic,
+  unloadablePathDiagnostic,
+} from "./normalize.ts";
 import type { ContentSource, SourceEntry, SourceLoadResult } from "./types.ts";
 import {
   baselineScanIgnore,
@@ -72,12 +76,22 @@ export const filesystemSource = (
       }
     }
 
-    const entries = await Promise.all(
-      loadable.map(async (file): Promise<SourceEntry> => {
+    const read = await Promise.all(
+      loadable.map(async (file): Promise<SourceEntry | Diagnostic> => {
         const source = await readFile(file, "utf-8");
         const ext = extname(file).toLowerCase();
         const format = ext === ".mdx" ? "mdx" : "md";
-        const parsed = matter(source);
+        // Invalid YAML leaves this one file out, reported at its line,
+        // instead of failing the whole scan.
+        let parsed: ReturnType<typeof matter>;
+        try {
+          parsed = matter(source);
+        } catch (error) {
+          if (error instanceof YAMLException) {
+            return frontmatterYamlDiagnostic(error, file);
+          }
+          throw error;
+        }
         return {
           body: { format, text: parsed.content },
           data: parsed.data,
@@ -90,6 +104,14 @@ export const filesystemSource = (
         };
       })
     );
+    const entries: SourceEntry[] = [];
+    for (const item of read) {
+      if ("body" in item) {
+        entries.push(item);
+      } else {
+        diagnostics.push(item);
+      }
+    }
 
     return { diagnostics, entries };
   };

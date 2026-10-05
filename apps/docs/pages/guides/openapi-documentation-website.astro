@@ -42,8 +42,9 @@ import { guideById } from "../_guides/guides.ts";
     Save the spec as <code>openapi.yaml</code> at the project root, beside{" "}
     <code>blume.config.ts</code>. A local file is the safer choice: Blume reads
     it at build time, so a build never depends on fetching the spec from
-    somewhere else. JSON works too, and so do Swagger 2.0 and OpenAPI 3.0 specs,
-    which Blume upgrades to 3.1 as it reads them.
+    somewhere else. JSON works too. Swagger 2.0 and OpenAPI 3.0 specs are
+    upgraded to 3.1 as Blume reads them, and 3.1 and 3.2 specs are read as
+    written.
   </p>
   <CodeBlock
     code={`openapi: 3.1.0
@@ -406,7 +407,8 @@ export default defineConfig({
     If you publish an SDK, show it instead of raw HTTP: add{" "}
     <code>x-codeSamples</code> to an operation in the spec, each with a{" "}
     <code>lang</code>, a <code>source</code>, and an optional{" "}
-    <code>label</code>. Those tabs come first, ahead of the generated ones.
+    <code>label</code>. Those tabs come first, ahead of the generated ones, and
+    they're part of the page's Markdown copy, so agents see your SDK calls too.
   </p>
 
   <h2>Build and check</h2>
@@ -435,7 +437,8 @@ npx blume preview`}
   </ul>
   <p>
     Search matches an operation's summary, description, tag, and endpoint. It
-    doesn't index every field in the schema tables or the code samples, so if
+    doesn't index every field in the schema tables or the generated code
+    samples, so if
     readers search for a field name, mention it in the operation's description.
   </p>
   <p>
@@ -460,8 +463,9 @@ npx blume preview`}
   <p>
     The reference is rebuilt from the spec on every build, so publishing an
     updated spec is a matter of committing it and deploying. The dev server
-    watches your content folder and <code>blume.config.ts</code>, not a spec
-    file beside them, so restart it after you edit the spec.
+    watches a local spec file along with your content folder and{" "}
+    <code>blume.config.ts</code>, so saving the spec updates the reference
+    without a restart.
   </p>
   <p>
     One change needs care. An operation's URL comes from its tag and operation

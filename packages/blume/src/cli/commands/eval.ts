@@ -104,12 +104,37 @@ const parseFlags = (args: EvalFlags) => {
   return { agent: args.agent, threshold, timeoutS };
 };
 
+/** A shell word for the rerun command, single-quoted only when it has to be. */
+const shellWord = (value: string): string =>
+  /^[\w./:@%+=,-]+$/u.test(value)
+    ? value
+    : `'${value.replaceAll("'", String.raw`'\''`)}'`;
+
+/**
+ * The command a `--fix` agent reruns to verify its edits. It carries the run's
+ * own flags: a bare `blume eval` would fall back to Codex and `evals.yaml`,
+ * grading a different file with a different agent than the run it's fixing.
+ */
+const rerunCommand = (
+  args: EvalFlags,
+  { agent, threshold, timeoutS }: ReturnType<typeof parseFlags>
+): string =>
+  [
+    `blume eval --agent ${agent}`,
+    args.file === DEFAULT_FILE ? "" : `--file ${shellWord(args.file)}`,
+    args.threshold === undefined ? "" : `--threshold ${threshold}`,
+    args.timeout === undefined ? "" : `--timeout ${timeoutS}`,
+  ]
+    .filter((part) => part !== "")
+    .join(" ");
+
 /** `blume eval --fix`: hand the failing report to the interactive agent. */
 const runFixHandoff = async (
   agent: AgentKind,
   result: EvalResult,
   root: string,
-  threshold: number
+  threshold: number,
+  command: string
 ): Promise<void> => {
   const count = result.counts.fail + result.counts.error;
   if (count === 0) {
@@ -120,7 +145,7 @@ const runFixHandoff = async (
   process.stderr.write(
     `  Handing ${count} failed question${count === 1 ? "" : "s"} to ${cli.name}…\n\n`
   );
-  const code = await launchAgentCode(agent, evalFixPrompt(report));
+  const code = await launchAgentCode(agent, evalFixPrompt(report, command));
   if (code !== 0) {
     process.exit(code);
   }
@@ -184,7 +209,8 @@ export const evalCommand = defineCommand({
   meta: commandMeta.eval,
   async run({ args }) {
     const root = process.cwd();
-    const { agent, threshold, timeoutS } = parseFlags(args);
+    const flags = parseFlags(args);
+    const { agent, threshold, timeoutS } = flags;
     if (args.action === "init") {
       await runInit(agent, args.file);
       return;
@@ -259,7 +285,13 @@ export const evalCommand = defineCommand({
     if (args.fix) {
       // The gate is a CI concern; a handoff run succeeds when the agent
       // session does, not when the docs already passed.
-      await runFixHandoff(agent, result, root, threshold);
+      await runFixHandoff(
+        agent,
+        result,
+        root,
+        threshold,
+        rerunCommand(args, flags)
+      );
       return;
     }
 

@@ -42,7 +42,7 @@ Creates a user and sends them an invite.
 
 ## The playground and samples
 
-The page's `ParamField`s become the Try it panel's inputs, the way an operation's parameters do in a spec: `path`, `query`, and `header` fields are parameters, and `body` fields make up a JSON body, with a field's nested fields (inside its [`Expandable`](/docs/content/components#expandable)) as the properties of an object. A `type` of `string[]` is an array, and one that isn't a JSON type, such as `enum<string>`, is sent as a string. A field's `default` fills the body, and its `placeholder` is the example value the samples show.
+The page's `ParamField`s become the Try it panel's inputs, the way an operation's parameters do in a spec: `path`, `query`, and `header` fields are parameters, and `body` fields make up a JSON body, with a field's nested fields (inside its [`Expandable`](/docs/content/components#expandable)) as the properties of an object. A `type` of `string[]` is an array, and one that isn't a JSON type, such as `enum<string>`, is sent as a string. A field's `default` fills the body, and its `placeholder` is the example value the samples show. An optional body field with neither starts empty and stays out of the request until the reader fills it in.
 
 Beside the panel, the page gets request samples in cURL, JavaScript, and Python. A page with its own `RequestExample` shows that in their place.
 

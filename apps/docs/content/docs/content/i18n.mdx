@@ -140,7 +140,7 @@ Blume validates each result's structure — frontmatter, code fences, links — 
 
 ## The language switcher
 
-When i18n is on, a language switcher appears in the header automatically, generated from your `locales`. For each page it links the matching translation in every language; where a translation is missing it links the fallback page and marks it as not translated. There's nothing to configure. Pages from a [GitHub Releases](/docs/content/sources/github-releases) source are the exception: release notes exist in one language only, so those pages render without a switcher.
+When i18n is on, a language switcher appears in the header automatically, generated from your `locales`. For each page it links the matching translation in every language; where a translation is missing it links the fallback page and marks it as not translated. With fallbacks off (`fallbackLocale: null`) there's no page to link, so the switcher leaves that language out. There's nothing to configure. Pages from a [GitHub Releases](/docs/content/sources/github-releases) source are the exception: release notes exist in one language only, so those pages render without a switcher.
 
 ## Routing by browser language
 
@@ -193,7 +193,7 @@ Set [`deployment.site`](/docs/deployment) so these can be emitted as absolute UR
 
 ## Search
 
-Search is scoped to the active language: on a `/fr/…` page the dialog returns French results, with an **All languages** toggle to search across every locale at once. The default (Orama) and FlexSearch indexes filter in the browser; hosted providers carry a `locale` facet on each record.
+Search is scoped to the active language: on a `/fr/…` page the dialog returns French results, with an **All languages** toggle to search across every locale at once. The default (Orama) and FlexSearch indexes filter in the browser, Pagefind keeps an index per language, and Algolia, Orama Cloud, and Typesense carry a `locale` field on each record. Mixedbread can't scope by language, so with it every search spans every locale and the dialog has no toggle. See [Search](/docs/configuration/search) for how each adapter handles it.
 
 ## Right-to-left
 

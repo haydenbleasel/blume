@@ -141,7 +141,7 @@ Blume validiert die Struktur jedes Ergebnisses – Frontmatter, Code-Fences, Lin
 
 ## Der Sprachumschalter [#the-language-switcher]
 
-Wenn i18n aktiviert ist, erscheint automatisch ein Sprachumschalter im Header, generiert aus deinen `locales`. Für jede Seite verlinkt er die passende Übersetzung in jeder Sprache; wo eine Übersetzung fehlt, verlinkt er die Fallback-Seite und kennzeichnet sie als nicht übersetzt. Es gibt nichts zu konfigurieren. Seiten aus einer [GitHub Releases](/docs/content/sources/github-releases)-Quelle sind die Ausnahme: Release Notes gibt es nur in einer Sprache, daher werden diese Seiten ohne Umschalter gerendert.
+Wenn i18n aktiviert ist, erscheint automatisch ein Sprachumschalter im Header, generiert aus deinen `locales`. Für jede Seite verlinkt er die passende Übersetzung in jeder Sprache; wo eine Übersetzung fehlt, verlinkt er die Fallback-Seite und kennzeichnet sie als nicht übersetzt. Sind Fallbacks deaktiviert (`fallbackLocale: null`), gibt es keine Seite, die er verlinken könnte, daher lässt der Umschalter diese Sprache weg. Es gibt nichts zu konfigurieren. Seiten aus einer [GitHub Releases](/docs/content/sources/github-releases)-Quelle sind die Ausnahme: Release Notes gibt es nur in einer Sprache, daher werden diese Seiten ohne Umschalter gerendert.
 
 ## Routing nach Browsersprache [#routing-by-browser-language]
 
@@ -194,7 +194,7 @@ Setze [`deployment.site`](/docs/deployment), damit diese als absolute URLs ausge
 
 ## Suche [#search]
 
-Die Suche ist auf die aktive Sprache beschränkt: Auf einer `/fr/…`-Seite liefert der Dialog französische Ergebnisse, mit einem Umschalter **Alle Sprachen**, um auf einmal über alle Locales zu suchen. Der Standardindex (Orama) und der FlexSearch-Index filtern im Browser; gehostete Anbieter führen eine `locale`-Facette auf jedem Datensatz.
+Die Suche ist auf die aktive Sprache beschränkt: Auf einer `/fr/…`-Seite liefert der Dialog französische Ergebnisse, mit einem Umschalter **Alle Sprachen**, um auf einmal über alle Locales zu suchen. Der Standardindex (Orama) und der FlexSearch-Index filtern im Browser, Pagefind führt einen Index pro Sprache, und Algolia, Orama Cloud und Typesense führen ein `locale`-Feld auf jedem Datensatz. Mixedbread kann nicht nach Sprache eingrenzen, daher erstreckt sich damit jede Suche über alle Locales, und der Dialog hat keinen Umschalter. Unter [Suche](/docs/configuration/search) erfährst du, wie die einzelnen Adapter damit umgehen.
 
 ## Rechts-nach-links [#right-to-left]
 

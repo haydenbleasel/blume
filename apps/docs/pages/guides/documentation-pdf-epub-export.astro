@@ -13,9 +13,15 @@
 // files; WebP's status from the EPUB 3.2 and 3.3 specs. Not yet run end to
 // end on a fresh project (the test page itself was not built), and the EPUBs
 // were not opened in Apple Books, calibre, or an e-ink reader.
-// Review: export code confirmed unchanged since the last npm release
-// (PageActions.astro, theme/entry.ts print block); expandable, per-block wrap,
-// and the site footer are main-only; publish with that release.
+// Updated for the print and EPUB fixes on main (e12b668a, 2dda5feb):
+// the print block in theme/entry.ts, the beforeprint switch in
+// head-scripts.ts, and the EPUB metadata, link, and image handling in
+// PageActions.astro. Read in the source; not rerun in a browser.
+// Updated for the page actions in the mobile On this page menu (2c113598):
+// RootLayout.astro, TableOfContents.astro, and PageActions.astro. Opened the
+// menu on a probe site in Chrome at 390, 768, and 1,100 pixels, and ran
+// Export to PDF and Export to EPUB from it before and after a client-side
+// navigation.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -67,24 +73,25 @@ export default defineConfig({
   </p>
   <CodeBlock code={`export: { pdf: true },`} lang="ts" title="blume.config.ts" />
   <p>
-    The action lives in the right-hand rail, below the table of contents, and
-    that rail doesn't show everywhere:
+    The action sits below the table of contents. Where that is depends on the
+    window and the page:
   </p>
   <ul>
     <li>
-      It appears only in windows at least 1,280 pixels wide. On a phone there's
-      no Export action, but printing from the browser's own menu still applies
-      the same print stylesheet.
+      In a window at least 1,280 pixels wide, it's in the right-hand rail. In
+      a narrower window or on a phone, it's at the bottom of the{" "}
+      <strong>On this page</strong> menu above the content, and its PDF and
+      EPUB entries open right under it.
     </li>
     <li>
       Pages whose <a href="/docs/content/frontmatter#layout">layout mode</a>{" "}
       drops the table of contents (<code>wide</code>, <code>center</code>,{" "}
-      <code>frame</code>, and <code>custom</code>) have no rail, and neither do
-      API operation pages.
+      <code>frame</code>, and <code>custom</code>) have no rail and no menu,
+      and API operation pages have neither.
     </li>
     <li>
-      Turning the outline off with <code>toc: false</code> keeps the rail, so
-      the action stays.
+      Turning the outline off with <code>toc: false</code> keeps both, so the
+      action stays. The menu then holds only the page actions.
     </li>
   </ul>
 
@@ -212,18 +219,16 @@ Test keys only send to phone numbers you've verified in the dashboard.
     title="docs/export-test.mdx"
   />
   <p>
-    Run <code>npx blume dev</code> and open <code>/export-test</code> in a
-    window at least 1,280 pixels wide. Wait for the diagram to draw before you
-    export. Mermaid renders in the browser after the page loads, and a diagram
+    Run <code>npx blume dev</code> and open <code>/export-test</code>. Wait
+    for the diagram to draw before you export. Mermaid renders in the browser after the page loads, and a diagram
     that hasn't finished prints as a blank space.
   </p>
 
   <h2>Check the PDF</h2>
   <p>
-    Switch the site to the light theme first. The print stylesheet keeps the
-    colors of the theme you're viewing, so a dark-mode export comes out as
-    pale text on white paper, or as white text on black pages once
-    backgrounds print.
+    You can export from either theme. When a reader prints from the dark
+    theme, Blume switches the page to the light theme for the printout and
+    back again afterward, so the PDF has dark text on white paper.
   </p>
   <p>
     Choose <strong>Export</strong>, then <strong>Export to PDF</strong>. In
@@ -234,13 +239,15 @@ Test keys only send to phone numbers you've verified in the dashboard.
     <strong>Print backgrounds</strong>. Other browsers word it differently.
   </p>
   <p>
-    The header, sidebar, rail, and breadcrumbs are gone, and the article fills
-    the page. Links stay clickable, and in Chrome they point at full URLs on
+    The header, sidebar, rail, and breadcrumbs are gone, and so is everything
+    after the article: feedback, "Last updated", previous and next links, and
+    the site footer. Code blocks print without their buttons, and{" "}
+    <code>response.json</code> prints in full even though it's collapsed on
+    screen. Links stay clickable, and in Chrome they point at full URLs on
     your site. Compare the rest against the{" "}
-    <a href="#export-checklist">checklist</a> below. On this page, expect three
-    problems: the <code>curl</code> command is cut off at the right margin,{" "}
-    <code>response.json</code> prints only its first ten lines under a{" "}
-    <strong>Show more</strong> label, and the accordion prints only its title.
+    <a href="#export-checklist">checklist</a> below. On this page, expect two
+    problems: the <code>curl</code> command is cut off at the right margin,
+    and the accordion prints only its title.
   </p>
 
   <h2>Check the EPUB</h2>
@@ -261,8 +268,13 @@ Test keys only send to phone numbers you've verified in the dashboard.
     <li>The book's title is the page's title.</li>
     <li>It opens on a contents page with a single entry, then the page.</li>
     <li>
-      The author reads "anonymous" and the language is always English, whatever
-      your site's locale. Neither has a setting.
+      The author and publisher are your site's <code>title</code>, and the
+      language is the page's language, so a translated page exports as a book
+      in that language.
+    </li>
+    <li>
+      Links to other pages become full URLs on your site, since the book holds
+      only this page.
     </li>
   </ul>
   <p>
@@ -292,7 +304,7 @@ Test keys only send to phone numbers you've verified in the dashboard.
       </tr>
       <tr>
         <td>Feedback, "Last updated", previous and next links, site footer</td>
-        <td>Printed</td>
+        <td>Removed</td>
         <td>Not included</td>
       </tr>
       <tr>
@@ -312,12 +324,12 @@ Test keys only send to phone numbers you've verified in the dashboard.
       </tr>
       <tr>
         <td><code>expandable</code> code blocks</td>
-        <td>Collapsed to ten lines</td>
+        <td>Printed in full</td>
         <td>Complete</td>
       </tr>
       <tr>
         <td>Copy buttons and icons</td>
-        <td>Printed</td>
+        <td>Buttons removed, icons printed</td>
         <td>Dropped</td>
       </tr>
       <tr>
@@ -343,7 +355,7 @@ Test keys only send to phone numbers you've verified in the dashboard.
       <tr>
         <td>Links to other pages</td>
         <td>Full URLs to your site</td>
-        <td>Site paths like <code>/</code>, which lead nowhere in a reader</td>
+        <td>Full URLs to your site</td>
       </tr>
     </tbody>
   </table>
@@ -413,9 +425,10 @@ Test keys only send to phone numbers you've verified in the dashboard.
 
   <h3>Keep must-read content out of collapsed places</h3>
   <p>
-    Accordions and <code>expandable</code> blocks print collapsed. Use them
-    for optional detail, and keep a step or a required value where it
-    prints.
+    An accordion prints only its title unless the reader opened it before
+    printing. Use accordions for optional detail, and keep a step or a
+    required value where it prints. <code>expandable</code> code blocks don't
+    have this problem: they print in full.
   </p>
 
   <h3>Host images next to the page</h3>
@@ -423,33 +436,20 @@ Test keys only send to phone numbers you've verified in the dashboard.
     Reference images by relative path, as the test page does, and give each
     one alt text. The EPUB export downloads every image on the page, and a
     browser can only download an image from another host when that host
-    allows it with CORS headers.
+    allows it with CORS headers. An image it can't download is left out of the
+    book.
   </p>
 
   <h3>Tidy the printout with theme.css</h3>
   <p>
-    For what the content can't fix, add print rules to a{" "}
+    Blume's print stylesheet already removes the page chrome and opens{" "}
+    <code>expandable</code> blocks. What it leaves alone is long lines, which
+    print cut off. To wrap them on paper only, add a print rule to a{" "}
     <a href="/docs/configuration/theming#themecss"><code>theme.css</code></a>{" "}
-    in your project root. This hides the copy buttons, the{" "}
-    <strong>Show more</strong> toggle, the site footer, and everything after
-    the article (related pages, the "Last updated" line, feedback, and
-    previous and next links), prints <code>expandable</code> blocks in full,
-    and wraps long lines on paper only:
+    in your project root:
   </p>
   <CodeBlock
     code={`@media print {
-  [data-blume-copy],
-  [data-blume-code-expand],
-  [data-blume-footer],
-  #blume-content > article ~ div {
-    display: none !important;
-  }
-
-  .prose pre[data-expandable] > code {
-    max-height: none !important;
-    mask-image: none !important;
-  }
-
   .prose pre,
   .prose pre code {
     white-space: pre-wrap !important;
@@ -468,20 +468,19 @@ Test keys only send to phone numbers you've verified in the dashboard.
   <h2>Troubleshooting</h2>
   <h3>There's no Export action</h3>
   <p>
-    Check that <code>export</code> is set in <code>blume.config.ts</code>, that
-    the window is at least 1,280 pixels wide, and that the page uses the
-    default layout mode. API operation pages never show it.
+    Check that <code>export</code> is set in <code>blume.config.ts</code> and
+    that the page uses the default layout mode. In a window narrower than
+    1,280 pixels, open the <strong>On this page</strong> menu above the
+    content: the action is at the bottom of it. API operation pages never show
+    it.
   </p>
-  <h3>Export to EPUB does nothing</h3>
+  <h3>An image from another host is missing from the EPUB</h3>
   <p>
-    When the entry flips from <strong>Generating…</strong> back to{" "}
-    <strong>Export to EPUB</strong> without a download, open the browser
-    console. <code>[blume] EPUB export failed</code> followed by a fetch
-    error (Chrome's is <code>Failed to fetch</code>) means an image couldn't
-    be downloaded, usually one on another host without CORS headers. One
-    failed image stops the whole export, and the reader sees no message.
-    Download the image into your content folder and reference it by relative
-    path.
+    Open the browser console. A warning that starts with{" "}
+    <code>[blume] EPUB export left out an image it couldn't fetch</code> names
+    the image the browser couldn't download, usually one on another host
+    without CORS headers. The rest of the book still exports. Download the
+    image into your content folder and reference it by relative path.
   </p>
   <h3>An image is missing from an EPUB made in dev</h3>
   <p>
@@ -494,9 +493,12 @@ Test keys only send to phone numbers you've verified in the dashboard.
 npx blume preview`}
     lang="bash"
   />
-  <h3>The PDF has pale text or black pages</h3>
+  <h3>A diagram prints in dark colors</h3>
   <p>
-    It was printed from the dark theme. Switch to light and export again.
+    The page prints in the light theme, but a Mermaid diagram redraws itself
+    for a theme change in the background, and a print that starts before the
+    redraw finishes keeps the dark drawing. Switch the site to the light
+    theme, wait for the diagram to redraw, and export again.
   </p>
   <h3>A diagram is blank in the PDF</h3>
   <p>

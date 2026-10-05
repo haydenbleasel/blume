@@ -4,6 +4,7 @@ import data from "blume:data";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import type { Navigation } from "../../core/types.ts";
+import { scopesLocales } from "../../search/adapters/locale-scope.ts";
 import { scopesVersions } from "../../search/adapters/version-scope.ts";
 import { resolvePopularIconMarkup } from "../../search/popular-icon.ts";
 import Icon from "../Icon.astro";
@@ -36,9 +37,15 @@ const {
   navigation,
   popularPages,
   strings,
-  locale,
+  locale: viewedLocale,
   version: viewedVersion = null,
 } = Astro.props;
+// Mixedbread searches every language whatever the dialog asks, so on it an
+// "All languages" toggle would change nothing: treat the site as
+// single-language for search instead.
+const locale = scopesLocales(data.config.search.provider)
+  ? viewedLocale
+  : undefined;
 // Pagefind, Orama Cloud, and Mixedbread search every version whatever the
 // dialog asks, so on those an "All versions" toggle would change nothing:
 // treat the site as unversioned for search instead.
@@ -90,6 +97,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
   data-i18n-popular={s.popular}
   data-i18n-results={s.results}
   data-locale={locale || undefined}
+  data-redact-queries={data.config.search.analytics.queries ? undefined : ""}
   data-version={version ?? undefined}
   data-versioned={version === null ? undefined : ""}
 >
@@ -240,6 +248,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
 
     import { track } from "./analytics-client.ts";
     import { createSearchTracker } from "./search/analytics.ts";
+    import type { SearchTracker } from "./search/analytics.ts";
     import { highlight, matchSnippet } from "./search/types.ts";
     import type { SearchFn, SearchHit } from "./search/types.ts";
 
@@ -306,7 +315,8 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       searchClient ??= (async () => {
         try {
           const { createSearch } = await import("blume:search-client");
-          return await createSearch();
+          // The reader types each query, so each supersedes the last.
+          return await createSearch({ typing: true });
         } catch (error) {
           searchClient = undefined;
           throw error;
@@ -325,7 +335,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
       preview!: HTMLElement;
       searchFn: SearchFn | null = null;
       /** Records settled queries and picked results (search/analytics.ts). */
-      tracker = createSearchTracker(track);
+      tracker!: SearchTracker;
       loaded = false;
       loadFailed = false;
       /** First-open client/index load still in flight. */
@@ -419,6 +429,10 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         this.message = this.querySelector("[data-blume-search-message]")!;
         this.preview = this.querySelector("[data-blume-search-preview]")!;
         this.assistantEnabled = this.hasAttribute("data-ask");
+        // `search.analytics.queries: false` keeps query text off providers.
+        this.tracker = createSearchTracker(track, {
+          queries: !this.hasAttribute("data-redact-queries"),
+        });
 
         const popularScript = this.querySelector(
           "[data-blume-search-popular]"

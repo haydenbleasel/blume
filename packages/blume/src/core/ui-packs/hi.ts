@@ -48,6 +48,7 @@ export const hi: UIStringsOverride = {
   banner: { dismiss: "घोषणा बंद करें" },
   changelog: {
     description: "उत्पाद अपडेट और रिलीज़ नोट्स।",
+    empty: "परिवर्तन लॉग में अभी कोई प्रविष्टि नहीं है।",
     title: "परिवर्तन लॉग",
   },
   consent: {

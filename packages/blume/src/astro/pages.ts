@@ -4,6 +4,7 @@ import {
 } from "../core/changelog-index.ts";
 import { staticSegments } from "../core/custom-pages.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
+import { referenceRoutes } from "../openapi/references.ts";
 import type { BlumePageRoute } from "./integration.ts";
 
 export {
@@ -47,6 +48,28 @@ export const hasGeneratedChangelog = (
 ): boolean =>
   hasChangelogIndex(project.graph.pages, project.config) &&
   !routeIsTaken(userPages, project.graph.pages, CHANGELOG_INDEX_ROUTE);
+
+/**
+ * Every route a navigation entry (a tab, selector item, featured link, header
+ * action, or CTA) may point at: content routes, custom `.astro` pages, the
+ * generated changelog, and reference routes (so a tab an author points at one
+ * still validates). `generateRuntime` and `blume doctor` both check
+ * `validateNavTargets` against it, so they flag the same entries.
+ */
+export const navTargetRoutes = (
+  project: BlumeProject,
+  userPages: { pattern: string }[]
+): Set<string> => {
+  const routes = new Set<string>([
+    ...project.graph.routes.keys(),
+    ...userPages.map((page) => page.pattern),
+    ...referenceRoutes(project.config),
+  ]);
+  if (hasGeneratedChangelog(project, userPages)) {
+    routes.add(CHANGELOG_INDEX_ROUTE);
+  }
+  return routes;
+};
 
 const humanizeSegment = (segment: string): string =>
   segment

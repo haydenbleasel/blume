@@ -8,6 +8,9 @@
  * helpers (`deploy/cloudflare-negotiation.ts` — its deploy bundle is uploaded
  * unbundled, so it cannot import this module); when editing here, mirror the
  * change there. Parity is enforced by `test/cloudflare-negotiation.test.ts`.
+ * Vercel's routing conditions (`deploy/vercel-negotiation.ts`) spell the same
+ * rule as regexes, checked against {@link prefersMarkdown} by
+ * `test/vercel-negotiation.test.ts`.
  */
 
 interface AcceptEntry {

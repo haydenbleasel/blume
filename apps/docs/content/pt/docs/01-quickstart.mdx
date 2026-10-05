@@ -16,10 +16,12 @@ Passe de uma pasta vazia a um site de documentação funcionando com apenas algu
     O `blume init` faz algumas perguntas — onde criar o projeto, qual o nome do
     seu site de documentação, que modelo usar e onde fica o seu conteúdo — e
     depois gera a estrutura mínima: uma pasta de conteúdo, um arquivo de
-    configuração e um `package.json` com os scripts `dev` e `build`. Ele instala
-    as dependências com o gerenciador de pacotes que o executou. Passe `--yes`
-    para pular as perguntas e aceitar os padrões, ou `--no-install` para apenas
-    criar os arquivos.
+    configuração e um `package.json` com os scripts `dev`, `build` e `doctor`,
+    além de um `.gitignore` que deixa `node_modules/`, o `.blume/` gerado,
+    `dist/` e `.env.local` (onde ficam os segredos locais) fora do controle de
+    versão. Ele instala as dependências com o gerenciador de pacotes que o
+    executou. Passe `--yes` para pular as perguntas e aceitar os padrões, ou
+    `--no-install` para apenas criar os arquivos.
 
     ```package-install
     npx blume init

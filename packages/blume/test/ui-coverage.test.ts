@@ -170,6 +170,16 @@ const navGroup = (
   display: "flat" | "group" | "page" = "flat"
 ): NavNode => ({ children, display, kind: "group", label });
 
+// SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
+// selectors, root) is irrelevant to the variant walk.
+const tree = (label: string) =>
+  ({
+    root: "/",
+    selectors: [],
+    sidebar: [navGroup(label, [])],
+    tabs: [],
+  }) as never;
+
 describe("navGroupIds", () => {
   it("numbers every group by pre-order position, keyed by identity", () => {
     const nested = navGroup("Nested", [navPage("/a/b")], "group");
@@ -184,15 +194,6 @@ describe("navGroupIds", () => {
   });
 
   it("lists every navigation tree by version and locale segment", () => {
-    // SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
-    // selectors, root) is irrelevant to the variant walk.
-    const tree = (label: string) =>
-      ({
-        root: "/",
-        selectors: [],
-        sidebar: [navGroup(label, [])],
-        tabs: [],
-      }) as never;
     const variants = navVariants({
       navigation: tree("default"),
       navigationByLocale: { ja: tree("ja") },
@@ -208,15 +209,6 @@ describe("navGroupIds", () => {
     // a segment while that locale is unprefixed, so `/blume-nav/…/de/…` is
     // never emitted for it: its current tree is `navigation` already, and its
     // archived trees take the `default` segment too.
-    // SAFETY: only the sidebar is read; the rest of a Navigation (tabs,
-    // selectors, root) is irrelevant to the variant walk.
-    const tree = (label: string) =>
-      ({
-        root: "/",
-        selectors: [],
-        sidebar: [navGroup(label, [])],
-        tabs: [],
-      }) as never;
     const variants = navVariants(
       {
         navigation: tree("de"),
@@ -321,13 +313,14 @@ describe("server-proxied search endpoint", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("returns an empty result when the endpoint responds non-ok", async () => {
+  it("rejects when the endpoint responds non-ok, so the dialog shows an error", async () => {
     // SAFETY: the stub covers the single search request; fetch's extra
     // properties (preconnect) are never touched.
     globalThis.fetch = ((_input) =>
       Promise.resolve(new Response("boom", { status: 500 }))) as typeof fetch;
-    const result = await createSearch({ api: "/api/search" })("q");
-    expect(result).toStrictEqual({ hits: [], sections: [] });
+    await expect(createSearch({ api: "/api/search" })("q")).rejects.toThrow(
+      "/api/search answered 500"
+    );
   });
 
   it("caps the server's hits at the search limit on success", async () => {
@@ -883,6 +876,55 @@ describe("layout chrome sources", () => {
     }
   });
 
+  it("puts the page actions in the mobile On this page dropdown", async () => {
+    // The rail only shows at `xl`, so below it the actions ride in the
+    // outline's dropdown, which renders wherever the rail would, headings or
+    // not. They render once, in the rail: the dropdown gets an empty mount.
+    const root = await layoutSource("RootLayout.astro");
+    expect(root).toMatch(
+      /showToc && \(\s*<TableOfContentsSlot[^>]*variant="mobile"\s*>\s*<div data-blume-page-actions-mount \/>\s*<\/TableOfContentsSlot>/u
+    );
+    expect(root.match(/<PageActions\b/gu)).toHaveLength(1);
+    expect(root).toMatch(
+      /<PageActions\s+divider=\{hasToc\}[^>]*\/>\s*<\/aside>/u
+    );
+    const toc = await layoutSource("TableOfContents.astro");
+    expect(toc).toContain(
+      '(headings.length > 0 || hasChildren) && variant === "mobile" && ('
+    );
+    expect(toc).toMatch(/<slot \/>\s*<\/details>/u);
+    // The script moves the one block between the rail and the mount at the
+    // rail's breakpoint, on load, on a breakpoint change, and after a swap.
+    const actions = await layoutSource("PageActions.astro");
+    expect(actions).not.toContain("variant?:");
+    expect(actions).toContain(
+      'const railQuery = window.matchMedia("(min-width: 80rem)");'
+    );
+    expect(actions).toContain(
+      'rail ? "[data-blume-toc]" : "[data-blume-page-actions-mount]"'
+    );
+    expect(actions).toContain(
+      'document.addEventListener("astro:after-swap", placeActions);'
+    );
+    expect(actions).toContain(
+      'railQuery.addEventListener("change", placeActions);'
+    );
+    // In the mount the groups expand in place: they leave the light-dismiss
+    // and the placement, and the styles key on the mount.
+    expect(actions).toContain(
+      'details.toggleAttribute("data-blume-dropdown", rail);'
+    );
+    expect(actions).toContain(
+      '"[data-blume-page-actions] details[data-blume-dropdown][open]"'
+    );
+    expect(actions).toContain(
+      "[data-blume-page-actions-mount] [data-blume-scroll-top] {"
+    );
+    expect(actions).toContain(
+      "[data-blume-page-actions-mount] [data-blume-menu] {"
+    );
+  });
+
   it("rotates a collapsible disclosure's indicator from its own details only", async () => {
     // `group-open:` matches any descendant of an open `.group`, and each of
     // these disclosures nests inside others of the same kind (sidebar groups,
@@ -890,6 +932,7 @@ describe("layout chrome sources", () => {
     // indicator reflected an open ancestor's state instead of its own.
     const disclosures = [
       "layout/NavTree.astro",
+      "layout/PageActions.astro",
       "content/TreeFolder.astro",
       "content/AccordionItem.astro",
       "openapi/SchemaProperty.astro",

@@ -95,6 +95,32 @@ describe("the generated changelog index mirror", () => {
     );
   });
 
+  it("takes its title and description from the changelog config", async () => {
+    const project = await scanFixture({
+      "blume.config.ts": `export default { changelog: { description: "Every Acme release.", title: "Release notes" } };`,
+      "docs/changelog/v2.md": entry("title: v2.0\ndate: 2026-09-24"),
+      "docs/index.md": "# Home\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/changelog"]?.mdx).toBe(
+      "# Release notes\n\nEvery Acme release.\n\n## 2026\n\n- [v2.0](/changelog/v2) — 2026-09-24\n"
+    );
+  });
+
+  it("reads a per-locale changelog config in the default locale, over i18n.ui", async () => {
+    const project = await scanFixture({
+      "blume.config.ts": `export default { changelog: { title: { de: "Versionshinweise", en: "Release notes" } }, i18n: { defaultLocale: "en", locales: [{ code: "de", label: "Deutsch" }, { code: "en", label: "English" }], ui: { en: { changelog: { description: "What shipped.", title: "Releases" } } } } };`,
+      "docs/changelog/v2.md": entry("title: v2.0\ndate: 2026-09-24"),
+      "docs/index.md": "# Home\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    // The title is the config's English entry; the unset description stays
+    // the i18n.ui override.
+    expect(raw["/changelog"]?.mdx).toBe(
+      "# Release notes\n\nWhat shipped.\n\n## 2026\n\n- [v2.0](/changelog/v2) — 2026-09-24\n"
+    );
+  });
+
   it("leaves a changelog the project serves itself alone", async () => {
     const owned = await scanFixture({
       ...RELEASES,

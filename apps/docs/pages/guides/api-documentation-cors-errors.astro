@@ -196,13 +196,14 @@ createServer(async (req, res) => {
   <p>
     The panel says the browser blocked the request, and tells you to set{" "}
     <code>{"playground: { proxy: true }"}</code> on the <code>openapi()</code>{" "}
-    reference. That text is the same on every Try it panel, GraphQL and
-    hand-written pages included, and it doesn't mention that the proxy needs
-    a server build; <a href="#set-the-proxy-for-each-kind-of-page">the proxy
-    section</a> has the right setting for each. Before blaming CORS, Blume
-    checks that something answers at that origin; if nothing does, it says
-    "Couldn't reach the API" instead, which means a wrong URL or a stopped
-    server. The console has the real reason. In Chrome:
+    reference, and that the proxy needs server output: a host adapter in{" "}
+    <code>deployment</code>. On a GraphQL or hand-written page, it names that
+    page's setting instead;{" "}
+    <a href="#set-the-proxy-for-each-kind-of-page">the proxy section</a> lists
+    each. Before blaming CORS, Blume checks that something answers at that
+    origin; if nothing does, it says "Couldn't reach the API" instead, which
+    means a wrong URL or a stopped server. The console has the real reason. In
+    Chrome:
   </p>
   <CodeBlock
     code={`Access to fetch at 'http://localhost:8787/v1/messages' from origin 'http://localhost:4321' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.`}
@@ -518,9 +519,9 @@ export default defineConfig({
 
   <h3 id="set-the-proxy-for-each-kind-of-page">Set the proxy for each kind of page</h3>
   <p>
-    The panel's message always names <code>openapi()</code>, but the setting
-    lives wherever the page comes from. Each one takes <code>true</code> for
-    the built-in proxy or the URL of your own:
+    The setting lives wherever the page comes from, and the panel's message
+    names the one for the page you're on. Each takes <code>true</code> for the
+    built-in proxy or the URL of your own:
   </p>
   <table>
     <thead>

@@ -1,8 +1,16 @@
-import { create, insertMultiple, search } from "@orama/orama";
+import {
+  components,
+  create,
+  insert,
+  insertMultiple,
+  search,
+} from "@orama/orama";
 import type {
   AnyOrama,
   EnumArrComparisonOperator,
   EnumComparisonOperator,
+  Result,
+  SearchParamsFullText,
   Tokenizer,
 } from "@orama/orama";
 
@@ -315,31 +323,88 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
 };
 
 /**
+ * On a Latin-default index holding pages in non-Latin locales, the tokenizer
+ * each of those locales' pages was indexed with, keyed by locale code. A query
+ * reads it to tokenize its term the way the pages it searches were.
+ */
+const translationTokenizers = new WeakMap<AnyOrama, Map<string, Tokenizer>>();
+
+/** A segmenting tokenizer for each document locale Orama's can't serve. */
+const localeTokenizers = (documents: OramaDoc[]): Map<string, Tokenizer> => {
+  const tokenizers = new Map<string, Tokenizer>();
+  for (const code of new Set(documents.map((doc) => doc.locale ?? ""))) {
+    const tokenizer = segmentingTokenizer(code);
+    if (tokenizer) {
+      tokenizers.set(code, tokenizer);
+    }
+  }
+  return tokenizers;
+};
+
+/**
+ * One tokenizer that hands each text to its locale's: Orama passes the
+ * language given to `insert` and `search` through to `tokenize`, so a page
+ * inserted under `ja` and a query searched under `ja` both reach the Japanese
+ * tokenizer, and everything else reaches Orama's own, exactly as on an index
+ * with no translations.
+ */
+const dispatchingTokenizer = (
+  tokenizers: Map<string, Tokenizer>
+): Tokenizer => {
+  const standard = components.tokenizer.createTokenizer();
+  return {
+    language: standard.language,
+    normalizationCache: standard.normalizationCache,
+    tokenize: (raw, language, prop, withCache) =>
+      // Orama's tokenizer rejects a language other than its own, so the
+      // locale that picked it is not passed on.
+      (tokenizers.get(language ?? "") ?? standard).tokenize(
+        raw,
+        undefined,
+        prop,
+        withCache
+      ),
+  };
+};
+
+/**
  * Build an in-memory Orama full-text index from search documents. Shared by the
  * Orama client loader (browser), the MCP server, and assistant grounding (Node),
  * so ranking is identical wherever docs are queried. `locale` — the site's
  * `i18n.defaultLocale` — swaps in a word-segmenting tokenizer for every
  * non-Latin script, all of which Orama's default tokenizer reduces to zero
- * tokens; the tokenizer belongs to the database, so on a mixed-locale site it
- * applies to every document. That is safe in one direction only: Latin words
+ * tokens. A non-Latin default's tokenizer serves every page: Latin words
  * survive segmentation intact, so English pages on a segmented index stay
- * searchable, but non-Latin translations on a Latin-default index still
- * collapse to zero tokens.
+ * searchable. A Latin default keeps Orama's tokenizer for its Latin-script
+ * pages, and each page in a non-Latin locale (the Japanese and Hindi
+ * translations of an English site) is indexed with its own locale's tokenizer.
  */
 export const buildOramaIndex = async (
   documents: OramaDoc[],
   locale?: string
 ): Promise<AnyOrama> => {
-  const tokenizer = segmentingTokenizer(locale);
-  const db = tokenizer
-    ? create({ components: { tokenizer }, schema: SCHEMA })
-    : create({ schema: SCHEMA });
-  await insertMultiple(
-    db,
-    documents.map((doc) =>
-      doc.facets ? { ...doc, facetTerms: toFacetTerms(doc.facets) } : doc
-    )
+  const rows = documents.map((doc) =>
+    doc.facets ? { ...doc, facetTerms: toFacetTerms(doc.facets) } : doc
   );
+  const tokenizer = segmentingTokenizer(locale);
+  const translations = tokenizer ? undefined : localeTokenizers(documents);
+  let db: AnyOrama;
+  if (translations && translations.size > 0) {
+    db = create({
+      components: { tokenizer: dispatchingTokenizer(translations) },
+      schema: SCHEMA,
+    });
+    for (const row of rows) {
+      // oxlint-disable-next-line no-await-in-loop -- one at a time, in order, so each page is tokenized under its own locale and ties still rank in document order.
+      await insert(db, row, row.locale);
+    }
+    translationTokenizers.set(db, translations);
+  } else {
+    db = tokenizer
+      ? create({ components: { tokenizer }, schema: SCHEMA })
+      : create({ schema: SCHEMA });
+    await insertMultiple(db, rows);
+  }
   if (documents.some((doc) => (doc.boost ?? 1) !== 1)) {
     boostedDatabases.add(db);
   }
@@ -379,17 +444,56 @@ interface OramaWhereClause {
     | undefined;
 }
 
+/** A ranked match, scored and carrying its document. */
+type Hit = Result<OramaDoc>;
+
+/**
+ * One search, with the term tokenized under `language`. On a bigrammed
+ * tokenizer the strict pass runs first: a term is only meant to match where
+ * its bigrams sit together, and scoring them independently lets a page
+ * sharing a couple of windows outrank the page the term is about. Terms
+ * spanning several words rarely appear in full on one page, so an empty
+ * strict result falls back to the default pass rather than reporting no
+ * matches.
+ */
+const rankedHits = async (
+  db: AnyOrama,
+  params: SearchParamsFullText<AnyOrama, OramaDoc>,
+  language: string | undefined,
+  bigrammed: boolean
+): Promise<Hit[]> => {
+  // The result-document generic is OramaDoc because `buildOramaIndex` is the
+  // only writer to this database and inserts OramaDoc records (plus the
+  // derived `facetTerms`).
+  const strict = bigrammed
+    ? await search<AnyOrama, OramaDoc>(
+        db,
+        { ...params, threshold: ALL_TOKENS },
+        language
+      )
+    : undefined;
+  const found =
+    strict && strict.hits.length > 0
+      ? strict
+      : await search<AnyOrama, OramaDoc>(db, params, language);
+  return found.hits;
+};
+
+/** A hit's rank across searches: its relevance times the page's boost. */
+const boostedScore = (hit: Hit): number =>
+  hit.score * (hit.document.boost ?? 1);
+
 /**
  * Query the index, returning the matching documents (highest-ranked first).
  * `filters` narrows results by exact `where` matches on the enum fields:
  * `locale` to one language, `contentTypes` to a set of page types, `facets`
  * to documents carrying every requested `key:value` term.
  *
- * On a bigrammed index the strict pass runs first: a term is only meant to
- * match where its bigrams sit together, and scoring them independently lets a
- * page sharing a couple of windows outrank the page the term is about. Terms
- * spanning several words rarely appear in full on one page, so an empty strict
- * result falls back to the default pass rather than reporting no matches.
+ * On an index whose translations have tokenizers of their own, a query scoped
+ * to a locale is tokenized with that locale's tokenizer. An unscoped query
+ * searches each locale's pages with its own tokenizer, and the Latin-script
+ * pages with Orama's, then merges the matches by score: every search runs over
+ * the one index, so their scores share its term statistics.
  */
 export const queryOramaIndex = async (
   db: AnyOrama,
@@ -424,16 +528,44 @@ export const queryOramaIndex = async (
   };
   const params =
     Object.keys(where).length > 0 ? { ...unfiltered, where } : unfiltered;
-  const bigrammed = isBigramLanguage(db.tokenizer?.language ?? "");
-  // The result-document generic is OramaDoc because `buildOramaIndex` is the
-  // only writer to this database and inserts OramaDoc records (plus the
-  // derived `facetTerms`).
-  const strict = bigrammed
-    ? await search<AnyOrama, OramaDoc>(db, { ...params, threshold: ALL_TOKENS })
-    : undefined;
-  const found =
-    strict && strict.hits.length > 0
-      ? strict
-      : await search<AnyOrama, OramaDoc>(db, params);
-  return found.hits.map((hit) => hit.document);
+  const translations = translationTokenizers.get(db);
+  if (!translations) {
+    const bigrammed = isBigramLanguage(db.tokenizer?.language ?? "");
+    const hits = await rankedHits(db, params, undefined, bigrammed);
+    return hits.map((hit) => hit.document);
+  }
+  if (filters?.locale) {
+    const { language = "" } = translations.get(filters.locale) ?? {};
+    const bigrammed = isBigramLanguage(language);
+    const hits = await rankedHits(db, params, filters.locale, bigrammed);
+    return hits.map((hit) => hit.document);
+  }
+  // `nin` matches only pages with a locale, which every Blume-built index
+  // gives each page. (Orama's `not` would admit locale-less pages, but it
+  // drops the sibling filters beside it.)
+  const searches = [
+    rankedHits(
+      db,
+      {
+        ...params,
+        where: { ...where, locale: { nin: [...translations.keys()] } },
+      },
+      undefined,
+      false
+    ),
+    ...[...translations].map(([code, tokenizer]) =>
+      rankedHits(
+        db,
+        { ...params, where: { ...where, locale: { eq: code } } },
+        code,
+        isBigramLanguage(tokenizer.language)
+      )
+    ),
+  ];
+  const found = await Promise.all(searches);
+  return found
+    .flat()
+    .toSorted((a, b) => boostedScore(b) - boostedScore(a))
+    .slice(0, limit)
+    .map((hit) => hit.document);
 };

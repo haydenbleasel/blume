@@ -15,6 +15,7 @@ import { isHttpUrl } from "../../audit/url.ts";
 import { BlumeError } from "../../core/diagnostics.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import type { DiagnosticSeverity } from "../../core/types.ts";
+import { parseIgnoreFlag } from "../args.ts";
 import { commandMeta } from "../command-meta.ts";
 import { reportInternalError } from "../internal-error.ts";
 import { flushStdout, logger, reportDiagnostics } from "../log.ts";
@@ -103,6 +104,12 @@ export const auditCommand = defineCommand({
         "Exit non-zero at this severity or above: error | warning | info. Defaults to error.",
       type: "string",
     },
+    ignore: {
+      description:
+        'With --external, skip outbound links whose URL matches this glob (e.g. "https://example.com/**"). Repeat it for more; internal links are always checked.',
+      type: "string",
+      valueHint: "glob",
+    },
     json: {
       description: "Emit the report as JSON on stdout (for CI/editors).",
       type: "boolean",
@@ -134,7 +141,7 @@ export const auditCommand = defineCommand({
     },
   },
   meta: commandMeta.audit,
-  async run({ args }) {
+  async run({ args, rawArgs }) {
     if (args["list-checks"]) {
       process.stdout.write(formatCatalog());
       return;
@@ -172,6 +179,7 @@ export const auditCommand = defineCommand({
     const only = splitTerms(args.only);
     const skip = splitTerms(args.skip);
     rejectUnknownTerms([...only, ...skip]);
+    const ignore = parseIgnoreFlag(rawArgs);
     let result: AuditResult;
     try {
       // `scanProject`, not `prepareProject`: the audit reads the *existing*
@@ -180,6 +188,7 @@ export const auditCommand = defineCommand({
       const project = await scanProject(root, { mode: "build" });
       result = await runAudit({
         external: args.external,
+        ignore,
         only,
         origin: args.url,
         project,

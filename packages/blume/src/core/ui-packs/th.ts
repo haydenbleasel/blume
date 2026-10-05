@@ -48,6 +48,7 @@ export const th: UIStringsOverride = {
   banner: { dismiss: "ปิดประกาศ" },
   changelog: {
     description: "อัปเดตผลิตภัณฑ์และบันทึกประจำรุ่น",
+    empty: "ยังไม่มีรายการในบันทึกการเปลี่ยนแปลง",
     title: "บันทึกการเปลี่ยนแปลง",
   },
   consent: {

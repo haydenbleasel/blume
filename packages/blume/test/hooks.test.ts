@@ -484,6 +484,57 @@ describe("useAssistant", () => {
     ]);
   });
 
+  it("sends only the latest turns that fit the route's limits", async () => {
+    const sent: { content: string; role: string }[][] = [];
+    const answer = "x".repeat(10_000);
+    setFetch((_url, init) => {
+      sent.push(JSON.parse(String(init?.body)).messages);
+      return Promise.resolve(streamResponse([answer]));
+    });
+    freshRender(useAssistant);
+    for (const question of ["first?", "second?", "third?", "fourth?"]) {
+      // oxlint-disable-next-line no-await-in-loop -- one question at a time, like a reader
+      await render(useAssistant).ask(question);
+    }
+    // Three 10,000-character answers are over the route's 24,000: the
+    // oldest turn goes, and its answer with it, so the kept ones open with a
+    // question.
+    expect(sent[2]).toHaveLength(5);
+    expect(sent[3]?.map((message) => message.content.slice(0, 7))).toEqual([
+      "second?",
+      "x".repeat(7),
+      "third?",
+      "x".repeat(7),
+      "fourth?",
+    ]);
+    expect(JSON.stringify(sent[3]).length).toBeLessThanOrEqual(24_000);
+    // The reader still sees the whole conversation.
+    expect(render(useAssistant).messages).toHaveLength(8);
+
+    // A question over the limit on its own still goes, alone.
+    await render(useAssistant).ask("y".repeat(30_000));
+    expect(sent[4]).toStrictEqual([
+      { content: "y".repeat(30_000), role: "user" },
+    ]);
+  });
+
+  it("sends at most the route's 40 messages", async () => {
+    const sent: { content: string; role: string }[][] = [];
+    setFetch((_url, init) => {
+      sent.push(JSON.parse(String(init?.body)).messages);
+      return Promise.resolve(streamResponse(["ok"]));
+    });
+    freshRender(useAssistant);
+    for (let turn = 1; turn <= 21; turn += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- one question at a time, like a reader
+      await render(useAssistant).ask(`question ${turn}?`);
+    }
+    const last = sent.at(-1) ?? [];
+    expect(sent[19]).toHaveLength(39);
+    expect(last).toHaveLength(39);
+    expect(last[0]).toStrictEqual({ content: "question 2?", role: "user" });
+  });
+
   it("replaces the placeholder with an error notice on a non-OK response", async () => {
     setFetch(() => Promise.resolve(new Response("boom", { status: 500 })));
     const { ask } = freshRender(useAssistant);

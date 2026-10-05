@@ -76,7 +76,7 @@ Dein Text wird an die eingebauten Anweisungen **angehängt** und ersetzt sie nic
 
 Der Assistent ist **in deinen Docs verankert**. Für jede Frage ruft er die relevantesten Seiten ab — über denselben lexikalischen [Orama](/docs/configuration/search)-Index, der auch die Suche auf der Seite antreibt — und injiziert sie in den System-Prompt des Modells, sodass Antworten aus deinen Inhalten statt aus dem Eigenwissen des Modells kommen. Der Assistent wird angewiesen, nur anhand der abgerufenen Seiten zu antworten, zu sagen, wenn etwas nicht abgedeckt ist, und die Seiten zu zitieren, aus denen er geschöpft hat.
 
-Die Seite, auf der sich der Leser gerade befindet, wird dem Kontext zuerst hinzugefügt und dient dazu, das Retrieval auf die Sprache dieser Seite zu beschränken — und auf einer [versionierten](/docs/content/versioning) Site auf ihre Docs-Version —, damit Antworten relevant für die aktuelle Stelle in den Docs bleiben. Das Retrieval läuft zur Anfragezeit aus einem in den Build eingebackenen Snapshot, funktioniert also unabhängig von deinem [Such](/docs/configuration/search)-Provider — selbst mit `search: false` — und braucht keine Konfiguration.
+Die Seite, auf der sich der Leser gerade befindet, wird dem Kontext zuerst hinzugefügt und dient dazu, das Retrieval auf die Sprache dieser Seite zu beschränken — und auf einer [versionierten](/docs/content/versioning) Site auf ihre Docs-Version —, damit Antworten relevant für die aktuelle Stelle in den Docs bleiben. Eine Frage von außerhalb der Docs, etwa von einer Landingpage, hält sich an die Sprache, die das Locale-Präfix der URL nennt (`/ja`), oder an die Standardsprache. Das Retrieval läuft zur Anfragezeit aus einem in den Build eingebackenen Snapshot, funktioniert also unabhängig von deinem [Such](/docs/configuration/search)-Provider — selbst mit `search: false` — und braucht keine Konfiguration.
 
 Grounding ist für jeden Adapter aktiv außer **[Inkeep](#inkeep)**, das sein eigenes Retrieval über die Inhalte ausführt, die du in seinem Dashboard indexiert hast.
 
@@ -125,6 +125,8 @@ Die drei sind nicht austauschbar. `contextBudget` begrenzt die gesamte Injektion
 
 Die Standardwerte passen zu einem gehosteten Modell. Senke sie, wenn du von eigener Hardware auslieferst und die Zeit bis zum ersten Token wichtiger ist als der Recall; Antworten bleiben in beiden Fällen verankert, und der Assistent ist angewiesen, zu sagen, wenn etwas nicht abgedeckt ist, statt die Lücke zu füllen.
 
+Auf eigener Hardware solltest du außerdem das Kontextfenster des Modells für den gesamten Prompt dimensionieren, nicht nur für die Auszüge: Die bisherige Konversation fügt bis zu 24.000 Zeichen hinzu, und mit aktivierten `tools` ein einzelnes `read_page`-Ergebnis bis zu 20.000, allein schon etwa 5.000 Tokens. Ollama etwa nutzt auf kleineren GPUs standardmäßig ein Fenster von 4k Tokens, und ein Prompt, der darüber hinauswächst, schlägt nicht fehl: Ollama verwirft den Anfang des Prompts, wo die Anweisungen und Auszüge stehen, und das Modell antwortet ohne deine Docs.
+
 ## Externer Endpunkt [#external-endpoint]
 
 Du hast schon ein API-Backend für AI? Richte das Panel darauf aus und halte den Docs-Build statisch:
@@ -147,6 +149,8 @@ Blume sendet denselben `POST`-Body wie seine eingebaute Route:
 }
 ```
 
+`messages` ist die bisherige Konversation, die mit der neuen Frage endet. Die eingebaute Route nimmt höchstens 40 Nachrichten und davon 24.000 Zeichen als JSON an; wächst eine Konversation über eine der beiden Grenzen hinaus, sendet das Panel die neuesten Beiträge, die hineinpassen, und verwirft die ältesten.
+
 Gib eine erfolgreiche Antwort zurück, deren Body ein reiner UTF-8-Textstream ist. Liegt der Endpunkt auf einem anderen Origin, erlaube den Docs-Origin per CORS: akzeptiere `OPTIONS` und `POST`, lasse den Request-Header `content-type` zu und gib die CORS-Header sowohl beim Preflight als auch bei der gestreamten Antwort zurück. Mit gesetztem `endpoint` erzeugt Blume die Chat-UI, aber keine Server-Route, keinen Grounding-Snapshot, keine Provider-Abhängigkeit und keine Warnung zu Provider-Secrets; dein Backend verantwortet Retrieval, Authentifizierung, Rate Limiting, Modellzugriff und Zitate. Ein daneben gesetzter Adapter wird ignoriert.
 
 ## Cross-Origin-Aufrufer [#cross-origin-callers]
@@ -162,7 +166,7 @@ ai: {
 }
 ```
 
-Die Route antwortet dann auf den `OPTIONS`-Preflight des Browsers und nennt einen aufgeführten Origin bei jeder Antwort — bei der gestreamten Antwort genauso wie bei den Fehler-Status, damit der Aufrufer einen abgelehnten Body von einem Provider-Ausfall unterscheiden kann. Origins, die nicht aufgeführt sind, bekommen keinen Header und bleiben der Same-Origin-Regel des Browsers unterworfen. Jeder Eintrag wird auf seinen Origin reduziert, `https://www.example.com/docs/` und `https://www.example.com` bedeuten also dasselbe. Damit jede Seite die Route aufrufen darf, führe `"*"` statt einzelner Origins auf.
+Die Route antwortet dann auf den `OPTIONS`-Preflight des Browsers und nennt einen aufgeführten Origin bei jeder Antwort — bei der gestreamten Antwort genauso wie bei den Fehler-Status, damit der Aufrufer einen abgelehnten Body von einem Provider-Ausfall unterscheiden kann. Diese Antworten geben außerdem `Retry-After` frei, sodass der Aufrufer nach einem `429` des [Rate Limitings](/docs/configuration/rate-limiting) auslesen kann, wie viele Sekunden er warten muss. Origins, die nicht aufgeführt sind, bekommen keinen Header und bleiben der Same-Origin-Regel des Browsers unterworfen. Jeder Eintrag wird auf seinen Origin reduziert, `https://www.example.com/docs/` und `https://www.example.com` bedeuten also dasselbe. Damit jede Seite die Route aufrufen darf, führe `"*"` statt einzelner Origins auf.
 
 Der Aufrufer sendet denselben `POST`-Body, den der Vertrag für den [externen Endpunkt](#external-endpoint) beschreibt, und liest denselben Textstream zurück. Sende ihn als JSON mit einem `content-type: application/json`-Header:
 

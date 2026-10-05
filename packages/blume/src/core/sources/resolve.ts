@@ -138,7 +138,17 @@ const buildSource = (
       return notionSource({ ...adapter.options, name }, ctx());
     }
     case "contentful": {
-      return contentfulSource({ ...adapter.options, name }, ctx());
+      // i18n and versions place an entry hyperlink's route as they do the
+      // linked entry's page.
+      return contentfulSource(
+        {
+          ...adapter.options,
+          i18n: config.i18n,
+          name,
+          versions: config.versions,
+        },
+        ctx()
+      );
     }
     case "payload": {
       return payloadSource({ ...adapter.options, name }, ctx());

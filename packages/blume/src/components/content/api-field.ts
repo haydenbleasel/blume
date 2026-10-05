@@ -43,7 +43,10 @@ export interface ParamFieldProps extends FieldProps {
   /** The name, for a field with no location attribute. */
   name?: string;
   path?: string;
-  /** Placeholder text for the parameter's playground input. */
+  /**
+   * An example value: the one the playground and request samples start
+   * with, not an input's placeholder hint (see `fieldSchema`).
+   */
   placeholder?: string;
   query?: string;
 }

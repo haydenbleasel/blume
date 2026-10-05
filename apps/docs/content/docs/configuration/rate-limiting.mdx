@@ -5,7 +5,7 @@ description: Limit how often one reader can call the assistant, the API playgrou
 
 The server routes a reader can call cost you something each time: the [assistant](/docs/configuration/assistant) spends model tokens, the [API playground](/docs/references/openapi#cors-and-the-proxy) proxy relays requests to your API, and [Mixedbread search](/docs/configuration/search#mixedbread) runs a paid query. Blume limits how often one reader, identified by IP address, can call each of them. A reader over the limit gets `429 Too Many Requests` with a `Retry-After` header, and the assistant tells them to try again in a few minutes.
 
-Rate limiting is on by default, at 30 requests per reader per route every 10 minutes: enough that a person never meets it, low enough to stop a script. It only matters for a server build; a static site has no server routes to limit.
+Rate limiting is on by default, at 30 requests per reader per route every 10 minutes: well above what a person sends to the assistant or the playground, and low enough to stop a script. Search counts differently. The search dialog sends a query each time the reader pauses while typing, so one search can take several requests, and a reader who searches steadily for a few minutes can reach the limit. If your site uses Mixedbread search, raise `requests`, which applies to every route. Rate limiting only matters for a server build; a static site has no server routes to limit.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -38,12 +38,18 @@ rateLimit: memory({ requests: 60, window: 600 }),
 
 ### Upstash
 
-`upstash()` keeps the count in Upstash Redis, which every instance shares. Create a database (on Vercel, add Upstash from the Marketplace), then set its REST endpoint and token as `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. Blume talks to Upstash's REST API, so there's nothing to install. Until both are set, the routes count in memory and `blume build` warns.
+`upstash()` keeps the count in Upstash Redis, which every instance shares. Create a database, then set its REST endpoint and token as `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. Blume talks to Upstash's REST API, so there's nothing to install. Until both are set, the routes count in memory and `blume build` warns.
 
 ```ts blume.config.ts lineNumbers
 import { upstash } from "blume/ratelimit";
 
 rateLimit: upstash(),
+```
+
+A database added from Vercel's Marketplace sets its endpoint and token as `KV_REST_API_URL` and `KV_REST_API_TOKEN` instead, with any prefix you chose when you connected it. Name the variables with `urlEnv` and `tokenEnv`:
+
+```ts blume.config.ts lineNumbers
+rateLimit: upstash({ urlEnv: "KV_REST_API_URL", tokenEnv: "KV_REST_API_TOKEN" }),
 ```
 
 ### Cloudflare
@@ -61,6 +67,21 @@ export default defineConfig({
 ```
 
 The binding's namespace comes from the Worker's name, so two sites on one account don't share a count. Set `namespaceId` to choose it yourself.
+
+## Behind a reverse proxy
+
+Vercel, Netlify, and Cloudflare tell Blume each reader's address. A `node()` server behind a reverse proxy, like nginx or Caddy, sees every request come from the proxy, so every reader shares one count and a busy site hits the limit for everyone. List the host the proxy answers for in `allowedDomains`:
+
+```ts blume.config.ts lineNumbers
+import { node } from "blume/deploy";
+
+deployment: node({
+  site: "https://docs.example.com",
+  allowedDomains: [{ hostname: "docs.example.com" }],
+}),
+```
+
+This is Astro's [`security.allowedDomains`](https://docs.astro.build/en/reference/configuration-reference/#securityalloweddomains): for a request whose `Host` or `X-Forwarded-Host` header matches an entry, Astro takes the reader's address from the first entry of `X-Forwarded-For`. Have the proxy pass the site's host through and replace any `X-Forwarded-For` the reader sent with the address it sees, like nginx's `proxy_set_header X-Forwarded-For $remote_addr;`. A proxy that appends to the header instead lets a reader pick their own address and get a fresh count with every request. Leave `allowedDomains` unset when readers reach the server directly.
 
 ## Turning it off
 

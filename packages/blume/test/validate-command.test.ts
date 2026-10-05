@@ -133,3 +133,49 @@ describe("blume validate — routes beyond the content graph", () => {
     expect(exitCode).toBe(1);
   });
 });
+
+describe("blume validate --ignore", () => {
+  it("never requests an external URL that a repeated --ignore glob matches", async () => {
+    // citty keeps only the last value of a repeated string flag, so this runs
+    // the real CLI: every `--ignore`, in either spelling, has to count.
+    const requested: string[] = [];
+    const server = Bun.serve({
+      fetch(request) {
+        requested.push(new URL(request.url).pathname);
+        return new Response("gone", { status: 404 });
+      },
+      port: 0,
+    });
+    const origin = `http://localhost:${server.port}`;
+    try {
+      const root = await fixture({
+        "docs/a.md": [
+          "---",
+          "title: A",
+          "---",
+          "",
+          `[placeholder](${origin}/placeholder/api)`,
+          "",
+          `[local](${origin}/local)`,
+          "",
+          `[gone](${origin}/gone)`,
+          "",
+        ].join("\n"),
+      });
+      const { exitCode, stderr } = await validate(
+        root,
+        "--external",
+        "--ignore",
+        `${origin}/placeholder/**`,
+        `--ignore=${origin}/local`
+      );
+      expect(stderr).toContain(`External link ${origin}/gone is unreachable`);
+      expect(stderr).not.toContain("/placeholder/api");
+      expect(stderr).not.toContain(`${origin}/local`);
+      expect(requested).toEqual(["/gone"]);
+      expect(exitCode).toBe(1);
+    } finally {
+      server.stop(true);
+    }
+  });
+});

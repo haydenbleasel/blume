@@ -55,6 +55,9 @@ export class BlumeMermaid extends HTMLElement {
         look: "classic",
         securityLevel: "strict",
         startOnLoad: false,
+        // Without this, a diagram that fails to parse leaves Mermaid's own
+        // "Syntax error in text" graphic appended to <body>, below the page.
+        suppressErrorRendering: true,
         theme: prefersDark() ? "dark" : "default",
       });
       try {
@@ -71,13 +74,24 @@ export class BlumeMermaid extends HTMLElement {
           // oxlint-disable-next-line github/no-inner-html -- Mermaid-generated SVG must be injected as HTML
           output.innerHTML = svg;
         }
-      } catch {
+      } catch (error) {
         // Localized message stamped on <body> by RootLayout's markup (the
         // data-attribute channel); English fallback when the attribute is
         // missing (a stale snapshot or a custom layout).
         output.textContent =
           document.body.dataset.i18nDiagramError ||
           "Could not render this diagram.";
+        // Readers get only the message above; the writer needs Mermaid's
+        // parser error (line and expected token) to fix the source. It goes
+        // to the console, and `blume dev` also shows it under the message.
+        console.error("[blume] Mermaid could not render a diagram:", error);
+        if (import.meta.env.DEV) {
+          const detail = document.createElement("pre");
+          detail.className =
+            "mt-2 overflow-x-auto text-muted-foreground text-xs";
+          detail.textContent = String(error);
+          output.append(detail);
+        }
       }
       output.removeAttribute("aria-busy");
     };

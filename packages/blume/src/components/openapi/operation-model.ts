@@ -3,6 +3,7 @@ import {
   declaredExample,
   exampleValue,
   objectProperties,
+  parameterDescription,
   resolveSchema,
   toJson,
 } from "./helpers.ts";
@@ -142,7 +143,7 @@ const modelParams = (
     const required = where === "path" ? true : param.required === true;
     const schema = resolveSchema(schemas, param.schema);
     params.push({
-      description: param.description,
+      description: parameterDescription(param, schemas),
       enum: schema.enum?.map(String),
       in: where,
       name: param.name,
@@ -330,6 +331,19 @@ const authInput = (
   }
 };
 
+/**
+ * The playground's credential inputs for an operation's security: the first
+ * alternative only — the spec's preferred way to authorize, matching what the
+ * static samples always showed.
+ */
+export const playgroundAuth = (
+  security: OperationSecurity
+): PlaygroundAuthInput[] =>
+  (security.alternatives[0] ?? []).flatMap((resolved) => {
+    const input = authInput(resolved);
+    return input ? [input] : [];
+  });
+
 /** Derive the playground request model for one operation, at build time. */
 export const operationModel = (args: {
   method: string;
@@ -344,12 +358,7 @@ export const operationModel = (args: {
   components?: ComponentsLike;
   security: OperationSecurity;
 }): PlaygroundModel => ({
-  // First alternative only — the spec's preferred way to authorize, matching
-  // what the static samples always showed.
-  auth: (args.security.alternatives[0] ?? []).flatMap((resolved) => {
-    const input = authInput(resolved);
-    return input ? [input] : [];
-  }),
+  auth: playgroundAuth(args.security),
   authOptional: args.security.optional,
   body: modelBody(args.requestBody, args.schemas, args.components),
   method: args.method.toUpperCase(),

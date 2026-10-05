@@ -44,8 +44,13 @@
  * stored preference instead of aborting before the swap listeners exist, and
  * after a swap the theme the `before-swap` stamp carried over stands, so a
  * toggle the reader made still holds for the rest of their visit.
+ *
+ * Paper is white, so a dark page prints light: `beforeprint` switches the root
+ * to the light theme (every token, Shiki color, and `dark:` utility follows
+ * it) and `afterprint` puts the dark theme back. The listeners sit on
+ * `window`, so the one registration outlives client-router swaps.
  */
-export const THEME_INIT_SCRIPT = `(()=>{const m=document.currentScript?.dataset.mode??"system";const apply=()=>{const r=document.documentElement;let s=null;let blocked=false;try{s=localStorage.getItem("blume-theme");}catch{blocked=true;}const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";r.dataset.theme=s??(blocked&&r.dataset.theme?r.dataset.theme:m==="system"?sys:m);};apply();document.addEventListener("astro:before-swap",(e)=>{const t=document.documentElement.dataset.theme;if(t){e.newDocument.documentElement.dataset.theme=t;}});document.addEventListener("astro:after-swap",apply);})();`;
+export const THEME_INIT_SCRIPT = `(()=>{const m=document.currentScript?.dataset.mode??"system";const apply=()=>{const r=document.documentElement;let s=null;let blocked=false;try{s=localStorage.getItem("blume-theme");}catch{blocked=true;}const sys=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";r.dataset.theme=s??(blocked&&r.dataset.theme?r.dataset.theme:m==="system"?sys:m);};apply();document.addEventListener("astro:before-swap",(e)=>{const t=document.documentElement.dataset.theme;if(t){e.newDocument.documentElement.dataset.theme=t;}});document.addEventListener("astro:after-swap",apply);let printed=null;addEventListener("beforeprint",()=>{const r=document.documentElement;if(r.dataset.theme==="dark"){printed="dark";r.dataset.theme="light";}});addEventListener("afterprint",()=>{if(printed){document.documentElement.dataset.theme=printed;printed=null;}});})();`;
 
 /**
  * Keep an embedded Scalar reference on Blume's theme. Scalar picks its own

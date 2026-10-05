@@ -50,6 +50,7 @@ export const id: UIStringsOverride = {
   banner: { dismiss: "Tutup pengumuman" },
   changelog: {
     description: "Pembaruan produk dan catatan rilis.",
+    empty: "Belum ada entri di log perubahan.",
     title: "Log perubahan",
   },
   consent: {

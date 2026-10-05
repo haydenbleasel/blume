@@ -20,8 +20,31 @@ const buildErrorSchema = z.looseObject({
     .optional(),
 });
 
+/**
+ * The diagnostic a `BlumeError` thrown inside the build carries, such as a
+ * failed hosted search sync in `astro:build:done`. The hook runs Blume's
+ * source rather than the CLI bundle, so its error is another copy of the class
+ * that the command's `instanceof BlumeError` doesn't recognize.
+ */
+const blumeErrorSchema = z.looseObject({
+  diagnostic: z.object({
+    code: z.string(),
+    column: z.number().optional(),
+    docsUrl: z.string().optional(),
+    file: z.string().optional(),
+    line: z.number().optional(),
+    message: z.string(),
+    severity: z.enum(["error", "info", "warning"]),
+    suggestion: z.string().optional(),
+  }),
+});
+
 /** One failure as a diagnostic at the file (and position) it names. */
 const failureDiagnostic = (error: Error): Diagnostic => {
+  const raised = blumeErrorSchema.safeParse(error);
+  if (raised.success) {
+    return raised.data.diagnostic;
+  }
   const parsed = buildErrorSchema.safeParse(error);
   const { id, loc } = parsed.success ? parsed.data : {};
   // A named error (`MDXError`, `CompilerError`) says which step failed.

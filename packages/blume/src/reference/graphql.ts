@@ -3,16 +3,28 @@ import { z } from "zod";
 import type { AdapterDescriptor } from "../core/adapter.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
 import {
+  graphqlAuthSchema,
   graphqlSourceSchema,
   liftSpec,
   hasSources,
   missingSourcesIssue,
   sharedOptions,
 } from "./options.ts";
-import type { GraphqlSourceOptions, PlaygroundOptions } from "./options.ts";
+import type {
+  GraphqlAuthOptions,
+  GraphqlSourceOptions,
+  PlaygroundOptions,
+} from "./options.ts";
 
 /** Options for {@link graphql}. */
 export interface GraphqlOptions {
+  /**
+   * How the endpoint authenticates, like the site's `api.auth`: `bearer`,
+   * `basic`, or `key` (sent in the `name` header, `x-api-key` by default).
+   * The Try it panel gets a field for the credential and the code samples
+   * send a placeholder. Applies to every source; a per-source `auth` wins.
+   */
+  auth?: GraphqlAuthOptions;
   /**
    * Code-sample languages shown per operation, in order. Defaults to
    * `["curl", "js", "python"]`; `false` shows none.
@@ -52,6 +64,8 @@ export const graphqlOptionsSchema = z
       codeSamples: ["curl", "js", "python"],
       route: "/graphql",
     }),
+    /** Default endpoint auth for every source (per-source `auth` wins). */
+    auth: graphqlAuthSchema.optional(),
     /** Default live endpoint URL for every source (per-source `endpoint` wins). */
     endpoint: z.string().optional(),
     /** One or more schemas; each renders on its own route by default. */

@@ -242,7 +242,7 @@ export const malformedIncludeDiagnostic = (
     "This <include> isn't a statement Blume can read, so the page shows it as written.",
   severity: "warning",
   suggestion:
-    "Write <include>./path.mdx</include> on a line of its own, or wrap it with the path on its own line and no blank lines; only lang and meta attributes are read.",
+    'Write <include>./path.mdx</include> on a line of its own, or wrap it with the path on its own line and no blank lines. Attributes take lowercase names and quoted values (plan="Pro"): lang and meta shape a code include, and any other is a prop the included file reads as {{name}}.',
 });
 
 /**

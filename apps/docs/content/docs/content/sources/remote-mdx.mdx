@@ -33,6 +33,10 @@ mdxRemote({
 });
 ```
 
+`include` (default `["**/*.{md,mdx}"]`) filters the files by their path under `path`, the way a `filesystem()` source's `include` does: a pattern starting with `!` excludes what it matches (`["**/*.mdx", "!drafts/**"]`). With `github`, the source lists the repository's whole tree at `ref` and keeps the files under `path`. If nothing is under `path` at that ref, the source reads no pages and warns with `BLUME_SOURCE_PATH_MISSING`. GitHub caps the listing (100,000 entries or 7 MB for the whole repository, whatever `path` is), and past it the source warns with `BLUME_SOURCE_TRUNCATED`: list the files with `url` and `files` instead.
+
+A relative link between remote files (`[Errors](./02-errors.mdx)`) lands on the page the linked file publishes at, with its ordering prefix dropped from the route, and `blume validate` checks it the same way.
+
 A private repo's token is read from the `GITHUB_TOKEN` environment variable — the adapter declares it, so `blume dev` and `blume build` warn when it's unset. It is never inlined into your config or generated output, and it is only ever sent to GitHub's own hosts (`api.github.com`, `raw.githubusercontent.com`), never to a custom `url` base. A public repo works without it.
 
 Remote pages are rendered with full MDX-plus-component fidelity: their bodies are materialized into a hidden staging directory and rendered through Astro alongside your local docs, so callouts, tabs, and every other Blume component keep working.

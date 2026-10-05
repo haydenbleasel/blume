@@ -287,6 +287,41 @@ describe("payloadSource", () => {
     ]);
   });
 
+  it("warns once per kind of node a page leaves out as a comment", async () => {
+    const { fetchImpl } = recordingFetch((): JsonValue => ({
+      docs: [
+        doc("a", {
+          content: {
+            root: el("root", [
+              el("relationship", []),
+              el("relationship", []),
+              el("block", [], { fields: { blockType: "banner" } }),
+              el("paragraph", [text("kept")]),
+            ]),
+          },
+          slug: "mixed",
+        }),
+      ],
+      hasNextPage: false,
+    }));
+    const source = payloadSource(
+      { collection: "docs", fetchImpl, name: "cms", url: "https://cms.test" },
+      ctxFor(await tempDir("payload-unsupported"))
+    );
+    const { diagnostics, entries } = await source.load();
+    expect(entries[0]?.body.text).toContain("kept");
+    expect(diagnostics.map((d) => [d.code, d.message])).toStrictEqual([
+      [
+        "BLUME_SOURCE_UNSUPPORTED_NODE",
+        'Source "cms": "mixed.md" has content Blume has no Markdown for (Lexical node: relationship), left out as a comment.',
+      ],
+      [
+        "BLUME_SOURCE_UNSUPPORTED_NODE",
+        'Source "cms": "mixed.md" has content Blume has no Markdown for (Lexical block: banner), left out as a comment.',
+      ],
+    ]);
+  });
+
   it("keeps drafts under --preview and names the auth collection", async () => {
     const { calls, fetchImpl } = recordingFetch(() => ({
       docs: [doc("b", { _status: "draft", slug: "draft", title: "Draft" })],

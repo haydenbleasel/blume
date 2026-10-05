@@ -285,6 +285,17 @@ interface ChangelogFrontmatter {
 }
 
 /**
+ * The tag a release shows beside its title. A draft (read only with
+ * `drafts`) says so, since nothing else marks it as unreleased.
+ */
+const releaseCategory = (release: GithubRelease): string => {
+  if (release.draft) {
+    return "Draft";
+  }
+  return release.prerelease ? "Prerelease" : "Release";
+};
+
+/**
  * Lower one release to a staged Markdown entry: the notes become the body,
  * `type: changelog` frontmatter (title/date/version/category) drives the
  * generated `/changelog` timeline and RSS feed, and a summary derived from the
@@ -294,7 +305,7 @@ const releaseToEntry = (release: GithubRelease, site?: string): SourceEntry => {
   const version = release.tag_name.replace(LEADING_V, "");
   const title = release.name?.trim() || release.tag_name;
   const date = release.published_at ?? release.created_at;
-  const category = release.prerelease ? "Prerelease" : "Release";
+  const category = releaseCategory(release);
   // Release notes are the repository's content, not the site author's, so a
   // link whose destination isn't a web, mail, or relative address
   // (`javascript:`, `data:`) keeps only its label (see `safe-links.ts`), and

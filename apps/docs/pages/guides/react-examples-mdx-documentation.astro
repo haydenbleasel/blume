@@ -7,8 +7,8 @@
 // (core/component-overrides.ts), BLUME_UNKNOWN_COMPONENT
 // (core/component-diagnostics.ts), the user mdx map spread over the built-ins
 // (astro/templates.ts), the Tailwind scan roots (astro/generate.ts: the site
-// sheet scans .astro/.mdx/.ts/.tsx only, not .jsx/.vue/.svelte; preview frames
-// scan all of them),
+// sheet scans .astro/.jsx/.mdx/.ts/.tsx, not .vue/.svelte, since 45625811;
+// preview frames scan all of them),
 // Component.astro and Tabs.astro, the Markdown downlevel
 // (ai/component-markdown.ts), AutoTypeTable extraction, and the preview
 // command's server-build refusal (cli/commands/preview.ts). Ran in a scratch
@@ -147,10 +147,8 @@ export function Switch({
   <p>
     The classes use Blume's theme tokens, like <code>bg-muted</code> and{" "}
     <code>bg-action</code>, so the switch follows the site's colors in light and
-    dark mode. Blume generates Tailwind classes from the <code>.tsx</code> files
-    in your project, so there's nothing to configure. Keep demos in{" "}
-    <code>.tsx</code> too: the site's stylesheet doesn't scan{" "}
-    <code>.jsx</code> files, so a class used only in one is never generated.
+    dark mode. Blume generates Tailwind classes from the <code>.tsx</code> and{" "}
+    <code>.jsx</code> files in your project, so there's nothing to configure.
     React ships with Blume and switches on when your project has a{" "}
     <code>.tsx</code> or <code>.jsx</code> file. For type checking in your
     editor, add React's types with <code>npm install -D @types/react</code>.
@@ -187,8 +185,8 @@ export default function SwitchDemo({ label = "Email alerts" }: { label?: string 
     every page, with no import. The file name must be a PascalCase identifier,
     and the component must be the file's default export. Vue and Svelte islands
     work the same way once you install their Astro integration, though the
-    site's Tailwind scan skips <code>.vue</code> and <code>.svelte</code> files
-    as well.
+    site's Tailwind scan skips <code>.vue</code> and <code>.svelte</code>{" "}
+    files.
   </p>
   <p>
     The <code>not-prose</code> class matters. MDX pages render inside the docs'
@@ -542,6 +540,11 @@ npx blume preview`}
       with no interactivity.
     </li>
     <li>
+      <code>BLUME_EXAMPLE_NOT_FOUND</code>, when a{" "}
+      <code>&lt;Component path&gt;</code> names no file under{" "}
+      <code>examples/</code>, such as after you rename an example.
+    </li>
+    <li>
       For a Vue or Svelte island, <code>BLUME_DEPENDENCY_MISSING</code>, which
       fails the build until you install the framework's Astro integration.
     </li>
@@ -590,10 +593,9 @@ npx blume preview`}
     Stray margins, fonts, or code styling come from the docs' typography: add{" "}
     <code>not-prose</code> to the island's outer element. Missing classes mean
     Tailwind never scanned the file that uses them. The site's stylesheet scans
-    your project's <code>.tsx</code>, <code>.ts</code>, <code>.mdx</code>, and{" "}
-    <code>.astro</code> files, so a class used only in a <code>.jsx</code>,{" "}
-    <code>.vue</code>, or <code>.svelte</code> island is never generated:
-    rename a React island to <code>.tsx</code>, or add{" "}
+    your project's <code>.tsx</code>, <code>.jsx</code>, <code>.ts</code>,{" "}
+    <code>.mdx</code>, and <code>.astro</code> files, so a class used only in a{" "}
+    <code>.vue</code> or <code>.svelte</code> island is never generated: add{" "}
     <code>@source "./islands";</code> to your <code>theme.css</code>. A
     component in a sibling package needs an <code>@source</code> line for that
     package, in <code>theme.css</code> or, for preview frames, in the

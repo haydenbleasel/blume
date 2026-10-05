@@ -91,11 +91,12 @@ import { guideById } from "../_guides/guides.ts";
   <p>
     Keep them as separate steps, so a red check says which question failed.
     Don't count on the docs build to catch a bad spec. Blume reads the spec
-    with Scalar's parser and upgrades it to OpenAPI 3.1, but it only rejects a
-    file that isn't a YAML or JSON object. A spec whose{" "}
-    <code>/messages/&#123;id&#125;</code> operation never declares its{" "}
-    <code>id</code> parameter still builds a reference, while{" "}
-    <code>oasdiff validate</code> rejects it.
+    with Scalar's parser, and it only rejects a file that isn't a YAML or JSON
+    object. It warns about a few mistakes that would render wrong, but it
+    isn't a validator. A spec whose <code>/messages/&#123;id&#125;</code>{" "}
+    operation never declares its <code>id</code> parameter still builds a
+    reference, with a <code>BLUME_OPENAPI_PATH_PARAMETER_MISSING</code>{" "}
+    warning, while <code>oasdiff validate</code> rejects it outright.
   </p>
 
   <h2>Lay out the repository</h2>
@@ -494,7 +495,9 @@ jobs:
       <code>blume validate --strict</code> checks every link in your pages,
       including links to operation pages. <code>--strict</code> fails on
       warnings too, including the reference's own, like{" "}
-      <code>BLUME_OPENAPI_EMPTY</code> for a spec with no operations.
+      <code>BLUME_OPENAPI_EMPTY</code> for a spec with no operations, or{" "}
+      <code>BLUME_OPENAPI_PATH_PARAMETER_MISSING</code> for a path parameter
+      the operation never declares.
     </li>
     <li>
       <code>blume build</code> fails with <code>BLUME_OPENAPI_UNAVAILABLE</code>{" "}
@@ -663,8 +666,11 @@ warning	[request-property-removed] at docs-site/openapi.json
   </p>
   <h3>oasdiff rejects a spec Blume renders</h3>
   <p>
-    That's expected: Blume doesn't validate the spec, so a spec with errors can
-    still render. Fix the finding in the code the spec comes from, such as a
+    That's expected: Blume doesn't validate the spec against the OpenAPI
+    schema, so a spec with errors can still render. It warns only about a
+    short list of mistakes, listed under{" "}
+    <a href="/docs/references/openapi#spec-warnings">spec warnings</a>. Fix
+    the finding in the code the spec comes from, such as a
     route's parameter schema, and export again. Don't hand-edit{" "}
     <code>openapi.json</code>: the next export overwrites it, and the freshness
     check fails until it does. To change what the docs show without changing

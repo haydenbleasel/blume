@@ -48,6 +48,7 @@ export const cs: UIStringsOverride = {
   banner: { dismiss: "Zavřít oznámení" },
   changelog: {
     description: "Novinky produktu a poznámky k vydání.",
+    empty: "V seznamu změn zatím nejsou žádné záznamy.",
     title: "Seznam změn",
   },
   consent: {

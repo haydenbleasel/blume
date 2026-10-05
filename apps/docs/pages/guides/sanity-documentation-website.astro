@@ -12,13 +12,15 @@
 // the sample NDJSON with groq-js, ran sanitySource with this config's
 // serializers over the sample documents (a stub client in place of
 // @sanity/client, both perspectives), compiled the output with @mdx-js/mdx,
-// and typechecked blume.config.ts. Review: replaced the internal
-// blume/sources/lower.ts helpers with inline ones (the escape helper's output
-// compiled with @mdx-js/mdx 3.1.1 and rendered as written), aligned preview
-// and rebuild steps with the other CMS guides, and corrected the
-// missing-token and missing-client troubleshooting against cli/prepare.ts and
-// core/sources/cache.ts. Not yet run end to end against a live Sanity
-// project or a deployment.
+// and typechecked blume.config.ts. Review: aligned preview and rebuild steps
+// with the other CMS guides, and corrected the missing-token and
+// missing-client troubleshooting against cli/prepare.ts and
+// core/sources/cache.ts. Later: switched the callout serializer to
+// escapeMarkdownText from blume/sources/lower.ts, which the custom sources
+// docs now document (reran sanitySource with a stub client over the sample
+// guide for the output shown), and rechecked the engine's SDK and empty-result
+// checks in core/sources/sanity.ts. Not yet run end to end against a live
+// Sanity project or a deployment.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -26,6 +28,7 @@ import { guideById } from "../_guides/guides.ts";
 
 const blumeConfigTsCode = `import { defineConfig } from "blume";
 import { custom, filesystem } from "blume/sources";
+import { escapeMarkdownText } from "blume/sources/lower.ts";
 import { sanitySource } from "blume/sources/sanity.ts";
 
 const TONES = ["note", "tip", "warning", "danger"];
@@ -42,11 +45,6 @@ const fence = (code: string, language: string) => {
   const ticks = "\`".repeat(Math.max(3, ...runs.map((run) => run.length + 1)));
   return \`\${ticks}\${language}\\n\${code}\\n\${ticks}\`;
 };
-
-// Backslash-escape every ASCII punctuation character, so an editor's
-// { or < renders as written instead of being read as MDX.
-const escapeText = (text: string) =>
-  text.replace(/[\\x21-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\x7e]/g, "\\\\$&");
 
 export default defineConfig({
   title: "Acme Docs",
@@ -70,7 +68,7 @@ export default defineConfig({
             callout: (block) => {
               const tone = field(block, "tone");
               const directive = TONES.includes(tone) ? tone : "note";
-              return \`:::\${directive}\\n\${escapeText(field(block, "text"))}\\n:::\`;
+              return \`:::\${directive}\\n\${escapeMarkdownText(field(block, "text"))}\\n:::\`;
             },
           },
         })
@@ -424,10 +422,10 @@ Send your key as a bearer token in the \`Authorization\` header.`}
     A serializer returns MDX, and setting any serializer writes the source's
     pages as MDX, so a <code>:::warning</code> directive renders as a callout.
     Blume escapes the text it converts itself, but a serializer's output goes
-    into the page as written. An editor's <code>{"{"}</code> or{" "}
-    <code>&lt;b&gt;</code> would break the page, so pass their text through{" "}
-    <code>escapeText</code>, which backslash-escapes every ASCII punctuation
-    character. <code>fence</code> writes a fence longer than any run of
+    into the page as written. An editor's <code>{"{"}</code> would break the
+    page and a <code>&lt;b&gt;</code> would render as HTML, so pass their text
+    through <code>escapeMarkdownText</code>, the escaper Blume's own
+    conversion uses. <code>fence</code> writes a fence longer than any run of
     backticks inside the code. The first guide now becomes:
   </p>
   <CodeBlock
@@ -440,31 +438,35 @@ npm install @acme/messages
 \`\`\`
 
 :::warning
-Keep the key out of client code\\. Anyone with it can send \\{messages\\} as you\\.
+Keep the key out of client code. Anyone with it can send \\{messages\\} as you.
 :::`}
     lang="mdx"
   />
   <p>
     <code>custom()</code> gives up some of <code>sanity()</code>'s checks. It
-    declares no package or secret, so Blume no longer checks for{" "}
-    <code>@sanity/client</code> or <code>SANITY_TOKEN</code>, and the dev
-    server's cached copy doesn't notice config changes. After you edit a
-    serializer or the query, run <code>npx blume sync</code>.
+    declares no package or secret, so <code>blume doctor</code> and the
+    build's up-front checks no longer look for <code>@sanity/client</code> or{" "}
+    <code>SANITY_TOKEN</code>. The engine still stops with{" "}
+    <code>BLUME_SOURCE_SDK_MISSING</code> when the client isn't installed, and
+    still warns when a query finds nothing without a token. And the dev
+    server's cached copy is kept per preview mode, not per config, so it
+    doesn't notice config changes. After you edit a serializer or the query,
+    run <code>npx blume sync</code>.
   </p>
 
   <h2>Preview drafts</h2>
   <p>
     Drafts are private in Sanity, so reading them takes a token. From the
     Studio folder, create one with read-only access and put it in the docs
-    project's <code>.env.local</code>, which Blume loads for you:
+    project's <code>.env.local</code>, which Blume loads for you and{" "}
+    <code>blume init</code> already listed in <code>.gitignore</code>:
   </p>
   <CodeBlock
     code={`npx sanity tokens add "Blume docs" --role=viewer`}
     lang="bash"
   />
   <CodeBlock
-    code={`echo "SANITY_TOKEN=paste-your-token-here" >> .env.local
-echo ".env.local" >> .gitignore`}
+    code={`echo "SANITY_TOKEN=paste-your-token-here" >> .env.local`}
     lang="bash"
   />
   <p>
@@ -610,7 +612,7 @@ echo ".env.local" >> .gitignore`}
     An error like <code>Could not parse expression with acorn</code> means a
     serializer returned an editor's text unescaped, and a <code>{"{"}</code>{" "}
     or <code>&lt;</code> in it read as code. Wrap the text in{" "}
-    <code>escapeText</code>.
+    <code>escapeMarkdownText</code>.
   </p>
   <h3>Drafts don't show up with --preview</h3>
   <p>
@@ -631,19 +633,19 @@ echo ".env.local" >> .gitignore`}
     variable is unset. A public dataset's production build doesn't need it, so
     there the warning is safe to ignore. A private dataset does: Sanity answers
     a query without a token with an empty result rather than an error, so the
-    build succeeds with no Sanity pages. Set the token, and redeploy, since a
-    changed variable only applies to new builds.
+    build succeeds with no Sanity pages and a second warning that the query
+    found no documents while the token was unset. Set the token, and redeploy,
+    since a changed variable only applies to new builds.
   </p>
   <h3>The build can't load the source</h3>
   <p>
-    <code>BLUME_SOURCE_FETCH_FAILED</code> carries the reason: Sanity's own
-    error for a wrong project ID or dataset, or a message that the source needs{" "}
-    <code>@sanity/client</code> when it isn't installed. Blume fetches before it
-    checks your dependencies, so on a fresh build the fetch error is what you
-    see. When a snapshot exists, Blume serves it with a{" "}
-    <code>BLUME_SOURCE_OFFLINE</code> warning instead, but a fresh build
-    machine has none, so there the build stops and your last deployment stays
-    live.
+    <code>BLUME_SOURCE_FETCH_FAILED</code> carries Sanity's own error for a
+    wrong project ID or dataset. When <code>@sanity/client</code> isn't
+    installed, the source stops before any request with{" "}
+    <code>BLUME_SOURCE_SDK_MISSING</code> instead. When a snapshot exists,
+    Blume serves it with a <code>BLUME_SOURCE_OFFLINE</code> warning instead,
+    but a fresh build machine has none, so there the build stops and your last
+    deployment stays live.
   </p>
   <h3>Two pages claim the same URL</h3>
   <p>

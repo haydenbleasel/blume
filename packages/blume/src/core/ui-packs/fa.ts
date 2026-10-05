@@ -49,6 +49,7 @@ export const fa: UIStringsOverride = {
   banner: { dismiss: "بستن اطلاعیه" },
   changelog: {
     description: "به‌روزرسانی‌های محصول و یادداشت‌های انتشار.",
+    empty: "هنوز هیچ موردی در گزارش تغییرات نیست.",
     title: "گزارش تغییرات",
   },
   consent: {

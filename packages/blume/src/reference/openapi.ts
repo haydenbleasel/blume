@@ -18,8 +18,8 @@ import type { OpenApiSourceOptions, PlaygroundOptions } from "./options.ts";
 export interface OpenApiOptions {
   /**
    * Code-sample languages generated per operation (Blume renderer), in
-   * order. Defaults to `["curl", "js", "python"]`; `false` generates none, so
-   * only the spec's own `x-codeSamples` show.
+   * order. Defaults to `["curl", "js", "python"]`; `false` (or an empty list)
+   * generates none, so only the spec's own `x-codeSamples` show.
    */
   codeSamples?: string[] | false;
   /** Start nested schema rows expanded rather than collapsed (Blume renderer). Defaults to `false`. */

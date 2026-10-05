@@ -15,7 +15,10 @@
 // canonical/noindex, and agent-readability.json in source; reran the script
 // against useblume.dev and blume dev; Vercel cache key, Cloudflare Vary, and
 // Firefox's Accept against their docs. Not yet run end to end on a fresh
-// Vercel or Cloudflare deployment.
+// Vercel or Cloudflare deployment. Updated against 400b5ff3 (read, not
+// rerun): Vercel's conditions honor q-values and case except when both types
+// sit below 1 (deploy/vercel-negotiation.ts), and dev sends Vary: Accept on
+// the HTML answer too (integration.ts negotiateMarkdown).
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -319,8 +322,9 @@ Fetch the message by its ID until its \`status\` is \`delivered\`.`;
   </p>
   <p>
     A request gets Markdown when its <code>Accept</code> header lists{" "}
-    <code>text/markdown</code> (or <code>text/x-markdown</code>) at least as
-    high as <code>text/html</code> (Vercel skips that comparison: see{" "}
+    <code>text/markdown</code> (or <code>text/x-markdown</code>, in any case)
+    with a quality value above zero and at least as high as{" "}
+    <code>text/html</code>'s (Vercel has one exception: see{" "}
     <a href="#troubleshooting">Troubleshooting</a>). A browser opening a page
     sends{" "}
     <code>text/html</code> first and never mentions Markdown. The answer is a
@@ -603,10 +607,10 @@ All checks passed.`} lang="txt" />
     The script exits with status 1 when a check fails, so it can run in CI
     after each deploy. Leave a landing-page homepage out of the run: its
     Markdown is the <code>llms.txt</code> index, not a copy of the page, so
-    the heading check fails there by design. Run it against a deployment
-    rather than <code>blume dev</code>, too. The dev server sends{" "}
-    <code>Vary: Accept</code> only on the Markdown response, since no cache
-    sits in front of it, so that one check fails locally.
+    the heading check fails there by design. The dev server negotiates the same
+    way and sends <code>Vary: Accept</code> with both formats, so you can try
+    the script against <code>http://localhost:4321</code> before you deploy,
+    but only a deployment tests the cache in front of it.
   </p>
 
   <h3>When the formats differ on purpose</h3>
@@ -692,12 +696,13 @@ All checks passed.`} lang="txt" />
   </p>
   <h3>Dev and production answer the same request differently</h3>
   <p>
-    The dev server and the Cloudflare Worker compare quality values, so{" "}
-    <code>Accept: text/markdown;q=0.5, text/html</code> gets HTML there.
-    Vercel's routing rule matches any lowercase <code>text/markdown</code>{" "}
-    entry without comparing quality values, so the same request gets Markdown
-    on Vercel. Send <code>text/markdown</code> alone, or with the highest
-    quality value, and every host answers the same way.
+    Every host compares quality values, so{" "}
+    <code>Accept: text/markdown;q=0.5, text/html</code> gets HTML everywhere.
+    Vercel's routing rules can't compare two quality values below 1, though.
+    For <code>Accept: text/markdown;q=0.9, text/html;q=0.8</code>, the dev
+    server and the Cloudflare Worker answer with Markdown, and Vercel answers
+    with HTML. Send <code>text/markdown</code> without a quality value, and
+    every host answers the same way.
   </p>
   <h3>The canonical check fails</h3>
   <p>

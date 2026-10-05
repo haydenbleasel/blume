@@ -12,9 +12,10 @@ import { z } from "zod";
  * Kitchen-sink sandbox: every Blume feature enabled in one project, for
  * exercising the framework end to end — including the native OpenAPI (with
  * an overlay) and AsyncAPI renderers, search, the assistant, MCP, i18n, export, OG images,
- * narration, content variables, pattern redirects, the site footer, written
- * feedback, rate limiting, and cookie consent (the `script()` analytics logs to the console,
- * with every tracked event, only once a reader accepts).
+ * narration, content variables, pattern redirects, the site footer, a
+ * renamed changelog index, written feedback, rate limiting, and cookie
+ * consent (the `script()` analytics logs to the console, with every tracked
+ * event, only once a reader accepts).
  */
 export default defineConfig({
   agents: {
@@ -60,6 +61,10 @@ export default defineConfig({
         en: "Try the AsyncAPI reference",
       },
     },
+  },
+  changelog: {
+    description: "Every Blume release, straight from GitHub.",
+    title: { de: "Versionshinweise", en: "Release notes" },
   },
   consent: native({ policy: "/docs/privacy" }),
   content: {
@@ -157,11 +162,14 @@ export default defineConfig({
       sources: [{ label: "Commerce events", spec: "./specs/asyncapi.yaml" }],
     }),
     graphql({
+      auth: { method: "bearer" },
       endpoint: "https://petstore.example.com/graphql",
       spec: "./specs/schema.graphql",
     }),
   ],
   search: {
+    // Query text reaches only the `blume:track` listener above.
+    analytics: { queries: false },
     popular: [
       { href: "/docs", icon: "rocket", label: "Getting started" },
       { href: "/events", icon: "radio", label: "Event reference" },

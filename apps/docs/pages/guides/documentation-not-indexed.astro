@@ -15,7 +15,10 @@
 // not run `blume build` or use a real Search Console property. Not yet run
 // end to end.
 // Review pass: re-checked the Page indexing and URL Inspection help, Vercel's
-// x-robots-tag docs, and duplicates.ts (byte-identical content only).
+// x-robots-tag docs, and duplicates.ts (byte-identical content only). The
+// canonical and sitemap outputs were edited by hand to match deploy/sitemap.ts
+// (a page canonicalizing elsewhere is left out) and audit/catalog.ts on main,
+// not rerun.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -105,7 +108,10 @@ import { guideById } from "../_guides/guides.ts";
       <tr>
         <td>URL blocked by robots.txt</td>
         <td>A <code>Disallow</code> rule in your own <code>public/robots.txt</code></td>
-        <td><code>ROBOTS_DISALLOWS_INDEXABLE</code></td>
+        <td>
+          <code>ROBOTS_DISALLOWS_INDEXABLE</code>,{" "}
+          <code>ROBOTS_BLOCKS_CRAWLER</code>
+        </td>
       </tr>
       <tr>
         <td>URL marked ‘noindex’</td>
@@ -206,9 +212,11 @@ Sitemap: https://docs.acme.example/sitemap.xml`}
     lang="txt"
   />
   <p>
-    Remove the rule, or delete the file to get Blume's back. The audit only
-    reads the rules for <code>User-agent: *</code>, so check any{" "}
-    <code>Googlebot</code> group, and CDN bot rules, with the scripts in{" "}
+    Remove the rule, or delete the file to get Blume's back. A rule in a group
+    that names one crawler, such as <code>Googlebot</code>, shows up as a
+    warning instead: "robots.txt blocks one crawler from pages in the
+    sitemap". The audit reads the robots.txt in <code>dist/</code>, so check
+    the live file and CDN bot rules with the scripts in{" "}
     <a href="/guides/ai-search-documentation-crawlability">checking crawler access</a>.
   </p>
   <p>
@@ -291,20 +299,17 @@ seo:
     title="docs/getting-started.mdx"
   />
   <CodeBlock
-    code={`✖ Non-canonical page in sitemap  1 page
-    /getting-started                   docs/getting-started.mdx:5
-    fix: List only canonical URLs in the sitemap.
-
-ℹ Non-canonical page  1 page
+    code={`ℹ Non-canonical page  1 page
     /getting-started                   docs/getting-started.mdx:5
     fix: Point \`seo.canonical\` at this page, or remove it to use the default self-canonical.`}
     lang="txt"
   />
   <p>
-    Blume's generated sitemap still lists a page whose{" "}
-    <code>seo.canonical</code> points elsewhere, and the audit reports that as
-    an error. For a page that really is a duplicate, a redirect is cleaner.
-    Delete the file and add this to <code>blume.config.ts</code>:
+    It's only a note, since pointing a page elsewhere is usually deliberate.
+    Blume leaves a page whose <code>seo.canonical</code> names another URL out
+    of the sitemap, which lists canonical URLs only. For a page that really is
+    a duplicate, a redirect is cleaner. Delete the file and add this to{" "}
+    <code>blume.config.ts</code>:
   </p>
   <CodeBlock
     code={`redirects: [{ from: "/getting-started", to: "/quickstart", status: 301 }],`}
@@ -325,8 +330,9 @@ seo:
     Blume builds its canonicals from <code>deployment.site</code>. For
     "Duplicate without user-selected canonical", note that{" "}
     <code>DUPLICATE_CONTENT</code> only catches byte-identical pages. Its fix
-    text suggests <code>seo.canonical</code>, which runs into the sitemap
-    error above, so merge the pages and redirect the one you drop.
+    is to merge the pages, or point <code>seo.canonical</code> on all but one
+    at the page to index, as Acme did above. Merging and redirecting the one
+    you drop leaves Google a single URL to choose.
   </p>
 
   <h2>Discovered or crawled, but not indexed</h2>
@@ -370,7 +376,7 @@ hidden: true
 
 ⚠ Indexable page not in sitemap  1 page
     /scheduled-sends                   docs/scheduled-sends.mdx
-    fix: Remove \`draft\`/\`hidden\`/\`noindex\` from the page's frontmatter if it should be indexed.`}
+    fix: Remove \`draft\`/\`hidden\`/\`noindex\` from the page's frontmatter if it should be indexed. A \`public/sitemap.xml\` replaces the generated sitemap, so add the page there or delete that file.`}
     lang="txt"
   />
   <p>

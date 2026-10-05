@@ -1751,7 +1751,7 @@ export const guides: Guide[] = [
       title: "How to run a documentation chatbot on a local LLM with Ollama",
     },
     nextStep: {
-      body: "Every question runs on your own machine. Add a bot check, and limit the route at your proxy, so scripts can't queue up work for your model.",
+      body: "Every question runs on your own machine. Add a bot check, and let the rate limit count each reader behind your proxy, so scripts can't queue up work for your model.",
       link: {
         href: "/guides/rate-limit-documentation-ai-assistant",
         label: "Read the rate limiting guide",
@@ -2358,7 +2358,7 @@ export const guides: Guide[] = [
     image: { src: "/guides/cjk-documentation-search.webp" },
     meta: {
       description:
-        "Why Chinese, Japanese and Korean words don't match in your docs search, and how to get CJK full-text search working with Orama or Pagefind in Blume.",
+        "How Blume's docs search handles Chinese, Japanese and Korean words, and how to test CJK full-text search with Orama, Pagefind, or Typesense.",
       title: "How to fix Chinese, Japanese and Korean documentation search",
     },
     nextStep: {

@@ -395,6 +395,9 @@ export default defineConfig({
   <p>
     <code>BLUME_REDIRECT_MATCHES_PAGE</code> means a redirect pattern also
     covers a page you kept. Narrow the pattern so it only matches the URLs that
-    moved.
+    moved. As a warning, which fails <code>blume validate --strict</code>, it
+    means an exact redirect starts at a page you kept: the redirect takes the
+    URL over, so the page never publishes. Delete the page if it moved, or
+    remove the redirect.
   </p>
 </GuidePage>

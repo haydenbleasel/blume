@@ -88,6 +88,7 @@ import {
 import { buildReferenceFiles } from "../openapi/scalar.ts";
 import { isOpenApiSource } from "../openapi/source.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
+import { sourcePages } from "../search/source-pages.ts";
 import {
   examplesEntryTemplate,
   tailwindEntryTemplate,
@@ -755,7 +756,7 @@ export const eject = async (
         // the package is hoisted out of the project's own node_modules.
         sources: [
           blumeSourceGlob(root, genDir),
-          "../../**/*.{astro,mdx,ts,tsx}",
+          "../../**/*.{astro,jsx,mdx,ts,tsx}",
         ],
         twoslashCss: twoslashCss(),
         userTheme,
@@ -914,6 +915,7 @@ export const eject = async (
     files.push({
       content: mixedbreadSearchEndpointTemplate(
         searchAdapter.options,
+        sourcePages(project),
         config.rateLimit
       ),
       path: join(srcDir, "pages", "api", "search.ts"),

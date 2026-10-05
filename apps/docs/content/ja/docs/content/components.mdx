@@ -557,7 +557,7 @@ Hover the <Tooltip tip="A set of protocols software uses to communicate." headli
 
 ### 自動型テーブル [#auto-type-table]
 
-TypeScript の型から型テーブルを生成し、ドキュメントをソースと同期させ続けます。`AutoTypeTable` に `path`（プロジェクトルートからの解決）と型の `name` を指定します。説明は JSDoc コメントから、デフォルト値は `@default` タグから取得され、省略可能なプロパティ（`?`）はそれに応じて示されます。
+TypeScript の型から型テーブルを生成し、ドキュメントをソースと同期させ続けます。`AutoTypeTable` に、ファイルを示す `path`（プロジェクトルート、つまり `blume` を実行するフォルダから解決されます）と型の `name` を指定します。説明は JSDoc コメントから、デフォルト値は `@default` タグから取得され、省略可能なプロパティ（`?`）はそれに応じて示されます。
 
 ```astro
 <AutoTypeTable path="./src/button.ts" name="ButtonProps" />
@@ -698,7 +698,7 @@ GitHub リポジトリへのリンクを、スター数とフォーク数とと�
 
 ## Component
 
-`Component` は、プロジェクトの `examples/` ディレクトリにあるサンプルファイルを、ハイライトされたソースと並べてタブ形式でライブプレビューとして描画します。`path` でファイルを指定します — `examples/` 配下の位置から拡張子を除いたもの（つまり `examples/counter.tsx` なら `path="counter"`）。React、Vue、Svelte、Astro のサンプルがすべてサポートされ、フレームワークのサンプルはハイドレートされ、Astro のものは静的に描画されます。単一のファイルからプレビューとコードを同期させ続けます。
+`Component` は、プロジェクトの `examples/` ディレクトリにあるサンプルファイルを、ハイライトされたソースと並べてタブ形式でライブプレビューとして描画します。`path` でファイルを指定します — `examples/` 配下の位置から拡張子を除いたもの（つまり `examples/counter.tsx` なら `path="counter"`）。React、Vue、Svelte、Astro のサンプルがすべてサポートされ、フレームワークのサンプルはハイドレートされ、Astro のものは静的に描画されます。単一のファイルからプレビューとコードを同期させ続けます。どのサンプルにも該当しない `path` を指定すると、代わりに「No example found」というボックスが描画され、`blume dev`、`blume build`、[`blume doctor`](/docs/cli/doctor) がその記述箇所の行で警告（`BLUME_EXAMPLE_NOT_FOUND`）を出します。
 
 プレビューは、ドキュメントのスタイルが一切届かない独立したフレーム内で描画されます — 本文のマージン、タイポグラフィ、テーマの装飾がコンポーネントに漏れ込むことはありません。フレームには Tailwind（プリフライトと、プロジェクトおよび examples ディレクトリからスキャンされたユーティリティ）と、`bg-background` のようなクラスがデフォルトでサイトのパレットに従うようにする Blume のデザイントークンが与えられ、サイトのライト／ダーク切り替えにリアルタイムで追従します。ペインは描画されたサンプルに合わせてサイズを調整し — 読み込み後にサンプルが拡大・縮小しても追従し続けます — Preview タブと Code タブは同じ高さを共有するため、切り替えてもページがずれることはありません。
 

@@ -29,6 +29,14 @@ const image = (target: string, line = 1): PageLink => ({
   target,
 });
 
+// A lowercase `<a href>`, which ships as written.
+const raw = (target: string, line: number): PageLink => ({
+  column: 1,
+  line,
+  raw: true,
+  target,
+});
+
 const heading = (text: string, slug: string): Heading => ({
   depth: 2,
   slug,
@@ -92,7 +100,7 @@ describe(extractLinks, () => {
 
   it("reads a component's string href, even wrapped onto its own line", () => {
     const body = [
-      'Inline <Card title="x" href="./install" /> and <a href="./raw">a</a>.',
+      'Inline <Card title="x" href="./install" /> and <abbr href="./no">a</abbr>.',
       "<Card",
       '  title="Wrapped"',
       "  href='../setup.mdx#run'",
@@ -106,6 +114,20 @@ describe(extractLinks, () => {
     expect(extractLinks(body, 4)).toStrictEqual([
       { column: 30, line: 5, target: "./install" },
       { column: 9, line: 8, target: "../setup.mdx#run" },
+    ]);
+  });
+
+  it("reads a lowercase <a href> as a raw link", () => {
+    // Raw HTML in `.md` (plain JSX in `.mdx`) ships as written, so its
+    // target is marked raw: checked the way the browser reads it.
+    const body = [
+      'An <a href="./raw">inline</a> tag and',
+      '<a class="x"',
+      "  href='/wrapped#top'>a wrapped one</a>.",
+    ].join("\n");
+    expect(extractLinks(body)).toStrictEqual([
+      { column: 13, line: 1, raw: true, target: "./raw" },
+      { column: 9, line: 3, raw: true, target: "/wrapped#top" },
     ]);
   });
 
@@ -177,6 +199,57 @@ describe(extractLinks, () => {
       { column: 5, line: 6, target: "/a" },
     ]);
   });
+
+  it("reads a reference-style link's definition", () => {
+    // `[text][guide]` renders with the definition's destination, so that's
+    // the target to check. A footnote definition isn't a link, and neither
+    // is a label with no destination.
+    const body = [
+      "See [the guide][guide] and [Setup].",
+      "",
+      '[guide]: /guides/intro "Intro"',
+      "  [setup]: <./setup page>",
+      "> [quoted]: /quoted",
+      "[^1]: A footnote, not a link.",
+      "[empty]: <>",
+      "```md",
+      "[fenced]: /nope",
+      "```",
+    ].join("\n");
+    expect(extractLinks(body)).toStrictEqual([
+      { column: 10, line: 3, target: "/guides/intro" },
+      { column: 13, line: 4, target: "./setup page" },
+      { column: 13, line: 5, target: "/quoted" },
+    ]);
+  });
+
+  it("reads an autolink's URL", () => {
+    // Only http(s) targets are ever checked, so a `mailto:` autolink isn't
+    // recorded; one shown as inline code isn't a link at all.
+    const body =
+      "Visit <https://example.com/docs>, <mailto:a@b.dev>, or `<https://code.dev>`.";
+    expect(extractLinks(body)).toStrictEqual([
+      { column: 8, line: 1, target: "https://example.com/docs" },
+    ]);
+  });
+
+  it("reads a link whose label wraps onto the next line", () => {
+    // A formatter wraps long labels; the link still renders. A blank line
+    // ends the paragraph, so brackets on either side of one are no link.
+    const body = [
+      "See [a long",
+      "label](/wrapped) and ![an",
+      "alt](./img.png).",
+      "",
+      "[not a link",
+      "",
+      "](/across-paragraphs)",
+    ].join("\n");
+    expect(extractLinks(body, 2)).toStrictEqual([
+      { column: 8, line: 4, target: "/wrapped" },
+      { column: 6, image: true, line: 5, target: "./img.png" },
+    ]);
+  });
 });
 
 describe(validateLinks, () => {
@@ -245,6 +318,29 @@ describe(validateLinks, () => {
       makePage({ id: "guides/setup.mdx", route: "/guides/setup" }),
     ]);
     expect(diagnostics).toHaveLength(0);
+  });
+
+  it("reads a raw <a href> the way the browser does", async () => {
+    // A raw `./setup` on `/docs/guides` (an index page) isn't rewritten, so
+    // the browser lands on `/docs/setup`; a raw `/guides/setup` isn't based,
+    // so it lands outside `/docs` and is broken.
+    const diagnostics = await validateLinks(
+      makeGraph([
+        makePage({
+          id: "guides/index.mdx",
+          links: [raw("./setup", 1), raw("/guides/setup", 2), link("./setup")],
+          route: "/docs/guides",
+        }),
+        makePage({ id: "setup.mdx", route: "/docs/setup" }),
+      ]),
+      { basePath: "/docs", publicDir: null }
+    );
+    expect(
+      diagnostics.map((diagnostic) => [diagnostic.line, diagnostic.message])
+    ).toStrictEqual([
+      [2, "Broken link to /guides/setup: no page resolves to /guides/setup."],
+      [1, "Broken link to ./setup: no page resolves to /docs/guides/setup."],
+    ]);
   });
 
   it("treats a numeric-prefixed index (01-index) as an index for relative links", async () => {

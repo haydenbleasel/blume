@@ -69,6 +69,29 @@ type Group = (typeof GROUPS)[number];
 
 const isGroup = (name: string): name is Group => GROUP_SET.has(name);
 
+/**
+ * The `layout` keys the built-in chrome reads (`RootLayout.astro` and
+ * `Header.astro`). Any other key is never rendered, so it's warned about
+ * rather than silently dropped; a typo or wrong case would otherwise leave
+ * the built-in in place with no sign why.
+ */
+const LAYOUT_SLOTS = [
+  "Layout",
+  "Header",
+  "Logo",
+  "Search",
+  "Sidebar",
+  "MobileNav",
+  "Breadcrumbs",
+  "TableOfContents",
+  "Pagination",
+  "Feedback",
+  "PageHeader",
+  "PageFooter",
+  "Footer",
+];
+const LAYOUT_SLOT_SET: ReadonlySet<string> = new Set(LAYOUT_SLOTS);
+
 /** The authoring forms an override accepts; the fix every rejection points at. */
 export const ACCEPTED_OVERRIDE_FORMS =
   "Each override must be an imported identifier, a path string, or a `{ component, client, media }` object literal whose `component` is an imported identifier or a path string.";
@@ -627,6 +650,15 @@ const collectGroupOverrides = (
     const normalized = normalizeEntry(entry, name, context);
     if (normalized) {
       result[name].push(normalized);
+    }
+    if (
+      name === "layout" &&
+      normalized &&
+      !LAYOUT_SLOT_SET.has(normalized.key)
+    ) {
+      context.warnings.push(
+        `Layout override "${normalized.key}" isn't a layout slot, so nothing renders it. Use one of: ${LAYOUT_SLOTS.join(", ")}.`
+      );
     }
   }
 };

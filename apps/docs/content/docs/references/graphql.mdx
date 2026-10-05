@@ -40,7 +40,7 @@ navigation: {
 
 ## Generated examples
 
-Every operation page carries a complete, valid example operation — one variable per argument, typed off the schema, with a bounded-depth selection set over the return type — plus matching example variables and an example response that mirrors the same selection. Code samples show the exact HTTP request (a JSON `POST` of `{ query, variables }`) in each configured language. The same [languages](/docs/references/openapi#code-samples-and-schemas) as `openapi()` are available, and `codeSamples: false` shows none:
+Every operation page carries a complete, valid example operation — one variable per argument, typed off the schema, with a bounded-depth selection set over the return type — plus matching example variables and an example response that mirrors the same selection. A variable whose argument declares a default starts at that default, and the selection leaves deprecated fields out. Code samples show the exact HTTP request (a JSON `POST` of `{ query, variables }`) in each configured language. The same [languages](/docs/references/openapi#code-samples-and-schemas) as `openapi()` are available, and `codeSamples: false` shows none:
 
 ```ts blume.config.ts lineNumbers
 reference: [
@@ -81,6 +81,18 @@ reference: [
 ## Try it playground
 
 Query and mutation pages render an interactive panel: edit the request body (the query and variables), point it at your endpoint or a custom URL, and send — the code samples update live so what you copy is byte-for-byte what was sent. Disable it with `playground: false`. Subscription pages show the generated operation and an example event instead: subscriptions run over a stateful transport (WebSocket or SSE) that the playground's single HTTP `POST` can't speak.
+
+A schema doesn't say how its API authenticates, so the panel sends no credentials until `auth` does. It takes the same shape as [`api.auth`](/docs/references/api-pages#site-defaults) for hand-written endpoint pages: `method` is `bearer`, `basic`, `key` (an API key in a header), or `none`, and `name` is the header an API key goes in (`x-api-key` by default). Every operation page then gets an **Authorization** section, the panel a credential field that works like the [OpenAPI one](/docs/references/openapi#credentials), and the code samples a placeholder credential. A per-source `auth` overrides the adapter's:
+
+```ts blume.config.ts lineNumbers
+reference: [
+  graphql({
+    spec: "./schema.graphql",
+    endpoint: "https://api.example.com/graphql",
+    auth: { method: "bearer" },
+  }),
+],
+```
 
 If your GraphQL API doesn't allow cross-origin requests from the docs site, route sends through a CORS proxy — a URL of your own, or `true` for the built-in `/_api-proxy` endpoint (under your `basePath`, if you set one; it needs [server output](/docs/deployment#server-rendering): a host adapter such as `deployment: vercel()` from `blume/deploy`). The built-in proxy only forwards to origins your documented specs declare — each configured GraphQL `endpoint`, plus any absolute `servers[].url` from a documented [OpenAPI spec](/docs/references/openapi) — so a public docs deployment can't be aimed at other hosts. That makes `endpoint` required for a working proxy: without one, the proxy has no origin to allow for this reference and refuses every send (the build warns about this). The same body limit, header forwarding, and response headers apply as for the [OpenAPI proxy](/docs/references/openapi#try-it-playground).
 

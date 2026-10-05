@@ -11,6 +11,8 @@ import type {
 import type { Diagnostic } from "../core/types.ts";
 import { extractAsyncApiOperations } from "./asyncapi.ts";
 import type { AsyncApiDocument } from "./asyncapi.ts";
+import { specIssues } from "./checks.ts";
+import type { SpecIssue } from "./checks.ts";
 import { extractGraphqlOperations } from "./graphql.ts";
 import type { GraphqlDocument } from "./graphql.ts";
 import { extractOperations } from "./model.ts";
@@ -173,24 +175,34 @@ const specEntries = (
 };
 
 /**
- * Label each tag's sidebar group with the spec's own tag name. The group label
- * is otherwise re-humanized from the tag's route slug (split on hyphens,
+ * Label each tag's sidebar group with the spec's own tag name, and order the
+ * groups as the overview does: the spec's declared tag order, then first use
+ * (see `operationCollector`), not alphabetically. The group label is
+ * otherwise re-humanized from the tag's route slug (split on hyphens,
  * title-cased), which mangles authored casing and symbols — `OAuth2` →
- * "Oauth2", `Größe` → "Größe" only by luck of the slug. Keys are the tag
- * directories under the reference route, the same group paths `meta.ts` files
- * use, so user-authored meta still overrides these.
+ * "Oauth2", `Größe` → "Größe" only by luck of the slug. A source that names
+ * its own `label` gets it on its route's group the same way (`GitHub (v2)`,
+ * not "Github V2"). Keys are the directories under the reference route, the
+ * same group paths `meta.ts` files use, so user-authored meta still
+ * overrides these.
  */
 const tagFolderMeta = (
   spec: ApiSpecData,
-  tags: { slug: string; name: string }[]
+  tags: { slug: string; name: string }[],
+  groupLabel: string | undefined
 ): Record<string, FolderMeta> => {
   const base = routeToRef(spec.route);
-  return Object.fromEntries(
-    tags.map((tag) => [
+  const meta: Record<string, FolderMeta> = Object.fromEntries(
+    tags.map((tag, order) => [
       base ? `${base}/${tag.slug}` : tag.slug,
-      { title: tag.name },
+      { order, title: tag.name },
     ])
   );
+  // A root-mounted reference has no group of its own to name.
+  if (groupLabel !== undefined && base) {
+    meta[base] = { title: groupLabel };
+  }
+  return meta;
 };
 
 interface LoadedSpec {
@@ -210,6 +222,8 @@ interface ParsedReference {
   operations: ApiOperationRef[];
   tags: ApiTagRef[];
   extractWarnings: string[];
+  /** Spec mistakes that would render silently wrong (OpenAPI only). */
+  issues?: SpecIssue[];
 }
 
 const parseReference = async (
@@ -247,7 +261,7 @@ const parseReference = async (
       warnings,
     };
   }
-  const { document, warnings } = await parseSpec(
+  const { document, issues, warnings } = await parseSpec(
     reference.spec,
     ctx.projectRoot,
     { ...options, overlays: reference.overlays }
@@ -256,6 +270,7 @@ const parseReference = async (
   return {
     document,
     extractWarnings: extracted.warnings,
+    issues: [...issues, ...specIssues(document)],
     operations: extracted.operations,
     tags: extracted.tags,
     warnings,
@@ -276,7 +291,7 @@ export const openApiSource = (
     const kindLabel = KIND_LABELS[reference.kind];
     const codePrefix = CODE_PREFIXES[reference.kind];
     try {
-      const { document, warnings, operations, tags, extractWarnings } =
+      const { document, warnings, operations, tags, extractWarnings, issues } =
         await parseReference(reference, ctx);
       const info = document.info ?? { title: reference.label, version: "" };
       // The playground proxy resolves here, not client-side: `true` selects
@@ -318,10 +333,14 @@ export const openApiSource = (
         title: info.title ?? reference.label,
         version: info.version ?? "",
       };
-      // Only GraphQL references carry a live endpoint (a schema names no
-      // server); assigned separately so the key stays absent otherwise.
+      // Only GraphQL references carry a live endpoint and its auth (a schema
+      // names no server); assigned separately so the keys stay absent
+      // otherwise.
       if (reference.endpoint !== undefined) {
         spec.endpoint = reference.endpoint;
+      }
+      if (reference.auth !== undefined) {
+        spec.auth = reference.auth;
       }
       return {
         diagnostics: [
@@ -334,6 +353,12 @@ export const openApiSource = (
             code: SKIPPED_CODES[reference.kind],
             message: `In ${kindLabel} spec "${reference.spec}": ${message}`,
             severity: "warning" as const,
+          })),
+          ...(issues ?? []).map((issue) => ({
+            code: issue.code,
+            message: `In ${kindLabel} spec "${reference.spec}": ${issue.message}`,
+            severity: "warning" as const,
+            suggestion: issue.suggestion,
           })),
           // A document with no operations (say, a config file that happens to
           // parse as YAML) would otherwise build a nav tab onto an empty
@@ -350,7 +375,7 @@ export const openApiSource = (
             : []),
         ],
         entries: specEntries(spec, operations, reference),
-        folderMeta: tagFolderMeta(spec, tags),
+        folderMeta: tagFolderMeta(spec, tags, reference.groupLabel),
         slug: reference.slug,
         spec,
       };

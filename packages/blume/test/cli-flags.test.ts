@@ -79,7 +79,9 @@ describe("unknown flags", () => {
     const { exitCode, stderr } = await run(root, ["validate", "--strcit"]);
     expect(exitCode).toBe(1);
     expect(stderr).toContain("(did you mean --strict?)");
-    expect(stderr).toContain("It takes --external, --json, --strict.");
+    expect(stderr).toContain(
+      "It takes --external, --ignore, --json, --strict."
+    );
   });
 });
 

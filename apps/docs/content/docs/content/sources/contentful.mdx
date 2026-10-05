@@ -3,7 +3,7 @@ title: Contentful
 description: Read a Contentful content type through the Delivery API with the contentful() source, lowering rich text bodies to Markdown with nothing to install.
 ---
 
-The built-in `contentful()` adapter reads the entries of one content type through the Content Delivery API and lowers each entry's rich text body to Markdown: headings, marks, links, lists, quotes, tables, and embedded assets map to their Markdown equivalents, and a body held in a Markdown long-text field passes through as written, except that a link that isn't a web, mail, phone, or relative address (a `javascript:` URL, say) keeps only its label, as it does in rich text. Nothing to install — the adapter speaks the REST API directly.
+The built-in `contentful()` adapter reads the entries of one content type through the Content Delivery API and lowers each entry's rich text body to Markdown: headings, marks, links, lists, quotes, and tables map to their Markdown equivalents, an embedded image asset to an image, and any other embedded file (a PDF, say) to a link to it. A body held in a Markdown long-text field passes through as written, except that a link that isn't a web, mail, phone, or relative address (a `javascript:` URL, say) keeps only its label, as it does in rich text. Nothing to install — the adapter speaks the REST API directly.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -19,14 +19,17 @@ export default defineConfig({
         contentType: "guide",
         // environment: "master", locale: "en-US"
         // Field ids default to title / description / slug / body, and the
-        // date to sys.updatedAt
-        fields: { body: "content" },
+        // date to sys.updatedAt; order (no default) sets the sidebar order
+        fields: { body: "content", order: "position" },
         // Extra Delivery API query parameters
         params: { "fields.section": "sdk" },
+        // A space with EU data residency:
+        // host: "cdn.eu.contentful.com",
+        // previewHost: "preview.eu.contentful.com",
       }),
     ],
   },
 });
 ```
 
-The Delivery API token comes from the `CONTENTFUL_ACCESS_TOKEN` environment variable, which the adapter declares. Under `--preview` the adapter reads drafts through the Preview API with `CONTENTFUL_PREVIEW_TOKEN`. The Preview API rejects delivery tokens, so `--preview` without a preview token fails with a clear error rather than falling back to `CONTENTFUL_ACCESS_TOKEN`. Assets are referenced from Contentful's CDN rather than downloaded — their URLs are stable. An embedded entry maps to a Blume component through the engine's `serializers` option, keyed by content type id, when you construct `contentfulSource` directly and pass it to [`custom()`](/docs/content/sources/custom); setting `serializers` writes the source's pages as MDX so the returned components render, and an embedded entry without a serializer is noted in a comment. A link to another entry renders as plain text, since there is no route to point at.
+The Delivery API token comes from the `CONTENTFUL_ACCESS_TOKEN` environment variable, which the adapter declares. Without it, the source stops before its first request with a `BLUME_MISSING_SECRET` error rather than Contentful's `401`, unless it has a [cached snapshot](/docs/content/sources#caching-and-offline-builds) to serve instead. Under `--preview` the adapter reads drafts through the Preview API with `CONTENTFUL_PREVIEW_TOKEN`. The Preview API rejects delivery tokens, so `--preview` without a preview token fails with a clear error rather than falling back to `CONTENTFUL_ACCESS_TOKEN`. A space with EU data residency is served from other hosts: set `host` to `cdn.eu.contentful.com` and `previewHost` to `preview.eu.contentful.com`. Map `fields.order` to a number field to set each page's sidebar order; it has no default. Assets are referenced from Contentful's CDN rather than downloaded — their URLs are stable. A link to another entry of the source's `contentType` points at that entry's page, at the route the page is built at (its slug under the source's `prefix`). A link to an entry the source doesn't turn into a page, one of another content type or one your `params` filter out, keeps only its text. The Delivery API leaves an unpublished, archived, or deleted asset or entry out of its response, so a page that embeds or links one renders without it (a link keeps its text) and the source warns with `BLUME_SOURCE_UNRESOLVED_LINK`. An embedded entry maps to a Blume component through the engine's `serializers` option, keyed by content type id, when you construct `contentfulSource` directly and pass it to [`custom()`](/docs/content/sources/custom); setting `serializers` writes the source's pages as MDX so the returned components render, and an embedded entry without a serializer is noted in a comment.

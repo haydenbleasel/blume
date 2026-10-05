@@ -85,7 +85,7 @@ export default defineComponents({
 });
 ```
 
-Verdrahtete Slots:
+Verdrahtete Slots (bei den Namen wird zwischen Groß- und Kleinschreibung unterschieden; jeder andere Schlüssel unter `layout` wird nirgends gerendert, und Blume warnt davor):
 
 | Slot | Ersetzt | Props |
 | --- | --- | --- |
@@ -96,12 +96,14 @@ Verdrahtete Slots:
 | `Sidebar` | Der primäre Navigationsbaum | `items`, `currentRoute` |
 | `MobileNav` | Die Navigation in der mobilen Schublade (standardmäßig `Sidebar`) | `items`, `currentRoute` |
 | `Breadcrumbs` | Der Breadcrumb-Pfad | `crumbs` |
-| `TableOfContents` | Die Gliederung „Auf dieser Seite“ | `headings`, `title`, `variant` |
+| `TableOfContents` | Die Gliederung „Auf dieser Seite“, in der rechten Leiste (`variant: "desktop"`) und im Dropdown über dem Inhalt auf schmaleren Bildschirmen (`"mobile"`) | `headings`, `title`, `variant` |
 | `Pagination` | Die Zurück-/Weiter-Links im Fußbereich | `prev`, `next`, `strings` |
 | `Feedback` | Die Bewertung „War diese Seite hilfreich?“ unter dem Artikel (wird nur gerendert, wenn [`feedback`](/docs/configuration#page-feedback) aktiviert ist) | `strings`, `comments` |
 | `PageHeader` | Ein Einfügepunkt über dem Artikel (keine eingebaute Komponente) | `page`, `headings`, `route` |
 | `PageFooter` | Ein Einfügepunkt unter dem Artikel (keine eingebaute Komponente) | `page`, `headings`, `route` |
 | `Footer` | Der [seitenweite Footer](/docs/configuration#footer) nach dem Content-Grid: Links, Social-Media-Profile, der Repository-Link und die Cookie-Einstellungen | `footer`, `locale`, `site`, `navigation`, `ui` |
+
+Die `mobile`-Variante erhält außerdem die [Seitenaktionen](/docs/content/navigation#page-actions) als Children (ein leeres Element, in das die Aktionen unterhalb von 1.280px aus der rechten Leiste verschoben werden), rendere darin also einen `<slot />`, damit sie auf schmaleren Bildschirmen erhalten bleiben. Sie wird auch auf einer Seite ohne Überschriften gerendert, dann mit leerem `headings`, sodass die Aktionen auch dort angezeigt werden.
 
 `PageHeader` und `PageFooter` haben keine eingebaute Komponente — sie rendern nichts, bis du sie setzt, was sie zu praktischen Einfügepunkten für ein Werbebanner oder einen „Zuletzt aktualisiert“-Hinweis macht. Der eingebaute `Footer` enthält die einzigen Links zu deinem Repository und deinen Social-Media-Profilen, daher sollte ein `Footer`-Override (der Ort für einen Marketing-Footer, den die Konfiguration nicht abbilden kann) sie beibehalten. Wenn `consent` gesetzt ist, behalte außerdem eine Möglichkeit bei, die Einwilligungsabfrage erneut zu öffnen: Jedes Element mit `data-blume-consent-open` funktioniert als Link zu den [Cookie-Einstellungen](/docs/configuration/consent#changing-an-answer).
 

@@ -58,6 +58,15 @@ export interface GraphqlTypeRef {
   name: string;
 }
 
+/** A GraphQL input value as JSON carries it in `variables` (enums by name). */
+export type GraphqlJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | GraphqlJsonValue[]
+  | { [key: string]: GraphqlJsonValue };
+
 /** An argument or input-object field. */
 export interface GraphqlInputValue {
   name: string;
@@ -65,6 +74,8 @@ export interface GraphqlInputValue {
   type: GraphqlTypeRef;
   /** Default value printed as a GraphQL literal (`10`, `"asc"`, `[1, 2]`). */
   default?: string;
+  /** The same default as JSON, for the example variables. */
+  defaultValue?: GraphqlJsonValue;
   deprecationReason?: string;
 }
 

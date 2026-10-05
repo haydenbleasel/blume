@@ -69,6 +69,8 @@ export interface AuditOptions {
   origin?: string;
   /** Probe outbound links (`--external`). */
   external?: boolean;
+  /** Outbound URLs not to probe (`--ignore`). */
+  ignore?: (url: string) => boolean;
   /** Only report these check ids or categories. */
   only?: string[];
   /** Suppress these check ids or categories. */
@@ -159,6 +161,7 @@ export const runAudit = async (options: AuditOptions): Promise<AuditResult> => {
       siteOrigin(project.config.deployment.options.site),
       normalizeBasePath(project.config.deployment.options.base)
     ),
+    ignore: options.ignore ?? (() => false),
     llms: crawl.llms,
     origin,
     pages: crawl.pages,

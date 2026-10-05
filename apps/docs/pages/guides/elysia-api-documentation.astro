@@ -609,9 +609,12 @@ bunx blume preview`}
     </tbody>
   </table>
   <p>
-    Vercel can't read files outside the Root Directory, which is why the spec
-    lives in <code>docs-site/</code> and is committed: the docs build never runs
-    your API or installs its dependencies. Blume detects the site's URL on
+    The spec lives in <code>docs-site/</code> and is committed, so the docs
+    build never runs your API or installs its dependencies. It also keeps the
+    build working if you turn off Vercel's{" "}
+    <strong>Include source files outside of the Root Directory in the Build Step</strong>{" "}
+    (on by default), which hides every file outside the Root Directory from
+    the build. Blume detects the site's URL on
     Vercel. For other hosts, and for setting <code>deployment.site</code> where
     a host doesn't expose its URL, see <a href="/docs/deployment">Deployment</a>.
   </p>
@@ -704,9 +707,8 @@ jobs:
   <h3>The site still shows the old endpoints</h3>
   <p>
     The site reads the exported file, not the running API, so run{" "}
-    <code>bun run openapi</code> again. The docs dev server doesn't watch the
-    spec file, so restart <code>bun run dev</code> in{" "}
-    <code>docs-site/</code> too.
+    <code>bun run openapi</code> again. The docs dev server watches the spec
+    file and updates the reference when the export rewrites it.
   </p>
   <h3>bun build doesn't build the site</h3>
   <p>

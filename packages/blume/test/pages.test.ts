@@ -9,6 +9,7 @@ import {
   discoverPages,
   discoverPagesSync,
   hasGeneratedChangelog,
+  navTargetRoutes,
 } from "../src/astro/pages.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 
@@ -154,5 +155,21 @@ describe("hasGeneratedChangelog", () => {
       { contentType: "changelog", route: "/changelog" },
     ]);
     expect(hasGeneratedChangelog(ownedByContent, [])).toBe(false);
+  });
+});
+
+describe("navTargetRoutes", () => {
+  it("lists content routes, custom page patterns, and the generated changelog", () => {
+    // Beyond what `hasGeneratedChangelog` reads, `navTargetRoutes` reads the
+    // graph's routes and the reference adapters with their base path.
+    const project = projectOf([
+      { contentType: "changelog", route: "/changelog/v1" },
+    ]);
+    project.graph.routes = new Map([["/changelog/v1", "changelog/v1.mdx"]]);
+    project.config.basePath = "";
+    project.config.reference = [];
+    expect([
+      ...navTargetRoutes(project, [{ pattern: "/compare/[tool]" }]),
+    ]).toStrictEqual(["/changelog/v1", "/compare/[tool]", "/changelog"]);
   });
 });

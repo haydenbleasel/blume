@@ -23,11 +23,13 @@ export const cloudflareAdapterSchema = adapterDescriptorSchema(
 );
 
 /**
- * Cloudflare Workers and Pages. A server build emits a Worker into
- * `dist/server` (with a generated wrapper that answers `Accept:
- * text/markdown`) and serves `dist/client` through the ASSETS binding.
- * `@astrojs/cloudflare` is an optional peer: install it in the project
- * (`npm install @astrojs/cloudflare`).
+ * Cloudflare. A server build targets Workers only (`@astrojs/cloudflare`
+ * dropped Pages in v13): it emits a Worker into `dist/server` (with a
+ * generated wrapper that answers `Accept: text/markdown`) and serves
+ * `dist/client` through the ASSETS binding. A static build
+ * (`output: "static"`) never loads the adapter, and its `dist/` deploys to
+ * Pages or to Workers static assets. `@astrojs/cloudflare` is an optional
+ * peer: install it in the project (`npm install @astrojs/cloudflare`).
  */
 export const cloudflare = (
   options: CloudflareOptions = {}

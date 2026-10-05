@@ -23,15 +23,17 @@ export const redirectChecks: CheckModule = {
     for (const redirect of context.redirects) {
       const from = normalizePath(redirect.from);
 
-      // A redirect whose source is also a built page never fires — the page
-      // wins. Ahrefs can't see this: it only observes the served response, which
-      // looks perfectly healthy.
+      // A redirect whose source is also a built page: one of the two never
+      // serves, and which depends on the host (a static layer that answers
+      // files first keeps the page; a router that runs redirects first keeps
+      // the redirect). Ahrefs can't see this: it only observes the served
+      // response, which looks perfectly healthy.
       if (context.byUrl.has(from)) {
         found.push(
           finding(
             "BLUME_AUDIT_REDIRECT_SOURCE_IS_PAGE",
             { ...site, url: from },
-            `A redirect is configured from ${from}, but ${from} is also a real page — the redirect never fires.`
+            `A redirect is configured from ${from}, but ${from} is also a real page — readers get one or the other, depending on the host.`
           )
         );
         continue;

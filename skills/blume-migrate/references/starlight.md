@@ -21,17 +21,17 @@ Keep content where it is — set `content.root: "src/content/docs"`.
 | `logo` (`{ src }` or `{ light, dark, alt }`) | `logo` — move the referenced file into `public/` |
 | `logo.replacesTitle` | `logo: { text: "" }` (renders the mark alone) |
 | `favicon` | copy the file into `public/` (drop the config field — Blume auto-detects) |
-| `social` (array of `{ label, icon, href }`; pre-0.33 legacy: `{ github: url }` object) | derive **`github: { owner, repo }`** from the GitHub entry; other socials drop (report) |
+| `social` (array of `{ label, icon, href }`; pre-0.33 legacy: `{ github: url }` object) | derive **`github: { owner, repo }`** from the GitHub entry; every other entry whose platform Blume knows → **`footer.socials`** (`{ discord: href, bluesky: href, … }`; the `x.com`/`twitter` icon → `x`; the platform list is under `footer` in `docs/configuration/index.mdx`); the rest (`mastodon`, `gitlab`, `rss`, …) drop (report) |
 | `editLink.baseUrl` (`…/edit/<branch>/<subdir?>`) | `github: { owner, repo, branch }` — **and any repo sub-path after the branch → `github.dir`** (a docs-in-subfolder repo breaks every edit link without it); **an origin other than `https://github.com` → `github.host`** (a GitHub Enterprise repo otherwise links to the public site) |
 | `sidebar` (array) | filesystem nav / `navigation.sidebar` (see below) |
 | `tableOfContents` (`false` or `{ minHeadingLevel, maxHeadingLevel }`) | `toc` — identical shape, 1:1 |
 | `markdown.headingLinks: false` | `markdown.headingAnchors: false` |
 | `expressiveCode.themes` | `markdown.code.theme: { light, dark }` — EC assigns by theme _type_, so match each theme by its darkness, not by array position |
 | `expressiveCode.styleOverrides` | drop → restyle via a root `theme.css` file |
-| `head` | **drop and report** (there is no `seo.metatags`); analytics `<script>` entries → one `script()` adapter each in the `analytics` list (from `blume/analytics`): `attrs.src` → `src`, an `async`/`defer` attr → `strategy`, every other `attrs` key → `attributes`, and an inline body (`content`) → `content` |
+| `head` | per entry: a `meta` tag → **`seo.metatags`** (`{ [attrs.name ?? attrs.property]: attrs.content }` — verification tokens, `theme-color`, and the like), minus the tags Blume writes itself (`description`, `robots`, `og:title`/`og:description`/`og:image`/`og:url`/`og:type`/`og:site_name`, `twitter:*` card tags, `article:*` dates — the build refuses them and names the setting that owns each, e.g. `og:image` → `seo.og`, `twitter:site` → `seo.x.handle`); an analytics `<script>` → one `script()` adapter each in the `analytics` list (from `blume/analytics`): `attrs.src` → `src`, an `async`/`defer` attr → `strategy`, every other `attrs` key → `attributes`, and an inline body (`content`) → `content`; anything else (`link`, `style`, other scripts) → drop and report |
 | `lastUpdated: true` | `lastModified: "git"` |
 | `customCss` | drop → move into a root **`theme.css`** file (auto-picked-up; not a config field) |
-| `components` (overrides) | Blume's layout slots via `defineComponents({ layout: { Header, Search, Sidebar, TableOfContents, Footer, … } })` — a near-1:1 map; reach for `blume eject` only beyond those |
+| `components` (overrides) | Blume's layout slots via `defineComponents({ layout: { … } })` in a root `components.ts`: `Header`, `Search`, `Sidebar`, `TableOfContents`, `Pagination` keep their names; `SiteTitle` → `Logo`; **`Footer` → `PageFooter`**, not Blume's `Footer` (that slot is the site footer; Starlight's `Footer` is the page-end last-updated date, pagination, and edit link, which Blume renders itself, so keep only what the override added). Other overrides (`Banner`, `PageTitle`, `Hero`, `EditLink`, `SocialIcons`, …) have no slot — fold their additions into `PageHeader`/`PageFooter`, or `blume eject`; a Starlight name left under `layout` matches no slot and does nothing. Rewrite reads of `Astro.locals.starlightRoute` against the slot's props |
 | `plugins` | **map, don't blanket-drop** — see Plugins below |
 | `pagination: false`, `pagefind`/Pagefind options, `titleDelimiter`, `credits`, `disable404Route`, `routeMiddleware` | drop (report) |
 | `locales` / `defaultLocale` | `i18n` (see below) |
@@ -40,7 +40,7 @@ Keep content where it is — set `content.root: "src/content/docs"`.
 
 Starlight's `sidebar` array → prefer letting Blume generate from the filesystem; use `navigation.sidebar` only for shapes files can't express:
 
-- `{ label, autogenerate: { directory: "d" } }` → **structure the folder and rely on filesystem nav** (label → the folder's `meta.ts` `title`). Do **not** map it to a sidebar item with `root:` — in an explicit Blume sidebar that renders a single page link, not the directory's children.
+- `{ label, items: [{ autogenerate: { directory: "d" } }] }` (0.39 and later; before 0.39 the group held it directly, `{ label, autogenerate: { directory: "d" } }`) → **structure the folder and rely on filesystem nav** (label → the folder's `meta.ts` `title`; `autogenerate.collapsed` → `collapsed: true` in each subfolder's `meta.ts`). Do **not** map it to a sidebar item with `root:` — in an explicit Blume sidebar that renders a single page link, not the directory's children. Since 0.39 a group's `items` can mix manual entries with an `autogenerate` entry; move those manual pages into the folder (route change → `redirects`) so the folder holds the whole group.
 - string `"guides/intro"` → `"/guides/intro"`; `{ label?, slug }` → `/<slug>`.
 - `{ label, items: [...] }` → `{ label, items: [...] }` (recursive) — or better, a real folder.
 - `{ label?, link }` → `{ label, href: link }`.
@@ -59,7 +59,8 @@ Starlight's `sidebar` array → prefer letting Blume generate from the filesyste
 | `lastUpdated: false` (boolean) | **remove** (Blume's `lastModified` takes a date; a boolean is a build error) |
 | `prev: false` **and** `next: false` | `pagination: false` (hides both links) |
 | `prev` / `next` otherwise (one side, or a label/link) | **drop** (report — the links can only be hidden together, and their labels come from the linked pages) |
-| `template: splash` / `hero` | **no equivalent** — rebuild as a custom `.astro` page under `content.pages`; a `hero` on a normal page drops (report) |
+| `template: splash` | `mode: center` (no sidebar, a wider centered column — the closest layout; report) |
+| `hero` | **no key** — its tagline → a paragraph, its actions → `<Card>`s or links, its image → a Markdown image (report); for a designed landing page, rebuild it as a custom `.astro` page under `content.pages` (`pages/index.astro` on `PageLayout` wins over the content page) |
 | `banner`, `tableOfContents`, `editUrl`, `head` | drop (report) |
 
 ## Asides → directives (and the `.md` trap)
@@ -83,7 +84,8 @@ Starlight content is full of Expressive Code fence meta; Blume understands some 
 - `title="file.js"` → works as-is (or use the space-title shorthand). Line ranges `{2-3}` → work as-is.
 - `ins=`/`del=` line marks → `// [!code ++]` / `// [!code --]` comments; `mark=` → `{ranges}` or `// [!code highlight]`.
 - `showLineNumbers` → `lineNumbers`.
-- **Drop:** `frame="terminal"`, `collapse=`, `wrap`, `"string"` and `/regex/` text markers (report if they carried meaning).
+- `wrap` / `wrap=true` → a bare `wrap` (that block's long lines wrap); a site-wide `expressiveCode.defaultProps.wrap: true` → `markdown.code.wrap: true`.
+- **Drop:** `frame="terminal"`, `collapse=`, `wrap=false`, `preserveIndent`/`hangingIndent`, `"string"` and `/regex/` text markers (report if they carried meaning).
 - ` ```diff lang="js" ` → a normal ` ```js ` fence with `[!code ++]`/`[!code --]` markers.
 
 ## Plugins — map, don't drop
@@ -114,4 +116,4 @@ Remove `@astrojs/starlight` (and plugin deps) from deps, delete the Starlight bi
 
 ## Dropped — report these
 
-Non-GitHub socials, badge variants, sidebar/item `attrs` + `translations`, `customCss` beyond `theme.css`, `head` entries, `routeMiddleware`, splash/hero pages (rebuild as custom pages), starlight-blog's tag and author pages, aside custom icons, EC frames/collapse/text markers, prev/next toggles, unmapped plugins, any `<Icon>` name with no Lucide equivalent.
+Socials on a platform `footer.socials` lacks, badge variants, sidebar/item `attrs` + `translations`, `customCss` beyond `theme.css`, `head` entries other than meta tags and analytics scripts, a page's frontmatter `head`, `routeMiddleware`, splash layouts approximated with `mode: center` and hero blocks rebuilt as content, override components with no Blume slot, starlight-blog's tag and author pages, aside custom icons, EC frames/collapse/text markers, prev/next toggles, unmapped plugins, any `<Icon>` name with no Lucide equivalent.

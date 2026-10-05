@@ -150,16 +150,14 @@ describe("source names", () => {
   });
 });
 
-describe("snapshotKey", () => {
-  const adapter = (query: string, pollInterval?: number) =>
-    onlyAdapter({
-      content: {
-        sources: [
-          sanity({ dataset: "d", pollInterval, projectId: "p", query }),
-        ],
-      },
-    });
+const adapter = (query: string, pollInterval?: number) =>
+  onlyAdapter({
+    content: {
+      sources: [sanity({ dataset: "d", pollInterval, projectId: "p", query })],
+    },
+  });
 
+describe("snapshotKey", () => {
   it("keys by preview mode and the options that shape the fetch", () => {
     const published = snapshotKey(adapter("*"), { mode: "dev" });
     expect(published).toStartWith("published-");

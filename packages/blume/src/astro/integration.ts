@@ -342,10 +342,11 @@ export interface BlumeIntegrationOptions {
    */
   buildArtifactsRoot?: string;
   /**
-   * The pattern redirects (`/beta/:slug*`), compiled against base-less
-   * request paths (see `core/redirect-patterns.ts`). Astro's own `redirects`
-   * carry only the exact ones, since it can't prerender a pattern's pages, so
-   * the dev server answers these itself.
+   * Every configured redirect, compiled against base-less request paths
+   * (see `compileEveryRedirect`), for the dev server to answer itself.
+   * Astro's own `redirects` carry only the exact ones, since it can't
+   * prerender a pattern's pages, and its dev handler answers one whose
+   * destination `[...slug]` serves with a `301` whatever its status.
    */
   redirects?: CompiledRedirect[];
 }
@@ -398,10 +399,12 @@ const negotiateMarkdown =
       if (homeLinkHeader && isHomeUrl(req.url)) {
         res.setHeader("Link", homeLinkHeader);
       }
-      if (prefersMarkdown(req.headers.accept)) {
-        const variant = markdownVariantUrl(req.url, contentRoutes);
-        if (variant) {
-          res.setHeader("Vary", "Accept");
+      const variant = markdownVariantUrl(req.url, contentRoutes);
+      if (variant) {
+        // Both answers at a negotiated URL depend on `Accept`, the HTML one
+        // too, so a cache never hands one client's variant to the other.
+        res.setHeader("Vary", "Accept");
+        if (prefersMarkdown(req.headers.accept)) {
           req.url = variant;
         }
       }
@@ -410,11 +413,11 @@ const negotiateMarkdown =
   };
 
 /**
- * Answer a pattern redirect in dev with its configured status, the way the
- * server wrappers do in a build. Request URLs arrive base-less (see
- * {@link negotiateMarkdown}), and the patterns were based to match.
+ * Answer a configured redirect in dev with its status, the way the server
+ * wrappers do in a build. Request URLs arrive base-less (see
+ * {@link negotiateMarkdown}), and the redirects were based to match.
  */
-const answerPatternRedirects =
+const answerRedirects =
   (redirects: readonly CompiledRedirect[]) =>
   (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
     const answer = matchCompiledRedirect(redirects, requestPath(req.url ?? ""));
@@ -533,7 +536,7 @@ export const blumeIntegration = (
         });
         if (options.redirects) {
           server.middlewares.stack.unshift({
-            handle: answerPatternRedirects(options.redirects),
+            handle: answerRedirects(options.redirects),
             route: "",
           });
         }

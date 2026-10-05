@@ -16,6 +16,10 @@
 // strings on main; the observed-results table is from that site's own config
 // (apps/docs/blume.config.ts: openai() with its configured model, default
 // retrieval, tools on) and is labeled as one site's runs, not a benchmark.
+// Updated against 400b5ff3 (read, not rerun): questions from outside the docs
+// keep to the URL's locale or the default one (readerScope in
+// ai/ask-context.ts), so the home-page misses those runs saw were dropped;
+// blume init gitignores .env.local; ai.exclude also drops the site skill.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -111,13 +115,14 @@ process.exitCode = failures > 0 ? 1 : 0;`;
     Markdown, even when search itself is off. A page with{" "}
     <code>search.exclude: true</code> in its frontmatter, or one hidden from the
     sidebar, stays out by default. <code>ai.exclude</code> doesn't keep a page
-    from the assistant: it's for <code>llms.txt</code>.
+    from the assistant: it's for <code>llms.txt</code> and your site's skill.
   </p>
   <p>For each question, the server route:</p>
   <ol>
     <li>
       Runs a keyword search over the snapshot, kept to the language (and docs
-      version) of the page the reader is on.
+      version) of the page the reader is on. From a page outside the docs, it
+      keeps to the language the URL names, or the default one.
     </li>
     <li>
       Puts that page first, then up to six matches, each cut down to its most
@@ -206,9 +211,9 @@ export default defineConfig({
   </p>
   <CodeBlock code={`AI_GATEWAY_API_KEY=your-gateway-key`} lang="bash" title=".env.local" />
   <p>
-    The <code>.gitignore</code> that <code>blume init</code> writes covers{" "}
-    <code>node_modules/</code>, <code>.blume/</code>, and <code>dist/</code>,
-    but not env files, so add it:
+    The <code>.gitignore</code> that <code>blume init</code> writes already
+    lists <code>.env.local</code>. If you set the project up another way, add
+    it:
   </p>
   <CodeBlock code={`echo ".env.local" >> .gitignore`} lang="bash" />
   <p>
@@ -361,17 +366,14 @@ export default defineConfig({
         <td>
           Asked from a docs page (once reworded), it passed both times, citing
           Deployment, whose
-          Private docs section says Blume has no sign-in of its own. Asked from
-          the home page, it said it didn't know all three times.
+          Private docs section says Blume has no sign-in of its own.
         </td>
       </tr>
       <tr>
         <td>"How do I stop scripts from spamming the chat box?"</td>
         <td>
           From a docs page, it mentioned the captcha option and cited the right
-          pages twice. From the home page, it once suggested an unrelated
-          setting and once said the docs don't cover it. Two runs came back
-          empty.
+          pages twice. Two runs came back empty.
         </td>
       </tr>
       <tr>
@@ -384,13 +386,12 @@ export default defineConfig({
     </tbody>
   </table>
   <p>
-    In these runs, the difference was where the question was asked. This
-    site's home page is a custom page, not a docs page. Retrieval and the
-    model's own searches keep to the language of the reader's page, so from a
-    page outside the docs they searched all five languages: for
-    the single sign-on question, five of the six pages retrieved up front were
-    translations. The fix was to send a docs page as <code>page</code>, as
-    the panel does when a reader asks from one.
+    Where a question is asked matters. The reader's page goes into the context
+    first, and retrieval and the model's own searches keep to its language. On
+    a page outside the docs, like this site's custom home page, there's no page
+    to put first, and they keep to the language the URL names, or the default
+    one. So set <code>page</code> on each eval question to the page a reader
+    would ask it from, as the panel does.
   </p>
   <p>
     The empty answers were <code>200</code> responses with no text, which is
@@ -510,7 +511,10 @@ export default defineConfig({
   <p>
     On a multilingual site, retrieval keeps to the language of the page the
     question came from. Asked from a page outside the docs, like a custom
-    landing page, it searches every language. Ask from a docs page, and set{" "}
+    landing page, it keeps to the locale the URL starts with (<code>/ja</code>),
+    or the default language when there's none. So a Japanese reader on an
+    unprefixed landing page gets answers from the default language's pages.
+    Put a localized landing page under its locale's prefix, and set{" "}
     <code>page</code> on each eval question.
   </p>
 </GuidePage>

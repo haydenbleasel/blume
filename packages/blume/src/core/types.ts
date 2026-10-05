@@ -62,6 +62,10 @@ export interface PageLink {
    * only those go through the image pipeline; a plain link to the same path
    * resolves as a site route. */
   image?: boolean;
+  /** Set when the target is a lowercase `<a href>`, which ships as written:
+   * the Markdown pipeline neither resolves its relative path file-style nor
+   * mounts the base path on it, so it's checked the way a browser reads it. */
+  raw?: boolean;
   /** 1-based line number in the source file. */
   line: number;
   /** 1-based column of the target within the line. */
@@ -69,6 +73,18 @@ export interface PageLink {
   /** Absolute path of the file the link was written in, when that isn't the
    * page's own source — a link inside an included partial. Diagnostics point
    * here so authors fix the partial, not the page that spliced it. */
+  file?: string;
+}
+
+/** A `<Component path="…">` in a page, located like a {@link PageLink}. */
+export interface ExampleUse {
+  /** The example's key as written: its path under `examples/`, sans extension. */
+  path: string;
+  /** 1-based line number in the source file. */
+  line: number;
+  /** 1-based column of the `path` value within the line. */
+  column: number;
+  /** Absolute path of the included partial it was written in, if not the page. */
   file?: string;
 }
 
@@ -194,6 +210,8 @@ export interface PageRecord {
   links: PageLink[];
   /** Capitalized JSX component tags used in the body (`.mdx` only). */
   componentsUsed?: string[];
+  /** The string `path` of each `<Component>` example in the body (`.mdx` only). */
+  examplesUsed?: ExampleUse[];
   /** Resolved "last updated" ISO date, when the feature is enabled. */
   lastModified?: string;
   /** Absolute paths of files this page `<include>`s, transitively. Drives the

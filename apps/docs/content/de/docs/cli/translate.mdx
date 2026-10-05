@@ -44,6 +44,7 @@ Bei einer Erstübersetzung gibt es noch keine Vorlage. Leg den Stil deshalb vora
 Für die Struktur ist nie der Agent zuständig. Vor dem Schreiben prüft Blume jede Antwort und baut die Datei aus der Quelle neu auf:
 
 - Das Frontmatter wird aus den Daten der Quelldatei rekonstruiert. Nur die sechs übersetzbaren Werte kommen aus der Übersetzung. Keys, die der Agent erfunden hat, werden verworfen, und Keys, die er gelöscht hat, werden wiederhergestellt. `slug`, `icon`, `order` und Datumsangaben kommen immer unverändert aus der Quelle.
+- `seo.canonical` ist der einzige Key der Quelle, der nicht übernommen wird. Er verweist auf eine Seite in der Quellsprache, und eine Übersetzung, deren Canonical auf eine andere Sprache zeigt, fällt in ihrer eigenen Sprache aus den Suchergebnissen. Deshalb bekommt die Übersetzung das Standard-Canonical, also ihre eigene URL.
 - Die Anzahl der Code-Fences muss mit der Quelle übereinstimmen. Der Body darf nicht leer sein, und das Frontmatter muss sich parsen lassen.
 - Jede Überschrift bekommt einen [`[#id]`-Marker](/docs/content/syntax#custom-anchors) am Ende, der sie an die Anker-ID ihrer Quellüberschrift bindet. Das entfällt, wenn die Übersetzung schon einen solchen Marker hat. So führen `#fragment`-Links in jeder Sprache zum selben Ziel. Überschriften werden nach ihrer Reihenfolge zugeordnet. Passt die Überschriftenstruktur einer Übersetzung nicht zur Quelle, bekommt sie deshalb keine Marker.
 

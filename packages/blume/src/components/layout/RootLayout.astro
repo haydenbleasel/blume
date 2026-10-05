@@ -868,13 +868,20 @@ const localeRedirect = localeTargets
             />
           )
         }
+        {/* Below `xl`, where the rail is hidden, the page actions ride in
+            the "On this page" dropdown, so it renders wherever the rail
+            would, with or without headings. They render once, in the rail:
+            the dropdown gets an empty mount the actions script moves them
+            into (see PageActions.astro). */}
         {
-          hasToc && (
+          showToc && (
             <TableOfContentsSlot
               headings={tocHeadings}
               title={strings.toc.title}
               variant="mobile"
-            />
+            >
+              <div data-blume-page-actions-mount />
+            </TableOfContentsSlot>
           )
         }
         <PageHeaderSlot headings={tocHeadings} page={page} route={page.route} />
@@ -911,6 +918,7 @@ const localeRedirect = localeTargets
                 (apiRail || modeLayout.width === "full") && "[&>*]:max-w-none",
                 modeLayout.width === "center" && "[&>*]:max-w-[54rem]",
               ]}
+              data-blume-page-end
             >
               {directoryGroup && <Directory group={directoryGroup} />}
               <RelatedPages links={relatedItems} title={strings.page.related} />

@@ -16,6 +16,8 @@ export interface ProbeResult {
   status?: number;
   timedOut?: boolean;
   error?: string;
+  /** The system error code behind a request that got no response (`ENOTFOUND`). */
+  code?: string;
   /** Whether the request was redirected before landing on `status`. */
   redirected?: boolean;
   /** The URL finally landed on, after following redirects. */
@@ -27,6 +29,18 @@ export interface ProbeResult {
   /** `X-Robots-Tag` of the response, when the server set one. */
   robotsTag?: string | null;
 }
+
+/**
+ * The reason a request got no response. Node's fetch rejects with a bare
+ * "fetch failed" and puts the system error (`getaddrinfo ENOTFOUND …`, with
+ * its `code`) on `cause`; Bun's rejects with the system error itself.
+ */
+const failure = (error: Error): Pick<ProbeResult, "code" | "error"> => {
+  const reason = error.cause instanceof Error ? error.cause : error;
+  return "code" in reason
+    ? { code: String(reason.code), error: reason.message }
+    : { error: reason.message };
+};
 
 /** Probe a URL with the given method, normalizing failures to a result. */
 const request = async (
@@ -56,10 +70,9 @@ const request = async (
     if (error instanceof Error && error.name === "AbortError") {
       return { ok: false, timedOut: true };
     }
-    return {
-      error: error instanceof Error ? error.message : String(error),
-      ok: false,
-    };
+    const reason =
+      error instanceof Error ? failure(error) : { error: String(error) };
+    return { ...reason, ok: false };
   } finally {
     clearTimeout(timer);
   }
@@ -95,10 +108,17 @@ export const gradeExternal = (
   if (result.timedOut) {
     return { detail: "request timed out", severity: "warning" };
   }
+  // No response at all. A host name that doesn't resolve is as dead as a 404;
+  // a refused, reset, or failed connection is more often someone else's outage
+  // or the runner's own network, so it's graded like a timeout.
   if (result.status === undefined) {
-    return { detail: result.error ?? "unreachable", severity: "error" };
+    return {
+      detail: result.error ?? "unreachable",
+      severity: result.code === "ENOTFOUND" ? "error" : "warning",
+    };
   }
-  // A 404/410 is definitively dead. A 403/429/5xx may well be rate limiting or a
+  // A 404/410 is definitively dead. Any other status — a 401/403 from a site
+  // that turns bots away, a 429, a 5xx — may well be rate limiting or a
   // transient blip, which is not the author's bug to fix.
   if (result.status === STATUS_NOT_FOUND || result.status === STATUS_GONE) {
     return { detail: `HTTP ${result.status}`, severity: "error" };

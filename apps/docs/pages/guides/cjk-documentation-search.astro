@@ -10,12 +10,15 @@
 // Pagefind 1.5.2 (pagefind_extended, through its Node API, queried in
 // Chromium 153 from a page in the query's language). create-corpus.sh was
 // run as rendered, and its pages' frontmatter and text match the probed
-// corpus exactly. Algolia and Typesense were not run. The corpus was not
-// reviewed by native speakers. Review: the "All languages" toggle, the
-// per-load Pagefind client, and the slashed result links were checked by
-// reading Search.astro, search/pagefind.ts, pagefind.js, and Astro's preview
-// server, not run. Not yet run end to end: no `blume dev` or `blume build` of
-// the corpus site itself.
+// corpus exactly. Algolia was not run. The corpus was not reviewed by native
+// speakers. Rerun 2026-09-30 on Bun 1.4.2 (ICU 78.1) against the per-locale
+// tokenizers in search/orama-index.ts: the English-default column, the
+// Traditional keywords on an English default, and unscoped queries. Ran the
+// corpus through Blume's own Typesense sync and dialog client (Typesense 30.2
+// locally) with and without `locale`. The "All languages" merge and the
+// per-language Pagefind client were read from search/pagefind.ts, not run.
+// Not yet run end to end: no `blume dev` or `blume build` of the corpus site
+// itself.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -24,15 +27,14 @@ import { guideById } from "../_guides/guides.ts";
 
 <GuidePage guide={guideById("cjk-documentation-search")}>
   <p>
-    Blume's default search engine, Orama, reads every page with one tokenizer,
-    and it picks that tokenizer from <code>i18n.defaultLocale</code>. When the
-    default is English or another Latin-script language, Chinese, Japanese and
-    Korean text is dropped when the index is built. Only the Latin words and
-    numbers in those pages survive, so a Japanese page turns up for{" "}
-    <code>RATE_LIMITED</code> but never for 再試行. Make Chinese, Japanese or
-    Korean the default and Orama switches to a word-segmenting tokenizer. Keep
-    English as the default, and Pagefind is the adapter that gives each
-    language its own segmented index.
+    Blume's default search engine, Orama, picks a tokenizer from each
+    locale's code. Chinese, Japanese and Korean pages get a word-segmenting
+    one, whether the language is your default or a translation of an English
+    site, so a Japanese page turns up for 再試行 as well as for{" "}
+    <code>RATE_LIMITED</code>. CJK words go missing in a few setups: a locale
+    code that doesn't name the language, FlexSearch, and Typesense without a{" "}
+    <code>locale</code>. Pagefind is the other local adapter that segments
+    each language, in an index of its own.
   </p>
   <p>
     By the end of this guide you have a small test site in four languages, a
@@ -49,22 +51,25 @@ import { guideById } from "../_guides/guides.ts";
     language processing, and test it the same way.
   </p>
 
-  <h2>Why CJK words don't match</h2>
+  <h2>How Blume tokenizes CJK text</h2>
   <p>
     Orama's standard tokenizer splits text on anything that isn't a basic Latin
     letter, a digit, or one of a few accented vowels. That's not only a spacing
-    problem: every Han, kana and Hangul character counts as a separator, so a
-    page in those scripts indexes none of its own words.
+    problem: every Han, kana and Hangul character counts as a separator, so on
+    its own it would index none of a CJK page's words.
   </p>
   <p>
-    When the default locale resolves to a non-Latin script, Blume swaps in a
+    So for a locale whose code resolves to a non-Latin script, Blume uses a
     tokenizer built on <code>Intl.Segmenter</code>, the word segmenter built
-    into browsers and Node.js. For Chinese and Japanese defaults it also
-    indexes Han, hiragana and katakana as overlapping pairs of characters, so
-    署名検証 is stored as 署名, 名検 and 検証. A query first looks for pages
-    that carry all of its pairs, which keeps a page that mentions 署名 and 検証
-    in separate sentences out of the results for the compound. Korean indexes
-    keep the segmenter's words.
+    into browsers and Node.js. With a non-Latin default locale, that tokenizer
+    reads every page. With a Latin-script default, like English, the Latin
+    pages keep Orama's tokenizer and each non-Latin translation gets its own
+    locale's. For Chinese and Japanese, Blume also indexes Han, hiragana and
+    katakana as overlapping pairs of characters, so 署名検証 is stored as
+    署名, 名検 and 検証. A query first looks for pages that carry all of its
+    pairs, which keeps a page that mentions 署名 and 検証 in separate
+    sentences out of the results for the compound. Korean indexes keep the
+    segmenter's words.
   </p>
   <p>The adapters don't all do this the same way:</p>
   <table>
@@ -79,10 +84,13 @@ import { guideById } from "../_guides/guides.ts";
       <tr>
         <td>Orama (default)</td>
         <td>
-          Segmented only when the default locale is non-Latin, with character
-          pairs for Chinese and Japanese
+          Segmented for every locale in a CJK script, with character pairs for
+          Chinese and Japanese
         </td>
-        <td>One tokenizer for every language, from the default locale</td>
+        <td>
+          One index: a non-Latin default's tokenizer for every page, or a
+          Latin default's plus one per non-Latin translation
+        </td>
       </tr>
       <tr>
         <td>FlexSearch</td>
@@ -105,11 +113,10 @@ import { guideById } from "../_guides/guides.ts";
       <tr>
         <td>Typesense</td>
         <td>
-          Blume creates the collection without a field{" "}
-          <code>locale</code>, so Typesense's default tokenizer, made for
-          languages that put spaces between words, applies. Blume recreates the
-          collection on every build, so a <code>locale</code> you add by hand
-          doesn't last.
+          Segmented for the one language you set with{" "}
+          <code>typesense({"{ locale }"})</code>. Without it, Typesense's
+          default tokenizer, made for languages that put spaces between words,
+          applies.
         </td>
         <td>One collection, filtered by a locale facet</td>
       </tr>
@@ -287,7 +294,7 @@ ko	속도제한	space left out	rate-limits`}
     read the language tends to test only what the tokenizer already handles.
   </p>
 
-  <h2>Reproduce the failure</h2>
+  <h2>Run the queries on the default setup</h2>
   <p>
     Add a config with English as the default and the three translations, and
     leave <code>search</code> out, so the default Orama adapter runs:
@@ -313,19 +320,21 @@ export default defineConfig({
   <p>
     Start <code>npx blume dev</code>, open <code>/ja/rate-limits</code>, and
     open search with <code>⌘K</code> (or <code>Ctrl K</code>). On a page in a
-    translation, the dialog searches that language only. Type 再試行: nothing.
-    Type <code>RATE_LIMITED</code>: the Japanese page comes up. That's the
-    signature of this failure. The code terms in a page are Latin, so they
-    survive, while every Japanese word is gone. <code>Webhook 署名</code> also
-    finds the Japanese webhooks page, but only because <code>Webhook</code>{" "}
-    matched: the tokenizer dropped 署名 from the query too.
+    translation, the dialog searches that language only. Type 再試行, and the
+    Japanese rate limits page comes up; <code>RATE_LIMITED</code> finds it
+    too. Type 署名検証, and only the webhooks page comes up, not the API keys
+    page that mentions 署名 and 検証 apart. Turn on "All languages" and the
+    same queries search every locale, each with its own tokenizer. Work
+    through the rest of your list the same way, and compare it with the{" "}
+    <a href="#compare-the-results">results we recorded</a>.
   </p>
 
   <h2>Pick the path for your default language</h2>
   <h3>Chinese, Japanese or Korean is your main language</h3>
   <p>
-    Make it the default. Orama then segments the whole index, and English pages
-    stay searchable next to it, because Latin words come through segmentation
+    Make it the default. Orama then reads every page with that language's
+    tokenizer, and English pages stay
+    searchable next to it, because Latin words come through segmentation
     intact:
   </p>
   <CodeBlock
@@ -360,14 +369,19 @@ export default defineConfig({
     <code>zh-TW</code> and <code>ja</code> all get character pairs. A{" "}
     <code>ko</code> default segments into words instead, so on a Korean-default
     site with Chinese or Japanese translations, a compound like 署名検証 also
-    matches pages that contain its parts separately.
+    matches pages that contain its parts separately. An English default
+    doesn't have that problem, since each translation keeps its own
+    tokenizer.
   </p>
 
   <h3>English stays the default</h3>
   <p>
-    Orama can't search the translations then, so switch the dialog to
-    Pagefind. It reads the <code>lang</code> attribute Blume puts on each
-    page's <code>&lt;html&gt;</code>, builds a separate index per language, and
+    Orama already segments each translation with its own locale's tokenizer,
+    so the config above needs nothing more. Switch the dialog to Pagefind when
+    you'd rather each reader download only their language's index, since
+    Orama ships every language in one file. Pagefind reads the{" "}
+    <code>lang</code> attribute Blume puts on each page's{" "}
+    <code>&lt;html&gt;</code>, builds a separate index per language, and
     segments Chinese, Japanese and Korean at build time:
   </p>
   <CodeBlock
@@ -401,21 +415,19 @@ npx blume preview`}
     The build log says how many pages it indexed, and <code>dist/pagefind</code>{" "}
     holds one <code>.pf_meta</code> file per language, with the language code
     in its name (<code>pagefind.ja_…</code>). A search on a Japanese page loads
-    the Japanese index only, and the dialog's "All languages" toggle doesn't
-    change that. Blume loads Pagefind once per full page load, and Pagefind
-    picks the language as it loads, so after you switch language from the
-    language menu, reload the page before you test. Pagefind has trade-offs of its own: no search in{" "}
-    <code>blume dev</code>, no docs-version scoping, no results from custom
-    pages, and result links that <code>blume preview</code> answers with Not
-    Found. The{" "}
+    the Japanese index only, and with the dialog's "All languages" toggle on,
+    Blume merges the other languages' indexes in. Search follows a switch
+    from the language menu without a reload. Pagefind has trade-offs of its
+    own: no search in <code>blume dev</code>, no docs-version scoping, and no
+    results from custom pages. The{" "}
     <a href="/guides/pagefind-documentation-search">Pagefind guide</a> covers
     them.
   </p>
-  <Callout type="warning">
+  <Callout>
     Switching the dialog to Pagefind doesn't change what the assistant and the
-    MCP server find. Both always search an Orama index built with your default
-    locale's tokenizer, so on an English-default site they still can't match
-    words in Chinese, Japanese or Korean pages.
+    MCP server find. Both always search an Orama index with the same
+    per-locale tokenizers, so they match words in your Chinese, Japanese and
+    Korean pages whichever adapter the dialog uses.
   </Callout>
 
   <h3>Hosted search on Algolia</h3>
@@ -457,13 +469,44 @@ await client.waitForTask({ indexName, taskID });`}
     your query list. We didn't run Algolia for this guide.
   </p>
 
+  <h3>Hosted search on Typesense</h3>
+  <p>
+    Typesense tokenizes a collection's text for one language, which you set
+    with <code>locale</code> on the adapter. Blume's sync applies it to the
+    title, description, content, and keyword fields each time it builds the
+    collection:
+  </p>
+  <CodeBlock
+    code={`import { typesense } from "blume/search";
+
+search: typesense({
+  host: "search.acme.example",
+  collection: "docs",
+  apiKey: "docs-search-public",
+  locale: "ja",
+}),`}
+    lang="ts"
+  />
+  <p>
+    We ran the corpus through Blume's sync and search client against a local
+    Typesense 30.2. Without <code>locale</code>, 再試行, 重试 and 署名検証
+    found nothing. With <code>locale: "ja"</code>, every Japanese query in
+    the list found its pages, 署名検証 also returned the API keys page, and
+    the kana reading けんしょう matched the pages with 検証. The one setting
+    covers every language in the collection, so pick your main CJK language
+    and run the rest of your list against it. The{" "}
+    <a href="/guides/typesense-documentation-search">Typesense guide</a>{" "}
+    covers the server and keys.
+  </p>
+
   <h2>Compare the results</h2>
   <p>
     We ran the query list against the corpus text on each engine. Orama ran
     Blume's own index code on Node.js 24.14.1 (ICU 78.2), Bun 1.4.2 (ICU 78.1),
     and headless Chromium 153 and WebKit 26.6 on macOS, with the same results on
-    all four. Pagefind 1.5.2 ran its extended binary and was queried in
-    Chromium from a page in each query's language. FlexSearch 0.8.212 ran with
+    all four; the English-default column is from a rerun on Bun with Blume's
+    per-locale tokenizers. Pagefind 1.5.2 ran its extended binary and was
+    queried in Chromium from a page in each query's language. FlexSearch 0.8.212 ran with
     the options Blume gives it. Each query was scoped to its own language, the
     way the dialog scopes it on a translated page.
   </p>
@@ -480,21 +523,21 @@ await client.waitForTask({ indexName, taskID });`}
     <tbody>
       <tr>
         <td>署名検証</td>
-        <td>nothing</td>
+        <td>webhooks</td>
         <td>webhooks</td>
         <td>webhooks</td>
         <td>webhooks, api-keys</td>
       </tr>
       <tr>
         <td>検証</td>
-        <td>nothing</td>
+        <td>webhooks, api-keys</td>
         <td>webhooks, api-keys</td>
         <td>webhooks</td>
         <td>webhooks, api-keys</td>
       </tr>
       <tr>
         <td>再試行</td>
-        <td>nothing</td>
+        <td>rate-limits</td>
         <td>rate-limits</td>
         <td>nothing</td>
         <td>rate-limits</td>
@@ -508,7 +551,7 @@ await client.waitForTask({ indexName, taskID });`}
       </tr>
       <tr>
         <td>Webhook 署名</td>
-        <td>webhooks, on Webhook alone</td>
+        <td>webhooks</td>
         <td>webhooks</td>
         <td>webhooks</td>
         <td>webhooks</td>
@@ -522,14 +565,14 @@ await client.waitForTask({ indexName, taskID });`}
       </tr>
       <tr>
         <td>签名验证</td>
-        <td>nothing</td>
+        <td>webhooks</td>
         <td>webhooks</td>
         <td>nothing</td>
         <td>webhooks, api-keys</td>
       </tr>
       <tr>
         <td>重试</td>
-        <td>nothing</td>
+        <td>rate-limits</td>
         <td>rate-limits</td>
         <td>nothing</td>
         <td>rate-limits</td>
@@ -543,14 +586,14 @@ await client.waitForTask({ indexName, taskID });`}
       </tr>
       <tr>
         <td>서명</td>
-        <td>nothing</td>
+        <td>webhooks, api-keys</td>
         <td>webhooks, api-keys</td>
         <td>webhooks, api-keys</td>
         <td>webhooks, api-keys</td>
       </tr>
       <tr>
         <td>서명을</td>
-        <td>nothing</td>
+        <td>webhooks</td>
         <td>webhooks</td>
         <td>webhooks</td>
         <td>webhooks</td>
@@ -567,11 +610,11 @@ await client.waitForTask({ indexName, taskID });`}
   <p>What the table shows, for these queries:</p>
   <ul>
     <li>
-      <strong>Orama with a Japanese default</strong> passed every Japanese and
-      Chinese query except the Traditional one, and it was the only engine
-      that kept the API keys page out of the compound results. A Chinese
-      default gave the same results; a Korean default also returned the API
-      keys page for 署名検証 and 签名验证.
+      <strong>Orama with an English or a Japanese default</strong> passed
+      every Japanese and Chinese query except the Traditional one, and it was
+      the only engine that kept the API keys page out of the compound results.
+      A Chinese default gave the same results; a Korean default also returned
+      the API keys page for 署名検証 and 签名验证.
     </li>
     <li>
       <strong>Pagefind</strong> found every page it should for the words, and
@@ -586,18 +629,22 @@ await client.waitForTask({ indexName, taskID });`}
       in the middle of a sentence. Don't use it for CJK content.
     </li>
     <li>
-      <strong>No engine</strong> converted Traditional characters to
-      Simplified, or matched a kana reading to its kanji.
+      <strong>None of these engines</strong> converted Traditional characters
+      to Simplified, or matched a kana reading to its kanji.
     </li>
   </ul>
 
   <h2>Troubleshooting</h2>
   <h3>A translated page matches its code terms but not its words</h3>
   <p>
-    Your default locale is Latin-script, and you're on Orama. Make the CJK
-    language the default or switch to Pagefind, as above. Adding CJK terms to
-    a page's <code>search.keywords</code> doesn't help, because keywords go
-    through the same tokenizer.
+    Orama indexed the page with its standard tokenizer, which keeps only the
+    Latin words, because the locale's code doesn't resolve to a CJK script.{" "}
+    <code>jp</code>, <code>cn</code> and <code>kr</code> are country codes,
+    not language codes: use <code>ja</code>, <code>zh</code> (or{" "}
+    <code>zh-TW</code>) and <code>ko</code>, and rename the locale's folder to
+    match. On Typesense, set <code>locale</code>; on FlexSearch, switch
+    adapters. Adding CJK terms to a page's <code>search.keywords</code>{" "}
+    doesn't help, because keywords go through the same tokenizer.
   </p>
   <h3>Search says it's available in the production build</h3>
   <p>
@@ -616,9 +663,9 @@ await client.waitForTask({ indexName, taskID });`}
   </p>
   <h3>A Traditional Chinese query misses Simplified pages</h3>
   <p>
-    Neither engine converts between the two. Add the Traditional form to the
-    page's frontmatter, which worked for both Orama with a Chinese or Japanese
-    default and Pagefind in our run:
+    Neither Orama nor Pagefind converts between the two. Add the Traditional
+    form to the page's frontmatter, which worked on Orama with an English,
+    Chinese, or Japanese default and on Pagefind in our run:
   </p>
   <CodeBlock
     code={`search:
@@ -627,8 +674,8 @@ await client.waitForTask({ indexName, taskID });`}
   />
   <h3>A single character finds nothing</h3>
   <p>
-    Orama with a Chinese or Japanese default matches one character only where
-    it starts a character pair, so a character at the end of a word can miss.
+    Orama matches one character on Chinese and Japanese pages only where it
+    starts a character pair, so a character at the end of a word can miss.
     Pagefind returned nothing for 証 in our run. Type two or more characters.
   </p>
   <h3>A page never appears in its language's results</h3>

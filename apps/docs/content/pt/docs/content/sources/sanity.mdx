@@ -4,7 +4,7 @@ description: >-
   Puxe documentos de um dataset do Sanity com a fonte sanity() — uma consulta GROQ seleciona os documentos, e os corpos em Portable Text deles viram Markdown.
 ---
 
-O adaptador nativo `sanity()` executa uma consulta GROQ e mapeia os campos de cada documento para o frontmatter e o corpo em Portable Text para Markdown. O adaptador declara `@sanity/client` como dependência de runtime — uma peer opcional, então instale-a só se você usar essa fonte.
+O adaptador nativo `sanity()` executa uma consulta GROQ e mapeia os campos de cada documento para o frontmatter e o corpo em Portable Text para Markdown. Um corpo guardado em um campo de string em Markdown passa adiante como foi escrito. A exceção são os links que não sejam um endereço web, de e-mail, de telefone ou relativo (uma URL `javascript:`, por exemplo), que ficam só com o rótulo. O adaptador declara `@sanity/client` como dependência de runtime — uma peer opcional, então instale-a só se você usar essa fonte.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -27,4 +27,4 @@ export default defineConfig({
 });
 ```
 
-Um token de leitura para um dataset privado vem da variável de ambiente `SANITY_TOKEN`, que o adaptador declara. Tipos de bloco personalizados do Portable Text são mapeados para componentes do Blume pela opção `serializers` do engine, disponível quando você constrói `sanitySource` diretamente e o passa para [`custom()`](/docs/content/sources/custom). Definir `serializers` faz com que as páginas da fonte sejam escritas como MDX, então um componente ou diretiva retornado por um serializer é renderizado.
+Um token de leitura para um dataset privado vem da variável de ambiente `SANITY_TOKEN`. O adaptador declara essa variável, então `blume dev` e `blume build` avisam quando ela não está definida; um dataset público funciona sem ela. Sem token, o Sanity responde à consulta de um dataset privado com nenhum documento em vez de um erro. Por isso, quando uma consulta não encontra nada e o token não está definido, a fonte adiciona um aviso `BLUME_MISSING_SECRET` dizendo isso. Com `--preview`, o adaptador lê rascunhos com a perspectiva `previewDrafts`, que o `@sanity/client` 8 informa ter sido renomeada para `drafts`; o nome antigo ainda funciona, e o `@sanity/client` 6 aceita só o antigo. Tipos de bloco personalizados do Portable Text são mapeados para componentes do Blume pela opção `serializers` do engine, disponível quando você constrói `sanitySource` diretamente e o passa para [`custom()`](/docs/content/sources/custom). Definir `serializers` faz com que as páginas da fonte sejam escritas como MDX, então um componente ou diretiva retornado por um serializer é renderizado.

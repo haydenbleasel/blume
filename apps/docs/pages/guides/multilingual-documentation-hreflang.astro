@@ -6,8 +6,10 @@
 // routes (core/manifest.ts), translation pairing by logical route
 // (core/sources/normalize.ts), the i18n folder diagnostics (core/i18n.ts),
 // the sitemap (deploy/sitemap.ts), the audit's i18n, indexability, sitemap,
-// and duplicate checks and their catalog messages, and translate's frontmatter
-// reconstruction (translate/validate.ts, prompts.ts). Google guidance checked
+// and duplicate checks and their catalog messages, translate's frontmatter
+// reconstruction (translate/validate.ts, prompts.ts; it drops seo.canonical),
+// and the language switcher's entries with fallbackLocale: null
+// (astro/templates.ts). Google guidance checked
 // against its localized-versions, canonicalization, consolidate-duplicate-URLs,
 // and page indexing report docs. What I ran: curl against the repo's own docs
 // dev server (en + de) for a translated page, its German translation, an
@@ -207,11 +209,11 @@ Erstelle im Acme-Dashboard einen API-Schlüssel und sende dann eine Testnachrich
     The English install page sets <code>seo.canonical</code> to its own URL.
     That's harmless on its own, since Blume emits the same self-canonical by
     default. The German page copied it along with the rest of the frontmatter.
-    That happens when you translate by copying a file, and{" "}
-    <code>blume translate</code> does it too: it rebuilds each translation's
-    frontmatter from the source, translates only the title, description,
-    sidebar label and badge, and SEO title and description, and copies every
-    other key as it is, <code>seo.canonical</code> included.
+    That happens when you translate by copying a file.{" "}
+    <code>blume translate</code> doesn't: it rebuilds each translation's
+    frontmatter from the source and copies every key except{" "}
+    <code>seo.canonical</code>, so its translations get their own URL as the
+    canonical.
   </p>
 
   <h2>Map every URL</h2>
@@ -265,7 +267,7 @@ Erstelle im Acme-Dashboard einen API-Schlüssel und sende dann eine Testnachrich
         <td><code>de</code></td>
         <td><strong><code>/guides/install</code></strong></td>
         <td>de, en, x-default</td>
-        <td>Yes</td>
+        <td><strong>No</strong></td>
       </tr>
       <tr>
         <td><code>/guides/configure</code></td>
@@ -297,7 +299,9 @@ Erstelle im Acme-Dashboard einen API-Schlüssel und sende dann eine Testnachrich
   </p>
   <p>
     The row in bold is the broken one: <code>/de/guides/install</code> is a
-    real German translation whose canonical names the English page.
+    real German translation whose canonical names the English page. Blume
+    leaves a page whose canonical names another URL out of the sitemap, so the
+    German translation drops out of it too.
   </p>
 
   <h2>Read the generated head</h2>
@@ -380,15 +384,6 @@ npx blume audit --only i18n,indexability,sitemap --verbose`}
         </td>
       </tr>
       <tr>
-        <td><code>BLUME_AUDIT_NON_CANONICAL_IN_SITEMAP</code></td>
-        <td>error</td>
-        <td><code>/de/guides/install</code></td>
-        <td>
-          /de/guides/install is in the sitemap but canonicalizes to
-          /guides/install.
-        </td>
-      </tr>
-      <tr>
         <td><code>BLUME_AUDIT_CANONICAL_NOT_SELF</code></td>
         <td>info</td>
         <td><code>/de/guides/install</code></td>
@@ -400,14 +395,14 @@ npx blume audit --only i18n,indexability,sitemap --verbose`}
     </tbody>
   </table>
   <p>
-    The errors make the command exit with code 1. Nothing is reported for{" "}
-    <code>/de/guides/configure</code>: the audit knows it's a fallback copy and
-    expects it to point elsewhere.
+    The <code>hreflang</code> errors make the command exit with code 1.
+    Nothing is reported for <code>/de/guides/configure</code>: the audit knows
+    it's a fallback copy and expects it to point elsewhere.
   </p>
   <p>
-    Each finding names the file to open. The sitemap and canonical findings
-    point at line 5 of <code>docs/de/guides/install.mdx</code>, the canonical
-    line. The <code>hreflang</code> finding on <code>/guides/install</code>{" "}
+    Each finding names the file to open. The canonical finding points at line
+    5 of <code>docs/de/guides/install.mdx</code>, the canonical line. The{" "}
+    <code>hreflang</code> finding on <code>/guides/install</code>{" "}
     names <code>docs/guides/install.mdx</code>, because that page carries the
     link, but the cause is the target named in the message.
   </p>
@@ -429,15 +424,15 @@ Erstelle im Acme-Dashboard einen API-Schlüssel und sende dann eine Testnachrich
   />
   <p>
     Remove the same two lines from <code>docs/guides/install.mdx</code> too.
-    Its self-canonical is redundant, and while it's there, the next{" "}
-    <code>blume translate</code> run that touches the page copies it back into
-    the German file.
+    Its self-canonical is redundant, and anyone who translates the page by
+    copying the file copies the canonical with it.
   </p>
   <Callout type="info">
     If you track translations with <code>blume translate</code>, editing the
     English file changes its hash, so <code>blume translate --check</code>{" "}
     reports the German page as stale. The next translate run rebuilds its
-    frontmatter from the English page, now without the canonical.
+    frontmatter from the English page, and never carries a{" "}
+    <code>seo.canonical</code> over.
   </Callout>
   <p>Build and audit again:</p>
   <CodeBlock
@@ -446,7 +441,7 @@ npx blume audit --only i18n,indexability,sitemap`}
     lang="bash"
   />
   <p>
-    The three findings are gone. With no errors left in those categories, the
+    Both findings are gone. With no errors left in those categories, the
     command exits with code 0. The German page's head now names itself:
   </p>
   <CodeBlock
@@ -459,8 +454,9 @@ npx blume audit --only i18n,indexability,sitemap`}
   />
   <p>
     In the matrix, the German install row's canonical now reads{" "}
-    <code>/de/guides/install</code>. Every member of each group is canonical to
-    itself and names the others, and the fallback copy stays outside.
+    <code>/de/guides/install</code>, and the page is back in the sitemap.
+    Every member of each group is canonical to itself and names the others,
+    and the fallback copy stays outside.
   </p>
 
   <h2>Choose what untranslated pages do</h2>
@@ -486,9 +482,8 @@ npx blume audit --only i18n,indexability,sitemap`}
     the German sidebar lists every page and German links stay in German
     navigation. With <code>null</code>, the German sidebar lists only
     translated pages, and a German page's link to an untranslated page goes to
-    the English one. The language switcher still offers German on an
-    untranslated English page, marked as not translated, and that link lands
-    on the 404.
+    the English one. On an untranslated English page, the language switcher
+    leaves German out, since there's no German page to link.
   </p>
   <p>
     The default also means a translation ships without a URL change. Once{" "}
@@ -510,7 +505,7 @@ npx blume audit --only i18n,indexability,sitemap`}
   />
   <p>
     The default gate fails on errors, which covers the <code>hreflang</code>{" "}
-    and sitemap conflicts in this guide. Drop <code>--only</code> to run every
+    conflict in this guide. Drop <code>--only</code> to run every
     check. For a complete workflow file, see the{" "}
     <a href="/guides/documentation-seo-audit-ci">SEO audit guide</a>.
   </p>

@@ -75,7 +75,7 @@ Your text is **appended to** the built-in instructions rather than replacing the
 
 The assistant is **grounded in your docs**. For each question it retrieves the most relevant pages — using the same lexical [Orama](/docs/configuration/search) index that powers on-page search — and injects them into the model's system prompt, so answers come from your content instead of the model's own knowledge. The assistant is told to answer only from the retrieved pages, to say when something isn't covered, and to cite the pages it drew from.
 
-The page the reader is currently on is added to the context first and used to scope retrieval to that page's language — and, on a [versioned](/docs/content/versioning) site, to its docs version — so answers stay relevant to where they are in the docs. Retrieval runs at request time from a snapshot baked into the build, so it works regardless of your [search](/docs/configuration/search) provider — even with `search: false` — and needs no configuration.
+The page the reader is currently on is added to the context first and used to scope retrieval to that page's language — and, on a [versioned](/docs/content/versioning) site, to its docs version — so answers stay relevant to where they are in the docs. A question from outside the docs, such as a landing page, keeps to the language the URL's locale prefix names (`/ja`), or to the default language. Retrieval runs at request time from a snapshot baked into the build, so it works regardless of your [search](/docs/configuration/search) provider — even with `search: false` — and needs no configuration.
 
 Grounding is on for every adapter except **[Inkeep](#inkeep)**, which runs its own retrieval over the content you've indexed in its dashboard.
 
@@ -124,6 +124,8 @@ The three aren't interchangeable. `contextBudget` caps the whole injection, `exc
 
 The defaults suit a hosted model. Lower them when you're serving from your own hardware and time-to-first-token matters more than recall; answers stay grounded either way, and the assistant is told to say when something isn't covered rather than fill the gap.
 
+On your own hardware, also size the model's context window for the whole prompt, not only the excerpts: the conversation so far adds as many as 24,000 characters, and with `tools` on, one `read_page` result as many as 20,000, about 5,000 tokens on its own. Ollama, for one, defaults to a 4k-token window on smaller GPUs, and a prompt that outgrows it doesn't fail: Ollama drops the start of the prompt, where the instructions and excerpts are, and the model answers without your docs.
+
 ## External endpoint
 
 Already have an API backend for AI? Point the panel at it and keep the docs build static:
@@ -146,6 +148,8 @@ Blume sends the same `POST` body as its built-in route:
 }
 ```
 
+`messages` is the conversation so far, ending with the new question. The built-in route takes at most 40 messages and 24,000 characters of them as JSON, so once a conversation outgrows either, the panel sends its latest turns that fit and drops the oldest.
+
 Return a successful response whose body is a plain UTF-8 text stream. If the endpoint is on another origin, allow the docs origin with CORS: accept `OPTIONS` and `POST`, permit the `content-type` request header, and return the CORS headers on both the preflight and streamed response. With `endpoint` set, Blume generates the chat UI but no server route, grounding snapshot, provider dependency, or provider-secret warning; your backend owns retrieval, authentication, rate limiting, model access, and citations. An adapter set alongside it is ignored.
 
 ## Cross-origin callers
@@ -161,7 +165,7 @@ ai: {
 }
 ```
 
-The route then answers the browser's `OPTIONS` preflight and names a listed origin on every response — the streamed answer and the error statuses alike, so the caller can tell a rejected body from a provider failure. Origins that aren't listed get no header and stay subject to the browser's same-origin rule. Each entry is reduced to its origin, so `https://www.example.com/docs/` and `https://www.example.com` mean the same thing. To let any page call the route, list `"*"` instead of origins.
+The route then answers the browser's `OPTIONS` preflight and names a listed origin on every response — the streamed answer and the error statuses alike, so the caller can tell a rejected body from a provider failure. Those responses expose `Retry-After` too, so after a [rate limit's](/docs/configuration/rate-limiting) `429` the caller can read how many seconds to wait. Origins that aren't listed get no header and stay subject to the browser's same-origin rule. Each entry is reduced to its origin, so `https://www.example.com/docs/` and `https://www.example.com` mean the same thing. To let any page call the route, list `"*"` instead of origins.
 
 The caller sends the same `POST` body the [external endpoint](#external-endpoint) contract describes and reads back the same text stream. Send it as JSON with a `content-type: application/json` header:
 

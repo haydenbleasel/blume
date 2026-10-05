@@ -51,6 +51,7 @@ export const ca: UIStringsOverride = {
   banner: { dismiss: "Tanca l'anunci" },
   changelog: {
     description: "Actualitzacions del producte i notes de la versió.",
+    empty: "Encara no hi ha entrades al registre de canvis.",
     title: "Registre de canvis",
   },
   consent: {

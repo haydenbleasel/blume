@@ -1009,13 +1009,20 @@ describe(scanBody, () => {
       "## E {#e}",
       "```",
       "## {#f}",
+      // MkDocs `attr_list` spellings fail the MDX compile the same way.
+      "## G { #g }",
+      "## H {: #h }",
+      "## I {:#i} [toc]",
     ].join("\n");
     const scan = scanBody(body);
     expect(scan.curlyMarkers).toStrictEqual([
-      { id: "a", line: 4 },
-      { id: "b", line: 6 },
-      { id: "d", line: 9 },
-      { id: "f", line: 13 },
+      { id: "a", line: 4, marker: "{#a}" },
+      { id: "b", line: 6, marker: "{#b}" },
+      { id: "d", line: 9, marker: "{#d}" },
+      { id: "f", line: 13, marker: "{#f}" },
+      { id: "g", line: 14, marker: "{ #g }" },
+      { id: "h", line: 15, marker: "{: #h }" },
+      { id: "i", line: 16, marker: "{:#i}" },
     ]);
     expect(scan.headings.map((h) => h.slug)).toContain("c");
   });
@@ -1266,6 +1273,25 @@ describe("rss feeds", () => {
     );
   });
 
+  it("describes an item with its meta description when it has no description", () => {
+    const release = {
+      ...postPage("v2", "/changelog/v2", "changelog", {
+        date: "2026-01-02",
+        seo: { description: "Faster builds." },
+      }),
+      description: undefined,
+    };
+    const both = postPage("v1", "/changelog/v1", "changelog", {
+      date: "2026-01-01",
+      seo: { description: "Meta summary" },
+    });
+    const [feed] = buildRssFeeds(makeProject([release, both]));
+    expect(feed?.items.map((item) => item.description)).toStrictEqual([
+      "Faster builds.",
+      "About v1",
+    ]);
+  });
+
   it("URI-encodes item links like the sitemap does", () => {
     const pages = [
       postPage("Tips", "/tips & tricks/café", "blog", { date: "2026-01-01" }),
@@ -1412,6 +1438,45 @@ describe("sitemap", () => {
     expect(xml).not.toContain("/b<");
     expect(xml).not.toContain("/c<");
     expect(xml).not.toContain("/d<");
+  });
+
+  it("lists canonical URLs only, leaving out a page whose canonical points elsewhere", () => {
+    const canonical = (id: string, url: string) =>
+      makePage({
+        id,
+        meta: pageMetaSchema.parse({ seo: { canonical: url } }),
+        route: `/${id}`,
+        title: id,
+      });
+    const pages = [
+      canonical("copy", "https://example.com/original"),
+      makePage({ id: "original", route: "/original", title: "Original" }),
+      // Naming itself, with or without a trailing slash, keeps it listed.
+      canonical("self", "https://example.com/self/"),
+      // Unicode routes compare decoded, as the audit reads them.
+      canonical("größe", "https://example.com/gr%C3%B6%C3%9Fe"),
+      // A malformed escape can't be decoded, so it names some other path.
+      canonical("bad", "https://example.com/bad%E0%A4%A"),
+    ];
+    const xml = buildSitemap(makeProject(pages)) ?? "";
+    expect(xml).not.toContain("/copy<");
+    expect(xml).not.toContain("/bad");
+    expect(xml).toContain("https://example.com/original<");
+    expect(xml).toContain("https://example.com/self<");
+    expect(xml).toContain("https://example.com/gr%C3%B6%C3%9Fe<");
+
+    // Under a deployment base the canonical carries it, like the <loc>.
+    const based = buildSitemap(
+      makeProject(
+        [
+          canonical("copy", "https://example.com/sub/original"),
+          canonical("self", "https://example.com/sub/self"),
+        ],
+        { deployment: { base: "/sub", site: "https://example.com" } }
+      )
+    );
+    expect(based).not.toContain("/copy<");
+    expect(based).toContain("https://example.com/sub/self<");
   });
 
   it("returns null without a site or when disabled", () => {

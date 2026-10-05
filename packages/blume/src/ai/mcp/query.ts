@@ -53,20 +53,28 @@ const contentTypesField = z.preprocess((value) => {
 }, z.array(z.string()).optional().describe('Only include pages of these content types (frontmatter `type`, e.g. `["doc", "rfc"]`). `list_pages` shows each page\'s type. Omit to include every type.'));
 
 /**
- * The optional facet filter `search_docs` and `list_pages` share. Only
- * string-valued entries survive; an empty `{}` means "no filter".
+ * The optional facet filter `search_docs` and `list_pages` share. A value
+ * is read the way `pageFacets` stores one: a string as-is, a number or
+ * boolean stringified (`{"priority": 1}` matches the facet `"1"`). Entries of
+ * any other shape are dropped; an empty `{}` means "no filter".
  */
-/** Accepts any plain object, so the string-valued entries can be sifted out. */
+/** Accepts any plain object, so the usable entries can be sifted out. */
 const looseFacetObject = z.record(z.string(), z.unknown());
+
+/** A filter value a facet can hold, stringified like `pageFacets` does. */
+const facetFilterValue = z
+  .union([z.string(), z.number(), z.boolean()])
+  .transform(String);
 
 const filtersField = z.preprocess((value) => {
   const candidate = looseFacetObject.safeParse(value);
   if (!candidate.success) {
     return;
   }
-  const entries = Object.entries(candidate.data).filter(
-    (entry): entry is [string, string] => typeof entry[1] === "string"
-  );
+  const entries = Object.entries(candidate.data).flatMap(([key, entry]) => {
+    const parsed = facetFilterValue.safeParse(entry);
+    return parsed.success ? [[key, parsed.data] as const] : [];
+  });
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }, z.record(z.string(), z.string()).optional().describe('Only include pages matching every facet, key → required value (e.g. `{"status": "enforced"}`). Facets are metadata the site declares per content type; `list_pages` shows each page\'s facet values. Omit for no facet filtering.'));
 

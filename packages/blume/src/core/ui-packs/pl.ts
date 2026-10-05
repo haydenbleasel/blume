@@ -50,6 +50,7 @@ export const pl: UIStringsOverride = {
   banner: { dismiss: "Zamknij ogłoszenie" },
   changelog: {
     description: "Aktualizacje produktu i informacje o wydaniach.",
+    empty: "W dzienniku zmian nie ma jeszcze wpisów.",
     title: "Dziennik zmian",
   },
   consent: {

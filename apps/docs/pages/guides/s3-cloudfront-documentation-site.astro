@@ -642,11 +642,14 @@ exit "$FAILED"`} lang="bash" title="check-site.sh" />
   <h3>Old URLs return 200 instead of a redirect</h3>
   <p>
     A static build serves each exact redirect as a small HTML page that sends
-    the browser on, and pattern redirects get no page, so they 404 here.
-    CloudFront reads neither <code>_redirects</code> nor{" "}
-    <code>vercel.json</code>. For real status codes, return them from the
-    viewer-request function, using the pairs in{" "}
-    <code>blume-redirects.json</code>.
+    the browser on, and pattern redirects get no page, so they 404 here. So
+    do a moved page's <code>.md</code> and <code>.mdx</code> copies: their
+    redirect pages sit at paths like <code>old.md/index.html</code>, and the
+    function passes a path with a dot through unchanged. CloudFront reads
+    neither <code>_redirects</code> nor <code>vercel.json</code>. For real
+    status codes, return them from the viewer-request function, using the
+    pairs in <code>blume-redirects.json</code>, which lists the Markdown
+    copies' redirects too.
   </p>
   <h3>A page with a dot in its URL 404s</h3>
   <p>

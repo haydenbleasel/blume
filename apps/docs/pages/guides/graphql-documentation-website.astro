@@ -514,9 +514,10 @@ export default defineConfig({
     in the reason and put links in the description.
   </p>
   <p>
-    Generated examples select every field, deprecated ones included, so the
-    example for <code>message</code> asks for <code>subject</code>. Keep
-    deprecated fields working until you remove them.
+    Generated examples leave deprecated fields out, so the example for{" "}
+    <code>message</code> doesn't ask for <code>subject</code>. Clients written
+    before the deprecation still do, so keep deprecated fields working until
+    you remove them.
   </p>
 
   <h2>Try a query from the docs</h2>
@@ -529,32 +530,49 @@ export default defineConfig({
   </p>
   <p>
     The request body is the JSON the API receives, a <code>query</code> and its{" "}
-    <code>variables</code>, prefilled from the generated example. The variables
-    are placeholders: <code>first</code> starts at <code>0</code>, not the
-    argument's default. Change it to <code>5</code>, select Send, and the panel
+    <code>variables</code>, prefilled from the generated example. A variable
+    whose argument has a default starts at it, so <code>first</code> is{" "}
+    <code>20</code>, and the rest are placeholders. Select Send, and the panel
     shows both templates. The code samples follow your edits, so a copied curl
     command matches what Send did. On <code>sendMessage</code>, replace{" "}
     <code>"id"</code> and <code>"string"</code> with <code>"welcome"</code> and
     an email address, or the server rejects the template ID.
   </p>
 
-  <h3>The panel sends no credentials</h3>
+  <h3>Send a key from the panel</h3>
   <p>
     Stop the server and start it the way production would run it, with a key:
   </p>
   <CodeBlock code="ACME_API_KEY=test_key npm start" lang="bash" />
   <p>
     Send again, and the response is a 401 with an <code>UNAUTHENTICATED</code>{" "}
-    error. On GraphQL pages the panel has no Authorization field: it sends{" "}
-    <code>Content-Type: application/json</code> and the body, nothing else. The
-    browser doesn't attach your API's cookies to the cross-origin request, and
-    the code samples carry no token either.
+    error. The panel sends <code>Content-Type: application/json</code> and the
+    body, nothing else, until the reference says how the API authenticates. A
+    schema can't, so tell <code>graphql()</code> with <code>auth</code>:
+  </p>
+  <CodeBlock
+    code={`graphql({
+  endpoint: "https://sandbox.acme.example/graphql",
+  auth: { method: "bearer" },
+  sources: [{ label: "Acme Messages API", spec: "./schema.graphql" }],
+}),`}
+    lang="ts"
+  />
+  <p>
+    <code>auth</code> takes the same methods as <code>api.auth</code> for
+    hand-written endpoint pages: <code>bearer</code>, <code>basic</code>, or{" "}
+    <code>key</code>, with <code>name</code> for the API key header. Every
+    operation page then gets an Authorization section, the panel a Bearer
+    token field, and the code samples an{" "}
+    <code>Authorization: Bearer YOUR_TOKEN</code> header. Paste{" "}
+    <code>test_key</code> into the field and Send works again. The samples
+    keep the placeholder unless you check Include my values in samples.
   </p>
   <p>
-    So point <code>endpoint</code> at a controlled endpoint: a sandbox that
-    answers without a key, holds only sample data, and sends nothing. Put the
-    production URL and auth header on a page you write. If you can't run a
-    sandbox, set <code>playground: false</code> and keep the examples.
+    A reader who pastes a production key sends real requests, so still point{" "}
+    <code>endpoint</code> at a controlled endpoint: a sandbox that holds only
+    sample data and sends nothing. If you can't run a sandbox, set{" "}
+    <code>playground: false</code> and keep the examples.
   </p>
 
   <h3>CORS</h3>
@@ -707,8 +725,8 @@ npx blume validate`}
   </p>
   <p>
     The reference rebuilds from the schema on every build, so a schema change
-    ships with a commit and a deploy. The dev server doesn't watch the schema
-    file, so restart it after editing.
+    ships with a commit and a deploy. The dev server watches a local schema
+    file and updates the reference when you save it.
   </p>
   <p>
     Renaming a field or type moves its page. Deprecate first, and when you
@@ -741,15 +759,15 @@ npx blume validate`}
   <p>
     That's CORS: allow the docs origin in your API, or turn on the proxy. The
     message tells you to set <code>playground: {"{ proxy: true }"}</code> on
-    the <code>openapi()</code> reference, whatever kind of page you're on. For
-    a GraphQL reference, set it on <code>graphql()</code> instead, with an
-    absolute <code>endpoint</code>, as shown in{" "}
+    the <code>graphql()</code> reference, which needs an absolute{" "}
+    <code>endpoint</code> and a host adapter, as shown in{" "}
     <a href="#try-a-query-from-the-docs">Try a query from the docs</a>.
   </p>
   <h3>Send returns UNAUTHENTICATED</h3>
   <p>
-    The panel can't send a key. Point <code>endpoint</code> at a sandbox that
-    answers without one, or set <code>playground: false</code>.
+    The panel sends a key only when <code>graphql()</code> sets{" "}
+    <code>auth</code> and the key field is filled in. See{" "}
+    <a href="#try-a-query-from-the-docs">Try a query from the docs</a>.
   </p>
   <h3>Send returns a 403 with the proxy on</h3>
   <p>
@@ -759,7 +777,7 @@ npx blume validate`}
   </p>
   <h3>Try it returns null or an empty list</h3>
   <p>
-    The prefilled variables are placeholders like <code>"id"</code> and{" "}
+    Variables without a default are placeholders like <code>"id"</code> and{" "}
     <code>0</code>. Replace them with real values before you send.
   </p>
 </GuidePage>

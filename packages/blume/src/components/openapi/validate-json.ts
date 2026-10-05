@@ -4,9 +4,10 @@ import type { ValidationSchema } from "./request.ts";
  * Minimal JSON-schema validation for the playground body editor. Client-safe
  * and dependency-free by design: the server prunes the operation's schema into
  * the tiny `ValidationSchema` subset (`operation-model.ts`), so a full
- * draft-2020 validator would be dead weight in the browser bundle. Checks are
- * advisory — they catch the common "typo'd a required field" mistakes, they do
- * not gate the Send button.
+ * draft-2020 validator would be dead weight in the browser bundle. The checks
+ * catch the common "typo'd a required field" mistakes, and any error they
+ * report blocks the Try it send (`playground-client.ts`) and the event
+ * composer's connect and send (`message-composer.ts`).
  */
 
 /** An already-parsed JSON object — string keys, parsed-JSON values. */

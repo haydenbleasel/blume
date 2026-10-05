@@ -19,7 +19,7 @@ export default defineConfig({
 });
 ```
 
-Damit wird die Referenz unter `/reference` (einer Übersichtsseite) eingebunden, jede Operation unter `/reference/<tag>/<operation>`. `spec` ist entweder eine `http(s)`-URL oder ein Pfad zu einer lokalen Datei in deinem Projekt. Blume parst sie mit dem [OpenAPI-Parser von Scalar](https://github.com/scalar/scalar) – Swagger-2.0- und OpenAPI-3.0-Spezifikationen werden automatisch auf 3.1 aktualisiert. Ein Adapter ist eine einfache Beschreibung der Referenz – keine geparste Spezifikation –, sodass Blume ihn vorab validieren und in die generierte Website einbetten kann; lässt du `reference` weg (oder leer), wird überhaupt keine Referenz gerendert. Du dokumentierst stattdessen eine eventgesteuerte API oder eine GraphQL-API? Sieh dir [AsyncAPI](/docs/references/asyncapi) und [GraphQL](/docs/references/graphql) an.
+Damit wird die Referenz unter `/reference` (einer Übersichtsseite) eingebunden, jede Operation unter `/reference/<tag>/<operation>`. `spec` ist entweder eine `http(s)`-URL oder ein Pfad zu einer lokalen Datei in deinem Projekt. Blume parst sie mit dem [OpenAPI-Parser von Scalar](https://github.com/scalar/scalar) – Swagger-2.0- und OpenAPI-3.0-Spezifikationen werden automatisch auf 3.1 aktualisiert, und Spezifikationen in 3.1 und [3.2](#openapi-32) werden so gelesen, wie sie geschrieben sind. Ein Adapter ist eine einfache Beschreibung der Referenz – keine geparste Spezifikation –, sodass Blume ihn vorab validieren und in die generierte Website einbetten kann; lässt du `reference` weg (oder leer), wird überhaupt keine Referenz gerendert. Du dokumentierst stattdessen eine eventgesteuerte API oder eine GraphQL-API? Sieh dir [AsyncAPI](/docs/references/asyncapi) und [GraphQL](/docs/references/graphql) an.
 
 Die Referenz fügt von sich aus keinen Header-Tab hinzu. Um sie sichtbar zu machen, richte einen [Navigations-Tab](/docs/content/navigation#tabs) auf ihre Route aus – dadurch wird beim nativen Renderer auch die Sidebar mit den Operationen auf diesen Tab beschränkt:
 
@@ -29,17 +29,29 @@ navigation: {
 }
 ```
 
+Die Tag-Gruppen der Sidebar und die Abschnitte der Übersichtsseite folgen derselben Reihenfolge: der Reihenfolge der `tags`-Liste auf oberster Ebene der Spezifikation, danach alle Tags, die sie nicht deklariert, in der Reihenfolge, in der Operationen sie zum ersten Mal verwenden.
+
 :::note
-Operationen werden für die Suche anhand ihrer **Zusammenfassung, ihrer Beschreibung, ihres Tags und ihres Endpoints** (`GET /pets/{id}`) indexiert. Die gerenderten Schematabellen und Codebeispiele werden nicht im Volltext indexiert; die Suche findet den Titel, den Beschreibungstext, den Abschnitt und den Pfad einer Operation und verlinkt dann auf ihre eigene Seite.
+Operationen werden für die Suche anhand ihrer **Zusammenfassung, ihrer Beschreibung, ihres Tags und ihres Endpoints** (`GET /pets/{id}`) indexiert. Die gerenderten Schematabellen und generierten Codebeispiele werden nicht im Volltext indexiert; die Suche findet den Titel, den Beschreibungstext, den Abschnitt und den Pfad einer Operation und verlinkt dann auf ihre eigene Seite. [Eigene Beispiele](#your-own-samples) werden wie jeder Codeblock indexiert, allerdings nur mit [`search.indexing.includeCodeBlocks`](/docs/configuration/search).
 :::
 
 ## Eine lokale Spezifikation [#a-local-spec]
 
-Ein relativer Pfad wird von deinem Projektstammverzeichnis aus aufgelöst und zur Build-Zeit gelesen. Sowohl JSON als auch YAML funktionieren:
+Ein relativer Pfad wird von deinem Projektstammverzeichnis aus aufgelöst und zur Build-Zeit gelesen. Sowohl JSON als auch YAML funktionieren, und `blume dev` überwacht die Datei – zusammen mit allen lokalen [Overlays](#overlays) –, sodass die Referenz aktualisiert wird, wenn du die Spezifikation speicherst:
 
 ```ts blume.config.ts lineNumbers
 reference: [openapi({ spec: "./openapi.yaml" })],
 ```
+
+## OpenAPI 3.2
+
+OpenAPI-3.2-Spezifikationen werden so gerendert, wie sie geschrieben sind. Eine `query`-Operation für die HTTP-Methode `QUERY` (ein sicherer Request, der einen Body mitführt) bekommt wie jede andere Methode eine Seite, Try it und Codebeispiele. Felder, die 3.2 hinzufügt und die Blume nicht anzeigt, etwa das `summary` eines Tags oder einer Response, werden ignoriert statt abgelehnt. Einige Neuerungen aus 3.2 werden noch nicht gerendert:
+
+- `additionalOperations` für Methoden, die ein Path Item nicht direkt benennt (etwa `COPY`): Diese Operationen werden weggelassen, mit einer `BLUME_OPENAPI_UNSUPPORTED`-[Warnung](#spec-warnings).
+- `in: querystring`-Parameter: Sie bekommen keine Zeile in der Parametertabelle, kein Eingabefeld in Try it und keinen Platz in den Codebeispielen, mit derselben Warnung.
+- `itemSchema`, das Schema jedes Elements in einem gestreamten Body (`text/event-stream`, `application/jsonl`): Die Seite zeigt für diesen Body kein Schema, es sei denn, daneben ist `schema` gesetzt.
+- Beispiele, die mit `dataValue` oder `serializedValue` statt `value` geschrieben sind: Die Seite zeigt sie nicht an.
+- Verschachtelte Tags (`parent`) und das `kind` von Tags: Tags bleiben in der Sidebar und in der Übersicht eine flache Liste.
 
 ## Route
 
@@ -56,7 +68,7 @@ reference: [
 
 ## Codebeispiele und Schemas [#code-samples-and-schemas]
 
-`codeSamples` legt fest, welche Sprachen pro Operation gerendert werden, und zwar in der Reihenfolge, in der du sie auflistest. Standardmäßig ist das `["curl", "js", "python"]`. Mit `expandSchemas` starten verschachtelte Schemazeilen ausgeklappt statt eingeklappt:
+`codeSamples` legt fest, welche Sprachen pro Operation gerendert werden, und zwar in der Reihenfolge, in der du sie auflistest. Standardmäßig ist das `["curl", "js", "python"]`, und mit `false` oder einer leeren Liste werden keine angezeigt. Mit `expandSchemas` starten verschachtelte Schemazeilen ausgeklappt statt eingeklappt:
 
 ```ts blume.config.ts lineNumbers
 reference: [
@@ -93,6 +105,8 @@ Jedes Beispiel ist schlichter Code für den Request, den du direkt kopieren und 
 
 Jeder Wert wird nach den Regeln der jeweiligen Sprache maskiert, sodass ein Header wie `If-Match: "33a64df5"` oder ein Body mit einem `$` darin genau so bei der API ankommt, wie er geschrieben wurde.
 
+Schematabellen folgen – wie die Beispiele – der Richtung, in der die Daten fließen: Ein Request-Body lässt `readOnly`-Properties weg, die der Server setzt, und eine Response lässt `writeOnly`-Properties weg, die er nie zurückgibt. Der Body eines [Webhooks oder Callbacks](#webhooks-and-callbacks) ist ein Request, den deine API sendet, daher wird er wie eine Response dargestellt.
+
 ### Eigene Beispiele [#your-own-samples]
 
 Um statt eines rohen HTTP-Aufrufs dein SDK zu zeigen, füge einer Operation in der Spezifikation `x-codeSamples` hinzu. Das ist die von Redocly definierte Extension, und Speakeasy und Stainless können sie für dich schreiben. Jeder Eintrag nimmt ein `lang`, den `source` und ein optionales `label`:
@@ -112,7 +126,19 @@ paths:
             planter list
 ```
 
-Diese Beispiele werden als eigene Tabs vor den generierten gerendert und bleiben unverändert, wenn Lesende das [Try it](#try-it-playground)-Formular ändern. Die ältere Schreibweise `x-code-samples` funktioniert ebenfalls. Um nur deine eigenen Beispiele zu zeigen, setze `codeSamples: false`.
+Diese Beispiele werden als eigene Tabs vor den generierten gerendert und bleiben unverändert, wenn Lesende das [Try it](#try-it-playground)-Formular ändern. Die ältere Schreibweise `x-code-samples` funktioniert ebenfalls. Um nur deine eigenen Beispiele zu zeigen, setze `codeSamples: false`. Anders als die generierten Beispiele sind sie auch in der Markdown-Fassung der Operationsseite enthalten, sodass `llms-full.txt`, der MCP-Server und der Assistent deine SDK-Aufrufe sehen.
+
+Ein `source` kann auch ein `$ref` auf eine Datei sein, die den Code des Beispiels enthält – so, wie Redocly es beschreibt, Beispiele in eigenen Dateien abzulegen. Blume liest die Datei relativ zur Spezifikation und lädt sie herunter, wenn die Spezifikation eine URL ist. Bei einem `$ref`, den Blume nicht lesen kann, oder einem, der in ein Dokument hinein zeigt (`#/…`), wird dieses Beispiel mit einer [`BLUME_OPENAPI_CODE_SAMPLE_REF`](#spec-warnings)-Warnung weggelassen:
+
+```yaml openapi.yaml lineNumbers
+paths:
+  /plants:
+    get:
+      x-codeSamples:
+        - lang: go
+          source:
+            $ref: ./code_samples/go/list_plants.go
+```
 
 ## Try-it-Playground
 
@@ -151,7 +177,7 @@ Der eingebaute Proxy leitet Requests nur an die Origins weiter, die deine Spezif
 
 ## Mehrere Spezifikationen [#multiple-specs]
 
-Verwende `sources`, um mehr als eine Spezifikation aus einem Adapter zu veröffentlichen. Jede Quelle bekommt ihre eigene Übersichtsroute und eigene Operationsseiten und teilt sich die Anzeigeoptionen des Adapters. Gib jeder Quelle ein `label` (wird für die Sidebar verwendet und um ihre Route abzuleiten) oder setze eine explizite `route`:
+Verwende `sources`, um mehr als eine Spezifikation aus einem Adapter zu veröffentlichen. Jede Quelle bekommt ihre eigene Übersichtsroute und eigene Operationsseiten und teilt sich die Anzeigeoptionen des Adapters. Gib jeder Quelle ein `label`, das unverändert ihre Gruppe in der Sidebar benennt und aus dem ihre Route abgeleitet wird, oder setze eine explizite `route`:
 
 ```ts blume.config.ts lineNumbers
 reference: [
@@ -247,7 +273,7 @@ Die OpenAPI-Semantik wird unverändert übernommen:
 
 ## Webhooks und Callbacks [#webhooks-and-callbacks]
 
-Auch die ausgehenden Requests deiner API werden dokumentiert. Jeder [Webhook](https://spec.openapis.org/oas/v3.1.0#oas-webhooks) im `webhooks`-Feld auf oberster Ebene der Spezifikation bekommt wie eine Operation seine eigene Seite: einsortiert unter seinem ersten Tag oder in einer **Webhooks**-Gruppe, wenn er keinen hat. Die Seite zeigt das Schema des Payloads und die Responses, die dein Endpoint zurücksenden sollte. Anstelle des Try-it-Panels und der Codebeispiele zeigt die rechte Spalte einen Beispiel-Payload, da deine API diesen Request sendet, statt ihn zu beantworten. Eine Webhook-Seite listet nur die `security` auf, die der Webhook selbst deklariert: Die `security` auf Root-Ebene der Spezifikation schützt Aufrufe an deine API und gilt daher nicht für Requests, die die API sendet.
+Auch die ausgehenden Requests deiner API werden dokumentiert. Jeder [Webhook](https://spec.openapis.org/oas/v3.1.0#oas-webhooks) im `webhooks`-Feld auf oberster Ebene der Spezifikation bekommt wie eine Operation seine eigene Seite: einsortiert unter seinem ersten Tag oder in einer **Webhooks**-Gruppe, wenn er keinen hat. Die Seite zeigt das Schema des Payloads und die Responses, die dein Endpoint zurücksenden sollte. Anstelle des Try-it-Panels und der Codebeispiele zeigt die rechte Spalte einen Beispiel-Payload, da deine API diesen Request sendet, statt ihn zu beantworten. Eine Webhook-Seite listet nur die `security` auf, die der Webhook selbst deklariert: Die `security` auf Root-Ebene der Spezifikation schützt Aufrufe an deine API und gilt daher nicht für Requests, die die API sendet. Ein Webhook, der ein `$ref` auf ein gemeinsam genutztes Path Item ist, wird weggelassen, mit einer [`BLUME_OPENAPI_REF_PATH_ITEM`](#spec-warnings)-Warnung.
 
 ```yaml openapi.yaml lineNumbers
 webhooks:
@@ -264,9 +290,25 @@ webhooks:
           description: Return a 200 to acknowledge the event.
 ```
 
-Die [`callbacks`](https://spec.openapis.org/oas/v3.1.0#callback-object) einer Operation – die Requests, die deine API zurück an eine vom Aufrufer angegebene URL sendet – werden in einem **Callbacks**-Abschnitt auf der Seite dieser Operation gerendert. Jeder zeigt den URL-Ausdruck (`{$request.body#/callbackUrl}`), seine Methode, seinen Request-Body und seine erwarteten Responses. Callbacks, die unter `components.callbacks` deklariert und mit `$ref` referenziert werden, funktionieren genauso.
+Die Webhooks einer 3.0-Spezifikation unter der Extension `x-webhooks` werden zu `webhooks`, wenn Blume die Spezifikation auf 3.1 aktualisiert. Eine Spezifikation, die bereits in 3.1 oder neuer vorliegt, wird nicht aktualisiert, daher wird für Webhooks, die sie noch unter `x-webhooks` führt, nichts gerendert, und es erscheint eine [`BLUME_OPENAPI_X_WEBHOOKS`](#spec-warnings)-Warnung: Benenne das Feld in `webhooks` um.
+
+Die [`callbacks`](https://spec.openapis.org/oas/v3.1.0#callback-object) einer Operation – die Requests, die deine API zurück an eine vom Aufrufer angegebene URL sendet – werden in einem **Callbacks**-Abschnitt auf der Seite dieser Operation gerendert. Jeder zeigt den URL-Ausdruck (`{$request.body#/callbackUrl}`), seine Methode, seine Parameter (etwa einen Signatur-Header), seinen Request-Body und seine erwarteten Responses. Callbacks, die unter `components.callbacks` deklariert und mit `$ref` referenziert werden, funktionieren genauso.
 
 Webhook-Seiten sind echte Seiten: Sie tauchen in der Suche, in `llms.txt` und im MCP-Server auf, und ihr Markdown teilt Agents mit, dass es sich um einen Request handelt, den die API sendet – so versucht ein Agent nicht, ihn aufzurufen.
+
+## Spezifikationswarnungen [#spec-warnings]
+
+Blume validiert eine Spezifikation nicht gegen das OpenAPI-Schema – nutze dafür einen Linter wie [Spectral](https://github.com/stoplightio/spectral) oder [oasdiff](https://github.com/oasdiff/oasdiff) in deiner CI. Blume warnt aber in `blume dev`, `blume build` und `blume check` vor Fehlern, die sonst ohne jeden Hinweis falsch gerendert würden, und vor Teilen einer Spezifikation, die es weglässt. Jede Warnung nennt die Spezifikation, und der Rest der Referenz wird trotzdem gebaut:
+
+| Code | Was falsch ist |
+| --- | --- |
+| `BLUME_OPENAPI_PATH_PARAMETER_MISSING` | Zu einem `{name}` im Pfad einer Operation gibt es keinen `in: path`-Parameter dieses Namens, daher hat die Seite kein Eingabefeld dafür, und Try it sowie die Codebeispiele senden den Platzhalter als wörtlichen Text. |
+| `BLUME_OPENAPI_PATH_PARAMETER_UNUSED` | Zu einem `in: path`-Parameter gibt es kein `{name}` im Pfad, daher landet der Wert, nach dem Try it fragt, nie in der URL. |
+| `BLUME_OPENAPI_UNKNOWN_SECURITY_SCHEME` | Eine `security`-Anforderung nennt ein Scheme, das `components.securitySchemes` nicht definiert, daher kann der [Authorization](#authorization)-Abschnitt es nicht beschreiben, und Requests senden keine Zugangsdaten dafür. |
+| `BLUME_OPENAPI_UNSUPPORTED` | Die Spezifikation verwendet ein Feature aus [OpenAPI 3.2](#openapi-32), das Blume noch nicht rendert: `additionalOperations`, wodurch diese Operationen weggelassen werden, oder einen `in: querystring`-Parameter, wodurch der Query-String auf der Seite, in Try it und in den Codebeispielen fehlt. |
+| `BLUME_OPENAPI_CODE_SAMPLE_REF` | Das `source` eines `x-codeSamples`-Eintrags ist ein `$ref`, den Blume nicht lesen kann oder der in ein Dokument hinein zeigt, daher wird dieses [Beispiel](#your-own-samples) weggelassen. |
+| `BLUME_OPENAPI_X_WEBHOOKS` | Eine Spezifikation in 3.1 oder neuer führt ihre Webhooks unter `x-webhooks`, der Extension, die 3.0-Tools lesen, und hat kein `webhooks`, daher wird keiner davon gerendert. Benenne das Feld in `webhooks` um. |
+| `BLUME_OPENAPI_REF_PATH_ITEM` | Ein Pfad oder Webhook ist ein `$ref` auf ein gemeinsam genutztes Path Item, etwa eines unter `components.pathItems`. Blume löst diese nicht auf, daher fehlen seine Operationen in der Referenz. Schreibe das Path Item direkt unter `paths` oder `webhooks`; seine Schemas, Parameter und Responses können `$ref`s bleiben. |
 
 ## Scalar stattdessen einbetten [#embedding-scalar-instead]
 

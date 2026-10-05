@@ -267,7 +267,7 @@ navigation: {
 }
 ```
 
-Each link takes a `label`, an `href`, and an optional `icon` (a [built-in icon](/docs/content/components#icon) name, image path/URL, or inline SVG — the same as anywhere else). An `href` may point anywhere: an external URL opens in a new tab, while an internal route (`/contact`) is validated against your pages at build time, warning you if nothing matches.
+Each link takes a `label`, an `href`, and an optional `icon` (a [built-in icon](/docs/content/components#icon) name, image path/URL, or inline SVG — the same as anywhere else). An `href` may point anywhere: an external URL opens in a new tab, while an internal route (`/contact`) is validated against your pages at build time and by [`blume doctor`](/docs/cli/doctor), warning you if nothing matches.
 
 ## Explicit sidebar
 
@@ -339,14 +339,14 @@ These come for free from the sidebar tree — no configuration:
 
 ## On this page
 
-A right-rail outline is generated automatically from each page's headings — `##` and `###` by default — so long pages stay scannable. Set [`toc`](/docs/configuration#table-of-contents) to change the heading range or turn the outline off. On narrower screens, where the right rail is hidden, it collapses into an “On this page” dropdown above the content.
+A right-rail outline is generated automatically from each page's headings — `##` and `###` by default — so long pages stay scannable. Set [`toc`](/docs/configuration#table-of-contents) to change the heading range or turn the outline off. On narrower screens, where the right rail is hidden, it collapses into an “On this page” dropdown above the content, which also holds the [page actions](#page-actions).
 
 ## Page actions
 
-Below the table of contents, every page shows a set of quick actions:
+Below the table of contents, every page shows a set of quick actions. In windows at least 1,280px wide they sit in the right-hand column with the outline. In narrower windows and on phones they sit at the bottom of the “On this page” dropdown above the content, which shows on a page with no headings too:
 
 - **Edit on GitHub** — links straight to the source file. Appears once you set [`github`](/docs/configuration) in your config.
-- **Scroll to top** — smoothly returns to the top of long pages.
+- **Scroll to top** — smoothly returns to the top of long pages. It's in the right-hand column only, since the dropdown already sits at the top of the page.
 
 Others hand the page to AI tools — **Copy as Markdown** and **Open in chat** — covered in [Markdown for agents](/docs/discoverability/markdown#copy-as-markdown).
 

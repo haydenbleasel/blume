@@ -3,9 +3,9 @@
 // against the OpenAPI, deployment, and validate docs, `blume init`
 // (cli/init/scaffold.ts, cli/init/questions.ts), the OpenAPI loader, slug, and
 // diagnostic rules (openapi/source.ts, openapi/parse.ts, openapi/model.ts),
-// and the dev watcher (cli/commands/dev.ts, which doesn't watch spec files) on
-// main; springdoc's v3 and v2 docs and FAQ compatibility tables, the
-// springdoc-openapi-maven-plugin and Gradle plugin READMEs, Spring Boot's
+// and the dev watcher (cli/commands/dev.ts, which watches local spec files
+// through openapi/references.ts referenceSpecFiles) on main; springdoc's v3
+// and v2 docs and FAQ compatibility tables, the springdoc-openapi-maven-plugin and Gradle plugin READMEs, Spring Boot's
 // Maven plugin docs (start goal, profiles, maxAttempts), the springdoc and
 // Spring Boot poms on Maven Central, the Ubuntu 24.04 runner image (Maven,
 // jq), and the workflow's action versions against their latest releases on
@@ -632,8 +632,9 @@ npm run dev`}
     with the required fields marked, and a Try it panel aimed at{" "}
     <code>https://api.acme.example/v1</code>. That host doesn't exist, so Send
     can't succeed here; with your own API, the panel calls the server you
-    declared in <code>@Server</code>. The dev server doesn't watch the spec
-    file, so after a new export, copy the file again and restart it.
+    declared in <code>@Server</code>. The dev server watches the spec file, so
+    after a new export, copy the file in again and the pages update without a
+    restart.
   </p>
   <p>
     For more on the reference itself, like code sample languages and a

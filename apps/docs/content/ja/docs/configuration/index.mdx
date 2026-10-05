@@ -459,7 +459,7 @@ export default defineConfig({
 });
 ```
 
-読者の回答は、`helpful`（`"yes"` または `"no"`）、`path`、`title` を含む `feedback` の [カスタムイベント](/docs/configuration/analytics#custom-events) として、イベント API を持つ設定済みのすべてのアナリティクスアダプターを通じて送信されます。あわせて `window` 上の `blume:track` イベントとしても送出されます。アナリティクスアダプターがない場合、回答はどこにも記録されません。また、[Cookie の同意](/docs/configuration/consent) が有効な場合、評価はアナリティクスを許可した読者にのみ表示されます。それ以外の読者から回答を受け取っても、送信先がないためです。質問文とお礼のテキストは UI 文字列なので、[`i18n.ui`](/docs/content/i18n#translated-ui) で翻訳できます。
+読者の回答は、`helpful`（`"yes"` または `"no"`）、`path`、`title` を含む `feedback` の [カスタムイベント](/docs/configuration/analytics#custom-events) として、イベント API を持つ設定済みのすべてのアナリティクスアダプターを通じて送信されます。あわせて `window` 上の `blume:track` イベントとしても送出されます。Fathom、Microsoft Clarity、Hotjar はイベント名だけを受け取り、プロパティは受け取らないため、評価の件数は数えられますが、「はい」と「いいえ」を区別できません。アナリティクスアダプターがない場合、回答はどこにも記録されません。また、[Cookie の同意](/docs/configuration/consent) が有効な場合、評価はアナリティクスを許可した読者にのみ表示されます。それ以外の読者から回答を受け取っても、送信先がないためです。質問文とお礼のテキストは UI 文字列なので、[`i18n.ui`](/docs/content/i18n#translated-ui) で翻訳できます。
 
 ### 記述式のフィードバック [#written-feedback]
 
@@ -471,7 +471,7 @@ export default defineConfig({
 });
 ```
 
-コメントは `feedback_comment` イベントとして送信され、評価と同じ `helpful`、`path`、`title` に加えて、読者の `comment`（最大 1,000 文字）を含みます。評価と同じアダプターを通じて送信されるため、コメントはイベントを確認している場所で読めます。プロバイダーはプロパティ値の長さに上限を設けているため、長いコメントは途中で切り詰められて届くことがあります。Google Analytics は 100 文字、Mixpanel は 255 文字まで保持し、PostHog と Segment はコメントを全文そのまま渡します。Plausible は個々のコメントを一覧表示せず、同一の値をグループ化するため、コメントよりも評価に向いています。読者は入力欄に何でも書き込めるため、コメントには個人情報が含まれている可能性があるものとして扱ってください。
+コメントは `feedback_comment` イベントとして送信され、評価と同じ `helpful`、`path`、`title` に加えて、読者の `comment`（最大 1,000 文字）を含みます。評価と同じアダプターを通じて送信されるため、コメントはイベントを確認している場所で読めます。プロバイダーはプロパティ値の長さに上限を設けているため、長いコメントは途中で切り詰められて届くことがあります。Google Analytics は 100 文字、Mixpanel は 255 バイト（日本語のように 1 文字に複数バイトを使う文字体系では、文字数はそれより少なくなります）まで保持し、Vercel Web Analytics は 255 文字までの値を受け付けます。一方、PostHog と Segment はコメントを全文そのまま渡します。Fathom、Clarity、Hotjar にはコメントのテキストがまったく届きません。Plausible は個々のコメントを一覧表示せず、同一の値をグループ化するため、コメントよりも評価に向いています。読者は入力欄に何でも書き込めるため、コメントには個人情報が含まれている可能性があるものとして扱ってください。
 
 入力欄のラベルとボタンも UI 文字列です（`feedback.comment` と `feedback.send`）。
 
@@ -505,6 +505,7 @@ export default defineConfig({
 | `react` | React アイランドの挙動 — React Compiler による自動メモ化 | [アイランド](/docs/content/islands#frameworks) |
 | `variables` | 任意のページで `{{name}}` が読み取る値 | [変数](/docs/content/variables) |
 | `feedback` | 各ページ末尾の「Was this page helpful?」評価（デフォルトは `true`）と、その後に続く任意の記述式コメント | [ページのフィードバック](#page-feedback) |
+| `changelog` | 生成される `/changelog` インデックスのタイトルと説明。それぞれ文字列またはロケールごとのマップで指定します | [チェンジログ](/docs/advanced/changelog#the-index-page) |
 
 ## 優先順位 [#precedence]
 

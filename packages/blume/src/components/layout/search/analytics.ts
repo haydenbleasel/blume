@@ -9,6 +9,10 @@
  * result is a `search_select` event with its position, for click-through. The
  * same query settling twice in a row (a filter toggled back and forth) counts
  * once.
+ *
+ * With `search.analytics.queries: false`, providers get each query's length
+ * (`queryChars`) instead of its text, and the text rides only the
+ * `blume:track` DOM event, the way the assistant reports questions.
  */
 import type { TrackProps } from "../analytics-client.ts";
 
@@ -18,13 +22,28 @@ export const MAX_QUERY_CHARS = 100;
 /** How long a query sits untouched before it counts as settled. */
 export const SETTLE_MS = 1000;
 
-/** Sends one analytics event. */
-export type SendEvent = (event: string, props: TrackProps) => void;
+/**
+ * Sends one analytics event; `local` rides only the `blume:track` DOM event
+ * (see `track`).
+ */
+export type SendEvent = (
+  event: string,
+  props: TrackProps,
+  local?: TrackProps
+) => void;
 
 /** The timer a tracker waits on; injectable for tests. */
 export interface SettleTimer {
   cancel: (handle: number) => void;
   start: (callback: () => void, ms: number) => number;
+}
+
+/** How a tracker reports. */
+export interface SearchTrackerOptions {
+  /** Whether providers receive each query's text (`search.analytics.queries`). */
+  queries?: boolean;
+  /** The timer a query waits on to settle; injectable for tests. */
+  timer?: SettleTimer;
 }
 
 /** What the dialog tells the tracker. */
@@ -51,11 +70,21 @@ const browserTimer: SettleTimer = {
 /** A tracker for one search dialog. */
 export const createSearchTracker = (
   send: SendEvent,
-  timer: SettleTimer = browserTimer
+  { queries = true, timer = browserTimer }: SearchTrackerOptions = {}
 ): SearchTracker => {
   let pending: PendingSearch | undefined;
   let handle: number | undefined;
   let last: string | undefined;
+
+  // Providers get the query's text, or only its length, in which case the
+  // text goes to the `blume:track` DOM event alone.
+  const report = (event: string, props: TrackProps, query: string): void => {
+    if (queries) {
+      send(event, { ...props, query });
+    } else {
+      send(event, { ...props, queryChars: query.length }, { query });
+    }
+  };
 
   const flush = (): void => {
     if (handle !== undefined) {
@@ -63,11 +92,11 @@ export const createSearchTracker = (
       handle = undefined;
     }
     if (pending && pending.query !== last) {
-      send("search", {
-        path: location.pathname,
-        query: pending.query,
-        results: pending.results,
-      });
+      report(
+        "search",
+        { path: location.pathname, results: pending.results },
+        pending.query
+      );
       last = pending.query;
     }
     pending = undefined;
@@ -80,12 +109,11 @@ export const createSearchTracker = (
     },
     selected: (query, position, url) => {
       flush();
-      send("search_select", {
-        path: location.pathname,
-        position,
-        query: query.slice(0, MAX_QUERY_CHARS),
-        url,
-      });
+      report(
+        "search_select",
+        { path: location.pathname, position, url },
+        query.slice(0, MAX_QUERY_CHARS)
+      );
     },
     settled: (query, results) => {
       if (handle !== undefined) {

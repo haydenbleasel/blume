@@ -15,9 +15,10 @@
 // meta.ts, a third source at /messages/api-v1 with includeInSearch: false,
 // and a product selector with page-mode groups and no tabs. Checked that the
 // page renders on the local dev server. Not yet run end to end: no Blume dev
-// server, build, validate, audit, or deploy of the fixture itself. Include
-// props and search.keywords are pending changesets, not in the npm release
-// (its frontmatter schema rejects search.keywords); publish with that release.
+// server, build, validate, audit, or deploy of the fixture itself. Updated
+// for main: a source's label names its sidebar group (openapi/source.ts
+// tagFolderMeta, c5f25f55), so the reference folders need no meta.ts; read
+// in the source, not rerun.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -438,28 +439,15 @@ export default defineConfig({
     are the URLs the quickstarts link to.
   </p>
   <p>
-    A reference's sidebar group is named after the last segment of its route,
-    so both groups would read API, and so would their filter in search. Name
-    them with a <code>meta.ts</code> in each route's folder. The folders hold
-    no pages, only the meta:
+    Each source's <code>label</code> names its sidebar group as written, so
+    the groups read Messages API and Verify API, and so do their filters in
+    search. Without a label, a group is named after the last segment of its
+    route, and both would read API.
   </p>
-  <CodeBlock
-    code={`import { defineMeta } from "blume";
-
-export default defineMeta({ title: "Messages API" });`}
-    lang="ts"
-    title="docs/messages/api/meta.ts"
-  />
-  <CodeBlock
-    code={`import { defineMeta } from "blume";
-
-export default defineMeta({ title: "Verify API" });`}
-    lang="ts"
-    title="docs/verify/api/meta.ts"
-  />
   <p>
-    Don't add an <code>index.mdx</code> to those folders, because the
-    reference's overview already owns that route. The two sources share
+    Don't add a <code>docs/messages/api/index.mdx</code> or{" "}
+    <code>docs/verify/api/index.mdx</code>, because each reference's overview
+    already owns that route. The two sources share
     display options like code sample languages. If your products need
     different ones, or their specs share operation names, the{" "}
     <a href="/guides/multiple-openapi-specs-documentation">multiple-specs guide</a>{" "}
@@ -547,8 +535,8 @@ export default defineMeta({ title: "Verify API" });`}
       groups, the dialog shows a filter pill per group. Each page files under
       its nearest group: a quickstart under its product, an operation under its
       tag, and a reference's overview under the reference's own group. That's
-      why the reference folders got titles of their own; without them, both
-      overviews would file under API.
+      why each source has a <code>label</code>; without one, both overviews
+      would file under API.
     </li>
     <li>
       <strong>Pinned starting points.</strong> Before a reader types, the
@@ -686,7 +674,8 @@ export default defineMeta({ display: "page" });`}
   <p>
     Readers arrive on the home page, on a product overview, on a quickstart
     from a search engine, and deep in an endpoint from someone's link. Check
-    each one. First, scan the project for duplicate routes and unknown icons:
+    each one. First, scan the project for duplicate routes, unknown icons, and
+    tabs or selector items that point at missing pages:
   </p>
   <CodeBlock code="npx blume doctor" lang="bash" />
   <p>Then run <code>npx blume dev</code> and open each entry point:</p>
@@ -753,14 +742,15 @@ npx blume audit --only duplicates`}
   <p>
     A page sits at a route the reference generates, most often an{" "}
     <code>index.mdx</code> in <code>docs/messages/api/</code>, which collides
-    with the Messages API overview. Delete it or move it up a level. Keep only{" "}
-    <code>meta.ts</code> in a reference's folder.
+    with the Messages API overview. Delete it or move it up a level.
   </p>
   <h3>Both reference groups are named API</h3>
   <p>
-    The <code>meta.ts</code> is missing or in the wrong folder. It has to sit
-    in the folder that matches the reference's route, so{" "}
-    <code>/messages/api</code> reads <code>docs/messages/api/meta.ts</code>.
+    A source has no <code>label</code>, so its group takes the last segment
+    of its route. Give each source a <code>label</code>. A{" "}
+    <code>meta.ts</code> in the folder that matches the route, like{" "}
+    <code>docs/messages/api/meta.ts</code>, also names the group and wins over
+    the label.
   </p>
   <h3>A tab opens a product's first page instead of its overview</h3>
   <p>
@@ -771,10 +761,8 @@ npx blume audit --only duplicates`}
   <h3>The dev server warns BLUME_NAV_MISSING_PAGE</h3>
   <p>
     A tab, selector item, or featured link points at a route with no page,
-    often a typo like <code>/verfy</code>. <code>blume dev</code> and{" "}
-    <code>blume build</code> print it as a warning, but{" "}
-    <code>blume doctor</code> doesn't check navigation targets, so a clean
-    doctor run can still hide it. Fix the path in{" "}
-    <code>blume.config.ts</code>.
+    often a typo like <code>/verfy</code>. <code>blume dev</code>,{" "}
+    <code>blume build</code>, and <code>blume doctor</code> print it as a
+    warning. Fix the path in <code>blume.config.ts</code>.
   </p>
 </GuidePage>

@@ -393,6 +393,7 @@ export default defineConfig({
     featured: [
       { label: "Status", href: "https://status.acme.example", icon: "activity" },
     ],
+    sidebar: { display: "group" },
   },
   redirects: [
     { from: "/guides/email", to: "/guides/send-email", status: 308 },
@@ -432,6 +433,7 @@ import { defineMeta } from "blume";
 
 export default defineMeta({
   title: "Guides",
+  collapsed: false,
   pages: ["send-email", "webhooks", "send-sms"],
 });
 
@@ -446,14 +448,14 @@ export default defineMeta({
     lang="ts"
   />
 
-  <h3>Pages jump above a nested folder</h3>
+  <h3>Pages after a nested folder</h3>
   <p>
-    You'll see Send an SMS above Webhooks, though <code>pages</code> lists it
-    last. By default, Blume draws each folder as a flat section header. So
-    that a page after a header can't pass for part of that section, it lists
-    a folder's pages before its subfolders. Nextra draws folders as
-    collapsible rows instead. Blume's <code>group</code> display does too,
-    and keeps the order as written:
+    Check that Send an SMS still comes after Webhooks. By default, Blume
+    draws each folder as a flat section header. So that a page after a header
+    can't pass for part of that section, it lists a folder's pages before its
+    subfolders. Nextra draws folders as collapsible rows instead. Blume's{" "}
+    <code>group</code> display does too, and keeps the order as written, so
+    the agent sets it:
   </p>
   <CodeBlock
     code={`navigation: {
@@ -463,11 +465,12 @@ export default defineMeta({
     title="blume.config.ts"
   />
   <p>
-    Set it for the whole sidebar, or in one subfolder's <code>meta.ts</code>.
+    It works for the whole sidebar, or in one subfolder's{" "}
+    <code>meta.ts</code>. If Send an SMS sits above Webhooks, neither is set.
     A group starts closed unless it holds the current page or sets{" "}
     <code>collapsed: false</code>, and Nextra opens top-level folders by
-    default, so add that where a folder should start open. At the top level,
-    Blume lists loose pages before folders in every{" "}
+    default, so Guides sets it too. At the top level, Blume lists loose pages
+    before folders in every{" "}
     <a href="/docs/content/navigation#display-modes">display mode</a>, so a
     root <code>_meta</code> that puts a page after a folder can't be matched.
   </p>
@@ -503,8 +506,10 @@ Task-by-task guides for the Acme API.`}
   <p>
     Nextra takes a page's sidebar label from <code>_meta</code> and its title
     from the first heading. Blume renders frontmatter <code>title</code> as
-    the heading, with <code>sidebar.label</code> for the sidebar. Where the
-    two differ, check which became the title. Keeping the old heading:
+    the heading, with <code>sidebar.label</code> for the sidebar, so the
+    agent keeps the old heading as <code>title</code> and the{" "}
+    <code>_meta</code> label as <code>sidebar.label</code>. Where the two
+    differ, check that each page's heading didn't change:
   </p>
   <CodeBlock
     code={`---
@@ -536,8 +541,9 @@ sidebar:
     <li>
       Separators, menus, and most <code>theme</code> options have no
       equivalent, and the agent lists them. A page with{" "}
-      <code>{"theme: { layout: 'full' }"}</code> comes closest to{" "}
-      <a href="/docs/content/frontmatter#layout">mode: wide</a>.
+      <code>{"theme: { layout: 'full' }"}</code> becomes{" "}
+      <a href="/docs/content/frontmatter#layout">mode: wide</a>, the closest
+      match.
     </li>
   </ul>
 
@@ -546,13 +552,14 @@ sidebar:
     Nextra 2 and 3's filename suffixes, like <code>index.en.mdx</code>, work
     in place with{" "}
     <a href="/docs/content/i18n#filename-suffixes">parser: "dot"</a>. Nextra
-    4 gives every language a folder, and the skill leaves them as they are.
-    Blume keeps the default language at the content root, though, so a{" "}
-    <code>content/en/</code> folder publishes as ordinary pages and warns with{" "}
-    <code>BLUME_I18N_DEFAULT_LOCALE_FOLDER</code>. Move its contents up a
-    level, and set{" "}
-    <a href="/docs/content/i18n#default-locale-urls">hideDefaultLocalePrefix: false</a>{" "}
-    to keep serving them under <code>/en/</code>, as Nextra did.
+    4 gives every language a folder, and the other languages' folders stay as
+    they are. Blume keeps the default language at the content root, though,
+    so the agent moves the contents of <code>content/en/</code> up a level.
+    To keep serving them under <code>/en/</code>, as Nextra did, it sets{" "}
+    <a href="/docs/content/i18n#default-locale-urls">hideDefaultLocalePrefix: false</a>;
+    to drop the prefix, it adds a redirect per page instead, so tell it which
+    you want. A default language folder left in place publishes as ordinary
+    pages and warns with <code>BLUME_I18N_DEFAULT_LOCALE_FOLDER</code>.
   </p>
 
   <h2>Review pages and components</h2>
@@ -615,10 +622,10 @@ sidebar:
   <p>
     Directives and these fences only work in <code>.mdx</code> pages, so the
     agent renames any <code>.md</code> page that gains one. Line ranges like{" "}
-    <code>{"{1,4-5}"}</code> carry over unchanged. The skill treats inline math
-    as unsupported, so check that the agent kept each <code>$x$</code> inline
-    as <code>$$x$$</code> rather than moving it onto its own line or dropping
-    it.
+    <code>{"{1,4-5}"}</code> carry over unchanged. Inline math takes two
+    dollar signs in Blume, since a single <code>$</code> stays literal text,
+    so check that each <code>$x$</code> now reads <code>$$x$$</code>, still
+    inside its sentence.
   </p>
 
   <h3>React components become islands</h3>
@@ -829,6 +836,9 @@ export default defineConfig({
   <p>
     <code>BLUME_REDIRECT_MATCHES_PAGE</code> means a redirect pattern, like one
     copied from <code>next.config</code>, also covers a page you kept. Narrow
-    it to the URLs that moved.
+    it to the URLs that moved. As a warning, which fails{" "}
+    <code>blume validate --strict</code>, it means an exact redirect starts at
+    a page you kept: the redirect takes the URL over, so the page never
+    publishes. Delete the page if it moved, or remove the redirect.
   </p>
 </GuidePage>

@@ -62,7 +62,7 @@ const isReadOnly = (
  * Prune a spec schema into the tiny subset `validate-json.ts` understands:
  * `$ref`s resolved inline, cycles cut (the visited set is copied per branch so
  * a ref reused by siblings still prunes fully), depth capped. Structure beyond
- * the cut simply goes unvalidated — advisory checks, not a gate.
+ * the cut simply goes unvalidated, so it can never block a send.
  */
 const pruneSchema = (
   schema: SchemaLike | undefined,

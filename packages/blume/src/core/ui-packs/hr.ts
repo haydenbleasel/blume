@@ -50,6 +50,7 @@ export const hr: UIStringsOverride = {
   banner: { dismiss: "Zatvori obavijest" },
   changelog: {
     description: "Ažuriranja proizvoda i napomene o izdanjima.",
+    empty: "U popisu promjena još nema unosa.",
     title: "Popis promjena",
   },
   consent: {

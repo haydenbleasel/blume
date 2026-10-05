@@ -10,8 +10,10 @@
 // fixed the warning shown, compared the enum, auth, operation ID, and path
 // prefix output with and without each setting, sent requests to runserver
 // (401, 202, paginated list, 404), and read the result with Blume's own
-// parser and schema helpers. Not yet run end to end: blume dev and build
-// weren't run on the generated spec.
+// parser and schema helpers. Later regenerated the schema with only
+// ENUM_GENERATE_CHOICE_DESCRIPTION off and read its wrapped enums with the
+// same helpers. Not yet run end to end: blume dev and build weren't run on
+// the generated spec.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -122,10 +124,12 @@ SPECTACULAR_SETTINGS = {
     </li>
     <li>
       <strong>Split request components.</strong>{" "}
-      <code>COMPONENT_SPLIT_REQUEST</code> writes a separate request schema
-      without the read-only fields. Blume's schema tables list every property
-      they're given, so without it, <code>id</code> and <code>status</code>{" "}
-      would show up in the request body.
+      <code>COMPONENT_SPLIT_REQUEST</code> writes a separate request schema,{" "}
+      <code>MessageRequest</code>, without the read-only fields.
+      drf-spectacular recommends it for the most accurate description of your
+      API. Blume leaves read-only fields out of request body tables either way,
+      so <code>id</code> and <code>status</code> never show up in the request
+      body.
     </li>
     <li>
       <strong>Tags.</strong> Their descriptions become the section intros on
@@ -135,7 +139,7 @@ SPECTACULAR_SETTINGS = {
   <p>
     Leave <code>OAS_VERSION</code> unset. drf-spectacular writes OpenAPI 3.0.3
     by default, which Blume upgrades to 3.1 as it reads the file. It can also
-    write 3.2.0, which Blume doesn't convert.
+    write 3.1.0 or 3.2.0, which Blume reads as written.
   </p>
 
   <h3>Accept bearer tokens</h3>
@@ -502,35 +506,35 @@ class TemplateSerializer(serializers.ModelSerializer):
     are fixed on the Django side.
   </p>
 
-  <h3>Keep choice fields inline</h3>
+  <h3>List each field's choices once</h3>
   <p>
     Look at <code>channel</code> in the generated file. drf-spectacular moves
-    every choice field into a shared enum component, and when the field has its
-    own description, it wraps the reference in <code>allOf</code>. Blume's
-    schema tables label an <code>allOf</code> field as <code>object</code> and
-    don't list its allowed values, so <code>channel</code> and{" "}
-    <code>status</code> would read as objects.
+    every choice field into a shared enum component,{" "}
+    <code>ChannelEnum</code>, and when the field has its own description, it
+    wraps the reference in <code>allOf</code>. Blume reads a one-member{" "}
+    <code>allOf</code> as its member, so <code>channel</code> is labeled{" "}
+    <code>ChannelEnum</code> with <code>email</code> and <code>sms</code> as
+    its allowed values.
   </p>
   <p>
-    The enum components come from a post-processing hook. Turn it off for the
-    docs only, so a schema you serve or generate clients from keeps them. Put
-    the overrides in their own module:
+    drf-spectacular also appends the choices to each field's description as a
+    bulleted list, so the reference shows them twice. Turn that off for the
+    docs only, so a schema you serve or generate clients from keeps it. Put the
+    override in its own module:
   </p>
   <CodeBlock
     code={`# Overrides for the schema the docs site reads. Pass them with
 # manage.py spectacular --custom-settings acme.docs_schema.SETTINGS
 SETTINGS = {
-    # Keep choice fields inline instead of moving them to shared
-    # enum components, and leave their allowed values out of the
-    # description, since the reference lists them.
-    "POSTPROCESSING_HOOKS": [],
+    # Leave each choice field's allowed values out of its description,
+    # since the reference lists them.
     "ENUM_GENERATE_CHOICE_DESCRIPTION": False,
 }`}
     lang="python"
     title="acme/docs_schema.py"
   />
   <p>
-    <code>--custom-settings</code> applies them on top of{" "}
+    <code>--custom-settings</code> applies it on top of{" "}
     <code>SPECTACULAR_SETTINGS</code> for one run:
   </p>
   <CodeBlock
@@ -539,10 +543,8 @@ SETTINGS = {
     lang="bash"
   />
   <p>
-    Now <code>channel</code> is a string with <code>email</code> and{" "}
-    <code>sms</code> as its allowed values. Each inline enum keeps an{" "}
-    <code>x-spec-enum-id</code> marker the hook would have removed; Blume
-    ignores it.
+    Now <code>channel</code>'s description reads "How to deliver the
+    message.", and its allowed values appear once, from the enum.
   </p>
 
   <h3>Replace the pagination examples</h3>
@@ -830,9 +832,11 @@ jobs:
   </p>
   <h3>The reference doesn't change after you regenerate</h3>
   <p>
-    <code>blume dev</code> doesn't watch the spec file, so restart it. If{" "}
-    <code>blume build</code> fails with <code>BLUME_OPENAPI_UNAVAILABLE</code>,
-    check that <code>spec</code> is relative to <code>docs-site/</code>, like{" "}
-    <code>./openapi.yaml</code>.
+    <code>blume dev</code> watches the file <code>spec</code> names and
+    updates the reference when it changes, so check that the command wrote a
+    new file: with <code>--fail-on-warn</code>, a run that fails leaves the
+    previous schema in place. If <code>blume build</code> fails with{" "}
+    <code>BLUME_OPENAPI_UNAVAILABLE</code>, check that <code>spec</code> is
+    relative to <code>docs-site/</code>, like <code>./openapi.yaml</code>.
   </p>
 </GuidePage>

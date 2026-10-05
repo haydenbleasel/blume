@@ -860,27 +860,27 @@ describe("version-scoped search", () => {
   });
 });
 
-describe("agent surfaces with versions", () => {
-  const versionedProject = async () => {
-    const contentRoot = await tempContent({
-      "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n\nCurrent guide.\n",
-      "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n\nOld guide.\n",
-      "v1.0/old-only.mdx": "---\ntitle: Old Only\n---\n# Old\n\nLegacy.\n",
-    });
-    const root = dirname(contentRoot);
-    await writeFile(
-      join(root, "blume.config.ts"),
-      `export default {
-        deployment: { site: "https://example.com" },
-        versions: {
-          archived: [{ id: "v1.0", label: "1.0" }],
-          current: { label: "2.0" },
-        },
-      };\n`
-    );
-    return await scanProject(root, { mode: "build" });
-  };
+const versionedProject = async () => {
+  const contentRoot = await tempContent({
+    "guides/x.mdx": "---\ntitle: X v2\n---\n# X\n\nCurrent guide.\n",
+    "v1.0/guides/x.mdx": "---\ntitle: X v1\n---\n# X\n\nOld guide.\n",
+    "v1.0/old-only.mdx": "---\ntitle: Old Only\n---\n# Old\n\nLegacy.\n",
+  });
+  const root = dirname(contentRoot);
+  await writeFile(
+    join(root, "blume.config.ts"),
+    `export default {
+      deployment: { site: "https://example.com" },
+      versions: {
+        archived: [{ id: "v1.0", label: "1.0" }],
+        current: { label: "2.0" },
+      },
+    };\n`
+  );
+  return await scanProject(root, { mode: "build" });
+};
 
+describe("agent surfaces with versions", () => {
   it("sections llms.txt by version and keeps llms-full.txt current-only", async () => {
     const project = await versionedProject();
     const { index, full } = await buildLlmsFiles(project);
@@ -902,6 +902,22 @@ describe("agent surfaces with versions", () => {
     expect(sitemap).not.toContain("https://example.com/v1.0/guides/x");
     // …while a page that exists only in the archive stays (self-canonical).
     expect(sitemap).toContain("https://example.com/v1.0/old-only");
+  });
+
+  it("keeps an archived page whose own seo.canonical names itself", async () => {
+    const project = await versionedProject();
+    const archived = project.graph.pages.find(
+      (entry) => entry.route === "/v1.0/guides/x"
+    );
+    if (!archived) {
+      throw new Error("expected the archived guide");
+    }
+    // The page head prefers `seo.canonical` over the version default, so the
+    // sitemap follows it.
+    archived.meta.seo.canonical = "https://example.com/v1.0/guides/x";
+    expect(buildSitemap(project)).toContain(
+      "https://example.com/v1.0/guides/x"
+    );
   });
 
   it("scopes the MCP tools to the current docs by default", async () => {

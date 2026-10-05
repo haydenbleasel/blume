@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 
 import GithubSlugger from "github-slugger";
+import type { YAMLException } from "js-yaml";
 import type { Nodes } from "mdast";
 import { extname } from "pathe";
 import { markdownToMdast } from "satteri";
@@ -22,7 +23,13 @@ import type {
   ResolvedI18nConfig,
 } from "../schema.ts";
 import { trimChar } from "../trim.ts";
-import type { Diagnostic, Heading, PageLink, PageRecord } from "../types.ts";
+import type {
+  Diagnostic,
+  ExampleUse,
+  Heading,
+  PageLink,
+  PageRecord,
+} from "../types.ts";
 import { detectVersionRef, versionizeRoute } from "../versions.ts";
 import type { NormalizeContext, SourceEntry } from "./types.ts";
 
@@ -126,6 +133,29 @@ export const unloadablePathDiagnostic = (
           'Rename the file (or its folder) without "#" or "?". Both are dropped from the page\'s URL anyway, so the page keeps its route.',
       }
     : undefined;
+
+/**
+ * The error for a content file whose front matter isn't valid YAML — most
+ * often an unquoted value holding `: `, which YAML reads as a nested mapping.
+ * Thrown out of a source's scan, it would fail every command with
+ * BLUME_INTERNAL; a source leaves the file out and reports this instead, like
+ * a page whose front matter fails the schema. js-yaml counts lines from the
+ * text after the opening `---`, which starts with the rest of that fence
+ * line, so its 0-based line is already the file's line minus one.
+ */
+export const frontmatterYamlDiagnostic = (
+  error: YAMLException,
+  file: string
+): Diagnostic => ({
+  code: "BLUME_FRONTMATTER_INVALID",
+  column: error.mark ? error.mark.column + 1 : undefined,
+  file,
+  line: error.mark ? error.mark.line + 1 : undefined,
+  message: `Front matter isn't valid YAML (${error.reason}), so the page was left out of the site.`,
+  severity: "error",
+  suggestion:
+    'Wrap the value at that line in double quotes, e.g. description: "Setup: the easy way".',
+});
 
 /**
  * Fold one raw path part into the accumulating route segments/groups.
@@ -235,9 +265,11 @@ const PROMPT_CLOSE = /<\/Prompt>/u;
 // the same marker — and the only spelling that survives the MDX parser, where
 // a bare `{…}` is a JSX expression and `#id` is not a valid one (`Could not
 // parse expression with acorn`). Further bracket markers may follow the brace
-// (`{#id} [toc]`), nothing else.
+// (`{#id} [toc]`), nothing else. The spaced `{ #id }` and kramdown's
+// `{: #id }` (MkDocs `attr_list` writes both) fail the compile the same way,
+// so they match too, though neither is an anchor in `.md`.
 const BARE_CURLY_MARKER =
-  /(?<!\\)\{#(?<id>[^\s}]+)\}(?:\s*\[(?:#[^\s\]]+|!?toc)\])*\s*$/u;
+  /(?<!\\)(?<marker>\{:?\s*#(?<id>[^\s}]+)\s*\})(?:\s*\[(?:#[^\s\]]+|!?toc)\])*\s*$/u;
 
 // A raw HTML element carrying an `id` — `<a id="…">`, `<section id='…'>`,
 // the unquoted `<a id=plain>`, or the JSX spelling `<div id={"…"}>` — whose
@@ -259,6 +291,8 @@ export interface CurlyMarker {
   id: string;
   /** 1-based line of the heading (a setext heading's first text line) in the body. */
   line: number;
+  /** The braces as written (`{#id}`, `{ #id }`, `{: #id }`). */
+  marker: string;
 }
 
 /** Scanner state: the open fence plus the paragraph lines accumulated so far. */
@@ -628,9 +662,9 @@ const noteCurlyMarker = (
   line: number,
   state: HeadingScanState
 ): void => {
-  const id = text.match(BARE_CURLY_MARKER)?.groups?.id;
-  if (id !== undefined) {
-    state.curlyMarkers.push({ id, line });
+  const groups = text.match(BARE_CURLY_MARKER)?.groups;
+  if (groups?.id !== undefined && groups.marker !== undefined) {
+    state.curlyMarkers.push({ id: groups.id, line, marker: groups.marker });
   }
 };
 
@@ -890,6 +924,42 @@ export const targetOffsetIn = (
   title: string | undefined
 ): number => matched.length - 1 - (title?.length ?? 0) - target.length;
 
+// A link-reference definition's destination, at the start of what follows its
+// `[label]:` (see `REF_DEFINITION`): `<…>`, which may hold spaces, or else the
+// run up to the first space, before any title.
+const DEFINITION_DESTINATION = /^(?:<(?<angle>[^<>]*)>|(?<bare>\S+))/u;
+
+// A CommonMark autolink (`<https://example.com>`). Only http(s) targets are
+// ever checked, so no other scheme is read. MDX rejects the syntax, so in
+// practice it's a `.md` page's.
+const AUTOLINK = /<(?<target>https?:\/\/[^\s<>]*)>/giu;
+
+/**
+ * Record the destination of a link-reference definition on `line`: a
+ * reference link (`[text][label]`, `[label]`) renders with it, so it's the
+ * target to check, once for every link that cites it. A footnote definition
+ * (`[^1]: …`) is no link; the links inside it are read like any others.
+ */
+const scanDefinition = (
+  line: string,
+  lineNumber: number,
+  links: PageLink[]
+): void => {
+  const groups = line.match(REF_DEFINITION)?.groups;
+  if (groups?.label === undefined || groups.label.startsWith("^")) {
+    return;
+  }
+  const rest = groups.rest ?? "";
+  const destination = rest.match(DEFINITION_DESTINATION)?.groups;
+  const target = destination?.angle ?? destination?.bare;
+  if (target) {
+    // `rest` runs to the end of the line; an angle-bracketed target starts
+    // one past its `<`.
+    const at = line.length - rest.length + (destination?.angle ? 1 : 0);
+    links.push({ column: at + 1, line: lineNumber, target });
+  }
+};
+
 /**
  * Extract link targets from a markdown body for later validation, recording the
  * 1-based line/column of each target. Skips fenced code blocks and inline code.
@@ -954,18 +1024,32 @@ const scanLinkLine = (
       });
     }
   }
+  for (const match of masked.matchAll(AUTOLINK)) {
+    const target = match.groups?.target ?? "";
+    links.push({ column: match.index + 2, line: lineNumber, target });
+  }
+  scanDefinition(masked, lineNumber, links);
   return next;
 };
 
 /**
- * A component's string `href` (`<Card href="./install" />`): the attribute
- * may sit on a later line than the tag name, where a formatter wraps a long
- * element, so the gap between them spans lines. An expression-valued
- * `href={…}` isn't a literal target, and a lowercase tag is raw HTML in a
- * `.md` page, so neither is matched.
+ * A component's string `href` (`<Card href="./install" />`), or a lowercase
+ * `<a href>`: the attribute may sit on a later line than the tag name, where
+ * a formatter wraps a long element, so the gap between them spans lines. An
+ * expression-valued `href={…}` isn't a literal target, so it isn't matched,
+ * and no other lowercase tag is a link.
  */
-const COMPONENT_HREF =
-  /<[A-Z][\w.]*(?=[\s/>])[^<>]*?\shref=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
+const ELEMENT_HREF =
+  /<(?:[A-Z][\w.]*|(?<anchor>a))(?=[\s/>])[^<>]*?\shref=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
+
+/**
+ * An inline link whose label wraps onto later lines of its paragraph
+ * (`[a long⏎label](/x)`), as a formatter leaves one: the line scan can't see
+ * it. The label holds a line break but no blank line (which would end the
+ * paragraph) and no brackets, so a match never repeats a one-line link.
+ */
+const WRAPPED_LINK =
+  /\[[^[\]\n]*(?:\n(?![ \t]*(?:\n|$))[^[\]\n]*)+\]\((?<target>(?:[^()\s]|\([^()\s]*\))+)(?<title>\s+"[^"]*")?\)/gu;
 
 /** The body with fenced blocks and inline code blanked, shape preserved. */
 const maskCode = (lines: readonly string[]): string => {
@@ -981,24 +1065,83 @@ const maskCode = (lines: readonly string[]): string => {
   return masked.join("\n");
 };
 
-/** Every component `href` target in `body`, with its 1-based position. */
-const componentHrefs = (
+/** The offset each of `lines` starts at once they're joined with `\n`. */
+const lineStartsOf = (lines: readonly string[]): number[] => {
+  const starts: number[] = [];
+  let at = 0;
+  for (const line of lines) {
+    starts.push(at);
+    at += line.length + 1;
+  }
+  return starts;
+};
+
+/**
+ * The 1-based position of offset `at` in the joined text whose `lineStarts`
+ * are given, lines shifted by `lineOffset`. A binary search, so a page with
+ * many links isn't rescanned from the top for each one.
+ */
+const positionIn = (
+  lineStarts: readonly number[],
+  at: number,
+  lineOffset: number
+): Pick<PageLink, "column" | "line"> => {
+  let low = 0;
+  let high = lineStarts.length - 1;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if ((lineStarts[mid] ?? 0) <= at) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return {
+    column: at - (lineStarts[low] ?? 0) + 1,
+    line: lineOffset + low + 1,
+  };
+};
+
+/**
+ * Every link in `body` that can span lines, with its 1-based position: an
+ * element's `href` (see `ELEMENT_HREF`) and a link whose label wraps (see
+ * `WRAPPED_LINK`). A lowercase `<a>` is raw HTML in `.md` and a plain element
+ * in `.mdx`; the Markdown pipeline passes either through as written, so its
+ * target is marked `raw`.
+ */
+const multilineLinks = (
   lines: readonly string[],
   lineOffset: number
 ): PageLink[] => {
   const links: PageLink[] = [];
   const text = maskCode(lines);
-  for (const match of text.matchAll(COMPONENT_HREF)) {
+  const lineStarts = lineStartsOf(lines);
+  for (const match of text.matchAll(ELEMENT_HREF)) {
     const target = match.groups?.double ?? match.groups?.single ?? "";
     // The value ends one character (its closing quote) before the match does.
     const at = match.index + match[0].length - target.length - 1;
-    const before = text.slice(0, at);
-    const lineStart = before.lastIndexOf("\n") + 1;
-    links.push({
-      column: at - lineStart + 1,
-      line: lineOffset + before.split("\n").length,
+    const link: PageLink = {
+      ...positionIn(lineStarts, at, lineOffset),
       target,
-    });
+    };
+    if (match.groups?.anchor) {
+      link.raw = true;
+    }
+    links.push(link);
+  }
+  for (const match of text.matchAll(WRAPPED_LINK)) {
+    const target = match.groups?.target ?? "";
+    const at =
+      match.index + targetOffsetIn(match[0], target, match.groups?.title);
+    const link: PageLink = {
+      ...positionIn(lineStarts, at, lineOffset),
+      target,
+    };
+    // As on one line, a preceding `!` makes it an image embed.
+    if (text[match.index - 1] === "!") {
+      link.image = true;
+    }
+    links.push(link);
   }
   return links;
 };
@@ -1014,9 +1157,37 @@ export const extractLinks = (body: string, lineOffset = 0): PageLink[] => {
     fence = scanLinkLine(line, lineNumber, fence, links);
   }
 
-  return body.includes("href=")
-    ? [...links, ...componentHrefs(lines, lineOffset)]
-    : links;
+  return [...links, ...multilineLinks(lines, lineOffset)];
+};
+
+/**
+ * A `<Component>` example's string `path` (`<Component path="forms/login" />`),
+ * wrapped onto a later line or not, read the way `ELEMENT_HREF` reads an
+ * `href`. An expression-valued `path={…}` isn't a literal, so it isn't matched.
+ */
+const COMPONENT_PATH =
+  /<Component(?=[\s/>])[^<>]*?\spath=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
+
+/**
+ * Every `<Component path>` in an `.mdx` body, with the 1-based position of its
+ * value; lines are shifted by `lineOffset`, as {@link extractLinks} does. Code
+ * blocks and inline code are skipped.
+ */
+export const extractExampleUses = (
+  body: string,
+  lineOffset = 0
+): ExampleUse[] => {
+  if (!body.includes("<Component")) {
+    return [];
+  }
+  const lines = body.split("\n");
+  const lineStarts = lineStartsOf(lines);
+  return [...maskCode(lines).matchAll(COMPONENT_PATH)].map((match) => {
+    const path = match.groups?.double ?? match.groups?.single ?? "";
+    // The value ends one character (its closing quote) before the match does.
+    const at = match.index + match[0].length - path.length - 1;
+    return { ...positionIn(lineStarts, at, lineOffset), path };
+  });
 };
 
 // Double-quoted strings hold JSX attribute values and JSON in `{...}` props; a
@@ -1082,23 +1253,29 @@ export const strippedLineOffset = (
 const entryLineOffset = (entry: SourceEntry): number =>
   entry.bodyLineOffset ?? strippedLineOffset(entry.raw, entry.body.text);
 
+/** A link (or `<Component>` example) found in a body: its line, and file. */
+interface Located {
+  file?: string;
+  line: number;
+}
+
 /**
  * Map links extracted from include-expanded text back to the file and raw
  * line each expanded line came from, so a broken link inside a partial is
  * reported against the partial. Links whose origin is the page's own source
  * carry no `file` override (origins already hold raw-file lines).
  */
-const remapExpandedLinks = (
-  links: PageLink[],
+const remapExpandedLinks = <T extends Located>(
+  links: T[],
   origins: { file: string; line: number }[],
   sourcePath: string | undefined
-): PageLink[] =>
+): T[] =>
   links.map((link) => {
     const origin = origins[link.line - 1];
     if (!origin) {
       return link;
     }
-    const remapped: PageLink = { ...link, line: origin.line };
+    const remapped: T = { ...link, line: origin.line };
     if (origin.file !== sourcePath) {
       remapped.file = origin.file;
     }
@@ -1112,22 +1289,26 @@ const entryIncludes = (entry: SourceEntry): string[] | undefined =>
     : undefined;
 
 /**
- * Extract an entry's links for validation. When the scan expanded includes,
- * extraction runs over the expanded text (origins already hold raw-file
- * lines); otherwise over the stripped body, shifted by the stripped front
- * matter block's height.
+ * Extract an entry's links (or `<Component>` examples) for validation. When
+ * the scan expanded includes, extraction runs over the expanded text (origins
+ * already hold raw-file lines); otherwise over the stripped body, shifted by
+ * the stripped front matter block's height.
  */
-const entryLinks = (entry: SourceEntry): PageLink[] =>
+const entryLinks = <T extends Located>(
+  entry: SourceEntry,
+  extract: (body: string, lineOffset?: number) => T[]
+): T[] =>
   entry.expanded
     ? remapExpandedLinks(
-        extractLinks(entry.expanded.text),
+        extract(entry.expanded.text),
         entry.expanded.origins,
         entry.sourcePath
       )
-    : extractLinks(entry.body.text, entryLineOffset(entry));
+    : extract(entry.body.text, entryLineOffset(entry));
 
 /**
- * Diagnostics for `{#id}` heading markers in an `.mdx` page. The MDX parser
+ * Diagnostics for `{#id}` heading markers (and the spaced `{ #id }` and
+ * kramdown `{: #id }` spellings) in an `.mdx` page. The MDX parser
  * reads a bare `{…}` as a JSX expression, so the page fails to compile —
  * reported here, at the marker's source line, instead of as a raw acorn error
  * at render time. An included `.md` partial is spliced into the including
@@ -1140,7 +1321,7 @@ const curlyMarkerDiagnostics = (
   markers: CurlyMarker[],
   sourceName: string
 ): Diagnostic[] =>
-  markers.map(({ id, line }) => {
+  markers.map(({ id, line, marker }) => {
     const origin = entry.expanded?.origins[line - 1];
     const page = entry.sourcePath ?? `${sourceName}:${entry.ref}`;
     const inPartial = origin !== undefined && origin.file !== entry.sourcePath;
@@ -1149,8 +1330,8 @@ const curlyMarkerDiagnostics = (
       file: origin?.file ?? page,
       line: origin?.line ?? line + entryLineOffset(entry),
       message: inPartial
-        ? `\`{#${id}}\` is a JSX expression once this partial is included in ${page} (.mdx), so that page fails to compile.`
-        : `\`{#${id}}\` is a JSX expression in .mdx, so this page fails to compile.`,
+        ? `\`${marker}\` is a JSX expression once this partial is included in ${page} (.mdx), so that page fails to compile.`
+        : `\`${marker}\` is a JSX expression in .mdx, so this page fails to compile.`,
       severity: "error",
       suggestion: `Write \`[#${id}]\` or escape it as \`\\{#${id}\\}\` — both pin the same anchor in .md and .mdx.`,
     };
@@ -1549,13 +1730,18 @@ export const normalizeEntry = (
     description: meta.description,
     editUrl: entry.editUrl,
     entryId: staged ? `${ctx.source.name}/${entry.ref}` : undefined,
+    examplesUsed:
+      format === "mdx" ? entryLinks(entry, extractExampleUses) : undefined,
     format,
     groups,
     headings,
     id: `${ctx.source.name}:${entry.ref}`,
     includes: entryIncludes(entry),
     lastModified: meta.lastModified ?? entry.lastModified,
-    links: [...entryLinks(entry), ...relatedPageLinks(meta.related)],
+    links: [
+      ...entryLinks(entry, extractLinks),
+      ...relatedPageLinks(meta.related),
+    ],
     meta,
     monolingual: ctx.source.monolingual,
     navPath,

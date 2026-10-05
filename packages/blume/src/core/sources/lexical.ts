@@ -26,6 +26,11 @@ import {
 export interface LexicalOptions {
   /** The CMS origin a relative upload URL (`/media/x.png`) resolves against. */
   baseUrl?: string;
+  /**
+   * Called with the label of each node left out as a comment (a block with
+   * no serializer, a node type with no Markdown), so the source can warn.
+   */
+  onUnsupported?: (what: string) => void;
   /** Serializers for `block`/`inlineBlock` nodes, keyed by `fields.blockType`. */
   serializers?: Record<string, (fields: JsonObject) => string>;
 }
@@ -52,6 +57,12 @@ const marksOf = (node: JsonObject): InlineMarks => {
 
 const children = (node: JsonObject): JsonObject[] => objectsIn(node.children);
 
+/** The comment for a node with no Markdown, reported to `onUnsupported`. */
+const leftOut = (what: string, options: LexicalOptions): string => {
+  options.onUnsupported?.(what);
+  return unsupported(what, writesMdx(options.serializers));
+};
+
 const typeOf = (node: JsonObject): string => asString(node.type) ?? "";
 
 const customBlock = (node: JsonObject, options: LexicalOptions): string => {
@@ -61,10 +72,7 @@ const customBlock = (node: JsonObject, options: LexicalOptions): string => {
   if (fields && serializer) {
     return serializer(fields);
   }
-  return unsupported(
-    `Lexical block${blockType ? `: ${blockType}` : ""}`,
-    writesMdx(options.serializers)
-  );
+  return leftOut(`Lexical block${blockType ? `: ${blockType}` : ""}`, options);
 };
 
 const inlineParts = (
@@ -119,9 +127,9 @@ const renderUpload = (node: JsonObject, options: LexicalOptions): string => {
   const value = asObject(node.value);
   const url = value ? asString(value.url) : undefined;
   if (!(value && url)) {
-    return unsupported(
+    return leftOut(
       "Lexical upload (fetch with depth 1 to populate it)",
-      writesMdx(options.serializers)
+      options
     );
   }
   const alt = asString(value.alt) ?? asString(value.filename) ?? "";
@@ -182,10 +190,7 @@ const renderBlock = (node: JsonObject, options: LexicalOptions): string => {
       return customBlock(node, options);
     }
     default: {
-      return unsupported(
-        `Lexical node: ${typeOf(node)}`,
-        writesMdx(options.serializers)
-      );
+      return leftOut(`Lexical node: ${typeOf(node)}`, options);
     }
   }
 };

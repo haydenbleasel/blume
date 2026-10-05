@@ -17,7 +17,8 @@ export default defineConfig({
         prefix: "handbook",
         url: "https://cms.example.com",
         collection: "docs",
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "richText" },
         // Extra query parameters: where[...], sort
         params: { sort: "title" },
@@ -27,4 +28,4 @@ export default defineConfig({
 });
 ```
 
-The API key comes from the `PAYLOAD_API_KEY` environment variable and is sent as `users API-Key <key>`; set `authCollection` when the key belongs to another auth-enabled collection. Only published documents are imported — `--preview` requests drafts and stages them with `draft: true`. Documents are fetched with `depth: 1` so uploads carry their URLs, and a relative upload path (`/media/x.png`) resolves against `url`. A `block` or `inlineBlock` node maps to a Blume component through the engine's `serializers` option, keyed by `blockType`, when you construct `payloadSource` directly and pass it to [`custom()`](/docs/content/sources/custom). Setting `serializers` writes the source's pages as MDX so the returned components render; a body held in a Markdown text field stays Markdown.
+The API key comes from the `PAYLOAD_API_KEY` environment variable and is sent as `users API-Key <key>`; set `authCollection` when the key belongs to another auth-enabled collection. Only published documents are imported — `--preview` requests drafts and stages them with `draft: true`. Documents are fetched with `depth: 1` so uploads carry their URLs, and a relative upload path (`/media/x.png`) resolves against `url`. Uploads are referenced at that URL rather than downloaded, since it doesn't expire the way Notion's do, so readers' browsers load them from your Payload server or its storage; to have Blume download and optimize them at build instead, authorize the host in [`image.domains`](/docs/configuration#images). A `block` or `inlineBlock` node maps to a Blume component through the engine's `serializers` option, keyed by `blockType`, when you construct `payloadSource` directly and pass it to [`custom()`](/docs/content/sources/custom). Setting `serializers` writes the source's pages as MDX so the returned components render; a body held in a Markdown text field stays Markdown. A node with no Markdown equivalent, or a block with no serializer, is left out as a comment, and the source warns with `BLUME_SOURCE_UNSUPPORTED_NODE` naming it and the page.

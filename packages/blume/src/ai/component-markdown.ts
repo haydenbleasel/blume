@@ -584,7 +584,7 @@ export const inlineCode = (text: string): string => {
 };
 
 /** Fence `code` so its opening/closing run outlengths any backticks inside. */
-const fencedBlock = (lang: string, code: string): string => {
+export const fencedBlock = (lang: string, code: string): string => {
   const trimmed = code.replace(/(?<!\n)\n+$/u, "");
   const runs = trimmed.match(/`+/gu);
   const longest = runs ? Math.max(...runs.map((run) => run.length)) : 0;

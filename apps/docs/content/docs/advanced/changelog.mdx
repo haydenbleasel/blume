@@ -62,6 +62,17 @@ Once you have at least one `type: changelog` entry, Blume generates a **`/change
 - The date follows the configured [`dateFormat`](/docs/configuration#date-format), minus the year the row's group already shows.
 - Drafts and `sidebar.hidden` entries are skipped.
 
+The page is headed **Changelog** (in English), with a one-line description below. Set your own with `changelog` in your config; they also become the page's `<title>`, meta description, and OG card, and the top of its Markdown mirror at `/changelog.md`:
+
+```ts blume.config.ts
+changelog: {
+  title: "Release notes",
+  description: "Every Acme SDK release, newest first.",
+},
+```
+
+Each takes a map of locale code to text too, like a [header tab label](/docs/content/i18n#per-locale-navigation). The index renders in the default locale, so it shows that locale's entry. Leave either unset and it keeps the built-in text, which a [UI string override](/docs/content/i18n#translated-ui) (`changelog.title` and `changelog.description` under `i18n.ui`) replaces.
+
 The page appears only when nothing already occupies the `/changelog` route. To replace it with your own design, add a [custom page](/docs/advanced/custom-pages) at `pages/changelog.astro` — it takes over and Blume stops generating the default index. The `<Update>` component the previous timeline was built from still ships for a custom page that wants inline release notes. It isn't one of the MDX components, so import it in the `.astro` page itself: `import Update from "blume/components/content/Update.astro";`.
 
 A header [tab](/docs/content/navigation#tabs) pointing at `/changelog` opens this index — no `href` needed.

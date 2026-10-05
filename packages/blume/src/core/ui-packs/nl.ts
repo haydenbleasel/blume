@@ -51,6 +51,7 @@ export const nl: UIStringsOverride = {
   banner: { dismiss: "Aankondiging sluiten" },
   changelog: {
     description: "Productupdates en releaseopmerkingen.",
+    empty: "Nog geen items in het wijzigingslogboek.",
     title: "Wijzigingslogboek",
   },
   consent: {

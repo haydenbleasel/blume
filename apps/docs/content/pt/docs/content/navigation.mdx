@@ -269,7 +269,7 @@ navigation: {
 }
 ```
 
-Cada link recebe um `label`, um `href` e um `icon` opcional (um nome de [ícone integrado](/docs/content/components#icon), caminho/URL de imagem ou SVG inline — o mesmo que em qualquer outro lugar). Um `href` pode apontar para qualquer lugar: uma URL externa abre em uma nova aba, enquanto uma rota interna (`/contact`) é validada contra as suas páginas no momento da build, avisando você se nada corresponder.
+Cada link recebe um `label`, um `href` e um `icon` opcional (um nome de [ícone integrado](/docs/content/components#icon), caminho/URL de imagem ou SVG inline — o mesmo que em qualquer outro lugar). Um `href` pode apontar para qualquer lugar: uma URL externa abre em uma nova aba, enquanto uma rota interna (`/contact`) é validada contra as suas páginas no momento da build e pelo [`blume doctor`](/docs/cli/doctor), avisando você se nada corresponder.
 
 ## Barra lateral explícita [#explicit-sidebar]
 
@@ -341,14 +341,14 @@ Elas vêm de graça a partir da árvore da barra lateral — sem configuração:
 
 ## Nesta página [#on-this-page]
 
-Um sumário na coluna direita é gerado automaticamente a partir dos títulos de cada página — `##` e `###` por padrão — para que páginas longas continuem fáceis de escanear. Defina [`toc`](/docs/configuration#table-of-contents) para mudar o intervalo de títulos ou desativar o sumário. Em telas mais estreitas, onde a coluna direita fica oculta, ele se recolhe em um dropdown “Nesta página” acima do conteúdo.
+Um sumário na coluna direita é gerado automaticamente a partir dos títulos de cada página — `##` e `###` por padrão — para que páginas longas continuem fáceis de escanear. Defina [`toc`](/docs/configuration#table-of-contents) para mudar o intervalo de títulos ou desativar o sumário. Em telas mais estreitas, onde a coluna direita fica oculta, ele se recolhe em um dropdown “Nesta página” acima do conteúdo, que também reúne as [ações da página](#page-actions).
 
 ## Ações da página [#page-actions]
 
-Abaixo do sumário, toda página exibe um conjunto de ações rápidas:
+Abaixo do sumário, toda página exibe um conjunto de ações rápidas. Em janelas com pelo menos 1.280px de largura, elas ficam na coluna da direita junto com o sumário. Em janelas mais estreitas e em celulares, elas ficam na parte de baixo do dropdown “Nesta página” acima do conteúdo, que aparece também em páginas sem títulos:
 
 - **Editar no GitHub** — leva direto ao arquivo-fonte. Aparece assim que você define [`github`](/docs/configuration) na sua configuração.
-- **Voltar ao topo** — retorna suavemente ao topo de páginas longas.
+- **Voltar ao topo** — retorna suavemente ao topo de páginas longas. Fica apenas na coluna da direita, já que o dropdown já está no topo da página.
 
 Outras entregam a página a ferramentas de IA — **Copiar como Markdown** e **Abrir no chat** — abordadas em [Markdown para agentes](/docs/discoverability/markdown#copy-as-markdown).
 

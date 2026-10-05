@@ -1,15 +1,15 @@
 import { afterEach, beforeAll, describe, expect, it, mock } from "bun:test";
-import { mkdtemp, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { pathToFileURL } from "node:url";
-
-import { join } from "pathe";
 
 import type { JsonValue } from "../src/core/adapter.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
-import { algolia } from "../src/search/adapters/index.ts";
+import type { BlumeConfigInput } from "../src/core/schema.ts";
+import {
+  algolia,
+  oramaCloud,
+  typesense,
+} from "../src/search/adapters/index.ts";
 import { syncSearchProvider } from "../src/search/sync/index.ts";
 
 /**
@@ -41,12 +41,20 @@ interface HostedRecord {
 }
 interface SaveObjectsArgs {
   indexName: string;
-  objects: { objectID: string }[];
+  objects: {
+    content: string;
+    locale: string;
+    objectID: string;
+    title: string;
+    url: string;
+  }[];
 }
 /** The slice of an Algolia index's settings the sync reads and writes. */
 interface AlgoliaSettings {
+  attributeForDistinct?: string;
   attributesForFaceting?: string[];
   customRanking?: string[];
+  distinct?: boolean;
 }
 /** One `setSettings` call the Algolia sync made, and whether it was awaited. */
 interface AlgoliaSettingsWrite {
@@ -62,7 +70,13 @@ interface TypesenseSearchParams {
   sort_by?: string;
 }
 interface TypesenseCollectionSchema {
-  fields: { facet?: boolean; name: string; optional?: boolean; type: string }[];
+  fields: {
+    facet?: boolean;
+    locale?: string;
+    name: string;
+    optional?: boolean;
+    type: string;
+  }[];
   name: string;
 }
 interface OramaCloudSearchParams {
@@ -102,10 +116,16 @@ interface ConstructedClients {
   oramaCloud?: ClientConfig;
   typesense?: ClientConfig;
 }
-interface CapturedTypesenseSync {
-  created?: boolean;
+/** What the mocked Typesense server holds, and what the sync did to it. */
+interface TypesenseServer {
+  /** The alias's collection, or the error looking it up fails with. */
+  alias?: string | Error;
+  /** A collection holds the alias's name itself (a sync from before aliases). */
+  legacy?: boolean;
+  importError?: Error;
+  /** Each call the sync made, in order, with the collection it named. */
+  calls: string[];
   schema?: TypesenseCollectionSchema;
-  deleted?: boolean;
   docs?: SyncedRecord[];
   options?: { action: string };
 }
@@ -126,15 +146,11 @@ let cloudDeploy: () => Promise<boolean>;
 let typesenseSearch: (
   params: TypesenseSearchParams
 ) => Promise<{ hits: { document: HostedRecord }[] }>;
-let typesenseRetrieve: () => Promise<Record<string, never>>;
-let typesenseCreate: (
-  schema: TypesenseCollectionSchema
-) => Promise<TypesenseCollectionSchema>;
-let typesenseImport: (
-  docs: SyncedRecord[],
-  options: { action: string }
-) => Promise<{ success: boolean }[]>;
-let typesenseDelete: () => Promise<Record<string, never>>;
+let typesenseServer: TypesenseServer = { calls: [] };
+/** The SDK's 404, which the sync reads as "no such alias". */
+class TypesenseNotFoundError extends Error {
+  override name = "TypesenseNotFoundError";
+}
 
 // Turn an object factory into a `new`-able constructor — the SDKs are used as
 // `new Client(...)` etc., and a function invoked with `new` that returns an
@@ -204,23 +220,54 @@ mockSdk("@oramacloud/client", () => ({
 }));
 // Hoisted out of the mock factory so its inner methods don't nest past the
 // four-level depth limit (mock.module → constructor → collections → documents).
-const typesenseDocuments = () => ({
-  import: (docs: SyncedRecord[], options: { action: string }) =>
-    typesenseImport(docs, options),
+const typesenseDocuments = (name?: string) => ({
+  import: (docs: SyncedRecord[], options: { action: string }) => {
+    typesenseServer.calls.push(`import ${name}`);
+    typesenseServer.docs = docs;
+    typesenseServer.options = options;
+    return typesenseServer.importError
+      ? Promise.reject(typesenseServer.importError)
+      : Promise.resolve([{ success: true }]);
+  },
   search: (params: TypesenseSearchParams) => typesenseSearch(params),
+});
+const typesenseCollection = (name?: string) => ({
+  create: (schema: TypesenseCollectionSchema) => {
+    typesenseServer.calls.push(`create ${schema.name}`);
+    typesenseServer.schema = schema;
+    return Promise.resolve(schema);
+  },
+  delete: () => {
+    typesenseServer.calls.push(`delete ${name}`);
+    return Promise.resolve({ name });
+  },
+  documents: () => typesenseDocuments(name),
+  retrieve: () =>
+    typesenseServer.legacy
+      ? Promise.resolve({ name })
+      : Promise.reject(new TypesenseNotFoundError()),
+});
+const typesenseAliases = (name?: string) => ({
+  retrieve: () => {
+    const { alias } = typesenseServer;
+    if (alias instanceof Error) {
+      return Promise.reject(alias);
+    }
+    return alias === undefined
+      ? Promise.reject(new TypesenseNotFoundError())
+      : Promise.resolve({ collection_name: alias, name });
+  },
+  upsert: (alias: string, mapping: { collection_name: string }) => {
+    typesenseServer.calls.push(`alias ${alias} ${mapping.collection_name}`);
+    return Promise.resolve({ ...mapping, name: alias });
+  },
 });
 mockSdk("typesense", () => ({
   Client: asConstructor((config) => {
     constructed.typesense = config;
-    return {
-      collections: (_name?: string) => ({
-        create: (schema: TypesenseCollectionSchema) => typesenseCreate(schema),
-        delete: () => typesenseDelete(),
-        documents: typesenseDocuments,
-        retrieve: () => typesenseRetrieve(),
-      }),
-    };
+    return { aliases: typesenseAliases, collections: typesenseCollection };
   }),
+  Errors: { ObjectNotFound: TypesenseNotFoundError },
 }));
 
 const INDEX = [
@@ -338,6 +385,15 @@ describe("client loaders", () => {
                 url: "/a",
                 version: "current",
               },
+              // A later record of the same page (a long page the sync
+              // split) adds no second row.
+              {
+                content: "c, continued",
+                description: "d",
+                title: "A",
+                url: "/a",
+                version: "current",
+              },
               {
                 content: "c2",
                 description: "d2",
@@ -367,6 +423,7 @@ describe("client loaders", () => {
     // cross-version badge works for hosted results too.
     expect(hits[0]?.version).toBe("");
     expect(hits[1]?.version).toBe("v1.0");
+    expect(hits.map((hit) => hit.url)).toStrictEqual(["/a", "/b"]);
 
     await search("q", { locale: "fr" });
     expect(captured.value?.requests[0]?.facetFilters).toStrictEqual([
@@ -454,9 +511,8 @@ describe("client loaders", () => {
     const result = await search("q");
     expect(captured.value?.q).toBe("q");
     expect(captured.value?.query_by).toBe("title,keywords,description,content");
-    expect(captured.value?.sort_by).toBe(
-      "_text_match(buckets: 10):desc,boost:desc"
-    );
+    // Relevance first; boost only orders equally good matches.
+    expect(captured.value?.sort_by).toBe("_text_match:desc,boost:desc");
     // No locale option means no filter — every language matches.
     expect(captured.value?.filter_by).toBeUndefined();
     expect(result.hits[0]?.url).toBe("/t");
@@ -506,6 +562,8 @@ describe("client loaders", () => {
       collection: "docs",
       connectionTimeoutSeconds: 5,
       host: "h",
+      // The sync's option, never the browser client's.
+      locale: "ja",
       // The named connection options decide the node list.
       nodes: [{ host: "other", port: 80, protocol: "http" }],
       port: 8108,
@@ -517,38 +575,78 @@ describe("client loaders", () => {
       nodes: [{ host: "h", port: 8108, protocol: "http" }],
     });
   });
-
-  it("pagefind imports the built bundle and maps its results", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "blume-pagefind-"));
-    const fixture = join(dir, "pagefind.mjs");
-    await writeFile(
-      fixture,
-      'export const search = () => Promise.resolve({ results: [{ data: () => Promise.resolve({ excerpt: "pf", meta: { title: "PF" }, url: "/p" }) }] });\n'
-    );
-    const { createSearch } =
-      await import("../src/components/layout/search/pagefind.ts");
-    const search = await createSearch({ url: pathToFileURL(fixture).href });
-    const { hits } = await search("q");
-    expect(hits[0]?.url).toBe("/p");
-    expect(hits[0]?.title).toBe("PF");
-  });
 });
 
-describe("hosted sync uploads", () => {
-  const records = [
-    {
-      _id: "/a",
-      boost: 2,
-      content: "c",
-      description: "d",
-      keywords: ["setup"],
-      locale: "en",
-      tag: "guides",
-      title: "A",
-      url: "/a",
-      version: "current",
+/** An uploaded Algolia object's size, as Algolia measures it. */
+const algoliaBytes = (object: SaveObjectsArgs["objects"][number]): number =>
+  Buffer.byteLength(JSON.stringify(object), "utf-8");
+
+/** A project with no pages, configured with `search`. */
+const syncProject = (search: BlumeConfigInput["search"]): BlumeProject => {
+  const config = blumeConfigSchema.parse({ search });
+  return {
+    config,
+    context: {
+      componentsFile: null,
+      configFile: null,
+      contentRoot: "/tmp/docs",
+      outDir: "/tmp/.blume",
+      pagesRoot: null,
+      root: "/tmp",
+      themeFile: null,
     },
-  ];
+    diagnostics: [],
+    droppedPages: 0,
+    graph: {
+      diagnostics: [],
+      navigation: { featured: [], selectors: [], sidebar: [], tabs: [] },
+      navigationByLocale: {},
+      navigationByVersion: {},
+      pages: [],
+      routes: new Map(),
+    },
+    manifest: {
+      blumeVersion: "0.0.0",
+      contentRoot: "/tmp/docs",
+      output: config.deployment.options.output,
+      projectRoot: "/tmp",
+      routes: [],
+      version: 1,
+    },
+    mode: "build",
+    sources: [],
+    themeFontsConfigured: false,
+  };
+};
+
+/** Every object the next Algolia sync uploads, captured. */
+const captureAlgolia = (): Captured<SaveObjectsArgs> => {
+  const captured: Captured<SaveObjectsArgs> = {};
+  algoliaSave = (args) => {
+    captured.value = args;
+    return Promise.resolve();
+  };
+  return captured;
+};
+
+/** The sync's calls, with each timestamped collection name as `docs_<n>`. */
+const typesenseCalls = (): string[] =>
+  typesenseServer.calls.map((call) => call.replaceAll(/_\d+/gu, "_<n>"));
+
+describe("hosted sync uploads", () => {
+  const page = {
+    _id: "/a",
+    boost: 2,
+    content: "c",
+    description: "d",
+    keywords: ["setup"],
+    locale: "en",
+    tag: "guides",
+    title: "A",
+    url: "/a",
+    version: "current",
+  };
+  const records = [page];
 
   it("algolia uploads objects keyed by objectID", async () => {
     process.env.ALGOLIA_ADMIN_API_KEY = "admin";
@@ -561,6 +659,86 @@ describe("hosted sync uploads", () => {
     await syncAlgolia(records, { appId: "app", indexName: "docs" });
     expect(captured.value?.indexName).toBe("docs");
     expect(captured.value?.objects[0]?.objectID).toBe("/a");
+  });
+
+  const DECLARED: AlgoliaSettings = {
+    attributesForFaceting: ["filterOnly(locale)", "filterOnly(version)"],
+    customRanking: ["desc(boost)"],
+  };
+
+  it("algolia splits a page too long for one record, listing it once by url", async () => {
+    process.env.ALGOLIA_ADMIN_API_KEY = "admin";
+    const captured = captureAlgolia();
+    algoliaSettings = DECLARED;
+    algoliaSettingsWrites.length = 0;
+    const words = Array.from({ length: 4000 }, (_, index) => `word${index}`);
+    const long = {
+      ...page,
+      _id: "/long",
+      content: words.join(" "),
+      url: "/long",
+    };
+    const { syncAlgolia } = await import("../src/search/sync/algolia.ts");
+    await syncAlgolia([page, long], { appId: "app", indexName: "docs" });
+    const objects = captured.value?.objects ?? [];
+    // The short page stays one record under its own id.
+    expect(objects[0]?.objectID).toBe("/a");
+    const pieces = objects.slice(1);
+    expect(pieces.length).toBeGreaterThan(1);
+    expect(pieces.map((piece) => piece.objectID)).toStrictEqual(
+      pieces.map((_, index) => (index === 0 ? "/long" : `/long#${index}`))
+    );
+    // Each piece fits Algolia's cap and carries the page's own fields, and
+    // the body is cut between words.
+    for (const piece of pieces) {
+      expect(algoliaBytes(piece)).toBeLessThanOrEqual(10_000);
+      expect(piece).toMatchObject({ locale: "en", title: "A", url: "/long" });
+    }
+    expect(pieces.map((piece) => piece.content).join(" ")).toBe(long.content);
+    expect(algoliaSettingsWrites[0]?.indexSettings).toStrictEqual({
+      ...DECLARED,
+      attributeForDistinct: "url",
+      distinct: true,
+    });
+  });
+
+  it("algolia cuts an unspaced script between characters", async () => {
+    process.env.ALGOLIA_ADMIN_API_KEY = "admin";
+    const captured = captureAlgolia();
+    algoliaSettings = DECLARED;
+    // 3 bytes a character, no spaces: 15,000 bytes of body.
+    const content = "検索".repeat(2500);
+    const { syncAlgolia } = await import("../src/search/sync/algolia.ts");
+    await syncAlgolia([{ ...page, content }], {
+      appId: "app",
+      indexName: "docs",
+    });
+    const objects = captured.value?.objects ?? [];
+    expect(objects).toHaveLength(2);
+    for (const piece of objects) {
+      expect(algoliaBytes(piece)).toBeLessThanOrEqual(10_000);
+    }
+    expect(objects.map((piece) => piece.content).join("")).toBe(content);
+  });
+
+  it("algolia keeps the site's own distinct attribute, and uploads whole what can't split", async () => {
+    process.env.ALGOLIA_ADMIN_API_KEY = "admin";
+    const captured = captureAlgolia();
+    algoliaSettings = { ...DECLARED, attributeForDistinct: "section" };
+    algoliaSettingsWrites.length = 0;
+    const { syncAlgolia } = await import("../src/search/sync/algolia.ts");
+    const long = { ...page, content: "word ".repeat(3000) };
+    await syncAlgolia([long], { appId: "app", indexName: "docs" });
+    expect(captured.value?.objects.length).toBeGreaterThan(1);
+    expect(algoliaSettingsWrites).toStrictEqual([]);
+
+    // A title alone past the cap leaves no room for any body: the record
+    // goes up whole, and Algolia's rejection names it.
+    const huge = { ...page, content: "body", title: "t".repeat(12_000) };
+    await syncAlgolia([huge], { appId: "app", indexName: "docs" });
+    expect(
+      captured.value?.objects.map((piece) => piece.objectID)
+    ).toStrictEqual(["/a"]);
   });
 
   it("algolia declares the locale and version filters, keeping the site's own facets", async () => {
@@ -655,38 +833,26 @@ describe("hosted sync uploads", () => {
     expect(captured.deployed).toBe(true);
   });
 
-  it("typesense creates the collection then upserts documents", async () => {
+  it("typesense imports into a new collection and points the alias at it", async () => {
     process.env.TYPESENSE_ADMIN_API_KEY = "admin";
-    const captured: CapturedTypesenseSync = {};
-    typesenseRetrieve = () => Promise.reject(new Error("not found"));
-    typesenseDelete = () => {
-      captured.deleted = true;
-      return Promise.resolve({});
-    };
-    typesenseCreate = (schema) => {
-      captured.created = true;
-      captured.schema = schema;
-      return Promise.resolve(schema);
-    };
-    typesenseImport = (docs, options) => {
-      captured.docs = docs;
-      captured.options = options;
-      return Promise.resolve([]);
-    };
+    typesenseServer = { calls: [] };
     const { syncTypesense } = await import("../src/search/sync/typesense.ts");
     await syncTypesense(records, { collection: "docs", host: "h" });
-    // First run: no existing collection, so nothing to drop.
-    expect(captured.deleted).toBeUndefined();
-    expect(captured.created).toBe(true);
-    expect(captured.options?.action).toBe("upsert");
-    expect(captured.docs?.[0]).toMatchObject({
+    // First run: no alias and no collection of that name, so nothing to drop.
+    expect(typesenseCalls()).toStrictEqual([
+      "create docs_<n>",
+      "import docs_<n>",
+      "alias docs docs_<n>",
+    ]);
+    expect(typesenseServer.options?.action).toBe("upsert");
+    expect(typesenseServer.docs?.[0]).toMatchObject({
       boost: 2,
       id: "/a",
       keywords: ["setup"],
     });
     // The collection sorts by boost and searches keywords.
     expect(
-      captured.schema?.fields.filter((field) =>
+      typesenseServer.schema?.fields.filter((field) =>
         ["boost", "keywords"].includes(field.name)
       )
     ).toStrictEqual([
@@ -706,27 +872,91 @@ describe("hosted sync uploads", () => {
       version: "current",
     };
     await syncTypesense([bare], { collection: "docs", host: "h" });
-    expect(captured.docs?.[0]?.keywords).toStrictEqual([]);
+    expect(typesenseServer.docs?.[0]?.keywords).toStrictEqual([]);
+    // No locale: every field keeps Typesense's default tokenizer.
+    expect(typesenseServer.schema?.fields.some((field) => field.locale)).toBe(
+      false
+    );
   });
 
-  it("typesense drops an existing collection before recreating it", async () => {
+  it("typesense tokenizes the searched text fields for the adapter's locale", async () => {
     process.env.TYPESENSE_ADMIN_API_KEY = "admin";
-    const captured: CapturedTypesenseSync = {};
-    typesenseRetrieve = () => Promise.resolve({});
-    typesenseDelete = () => {
-      captured.deleted = true;
-      return Promise.resolve({});
-    };
-    typesenseCreate = (schema) => {
-      captured.created = true;
-      return Promise.resolve(schema);
-    };
-    typesenseImport = () => Promise.resolve([]);
+    typesenseServer = { calls: [] };
+    const { syncTypesense } = await import("../src/search/sync/typesense.ts");
+    await syncTypesense(records, {
+      collection: "docs",
+      host: "h",
+      locale: "ja",
+    });
+    const localized = typesenseServer.schema?.fields
+      .filter((field) => field.locale === "ja")
+      .map((field) => field.name);
+    expect(localized).toStrictEqual([
+      "title",
+      "description",
+      "content",
+      "keywords",
+    ]);
+  });
+
+  it("typesense swaps the alias, then drops the collection it replaced", async () => {
+    process.env.TYPESENSE_ADMIN_API_KEY = "admin";
+    typesenseServer = { alias: "docs_1", calls: [] };
     const { syncTypesense } = await import("../src/search/sync/typesense.ts");
     await syncTypesense(records, { collection: "docs", host: "h" });
-    // A pre-existing collection is dropped so stale records don't survive.
-    expect(captured.deleted).toBe(true);
-    expect(captured.created).toBe(true);
+    // Searches read docs_1 until the alias moves, so none see a partial index.
+    expect(typesenseCalls()).toStrictEqual([
+      "create docs_<n>",
+      "import docs_<n>",
+      "alias docs docs_<n>",
+      "delete docs_<n>",
+    ]);
+    expect(typesenseServer.calls.at(-1)).toBe("delete docs_1");
+  });
+
+  it("typesense replaces a collection from before the alias under its name", async () => {
+    process.env.TYPESENSE_ADMIN_API_KEY = "admin";
+    typesenseServer = { calls: [], legacy: true };
+    const { syncTypesense } = await import("../src/search/sync/typesense.ts");
+    await syncTypesense(records, { collection: "docs", host: "h" });
+    // An alias can't share a collection's name: the old collection goes once
+    // the new one is complete, and the alias takes the name straight after.
+    expect(typesenseCalls()).toStrictEqual([
+      "create docs_<n>",
+      "import docs_<n>",
+      "delete docs",
+      "alias docs docs_<n>",
+    ]);
+  });
+
+  it("typesense keeps the previous collection serving when the import fails", async () => {
+    process.env.TYPESENSE_ADMIN_API_KEY = "admin";
+    typesenseServer = {
+      alias: "docs_1",
+      calls: [],
+      importError: new Error("1 documents failed during import"),
+    };
+    const { syncTypesense } = await import("../src/search/sync/typesense.ts");
+    await expect(
+      syncTypesense(records, { collection: "docs", host: "h" })
+    ).rejects.toThrow("failed during import");
+    // The half-built collection goes; the alias never moved off docs_1.
+    expect(typesenseCalls()).toStrictEqual([
+      "create docs_<n>",
+      "import docs_<n>",
+      "delete docs_<n>",
+    ]);
+    expect(typesenseServer.calls).not.toContain("delete docs_1");
+  });
+
+  it("typesense stops before building anything when the alias lookup fails", async () => {
+    process.env.TYPESENSE_ADMIN_API_KEY = "admin";
+    typesenseServer = { alias: new Error("Forbidden"), calls: [] };
+    const { syncTypesense } = await import("../src/search/sync/typesense.ts");
+    await expect(
+      syncTypesense(records, { collection: "docs", host: "h" })
+    ).rejects.toThrow("Forbidden");
+    expect(typesenseServer.calls).toStrictEqual([]);
   });
 
   it("the dispatcher runs the provider sync and reports success", async () => {
@@ -736,49 +966,73 @@ describe("hosted sync uploads", () => {
       captured.value = args;
       return Promise.resolve();
     };
-    const config = blumeConfigSchema.parse({
-      search: algolia({ apiKey: "k", appId: "app", indexName: "docs" }),
-    });
-    const project: BlumeProject = {
-      config,
-      context: {
-        componentsFile: null,
-        configFile: null,
-        contentRoot: "/tmp/docs",
-        outDir: "/tmp/.blume",
-        pagesRoot: null,
-        root: "/tmp",
-        themeFile: null,
-      },
-      diagnostics: [],
-      droppedPages: 0,
-      graph: {
-        diagnostics: [],
-        navigation: { featured: [], selectors: [], sidebar: [], tabs: [] },
-        navigationByLocale: {},
-        navigationByVersion: {},
-        pages: [],
-        routes: new Map(),
-      },
-      manifest: {
-        blumeVersion: "0.0.0",
-        contentRoot: "/tmp/docs",
-        output: config.deployment.options.output,
-        projectRoot: "/tmp",
-        routes: [],
-        version: 1,
-      },
-      mode: "build",
-      sources: [],
-      themeFontsConfigured: false,
-    };
     const messages: string[] = [];
-    await syncSearchProvider(project, {
-      start: (message) => messages.push(message),
-      success: (message) => messages.push(message),
-      warn: (message) => messages.push(message),
-    });
+    await syncSearchProvider(
+      syncProject(algolia({ apiKey: "k", appId: "app", indexName: "docs" })),
+      {
+        start: (message) => messages.push(message),
+        success: (message) => messages.push(message),
+        warn: (message) => messages.push(message),
+      }
+    );
     expect(captured.value?.indexName).toBe("docs");
     expect(messages.some((message) => message.includes("Synced"))).toBe(true);
   });
+
+  // With its admin key set, a hosted adapter's failed sync fails the build
+  // instead of deploying the site against an index it didn't update. (Unset,
+  // the sync warns and skips: see search-providers.test.ts.)
+  const failingSyncs = [
+    {
+      env: "ALGOLIA_ADMIN_API_KEY",
+      fail: () => {
+        algoliaSave = () => Promise.reject(new Error("Invalid API key"));
+      },
+      search: algolia({ apiKey: "k", appId: "app", indexName: "docs" }),
+    },
+    {
+      env: "ORAMA_PRIVATE_API_KEY",
+      fail: () => {
+        cloudSnapshot = () => Promise.reject(new Error("Invalid API key"));
+      },
+      search: oramaCloud({
+        apiKey: "k",
+        endpoint: "https://x.orama.run",
+        indexId: "idx",
+      }),
+    },
+    {
+      env: "TYPESENSE_ADMIN_API_KEY",
+      fail: () => {
+        typesenseServer = { alias: new Error("Invalid API key"), calls: [] };
+      },
+      search: typesense({ apiKey: "k", collection: "docs", host: "h" }),
+    },
+  ];
+
+  for (const { env, fail, search } of failingSyncs) {
+    it(`fails the build when ${search.kind} has ${env} but its sync fails`, async () => {
+      process.env[env] = "admin";
+      fail();
+      const warnings: string[] = [];
+      try {
+        await expect(
+          syncSearchProvider(syncProject(search), {
+            start: () => 0,
+            success: () => 0,
+            warn: (message) => warnings.push(message),
+          })
+        ).rejects.toMatchObject({
+          diagnostic: {
+            code: "BLUME_SEARCH_SYNC_FAILED",
+            message: `Search sync to ${search.kind} failed: Invalid API key`,
+            severity: "error",
+          },
+        });
+      } finally {
+        Reflect.deleteProperty(process.env, env);
+      }
+      expect(warnings).toStrictEqual([]);
+    });
+  }
 });

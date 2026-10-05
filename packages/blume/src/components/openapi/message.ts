@@ -41,15 +41,19 @@ export interface MessageServerOption {
   /** `protocol://host+pathname` — what the reader picks between. */
   label: string;
   /**
-   * The spec server with its host/pathname variables at their defaults; the
-   * snippet builders read host/pathname/protocol.
+   * The spec server with its host/pathname variables at their defaults and
+   * its `security` refs resolved; the snippet builders read
+   * host/pathname/protocol/security.
    */
   server: AsyncApiServerObject;
 }
 
 export interface MessageModel {
   action: AsyncApiAction;
-  /** Channel address with `{param}` templates intact, e.g. `user/{id}/signedup`. */
+  /**
+   * Channel address with `{param}` templates intact, e.g. `user/{id}/signedup`
+   * — or the Kafka binding's `topic` when the channel names one.
+   */
   address: string;
   /**
    * Whether the panel offers a live connection. Only WebSocket bindings can be
@@ -57,6 +61,8 @@ export interface MessageModel {
    * CLI samples rather than faked connectivity.
    */
   connectable: boolean;
+  /** Example Kafka message key, sampled from the first message's binding. */
+  key?: string;
   params: MessageParam[];
   payload: MessagePayload;
   /** Normalized binding key (`ws`, `kafka`, `mqtt`, …) when the spec implies one. */
@@ -149,7 +155,7 @@ export const buildMessage = (
   } catch {
     payload = undefined;
   }
-  return {
+  const sample: MessageSample = {
     action: model.action,
     address: model.address.replaceAll(PARAM_TEMPLATE, (template, name) => {
       const value = values.params[String(name)] ?? "";
@@ -158,6 +164,10 @@ export const buildMessage = (
     payload,
     server: custom === "" ? picked?.server : customServer(custom),
   };
+  if (model.key !== undefined) {
+    sample.key = model.key;
+  }
+  return sample;
 };
 
 /**

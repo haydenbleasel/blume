@@ -90,6 +90,8 @@ const uiStringsObject = z.object({
         .default(
           "Product updates, new features, and fixes from every release."
         ),
+      // What the index says when it has no entries to list.
+      empty: z.string().default("No changelog entries yet."),
       title: z.string().default("Changelog"),
     })
     .prefault({}),

@@ -27,4 +27,4 @@ export { memory } from "./memory.ts";
 export type { MemoryAdapter, RateLimitOptions } from "./memory.ts";
 export type { RateLimitAdapter } from "./schema.ts";
 export { upstash } from "./upstash.ts";
-export type { UpstashAdapter } from "./upstash.ts";
+export type { UpstashAdapter, UpstashOptions } from "./upstash.ts";

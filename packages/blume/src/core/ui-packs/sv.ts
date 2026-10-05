@@ -49,6 +49,7 @@ export const sv: UIStringsOverride = {
   banner: { dismiss: "Stäng meddelandet" },
   changelog: {
     description: "Produktuppdateringar och versionsinformation.",
+    empty: "Inga poster i ändringsloggen ännu.",
     title: "Ändringslogg",
   },
   consent: {

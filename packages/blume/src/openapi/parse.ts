@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type * as ConverterModule from "@asyncapi/converter";
 import { normalize, upgrade } from "@scalar/openapi-parser";
 import pRetry, { AbortError } from "p-retry";
-import { isAbsolute, join } from "pathe";
+import { dirname, isAbsolute, join, resolve } from "pathe";
 import type * as UndiciModule from "undici";
 
 import {
@@ -15,8 +15,11 @@ import { nodeRequire } from "../core/node-require.ts";
 import { hashText } from "../core/sources/cache.ts";
 import type { AsyncApiDocument } from "./asyncapi.ts";
 import { normalizeAsyncApiDocument } from "./asyncapi.ts";
+import { operationLabel } from "./checks.ts";
+import type { SpecIssue } from "./checks.ts";
 import { buildGraphqlDocument } from "./graphql-build.ts";
 import type { GraphqlDocument } from "./graphql.ts";
+import { HTTP_METHODS } from "./model.ts";
 import type { ApiDocument } from "./model.ts";
 import { applyOverlay, isJsonObject, overlayDocument } from "./overlay.ts";
 import { SpecDependencyError } from "./spec-dependency-error.ts";
@@ -25,6 +28,8 @@ import { SpecDependencyError } from "./spec-dependency-error.ts";
  * Spec loading and normalization. Blume reuses Scalar's parser
  * (`@scalar/openapi-parser`) to read a spec (YAML or JSON), then upgrade Swagger
  * 2.0 / OpenAPI 3.0 documents to 3.1 so the renderer only handles one shape.
+ * OpenAPI 3.2 is backward compatible with 3.1, so a 3.2 document is read as
+ * written.
  * Internal `$ref`s are deliberately left in place (see `model.ts`).
  *
  * Remote (`http(s)`) specs are fetched defensively — bounded per attempt, retried
@@ -58,6 +63,8 @@ const PROXY_ENV_VARS = [
 
 export interface ParsedSpec {
   document: ApiDocument;
+  /** `x-codeSamples` entries whose `$ref` couldn't be inlined. */
+  issues: SpecIssue[];
   warnings: string[];
 }
 
@@ -360,6 +367,123 @@ export const readOverlaidSpec = async (
   return { text: JSON.stringify(document), warnings };
 };
 
+/** A `$ref` in place of an `x-codeSamples` entry's `source`. */
+interface SampleRef {
+  $ref: string;
+}
+
+/** An `x-codeSamples` entry whose `source` is a `$ref` rather than the code. */
+const isRefSample = (value: unknown): value is { source: SampleRef } =>
+  isJsonObject(value) &&
+  isJsonObject(value.source) &&
+  typeof value.source.$ref === "string";
+
+/**
+ * Where a code sample's `$ref` points, in the form `readSpecText` reads: a
+ * URL, or a path resolved against the spec's own location. `undefined` for
+ * a JSON pointer (`#/…`, or a file with a fragment), which names a spot
+ * inside a document rather than a file of code.
+ */
+const sampleTarget = (
+  ref: string,
+  spec: string,
+  root: string
+): string | undefined => {
+  if (ref.includes("#")) {
+    return undefined;
+  }
+  if (URL_SPEC.test(ref)) {
+    return ref;
+  }
+  if (URL_SPEC.test(spec)) {
+    return new URL(ref, spec).href;
+  }
+  return resolve(dirname(isAbsolute(spec) ? spec : join(root, spec)), ref);
+};
+
+/**
+ * Inline each `x-codeSamples` entry whose `source` is a `$ref` to a file of
+ * its own, as Redocly's docs describe (`source: { $ref: ../code_samples/… }`):
+ * `redocly bundle` inlines those, and a spec read as written doesn't. Each
+ * file is read relative to the spec,
+ * the way the spec itself was (local, or fetched and cached), so the sample
+ * renders like a written-out one. An entry that can't be read is left out of
+ * the page, with a warning, rather than dropped without a sign.
+ */
+const inlineSampleRefs = async (
+  document: ApiDocument,
+  spec: string,
+  root: string,
+  options: SpecFetchOptions
+): Promise<SpecIssue[]> => {
+  const reads: Promise<SpecIssue | undefined>[] = [];
+  const inline = async (
+    entry: { source: SampleRef | string },
+    ref: string,
+    label: string
+  ): Promise<SpecIssue | undefined> => {
+    const target = sampleTarget(ref, spec, root);
+    if (target === undefined) {
+      return {
+        code: "BLUME_OPENAPI_CODE_SAMPLE_REF",
+        message: `${label} has an \`x-codeSamples\` entry whose \`source\` is a $ref to "${ref}", a spot inside a document, which Blume doesn't resolve, so the sample is left out.`,
+        suggestion:
+          "Point the `$ref` at a file that holds only the sample's code, or write the code out in `source`.",
+      };
+    }
+    try {
+      const { text } = await readSpecText(target, root, options);
+      entry.source = text;
+      return undefined;
+    } catch (error) {
+      // SAFETY: a failed read throws a Node error, and a failed fetch an
+      // Error (`attemptFetch` wraps anything else); only the message is shown.
+      const { message } = error as Error;
+      return {
+        code: "BLUME_OPENAPI_CODE_SAMPLE_REF",
+        message: `${label} has an \`x-codeSamples\` entry whose \`source\` is a $ref to "${ref}", which couldn't be read (${message}), so the sample is left out.`,
+        suggestion:
+          "Check the path, which is relative to the spec, or write the code out in `source`.",
+      };
+    }
+  };
+  const visit = (
+    name: string,
+    item: NonNullable<ApiDocument["paths"]>[string] | undefined,
+    webhook: boolean
+  ): void => {
+    if (!isJsonObject(item) || "$ref" in item) {
+      return;
+    }
+    for (const method of HTTP_METHODS) {
+      const operation = item[method];
+      // The spelling `customCodeSamples` renders: the current one wins.
+      const samples = isJsonObject(operation)
+        ? (operation["x-codeSamples"] ?? operation["x-code-samples"])
+        : undefined;
+      for (const entry of Array.isArray(samples) ? samples : []) {
+        if (isRefSample(entry)) {
+          reads.push(
+            inline(
+              entry,
+              entry.source.$ref,
+              operationLabel(name, method, webhook)
+            )
+          );
+        }
+      }
+    }
+  };
+  for (const [path, item] of Object.entries(document.paths ?? {})) {
+    visit(path, item, false);
+  }
+  for (const [name, item] of Object.entries(document.webhooks ?? {})) {
+    visit(name, item, true);
+  }
+  const issues = await Promise.all(reads);
+  return issues.filter((issue) => issue !== undefined);
+};
+
 export const parseSpec = async (
   spec: string,
   root: string,
@@ -377,7 +501,8 @@ export const parseSpec = async (
       `${spec} is not a valid OpenAPI document (expected a YAML or JSON object).`
     );
   }
-  return { document: specification, warnings };
+  const issues = await inlineSampleRefs(specification, spec, root, options);
+  return { document: specification, issues, warnings };
 };
 
 export interface ParsedAsyncApiSpec {

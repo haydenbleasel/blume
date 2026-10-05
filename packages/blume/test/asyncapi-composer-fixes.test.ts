@@ -77,12 +77,13 @@ const messageModel = (protocol: string | undefined): MessageModel => ({
   servers: [],
 });
 
+const address = (protocol?: string) => {
+  const model = messageModel(protocol);
+  return buildMessage(model, defaultMessageValues(model)).address;
+};
+
 describe("channel parameters in the address", () => {
   it("encodes a value only where the address is a URL", () => {
-    const address = (protocol?: string) => {
-      const model = messageModel(protocol);
-      return buildMessage(model, defaultMessageValues(model)).address;
-    };
     expect(address("ws")).toBe("sensors/sensor%201%2Fa/readings");
     expect(address("https")).toBe("sensors/sensor%201%2Fa/readings");
     expect(address("kafka")).toBe("sensors/sensor 1/a/readings");

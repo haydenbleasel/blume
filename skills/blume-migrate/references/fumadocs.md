@@ -6,21 +6,22 @@ Fumadocs is code-first: navigation comes from the folder tree + per-folder `meta
 
 - Content under **`content/docs/`** (the Fumadocs convention).
 - Per-folder **`meta.json`** files.
-- `fumadocs-ui` / `fumadocs-core` / `fumadocs-mdx` deps and a `source.config.ts`.
-- A `loader({ baseUrl: "/docs" })` call in `lib/source.ts` (or `app/source.ts`, `src/lib/source.ts`, `source.ts`).
+- `fumadocs-ui` / `fumadocs-core` / `fumadocs-mdx` deps, and collections declared either in a `source.config.ts` (the Config API) or, in newer scaffolds, with `defineDocs` from `fumadocs-mdx/macro` inside `lib/source.ts` (no `source.config.ts` at all).
+- A `loader({ baseUrl })` call in `lib/source.ts` (or `app/source.ts`, `src/lib/source.ts`, `source.ts`). Newer scaffolds pass a constant (`baseUrl: docsRoute`) defined in `lib/shared.ts` — resolve it there.
 
 ## Config
 
-Fumadocs declares almost nothing Blume needs — only two things map:
+Fumadocs declares little Blume needs — read the loader and the shared layout options:
 
-- **Title** — read `package.json` `name`, prettified (drop scope, split on `-_`, Title-Case). For a generic monorepo name (`web`, `app`, `docs`…), use the repo-root directory name instead.
+- **Title** — the header title: `nav.title` in `baseOptions` (`lib/layout.shared.tsx`, or `app/layout.config.tsx` in older scaffolds; often the `appName` constant from `lib/shared.ts`; extract the text if it's JSX). Without one, read `package.json` `name`, prettified (drop scope, split on `-_`, Title-Case); for a generic monorepo name (`web`, `app`, `docs`…), use the repo-root directory name instead.
+- **Header settings** (the same `baseOptions`): `githubUrl` → `github: { owner, repo }` (the repository and edit links; when it's built from a `gitConfig` constant in `lib/shared.ts`, `{ user, repo, branch }` → `{ owner: user, repo, branch }`); `links` entries → `navigation.actions` (`{ label: text, href: url }`), except a `type: "icon"` link to a platform `footer.socials` knows (Discord, X, …), which goes there instead. Menus, custom items, and JSX in `nav` → report.
 - **Route prefix** — the `baseUrl` in the source loader (required in Fumadocs, so it's always declared). If it's a real prefix (e.g. `/docs`), set top-level **`basePath: "/docs"`** — it prefixes every route while staying invisible to the sidebar, which matches Fumadocs' behavior. (A `content.sources` `prefix` also works but adds a wrapping nav group — only use it when you _want_ the group.) If `baseUrl` is `"/"`, serve from the site root (nothing to set).
 
-Everything else is `defineConfig({ title })`.
+Everything else is Blume defaults.
 
-**Also read `source.config.ts` `mdxOptions`** — remark/rehype plugins live there:
+**Also read the MDX options** — remark/rehype plugins live in `source.config.ts` `mdxOptions`, or, with the macro API, in the collection options passed to `defineDocs` (a macro project may still keep a `source.config.ts` for global options):
 
-- `remark-math`/`rehype-katex` → nothing to configure: block math `$$…$$` renders in `.mdx` out of the box (there is **no** `markdown.math` field). Inline `$…$` is **not** supported — convert inline math to `$$…$$` or drop it (report).
+- `remark-math`/`rehype-katex` → nothing to configure: `$$…$$` renders in `.mdx` out of the box (there is **no** `markdown.math` field), as a block or inline within a sentence. A single `$` stays literal, so convert each inline `$…$` to `$$…$$` inside its sentence.
 - A Twoslash transformer → Blume supports the `twoslash` fence meta natively; drop the plugin.
 - Custom Shiki transformers/themes or other plugins → report.
 
@@ -39,14 +40,17 @@ Everything else is `defineConfig({ title })`.
 | `description` | **drop** (folders have no description) |
 | `collapsible: false` | that folder's `display: "flat"` (a plain heading, even under a global `"group"` mode) |
 
-`meta.ts` accepts **only** `title`, `icon`, `order`, `collapsed`, `pages`, `display`. Render mode is per-folder or global: a folder that needs collapsible rendering sets its own `meta.ts` `display: "group"` (drill-in is `"page"`); when the whole sidebar should collapse, set `navigation.sidebar.display: "group"` once in `blume.config.ts` instead of repeating it per folder.
+`meta.ts` accepts **only** `title`, `icon`, `order`, `collapsed`, `pages`, `display`, `directory` (`"card"`/`"accordion"` lists the folder's pages below its `index` page — the replacement for a hand-written card list of the folder's children). Render mode is per-folder or global: a folder that needs collapsible rendering sets its own `meta.ts` `display: "group"` (drill-in is `"page"`); when the whole sidebar should collapse, set `navigation.sidebar.display: "group"` once in `blume.config.ts` instead of repeating it per folder.
+
+**Numeric filename prefixes move URLs.** Fumadocs builds slugs from the file path as written, so `01-intro.mdx` serves `/docs/01-intro`; Blume reads a `01-` prefix on a file or folder as sort order and drops it from the route (`/docs/intro`). Add a `redirects` entry for every prefixed file or folder (or pin the old path with frontmatter `slug`, a full path from the content root), and write `pages` entries without the prefix (`"intro"`, not `"01-intro"`).
 
 **`root: true` folders are Fumadocs' tab mechanism** — Fumadocs UI renders them as layout tabs and scopes the sidebar to the active one. That is exactly Blume's `navigation.tabs`: add `{ label, path, icon? }` per root folder (label/icon from its `meta.json`), pointing at the folder's route. Blume then scopes the sidebar by URL prefix the same way. Don't try to model root folders inside `meta.ts`.
 
 Handle the `pages` array items:
 
 - **`"..."`** (rest marker) / `""` → drop; Blume appends unlisted pages automatically. **`"z...a"`** (reversed rest) → no equivalent; list the pages explicitly in the intended order.
-- **`"!page"`** (exclusion) → Blume _appends_ unlisted pages, so a dropped `!page` **resurfaces in the sidebar**. Set that page's frontmatter `sidebar.hidden: true` instead.
+- **A `pages` list with no `"..."`** → Fumadocs shows **only** the listed items; every page and folder it leaves out is hidden from the sidebar (still served by URL). Blume appends unlisted children, so each one **resurfaces** — set `sidebar.hidden: true` in each left-out page's frontmatter (for a left-out folder, in every page under it — a folder with no visible page drops out of the sidebar).
+- **`"!page"`** (exclusion from `"..."`) → the same trap: Blume _appends_ unlisted pages, so a dropped `!page` **resurfaces in the sidebar**. Set that page's frontmatter `sidebar.hidden: true` instead.
 - **`"---Section---"`** (separator; also the `---[Icon]Label---` variant) → Blume has no flat separator. Turn each section into a **`(Section)/` group folder** (route-transparent — the `(…)` segment is stripped from URLs), and move the section's pages into it. If a section wraps a single existing folder, leave it in place and set that folder's `meta.ts` `title` instead.
 - **`"...folder"`** (extract) → Blume can't flatten a folder inline; keep it as a normal group at that ordering position and report it.
 - **`"[Text](url)"`** (link; also `[Icon][Text](url)` and `external:` variants) → a top-level/utility link belongs in **`navigation.featured`** (`{ label, href, icon? }` — pinned above the sidebar on every route). A link buried deep in one folder has no folder-meta home — drop and report (or model that one folder via an explicit `navigation.sidebar`).
@@ -54,7 +58,7 @@ Handle the `pages` array items:
 
 ## Frontmatter
 
-Fumadocs' core frontmatter (`title`, `description`, `icon`) matches Blume — but **convert `icon` casing** (see Icons). Drops: **`full`** (Fumadocs' full-width/no-TOC layout — no equivalent; report) and **`_openapi`** (generated API stubs — delete the whole page, see OpenAPI). Any other non-schema key is a build error, so drop and report.
+Fumadocs' core frontmatter (`title`, `description`, `icon`) matches Blume — but **convert `icon` casing** (see Icons). **`full: true`** (full width, TOC folded into a popover) → `mode: wide` (full column width, no TOC — the closest match; report); **`_openapi`** marks a generated API stub — delete the whole page (see OpenAPI). Any other non-schema key is a build error, so drop and report.
 
 ## Icons: lucide-react names → kebab-case
 
@@ -71,7 +75,7 @@ Fumadocs icons are strings resolved by the repo's own `icon` handler in `loader(
 - **`<Banner>`** (layout-mounted, not per-page) → the `banner` config field (`{ content, link: { href, text }, dismissible, id }`).
 - **`<include>./partial.mdx</include>`** — Blume uses the same include syntax. **Pass through unchanged**: paths resolve relative to the including file, a leading `/` resolves from the content root, and nested includes work. Keep partials in `_`-prefixed files or folders so they stay out of routing and the sidebar.
 - **No equivalent — report:** `<DynamicCodeBlock>`, `<ImageZoom>` (Blume zooms content images by default), `<InlineTOC>`.
-- **Strip or convert every import** — not just `fumadocs-*`: `lucide-react` imports (icon JSX → string names), `next/image`/`next/link` (→ Markdown image/link), and local components. **Inventory `mdx-components.tsx` before deleting it** — components registered there are used import-free in MDX bodies; port or inline each usage first.
+- **Strip or convert every import** — not just `fumadocs-*`: `lucide-react` imports (icon JSX → string names), `next/image`/`next/link` (→ Markdown image/link), and local components. **Inventory the MDX components file before deleting it** — `components/mdx.tsx` (`getMDXComponents`) in newer scaffolds, `mdx-components.tsx` in older ones; components registered there are used import-free in MDX bodies; port or inline each usage first.
 
 ## Headings
 
@@ -96,8 +100,8 @@ A `loader({ i18n })` setup (locale-suffixed files or locale dirs) → Blume `i18
 
 ## Package.json & teardown
 
-Repoint scripts (`dev`→`blume dev`, `build`→`blume build`, `start`→`blume preview`), remove the `fumadocs-*`/`@fumadocs/*` deps and the host framework's deps (`next`, `react-router`, `@tanstack/*`…), add `blume`. Safe to delete after harvesting (see above for what to read first): `source.config.*`, `mdx-components.tsx`, the app/route dir, and host-framework config (`next.config.*`, `next-env.d.ts`, the `next` tsconfig plugin — or the React Router/TanStack equivalents).
+Repoint scripts (`dev`→`blume dev`, `build`→`blume build`, `start`→`blume preview`), remove the `fumadocs-*`/`@fumadocs/*` deps and the host framework's deps (`next`, `react-router`, `@tanstack/*`…), add `blume`. Safe to delete after harvesting (see above for what to read first): `source.config.*`, `lib/source.ts`, `lib/shared.ts`, `lib/layout.shared.tsx` (or `app/layout.config.tsx`), `components/mdx.tsx` / `mdx-components.tsx`, the app/route dir, and host-framework config (`next.config.*`, `next-env.d.ts`, the `next` tsconfig plugin — or the React Router/TanStack equivalents).
 
 ## Dropped — report these
 
-Folder `description` and `collapsible: false`; reversed rest (`z...a`) ordering; the extract (`...folder`) flatten semantics; deep-folder sidebar links; frontmatter `full`; `<DynamicCodeBlock>`/`<InlineTOC>`; custom Shiki transformers; any icon with no Lucide equivalent after casing conversion.
+Folder `description` and `collapsible: false`; reversed rest (`z...a`) ordering; the extract (`...folder`) flatten semantics; deep-folder sidebar links; frontmatter `full` (approximated as `mode: wide`); header settings from `lib/layout.shared.tsx` with no Blume home; `<DynamicCodeBlock>`/`<InlineTOC>`; custom Shiki transformers; any icon with no Lucide equivalent after casing conversion.

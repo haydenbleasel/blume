@@ -26,7 +26,7 @@ blume eval  4 question(s) · Codex
 
 ## So funktioniert es [#how-it-works]
 
-Jede Frage durchläuft zwei Agent-Sessions, und zwar mit einer Agent-CLI, die du bereits installiert hast – standardmäßig [Codex](https://developers.openai.com/codex/cli) oder mit `--agent claude` [Claude Code](https://claude.com/claude-code). Blume speichert keine API-Keys und ruft selbst kein Modell auf. Mit Codex laufen beide Sessions außerdem ohne die Shell-, Befehls- und Bild-Tools von Codex und erben keine deiner Umgebungsvariablen.
+Jede Frage durchläuft zwei Agent-Sessions, und zwar mit einer Agent-CLI, die du bereits installiert hast – standardmäßig [Codex](https://developers.openai.com/codex/cli) oder mit `--agent claude` [Claude Code](https://claude.com/claude-code). Blume speichert keine API-Keys und ruft selbst kein Modell auf. Mit Codex laufen beide Sessions außerdem ohne die Shell-, Befehls- und Bild-Tools von Codex und erben keine deiner Umgebungsvariablen. Mit Claude Code sind in beiden Sessions alle eingebauten Tools deaktiviert, und deine Claude-Code-Einstellungsdateien sowie deine `CLAUDE.md` werden übersprungen. So können deine Hooks, Plugins und dein Memory dem Reader nichts verraten, was nicht in der Doku steht. Dein Claude-Code-Login funktioniert weiterhin; alles andere, was Claude Code braucht, etwa `ANTHROPIC_API_KEY`, setzt du in deiner Shell statt in `settings.json`.
 
 1. **Der Reader** beantwortet die Frage _ausschließlich_ anhand deiner Dokumentation. Er läuft in einem leeren Verzeichnis mit deaktivierten Datei-, Shell- und Web-Tools und ist mit einem privaten [MCP-Server](/docs/discoverability/mcp) verbunden, der deine Doku bereitstellt – mit denselben `search_docs`/`get_page`-Tools, die ein echter Agent auf deiner deployten Seite verwendet. Er kann dein Repo nicht lesen und erlebt die Doku daher genau wie ein neuer Nutzer: Was nicht dasteht, existiert nicht.
 2. **Der Judge** bewertet die Antwort anhand der Fakten, die du aufgeführt hast, und hat dabei gar keine Tools. Umschreibungen bestehen; ein fehlender oder widersprochener Fakt fällt durch – genau wie „die Dokumentation sagt dazu nichts“.
@@ -83,9 +83,9 @@ blume eval --threshold 0.8    # at least 80% must pass
 blume eval --json             # machine-readable report on stdout
 ```
 
-Der JSON-Report hat dieselbe Struktur aus `diagnostics` + `summary` wie `blume validate --json` und `blume audit --json` und enthält zusätzlich die Ergebnisse pro Frage (Antwort, Score, fehlende Fakten, Kosten).
+Der JSON-Report hat dieselbe Struktur aus `diagnostics` + `summary` wie `blume validate --json` und `blume audit --json` und enthält zusätzlich die Ergebnisse pro Frage (Antwort, Score, fehlende Fakten und – mit Claude Code – Kosten).
 
-Da jede Frage zwei Modell-Sessions umfasst, kostet ein Eval-Lauf echtes Geld und Zeit – die Kosten pro Frage werden während des Laufs angezeigt. Ein sinnvolles CI-Setup führt `blume eval` bei Änderungen an der Doku aus, nicht bei jedem Push.
+Da jede Frage zwei Modell-Sessions umfasst, kostet ein Eval-Lauf echtes Geld und Zeit. Mit Claude Code werden die Kosten pro Frage während des Laufs angezeigt und in der Zusammenfassung aufsummiert; Codex meldet seine Kosten nicht, daher zeigt ein Codex-Lauf keine an. Ein sinnvolles CI-Setup führt `blume eval` bei Änderungen an der Doku aus, nicht bei jedem Push.
 
 ## Befunde beheben [#fixing-the-findings]
 
@@ -95,7 +95,7 @@ Jeder Fehlschlag nennt die fehlenden Fakten und die Seite, auf der sie stehen so
 blume eval --fix
 ```
 
-Das schreibt den vollständigen JSON-Report in eine Datei und öffnet den Agenten interaktiv mit einem Prompt, der ihn durch jede fehlgeschlagene Frage führt: die genannte Seite lesen, die fehlenden Fakten im Stil der Seite ergänzen und `blume eval` erneut ausführen, bis alles besteht. Die Session ist bewusst interaktiv – du prüfst die Änderungen über den Berechtigungsablauf des Agenten selbst. Außerdem wird der Agent angewiesen, niemals Fragen zu löschen oder erwartete Fakten abzuschwächen, nur um auf Grün zu kommen.
+Das schreibt den vollständigen JSON-Report in eine Datei und öffnet den Agenten interaktiv mit einem Prompt, der ihn durch jede fehlgeschlagene Frage führt: die genannte Seite lesen, die fehlenden Fakten im Stil der Seite ergänzen und `blume eval` mit denselben Werten für `--agent`, `--file`, `--threshold` und `--timeout` wie im ursprünglichen Lauf erneut ausführen, bis alles besteht. Die Session ist bewusst interaktiv – du prüfst die Änderungen über den Berechtigungsablauf des Agenten selbst. Außerdem wird der Agent angewiesen, niemals Fragen zu löschen oder erwartete Fakten abzuschwächen, nur um auf Grün zu kommen.
 
 ## Flags
 

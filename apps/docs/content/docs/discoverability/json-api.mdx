@@ -13,6 +13,8 @@ Every Blume site also serves its docs as a small read-only **JSON API** — the 
 | `/api/docs/search?q=` | Full-text search, with the same `limit`, `contentTypes`, `locale`, `version`, and `filters[key]` scoping as `search_docs`. Server output only. |
 | `/openapi.json` | The OpenAPI 3.1 description of the whole machine-readable surface. |
 
+The page index leaves out [hidden pages](/docs/content/navigation#hidden-pages), which get no per-page document either; `get_page` and the page's `.md` mirror still serve one, since hidden isn't private. Pages with `seo.noindex`, `ai.exclude`, or `search.exclude` are listed like any other. A page document's `markdown` is the page's source as agents read it, with its frontmatter block kept at the top.
+
 The page index, per-page documents, and navigation are prerendered, so a static site serves them as files from any host. Search is a live endpoint and exists only under [server output](/docs/deployment#server-rendering), where it runs the same index `search_docs` does.
 
 ## Errors

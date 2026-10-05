@@ -169,6 +169,16 @@ describe("search config schema", () => {
     });
   });
 
+  it("sends query text to analytics unless search.analytics.queries is off", () => {
+    expect(blumeConfigSchema.parse({}).search.analytics).toStrictEqual({
+      queries: true,
+    });
+    expect(
+      parse({ analytics: { queries: false }, provider: orama() }).search
+        .analytics
+    ).toStrictEqual({ queries: false });
+  });
+
   it("accepts nested JSON in a passthrough option", () => {
     const result = blumeConfigSchema.safeParse({
       search: algolia({
@@ -463,17 +473,21 @@ describe("searchClientTemplate", () => {
 
 describe("mixedbreadSearchEndpointTemplate", () => {
   it("reads the secret from the environment and inlines the options", () => {
-    const endpoint = mixedbreadSearchEndpointTemplate({
-      storeId: "store-123",
-    });
+    const endpoint = mixedbreadSearchEndpointTemplate(
+      { storeId: "store-123" },
+      []
+    );
     expect(endpoint).toContain('import { getSecret } from "astro:env/server"');
     expect(endpoint).toContain('getSecret("MIXEDBREAD_API_KEY")');
-    expect(endpoint).toContain('const OPTIONS = {"storeId":"store-123"};');
+    expect(endpoint).toContain('const STORE_ID = "store-123";');
     expect(endpoint).toContain("export const prerender = false;");
   });
 
   it("reads the request body under a cap before parsing it", () => {
-    const endpoint = mixedbreadSearchEndpointTemplate({ storeId: "store-123" });
+    const endpoint = mixedbreadSearchEndpointTemplate(
+      { storeId: "store-123" },
+      []
+    );
     expect(endpoint).toContain(
       'import { readCappedText } from "blume/core/request-body.ts";'
     );
@@ -596,6 +610,23 @@ describe("syncSearchProvider", () => {
       expect(log.calls.warn[0]).toContain(`${env} is not set`);
     });
   }
+
+  it("warns and skips orama-cloud without an indexId, even with its key set", async () => {
+    // `indexId` is what turns the Orama Cloud sync on.
+    process.env.ORAMA_PRIVATE_API_KEY = "private";
+    const log = reporter();
+    try {
+      await syncSearchProvider(
+        emptyProject(
+          oramaCloud({ apiKey: "pub", endpoint: "https://x.orama.run" })
+        ),
+        log
+      );
+    } finally {
+      Reflect.deleteProperty(process.env, "ORAMA_PRIVATE_API_KEY");
+    }
+    expect(log.calls.warn[0]).toContain("indexId");
+  });
 
   it("throws when the orama-cloud index id is absent", async () => {
     // `indexId` is optional on the adapter (the browser client doesn't need

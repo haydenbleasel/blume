@@ -25,7 +25,12 @@ export interface MessageSample {
   address: string;
   /** Example payload value (undefined when none could be derived). */
   payload?: unknown;
-  /** First server the channel is available on, if any. */
+  /** Example Kafka message key, when the message's binding declares one. */
+  key?: string;
+  /**
+   * First server the channel is available on, if any, its `security` entries
+   * resolved to scheme objects.
+   */
   server?: AsyncApiServerObject;
 }
 
@@ -98,12 +103,63 @@ const webSocketSnippet = (sample: MessageSample): string => {
   ].join("\n");
 };
 
+/** librdkafka's `sasl.mechanisms` value for each AsyncAPI SASL scheme type. */
+const SASL_MECHANISMS = new Map([
+  ["gssapi", "GSSAPI"],
+  ["plain", "PLAIN"],
+  ["scramSha256", "SCRAM-SHA-256"],
+  ["scramSha512", "SCRAM-SHA-512"],
+]);
+
+/**
+ * The `-X` properties kcat hands librdkafka to reach the server: TLS for
+ * `kafka-secure`, and the first SASL scheme the server declares, with its
+ * credentials read from the environment (Kerberos brings its own).
+ */
+const kafkaSecurityFlags = (server?: AsyncApiServerObject): string[] => {
+  const tls = server?.protocol?.toLowerCase() === "kafka-secure";
+  const mechanism = (server?.security ?? [])
+    .map((entry) => SASL_MECHANISMS.get(String(entry?.type)))
+    .find((value) => value !== undefined);
+  if (mechanism === undefined) {
+    return tls ? ["-X security.protocol=SSL"] : [];
+  }
+  const flags = [
+    `-X security.protocol=${tls ? "SASL_SSL" : "SASL_PLAINTEXT"}`,
+    `-X sasl.mechanisms=${mechanism}`,
+  ];
+  if (mechanism !== "GSSAPI") {
+    flags.push(
+      '-X sasl.username="$KAFKA_USERNAME"',
+      '-X sasl.password="$KAFKA_PASSWORD"'
+    );
+  }
+  return flags;
+};
+
+/**
+ * The separator between key and value: kcat splits each produced line at its
+ * first `|`, and prints consumed keys before one.
+ */
+const KEY_DELIMITER = "|";
+
 const kcatSnippet = (sample: MessageSample): string => {
   const broker = sample.server?.host ?? "localhost:9092";
-  const base = `kcat -b ${shellQuote(broker)} -t ${shellQuote(sample.address)}`;
-  return sample.action === "receive"
-    ? `echo ${shellQuote(payloadInline(sample))} | ${base} -P`
-    : `${base} -C`;
+  const mode = sample.action === "receive" ? "-P" : "-C";
+  const keyed =
+    sample.key === undefined ? "" : ` -K ${shellQuote(KEY_DELIMITER)}`;
+  const command = [
+    `kcat -b ${shellQuote(broker)} -t ${shellQuote(sample.address)} ${mode}${keyed}`,
+    ...kafkaSecurityFlags(sample.server),
+  ].join(" \\\n  ");
+  if (sample.action !== "receive") {
+    return command;
+  }
+  const line =
+    sample.key === undefined
+      ? payloadInline(sample)
+      : `${sample.key}${KEY_DELIMITER}${payloadInline(sample)}`;
+  return `echo ${shellQuote(line)} | ${command}`;
 };
 
 const mosquittoSnippet = (sample: MessageSample): string => {

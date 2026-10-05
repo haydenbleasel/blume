@@ -28,7 +28,7 @@ Os ids das âncoras são gerados a partir do texto do título, então um título
 
 Crie um link para ela como `/page#setup`. A sintaxe é igual à do Fumadocs, então conteúdo migrado funciona sem alterações.
 
-A forma `{#custom-id}`, usada pelo Pandoc, pelo kramdown e por toolchains de especificação baseadas em Markdown, é aceita como equivalente em arquivos `.md`. No `.mdx`, um `{…}` solto é uma expressão JSX e a página não compila — o `blume check` reporta o marcador como `BLUME_MDX_CURLY_ANCHOR` — então escreva `[#custom-id]` ali, ou escape as chaves. A forma escapada fixa a mesma âncora nos dois formatos, o que a torna a grafia certa para um partial que páginas `.mdx` [incluem](/docs/content/includes):
+A forma `{#custom-id}`, usada pelo Pandoc, pelo kramdown e por toolchains de especificação baseadas em Markdown, é aceita como equivalente em arquivos `.md`. Somente essa grafia sem espaços fixa uma âncora: a forma com espaços `{ #custom-id }` e o `{: #custom-id }` do kramdown (ambos vindos do `attr_list` do MkDocs) permanecem no texto do título. No `.mdx`, um `{…}` solto é uma expressão JSX e a página não compila — o `blume check` reporta as três grafias como `BLUME_MDX_CURLY_ANCHOR` — então escreva `[#custom-id]` ali, ou escape as chaves. A forma escapada fixa a mesma âncora nos dois formatos, o que a torna a grafia certa para um partial que páginas `.mdx` [incluem](/docs/content/includes):
 
 ```md
 ## Getting started \{#setup\}
@@ -458,7 +458,7 @@ flowchart LR
 ```
 ````
 
-Os diagramas são renderizados no cliente, então este é um recurso exclusivo do MDX, e a biblioteca Mermaid é carregada apenas em páginas que incluem um; um site sem nenhum diagrama nem chega a enviá-la. Por padrão, os diagramas usam o layout dagre e o visual clássico do Mermaid; ative outro layout ou visual em um único diagrama pelo front matter do Mermaid (um bloco `config:` com `layout: elk` ou `look: neo`), e o motor ELK é carregado apenas para os diagramas que o solicitarem. O restante desta seção é uma galeria de tipos comuns — veja a [documentação do Mermaid](https://mermaid.js.org/intro/) para a lista completa.
+Os diagramas são renderizados no cliente, então este é um recurso exclusivo do MDX, e a biblioteca Mermaid é carregada apenas em páginas que incluem um; um site sem nenhum diagrama nem chega a enviá-la. Por padrão, os diagramas usam o layout dagre e o visual clássico do Mermaid; ative outro layout ou visual em um único diagrama pelo front matter do Mermaid (um bloco `config:` com `layout: elk` ou `look: neo`), e o motor ELK é carregado apenas para os diagramas que o solicitarem. Um diagrama que o Mermaid não consegue interpretar mostra "Não foi possível renderizar este diagrama." no lugar dele; o erro do parser do Mermaid, com a linha em que ele parou, vai para o console do navegador, e o `blume dev` também o exibe abaixo da mensagem. O restante desta seção é uma galeria de tipos comuns — veja a [documentação do Mermaid](https://mermaid.js.org/intro/) para a lista completa.
 
 ### Fluxograma [#flowchart]
 

@@ -76,7 +76,7 @@ Seu texto é **acrescentado às** instruções internas em vez de substituí-las
 
 O assistente é **fundamentado na sua documentação**. Para cada pergunta ele recupera as páginas mais relevantes — usando o mesmo índice léxico do [Orama](/docs/configuration/search) que alimenta a busca na página — e as injeta no system prompt do modelo, de forma que as respostas venham do seu conteúdo e não do conhecimento próprio do modelo. O assistente é instruído a responder apenas a partir das páginas recuperadas, a dizer quando algo não está coberto e a citar as páginas de onde tirou a informação.
 
-A página em que o leitor está no momento é adicionada primeiro ao contexto e usada para limitar a recuperação ao idioma daquela página — e, num site [versionado](/docs/content/versioning), à versão da documentação dela — para que as respostas continuem relevantes ao ponto em que ele está na documentação. A recuperação roda no momento da requisição a partir de um snapshot embutido no build, então funciona independentemente do seu provedor de [busca](/docs/configuration/search) — até mesmo com `search: false` — e não precisa de configuração.
+A página em que o leitor está no momento é adicionada primeiro ao contexto e usada para limitar a recuperação ao idioma daquela página — e, num site [versionado](/docs/content/versioning), à versão da documentação dela — para que as respostas continuem relevantes ao ponto em que ele está na documentação. Uma pergunta feita fora da documentação, como numa landing page, fica restrita ao idioma indicado pelo prefixo de locale da URL (`/ja`), ou ao idioma padrão. A recuperação roda no momento da requisição a partir de um snapshot embutido no build, então funciona independentemente do seu provedor de [busca](/docs/configuration/search) — até mesmo com `search: false` — e não precisa de configuração.
 
 A fundamentação está ativa para todos os adaptadores, exceto o **[Inkeep](#inkeep)**, que roda a própria recuperação sobre o conteúdo que você indexou no painel dele.
 
@@ -125,6 +125,8 @@ Os três não são intercambiáveis. `contextBudget` limita toda a injeção, `e
 
 Os padrões servem bem para um modelo hospedado. Reduza-os quando você estiver servindo a partir do seu próprio hardware e o tempo até o primeiro token importar mais que a abrangência; as respostas continuam fundamentadas de qualquer forma, e o assistente é instruído a dizer quando algo não está coberto em vez de preencher a lacuna.
 
+No seu próprio hardware, dimensione também a janela de contexto do modelo para o prompt inteiro, e não só para os trechos: a conversa até ali acrescenta até 24.000 caracteres e, com `tools` ativado, um único resultado de `read_page` acrescenta até 20.000, cerca de 5.000 tokens sozinho. O Ollama, por exemplo, usa por padrão uma janela de 4k tokens em GPUs menores, e um prompt que a ultrapassa não falha: o Ollama descarta o início do prompt, onde ficam as instruções e os trechos, e o modelo responde sem a sua documentação.
+
 ## Endpoint externo [#external-endpoint]
 
 Já tem um backend de API para IA? Aponte o painel para ele e mantenha o build da documentação estático:
@@ -147,6 +149,8 @@ O Blume envia o mesmo corpo `POST` que a rota interna:
 }
 ```
 
+`messages` é a conversa até aqui, terminando com a nova pergunta. A rota interna aceita no máximo 40 mensagens e 24.000 caracteres delas em JSON, então, quando uma conversa ultrapassa qualquer um desses limites, o painel envia as trocas mais recentes que cabem e descarta as mais antigas.
+
 Retorne uma resposta bem-sucedida cujo corpo seja um fluxo de texto UTF-8 puro. Se o endpoint estiver em outra origem, permita a origem da documentação com CORS: aceite `OPTIONS` e `POST`, permita o cabeçalho de requisição `content-type` e retorne os cabeçalhos CORS tanto no preflight quanto na resposta com streaming. Com `endpoint` definido, o Blume gera a interface de chat mas nenhuma rota de servidor, snapshot de fundamentação, dependência de provedor ou aviso de segredo de provedor; seu backend fica responsável pela recuperação, autenticação, limitação de taxa, acesso ao modelo e citações. Um adaptador definido junto com ele é ignorado.
 
 ## Chamadas de outras origens [#cross-origin-callers]
@@ -162,7 +166,7 @@ ai: {
 }
 ```
 
-A rota então responde ao preflight `OPTIONS` do navegador e nomeia uma origem listada em toda resposta — tanto na resposta com streaming quanto nos status de erro, para que quem chama consiga distinguir um corpo rejeitado de uma falha do provedor. Origens que não estão listadas não recebem cabeçalho nenhum e continuam sujeitas à regra de mesma origem do navegador. Cada entrada é reduzida à sua origem, então `https://www.example.com/docs/` e `https://www.example.com` significam a mesma coisa. Para permitir que qualquer página chame a rota, liste `"*"` em vez de origens.
+A rota então responde ao preflight `OPTIONS` do navegador e nomeia uma origem listada em toda resposta — tanto na resposta com streaming quanto nos status de erro, para que quem chama consiga distinguir um corpo rejeitado de uma falha do provedor. Essas respostas também expõem `Retry-After`, então, depois do `429` de uma [limitação de taxa](/docs/configuration/rate-limiting), quem chama consegue ler quantos segundos esperar. Origens que não estão listadas não recebem cabeçalho nenhum e continuam sujeitas à regra de mesma origem do navegador. Cada entrada é reduzida à sua origem, então `https://www.example.com/docs/` e `https://www.example.com` significam a mesma coisa. Para permitir que qualquer página chame a rota, liste `"*"` em vez de origens.
 
 Quem chama envia o mesmo corpo `POST` que o contrato do [endpoint externo](#external-endpoint) descreve e lê de volta o mesmo fluxo de texto. Envie-o como JSON com um cabeçalho `content-type: application/json`:
 

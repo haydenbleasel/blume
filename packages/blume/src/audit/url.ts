@@ -45,10 +45,11 @@ export type ResolvedHref =
   | { kind: "self-origin"; path: string; hash: string }
   /**
    * A path on this origin that lacks `deployment.base`. The host serves the
-   * whole build under the base, so nothing answers here — `path` is the path
-   * as requested, base missing.
+   * whole build under the base, so nothing in the build answers here — `path`
+   * is the path as requested, base missing. `absolute` when the href spelled
+   * out the origin: a full URL can name another app on the same host.
    */
-  | { kind: "outside-base"; path: string }
+  | { kind: "outside-base"; path: string; absolute: boolean }
   /** An absolute URL on another origin. */
   | { kind: "external"; url: string }
   /** In-page anchor, `mailto:`, `tel:`, `javascript:`, data URI — not a page link. */
@@ -139,7 +140,11 @@ export const resolveHref = (
     if (origin && parsed.origin === origin) {
       const served = decodePath(parsed.pathname);
       if (!underBase(deployBase, served)) {
-        return { kind: "outside-base", path: normalizePath(served) };
+        return {
+          absolute: true,
+          kind: "outside-base",
+          path: normalizePath(served),
+        };
       }
       return {
         hash: parsed.hash.slice(1),
@@ -171,7 +176,11 @@ export const resolveHref = (
   // (`./auth`) was resolved against the base-less page URL above, so it
   // inherits the page's base by construction.
   if (target.startsWith("/") && !underBase(deployBase, served)) {
-    return { kind: "outside-base", path: normalizePath(served) };
+    return {
+      absolute: false,
+      kind: "outside-base",
+      path: normalizePath(served),
+    };
   }
   return {
     hash: resolved.hash.slice(1),

@@ -401,6 +401,36 @@ describe("normalizeEntry", () => {
     expect(escaped.pages[0]?.headings[0]?.slug).toBe("a");
   });
 
+  it("reports the spaced and kramdown {#id} spellings as written in .mdx", () => {
+    const mdx = normalizeEntry(
+      {
+        body: { format: "mdx", text: "## A { #a }\n\n## B {: #b }\n" },
+        data: {},
+        ref: "a.mdx",
+      },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    const md = normalizeEntry(
+      { body: { format: "md", text: "## A { #a }\n" }, data: {}, ref: "a.md" },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    expect(mdx.diagnostics.map((d) => [d.message, d.suggestion])).toStrictEqual(
+      [
+        [
+          "`{ #a }` is a JSX expression in .mdx, so this page fails to compile.",
+          "Write `[#a]` or escape it as `\\{#a\\}` — both pin the same anchor in .md and .mdx.",
+        ],
+        [
+          "`{: #b }` is a JSX expression in .mdx, so this page fails to compile.",
+          "Write `[#b]` or escape it as `\\{#b\\}` — both pin the same anchor in .md and .mdx.",
+        ],
+      ]
+    );
+    // Only the unspaced `{#id}` is an anchor in .md; these stay heading text.
+    expect(md.diagnostics).toStrictEqual([]);
+    expect(md.pages[0]?.headings[0]?.text).toBe("A { #a }");
+  });
+
   it("names a path-less remote .mdx entry by source and ref in the {#id} diagnostic", () => {
     const { diagnostics } = normalizeEntry(
       { body: { format: "mdx", text: "## A {#a}\n" }, data: {}, ref: "a.mdx" },
@@ -887,18 +917,71 @@ describe("mdxRemoteSource (github mode)", () => {
     const { diagnostics } = await source.load();
     expect(diagnostics.map((d) => d.code)).toContain("BLUME_SOURCE_TRUNCATED");
   });
+
+  it("warns when path isn't a folder at the ref", async () => {
+    const tree = { tree: [{ path: "documentation/a.md", type: "blob" }] };
+    const fetchImpl = asFetch(() => Promise.resolve(okJson(tree)));
+    const source = mdxRemoteSource(
+      {
+        fetchImpl,
+        github: { owner: "acme", path: "docs", ref: "v1", repo: "sdk" },
+        include: ["**/*.{md,mdx}"],
+        name: "sdk",
+      },
+      ctxFor(join(await makeProject({}), ".cache"))
+    );
+    const { diagnostics, entries } = await source.load();
+    expect(entries).toStrictEqual([]);
+    expect(diagnostics.map((d) => [d.code, d.message])).toStrictEqual([
+      [
+        "BLUME_SOURCE_PATH_MISSING",
+        'Source "sdk" read no files: there is no folder "docs" in acme/sdk at v1.',
+      ],
+    ]);
+  });
+
+  it("excludes what a negated include glob matches, as the filesystem source does", async () => {
+    const tree = {
+      tree: [
+        { path: "docs/a.md", type: "blob" },
+        { path: "docs/drafts/b.md", type: "blob" },
+        { path: "docs/notes.txt", type: "blob" },
+      ],
+    };
+    const fetchImpl = asFetch((input) =>
+      isTreeApi(input.toString())
+        ? Promise.resolve(okJson(tree))
+        : Promise.resolve(ok("---\ntitle: A\n---\nbody\n"))
+    );
+    const load = async (include: string[]) => {
+      const source = mdxRemoteSource(
+        {
+          fetchImpl,
+          github: { owner: "acme", path: "docs", ref: "main", repo: "sdk" },
+          include,
+          name: "sdk",
+        },
+        ctxFor(join(await makeProject({}), ".cache"))
+      );
+      const { entries } = await source.load();
+      return entries.map((entry) => entry.ref);
+    };
+    expect(await load(["**/*.md", "!drafts/**"])).toStrictEqual(["a.md"]);
+    // Negations alone include nothing, as in tinyglobby.
+    expect(await load(["!drafts/**"])).toStrictEqual([]);
+  });
 });
 
-describe("scanProject composition", () => {
-  const withConfig = async (
-    files: Record<string, string>,
-    config: string
-  ): Promise<string> => {
-    const root = await makeProject(files);
-    await writeFile(join(root, "blume.config.ts"), config);
-    return root;
-  };
+const withConfig = async (
+  files: Record<string, string>,
+  config: string
+): Promise<string> => {
+  const root = await makeProject(files);
+  await writeFile(join(root, "blume.config.ts"), config);
+  return root;
+};
 
+describe("scanProject composition", () => {
   it("merges multiple filesystem sources and namespaces by prefix", async () => {
     const root = await withConfig(
       {

@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   translations:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Only the changesets release PR carries pending translation updates;
     # regular PRs haven't been translated yet, so checking them is noise.
     # (pull_request branch filters only match the base branch, hence the job-level if.)

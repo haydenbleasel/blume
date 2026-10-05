@@ -1,5 +1,7 @@
 import {
   normalizeBasePath,
+  normalizePath,
+  stripBasePath,
   withAuthoredBasePath,
   withBasePath,
   withComposedBasePath,
@@ -11,6 +13,7 @@ import {
   compileRedirects,
   exactFirst,
   expandRedirect,
+  isPatternPath,
   underscoreRedirect,
   vercelRedirect,
 } from "../core/redirect-patterns.ts";
@@ -110,8 +113,59 @@ export const applyBaseToPlatformRedirects = (
 };
 
 /**
+ * The raw-Markdown copies Blume serves beside every page (`/guide.md`,
+ * `/guide.mdx`; see `rawMarkdownEndpointTemplate`).
+ */
+const MIRROR_EXTENSIONS = [".md", ".mdx"] as const;
+
+/**
+ * Where a page's Markdown copy is served, from the page's served path and the
+ * deployment base that path carries: the endpoints name the root `index`.
+ */
+const mirrorPath = (path: string, base: string, extension: string): string => {
+  const route = stripBasePath(base, path);
+  return `${base}${route === "/" ? "/index" : route}${extension}`;
+};
+
+/**
+ * Based `redirects`, each exact one that moves a page followed by the same
+ * redirect for the page's Markdown copies: from a path no page is served at
+ * to one a page is, `/old.md` goes to `/new.md` (and `.mdx` alike), where it
+ * would otherwise 404 for an agent still reading the old URL. A pattern gets
+ * none; one that carries its capture over (`/beta/:slug*` → `/v2/:slug*`)
+ * already moves `/beta/guide.md` along. `pages` are the served page routes
+ * (carrying `basePath`, not `deployment.base`), and `bases` the deployment
+ * base each end carries: Astro's config leaves it off `from` (see
+ * {@link applyBaseToAstroRedirects}).
+ */
+export const withMirrorRedirects = (
+  redirects: Redirect[],
+  pages: RouteSet,
+  bases: { from: string; to: string }
+): Redirect[] =>
+  redirects.flatMap((redirect) => {
+    const from = normalizePath(redirect.from);
+    const to = normalizePath(redirect.to);
+    const movesPage =
+      !isPatternPath(redirect.from) &&
+      servesRoute(pages, stripBasePath(bases.to, to)) &&
+      !servesRoute(pages, stripBasePath(bases.from, from));
+    return movesPage
+      ? [
+          redirect,
+          ...MIRROR_EXTENSIONS.map((extension) => ({
+            from: mirrorPath(from, bases.from, extension),
+            status: redirect.status,
+            to: mirrorPath(to, bases.to, extension),
+          })),
+        ]
+      : [redirect];
+  });
+
+/**
  * The configured redirects as the host platform matches them, via
- * {@link applyBaseToPlatformRedirects}, exact paths ahead of patterns: hosts
+ * {@link applyBaseToPlatformRedirects} plus the Markdown copies of each moved
+ * page ({@link withMirrorRedirects}), exact paths ahead of patterns: hosts
  * try rules in order, and an exact redirect wins over a pattern that also
  * covers its path. The one basing every consumer must share: the emitted
  * redirect files and the server wrappers all compare these paths against
@@ -122,12 +176,18 @@ export const platformRedirects = (project: {
   manifest: Pick<BlumeProject["manifest"], "routes">;
 }): Redirect[] => {
   const { config } = project;
+  const base = normalizeBasePath(config.deployment.options.base);
+  const pages = routeSetFor(project.manifest.routes);
   return exactFirst(
-    applyBaseToPlatformRedirects(
-      config.redirects,
-      config.basePath,
-      config.deployment.options.base ?? "",
-      routeSetFor(project.manifest.routes)
+    withMirrorRedirects(
+      applyBaseToPlatformRedirects(
+        config.redirects,
+        config.basePath,
+        base,
+        pages
+      ),
+      pages,
+      { from: base, to: base }
     )
   );
 };

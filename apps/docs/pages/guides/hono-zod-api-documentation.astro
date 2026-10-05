@@ -651,10 +651,10 @@ git add src docs-site/openapi.json`}
     lang="bash"
   />
   <p>
-    The docs dev server doesn't watch the spec file, so restart it to see
-    the change. To catch a route change that was committed without a fresh
-    export, regenerate the spec in CI and fail when it differs from the
-    committed file:
+    The docs dev server watches the spec file, so it shows the change as soon
+    as the export writes it. To catch a route change that was committed
+    without a fresh export, regenerate the spec in CI and fail when it differs
+    from the committed file:
   </p>
   <CodeBlock
     code={`name: API spec
@@ -746,7 +746,8 @@ jobs:
   </p>
   <h3>The docs show an old schema</h3>
   <p>
-    Run <code>npm run openapi</code> again and restart the docs dev server. If{" "}
+    Run <code>npm run openapi</code> again. The docs dev server picks up the
+    new file on its own. If{" "}
     <code>blume build</code> fails with <code>BLUME_OPENAPI_UNAVAILABLE</code>,
     the spec file is missing or invalid: check that{" "}
     <code>docs-site/openapi.json</code> exists and that <code>spec</code> is{" "}

@@ -12,13 +12,129 @@
 // citation rewriting, Stop, 400/429/503, an empty 200, and an unlisted origin.
 // Replayed each curl command here against that stand-in. Not yet run end to
 // end against a deployed Blume route and a real model.
-// Review: rechecked the route's validation order, CORS helpers (no
-// Access-Control-Expose-Headers, so Retry-After stays unreadable
-// cross-origin), and Astro 7.3.2's origin check; setup now hands off to the
-// assistant guide and the bot check to the rate limiting guide.
+// Review: rechecked the route's validation order, CORS helpers, and Astro
+// 7.3.2's origin check; setup now hands off to the assistant guide and the
+// bot check to the rate limiting guide. Updated against 400b5ff3 (read, not
+// rerun): withCors exposes Retry-After to a listed origin (ai/cors.ts), so
+// the 429 notice reads it; a page path outside the snapshot keeps retrieval
+// to its locale prefix or the default locale (readerScope).
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
+
+const askDocsCode = `// Where the docs are deployed, with the deployment base if there is one
+// (like https://acme.example/docs). The route and every citation live under it.
+export const DOCS_URL = "https://docs.acme.example";
+
+export interface AskMessage {
+  content: string;
+  role: "assistant" | "user";
+}
+
+/** The route turned the question away, or the answer never arrived. */
+export class AskError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const GENERIC = "Something went wrong answering that. Try again.";
+
+const NOTICES: Record<number, string> = {
+  0: "Couldn't reach the docs. Check your connection and try again.",
+  400: "That question couldn't be sent. Shorten it and try again.",
+  403: "The docs assistant turned that request away.",
+  413: "That question is too long. Shorten it and try again.",
+  429: "You've asked a lot of questions. Try again in a few minutes.",
+  503: "The docs assistant isn't available right now.",
+};
+
+// A 429 from the rate limit says in Retry-After how many seconds are left.
+const notice = (response: Response): string => {
+  const seconds = Number(response.headers.get("retry-after"));
+  if (response.status === 429 && seconds > 0) {
+    const minutes = Math.ceil(seconds / 60);
+    return \`You've asked a lot of questions. Try again in \${minutes} minute\${minutes === 1 ? "" : "s"}.\`;
+  }
+  return NOTICES[response.status] ?? GENERIC;
+};
+
+// The route answers 400 past 40 messages or 24,000 characters of JSON, so
+// send the latest turns that fit, starting with a question.
+const fit = (messages: AskMessage[]): AskMessage[] => {
+  let kept = messages.slice(-40);
+  while (
+    kept.length > 1 &&
+    (kept[0].role === "assistant" || JSON.stringify(kept).length > 24_000)
+  ) {
+    kept = kept.slice(1);
+  }
+  return kept;
+};
+
+/** Point a citation like /templates at the docs, not at your app. */
+export const docsHref = (url: string): string =>
+  url.startsWith("/") && !url.startsWith("//") ? \`\${DOCS_URL}\${url}\` : url;
+
+interface AskOptions {
+  messages: AskMessage[];
+  /** Called with the answer so far, each time more of it arrives. */
+  onText: (answer: string) => void;
+  /** The docs route that covers the reader's screen, like "/templates". */
+  page?: string;
+  signal: AbortSignal;
+}
+
+export const askDocs = async ({
+  messages,
+  onText,
+  page,
+  signal,
+}: AskOptions): Promise<string> => {
+  let response: Response;
+  try {
+    response = await fetch(\`\${DOCS_URL}/api/ask\`, {
+      body: JSON.stringify({
+        messages: fit(messages),
+        page: page ? { path: page } : undefined,
+      }),
+      // Without a JSON content type, the docs site's cross-site check
+      // answers 403 before the route runs.
+      headers: { "content-type": "application/json" },
+      method: "POST",
+      signal,
+    });
+  } catch (error) {
+    // A Stop click lands here too, and the caller handles it.
+    if (signal.aborted) {
+      throw error;
+    }
+    // Offline, DNS, or a CORS rejection: the browser gives no status.
+    throw new AskError(0, NOTICES[0]);
+  }
+  if (!(response.ok && response.body)) {
+    throw new AskError(response.status, notice(response));
+  }
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let answer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    answer += value;
+    onText(answer);
+  }
+  // A provider failure after the 200 (a bad key, an unknown model) ends the
+  // stream with no text, so an empty answer is an error.
+  if (!answer) {
+    throw new AskError(200, GENERIC);
+  }
+  return answer;
+};`;
 ---
 
 <GuidePage guide={guideById("embed-documentation-chatbot")}>
@@ -259,109 +375,7 @@ vary: origin`}
     <code>AskError</code> with a message for the reader:
   </p>
   <CodeBlock
-    code={`// Where the docs are deployed, with the deployment base if there is one
-// (like https://acme.example/docs). The route and every citation live under it.
-export const DOCS_URL = "https://docs.acme.example";
-
-export interface AskMessage {
-  content: string;
-  role: "assistant" | "user";
-}
-
-/** The route turned the question away, or the answer never arrived. */
-export class AskError extends Error {
-  status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
-const GENERIC = "Something went wrong answering that. Try again.";
-
-const NOTICES: Record<number, string> = {
-  0: "Couldn't reach the docs. Check your connection and try again.",
-  400: "That question couldn't be sent. Shorten it and try again.",
-  403: "The docs assistant turned that request away.",
-  413: "That question is too long. Shorten it and try again.",
-  429: "You've asked a lot of questions. Try again in a few minutes.",
-  503: "The docs assistant isn't available right now.",
-};
-
-// The route answers 400 past 40 messages or 24,000 characters of JSON, so
-// send the latest turns that fit, starting with a question.
-const fit = (messages: AskMessage[]): AskMessage[] => {
-  let kept = messages.slice(-40);
-  while (
-    kept.length > 1 &&
-    (kept[0].role === "assistant" || JSON.stringify(kept).length > 24_000)
-  ) {
-    kept = kept.slice(1);
-  }
-  return kept;
-};
-
-/** Point a citation like /templates at the docs, not at your app. */
-export const docsHref = (url: string): string =>
-  url.startsWith("/") && !url.startsWith("//") ? \`\${DOCS_URL}\${url}\` : url;
-
-interface AskOptions {
-  messages: AskMessage[];
-  /** Called with the answer so far, each time more of it arrives. */
-  onText: (answer: string) => void;
-  /** The docs route that covers the reader's screen, like "/templates". */
-  page?: string;
-  signal: AbortSignal;
-}
-
-export const askDocs = async ({
-  messages,
-  onText,
-  page,
-  signal,
-}: AskOptions): Promise<string> => {
-  let response: Response;
-  try {
-    response = await fetch(\`\${DOCS_URL}/api/ask\`, {
-      body: JSON.stringify({
-        messages: fit(messages),
-        page: page ? { path: page } : undefined,
-      }),
-      // Without a JSON content type, the docs site's cross-site check
-      // answers 403 before the route runs.
-      headers: { "content-type": "application/json" },
-      method: "POST",
-      signal,
-    });
-  } catch (error) {
-    // A Stop click lands here too, and the caller handles it.
-    if (signal.aborted) {
-      throw error;
-    }
-    // Offline, DNS, or a CORS rejection: the browser gives no status.
-    throw new AskError(0, NOTICES[0]);
-  }
-  if (!(response.ok && response.body)) {
-    throw new AskError(response.status, NOTICES[response.status] ?? GENERIC);
-  }
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-  let answer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    answer += value;
-    onText(answer);
-  }
-  // A provider failure after the 200 (a bad key, an unknown model) ends the
-  // stream with no text, so an empty answer is an error.
-  if (!answer) {
-    throw new AskError(200, GENERIC);
-  }
-  return answer;
-};`}
+    code={askDocsCode}
     lang="ts"
     title="src/ask-docs.ts"
   />
@@ -520,8 +534,9 @@ export function TemplatesScreen() {
     puts that page into the model's context first, marked as the page the
     reader is viewing, and keeps retrieval to its language and, on a versioned
     site, its docs version. Use the route as your docs sidebar links it,
-    without <code>deployment.base</code>. A path that matches no page is
-    ignored, and answers come from search alone.
+    without <code>deployment.base</code>. A path that matches no page, or no{" "}
+    <code>page</code> at all, leaves answers to search alone, kept to the
+    locale the path starts with (<code>/ja</code>) or the default language.
   </p>
   <p>
     The assistant cites pages as Markdown links to their routes, like{" "}
@@ -574,7 +589,7 @@ export function TemplatesScreen() {
       <tr>
         <td>429</td>
         <td>The reader is over the rate limit</td>
-        <td>Try again in a few minutes</td>
+        <td>How many minutes to wait</td>
       </tr>
       <tr>
         <td>503</td>
@@ -595,10 +610,11 @@ export function TemplatesScreen() {
   </table>
   <p>
     Every response from the route names a listed origin, so your app can
-    always read its status. The 429's <code>Retry-After</code> header isn't
-    exposed to other origins, though, so show a fixed wait. Each error also has
-    a short plain-text body that explains it: read it with <code>curl</code>{" "}
-    when you debug, and keep your own wording in the panel.
+    always read its status. It also exposes <code>Retry-After</code> to that
+    origin, so after a 429 <code>notice</code> reads the seconds left and
+    tells the reader how long to wait. Each error also has a short plain-text
+    body that explains it: read it with <code>curl</code> when you debug, and
+    keep your own wording in the panel.
   </p>
   <p>
     Stop aborts the request, and so does closing the panel mid-answer. The

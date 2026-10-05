@@ -6,8 +6,11 @@
 // (astro/render-deps.ts), the MCP handler and discovery documents
 // (ai/mcp/server.ts, ai/mcp/discovery.ts), the static-build gate
 // (cli/prepare.ts), @astrojs/node 11.1.5's standalone server, Astro 7.3.2's
-// X-Forwarded-For handling, and Docker's Dockerfile, Compose, and Node.js
-// guides, Caddy's docs, and nginx's docs. Ran the guide's tools/list request
+// X-Forwarded-For handling (core/app/node.js trusts the header only for a
+// host in security.allowedDomains, which node({ allowedDomains }) sets), and
+// Docker's Dockerfile, Compose, and Node.js guides, Caddy's docs
+// (reverse_proxy ignores a reader's own X-Forwarded-For by default), and
+// nginx's docs. Ran the guide's tools/list request
 // against createMcpFetchHandler under Bun, and the health check one-liner
 // under Node 24. Docker isn't installed here, so neither image was built.
 // Not yet run end to end.
@@ -115,7 +118,10 @@ import { node } from "blume/deploy";
 
 export default defineConfig({
   title: "Acme Docs",
-  deployment: node({ site: "https://docs.acme.example" }),
+  deployment: node({
+    site: "https://docs.acme.example",
+    allowedDomains: [{ hostname: "docs.acme.example" }],
+  }),
   agents: {
     mcp: { enabled: true },
   },
@@ -128,7 +134,10 @@ export default defineConfig({
     environment for Blume to read it from. It's baked in at build time: the
     MCP discovery files, the <strong>Connect to MCP</strong> menu, the sitemap,
     and canonical URLs all use it. Moving to another domain means building a
-    new image.
+    new image. <code>allowedDomains</code> is for the reverse proxy you'll put
+    in front, which{" "}
+    <a href="#run-it-with-compose-and-https">Run it with Compose and HTTPS</a>{" "}
+    explains.
   </p>
   <p>Build it and start the server on your machine before you containerize:</p>
   <CodeBlock
@@ -318,6 +327,16 @@ volumes:
     <code>caddy_data</code> volume keeps certificates across restarts. Caddy
     waits for the docs container's health check to pass before it starts.
   </p>
+  <p>
+    Behind Caddy, every request reaches the Node server from Caddy's address.
+    Caddy passes the <code>Host</code> header through and sets{" "}
+    <code>X-Forwarded-For</code> to the reader's address, ignoring any value
+    the reader sent. The <code>allowedDomains</code> entry in{" "}
+    <code>blume.config.ts</code> tells the server to trust that header on
+    requests for <code>docs.acme.example</code>, so Blume's{" "}
+    <a href="/docs/configuration/rate-limiting#behind-a-reverse-proxy">rate limit</a>{" "}
+    counts each reader apart. Without it, all readers share Caddy's count.
+  </p>
 
   <h3>Pass secrets at runtime</h3>
   <p>
@@ -429,12 +448,13 @@ docker compose exec docs find dist/server/node_modules -xtype l`}
       Agents outside it can't reach the MCP endpoint either.
     </li>
     <li>
-      <strong>Limit the assistant at the proxy.</strong> Blume's{" "}
-      <a href="/docs/configuration/rate-limiting">rate limit</a> counts
-      requests per reader address, but behind Caddy the Node server sees
-      Caddy's address on every request, so all readers share one count. If you
-      turn on the assistant, limit requests in front of the server and set{" "}
-      <code>rateLimit: false</code>. The MCP endpoint isn't rate limited.
+      <strong>Let the proxy set the reader's address.</strong>{" "}
+      <code>allowedDomains</code> trusts the first address in{" "}
+      <code>X-Forwarded-For</code>, so a proxy that appends to the header a
+      reader sent, instead of replacing it, lets them pick a fresh address and
+      a fresh rate-limit count with every request. If you swap Caddy for
+      nginx, set <code>proxy_set_header X-Forwarded-For $remote_addr;</code>.
+      The MCP endpoint isn't rate limited.
     </li>
   </ul>
 

@@ -16,6 +16,7 @@ import { resolveSources } from "../src/core/sources/resolve.ts";
 import type { SourceContext, SourceEntry } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 import { notion } from "../src/sources/notion.ts";
+import { withEnv } from "./cms-fixtures.ts";
 
 const dirs: string[] = [];
 const tempDir = async (): Promise<string> => {
@@ -709,6 +710,42 @@ describe("notionSource (block + property edge cases)", () => {
     expect(diagnostics.map((d) => d.code)).toContain("BLUME_SOURCE_OFFLINE");
     expect(diagnostics[0]?.message).toContain("@notionhq/client");
   });
+
+  it("builds the SDK client from NOTION_TOKEN, and fails before a request without it", async () => {
+    const auths: (string | undefined)[] = [];
+    mock.module("@notionhq/client", () => ({
+      Client: class {
+        blocks = client().blocks;
+        dataSources = client().dataSources;
+        databases = databases;
+        constructor(config: { auth?: string }) {
+          auths.push(config.auth);
+        }
+      },
+    }));
+    await withEnv("NOTION_TOKEN", "secret-token", async () => {
+      const source = notionSource(
+        { database: "db1", fetchImpl, name: "handbook" },
+        await ctxFor()
+      );
+      const { entries } = await source.load();
+      expect(entries).toHaveLength(1);
+    });
+    await withEnv("NOTION_TOKEN", undefined, async () => {
+      const source = notionSource(
+        { database: "db1", fetchImpl, name: "handbook" },
+        await ctxFor()
+      );
+      await expect(source.load()).rejects.toMatchObject({
+        diagnostic: {
+          code: "BLUME_MISSING_SECRET",
+          message: 'Source "handbook" needs NOTION_TOKEN, which is not set.',
+        },
+      });
+    });
+    // No client was built for the second load, so nothing was requested.
+    expect(auths).toStrictEqual(["secret-token"]);
+  });
 });
 
 // Pages without a title property slug to their id, so any count is fine.
@@ -902,43 +939,43 @@ describe("notionSource (video blocks)", () => {
   });
 });
 
-describe("notionSource (request pacing)", () => {
-  /**
-   * A client whose block fetches report how many are in flight at once. Each
-   * call parks for a tick so overlapping requests are actually observed
-   * overlapping — with 429 fan-out this is exactly the burst the limiter caps.
-   */
-  const trackingClient = (
-    pageCount: number,
-    onRequest: (inFlight: number) => void
-  ): NotionClientLike => {
-    let inFlight = 0;
-    return {
-      blocks: {
-        children: {
-          list: async () => {
-            inFlight += 1;
-            onRequest(inFlight);
-            await sleep(5);
-            inFlight -= 1;
-            return { has_more: false, next_cursor: null, results: [] };
-          },
+/**
+ * A client whose block fetches report how many are in flight at once. Each
+ * call parks for a tick so overlapping requests are actually observed
+ * overlapping — with 429 fan-out this is exactly the burst the limiter caps.
+ */
+const trackingClient = (
+  pageCount: number,
+  onRequest: (inFlight: number) => void
+): NotionClientLike => {
+  let inFlight = 0;
+  return {
+    blocks: {
+      children: {
+        list: async () => {
+          inFlight += 1;
+          onRequest(inFlight);
+          await sleep(5);
+          inFlight -= 1;
+          return { has_more: false, next_cursor: null, results: [] };
         },
       },
-      dataSources: {
-        query: () =>
-          Promise.resolve({
-            has_more: false,
-            next_cursor: null,
-            results: Array.from({ length: pageCount }, (_, i) =>
-              pageStub(`p${i}`)
-            ),
-          }),
-      },
-      databases,
-    };
+    },
+    dataSources: {
+      query: () =>
+        Promise.resolve({
+          has_more: false,
+          next_cursor: null,
+          results: Array.from({ length: pageCount }, (_, i) =>
+            pageStub(`p${i}`)
+          ),
+        }),
+    },
+    databases,
   };
+};
 
+describe("notionSource (request pacing)", () => {
   it("bounds concurrent API requests to the default pool of 3", async () => {
     let peak = 0;
     const source = notionSource(
@@ -1047,9 +1084,10 @@ describe("notionSource data sources", () => {
       { client: empty, database: "db1", fetchImpl, name: "handbook" },
       await ctxFor()
     );
+    // A misconfiguration names itself rather than reading as a fetch failure.
     const failure = source.load();
     await expect(failure).rejects.toMatchObject({
-      diagnostic: { code: "BLUME_SOURCE_FETCH_FAILED" },
+      diagnostic: { code: "BLUME_SOURCE_MISCONFIGURED" },
     });
     await expect(failure).rejects.toThrow(/no data source/u);
   });

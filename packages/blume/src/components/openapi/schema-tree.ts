@@ -2,6 +2,7 @@ import {
   objectProperties,
   refName,
   resolveSchema,
+  soleAllOfMember,
   typeLabel,
 } from "./helpers.ts";
 import type { SchemaLike, SpecValue } from "./helpers.ts";
@@ -67,6 +68,15 @@ export type SchemaNode =
 const isString = (value: SpecValue): value is string =>
   typeof value === "string";
 
+/**
+ * The `$ref` a schema stands for: its own, or its member's when it is a
+ * single-member `allOf` wrapper, which plans (and stops at a circle) the same.
+ */
+const refOf = (schema: SchemaLike): string | undefined => {
+  const ref = schema.$ref ?? soleAllOfMember(schema)?.$ref;
+  return isString(ref) ? ref : undefined;
+};
+
 const typesOf = (schema: SchemaLike): (string | undefined)[] =>
   Array.isArray(schema.type) ? schema.type : [schema.type];
 
@@ -88,13 +98,32 @@ interface PendingRef {
   slot: SchemaSlot;
 }
 
-/** Plan the table tree for one schema (a request body, a response, a payload). */
+/**
+ * Which way a schema's data travels, when its table has one: a request body
+ * leaves out the `readOnly` fields the server generates, and a response the
+ * `writeOnly` ones it never returns, as the examples beside them do.
+ */
+export type SchemaDirection = "request" | "response";
+
+/**
+ * Plan the table tree for one schema (a request body, a response, a payload).
+ * With a `direction`, every table in the tree leaves out the fields that
+ * don't travel that way.
+ */
 export const schemaTree = (
   root: SchemaLike,
-  schemas: Record<string, SchemaLike>
+  schemas: Record<string, SchemaLike>,
+  direction?: SchemaDirection
 ): SchemaNode => {
   const queue: PendingRef[] = [];
   const expanded = new Set<string>();
+  const omitted = direction === "request" ? "readOnly" : "writeOnly";
+
+  /** Whether a property stays out of this tree's tables. */
+  const hidden = (property: SchemaLike): boolean =>
+    direction !== undefined &&
+    (property[omitted] === true ||
+      resolveSchema(schemas, property)[omitted] === true);
 
   /**
    * A table for `schema`, where `ancestors` are the named schemas already
@@ -107,8 +136,9 @@ export const schemaTree = (
     ancestors: string[],
     resolved = false
   ): SchemaSlot => {
-    if (!resolved && isString(schema.$ref)) {
-      const name = refName(schema.$ref);
+    const ref = resolved ? undefined : refOf(schema);
+    if (ref) {
+      const name = refName(ref);
       if (ancestors.includes(name)) {
         return { node: { kind: "circular", name } };
       }
@@ -132,10 +162,8 @@ export const schemaTree = (
     }
     // A row discloses nested structure — never a model inside itself.
     const rowChildren = (property: SchemaLike): SchemaSlot | undefined => {
-      if (
-        isString(property.$ref) &&
-        ancestors.includes(refName(property.$ref))
-      ) {
+      const propertyRef = refOf(property);
+      if (propertyRef && ancestors.includes(refName(propertyRef))) {
         return undefined;
       }
       const target = resolveSchema(schemas, property);
@@ -147,12 +175,14 @@ export const schemaTree = (
         : undefined;
     };
     const { properties, required } = objectProperties(schema, schemas);
-    const rows: SchemaRow[] = properties.map(([name, property]) => ({
-      children: rowChildren(property),
-      name,
-      required: required.has(name),
-      schema: property,
-    }));
+    const rows: SchemaRow[] = properties
+      .filter(([, property]) => !hidden(property))
+      .map(([name, property]) => ({
+        children: rowChildren(property),
+        name,
+        required: required.has(name),
+        schema: property,
+      }));
     // Shared properties beside a `oneOf`/`anyOf` (`amount` and `currency`
     // next to `Card | BankAccount`) render above the variants, planned first
     // as they read first.

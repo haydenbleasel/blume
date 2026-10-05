@@ -12,7 +12,11 @@ declare module "blume:search-client" {
   // biome-ignore lint/style/useImportType: ambient module must stay a global script
   // oxlint-disable-next-line typescript/consistent-type-imports
   type Fn = import("./components/layout/search/types.ts").SearchFn;
-  export const createSearch: () => Fn | Promise<Fn>;
+  type Options =
+    // biome-ignore lint/style/useImportType: ambient module must stay a global script
+    // oxlint-disable-next-line typescript/consistent-type-imports
+    import("./components/layout/search/types.ts").SearchClientOptions;
+  export const createSearch: (options?: Options) => Fn | Promise<Fn>;
 }
 
 declare module "blume:consent-client" {

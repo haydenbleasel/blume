@@ -10,10 +10,10 @@ O `blume validate` lê seu conteúdo do mesmo jeito que um build faz e verifica 
 blume validate
 ```
 
-- **Links internos de página** (`/guides/intro`, `./sibling`) precisam levar a uma página real, e os quebrados são reportados como erros. Um `href` em string de um componente (`<Card href="./install">`) é verificado da mesma forma, mas uma expressão `href={…}` não é.
+- **Links internos de página** (`/guides/intro`, `./sibling`) precisam levar a uma página real, e os quebrados são reportados como erros. Todas as formas de link que o Markdown e o MDX renderizam são lidas: links inline, inclusive um cujo texto quebra para a linha seguinte; links no estilo de referência, verificados na definição `[label]: /target`; autolinks (`<https://…>`, em `.md`); e um `href` em string de um componente (`<Card href="./install">`). Um `<a href>` HTML em minúsculas vai para o site exatamente como foi escrito, então ele é verificado do jeito que um navegador o lê: um caminho relativo é resolvido a partir da URL da página, e nenhum [`basePath`](/docs/deployment#mount-the-docs-under-a-path) é adicionado. Uma expressão `href={…}` não é verificada.
 - **Links de âncora** (`#section`, `/guides/intro#setup`) precisam corresponder a uma âncora na página de destino, que pode ser o id de um heading (gerado ou [fixado](/docs/content/syntax#custom-anchors)) ou o atributo `id` de um elemento HTML bruto. As âncoras não encontradas são reportadas como avisos. Ids dentro de blocos de código, código inline, comentários HTML e blocos `<Prompt>` não contam.
 - **Links de assets** são verificados onde o arquivo fica. Um caminho absoluto (`/logo.png`) é procurado no diretório `public/`, e uma imagem incorporada com caminho relativo (`![](./diagram.png)`) é procurada na própria pasta da página. Um link simples para um caminho relativo continua sendo resolvido como uma rota do site. Só as imagens incorporadas passam pelo pipeline de imagens.
-- **Links externos** só são verificados com [`--external`](#flags), que vem desativado por padrão porque precisa de acesso à rede. Links mortos (404/410/inacessível) são erros. Respostas com limite de taxa ou transitórias (403/429/5xx/timeout) são avisos.
+- **Links externos** só são verificados com [`--external`](#flags), que vem desativado por padrão porque precisa de acesso à rede. Um link morto é um erro: um 404 ou 410, ou um nome de host que não resolve. Qualquer outra falha é um aviso, já que o problema costuma estar mais no outro site ou na rede do que no link: qualquer outro status de erro (um 401 ou 403 de um site que bloqueia bots, um 429 de limite de taxa, uma indisponibilidade 5xx), uma conexão recusada ou interrompida, ou nenhuma resposta em 10 segundos. Para deixar de fora URLs que não dá para verificar de onde o comando roda, como um domínio de placeholder, um servidor local ou um site que bloqueia bots, passe [`--ignore`](#flags). Uma URL solta que o GitHub-flavored Markdown transforma em link por conta própria, sem nenhuma sintaxe de link ao redor, não é lida. O [`blume audit --external`](/docs/cli/audit) verifica essa URL no site gerado.
 
 ## O que conta como página [#what-counts-as-a-page]
 
@@ -22,6 +22,7 @@ Os links são resolvidos considerando tudo o que o site gerado serve, não só a
 ## Flags
 
 - `--external` — também verifica links `http(s)` externos pela rede.
+- `--ignore <glob>` — com `--external`, não faz a requisição de um link externo cuja URL corresponda ao glob e não reporta nada sobre ele. O glob é comparado com a URL completa do link, incluindo o esquema. O `*` corresponde dentro de um segmento do caminho e o `**` atravessa segmentos. Assim, `--ignore "https://api.acme.example/**"` pula todos os links para esse host, e `--ignore "http://localhost:*/**"` pula todos os servidores locais. Repita a flag para adicionar mais padrões e coloque cada um entre aspas para que o seu shell não o expanda. Links internos são sempre verificados, porque são resolvidos a partir das suas próprias páginas. Então corrija o link quebrado ou adicione um [redirect](/docs/deployment#redirects).
 - `--strict` — também sai com código diferente de zero quando há avisos. As notas de nível info continuam sendo só informativas.
 - `--json` — emite os diagnósticos como JSON no stdout em vez do relatório no terminal.
 
@@ -33,17 +34,10 @@ Os links são resolvidos considerando tudo o que o site gerado serve, não só a
 | `BLUME_BROKEN_ANCHOR` | aviso | A página existe, mas não tem nenhuma âncora correspondente ao fragmento. |
 | `BLUME_BROKEN_ASSET` | aviso | Um caminho absoluto não está em `public/`, ou uma imagem incorporada com caminho relativo não está ao lado da página. |
 | `BLUME_ASSETS_UNCHECKED` | info | Não existe um diretório `public/`, então os caminhos absolutos de assets não foram verificados. |
-| `BLUME_DEAD_LINK` | erro ou aviso | Um link externo (com `--external`) retornou 404/410 ou estava inacessível (erro), ou teve uma resposta transitória 403/429/5xx/timeout (aviso). |
+| `BLUME_DEAD_LINK` | erro ou aviso | Um link externo (com `--external`) retornou 404/410 ou o host dele não resolve (erro), ou recebeu qualquer outro status de erro, não conseguiu conexão ou não teve resposta a tempo (aviso). |
 
 O código de saída é o contrato: erros fazem o comando sair com código diferente de zero, e o `--strict` faz o mesmo com os avisos.
 
 ## Saída JSON [#json-output]
 
-Com `--json`, o `blume validate` (e o [`blume doctor`](/docs/cli/doctor)) escreve um objeto no stdout. Esse objeto tem uma lista `diagnostics` e um `summary` com as contagens por severidade. Cada entrada da lista traz:
-
-- `code`, `severity` e `message`
-- o `file` relativo à raiz do projeto, com `line` e `column` quando o problema tem uma localização
-- uma `suggestion`
-- um `docsUrl` apontando para a página que explica o código
-
-O código de saída não muda. Assim, o mesmo comando pode servir de verificação no CI e alimentar uma integração com o editor.
+Com `--json`, o `blume validate` (e o [`blume doctor`](/docs/cli/doctor)) escreve um objeto no stdout. Esse objeto tem uma lista `diagnostics` e um `summary` com as contagens por severidade. Cada entrada da lista traz `code`, `severity` e `message`, o `file` relativo à raiz do projeto, com `line` e `column` quando o problema tem uma localização, uma `suggestion` e um `docsUrl` apontando para a página que explica o código. O código de saída não muda. Assim, o mesmo comando pode servir de verificação no CI e alimentar uma integração com o editor.

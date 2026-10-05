@@ -109,6 +109,9 @@ export const snapshotCache = (cacheDir: string): SnapshotCache => {
  * snapshot exists, serve it without fetching (cache-first dev). On fetch failure,
  * serve the last-known-good snapshot with a warning so a CMS/network outage
  * doesn't fail the build; if there is no snapshot either, surface a hard error.
+ * A `BlumeError` from the source (a missing SDK or token, checked before any
+ * request, or a misconfiguration) already names its cause, so without a
+ * snapshot it surfaces as itself rather than as a fetch failure.
  */
 export const loadWithCache = async (
   name: string,
@@ -137,6 +140,9 @@ export const loadWithCache = async (
         severity: "warning",
       };
       return { diagnostics: [diagnostic], entries: fallback };
+    }
+    if (error instanceof BlumeError) {
+      throw error;
     }
     // SAFETY: same invariant as above — `fetchEntries` failures are Errors.
     throw new BlumeError({

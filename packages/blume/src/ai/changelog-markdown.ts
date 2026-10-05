@@ -1,4 +1,5 @@
 import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
+import { withChangelogIndexText } from "../core/changelog-index.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
@@ -45,12 +46,16 @@ const rowLine = (project: BlumeProject, { date, page }: IndexRow): string => {
 
 export const buildChangelogIndexMarkdown = (project: BlumeProject): string => {
   const { i18n } = project.config;
-  const ui = i18n
-    ? resolveUIStrings(i18n.defaultLocale, {
-        defaultLocale: i18n.defaultLocale,
-        overrides: i18n.ui,
-      })
-    : EN_UI;
+  const ui = withChangelogIndexText(
+    project.config,
+    i18n
+      ? resolveUIStrings(i18n.defaultLocale, {
+          defaultLocale: i18n.defaultLocale,
+          overrides: i18n.ui,
+        })
+      : EN_UI,
+    i18n?.defaultLocale
+  );
   const rows: IndexRow[] = project.graph.pages
     .filter(
       (page) =>

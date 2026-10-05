@@ -16,7 +16,10 @@
 // `$ref` source or a non-list `x-codeSamples`. Third-party claims checked
 // against Redocly's, Speakeasy's, and Stainless's docs. Not yet run end to
 // end: the rendered tabs were read from the source, not from a blume dev or
-// build.
+// build. Later: $ref sources are now read relative to the spec (parse.ts
+// inlineSampleRefs, BLUME_OPENAPI_CODE_SAMPLE_REF when unreadable), and dev
+// watches local specs (openapi/references.ts referenceSpecFiles); checked in
+// source, not re-run.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -58,7 +61,8 @@ await mkdir("out");
 
 for (const [index, { name, sample }] of samples.entries()) {
   const { label = "", lang, source } = sample ?? {};
-  // Blume skips an entry like this without a warning, so fail on it here.
+  // Blume skips a malformed entry without a warning, and a $ref source isn't
+  // code this script can check, so fail on both here.
   if (typeof lang !== "string" || typeof source !== "string" || typeof label !== "string") {
     problems.push(\`\${name}: sample \${index} needs a string lang and source\`);
     continue;
@@ -229,7 +233,8 @@ if (problems.length > 0) {
     <li>
       <strong><code>source</code></strong> is the code, as a string. The{" "}
       <code>|</code> block keeps its line breaks, and Blume trims the final
-      newline.
+      newline. It can also be a <code>$ref</code> to a file that holds only
+      the code, which Blume reads relative to the spec.
     </li>
   </ul>
   <p>
@@ -245,9 +250,9 @@ if (problems.length > 0) {
 
   <h2>See the tabs</h2>
   <p>
-    The dev server doesn't watch a spec file beside your content folder, so
-    restart it after editing the spec, then open{" "}
-    <code>/api/messages/send-message</code>:
+    Start the dev server, then open <code>/api/messages/send-message</code>.
+    It watches the spec file, so later edits to the samples show up without
+    a restart:
   </p>
   <CodeBlock code="npm run dev" lang="bash" />
   <p>
@@ -336,8 +341,7 @@ export default defineConfig({
     To show only your own samples, set <code>codeSamples: false</code>. An
     operation with no <code>x-codeSamples</code> then has no request samples
     at all, so add them to every operation before you turn the generated ones
-    off. An empty list doesn't do the same thing: <code>codeSamples: []</code>{" "}
-    brings back the defaults.
+    off. An empty list, <code>codeSamples: []</code>, does the same.
   </p>
   <p>
     The option covers every operation in that reference. You can't drop the
@@ -370,11 +374,14 @@ export default defineConfig({
     </li>
   </ul>
   <p>
-    One more limit: samples live only on the rendered page. Site search
-    doesn't index them, and the page's Markdown copy, which agents, the MCP
-    server, and the assistant read, holds the endpoint and description but not
-    the samples. If agents should learn your SDK, write a hand-written
-    quickstart page with the same calls.
+    Your samples also reach the page's Markdown copy, which agents, the MCP
+    server, and the assistant read, so an agent that looks up an operation
+    sees your SDK call too. Site search indexes them like any other code
+    block: only when{" "}
+    <a href="/docs/configuration/search">
+      <code>search.indexing.includeCodeBlocks</code>
+    </a>{" "}
+    is on.
   </p>
 
   <h2>Test every sample against your SDK</h2>
@@ -388,7 +395,8 @@ export default defineConfig({
   <p>
     First, a script that finds every <code>x-codeSamples</code> entry and
     writes each TypeScript and Python one to <code>out/</code>. It also fails
-    on entries Blume would skip without a warning:
+    on entries it can't check, such as a <code>source</code> that's a{" "}
+    <code>$ref</code> to a file:
   </p>
   <CodeBlock
     code={extractMjsCode}
@@ -560,12 +568,15 @@ actions:
   <p>
     Blume skips an entry without a warning when its <code>lang</code> or{" "}
     <code>source</code> isn't a string, or when <code>x-codeSamples</code>{" "}
-    isn't a list. A common cause is a <code>source</code> written as a{" "}
-    <code>$ref</code> to a file, which Redocly supports and Blume doesn't:
-    paste the code inline. Also check the list sits on the operation, not on
-    the path. Run <code>node extract.mjs ../openapi.yaml</code> in{" "}
-    <code>samples-check</code> to name each entry that's wrong. If the spec
-    is right, restart the dev server.
+    isn't a list. A <code>source</code> that's a <code>$ref</code> is read
+    relative to the spec. When Blume can't read that file, or the{" "}
+    <code>$ref</code> points at a spot inside a document rather than a file
+    of code, it leaves the sample out with a{" "}
+    <code>BLUME_OPENAPI_CODE_SAMPLE_REF</code> warning that names the
+    operation. Also check the list sits on the operation, not on the path.
+    Run <code>node extract.mjs ../openapi.yaml</code> in{" "}
+    <code>samples-check</code> to name each entry that isn't written out
+    inline.
   </p>
   <h3>Two tabs are both called Python</h3>
   <p>
@@ -575,9 +586,9 @@ actions:
   </p>
   <h3>The generated samples are still there</h3>
   <p>
-    <code>codeSamples: []</code> means the defaults. Use{" "}
-    <code>codeSamples: false</code> to turn them off, and check you edited the
-    adapter whose <code>route</code> serves the page.
+    Check you edited the adapter whose <code>route</code> serves the page:{" "}
+    <code>codeSamples: false</code> covers only the operations its own
+    specs render.
   </p>
   <h3>A sample has no syntax colors</h3>
   <p>

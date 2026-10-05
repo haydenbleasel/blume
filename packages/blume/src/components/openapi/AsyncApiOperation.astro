@@ -7,11 +7,12 @@ import { asyncApiOperationObject } from "../../openapi/asyncapi.ts";
 import { operationOf, specOf } from "../../openapi/model.ts";
 import { highlightCode } from "../../markdown/index.ts";
 import {
-  asyncApiSecurityEntries,
+  asyncApiSecurity,
   bindingGroups,
   channelParameters,
-  channelServers,
+  kafkaTopic,
   messageLabel,
+  namedChannelServers,
   operationMessages,
   payloadSchema,
   protocolOf,
@@ -33,7 +34,6 @@ import PanelTabs from "./PanelTabs.astro";
 import ParametersTable from "./ParametersTable.astro";
 import SchemaTable from "./SchemaTable.astro";
 import type { SecuritySchemeLike } from "./security.ts";
-import { resolveAsyncApiSecurity } from "./security.ts";
 import OperationPanel from "./OperationPanel.astro";
 
 /**
@@ -61,9 +61,11 @@ const schemas = (document.components?.schemas ?? {}) as Record<
   string,
   SchemaLike
 >;
-const servers = channelServers(channel, document);
-const security = resolveAsyncApiSecurity(
-  asyncApiSecurityEntries(operation, servers),
+const namedServers = namedChannelServers(channel, document);
+const servers = namedServers.map(({ server }) => server);
+const security = asyncApiSecurity(
+  operation,
+  namedServers,
   document.components?.securitySchemes as
     | Record<string, SecuritySchemeLike>
     | undefined
@@ -96,10 +98,15 @@ const messagePanels = await Promise.all(
 
 // One derived model feeds the static default sample, the composer form, and
 // (client-side) the live samples + WebSocket frame — they can never drift.
+// A Kafka channel binding's `topic` names the real topic when the address
+// doesn't, so the samples use it.
+const topic =
+  protocol === "kafka" ? kafkaTopic(channel, document.components) : undefined;
 const model = ref
   ? messageModel({
       action: ref.method === "send" ? "send" : "receive",
-      address: ref.path,
+      address: topic ?? ref.path,
+      components: document.components,
       messages,
       parameters,
       protocol,

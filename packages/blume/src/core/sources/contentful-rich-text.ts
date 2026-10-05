@@ -1,7 +1,8 @@
 /**
  * Contentful rich text → Markdown. Covers the block, inline, and mark types
  * the Rich Text editor emits; embedded entries fall through to a serializer
- * keyed by content type or are noted in a comment. Links to assets and
+ * keyed by content type or are noted in a comment, and a link to an entry
+ * points at its page when the source says it has one. Links to assets and
  * entries arrive unresolved from the Delivery API (`data.target` is a
  * `sys` link), so the source hands in resolvers over the response's
  * `includes`; a document the SDK already resolved (with `fields` inline)
@@ -25,14 +26,22 @@ import {
   writesMdx,
 } from "./lower.ts";
 
-/** An asset's file as a Markdown image needs it. */
+/** An asset's file as a Markdown image or link needs it. */
 export interface ContentfulAsset {
+  /** The file's MIME type; an asset that isn't an image renders as a link. */
+  contentType?: string;
   description?: string;
+  fileName?: string;
   title?: string;
   url: string;
 }
 
 export interface ContentfulRichTextOptions {
+  /**
+   * The route of a linked entry's page; an entry hyperlink to an entry with
+   * none keeps only its text.
+   */
+  entryHref?: (entry: JsonObject) => string | undefined;
   /** Resolve an asset link (`data.target.sys.id`) to its file. */
   resolveAsset?: (id: string) => ContentfulAsset | null;
   /** Resolve an entry link to the entry (`sys` plus `fields`). */
@@ -55,7 +64,9 @@ export const assetFromEntry = (asset: JsonObject): ContentfulAsset | null => {
     return null;
   }
   return {
+    contentType: asString(getPath(asset, "fields.file.contentType")),
     description: asString(getPath(asset, "fields.description")),
+    fileName: asString(getPath(asset, "fields.file.fileName")),
     title: asString(getPath(asset, "fields.title")),
     url: absoluteUrl(url),
   };
@@ -166,11 +177,16 @@ const inlineNodeParts = (
         linkedAsset(node, options)?.url
       );
     }
+    case "entry-hyperlink": {
+      const entry = linkedTarget(node, options.resolveEntry);
+      const href = entry ? options.entryHref?.(entry) : undefined;
+      return linkParts(inlineParts(children(node), options), href);
+    }
     case "embedded-entry-inline": {
       return [{ markdown: embeddedEntry(node, options) }];
     }
     default: {
-      // entry-hyperlink (no route to point at) and anything unknown: the label.
+      // Anything unknown: the label.
       return inlineParts(children(node), options);
     }
   }
@@ -264,11 +280,18 @@ const renderBlock = (
     }
     case "embedded-asset-block": {
       const asset = linkedAsset(node, options);
+      if (!asset) {
+        return "";
+      }
+      // Any file can be embedded: one that isn't an image (a PDF, a video)
+      // would render as a broken image, so it's a link to the file.
+      if (asset.contentType && !asset.contentType.startsWith("image/")) {
+        const label = asset.title ?? asset.fileName ?? asset.url;
+        return renderInline(linkParts([{ marks: {}, text: label }], asset.url));
+      }
       // Contentful's own rich-text renderer uses the description as alt text
       // and the title only as a fallback.
-      return asset
-        ? image(asset.description ?? asset.title ?? "", asset.url)
-        : "";
+      return image(asset.description ?? asset.title ?? "", asset.url);
     }
     case "embedded-entry-block": {
       return embeddedEntry(node, options);

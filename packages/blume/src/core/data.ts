@@ -248,6 +248,8 @@ export interface BlumeDataConfig {
   /** Repository URL for header/edit links, or `null`. */
   repoUrl: string | null;
   search: {
+    /** `search.analytics`: whether the dialog's events carry each query's text. */
+    analytics: { queries: boolean };
     enabled: boolean;
     /** Resolved empty-state links; empty when unset (Search falls back to sidebar). */
     popular: { icon?: string; label: string; route: string }[];

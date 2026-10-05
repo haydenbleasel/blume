@@ -11,11 +11,13 @@
 // Code 2.1.283 and ANTHROPIC_MODEL=claude-sonnet-5, once before the docs fix
 // (exit 1; the jq output below is from that report) and once after it (exit
 // 0, the warning question still missing), plus the jq commands against both
-// reports. Review: rechecked the eval source (the --fix prompt reruns plain
-// `blume eval`, warning misses don't touch the exit code) and the action
-// majors against their GitHub releases (checkout, setup-node, and
-// upload-artifact are all v7). The workflow itself was not run. Not yet run
-// end to end.
+// reports. Review: rechecked the eval source and the action majors against
+// their GitHub releases (checkout, setup-node, and upload-artifact are all
+// v7). Updated against 400b5ff3 (read, not rerun): a warning question's miss
+// prints as warn and counts as warned (eval/report.ts; JSON status stays
+// "fail" with severity "warning"), --fix reruns with the run's own flags,
+// Claude runs pass --tools "" and --setting-sources "", and only Claude Code
+// reports cost. The workflow itself was not run. Not yet run end to end.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -167,8 +169,9 @@ npx blume eval --agent claude --json > eval-report.json`}
     Progress goes to your terminal, and{" "}
     <code>--json</code> writes the full report, answers included, to the file.
     Each question's line shows its status, the judge's score from 0 to 1, its
-    duration, and the cost estimate. Missing facts are listed underneath, and
-    a <code>fix:</code> line at the end names the source file to edit.
+    duration, and, with Claude Code, the cost estimate. Missing facts are
+    listed underneath, and a <code>fix:</code> line at the end names the
+    source file to edit.
   </p>
 
   <h2>Read a failure</h2>
@@ -238,8 +241,11 @@ requests that use the key get a \`401\` response.`}
   </p>
   <p>
     <code>scheduled-send</code> missed too, but as a warning question it
-    doesn't fail the run. With no route, its finding points at its line in{" "}
-    <code>evals.yaml</code>.
+    doesn't fail the run: its line reads <code>warn</code>, and the summary
+    counts it as warned. In the JSON report it keeps the status{" "}
+    <code>fail</code> with <code>"severity": "warning"</code>, which is why the{" "}
+    <code>jq</code> filter caught it. With no route, its finding points at its
+    line in <code>evals.yaml</code>.
   </p>
 
   <h2>Fix the docs, not the question</h2>
@@ -261,9 +267,8 @@ without downtime:
   />
   <p>
     Run the evals again. All three error-level questions pass and the command
-    exits 0. <code>scheduled-send</code> still misses: the terminal marks it
-    failed and counts it in the "failed" total, but it doesn't touch the exit
-    code, and the JSON report's <code>summary</code> counts it as a warning.
+    exits 0. <code>scheduled-send</code> still misses, as a warning that
+    doesn't touch the exit code.
   </p>
   <p>
     Don't edit the question to get to green. If a fact is wrong because the
@@ -272,9 +277,10 @@ without downtime:
     <code>npx blume eval --fix --agent claude</code>. After the run, it opens
     Claude Code with the report and instructions to add the missing facts to
     the named pages, never deleting a question or weakening a fact. Those
-    instructions end by rerunning plain <code>blume eval</code>, which uses
-    Codex, so tell the agent to add <code>--agent claude</code>, or rerun the
-    evals yourself with your CI flags once you've reviewed its edits.
+    instructions end by rerunning <code>blume eval</code> with the run's own{" "}
+    <code>--agent</code>, <code>--file</code>, <code>--threshold</code>, and{" "}
+    <code>--timeout</code>, so the check uses the same agent and file as the
+    run it fixes. Review the agent's edits before you commit them.
   </p>
 
   <h2>Account for model variability</h2>
@@ -304,10 +310,12 @@ without downtime:
     </li>
   </ul>
   <p>
-    Blume doesn't start Claude Code in bare mode, so a local run also loads
-    your own <code>~/.claude</code>: a model in your user settings (which{" "}
-    <code>ANTHROPIC_MODEL</code> overrides) and a personal{" "}
-    <code>CLAUDE.md</code>. CI runners have none of that.
+    Blume starts Claude Code with every built-in tool off and without your
+    settings files or <code>CLAUDE.md</code>, so a local run matches CI: your
+    hooks, plugins, and memory can't feed the reader, and a model or{" "}
+    <code>env</code> block in <code>settings.json</code> doesn't apply. Your
+    Claude Code login still works; set <code>ANTHROPIC_MODEL</code>, and{" "}
+    <code>ANTHROPIC_API_KEY</code> if you use one, in your shell.
   </p>
 
   <h3>Check that a new question is stable</h3>
@@ -499,9 +507,9 @@ jobs:
   <h3>It passes locally and fails in CI</h3>
   <p>
     Check that both runs used the same <code>ANTHROPIC_MODEL</code> and CLI
-    version, and that your own Claude Code settings aren't the difference. If
-    they match, the question may be unstable: run the stability check above
-    and compare the reader's <code>answer</code> in the CI artifact with your
-    local report.
+    version. A model set only in your <code>settings.json</code> doesn't count,
+    since eval runs skip that file. If they match, the question may be
+    unstable: run the stability check above and compare the reader's{" "}
+    <code>answer</code> in the CI artifact with your local report.
   </p>
 </GuidePage>

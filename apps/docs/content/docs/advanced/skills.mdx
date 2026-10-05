@@ -23,7 +23,7 @@ npx skills add haydenbleasel/blume --skill blume-migrate
 
 ## Self-updating docs
 
-`blume-update-docs` keeps your docs in sync with the product they document. On each run — typically from a schedule you configure in your agent runner — it audits recently merged PRs, changelogs, config schemas, and CLI help against the docs content, updates only pages that are factually stale (feature-flagged work is ignored), verifies with `blume build`, and opens or updates a `blume/*` pull request. If nothing drifted, it reports a clean no-op instead of opening a noisy PR.
+`blume-update-docs` keeps your docs in sync with the product they document. On each run — typically from a schedule you configure in your agent runner — it audits recently merged PRs, changelogs, config schemas, and CLI help against the docs content, updates only pages that are factually stale (feature-flagged work is ignored), verifies with `blume build` and `blume validate`, and opens or updates a `blume/*` pull request. If nothing drifted, it reports a clean no-op instead of opening a noisy PR.
 
 ```bash
 npx skills add haydenbleasel/blume --skill blume-update-docs

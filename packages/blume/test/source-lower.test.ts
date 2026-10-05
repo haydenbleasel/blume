@@ -38,7 +38,7 @@ import {
   queryString,
   remoteSource,
 } from "../src/core/sources/remote.ts";
-import type { RemoteFieldMap } from "../src/core/sources/remote.ts";
+import type { RemoteFields } from "../src/core/sources/remote.ts";
 import type { SourceEntry } from "../src/core/sources/types.ts";
 import {
   cleanupTempDirs,
@@ -215,7 +215,7 @@ describe("writesMdx", () => {
 });
 
 describe("remote helpers", () => {
-  const fields: Required<RemoteFieldMap> = {
+  const fields: RemoteFields = {
     body: "body",
     description: "description",
     lastModified: "updatedAt",

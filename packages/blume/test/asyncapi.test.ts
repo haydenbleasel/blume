@@ -8,14 +8,18 @@ import type { MessageSample } from "../src/components/openapi/async-snippets.ts"
 import { asyncSampleLanguages } from "../src/components/openapi/async-snippets.ts";
 import type { NamedMessage } from "../src/components/openapi/async.ts";
 import {
-  asyncApiSecurityEntries,
+  asyncApiSecurity,
   bindingGroups,
   channelParameters,
   channelServers,
+  kafkaKeySchema,
+  kafkaTopic,
   messageLabel,
+  namedChannelServers,
   operationMessages,
   payloadSchema,
   protocolOf,
+  resolvedServerSecurity,
 } from "../src/components/openapi/async.ts";
 import {
   resolveAsyncApiSecurity,
@@ -671,25 +675,136 @@ describe("components/openapi/async helpers", () => {
   });
 
   it("unions server security unless the operation declares its own", () => {
+    const schemes = { sasl: { type: "scramSha256" } };
+    const sasl = { key: "sasl", scheme: schemes.sasl, scopes: [] };
+    const first = {
+      name: "a",
+      server: { security: [{ $ref: "#/components/securitySchemes/sasl" }] },
+    };
     const servers = [
-      { security: [{ $ref: "#/components/securitySchemes/sasl" }] },
+      first,
       {
-        security: [
-          { $ref: "#/components/securitySchemes/sasl" },
-          { type: "userPassword" },
-          // SAFETY: a non-object entry exercises the security-entry guard.
-          "junk" as never,
-        ],
+        name: "b",
+        server: {
+          security: [
+            { $ref: "#/components/securitySchemes/sasl" },
+            { type: "userPassword" },
+            // SAFETY: a non-object entry exercises the security-entry guard.
+            "junk" as never,
+          ],
+        },
       },
     ];
-    expect(asyncApiSecurityEntries(undefined, servers)).toStrictEqual([
-      { $ref: "#/components/securitySchemes/sasl" },
-      { type: "userPassword" },
-    ]);
+    // SASL is on both servers, so it names none; the inline scheme is on b only.
+    expect(asyncApiSecurity(undefined, servers, schemes)).toStrictEqual({
+      alternatives: [
+        [sasl],
+        [
+          {
+            key: "userPassword",
+            scheme: { type: "userPassword" },
+            scopes: [],
+            servers: ["b"],
+          },
+        ],
+      ],
+      optional: false,
+      unauthenticatedServers: [],
+    });
+    // Servers that declare the same schemes render exactly as one would.
+    expect(asyncApiSecurity(undefined, [first, first], schemes)).toStrictEqual({
+      alternatives: [[sasl]],
+      optional: false,
+    });
     // A declared list wins outright — even an empty one (public operation).
-    expect(asyncApiSecurityEntries({ security: [] }, servers)).toStrictEqual(
+    expect(asyncApiSecurity({ security: [] }, servers, schemes)).toStrictEqual({
+      alternatives: [],
+      optional: false,
+    });
+  });
+
+  it("names the servers that need no security beside ones that do", () => {
+    const schemes = { scram: { type: "scramSha512" } };
+    const production = {
+      name: "production",
+      server: { security: [{ $ref: "#/components/securitySchemes/scram" }] },
+    };
+    // SAFETY: a non-array `security` exercises the list guard.
+    const local = { name: "local", server: { security: "none" as never } };
+    expect(
+      asyncApiSecurity(undefined, [production, local], schemes)
+    ).toStrictEqual({
+      alternatives: [
+        [
+          {
+            key: "scram",
+            scheme: schemes.scram,
+            scopes: [],
+            servers: ["production"],
+          },
+        ],
+      ],
+      optional: false,
+      unauthenticatedServers: ["local"],
+    });
+    // No server declares any: nothing to render.
+    expect(asyncApiSecurity(undefined, [local], schemes)).toStrictEqual({
+      alternatives: [],
+      optional: false,
+    });
+  });
+
+  it("names channel servers and resolves their security refs", () => {
+    expect(
+      namedChannelServers(
+        ASYNC_SPEC_3.channels?.userSignedup,
+        ASYNC_SPEC_3
+      ).map(({ name }) => name)
+    ).toStrictEqual(["prod"]);
+    expect(
+      namedChannelServers(
+        undefined,
+        // SAFETY: a non-object server exercises the default-list guard.
+        { servers: { a: { host: "a" }, b: null as never } }
+      )
+    ).toStrictEqual([{ name: "a", server: { host: "a" } }]);
+    expect(
+      resolvedServerSecurity(
+        {
+          security: [
+            { $ref: "#/components/securitySchemes/sasl" },
+            { type: "plain" },
+            // SAFETY: a non-object entry exercises the entry guard.
+            null as never,
+          ],
+        },
+        ASYNC_SPEC_3.components
+      )
+    ).toStrictEqual([{ type: "scramSha256" }, { type: "plain" }]);
+    // SAFETY: a non-array `security` exercises the list guard.
+    expect(resolvedServerSecurity({ security: "x" as never })).toStrictEqual(
       []
     );
+  });
+
+  it("reads the Kafka topic and key off their bindings", () => {
+    expect(kafkaTopic(ASYNC_SPEC_3.channels?.userSignedup)).toBe(
+      "user-signups"
+    );
+    expect(
+      kafkaTopic(
+        { bindings: { $ref: "#/components/channelBindings/k" } },
+        { channelBindings: { k: { kafka: { topic: "t" } } } }
+      )
+    ).toBe("t");
+    expect(kafkaTopic({ bindings: { kafka: { topic: "" } } })).toBeUndefined();
+    expect(kafkaTopic({ bindings: { kafka: "junk" } })).toBeUndefined();
+    expect(kafkaTopic({})).toBeUndefined();
+    expect(
+      kafkaKeySchema({ bindings: { kafka: { key: { type: "string" } } } })
+    ).toStrictEqual({ type: "string" });
+    expect(kafkaKeySchema({ bindings: { mqtt: {} } })).toBeUndefined();
+    expect(kafkaKeySchema({})).toBeUndefined();
   });
 
   it("flattens binding maps, dropping bindingVersion and empty groups", () => {
@@ -758,6 +873,69 @@ describe("components/openapi/async-snippets", () => {
     expect(
       kcat?.build({ action: "receive", address: "t", payload: undefined })
     ).toBe("echo '{}' | kcat -b 'localhost:9092' -t 't' -P");
+  });
+
+  it("keys kcat messages and passes the server's SASL settings", () => {
+    const [kcat] = asyncSampleLanguages([], "kafka");
+    const secure: MessageSample = {
+      ...base,
+      key: "ord_7Hq2",
+      server: {
+        host: "kafka.acme.example:9093",
+        protocol: "kafka-secure",
+        security: [{ type: "X509" }, { type: "scramSha512" }],
+      },
+    };
+    expect(kcat?.build(secure)).toBe(
+      [
+        `echo 'ord_7Hq2|{"id":"u1"}' | kcat -b 'kafka.acme.example:9093' -t 'user/signedup' -P -K '|' \\`,
+        "  -X security.protocol=SASL_SSL \\",
+        "  -X sasl.mechanisms=SCRAM-SHA-512 \\",
+        '  -X sasl.username="$KAFKA_USERNAME" \\',
+        '  -X sasl.password="$KAFKA_PASSWORD"',
+      ].join("\n")
+    );
+    // Consuming prints each key before the delimiter.
+    expect(
+      kcat?.build({
+        ...secure,
+        action: "send",
+        server: {
+          host: "b:9092",
+          protocol: "kafka",
+          security: [{ type: "plain" }],
+        },
+      })
+    ).toBe(
+      [
+        "kcat -b 'b:9092' -t 'user/signedup' -C -K '|' \\",
+        "  -X security.protocol=SASL_PLAINTEXT \\",
+        "  -X sasl.mechanisms=PLAIN \\",
+        '  -X sasl.username="$KAFKA_USERNAME" \\',
+        '  -X sasl.password="$KAFKA_PASSWORD"',
+      ].join("\n")
+    );
+    // Kerberos takes no username or password; TLS alone just switches to SSL.
+    expect(
+      kcat?.build({
+        ...base,
+        action: "send",
+        server: {
+          host: "b",
+          protocol: "kafka",
+          security: [{ type: "gssapi" }],
+        },
+      })
+    ).toBe(
+      "kcat -b 'b' -t 'user/signedup' -C \\\n  -X security.protocol=SASL_PLAINTEXT \\\n  -X sasl.mechanisms=GSSAPI"
+    );
+    expect(
+      kcat?.build({
+        ...base,
+        action: "send",
+        server: { host: "b", protocol: "KAFKA-SECURE" },
+      })
+    ).toBe("kcat -b 'b' -t 'user/signedup' -C \\\n  -X security.protocol=SSL");
   });
 
   it("builds mosquitto pub/sub samples, splitting host and port", () => {
@@ -959,8 +1137,8 @@ describe("source.openApiSource with AsyncAPI references", () => {
       "events/index.mdx",
     ]);
     expect(folderMeta).toStrictEqual({
-      "events/ping": { title: "ping" },
-      "events/users": { title: "Users" },
+      "events/ping": { order: 1, title: "ping" },
+      "events/users": { order: 0, title: "Users" },
     });
     const data = source.openApiData();
     expect(data.events?.kind).toBe("asyncapi");

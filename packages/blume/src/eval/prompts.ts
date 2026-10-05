@@ -40,8 +40,11 @@ Reply with ONLY this JSON object on a single line, no markdown fences:
 {"pass": true|false, "score": 0.0-1.0, "missing": ["expected facts absent or contradicted"], "notes": "one sentence"}`;
 };
 
-/** The `--fix` handoff prompt: where the report is and the ground rules. */
-export const evalFixPrompt = (reportPath: string): string =>
+/**
+ * The `--fix` handoff prompt: where the report is, the ground rules, and the
+ * `blume eval` command that verifies the fixes (the run's own flags).
+ */
+export const evalFixPrompt = (reportPath: string, command: string): string =>
   `Fix the documentation gaps found by \`blume eval\` in this project.
 
 The full report is at ${reportPath}. It is JSON: each entry in \`eval.results\` with status "fail" is one question the documentation could not answer. Each carries the \`question\`, the \`expected\` facts, the judge's \`missing\` facts, and the reader agent's \`answer\` (what the docs currently convey). The matching \`diagnostics\` entry names the source \`file\` of the page that should answer it.
@@ -51,7 +54,7 @@ Work through every failed question:
 2. Edit the documentation so it states the missing facts explicitly. Add prose, not filler; keep the page's voice.
 3. Never delete questions from the evals file or weaken expected facts.
 
-When you are done, run \`blume eval\` to verify, and repeat until every question passes.`;
+When you are done, run \`${command}\` to verify, and repeat until every question passes.`;
 
 /** The `eval init` prompt: draft a starter evals file from the docs. */
 export const initPrompt = (evalsPath: string): string =>

@@ -470,11 +470,13 @@ Each Acme API has its own base URL and its own reference.
   />
   <p>
     The dropdown's <code>path</code> scopes the sidebar to everything under{" "}
-    <code>/api</code>, so both specs share it. Out of the box, their groups
-    are named after the last segment of each route (Messages, Contacts) and
-    sorted alphabetically, and so are the tag groups inside them, which puts
-    Events above Messages. A <code>meta.ts</code> in each spec's folder fixes
-    all of that, even though the folder holds no pages of its own:
+    <code>/api</code>, so both specs share it. Out of the box, each group is
+    named after its source's <code>label</code> (Messages API, Contacts API),
+    and the tag groups inside it follow the spec's <code>tags</code> list, the
+    same order as its overview page. The two groups themselves sort
+    alphabetically, which puts the Contacts API first. A <code>meta.ts</code>{" "}
+    in each spec's folder sets their order and how they open, even though the
+    folder holds no pages of its own:
   </p>
   <CodeBlock
     code={`import { defineMeta } from "blume";
@@ -483,7 +485,6 @@ export default defineMeta({
   title: "Messages API",
   display: "page",
   order: 1,
-  pages: ["messages", "events"],
 });`}
     lang="ts"
     title="docs/api/messages/meta.ts"
@@ -495,16 +496,17 @@ export default defineMeta({
   title: "Contacts API",
   display: "page",
   order: 2,
-  pages: ["contacts", "events"],
 });`}
     lang="ts"
     title="docs/api/contacts/meta.ts"
   />
   <p>
-    <code>title</code> names the group, <code>order</code> puts the Messages
-    API first, and <code>pages</code> orders the tag groups by their slugs.{" "}
+    <code>order</code> puts the Messages API first.{" "}
     <code>display: "page"</code> turns each spec into one sidebar row that
-    opens into a panel of its own, so readers still see one API at a time.
+    opens into a panel of its own, so readers still see one API at a time. A{" "}
+    <code>meta.ts</code> you write replaces the one Blume derives from the
+    source, so it repeats the <code>title</code>; leave it out and the group
+    falls back to a name from the route, like Messages.
   </p>
 
   <h2>Handle names that overlap</h2>
@@ -684,10 +686,12 @@ npx blume audit --only duplicates`}
   </p>
   <h3>The sidebar says Messages, not Messages API</h3>
   <p>
-    A spec's sidebar group takes its name from the route, not from the
-    source's <code>label</code>. Add a <code>meta.ts</code> with a{" "}
-    <code>title</code> in that spec's folder, as shown in{" "}
-    <a href="#add-navigation">Add navigation</a>.
+    A spec's sidebar group takes its source's <code>label</code>. It falls
+    back to a name from the route when the source has no <code>label</code>,
+    or when a <code>meta.ts</code> in that spec's folder leaves out{" "}
+    <code>title</code>, since your <code>meta.ts</code> replaces the one Blume
+    derives. Set the <code>label</code>, or add the <code>title</code> as
+    shown in <a href="#add-navigation">Add navigation</a>.
   </p>
   <h3>An overlay rename stopped working</h3>
   <p>

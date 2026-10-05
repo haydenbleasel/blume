@@ -43,6 +43,18 @@ export type SearchFn = (
   }
 ) => Promise<SearchResult>;
 
+/** What a caller tells `createSearch` (`blume:search-client`) about its queries. */
+export interface SearchClientOptions {
+  /**
+   * The queries come from a reader typing, as in the search dialog, so each
+   * one supersedes the last. The server-proxied client (Mixedbread), whose
+   * endpoint is rate-limited, then waits for a pause in typing before it
+   * sends a query and aborts the one a newer query supersedes. Other
+   * providers ignore it.
+   */
+  typing?: boolean;
+}
+
 /** A document in the client-loaded `blume-search.json` index. */
 export interface IndexedDocument {
   route: string;

@@ -87,18 +87,18 @@ We reported it upstream in [oxc-project/oxc#24096](https://github.com/oxc-projec
 
 Patch oxfmt so it preserves the line break that sits directly against a `:::` fence. Blume ships the same fix in its own repo, and you can apply it in any project.
 
-1. Save the patch as `patches/oxfmt@0.67.0.patch`:
+1. Save the patch as `patches/oxfmt@0.71.0.patch`:
 
-   ```diff patches/oxfmt@0.67.0.patch
-   diff --git a/dist/markdown-BMigo7Hm.js b/dist/markdown-BMigo7Hm.js
-   index bc9037f6c0de5516b139d8cdb195b1e25cd33bc0..a02c284e28bb535f9964a8a086ebb6549657e416 100644
-   --- a/dist/markdown-BMigo7Hm.js
-   +++ b/dist/markdown-BMigo7Hm.js
-   @@ -4872,7 +4872,43 @@ function lu(e, t, r) {
+   ```diff patches/oxfmt@0.71.0.patch
+   diff --git a/dist/markdown-gizI1LFO.js b/dist/markdown-gizI1LFO.js
+   index 95a638402fa6f73b29ebb8d7a7ef229bee68a690..e2e2ea5b443fe10698c49c2ef3dc3d5909335915 100644
+   --- a/dist/markdown-gizI1LFO.js
+   +++ b/dist/markdown-gizI1LFO.js
+   @@ -4898,7 +4898,43 @@ function lu(e, t, r) {
     		case "sentence": return Oh(e, r);
     		case "word": return t.parser !== "mdx" ? zh(e, t) : Uh(e);
     		case "whitespace": {
-   -			let { next: a } = e, u = a && /^>|^(?:[*+-]|#{1,6}|\d+[).])$/.test(a.value) && !NE(e) && !(t.proseWrap === "preserve" && RE(e)) ? "never" : t.proseWrap;
+   -			let { next: a } = e, u = a && /^>|^(?:[*+-]|#{1,6}|\d+[).])$/.test(a.value) && !RE(e) && !(t.proseWrap === "preserve" && ME(e)) ? "never" : t.proseWrap;
    +			let { next: a, previous: oxfmtFencePrev } = e;
    +			// Preserve line breaks that sit directly against a `:::` container
    +			// directive fence, so `proseWrap: "never"` keeps the opening/closing
@@ -135,7 +135,7 @@ Patch oxfmt so it preserves the line break that sits directly against a `:::` fe
    +				}
    +				oxfmtPrevIsTitledFence = oxfmtIsFence(oxfmtLineFirst);
    +			}
-   +			let u = oxfmtIsFence(oxfmtFencePrev) || oxfmtPrevIsTitledFence || oxfmtIsFence(a) ? "preserve" : a && /^>|^(?:[*+-]|#{1,6}|\d+[).])$/.test(a.value) && !NE(e) && !(t.proseWrap === "preserve" && RE(e)) ? "never" : t.proseWrap;
+   +			let u = oxfmtIsFence(oxfmtFencePrev) || oxfmtPrevIsTitledFence || oxfmtIsFence(a) ? "preserve" : a && /^>|^(?:[*+-]|#{1,6}|\d+[).])$/.test(a.value) && !RE(e) && !(t.proseWrap === "preserve" && ME(e)) ? "never" : t.proseWrap;
     			return ou(e, n.value, u, !1, t);
     		}
     		case "emphasis": {
@@ -146,7 +146,7 @@ Patch oxfmt so it preserves the line break that sits directly against a `:::` fe
    ```json package.json
    {
      "patchedDependencies": {
-       "oxfmt@0.67.0": "patches/oxfmt@0.67.0.patch"
+       "oxfmt@0.71.0": "patches/oxfmt@0.71.0.patch"
      }
    }
    ```
@@ -155,7 +155,7 @@ Patch oxfmt so it preserves the line break that sits directly against a `:::` fe
 
    ```yaml pnpm-workspace.yaml
    patchedDependencies:
-     oxfmt@0.67.0: patches/oxfmt@0.67.0.patch
+     oxfmt@0.71.0: patches/oxfmt@0.71.0.patch
    ```
 
 3. Reinstall so the patch is applied:

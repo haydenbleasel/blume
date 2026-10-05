@@ -4,7 +4,7 @@ description: >-
   Hol dir mit der Quelle sanity() Dokumente aus einem Sanity-Dataset – eine GROQ-Abfrage wählt die Dokumente aus, und ihre Portable-Text-Inhalte werden zu Markdown.
 ---
 
-Der integrierte `sanity()`-Adapter führt eine GROQ-Abfrage aus. Dabei ordnet er die Felder jedes Dokuments dem Frontmatter zu und wandelt den Portable-Text-Inhalt in Markdown um. Als Laufzeitabhängigkeit deklariert der Adapter `@sanity/client`. Das ist ein optionaler Peer, du musst ihn also nur installieren, wenn du diese Quelle verwendest.
+Der integrierte `sanity()`-Adapter führt eine GROQ-Abfrage aus. Dabei ordnet er die Felder jedes Dokuments dem Frontmatter zu und wandelt den Portable-Text-Inhalt in Markdown um. Steht der Inhalt in einem Markdown-String-Feld, wird er so übernommen, wie er geschrieben ist. Es gibt nur eine Ausnahme: Ist ein Link keine Web-, Mail-, Telefon- oder relative Adresse (etwa eine `javascript:`-URL), bleibt nur seine Beschriftung erhalten. Als Laufzeitabhängigkeit deklariert der Adapter `@sanity/client`. Das ist ein optionaler Peer, du musst ihn also nur installieren, wenn du diese Quelle verwendest.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -27,4 +27,4 @@ export default defineConfig({
 });
 ```
 
-Ein Lese-Token für ein privates Dataset kommt aus der Umgebungsvariable `SANITY_TOKEN`, die der Adapter deklariert. Eigene Portable-Text-Blocktypen ordnest du über die Engine-Option `serializers` Blume-Komponenten zu. Diese Option steht dir zur Verfügung, wenn du `sanitySource` direkt erstellst und an [`custom()`](/docs/content/sources/custom) übergibst. Sobald du `serializers` setzt, werden die Seiten der Quelle als MDX geschrieben. So werden Komponenten oder Direktiven, die ein Serializer zurückgibt, auch gerendert.
+Ein Lese-Token für ein privates Dataset kommt aus der Umgebungsvariable `SANITY_TOKEN`. Der Adapter deklariert sie, deshalb warnen `blume dev` und `blume build`, wenn sie nicht gesetzt ist. Ein öffentliches Dataset funktioniert auch ohne sie. Fragst du ein privates Dataset ohne Token ab, antwortet Sanity nicht mit einem Fehler, sondern liefert einfach keine Dokumente. Wenn eine Abfrage also nichts findet und das Token nicht gesetzt ist, ergänzt die Quelle eine `BLUME_MISSING_SECRET`-Warnung, die genau darauf hinweist. Mit `--preview` liest der Adapter Entwürfe über die Perspektive `previewDrafts`. Laut `@sanity/client` 8 wurde sie in `drafts` umbenannt. Der alte Name funktioniert aber weiterhin, und `@sanity/client` 6 akzeptiert nur den alten. Eigene Portable-Text-Blocktypen ordnest du über die Engine-Option `serializers` Blume-Komponenten zu. Diese Option steht dir zur Verfügung, wenn du `sanitySource` direkt erstellst und an [`custom()`](/docs/content/sources/custom) übergibst. Sobald du `serializers` setzt, werden die Seiten der Quelle als MDX geschrieben. So werden Komponenten oder Direktiven, die ein Serializer zurückgibt, auch gerendert.

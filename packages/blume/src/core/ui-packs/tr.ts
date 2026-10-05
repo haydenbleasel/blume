@@ -50,6 +50,7 @@ export const tr: UIStringsOverride = {
   banner: { dismiss: "Duyuruyu kapat" },
   changelog: {
     description: "Ürün güncellemeleri ve sürüm notları.",
+    empty: "Değişiklik günlüğünde henüz kayıt yok.",
     title: "Değişiklik günlüğü",
   },
   consent: {

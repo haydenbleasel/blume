@@ -29,6 +29,8 @@ The server exposes read-only tools — `search_docs`, `get_page`, `list_pages`, 
 
 `search_docs` runs its own full-text index, so it works regardless of your [search](/docs/configuration/search) provider — and even with `search: false`. The MCP server is a separate feature from on-page search.
 
+[Hidden pages](/docs/content/navigation#hidden-pages) stay out of `list_pages` and `resources/list`, and out of `search_docs` unless [`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) is on, as they stay out of site search and `llms.txt`. `get_page` and `resources/read` still return a hidden page by its route: hidden isn't private, and the page is still served at its URL and as Markdown.
+
 The same tools are available over plain HTTP as the [JSON API](/docs/discoverability/json-api), for frameworks that don't speak MCP.
 
 The endpoint reads a request body only up to 64 KB and answers anything larger with `413`. A call to a tool that doesn't exist, or with `arguments` that aren't an object, gets the JSON-RPC Invalid params error (`-32602`).
@@ -48,6 +50,8 @@ Both tools also accept a `filters` object matching against the facets a site dec
 ```
 
 Every `filters` entry must match (results carry their facet values, and `list_pages` shows each page's), so a knowledge base can drive progressive-disclosure agent workflows — enumerate the enforced standards, search only within them — without any server of its own.
+
+A value matches exactly, case included, as `list_pages` shows it: `"enforced"` doesn't match a page whose `status` is `Enforced`. Facet values are strings, so a number or boolean in `filters` matches its string form (`{"priority": 1}` finds `priority: 1`), and a value of any other shape, such as a list, is ignored rather than filtering.
 
 ## Server output required
 

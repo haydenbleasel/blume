@@ -15,7 +15,9 @@
 // Google's snippet and canonicalization docs checked 2026-09-27. Did not run
 // `blume build` or the workflow. Not yet run end to end.
 // Review pass: canonical advice matches deploy/sitemap.ts (a page whose
-// seo.canonical points elsewhere stays listed, NON_CANONICAL_IN_SITEMAP).
+// seo.canonical points elsewhere is left out of the sitemap). The audit
+// counts, the network check count, and the sitemap fix text were updated by
+// hand to match audit/catalog.ts on main, not rerun.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -228,7 +230,7 @@ npx blume audit`}
   </p>
   <CodeBlock
     code={`  blume audit  4 pages · dist · offline
-  312 audits · 4 errors · 3 warnings · 0 notes
+  316 audits · 4 errors · 3 warnings · 0 notes
 
   indexability
 
@@ -255,7 +257,7 @@ npx blume audit`}
 
   ⚠ Indexable page not in sitemap  1 page
       /billing                           docs/billing.mdx
-      fix: Remove \`draft\`/\`hidden\`/\`noindex\` from the page's frontmatter if it should be indexed.
+      fix: Remove \`draft\`/\`hidden\`/\`noindex\` from the page's frontmatter if it should be indexed. A \`public/sitemap.xml\` replaces the generated sitemap, so add the page there or delete that file.
 
   content
 
@@ -264,12 +266,12 @@ npx blume audit`}
       fix: Rewrite \`description\` in the frontmatter to fit the length range.
 
   ⊘ external     skipped \u2014 pass --external (2 checks)
-  ⊘ network      skipped \u2014 pass --url <origin> (11 checks)`}
+  ⊘ network      skipped \u2014 pass --url <origin> (12 checks)`}
     lang="text"
   />
   <p>
     The command exits with code 1, because there are errors. Four pages means
-    the three docs pages plus the 404 page, and 312 audits is every check that
+    the three docs pages plus the 404 page, and 316 audits is every check that
     ran times every page.
   </p>
 
@@ -306,10 +308,10 @@ npx blume audit`}
     lang="text"
   />
   <p>
-    The "not in sitemap" warning is a side effect of the stale file: its fix
-    text assumes a <code>draft</code>, <code>hidden</code>, or{" "}
-    <code>noindex</code> flag kept the page out, but here the hand-made
-    sitemap never listed it.
+    The "not in sitemap" warning is a side effect of the stale file. No{" "}
+    <code>draft</code>, <code>hidden</code>, or <code>noindex</code> flag kept
+    the page out; the hand-made sitemap never listed it, which is the case the
+    fix text's second sentence covers.
   </p>
 
   <h2>Choose a severity gate</h2>
@@ -384,10 +386,10 @@ description: Install the Acme SDK for Node.js or Python, set your API key as an 
     lang="mdx"
   />
   <p>
-    If a page really is a copy of another, redirect it to the page that stays
-    rather than setting <code>seo.canonical</code>. Blume's generated sitemap
-    still lists a page whose canonical points elsewhere, and the audit reports
-    that as <code>BLUME_AUDIT_NON_CANONICAL_IN_SITEMAP</code>, an error.
+    If a page really is a copy of another, redirect it to the page that stays.
+    Pointing its <code>seo.canonical</code> at that page also works, and Blume
+    then leaves the copy out of the generated sitemap, but the copy keeps
+    publishing at its own URL. A redirect leaves one URL to index.
   </p>
   <p>
     <strong>The description.</strong> Write one that says what the page
@@ -428,8 +430,8 @@ export default defineConfig({
   />
   <p>
     <strong>The sitemap.</strong> Delete the hand-made file, and Blume
-    generates one from your pages, leaving out drafts, hidden pages, and{" "}
-    <code>noindex</code> pages:
+    generates one from your pages, leaving out drafts, hidden pages,{" "}
+    <code>noindex</code> pages, and pages whose canonical names another URL:
   </p>
   <CodeBlock code="rm public/sitemap.xml" lang="bash" />
   <p>
@@ -443,12 +445,12 @@ npx blume audit --fail-on warning`}
   />
   <CodeBlock
     code={`  blume audit  4 pages · dist · offline
-  312 audits · 0 errors · 0 warnings · 0 notes
+  316 audits · 0 errors · 0 warnings · 0 notes
 
   ✔ No issues found.
 
   ⊘ external     skipped \u2014 pass --external (2 checks)
-  ⊘ network      skipped \u2014 pass --url <origin> (11 checks)`}
+  ⊘ network      skipped \u2014 pass --url <origin> (12 checks)`}
     lang="text"
   />
   <p>
@@ -521,17 +523,21 @@ jobs:
   <h3>Check a deployment too</h3>
   <p>
     Some problems only exist on the server: a rewrite that 404s a built page,
-    responses without compression, or an <code>X-Robots-Tag</code> header
-    quietly deindexing a page whose HTML looks fine. After a preview deploy,
-    point the audit at it to add those network checks:
+    a redirect the host never applies, responses without compression, or an{" "}
+    <code>X-Robots-Tag</code> header quietly deindexing a page whose HTML
+    looks fine. After a preview deploy, point the audit at it to add those
+    network checks:
   </p>
   <CodeBlock
     code="npx blume audit --url https://preview.docs.acme.example"
     lang="bash"
   />
   <p>
-    It still reads the local build, so run it in a job that has built the same
-    commit. Add <code>--external</code> to probe outbound links as well.
+    It requests each exact redirect's old URL too, and reports{" "}
+    <code>BLUME_AUDIT_REDIRECT_NOT_SERVED</code> when the live site doesn't
+    send it to the page you configured. It still reads the local build, so run
+    it in a job that has built the same commit. Add <code>--external</code> to
+    probe outbound links as well.
   </p>
 
   <h2>Troubleshooting</h2>
@@ -565,15 +571,19 @@ jobs:
   <p>
     A pattern redirect covers a page you kept, and the build rejects it before
     the audit ever runs, since hosts disagree on which one answers. Narrow the
-    pattern to the paths that actually moved. The{" "}
+    pattern to the paths that actually moved. An exact redirect from a page's
+    own URL gets the same code as a warning: the redirect takes the URL over,
+    so the page never publishes. Delete the page if it moved, or drop the
+    redirect. The{" "}
     <a href="/guides/documentation-url-migration-redirects">URL migration guide</a>{" "}
     covers planning a move.
   </p>
-  <h3>"An unexpected error occurred" with "bad indentation of a mapping entry"</h3>
+  <h3>BLUME_FRONTMATTER_INVALID with "bad indentation of a mapping entry"</h3>
   <p>
     A front matter value contains a colon followed by a space, like{" "}
     <code>description: Setup: install the SDK</code>, which YAML reads as a
-    nested key. Quote the value, or rephrase it without the colon.
+    nested key. Blume names the file and line and leaves that page out of the
+    site. Quote the value, or rephrase it without the colon.
   </p>
   <h3>The audit passes, but a page still isn't indexed</h3>
   <p>

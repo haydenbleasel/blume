@@ -6,7 +6,11 @@ import {
   discoverPagesSync,
   hasGeneratedChangelog,
 } from "../astro/pages.ts";
-import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
+import {
+  mountBasePath,
+  normalizeBasePath,
+  normalizePath,
+} from "../core/base-path.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { siteRoot } from "../core/site-url.ts";
 
@@ -28,6 +32,30 @@ const lastmodTag = (value: string | undefined): string => {
   return Number.isNaN(date.getTime())
     ? ""
     : `<lastmod>${date.toISOString().slice(0, 10)}</lastmod>`;
+};
+
+/**
+ * Whether a page's own `seo.canonical` names another URL. The sitemap lists
+ * canonical URLs only, so such a page stays out — `blume audit` reports a
+ * listed one as NON_CANONICAL_IN_SITEMAP and expects it unlisted. Compared by
+ * decoded path, as the audit does: `served` is the page's path with the
+ * deployment base mounted, which the canonical carries too.
+ */
+const canonicalElsewhere = (
+  canonical: string | undefined,
+  served: string
+): boolean => {
+  if (!canonical) {
+    return false;
+  }
+  const { pathname } = new URL(canonical);
+  let path = pathname;
+  try {
+    path = decodeURI(pathname);
+  } catch {
+    // A malformed escape stays as written; it can't match the served path.
+  }
+  return normalizePath(path) !== normalizePath(served);
 };
 
 /** One emitted sitemap artifact: its dist-root filename and XML body. */
@@ -62,7 +90,8 @@ ${urls.join("\n")}
  * can't see: custom `.astro` pages (most importantly a custom landing `/`) and
  * the generated `/changelog` index. Returns null when the sitemap is disabled
  * or no `site` is configured (absolute URLs are required for a valid sitemap).
- * Drafts, hidden, and `noindex` pages are excluded.
+ * Drafts, hidden, and `noindex` pages are excluded, and so is a page whose
+ * `seo.canonical` points elsewhere.
  *
  * Sites within the per-file URL cap get the single classic `sitemap.xml`;
  * larger sites get `sitemap.xml` as a sitemap index over numbered
@@ -87,7 +116,9 @@ export const buildSitemapFiles = (
   // or when their canonical points at a still-existing latest equivalent —
   // listing a URL whose canonical says "index the other page" invites the
   // noindexed-page-in-sitemap incoherence Docusaurus is known for. A page
-  // that exists only in an archived version stays listed (self-canonical).
+  // that exists only in an archived version stays listed (self-canonical),
+  // and a page's own `seo.canonical` wins over the version's default, as it
+  // does in the page head (see `canonicalElsewhere`).
   const { versions } = project.config;
   const archivedById = new Map(
     (versions?.archived ?? []).map((version) => [version.id, version])
@@ -109,6 +140,7 @@ export const buildSitemapFiles = (
     return Boolean(
       archived?.noindex ||
       (archived?.canonical === "latest" &&
+        !page.meta.seo.canonical &&
         currentKeys?.has(`${page.versionKey}\u0000${page.locale}`))
     );
   };
@@ -128,16 +160,18 @@ export const buildSitemapFiles = (
     urls.push(`  <url><loc>${loc}</loc>${lastmodTag(lastModified)}</url>`);
   };
   for (const page of project.graph.pages) {
+    const served = mountBasePath(deployBase, page.route);
     if (
       page.meta.draft ||
       page.meta.sidebar.hidden ||
       page.meta.seo.noindex ||
       ERROR_ROUTES.has(page.route) ||
-      archivedExcluded(page)
+      archivedExcluded(page) ||
+      canonicalElsewhere(page.meta.seo.canonical, served)
     ) {
       continue;
     }
-    pushUrl(mountBasePath(deployBase, page.route), page.lastModified);
+    pushUrl(served, page.lastModified);
   }
   // Custom `.astro` pages and the generated changelog index mount outside
   // `basePath` (they're injected at their pattern — see `blumeIntegration`), so

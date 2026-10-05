@@ -19,10 +19,12 @@ import {
   exampleVariables,
   graphqlPlaygroundModel,
   graphqlRoutes,
+  graphqlSecurity,
 } from "./graphql-helpers.ts";
 import { buildRequest, defaultValues } from "./request.ts";
 import { languageSamplePanels } from "./sample-panels.ts";
 import { sampleLanguages } from "./snippets.ts";
+import Authorization from "./Authorization.astro";
 import Description from "./Description.astro";
 import GraphqlChip from "./GraphqlChip.astro";
 import GraphqlFieldsTable from "./GraphqlFieldsTable.astro";
@@ -107,6 +109,7 @@ const responsePanels =
     : [];
 
 const returnRoute = field ? routes.get(field.type.name) : undefined;
+const security = spec ? graphqlSecurity(spec) : undefined;
 ---
 
 {
@@ -134,6 +137,7 @@ const returnRoute = field ? routes.get(field.type.name) : undefined;
               Deprecated: <span set:text={field.deprecationReason} />
             </p>
           )}
+          {security && <Authorization security={security} />}
           <GraphqlFieldsTable
             routes={routes}
             rows={field.args}
@@ -169,6 +173,7 @@ const returnRoute = field ? routes.get(field.type.name) : undefined;
                 model={model}
                 operation={id}
                 proxy={spec.playground.proxy}
+                proxyConfig="graphql"
                 slug={spec.slug}
               />
             )}

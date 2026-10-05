@@ -584,8 +584,8 @@ npm run dev`}
     operations show an Authorization section, and their code samples send{" "}
     <code>Authorization: Bearer YOUR_TOKEN</code>. A route without it gets
     neither, so a public health check stays public in the docs too. The dev
-    server doesn't watch the spec file, so restart it after you run{" "}
-    <code>npm run openapi</code> again.
+    server watches the spec file, so when you run <code>npm run openapi</code>{" "}
+    again, the pages update without a restart.
   </p>
 
   <h2>Add a first-request guide</h2>

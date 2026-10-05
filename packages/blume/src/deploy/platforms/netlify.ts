@@ -118,7 +118,8 @@ export const emitNetlifyPatternRedirects = async (
  */
 export const netlifyPlatform: DeployPlatform = {
   astro: {
-    config: {},
+    config: () => ({}),
+    configOptions: [],
     options: () => ({}),
     package: NETLIFY_ADAPTER_PACKAGE,
   },

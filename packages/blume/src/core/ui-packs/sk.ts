@@ -48,6 +48,7 @@ export const sk: UIStringsOverride = {
   banner: { dismiss: "Zavrieť oznámenie" },
   changelog: {
     description: "Novinky produktu a poznámky k vydaniu.",
+    empty: "V zozname zmien zatiaľ nie sú žiadne záznamy.",
     title: "Zoznam zmien",
   },
   consent: {

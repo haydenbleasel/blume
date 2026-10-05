@@ -4,7 +4,7 @@ description: >-
   AsyncAPI 仕様を追加するだけで、ネイティブなイベントリファレンスが手に入ります。send と receive の各オペレーションごとに実際のページが生成され、サイドバーと検索に表示されます。
 ---
 
-イベント駆動型 API では `blume/reference` の `asyncapi()` アダプターを使用し、[OpenAPI](/docs/references/openapi) や [GraphQL](/docs/references/graphql) のアダプターと並べて `reference` に記述します。`openapi()` と同じオプションを受け取り、同じネイティブレンダラーで描画されます。各 `send`/`receive` オペレーションは実際のページになり、次の内容を備えます。メッセージのペイロードとヘッダーのスキーマテーブル、チャネルパラメーター、プロトコルバインディング、仕様の `securitySchemes` から導出される Authorization セクション（サーバーレベルとオペレーションレベルの両方に対応し、代替手段は「or」グループとして表示されます）、そして [Try it](#try-it-for-events) メッセージコンポーザーです。各オペレーションは本物の Blume ページであるため、独自の URL を持ち、**サイト検索**や `llms.txt` に表示され、Open Graph 画像も生成されます。これは手書きのドキュメントとまったく同じです。
+イベント駆動型 API では `blume/reference` の `asyncapi()` アダプターを使用し、[OpenAPI](/docs/references/openapi) や [GraphQL](/docs/references/graphql) のアダプターと並べて `reference` に記述します。`openapi()` と同じオプションを受け取り、同じネイティブレンダラーで描画されます。各 `send`/`receive` オペレーションは実際のページになり、次の内容を備えます。メッセージのペイロードとヘッダーのスキーマテーブル、チャネルパラメーター、プロトコルバインディング、仕様の `securitySchemes` から導出される Authorization セクション（サーバーレベルとオペレーションレベルの両方に対応し、代替手段は「or」グループとして表示されます。チャネルのサーバー間で違いがある場合は、各スキームがどのサーバーに適用されるかも表示されます）、そして [Try it](#try-it-for-events) メッセージコンポーザーです。各オペレーションは本物の Blume ページであるため、独自の URL を持ち、**サイト検索**や `llms.txt` に表示され、Open Graph 画像も生成されます。これは手書きのドキュメントとまったく同じです。
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -30,6 +30,8 @@ AsyncAPI **2.x の仕様は、公式の AsyncAPI コンバーターによって�
 ## コードサンプル [#code-samples]
 
 コードサンプルは**プロトコルに対応**しており、オペレーションのバインディング（またはそのサーバーのプロトコル）に応じて切り替わります。WebSocket には `wscat` とブラウザーの `WebSocket` スニペット、Kafka には `kcat`、MQTT には `mosquitto_pub`/`mosquitto_sub` が使われます。`codeSamples` を使うと、`openapi()` で言語を選ぶのと同じ方法でこのセットを絞り込めます。`codeSamples: false` を指定すると、コードサンプルは表示されません。対応するツールがないプロトコルでは、架空のクライアントをでっち上げるのではなく、メッセージペイロードの例のみを表示します。
+
+`kcat` のサンプルは Kafka バインディングも読み取ります。チャネルバインディングの `topic` は、チャネルアドレスの代わりにトピック名として使われます。メッセージバインディングの `key` はメッセージのキーになります。サンプルは `-K '|'` を指定して `key|payload` 形式の行をプロデュースし、コンシューム時にも同じフラグを使うため、各キーはそのメッセージの前に出力されます。キーの値はペイロードと同じようにキースキーマから導出されるため、スキーマに `examples` のエントリーを指定してください。サーバーが SASL スキーム（`plain`、`scramSha256`、`scramSha512`、`gssapi` のいずれか）を宣言している場合、サンプルには librdkafka が必要とする `-X` 設定が追加され、ユーザー名とパスワードは `$KAFKA_USERNAME` と `$KAFKA_PASSWORD` から読み取られます。`kafka-secure` サーバーでは TLS が追加されます。
 
 ## 共通オプション [#shared-options]
 

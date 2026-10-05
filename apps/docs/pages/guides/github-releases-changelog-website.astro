@@ -15,7 +15,10 @@
 // (BLUME_SOURCE_UNAVAILABLE, build continues), feed, and edit-link label
 // against core/sources/github-releases.ts, deploy/rss.ts, and
 // core/i18n-ui.ts, and the Netlify build hook path against Netlify's docs.
-// Not yet run end to end against a real repository.
+// Rechecked baseUrl, the Draft tag, and the feed item's description against
+// sources/github-releases.ts, core/sources/github-releases.ts, and
+// deploy/rss.ts, and the changelog config's title and description against
+// core/changelog-index.ts. Not yet run end to end against a real repository.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -42,9 +45,10 @@ import { guideById } from "../_guides/guides.ts";
     If you'd rather keep release notes as files in your docs repository, you
     don't need this source. Any page with <code>type: changelog</code> in its
     frontmatter joins the same timeline and feed (see{" "}
-    <a href="/docs/advanced/changelog">Changelogs</a>). The source reads from{" "}
-    <code>api.github.com</code> only, so releases on GitLab or GitHub
-    Enterprise Server need another route. The examples use a fictional{" "}
+    <a href="/docs/advanced/changelog">Changelogs</a>). The source reads
+    GitHub's REST API, from <code>api.github.com</code> unless you point its{" "}
+    <code>baseUrl</code> at a GitHub Enterprise Server, so releases on GitLab
+    need another route. The examples use a fictional{" "}
     <code>acme/sdk</code> repository and a docs site at{" "}
     <code>docs.acme.example</code>.
   </p>
@@ -124,7 +128,7 @@ export default defineConfig({
       <tr>
         <td><code>drafts</code></td>
         <td><code>false</code></td>
-        <td>Includes draft releases</td>
+        <td>Includes draft releases, tagged <code>Draft</code></td>
       </tr>
       <tr>
         <td><code>limit</code></td>
@@ -135,6 +139,15 @@ export default defineConfig({
         <td><code>pollInterval</code></td>
         <td>none</td>
         <td>Seconds between re-fetches while <code>blume dev</code> runs</td>
+      </tr>
+      <tr>
+        <td><code>baseUrl</code></td>
+        <td><code>https://api.github.com</code></td>
+        <td>
+          The REST API to read, like{" "}
+          <code>https://github.acme.example/api/v3</code> for a GitHub
+          Enterprise Server
+        </td>
       </tr>
     </tbody>
   </table>
@@ -151,7 +164,9 @@ export default defineConfig({
     A private repository needs a token: without one, GitHub answers 404 and the
     changelog comes out empty. Create a fine-grained personal access token for
     that one repository, with <strong>Contents</strong> set to{" "}
-    <strong>Read-only</strong>. For local work, put it in{" "}
+    <strong>Read-only</strong>. With <code>baseUrl</code> set, Blume sends the
+    token to that server, so create it on your GitHub Enterprise Server. For
+    local work, put it in{" "}
     <code>.env.local</code>, which Blume loads from the project folder up to the
     repository root. Keep that file out of Git.
   </p>
@@ -229,11 +244,16 @@ export default defineConfig({
   </p>
   <p>
     The feed is at <code>/changelog/rss.xml</code>. Each item carries the
-    release's title, page URL, and publish date, newest first, up to 50 items.
+    release's title, page URL, summary, and publish date, newest first, up to
+    50 items.
     Tune it under <a href="/docs/discoverability/rss">seo.rss</a>: raise{" "}
     <code>limit</code>, or remove <code>"changelog"</code> from{" "}
-    <code>types</code> to keep the timeline without a feed. To redesign the
-    timeline itself, add a{" "}
+    <code>types</code> to keep the timeline without a feed. The timeline is
+    headed <strong>Changelog</strong>. To rename it or change the line below
+    the heading, set <code>changelog.title</code> and{" "}
+    <code>changelog.description</code> in <code>blume.config.ts</code> (see{" "}
+    <a href="/docs/advanced/changelog#the-index-page">The index page</a>). To
+    redesign the timeline itself, add a{" "}
     <a href="/docs/advanced/custom-pages">custom page</a> at{" "}
     <code>pages/changelog.astro</code>, and Blume stops generating its own.
   </p>
@@ -277,7 +297,7 @@ export default defineConfig({
     Leave <code>drafts</code> off on a public site. GitHub lists draft releases
     only to users with push access to the repository, so drafts need such a
     token, and Blume publishes every draft it receives like any other
-    release. <code>blume build --preview</code>{" "}
+    release, tagged <code>Draft</code>. <code>blume build --preview</code>{" "}
     doesn't change what this source fetches.
   </Callout>
 
@@ -462,6 +482,7 @@ SMS templates and a faster retry policy.
   <title>v1.3.0</title>
   <link>https://docs.acme.example/changelog/v1-3-0</link>
   <guid isPermaLink="true">https://docs.acme.example/changelog/v1-3-0</guid>
+  <description>SMS templates and a faster retry policy. Send SMS from a saved template with templates.render(). See Templates. Retries no longer resend a message the API…</description>
   <pubDate>Tue, 15 Sep 2026 14:02:11 GMT</pubDate>
 </item>`}
     lang="xml"

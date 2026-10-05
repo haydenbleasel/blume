@@ -622,10 +622,37 @@ export interface ReaderScope {
   filters: { locale: string | undefined; version: string | undefined };
 }
 
+// The snapshot's locale codes, keyed lowercase, built once per snapshot.
+const localeCodes = new WeakMap<AskData, Map<string, string>>();
+
+/**
+ * The locale a path's first segment names (`/ja` or `/ja/pricing` → `ja`),
+ * when it's one the snapshot's documents carry: a page outside the docs,
+ * like a localized landing page, still says which language it's in.
+ */
+const pathLocale = (data: AskData, path: string): string | undefined => {
+  let codes = localeCodes.get(data);
+  if (!codes) {
+    codes = new Map<string, string>();
+    for (const { locale } of data.documents) {
+      if (locale) {
+        codes.set(locale.toLowerCase(), locale);
+      }
+    }
+    localeCodes.set(data, codes);
+  }
+  const [, first = ""] = normalizeRoute(path).split("/");
+  return first ? codes.get(first.toLowerCase()) : undefined;
+};
+
 /**
  * Where the reader is: their page, when it's in the snapshot, and the locale
- * and docs version retrieval keeps to. Without a page, a versioned site
- * grounds in the current docs rather than every archived copy of each page.
+ * and docs version retrieval keeps to. A page the snapshot doesn't have (the
+ * homepage, a custom page, or none at all from a cross-origin caller) keeps
+ * to the locale its path's first segment names, or the default locale, so
+ * translations of every page don't crowd each other out. Without a page, a
+ * versioned site grounds in the current docs rather than every archived copy
+ * of each page.
  */
 export const readerScope = (
   data: AskData,
@@ -635,10 +662,13 @@ export const readerScope = (
   const current = page?.path
     ? byRoute.get(normalizeRoute(page.path))
     : undefined;
+  const locale = current
+    ? current.locale
+    : (page?.path && pathLocale(data, page.path)) || data.defaultLocale;
   return {
     current,
     filters: {
-      locale: current?.locale || undefined,
+      locale: locale || undefined,
       version: data.versioned ? (current?.version ?? "") : undefined,
     },
   };

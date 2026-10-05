@@ -9,10 +9,10 @@ description: blume validate checks every link in your content — pages, anchors
 blume validate
 ```
 
-- **Internal page links** (`/guides/intro`, `./sibling`) must resolve to a real page — broken ones are reported as errors. A component's string `href` (`<Card href="./install">`) is checked the same way; an `href={…}` expression isn't.
+- **Internal page links** (`/guides/intro`, `./sibling`) must resolve to a real page — broken ones are reported as errors. Every link form Markdown and MDX render is read: inline links, including one whose label wraps onto the next line; reference-style links, checked at their `[label]: /target` definition; autolinks (`<https://…>`, in `.md`); and a component's string `href` (`<Card href="./install">`). A lowercase HTML `<a href>` ships exactly as written, so it's checked the way a browser reads it: a relative path resolves against the page's URL, and no [`basePath`](/docs/deployment#mount-the-docs-under-a-path) is added. An `href={…}` expression isn't checked.
 - **Anchor links** (`#section`, `/guides/intro#setup`) must match an anchor on the target page — a heading's id (generated or [pinned](/docs/content/syntax#custom-anchors)) or a raw HTML element's `id` attribute — with misses reported as warnings. Ids inside code blocks, inline code, HTML comments, and `<Prompt>` blocks don't count.
 - **Asset links** are checked where the file lives: an absolute path (`/logo.png`) against the `public/` directory, a relative image embed (`![](./diagram.png)`) against the page's own folder. A plain link to a relative path still resolves as a site route — only image embeds go through the image pipeline.
-- **External links** are only checked with [`--external`](#flags) (off by default since it requires the network); dead links (404/410/unreachable) are errors, while rate-limited or transient responses (403/429/5xx/timeout) are warnings.
+- **External links** are only checked with [`--external`](#flags) (off by default since it requires the network). A dead link is an error: a 404 or 410, or a host name that doesn't resolve. Anything else that fails is a warning, since it's more often the other site or the network than the link: any other error status (a 401 or 403 from a site that turns bots away, a 429 rate limit, a 5xx outage), a refused or dropped connection, or no answer within 10 seconds. To leave out URLs that can't be checked from where the command runs, like a placeholder domain, a local server, or a site that turns bots away, pass [`--ignore`](#flags). A bare URL that GitHub-flavored Markdown links on its own, with no link syntax around it, isn't read; [`blume audit --external`](/docs/cli/audit) checks it in the built site.
 
 ## What counts as a page
 
@@ -21,6 +21,7 @@ Links resolve against everything the built site serves, not just Markdown pages:
 ## Flags
 
 - `--external` — also check external `http(s)` links over the network.
+- `--ignore <glob>` — with `--external`, don't request an external link whose URL matches the glob, and report nothing for it. The glob is matched against the link's full URL, scheme included: `*` matches within one path segment and `**` across segments, so `--ignore "https://api.acme.example/**"` skips every link to that host and `--ignore "http://localhost:*/**"` every local server. Repeat the flag for more patterns, and quote each one so your shell doesn't expand it. Internal links are always checked: they resolve against your own pages, so fix a broken one or add a [redirect](/docs/deployment#redirects).
 - `--strict` — exit non-zero on warnings too. Info-level notes stay advisory.
 - `--json` — emit the diagnostics as JSON on stdout instead of the terminal report.
 
@@ -32,7 +33,7 @@ Links resolve against everything the built site serves, not just Markdown pages:
 | `BLUME_BROKEN_ANCHOR` | warning | The page exists but has no anchor matching the fragment. |
 | `BLUME_BROKEN_ASSET` | warning | An absolute path isn't in `public/`, or a relative image embed isn't beside the page. |
 | `BLUME_ASSETS_UNCHECKED` | info | There is no `public/` directory, so absolute asset paths weren't checked. |
-| `BLUME_DEAD_LINK` | error or warning | An external link (with `--external`) returned 404/410 or was unreachable (error), or a transient 403/429/5xx/timeout (warning). |
+| `BLUME_DEAD_LINK` | error or warning | An external link (with `--external`) returned 404/410 or its host doesn't resolve (error), or it got any other error status, no connection, or no answer in time (warning). |
 
 The exit code is the contract: errors exit non-zero, and `--strict` makes warnings do the same.
 

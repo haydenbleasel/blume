@@ -1,45 +1,113 @@
 import { describe, expect, it } from "bun:test";
 
+import { prefersMarkdown } from "../src/astro/markdown-negotiation.ts";
 import {
-  ACCEPT_JSON_HEADER_VALUE,
-  ACCEPT_MARKDOWN_HEADER_VALUE,
+  ACCEPT_JSON_CONDITIONS,
+  ACCEPT_MARKDOWN_CONDITIONS,
   buildNegotiationRoutes,
   injectNegotiationRoutes,
 } from "../src/deploy/vercel-negotiation.ts";
-import type { VercelRoute } from "../src/deploy/vercel-negotiation.ts";
+import type {
+  AcceptConditions,
+  VercelRoute,
+} from "../src/deploy/vercel-negotiation.ts";
 
-// The router's matching semantics aren't contractual — exercise the pattern
+// The router's matching semantics aren't contractual — exercise each pattern
 // both as a substring match and wrapped as a full-string match, since it must
 // behave identically either way.
-const partial = new RegExp(ACCEPT_MARKDOWN_HEADER_VALUE, "u");
-const full = new RegExp(`^(?:${ACCEPT_MARKDOWN_HEADER_VALUE})$`, "u");
-
-const matchesBoth = (accept: string): boolean => {
-  const a = partial.test(accept);
-  const b = full.test(accept);
-  expect(a).toBe(b);
-  return a;
+const matchesBoth = (pattern: string | undefined, accept: string): boolean => {
+  const partial = new RegExp(pattern ?? "", "u").test(accept);
+  const full = new RegExp(`^(?:${pattern ?? ""})$`, "u").test(accept);
+  expect(partial).toBe(full);
+  return partial;
 };
 
-describe("accept-header pattern", () => {
-  it("matches Markdown accept headers under both matching semantics", () => {
-    expect(matchesBoth("text/markdown")).toBe(true);
-    expect(matchesBoth("text/x-markdown")).toBe(true);
-    expect(matchesBoth("text/markdown;q=0.9")).toBe(true);
-    expect(matchesBoth("text/markdown, */*")).toBe(true);
-    expect(matchesBoth("text/html, text/markdown;q=0.9")).toBe(true);
-    expect(matchesBoth("application/json,text/markdown")).toBe(true);
+/**
+ * Whether a route written once per condition pair fires for `accept`: all of
+ * one pair's `has`, and none of its `missing`, match.
+ */
+const fires = (
+  conditions: readonly AcceptConditions[],
+  accept: string
+): boolean =>
+  conditions.some(
+    ({ has, missing = [] }) =>
+      has.every((condition) => matchesBoth(condition.value, accept)) &&
+      !missing.some((condition) => matchesBoth(condition.value, accept))
+  );
+
+describe("accept-header conditions", () => {
+  it("negotiate Markdown the way dev and Cloudflare do", () => {
+    const headers = [
+      // Markdown.
+      "text/markdown",
+      "text/x-markdown",
+      "Text/Markdown",
+      "TEXT/X-MARKDOWN; charset=utf-8",
+      "text/markdown;q=1",
+      "text/markdown ; q=1.0, text/html",
+      "text/html, text/markdown",
+      "text/markdown;q=0.9",
+      "text/markdown; charset=utf-8; q=0.8, */*;q=0.1",
+      "text/markdown;q=.5, text/html;q=0",
+      "text/markdown;Q=0.5",
+      "application/json,text/markdown",
+      "text/markdown;q=0, text/x-markdown",
+      // HTML.
+      "text/html",
+      "text/html,application/xhtml+xml,application/xml;q=0.9,*/*",
+      "*/*",
+      "application/json",
+      "text/markdown;q=0",
+      "text/markdown; q=0.000",
+      "text/markdown;q=",
+      "text/html, text/markdown;q=0.9",
+      "TEXT/HTML, text/markdown;q=0.9",
+      "text/markdown;q=0.5, text/html",
+      "text/markdown;q=0.9, text/html;q=0.95",
+      // A longer media type must not match on its `text/markdown` prefix.
+      "text/markdownx",
+      "text/markdown x",
+    ];
+    for (const accept of headers) {
+      expect({
+        accept,
+        negotiated: fires(ACCEPT_MARKDOWN_CONDITIONS, accept),
+      }).toStrictEqual({ accept, negotiated: prefersMarkdown(accept) });
+    }
   });
 
-  it("rejects browser and non-Markdown accept headers", () => {
-    expect(matchesBoth("text/html")).toBe(false);
-    expect(
-      matchesBoth("text/html,application/xhtml+xml,application/xml;q=0.9,*/*")
-    ).toBe(false);
-    expect(matchesBoth("*/*")).toBe(false);
-    expect(matchesBoth("application/json")).toBe(false);
-    // A longer media type must not match on its `text/markdown` prefix.
-    expect(matchesBoth("text/markdownx")).toBe(false);
+  it("serve HTML when Markdown and HTML both weigh in below 1", () => {
+    // A routing condition can't compare two q-values; dev and Cloudflare
+    // send Markdown here.
+    for (const accept of [
+      "text/markdown;q=0.9, text/html;q=0.8",
+      "text/html;q=0.5, text/markdown;q=0.5",
+    ]) {
+      expect(prefersMarkdown(accept)).toBe(true);
+      expect(fires(ACCEPT_MARKDOWN_CONDITIONS, accept)).toBe(false);
+    }
+  });
+
+  it("negotiate JSON the same way", () => {
+    for (const accept of [
+      "application/json",
+      "Application/Problem+JSON",
+      "application/json;q=0.9",
+      "application/json, text/plain",
+      "text/html, application/json",
+    ]) {
+      expect(fires(ACCEPT_JSON_CONDITIONS, accept)).toBe(true);
+    }
+    for (const accept of [
+      "*/*",
+      "text/html,application/xhtml+xml",
+      "application/jsonx",
+      "application/json;q=0",
+      "text/html, application/json;q=0.9",
+    ]) {
+      expect(fires(ACCEPT_JSON_CONDITIONS, accept)).toBe(false);
+    }
   });
 });
 
@@ -49,20 +117,17 @@ describe("buildNegotiationRoutes", () => {
       "/docs/a",
       "/docs/b",
     ]);
-    expect(rewriteRoutes).toStrictEqual([
-      {
+    // One rewrite per condition pair: full-weight Markdown, and partial
+    // weight with no HTML above zero.
+    expect(rewriteRoutes).toStrictEqual(
+      ACCEPT_MARKDOWN_CONDITIONS.map((conditions) => ({
         dest: "$1.md",
-        has: [
-          {
-            key: "accept",
-            type: "header",
-            value: ACCEPT_MARKDOWN_HEADER_VALUE,
-          },
-        ],
         headers: { vary: "Accept" },
         src: "^(/docs/a|/docs/b)/?$",
-      },
-    ]);
+        ...conditions,
+      }))
+    );
+    expect(rewriteRoutes[1]?.missing).toHaveLength(1);
     expect(headerRoutes).toStrictEqual([
       {
         continue: true,
@@ -91,7 +156,11 @@ describe("buildNegotiationRoutes", () => {
       dest: "/index.md",
       src: "^/$",
     });
-    expect(rewriteRoutes[1]?.src).toBe("^(/guide)/?$");
+    expect(rewriteRoutes[1]).toMatchObject({
+      dest: "/index.md",
+      src: "^/$",
+    });
+    expect(rewriteRoutes[2]?.src).toBe("^(/guide)/?$");
     // The Vary route covers the home page alongside the rest.
     const vary = new RegExp(headerRoutes[0]?.src ?? "", "u");
     expect(vary.test("/")).toBe(true);
@@ -100,12 +169,14 @@ describe("buildNegotiationRoutes", () => {
 
   it("stamps x-markdown-tokens on the home rewrite when a count is given", () => {
     const { rewriteRoutes } = buildNegotiationRoutes(["/", "/guide"], 128);
-    expect(rewriteRoutes[0]?.headers).toStrictEqual({
-      vary: "Accept",
-      "x-markdown-tokens": "128",
-    });
+    for (const home of rewriteRoutes.slice(0, 2)) {
+      expect(home.headers).toStrictEqual({
+        vary: "Accept",
+        "x-markdown-tokens": "128",
+      });
+    }
     // Chunked rewrites span many pages, so a per-page count never rides them.
-    expect(rewriteRoutes[1]?.headers).toStrictEqual({ vary: "Accept" });
+    expect(rewriteRoutes[2]?.headers).toStrictEqual({ vary: "Accept" });
     // Without a count the home rewrite stays as before.
     const plain = buildNegotiationRoutes(["/", "/guide"]);
     expect(plain.rewriteRoutes[0]?.headers).toStrictEqual({ vary: "Accept" });
@@ -134,12 +205,13 @@ describe("buildNegotiationRoutes", () => {
     for (const route of [...rewriteRoutes, ...headerRoutes]) {
       expect((route.src ?? "").length).toBeLessThan(4096);
     }
-    // Every route is matched by exactly one rewrite entry.
+    // Every route is matched by exactly one chunk's pair of rewrites.
     for (const path of routes) {
       const matches = rewriteRoutes.filter((route) =>
         new RegExp(route.src ?? "", "u").test(path)
       );
-      expect(matches).toHaveLength(1);
+      expect(matches).toHaveLength(ACCEPT_MARKDOWN_CONDITIONS.length);
+      expect(new Set(matches.map((route) => route.src)).size).toBe(1);
     }
   });
 });
@@ -158,6 +230,19 @@ const baseConfig = {
   version: 3,
 };
 
+/** The negotiated 404 routes for `dest`, one per condition pair. */
+const negotiatedNotFound = (
+  dest: string,
+  conditions: readonly AcceptConditions[]
+): VercelRoute[] =>
+  conditions.map((condition) => ({
+    dest,
+    headers: { vary: "Accept" },
+    src: "^/.*$",
+    status: 404,
+    ...condition,
+  }));
+
 describe("injectNegotiationRoutes", () => {
   it("splices Vary routes then rewrites, all before handle:filesystem", () => {
     const injected = injectNegotiationRoutes(JSON.stringify(baseConfig), [
@@ -169,14 +254,16 @@ describe("injectNegotiationRoutes", () => {
     expect(config.routes.map((route: { src?: string }) => route.src)).toEqual([
       "^(?:/docs/a)/?$",
       "^(/docs/a)/?$",
+      "^(/docs/a)/?$",
       undefined,
       "^/_astro/(.*)$",
       "^/api/ask/?$",
       "^/.*$",
     ]);
-    expect(config.routes[2]).toStrictEqual({ handle: "filesystem" });
+    expect(config.routes[3]).toStrictEqual({ handle: "filesystem" });
     expect(config.routes[0].continue).toBe(true);
     expect(config.routes[1].dest).toBe("$1.md");
+    expect(config.routes[2].dest).toBe("$1.md");
   });
 
   it("leaves the trailing-slash redirect to the adapter", () => {
@@ -281,8 +368,10 @@ describe("injectNegotiationRoutes", () => {
     const updated = JSON.parse(twice ?? "").routes.filter(
       (route: { dest?: string }) => route.dest === "/index.md"
     );
-    expect(updated).toHaveLength(1);
-    expect(updated[0].headers["x-markdown-tokens"]).toBe("512");
+    expect(updated).toHaveLength(ACCEPT_MARKDOWN_CONDITIONS.length);
+    for (const route of updated) {
+      expect(route.headers["x-markdown-tokens"]).toBe("512");
+    }
   });
 
   it("replaces a previously injected Link route instead of duplicating it", () => {
@@ -398,15 +487,7 @@ describe("injectNegotiationRoutes", () => {
       undefined,
       { markdown: true }
     );
-    const config = JSON.parse(injected ?? "");
-    const routes: {
-      dest?: string;
-      handle?: string;
-      has?: { key: string; type: string; value: string }[];
-      headers?: Record<string, string>;
-      src?: string;
-      status?: number;
-    }[] = config.routes;
+    const routes: VercelRoute[] = JSON.parse(injected ?? "").routes;
     const fallbackIndex = routes.findIndex(
       (route) => route.dest === "/404.html"
     );
@@ -417,21 +498,15 @@ describe("injectNegotiationRoutes", () => {
       (route) => route.handle === "filesystem"
     );
     const serverIndex = routes.findIndex((route) => route.dest === "_render");
-    expect(routes[fallbackIndex - 2]).toStrictEqual({
-      dest: "/404.md",
-      has: [
-        { key: "accept", type: "header", value: ACCEPT_MARKDOWN_HEADER_VALUE },
-      ],
-      headers: { vary: "Accept" },
-      src: "^/.*$",
-      status: 404,
-    });
+    expect(routes.slice(fallbackIndex - 3, fallbackIndex - 1)).toStrictEqual(
+      negotiatedNotFound("/404.md", ACCEPT_MARKDOWN_CONDITIONS)
+    );
     expect(routes[fallbackIndex - 1]).toStrictEqual({
       dest: "/404.md",
       src: "^/.*\\.mdx?$",
       status: 404,
     });
-    expect(fallbackIndex - 2).toBeGreaterThan(serverIndex);
+    expect(fallbackIndex - 3).toBeGreaterThan(serverIndex);
     expect(serverIndex).toBeGreaterThan(filesystemIndex);
     // The `.md` route catches raw-mirror URLs without a page, not pages.
     const mdSrc = new RegExp(routes[fallbackIndex - 1]?.src ?? "", "u");
@@ -481,7 +556,7 @@ describe("injectNegotiationRoutes", () => {
       { markdown: true }
     );
     expect(twice).toBe(once ?? "");
-    expect((once ?? "").match(/\/404\.md/gu)).toHaveLength(2);
+    expect((once ?? "").match(/\/404\.md/gu)).toHaveLength(3);
     // Dropping the flag on a re-injection removes them again.
     const dropped = injectNegotiationRoutes(once ?? "", ["/docs/a"]);
     expect(dropped).not.toContain("/404.md");
@@ -496,41 +571,14 @@ describe("injectNegotiationRoutes", () => {
       undefined,
       { json: true, markdown: true }
     );
-    const config = JSON.parse(injected ?? "");
-    const routes: {
-      dest?: string;
-      has?: { key: string; type: string; value: string }[];
-      headers?: Record<string, string>;
-      src?: string;
-      status?: number;
-    }[] = config.routes;
+    const routes: VercelRoute[] = JSON.parse(injected ?? "").routes;
     const fallbackIndex = routes.findIndex(
       (route) => route.dest === "/404.html"
     );
-    expect(routes.slice(fallbackIndex - 4, fallbackIndex)).toStrictEqual([
-      {
-        dest: "/404.md",
-        has: [
-          {
-            key: "accept",
-            type: "header",
-            value: ACCEPT_MARKDOWN_HEADER_VALUE,
-          },
-        ],
-        headers: { vary: "Accept" },
-        src: "^/.*$",
-        status: 404,
-      },
+    expect(routes.slice(fallbackIndex - 6, fallbackIndex)).toStrictEqual([
+      ...negotiatedNotFound("/404.md", ACCEPT_MARKDOWN_CONDITIONS),
       { dest: "/404.md", src: "^/.*\\.mdx?$", status: 404 },
-      {
-        dest: "/404.json",
-        has: [
-          { key: "accept", type: "header", value: ACCEPT_JSON_HEADER_VALUE },
-        ],
-        headers: { vary: "Accept" },
-        src: "^/.*$",
-        status: 404,
-      },
+      ...negotiatedNotFound("/404.json", ACCEPT_JSON_CONDITIONS),
       { dest: "/404.json", src: "^/.*\\.json$", status: 404 },
     ]);
     // The `.json` route catches JSON URLs no file backs, nothing else.
@@ -549,7 +597,7 @@ describe("injectNegotiationRoutes", () => {
       { json: true }
     );
     expect(jsonOnly).not.toContain("/404.md");
-    expect((jsonOnly ?? "").match(/\/404\.json/gu)).toHaveLength(2);
+    expect((jsonOnly ?? "").match(/\/404\.json/gu)).toHaveLength(3);
     const twice = injectNegotiationRoutes(
       jsonOnly ?? "",
       ["/docs/a"],
@@ -561,17 +609,6 @@ describe("injectNegotiationRoutes", () => {
     expect(twice).toBe(jsonOnly ?? "");
     const dropped = injectNegotiationRoutes(jsonOnly ?? "", ["/docs/a"]);
     expect(dropped).not.toContain("/404.json");
-  });
-
-  it("matches the JSON accept condition the way the Markdown one does", () => {
-    const accept = new RegExp(ACCEPT_JSON_HEADER_VALUE, "u");
-    expect(accept.test("application/json")).toBe(true);
-    expect(accept.test("application/problem+json")).toBe(true);
-    expect(accept.test("text/html, application/json;q=0.9")).toBe(true);
-    expect(accept.test("application/json, text/plain")).toBe(true);
-    expect(accept.test("*/*")).toBe(false);
-    expect(accept.test("text/html,application/xhtml+xml")).toBe(false);
-    expect(accept.test("application/jsonx")).toBe(false);
   });
 
   it("returns null when there is nowhere to splice", () => {

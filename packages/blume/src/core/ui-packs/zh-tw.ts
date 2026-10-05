@@ -48,6 +48,7 @@ export const zhTW: UIStringsOverride = {
   banner: { dismiss: "關閉公告" },
   changelog: {
     description: "產品更新與版本說明。",
+    empty: "尚無更新日誌項目。",
     title: "更新日誌",
   },
   consent: {

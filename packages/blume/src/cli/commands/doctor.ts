@@ -5,13 +5,17 @@ import { defineCommand } from "citty";
 import { join } from "pathe";
 import { satisfies } from "semver";
 
+import { discoverExamples } from "../../astro/examples.ts";
 import { discoverIslands } from "../../astro/islands.ts";
+import { discoverPages, navTargetRoutes } from "../../astro/pages.ts";
 import { missingDependencyDiagnostic } from "../../astro/runtime-deps.ts";
+import { missingExampleDiagnostics } from "../../core/component-diagnostics.ts";
 import {
   analyzeComponentOverrides,
   ComponentOverridesError,
 } from "../../core/component-overrides.ts";
 import { BlumeError } from "../../core/diagnostics.ts";
+import { validateNavTargets } from "../../core/nav-diagnostics.ts";
 import { packageRoot } from "../../core/package-root.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import type { ResolvedConfig } from "../../core/schema.ts";
@@ -35,23 +39,24 @@ const FALLBACK_NODE_RANGE = ">=22.12.0";
  * Plan `components.ts` the way `blume dev`/`build` do, reporting each override
  * that can't be planned — a non-static form, or an import of a file that
  * doesn't exist — with its own line. The scan alone never reads the file, so
- * without this doctor would pass a project whose build fails.
+ * without this doctor would pass a project whose build fails. Also returns
+ * the MDX tags the file overrides.
  */
 const componentsDiagnostics = async (
   componentsFile: string | null
-): Promise<Diagnostic[]> => {
+): Promise<{ issues: Diagnostic[]; mdx: string[] }> => {
   if (!componentsFile) {
-    return [];
+    return { issues: [], mdx: [] };
   }
   try {
-    analyzeComponentOverrides(
+    const { mdx } = analyzeComponentOverrides(
       await readFile(componentsFile, "utf-8"),
       componentsFile
     );
-    return [];
+    return { issues: [], mdx: mdx.map((entry) => entry.key) };
   } catch (error) {
     if (error instanceof ComponentOverridesError) {
-      return error.issues;
+      return { issues: error.issues, mdx: [] };
     }
     throw error;
   }
@@ -117,15 +122,33 @@ export const doctorCommand = defineCommand({
     loadEnvFiles(root);
 
     try {
-      const project = await scanProject(root, { mode: "build" });
+      const project = await scanProject(root, {
+        // A missing secret fails at the first request. Checked before the
+        // sources fetch, so it's still reported when one of them fails the
+        // scan for want of it.
+        beforeSources: (config) => {
+          diagnostics.push(...checkRequiredSecrets(config));
+        },
+        mode: "build",
+      });
+      // Tabs, selector items, and featured links can point at custom pages
+      // and generated routes too, so they're checked against every route
+      // the site serves, as `blume dev`/`build` check them.
+      const userPages = project.context.pagesRoot
+        ? await discoverPages(project.context.pagesRoot)
+        : [];
       diagnostics.push(
         ...project.diagnostics,
-        ...unregisteredSnapshotDiagnostics(project)
+        ...unregisteredSnapshotDiagnostics(project),
+        ...validateNavTargets(
+          project.graph.navigation,
+          navTargetRoutes(project, userPages)
+        )
       );
 
       const { config } = project;
-      // The packages and secrets a build would need: an adapter's missing SDK
-      // fails the build, and a missing secret fails at the first request.
+      // The packages a build would need: an adapter's missing SDK fails the
+      // build.
       const { islands } = await discoverIslands(root);
       const dependencies = await missingDependencyDiagnostic(
         config,
@@ -136,9 +159,19 @@ export const doctorCommand = defineCommand({
       if (dependencies) {
         diagnostics.push(dependencies);
       }
+      const overrides = await componentsDiagnostics(
+        project.context.componentsFile
+      );
       diagnostics.push(
-        ...(await componentsDiagnostics(project.context.componentsFile)),
-        ...checkRequiredSecrets(config)
+        ...overrides.issues,
+        // A `<Component path>` naming no example renders a "No example
+        // found" box, which dev and build warn about too.
+        ...missingExampleDiagnostics(
+          project.graph.pages,
+          await discoverExamples(root, config.examples.source),
+          root,
+          new Set([...islands.map((island) => island.name), ...overrides.mdx])
+        )
       );
       const features = serverFeatures(config);
       if (

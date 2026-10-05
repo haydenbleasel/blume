@@ -3,7 +3,7 @@ title: AsyncAPI
 description: Drop in an AsyncAPI spec and get a native event reference — one real page per send and receive operation, in your sidebar and search.
 ---
 
-Event-driven APIs use the `asyncapi()` adapter from `blume/reference`, listed under `reference` beside any [OpenAPI](/docs/references/openapi) or [GraphQL](/docs/references/graphql) adapters. It takes the same options as `openapi()` and renders with the same native renderer. Each `send`/`receive` operation becomes a real page with message payload and header schema tables, channel parameters, protocol bindings, an Authorization section derived from the spec's `securitySchemes` (server-level and operation-level, alternatives as "or" groups), and a [Try it](#try-it-for-events) message composer. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc.
+Event-driven APIs use the `asyncapi()` adapter from `blume/reference`, listed under `reference` beside any [OpenAPI](/docs/references/openapi) or [GraphQL](/docs/references/graphql) adapters. It takes the same options as `openapi()` and renders with the same native renderer. Each `send`/`receive` operation becomes a real page with message payload and header schema tables, channel parameters, protocol bindings, an Authorization section derived from the spec's `securitySchemes` (server-level and operation-level, alternatives as "or" groups, and when a channel's servers differ, which servers each scheme applies to), and a [Try it](#try-it-for-events) message composer. Because each operation is a genuine Blume page, it gets its own URL, shows up in **site search** and `llms.txt`, and gets an Open Graph image — the same as any hand-written doc.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -29,6 +29,8 @@ AsyncAPI **2.x specs are normalized to 3.x automatically** with the official Asy
 ## Code samples
 
 Code samples are **protocol-aware**, keyed off the operation's binding (or its servers' protocol): `wscat` and a browser `WebSocket` snippet for WebSockets, `kcat` for Kafka, `mosquitto_pub`/`mosquitto_sub` for MQTT. `codeSamples` filters that set, the same way it picks languages on `openapi()`, and `codeSamples: false` shows none. A protocol without a supported tool renders the message payload example alone rather than a fabricated client.
+
+The `kcat` sample reads the Kafka bindings too. A channel binding's `topic` replaces the channel address as the topic name. A message binding's `key` keys the message: the sample produces `key|payload` lines with `-K '|'`, and consumes with the same flag so each key prints before its message. The key value comes from the key schema like a payload's does, so give the schema an `examples` entry. When the server declares a SASL scheme (`plain`, `scramSha256`, `scramSha512`, or `gssapi`), the sample adds the `-X` settings librdkafka needs, reading the username and password from `$KAFKA_USERNAME` and `$KAFKA_PASSWORD`. A `kafka-secure` server adds TLS.
 
 ## Shared options
 

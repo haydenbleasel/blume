@@ -481,6 +481,38 @@ describe("operationModel", () => {
     expect(model.method).toBe("GET");
   });
 
+  it("describes a param from its schema when it has no description of its own", () => {
+    const model = buildModel({
+      parameters: [
+        // Elysia and oRPC write the description on the schema.
+        {
+          in: "query",
+          name: "limit",
+          schema: { description: "Page size.", type: "integer" },
+        },
+        {
+          in: "query",
+          name: "id",
+          schema: { $ref: "#/components/schemas/Id" },
+        },
+        {
+          description: "Own words.",
+          in: "query",
+          name: "sort",
+          schema: { description: "Schema words.", type: "string" },
+        },
+        { in: "query", name: "bare" },
+      ],
+      schemas: { Id: { description: "A user ID.", type: "string" } },
+    });
+    expect(model.params.map((param) => param.description)).toStrictEqual([
+      "Page size.",
+      "A user ID.",
+      "Own words.",
+      undefined,
+    ]);
+  });
+
   it("emits typed fields for flat primitive bodies only", () => {
     const flat = buildModel({
       method: "post",

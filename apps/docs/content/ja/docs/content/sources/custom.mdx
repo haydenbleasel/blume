@@ -9,6 +9,7 @@ description: >-
 ```ts blume.config.ts
 import { defineConfig } from "blume";
 import { custom, filesystem } from "blume/sources";
+import { escapeMarkdownText } from "blume/sources/lower.ts";
 import { sanitySource } from "blume/sources/sanity.ts";
 
 export default defineConfig({
@@ -24,7 +25,8 @@ export default defineConfig({
           query: `*[_type == "guide"]`,
           // Map custom Portable Text blocks to Blume components
           serializers: {
-            callout: (block) => `<Callout>${block.text}</Callout>`,
+            callout: (block) =>
+              `<Callout>${escapeMarkdownText(String(block.text ?? ""))}</Callout>`,
           },
         })
       ),
@@ -33,8 +35,10 @@ export default defineConfig({
 });
 ```
 
-上記の `sanitySource` のように Blume のエンジンファクトリーで構築したソースは、実行中のコマンドのコンテキストで再構築されます。そのため、組み込みアダプターと同様に、`--preview` 指定時には下書きを読み込み、スナップショットを `.blume/cache` に保持します。独自のソースでも、`withContext(ctx)` を実装し、そのコンテキストで再構築した自身を返せば、同じように動作させることができます。
+シリアライザーの戻り値は MDX としてそのままページに書き込まれます。そのため、CMS から取得したテキストはエスケープする必要があります。エスケープしないと、編集者のテキストに含まれる `{` が式として実行されてビルドが失敗し、`<b>` は HTML としてレンダリングされます。`escapeMarkdownText` は Blume の組み込みの変換処理と同じ方法でエスケープするため、テキストは書かれたとおりに表示されます。
 
-`custom()` はオプションオブジェクトではなく `ContentSource` インスタンスを受け取ります。そのため、[共通オプション](/docs/content/sources#adapters)の `prefix` や `pollInterval` を渡す場所はありません。`prefix` はソース自身がプロパティとして設定し、再取得の動作はソースの `watch` メソッドの実装に従います。また、`custom()` はプレーンなデータではなく稼働中のインスタンスを保持するため、独自のランタイム依存関係やシークレットを宣言しません。これらはインスタンス自身が管理します。
+上記の `sanitySource` のように Blume のエンジンファクトリーで構築したソースは、実行中のコマンドのコンテキストで再構築されます。そのため、組み込みアダプターと同様に、`--preview` 指定時には下書きを読み込み、スナップショットを `.blume/cache` に保持します。独自のソースでも、`withContext(ctx)` を実装し、そのコンテキストで再構築した自身を返せば、同じように動作させることができます。ただし、組み込みアダプターとは異なり、`custom()` ソースのスナップショットはオプションの組み合わせごとではなく、プレビューモードごとにのみ保持されます。Blume から見えるのはオプションではなくインスタンスだからです。ソースのクエリ、フィールド、シリアライザーを編集した後も `blume dev` はそのスナップショットを配信するため、`blume sync` を実行して改めて取得してください。
+
+`custom()` はオプションオブジェクトではなく `ContentSource` インスタンスを受け取ります。そのため、[共通オプション](/docs/content/sources#adapters)の `prefix` や `pollInterval` を渡す場所はありません。`prefix` はソース自身がプロパティとして設定し、再取得の動作はソースの `watch` メソッドの実装に従います。また、`custom()` はプレーンなデータではなく稼働中のインスタンスを保持するため、独自のランタイム依存関係やシークレットを宣言しません。これらはインスタンス自身が管理します。`blume dev` と `blume build` は、`custom()` ソースが読み込む変数が未設定でも警告しません。その代わり、API がトークンを必要とするエンジン（`notionSource`、`contentfulSource`）は、最初のリクエストの前に `BLUME_MISSING_SECRET` で停止します。
 
 ローカルファイルを読み込むカスタムソースでは、各エントリーに `sourcePath` を、ソース自体に `contentRoot` を設定してください。`sourcePath` は診断メッセージでファイル名を示すために使われ、相対パスの画像もそのファイルの場所を基準に解決されます。`contentRoot` は、ページの日付を決める git `log` の対象範囲を限定します。`contentRoot` を設定しない場合、そのソースのページには git から取得される[「最終更新日」](/docs/configuration#last-modified)が付きません。

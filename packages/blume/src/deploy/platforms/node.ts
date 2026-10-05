@@ -1,3 +1,4 @@
+import type { JsonValue } from "../../core/adapter.ts";
 import { NODE_ADAPTER_PACKAGE } from "../adapters/node.ts";
 import { wrapNodeEntry } from "../node-headers.ts";
 import { clientDir, distDir } from "./paths.ts";
@@ -11,11 +12,20 @@ import type { DeployPlatform } from "./types.ts";
  * discovery files and downloaded SVGs need instead, and answers the
  * configured redirects with their exact status, which Astro's own handler
  * would default to 301 or 308. No platform env to detect: the site URL has to
- * be configured.
+ * be configured. `allowedDomains` becomes Astro's `security.allowedDomains`,
+ * which a server behind a reverse proxy needs before Astro reads the reader's
+ * address from `X-Forwarded-For`.
  */
 export const nodePlatform: DeployPlatform = {
   astro: {
-    config: {},
+    config: ({ allowedDomains }) => {
+      const config: Record<string, JsonValue> = {};
+      if (allowedDomains) {
+        config.security = { allowedDomains };
+      }
+      return config;
+    },
+    configOptions: ["allowedDomains"],
     options: () => ({ mode: "standalone" }),
     package: NODE_ADAPTER_PACKAGE,
   },

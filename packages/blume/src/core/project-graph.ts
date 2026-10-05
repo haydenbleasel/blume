@@ -1,6 +1,6 @@
 import { isAbsolute, relative } from "pathe";
 
-import { withBasePath } from "./base-path.ts";
+import { normalizePath, withBasePath } from "./base-path.ts";
 import { CHANGELOG_INDEX_ROUTE, hasChangelogIndex } from "./changelog-index.ts";
 import { loadConfig } from "./config.ts";
 import { customStaticRoutes, discoverPages } from "./custom-pages.ts";
@@ -19,10 +19,11 @@ import { buildManifest } from "./manifest.ts";
 import { discoverFolderMeta } from "./meta.ts";
 import type { FolderMetaSource } from "./meta.ts";
 import { resolveProjectContext } from "./project.ts";
-import { pathsUnderPattern } from "./redirect-patterns.ts";
+import { isPatternPath, pathsUnderPattern } from "./redirect-patterns.ts";
 import type { ResolvedConfig } from "./schema.ts";
 import { normalizeEntry, strippedLineOffset } from "./sources/normalize.ts";
 import { resolveDocsCollection, resolveSources } from "./sources/resolve.ts";
+import type { SourceRuntime } from "./sources/resolve.ts";
 import type {
   ContentSource,
   SourceEntry,
@@ -309,17 +310,36 @@ const substituteLoadedVariables = (
  * and the Node server serve the page), so the pattern is rejected rather than
  * let the answer depend on the host. `pages` are the served page paths, which
  * carry `basePath`, as the based `from` does.
+ *
+ * An exact redirect from a page's own URL answers the same way everywhere:
+ * Astro ranks its route above the page's catch-all, in dev and build alike,
+ * and writes the redirect page where the page would go, so the page never
+ * publishes. That's a warning rather than an error, since the outcome doesn't
+ * depend on the host.
  */
 const redirectPageDiagnostics = (
   config: ResolvedConfig,
   pages: readonly string[],
   configFile: string | null
 ): Diagnostic[] =>
-  config.redirects.flatMap((redirect) => {
-    const matched = pathsUnderPattern(
-      withBasePath(config.basePath, redirect.from),
-      pages
-    );
+  config.redirects.flatMap((redirect): Diagnostic[] => {
+    const from = withBasePath(config.basePath, redirect.from);
+    if (!isPatternPath(redirect.from)) {
+      const page = normalizePath(from);
+      return pages.includes(page)
+        ? [
+            {
+              code: "BLUME_REDIRECT_MATCHES_PAGE",
+              file: configFile ?? undefined,
+              message: `The redirect from ${redirect.from} is also the page ${page}, which never publishes: its URL redirects to ${redirect.to} instead.`,
+              severity: "warning",
+              suggestion:
+                "If the page moved, delete it or give it a new slug; otherwise remove the redirect.",
+            } satisfies Diagnostic,
+          ]
+        : [];
+    }
+    const matched = pathsUnderPattern(from, pages);
     const [first] = matched;
     if (first === undefined) {
       return [];
@@ -345,6 +365,26 @@ const bannerLinkHref = (
     ? undefined
     : banner.link?.href;
 
+/**
+ * The project's sources, before any of them loads: `beforeSources` sees the
+ * config first, then each source validates itself (e.g. the filesystem
+ * source checks its root exists), replacing the single hard `contentRoot`
+ * check.
+ */
+const validatedSources = (
+  config: ResolvedConfig,
+  context: ProjectContext,
+  runtime: SourceRuntime,
+  beforeSources?: (config: ResolvedConfig) => void
+): ContentSource[] => {
+  beforeSources?.(config);
+  const sources = resolveSources(config, context, runtime);
+  for (const source of sources) {
+    source.validate?.();
+  }
+  return sources;
+};
+
 export const scanProject = async (
   root: string,
   options: {
@@ -356,6 +396,12 @@ export const scanProject = async (
     overrides?: ConfigOverrides;
     /** Relocate the generated runtime (e.g. `.blume-verify` for isolation). */
     runtimeDir?: string;
+    /**
+     * Called with the resolved config before any source loads, so a command
+     * can report an unset secret ahead of a fetch that fails without it: a
+     * source that can't load fails the scan, and nothing after it runs.
+     */
+    beforeSources?: (config: ResolvedConfig) => void;
   } = {}
 ): Promise<BlumeProject> => {
   const mode = options.mode ?? "dev";
@@ -367,17 +413,12 @@ export const scanProject = async (
   const context = resolveProjectContext(root, config, {
     runtimeDir: options.runtimeDir,
   });
-
-  // Each source validates itself (e.g. the filesystem source checks its root
-  // exists), replacing the single hard `contentRoot` check.
-  const sources = resolveSources(config, context, {
-    mode,
-    preview,
-    refresh: options.refresh,
-  });
-  for (const source of sources) {
-    source.validate?.();
-  }
+  const sources = validatedSources(
+    config,
+    context,
+    { mode, preview, refresh: options.refresh },
+    options.beforeSources
+  );
 
   // Folder meta is discovered per filesystem source, under each source's own
   // root and keyed by its route prefix, so a prefixed/root-differing source's

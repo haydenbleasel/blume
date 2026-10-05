@@ -25,7 +25,7 @@ blume eval  4 question(s) · Codex
 
 ## How it works
 
-Each question runs through two agent sessions, using an agent CLI you already have installed — [Codex](https://developers.openai.com/codex/cli) by default, or [Claude Code](https://claude.com/claude-code) with `--agent claude`. Blume holds no API keys and calls no model itself. With Codex, both sessions also run without Codex's shell, command, and image tools, and inherit none of your environment variables.
+Each question runs through two agent sessions, using an agent CLI you already have installed — [Codex](https://developers.openai.com/codex/cli) by default, or [Claude Code](https://claude.com/claude-code) with `--agent claude`. Blume holds no API keys and calls no model itself. With Codex, both sessions also run without Codex's shell, command, and image tools, and inherit none of your environment variables. With Claude Code, both sessions run with every built-in tool turned off and skip your Claude Code settings files and `CLAUDE.md`, so your hooks, plugins, and memory can't tell the reader what the docs don't. Your Claude Code login still works; set anything else it needs, such as `ANTHROPIC_API_KEY`, in your shell rather than in `settings.json`.
 
 1. **The reader** answers the question using _only_ your documentation. It runs in an empty directory with its file, shell, and web tools disabled, connected to a private [MCP server](/docs/discoverability/mcp) that serves your docs — the same `search_docs`/`get_page` tools a real agent uses against your deployed site. It cannot read your repo, so it experiences the docs exactly like a fresh user: what isn't written doesn't exist.
 2. **The judge** grades the answer against the facts you listed, with no tools at all. Paraphrase passes; a missing or contradicted fact fails — and so does "the documentation doesn't say."
@@ -82,9 +82,9 @@ blume eval --threshold 0.8    # at least 80% must pass
 blume eval --json             # machine-readable report on stdout
 ```
 
-The JSON report carries the same `diagnostics` + `summary` shape as `blume validate --json` and `blume audit --json`, with the per-question results (answer, score, missing facts, cost) alongside.
+The JSON report carries the same `diagnostics` + `summary` shape as `blume validate --json` and `blume audit --json`, with the per-question results (answer, score, missing facts, and with Claude Code, cost) alongside.
 
-Because each question is two model sessions, an eval run costs real money and minutes — the per-question spend is printed as it runs. A sensible CI setup runs `blume eval` on docs changes rather than every push.
+Because each question is two model sessions, an eval run costs real money and minutes. With Claude Code, the per-question spend is printed as it runs and totaled in the summary; Codex doesn't report its spend, so a Codex run shows none. A sensible CI setup runs `blume eval` on docs changes rather than every push.
 
 ## Fixing the findings
 
@@ -94,7 +94,7 @@ Each failure names the missing facts and the page that should state them. To han
 blume eval --fix
 ```
 
-This writes the full JSON report to a file and opens the agent interactively with a prompt that walks it through each failed question: read the named page, add the missing facts in the page's voice, and rerun `blume eval` until everything passes. The session is interactive by design — you review the edits through the agent's own permission flow — and the agent is told never to delete questions or weaken expected facts to get to green.
+This writes the full JSON report to a file and opens the agent interactively with a prompt that walks it through each failed question: read the named page, add the missing facts in the page's voice, and rerun `blume eval` with the run's own `--agent`, `--file`, `--threshold`, and `--timeout` until everything passes. The session is interactive by design — you review the edits through the agent's own permission flow — and the agent is told never to delete questions or weaken expected facts to get to green.
 
 ## Flags
 

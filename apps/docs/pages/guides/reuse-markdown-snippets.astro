@@ -13,9 +13,9 @@
 // against the fixture's docs folder. CODEOWNERS facts checked against
 // GitHub's docs. Not yet run end to end: no blume dev or blume build of the
 // fixture, so the dist/ greps rest on the prerendered [...slug].md endpoint
-// and this site's own build output. Review: the release callout was checked
-// against the blume@2.0.3 tag (no core/variables.ts, a strict top-level config
-// schema, and include attributes other than lang and meta parsed and ignored).
+// and this site's own build output. Updated for main: the
+// BLUME_INCLUDE_MALFORMED suggestion names lowercase, quoted attributes
+// (core/includes.ts, 922d680d); read in the source, not rerun.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -250,8 +250,9 @@ console.log(webhook.id);
     lang="mdx"
   />
   <p>
-    Every attribute except <code>lang</code> and <code>meta</code> is a prop,
-    and its value is plain text. A prop applies to the included file and to
+    Every attribute except <code>lang</code> and <code>meta</code> is a prop.
+    Attribute names are lowercase, and values are quoted plain text. A prop
+    applies to the included file and to
     anything that file includes, which is how <code>scope</code> reaches{" "}
     <code>api-key.mdx</code> through <code>setup.mdx</code>. A prop also wins
     over a site-wide variable with the same name. A page that only needs the
@@ -484,9 +485,12 @@ grep -rn --include="*.md" "@acme/messages@1.4.0" dist`}
   <p>
     An include is block-level, so it needs a line of its own, not a place
     inside a sentence. A statement a formatter wraps over several lines still
-    works, as long as no blank line splits it. A line that starts{" "}
-    <code>&lt;include</code> but doesn't close into a statement raises a{" "}
-    <code>BLUME_INCLUDE_MALFORMED</code> warning at that line.
+    works, as long as no blank line splits it. An attribute needs a lowercase
+    name and a quoted value, so <code>Scope="webhooks:write"</code> or{" "}
+    <code>scope=webhooks:write</code> breaks the statement too. A line that
+    starts <code>&lt;include</code> but doesn't close into a statement raises
+    a <code>BLUME_INCLUDE_MALFORMED</code> warning at that line, and its
+    suggestion spells out these rules.
   </p>
 
   <h3>A partial shows up as its own page</h3>

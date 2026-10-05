@@ -4,7 +4,7 @@ description: >-
   contentful() ソースを使用して Delivery API 経由で Contentful のコンテンツタイプを読み込み、リッチテキスト本文を Markdown に変換します。追加のインストールは不要です。
 ---
 
-組み込みの `contentful()` アダプターは、Content Delivery API を通じて 1 つのコンテンツタイプのエントリーを読み込み、各エントリーのリッチテキスト本文を Markdown に変換します。見出し、マーク、リンク、リスト、引用、テーブル、埋め込みアセットは、それぞれ対応する Markdown の要素に変換されます。Markdown の長文テキストフィールドに保持された本文は、記述されたとおりにそのまま渡されます。ただし、Web、メール、電話、相対アドレスのいずれでもないリンク（たとえば `javascript:` URL）は、リッチテキストの場合と同様にラベルのみが残ります。アダプターは REST API と直接通信するため、何もインストールする必要はありません。
+組み込みの `contentful()` アダプターは、Content Delivery API を通じて 1 つのコンテンツタイプのエントリーを読み込み、各エントリーのリッチテキスト本文を Markdown に変換します。見出し、マーク、リンク、リスト、引用、テーブルはそれぞれ対応する Markdown の要素に、埋め込みの画像アセットは画像に、その他の埋め込みファイル（たとえば PDF）はそのファイルへのリンクに変換されます。Markdown の長文テキストフィールドに保持された本文は、記述されたとおりにそのまま渡されます。ただし、Web、メール、電話、相対アドレスのいずれでもないリンク（たとえば `javascript:` URL）は、リッチテキストの場合と同様にラベルのみが残ります。アダプターは REST API と直接通信するため、何もインストールする必要はありません。
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -20,14 +20,17 @@ export default defineConfig({
         contentType: "guide",
         // environment: "master", locale: "en-US"
         // Field ids default to title / description / slug / body, and the
-        // date to sys.updatedAt
-        fields: { body: "content" },
+        // date to sys.updatedAt; order (no default) sets the sidebar order
+        fields: { body: "content", order: "position" },
         // Extra Delivery API query parameters
         params: { "fields.section": "sdk" },
+        // A space with EU data residency:
+        // host: "cdn.eu.contentful.com",
+        // previewHost: "preview.eu.contentful.com",
       }),
     ],
   },
 });
 ```
 
-Delivery API のトークンは、アダプターが宣言する `CONTENTFUL_ACCESS_TOKEN` 環境変数から取得されます。`--preview` を指定すると、アダプターは `CONTENTFUL_PREVIEW_TOKEN` を使用して Preview API から下書きを読み込みます。Preview API は配信用トークンを受け付けません。そのため、プレビュー用トークンなしで `--preview` を指定した場合は、`CONTENTFUL_ACCESS_TOKEN` にフォールバックせず、明確なエラーで失敗します。アセットはダウンロードされず、Contentful の CDN から参照されます。これらの URL は変わらないためです。`contentfulSource` を直接構築して [`custom()`](/docs/content/sources/custom) に渡す場合は、エンジンの `serializers` オプションを使用して、埋め込みエントリーを Blume コンポーネントにマッピングできます。このオプションのキーにはコンテンツタイプ ID を指定します。`serializers` を設定すると、返されたコンポーネントがレンダリングされるように、そのソースのページは MDX として書き出されます。シリアライザーが設定されていない埋め込みエントリーは、その旨がコメントとして出力されます。別のエントリーへのリンクには参照先のルートがないため、プレーンテキストとしてレンダリングされます。
+Delivery API のトークンは、アダプターが宣言する `CONTENTFUL_ACCESS_TOKEN` 環境変数から取得されます。この変数がない場合、代わりに提供できる[キャッシュされたスナップショット](/docs/content/sources#caching-and-offline-builds)がない限り、ソースは最初のリクエストを送信する前に、Contentful の `401` ではなく `BLUME_MISSING_SECRET` エラーで停止します。`--preview` を指定すると、アダプターは `CONTENTFUL_PREVIEW_TOKEN` を使用して Preview API から下書きを読み込みます。Preview API は配信用トークンを受け付けません。そのため、プレビュー用トークンなしで `--preview` を指定した場合は、`CONTENTFUL_ACCESS_TOKEN` にフォールバックせず、明確なエラーで失敗します。EU データレジデンシーを利用するスペースは別のホストから配信されます。`host` を `cdn.eu.contentful.com` に、`previewHost` を `preview.eu.contentful.com` に設定してください。各ページのサイドバーでの順序を設定するには、`fields.order` を数値フィールドにマッピングします。このオプションにデフォルト値はありません。アセットはダウンロードされず、Contentful の CDN から参照されます。これらの URL は変わらないためです。ソースの `contentType` に属する別のエントリーへのリンクは、そのエントリーのページ、つまりページがビルドされるルート（ソースの `prefix` 配下にあるそのエントリーのスラッグ）を指します。ソースがページ化しないエントリー（別のコンテンツタイプのエントリーや、`params` で除外されたエントリー）へのリンクは、テキストのみが残ります。Delivery API は、未公開、アーカイブ済み、または削除済みのアセットやエントリーをレスポンスに含めません。そのため、それらを埋め込んだりリンクしたりしているページはその要素なしでレンダリングされ（リンクはテキストのみが残ります）、ソースは `BLUME_SOURCE_UNRESOLVED_LINK` で警告します。`contentfulSource` を直接構築して [`custom()`](/docs/content/sources/custom) に渡す場合は、エンジンの `serializers` オプションを使用して、埋め込みエントリーを Blume コンポーネントにマッピングできます。このオプションのキーにはコンテンツタイプ ID を指定します。`serializers` を設定すると、返されたコンポーネントがレンダリングされるように、そのソースのページは MDX として書き出されます。シリアライザーが設定されていない埋め込みエントリーは、その旨がコメントとして出力されます。

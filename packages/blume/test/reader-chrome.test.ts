@@ -52,22 +52,47 @@ describe("print stylesheet", () => {
         "[data-blume-toc]",
         "[data-blume-assistant-panel]",
         "[data-blume-page-actions]",
+        // Everything after the article, the site footer (or its override),
+        // and the buttons layered onto code blocks.
+        "[data-blume-page-end]",
+        "[data-blume-footer]",
+        "body > footer",
+        "[data-blume-copy]",
+        "[data-blume-ask]",
+        "[data-blume-code-expand]",
       ])
     );
   });
 
   it("marks every chrome element the rule names", async () => {
-    const [header, root, page, assistant] = await sources([
+    const [header, root, page, assistant, footer] = await sources([
       "components/layout/Header.astro",
       "components/layout/RootLayout.astro",
       "components/layout/PageLayout.astro",
       "components/islands/assistant.tsx",
+      "components/layout/SiteFooter.astro",
     ]);
     expect(header).toContain("data-blume-header\n");
     expect(root).toContain("data-blume-nav-drawer");
     expect(root).toContain("data-blume-toc");
+    expect(root).toContain("data-blume-page-end\n");
+    expect(root).toContain('button.setAttribute("data-blume-copy", "");');
+    expect(root).toContain('button.setAttribute("data-blume-ask", "");');
+    expect(root).toContain(
+      'button.setAttribute("data-blume-code-expand", "");'
+    );
     expect(page).toContain("data-blume-nav-drawer");
     expect(assistant).toContain('data-blume-assistant-panel=""');
+    expect(footer).toContain("data-blume-footer>");
+  });
+
+  it("prints a collapsed expandable block in full", () => {
+    // The print rule repeats the collapse's selector so it wins by order; a
+    // weaker selector lost to it and printed the first lines plus the fade.
+    const print = entry.slice(entry.indexOf("@media print {"));
+    expect(print).toContain(
+      ".prose pre[data-expandable]:not([data-expanded]) > code {\n    mask-image: none;\n    max-height: none;"
+    );
   });
 });
 

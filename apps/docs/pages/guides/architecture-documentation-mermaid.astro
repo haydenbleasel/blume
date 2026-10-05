@@ -25,8 +25,9 @@
 // Not yet run end to end: no blume dev or blume build of the fixture, so the
 // browser rendering, theme switch, console check, JavaScript-off view, and
 // exports rest on the source above.
-// Review: narration (page-narration changeset) is main-only (publish with the
-// release that ships it); the swallowed parser error confirmed in mermaid-element.ts.
+// Updated for main: mermaid-element.ts logs Mermaid's parser error to the
+// console and shows it under the message in dev (c8820c29); the print
+// stylesheet switches a dark page to light (e12b668a). Read in the source.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -275,8 +276,8 @@ blume.config.ts`}
     <li>
       <strong>In exports.</strong> If you turn on{" "}
       <a href="/docs/configuration/export">export</a>, the EPUB strips every
-      SVG, so it has the text and no diagrams. PDF export prints the diagrams
-      as they're drawn on screen, in the current theme. The{" "}
+      SVG, so it has the text and no diagrams. PDF export prints the page in
+      the light theme, with the diagrams as they're drawn on screen. The{" "}
       <a href="/guides/documentation-pdf-epub-export">PDF and EPUB guide</a>{" "}
       covers what else changes in each format.
     </li>
@@ -345,7 +346,8 @@ diff --git a/docs/architecture/index.mdx b/docs/architecture/index.mdx
     <li>
       <strong>Check the syntax before merging.</strong> <code>blume build</code>{" "}
       and <code>blume validate</code> don't parse Mermaid, because the browser
-      does. A broken diagram only shows up on the page.
+      does. A broken diagram only shows up on the page and in the browser
+      console.
     </li>
   </ul>
   <p>
@@ -418,9 +420,12 @@ npx blume validate`}
   <h3>The page says "Could not render this diagram."</h3>
   <p>
     Mermaid couldn't parse the source, and Blume shows this message in place
-    of the diagram. Blume doesn't log Mermaid's parser error, so the browser
-    console won't help: run the source through the <code>mmdc</code> loop
-    above or the live editor to see the error. Two common causes: a lowercase{" "}
+    of the diagram. Mermaid's parser error, with the line it stopped on, is in
+    the browser console under{" "}
+    <code>[blume] Mermaid could not render a diagram</code>, and in{" "}
+    <code>blume dev</code> it also shows under the message. The{" "}
+    <code>mmdc</code> loop above reports the same error from the command
+    line. Two common causes: a lowercase{" "}
     <code>end</code> as a flowchart node ID, which Mermaid reads as a keyword
     (write <code>End</code> or pick another ID), and a label with parentheses
     or other special characters, which needs quotes, as in{" "}

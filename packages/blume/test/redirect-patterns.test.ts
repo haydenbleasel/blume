@@ -9,6 +9,7 @@ import { validateLinks } from "../src/core/links.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import {
+  compileEveryRedirect,
   compileRedirects,
   encodeCapture,
   exactFirst,
@@ -240,6 +241,27 @@ describe("matching", () => {
     expect(encodeCapture("a?b#c")).toBe("a%3Fb%23c");
   });
 
+  it("compiles exact redirects too for the dev server, ahead of patterns", () => {
+    const every = compileEveryRedirect([
+      BETA,
+      { from: "/beta/a.b/", status: 307, to: "/ü" },
+      { from: "/", status: 302, to: "/start" },
+    ]);
+    expect(every.slice(0, 2)).toStrictEqual([
+      [String.raw`^/beta/a\.b/?$`, "/%C3%BC", 307],
+      ["^/$", "/start", 302],
+    ]);
+    expect(every.slice(2)).toStrictEqual(compileRedirects([BETA]));
+    expect(matchCompiledRedirect(every, "/beta/a.b/")).toStrictEqual([
+      "/%C3%BC",
+      307,
+    ]);
+    expect(matchCompiledRedirect(every, "/beta/axb")).toStrictEqual([
+      "/v2/axb",
+      301,
+    ]);
+  });
+
   it("reads a request URL's decoded path, keeping a malformed escape", () => {
     expect(requestPath("/beta/%C3%BC?x=1#y")).toBe("/beta/ü");
     expect(requestPath("/beta/%E0%A4%A")).toBe("/beta/%E0%A4%A");
@@ -437,12 +459,15 @@ describe("the generated Astro config", () => {
     root: "/p",
     themeFile: null,
   };
-  const configFor = (input: BlumeConfigInput): string =>
+  const configFor = (
+    input: BlumeConfigInput,
+    contentRoutes: string[] = []
+  ): string =>
     astroConfigTemplate({
       askPath: "/p/.blume/src/generated/Ask.astro",
       config: blumeConfigSchema.parse(input),
       consentClientPath: "/p/.blume/src/generated/consent-client.ts",
-      contentRoutes: [],
+      contentRoutes,
       context,
       examplesPath: "/p/.blume/src/generated/examples.ts",
       examplesThemePath: "/p/.blume/src/generated/examples.css",
@@ -454,19 +479,36 @@ describe("the generated Astro config", () => {
       themePath: "/p/.blume/src/generated/app.css",
     });
 
-  it("gives Astro the exact redirects and the dev server the patterns", () => {
+  it("gives Astro the exact redirects and the dev server every one", () => {
     const generated = configFor({
       basePath: "/docs",
-      redirects: [{ from: "/old", to: "/new" }, BETA],
+      redirects: [BETA, { from: "/old", status: 302, to: "/new" }],
     });
     expect(generated).toContain(
-      'redirects: {"/docs/old":{"destination":"/docs/new","status":301}}'
+      'redirects: {"/docs/old":{"destination":"/docs/new","status":302}}'
+    );
+    // Astro's dev handler would answer the exact one with a 301.
+    expect(generated).toContain(
+      '"redirects":[["^/docs/old/?$","/docs/new",302],["^/docs/beta/?$","/docs/v2",301],["^/docs/beta/(.+?)/?$","/docs/v2/$1",301]]'
+    );
+    expect(configFor({})).not.toContain('"redirects":[');
+  });
+
+  it("moves a moved page's Markdown copies with it", () => {
+    const generated = configFor(
+      {
+        basePath: "/docs",
+        deployment: vercel({ base: "/base" }),
+        redirects: [{ from: "/old", status: 307, to: "/new" }],
+      },
+      ["/docs/new"]
     );
     expect(generated).toContain(
-      '"redirects":[["^/docs/beta/?$","/docs/v2",301],["^/docs/beta/(.+?)/?$","/docs/v2/$1",301]]'
+      'redirects: {"/docs/old":{"destination":"/base/docs/new","status":307},"/docs/old.md":{"destination":"/base/docs/new.md","status":307},"/docs/old.mdx":{"destination":"/base/docs/new.mdx","status":307}}'
     );
-    const exactOnly = configFor({ redirects: [{ from: "/old", to: "/new" }] });
-    expect(exactOnly).not.toContain('"redirects":[');
+    expect(generated).toContain(
+      '"redirects":[["^/docs/old/?$","/base/docs/new",307],["^/docs/old\\\\.md/?$","/base/docs/new.md",307],["^/docs/old\\\\.mdx/?$","/base/docs/new.mdx",307]]'
+    );
   });
 });
 
@@ -494,6 +536,33 @@ describe("the scan", () => {
       "The redirect from /:page also matches the page /intro, which some hosts would redirect and others would serve.",
     ]);
     expect(conflicts[0]?.file).toBe(join(root, "blume.config.ts"));
+
+    // An exact redirect shadows its page on every host: a warning.
+    const shadowed = await scanProject(
+      await scratch({
+        "blume.config.ts": `export default ${JSON.stringify({
+          redirects: [
+            { from: "/intro/", to: "/" },
+            { from: "/gone", to: "/" },
+          ],
+        })};\n`,
+        "docs/index.md": "---\ntitle: Home\n---\n\nHome.\n",
+        "docs/intro.md": "---\ntitle: Intro\n---\n\nIntro.\n",
+      }),
+      { mode: "build" }
+    );
+    expect(
+      shadowed.diagnostics
+        .filter(
+          (diagnostic) => diagnostic.code === "BLUME_REDIRECT_MATCHES_PAGE"
+        )
+        .map((diagnostic) => [diagnostic.severity, diagnostic.message])
+    ).toEqual([
+      [
+        "warning",
+        "The redirect from /intro/ is also the page /intro, which never publishes: its URL redirects to / instead.",
+      ],
+    ]);
 
     // A link into a pattern is a valid target, like one to an exact `from`.
     const links = await validateLinks(scanned.graph, {

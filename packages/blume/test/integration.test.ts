@@ -417,20 +417,20 @@ describe("blumeIntegration markdown negotiation", () => {
     expect(nexted).toBe(true);
   });
 
-  it("does not negotiate when the client does not prefer markdown", () => {
+  it("serves HTML, varying on Accept, when the client does not prefer markdown", () => {
     const handle = markdownHandle(["/guide"]);
     const req: DevRequest = {
       headers: { accept: "text/html" },
       method: "GET",
       url: "/guide",
     };
-    let headerSet = false;
+    const headers: CollectedHeaders = {};
     let nexted = false;
     handle(
       req,
       {
-        setHeader: () => {
-          headerSet = true;
+        setHeader: (key: string, value: string) => {
+          headers[key] = value;
         },
       },
       () => {
@@ -439,7 +439,9 @@ describe("blumeIntegration markdown negotiation", () => {
     );
 
     expect(req.url).toBe("/guide");
-    expect(headerSet).toBe(false);
+    // The HTML answer depends on `Accept` as much as the Markdown one, as
+    // on Vercel and Cloudflare.
+    expect(headers.Vary).toBe("Accept");
     expect(nexted).toBe(true);
   });
 });

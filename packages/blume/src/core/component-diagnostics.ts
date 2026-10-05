@@ -1,3 +1,5 @@
+import { relative } from "pathe";
+
 import { BUILTIN_MDX_TAGS } from "./builtin-tags.ts";
 import type { Diagnostic, PageRecord } from "./types.ts";
 
@@ -38,6 +40,57 @@ export const validateUsedComponents = (
         severity: "warning",
         suggestion,
       });
+    }
+  }
+  return diagnostics;
+};
+
+/** What example discovery found: where it looked, and each example's key. */
+export interface ExampleKeys {
+  /** Absolute directory the examples were discovered under. */
+  dir: string;
+  examples: readonly { path: string }[];
+}
+
+/**
+ * Warn about each `<Component path>` in an `.mdx` page that names no
+ * discovered example. The page still renders, with a "No example found" box
+ * where the preview should be, so without this a typo or a moved example
+ * ships silently. Reported at the `path` value, in the partial that holds it
+ * when an `<include>` brought it in; a file shared by several locales is
+ * reported once. `extraTags` are the project's own components (islands +
+ * overrides), as for {@link validateUsedComponents}: one named `Component`
+ * replaces the built-in and resolves `path` its own way, so none is checked.
+ */
+export const missingExampleDiagnostics = (
+  pages: readonly PageRecord[],
+  discovery: ExampleKeys,
+  root: string,
+  extraTags: ReadonlySet<string>
+): Diagnostic[] => {
+  if (extraTags.has("Component")) {
+    return [];
+  }
+  const known = new Set(discovery.examples.map((example) => example.path));
+  const dir = relative(root, discovery.dir) || ".";
+  const diagnostics: Diagnostic[] = [];
+  const seen = new Set<string>();
+  for (const page of pages) {
+    for (const use of page.examplesUsed ?? []) {
+      const file = use.file ?? page.sourcePath ?? page.id;
+      const key = `${file}:${use.line}:${use.column}`;
+      if (!(known.has(use.path) || seen.has(key))) {
+        seen.add(key);
+        diagnostics.push({
+          code: "BLUME_EXAMPLE_NOT_FOUND",
+          column: use.column,
+          file,
+          line: use.line,
+          message: `<Component path="${use.path}"> in ${page.route} names no example, so the page shows "No example found" in its place.`,
+          severity: "warning",
+          suggestion: `Fix the path, or add the example under ${dir}/: \`path\` is its location there, without the extension.`,
+        });
+      }
     }
   }
   return diagnostics;

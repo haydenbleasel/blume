@@ -361,6 +361,9 @@ export default defineComponents({
     expect(appCss).toContain(
       `@source "${relative(join(root, "src/generated"), join(packageRoot(), "src"))}/**/*.{astro,ts,tsx}";`
     );
+    // The project scan covers `.jsx` islands too: the scan is a file glob,
+    // so a class used only in one would otherwise never be generated.
+    expect(appCss).toContain('@source "../../**/*.{astro,jsx,mdx,ts,tsx}";');
 
     // Every returned path was actually written; the local spec resolved, so no
     // reference warnings surface.
@@ -583,13 +586,13 @@ export default defineComponents({
   });
 });
 
-describe("blumeSourceGlob", () => {
-  const makeRoot = async (): Promise<string> => {
-    const root = await mkdtemp(join(tmpdir(), "blume-source-"));
-    ejectDirs.push(root);
-    return root;
-  };
+const makeRoot = async (): Promise<string> => {
+  const root = await mkdtemp(join(tmpdir(), "blume-source-"));
+  ejectDirs.push(root);
+  return root;
+};
 
+describe("blumeSourceGlob", () => {
   it("keeps the portable glob when blume is in the project's node_modules", async () => {
     const root = await makeRoot();
     await mkdir(join(root, "node_modules", "blume"), { recursive: true });

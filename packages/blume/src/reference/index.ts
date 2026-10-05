@@ -27,6 +27,7 @@ export type { GraphqlAdapter, GraphqlOptions } from "./graphql.ts";
 export { openapi } from "./openapi.ts";
 export type { OpenApiAdapter, OpenApiOptions } from "./openapi.ts";
 export type {
+  GraphqlAuthOptions,
   GraphqlSourceOptions,
   PlaygroundOptions,
   ReferenceSourceOptions,

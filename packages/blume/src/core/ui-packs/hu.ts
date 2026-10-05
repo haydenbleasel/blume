@@ -49,6 +49,7 @@ export const hu: UIStringsOverride = {
   banner: { dismiss: "Közlemény bezárása" },
   changelog: {
     description: "Termékfrissítések és kiadási megjegyzések.",
+    empty: "A változásnaplóban még nincsenek bejegyzések.",
     title: "Változásnapló",
   },
   consent: {

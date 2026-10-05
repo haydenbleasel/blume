@@ -87,6 +87,8 @@ interface ContextOptions {
   /** `agents.mcp`, whose route llms.txt lists but the static output never holds. */
   mcp?: { enabled: boolean; route: string };
   files?: Map<string, number>;
+  /** `--ignore`: outbound URLs the external tier doesn't probe. */
+  ignore?: (url: string) => boolean;
   sources?: Map<string, string>;
   seo?: { robots?: boolean; sitemap?: boolean };
   configFile?: string;
@@ -145,6 +147,7 @@ export const context = (options: ContextOptions = {}): AuditContext => {
     byUrl,
     files,
     graph: buildGraph(pages, siteOrigin(options.site)),
+    ignore: options.ignore ?? (() => false),
     llms: options.llms ?? null,
     origin: null,
     pages,

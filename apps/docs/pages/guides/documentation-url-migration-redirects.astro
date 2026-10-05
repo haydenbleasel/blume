@@ -5,9 +5,11 @@
 // main: core/schema.ts (redirect shape and statuses), deploy/redirects.ts and
 // deploy/artifacts.ts (host files, and a public/_redirects suppressing the
 // generated one), audit/checks/redirects.ts and links.ts, audit/checks/
-// network.ts (--url probes built pages, never redirect sources), audit/crawl.ts
-// (Astro's redirect pages have no <head>, so the audit skips them), and
-// Astro's redirect page template and dev redirect status. Third-party facts
+// network.ts (--url probes built pages and each exact redirect's old URL),
+// audit/crawl.ts (Astro's redirect pages have no <head>, so the audit skips
+// them), core/redirect-patterns.ts (dev answers exact redirects with their
+// configured status), deploy/redirects.ts (Markdown copies follow an exact
+// redirect), and Astro's redirect page template. Third-party facts
 // from Google's site-move, redirect, and Change of Address docs, Vercel's
 // redirect, domain, and system env var docs, Cloudflare's _redirects and
 // domain redirect docs, and Netlify's redirect docs.
@@ -16,8 +18,9 @@
 // server faking a redirect page, a chain, a 307, and a dead destination.
 // Not yet run end to end.
 // Review pass: re-checked Google's redirect and site-move docs, Astro's
-// redirect template (core/routing/3xx.js), and the pattern-only
-// BLUME_REDIRECT_MATCHES_PAGE check.
+// redirect template (core/routing/3xx.js), and BLUME_REDIRECT_MATCHES_PAGE
+// in core/project-graph.ts (an error for a pattern, a warning for an exact
+// redirect from a page's own URL).
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -139,9 +142,9 @@ import { guideById } from "../_guides/guides.ts";
   />
   <p>
     Replace <code>docs.acme.example</code> with your domain in both places. The
-    sitemap leaves out draft, hidden, and <code>noindex</code> pages, so add
-    any of those people still reach, plus paths your analytics show traffic
-    on. Commit the file.
+    sitemap leaves out draft, hidden, and <code>noindex</code> pages, and pages
+    whose canonical names another URL, so add any of those people still reach,
+    plus paths your analytics show traffic on. Commit the file.
   </p>
 
   <h2>Map each old URL to its new home</h2>
@@ -220,6 +223,13 @@ export default defineConfig({
     Patterns also keep a large move under host limits: Cloudflare's{" "}
     <code>_redirects</code> takes 2,000 exact and 100 pattern rules, and a
     Vercel <code>vercel.json</code> takes 2,048 redirects.
+  </p>
+  <p>
+    An exact redirect from one page to another also moves the page's{" "}
+    <a href="/docs/discoverability/markdown#raw-markdown">raw Markdown</a>:{" "}
+    <code>/quickstart.md</code> and <code>/quickstart.mdx</code> redirect to
+    the new page's copies with the same status, so agents following an old
+    link still find the text.
   </p>
 
   <h2>Check the redirects before you deploy</h2>
@@ -302,9 +312,9 @@ exit "$failed"`}
     page. A status of <code>000</code> means no answer at all.
   </p>
   <p>
-    In dev, this proves where each URL lands, not its status: the dev server
-    answers exact redirects with a 301 whatever <code>status</code> says. In
-    production your host sends the status, so check it on the public site.
+    The dev server answers each redirect with the <code>status</code> you
+    configured, as a server build does. In production your host decides what
+    goes out, so check the public site too.
   </p>
   <p>Next, stop the dev server, build, and run the audit's redirect and link checks:</p>
   <CodeBlock
@@ -315,8 +325,11 @@ npx blume audit --only redirects,links,indexability,sitemap`}
   <p>
     The audit walks every configured redirect, old ones included. It reports a
     redirect that lands on no page (<code>BLUME_AUDIT_REDIRECT_BROKEN</code>),
-    a loop, a chain where an older redirect points at a page you've moved
-    since, and a redirect whose source is still a real page, so it never fires.
+    a loop, and a chain where an older redirect points at a page you've moved
+    since. A redirect from a page you kept is caught before that:{" "}
+    <code>blume validate</code>, <code>doctor</code>, <code>dev</code>, and{" "}
+    <code>build</code> warn with <code>BLUME_REDIRECT_MATCHES_PAGE</code>,
+    because an exact redirect takes the URL over and the page never publishes.
   </p>
 
   <h2>Update links, canonicals, and the sitemap</h2>
@@ -441,8 +454,11 @@ npx blume audit --only redirects,links,indexability,sitemap`}
   <p>
     <code>blume audit --url https://docs.acme.example</code> is worth running
     too. It requests every page in your build from the live host and reports
-    4xx, 5xx, and header problems, but it never requests the old URLs, so it
-    can't tell you whether a redirect fires.
+    4xx, 5xx, and header problems. It also requests the old URL of every exact
+    redirect and reports <code>BLUME_AUDIT_REDIRECT_NOT_SERVED</code> when one
+    fails, answers 200 with the redirect page, or lands somewhere else. It
+    doesn't check the status code or pattern redirects, and it knows nothing
+    about a domain rule, so keep the script for those.
   </p>
 
   <h2>Keep a way back</h2>
@@ -490,10 +506,13 @@ npx blume audit --only redirects,links,indexability,sitemap`}
     Blume would write, so none of your config's redirects reach it. Move its
     rules into <code>blume.config.ts</code> and delete the file.
   </p>
-  <h3>The build stops with BLUME_REDIRECT_MATCHES_PAGE</h3>
+  <h3>The build reports BLUME_REDIRECT_MATCHES_PAGE</h3>
   <p>
-    A pattern also covers a page that still exists, and hosts disagree on which
-    one answers. Narrow the pattern to the paths that moved.
+    As an error, a pattern also covers a page that still exists, and hosts
+    disagree on which one answers. Narrow the pattern to the paths that moved.
+    As a warning, an exact redirect starts at a page's own URL, so the redirect
+    wins and the page never publishes. Delete the page if it moved, or remove
+    the redirect.
   </p>
   <h3>Canonical URLs still name the old domain</h3>
   <p>

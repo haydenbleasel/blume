@@ -190,10 +190,10 @@ import { guideById } from "../_guides/guides.ts";
       <strong><code>id</code> frontmatter.</strong> Docusaurus builds a page's
       URL from its ID, so <code>id: part1</code> in{" "}
       <code>guides/hello.md</code> serves the page at{" "}
-      <code>/docs/guides/part1</code>. Blume has no <code>id</code> key, and the
-      skill drops it, so the page moves to its file path,{" "}
-      <code>guides/hello</code>. Where an ID differs from its filename, replace
-      it with <code>slug: guides/part1</code>.
+      <code>/docs/guides/part1</code>. Blume has no <code>id</code> key, so
+      where an ID differs from its filename, the agent replaces it with{" "}
+      <code>slug: guides/part1</code> to keep the URL. Without one, the page
+      would move to its file path, <code>guides/hello</code>.
     </li>
     <li>
       <strong>Versions.</strong> Docusaurus serves your latest release at{" "}
@@ -271,12 +271,13 @@ import { guideById } from "../_guides/guides.ts";
       and its old <code>/docs/category/</code> URL should have a redirect.
     </li>
     <li>
-      <strong>Category pages.</strong> The skill turns each{" "}
-      <code>&lt;DocCardList /&gt;</code> into a <code>&lt;CardGroup&gt;</code>{" "}
-      with a card per page, which goes stale as pages change. Setting{" "}
-      <a href="/docs/content/navigation#directory-listings">directory: "card"</a>{" "}
-      in the folder's <code>meta.ts</code> lists them for you instead, below the
-      index page's content, and suits a generated-index category too.
+      <strong>Category pages.</strong> Each{" "}
+      <code>&lt;DocCardList /&gt;</code> and generated-index category should
+      now be a folder whose <code>meta.ts</code> sets{" "}
+      <a href="/docs/content/navigation#directory-listings">directory: "card"</a>,
+      which lists the folder's pages below the index page's content and keeps
+      the list current. A hand-written <code>&lt;CardGroup&gt;</code> of every
+      page goes stale as pages change, so swap any you find for the setting.
     </li>
     <li>
       <strong>Blog.</strong> Posts should carry a <code>date</code>, and the
@@ -285,10 +286,11 @@ import { guideById } from "../_guides/guides.ts";
       <code>blog/index.mdx</code> that links your posts.
     </li>
     <li>
-      <strong>Math.</strong> The skill treats inline <code>$x$</code> as
-      unsupported, so the agent may have moved a formula onto its own line or
-      dropped it. Blume renders inline math written with two dollar signs,
-      like <code>$$x^2$$</code> inside a sentence, so put those back.
+      <strong>Math.</strong> Inline math takes two dollar signs in Blume, so
+      each inline <code>$x$</code> should now read <code>$$x$$</code> inside
+      its sentence, not on a line of its own. A single <code>$</code> stays
+      literal text, so a formula still written that way shows its dollar
+      signs.
     </li>
     <li>
       <strong>Dependencies.</strong> Only the Docusaurus packages and scripts
@@ -498,6 +500,9 @@ export default defineConfig({
   <h3>A redirect fails the build</h3>
   <p>
     <code>BLUME_REDIRECT_MATCHES_PAGE</code> means a pattern also covers a page
-    you kept. Narrow it to the URLs that moved.
+    you kept. Narrow it to the URLs that moved. As a warning, which fails{" "}
+    <code>blume validate --strict</code>, it means an exact redirect starts at
+    a page you kept: the redirect takes the URL over, so the page never
+    publishes. Delete the page if it moved, or remove the redirect.
   </p>
 </GuidePage>

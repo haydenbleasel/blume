@@ -77,6 +77,22 @@ const fetchMock = (input: RequestInfo | URL, init?: RequestInit) => {
   if (url === "https://network.example") {
     return Promise.reject(new TypeError("network down"));
   }
+  if (url === "https://nxdomain.example") {
+    // Node's fetch: the system error rides on `cause`.
+    const cause = Object.assign(
+      new Error("getaddrinfo ENOTFOUND nxdomain.example"),
+      { code: "ENOTFOUND" }
+    );
+    return Promise.reject(new TypeError("fetch failed", { cause }));
+  }
+  if (url === "https://nxdomain-bun.example") {
+    // Bun's fetch: the code sits on the error itself.
+    return Promise.reject(
+      Object.assign(new TypeError("getaddrinfo ENOTFOUND nxdomain-bun"), {
+        code: "ENOTFOUND",
+      })
+    );
+  }
   if (url === "https://method.example") {
     return Promise.resolve(
       new Response(null, { status: method === "HEAD" ? 405 : 200 })
@@ -132,10 +148,51 @@ describe("validateLinks — external link probing", () => {
     expect(byUrl(diagnostics, "timeout.example")?.message).toContain(
       "request timed out"
     );
-    expect(byUrl(diagnostics, "network.example")?.severity).toBe("error");
+    expect(byUrl(diagnostics, "network.example")?.severity).toBe("warning");
     expect(byUrl(diagnostics, "network.example")?.message).toContain(
       "network down"
     );
+  });
+
+  it("fails a host whose name doesn't resolve, naming why", async () => {
+    // Node reports "fetch failed" with the reason on `cause`; the diagnostic
+    // names the reason, so a dead domain reads as one.
+    const diagnostics = await check([
+      link("https://nxdomain.example"),
+      link("https://nxdomain-bun.example", 2),
+    ]);
+    expect(
+      diagnostics.map((diagnostic) => [diagnostic.severity, diagnostic.message])
+    ).toStrictEqual([
+      [
+        "error",
+        "External link https://nxdomain.example is unreachable (getaddrinfo ENOTFOUND nxdomain.example).",
+      ],
+      [
+        "error",
+        "External link https://nxdomain-bun.example is unreachable (getaddrinfo ENOTFOUND nxdomain-bun).",
+      ],
+    ]);
+  });
+
+  it("never requests a URL that --ignore matches", async () => {
+    const diagnostics = await validateLinks(
+      graphWith([
+        link("https://notfound.example"),
+        link("https://server.example", 2),
+      ]),
+      {
+        checkExternal: true,
+        ignore: (url) => url === "https://notfound.example",
+        publicDir: null,
+      }
+    );
+    expect(diagnostics.map((diagnostic) => diagnostic.message)).toStrictEqual([
+      "External link https://server.example is unreachable (HTTP 500).",
+    ]);
+    expect(calls.map((call) => call.url)).toStrictEqual([
+      "https://server.example",
+    ]);
   });
 
   it("retries with GET when HEAD is rejected by the server", async () => {

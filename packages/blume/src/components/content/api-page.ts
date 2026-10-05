@@ -1,3 +1,4 @@
+import { exampleValue } from "../openapi/helpers.ts";
 import type { ParameterLike, SchemaLike } from "../openapi/helpers.ts";
 import { resolveSecurity } from "../openapi/security.ts";
 import type { OperationSecurity } from "../openapi/security.ts";
@@ -168,19 +169,42 @@ export const endpointParameters = (fields: EndpointField[]): ParameterLike[] =>
         ]
   );
 
-/** The body fields as a JSON request body, or `undefined` when there are none. */
+/** Whether a field, or one nested in it, has a `default` or `placeholder`. */
+const hasValue = (field: EndpointField): boolean =>
+  field.default !== undefined ||
+  Boolean(field.placeholder) ||
+  (field.fields ?? []).some(hasValue);
+
+/**
+ * The fields a request starts with: required ones, and ones with a value to
+ * send. An optional field with neither is left for the reader to fill,
+ * rather than sent as the sampler's `"string"`, `0`, or `true`.
+ */
+const sentFields = (fields: EndpointField[]): EndpointField[] =>
+  fields
+    .filter((field) => field.required === true || hasValue(field))
+    .map((field) => ({ ...field, fields: sentFields(field.fields ?? []) }));
+
+/**
+ * The body fields as a JSON request body, or `undefined` when there are none.
+ * Its example, which the playground and samples start from, holds only the
+ * {@link sentFields}.
+ */
 export const endpointBody = (fields: EndpointField[]) => {
   const body = fields.filter((field) => field.location === "body");
+  const object = (members: EndpointField[]): SchemaLike =>
+    fieldSchema({
+      fields: members,
+      location: "body",
+      name: "",
+      type: "object",
+    });
   return body.length > 0
     ? {
         content: {
           "application/json": {
-            schema: fieldSchema({
-              fields: body,
-              location: "body",
-              name: "",
-              type: "object",
-            }),
+            example: exampleValue(object(sentFields(body)), {}),
+            schema: object(body),
           },
         },
       }

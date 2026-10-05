@@ -5,8 +5,9 @@
 // the repo's own translations workflow on main. Action versions checked
 // against the actions/checkout and actions/setup-node READMEs. Per-locale
 // header-link and footer-link labels are not in the current npm release
-// (checked against the blume@2.0.3 tag's schema). Not yet run end to end on a
-// sample project.
+// (checked against the blume@2.0.3 tag's schema). Updated for main: the
+// frontmatter rebuild drops seo.canonical (492fdf20); read in the source.
+// Not yet run end to end on a sample project.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -134,7 +135,9 @@ blume.translations.json`}
     everything else, like the page order, as it is. Blume never trusts the
     agent with structure: it rebuilds each page's frontmatter from the English
     file and only takes the translated title, description, sidebar label and
-    badge, and SEO title and description. A reply with a different number of
+    badge, and SEO title and description. The one English key it leaves out is{" "}
+    <code>seo.canonical</code>, so each translation's canonical URL is its own.
+    A reply with a different number of
     code blocks, an empty body, or frontmatter that doesn't parse is rejected,
     and nothing is written for that file.
   </p>
@@ -368,13 +371,15 @@ jobs:
   </p>
   <h3>German pages name the English page as canonical</h3>
   <p>
-    The English page sets <code>seo.canonical</code> in its frontmatter.{" "}
-    <code>blume translate</code> copies every frontmatter key it doesn't
-    translate, so the German page inherits that URL. Remove{" "}
-    <code>seo.canonical</code> from the English page unless it really points
-    elsewhere, then retranslate. The{" "}
+    If the page has no German file, that's expected: Blume renders the English
+    content at the German URL and points its canonical at the English page. If
+    it does have one, the German file sets <code>seo.canonical</code> itself,
+    usually because it was written by hand from a copy of the English file.{" "}
+    <code>blume translate</code> leaves <code>seo.canonical</code> out of the
+    files it writes, but it adopts hand-written pages as they are. Remove the
+    key from the German file. The{" "}
     <a href="/guides/multilingual-documentation-hreflang">hreflang guide</a>{" "}
-    walks through the fix and the audit that catches it.
+    covers the audit that catches it.
   </p>
   <h3>The agent isn't found</h3>
   <p>

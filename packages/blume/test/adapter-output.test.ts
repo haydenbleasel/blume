@@ -100,6 +100,15 @@ describe("deployStaticDir", () => {
     );
   });
 
+  it("serves the base's directory for a Vercel server build under a base", () => {
+    // The build moves the static files to `static/<base>/`, so the budget
+    // and the audit read them there.
+    const ctx = context("/proj");
+    expect(deployStaticDir(config(vercel({ base: "docs/" })), ctx)).toBe(
+      "/proj/.vercel/output/static/docs"
+    );
+  });
+
   it("serves dist/ for a static build", () => {
     const ctx = context("/proj");
     expect(deployStaticDir(config(), ctx)).toBe("/proj/dist");
@@ -125,6 +134,15 @@ describe("deployStaticDir", () => {
     const ctx = context("/proj");
     expect(deployStaticDir(config(cloudflare()), ctx)).toBe(
       "/proj/dist/client"
+    );
+  });
+
+  it("serves the base's directory for a Cloudflare server build under a base", () => {
+    // The adapter writes the client output to `dist/client/<base>/`, so the
+    // budget and the audit read it there.
+    const ctx = context("/proj");
+    expect(deployStaticDir(config(cloudflare({ base: "/a/b/" })), ctx)).toBe(
+      "/proj/dist/client/a/b"
     );
   });
 

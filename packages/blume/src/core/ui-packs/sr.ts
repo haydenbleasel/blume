@@ -49,6 +49,7 @@ export const sr: UIStringsOverride = {
   banner: { dismiss: "Затвори обавештење" },
   changelog: {
     description: "Ажурирања производа и белешке о издањима.",
+    empty: "У дневнику измена још нема уноса.",
     title: "Дневник измена",
   },
   consent: {

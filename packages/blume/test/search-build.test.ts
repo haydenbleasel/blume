@@ -40,7 +40,8 @@ describe("Pagefind build", () => {
       ),
     ]);
 
-    await buildSearchIndex(output);
+    // The count is what the index holds, not every HTML file read.
+    expect(await buildSearchIndex(output)).toBe(1);
     const server = createServer(async (request, response) => {
       const { pathname } = new URL(request.url ?? "/", "http://localhost");
       const file = path.join(output, pathname);

@@ -374,16 +374,15 @@ const rectangular = (lightness: number, chroma: number, hue: number) => {
 /** A color function's channels, converted to sRGB with `alpha`. */
 type Converter = (channels: Channels, alpha: number) => Rgba;
 
-const rgb: Converter = ([red, green, blue], alpha) => {
-  const channel = (component: Component): number =>
-    clamp(scaled(component, 255) / 255);
-  return {
-    alpha,
-    blue: channel(blue),
-    green: channel(green),
-    red: channel(red),
-  };
-};
+const rgbChannel = (component: Component): number =>
+  clamp(scaled(component, 255) / 255);
+
+const rgb: Converter = ([red, green, blue], alpha) => ({
+  alpha,
+  blue: rgbChannel(blue),
+  green: rgbChannel(green),
+  red: rgbChannel(red),
+});
 
 /** A converter for a hue-and-two-percentages function (`hsl()`, `hwb()`). */
 const cylindrical =

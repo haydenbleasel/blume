@@ -13,6 +13,7 @@ import { validateLinks } from "../../core/links.ts";
 import { buildManifest } from "../../core/manifest.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import type { Diagnostic } from "../../core/types.ts";
+import { parseIgnoreFlag } from "../args.ts";
 import { commandMeta } from "../command-meta.ts";
 import { reportInternalError } from "../internal-error.ts";
 import {
@@ -28,6 +29,12 @@ export const validateCommand = defineCommand({
       description: "Check external (HTTP) links over the network.",
       type: "boolean",
     },
+    ignore: {
+      description:
+        'With --external, skip external links whose URL matches this glob (e.g. "https://example.com/**"). Repeat it for more; internal links are always checked.',
+      type: "string",
+      valueHint: "glob",
+    },
     json: {
       description: "Emit diagnostics as JSON on stdout (for CI/editors).",
       type: "boolean",
@@ -38,8 +45,9 @@ export const validateCommand = defineCommand({
     },
   },
   meta: commandMeta.validate,
-  async run({ args }) {
+  async run({ args, rawArgs }) {
     const root = process.cwd();
+    const ignore = parseIgnoreFlag(rawArgs);
     const diagnostics: Diagnostic[] = [];
 
     try {
@@ -83,6 +91,7 @@ export const validateCommand = defineCommand({
           checkExternal: Boolean(args.external),
           extraRoutes,
           i18n: project.config.i18n,
+          ignore,
           publicDir: existsSync(publicDir) ? publicDir : null,
           redirects: project.config.redirects,
         }))

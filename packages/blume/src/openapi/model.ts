@@ -1,5 +1,6 @@
-import type { Document, OperationObject } from "@scalar/openapi-types/3.1";
+import type { Document, OperationObject } from "@scalar/openapi-types/3.2";
 
+import type { GraphqlAuthOptions } from "../reference/options.ts";
 import type {
   AsyncApiAction,
   AsyncApiDocument,
@@ -26,10 +27,18 @@ export { slugify } from "./references.ts";
  * per-operation route so it becomes a first-class Blume page.
  */
 
-/** A normalized OpenAPI 3.1 document, internal `$ref`s intact. */
+/**
+ * A normalized OpenAPI document, internal `$ref`s intact. Typed as 3.2, which
+ * is backward compatible with 3.1, so one type covers both the upgraded 3.1
+ * documents and the 3.2 ones read as written.
+ */
 export type ApiDocument = Document;
 
-/** The HTTP methods an OpenAPI path item may declare, in spec order. */
+/**
+ * The HTTP methods an OpenAPI path item may declare, in spec order. `query`
+ * is OpenAPI 3.2's (the QUERY method: a safe request that carries a body); a
+ * 3.1 path item can't declare it, so listing it changes nothing there.
+ */
 export const HTTP_METHODS = [
   "get",
   "put",
@@ -39,6 +48,7 @@ export const HTTP_METHODS = [
   "head",
   "patch",
   "trace",
+  "query",
 ] as const;
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
@@ -140,6 +150,8 @@ export interface ApiSpecData {
    * (GraphQL only; OpenAPI documents carry their servers in the document).
    */
   endpoint?: string;
+  /** How the GraphQL endpoint authenticates (GraphQL only). */
+  auth?: GraphqlAuthOptions;
   /** Operations keyed by {@link ApiOperationRef.key}. */
   operations: Record<string, ApiOperationRef>;
   tags: ApiTagRef[];

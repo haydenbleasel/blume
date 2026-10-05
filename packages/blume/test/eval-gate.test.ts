@@ -7,7 +7,7 @@ import { dirname, join } from "pathe";
 import { scanProject } from "../src/core/project-graph.ts";
 import type { Diagnostic } from "../src/core/types.ts";
 import type { HeadlessRunner } from "../src/eval/agents.ts";
-import { evalReportJson } from "../src/eval/report.ts";
+import { evalReportJson, summaryLine } from "../src/eval/report.ts";
 import { passFraction, runEval } from "../src/eval/run.ts";
 import type { EvalResult, QuestionResult } from "../src/eval/run.ts";
 import type { EvalQuestion } from "../src/eval/schema.ts";
@@ -164,6 +164,8 @@ describe("a run with a failing warning-severity question", () => {
     });
 
     expect(evaluated.counts).toEqual({ error: 0, fail: 1, pass: 1, skip: 0 });
+    expect(evaluated.results[1]?.severity).toBe("warning");
+    expect(summaryLine(evaluated)).toStartWith("1 passed · 1 warned · ");
     expect(passFraction(evaluated)).toBe(1);
     expect(
       JSON.parse(evalReportJson(evaluated, root, 1)).summary

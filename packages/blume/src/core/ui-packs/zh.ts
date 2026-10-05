@@ -48,6 +48,7 @@ export const zh: UIStringsOverride = {
   banner: { dismiss: "关闭公告" },
   changelog: {
     description: "产品更新与版本说明。",
+    empty: "暂无更新日志条目。",
     title: "更新日志",
   },
   consent: {

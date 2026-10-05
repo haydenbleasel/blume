@@ -1053,19 +1053,21 @@ export const sampleLanguageInfo = (raw: string): SampleLanguageInfo | null => {
   return language ? { label: language.label, lang: language.lang } : null;
 };
 
+/** `openapi()`'s default `codeSamples`, which hand-written endpoint pages always use. */
+export const DEFAULT_SAMPLE_LANGUAGES = ["curl", "js", "python"];
+
 /**
  * The sample languages to render, resolved from config ids (unknown ids
- * dropped). `false` renders none; an empty list, the defaults.
+ * dropped), in order. `false` and an empty list both render none.
  */
 export const sampleLanguages = (ids: string[] | false): SampleLanguage[] => {
   if (ids === false) {
     return [];
   }
-  const wanted = ids.length > 0 ? ids : ["curl", "js", "python"];
   const byId = new Map(LANGUAGES.map((entry) => [entry.id, entry]));
   const out: SampleLanguage[] = [];
   const seen = new Set<string>();
-  for (const raw of wanted) {
+  for (const raw of ids) {
     const id = sampleLanguageId(raw);
     const language = byId.get(id);
     if (language && !seen.has(id)) {

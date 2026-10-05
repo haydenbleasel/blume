@@ -445,7 +445,8 @@ export const publishBuildArtifacts = async (
   await buildNarration(project, distDir, logger);
 
   // Upload the index to a hosted provider (Algolia, Orama Cloud, Typesense).
-  // Skipped with a warning when its admin key isn't configured.
+  // Skipped with a warning when its admin key isn't configured; with the key
+  // set, a failed sync fails the build.
   await syncSearchProvider(project, {
     start: logger.info.bind(logger),
     success: logger.info.bind(logger),

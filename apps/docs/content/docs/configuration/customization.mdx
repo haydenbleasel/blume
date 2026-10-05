@@ -84,7 +84,7 @@ export default defineComponents({
 });
 ```
 
-Wired slots:
+Wired slots (names are case-sensitive; any other key under `layout` renders nowhere, and Blume warns about it):
 
 | Slot | Replaces | Props |
 | --- | --- | --- |
@@ -95,12 +95,14 @@ Wired slots:
 | `Sidebar` | The primary navigation tree | `items`, `currentRoute` |
 | `MobileNav` | The nav inside the mobile drawer (defaults to `Sidebar`) | `items`, `currentRoute` |
 | `Breadcrumbs` | The breadcrumb trail | `crumbs` |
-| `TableOfContents` | The on-this-page outline | `headings`, `title`, `variant` |
+| `TableOfContents` | The on-this-page outline, in the right rail (`variant: "desktop"`) and in the dropdown above the content on narrower screens (`"mobile"`) | `headings`, `title`, `variant` |
 | `Pagination` | The prev/next footer links | `prev`, `next`, `strings` |
 | `Feedback` | The "Was this page helpful?" rating below the article (rendered only when [`feedback`](/docs/configuration#page-feedback) is on) | `strings`, `comments` |
 | `PageHeader` | An injection point above the article (no built-in) | `page`, `headings`, `route` |
 | `PageFooter` | An injection point below the article (no built-in) | `page`, `headings`, `route` |
 | `Footer` | The [site footer](/docs/configuration#footer) after the content grid: links, social profiles, the repository link, and Cookie settings | `footer`, `locale`, `site`, `navigation`, `ui` |
+
+The `mobile` variant also receives the [page actions](/docs/content/navigation#page-actions) as its children (an empty element the actions move into from the right rail below 1,280px), so render a `<slot />` in it to keep them on narrower screens. It renders on a page with no headings as well, with `headings` empty, so the actions still show there.
 
 `PageHeader` and `PageFooter` have no built-in component — they render nothing until you set them, which makes them handy injection points for a promo banner or a "last updated" note. The built-in `Footer` holds the only links to your repository and social profiles, so a `Footer` override (the place for a marketing footer the config can't express) should keep them. With `consent` set, also keep a way to reopen it: any element with `data-blume-consent-open` works as the [Cookie settings](/docs/configuration/consent#changing-an-answer) link.
 

@@ -395,8 +395,11 @@ npx blume audit --url https://docs.acme.example --only indexability,robots,sitem
   />
   <p>
     From <code>dist/</code> it reports noindex pages, canonicals that point at
-    missing or redirecting pages, and robots.txt rules that block a sitemap
-    page (<code>BLUME_AUDIT_ROBOTS_DISALLOWS_INDEXABLE</code>). With{" "}
+    missing or redirecting pages, robots.txt rules that block a sitemap page
+    for every crawler (<code>BLUME_AUDIT_ROBOTS_DISALLOWS_INDEXABLE</code>),
+    and a group that blocks one named crawler from sitemap pages
+    (<code>BLUME_AUDIT_ROBOTS_BLOCKS_CRAWLER</code>, a warning, since
+    shutting out a training crawler is often on purpose). With{" "}
     <code>--url</code> it fetches every page, robots.txt, and the sitemap from
     the live site, and reports error responses (<code>BLUME_AUDIT_HTTP_4XX</code>,{" "}
     <code>BLUME_AUDIT_HTTP_5XX</code>), an unreachable robots.txt or sitemap,
@@ -406,10 +409,11 @@ npx blume audit --url https://docs.acme.example --only indexability,robots,sitem
     indexable.
   </p>
   <p>
-    It has two limits. It fetches as a generic HTTP client, not a crawler, so a
+    It has two limits. It fetches as a plain HTTP client, not a crawler, so a
     clean run means your host serves the pages, not that crawlers get through.
-    And its robots.txt check reads only the <code>User-agent: *</code> group,
-    which is why <code>check-robots.mjs</code> exists. If your host supplies
+    And it checks the rules in the robots.txt it built, not the live file, so
+    groups your CDN adds are invisible to it, which is why{" "}
+    <code>check-robots.mjs</code> exists. If your host supplies
     the site URL at deploy time, expect one{" "}
     <code>BLUME_AUDIT_SITE_INFERRED_AT_DEPLOY</code>.
   </p>

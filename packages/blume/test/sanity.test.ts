@@ -14,6 +14,7 @@ import type { SanityClientLike } from "../src/core/sources/sanity.ts";
 import type { SourceContext, SourceEntry } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 import { sanity } from "../src/sources/sanity.ts";
+import { withEnv } from "./cms-fixtures.ts";
 
 const dirs: string[] = [];
 const tempDir = async (): Promise<string> => {
@@ -36,7 +37,7 @@ const ctxFor = (cacheDir: string): SourceContext => ({
 interface SanityDocFixture {
   _id: string;
   _updatedAt?: string;
-  body?: PortableTextBlock[];
+  body?: PortableTextBlock[] | string;
   description?: string;
   meta?: string;
   slug?: { current: string };
@@ -155,6 +156,72 @@ describe("sanitySource", () => {
     expect(entry?.body.text).toContain("## Hello");
     expect(entry?.raw).toContain("title: Getting Started");
     expect(entry?.lastModified).toBe("2024-05-01T00:00:00Z");
+  });
+
+  it("passes a Markdown string body through as .md", async () => {
+    const source = sanitySource(
+      {
+        client: clientReturning([
+          {
+            ...doc,
+            body: "# Setup\n\nRun [it](javascript:alert(1)) and [docs](/docs).\n\n",
+          },
+        ]),
+        dataset: "production",
+        name: "guides",
+        projectId: "p1",
+        query: "*",
+        // A Markdown field stays Markdown even beside serializers.
+        serializers: { callout: (b) => `<Callout>${b.text}</Callout>` },
+      },
+      ctxFor(await tempDir())
+    );
+    const { entries } = await source.load();
+    expect(entries[0]?.ref).toBe("getting-started.md");
+    expect(entries[0]?.body).toStrictEqual({
+      format: "md",
+      text: "# Setup\n\nRun it and [docs](/docs).\n",
+    });
+  });
+
+  it("warns when a query without a token finds no documents", async () => {
+    await withEnv("SANITY_TOKEN", undefined, async () => {
+      const anonymous = sanitySource(
+        {
+          client: clientReturning([]),
+          dataset: "private",
+          name: "guides",
+          projectId: "p1",
+          query: "*",
+        },
+        ctxFor(await tempDir())
+      );
+      const { diagnostics, entries } = await anonymous.load();
+      expect(entries).toStrictEqual([]);
+      expect(diagnostics).toMatchObject([
+        {
+          code: "BLUME_MISSING_SECRET",
+          message:
+            'Source "guides" found no documents, and SANITY_TOKEN is not set. A private dataset returns nothing to a query without a token.',
+          severity: "warning",
+        },
+      ]);
+    });
+    await withEnv("SANITY_TOKEN", "read-token", async () => {
+      const authorized = sanitySource(
+        {
+          client: clientReturning([]),
+          dataset: "private",
+          name: "guides",
+          projectId: "p1",
+          query: "*",
+        },
+        ctxFor(await tempDir())
+      );
+      // With a token, an empty result is the query's own answer.
+      const { diagnostics } = await authorized.load();
+      expect(diagnostics).toStrictEqual([]);
+    });
   });
 
   it("writes entries as MDX when serializers turn blocks into components", async () => {

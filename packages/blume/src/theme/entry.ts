@@ -940,8 +940,11 @@ pre:has(.line.focused):hover .line:not(.focused) {
    Strip the surrounding chrome so the printout is just the article. Scoped to
    the chrome itself, never bare \`header\`/\`aside\`: content renders those too
    (every Callout and Panel is an <aside>, every changelog Update has a
-   <header>), and they belong in the printout. \`body > header\` keeps a
-   \`layout.Header\` override out as well. */
+   <header>), and they belong in the printout. \`body > header\` and
+   \`body > footer\` keep \`layout.Header\` and \`layout.Footer\` overrides out
+   as well. Everything after the article (directory and related-page cards,
+   last updated, feedback, prev/next) is page chrome too, and so are the
+   copy, ask, and expand buttons on code blocks. */
 @media print {
   [data-blume-banner],
   [data-blume-header],
@@ -951,7 +954,13 @@ pre:has(.line.focused):hover .line:not(.focused) {
   [data-blume-assistant-panel],
   [data-blume-page-actions],
   #blume-content > nav,
-  #blume-content > details {
+  #blume-content > details,
+  [data-blume-page-end],
+  [data-blume-footer],
+  body > footer,
+  [data-blume-copy],
+  [data-blume-ask],
+  [data-blume-code-expand] {
     display: none !important;
   }
 
@@ -960,6 +969,23 @@ pre:has(.line.focused):hover .line:not(.focused) {
   .prose :where(pre:not(.twoslash, .twoslash pre, blume-panel-tabs *) > code) {
     max-height: none;
     overflow: visible;
+  }
+
+  /* A collapsed \`expandable\` block prints open: its toggle is hidden above,
+     so the collapse would cut the block off at its first lines. Same
+     selector as the collapse, so this later rule wins. */
+  .prose pre[data-expandable]:not([data-expanded]) > code {
+    mask-image: none;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  /* The theme script switches a dark page to light for printing
+     (\`beforeprint\`); a color transition would print mid-fade. */
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
   }
 
   #blume-content {

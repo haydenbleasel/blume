@@ -248,4 +248,46 @@ describe("schemaTree", () => {
     expect(meta && rowExpands(meta)).toBe(true);
     expect(rowsOf(childOf(meta)).has("tag")).toBe(true);
   });
+
+  it("leaves readOnly fields out of a request and writeOnly out of a response", () => {
+    const schemas = {
+      Id: { readOnly: true, type: "string" },
+      User: {
+        properties: {
+          createdAt: { readOnly: true, type: "string" },
+          id: ref("Id"),
+          name: { type: "string" },
+          owner: { allOf: [ref("Owner")], readOnly: true },
+          password: { type: "string", writeOnly: true },
+          profile: {
+            properties: {
+              bio: { type: "string" },
+              views: { readOnly: true, type: "integer" },
+            },
+            type: "object",
+          },
+        },
+        required: ["id", "name"],
+        type: "object",
+      },
+    } satisfies Record<string, SchemaLike>;
+    const names = (node: SchemaNode | undefined) => [...rowsOf(node).keys()];
+
+    const request = rowsOf(schemaTree(ref("User"), schemas, "request"));
+    expect([...request.keys()]).toStrictEqual(["name", "password", "profile"]);
+    // Nested tables follow the same direction.
+    expect(names(childOf(request.get("profile")))).toStrictEqual(["bio"]);
+
+    const response = schemaTree(ref("User"), schemas, "response");
+    expect(names(response)).toStrictEqual([
+      "createdAt",
+      "id",
+      "name",
+      "owner",
+      "profile",
+    ]);
+
+    // A table with no direction (an AsyncAPI payload) shows every field.
+    expect(names(schemaTree(ref("User"), schemas))).toHaveLength(6);
+  });
 });

@@ -812,21 +812,21 @@ npx blume validate`}
   </p>
   <h3>A field is sent as "string", 0, or true</h3>
   <p>
-    A body field with no <code>placeholder</code> or <code>default</code>{" "}
-    still goes into the sample body, with a stand-in value for its type.
-    Give every body field one of the two. A <code>placeholder</code> is always
-    text, so on a number field the samples send <code>"5"</code>; use{" "}
-    <code>default={"{5}"}</code> there instead.
+    A required body field with no <code>placeholder</code> or{" "}
+    <code>default</code> still goes into the sample body, with a stand-in
+    value for its type. Optional fields with neither start empty and stay out
+    of the request. Give every required body field one of the two. A{" "}
+    <code>placeholder</code> is always text, so on a number field the samples
+    send <code>"5"</code>; use <code>default={"{5}"}</code> there instead.
   </p>
   <h3>Send says the browser blocked the request</h3>
   <p>
     That's CORS: the API answered, but not with headers that allow your docs
-    origin. The message tells you to set <code>playground.proxy</code> on the{" "}
-    <code>openapi()</code> reference whatever the page, but for hand-written
-    pages the setting is <code>api.playground.proxy</code> in{" "}
-    <code>blume.config.ts</code>, as shown in <a href="#publish">Publish</a>,
-    and it needs a server build. Locally, check that the sample API's{" "}
-    <code>DOCS_ORIGIN</code> matches the port <code>blume dev</code> printed.
+    origin. The message names the fix for hand-written pages,{" "}
+    <code>api.playground.proxy</code> in <code>blume.config.ts</code>, as
+    shown in <a href="#publish">Publish</a>, and it needs a server build.
+    Locally, check that the sample API's <code>DOCS_ORIGIN</code> matches the
+    port <code>blume dev</code> printed.
   </p>
   <h3>The build fails with BLUME_SERVER_FEATURE_REQUIRED</h3>
   <p>

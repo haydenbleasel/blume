@@ -50,6 +50,7 @@ export const ja: UIStringsOverride = {
   banner: { dismiss: "お知らせを閉じる" },
   changelog: {
     description: "製品のアップデートとリリースノート。",
+    empty: "変更履歴のエントリーはまだありません。",
     title: "変更履歴",
   },
   consent: {

@@ -51,6 +51,7 @@ export const ptBR: UIStringsOverride = {
   banner: { dismiss: "Fechar o anúncio" },
   changelog: {
     description: "Atualizações do produto e notas de lançamento.",
+    empty: "Ainda não há entradas no registro de alterações.",
     title: "Registro de alterações",
   },
   consent: {

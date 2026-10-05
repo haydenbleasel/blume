@@ -3,6 +3,8 @@ import { join } from "pathe";
 import { BlumeError } from "../diagnostics.ts";
 import matter from "../frontmatter.ts";
 import { nodeRequire } from "../node-require.ts";
+import { neutralizeUnsafeLinks } from "../safe-links.ts";
+import type { Diagnostic } from "../types.ts";
 import {
   hashText,
   loadWithCache,
@@ -10,7 +12,7 @@ import {
   snapshotCache,
 } from "./cache.ts";
 import type { JsonObject } from "./json.ts";
-import { asString, getPath } from "./json.ts";
+import { asString, getPath, isStringValue } from "./json.ts";
 import { writesMdx } from "./lower.ts";
 import { slugify, slugifyPath } from "./normalize.ts";
 import { portableTextToMarkdown } from "./portable-text.ts";
@@ -35,7 +37,7 @@ export interface SanityFieldMap {
   description?: string;
   /** Route slug (dot path); default `slug.current`. */
   slug?: string;
-  /** Portable Text body field; default `body`. */
+  /** Body field, Portable Text or a Markdown string; default `body`. */
   body?: string;
   /** Last-modified ISO date; default `_updatedAt`. */
   lastModified?: string;
@@ -172,29 +174,32 @@ export const sanitySource = (
       data.description = description;
     }
 
-    // SAFETY: the configured body field holds Portable Text blocks; a value of
-    // any other shape fails the `Array.isArray` check below and yields an
-    // empty body, and the serializer tolerates malformed blocks.
-    const blocks = (getPath(doc, fields.body ?? "body") ??
-      []) as PortableTextBlock[];
-    const markdown = Array.isArray(blocks)
-      ? portableTextToMarkdown(blocks, {
-          imageUrl: (block) => {
-            // SAFETY: `asset` on an image block is Sanity's asset reference
-            // object; any other shape yields no `_ref` and the image is
-            // skipped.
-            const ref = (block.asset as { _ref?: string } | undefined)?._ref;
-            return ref
-              ? imageUrlFromRef(ref, options.projectId, options.dataset)
-              : null;
-          },
-          serializers: options.serializers,
-        })
-      : "";
-
+    const body = getPath(doc, fields.body ?? "body");
+    let markdown = "";
     // Serializer output is MDX (components, directives), so a source with
-    // serializers writes its entries as `.mdx`.
-    const format = writesMdx(options.serializers) ? "mdx" : "md";
+    // serializers writes its Portable Text entries as `.mdx`.
+    let format: "md" | "mdx" = writesMdx(options.serializers) ? "mdx" : "md";
+    if (isStringValue(body)) {
+      // A Markdown field passes through as `.md`, its unsafe links reduced to
+      // their labels, as the other CMS sources do (see `documentEntry`).
+      markdown = neutralizeUnsafeLinks(`${body.trimEnd()}\n`);
+      format = "md";
+    } else if (Array.isArray(body)) {
+      // SAFETY: an array in the body field is Portable Text blocks; the
+      // serializer tolerates malformed blocks.
+      markdown = portableTextToMarkdown(body as PortableTextBlock[], {
+        imageUrl: (block) => {
+          // SAFETY: `asset` on an image block is Sanity's asset reference
+          // object; any other shape yields no `_ref` and the image is
+          // skipped.
+          const ref = (block.asset as { _ref?: string } | undefined)?._ref;
+          return ref
+            ? imageUrlFromRef(ref, options.projectId, options.dataset)
+            : null;
+        },
+        serializers: options.serializers,
+      });
+    }
     const raw = matter.stringify(markdown, data);
     return {
       body: { format, text: markdown },
@@ -211,18 +216,31 @@ export const sanitySource = (
   const load = async (
     refresh = ctx?.refresh ?? true
   ): Promise<SourceLoadResult> => {
+    const empty: Diagnostic[] = [];
     const result = await loadWithCache(
       options.name,
       cache,
       async () => {
         const client = resolveClient(options, ctx?.preview ?? false);
         const docs = await client.fetch<SanityDocument[]>(options.query);
+        // A private dataset answers a query without a token with no
+        // documents rather than an error, so an empty result is the only
+        // sign the token is missing.
+        if (docs.length === 0 && !(options.token ?? process.env.SANITY_TOKEN)) {
+          empty.push({
+            code: "BLUME_MISSING_SECRET",
+            message: `Source "${options.name}" found no documents, and SANITY_TOKEN is not set. A private dataset returns nothing to a query without a token.`,
+            severity: "warning",
+            suggestion:
+              "Set SANITY_TOKEN to a token with read access if the dataset is private.",
+          });
+        }
         return docs.map(toEntry);
       },
       refresh
     );
     snapshot = new Map(result.entries.map((entry) => [entry.ref, entry]));
-    return result;
+    return { ...result, diagnostics: [...result.diagnostics, ...empty] };
   };
 
   const read = async (ref: string): Promise<string> => {

@@ -12,6 +12,7 @@ import {
   defaultMessageValues,
   messageFrame,
 } from "../src/components/openapi/message.ts";
+import type { AsyncApiSpecValue } from "../src/openapi/asyncapi.ts";
 
 /**
  * The event composer's shared model: derivation from a spec
@@ -179,6 +180,74 @@ describe("messageModel", () => {
     expect(buildModel().connectable).toBeTrue();
     expect(buildModel({ protocol: "kafka" }).connectable).toBeFalse();
     expect(buildModel({ protocol: undefined }).connectable).toBeFalse();
+  });
+
+  it("samples a Kafka message key and resolves server security", () => {
+    const components = {
+      messageBindings: {
+        keyed: { kafka: { key: { $ref: "#/components/schemas/OrderId" } } },
+      },
+      schemas: { OrderId: { examples: ["ord_7Hq2"], type: "string" } },
+      securitySchemes: { scram: { type: "scramSha512" } },
+    };
+    const model = buildModel({
+      components,
+      messages: [
+        named({
+          bindings: { $ref: "#/components/messageBindings/keyed" },
+          examples: [{ payload: { orderId: "ord_7Hq2" } }],
+        }),
+      ],
+      protocol: "kafka",
+      schemas: components.schemas,
+      servers: [
+        {
+          host: "kafka.acme.example:9093",
+          protocol: "kafka-secure",
+          security: [{ $ref: "#/components/securitySchemes/scram" }],
+        },
+        { host: "localhost:9092", protocol: "kafka" },
+      ],
+    });
+    expect(model.key).toBe("ord_7Hq2");
+    expect(model.servers[0]?.server.security).toStrictEqual([
+      { type: "scramSha512" },
+    ]);
+    // A server that declares no security gets no empty list.
+    expect(model.servers[1]?.server).toStrictEqual({
+      host: "localhost:9092",
+      protocol: "kafka",
+    });
+    const [kcat] = asyncSampleLanguages([], "kafka");
+    const values = defaultMessageValues(model);
+    expect(kcat?.build(buildMessage(model, values))).toBe(
+      [
+        `echo 'ord_7Hq2|{"orderId":"ord_7Hq2"}' | kcat -b 'kafka.acme.example:9093' -t 'user/signedup' -P -K '|' \\`,
+        "  -X security.protocol=SASL_SSL \\",
+        "  -X sasl.mechanisms=SCRAM-SHA-512 \\",
+        '  -X sasl.username="$KAFKA_USERNAME" \\',
+        '  -X sasl.password="$KAFKA_PASSWORD"',
+      ].join("\n")
+    );
+    // Picking the local broker drops the SASL flags and keeps the key.
+    expect(kcat?.build(buildMessage(model, { ...values, server: 1 }))).toBe(
+      `echo 'ord_7Hq2|{"orderId":"ord_7Hq2"}' | kcat -b 'localhost:9092' -t 'user/signedup' -P -K '|'`
+    );
+  });
+
+  it("writes a non-string key as JSON and skips a key it can't sample", () => {
+    const keyed = (key: AsyncApiSpecValue) =>
+      buildModel({
+        messages: [named({ bindings: { kafka: { key } } })],
+        protocol: "kafka",
+      }).key;
+    expect(keyed({ type: "integer" })).toBe("0");
+    expect(
+      keyed({ properties: { id: { type: "string" } }, type: "object" })
+    ).toBe('{"id":"string"}');
+    // An unresolvable ref samples to nothing, so the sample stays unkeyed.
+    expect(keyed({ $ref: "#/components/schemas/Missing" })).toBeUndefined();
+    expect(buildModel({ protocol: "kafka" }).key).toBeUndefined();
   });
 });
 

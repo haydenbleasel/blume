@@ -11,7 +11,10 @@ import { operationModel } from "../openapi/operation-model.ts";
 import Playground from "../openapi/Playground.astro";
 import { buildRequest, defaultValues } from "../openapi/request.ts";
 import RequestPanel from "../openapi/RequestPanel.astro";
-import { sampleLanguages } from "../openapi/snippets.ts";
+import {
+  DEFAULT_SAMPLE_LANGUAGES,
+  sampleLanguages,
+} from "../openapi/snippets.ts";
 import {
   endpointBody,
   endpointParameters,
@@ -46,6 +49,7 @@ const tryIt = spec.playground !== "simple" && api.playground.enabled;
       model={model}
       operation={`${spec.method} ${spec.target}`}
       proxy={api.playground.proxy}
+      proxyConfig="api"
       slug="api-pages"
     />
   )
@@ -53,7 +57,7 @@ const tryIt = spec.playground !== "simple" && api.playground.enabled;
 {
   !spec.requestExample && (
     <RequestPanel
-      languages={sampleLanguages([])}
+      languages={sampleLanguages(DEFAULT_SAMPLE_LANGUAGES)}
       responses={{}}
       sample={buildRequest(model, defaultValues(model))}
       schemas={{}}

@@ -88,6 +88,17 @@ const claudeRunner =
     );
   };
 
+const codexRunner: HeadlessRunner = async (bin, args) => {
+  const at = args.indexOf("--output-last-message");
+  const path = args[at + 1] ?? "";
+  const reader = args.some((arg) => arg.startsWith("mcp_servers."));
+  await writeFile(
+    path,
+    reader ? "The docs say Node 22.12.\n" : '{"pass": true}\n'
+  );
+  return ok("progress noise\n");
+};
+
 describe("runEval", () => {
   it("runs reader and judge per question and sums cost", async () => {
     const project = await projectFixture();
@@ -272,16 +283,6 @@ describe("runEval", () => {
     const evals: EvalsFile = {
       questions: [question({ id: "codex-run" })],
       version: 1,
-    };
-    const codexRunner: HeadlessRunner = async (bin, args) => {
-      const at = args.indexOf("--output-last-message");
-      const path = args[at + 1] ?? "";
-      const reader = args.some((arg) => arg.startsWith("mcp_servers."));
-      await writeFile(
-        path,
-        reader ? "The docs say Node 22.12.\n" : '{"pass": true}\n'
-      );
-      return ok("progress noise\n");
     };
     const result = await runEval({
       agent: "codex",

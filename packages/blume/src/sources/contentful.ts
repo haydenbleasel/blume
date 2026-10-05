@@ -21,10 +21,20 @@ export interface ContentfulOptions extends SharedSourceOptions {
    * / `sys.updatedAt`.
    */
   fields?: SourceFieldMap;
+  /**
+   * Delivery API host name. Defaults to `cdn.contentful.com`; a space with
+   * EU data residency reads from `cdn.eu.contentful.com`.
+   */
+  host?: string;
   /** Locale code to fetch; omit for the space's default locale. */
   locale?: string;
   /** Extra query parameters for the entries request (`"fields.section": "sdk"`). */
   params?: Record<string, string>;
+  /**
+   * Preview API host name for `--preview`. Defaults to
+   * `preview.contentful.com` (`preview.eu.contentful.com` in the EU).
+   */
+  previewHost?: string;
   /** Space id. */
   space: string;
 }
@@ -33,8 +43,10 @@ export const contentfulOptionsSchema = sharedSourceOptionsSchema.extend({
   contentType: z.string(),
   environment: z.string().optional(),
   fields: sourceFieldMapSchema.optional(),
+  host: z.string().optional(),
   locale: z.string().optional(),
   params: queryParamsSchema.optional(),
+  previewHost: z.string().optional(),
   space: z.string(),
 });
 

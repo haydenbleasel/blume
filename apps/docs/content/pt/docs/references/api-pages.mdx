@@ -43,7 +43,7 @@ Creates a user and sends them an invite.
 
 ## O playground e as amostras [#the-playground-and-samples]
 
-Os `ParamField`s da página viram as entradas do painel Try it, do mesmo jeito que os parâmetros de uma operação numa spec. Campos `path`, `query` e `header` são parâmetros, e campos `body` formam um corpo JSON. Os campos aninhados de um campo (dentro do [`Expandable`](/docs/content/components#expandable) dele) viram as propriedades de um objeto. Um `type` `string[]` é um array, e um tipo que não seja JSON, como `enum<string>`, é enviado como string. O `default` de um campo preenche o corpo, e o `placeholder` dele é o valor de exemplo que aparece nas amostras.
+Os `ParamField`s da página viram as entradas do painel Try it, do mesmo jeito que os parâmetros de uma operação numa spec. Campos `path`, `query` e `header` são parâmetros, e campos `body` formam um corpo JSON. Os campos aninhados de um campo (dentro do [`Expandable`](/docs/content/components#expandable) dele) viram as propriedades de um objeto. Um `type` `string[]` é um array, e um tipo que não seja JSON, como `enum<string>`, é enviado como string. O `default` de um campo preenche o corpo, e o `placeholder` dele é o valor de exemplo que aparece nas amostras. Um campo opcional do corpo que não tenha nenhum dos dois começa vazio e fica fora da requisição até o leitor preenchê-lo.
 
 Ao lado do painel, a página ganha amostras de requisição em cURL, JavaScript e Python. Se a página tiver seu próprio `RequestExample`, ele aparece no lugar delas.
 

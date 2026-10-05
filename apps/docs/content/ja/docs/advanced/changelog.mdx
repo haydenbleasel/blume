@@ -63,6 +63,17 @@ A big batch of components landed this release — columns, frames, trees, and to
 - 日付は設定された [`dateFormat`](/docs/configuration#date-format) に従いますが、行のグループですでに表示されている年は省略されます。
 - 下書きと `sidebar.hidden` のエントリはスキップされます。
 
+このページの見出しは **Changelog**（英語）で、その下に 1 行の説明が表示されます。設定ファイルの `changelog` で独自のものを指定できます。これらはページの `<title>`、メタディスクリプション、OG カード、そして `/changelog.md` にある Markdown ミラーの冒頭にも使われます:
+
+```ts blume.config.ts
+changelog: {
+  title: "Release notes",
+  description: "Every Acme SDK release, newest first.",
+},
+```
+
+どちらも、[ヘッダータブのラベル](/docs/content/i18n#per-locale-navigation)と同様に、ロケールコードからテキストへのマップも受け付けます。インデックスはデフォルトのロケールでレンダリングされるため、そのロケールのエントリが表示されます。どちらかを未設定のままにすると組み込みのテキストが維持され、それは [UI 文字列のオーバーライド](/docs/content/i18n#translated-ui)（`i18n.ui` 配下の `changelog.title` と `changelog.description`）で置き換えられます。
+
 このページは `/changelog` ルートが他に占有されていない場合にのみ表示されます。独自のデザインに置き換えるには、`pages/changelog.astro` に[カスタムページ](/docs/advanced/custom-pages)を追加してください — それが優先され、Blume はデフォルトのインデックスの生成を停止します。以前のタイムラインの構築に使われていた `<Update>` コンポーネントは、リリースノートをインラインで表示したいカスタムページ向けに引き続き提供されています。これは MDX コンポーネントには含まれていないため、`.astro` ページ自体でインポートしてください: `import Update from "blume/components/content/Update.astro";`。
 
 `/changelog` を指すヘッダーの[タブ](/docs/content/navigation#tabs)はこのインデックスを開きます — `href` は不要です。

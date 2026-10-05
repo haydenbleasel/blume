@@ -262,8 +262,9 @@ import { guideById } from "../_guides/guides.ts";
     <code>blume build</code> and <code>blume validate</code>, with its edits
     going through its usual permission prompts. Tell it to use the tables on
     this page, then review its diff and closing summary against the sections
-    below. The skill's general rules turn inline math into display math, so
-    check that too.
+    below. Check math too: each inline <code>$x$</code> or{" "}
+    <code>\(x\)</code> should read <code>$$x$$</code>, still inside its
+    sentence.
   </p>
 
   <h2>The example project</h2>
@@ -894,9 +895,10 @@ npx blume validate --strict`}
     An attribute list is still in an <code>.mdx</code> page:{" "}
     <code>{"{ .md-button }"}</code>, <code>{"{ #id }"}</code>, or{" "}
     <code>{"{ width=\"300\" }"}</code>. MDX reads braces as JavaScript. Remove
-    it, or write an anchor as <code>[#id]</code>. Blume flags an unspaced{" "}
-    <code>{"{#id}"}</code> as <code>BLUME_MDX_CURLY_ANCHOR</code> before the
-    compile, but the spaced form goes straight to the compiler.
+    it, or write an anchor as <code>[#id]</code>. Blume flags an anchor
+    written as <code>{"{#id}"}</code>, <code>{"{ #id }"}</code>, or{" "}
+    <code>{"{: #id }"}</code> as <code>BLUME_MDX_CURLY_ANCHOR</code> before
+    the compile, but other attribute lists go straight to the compiler.
   </p>
   <h3>A page fails with "to create a comment in MDX"</h3>
   <p>

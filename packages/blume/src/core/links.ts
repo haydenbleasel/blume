@@ -312,10 +312,13 @@ const checkPathLink = (
 ): LinkResult => {
   // Page routes carry the site-wide base; an absolute author path is written
   // as if mounted at root, so base it for the route lookup (idempotent — a
-  // relative link already resolved against the based `page.route`). A real
-  // route always wins over the asset-extension heuristic, so a dotted route
-  // (e.g. `/releases/v1.0`) isn't misread as a missing asset.
-  const authoredRoute = toRoute(withBasePath(ctx.basePath, resolved));
+  // relative link already resolved against the based `page.route`). A raw
+  // `<a href>` ships unbased, so it's looked up as written. A real route
+  // always wins over the asset-extension heuristic, so a dotted route (e.g.
+  // `/releases/v1.0`) isn't misread as a missing asset.
+  const authoredRoute = toRoute(
+    link.raw ? resolved : withBasePath(ctx.basePath, resolved)
+  );
   const route = servedRoute(authoredRoute, page, ctx);
   if (ctx.routes.has(route)) {
     return fragment ? checkAnchor(route, fragment, site, ctx, via) : null;
@@ -436,6 +439,12 @@ export interface FileRouteIndex {
    * into the reader's locale onto the fallback copy.
    */
   byDefaultNavPath: Map<string, string>;
+  /**
+   * A staged page's entry id (`<source>/<ref>`) → its route. A remote
+   * source's files have no path on disk, so a file link between two of them
+   * (`./02-errors.mdx`) resolves by entry id, as the rendered link does.
+   */
+  byEntryId: Map<string, string>;
 }
 
 /** The linking side of a file link: where the page's source lives. */
@@ -450,12 +459,19 @@ export const buildFileRouteIndex = (
 ): FileRouteIndex => {
   const bySource = new Map<string, string>();
   const byDefaultNavPath = new Map<string, string>();
+  const byEntryId = new Map<string, string>();
   for (const page of pages) {
-    const { sourcePath } = page;
-    if (!sourcePath || page.fallback) {
+    const { entryId, sourcePath } = page;
+    if (page.fallback) {
       continue;
     }
     const isDefault = page.locale === i18n?.defaultLocale;
+    if (entryId && (!byEntryId.has(entryId) || isDefault)) {
+      byEntryId.set(entryId, page.route);
+    }
+    if (!sourcePath) {
+      continue;
+    }
     if (!bySource.has(sourcePath) || isDefault) {
       bySource.set(sourcePath, page.route);
     }
@@ -463,7 +479,7 @@ export const buildFileRouteIndex = (
       byDefaultNavPath.set(normalize(page.navPath), page.route);
     }
   }
-  return { byDefaultNavPath, bySource };
+  return { byDefaultNavPath, byEntryId, bySource };
 };
 
 /**
@@ -492,11 +508,15 @@ const relativeTarget = (
   ctx: LinkContext
 ): string => {
   const base = { isIndex: isIndexPage(page), route: page.route };
-  const { navPath, sourcePath } = page;
-  const resolveFile = sourcePath
-    ? (path: string) =>
-        routeOfLinkedFile(ctx.fileRoutes, { navPath, sourcePath }, path)
-    : undefined;
+  const { entryId, navPath, sourcePath } = page;
+  let resolveFile: ((path: string) => string | undefined) | undefined;
+  if (sourcePath) {
+    resolveFile = (path) =>
+      routeOfLinkedFile(ctx.fileRoutes, { navPath, sourcePath }, path);
+  } else if (entryId) {
+    resolveFile = (path) =>
+      ctx.fileRoutes.byEntryId.get(normalize(join(dirname(entryId), path)));
+  }
   return (
     resolveRelativeHref(rawPath, base, resolveFile, (route) =>
       ctx.routes.has(route)
@@ -555,9 +575,14 @@ const classifyLink = (
     return fragment ? checkAnchor(page.route, fragment, site, ctx, via) : null;
   }
 
-  const resolved = rawPath.startsWith("/")
-    ? rawPath
-    : relativeTarget(page, rawPath, ctx);
+  let resolved = rawPath;
+  if (!rawPath.startsWith("/")) {
+    // A raw `<a href>` isn't rewritten, so the browser resolves it against
+    // the page's slashless URL: its parent directory, even on an index page.
+    resolved = link.raw
+      ? resolveRelative(page.route, rawPath, false)
+      : relativeTarget(page, rawPath, ctx);
+  }
   return checkPathLink(resolved, fragment, page, link, site, ctx, via);
 };
 
@@ -582,6 +607,8 @@ export const validateLinks = async (
     i18n?: LocaleRouting | null;
     publicDir: string | null;
     checkExternal?: boolean;
+    /** External URLs not to request (`--ignore`). Internal links are always checked. */
+    ignore?: (url: string) => boolean;
     /** Configured redirects; their `from` paths count as valid link targets. */
     redirects?: { from: string }[];
   }
@@ -629,8 +656,11 @@ export const validateLinks = async (
     });
   }
 
-  if (options.checkExternal && external.length > 0) {
-    diagnostics.push(...(await checkExternalLinks(external)));
+  // `--ignore` names URLs that can't be checked from where this runs: a
+  // placeholder host, a local server, a site that turns bots away.
+  const probed = external.filter((ref) => !options.ignore?.(ref.url));
+  if (options.checkExternal && probed.length > 0) {
+    diagnostics.push(...(await checkExternalLinks(probed)));
   }
 
   // A partial spliced into several pages (or every locale of one) yields the

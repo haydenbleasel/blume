@@ -19,7 +19,8 @@
 // deploy, and rebuild steps with the other CMS guides (Vercel deploy hooks,
 // VERCEL_ENV, and Deployment Protection checked against Vercel's docs), and
 // corrected the missing-token claim against cli/prepare.ts and
-// core/sources/cache.ts.
+// core/sources/cache.ts. Rechecked fields.order (sources/shared.ts,
+// core/sources/remote.ts) and init's .gitignore (cli/commands/init.ts).
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -246,17 +247,16 @@ export default defineConfig({
     <code>fields</code>, for example{" "}
     <code>{'fields: { body: "markdown" }'}</code>. The keys are{" "}
     <code>title</code>, <code>description</code>, <code>slug</code>,{" "}
-    <code>body</code>, and <code>lastModified</code> (which defaults to{" "}
-    <code>updatedAt</code>).
+    <code>body</code>, <code>lastModified</code> (which defaults to{" "}
+    <code>updatedAt</code>), and <code>order</code> (which has no default).
   </p>
   <p>
     The source reads its token from <code>STRAPI_API_TOKEN</code>. Blume loads{" "}
-    <code>.env.local</code> for you, so put it there and keep the file out of
-    Git:
+    <code>.env.local</code> for you, and <code>blume init</code> already
+    listed it in <code>.gitignore</code>, so put it there:
   </p>
   <CodeBlock
-    code={`echo "STRAPI_API_TOKEN=paste-your-token-here" >> .env.local
-echo ".env.local" >> .gitignore`}
+    code={`echo "STRAPI_API_TOKEN=paste-your-token-here" >> .env.local`}
     lang="bash"
   />
 
@@ -288,8 +288,10 @@ Every request to the Acme API needs an **API key**. Create one in [your settings
     belongs in an MDX file in <code>docs/</code>.
   </p>
   <p>
-    Strapi pages sit in a Guides group in the sidebar, sorted by title, since
-    Blume reads no order field from Strapi. To set the order, add{" "}
+    Strapi pages sit in a Guides group in the sidebar, sorted by title. To
+    set the order, add a Number field to Doc and name it in{" "}
+    <code>fields.order</code>, so editors control it in Strapi. Or keep the
+    order in the repository with{" "}
     <a href="/docs/content/meta">folder meta</a> for the prefix, listing
     slugs:
   </p>
@@ -473,9 +475,9 @@ export default defineMeta({
   <p>
     <code>BLUME_SOURCE_FETCH_FAILED</code> quotes Strapi's status. The token
     isn't set where the build runs, has expired, or is a Custom token without
-    find on Doc. Blume fetches before it checks for missing variables, so on a
-    fresh build this error comes without a <code>BLUME_MISSING_SECRET</code>{" "}
-    warning. A changed variable only applies to new builds, so redeploy.
+    find on Doc. An unset token also gets a{" "}
+    <code>BLUME_MISSING_SECRET</code> warning, printed before the fetch. A
+    changed variable only applies to new builds, so redeploy.
   </p>
   <h3>The build fails with 404 Not Found</h3>
   <p>

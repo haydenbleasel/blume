@@ -644,6 +644,19 @@ describe("frontmatter in scope", () => {
     );
   });
 
+  it("leaves a body expression as written; only props resolve", () => {
+    // The docs say so: `{frontmatter.owner}` in the page's text isn't a prop,
+    // so the Markdown copy keeps it verbatim.
+    const out = downlevelComponents(
+      "Owned by {frontmatter.owner}.\n\n<Callout title={frontmatter.owner}>Body.</Callout>\n",
+      undefined,
+      { owner: "Platform" }
+    );
+    expect(out).toBe(
+      "Owned by {frontmatter.owner}.\n\n> **Platform**\n>\n> Body.\n"
+    );
+  });
+
   it("still reports non-frontmatter scope as lossy", () => {
     const source = "<TypeTable type={imported.props} />\n";
     expect(downlevelComponents(source, undefined, { a: 1 })).toBe(source);

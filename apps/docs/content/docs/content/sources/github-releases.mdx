@@ -20,12 +20,20 @@ export default defineConfig({
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
+        // baseUrl: "https://github.acme.com/api/v3", // GitHub Enterprise Server
       }),
     ],
   },
 });
 ```
 
-Each release maps to the changelog fields automatically: its name (or tag) becomes the title, its published date drives the timeline order, the tag becomes `changelog.version`, and prereleases are tagged `Prerelease` (others `Release`). The notes render as the entry body, with two changes to their links: a link that isn't a web, mail, phone, or relative address (a `javascript:` URL, say) keeps only its label, and a link back to your own [`deployment.site`](/docs/deployment) is rewritten to its root-relative path, so it follows preview deploys and your deployment base. Give the source a `prefix` so its release pages nest under a route like `/changelog/v1-2-0`.
+Each release maps to the changelog fields automatically: its name (or tag) becomes the title, its published date drives the timeline order, the tag becomes `changelog.version`, and prereleases are tagged `Prerelease`, drafts (when `drafts` includes them) `Draft`, and the rest `Release`. A draft is published like any other release, so include drafts only in a build readers don't see. A summary of the notes becomes the page's meta description, which the changelog's RSS feed uses as the item's description too. The notes render as the entry body, with two changes to their links: a link that isn't a web, mail, phone, or relative address (a `javascript:` URL, say) keeps only its label, and a link back to your own [`deployment.site`](/docs/deployment) is rewritten to its root-relative path, so it follows preview deploys and your deployment base. Give the source a `prefix` so its release pages nest under a route like `/changelog/v1-2-0`. The timeline at `/changelog` takes its title and description from the top-level [`changelog`](/docs/advanced/changelog#the-index-page) config, not from the source:
 
-A private repo authenticates with the `GITHUB_TOKEN` environment variable — the same token the other GitHub features use, never inlined into your config; the adapter declares it, so a build without it warns. Like [every remote source](/docs/content/sources#caching-and-offline-builds) it's cached under `.blume/cache/<source>/` and served offline if the API is unreachable. Because a changelog is supplementary, a fetch failure with no cache (say a CI build without a token) degrades to an empty changelog with a warning rather than failing the build — set `GITHUB_TOKEN` in your CI and deploy environments to populate it.
+```ts blume.config.ts
+changelog: {
+  title: "SDK releases",
+  description: "Every release of the Acme SDK, from GitHub.",
+},
+```
+
+A private repo authenticates with the `GITHUB_TOKEN` environment variable — the same token the other GitHub features use, never inlined into your config; the adapter declares it, so a build without it warns. For a repository on GitHub Enterprise Server, set `baseUrl` to its REST API (`https://<host>/api/v3`); `GITHUB_TOKEN` is sent there, so it must be a token for that server. Like [every remote source](/docs/content/sources#caching-and-offline-builds) it's cached under `.blume/cache/<source>/` and served offline if the API is unreachable. Because a changelog is supplementary, a fetch failure with no cache (say a CI build without a token) degrades to an empty changelog with a warning rather than failing the build — set `GITHUB_TOKEN` in your CI and deploy environments to populate it.

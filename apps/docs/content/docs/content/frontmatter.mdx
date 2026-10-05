@@ -5,6 +5,8 @@ description: Every frontmatter field a page accepts, all optional — title, des
 
 Every page accepts the following frontmatter. All fields are optional.
 
+Frontmatter is YAML, so quote a value that holds a colon followed by a space, like `description: "Setup: the easy way"`. Unquoted, YAML reads the second colon as the start of a nested key, and Blume reports the file and line as `BLUME_FRONTMATTER_INVALID`.
+
 <TypeTable
   type={{
     title: { type: "string", description: "Page title." },
@@ -163,7 +165,7 @@ seo:
     creator: "@jane"
 ```
 
-`noindex` emits a robots `noindex`, drops the page from the sitemap, and skips its structured data. `x.creator` credits the page to an X account (`twitter:creator`) — a guest post's author, say. See [Metadata](/docs/discoverability/metadata#per-page-overrides) for every field.
+`noindex` emits a robots `noindex`, drops the page from the sitemap, and skips its structured data. A `canonical` that names another URL drops the page from the sitemap too, since the sitemap lists canonical URLs only. `x.creator` credits the page to an X account (`twitter:creator`) — a guest post's author, say. See [Metadata](/docs/discoverability/metadata#per-page-overrides) for every field.
 
 ## Search
 
@@ -175,7 +177,7 @@ search:
   boost: 3
 ```
 
-`exclude` keeps the page out of search, and `tags` groups it under a filter in the search dialog. `keywords` are extra terms the page is found by, beyond its own text. `boost` multiplies the page's relevance: above 1 ranks it higher, below 1 lower. See [Ranking](/docs/configuration/search#ranking).
+`exclude` keeps the page out of search, and `tags` labels its record for a hosted search adapter to filter on (see [Tags](/docs/configuration/search#tags)). `keywords` are extra terms the page is found by, beyond its own text. `boost` multiplies the page's relevance: above 1 ranks it higher, below 1 lower. See [Ranking](/docs/configuration/search#ranking).
 
 ## AI
 
@@ -184,7 +186,7 @@ ai:
   exclude: true
 ```
 
-`ai.exclude` keeps the page out of [`llms.txt` and `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page). The page still renders, stays in search, and keeps its place in the sitemap.
+`ai.exclude` keeps the page out of [`llms.txt` and `llms-full.txt`](/docs/discoverability/llms-txt#excluding-a-page) and out of the page map in your [site's skill](/docs/discoverability/agent-discovery#your-sites-skill). The page still renders, stays in search, the [MCP server](/docs/discoverability/mcp), and the [JSON API](/docs/discoverability/json-api), and keeps its place in the sitemap.
 
 ## Changelog
 

@@ -49,6 +49,7 @@ export const fi: UIStringsOverride = {
   banner: { dismiss: "Sulje ilmoitus" },
   changelog: {
     description: "Tuotepäivitykset ja julkaisutiedot.",
+    empty: "Muutoslokissa ei ole vielä merkintöjä.",
     title: "Muutosloki",
   },
   consent: {

@@ -78,6 +78,49 @@ describe(searchDocs, () => {
   });
 });
 
+const localeFrom = (data: AskData, path?: string) =>
+  readerScope(data, byRoute, path === undefined ? undefined : { path }).filters
+    .locale;
+
+describe(readerScope, () => {
+  /** The same snapshot on a site whose default locale is English. */
+  const I18N: AskData = { ...DATA, defaultLocale: "en" };
+
+  it("keeps a question from outside the docs to the default locale", () => {
+    // The homepage and a custom page aren't in the snapshot, and a
+    // cross-origin caller may send no page at all.
+    expect(localeFrom(I18N, "/")).toBe("en");
+    expect(localeFrom(I18N, "/pricing")).toBe("en");
+    expect(localeFrom(I18N)).toBe("en");
+    // A single-locale site has nothing to filter.
+    expect(localeFrom({ ...DATA, documents: DATA.documents.slice(0, 1) })).toBe(
+      undefined
+    );
+  });
+
+  it("takes the locale a path outside the docs names", () => {
+    expect(localeFrom(I18N, "/de")).toBe("de");
+    expect(localeFrom(I18N, "/DE/preise/")).toBe("de");
+    expect(localeFrom(DATA, "/de")).toBe("de");
+  });
+
+  it("scopes the model's own searches the same way", async () => {
+    const home = createAskTools(I18N)({ path: "/" });
+    const options = { context: {}, messages: [], toolCallId: "1" };
+    const english = await home.search_docs?.execute?.(
+      { query: "Narration Erzählung" },
+      options
+    );
+    expect(english).toContain("## Narration (/docs/narration)");
+    expect(english).not.toContain("/de/docs/narration");
+    const german = await createAskTools(I18N)({
+      path: "/de",
+    }).search_docs?.execute?.({ query: "Narration Erzählung" }, options);
+    expect(german).toContain("## Erzählung (/de/docs/narration)");
+    expect(german).not.toContain("(/docs/narration)");
+  });
+});
+
 describe(readPage, () => {
   it("reads a page by route, path, or full URL", () => {
     expect(readPage(DATA, byRoute, "/docs/narration")).toStartWith(
@@ -240,6 +283,9 @@ afterAll(async () => {
   );
 });
 
+const resolve = (specifier: string): string =>
+  JSON.stringify(pathToFileURL(Bun.resolveSync(specifier, PKG_ROOT)).href);
+
 const loadRoute = async (): Promise<AskRoute> => {
   const parsed = blumeConfigSchema.parse({
     ai: {
@@ -261,8 +307,6 @@ const loadRoute = async (): Promise<AskRoute> => {
   dirs.push(dir);
   const dataFile = join(dir, "ask-data.json");
   await writeFile(dataFile, JSON.stringify(DATA), "utf-8");
-  const resolve = (specifier: string): string =>
-    JSON.stringify(pathToFileURL(Bun.resolveSync(specifier, PKG_ROOT)).href);
   const source = askEndpointTemplate(backend, {
     tools: parsed.ai.assistant?.tools,
   })

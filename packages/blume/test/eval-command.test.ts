@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { stripVTControlCharacters } from "node:util";
 
 import { dirname, join } from "pathe";
 
@@ -158,6 +159,25 @@ describe("blume eval", () => {
     expect(stderr).toContain("docs/guides/install.md");
   });
 
+  it("reports a warning-severity miss as a warning and passes the gate", async () => {
+    const root = await fixture({
+      ...PROJECT_FILES,
+      "evals.yaml": `${EVALS}    severity: warning\n`,
+    });
+    const bin = await fakeClaude(root);
+    const { exitCode, stderr } = await runClaude(root, bin, {
+      FAKE_VERDICT: FAIL_VERDICT,
+    });
+    expect(exitCode).toBe(0);
+    // CI forces color, which wraps the ⚠ in its own escape codes.
+    expect(stripVTControlCharacters(stderr)).toContain(
+      "⚠ docs/guides/install.md"
+    );
+    expect(stderr).toContain("0 passed · 1 warned");
+    expect(stderr).not.toContain("fix:");
+    expect(stderr).not.toContain("failed");
+  });
+
   it("respects --threshold", async () => {
     const root = await fixture();
     const bin = await fakeClaude(root);
@@ -204,8 +224,36 @@ describe("blume eval", () => {
       join(root, "interactive-prompt.txt"),
       "utf-8"
     );
-    expect(prompt).toContain("blume eval");
+    expect(prompt).toContain("run `blume eval --agent claude` to verify");
     expect(prompt).toContain("report.json");
+  });
+
+  it("tells the --fix agent to rerun with the run's own flags", async () => {
+    const root = await fixture({
+      ...PROJECT_FILES,
+      "qa evals.yaml": EVALS,
+    });
+    const bin = await fakeClaude(root);
+    const { exitCode } = await runClaude(
+      root,
+      bin,
+      { FAKE_VERDICT: FAIL_VERDICT },
+      "--file",
+      "qa evals.yaml",
+      "--threshold",
+      "0.5",
+      "--timeout",
+      "60",
+      "--fix"
+    );
+    expect(exitCode).toBe(0);
+    const prompt = await readFile(
+      join(root, "interactive-prompt.txt"),
+      "utf-8"
+    );
+    expect(prompt).toContain(
+      "run `blume eval --agent claude --file 'qa evals.yaml' --threshold 0.5 --timeout 60` to verify"
+    );
   });
 
   it("errors clearly without an evals file", async () => {

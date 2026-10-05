@@ -7,7 +7,12 @@ import { sharedSourceOptionsSchema } from "./shared.ts";
 
 /** Options for {@link githubReleases}. */
 export interface GithubReleasesOptions extends SharedSourceOptions {
-  /** Include draft releases (needs a token with repo write access). */
+  /**
+   * The GitHub REST API base URL. Defaults to `https://api.github.com`; a
+   * GitHub Enterprise Server's is `https://<host>/api/v3`.
+   */
+  baseUrl?: string;
+  /** Include draft releases, tagged `Draft` (needs a token with repo write access). */
   drafts?: boolean;
   /** Cap the number of releases materialized, newest-first. Defaults to 100. */
   limit?: number;
@@ -20,6 +25,7 @@ export interface GithubReleasesOptions extends SharedSourceOptions {
 }
 
 export const githubReleasesOptionsSchema = sharedSourceOptionsSchema.extend({
+  baseUrl: z.string().optional(),
   drafts: z.boolean().optional(),
   limit: z.number().positive().optional(),
   owner: z.string(),

@@ -3,6 +3,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { close, createIndex } from "pagefind";
 import { dirname, join } from "pathe";
 
+/** The part of `pagefind-entry.json` that counts the index's pages. */
+interface PagefindEntry {
+  languages: Record<string, { page_count: number }>;
+}
+
 /**
  * Build a local Pagefind search index over the built site. Pagefind indexes
  * every rendered page except those whose `<html>` carries
@@ -23,7 +28,9 @@ import { dirname, join } from "pathe";
  * Pagefind/pagefind#1272; switch back to `writeFiles()` once a release ships
  * that fix.
  *
- * Returns the number of pages indexed.
+ * Returns the number of pages indexed: the index's own count, summed over its
+ * languages from `pagefind-entry.json`. `addDirectory`'s `page_count` counts
+ * every HTML file it read, including the ones kept out of the index.
  */
 export const buildSearchIndex = async (outDir: string): Promise<number> => {
   const { index } = await createIndex({});
@@ -34,7 +41,7 @@ export const buildSearchIndex = async (outDir: string): Promise<number> => {
   // These awaits are strictly ordered, not independent: the directory must be
   // indexed before its files are read, and the index closed only after.
   // oxlint-disable-next-line react-doctor/async-parallel
-  const result = await index.addDirectory({ path: outDir });
+  await index.addDirectory({ path: outDir });
   const { files } = await index.getFiles();
   await close();
 
@@ -49,5 +56,16 @@ export const buildSearchIndex = async (outDir: string): Promise<number> => {
     files.map((file) => writeFile(join(searchDir, file.path), file.content))
   );
 
-  return result.page_count;
+  // Pagefind always writes the entry file, listing no languages when nothing
+  // was indexed.
+  const entry = files.find((file) => file.path === "pagefind-entry.json");
+  // SAFETY: the entry file is Pagefind's JSON, which counts each language's
+  // pages in `page_count`.
+  const { languages } = JSON.parse(
+    new TextDecoder().decode(entry?.content)
+  ) as PagefindEntry;
+  return Object.values(languages).reduce(
+    (sum, language) => sum + language.page_count,
+    0
+  );
 };

@@ -8,8 +8,10 @@
 // a throwaway fixture: no diagnostics, and the list_pages and search_docs
 // output shown here is what the handler returned, with the dev server URL as
 // the site. The same harness produced the BLUME_FRONTMATTER_INVALID and
-// BLUME_CONFIG_INVALID messages, the ignored non-string filter, and a hidden
-// page that list_pages and search_docs skip but get_page still returns.
+// BLUME_CONFIG_INVALID messages and a hidden page that list_pages and
+// search_docs skip but get_page still returns. Updated for main: filters
+// match a number or boolean against its string form (ai/mcp/query.ts,
+// 0a38c27f); read in the source, not rerun.
 // Claude Code's --scope and --header flags and Cloudflare Access service
 // token headers were checked against their official docs. Not yet run end to
 // end: the rendered pages, directory cards, and `{frontmatter.status}` Callout
@@ -307,8 +309,9 @@ Recovering endpoints see a gradual ramp instead of a burst. A delivery can now a
     callout reads the status from the frontmatter, so it can't drift from the
     field agents filter on, and the page's Markdown copy for agents shows the
     same "Status: accepted". Keep frontmatter references in component props
-    like <code>title</code>: an expression in a component's body isn't
-    resolved in that Markdown copy.
+    like <code>title</code>: an expression in the page's own text, like{" "}
+    <code>{"{frontmatter.owner}"}</code>, stays as written in that{" "}
+    <a href="/docs/discoverability/markdown">Markdown copy</a>.
   </p>
   <p>
     The <code>0001-</code> prefix sorts the records in the sidebar and is
@@ -648,10 +651,11 @@ export default defineConfig({
   <p>
     Nothing: facet values match exactly and are case-sensitive, so{" "}
     <code>"Accepted"</code> doesn't find <code>accepted</code>. Check the
-    values <code>list_pages</code> reports. Everything: only string values
-    count as filters, and any other value is dropped without an error, so{" "}
-    <code>{'{"status": 1}'}</code> filters nothing. Send numbers and booleans as
-    strings, like <code>"1"</code> or <code>"true"</code>.
+    values <code>list_pages</code> reports. Everything: a filter value must be
+    a string, number, or boolean, and any other shape is dropped without an
+    error, so <code>{'{"status": ["accepted"]}'}</code> filters nothing. Send
+    one value per key. A number or boolean matches its string form, so{" "}
+    <code>1</code> and <code>"1"</code> find the same pages.
   </p>
   <h3>A document doesn't show up in list_pages or search_docs</h3>
   <p>

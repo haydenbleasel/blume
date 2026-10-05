@@ -25,8 +25,9 @@ Findings are grouped by check rather than listed per page, so the report reads a
 ## Flags
 
 - `--fail-on error|warning|info` — the CI gate: exit non-zero at this severity or above. Defaults to `error`; `--strict` is an alias for `--fail-on warning`.
-- `--url <origin>` — also probe a live deployment for status codes, response headers, and redirect chains.
+- `--url <origin>` — also probe a live deployment for status codes, response headers, and configured redirects.
 - `--external` — probe outbound links over the network.
+- `--ignore <glob>` — with `--external`, don't probe an outbound link whose URL matches the glob, like `--ignore "https://api.acme.example/**"`. Repeat the flag for more patterns. It matches the way [`blume validate --ignore`](/docs/cli/validate#flags) does, and internal links are always checked.
 - `--only <check|category>` / `--skip <check|category>` — narrow the report to, or away from, these checks or categories (comma-separated). A term that names no check or category is an error that suggests the closest one, so a typo can't quietly empty the report.
 - `--list-checks` — print every check the audit can report, then exit.
 - `--verbose` — list every affected page with each finding's full detail, instead of the first few.
@@ -44,14 +45,18 @@ blume audit --fail-on warning    # also fails on warnings
 
 ## Checking a live deployment
 
-Some things only the real server can tell you: whether a page that exists in `dist/` actually 404s behind a bad rewrite, whether responses are compressed, and whether an `X-Robots-Tag` header is quietly deindexing a page whose HTML looks perfectly fine. Point the audit at a deployment to add those checks:
+Some things only the real server can tell you: whether a page that exists in `dist/` actually 404s behind a bad rewrite, whether responses are compressed, whether an `X-Robots-Tag` header is quietly deindexing a page whose HTML looks perfectly fine, and whether each old URL in [`redirects`](/docs/deployment#redirects) really redirects where you configured it. Point the audit at a deployment to add those checks:
 
 ```bash
 blume audit --url https://docs.example.com
 blume audit --url https://docs.example.com --external   # also probe outbound links
 ```
 
-Outbound links are graded rather than flatly failed: a 404 is a broken link you can fix, while a 403 or 5xx is usually rate limiting or someone else's outage and is reported as a warning.
+These requests go out as a plain HTTP client, not as a crawler: the audit doesn't send Googlebot's or an AI crawler's user agent, since a host's bot protection can block a client pretending to be one. A firewall or CDN rule that treats crawlers differently isn't exercised, so check it with the crawler's own tools, such as Google Search Console's URL Inspection.
+
+The audit requests every exact redirect's old URL (a pattern names no single URL to request). One that 404s is an error. One that answers 200 is a warning: a host that doesn't read the redirect file the build wrote serves the build's meta-refresh page there instead of an HTTP redirect, which readers follow but crawlers may not. See [Redirects](/docs/deployment#redirects) for what each host reads.
+
+Outbound links are graded rather than flatly failed: a 404 or 410, or a host name that doesn't resolve, is a broken link you can fix, while any other error status (a 401 or 403 from a site that turns bots away, a 429, a 5xx), a refused connection, or a timeout is usually rate limiting or someone else's outage and is reported as a warning. Leave out URLs the audit can't check from where it runs, like a placeholder domain or a local server, with `--ignore`.
 
 ## Fixing the findings with an agent
 
@@ -78,7 +83,7 @@ Limits worth stating plainly:
 Anything the audit did not run is reported as skipped rather than silently passing:
 
 ```
-⊘ network      skipped — pass --url <origin> (11 checks)
+⊘ network      skipped — pass --url <origin> (12 checks)
 ⊘ external     skipped — pass --external (2 checks)
 ```
 
@@ -195,7 +200,7 @@ Fix: Give each page a distinct `description`.
 
 `BLUME_AUDIT_DUPLICATE_CONTENT` · warning · from the built HTML
 
-Fix: Merge the pages, or set `seo.canonical` on all but one.
+Fix: Merge the pages, or point `seo.canonical` on all but one at the page to index.
 
 ### Indexability
 
@@ -273,6 +278,8 @@ Fix: Remove the X-Robots-Tag header, or align it with the page's robots meta.
 
 Fix: Fix the link target, or create the page it points at.
 
+Under [`deployment.base`](/docs/deployment#subpath-deploys), a root-relative link without the base is reported here, since the host serves nothing of this build there. A full URL on the same host outside the base isn't: that's how a page links to another app the host serves beside the docs.
+
 #### Page has links to a redirect [#link-to-redirect]
 
 `BLUME_AUDIT_LINK_TO_REDIRECT` · warning · from the built HTML
@@ -345,13 +352,21 @@ Fix: Use a real redirect in `blume.config.ts` instead of a meta refresh.
 
 `BLUME_AUDIT_REDIRECT_SOURCE_IS_PAGE` · error · from the built HTML
 
-Fix: Remove the redirect, or delete the page it shadows — the page wins and the redirect never fires.
+Fix: Remove the redirect, or delete the page it shadows — a path can't be both, and which one readers get depends on the host.
 
 #### HTTPS to HTTP redirect [#redirect-to-http]
 
 `BLUME_AUDIT_REDIRECT_TO_HTTP` · error · needs `--url`
 
 Fix: Redirect to the HTTPS URL.
+
+#### Live site doesn't redirect as configured [#redirect-not-served]
+
+`BLUME_AUDIT_REDIRECT_NOT_SERVED` · error · needs `--url`
+
+Fix: Deploy the redirect file your host reads (see Redirects in the deployment docs), or name the host in `deployment`.
+
+A warning instead when the old URL answers 200 (the meta-refresh page) or redirects somewhere other than the configured destination.
 
 ### Social cards
 
@@ -509,7 +524,7 @@ Fix: Load the subresource over HTTPS — browsers block mixed content.
 
 `BLUME_AUDIT_INDEXABLE_PAGE_NOT_IN_SITEMAP` · warning · from the built HTML
 
-Fix: Remove `draft`/`hidden`/`noindex` from the page's frontmatter if it should be indexed.
+Fix: Remove `draft`/`hidden`/`noindex` from the page's frontmatter if it should be indexed. A `public/sitemap.xml` replaces the generated sitemap, so add the page there or delete that file.
 
 #### Noindex page in sitemap [#noindex-in-sitemap]
 
@@ -578,6 +593,14 @@ Fix: Every robots.txt line must be a `Field: value` directive or a comment.
 `BLUME_AUDIT_ROBOTS_DISALLOWS_INDEXABLE` · error · from the built HTML
 
 Fix: A page can't be both disallowed in robots.txt and advertised in the sitemap.
+
+#### robots.txt blocks one crawler from pages in the sitemap [#robots-blocks-crawler]
+
+`BLUME_AUDIT_ROBOTS_BLOCKS_CRAWLER` · warning · from the built HTML
+
+Fix: Narrow or remove the rule in that crawler's `User-agent` group if it should read these pages. Blocking an AI crawler on purpose is fine; skip this check.
+
+A crawler named in its own `User-agent` group follows only that group, so a rule there (`User-agent: GPTBot` then `Disallow: /`) shuts it out while every other crawler reads the page. The audit reports each crawler once, at the rule that blocks its first page.
 
 #### robots.txt does not reference the sitemap [#robots-sitemap-missing]
 

@@ -266,8 +266,9 @@ export const relativeLinksPlugin = (
 
   // A component's string `href` (`<Card href="./install">`) is the same kind
   // of link, and `blume validate` reads it as one. Lowercase elements are
-  // raw HTML in a `.md` page, which neither rewrites nor checks, so only
-  // components are rewritten; an expression-valued `href={…}` is left alone.
+  // raw HTML in a `.md` page, which isn't rewritten, so only components are
+  // rewritten (validate reads a raw `<a href>` as the browser does); an
+  // expression-valued `href={…}` is left alone.
   const rewriteHref = (node: JsxNode, ctx: RelativeLinksContext): void => {
     if (!node.name || !COMPONENT_NAME.test(node.name)) {
       return;

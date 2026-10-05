@@ -508,14 +508,14 @@ describe("buildLlmsFiles — navigation structure", () => {
   });
 });
 
-describe("buildLlmsFiles — agents.llmsTxt.openapi", () => {
-  const apiPage = (): PageRecord =>
-    makePage("openapi:reference/get-pet.mdx", "/reference/get-pet", "Get Pet", {
-      body: { format: "mdx", text: "API operation body." },
-      navPath: "reference/get-pet.mdx",
-      source: { name: "openapi", ref: "reference/get-pet.mdx" },
-    });
+const apiPage = (): PageRecord =>
+  makePage("openapi:reference/get-pet.mdx", "/reference/get-pet", "Get Pet", {
+    body: { format: "mdx", text: "API operation body." },
+    navPath: "reference/get-pet.mdx",
+    source: { name: "openapi", ref: "reference/get-pet.mdx" },
+  });
 
+describe("buildLlmsFiles — agents.llmsTxt.openapi", () => {
   it("includes generated API reference pages by default", async () => {
     const { full, index } = await buildLlmsFiles(
       makeProject([makePage("a.md", "/a", "Alpha"), apiPage()])
@@ -748,10 +748,10 @@ describe("markdownRoutePaths", () => {
   });
 });
 
-describe("component downleveling in agent surfaces", () => {
-  const tableProject = (): BlumeProject =>
-    makeProject([makePage("t.md", "/t", "Table")]);
+const tableProject = (): BlumeProject =>
+  makeProject([makePage("t.md", "/t", "Table")]);
 
+describe("component downleveling in agent surfaces", () => {
   it("stores a downleveled md variant beside the verbatim source", async () => {
     const raw = await buildRawMarkdown(tableProject());
     expect(raw["/t"]?.mdx).toContain('<Callout type="warning">');
@@ -829,10 +829,10 @@ describe("component downleveling in agent surfaces", () => {
   });
 });
 
-describe("agent-facing markdown honors <Visibility>", () => {
-  const visProject = (): BlumeProject =>
-    makeProject([makePage("v.md", "/v", "Vis")]);
+const visProject = (): BlumeProject =>
+  makeProject([makePage("v.md", "/v", "Vis")]);
 
+describe("agent-facing markdown honors <Visibility>", () => {
   it("filters llms-full.txt: web removed, agents unwrapped, fences kept", async () => {
     const { full } = await buildLlmsFiles(visProject());
     expect(full).not.toContain("Web-only body.");
@@ -1514,6 +1514,34 @@ describe("createAskContext", () => {
     expect(system).not.toContain("Install EN");
   });
 
+  it("keeps a question from outside the docs to one locale", async () => {
+    const documents = ["en", "fr", "de"].map((locale) => ({
+      content: `single sign-on setup (${locale})`,
+      description: "",
+      locale,
+      route: `/${locale}/sso`,
+      title: `SSO ${locale.toUpperCase()}`,
+    }));
+    const ground = createAskContext({
+      defaultLocale: "en",
+      documents,
+      site: null,
+    });
+    // The homepage isn't a docs page: every translation used to compete.
+    const home = await ground([{ content: "single sign-on", role: "user" }], {
+      path: "/",
+    });
+    expect(home).toContain("SSO EN");
+    expect(home).not.toContain("SSO FR");
+    expect(home).not.toContain("SSO DE");
+    // A localized landing page keeps to its own locale.
+    const french = await ground([{ content: "single sign-on", role: "user" }], {
+      path: "/fr",
+    });
+    expect(french).toContain("SSO FR");
+    expect(french).not.toContain("SSO EN");
+  });
+
   it("grounds a CJK question when the snapshot carries a default locale", async () => {
     const documents = [
       {
@@ -1524,8 +1552,12 @@ describe("createAskContext", () => {
         title: "ポイントの扱い",
       },
     ];
-    // Without the locale, the default tokenizer finds nothing to ground on.
-    const unsegmented = createAskContext({ documents, site: null });
+    // Without a locale, the default tokenizer finds nothing to ground on: a
+    // site that never declared its language tags every page `en`.
+    const unsegmented = createAskContext({
+      documents: documents.map((page) => ({ ...page, locale: "en" })),
+      site: null,
+    });
     expect(
       await unsegmented([{ content: "ポイント", role: "user" }])
     ).toBeUndefined();
@@ -1537,6 +1569,18 @@ describe("createAskContext", () => {
     });
     const system = await ground([{ content: "ポイント", role: "user" }]);
     expect(system).toContain("ポイントの扱い (/ja/points)");
+
+    // A Japanese translation of an English-default site grounds it too,
+    // asked from a Japanese page (a question from nowhere keeps to English).
+    const translated = createAskContext({
+      defaultLocale: "en",
+      documents,
+      site: null,
+    });
+    const answer = await translated([{ content: "ポイント", role: "user" }], {
+      path: "/ja",
+    });
+    expect(answer).toContain("ポイントの扱い (/ja/points)");
   });
 
   it("truncates long excerpts and returns undefined for an empty corpus", async () => {

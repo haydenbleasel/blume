@@ -41,7 +41,7 @@ navigation: {
 
 ## Generierte Beispiele [#generated-examples]
 
-Jede Operationsseite enthält eine vollständige, gültige Beispiel-Operation – eine Variable pro Argument, typisiert anhand des Schemas, mit einem Selection Set begrenzter Tiefe über den Rückgabetyp. Dazu kommen passende Beispielvariablen und eine Beispielantwort, die dieselbe Selection widerspiegelt. Die Code-Beispiele zeigen den exakten HTTP-Request (ein JSON-`POST` von `{ query, variables }`) in jeder konfigurierten Sprache. Dir stehen dieselben [Sprachen](/docs/references/openapi#code-samples-and-schemas) wie bei `openapi()` zur Verfügung, und mit `codeSamples: false` werden keine angezeigt:
+Jede Operationsseite enthält eine vollständige, gültige Beispiel-Operation – eine Variable pro Argument, typisiert anhand des Schemas, mit einem Selection Set begrenzter Tiefe über den Rückgabetyp. Dazu kommen passende Beispielvariablen und eine Beispielantwort, die dieselbe Selection widerspiegelt. Deklariert ein Argument einen Standardwert, beginnt die zugehörige Variable mit diesem Wert, und als deprecated markierte Felder lässt die Selection weg. Die Code-Beispiele zeigen den exakten HTTP-Request (ein JSON-`POST` von `{ query, variables }`) in jeder konfigurierten Sprache. Dir stehen dieselben [Sprachen](/docs/references/openapi#code-samples-and-schemas) wie bei `openapi()` zur Verfügung, und mit `codeSamples: false` werden keine angezeigt:
 
 ```ts blume.config.ts lineNumbers
 reference: [
@@ -82,6 +82,18 @@ reference: [
 ## Try-it-Playground
 
 Query- und Mutation-Seiten zeigen ein interaktives Panel. Dort bearbeitest du den Request-Body (die Query und die Variablen), richtest ihn auf deinen Endpoint oder eine eigene URL und schickst ihn ab. Die Code-Beispiele aktualisieren sich dabei live, sodass das, was du kopierst, Byte für Byte dem gesendeten Request entspricht. Mit `playground: false` schaltest du das Panel ab. Subscription-Seiten zeigen stattdessen die generierte Operation und ein Beispiel-Event. Subscriptions laufen nämlich über einen zustandsbehafteten Transport (WebSocket oder SSE), und den unterstützt der einzelne HTTP-`POST` des Playgrounds nicht.
+
+Ein Schema verrät nicht, wie sich seine API authentifiziert. Deshalb sendet das Panel keine Zugangsdaten, bis du sie mit `auth` festlegst. Die Option hat dieselbe Form wie [`api.auth`](/docs/references/api-pages#site-defaults) für von Hand geschriebene Endpoint-Seiten: `method` ist `bearer`, `basic`, `key` (ein API-Key in einem Header) oder `none`, und `name` ist der Header, in dem der API-Key mitgeschickt wird (standardmäßig `x-api-key`). Jede Operationsseite bekommt dann einen Abschnitt **Autorisierung**, das Panel ein Feld für Zugangsdaten, das genauso funktioniert wie das [bei OpenAPI](/docs/references/openapi#credentials), und die Code-Beispiele Platzhalter-Zugangsdaten. Ein `auth` pro Quelle überschreibt das des Adapters:
+
+```ts blume.config.ts lineNumbers
+reference: [
+  graphql({
+    spec: "./schema.graphql",
+    endpoint: "https://api.example.com/graphql",
+    auth: { method: "bearer" },
+  }),
+],
+```
 
 Wenn deine GraphQL-API keine Cross-Origin-Requests von der Doku-Seite erlaubt, leite die Requests über einen CORS-Proxy. Das kann eine eigene URL sein oder `true` für den integrierten `/_api-proxy`-Endpoint (unter deinem `basePath`, falls du einen gesetzt hast). Der integrierte Endpoint braucht [Server-Output](/docs/deployment#server-rendering), also einen Host-Adapter wie `deployment: vercel()` aus `blume/deploy`. Der integrierte Proxy leitet nur an Origins weiter, die in deinen dokumentierten Specs stehen: jeden konfigurierten GraphQL-`endpoint` und jede absolute `servers[].url` aus einer dokumentierten [OpenAPI-Spec](/docs/references/openapi). So kann niemand ein öffentliches Doku-Deployment auf andere Hosts richten. Deshalb braucht ein funktionierender Proxy einen `endpoint`. Ohne ihn hat der Proxy für diese Referenz keinen erlaubten Origin und lehnt jeden Request ab (der Build warnt dich davor). Es gelten dasselbe Body-Limit, dieselbe Header-Weiterleitung und dieselben Response-Header wie beim [OpenAPI-Proxy](/docs/references/openapi#try-it-playground).
 

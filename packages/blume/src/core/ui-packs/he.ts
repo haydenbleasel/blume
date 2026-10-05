@@ -48,6 +48,7 @@ export const he: UIStringsOverride = {
   banner: { dismiss: "סגירת ההודעה" },
   changelog: {
     description: "עדכוני מוצר והערות גרסה.",
+    empty: "אין עדיין רשומות ביומן השינויים.",
     title: "יומן שינויים",
   },
   consent: {

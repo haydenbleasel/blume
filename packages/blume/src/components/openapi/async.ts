@@ -8,6 +8,8 @@ import type {
 } from "../../openapi/asyncapi.ts";
 import type { ParameterLike, SchemaLike } from "./helpers.ts";
 import { resolveComponentRef } from "./helpers.ts";
+import type { OperationSecurity, SecuritySchemeLike } from "./security.ts";
+import { resolveAsyncApiSecurity } from "./security.ts";
 
 /**
  * Runtime helpers for the AsyncAPI components — the async counterpart of
@@ -239,31 +241,60 @@ export const channelParameters = (
 
 const SERVER_REF = /^#\/servers\/(?<name>[^/]+)$/u;
 
+/** A server paired with its key under the document's `servers`. */
+export interface NamedServer {
+  name: string;
+  server: AsyncApiServerObject;
+}
+
 /**
- * The servers a channel is available on: its `servers` refs when declared,
- * else every server the document declares (the spec's default).
+ * The servers a channel is available on, by name: its `servers` refs when
+ * declared, else every server the document declares (the spec's default).
  */
-export const channelServers = (
+export const namedChannelServers = (
   channel: AsyncApiChannelObject | undefined,
   document: AsyncApiDocument
-): AsyncApiServerObject[] => {
+): NamedServer[] => {
   const all = document.servers ?? {};
   const refs = channel?.servers;
   if (!Array.isArray(refs) || refs.length === 0) {
-    return Object.values(all).filter(isObject);
+    return Object.entries(all).flatMap(([name, server]) =>
+      isObject(server) ? [{ name, server }] : []
+    );
   }
-  const servers: AsyncApiServerObject[] = [];
+  const servers: NamedServer[] = [];
   for (const ref of refs) {
-    const name = SERVER_REF.exec(
+    const pointer = SERVER_REF.exec(
       isObject(ref) && isString(ref.$ref) ? ref.$ref : ""
     )?.groups?.name;
-    const server = name === undefined ? undefined : all[unescapePointer(name)];
-    if (isObject(server)) {
-      servers.push(server);
+    const name = pointer === undefined ? undefined : unescapePointer(pointer);
+    const server = name === undefined ? undefined : all[name];
+    if (name !== undefined && isObject(server)) {
+      servers.push({ name, server });
     }
   }
   return servers;
 };
+
+/**
+ * A server's `security` entries with their `$ref`s into
+ * `components.securitySchemes` resolved (non-objects dropped), for the
+ * samples, which read the scheme off the server they're built from.
+ */
+export const resolvedServerSecurity = (
+  server: AsyncApiServerObject,
+  components?: Components
+): AsyncApiRefLike[] =>
+  (Array.isArray(server.security) ? server.security : [])
+    .filter(isObject)
+    .map((entry) => resolveComponentRef(entry, components, "securitySchemes"));
+
+/** The servers a channel is available on; see {@link namedChannelServers}. */
+export const channelServers = (
+  channel: AsyncApiChannelObject | undefined,
+  document: AsyncApiDocument
+): AsyncApiServerObject[] =>
+  namedChannelServers(channel, document).map(({ server }) => server);
 
 /** A protocol-keyed `bindings` map, whatever object it sits on. */
 type BindingMap = Record<string, AsyncApiSpecValue>;
@@ -290,6 +321,34 @@ export const resolveBindings = (
     components?.[groups?.section ?? ""]?.[unescapePointer(groups?.name ?? "")];
   return isObject(target) ? target : undefined;
 };
+
+/** The `kafka` object of a bindings map, a `$ref`'d map resolved. */
+const kafkaBinding = (
+  bindings: BindingMap | undefined,
+  components?: Components
+): Record<string, AsyncApiSpecValue> | undefined => {
+  const kafka = resolveBindings(bindings, components)?.kafka;
+  return isObject(kafka) ? kafka : undefined;
+};
+
+/**
+ * A Kafka channel binding's `topic`, which names the topic when it differs
+ * from the channel address. The samples produce to and consume from it.
+ */
+export const kafkaTopic = (
+  channel: AsyncApiChannelObject | undefined,
+  components?: Components
+): string | undefined => {
+  const topic = kafkaBinding(channel?.bindings, components)?.topic;
+  return isString(topic) && topic !== "" ? topic : undefined;
+};
+
+/** The schema of a message's Kafka key (its `kafka` binding's `key`). */
+export const kafkaKeySchema = (
+  message: AsyncApiMessageLike | undefined,
+  components?: Components
+): SchemaLike | undefined =>
+  schemaOf(kafkaBinding(message?.bindings, components)?.key);
 
 /** Normalize protocol spellings onto the binding key they document. */
 const PROTOCOL_ALIASES = {
@@ -326,35 +385,70 @@ export const protocolOf = (
 };
 
 /**
- * The security list an operation actually enforces: its own `security` when
- * declared, else the union of its servers' — connecting already requires the
- * server's schemes. Server entries dedupe by `$ref`, so two servers sharing a
- * scheme render it once.
+ * The security an operation renders: its own `security` when declared, else
+ * the union of its servers' — connecting already requires the server's
+ * schemes. Server entries dedupe by `$ref`, so two servers sharing a scheme
+ * render it once. Each server's list stands alone, though: when the servers
+ * disagree (a production cluster behind SASL beside a local broker with no
+ * security), a scheme only some servers declare names them, and
+ * `unauthenticatedServers` lists the ones that declare none, rather than one
+ * server's scheme reading as required on all of them.
  */
-export const asyncApiSecurityEntries = (
+export const asyncApiSecurity = (
   operation: AsyncApiOperationObject | undefined,
-  servers: AsyncApiServerObject[]
-): AsyncApiRefLike[] => {
+  servers: NamedServer[],
+  schemes: Record<string, SecuritySchemeLike> | undefined
+): OperationSecurity => {
   if (Array.isArray(operation?.security)) {
-    return operation.security;
+    return resolveAsyncApiSecurity(operation.security, schemes);
   }
-  const entries: AsyncApiRefLike[] = [];
-  const seen = new Set<string>();
-  for (const server of servers) {
-    for (const entry of server.security ?? []) {
-      if (!isObject(entry)) {
+  const entries: { entry: AsyncApiRefLike; servers: string[] }[] = [];
+  const byRef = new Map<string, string[]>();
+  const unauthenticated: string[] = [];
+  for (const { name, server } of servers) {
+    const declared = Array.isArray(server.security)
+      ? server.security.filter(isObject)
+      : [];
+    if (declared.length === 0) {
+      unauthenticated.push(name);
+    }
+    for (const entry of declared) {
+      const shared = isString(entry.$ref) ? byRef.get(entry.$ref) : undefined;
+      if (shared) {
+        shared.push(name);
         continue;
       }
+      const names = [name];
       if (isString(entry.$ref)) {
-        if (seen.has(entry.$ref)) {
-          continue;
-        }
-        seen.add(entry.$ref);
+        byRef.set(entry.$ref, names);
       }
-      entries.push(entry);
+      entries.push({ entry, servers: names });
     }
   }
-  return entries;
+  const agree =
+    entries.length === 0 ||
+    (unauthenticated.length === 0 &&
+      entries.every((item) => item.servers.length === servers.length));
+  if (agree) {
+    return resolveAsyncApiSecurity(
+      entries.map(({ entry }) => entry),
+      schemes
+    );
+  }
+  return {
+    // A scheme every server declares needs no server list of its own.
+    alternatives: entries.map(({ entry, servers: names }) =>
+      resolveAsyncApiSecurity([entry], schemes)
+        .alternatives.flat()
+        .map((resolved) =>
+          names.length === servers.length
+            ? resolved
+            : { ...resolved, servers: names }
+        )
+    ),
+    optional: false,
+    unauthenticatedServers: unauthenticated,
+  };
 };
 
 /** One protocol's binding fields, ready for a key/value table. */

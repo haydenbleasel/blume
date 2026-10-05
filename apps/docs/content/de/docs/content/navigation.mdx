@@ -270,7 +270,7 @@ navigation: {
 }
 ```
 
-Jeder Link nimmt ein `label`, ein `href` und optional ein `icon` entgegen (ein Name eines [eingebauten Symbols](/docs/content/components#icon), ein Bildpfad bzw. eine Bild-URL oder ein Inline-SVG – wie überall sonst auch). Ein `href` kann überallhin verweisen: Eine externe URL öffnet sich in einem neuen Tab, während eine interne Route (`/contact`) zur Build-Zeit gegen deine Seiten geprüft wird und dich warnt, wenn nichts übereinstimmt.
+Jeder Link nimmt ein `label`, ein `href` und optional ein `icon` entgegen (ein Name eines [eingebauten Symbols](/docs/content/components#icon), ein Bildpfad bzw. eine Bild-URL oder ein Inline-SVG – wie überall sonst auch). Ein `href` kann überallhin verweisen: Eine externe URL öffnet sich in einem neuen Tab, während eine interne Route (`/contact`) zur Build-Zeit und von [`blume doctor`](/docs/cli/doctor) gegen deine Seiten geprüft wird und dich warnt, wenn nichts übereinstimmt.
 
 ## Explizite Seitenleiste [#explicit-sidebar]
 
@@ -342,14 +342,14 @@ Diese ergeben sich kostenlos aus dem Seitenleistenbaum – ohne Konfiguration:
 
 ## Auf dieser Seite [#on-this-page]
 
-Aus den Überschriften jeder Seite – standardmäßig `##` und `###` – wird automatisch eine Gliederung in der rechten Spalte erzeugt, damit lange Seiten überschaubar bleiben. Setze [`toc`](/docs/configuration#table-of-contents), um den Bereich der Überschriftenebenen zu ändern oder die Gliederung auszuschalten. Auf schmaleren Bildschirmen, wo die rechte Spalte ausgeblendet ist, klappt sie zu einem „Auf dieser Seite“-Dropdown über dem Inhalt zusammen.
+Aus den Überschriften jeder Seite – standardmäßig `##` und `###` – wird automatisch eine Gliederung in der rechten Spalte erzeugt, damit lange Seiten überschaubar bleiben. Setze [`toc`](/docs/configuration#table-of-contents), um den Bereich der Überschriftenebenen zu ändern oder die Gliederung auszuschalten. Auf schmaleren Bildschirmen, wo die rechte Spalte ausgeblendet ist, klappt sie zu einem „Auf dieser Seite“-Dropdown über dem Inhalt zusammen, das auch die [Seitenaktionen](#page-actions) enthält.
 
 ## Seitenaktionen [#page-actions]
 
-Unter dem Inhaltsverzeichnis zeigt jede Seite eine Reihe von Schnellaktionen:
+Unter dem Inhaltsverzeichnis zeigt jede Seite eine Reihe von Schnellaktionen. In Fenstern ab 1.280px Breite stehen sie in der rechten Spalte bei der Gliederung. In schmaleren Fenstern und auf Smartphones stehen sie am Ende des „Auf dieser Seite“-Dropdowns über dem Inhalt, das auch auf einer Seite ohne Überschriften erscheint:
 
 - **Auf GitHub bearbeiten** – verlinkt direkt auf die Quelldatei. Erscheint, sobald du [`github`](/docs/configuration) in deiner Konfiguration setzt.
-- **Nach oben scrollen** – kehrt sanft an den Anfang langer Seiten zurück.
+- **Nach oben scrollen** – kehrt sanft an den Anfang langer Seiten zurück. Diese Aktion gibt es nur in der rechten Spalte, da das Dropdown ohnehin schon am Anfang der Seite sitzt.
 
 Andere übergeben die Seite an KI-Tools – **Als Markdown kopieren** und **Im Chat öffnen** – beschrieben unter [Markdown für Agenten](/docs/discoverability/markdown#copy-as-markdown).
 

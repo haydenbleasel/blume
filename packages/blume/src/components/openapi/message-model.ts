@@ -1,10 +1,15 @@
 import type {
   AsyncApiAction,
+  AsyncApiDocument,
   AsyncApiServerObject,
 } from "../../openapi/asyncapi.ts";
 import { withServerDefaults } from "../../openapi/model.ts";
 import type { AsyncApiMessageLike, NamedMessage } from "./async.ts";
-import { payloadSchema } from "./async.ts";
+import {
+  kafkaKeySchema,
+  payloadSchema,
+  resolvedServerSecurity,
+} from "./async.ts";
 import { exampleValue, toJson } from "./helpers.ts";
 import type { ParameterLike, SchemaLike } from "./helpers.ts";
 import type {
@@ -77,19 +82,42 @@ const messagePayload = (
 };
 
 /**
+ * The first message's Kafka key as the kcat sample writes it: sampled from
+ * its binding's `key` schema the way a payload is (a declared example wins),
+ * a non-string value as JSON. None when the message declares no key.
+ */
+const messageKey = (
+  message: AsyncApiMessageLike | undefined,
+  schemas: Record<string, SchemaLike>,
+  components: AsyncApiDocument["components"]
+): string | undefined => {
+  const schema = kafkaKeySchema(message, components);
+  const key = inputValue(schema ? exampleValue(schema, schemas) : null);
+  return key === "" ? undefined : key;
+};
+
+/**
  * A server's base URL for the picker. Falls back to the bare host when the
  * spec omits `protocol` — a label is a label, and the snippet builders read
  * the server object itself rather than this string. Server variables in the
  * host and pathname (`{env}.events.example.com`) resolve to their declared
  * defaults, in the label and in the object the samples and connect URL read.
+ * Security refs resolve here too, so the kcat sample can name the server's
+ * SASL mechanism.
  */
-const serverOption = (spec: AsyncApiServerObject): MessageServerOption => {
+const serverOption = (
+  spec: AsyncApiServerObject,
+  components: AsyncApiDocument["components"]
+): MessageServerOption => {
   const server = { ...spec };
   if (spec.host !== undefined) {
     server.host = withServerDefaults(spec.host, spec.variables);
   }
   if (spec.pathname !== undefined) {
     server.pathname = withServerDefaults(spec.pathname, spec.variables);
+  }
+  if (spec.security !== undefined) {
+    server.security = resolvedServerSecurity(spec, components);
   }
   const host = `${server.host ?? ""}${server.pathname ?? ""}`;
   return {
@@ -102,17 +130,32 @@ const serverOption = (spec: AsyncApiServerObject): MessageServerOption => {
 export const messageModel = (args: {
   action: AsyncApiAction;
   address: string;
+  /** The document's `components`, which bindings and security refs resolve against. */
+  components?: AsyncApiDocument["components"];
   messages: NamedMessage[];
   parameters: ParameterLike[];
   protocol?: string;
   schemas: Record<string, SchemaLike>;
   servers: AsyncApiServerObject[];
-}): MessageModel => ({
-  action: args.action,
-  address: args.address,
-  connectable: Object.hasOwn(LIVE_PROTOCOLS, args.protocol ?? ""),
-  params: messageParams(args.parameters),
-  payload: messagePayload(args.messages[0]?.message, args.schemas),
-  protocol: args.protocol,
-  servers: args.servers.map(serverOption),
-});
+}): MessageModel => {
+  const model: MessageModel = {
+    action: args.action,
+    address: args.address,
+    connectable: Object.hasOwn(LIVE_PROTOCOLS, args.protocol ?? ""),
+    params: messageParams(args.parameters),
+    payload: messagePayload(args.messages[0]?.message, args.schemas),
+    protocol: args.protocol,
+    servers: args.servers.map((server) =>
+      serverOption(server, args.components)
+    ),
+  };
+  const key = messageKey(
+    args.messages[0]?.message,
+    args.schemas,
+    args.components
+  );
+  if (key !== undefined) {
+    model.key = key;
+  }
+  return model;
+};

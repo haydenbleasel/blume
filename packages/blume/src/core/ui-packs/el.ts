@@ -50,6 +50,7 @@ export const el: UIStringsOverride = {
   banner: { dismiss: "Κλείσιμο ανακοίνωσης" },
   changelog: {
     description: "Ενημερώσεις προϊόντος και σημειώσεις έκδοσης.",
+    empty: "Δεν υπάρχουν ακόμη καταχωρίσεις στο ιστορικό αλλαγών.",
     title: "Ιστορικό αλλαγών",
   },
   consent: {

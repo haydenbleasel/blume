@@ -34,7 +34,10 @@ import {
   schemeLabel,
 } from "../src/components/openapi/security.ts";
 import type { SecurityRequirementLike } from "../src/components/openapi/security.ts";
-import { sampleLanguages } from "../src/components/openapi/snippets.ts";
+import {
+  DEFAULT_SAMPLE_LANGUAGES,
+  sampleLanguages,
+} from "../src/components/openapi/snippets.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
@@ -49,12 +52,15 @@ import { InvalidSpecError, parseSpec } from "../src/openapi/parse.ts";
 import {
   blumeReferences,
   hasScalarReferences,
+  referenceSpecFiles,
   resolveReferences,
 } from "../src/openapi/references.ts";
+import type { RenderedPageData } from "../src/openapi/render-mdx.ts";
 import { operationMdx, overviewMdx } from "../src/openapi/render-mdx.ts";
 import { buildReferenceFiles } from "../src/openapi/scalar.ts";
 import { isOpenApiSource, openApiSource } from "../src/openapi/source.ts";
 import { asyncapi, openapi, scalar } from "../src/reference/index.ts";
+import { openapiOptionsSchema } from "../src/reference/openapi.ts";
 
 const ctx = (projectRoot: string) => ({
   cacheDir: join(projectRoot, ".blume/cache/openapi"),
@@ -229,6 +235,10 @@ const queued = (responses: Response[]) => {
   };
 };
 
+/** The groups among a sidebar level's nodes, in order. */
+const groups = (nodes: NavNode[]): NavNode[] =>
+  nodes.filter((node) => node.kind === "group");
+
 describe("references", () => {
   it("resolves a Blume-rendered OpenAPI reference by default", () => {
     const config = blumeConfigSchema.parse({
@@ -245,6 +255,33 @@ describe("references", () => {
     });
     expect(hasScalarReferences(config)).toBe(false);
     expect(blumeReferences(config)).toHaveLength(1);
+  });
+
+  it("lists the local spec and overlay files references read, for the dev watcher", () => {
+    const config = blumeConfigSchema.parse({
+      reference: [
+        openapi({
+          sources: [
+            { overlays: ["./overlays/public.yaml"], spec: "./openapi.yaml" },
+            { spec: "https://api.test/openapi.json" },
+            {
+              overlays: ["https://api.test/overlay.yaml"],
+              route: "/admin",
+              spec: "/abs/admin.json",
+            },
+          ],
+        }),
+        asyncapi({ spec: "async.yaml" }),
+        // The same file twice is watched once.
+        scalar({ route: "/embed", spec: "./openapi.yaml" }),
+      ],
+    });
+    expect(referenceSpecFiles(config, "/project")).toStrictEqual([
+      "/project/openapi.yaml",
+      "/project/overlays/public.yaml",
+      "/abs/admin.json",
+      "/project/async.yaml",
+    ]);
   });
 
   it("resolves a Blume-rendered AsyncAPI reference by default", () => {
@@ -1007,26 +1044,52 @@ describe("parse.parseSpec remote hardening", () => {
   });
 });
 
-describe("render-mdx", () => {
-  const specData = (over: Partial<ApiSpecData> = {}): ApiSpecData =>
-    // SAFETY: render-mdx never reads `kind` — the only ApiSpecData field these
-    // defaults omit.
-    ({
-      codeSamples: [],
-      description: "",
-      document: SPEC_3_1,
-      expandSchemas: false,
-      label: "API",
-      operations: {},
-      playground: { enabled: true, proxy: false },
-      route: "/api",
-      slug: "api",
-      tags: [],
-      title: "API",
-      version: "1",
-      ...over,
-    }) as ApiSpecData;
+const specData = (over: Partial<ApiSpecData> = {}): ApiSpecData =>
+  // SAFETY: render-mdx never reads `kind` — the only ApiSpecData field these
+  // defaults omit.
+  ({
+    codeSamples: [],
+    description: "",
+    document: SPEC_3_1,
+    expandSchemas: false,
+    label: "API",
+    operations: {},
+    playground: { enabled: true, proxy: false },
+    route: "/api",
+    slug: "api",
+    tags: [],
+    title: "API",
+    version: "1",
+    ...over,
+  }) as ApiSpecData;
 
+const describeOperation = (
+  description: string,
+  seoDescriptionSuffix = true
+): RenderedPageData["seo"] =>
+  operationMdx(
+    specData({ title: "Example API" }),
+    {
+      deprecated: false,
+      description,
+      key: "op",
+      method: "delete",
+      operationId: "op",
+      path: "/pets/bulk",
+      route: "/api/pets/op",
+      summary: "Bulk delete pets",
+      tag: "pet",
+      tagSlug: "pet",
+    },
+    {
+      includeInLlms: true,
+      includeInSearch: true,
+      noindex: false,
+      seoDescriptionSuffix,
+    }
+  ).data.seo;
+
+describe("render-mdx", () => {
   it("renders an operation page with searchable frontmatter and a component body", () => {
     const { operations } = extractOperations(SPEC_3_1, "/api");
     const addPet = operations.find((op) => op.key === "add-pet");
@@ -1481,6 +1544,87 @@ describe("render-mdx", () => {
     });
   });
 
+  describe("a first paragraph that ends in a colon", () => {
+    it("is followed by the items of the list it introduces", () => {
+      expect(
+        describeOperation(
+          "Delete pets in bulk. Supports two modes:\n\n- Explicit IDs\n- Select all"
+        )
+      ).toStrictEqual({
+        description:
+          "Delete pets in bulk. Supports two modes: Explicit IDs; Select all. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+      // Items lose their own closing mark where they join; a bold lead-in and
+      // an ordered list read the same.
+      expect(
+        describeOperation("**Supports:**\n\n1. Pets.\n2. Owners.")
+      ).toStrictEqual({
+        description:
+          "Supports: Pets; Owners. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+      // A nested list's lead-in closes like any other.
+      expect(
+        describeOperation("Supports:\n\n- Modes:\n  - Explicit IDs")
+      ).toStrictEqual({
+        description:
+          "Supports: Modes. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+    });
+
+    it("closes as a sentence when no list prose follows", () => {
+      expect(
+        describeOperation(
+          'Delete pets in bulk. Example:\n\n```json\n{ "ids": [1] }\n```'
+        )
+      ).toStrictEqual({
+        description:
+          "Delete pets in bulk. Example. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+      // A list of code blocks has no item prose to fold in.
+      expect(
+        describeOperation("Supports:\n\n- ```\n  ids\n  ```")
+      ).toStrictEqual({
+        description:
+          "Supports. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+    });
+
+    it("keeps punctuation that closes inline code", () => {
+      expect(
+        describeOperation("Keys are prefixed with `tenant:`")
+      ).toStrictEqual({
+        description:
+          "Keys are prefixed with tenant:. Reference for the DELETE /pets/bulk endpoint in the Example API.",
+      });
+      // A list item's closing mark is dropped only when it's prose.
+      expect(
+        describeOperation("Runs:\n\n- `SELECT 1;`\n- A ping.", false)
+      ).toStrictEqual({ description: "Runs: SELECT 1;; A ping" });
+    });
+
+    it("resolves the lead-in with the suffix off and on the overview", () => {
+      expect(
+        describeOperation(
+          "Supports two modes:\n\n- Explicit IDs\n- Select all",
+          false
+        )
+      ).toStrictEqual({
+        description: "Supports two modes: Explicit IDs; Select all",
+      });
+      expect(
+        describeOperation(
+          "Delete pets in bulk. Example:\n\n```\n{}\n```",
+          false
+        )
+      ).toStrictEqual({ description: "Delete pets in bulk. Example." });
+      expect(
+        overviewMdx(
+          specData({ description: "This API supports:\n\n- Pets\n- Owners" })
+        ).data.seo
+      ).toStrictEqual({ description: "This API supports: Pets; Owners" });
+    });
+  });
+
   it("does not repeat API when the spec title already includes it", () => {
     const spec = specData({ title: "Example API" });
     const overview = overviewMdx(spec);
@@ -1660,10 +1804,12 @@ describe("source.openApiSource", () => {
     expect(refs).toContain("api/pet/add-pet.mdx");
     expect(refs.at(-1)).toBe("api/index.mdx");
     // Each tag directory is labeled with the spec's own tag name, so the
-    // sidebar group renders the authored casing instead of a re-humanized slug.
+    // sidebar group renders the authored casing instead of a re-humanized slug,
+    // and ranked in the overview's order. The source names no `label`, so its
+    // own group keeps the name its route gives it.
     expect(folderMeta).toStrictEqual({
-      "api/operations": { title: "Operations" },
-      "api/pet": { title: "pet" },
+      "api/operations": { order: 1, title: "Operations" },
+      "api/pet": { order: 0, title: "pet" },
     });
 
     const data = source.openApiData();
@@ -1945,6 +2091,82 @@ describe("source.openApiSource", () => {
     } finally {
       await rm(root, { force: true, recursive: true });
     }
+  });
+
+  it("names each source's group by its label and orders tags as the spec does", async () => {
+    const root = await mkdtemp(join(tmpdir(), "blume-openapi-nav-"));
+    try {
+      await mkdir(join(root, "docs"), { recursive: true });
+      await writeFile(
+        join(root, "blume.config.ts"),
+        'export default {\n  reference: [{ kind: "openapi", options: { sources: [{ label: "GitHub OAuth (v2)", spec: "./a.json" }, { route: "/reference/partner-apis", spec: "./b.json" }] }, requiredSecrets: [], runtimeDeps: [] }],\n};\n'
+      );
+      await writeFile(join(root, "docs/index.md"), "# Home\n");
+      const spec = JSON.stringify({
+        info: { title: "API", version: "1" },
+        openapi: "3.1.0",
+        paths: {
+          "/a": { get: { operationId: "a", summary: "A", tags: ["Zebras"] } },
+          "/b": { get: { operationId: "b", summary: "B", tags: ["Apples"] } },
+          "/c": { get: { operationId: "c", summary: "C", tags: ["Mangos"] } },
+        },
+        tags: [{ name: "Zebras" }, { name: "Mangos" }, { name: "Apples" }],
+      });
+      await writeFile(join(root, "a.json"), spec);
+      await writeFile(join(root, "b.json"), spec);
+      const project = await scanProject(root);
+      const reference = groups(project.graph.navigation.sidebar).find(
+        (node) => node.label === "Reference"
+      );
+      const sources =
+        reference?.kind === "group" ? groups(reference.children) : [];
+      // A labeled source's group carries its label as written; an unlabeled
+      // one keeps the name its route gives it.
+      expect(sources.map((node) => node.label)).toStrictEqual([
+        "GitHub OAuth (v2)",
+        "Partner APIs",
+      ]);
+      // Both list their tags in the spec's declared order, as the overview
+      // does, not alphabetically.
+      for (const source of sources) {
+        expect(
+          source.kind === "group"
+            ? groups(source.children).map((node) => node.label)
+            : []
+        ).toStrictEqual(["Zebras", "Mangos", "Apples"]);
+      }
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  it("leaves a root-mounted source's label off the root group", async () => {
+    const dir = await tempSpec(SPEC_3_1);
+    const { folderMeta } = await openApiSource(
+      [
+        {
+          ...indexedReference,
+          basePath: "",
+          display: {
+            codeSamples: [],
+            expandSchemas: false,
+            playground: { enabled: true, proxy: false },
+          },
+          groupLabel: "Petstore",
+          kind: "openapi",
+          label: "Petstore",
+          route: "/",
+          slug: "reference",
+          spec: "spec.json",
+        },
+      ],
+      ctx(dir)
+    ).load();
+    expect(Object.keys(folderMeta ?? {}).toSorted()).toStrictEqual([
+      "operations",
+      "pet",
+    ]);
+    await rm(dir, { force: true, recursive: true });
   });
 });
 
@@ -2291,14 +2513,18 @@ describe("snippets", () => {
       (language) => language.id
     );
     expect(ids).toStrictEqual(["curl", "js", "csharp"]);
-    // `false` generates none.
+    // `false` generates none, and so does an empty list: it names no language.
     expect(sampleLanguages(false)).toStrictEqual([]);
-    // Empty falls back to the default trio.
-    expect(sampleLanguages([]).map((language) => language.id)).toStrictEqual([
-      "curl",
-      "js",
-      "python",
-    ]);
+    expect(sampleLanguages([])).toStrictEqual([]);
+  });
+
+  it("keeps the hand-written pages' languages in step with openapi()'s default", () => {
+    expect(
+      openapiOptionsSchema.parse({ spec: "./openapi.yaml" }).codeSamples
+    ).toStrictEqual(DEFAULT_SAMPLE_LANGUAGES);
+    expect(
+      sampleLanguages(DEFAULT_SAMPLE_LANGUAGES).map((language) => language.id)
+    ).toStrictEqual(["curl", "js", "python"]);
   });
 });
 
@@ -2318,6 +2544,12 @@ describe("security", () => {
     oidc: { type: "openIdConnect" },
     tls: { type: "mutualTLS" },
   };
+
+  const resolved = (key: keyof typeof SCHEMES) => ({
+    key,
+    scheme: SCHEMES[key],
+    scopes: [],
+  });
 
   it("prefers the operation's security and treats [] as public", () => {
     const root = [{ bearerAuth: [] }];
@@ -2389,11 +2621,6 @@ describe("security", () => {
   });
 
   it("labels schemes and locates their credential", () => {
-    const resolved = (key: keyof typeof SCHEMES) => ({
-      key,
-      scheme: SCHEMES[key],
-      scopes: [],
-    });
     expect(schemeLabel(resolved("bearerAuth"))).toBe("Bearer token (JWT)");
     expect(schemeLabel(resolved("basicAuth"))).toBe("Basic auth");
     expect(schemeLabel(resolved("apiHeader"))).toBe("API key");

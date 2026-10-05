@@ -237,7 +237,7 @@ Every build writes an [agent skill](https://agentskills.io) for your docs, a `SK
 - your API references
 - a map of the docs in sidebar order, linking each page's Markdown with its one-line description
 
-The skill is named after your site's `title` (`Acme Docs` becomes `acme-docs`). It covers the current version in the default language, leaves out API operation pages and changelog entries (each has one line of its own above the map), and lists up to 200 pages, pointing at `llms.txt` for the rest. The links are absolute, so the skill needs [`deployment.site`](/docs/deployment); a build without one skips it.
+The skill is named after your site's `title` (`Acme Docs` becomes `acme-docs`). It covers the current version in the default language, leaves out API operation pages and changelog entries (each has one line of its own above the map), skips the pages `llms.txt` does (drafts, hidden and `noindex` pages, and pages with [`ai.exclude`](/docs/discoverability/llms-txt#excluding-a-page)), and lists up to 200 pages, pointing at `llms.txt` for the rest. The links are absolute, so the skill needs [`deployment.site`](/docs/deployment); a build without one skips it.
 
 The generated skill is a guide to your docs, not a summary of your product. For one that teaches an agent your product — setup, core concepts, common tasks, and gotchas — have your coding agent write it from the docs:
 

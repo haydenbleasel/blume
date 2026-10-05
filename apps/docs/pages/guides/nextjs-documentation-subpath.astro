@@ -481,12 +481,13 @@ curl -s "$SITE/robots.txt" | grep -i '^sitemap'`}
     <code>site</code> includes the path. Set it to the bare origin,{" "}
     <code>https://www.acme.example</code>, and rebuild.
   </p>
-  <h3>blume audit reports links to your app as broken</h3>
+  <h3>blume audit passes a broken link to your app</h3>
   <p>
-    <code>blume audit</code> reads only the docs build, so a full URL on your
-    domain outside <code>/docs</code> looks unserved and reports{" "}
-    <code>BLUME_AUDIT_LINK_TO_BROKEN</code>. Check those links through your
-    domain instead. Skipping the check with{" "}
-    <code>--skip=BLUME_AUDIT_LINK_TO_BROKEN</code> hides real broken links too.
+    <code>blume audit</code> reads only the docs build. A full URL on your
+    domain outside <code>/docs</code> names another app, so the audit leaves
+    it alone, and a typo in one passes. Check those links through your domain
+    instead. A root-relative link that ends up outside the base is still
+    reported as <code>BLUME_AUDIT_LINK_TO_BROKEN</code>, since nothing in the
+    build answers there, so write links to your app as full URLs.
   </p>
 </GuidePage>

@@ -34,6 +34,10 @@ mdxRemote({
 });
 ```
 
+`include` (padrão `["**/*.{md,mdx}"]`) filtra os arquivos pelo caminho deles dentro de `path`, do mesmo jeito que o `include` de uma source `filesystem()`: um padrão que começa com `!` exclui os arquivos que correspondem a ele (`["**/*.mdx", "!drafts/**"]`). Com `github`, a source lista a árvore inteira do repositório em `ref` e mantém os arquivos que estão dentro de `path`. Se não houver nada dentro de `path` nessa ref, a source não lê nenhuma página e emite o aviso `BLUME_SOURCE_PATH_MISSING`. O GitHub limita a listagem (100.000 entradas ou 7 MB para o repositório inteiro, seja qual for o `path`) e, acima desse limite, a source emite o aviso `BLUME_SOURCE_TRUNCATED`: nesse caso, liste os arquivos com `url` e `files`.
+
+Um link relativo entre arquivos remotos (`[Errors](./02-errors.mdx)`) leva à página em que o arquivo vinculado é publicado, sem o prefixo de ordenação na rota, e o `blume validate` verifica esse link da mesma forma.
+
 O token de um repositório privado é lido da variável de ambiente `GITHUB_TOKEN`. Como o adapter declara essa variável, o `blume dev` e o `blume build` avisam quando ela não está definida. O token nunca é inserido na sua configuração nem no output gerado, e só é enviado para os próprios hosts do GitHub (`api.github.com`, `raw.githubusercontent.com`), nunca para uma base `url` personalizada. Um repositório público funciona sem ele.
 
 As páginas remotas são renderizadas com total fidelidade de MDX e componentes: o conteúdo delas é materializado em um diretório de staging oculto e renderizado pelo Astro junto com a sua documentação local, então callouts, tabs e todos os outros componentes do Blume continuam funcionando.

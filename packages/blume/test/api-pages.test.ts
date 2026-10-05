@@ -24,6 +24,7 @@ import type {
   EndpointField,
   EndpointSpec,
 } from "../src/components/content/api-page.ts";
+import { operationModel } from "../src/components/openapi/operation-model.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { pageMetaSchema } from "../src/core/schema.ts";
 import { API_RAIL_KEY, apiRailPlugin } from "../src/markdown/api-rail.ts";
@@ -135,6 +136,9 @@ describe("fields as schema", () => {
     expect(endpointBody(endpointFields)).toEqual({
       content: {
         "application/json": {
+          // `tags` is optional with no default or placeholder, so the
+          // example leaves it out; `address` is in for its child's placeholder.
+          example: { address: { city: "Oslo" }, role: "member" },
           schema: {
             properties: {
               address: {
@@ -153,6 +157,49 @@ describe("fields as schema", () => {
     expect(endpointBody([])).toBeUndefined();
     expect(fieldSchema({ location: "body", name: "n" })).toEqual({
       type: "string",
+    });
+  });
+
+  it("starts Try it with the required fields and the ones with a value", () => {
+    const model = operationModel({
+      method: "POST",
+      parameters: [],
+      path: "/users",
+      requestBody: endpointBody([
+        { location: "body", name: "email", required: true, type: "string" },
+        { location: "body", name: "note", type: "string" },
+        { location: "body", name: "count", type: "integer" },
+        { location: "body", name: "active", type: "boolean" },
+        { default: 10, location: "body", name: "limit", type: "integer" },
+        { location: "body", name: "hint", placeholder: "hi", type: "string" },
+        {
+          fields: [{ location: "body", name: "tag", type: "string" }],
+          location: "body",
+          name: "meta",
+          required: true,
+          type: "object",
+        },
+        // Its child is required only once the reader sends the object.
+        {
+          fields: [
+            { location: "body", name: "city", required: true, type: "string" },
+          ],
+          location: "body",
+          name: "address",
+          type: "object",
+        },
+      ]),
+      schemas: {},
+      security: { alternatives: [], optional: false },
+      servers: [],
+    });
+    // An optional field with neither a default nor a placeholder used to go
+    // out as the sampler's "string", 0, or true.
+    expect(JSON.parse(model.body?.example ?? "")).toEqual({
+      email: "string",
+      hint: "hi",
+      limit: 10,
+      meta: {},
     });
   });
 });

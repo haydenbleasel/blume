@@ -33,6 +33,8 @@ export interface SourceFieldMap {
   description?: string;
   /** Field holding the last-modified date. */
   lastModified?: string;
+  /** Field holding the sidebar order (a number). No default: unset, none is read. */
+  order?: string;
   /** Field holding the page slug. */
   slug?: string;
   /** Field holding the page title. */
@@ -44,6 +46,7 @@ export const sourceFieldMapSchema = z.strictObject({
   body: z.string().optional(),
   description: z.string().optional(),
   lastModified: z.string().optional(),
+  order: z.string().optional(),
   slug: z.string().optional(),
   title: z.string().optional(),
 });

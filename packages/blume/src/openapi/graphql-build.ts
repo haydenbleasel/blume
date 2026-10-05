@@ -26,6 +26,7 @@ import {
   parse,
   print,
   specifiedDirectives,
+  valueFromASTUntyped,
   visit,
 } from "graphql";
 
@@ -34,6 +35,7 @@ import type {
   GraphqlEnumValue,
   GraphqlField as ModelField,
   GraphqlInputValue,
+  GraphqlJsonValue,
   GraphqlTypeDef,
   GraphqlTypeRef,
 } from "./graphql.ts";
@@ -68,6 +70,21 @@ const defaultLiteral = (
   return literal ? print(literal) : undefined;
 };
 
+/**
+ * The same default as the JSON a client sends in `variables`, which the
+ * example variables start from.
+ */
+const defaultJson = (
+  input: GraphQLArgument | GraphQLInputField
+): GraphqlJsonValue | undefined => {
+  const literal = input.default?.literal;
+  // SAFETY: a const literal has no variables, so it lowers to JSON values
+  // only: numbers, strings, booleans, null, enum names, lists and objects.
+  return literal
+    ? (valueFromASTUntyped(literal) as GraphqlJsonValue)
+    : undefined;
+};
+
 const inputValue = (
   input: GraphQLArgument | GraphQLInputField
 ): GraphqlInputValue => {
@@ -79,6 +96,10 @@ const inputValue = (
   const printed = defaultLiteral(input);
   if (printed !== undefined) {
     value.default = printed;
+  }
+  const json = defaultJson(input);
+  if (json !== undefined) {
+    value.defaultValue = json;
   }
   // `deprecationReason` is null on non-deprecated members in some builds;
   // absent means "not deprecated" downstream, so both collapse to absent.

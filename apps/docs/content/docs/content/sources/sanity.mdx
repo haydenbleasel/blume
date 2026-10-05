@@ -3,7 +3,7 @@ title: Sanity
 description: Pull documents from a Sanity dataset with the sanity() source — a GROQ query picks the documents and their Portable Text bodies become Markdown.
 ---
 
-The built-in `sanity()` adapter runs a GROQ query and maps each document's fields to frontmatter and its Portable Text body to Markdown. The adapter declares `@sanity/client` as its runtime dependency — an optional peer, so install it only if you use this source.
+The built-in `sanity()` adapter runs a GROQ query and maps each document's fields to frontmatter and its Portable Text body to Markdown. A body held in a Markdown string field passes through as written, except that a link that isn't a web, mail, phone, or relative address (a `javascript:` URL, say) keeps only its label. The adapter declares `@sanity/client` as its runtime dependency — an optional peer, so install it only if you use this source.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";
@@ -26,4 +26,4 @@ export default defineConfig({
 });
 ```
 
-A read token for a private dataset comes from the `SANITY_TOKEN` environment variable, which the adapter declares. Custom Portable Text block types map to Blume components through the engine's `serializers` option, available when you construct `sanitySource` directly and pass it to [`custom()`](/docs/content/sources/custom). Setting `serializers` writes the source's pages as MDX, so a component or directive a serializer returns renders.
+A read token for a private dataset comes from the `SANITY_TOKEN` environment variable. The adapter declares it, so `blume dev` and `blume build` warn when it's unset; a public dataset works without it. Sanity answers a private dataset's query without a token with no documents rather than an error, so when a query finds nothing and the token is unset, the source adds a `BLUME_MISSING_SECRET` warning saying so. Under `--preview` the adapter reads drafts with the `previewDrafts` perspective, which `@sanity/client` 8 reports as renamed to `drafts`; the old name still works, and `@sanity/client` 6 accepts only the old one. Custom Portable Text block types map to Blume components through the engine's `serializers` option, available when you construct `sanitySource` directly and pass it to [`custom()`](/docs/content/sources/custom). Setting `serializers` writes the source's pages as MDX, so a component or directive a serializer returns renders.

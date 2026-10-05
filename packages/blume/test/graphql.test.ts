@@ -16,6 +16,7 @@ import {
   graphqlOperationRoutes,
   graphqlPlaygroundModel,
   graphqlRoutes,
+  graphqlSecurity,
   graphqlUsage,
   isOutputField,
   selectionSet,
@@ -420,6 +421,41 @@ describe("graphql config and references", () => {
     ]);
   });
 
+  it("carries auth to each source, a per-source auth winning", () => {
+    const config = blumeConfigSchema.parse({
+      reference: [
+        graphql({
+          auth: { method: "bearer" },
+          sources: [
+            { label: "Main", spec: "a.graphql" },
+            {
+              auth: { method: "key", name: "X-Api-Token" },
+              label: "Other",
+              spec: "b.graphql",
+            },
+          ],
+        }),
+        graphql({ route: "/open", spec: "c.graphql" }),
+      ],
+    });
+    expect(resolveReferences(config).map((ref) => ref.auth)).toStrictEqual([
+      { method: "bearer" },
+      { method: "key", name: "X-Api-Token" },
+      undefined,
+    ]);
+    expect(() =>
+      blumeConfigSchema.parse({
+        reference: [
+          graphql({
+            // SAFETY: an unknown method exercises the schema's enum.
+            auth: { method: "oauth" as never },
+            spec: "a.graphql",
+          }),
+        ],
+      })
+    ).toThrow();
+  });
+
   it("gates the built-in proxy endpoint on either block", () => {
     expect(needsPlaygroundProxy(parse({}))).toBe(false);
     expect(
@@ -530,7 +566,13 @@ const ctx = (projectRoot: string) => ({
   projectRoot,
 });
 
-const reference = (spec: string, overrides: { endpoint?: string } = {}) => ({
+const reference = (
+  spec: string,
+  overrides: {
+    auth?: { method: "bearer" | "basic" | "key" | "none"; name?: string };
+    endpoint?: string;
+  } = {}
+) => ({
   basePath: "",
   display: {
     codeSamples: ["curl"],
@@ -554,7 +596,12 @@ describe("source.openApiSource (graphql)", () => {
     const dir = await mkdtemp(join(tmpdir(), "blume-graphql-src-"));
     await writeFile(join(dir, "schema.graphql"), SDL);
     const source = openApiSource(
-      [reference("schema.graphql", { endpoint: "https://api.test/graphql" })],
+      [
+        reference("schema.graphql", {
+          auth: { method: "bearer" },
+          endpoint: "https://api.test/graphql",
+        }),
+      ],
       ctx(dir)
     );
     const { entries, diagnostics, folderMeta } = await source.load();
@@ -563,16 +610,18 @@ describe("source.openApiSource (graphql)", () => {
     expect(refs).toContain("graphql/queries/pets.mdx");
     expect(refs).toContain("graphql/objects/pet-object.mdx");
     expect(refs.at(-1)).toBe("graphql/index.mdx");
+    // Groups rank in the overview's order: operations first, then types.
     expect(folderMeta?.["graphql/queries"]).toStrictEqual({
+      order: 0,
       title: "Queries",
     });
-    expect(folderMeta?.["graphql/input-objects"]).toStrictEqual({
-      title: "Input Objects",
-    });
+    expect(folderMeta?.["graphql/input-objects"]?.title).toBe("Input Objects");
+    expect(folderMeta?.["graphql/input-objects"]?.order).toBeGreaterThan(0);
 
     const spec = source.openApiData().graphql;
     expect(spec?.kind).toBe("graphql");
     expect(spec?.endpoint).toBe("https://api.test/graphql");
+    expect(spec?.auth).toStrictEqual({ method: "bearer" });
     // A schema names no title; the reference label stands in, and the schema
     // description becomes the overview prose.
     expect(spec?.title).toBe("GraphQL");
@@ -749,7 +798,8 @@ describe("graphql-helpers", () => {
 
   it("samples variables from argument types", () => {
     const variables = exampleVariables(document, pets);
-    expect(variables?.limit).toBe(0);
+    // `limit: Int = 10` starts at its default, not the Int sample.
+    expect(variables?.limit).toBe(10);
     expect(variables?.sort).toBe("ASC");
     // Input objects nest to the depth bound; the recursive tail samples null.
     expect(variables?.filter).toStrictEqual({
@@ -763,6 +813,62 @@ describe("graphql-helpers", () => {
     });
     const legacy = graphqlRootField(document, refFor(spec, "legacy"));
     expect(exampleVariables(document, legacy ?? pets)).toBeUndefined();
+  });
+
+  it("starts variables and input fields at their declared defaults", () => {
+    const doc = buildGraphqlDocument(
+      `type Query {
+         list(first: Int = 20, order: Order = DESC, tags: [String] = ["a"], where: Where = { min: 1.5 }, cursor: String = null, page: Int): String
+         find(where: Where): String
+       }
+       enum Order { ASC DESC }
+       input Where { min: Float, order: Order = DESC }`
+    );
+    const list = graphqlRootField(doc, {
+      ...refFor(spec, "pets"),
+      operationId: "list",
+    });
+    const find = graphqlRootField(doc, {
+      ...refFor(spec, "pets"),
+      operationId: "find",
+    });
+    if (!(list && find)) {
+      throw new Error("fixture field missing");
+    }
+    expect(exampleVariables(doc, list)).toStrictEqual({
+      cursor: null,
+      first: 20,
+      order: "DESC",
+      page: 0,
+      tags: ["a"],
+      where: { min: 1.5 },
+    });
+    // An input object's own field defaults apply when it is sampled.
+    expect(exampleVariables(doc, find)).toStrictEqual({
+      where: { min: 0, order: "DESC" },
+    });
+    // The introspection path carries the same JSON default.
+    const introspected = buildGraphqlDocument(
+      JSON.stringify(introspectionFromSchema(referenceSchema(SDL)))
+    );
+    expect(
+      introspected.types.Query?.fields?.find((f) => f.name === "pets")?.args[0]
+        ?.defaultValue
+    ).toBe(10);
+  });
+
+  it("leaves deprecated fields out of the example selection", () => {
+    const doc = buildGraphqlDocument(
+      `type Query { pet: Pet }
+       type Pet { id: ID, legacyName: String @deprecated(reason: "Use name."), name: String, old: Old @deprecated }
+       type Old { id: ID @deprecated }`
+    );
+    expect(selectionSet(doc, "Pet")?.map((s) => s.name)).toStrictEqual([
+      "id",
+      "name",
+    ]);
+    // Nothing left to select still yields a valid set.
+    expect(selectionSet(doc, "Old")).toStrictEqual([{ name: "__typename" }]);
   });
 
   it("samples non-null custom scalars and exhausted inputs as placeholders", () => {
@@ -893,6 +999,41 @@ describe("graphql-helpers", () => {
       query
     );
     expect(empty.servers).toStrictEqual([GRAPHQL_ENDPOINT_PLACEHOLDER]);
+    // No `auth`: no credential field, and the section stays off the page.
+    expect(model.auth).toStrictEqual([]);
+    expect(graphqlSecurity(spec).alternatives).toStrictEqual([]);
+  });
+
+  it("gives the playground and samples the configured credential", () => {
+    const query = exampleQuery(document, pets, "query");
+    const bearer = graphqlPlaygroundModel(
+      specData({ auth: { method: "bearer" } }),
+      query
+    );
+    expect(bearer.auth.map((input) => input.carrier)).toStrictEqual([
+      { in: "header", name: "Authorization" },
+    ]);
+    const values = defaultValues(bearer);
+    expect(buildRequest(bearer, values).headers.Authorization).toBe(
+      "Bearer YOUR_TOKEN"
+    );
+    expect(
+      buildRequest(bearer, {
+        ...values,
+        auth: { bearer: { value: "t0ken" } },
+      }).headers.Authorization
+    ).toBe("Bearer t0ken");
+    // An API key goes in the named header, `x-api-key` by default.
+    const key = graphqlPlaygroundModel(
+      specData({ auth: { method: "key", name: "X-Api-Token" } }),
+      query
+    );
+    expect(buildRequest(key, defaultValues(key)).headers["X-Api-Token"]).toBe(
+      "YOUR_API_KEY"
+    );
+    expect(
+      graphqlSecurity(specData({ auth: { method: "none" } })).alternatives
+    ).toStrictEqual([]);
   });
 
   it("maps type names to their page routes", () => {

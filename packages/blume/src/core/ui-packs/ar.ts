@@ -48,6 +48,7 @@ export const ar: UIStringsOverride = {
   banner: { dismiss: "إغلاق الإعلان" },
   changelog: {
     description: "تحديثات المنتج وملاحظات الإصدارات.",
+    empty: "لا توجد إدخالات في سجل التغييرات بعد.",
     title: "سجل التغييرات",
   },
   consent: {

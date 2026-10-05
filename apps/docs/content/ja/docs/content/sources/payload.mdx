@@ -18,7 +18,8 @@ export default defineConfig({
         prefix: "handbook",
         url: "https://cms.example.com",
         collection: "docs",
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "richText" },
         // Extra query parameters: where[...], sort
         params: { sort: "title" },
@@ -28,4 +29,4 @@ export default defineConfig({
 });
 ```
 
-API キーは `PAYLOAD_API_KEY` 環境変数から読み込まれ、`users API-Key <key>` として送信されます。キーが別の認証対応コレクションに属している場合は、`authCollection` を設定してください。インポートされるのは公開済みのドキュメントのみです。`--preview` を指定すると下書きをリクエストし、`draft: true` を付けてステージングします。ドキュメントは `depth: 1` で取得されるため、アップロードには URL が含まれます。また、相対的なアップロードパス（`/media/x.png`）は `url` を基準に解決されます。`payloadSource` を直接構築して [`custom()`](/docs/content/sources/custom) に渡す場合は、エンジンの `serializers` オプションを使って、`block` または `inlineBlock` ノードを `blockType` をキーとして Blume コンポーネントにマッピングできます。`serializers` を設定すると、返されたコンポーネントがレンダリングされるように、ソースのページは MDX として書き出されます。なお、Markdown テキストフィールドに格納された本文は Markdown のままです。
+API キーは `PAYLOAD_API_KEY` 環境変数から読み込まれ、`users API-Key <key>` として送信されます。キーが別の認証対応コレクションに属している場合は、`authCollection` を設定してください。インポートされるのは公開済みのドキュメントのみです。`--preview` を指定すると下書きをリクエストし、`draft: true` を付けてステージングします。ドキュメントは `depth: 1` で取得されるため、アップロードには URL が含まれます。また、相対的なアップロードパス（`/media/x.png`）は `url` を基準に解決されます。アップロードはダウンロードされず、その URL のまま参照されます。この URL は Notion のものとは異なり有効期限が切れないため、読者のブラウザは Payload サーバーまたはそのストレージから直接読み込みます。代わりにビルド時に Blume でダウンロードして最適化したい場合は、[`image.domains`](/docs/configuration#images) でそのホストを許可してください。`payloadSource` を直接構築して [`custom()`](/docs/content/sources/custom) に渡す場合は、エンジンの `serializers` オプションを使って、`block` または `inlineBlock` ノードを `blockType` をキーとして Blume コンポーネントにマッピングできます。`serializers` を設定すると、返されたコンポーネントがレンダリングされるように、ソースのページは MDX として書き出されます。なお、Markdown テキストフィールドに格納された本文は Markdown のままです。Markdown に相当するものがないノードや、シリアライザーが設定されていないブロックはコメントとして除外され、ソースはそのノードとページ名を示す `BLUME_SOURCE_UNSUPPORTED_NODE` 警告を出します。

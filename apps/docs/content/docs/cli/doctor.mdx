@@ -9,16 +9,20 @@ description: blume doctor diagnoses configuration and content problems before yo
 blume doctor
 ```
 
+`blume init` also adds it to `package.json` as a `doctor` script. With pnpm, run that as `pnpm run doctor` (`pnpm --filter <workspace> run doctor` from a monorepo root): a bare `pnpm doctor` runs pnpm's own built-in `doctor` command instead of the script.
+
 ## What it checks
 
 - **The Node version** against the range the installed `blume` package supports, read from its own `engines` field. A version outside it is a warning: things may work, but it isn't a combination Blume tests.
 - **`blume.config.ts`**, with the same validation a build runs. A removed or renamed key fails with a hint naming its replacement rather than a bare "unrecognized key".
 - **Every content page and folder meta**: the diagnostics `blume dev` and `blume build` print as they load the project — invalid frontmatter, navigation problems, missing include targets, and the rest — collected in one report.
+- **Navigation that leads nowhere**: a tab, selector item, featured link, header action, or call to action whose path matches no page, custom `.astro` page, generated route, or reference: a warning (`BLUME_NAV_MISSING_PAGE`), the same one `blume dev` and `blume build` print.
+- **[`<Component>`](/docs/content/components#component) examples that don't exist**: a `path` that names no file under `examples`, which the page would show as a "No example found" box: a warning (`BLUME_EXAMPLE_NOT_FOUND`) at its line, as `blume dev` and `blume build` print it. A `components.ts` override or island named `Component` replaces the built-in, and isn't checked.
 - **Features that need a server** on a site configured for static output — the assistant, the MCP server, the Try it playground's built-in proxy, or server-mode search (Mixedbread): an error naming the feature, with the deployment adapter to switch to (or, when a host adapter is set to `output: "static"`, telling you to drop that option).
 - **Packages your config needs** that aren't installed — the SDK a search, content source, or assistant adapter imports, a deployment adapter's `@astrojs/*` package, or the renderer for Vue or Svelte islands: an error naming each package, with the install command for your package manager. `blume build` stops on the same check.
 - **`components.ts` overrides** Blume can't plan — an inline or computed entry, or an import whose file doesn't exist: an error for each, at its line.
 - **A version-shaped folder** (`v1.0/`) on a site with no `versions` configured, which would otherwise build as ordinary content: a warning pointing at [`blume version`](/docs/cli/version).
-- **Secrets an enabled feature reads** that aren't set, such as `MIXEDBREAD_API_KEY` or `OPENROUTER_API_KEY`: a warning naming the variable. Doctor loads `.env` and `.env.local` first, like `blume dev` and `blume build`.
+- **Secrets an enabled feature reads** that aren't set, such as `MIXEDBREAD_API_KEY` or `OPENROUTER_API_KEY`: a warning naming the variable. Doctor loads `.env` and `.env.local` first, like `blume dev` and `blume build`, and checks before any remote content source fetches, so the warning still prints when a source then fails without its token.
 
 ## The summary
 

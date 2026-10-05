@@ -48,7 +48,6 @@ channels:
     bindings:
       kafka:
         bindingVersion: 0.5.0
-        topic: order-created
         partitions: 12
   orderStatus:
     address: orders/{orderId}/status
@@ -134,6 +133,14 @@ components:
           - correlationId
       payload:
         $ref: "#/components/schemas/Order"
+      bindings:
+        kafka:
+          bindingVersion: 0.5.0
+          key:
+            type: string
+            description: The order ID, so every event for one order lands on the same partition.
+            examples:
+              - ord_7Hq2
     OrderStatusChanged:
       name: OrderStatusChanged
       title: Order status changed

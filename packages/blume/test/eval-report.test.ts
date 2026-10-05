@@ -186,6 +186,46 @@ describe("fixLines", () => {
   });
 });
 
+describe("a warning-severity miss", () => {
+  const warned: QuestionResult = { ...failResult, severity: "warning" };
+  const finding = {
+    code: "BLUME_EVAL_QUESTION_FAILED",
+    file: "/root/docs/deploy.mdx",
+    message: 'Docs could not answer: "How do I deploy to Vercel?"',
+    severity: "warning" as const,
+  };
+  const withWarning: EvalResult = {
+    ...result,
+    counts: { error: 0, fail: 1, pass: 1, skip: 0 },
+    diagnostics: [finding],
+    results: [passResult, warned],
+  };
+
+  it("reads as a warning on its question line", () => {
+    const line = strip(questionLine(warned));
+    expect(line).toContain("⚠ deploy-vercel");
+    expect(line).toContain("warn  0.40");
+    expect(line).not.toContain("fail");
+    expect(strip(questionLine(failResult))).toContain("✖ deploy-vercel");
+  });
+
+  it("counts as warned, not failed, in the summary", () => {
+    expect(summaryLine(withWarning)).toBe(
+      "1 passed · 1 warned · 1m 42s · $0.71"
+    );
+  });
+
+  it("prints as a warning line instead of a fix line", () => {
+    expect(fixLines(withWarning, "/root")).toEqual([]);
+    expect(warningLines(withWarning, "/root").map(strip)).toEqual([
+      '  ⚠ docs/deploy.mdx Docs could not answer: "How do I deploy to Vercel?"',
+    ]);
+    const report = strip(formatEvalReport(withWarning, "/root"));
+    expect(report).toContain("⚠ docs/deploy.mdx");
+    expect(report).not.toContain("fix:");
+  });
+});
+
 describe("formatEvalReport", () => {
   it("lists every question, missing facts, and the fix lines", () => {
     const report = strip(formatEvalReport(result, "/root"));

@@ -485,6 +485,16 @@ const footerConfigSchema = z.strictObject({
   socials: z.partialRecord(z.enum(FOOTER_SOCIALS), z.string()).default({}),
 });
 
+/**
+ * The generated `/changelog` index. Its title and description may be
+ * per-locale maps; unset, they're the `changelog` UI strings `i18n.ui`
+ * translates.
+ */
+const changelogConfigSchema = z.strictObject({
+  description: localizableLabelSchema.optional(),
+  title: localizableLabelSchema.optional(),
+});
+
 /** A validated `content.sources` entry: an adapter descriptor from `blume/sources`. */
 export type { ContentSourceAdapter } from "../sources/registry.ts";
 
@@ -778,9 +788,17 @@ const searchIndexingSchema = z
   })
   .prefault({});
 
+/** What the search dialog's analytics events carry. */
+const searchAnalyticsSchema = z
+  .strictObject({
+    queries: z.boolean().default(true),
+  })
+  .prefault({});
+
 /** The object form of `search`: the adapter plus its adapter-independent settings. */
 const searchOptionsSchema = z.strictObject(
   {
+    analytics: searchAnalyticsSchema,
     indexing: searchIndexingSchema,
     /** Curated links for the Cmd+K empty state; defaults to the first sidebar pages. */
     popular: z.array(searchPopularLinkSchema).default([]),
@@ -2022,9 +2040,9 @@ const markdownConfigSchema = z.strictObject(
 const reactConfigSchema = z.strictObject({
   /**
    * Auto-memoize React components/hooks with the React Compiler
-   * (`babel-plugin-react-compiler`). On by default whenever React is enabled
+   * (`oxc-transform-react`). On by default whenever React is enabled
    * (a project `.tsx`/`.jsx`, a React island/example/override, or the assistant); set
-   * to `false` to skip the compiler's babel pass.
+   * to `false` to skip the compiler pass.
    */
   compiler: z.boolean().default(true),
 });
@@ -2102,6 +2120,7 @@ export const blumeConfigSchema = z
         })
         .optional()
         .transform((value) => normalizeBasePath(value)),
+      changelog: changelogConfigSchema.optional(),
       // An adapter from `blume/consent`; analytics waits for the reader.
       consent: consentConfigSchema,
       content: contentConfigSchema.prefault({}),

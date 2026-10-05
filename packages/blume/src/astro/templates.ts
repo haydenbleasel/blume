@@ -4,13 +4,17 @@ import { pathToFileURL } from "node:url";
 import { dirname, isAbsolute, join, relative } from "pathe";
 
 import type { AskRetrievalOptions } from "../ai/ask-context.ts";
+import { ASK_MAX_MESSAGES, ASK_MAX_MESSAGES_CHARS } from "../ai/ask-limits.ts";
 import type { AskBackend } from "../ai/ask.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import type { CaptchaAdapter } from "../captcha/schema.ts";
 import { CONSENT_CLIENT_MODULES } from "../consent/clients.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { TOC_HIDDEN_KEY } from "../core/heading-markers.ts";
-import { compileRedirects, isPatternPath } from "../core/redirect-patterns.ts";
+import {
+  compileEveryRedirect,
+  isPatternPath,
+} from "../core/redirect-patterns.ts";
 import type { CompiledRedirect } from "../core/redirect-patterns.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { resolveDocsCollection } from "../core/sources/collection.ts";
@@ -22,7 +26,10 @@ import { deployPassthrough } from "../deploy/adapters/types.ts";
 import { SVG_ASSET_HEADERS } from "../deploy/headers.ts";
 import { deployPlatform } from "../deploy/platforms/index.ts";
 import { adapterRoot, distDir } from "../deploy/platforms/paths.ts";
-import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
+import {
+  applyBaseToAstroRedirects,
+  withMirrorRedirects,
+} from "../deploy/redirects.ts";
 import { API_RAIL_KEY } from "../markdown/api-rail.ts";
 import { VIEWS_KEY } from "../markdown/views.ts";
 import type { OgCache } from "../og/cache.ts";
@@ -34,6 +41,7 @@ import type {
   ResolvedSearchAdapter,
   SearchAdapterKind,
 } from "../search/adapters/registry.ts";
+import type { SourcePage } from "../search/source-pages.ts";
 import { buildFontEntries, fontLocaleCodes } from "../theme/fonts.ts";
 import { importSpecifier, wrapperPropsType } from "./component-slots.ts";
 import type { ExampleSpec } from "./examples.ts";
@@ -122,7 +130,7 @@ const renderAstroAdapter = (
   const { astro } = platform;
   const args = {
     ...astro.options(context),
-    ...deployPassthrough(deployment.options),
+    ...deployPassthrough(deployment.options, astro.configOptions),
   };
   const argsLiteral = Object.keys(args).length > 0 ? JSON.stringify(args) : "";
   const construct = `adapter(${argsLiteral})`;
@@ -133,7 +141,7 @@ const renderAstroAdapter = (
       ? `withAdapterRoot(${construct}, ${JSON.stringify(adapterRoot(context))})`
       : construct;
   return {
-    configEntries: Object.entries(astro.config)
+    configEntries: Object.entries(astro.config(deployment.options))
       .map(([key, value]) => `\n  ${key}: ${JSON.stringify(value)},`)
       .join(""),
     importLine: `import adapter from "${astro.package}";\n`,
@@ -283,18 +291,14 @@ const renderUserAliases = (
     .join("");
 
 /**
- * Excludes Vite's pre-bundled dep cache from @vitejs/plugin-react. Astro's
- * react() replaces the plugin's default `/node_modules/` exclude with just
- * `/\.astro$/`, so without this Babel re-parses every optimized dep chunk
- * served from `.vite/deps` — a 500KB+ vendor bundle per chunk, re-done on each
- * re-optimization. A blanket `/node_modules/` exclude would instead switch the
- * React Compiler off for Blume's own components in published installs (they
- * resolve under `node_modules/blume/src`, and exclude beats include in the
- * plugin's filter), so only the pre-bundle cache is excluded. The hidden runtime
- * relocates that cache to `<runtime>/.cache/vite` (see `cacheOptions`), so both
- * the default and the relocated path are excluded.
+ * Excludes the hidden runtime's pre-bundled dep cache from @vitejs/plugin-react.
+ * Astro's react() already excludes `/node_modules/`, which covers Vite's
+ * default `node_modules/.vite` cache, but the hidden runtime relocates that
+ * cache to `<runtime>/.cache/vite` (see `cacheOptions`). Without this the React
+ * Compiler re-transforms every optimized dep chunk served from there — a 500KB+
+ * vendor bundle per chunk, re-done on each re-optimization.
  */
-const REACT_EXCLUDE = String.raw`exclude: [/\/node_modules\/\.vite\//, /\/\.cache\/vite\//]`;
+const REACT_EXCLUDE = String.raw`exclude: [/\/\.cache\/vite\//]`;
 
 /**
  * The `cacheDir` entries for the generated config's top level and its `vite`
@@ -324,17 +328,14 @@ const runtimeCacheOptions = (
 };
 
 /**
- * The `react()` integration call. When `compilerPath` is set (the resolved
- * absolute path to `babel-plugin-react-compiler`), react() carries the compiler
- * as the first babel plugin — an absolute path, because @vitejs/plugin-react
- * resolves babel plugins from the *project* root, not `.blume/`, so a bare
- * specifier wouldn't resolve in a user project. `target: "19"` matches Blume's
- * React pin. `null`/`undefined` (compiler off or unresolvable) omits the babel
- * block. Both variants carry the pre-bundle exclude above.
+ * The `react()` integration call. `compiler` turns on @astrojs/react's React
+ * Compiler, which runs on `oxc-transform-react` and targets the installed
+ * React major; false/absent (compiler off or unresolvable) leaves it out. Both
+ * variants carry the pre-bundle exclude above.
  */
-const reactIntegration = (compilerPath: string | null | undefined): string =>
-  compilerPath
-    ? `react({ babel: { plugins: [[${JSON.stringify(compilerPath)}, { target: "19" }]] }, ${REACT_EXCLUDE} })`
+const reactIntegration = (compiler: boolean | undefined): string =>
+  compiler
+    ? `react({ compiler: true, ${REACT_EXCLUDE} })`
     : `react({ ${REACT_EXCLUDE} })`;
 
 interface IntegrationBridgeOptions {
@@ -388,11 +389,10 @@ interface OptimizeDepsConfig {
  * the Vite root is the generated runtime, so user pages, convention islands,
  * and alias-reachable components all live outside it and are otherwise only
  * crawled when first requested. The compiler runtime rides the include list
- * because it is Babel-injected and no source scan can see it. @vitejs/plugin-react
- * would add it itself, but only when the babel plugin is passed by its bare
- * name (`getReactCompilerPlugin` is an exact string match) — Blume passes an
- * absolute path (see `reactIntegration`), which that check never matches. See
- * the optimizeDeps comment in the generated config for the failure this prevents.
+ * because the compiler injects its import and no source scan can see it. The
+ * compiler plugin in `@vitejs/plugin-react` lists it too; Blume keeps it
+ * explicit so the guard doesn't hinge on that plugin's internals. See the
+ * optimizeDeps comment in the generated config for the failure this prevents.
  */
 /**
  * The client-side libraries a site needs, decided at generation time. A
@@ -432,7 +432,7 @@ const resolveOptimizeDeps = (options: {
   context: ProjectContext;
   features: ClientFeatures;
   needsReact: boolean;
-  reactCompilerPath: string | null | undefined;
+  reactCompiler: boolean | undefined;
   searchKind: SearchAdapterKind;
 }): OptimizeDepsConfig => {
   const { context, features } = options;
@@ -456,7 +456,7 @@ const resolveOptimizeDeps = (options: {
     // (__PREFETCH_PREFETCH_ALL__ and friends) that a pre-bundled copy loses,
     // throwing ReferenceError on every page. Astro manages their optimization
     // itself, without a mid-session reload.
-    ...(options.needsReact && options.reactCompilerPath
+    ...(options.needsReact && options.reactCompiler
       ? ["react/compiler-runtime"]
       : []),
   ];
@@ -612,11 +612,10 @@ export const astroConfigTemplate = (options: {
    */
   generatedModulesDir?: string;
   /**
-   * Absolute path to `babel-plugin-react-compiler` when the React Compiler is
-   * enabled (resolved from Blume's package root by the caller); null/absent
-   * disables the compiler and emits a bare `react()`.
+   * Turn on the React Compiler (the caller checked that `oxc-transform-react`
+   * resolves); false/absent emits `react()` without it.
    */
-  reactCompilerPath?: string | null;
+  reactCompiler?: boolean;
   /** Project tsconfig path aliases (`find` -> absolute dir), e.g. `@` -> src. */
   aliases?: Record<string, string>;
   /**
@@ -664,7 +663,7 @@ export const astroConfigTemplate = (options: {
     context,
     features,
     needsReact,
-    reactCompilerPath: options.reactCompilerPath,
+    reactCompiler: options.reactCompiler,
     searchKind: config.search.provider.kind,
   });
 
@@ -700,11 +699,17 @@ export const astroConfigTemplate = (options: {
   // Base the redirect paths the same way routes are based, so a redirect lands
   // under `basePath` too. Astro layers its own `base` (deployment.base) onto
   // `from` when matching, but never onto `to` — see applyBaseToAstroRedirects.
-  const basedRedirects = applyBaseToAstroRedirects(
-    config.redirects,
-    config.basePath,
-    deployment.options.base ?? "",
-    new Set(contentRoutes)
+  // A moved page's Markdown copies move with it (see withMirrorRedirects).
+  const redirectPages = new Set(contentRoutes);
+  const basedRedirects = withMirrorRedirects(
+    applyBaseToAstroRedirects(
+      config.redirects,
+      config.basePath,
+      deployment.options.base ?? "",
+      redirectPages
+    ),
+    redirectPages,
+    { from: "", to: normalizeBasePath(deployment.options.base) }
   );
   // Only exact redirects: Astro can't prerender a pattern's redirect pages
   // (it would need every path the pattern covers), so a pattern reaches the
@@ -837,7 +842,7 @@ export const astroConfigTemplate = (options: {
     `mdx({ processor: blumeMdxProcessor(${processorOptions}) })`,
   ];
   if (needsReact) {
-    integrations.push(reactIntegration(options.reactCompilerPath));
+    integrations.push(reactIntegration(options.reactCompiler));
   }
   if (needsVue) {
     integrations.push("vue()");
@@ -855,7 +860,7 @@ export const astroConfigTemplate = (options: {
         contentRoutes,
         ejected,
         pages,
-        redirects: compileRedirects(basedRedirects),
+        redirects: compileEveryRedirect(basedRedirects),
       })
     )})`
   );
@@ -931,8 +936,8 @@ ${userConfigSetup}export default defineConfig({
     // Everything hydration can reach must be part of the dev dep optimizer's
     // FIRST run. The Vite root is the generated runtime, so user pages,
     // islands, and aliased components live outside it and are only crawled
-    // when first requested — and \`react/compiler-runtime\` is Babel-injected,
-    // so no source scan can ever see it. A dependency discovered after
+    // when first requested — and \`react/compiler-runtime\` is injected by the
+    // React Compiler, so no source scan can ever see it. A dependency discovered after
     // hydration begins triggers a mid-session re-optimization whose new
     // generation imports React through new \`?v=\` URLs; the browser then
     // evaluates a second React copy and every island tears down with
@@ -1270,8 +1275,8 @@ const askCaptchaTemplate = (adapter?: CaptchaAdapter): RateLimitTemplate => {
 
 /**
  * Largest request body the assistant route reads: 64 KB, well above the
- * 24,000-character message budget it validates next, so a real conversation
- * never meets it.
+ * message budget it validates next (`ai/ask-limits.ts`), so a real
+ * conversation never meets it.
  */
 const ASK_BODY_LIMIT_BYTES = 65_536;
 
@@ -1380,7 +1385,7 @@ ${limit.check}  const text = await readCappedText(request, ${ASK_BODY_LIMIT_BYTE
   const valid =
     Array.isArray(raw) &&
     raw.length > 0 &&
-    raw.length <= 40 &&
+    raw.length <= ${ASK_MAX_MESSAGES} &&
     raw.every(
       (m: unknown) =>
         typeof m === "object" &&
@@ -1388,10 +1393,10 @@ ${limit.check}  const text = await readCappedText(request, ${ASK_BODY_LIMIT_BYTE
         ("role" in m && (m.role === "user" || m.role === "assistant")) &&
         ("content" in m && typeof m.content === "string")
     ) &&
-    JSON.stringify(raw).length <= 24_000;
+    JSON.stringify(raw).length <= ${ASK_MAX_MESSAGES_CHARS};
   if (!valid) {
     return new Response(
-      "Invalid request: send 1-40 user/assistant messages with string content.",
+      "Invalid request: send 1-${ASK_MAX_MESSAGES} user/assistant messages with string content.",
       { status: 400 }
     );
   }
@@ -1649,10 +1654,12 @@ export const searchClientTemplate = (config: ResolvedConfig): string => {
       return hostedSearchClient(provider);
     }
     case "server": {
-      return `${SEARCH_CLIENT_HEADER}${searchClientImport("endpoint")}${SEARCH_BASE_IMPORT}
+      // The dialog passes `typing`, which paces its queries (see endpoint.ts).
+      return `${SEARCH_CLIENT_HEADER}${searchClientImport("endpoint")}${SEARCH_BASE_IMPORT}import type { SearchClientOptions } from "blume/components/layout/search/types.ts";
 const api = joinBase(import.meta.env.BASE_URL, "api/search");
 
-export const createSearch = () => create({ api });
+export const createSearch = (options: SearchClientOptions = {}) =>
+  create({ ...options, api });
 `;
     }
     case "pagefind": {
@@ -1674,14 +1681,17 @@ export const createSearch = () => create({ url });
 /**
  * Generate the Mixedbread search endpoint (`/api/search`). It holds the secret
  * key server-side and proxies semantic queries to the configured store. The
- * adapter's options are inlined as a literal so the route never imports the
- * config. The result mapping is best-effort and may need tuning to how your
- * content was synced (see the Mixedbread sync step / \`mxbai vs sync\`).
+ * adapter's options are inlined as literals so the route never imports the
+ * config. `pages` (see `sourcePages`) maps each source file to its page: a
+ * chunk links to the page whose file `mxbai store sync` uploaded it from,
+ * found by the longest trailing run of the path the CLI recorded.
  */
 export const mixedbreadSearchEndpointTemplate = (
   options: MixedbreadOptions,
+  pages: [string, SourcePage][],
   rateLimit?: RateLimitAdapter | null
 ): string => {
+  const { search_options: tuning, storeId, ...searchOptions } = options;
   const limit = rateLimitTemplate(rateLimit, "search");
   const imports = [
     'import type { APIRoute } from "astro";',
@@ -1696,9 +1706,26 @@ ${imports.join("\n")}
 export const prerender = false;
 
 const client = new Mixedbread({ apiKey: getSecret("MIXEDBREAD_API_KEY") ?? "" });
-const OPTIONS = ${JSON.stringify(options)};
-// Every option besides the store reaches the search call verbatim.
-const { storeId: STORE_ID, ...SEARCH_OPTIONS } = OPTIONS;
+const STORE_ID = ${JSON.stringify(storeId)};
+// Every other option reaches the search call verbatim.
+const SEARCH_OPTIONS = ${JSON.stringify(searchOptions)};
+const SEARCH_TUNING = ${JSON.stringify(tuning ?? {})};
+// Each page's source file, relative to the project root, and the page it renders.
+const PAGES = new Map<string, { title: string; url: string }>(${JSON.stringify(pages)});
+
+// The page a synced file renders. \`mxbai store sync\` records the path
+// relative to where it ran (the project root, or a monorepo root above it), so
+// the longest trailing run of that path that names a page's file wins.
+const pageFor = (path: string) => {
+  const segments = path.replaceAll("\\\\", "/").split("/");
+  for (let start = 0; start < segments.length; start += 1) {
+    const page = PAGES.get(segments.slice(start).join("/"));
+    if (page) {
+      return page;
+    }
+  }
+  return undefined;
+};
 ${limit.setup}
 export const POST: APIRoute = async (context) => {
   const { request } = context;
@@ -1724,23 +1751,32 @@ ${limit.check}  // A search body is one short query: read it under a 16 KB cap, 
     });
   }
   // \`top_k\` defaults to 8 unless an option sets it; the query and store
-  // always come from the request and \`storeId\`.
+  // always come from the request and \`storeId\`. File metadata is always
+  // returned: it holds the path \`mxbai store sync\` recorded for the file.
   const response = await client.stores.search({
     top_k: 8,
     ...SEARCH_OPTIONS,
     query,
+    search_options: { ...SEARCH_TUNING, return_metadata: true },
     store_identifiers: [STORE_ID],
   });
-  const hits = (response.data ?? []).map((chunk) => {
+  const seen = new Set<string>();
+  const hits = (response.data ?? []).flatMap((chunk) => {
+    const { file_path: path } = (chunk.metadata ?? {}) as { file_path?: unknown };
+    const page = typeof path === "string" ? pageFor(path) : undefined;
+    // A file no page renders has nowhere to link, and a page's later chunks
+    // would repeat it: one hit per page, at its best chunk.
+    if (!page || seen.has(page.url)) {
+      return [];
+    }
+    seen.add(page.url);
     const meta = chunk.generated_metadata ?? {};
     // Only a text chunk carries \`text\`; image, audio, and video chunks fall
     // back to the excerpt the store generated for them.
     const text = "text" in chunk ? chunk.text : undefined;
-    return {
-      excerpt: text ?? meta.excerpt ?? "",
-      title: meta.title ?? chunk.filename ?? "",
-      url: meta.url ?? "",
-    };
+    return [
+      { excerpt: text ?? meta.excerpt ?? "", title: page.title, url: page.url },
+    ];
   });
   return new Response(JSON.stringify(hits), {
     headers: { "Content-Type": "application/json" },
@@ -2417,6 +2453,7 @@ import type { CollectionKey } from "astro:content";
 import RootLayout from "blume/components/layout/RootLayout.astro";
 import { withBase, withMountedBase } from "blume/components/islands/base-path.ts";
 import { mountBasePath, stripBasePath } from "blume/core/base-path.ts";
+import { routeSetFor, servesRoute } from "blume/core/locale-links.ts";
 import { resolveSlot } from "blume/components/layout/overrides.ts";
 ${componentImports}
 import data from "blume:data";
@@ -2620,18 +2657,24 @@ const logicalRoute = i18n
   ? stripLocale(stripBasePath(data.config.basePath, route), locale)
   : route;
 // A page from a one-language source (GitHub Releases) gets no switcher: every
-// other locale would only repeat the same text.
+// other locale would only repeat the same text. A locale with no real
+// translation links the page's fallback copy, which exists only while
+// fallbacks are on; where nothing is served at that URL (\`fallbackLocale:
+// null\`), the locale is left out rather than linked to a 404.
 const localeSwitch = i18n && !monolingual
-  ? i18n.locales.map((l) => {
+  ? i18n.locales.flatMap((l) => {
       const alt = (alternates ?? []).find((x) => x.locale === l.code);
-      return {
-        code: l.code,
-        current: l.code === locale,
-        dir: l.dir,
-        href: alt ? alt.path : mountLocalized(logicalRoute, l.code),
-        label: l.label,
-        untranslated: !alt,
-      };
+      const href = alt ? alt.path : mountLocalized(logicalRoute, l.code);
+      return alt || servesRoute(routeSetFor(data.routes), href)
+        ? [{
+            code: l.code,
+            current: l.code === locale,
+            dir: l.dir,
+            href,
+            label: l.label,
+            untranslated: !alt,
+          }]
+        : [];
     })
   : [];
 
@@ -2958,13 +3001,15 @@ const canonical = base ? base + basedRoute : null;
 const ogPath = data.config.og.enabled ? withMountedBase("/og/changelog.png") : null;
 const ogImage = ogPath && base ? base + ogPath : ogPath;
 
-// The page chrome (h1, title, description) comes from the translatable
-// \`changelog\` group; optional chaining tolerates a not-yet-regenerated data
-// snapshot from before these keys existed.
+// The page chrome (h1, title, description, empty state) comes from the
+// translatable \`changelog\` group, which carries the \`changelog\` config's title and
+// description when it sets them; optional chaining tolerates a
+// not-yet-regenerated data snapshot from before these keys existed.
 const changelogTitle = data.ui.changelog?.title ?? "Changelog";
 const changelogDescription =
   data.ui.changelog?.description ??
   "Product updates, new features, and fixes from every release.";
+const changelogEmpty = data.ui.changelog?.empty ?? "No changelog entries yet.";
 // The layout suffixes "- {site title}" itself, so the page title is just the
 // changelog's own name — prefixing the site title too would double it
 // ("Acme Changelog - Acme").
@@ -3017,7 +3062,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   <p class="text-lg text-muted-foreground">{changelogDescription}</p>
   {
     items.length === 0 ? (
-      <p>No changelog entries yet.</p>
+      <p>{changelogEmpty}</p>
     ) : (
       <div class="not-prose mt-10 divide-y divide-border border-border border-y">
         {groups.map((group) => (

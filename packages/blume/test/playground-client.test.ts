@@ -181,7 +181,11 @@ interface Fixture {
 }
 
 /** Build the server-rendered DOM Playground.astro + RequestPanel.astro emit. */
-const createFixture = (model: PlaygroundModel, proxy?: string): Fixture => {
+const createFixture = (
+  model: PlaygroundModel,
+  proxy?: string,
+  proxyConfig?: string
+): Fixture => {
   const panel = el("div", { "data-operation-panel": "" });
   const curl = el("div", { "data-panel": "curl", "data-sample-lang": "curl" });
   const curlCode = el("code");
@@ -191,12 +195,15 @@ const createFixture = (model: PlaygroundModel, proxy?: string): Fixture => {
   // Unknown language id: the client must skip it.
   const weird = el("div", { "data-sample-lang": "weird" });
 
-  const root = el(
-    "blume-playground",
-    proxy
-      ? { "data-proxy": proxy, "data-storage-key": STORAGE_KEY }
-      : { "data-storage-key": STORAGE_KEY }
+  // Playground.astro leaves `data-proxy` off a panel that sends directly.
+  const attributes = Object.fromEntries(
+    [
+      ["data-storage-key", STORAGE_KEY],
+      ["data-proxy", proxy ?? ""],
+      ["data-proxy-config", proxyConfig ?? ""],
+    ].filter(([, value]) => value !== "")
   );
+  const root = el("blume-playground", attributes);
   root.append(
     el(
       "script",
@@ -474,6 +481,22 @@ describe("deep body validation", () => {
   });
 });
 
+/** The CORS message a panel rendered for `config` shows. */
+const corsText = async (config: string): Promise<string> => {
+  const fixture = createFixture(bearerModel(), undefined, config);
+  init(fixture);
+  // The send fails and the probe answers: the CORS wall.
+  let calls = 0;
+  fetchImpl = () => {
+    calls += 1;
+    return calls === 1
+      ? Promise.reject(new TypeError("Failed to fetch"))
+      : Promise.resolve(new Response(null));
+  };
+  await clickSend(fixture);
+  return fixture.response.textContent;
+};
+
 describe("send + response rendering", () => {
   it("renders status, timing, headers, and pretty JSON", async () => {
     const fixture = createFixture(deepModel());
@@ -668,6 +691,23 @@ describe("send + response rendering", () => {
     fetchImpl = () => Promise.reject(new Error("boom"));
     await clickSend(fixture);
     expect(fixture.response.textContent).toBe("Request failed: Error: boom");
+  });
+
+  it("names the proxy setting for the surface the panel is on", async () => {
+    expect(await corsText("graphql")).toContain(
+      "Set `playground: { proxy: true }` on the `graphql()` reference in the Blume config"
+    );
+    expect(await corsText("api")).toContain(
+      "Set `api: { playground: { proxy: true } }` in the Blume config"
+    );
+    const openapi = await corsText("openapi");
+    expect(openapi).toContain(
+      "Set `playground: { proxy: true }` on the `openapi()` reference in the Blume config"
+    );
+    // The built-in proxy is a server route, so a static site can't use it.
+    expect(openapi).toContain(
+      "The proxy needs server output: a host adapter in `deployment`."
+    );
   });
 
   it("never blames CORS for a proxied or same-site send", async () => {

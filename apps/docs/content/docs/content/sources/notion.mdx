@@ -25,7 +25,7 @@ export default defineConfig({
 });
 ```
 
-The integration token comes from the `NOTION_TOKEN` environment variable (share the database with your integration); the adapter declares it, so a build without it warns.
+The integration token comes from the `NOTION_TOKEN` environment variable (share the database with your integration). Without it, the source stops before calling Notion with a `BLUME_MISSING_SECRET` error naming the variable, unless it has a [cached snapshot](/docs/content/sources#caching-and-offline-builds) to serve instead.
 
 The `Status` property is a publish gate by default. A page whose Status (a status or select property) holds any value other than `publishedValue`, which defaults to `Published`, imports with `draft: true`, and production builds drop drafts. A page with no Status value is published, and a database without the property publishes every page. Notion's default status options are Not started, In progress, and Done, so a database that uses them has no `Published` value and publishes nothing until you set `publishedValue: "Done"` (or whichever option means published). `properties.status` names a differently named property; to import every page whatever its status, point it at a property the database doesn't have.
 

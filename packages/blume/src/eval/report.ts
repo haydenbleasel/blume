@@ -10,27 +10,40 @@ import { duration, money, seconds } from "../cli/report-format.ts";
 import { countBySeverity } from "../core/diagnostics.ts";
 import type { EvalResult, QuestionResult, QuestionStatus } from "./run.ts";
 
+/** How a question reads in the report: its status, or `warn` for a warned miss. */
+type ShownStatus = QuestionStatus | "warn";
+
 const GLYPH = {
   error: "!",
   fail: "✖",
   pass: "✔",
   skip: "⊘",
-} satisfies Record<QuestionStatus, string>;
+  warn: "⚠",
+} satisfies Record<ShownStatus, string>;
 
 const STATUS_COLOR = {
   error: colors.yellow,
   fail: colors.red,
   pass: colors.green,
   skip: colors.dim,
-} satisfies Record<QuestionStatus, ColorFunction>;
+  warn: colors.yellow,
+} satisfies Record<ShownStatus, ColorFunction>;
+
+/**
+ * A failed `severity: warning` question: its miss never counts against the
+ * gate, so the report shows and counts it as a warning, not a failure.
+ */
+const warned = (result: QuestionResult): boolean =>
+  result.status === "fail" && result.severity === "warning";
 
 /** Longest id gets the room; everything shorter aligns to it. */
 const ID_PAD = 28;
 
 /** One question's progress/report line: glyph, id, status, score, time, cost. */
 export const questionLine = (result: QuestionResult): string => {
-  const color = STATUS_COLOR[result.status];
-  const glyph = color(GLYPH[result.status]);
+  const shown: ShownStatus = warned(result) ? "warn" : result.status;
+  const color = STATUS_COLOR[shown];
+  const glyph = color(GLYPH[shown]);
   const id = result.id.padEnd(ID_PAD);
   if (result.status === "skip") {
     return `  ${glyph} ${id} ${colors.dim("skipped")}`;
@@ -38,7 +51,7 @@ export const questionLine = (result: QuestionResult): string => {
   const score = result.score === undefined ? "" : result.score.toFixed(2);
   const cost = money(result.costUsd);
   const cells = [
-    color(result.status),
+    color(shown),
     score,
     colors.dim(seconds(result.durationMs)),
     cost === "" ? "" : colors.dim(cost),
@@ -75,9 +88,12 @@ export const questionDetails = (
 /** The one-line totals: `9 passed · 2 failed · 1 skipped · 1m 42s · $0.71`. */
 export const summaryLine = (result: EvalResult): string => {
   const { counts } = result;
+  const warnings = result.results.filter(warned).length;
+  const failures = counts.fail - warnings;
   const parts = [
     `${counts.pass} passed`,
-    counts.fail > 0 ? `${counts.fail} failed` : "",
+    failures > 0 ? `${failures} failed` : "",
+    warnings > 0 ? `${warnings} warned` : "",
     counts.error > 0 ? `${counts.error} errored` : "",
     counts.skip > 0 ? `${counts.skip} skipped` : "",
     duration(result.durationMs),
@@ -98,10 +114,11 @@ export const startLine = (id: string, index: number, total: number): string =>
  * `fix:` pointers for failed questions, naming the file that resolves each. A
  * question whose agent run errored gets a `run failed:` line pointing at the
  * question instead: the run never graded the docs, so there's no page to fix.
+ * A `severity: warning` question's miss is a warning line instead.
  */
 export const fixLines = (result: EvalResult, root: string): string[] =>
   result.diagnostics
-    .filter((diagnostic) => diagnostic.code !== "BLUME_EVAL_ROUTE_UNKNOWN")
+    .filter((diagnostic) => diagnostic.severity !== "warning")
     .map((finding) => {
       const site = finding.file
         ? `${relative(root, finding.file)}${finding.line ? `:${finding.line}` : ""}`
@@ -113,10 +130,13 @@ export const fixLines = (result: EvalResult, root: string): string[] =>
       return `  ${label} ${site} ${colors.dim(finding.message)}`;
     });
 
-/** Dim warnings for route hints that no longer match a page. */
+/**
+ * Dim warnings: route hints that no longer match a page, and the misses of
+ * `severity: warning` questions.
+ */
 export const warningLines = (result: EvalResult, root: string): string[] =>
   result.diagnostics
-    .filter((diagnostic) => diagnostic.code === "BLUME_EVAL_ROUTE_UNKNOWN")
+    .filter((diagnostic) => diagnostic.severity === "warning")
     .map((finding) => {
       const site = finding.file
         ? ` ${relative(root, finding.file)}${finding.line ? `:${finding.line}` : ""}`
@@ -140,10 +160,11 @@ export const formatEvalReport = (
   }
   lines.push("");
 
-  // The finding tells the author which file fixes which failure.
-  const failures = fixLines(result, root);
-  lines.push(...failures);
-  if (failures.length > 0) {
+  // The finding tells the author which file fixes which failure, warnings
+  // first, as the command prints them.
+  const findings = [...warningLines(result, root), ...fixLines(result, root)];
+  lines.push(...findings);
+  if (findings.length > 0) {
     lines.push("");
   }
 

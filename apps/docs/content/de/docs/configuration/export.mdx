@@ -1,20 +1,20 @@
 ---
 title: Export
 description: >-
-  Lassen Sie Leser jede Seite als PDF oder EPUB herunterladen — clientseitig gerendert, damit Ihre statischen Builds statisch bleiben und keine Serverinfrastruktur benötigen.
+  Lass Leser jede Seite als PDF oder EPUB herunterladen — clientseitig gerendert, damit deine statischen Builds statisch bleiben und keine Serverinfrastruktur benötigen.
 ---
 
 Blume kann eine **Export**-Aktion zu den [Seitenaktionen](/docs/content/navigation#page-actions) unterhalb des Inhaltsverzeichnisses hinzufügen, sodass Leser die Seite, auf der sie sich befinden, als **PDF** oder **EPUB** speichern können. Die Funktion ist standardmäßig deaktiviert und läuft vollständig clientseitig — kein Server, und [statische](/docs/deployment) Builds bleiben statisch.
 
 ## Aktivieren [#enable-it]
 
-Schalten Sie beide Formate mit einem einzigen Schalter ein:
+Schalte beide Formate mit einem einzigen Schalter ein:
 
 ```ts blume.config.ts
 export: true,
 ```
 
-Um nur ein Format anzubieten, übergeben Sie stattdessen ein Objekt:
+Um nur ein Format anzubieten, übergib stattdessen ein Objekt:
 
 ```ts blume.config.ts
 export: {
@@ -23,27 +23,29 @@ export: {
 },
 ```
 
-Jedes Format, das Sie weglassen (oder auf `false` setzen), wird aus dem Menü ausgeschlossen. Sind beide deaktiviert — die Standardeinstellung —, erscheint die **Export**-Aktion überhaupt nicht.
+Jedes Format, das du weglässt (oder auf `false` setzt), wird aus dem Menü ausgeschlossen. Sind beide deaktiviert — die Standardeinstellung —, erscheint die **Export**-Aktion überhaupt nicht.
 
 ## PDF
 
-**Als PDF exportieren** öffnet den Druckdialog Ihres Browsers mit einem Druck-Stylesheet, das die Website-Umgebung — Kopfzeile, Seitenleisten, Navigation — entfernt und nur den Artikel übrig lässt. Wählen Sie **Als PDF speichern**, um den Vorgang abzuschließen.
+**Als PDF exportieren** öffnet den Druckdialog deines Browsers mit einem Druck-Stylesheet, das die Website-Umgebung — Kopfzeile, Seitenleisten, Navigation und alles nach dem Artikel (zuletzt aktualisiert, Feedback, Links zur vorherigen und nächsten Seite, die Fußzeile der Website) sowie die Kopieren-Schaltflächen an Codeblöcken — entfernt und nur den Artikel übrig lässt. Eingeklappte [`expandable`](/docs/content/syntax#long-lines-and-long-blocks)-Codeblöcke werden vollständig gedruckt, und eine im dunklen Theme gelesene Seite wird im hellen gedruckt. Wähle **Als PDF speichern**, um den Vorgang abzuschließen. Dasselbe Stylesheet greift, wenn ein Leser über das browsereigene Menü druckt.
 
 Da die live dargestellte, vollständig gestaltete Seite gedruckt wird, behält das Ergebnis gestochen scharfen, markierbaren Text, echte Schriftarten und syntaxhervorgehobenen Code. Es sind keine Abhängigkeiten erforderlich, und es funktioniert in der Entwicklung, in der Produktion und auf statischen Hosts gleichermaßen.
 
 :::note
-Der PDF-Export läuft über den nativen Druckdialog des Browsers, daher hängen die genaue Formulierung „Als PDF speichern“ und die Optionen vom Browser ab. Aktivieren Sie im Dialog **Hintergrundgrafiken**, damit die Hintergründe von Codeblöcken und Hinweisen erhalten bleiben.
+Der PDF-Export läuft über den nativen Druckdialog des Browsers, daher hängen die genaue Formulierung „Als PDF speichern“ und die Optionen vom Browser ab. Aktiviere im Dialog **Hintergrundgrafiken**, damit die Hintergründe von Codeblöcken und Hinweisen erhalten bleiben.
 :::
 
 ## EPUB
 
-**Als EPUB exportieren** erzeugt im Browser eine eigenständige `.epub`-Datei der aktuellen Seite und lädt sie herunter — bereit für Apple Books, Calibre oder jeden E-Reader. Der Generator wird erst geladen, wenn ein Leser auf Export klickt, sodass er den Rest Ihrer Website nie belastet.
+**Als EPUB exportieren** erzeugt im Browser eine eigenständige `.epub`-Datei der aktuellen Seite und lädt sie herunter — bereit für Apple Books, Calibre oder jeden E-Reader. Der Generator wird erst geladen, wenn ein Leser auf Export klickt, sodass er den Rest deiner Website nie belastet.
 
-Damit die Datei auf einem Gerät ohne eigenes Stylesheet oder JavaScript lesbar bleibt, schreibt Blume die Seite in sauberes, eigenständiges HTML um: syntaxhervorgehobener Code wird zu einfacher Monospace-Schrift, dekorative Symbole und Kopieren-Schaltflächen entfallen, und ein integriertes E-Reader-Stylesheet kümmert sich um Abstände, Codeblöcke und Tabellen.
+Damit die Datei auf einem Gerät ohne eigenes Stylesheet oder JavaScript lesbar bleibt, schreibt Blume die Seite in sauberes, eigenständiges HTML um: syntaxhervorgehobener Code wird zu einfacher Monospace-Schrift, dekorative Symbole und Kopieren-Schaltflächen entfallen, und ein integriertes E-Reader-Stylesheet kümmert sich um Abstände, Codeblöcke und Tabellen. Links zu anderen Seiten verweisen auf deine Live-Website, da das Buch nur diese Seite enthält.
+
+Das Buch erhält als Titel die Überschrift der Seite, übernimmt die Sprache der Seite und nennt den [`title`](/docs/configuration#site) deiner Website als Autor und Herausgeber. Bilder werden in das Buch geladen; ein Bild, das der Browser nicht abrufen kann — etwa eines auf einem anderen Host, der keine Cross-Origin-Anfragen erlaubt —, wird weggelassen, und in der Browserkonsole erscheint eine Warnung.
 
 ## Was exportiert wird [#what-gets-exported]
 
-Beide Formate exportieren die **einzelne Seite**, die ein Leser gerade betrachtet — nicht die gesamte Website —, was dazu passt, wo die Aktion angesiedelt ist: unterhalb des Inhaltsverzeichnisses dieser Seite.
+Beide Formate exportieren die **einzelne Seite**, die ein Leser gerade betrachtet — nicht die gesamte Website —, was dazu passt, wo die Aktion angesiedelt ist: unterhalb des Inhaltsverzeichnisses dieser Seite. Wie die anderen [Seitenaktionen](/docs/content/navigation#page-actions) befindet sie sich in Fenstern ab 1.280px Breite in der rechten Spalte und in schmaleren Fenstern sowie auf Smartphones im Dropdown „Auf dieser Seite“ oberhalb des Inhalts.
 
 :::note
 In einem EPUB gibt es kein JavaScript, um Tabs zu wechseln, daher werden Inhalte mit Tabs — wie [package-install](/docs/content/syntax)-Blöcke und Codegruppen — so erweitert, dass alle Panels gleichzeitig angezeigt werden. Clientseitig gerenderte Einbettungen wie Mermaid-Diagramme sind nicht enthalten.

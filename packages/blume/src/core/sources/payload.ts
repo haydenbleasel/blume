@@ -1,8 +1,9 @@
+import type { Diagnostic } from "../types.ts";
 import type { JsonObject } from "./json.ts";
 import { asObject, asString, isJsonObject, objectsIn } from "./json.ts";
 import { lexicalToMarkdown } from "./lexical.ts";
 import { writesMdx } from "./lower.ts";
-import type { RemoteFieldMap, RestClient } from "./remote.ts";
+import type { RemoteFieldMap, RemoteFields, RestClient } from "./remote.ts";
 import {
   documentEntry,
   fetchJson,
@@ -44,7 +45,7 @@ export interface PayloadSourceOptions {
 
 const PAGE_SIZE = 100;
 
-const DEFAULT_FIELDS: Required<RemoteFieldMap> = {
+const DEFAULT_FIELDS: RemoteFields = {
   body: "content",
   description: "description",
   lastModified: "updatedAt",
@@ -64,13 +65,45 @@ export const payloadSource = (
   const fields = { ...DEFAULT_FIELDS, ...options.fields };
   const origin = options.url.replace(/\/+$/u, "");
 
-  const lower = (body: JsonObject): string =>
+  const lower = (body: JsonObject, leftOut: Set<string>): string =>
     lexicalToMarkdown(body, {
       baseUrl: origin,
+      onUnsupported: (what) => leftOut.add(what),
       serializers: options.serializers,
     });
 
-  const fetchEntries = async (): Promise<SourceEntry[]> => {
+  // A document mapped to its entry, with a warning for each kind of node its
+  // body left out as a comment.
+  const toEntry = (
+    doc: JsonObject,
+    draft: boolean,
+    warn: (diagnostic: Diagnostic) => void
+  ): SourceEntry => {
+    const leftOut = new Set<string>();
+    const id = asString(doc.id) ?? String(doc.id ?? "");
+    const entry = documentEntry(
+      doc,
+      fields,
+      id,
+      (body) => (isJsonObject(body) ? lower(body, leftOut) : ""),
+      draft,
+      writesMdx(options.serializers)
+    );
+    for (const what of leftOut) {
+      warn({
+        code: "BLUME_SOURCE_UNSUPPORTED_NODE",
+        message: `Source "${options.name}": "${entry.ref}" has content Blume has no Markdown for (${what}), left out as a comment.`,
+        severity: "warning",
+        suggestion:
+          "Map a block type to a component with a serializer on payloadSource, passed to custom(); other nodes have no Markdown equivalent.",
+      });
+    }
+    return entry;
+  };
+
+  const fetchEntries = async (
+    warn: (diagnostic: Diagnostic) => void
+  ): Promise<SourceEntry[]> => {
     const preview = ctx?.preview ?? false;
     const token = options.token ?? process.env.PAYLOAD_API_KEY;
     const client: RestClient = {
@@ -105,17 +138,7 @@ export const payloadSource = (
         if (draft && !preview) {
           continue;
         }
-        const id = asString(doc.id) ?? String(doc.id ?? "");
-        entries.push(
-          documentEntry(
-            doc,
-            fields,
-            id,
-            (body) => (isJsonObject(body) ? lower(body) : ""),
-            draft,
-            writesMdx(options.serializers)
-          )
-        );
+        entries.push(toEntry(doc, draft, warn));
       }
       more = result.hasNextPage === true;
       page += 1;

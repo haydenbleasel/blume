@@ -272,14 +272,16 @@ export const initCommand = defineCommand({
     // which `init` leaves alone; say what it still needs before installing.
     const note = workspaceNote(root, answers, env);
 
-    // Keep installed dependencies, Blume's generated runtime (`.blume/`), and
-    // build output (`dist/`) out of version control. Idempotent: creates
-    // `.gitignore` when absent and skips entries already present
-    // (trailing-slash agnostic).
+    // Keep installed dependencies, Blume's generated runtime (`.blume/`),
+    // build output (`dist/`), and local secrets (`.env.local`, where every
+    // missing-secret warning says to put them) out of version control.
+    // Idempotent: creates `.gitignore` when absent and skips entries already
+    // present (trailing-slash agnostic).
     const ignored = await ensureGitignore(root, [
       "node_modules/",
       ".blume/",
       "dist/",
+      ".env.local",
     ]);
     if (ignored.length > 0) {
       sink.success(`Added ${ignored.join(", ")} to .gitignore`);

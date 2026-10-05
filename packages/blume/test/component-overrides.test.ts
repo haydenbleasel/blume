@@ -256,6 +256,19 @@ describe("analyzeComponentOverrides warnings", () => {
     expect(result.warnings.join(" ")).toContain('client: "media"');
   });
 
+  it("warns about a layout key that isn't a slot, and keeps it", () => {
+    const result = analyze(`
+      export default { layout: { footer: "./footer.astro", Footer: "./footer.astro" } };
+    `);
+    expect(result.layout.map((entry) => entry.key)).toEqual([
+      "footer",
+      "Footer",
+    ]);
+    expect(result.warnings).toEqual([
+      'Layout override "footer" isn\'t a layout slot, so nothing renders it. Use one of: Layout, Header, Logo, Search, Sidebar, MobileNav, Breadcrumbs, TableOfContents, Pagination, Feedback, PageHeader, PageFooter, Footer.',
+    ]);
+  });
+
   it("warns when client: only can't infer a framework", () => {
     const result = analyze(
       'export default { mdx: { Solo: { component: "./Solo.astro", client: "only" } } };'

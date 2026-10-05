@@ -9,9 +9,11 @@
 // secrets (cli/required-secrets.ts), and GitHub's REST, token, and Actions
 // docs. Ran mdxRemoteSource against two subtrees of a public GitHub repository
 // (one pinned to a tag, one to a commit SHA) to confirm routes, edit links,
-// the snapshot layout, folder meta ordering, and that a `path` missing at the
-// ref yields no pages and no warning; ran link validation and route
-// collection over mocked remote pages. Not yet run end to end with
+// the snapshot layout, and folder meta ordering; ran link validation and
+// route collection over mocked remote pages. Rechecked the prefixed-file
+// links, `!` include patterns (probed with picomatch), and the
+// BLUME_SOURCE_PATH_MISSING and BLUME_SOURCE_TRUNCATED warnings against
+// core/links.ts and core/sources/mdx-remote.ts. Not yet run end to end with
 // `blume build`.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
@@ -247,9 +249,9 @@ export default defineConfig({
     sidebar lists the local pages that belong to no tab. A frontmatter <code>slug</code> in a
     remote page stays inside its prefix, too. Every <code>.md</code> and{" "}
     <code>.mdx</code> file under <code>path</code> becomes a page, so keep
-    READMEs and contributing notes out of the docs folder, or narrow{" "}
-    <code>include</code> with a positive glob such as{" "}
-    <code>["*.mdx", "guides/**/*.mdx"]</code>.
+    READMEs and contributing notes out of the docs folder, or leave them out
+    with a <code>!</code> pattern in <code>include</code>, such as{" "}
+    <code>{'["**/*.{md,mdx}", "!**/README.md"]'}</code>.
   </p>
   <h3>Order a remote section from the portal</h3>
   <p>
@@ -327,8 +329,9 @@ export default defineMeta({
   </p>
   <p>
     Locally, put the token in <code>.env.local</code> at the portal's root as{" "}
-    <code>GITHUB_TOKEN=</code> followed by the token, and keep that file out of
-    Git. Blume loads <code>.env</code> and <code>.env.local</code> itself. To
+    <code>GITHUB_TOKEN=</code> followed by the token. <code>blume init</code>{" "}
+    already listed that file in <code>.gitignore</code>, and Blume loads{" "}
+    <code>.env</code> and <code>.env.local</code> itself. To
     use your GitHub CLI login for one run without writing it to disk:
   </p>
   <CodeBlock code="GITHUB_TOKEN=$(gh auth token) npx blume dev" lang="bash" />
@@ -366,10 +369,9 @@ export default defineMeta({
     </li>
     <li>
       <strong>Ordering prefixes:</strong> Blume drops a numeric prefix like{" "}
-      <code>02-</code> from a remote file's route, but{" "}
-      <code>blume validate</code> resolves a link to <code>./02-errors.mdx</code>{" "}
-      as <code>/sdk/02-errors</code> and reports it broken. Leave prefixes off
-      remote file names and order the section with <code>meta.ts</code>.
+      <code>02-</code> from a remote file's route, and a link to{" "}
+      <code>./02-errors.mdx</code> lands on <code>/sdk/errors</code>, in the
+      page and in <code>blume validate</code> alike.
     </li>
   </ul>
   <p>
@@ -528,13 +530,14 @@ git push origin v1.5.0`}
     <code>GITHUB_TOKEN</code> is set where the build runs and that the token has
     the repository selected. A 403 or 429 can also mean a rate limit.
   </p>
-  <h3>A section is empty, and nothing warns</h3>
+  <h3>A section is empty</h3>
   <p>
-    If <code>path</code> doesn't exist at the pinned ref, or <code>include</code>{" "}
-    matches none of its files, the source loads zero pages without a
-    diagnostic, for example when a repository moved its docs folder before or
-    after the tag you pinned. Browse the repository at that ref on GitHub, then
-    fix <code>path</code> or move the pin.
+    If <code>path</code> doesn't exist at the pinned ref, the source loads zero
+    pages and warns <code>BLUME_SOURCE_PATH_MISSING</code>, for example when a
+    repository moved its docs folder before or after the tag you pinned. If{" "}
+    <code>include</code> matches none of the files under it, the section is
+    empty without a diagnostic. Browse the repository at that ref on GitHub,
+    then fix <code>path</code>, <code>include</code>, or the pin.
   </p>
   <h3>The site shows older content than the repository</h3>
   <p>

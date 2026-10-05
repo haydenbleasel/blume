@@ -15,7 +15,8 @@
 // Review: rechecked Ollama's context-length and FAQ docs (4k/32k/256k by
 // VRAM, OLLAMA_NO_CLOUD, OLLAMA_NUM_PARALLEL=1) and, for the reverse-proxy
 // rate-limit note, Astro 7.3.2's core/app/node.js (X-Forwarded-For is only
-// trusted when security.allowedDomains matches, which Blume doesn't set).
+// trusted when security.allowedDomains matches, which node()'s
+// allowedDomains sets: deploy/platforms/node.ts on 400b5ff3).
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -255,8 +256,21 @@ DOCS_LLM_API_KEY=ollama PORT=8080 node dist/server/entry.mjs`}
     design. Blume's rate limit, on by default at 30 questions per reader every
     10 minutes, counts by the address the Node server sees. Behind a reverse
     proxy on the same machine, that's the proxy's address on every request, so
-    all readers would share one count. Set <code>rateLimit: false</code> and
-    limit <code>/api/ask</code> in the proxy instead, as{" "}
+    all readers would share one count. List the site's host in{" "}
+    <code>node()</code>'s <code>allowedDomains</code>, and Astro reads each
+    reader's address from the <code>X-Forwarded-For</code> header the proxy
+    sends:
+  </p>
+  <CodeBlock
+    code={`deployment: node({
+  site: "https://docs.acme.example",
+  allowedDomains: [{ hostname: "docs.acme.example" }],
+}),`}
+    lang="ts"
+  />
+  <p>
+    The proxy must replace any <code>X-Forwarded-For</code> the reader sent,
+    not append to it, as{" "}
     <a href="/guides/rate-limit-documentation-ai-assistant#everyone-hits-the-limit-at-once">the rate limiting guide</a>{" "}
     explains. Its bot check works either way.
   </p>

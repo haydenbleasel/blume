@@ -55,7 +55,7 @@ Upgrade to the **{{plan}}** plan to use {{feature}}.
 </include>
 ```
 
-A prop applies to the included file and to anything it includes in turn, and takes precedence over a site-wide variable with the same name. Every attribute except `lang` and `meta` is a prop; attribute values are plain text.
+A prop applies to the included file and to anything it includes in turn, and takes precedence over a site-wide variable with the same name. Every attribute except `lang` and `meta` is a prop; attribute names are lowercase, and values are quoted plain text. Props reach Markdown and MDX partials only: a `{{name}}` in an included [code file](#including-code-files) isn't replaced by a prop.
 
 ## Including code files
 

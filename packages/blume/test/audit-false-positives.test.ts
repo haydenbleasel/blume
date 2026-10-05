@@ -82,12 +82,12 @@ describe("orphan pages", () => {
   });
 });
 
-describe("text fragments", () => {
-  const pages = (href: string) => [
-    snapshot({ ids: new Set(["setup"]), links: [link(href)], url: "/" }),
-    snapshot({ ids: new Set(["install"]), links: [link("/")], url: "/b" }),
-  ];
+const pages = (href: string) => [
+  snapshot({ ids: new Set(["setup"]), links: [link(href)], url: "/" }),
+  snapshot({ ids: new Set(["install"]), links: [link("/")], url: "/b" }),
+];
 
+describe("text fragments", () => {
   it("ignores a bare text fragment, on this page or another", () => {
     for (const href of [
       "#:~:text=Lorem",

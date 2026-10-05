@@ -85,7 +85,7 @@ export default defineComponents({
 });
 ```
 
-Slots conectados:
+Slots conectados (os nomes diferenciam maiúsculas de minúsculas; qualquer outra chave em `layout` não é renderizada em lugar nenhum, e o Blume emite um aviso sobre isso):
 
 | Slot | Substitui | Props |
 | --- | --- | --- |
@@ -96,12 +96,14 @@ Slots conectados:
 | `Sidebar` | A árvore de navegação principal | `items`, `currentRoute` |
 | `MobileNav` | A navegação dentro da gaveta mobile (usa `Sidebar` por padrão) | `items`, `currentRoute` |
 | `Breadcrumbs` | A trilha de navegação | `crumbs` |
-| `TableOfContents` | O sumário desta página | `headings`, `title`, `variant` |
+| `TableOfContents` | O sumário desta página, na coluna da direita (`variant: "desktop"`) e no menu suspenso acima do conteúdo em telas mais estreitas (`"mobile"`) | `headings`, `title`, `variant` |
 | `Pagination` | Os links de anterior/próximo no rodapé | `prev`, `next`, `strings` |
 | `Feedback` | A avaliação "Esta página foi útil?" abaixo do artigo (renderizada apenas quando [`feedback`](/docs/configuration#page-feedback) está ativado) | `strings`, `comments` |
 | `PageHeader` | Um ponto de injeção acima do artigo (sem componente integrado) | `page`, `headings`, `route` |
 | `PageFooter` | Um ponto de injeção abaixo do artigo (sem componente integrado) | `page`, `headings`, `route` |
 | `Footer` | O [rodapé do site](/docs/configuration#footer) após a grade de conteúdo: links, perfis sociais, o link do repositório e as Configurações de cookies | `footer`, `locale`, `site`, `navigation`, `ui` |
+
+A variante `mobile` também recebe as [ações da página](/docs/content/navigation#page-actions) como filhos (um elemento vazio para o qual as ações são movidas a partir da coluna da direita abaixo de 1.280px), então renderize um `<slot />` nela para mantê-las em telas mais estreitas. Ela também é renderizada em páginas sem títulos, com `headings` vazio, para que as ações continuem aparecendo ali.
 
 `PageHeader` e `PageFooter` não têm componente integrado — eles não renderizam nada até você defini-los, o que os torna pontos de injeção convenientes para um banner promocional ou uma nota de "última atualização". O `Footer` integrado contém os únicos links para o seu repositório e seus perfis sociais, então uma substituição de `Footer` (o lugar para um rodapé de marketing que a configuração não consegue expressar) deve mantê-los. Com `consent` definido, mantenha também uma forma de reabrir o consentimento: qualquer elemento com `data-blume-consent-open` funciona como o link de [Configurações de cookies](/docs/configuration/consent#changing-an-answer).
 

@@ -61,7 +61,7 @@ const adapterSecretOwners = (config: ResolvedConfig): SecretOwner[] => {
  * the failure surfaces at `blume dev`/`build` instead of at the first request in
  * production. These are runtime secrets (the endpoint reads them on the server),
  * so this warns rather than hard-fails — the value may live only in the deploy
- * environment. Build-time secrets (search-index sync) already warn during sync.
+ * environment. Build-time secrets (search-index sync) are checked by the sync.
  */
 export const checkRequiredSecrets = (config: ResolvedConfig): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];

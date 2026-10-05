@@ -19,7 +19,8 @@ export default defineConfig({
         url: "https://cms.example.com",
         contentType: "guides",
         // locale: "en"
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "body" },
         // Extra query parameters: filters[...], sort
         params: { "filters[section][$eq]": "sdk" },
@@ -29,4 +30,4 @@ export default defineConfig({
 });
 ```
 
-API トークンは `STRAPI_API_TOKEN` 環境変数から取得され、Bearer トークンとして送信されます。エントリーは `populate=*` を指定して取得されるため、画像には URL が含まれます（範囲を絞り込むには `populate` を設定してください）。相対アップロードパス（`/uploads/x.png`）は `url` を基準に解決されます。インポートされるのは公開済みのエントリーのみです。`--preview` を指定すると下書きがリクエストされます（Strapi 5 では `status=draft`、Strapi 4 では `publicationState=preview`）。このとき、一度も公開されたことのないドキュメントは `draft: true` としてステージングされます。公開済みのドキュメントの場合は、最新の下書きがプレビューされます。
+API トークンは `STRAPI_API_TOKEN` 環境変数から取得され、Bearer トークンとして送信されます。エントリーは `populate=*` を指定して取得されるため、画像には URL が含まれます（範囲を絞り込むには `populate` を設定してください）。Blocks フィールド内の相対アップロードパス（`/uploads/x.png`）は `url` を基準に解決されます。Markdown フィールドは記述されたとおりにそのまま渡されるため、そこに含まれる相対パスはドキュメントサイトを基準としたままとなり、正しく表示されません。Markdown フィールドでは、Strapi の Markdown エディターが挿入するのと同じように、絶対 URL で画像を指定してください。インポートされるのは公開済みのエントリーのみです。`--preview` を指定すると下書きがリクエストされます（Strapi 5 では `status=draft`、Strapi 4 では `publicationState=preview`）。このとき、一度も公開されたことのないドキュメントは `draft: true` としてステージングされます。公開済みのドキュメントの場合は、最新の下書きがプレビューされます。

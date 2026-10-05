@@ -860,6 +860,18 @@ describe("Assistant open/close", () => {
   });
 });
 
+const ask = async (response: () => Response): Promise<string> => {
+  setFetch(() => Promise.resolve(response()));
+  let tree = fresh();
+  setComposer(tree, "configured?");
+  tree = render();
+  submit(tree);
+  await settle();
+  tree = render();
+  const [answer] = answers(tree);
+  return answerHtml(answer);
+};
+
 describe("Assistant conversation", () => {
   it("streams a suggestion's answer, grounding the request and basing citations", async () => {
     const requests: { init?: RequestInit; url: string }[] = [];
@@ -1044,17 +1056,6 @@ describe("Assistant conversation", () => {
   });
 
   it("shows the route's not-configured notice for a 503, and only that", async () => {
-    const ask = async (response: () => Response): Promise<string> => {
-      setFetch(() => Promise.resolve(response()));
-      let tree = fresh();
-      setComposer(tree, "configured?");
-      tree = render();
-      submit(tree);
-      await settle();
-      tree = render();
-      const [answer] = answers(tree);
-      return answerHtml(answer);
-    };
     // The generated route's missing-key notice names the variable to set.
     expect(
       await ask(

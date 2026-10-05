@@ -165,6 +165,10 @@ describe("agentArgs", () => {
       "--output-format",
       "json",
       "--strict-mcp-config",
+      "--tools",
+      "",
+      "--setting-sources",
+      "",
       "--mcp-config",
       "/work/mcp-config.json",
       "--allowedTools",
@@ -181,6 +185,31 @@ describe("agentArgs", () => {
     expect(args).toContain("--strict-mcp-config");
     expect(args).not.toContain("--mcp-config");
     expect(args).toEqual(expect.arrayContaining(["--max-turns", "1"]));
+  });
+
+  it("leaves a claude run no built-in tools, whatever Claude Code names them", () => {
+    // A deny list goes stale as Claude Code adds tools (`Monitor` runs shell
+    // commands, `Skill` loads the user's skills); `--tools ""` turns every
+    // built-in off, so the reader keeps only the docs MCP tools.
+    for (const args of [
+      agentArgs("claude", { lastMessagePath: "/work/answer.txt", mcp }),
+      agentArgs("claude", { lastMessagePath: "/work/verdict.txt" }),
+    ]) {
+      expect(args[args.indexOf("--tools") + 1]).toBe("");
+    }
+  });
+
+  it("keeps the user's Claude Code settings and CLAUDE.md out of a claude run", () => {
+    // Like codex's `--ignore-user-config`: hooks, plugins, and memory would
+    // otherwise feed the reader context the docs never gave it. Not `--bare`,
+    // which also stops reading a subscription login.
+    for (const args of [
+      agentArgs("claude", { lastMessagePath: "/work/answer.txt", mcp }),
+      agentArgs("claude", { lastMessagePath: "/work/verdict.txt" }),
+    ]) {
+      expect(args[args.indexOf("--setting-sources") + 1]).toBe("");
+      expect(args).not.toContain("--bare");
+    }
   });
 
   it("builds the codex reader argv: TOML server overrides, stdin prompt", () => {
@@ -373,10 +402,15 @@ describe("prompts", () => {
   });
 
   it("evalFixPrompt points at the report and protects the evals file", () => {
-    const prompt = evalFixPrompt("/tmp/report.json");
+    const prompt = evalFixPrompt(
+      "/tmp/report.json",
+      "blume eval --agent claude --file qa.yaml"
+    );
     expect(prompt).toContain("/tmp/report.json");
     expect(prompt).toContain("Never delete questions");
-    expect(prompt).toContain("blume eval");
+    expect(prompt).toContain(
+      "run `blume eval --agent claude --file qa.yaml` to verify"
+    );
   });
 
   it("initPrompt names the target file and the format", () => {

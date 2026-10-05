@@ -544,7 +544,7 @@ A **Prop / Type** grid where each row expands to reveal its description and deta
 
 ### Auto type table
 
-Generate a type table from a TypeScript type so the docs stay in sync with the source. Point `AutoTypeTable` at a file with `path` (resolved from your project root) and a type `name`. Descriptions come from JSDoc comments, defaults from `@default` tags, and optional properties (`?`) are marked accordingly.
+Generate a type table from a TypeScript type so the docs stay in sync with the source. Point `AutoTypeTable` at a file with `path` (resolved from your project root, the folder you run `blume` in) and a type `name`. Descriptions come from JSDoc comments, defaults from `@default` tags, and optional properties (`?`) are marked accordingly.
 
 ```astro
 <AutoTypeTable path="./src/button.ts" name="ButtonProps" />
@@ -685,7 +685,7 @@ The card reads the instance from [`github.host`](/docs/configuration#github-ente
 
 ## Component
 
-`Component` renders an example file from your project's `examples/` directory as a live preview alongside its highlighted source, in tabs. Point it at a file with `path` — its location under `examples/`, without the extension (so `examples/counter.tsx` is `path="counter"`). React, Vue, Svelte, and Astro examples are all supported; framework examples hydrate, Astro ones render statically. It keeps the preview and the code in sync from a single file.
+`Component` renders an example file from your project's `examples/` directory as a live preview alongside its highlighted source, in tabs. Point it at a file with `path` — its location under `examples/`, without the extension (so `examples/counter.tsx` is `path="counter"`). React, Vue, Svelte, and Astro examples are all supported; framework examples hydrate, Astro ones render statically. It keeps the preview and the code in sync from a single file. A `path` that names no example renders a "No example found" box instead, and `blume dev`, `blume build`, and [`blume doctor`](/docs/cli/doctor) warn about it (`BLUME_EXAMPLE_NOT_FOUND`) at its line.
 
 The preview renders in an isolated frame that the docs styles never reach — no prose margins, typography, or theme chrome bleed into your component. The frame gets Tailwind (preflight + utilities scanned from your project and your examples directory), Blume's design tokens so classes like `bg-background` follow the site palette by default, and it follows the site's light/dark toggle live. The pane sizes itself to the rendered example — and keeps tracking it if the example grows or shrinks after load — with the Preview and Code tabs sharing one height so toggling them never shifts the page.
 

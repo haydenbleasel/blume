@@ -20,6 +20,8 @@
  * `/v2` rather than `/v2/` on every host.
  */
 
+import { normalizePath } from "./base-path.ts";
+
 /** The name `*` captures under, which `_redirects` reads as `:splat`. */
 export const SPLAT = "splat";
 
@@ -401,19 +403,46 @@ export type CompiledRedirect = [
   status: number,
 ];
 
+/** One rule, compiled (see {@link compileRedirects}). */
+const compileRule = (rule: RedirectRule): CompiledRedirect => {
+  const { location, source } = regexRedirect(rule);
+  return [source, encodeURI(location), rule.status];
+};
+
 /**
  * The pattern redirects among `redirects`, compiled for the server wrappers
- * and the dev server, in the order to try them. The `Location` template is
- * percent-encoded as the header needs; a capture is encoded when it's filled
- * (see {@link fillLocation}).
+ * and Vercel's routing config, in the order to try them. The `Location`
+ * template is percent-encoded as the header needs; a capture is encoded when
+ * it's filled (see {@link fillLocation}).
  */
 export const compileRedirects = (
   redirects: readonly RedirectEnds[]
+): CompiledRedirect[] => redirects.flatMap(expandRedirect).map(compileRule);
+
+/**
+ * Every redirect among `redirects` compiled, exact paths first: a pattern as
+ * {@link compileRedirects} compiles it, an exact path as a rule matching
+ * just that path, a trailing slash optional. What the dev server answers
+ * with, where Astro's own handler would send an exact redirect to a page
+ * served by `[...slug]` as a `301` whatever its status.
+ */
+export const compileEveryRedirect = (
+  redirects: readonly RedirectEnds[]
 ): CompiledRedirect[] =>
-  redirects.flatMap(expandRedirect).map((rule) => {
-    const { location, source } = regexRedirect(rule);
-    return [source, encodeURI(location), rule.status];
-  });
+  exactFirst(redirects)
+    .flatMap((redirect) => {
+      const rules = expandRedirect(redirect);
+      return rules.length > 0
+        ? rules
+        : [
+            {
+              parts: [{ kind: "text", text: normalizePath(redirect.from) }],
+              status: redirect.status,
+              to: redirect.to,
+            } satisfies RedirectRule,
+          ];
+    })
+    .map(compileRule);
 
 /** A captured value, encoded for a `Location` header that must not grow a query or fragment. */
 export const encodeCapture = (value: string): string =>

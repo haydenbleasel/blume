@@ -6,9 +6,9 @@
 // against Notion's help and developer docs, and deploy hooks against
 // Vercel's docs (September 2026). Not yet run end to end on a sample
 // database. Review (September 2026): the missing-token and missing-SDK
-// troubleshooting now follows cli/prepare.ts and core/sources/cache.ts (a
-// fresh build's fetch error comes before the secret and dependency checks),
-// checked by calling the Notion API without a token.
+// troubleshooting follows cli/prepare.ts, core/sources/notion.ts, and
+// core/sources/cache.ts (the secrets warning prints before any source loads,
+// and the source stops before calling Notion without a token or its SDK).
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -175,12 +175,11 @@ export default defineConfig({
   </p>
   <p>
     The source reads its token from <code>NOTION_TOKEN</code>. Blume loads{" "}
-    <code>.env.local</code> for you, so put the token there and keep the file
-    out of Git:
+    <code>.env.local</code> for you, and <code>blume init</code> already
+    listed it in <code>.gitignore</code>, so put the token there:
   </p>
   <CodeBlock
-    code={`echo "NOTION_TOKEN=paste-your-token-here" >> .env.local
-echo ".env.local" >> .gitignore`}
+    code={`echo "NOTION_TOKEN=paste-your-token-here" >> .env.local`}
     lang="bash"
   />
 
@@ -361,24 +360,21 @@ jobs:
     is the database's and not a view's. Blume passes on Notion's own error in
     a <code>BLUME_SOURCE_FETCH_FAILED</code> diagnostic.
   </p>
-  <h3>The build fails with an authorization error</h3>
+  <h3>The build fails with BLUME_MISSING_SECRET</h3>
   <p>
-    <code>NOTION_TOKEN</code> isn't set where the build runs. Blume fetches
-    Notion before it checks for missing variables, so on a fresh build machine
-    the fetch fails first: <code>BLUME_SOURCE_FETCH_FAILED</code>, with
-    Notion's message that the Authorization header must use the format{" "}
-    <code>Bearer &lt;token&gt;</code>. You only see the{" "}
-    <code>BLUME_MISSING_SECRET</code> warning when Blume has a snapshot to
-    serve instead, as a dev server that fetched once already does. Locally,
-    check <code>.env.local</code> is in the folder you run Blume from. On your
-    host, add the variable to the environment that ran the build, then
-    redeploy: a changed variable only applies to new builds.
+    <code>NOTION_TOKEN</code> isn't set where the build runs. Blume warns
+    about it first, then the source stops before calling Notion, since Notion
+    answers nothing without a token. With a snapshot to serve instead, as a
+    dev server that fetched once already has, you get only the warning and the
+    cached pages. Locally, check <code>.env.local</code> is in the folder you
+    run Blume from. On your host, add the variable to the environment that ran
+    the build, then redeploy: a changed variable only applies to new builds.
   </p>
   <h3>The build says a package isn't installed</h3>
   <p>
     <code>@notionhq/client</code> isn't in your dependencies. On a fresh build
-    the fetch fails with <code>BLUME_SOURCE_FETCH_FAILED</code> and a message
-    naming the package and its install command. Install it with{" "}
+    the source stops with <code>BLUME_SOURCE_SDK_MISSING</code>, naming the
+    package and its install command. Install it with{" "}
     <code>npm install @notionhq/client</code> and build again.
   </p>
   <h3>The site shows old content with a warning</h3>

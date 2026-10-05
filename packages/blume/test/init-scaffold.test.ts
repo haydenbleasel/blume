@@ -630,14 +630,14 @@ describe("applyPlan", () => {
   });
 });
 
-describe("starter pages", () => {
-  const starterPages = () =>
-    (["docs", "api", "sdk", "changelog"] as const).flatMap((template) =>
-      buildPlan("/proj", answersWith({ template })).filter((file) =>
-        file.path.endsWith(".mdx")
-      )
-    );
+const starterPages = () =>
+  (["docs", "api", "sdk", "changelog"] as const).flatMap((template) =>
+    buildPlan("/proj", answersWith({ template })).filter((file) =>
+      file.path.endsWith(".mdx")
+    )
+  );
 
+describe("starter pages", () => {
   it("give every page a description blume audit accepts", () => {
     // The audit measures rendered columns against these thresholds, so an
     // untouched scaffold carries no finding of Blume's own making.

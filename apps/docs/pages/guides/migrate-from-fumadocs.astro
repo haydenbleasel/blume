@@ -126,9 +126,9 @@ import { guideById } from "../_guides/guides.ts";
   </table>
   <p>
     What doesn't carry over: the home page and anything else in{" "}
-    <code>app/</code> outside the docs route, header settings in{" "}
-    <code>lib/layout.shared.tsx</code> (you carry those over by hand), a
-    folder's <code>description</code>,
+    <code>app/</code> outside the docs route, header menus and custom items
+    in <code>lib/layout.shared.tsx</code>, a folder's{" "}
+    <code>description</code>,
     reversed (<code>z...a</code>) and extracted (<code>...folder</code>)
     ordering, <code>&lt;DynamicCodeBlock&gt;</code>,{" "}
     <code>&lt;InlineTOC&gt;</code>, and custom remark, rehype, or Shiki
@@ -215,9 +215,9 @@ import { guideById } from "../_guides/guides.ts";
   </p>
   <ol>
     <li>
-      Writes <code>blume.config.ts</code>, with a title from your{" "}
-      <code>package.json</code> name and a <code>basePath</code> from your
-      loader's <code>baseUrl</code>.
+      Writes <code>blume.config.ts</code>, with a <code>basePath</code> from
+      your loader's <code>baseUrl</code>, and the title, repository, and
+      header links from <code>lib/layout.shared.tsx</code>.
     </li>
     <li>
       Moves the pages into <code>docs/</code>, converts each{" "}
@@ -445,8 +445,8 @@ sidebar:
     <li>
       <strong><code>display: "group"</code> keeps folders collapsible.</strong>{" "}
       Fumadocs folders collapse by default. Blume's default is flat headers,
-      where <code>collapsed</code> does nothing, so add it if your diff lacks
-      it.
+      where <code>collapsed</code> does nothing, so check that your config
+      sets it.
     </li>
     <li>
       <strong>The imports are gone.</strong> Blume's components need none. The
@@ -469,12 +469,12 @@ sidebar:
   </p>
   <ul>
     <li>
-      <strong>Config.</strong> The title comes from your{" "}
-      <code>package.json</code> name. If your header showed{" "}
-      <code>nav.title</code> from <code>lib/layout.shared.tsx</code> instead,
-      set <code>title</code> to it. That file's <code>githubUrl</code> becomes{" "}
-      <code>github: {"{ owner, repo }"}</code>, for the repository and edit
-      links, and its header links become <code>navigation.actions</code>.
+      <strong>Config.</strong> The title should match your header's{" "}
+      <code>nav.title</code> from <code>lib/layout.shared.tsx</code>, or your{" "}
+      <code>package.json</code> name if the header set none. That file's{" "}
+      <code>githubUrl</code> becomes <code>github: {"{ owner, repo }"}</code>,
+      for the repository and edit links, and its header links become{" "}
+      <code>navigation.actions</code>.
     </li>
     <li>
       <strong>Sidebar.</strong> Click through every folder and tab. A{" "}
@@ -510,9 +510,10 @@ sidebar:
     Fumadocs hides a page two ways: a <code>pages</code> list without{" "}
     <code>"..."</code> leaves out every page it doesn't name, and a{" "}
     <code>"!name"</code> entry excludes one page from <code>"..."</code>. Blume
-    appends the pages a <code>meta.ts</code> doesn't name, so both kinds come
-    back. Give each one <code>sidebar.hidden: true</code>. It stays built and
-    reachable by URL, as before.
+    appends the pages a <code>meta.ts</code> doesn't name, so each of those
+    pages should now carry <code>sidebar.hidden: true</code>. It stays built
+    and reachable by URL, as before. Compare the sidebar with the old site,
+    and hide any page that came back.
   </p>
 
   <h3>Your own components</h3>
@@ -682,7 +683,8 @@ export default defineConfig({
     Blume reads a numeric prefix like <code>01-</code> in a file or folder name
     as sort order and drops it from the URL, so <code>01-intro.mdx</code> moves
     from <code>/docs/01-intro</code> to <code>/docs/intro</code>. Fumadocs keeps
-    the number in the URL. Add a redirect for each one the URL check prints.
+    the number in the URL. The agent adds a redirect for each prefixed name;
+    add one for any the URL check still prints.
   </p>
   <h3>An icon is missing</h3>
   <p>
@@ -716,13 +718,15 @@ export default defineConfig({
     but only between two dollar signs: <code>$$</code> lines for a block, or{" "}
     <code>$$x^2$$</code> inside a sentence for inline math. A single{" "}
     <code>$</code> stays literal text, so rewrite each inline{" "}
-    <code>$x$</code> as <code>$$x$$</code>. The skill treats inline math as
-    unsupported, so also check that the agent didn't move formulas onto lines
-    of their own or drop them.
+    <code>$x$</code> as <code>$$x$$</code>, inside its sentence rather than on
+    a line of its own.
   </p>
   <h3>A redirect fails the build</h3>
   <p>
     <code>BLUME_REDIRECT_MATCHES_PAGE</code> means a redirect pattern also
-    covers a page you kept. Narrow it to the URLs that moved.
+    covers a page you kept. Narrow it to the URLs that moved. As a warning,
+    which fails <code>blume validate --strict</code>, it means an exact
+    redirect starts at a page you kept: the redirect takes the URL over, so the
+    page never publishes. Delete the page if it moved, or remove the redirect.
   </p>
 </GuidePage>

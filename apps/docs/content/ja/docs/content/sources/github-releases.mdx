@@ -21,12 +21,20 @@ export default defineConfig({
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
+        // baseUrl: "https://github.acme.com/api/v3", // GitHub Enterprise Server
       }),
     ],
   },
 });
 ```
 
-各リリースは変更履歴のフィールドに自動的に対応付けられます。リリース名（またはタグ）がタイトルになり、公開日がタイムラインの順序を決め、タグが `changelog.version` になります。また、プレリリースには `Prerelease`（それ以外には `Release`）のタグが付きます。リリースノートはエントリ本文としてレンダリングされますが、その際リンクに 2 つの変更が加えられます。Web、メール、電話、相対アドレスのいずれでもないリンク（たとえば `javascript:` URL）はラベルのみが残ります。また、自身の [`deployment.site`](/docs/deployment) へのリンクはルート相対パスに書き換えられるため、プレビューデプロイやデプロイのベースパスに追従します。ソースに `prefix` を指定すると、リリースページが `/changelog/v1-2-0` のようなルート配下にネストされます。
+各リリースは変更履歴のフィールドに自動的に対応付けられます。リリース名（またはタグ）がタイトルになり、公開日がタイムラインの順序を決め、タグが `changelog.version` になります。また、プレリリースには `Prerelease`、下書き（`drafts` で含めた場合）には `Draft`、それ以外には `Release` のタグが付きます。下書きも他のリリースと同様に公開されるため、下書きを含めるのは読者が閲覧しないビルドに限定してください。リリースノートの要約はページのメタディスクリプションになり、変更履歴の RSS フィードでも各アイテムの説明として使用されます。リリースノートはエントリ本文としてレンダリングされますが、その際リンクに 2 つの変更が加えられます。Web、メール、電話、相対アドレスのいずれでもないリンク（たとえば `javascript:` URL）はラベルのみが残ります。また、自身の [`deployment.site`](/docs/deployment) へのリンクはルート相対パスに書き換えられるため、プレビューデプロイやデプロイのベースパスに追従します。ソースに `prefix` を指定すると、リリースページが `/changelog/v1-2-0` のようなルート配下にネストされます。`/changelog` のタイムラインのタイトルと説明は、ソースではなくトップレベルの [`changelog`](/docs/advanced/changelog#the-index-page) 設定から取得されます：
 
-プライベートリポジトリは `GITHUB_TOKEN` 環境変数で認証します。これは他の GitHub 機能で使われるものと同じトークンで、設定ファイルに直接記述されることはありません。アダプターがこの変数を宣言しているため、未設定のままビルドすると警告が表示されます。[すべてのリモートソース](/docs/content/sources#caching-and-offline-builds)と同様に `.blume/cache/<source>/` にキャッシュされ、API に到達できない場合はオフラインでキャッシュから提供されます。変更履歴は補助的なコンテンツであるため、キャッシュがない状態で取得に失敗した場合（たとえばトークンのない CI ビルドなど）でも、ビルドを失敗させることはなく、警告を出したうえで空の変更履歴になります。変更履歴を表示するには、CI 環境とデプロイ環境で `GITHUB_TOKEN` を設定してください。
+```ts blume.config.ts
+changelog: {
+  title: "SDK releases",
+  description: "Every release of the Acme SDK, from GitHub.",
+},
+```
+
+プライベートリポジトリは `GITHUB_TOKEN` 環境変数で認証します。これは他の GitHub 機能で使われるものと同じトークンで、設定ファイルに直接記述されることはありません。アダプターがこの変数を宣言しているため、未設定のままビルドすると警告が表示されます。GitHub Enterprise Server 上のリポジトリの場合は、`baseUrl` にその REST API（`https://<host>/api/v3`）を設定してください。`GITHUB_TOKEN` はそのサーバーに送信されるため、そのサーバー用のトークンである必要があります。[すべてのリモートソース](/docs/content/sources#caching-and-offline-builds)と同様に `.blume/cache/<source>/` にキャッシュされ、API に到達できない場合はオフラインでキャッシュから提供されます。変更履歴は補助的なコンテンツであるため、キャッシュがない状態で取得に失敗した場合（たとえばトークンのない CI ビルドなど）でも、ビルドを失敗させることはなく、警告を出したうえで空の変更履歴になります。変更履歴を表示するには、CI 環境とデプロイ環境で `GITHUB_TOKEN` を設定してください。

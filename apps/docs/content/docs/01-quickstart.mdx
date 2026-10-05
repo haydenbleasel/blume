@@ -15,8 +15,10 @@ Go from an empty folder to a running docs site in a few commands. Blume needs **
     `blume init` asks a few questions — where to create the project, what your
     docs site is called, which template, and where your content lives — then
     scaffolds the minimum surface: a content folder, a config file, and a
-    `package.json` with `dev` and `build` scripts. It installs the dependencies
-    with the package manager that ran it. Pass `--yes` to skip the prompts and
+    `package.json` with `dev`, `build`, and `doctor` scripts, plus a
+    `.gitignore` that keeps `node_modules/`, the generated `.blume/`, `dist/`,
+    and `.env.local` (where local secrets go) out of version control. It
+    installs the dependencies with the package manager that ran it. Pass `--yes` to skip the prompts and
     take the defaults, or `--no-install` to only write the files.
 
     ```package-install

@@ -12,9 +12,30 @@ import { normalizePath } from "../url.ts";
  */
 const MATCH_ORIGIN = "https://robots-audit.invalid";
 
+const USER_AGENT_LINE = /^\s*user-agent\s*:\s*(?<agent>[^#]*)/iu;
+
+/**
+ * The crawlers robots.txt names in a `User-agent` line, other than `*`, as
+ * written (first spelling wins). robots-parser matches a group by the token
+ * before any `/version`, case-insensitively, so that's what dedupes them.
+ */
+const namedAgents = (raw: string): string[] => {
+  const agents = new Map<string, string>();
+  for (const line of raw.split(/\r?\n/u)) {
+    const agent = USER_AGENT_LINE.exec(line)?.groups?.agent?.trim() ?? "";
+    const key = agent.toLowerCase().split("/")[0]?.trim() ?? "";
+    if (key && key !== "*" && !agents.has(key)) {
+      agents.set(key, agent);
+    }
+  }
+  return [...agents.values()];
+};
+
 /**
  * robots.txt: is it there, is it well-formed, does it point at the sitemap, and
  * — the one that matters — does it block a page the sitemap is advertising?
+ * Blocking every crawler (`User-agent: *`) is an error; a group aimed at one
+ * crawler is a warning, since shutting out an AI crawler is often on purpose.
  *
  * Ahrefs also tracks "robots.txt has too many redirects". A static host serves
  * the file directly, so that is effectively unreachable here and isn't checked.
@@ -70,6 +91,14 @@ export const robotsChecks: CheckModule = {
     // consecutive User-agent lines form one group as the spec requires.
     const parser = robotsParser(`${MATCH_ORIGIN}/robots.txt`, robots.raw);
     const lines = robots.raw.split(/\r?\n/u);
+    const ruleAt = (url: string, agent: string) => {
+      const line = parser.getMatchingLineNumber(url, agent);
+      return { line, rule: line > 0 ? lines[line - 1]?.trim() : undefined };
+    };
+    // A crawler named in its own group follows only that group, so a rule
+    // there can block it from a page every other crawler may read.
+    const agents = namedAgents(robots.raw);
+    const blockedFor = new Map<string, string[]>();
     for (const loc of context.sitemap?.urls ?? []) {
       let pathname: string;
       try {
@@ -82,8 +111,7 @@ export const robotsChecks: CheckModule = {
       const path = normalizePath(pathname);
       const url = `${MATCH_ORIGIN}${pathname}`;
       if (parser.isDisallowed(url, "*")) {
-        const line = parser.getMatchingLineNumber(url, "*");
-        const rule = line > 0 ? lines[line - 1]?.trim() : undefined;
+        const { rule } = ruleAt(url, "*");
         found.push(
           finding(
             "BLUME_AUDIT_ROBOTS_DISALLOWS_INDEXABLE",
@@ -91,7 +119,35 @@ export const robotsChecks: CheckModule = {
             `robots.txt "${rule ?? "Disallow"}" blocks ${path}, which sitemap.xml advertises.`
           )
         );
+        continue;
       }
+      for (const agent of agents) {
+        if (!parser.isDisallowed(url, agent)) {
+          continue;
+        }
+        const blocked = blockedFor.get(agent);
+        if (blocked) {
+          blocked.push(url);
+        } else {
+          blockedFor.set(agent, [url]);
+        }
+      }
+    }
+
+    // One finding per crawler, at the rule that blocks its first page: a
+    // `Disallow: /` aimed at one bot would otherwise list every page.
+    for (const [agent, urls] of blockedFor) {
+      const [first = ""] = urls;
+      const { line, rule } = ruleAt(first, agent);
+      const path = normalizePath(new URL(first).pathname);
+      const more = urls.length > 1 ? ` and ${urls.length - 1} more` : "";
+      found.push(
+        finding(
+          "BLUME_AUDIT_ROBOTS_BLOCKS_CRAWLER",
+          { file: robots.file, line, url: "/robots.txt" },
+          `robots.txt "${rule ?? "Disallow"}" blocks ${agent} from ${path}${more}, which sitemap.xml advertises.`
+        )
+      );
     }
 
     return found;

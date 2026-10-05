@@ -78,7 +78,9 @@ export const buildRssFeeds = (project: BlumeProject): RssFeed[] => {
     const items: RssItem[] = pages
       .map((page) => ({
         date: pageDate(page),
-        description: page.description,
+        // A page with only a meta description (a GitHub release, whose
+        // summary goes in `seo.description`) still describes its item.
+        description: page.description ?? page.meta.seo.description,
         // Encode like the sitemap does: a route with spaces or non-ASCII
         // must still yield a valid <link>/<guid> URL after XML decoding.
         link: encodeURI(`${base}${mountBasePath(deployBase, page.route)}`),

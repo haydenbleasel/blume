@@ -11,16 +11,22 @@
 //
 // What ran: the Typesense 30.2 macOS binary locally, with Blume's own
 // syncSearchProvider and the dialog's createSearch from main called through
-// bun on a small fixture project (not `blume build`). That covered the key
-// scopes and custom key values, the build-time sync and record shape, the
-// search function below, the keyword hit, the deleted page, the synonym set
-// detaching on each sync and relinking with the sync key, the 401 and
-// unreachable-host skip warnings (collection left intact), the missing and
-// partial collection during a sync, --cors-domains, pointing the sync at an
-// alias, the typesense 3.1.0 client, and the build script's logic with the
-// sync standing in for `blume build`. Synonyms on Typesense 29.1 were checked
-// the same way. Not run: `blume build` or `blume dev` themselves, Docker,
-// Compose, or Caddy. Not yet run end to end.
+// bun on a small fixture project (not `blume build`). That covered custom key
+// values, the build-time sync and record shape, the search function below,
+// the keyword hit, the deleted page, the 401 and unreachable-host skip
+// warnings, --cors-domains, the typesense 3.1.0 client, and the build
+// script's logic with the sync standing in for `blume build`. Synonyms on
+// Typesense 29.1 were checked the same way. Rerun 2026-09-30 against the
+// alias-swap sync and relevance-first sort (search/sync/typesense.ts,
+// components/layout/search/typesense.ts): the sync key scopes (without
+// aliases:* or docs_.* the sync gets a 401 before it changes anything), the
+// search key and the synonym relink through the alias, the synonym link
+// lost on the next sync, and a sync taking over a DocSearch-style alias.
+// Rerun 2026-09-30 after failed syncs started failing the build: `blume
+// build` with the key set and an unreachable host exits 1 with
+// BLUME_SEARCH_SYNC_FAILED, and without the key warns and succeeds. Not run:
+// a `blume build` sync against a live server, `blume dev`, Docker, Compose,
+// or Caddy. Not yet run end to end.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -32,9 +38,9 @@ import { guideById } from "../_guides/guides.ts";
     To self-host search for a documentation site, run a Typesense server, give
     the site a search-only key that browsers can use, and let your build write
     the index with a separate key. In Blume, the <code>typesense()</code> search
-    adapter handles both halves: every <code>blume build</code> rebuilds a
-    Typesense collection from your pages, and the search dialog queries that
-    collection straight from the reader's browser.
+    adapter handles both halves: every <code>blume build</code> fills a new
+    Typesense collection from your pages and points an alias at it, and the
+    search dialog queries that alias straight from the reader's browser.
   </p>
   <p>
     By the end of this guide, you have a local Typesense server you've tested
@@ -58,9 +64,12 @@ import { guideById } from "../_guides/guides.ts";
     into one record: its title, description, and body as plain text, plus its
     URL, <code>search.keywords</code>, <code>search.boost</code>, locale, and
     docs version. It reads your Markdown and MDX source, not the built HTML.
-    Then it deletes the collection, creates it again with its own schema, and
-    imports the records. Recreating the collection has three effects this guide
-    plans around:
+    Then it creates a new collection with its own schema, named after your{" "}
+    <code>collection</code> setting plus a timestamp, like{" "}
+    <code>docs_1790792208477</code>, and imports the records. Once the import
+    is complete, it points an alias with the <code>collection</code> name at
+    the new collection and drops the one the alias pointed at before. A fresh
+    collection on every sync has three effects this guide plans around:
   </p>
   <ul>
     <li>
@@ -68,14 +77,13 @@ import { guideById } from "../_guides/guides.ts";
       because nothing from the old collection survives.
     </li>
     <li>
-      Anything you attached to the collection yourself, like a synonym set, is
-      detached. You reapply it after each sync.
+      Anything you attached to the collection yourself, like a synonym set,
+      doesn't carry over to the new one. You reapply it after each sync.
     </li>
     <li>
-      Between the delete and the end of the import, searches fail or return
-      only some pages. While the collection is missing, the dialog shows
-      "Something went wrong. Please try again." The gap lasts as long as the
-      import, so it grows with your docs.
+      Searches keep reading the previous collection until the new one is
+      complete, and a sync that fails leaves the previous one serving. The
+      sync key has to manage the alias and every collection named after it.
     </li>
   </ul>
 
@@ -110,8 +118,8 @@ import { guideById } from "../_guides/guides.ts";
       </tr>
       <tr>
         <td>Reindexing</td>
-        <td>Deletes and recreates the collection</td>
         <td>Fills a new timestamped collection, then points an alias at it</td>
+        <td>The same</td>
       </tr>
       <tr>
         <td>Search UI</td>
@@ -121,11 +129,11 @@ import { guideById } from "../_guides/guides.ts";
     </tbody>
   </table>
   <p>
-    The scraper's alias swap means a search never hits a missing collection,
-    which Blume's sync can't promise. In exchange, Blume needs no crawler, no
-    selectors to maintain, and no deployed site to index. The two don't mix:
-    Blume's dialog queries the fields its own sync writes, so it can't read a
-    collection the scraper filled.
+    Both swap an alias, so a search never hits a missing collection. Blume
+    needs no crawler, no selectors to maintain, and no deployed site to index,
+    but its records are whole pages. The two don't mix: Blume's dialog
+    queries the fields its own sync writes, so it can't read a collection the
+    scraper filled.
   </p>
 
   <h2>Run Typesense locally</h2>
@@ -146,18 +154,22 @@ import { guideById } from "../_guides/guides.ts";
   <h2>Create a sync key and a search-only key</h2>
   <p>
     The key you started the server with can do anything, so keep it away from
-    your build and your readers. Create two narrower keys, both limited to a
-    collection named <code>docs</code>. The sync key can manage that collection
-    and its documents, which is all Blume's sync needs:
+    your build and your readers. Create two narrower keys. The sync key can
+    manage the <code>docs</code> alias, the collections the sync names after it
+    (<code>docs_</code> and a timestamp, matched here by a regular expression),
+    and their documents, which is all Blume's sync needs:
   </p>
   <CodeBlock
     code={`curl -s "http://localhost:8108/keys" -X POST \\
   -H "X-TYPESENSE-API-KEY: local-admin-key" \\
   -H "Content-Type: application/json" \\
-  -d '{"description": "Docs sync", "actions": ["collections:*", "documents:*"], "collections": ["docs"], "value": "local-sync-key"}'`}
+  -d '{"description": "Docs sync", "actions": ["collections:*", "documents:*", "aliases:*"], "collections": ["docs", "docs_.*"], "value": "local-sync-key"}'`}
     lang="bash"
   />
-  <p>The search key can only search it:</p>
+  <p>
+    The search key can only search <code>docs</code>, and reaches whichever
+    collection the alias points at:
+  </p>
   <CodeBlock
     code={`curl -s "http://localhost:8108/keys" -X POST \\
   -H "X-TYPESENSE-API-KEY: local-admin-key" \\
@@ -208,13 +220,22 @@ export default defineConfig({
     from <code>TYPESENSE_ADMIN_API_KEY</code>, which never enters the config or
     the browser. Despite the name, it doesn't need Typesense's admin key: the
     scoped sync key is enough. Blume loads <code>.env.local</code> for every
-    command, so put it there and keep the file out of Git:
+    command, so put it there. <code>blume init</code> lists the file in{" "}
+    <code>.gitignore</code>; the second line adds it if your project doesn't:
   </p>
   <CodeBlock
     code={`echo "TYPESENSE_ADMIN_API_KEY=local-sync-key" >> .env.local
-echo ".env.local" >> .gitignore`}
+grep -qx ".env.local" .gitignore || echo ".env.local" >> .gitignore`}
     lang="bash"
   />
+  <p>
+    If your pages are in Chinese, Japanese, or Thai, also set{" "}
+    <code>locale</code> to their two-letter language code, like{" "}
+    <code>locale: "ja"</code>. Typesense's default tokenizer splits text on
+    spaces, so without it a word in those languages only matches at the start
+    of a run of text. One collection holds every language, so the setting
+    covers them all.
+  </p>
   <p>
     Last, add a throwaway page with a word no other page uses, and a keyword
     that appears nowhere in its text:
@@ -238,8 +259,9 @@ The quasar client is a word no other page uses.`}
     Once the pages are built, the log reports the sync with a line like{" "}
     <code>Synced 12 record(s) to typesense</code>, one record per searchable
     page. If it says <code>Search sync skipped</code> instead, the build still
-    succeeded but the collection didn't change; see{" "}
-    <a href="#troubleshooting">Troubleshooting</a>.
+    succeeded but the collection didn't change. If the key is set and the sync
+    fails, the build fails with <code>BLUME_SEARCH_SYNC_FAILED</code>. For
+    both, see <a href="#troubleshooting">Troubleshooting</a>.
   </p>
 
   <h2>Test searches</h2>
@@ -253,7 +275,7 @@ The quasar client is a word no other page uses.`}
     -H "X-TYPESENSE-API-KEY: docs-search-public" \\
     --data-urlencode "q=$1" \\
     --data-urlencode "query_by=title,keywords,description,content" \\
-    --data-urlencode "sort_by=_text_match(buckets: 10):desc,boost:desc" \\
+    --data-urlencode "sort_by=_text_match:desc,boost:desc" \\
     | jq -c '{found, urls: [.hits[].document.url]}'
 }
 
@@ -300,16 +322,17 @@ curl -s "http://localhost:8108/collections/docs" -X PATCH \\
   </p>
   <p>
     Run <code>npx blume build</code> again and repeat the search: it finds
-    nothing. The set still exists, but the recreated collection isn't linked to
-    it. Run the <code>PATCH</code> again and the synonym is back. Curation sets,
-    which pin or hide results for a query, detach the same way and relink
+    nothing. The set still exists, but the new collection behind the alias
+    isn't linked to it. Run the <code>PATCH</code> again, which goes through
+    the alias to that collection, and the synonym is back. Curation sets,
+    which pin or hide results for a query, fall off the same way and relink
     through the <code>curation_sets</code> field. The build script in the
     deploy step relinks after every production sync.
   </p>
   <Callout type="warning">
     On Typesense 29 and earlier, synonyms are stored on the collection itself,
-    so each sync deletes them. Recreate them after every build instead of
-    relinking.
+    so each new collection starts without them. Recreate them after every
+    build instead of relinking.
   </Callout>
 
   <h2>Test a deleted page</h2>
@@ -394,7 +417,7 @@ curl https://search.acme.example/health`}
 curl -s "https://search.acme.example/keys" -X POST \\
   -H "X-TYPESENSE-API-KEY: $TYPESENSE_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"description": "Docs sync", "actions": ["collections:*", "documents:*"], "collections": ["docs"]}'
+  -d '{"description": "Docs sync", "actions": ["collections:*", "documents:*", "aliases:*"], "collections": ["docs", "docs_.*"]}'
 
 curl -s "https://search.acme.example/keys" -X POST \\
   -H "X-TYPESENSE-API-KEY: $TYPESENSE_API_KEY" \\
@@ -406,9 +429,9 @@ curl -s "https://search.acme.example/keys" -X POST \\
     Typesense shows a generated key only once, as <code>value</code> in the
     response. Save the sync key's value in your host's environment as{" "}
     <code>TYPESENSE_ADMIN_API_KEY</code>, set for production builds only. A
-    preview build that can see the key syncs too, and replaces production's
-    collection with that branch's pages. Create the synonym set on this server
-    with the same <code>PUT</code> as before, using this admin key.
+    preview build that can see the key syncs too, and moves production's
+    alias onto that branch's pages. Create the synonym set on this server with
+    the same <code>PUT</code> as before, using this admin key.
   </p>
 
   <h3>Update the config</h3>
@@ -431,28 +454,25 @@ curl -s "https://search.acme.example/keys" -X POST \\
     instead of trying the local key against production.
   </p>
 
-  <h3>Fail the build when the sync fails</h3>
+  <h3>Relink the synonym set after each sync</h3>
   <p>
-    A failed sync doesn't fail <code>blume build</code>. It logs a warning and
-    the build carries on, so a stale or empty index can ship unnoticed. This
-    script fails on that warning and relinks the synonym set after a sync:
+    With <code>TYPESENSE_ADMIN_API_KEY</code> set, a failed sync fails{" "}
+    <code>blume build</code> with <code>BLUME_SEARCH_SYNC_FAILED</code>, and
+    the alias keeps serving the last complete sync, so a stale index can't
+    ship unnoticed. A sync that succeeds moves the alias to a new collection,
+    which doesn't carry the synonym link over. This script relinks it after
+    the build:
   </p>
   <CodeBlock
     code={`#!/usr/bin/env bash
-# Builds the docs. On builds that sync search, fails if the sync didn't
-# finish, then relinks the synonym set the sync detached.
+# Builds the docs. On builds that sync search, links the synonym set to the
+# new collection. A failed sync fails the build, so the script stops there.
 set -euo pipefail
 
-log="$(mktemp)"
-npx blume build 2>&1 | tee "$log"
+npx blume build
 
 if [ -z "\${TYPESENSE_ADMIN_API_KEY:-}" ]; then
   exit 0
-fi
-
-if grep -q "Search sync skipped" "$log"; then
-  echo "The Typesense sync failed. Search may be stale or empty until a sync succeeds." >&2
-  exit 1
 fi
 
 curl -fsS -X PATCH "https://search.acme.example/collections/docs" \\
@@ -493,12 +513,16 @@ curl -fsS -X PATCH "https://search.acme.example/collections/docs" \\
     Locally, Blume reads <code>.env.local</code> from the folder you build in
     and its parents, up to the repository root.
   </p>
-  <h3>The log says the request failed with HTTP code 401</h3>
+  <h3>The build fails with BLUME_SEARCH_SYNC_FAILED and HTTP code 401</h3>
   <p>
-    Typesense rejected the sync key. It's usually the search key in{" "}
-    <code>TYPESENSE_ADMIN_API_KEY</code>, or a sync key scoped to a different
-    collection than the config's <code>collection</code>. The rejection comes
-    before the delete, so the old collection keeps serving.
+    The sync ran with a key and failed, and the message after{" "}
+    <code>Search sync to typesense failed:</code> says why. With HTTP code
+    401, Typesense rejected the sync key. It's usually the search key in{" "}
+    <code>TYPESENSE_ADMIN_API_KEY</code>, or a sync key whose scope misses
+    part of what the sync touches: it needs the <code>aliases:*</code> action,
+    and both the config's <code>collection</code> and that name followed by{" "}
+    <code>_.*</code> in <code>collections</code>. The sync stops before it
+    changes anything, so the last complete sync keeps serving.
   </p>
   <h3>The build fails with BLUME_DEPENDENCY_MISSING</h3>
   <p>
@@ -522,8 +546,9 @@ curl -fsS -X PATCH "https://search.acme.example/collections/docs" \\
       config points at an <code>http</code> server. Serve Typesense over HTTPS.
     </li>
     <li>
-      <strong>404, Collection not found:</strong> a sync deleted the collection
-      and didn't finish, or one is running now. Build again with the key set.
+      <strong>404, Collection not found:</strong> no sync has finished on this
+      server yet, so there's no alias, or the config's{" "}
+      <code>collection</code> names a different one. Build with the key set.
     </li>
     <li>
       <strong>401:</strong> the config's <code>apiKey</code> isn't a search key
@@ -538,9 +563,10 @@ curl -fsS -X PATCH "https://search.acme.example/collections/docs" \\
   </p>
   <h3>You're moving from a DocSearch collection</h3>
   <p>
-    Stop the scraper and give Blume a new collection name. The name the scraper
-    gave you is an alias: pointed at it, Blume's first sync deletes the
-    collection behind the alias and creates a real collection under the same
-    name, leaving the stale alias behind.
+    Stop the scraper first, or its next run moves the alias back. The name the
+    scraper gave you is an alias, and Blume can take it over: pointed at it,
+    Blume's first sync fills a new collection, moves the alias onto it, and
+    drops the scraper's collection. Scope the sync key to that name and the
+    name followed by <code>_.*</code>, as above.
   </p>
 </GuidePage>

@@ -24,6 +24,7 @@ import {
   renderInline,
 } from "./lower.ts";
 import { slugify, slugifyPath } from "./normalize.ts";
+import { missingSecretError } from "./remote.ts";
 import type {
   ContentSource,
   SourceContext,
@@ -446,7 +447,12 @@ export const notionSource = (
         severity: "error",
       });
     }
-    return new Client({ auth: options.token ?? process.env.NOTION_TOKEN });
+    // Every Notion API call needs the integration token.
+    const auth = options.token ?? process.env.NOTION_TOKEN;
+    if (!auth) {
+      throw missingSecretError(options.name, "NOTION_TOKEN");
+    }
+    return new Client({ auth });
   };
 
   const childrenOf = (

@@ -39,6 +39,26 @@ export interface MdxRemoteSourceOptions {
 // thing on every source type: negation, character classes, nested braces, and
 // extglobs included. Compiled once per enumeration, not per ref.
 
+/**
+ * Whether a ref is included, read the way tinyglobby reads an `include`
+ * array: a `!` pattern excludes what it matches, and the rest include. One
+ * picomatch matcher over the whole array would OR a negation in, and
+ * `!drafts/**` would include every other path, `.txt` files and all.
+ */
+const includeMatcher = (include: string[]): ((ref: string) => boolean) => {
+  // An empty pattern list matches nothing, so an array of only negations
+  // includes nothing, as in tinyglobby.
+  const included = picomatch(
+    include.filter((pattern) => !pattern.startsWith("!"))
+  );
+  const excluded = picomatch(
+    include
+      .filter((pattern) => pattern.startsWith("!"))
+      .map((pattern) => pattern.slice(1))
+  );
+  return (ref) => included(ref) && !excluded(ref);
+};
+
 /** A file to fetch: its source-local ref plus where to read it from. */
 interface RemoteRef {
   ref: string;
@@ -102,12 +122,23 @@ interface GithubTreeEntry {
   type: string;
 }
 
+/** The files a source reads, and what the listing said about them. */
+interface Enumeration {
+  /**
+   * The configured `path`, described, when the repository at the ref has no
+   * folder there, so the source read nothing.
+   */
+  missing?: string;
+  refs: RemoteRef[];
+  truncated: boolean;
+}
+
 /** Enumerate a GitHub repo subtree, mapping blobs to remote refs. */
 const enumerateGithub = async (
   github: { owner: string; repo: string; ref: string; path: string },
   include: string[],
   doFetch: typeof fetch
-): Promise<{ refs: RemoteRef[]; truncated: boolean }> => {
+): Promise<Enumeration> => {
   const { owner, repo, ref } = github;
   const base = github.path.replaceAll(/^\/|\/$/gu, "");
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${ref}?recursive=1`;
@@ -119,7 +150,7 @@ const enumerateGithub = async (
     truncated?: boolean;
   };
   const prefix = base ? `${base}/` : "";
-  const included = picomatch(include);
+  const included = includeMatcher(include);
   const refs = (body.tree ?? []).flatMap((node) => {
     if (!(node.type === "blob" && node.path.startsWith(prefix))) {
       return [];
@@ -138,7 +169,18 @@ const enumerateGithub = async (
   });
   // GitHub caps the recursive tree response (~100k entries / 7MB) and flags it
   // with `truncated`; ignoring it would silently import only part of the repo.
-  return { refs, truncated: body.truncated === true };
+  const truncated = body.truncated === true;
+  // Git has no empty folders, so a complete listing with nothing under
+  // `path` means the path is wrong at this ref (a moved docs folder, a typo).
+  const found =
+    prefix === "" ||
+    truncated ||
+    (body.tree ?? []).some((node) => node.path.startsWith(prefix));
+  return {
+    missing: found ? undefined : `"${base}" in ${owner}/${repo} at ${ref}`,
+    refs,
+    truncated,
+  };
 };
 
 /**
@@ -169,15 +211,12 @@ export const mdxRemoteSource = (
     });
   };
 
-  const enumerate = async (): Promise<{
-    refs: RemoteRef[];
-    truncated: boolean;
-  }> => {
+  const enumerate = async (): Promise<Enumeration> => {
     if (options.github) {
       return await enumerateGithub(options.github, options.include, doFetch);
     }
     const base = (options.url ?? "").replace(/\/$/u, "");
-    const included = picomatch(options.include);
+    const included = includeMatcher(options.include);
     const refs = (options.files ?? []).flatMap((ref) =>
       included(ref)
         ? [{ editUrl: `${base}/${ref}`, fetchUrl: `${base}/${ref}`, ref }]
@@ -209,12 +248,25 @@ export const mdxRemoteSource = (
       options.name,
       cache,
       async () => {
-        const { refs, truncated } = await enumerate();
+        const { missing, refs, truncated } = await enumerate();
+        if (missing) {
+          skipped.push({
+            code: "BLUME_SOURCE_PATH_MISSING",
+            message: `Source "${options.name}" read no files: there is no folder ${missing}.`,
+            severity: "warning",
+            suggestion:
+              "Check github.path and github.ref against the repository.",
+          });
+        }
         if (truncated) {
+          // The listing covers the whole repository at the ref, whatever
+          // `path` is, so narrowing it doesn't help.
           skipped.push({
             code: "BLUME_SOURCE_TRUNCATED",
-            message: `Source "${options.name}" hit GitHub's tree listing limit; some files were not enumerated. Narrow the source path or split the repo.`,
+            message: `Source "${options.name}" hit GitHub's tree listing limit for the whole repository; some files were not enumerated.`,
             severity: "warning",
+            suggestion:
+              "List the files to read with { url, files } instead, or split the repository.",
           });
         }
         const reasons: string[] = [];

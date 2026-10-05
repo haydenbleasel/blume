@@ -54,6 +54,16 @@ describe("PanelTabs", () => {
   });
 });
 
+describe("ParametersTable", () => {
+  it("falls back to the schema's description, as the Try it panel does", async () => {
+    const table = await source("ParametersTable.astro");
+    expect(table).toContain(
+      "const description = parameterDescription(param, schemas);"
+    );
+    expect(table).not.toContain("param.description");
+  });
+});
+
 describe("logical spacing", () => {
   it("uses no physical left/right utilities", async () => {
     const files = [

@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
 
+import { filesystem } from "../src/sources/filesystem.ts";
+import { notion } from "../src/sources/notion.ts";
+
 const CLI = join(import.meta.dir, "..", "src", "cli", "index.ts");
 
 const dirs: string[] = [];
@@ -85,6 +88,82 @@ export default {
     ).toContain("BLUME_COMPONENTS_INVALID");
   });
 
+  it("reports navigation entries that point at missing pages, as dev and build do", async () => {
+    const root = await makeProject({
+      ...HOME,
+      "blume.config.ts": `export default {
+  navigation: {
+    featured: [{ label: "Missing", href: "/missing" }],
+    selectors: [
+      {
+        items: [{ label: "SDK", path: "/sdk" }],
+        kind: "product",
+        label: "Product",
+      },
+    ],
+    tabs: [
+      { label: "Guides", path: "/guides" },
+      { label: "Custom", path: "/custom" },
+      { label: "Gone", path: "/gone" },
+    ],
+  },
+};
+`,
+      "docs/guides/setup.mdx": "---\ntitle: Setup\n---\n# Setup\n",
+      "pages/custom.astro": "<h1>Custom</h1>\n",
+    });
+    const { exitCode, stderr } = await doctor(root);
+    expect(exitCode).toBe(0);
+    for (const [label, path] of [
+      ["Gone", "/gone"],
+      ["SDK", "/sdk"],
+      ["Missing", "/missing"],
+    ]) {
+      expect(stderr).toContain(
+        `Navigation entry "${label}" points to ${path}, but no page matches it.`
+      );
+    }
+    expect(stderr).not.toContain('"Guides" points');
+    expect(stderr).not.toContain('"Custom" points');
+  });
+
+  it("reports a <Component path> that names no example, at its line", async () => {
+    const root = await makeProject({
+      "docs/index.mdx": [
+        "---",
+        "title: Home",
+        "---",
+        "# Home",
+        "",
+        '<Component path="counter" />',
+        "",
+        '<Component path="forms/missing" />',
+      ].join("\n"),
+      "examples/counter.astro": "<p>Counter</p>\n",
+    });
+    const { exitCode, stderr } = await doctor(root);
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain("BLUME_EXAMPLE_NOT_FOUND");
+    expect(stderr).toContain('<Component path="forms/missing">');
+    expect(stderr).toContain("docs/index.mdx:8:18");
+    expect(stderr).not.toContain('<Component path="counter">');
+  });
+
+  it("leaves <Component> alone when components.ts replaces it", async () => {
+    const root = await makeProject({
+      "components.ts": `import Component from "./components/Component.astro";
+
+export default { mdx: { Component } };
+`,
+      "components/Component.astro": "<slot />\n",
+      "docs/index.mdx":
+        '---\ntitle: Home\n---\n# Home\n\n<Component path="anything" />\n',
+    });
+    const { exitCode, stderr, stdout } = await doctor(root);
+    expect(exitCode).toBe(0);
+    expect(`${stdout}${stderr}`).toContain("No problems found.");
+  });
+
   it("warns about a version-shaped folder when versioning isn't configured", async () => {
     const root = await makeProject({
       ...HOME,
@@ -94,5 +173,44 @@ export default {
     expect(exitCode).toBe(0);
     expect(stderr).toContain("BLUME_VERSIONS_UNCONFIGURED_VERSION");
     expect(stderr).toContain('Folder "v1.0/" looks like a version snapshot');
+  });
+
+  it("names a source's unset token before the source fetches", async () => {
+    const root = await makeProject({
+      ...HOME,
+      "blume.config.ts": `export default {
+  content: {
+    sources: [
+      ${JSON.stringify(filesystem({ root: "docs" }))},
+      ${JSON.stringify(notion({ database: "db", prefix: "notes" }))},
+    ],
+  },
+};
+`,
+    });
+    const { NOTION_TOKEN: _unset, ...env } = process.env;
+    const proc = Bun.spawn([process.execPath, CLI, "doctor", "--json"], {
+      cwd: root,
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const [exitCode, stdout] = await Promise.all([
+      proc.exited,
+      new Response(proc.stdout).text(),
+    ]);
+    expect(exitCode).toBe(1);
+    const report = JSON.parse(stdout);
+    // The warning is collected before the scan, and the source stops before
+    // its first request instead of failing on Notion's 401.
+    expect(
+      report.diagnostics.map(
+        (diagnostic: { message: string; severity: string }) =>
+          `${diagnostic.severity}: ${diagnostic.message}`
+      )
+    ).toStrictEqual([
+      "warning: Content source (notion) is enabled but NOTION_TOKEN is not set.",
+      'error: Source "notes" needs NOTION_TOKEN, which is not set.',
+    ]);
   });
 });

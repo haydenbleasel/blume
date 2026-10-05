@@ -19,7 +19,8 @@ export default defineConfig({
         url: "https://cms.example.com",
         contentType: "guides",
         // locale: "en"
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "body" },
         // Extra query parameters: filters[...], sort
         params: { "filters[section][$eq]": "sdk" },
@@ -29,4 +30,4 @@ export default defineConfig({
 });
 ```
 
-Das API-Token stammt aus der Umgebungsvariable `STRAPI_API_TOKEN` und wird als Bearer-Token gesendet. Einträge werden mit `populate=*` abgerufen, damit Bilder ihre URLs mitbringen (setze `populate`, um das einzuschränken). Ein relativer Upload-Pfad (`/uploads/x.png`) wird relativ zu `url` aufgelöst. Importiert werden nur veröffentlichte Einträge. Mit `--preview` werden Entwürfe angefragt (`status=draft` unter Strapi 5, `publicationState=preview` unter Strapi 4). Jedes Dokument, das noch nie veröffentlicht wurde, wird dabei mit `draft: true` bereitgestellt. Bei einem veröffentlichten Dokument siehst du in der Vorschau seinen neuesten Entwurf.
+Das API-Token stammt aus der Umgebungsvariable `STRAPI_API_TOKEN` und wird als Bearer-Token gesendet. Einträge werden mit `populate=*` abgerufen, damit Bilder ihre URLs mitbringen (setze `populate`, um das einzuschränken). Ein relativer Upload-Pfad (`/uploads/x.png`) in einem Blocks-Feld wird relativ zu `url` aufgelöst. Ein Markdown-Feld wird unverändert übernommen. Ein relativer Pfad bleibt dort also relativ zu deiner Dokumentations-Website und führt ins Leere. Verwende in Markdown-Feldern deshalb absolute Bild-URLs, so wie der Markdown-Editor von Strapi sie einfügt. Importiert werden nur veröffentlichte Einträge. Mit `--preview` werden Entwürfe angefragt (`status=draft` unter Strapi 5, `publicationState=preview` unter Strapi 4). Jedes Dokument, das noch nie veröffentlicht wurde, wird dabei mit `draft: true` bereitgestellt. Bei einem veröffentlichten Dokument siehst du in der Vorschau seinen neuesten Entwurf.

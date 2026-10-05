@@ -126,10 +126,7 @@ export interface CustomerStory {
   title: string;
 }
 
-// Specific's story and photo are from Iman Radjavi (2026-09-26). QuiverAI is
-// a draft: its image is a capture of its docs standing in for a photo, its
-// numbers are counted from its sitemap, and the bracketed copy (here and in
-// customers/quiverai.astro) is placeholder until its content lands.
+// Specific's story and photo are from Iman Radjavi (2026-09-26).
 export const stories: CustomerStory[] = [
   {
     color: "oklch(0.5 0.17 38)",
@@ -161,34 +158,6 @@ export const stories: CustomerStory[] = [
       "Specific, the cloud platform for coding agents, runs everything it can on itself. With Blume, that now includes its docs.",
     tagline: "in an afternoon.",
     title: "Specific migrated from Mintlify",
-  },
-  {
-    color: "oklch(0.45 0.09 225)",
-    customer: customers.quiverai,
-    facts: {
-      features: [
-        { href: "/docs/references/openapi", label: "API reference" },
-        { href: "/docs/discoverability/markdown", label: "Markdown mirrors" },
-      ],
-      industry: "AI vector design",
-    },
-    id: "quiverai",
-    image: {
-      alt: "The QuiverAI docs, built with Blume",
-      src: "/customers/quiverai.webp",
-    },
-    meta: {
-      description: "How QuiverAI runs its docs on Blume.",
-      title: "QuiverAI runs its docs on Blume",
-    },
-    stats: [
-      { label: "Docs pages", value: "31" },
-      { label: "API reference pages", value: "9" },
-    ],
-    summary:
-      "[Summary: who QuiverAI is and the one-sentence version of how Blume fits in.]",
-    tagline: "[The outcome, in one line.]",
-    title: "QuiverAI runs its docs on Blume",
   },
 ];
 

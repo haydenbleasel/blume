@@ -19,7 +19,8 @@ export default defineConfig({
         url: "https://cms.example.com",
         contentType: "guides",
         // locale: "en"
-        // Field paths default to title / description / slug / content / updatedAt
+        // Field paths default to title / description / slug / content /
+        // updatedAt; order (no default) sets the sidebar order
         fields: { body: "body" },
         // Extra query parameters: filters[...], sort
         params: { "filters[section][$eq]": "sdk" },
@@ -29,4 +30,4 @@ export default defineConfig({
 });
 ```
 
-API टोकन `STRAPI_API_TOKEN` एनवायरनमेंट वेरिएबल से लिया जाता है और bearer टोकन के रूप में भेजा जाता है। एंट्रियाँ `populate=*` के साथ फ़ेच की जाती हैं, ताकि इमेज के साथ उनके URL भी आएँ। इसे सीमित करने के लिए आप `populate` सेट कर सकते हैं। सापेक्ष अपलोड पाथ (`/uploads/x.png`) को `url` के आधार पर रिज़ॉल्व किया जाता है। केवल प्रकाशित एंट्रियाँ इम्पोर्ट की जाती हैं — `--preview` ड्राफ़्ट का अनुरोध करता है (Strapi 5 पर `status=draft`, Strapi 4 पर `publicationState=preview`)। इसके साथ, जो दस्तावेज़ कभी प्रकाशित नहीं हुआ है, उसे `draft: true` के साथ स्टेज किया जाता है, जबकि प्रकाशित दस्तावेज़ के लिए उसके नवीनतम ड्राफ़्ट का प्रीव्यू दिखाया जाता है।
+API टोकन `STRAPI_API_TOKEN` एनवायरनमेंट वेरिएबल से लिया जाता है और bearer टोकन के रूप में भेजा जाता है। एंट्रियाँ `populate=*` के साथ फ़ेच की जाती हैं, ताकि इमेज के साथ उनके URL भी आएँ। इसे सीमित करने के लिए आप `populate` सेट कर सकते हैं। Blocks फ़ील्ड में सापेक्ष अपलोड पाथ (`/uploads/x.png`) को `url` के आधार पर रिज़ॉल्व किया जाता है। Markdown फ़ील्ड जैसी लिखी गई है, वैसी ही आगे जाती है, इसलिए उसमें सापेक्ष पाथ आपकी डॉक्यूमेंटेशन साइट के सापेक्ष ही रहता है और काम नहीं करता: Markdown फ़ील्ड में पूर्ण (absolute) इमेज URL का उपयोग करें, जैसा कि Strapi का Markdown एडिटर उन्हें डालता है। केवल प्रकाशित एंट्रियाँ इम्पोर्ट की जाती हैं — `--preview` ड्राफ़्ट का अनुरोध करता है (Strapi 5 पर `status=draft`, Strapi 4 पर `publicationState=preview`)। इसके साथ, जो दस्तावेज़ कभी प्रकाशित नहीं हुआ है, उसे `draft: true` के साथ स्टेज किया जाता है, जबकि प्रकाशित दस्तावेज़ के लिए उसके नवीनतम ड्राफ़्ट का प्रीव्यू दिखाया जाता है।

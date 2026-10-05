@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 
-import { join } from "pathe";
+import { dirname, join } from "pathe";
 
 import { crossOriginDiscoveryPaths } from "../../ai/ai-catalog.ts";
 import {
@@ -20,7 +20,10 @@ import {
   SIGNATURES_DIRECTORY_PATH,
   SIGNATURES_DIRECTORY_TYPE,
 } from "../../ai/web-bot-auth.ts";
+import { mountBasePath, normalizeBasePath } from "../../core/base-path.ts";
 import type { BlumeProject } from "../../core/project-graph.ts";
+import { isPatternPath, regexRedirect } from "../../core/redirect-patterns.ts";
+import type { ResolvedConfig } from "../../core/schema.ts";
 import type { ProjectContext } from "../../core/types.ts";
 import { VERCEL_ADAPTER_PACKAGE } from "../adapters/vercel.ts";
 import {
@@ -37,7 +40,9 @@ import {
 import {
   injectNegotiationRoutes,
   injectRedirectRoutes,
+  rebaseAdapterRoutes,
 } from "../vercel-negotiation.ts";
+import type { VercelRoute } from "../vercel-negotiation.ts";
 import { adapterRoot, toSiteUrl } from "./paths.ts";
 import type { BuildLog, DeployPlatform, RedirectFile } from "./types.ts";
 
@@ -55,6 +60,14 @@ export const VERCEL_JSON_FILE: RedirectFile = {
  */
 const buildOutputDir = (context: ProjectContext): string =>
   join(adapterRoot(context), ".vercel", "output");
+
+/** The static files a server build serves, under the base's directory. */
+const staticDir = (context: ProjectContext, base: string): string =>
+  join(buildOutputDir(context), "static", base);
+
+/** The project's normalized `deployment.base`, `""` for none. */
+const deploymentBase = (project: BlumeProject): string =>
+  normalizeBasePath(project.config.deployment.options.base);
 
 /**
  * Refuse to ship a function bundle that would crash at runtime: a bare import
@@ -99,18 +112,21 @@ export const emitVercelNegotiation = async (
   log: BuildLog
 ): Promise<void> => {
   const { config, context } = project;
-  const outputDir = buildOutputDir(context);
-  const configPath = join(outputDir, "config.json");
+  const configPath = join(buildOutputDir(context), "config.json");
   if (!existsSync(configPath)) {
     return;
   }
+  const base = deploymentBase(project);
   const routePaths = markdownRoutePaths(project);
+  // Keyed by the file's path in `static/`, under the base's directory.
   const overrides: Record<string, string> = {};
   if (hasApiCatalog(config)) {
-    overrides[API_CATALOG_PATH.slice(1)] = API_CATALOG_TYPE;
+    overrides[mountBasePath(base, API_CATALOG_PATH).slice(1)] =
+      API_CATALOG_TYPE;
   }
   if (config.agents.webBotAuth.keys.length > 0) {
-    overrides[SIGNATURES_DIRECTORY_PATH.slice(1)] = SIGNATURES_DIRECTORY_TYPE;
+    overrides[mountBasePath(base, SIGNATURES_DIRECTORY_PATH).slice(1)] =
+      SIGNATURES_DIRECTORY_TYPE;
   }
   // The homepage rewrite serves `/index.md` from the static layer, so its
   // `x-markdown-tokens` estimate has to ride the routing config; the runtime
@@ -120,7 +136,7 @@ export const emitVercelNegotiation = async (
   // The Markdown and JSON 404 routes point at the prerendered twins; only
   // wire each when the build actually emitted it (a project that owns `/404`
   // gets none).
-  const staticDir = join(outputDir, "static");
+  const builtDir = staticDir(context, base);
   const injected = injectNegotiationRoutes(
     await readFile(configPath, "utf-8"),
     routePaths,
@@ -128,13 +144,14 @@ export const emitVercelNegotiation = async (
     overrides,
     home ? markdownTokenCount(agentMarkdown(home)) : undefined,
     {
-      json: existsSync(join(staticDir, "404.json")),
-      markdown: existsSync(join(staticDir, "404.md")),
+      json: existsSync(join(builtDir, "404.json")),
+      markdown: existsSync(join(builtDir, "404.md")),
     },
     crossOriginDiscoveryPaths(config),
     // Downloaded content assets are prerendered static files; only a build
     // that has them needs the SVG sandbox route.
-    existsSync(join(staticDir, "blume-assets"))
+    existsSync(join(builtDir, "blume-assets")),
+    base
   );
   if (injected === null) {
     log.warn(
@@ -175,6 +192,76 @@ export const emitVercelPatternRedirects = async (
   await writeFile(configPath, injected, "utf-8");
 };
 
+type Redirect = ResolvedConfig["redirects"][number];
+
+/**
+ * The exact redirects as Build Output routes, matched the way the pattern ones
+ * are (see `regexRedirect`): the served path, a trailing slash optional.
+ */
+const exactRedirectRoutes = (redirects: Redirect[]): VercelRoute[] =>
+  redirects
+    .filter((redirect) => !isPatternPath(redirect.from))
+    .map(({ from, status, to }) => ({
+      headers: { Location: encodeURI(to) },
+      src: regexRedirect({ parts: [{ kind: "text", text: from }], status, to })
+        .source,
+      status,
+    }));
+
+/**
+ * Move a server build's static files under `deployment.base`.
+ * `@astrojs/vercel` copies them to the root of the Build Output tree's
+ * `static/`, while the pages request `<base>/_astro/…` and link to
+ * `<base>/…`, so nothing the site asks for would be found. Moved to
+ * `static/<base>/`, they're served at the base, as the routes that
+ * {@link rebaseVercelRoutes} moves there expect.
+ */
+export const moveStaticUnderBase = async (
+  context: ProjectContext,
+  base: string
+): Promise<void> => {
+  const root = staticDir(context, "");
+  if (!base || !existsSync(root)) {
+    return;
+  }
+  // Through a sibling, since the target lies inside the directory it moves.
+  const staging = join(buildOutputDir(context), "static-unbased");
+  await rename(root, staging);
+  const target = staticDir(context, base);
+  await mkdir(dirname(target), { recursive: true });
+  await rename(staging, target);
+};
+
+/**
+ * Move the adapter's routing config under `deployment.base` to match the
+ * static files (see `rebaseAdapterRoutes`), its exact redirects rebuilt from
+ * the configured ones. Resolves to false when the config can't be read: the
+ * adapter's routes would then miss every path under the base.
+ */
+export const rebaseVercelRoutes = async (
+  project: BlumeProject,
+  log: BuildLog
+): Promise<boolean> => {
+  const base = deploymentBase(project);
+  const configPath = join(buildOutputDir(project.context), "config.json");
+  if (!base || !existsSync(configPath)) {
+    return true;
+  }
+  const rebased = rebaseAdapterRoutes(
+    await readFile(configPath, "utf-8"),
+    base,
+    exactRedirectRoutes(platformRedirects(project))
+  );
+  if (rebased === null) {
+    log.error(
+      `Could not move the routes in .vercel/output/config.json under the deployment base "${base}", so the site would not be served there.`
+    );
+    return false;
+  }
+  await writeFile(configPath, rebased, "utf-8");
+  return true;
+};
+
 /**
  * Vercel. A server build's Build Output tree lands at `.vercel/output` — at
  * the project root, because the adapter is handed that root up front: its
@@ -183,11 +270,14 @@ export const emitVercelPatternRedirects = async (
  * Static assets are served from the tree's `static/` half, so the deploy
  * artifacts are written there; headers (the discovery files', the sandbox on
  * downloaded SVGs) arrive through the routing config rather than a
- * `_headers` file, which Vercel never reads.
+ * `_headers` file, which Vercel never reads. The adapter ignores
+ * `deployment.base`, so under one the build moves the static files and the
+ * routes beneath it.
  */
 export const vercelPlatform: DeployPlatform = {
   astro: {
-    config: {},
+    config: () => ({}),
+    configOptions: [],
     options: () => ({}),
     package: VERCEL_ADAPTER_PACKAGE,
   },
@@ -210,12 +300,19 @@ export const vercelPlatform: DeployPlatform = {
     if (!ok) {
       return false;
     }
+    // A verify build moves its static files too, where the budget gate reads
+    // them (`serverStaticDir`).
+    await moveStaticUnderBase(context, deploymentBase(project));
     // An isolated verify only proves the bundle would ship; the routing
     // config is a deploy artifact and stays untouched.
-    if (!isolated) {
-      await emitVercelNegotiation(project, log);
-      await emitVercelPatternRedirects(project, log);
+    if (isolated) {
+      return true;
     }
+    if (!(await rebaseVercelRoutes(project, log))) {
+      return false;
+    }
+    await emitVercelNegotiation(project, log);
+    await emitVercelPatternRedirects(project, log);
     return true;
   },
   hiddenRuntime: {
@@ -231,5 +328,5 @@ export const vercelPlatform: DeployPlatform = {
   redirectFiles: [VERCEL_JSON_FILE],
   serverClientUnderBase: false,
   serverOutputDir: buildOutputDir,
-  serverStaticDir: (context) => join(buildOutputDir(context), "static"),
+  serverStaticDir: staticDir,
 };

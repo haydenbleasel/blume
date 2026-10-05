@@ -50,13 +50,29 @@ const fakeStorage = (stored: string | null, blocked = false) => ({
   },
 });
 
+/** `window`-level listeners (`beforeprint`/`afterprint`) the script registers. */
+const windowListeners = new Map<string, (() => void)[]>();
+
+const dispatchWindow = (type: string): void => {
+  for (const listener of windowListeners.get(type) ?? []) {
+    listener();
+  }
+};
+
 const runThemeScript = async (input: {
   document: FakeDocument;
   stored: string | null;
   prefersDark: boolean;
   blocked?: boolean;
 }) => {
+  windowListeners.clear();
   Object.assign(globalThis, {
+    addEventListener: (type: string, listener: () => void) => {
+      windowListeners.set(type, [
+        ...(windowListeners.get(type) ?? []),
+        listener,
+      ]);
+    },
     document: input.document,
     localStorage: fakeStorage(input.stored, input.blocked),
     matchMedia: () => ({ matches: input.prefersDark }),
@@ -68,10 +84,14 @@ const runThemeScript = async (input: {
   await import(file);
 };
 
+// Bun has a global `addEventListener` of its own; put it back after a stub.
+const nativeAddEventListener = globalThis.addEventListener;
+
 afterEach(() => {
   for (const name of ["document", "localStorage", "matchMedia"]) {
     Reflect.deleteProperty(globalThis, name);
   }
+  globalThis.addEventListener = nativeAddEventListener;
 });
 
 describe("THEME_INIT_SCRIPT", () => {
@@ -133,6 +153,25 @@ describe("THEME_INIT_SCRIPT", () => {
     expect(incoming.documentElement.dataset.theme).toBe("dark");
     document.dispatch("astro:after-swap", { newDocument: incoming });
     expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  test("prints a dark page in the light theme, then restores it", async () => {
+    const document = fakeDocument("system");
+    await runThemeScript({ document, prefersDark: false, stored: "dark" });
+    dispatchWindow("beforeprint");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    dispatchWindow("afterprint");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  test("leaves a light page alone around printing", async () => {
+    const document = fakeDocument("system");
+    await runThemeScript({ document, prefersDark: false, stored: "light" });
+    dispatchWindow("beforeprint");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    // A stray afterprint (no beforeprint switch) doesn't force a theme.
+    dispatchWindow("afterprint");
+    expect(document.documentElement.dataset.theme).toBe("light");
   });
 
   test("leaves the incoming document alone when no theme is set yet", async () => {

@@ -2,6 +2,7 @@ import { existsSync, watch as fsWatch, statSync } from "node:fs";
 import type { Dirent } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 
+import { YAMLException } from "js-yaml";
 import { basename, isAbsolute, join, relative, resolve } from "pathe";
 
 import { nextFenceState } from "../code-fences.ts";
@@ -19,6 +20,7 @@ import {
   localizedRoute,
   placeEntryRef,
   resolveEntryRoute,
+  frontmatterYamlDiagnostic,
   slugifyPath,
   strippedLineOffset,
   unloadablePathDiagnostic,
@@ -785,13 +787,14 @@ const noteToEntry = (
  * Read and split one note, or null when it vanished between the walk and the
  * read. Obsidian renames and deletes notes while a dev server watches the
  * vault, and one file disappearing mid-load must not fail the whole reload.
- * Any other read failure still throws.
+ * A note whose front matter isn't valid YAML comes back as its diagnostic,
+ * so it's left out the same way. Any other read failure still throws.
  */
 const readNote = async (
   vaultDir: string,
   rel: string,
   options: Pick<ObsidianSourceOptions, "i18n" | "versions">
-): Promise<ParsedNote | null> => {
+): Promise<ParsedNote | Diagnostic | null> => {
   const absPath = join(vaultDir, rel);
   try {
     const file = await readFile(absPath, "utf-8");
@@ -808,6 +811,9 @@ const readNote = async (
       rel,
     };
   } catch (error) {
+    if (error instanceof YAMLException) {
+      return frontmatterYamlDiagnostic(error, absPath);
+    }
     // SAFETY: a rejected `readFile` always yields a Node system error, whose
     // `code` is the only field read here.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -976,7 +982,14 @@ export const obsidianSource = (
     const read = await Promise.all(
       files.map((rel) => readNote(vaultDir, rel, options))
     );
-    const notes = read.filter((note): note is ParsedNote => note !== null);
+    const notes = read.filter(
+      (note): note is ParsedNote => note !== null && "rel" in note
+    );
+    skipped.push(
+      ...read.filter(
+        (note): note is Diagnostic => note !== null && "code" in note
+      )
+    );
     // Resolving `[[Note#H]]` needs the target's route and headings, so every
     // note is parsed and indexed before any body is rewritten.
     const { index, pairs } = buildLinkIndex(notes, options);

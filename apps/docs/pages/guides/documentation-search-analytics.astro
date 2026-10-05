@@ -8,9 +8,12 @@
 // queryOramaIndex under Bun over a synthetic four-page Acme corpus to get the
 // before/after results in the keyword fix. PostHog SQL checked against
 // PostHog's SQL docs, not run. The report numbers are synthetic, and say so.
-// Review: the Pagefind language scope and the Mixedbread empty-list path
-// were read from Search.astro and components/layout/search/{pagefind,
-// endpoint}.ts. Not yet run end to end.
+// Rechecked 2026-09-30, from reading code: the language scoping and the
+// failed-search path in Search.astro and components/layout/search/{pagefind,
+// endpoint}.ts, the adapters that take properties (analytics-client.ts), and
+// the per-locale tokenizers in search/orama-index.ts. Rechecked 2026-09-30
+// against search.analytics.queries (core/schema.ts and the tracker). Not yet
+// run end to end.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -94,9 +97,9 @@ import { guideById } from "../_guides/guides.ts";
     <li>
       Opening a Popular link or handing the query to the assistant sends no{" "}
       <code>search_select</code>. A search that fails, like a hosted engine that
-      doesn't answer, sends nothing. Mixedbread is the exception: when its{" "}
-      <code>/api/search</code> route fails, the dialog gets an empty list, so
-      the search is recorded with <code>results: 0</code>.
+      doesn't answer or a Mixedbread <code>/api/search</code> route that
+      errors, shows an error and sends nothing, so an outage doesn't pass for
+      a content gap.
     </li>
   </ul>
 
@@ -165,7 +168,8 @@ export default defineConfig({
   <h2>Treat search terms as reader input</h2>
   <p>
     Readers paste things into search boxes: email addresses, API keys, order
-    numbers. Blume sends the query as typed, and your analytics stores it.
+    numbers. By default Blume sends the query as typed, and your analytics
+    stores it.
     Google Analytics{" "}
     <a href="https://support.google.com/analytics/answer/6366371"
       >forbids personally identifiable information</a
@@ -179,6 +183,16 @@ export default defineConfig({
     <li>
       Turn on your provider's redaction where it has one. GA4's data redaction
       removes likely email addresses from event parameters.
+    </li>
+    <li>
+      If query text can't go to your provider at all, set{" "}
+      <code>{"search: { analytics: { queries: false } }"}</code> in{" "}
+      <code>blume.config.ts</code>. Both events then carry{" "}
+      <code>queryChars</code>, the query's length, in place of{" "}
+      <code>query</code>, and the text reaches only the{" "}
+      <code>blume:track</code> event. The zero-result counts still arrive, but
+      the queries below group by the text, so this report needs you to forward
+      it yourself, to a store you control.
     </li>
     <li>
       If you forward <code>blume:track</code> with your own code, put that code
@@ -473,16 +487,17 @@ ORDER BY searches DESC`}
     <a href="/docs/content/versioning">versioned</a> site, results default to
     the version being viewed, so a page that only exists in another version
     needs the All versions toggle. Languages work the same way, with an All
-    languages toggle, except on Pagefind, which only searches the language of
-    the page the reader is on whatever the toggle says. Then check the index. Orama, FlexSearch, Algolia, Orama
-    Cloud, and Typesense skip code blocks by default, so an option name that
+    languages toggle; Mixedbread has none, since it always searches every
+    language. Then check the index. Orama, FlexSearch, Algolia, Orama Cloud,
+    and Typesense skip code blocks by default, so an option name that
     only appears in code needs{" "}
     <a href="/docs/configuration/search#whats-indexed"
       ><code>search.indexing.includeCodeBlocks</code></a
     >. Pages with <code>search.exclude</code> and hidden pages aren't indexed
     either. If the zero-result terms are in Japanese, Chinese, Korean, or
-    another non-Latin script, and your default language is written in Latin
-    script, Orama can't match them at all: see{" "}
+    another non-Latin script, check that the locale's code names the
+    language, like <code>ja</code> rather than <code>jp</code>, since Orama
+    picks each locale's tokenizer from it: see{" "}
     <a href="/guides/cjk-documentation-search"
       >Make docs search work in Chinese, Japanese and Korean</a
     >.

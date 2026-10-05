@@ -8,6 +8,7 @@ Any object implementing the `ContentSource` interface can be passed to `custom()
 ```ts blume.config.ts
 import { defineConfig } from "blume";
 import { custom, filesystem } from "blume/sources";
+import { escapeMarkdownText } from "blume/sources/lower.ts";
 import { sanitySource } from "blume/sources/sanity.ts";
 
 export default defineConfig({
@@ -23,7 +24,8 @@ export default defineConfig({
           query: `*[_type == "guide"]`,
           // Map custom Portable Text blocks to Blume components
           serializers: {
-            callout: (block) => `<Callout>${block.text}</Callout>`,
+            callout: (block) =>
+              `<Callout>${escapeMarkdownText(String(block.text ?? ""))}</Callout>`,
           },
         })
       ),
@@ -32,8 +34,10 @@ export default defineConfig({
 });
 ```
 
-A source built with one of Blume's engine factories, like `sanitySource` above, is rebuilt on the running command's context, so it reads drafts under `--preview` and keeps its snapshot in `.blume/cache` the way the built-in adapter does. A source of your own can do the same by implementing `withContext(ctx)` and returning itself rebuilt on that context.
+A serializer's return value is written into the page as MDX, as is, so text it takes from the CMS must be escaped: a `{` in an editor's text would otherwise run as an expression and fail the build, and a `<b>` would render as HTML. `escapeMarkdownText` escapes it the way Blume's built-in lowering does, so the text renders as written.
 
-`custom()` takes a `ContentSource` instance rather than an options object, so there is nothing to pass the [shared options](/docs/content/sources#adapters) `prefix` or `pollInterval` to. The source sets its own `prefix` property, and re-fetching is whatever its `watch` method implements. It carries a live instance rather than plain data, so it declares no runtime dependency or secret of its own — the instance manages those itself.
+A source built with one of Blume's engine factories, like `sanitySource` above, is rebuilt on the running command's context, so it reads drafts under `--preview` and keeps its snapshot in `.blume/cache` the way the built-in adapter does. A source of your own can do the same by implementing `withContext(ctx)` and returning itself rebuilt on that context. Unlike a built-in adapter's, a `custom()` source's snapshot is kept per preview mode only, not per set of options, since Blume sees an instance rather than its options. `blume dev` serves that snapshot after you edit the source's query, fields, or serializers, so run `blume sync` to fetch afresh.
+
+`custom()` takes a `ContentSource` instance rather than an options object, so there is nothing to pass the [shared options](/docs/content/sources#adapters) `prefix` or `pollInterval` to. The source sets its own `prefix` property, and re-fetching is whatever its `watch` method implements. It carries a live instance rather than plain data, so it declares no runtime dependency or secret of its own — the instance manages those itself. `blume dev` and `blume build` don't warn about an unset variable a `custom()` source reads; an engine whose API requires its token (`notionSource`, `contentfulSource`) stops before its first request with `BLUME_MISSING_SECRET` instead.
 
 A custom source that reads local files should set `sourcePath` on each entry and `contentRoot` on the source itself. `sourcePath` names the file in diagnostics and resolves relative images beside it; `contentRoot` bounds the git `log` that dates pages, so without it the source's pages get no git-derived ["Last updated" date](/docs/configuration#last-modified).

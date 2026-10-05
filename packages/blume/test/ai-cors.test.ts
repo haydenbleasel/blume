@@ -10,6 +10,13 @@ const request = (headers: Record<string, string> = {}): Request =>
     method: "POST",
   });
 
+/** The route's answer once the rate limit turns a reader away. */
+const rateLimitedResponse = (): Response =>
+  new Response("Too many requests: try again in 30 seconds.", {
+    headers: { "retry-after": "30" },
+    status: 429,
+  });
+
 describe("corsHeaders", () => {
   it("names a listed origin and varies on it", () => {
     expect(
@@ -124,12 +131,31 @@ describe("withCors", () => {
     );
   });
 
+  it("lets a listed origin read a 429's Retry-After", async () => {
+    // `Retry-After` isn't a safelisted response header, so a browser hides
+    // it from a cross-origin caller unless the response exposes it.
+    for (const allowed of [ALLOWED, ["*"]]) {
+      // oxlint-disable-next-line no-await-in-loop -- two lists, one at a time
+      const limited = await withCors(
+        allowed,
+        rateLimitedResponse
+      )({
+        request: request({ origin: "https://www.example.com" }),
+      });
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get("access-control-expose-headers")).toBe(
+        "retry-after"
+      );
+    }
+  });
+
   it("leaves an unlisted origin without an allow header", async () => {
     const post = withCors(ALLOWED, () => new Response("ok"));
     const response = await post({
       request: request({ origin: "https://evil.example" }),
     });
     expect(response.headers.has("access-control-allow-origin")).toBe(false);
+    expect(response.headers.has("access-control-expose-headers")).toBe(false);
     expect(response.headers.get("vary")).toBe("origin");
   });
 });
