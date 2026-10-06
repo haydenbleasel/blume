@@ -1,7 +1,19 @@
-import baseMatter from "gray-matter";
+import * as grayMatter from "gray-matter";
 import { dump, load } from "js-yaml";
 
 import { YAML_SCHEMA } from "./yaml.ts";
+
+// The config loader disables jiti's default-export interop so it can distinguish
+// `export default null` from a module namespace. Import gray-matter's CommonJS
+// export through its namespace so the wrapper still receives the callable
+// function rather than jiti's read-only module proxy.
+// SAFETY: jiti's disabled interop wraps CommonJS exports in a module proxy
+// whose `default` is the original gray-matter function; native ESM gives the
+// function directly, in which case the optional nested property is absent.
+const grayMatterExport = grayMatter.default as typeof grayMatter.default & {
+  default?: typeof grayMatter.default;
+};
+const baseMatter = grayMatterExport.default ?? grayMatterExport;
 
 // gray-matter@4 binds js-yaml 3's `safeLoad`/`safeDump` as its default YAML
 // engine. In a workspace that resolves a newer js-yaml for gray-matter — v4

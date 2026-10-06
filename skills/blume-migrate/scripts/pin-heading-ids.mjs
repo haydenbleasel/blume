@@ -258,6 +258,10 @@ const real = (file) => {
   }
 };
 
+/** Stable report paths, independent of the host platform's separator. */
+const reportPath = (file, cwd) =>
+  path.relative(cwd, file).split(path.sep).join("/");
+
 const ORDERING_PREFIX = /^\d+[-_.]/u;
 const NOT_AN_ORDER = /^(?:\d+\.\d|\d{4}-\d{2}-\d{2}(?:[-_.]|$))/u;
 const GROUP = /^\(.*\)$/u;
@@ -583,7 +587,7 @@ const sourceHeadings = (file, context, seen = new Set()) => {
         out.push(...sourceHeadings(resolved, context, nextSeen));
       } else {
         context.notes.push(
-          `${path.relative(context.cwd, file)}: include not found: ${target}`
+          `${reportPath(file, context.cwd)}: include not found: ${target}`
         );
       }
     } else if (heading.test(line)) {
@@ -718,7 +722,7 @@ const pinHeading = (result, page, heading, oldId, entry) => {
   const claimed = claims.get(claim);
   if (claimed && claimed !== oldId) {
     notes.push(
-      `${path.relative(cwd, entry.file)}:${entry.index + 1}: renders with two old ids (#${claimed}, #${oldId}), and a line pins one; kept #${claimed}`
+      `${reportPath(entry.file, cwd)}:${entry.index + 1}: renders with two old ids (#${claimed}, #${oldId}), and a line pins one; kept #${claimed}`
     );
     return;
   }
@@ -730,7 +734,7 @@ const pinHeading = (result, page, heading, oldId, entry) => {
     fileEdits.set(entry.index, markerFor(entry, oldId));
     edits.set(entry.file, fileEdits);
     pins.push({
-      file: path.relative(cwd, entry.file),
+      file: reportPath(entry.file, cwd),
       from: heading.id,
       line: entry.index + 1,
       replaces: entry.pinned,
