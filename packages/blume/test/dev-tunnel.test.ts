@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
+import cloudflareAdapter from "@astrojs/cloudflare";
+import { getViteConfig } from "astro/config";
 import { join } from "pathe";
+import { createServer } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 
 import { generateRuntime } from "../src/astro/generate.ts";
 import { cloudflareTunnelOutputPlugin } from "../src/astro/tunnel-output.ts";
@@ -65,6 +69,63 @@ describe("blume dev tunnel flags", () => {
 
     await fakeServer.listen();
     expect(events).toEqual(["listen", "printUrls"]);
+  });
+
+  it("forwards auto-start tunnel settings through Astro's Cloudflare adapter", async () => {
+    const root = await mkdtemp(join(tmpdir(), "blume-adapter-tunnel-"));
+    tempDirs.push(root);
+    await symlink(
+      join(PKG_ROOT, "node_modules"),
+      join(root, "node_modules"),
+      "junction"
+    );
+    await mkdir(join(root, "src", "pages"), { recursive: true });
+    await writeFile(
+      join(root, "src", "pages", "index.astro"),
+      "<h1>Docs</h1>\n"
+    );
+
+    let listenBeforeTunnel: ViteDevServer["listen"] | undefined;
+    let listenAfterTunnel: ViteDevServer["listen"] | undefined;
+    const beforeTunnel: Plugin = {
+      configureServer(server) {
+        listenBeforeTunnel = server.listen;
+      },
+      enforce: "pre",
+      name: "blume:test:tunnel-before",
+    };
+    const afterTunnel: Plugin = {
+      configureServer(server) {
+        listenAfterTunnel = server.listen;
+      },
+      enforce: "post",
+      name: "blume:test:tunnel-after",
+    };
+
+    const adapterOptions = {
+      inspectorPort: false as const,
+      prerenderEnvironment: "node" as const,
+      tunnel: { autoStart: true as const, name: "docs-share" },
+    };
+    const viteConfig = await getViteConfig(
+      {
+        plugins: [beforeTunnel, afterTunnel],
+        root,
+      },
+      {
+        adapter: cloudflareAdapter(adapterOptions),
+        output: "server",
+        root,
+      }
+    )({ command: "serve", mode: "development" });
+    const server = await createServer(viteConfig);
+    try {
+      expect(listenBeforeTunnel).toBeDefined();
+      expect(listenAfterTunnel).toBeDefined();
+      expect(listenAfterTunnel).not.toBe(listenBeforeTunnel);
+    } finally {
+      await server.close();
+    }
   });
 
   it("parses tunnel modes and requires a valid name to accompany --tunnel", async () => {

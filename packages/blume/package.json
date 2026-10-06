@@ -200,6 +200,7 @@
     "@ai-sdk/openai": "^4.0.78",
     "@ai-sdk/openai-compatible": "^3.0.48",
     "@ai-sdk/xai": "^5.0.10",
+    "@astrojs/cloudflare": "^14.0.0",
     "@asyncapi/converter": "^2.0.2",
     "@mixedbread/sdk": "^0.77.0",
     "@notionhq/client": "^5.26.0",
@@ -218,7 +219,8 @@
     "bun-types": "^1.4.2",
     "flexsearch": "^0.8.212",
     "mitata": "1.0.34",
-    "typesense": "^3.0.6"
+    "typesense": "^3.0.6",
+    "vite": "^8.0.13"
   },
   "peerDependencies": {
     "@ai-sdk/anthropic": "^4.0.0",
