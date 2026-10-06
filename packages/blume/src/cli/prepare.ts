@@ -26,6 +26,8 @@ export interface PrepareOptions {
   strictOptIn?: boolean;
   /** Local dev server URL, used as the `deployment.site` fallback (dev only). */
   devServerUrl?: string;
+  /** Transient Cloudflare dev tunnel settings; never part of resolved config. */
+  tunnel?: { autoStart: true; name?: string };
   /** Render drafts and fetch unpublished CMS content. */
   preview?: boolean;
   /** Force remote sources to re-fetch instead of serving the cached snapshot. */
@@ -129,7 +131,7 @@ export const prepareProject = async (
 
   let warnings: string[];
   try {
-    ({ warnings } = await generateRuntime(project));
+    ({ warnings } = await generateRuntime(project, { tunnel: options.tunnel }));
   } catch (error) {
     // A config error the generator raised (an unplannable `components.ts`
     // override, a missing font file) is the user's to fix, not an internal

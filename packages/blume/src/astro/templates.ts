@@ -121,10 +121,33 @@ interface AstroAdapterRender {
   option: string;
 }
 
+const usesCloudflareTunnel = (
+  config: ResolvedConfig,
+  tunnel: { autoStart: true; name?: string } | undefined,
+  ejected: boolean
+): boolean =>
+  tunnel !== undefined &&
+  config.deployment.kind === "cloudflare" &&
+  config.deployment.options.output === "server" &&
+  !ejected;
+
+const renderTunnelOutputPlugin = (
+  config: ResolvedConfig,
+  tunnel: { autoStart: true; name?: string } | undefined,
+  ejected: boolean
+): { importNames: string[]; pluginEntry: string } =>
+  usesCloudflareTunnel(config, tunnel, ejected)
+    ? {
+        importNames: ["cloudflareTunnelOutputPlugin"],
+        pluginEntry: "cloudflareTunnelOutputPlugin(), ",
+      }
+    : { importNames: [], pluginEntry: "" };
+
 const renderAstroAdapter = (
   deployment: ResolvedConfig["deployment"],
   context: ProjectContext,
-  ejected: boolean
+  ejected: boolean,
+  tunnel?: { autoStart: true; name?: string }
 ): AstroAdapterRender => {
   const platform = deployPlatform(deployment);
   if (deployment.options.output !== "server" || !platform.astro) {
@@ -135,6 +158,9 @@ const renderAstroAdapter = (
     ...astro.options(context),
     ...deployPassthrough(deployment.options, astro.configOptions),
   };
+  if (deployment.kind === "cloudflare" && !ejected && tunnel) {
+    Object.assign(args, { tunnel });
+  }
   const argsLiteral = Object.keys(args).length > 0 ? JSON.stringify(args) : "";
   const construct = `adapter(${argsLiteral})`;
   // An ejected app's Astro root is the project root already, so its adapter
@@ -631,6 +657,8 @@ export const astroConfigTemplate = (options: {
   contentRoot?: string;
   /** Bridge used to load configured integrations without serializing them. */
   integrationBridge?: IntegrationBridgeOptions;
+  /** Transient CLI-only Cloudflare development tunnel configuration. */
+  tunnel?: { autoStart: true; name?: string };
 }): string => {
   const { context, config, needsReact, pages, themePath } = options;
 
@@ -677,7 +705,7 @@ export const astroConfigTemplate = (options: {
     configEntries: adapterConfigEntries,
     importLine: adapterImport,
     option: adapterOption,
-  } = renderAstroAdapter(deployment, context, ejected);
+  } = renderAstroAdapter(deployment, context, ejected, options.tunnel);
 
   const siteOption = deployment.options.site
     ? `\n  site: ${JSON.stringify(deployment.options.site)},`
@@ -809,11 +837,17 @@ export const astroConfigTemplate = (options: {
   const variablesPluginEntry = substitutesVariables
     ? `variablesVitePlugin(${JSON.stringify(config.variables)}), `
     : "";
+  const tunnelOutput = renderTunnelOutputPlugin(
+    config,
+    options.tunnel,
+    ejected
+  );
   const blumeImports = [
     "blumeIntegration",
     "includeHmrPlugin",
     "mdxSourceErrorsPlugin",
     "prerenderDepsPlugin",
+    ...tunnelOutput.importNames,
     ...runtimeModuleImports,
     ...(adapterOption.includes("withAdapterRoot") ? ["withAdapterRoot"] : []),
     ...(substitutesVariables ? ["variablesVitePlugin"] : []),
@@ -939,7 +973,7 @@ ${userConfigSetup}export default defineConfig({
   // the overlap only adds memory.
   build: { concurrency: Math.min(8, availableParallelism()) },
   vite: {${viteCacheOption}
-    plugins: [${runtimeModulesPluginEntry}${variablesPluginEntry}tailwindcss(), includeHmrPlugin(${configPath(
+    plugins: [${runtimeModulesPluginEntry}${variablesPluginEntry}${tunnelOutput.pluginEntry}tailwindcss(), includeHmrPlugin(${configPath(
       `${context.outDir}/src/generated/includes.json`,
       ejected
     )}), mdxSourceErrorsPlugin(), prerenderDepsPlugin()],

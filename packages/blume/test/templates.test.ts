@@ -126,6 +126,27 @@ const askConfig = (ask: NonNullable<BlumeConfig["ai"]>["assistant"]) =>
 const withProvider = (search: BlumeConfig["search"]) =>
   blumeConfigSchema.parse({ search });
 
+const renderTunnelConfig = (
+  resolvedConfig: ReturnType<typeof blumeConfigSchema.parse>,
+  options: { generatedModulesDir?: string } = {}
+) =>
+  astroConfigTemplate({
+    askPath: ASK_PATH,
+    config: resolvedConfig,
+    consentClientPath: CONSENT_CLIENT_PATH,
+    contentRoutes: [],
+    context: context(),
+    examplesPath: EXAMPLES_PATH,
+    examplesThemePath: EXAMPLES_THEME_PATH,
+    featuresPath: FEATURES_PATH,
+    needsReact: false,
+    pages: [],
+    searchClientPath: SEARCH_CLIENT_PATH,
+    themePath: THEME_PATH,
+    tunnel: { autoStart: true },
+    ...options,
+  });
+
 const example = (over: Partial<ExampleSpec> = {}): ExampleSpec => ({
   client: "visible",
   file: "/project/examples/counter.tsx",
@@ -1387,6 +1408,64 @@ describe("astroConfigTemplate", () => {
     expect(out).toContain(
       'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node"})'
     );
+  });
+
+  it("passes transient Cloudflare dev tunnel options to the adapter constructor", () => {
+    const cloudflareConfig = blumeConfigSchema.parse({
+      deployment: cloudflare(),
+    });
+    const render = (tunnel?: { autoStart: true; name?: string }) =>
+      astroConfigTemplate({
+        askPath: ASK_PATH,
+        config: cloudflareConfig,
+        consentClientPath: CONSENT_CLIENT_PATH,
+        contentRoutes: [],
+        context: context(),
+        examplesPath: EXAMPLES_PATH,
+        examplesThemePath: EXAMPLES_THEME_PATH,
+        featuresPath: FEATURES_PATH,
+        needsReact: false,
+        pages: [],
+        searchClientPath: SEARCH_CLIENT_PATH,
+        themePath: THEME_PATH,
+        tunnel,
+      });
+
+    const quickTunnel = render({ autoStart: true });
+    expect(quickTunnel).toContain(
+      'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node","tunnel":{"autoStart":true}})'
+    );
+    expect(quickTunnel).toContain("cloudflareTunnelOutputPlugin(), ");
+    expect(quickTunnel).toContain("cloudflareTunnelOutputPlugin");
+    expect(render({ autoStart: true, name: "docs-share" })).toContain(
+      'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node","tunnel":{"autoStart":true,"name":"docs-share"}})'
+    );
+    const withoutTunnel = render();
+    expect(withoutTunnel).not.toContain('"tunnel"');
+    expect(withoutTunnel).not.toContain("cloudflareTunnelOutputPlugin");
+  });
+
+  it("does not emit dev tunnel options for non-Cloudflare, static, or ejected configs", () => {
+    const nodeConfig = renderTunnelConfig(
+      blumeConfigSchema.parse({ deployment: node() })
+    );
+    expect(nodeConfig).not.toContain('"tunnel"');
+    expect(nodeConfig).not.toContain("cloudflareTunnelOutputPlugin");
+    expect(
+      renderTunnelConfig(
+        blumeConfigSchema.parse({
+          deployment: cloudflare({ output: "static" }),
+        })
+      )
+    ).not.toContain('"tunnel"');
+    expect(
+      renderTunnelConfig(
+        blumeConfigSchema.parse({ deployment: cloudflare() }),
+        {
+          generatedModulesDir: "./src/generated",
+        }
+      )
+    ).not.toContain('"tunnel"');
   });
 
   it("opts cloudflare builds out of the adapter's KV session and Images bindings", () => {

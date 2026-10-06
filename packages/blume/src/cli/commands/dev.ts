@@ -67,6 +67,31 @@ const boundPortOf = (
   return requested;
 };
 
+/**
+ * Resolve CLI tunnel flags to the transient adapter configuration.
+ *
+ * @param tunnel - Whether the Quick Tunnel flag was supplied.
+ * @param name - The optional configured Cloudflare tunnel name.
+ * @returns The auto-start adapter option, or a diagnostic for an invalid name.
+ */
+export const resolveTunnelOptions = (
+  tunnel: boolean | undefined,
+  name: string | undefined
+):
+  | { _tag: "invalid-name"; message: string }
+  | { _tag: "ok"; options?: { autoStart: true; name?: string } } => {
+  if (name !== undefined && (name.length === 0 || name.startsWith("-"))) {
+    return {
+      _tag: "invalid-name",
+      message: "`--tunnel-name` requires a non-empty name, not an option flag.",
+    };
+  }
+  if (name !== undefined) {
+    return { _tag: "ok", options: { autoStart: true, name } };
+  }
+  return tunnel ? { _tag: "ok", options: { autoStart: true } } : { _tag: "ok" };
+};
+
 export const devCommand = defineCommand({
   args: {
     "content-dir": {
@@ -85,12 +110,28 @@ export const devCommand = defineCommand({
       type: "boolean",
     },
     strict: { description: "Fail on diagnostics.", type: "boolean" },
+    tunnel: {
+      description:
+        "Expose a Cloudflare server dev site through a Quick Tunnel.",
+      type: "boolean",
+    },
+    "tunnel-name": {
+      description:
+        "Use a preconfigured named Cloudflare tunnel (implies --tunnel).",
+      type: "string",
+    },
   },
   meta: commandMeta.dev,
   async run({ args }) {
     const root = process.cwd();
     await refuseIfEjected(root, "dev");
     const preview = args.preview ?? false;
+    const tunnelResult = resolveTunnelOptions(args.tunnel, args["tunnel-name"]);
+    if (tunnelResult._tag === "invalid-name") {
+      logger.error(tunnelResult.message);
+      process.exit(1);
+    }
+    const tunnel = tunnelResult.options;
     const overrides = args["content-dir"]
       ? { contentRoot: args["content-dir"] }
       : undefined;
@@ -129,7 +170,21 @@ export const devCommand = defineCommand({
       preview,
       root,
       strict: args.strict,
+      tunnel,
     });
+
+    if (
+      tunnel &&
+      (project.config.deployment.kind !== "cloudflare" ||
+        project.config.deployment.options.output !== "server")
+    ) {
+      process.off("exit", releaseLock);
+      releaseLock();
+      logger.error(
+        "`blume dev --tunnel` requires `deployment: cloudflare()` with server output."
+      );
+      process.exit(1);
+    }
 
     // A factory so the regenerate loop can recreate the server when a
     // structural (route-set) change can't be re-synced in place (see below).
@@ -203,7 +258,7 @@ export const devCommand = defineCommand({
         const structural = nextSignature !== lastSignature;
         // Generate first: the new runtime data (and any staged remote content)
         // is on disk and published before the store re-syncs against it.
-        await generateRuntime(next);
+        await generateRuntime(next, { tunnel });
         if (structural && !(await refreshBlumeContent())) {
           await server.stop();
           server = await createServer(boundPort, false);
