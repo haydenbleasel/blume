@@ -86,7 +86,11 @@ describe("blume dev tunnel flags", () => {
       ]));
     `;
     const result = await runBun(["-e", script], PKG_ROOT);
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Expected subprocess to exit with code 0, got ${result.exitCode}:\n${result.stderr}`
+      );
+    }
     expect(result.stderr).toBe("");
     expect(JSON.parse(result.stdout)).toEqual([
       { result: { _tag: "ok" } },
