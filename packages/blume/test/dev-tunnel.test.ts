@@ -9,7 +9,6 @@ import { cloudflareTunnelOutputPlugin } from "../src/astro/tunnel-output.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 
 const PKG_ROOT = join(import.meta.dir, "..");
-const REPO_ROOT = join(PKG_ROOT, "..", "..");
 const CLI = join(PKG_ROOT, "bin", "blume.mjs");
 const DEPLOY_ADAPTERS = join(PKG_ROOT, "src", "deploy", "adapters", "index.ts");
 const tempDirs: string[] = [];
@@ -86,7 +85,7 @@ describe("blume dev tunnel flags", () => {
         request(["--name", "docs-share"]),
       ]));
     `;
-    const result = await runBun(["-e", script], REPO_ROOT);
+    const result = await runBun(["-e", script], PKG_ROOT);
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
     expect(JSON.parse(result.stdout)).toEqual([
