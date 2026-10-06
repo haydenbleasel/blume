@@ -22,6 +22,8 @@ import type { FontSlug } from "../theme/fonts.ts";
 import type { FooterSocial } from "./footer.ts";
 import type {
   blumeConfigSchema,
+  McpClient,
+  McpCustomClient,
   OpenInChatProvider,
   SidebarDisplay,
   SidebarItemConfig,
@@ -719,6 +721,32 @@ export interface LlmsTxtConfig {
 
 /** Expose the docs as an MCP server for connecting agents. */
 export interface McpConfig {
+  /**
+   * The clients the "Connect to MCP" page action installs the server into,
+   * beside its "Copy server URL" row. Defaults to `true` (every built-in
+   * client). Set `false` to list none, or list built-in keys and your own
+   * clients, in order. A custom client's `command` is copied with `{name}`
+   * (the server name as an id) and `{url}` (the server's URL) filled in; its
+   * `label` localizes like a header link's, and `icon` defaults to `terminal`.
+   *
+   * ```ts
+   * agents: {
+   *   mcp: {
+   *     enabled: true,
+   *     clients: [
+   *       "claude-code",
+   *       {
+   *         label: "Copy Copilot CLI command",
+   *         command: "copilot mcp add --transport http {name} {url}",
+   *         icon: "terminal",
+   *       },
+   *       "vscode",
+   *     ],
+   *   },
+   * }
+   * ```
+   */
+  clients?: boolean | (McpClient | McpCustomClient)[];
   /** Turn the MCP server on. Defaults to `false`. */
   enabled?: boolean;
   /** Optional system hint passed to connecting agents. */

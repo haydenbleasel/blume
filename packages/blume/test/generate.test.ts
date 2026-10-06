@@ -783,7 +783,11 @@ describe("buildRuntimeData", () => {
       href: "/home",
       light: "/light.png",
     });
-    expect(data.config.mcp).toEqual({ name: "Docs MCP", route: "/mcp" });
+    expect(data.config.mcp).toEqual({
+      clients: ["claude-code", "codex", "cursor", "vscode"],
+      name: "Docs MCP",
+      route: "/mcp",
+    });
     expect(data.config.og.enabled).toBe(true);
     expect(data.config.site).toBe("https://example.com");
   });

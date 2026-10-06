@@ -9,6 +9,8 @@ import type { UIStrings } from "../../core/i18n-ui.ts";
 import { resolveDateFormatOptions } from "../../core/date-format.ts";
 import type { ResolvedDateFormat } from "../../core/schema.ts";
 import type { OpenInChatProvider } from "../../core/open-in-chat.ts";
+import { mcpMenuEntries } from "../../core/mcp-clients.ts";
+import type { McpClientEntry } from "../../core/mcp-clients.ts";
 import type {
   BlumeBanner,
   BlumeClientData,
@@ -114,7 +116,15 @@ interface Props {
   banner?: BlumeBanner | null;
   analytics?: BlumeDataConfig["analytics"] | null;
   navigation: Navigation;
-  mcp?: { name: string; route: string } | null;
+  /**
+   * The hosted MCP server. `clients` lists the "Connect to MCP" menu's
+   * clients in order, and defaults to every built-in one.
+   */
+  mcp?: {
+    clients?: readonly McpClientEntry[];
+    name: string;
+    route: string;
+  } | null;
   page: { title: string; description?: string; route: string };
   headings: Heading[];
   imageZoom?: boolean;
@@ -471,6 +481,11 @@ const markdownMirror = isBare
 // Needs a configured site to be useful, so the menu is hidden without one.
 const mcpUrl =
   mcp && siteUrl ? new URL(withMountedBase(mcp.route), siteUrl).href : null;
+// Custom clients' labels resolve to the page's locale. Without a list,
+// PageActions shows every built-in client.
+const mcpMenu = mcp?.clients
+  ? mcpMenuEntries(mcp.clients, locale, data.config.i18n?.defaultLocale)
+  : undefined;
 
 // Scope the sidebar (and the breadcrumbs/pagination derived from it) to the
 // active tab's section, so a multi-section site drills each tab into its own
@@ -968,6 +983,7 @@ const localeRedirect = localeTargets
               editUrl={editUrl}
               exportEpub={exportEpub}
               exportPdf={exportPdf}
+              mcpMenu={mcpMenu}
               mcpName={mcp?.name}
               mcpUrl={mcpUrl}
               openInChat={openInChat}

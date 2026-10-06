@@ -927,6 +927,26 @@ describe("layout chrome sources", () => {
     );
   });
 
+  it("lists the agents.mcp.clients rows in Connect to MCP", async () => {
+    // The layout resolves custom labels for the page's locale and passes the
+    // list on; without one, PageActions falls back to every built-in client.
+    const root = await layoutSource("RootLayout.astro");
+    expect(root).toContain(
+      "mcpMenuEntries(mcp.clients, locale, data.config.i18n?.defaultLocale)"
+    );
+    expect(root).toMatch(/<PageActions\b[^>]*\bmcpMenu=\{mcpMenu\}/u);
+    const actions = await layoutSource("PageActions.astro");
+    expect(actions).toContain(
+      "const mcpRows = mcpMenuRows(mcpMenu ?? mcpClients);"
+    );
+    // A custom row carries its command template, and the script copies it
+    // with the server's id and URL filled in.
+    expect(actions).toContain("data-mcp-copy-command={client.command}");
+    expect(actions).toMatch(
+      /mcpClientCommand\(button\.dataset\.mcpCopyCommand \?\? "", \{\s*name: id,\s*url: mcpUrl,\s*\}\)/u
+    );
+  });
+
   it("rotates a collapsible disclosure's indicator from its own details only", async () => {
     // `group-open:` matches any descendant of an open `.group`, and each of
     // these disclosures nests inside others of the same kind (sidebar groups,

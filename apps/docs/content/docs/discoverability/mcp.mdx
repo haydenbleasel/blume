@@ -1,6 +1,6 @@
 ---
 title: MCP server
-description: Host a Model Context Protocol server so coding agents can search and read your docs directly — tools, resources, discovery documents, content-type and facet filters, and the server output it needs.
+description: Host a Model Context Protocol server so coding agents can search and read your docs directly — tools, resources, discovery documents, content-type and facet filters, the Connect to MCP menu, and the server output it needs.
 ---
 
 Host a [Model Context Protocol](https://modelcontextprotocol.io) server so coding agents (Claude Code, Cursor, VS Code, claude.ai connectors) can search and read your docs directly — no scraping. It's opt-in:
@@ -14,12 +14,13 @@ agents: {
 }
 ```
 
-| Option         | Default | Description                                       |
-| -------------- | ------- | ------------------------------------------------- |
-| `enabled`      | `false` | Generate and host the MCP server.                 |
-| `route`        | `/mcp`  | Path the Streamable-HTTP endpoint is mounted on.  |
-| `name`         | title   | Server name shown to clients (defaults to title). |
-| `instructions` | —       | Optional system hint passed to connecting agents. |
+| Option | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Generate and host the MCP server. |
+| `route` | `/mcp` | Path the Streamable-HTTP endpoint is mounted on. |
+| `name` | title | Server name shown to clients (defaults to title). |
+| `instructions` | — | Optional system hint passed to connecting agents. |
+| `clients` | `true` | Clients the **Connect to MCP** menu installs into. |
 
 If a content or custom page already owns the route, the server isn't generated: the build warns, and `llms.txt` and the other [discovery documents](/docs/discoverability/agent-discovery) leave it out.
 
@@ -27,7 +28,7 @@ If a content or custom page already owns the route, the server isn't generated: 
 
 ## Tools and resources
 
-The server exposes read-only tools — `search_docs`, `get_page`, `list_pages`, and `get_navigation` — and every page as an MCP resource (`resources/list` enumerates the pages at their served URLs with a `text/markdown` type, leaving out i18n fallback copies of untranslated pages as `list_pages` does; `resources/read` returns the page's [agent Markdown](/docs/discoverability/markdown), the same output as `get_page`), so clients that attach context by URI can browse the docs without calling a tool. It publishes discovery documents at `/.well-known/mcp.json` and `/.well-known/mcp/server-card.json`. The server card follows the [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) Server Card extension schema (reverse-DNS `name`, `remotes` transport endpoints), with initialize-shaped compat fields (`serverInfo`, `capabilities`, `transports`) for scanners built against the proposal's earlier revision. Each page's **Connect to MCP** menu offers copy-and-go install for Claude Code, Cursor, VS Code, and Codex (shown once [`deployment.site`](/docs/deployment) is set).
+The server exposes read-only tools — `search_docs`, `get_page`, `list_pages`, and `get_navigation` — and every page as an MCP resource (`resources/list` enumerates the pages at their served URLs with a `text/markdown` type, leaving out i18n fallback copies of untranslated pages as `list_pages` does; `resources/read` returns the page's [agent Markdown](/docs/discoverability/markdown), the same output as `get_page`), so clients that attach context by URI can browse the docs without calling a tool. It publishes discovery documents at `/.well-known/mcp.json` and `/.well-known/mcp/server-card.json`. The server card follows the [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) Server Card extension schema (reverse-DNS `name`, `remotes` transport endpoints), with initialize-shaped compat fields (`serverInfo`, `capabilities`, `transports`) for scanners built against the proposal's earlier revision. Each page's **Connect to MCP** menu offers copy-and-go install for Claude Code, Cursor, VS Code, and Codex (shown once [`deployment.site`](/docs/deployment) is set), and you can [choose the clients](#connect-to-mcp-menu) it lists.
 
 `search_docs` runs its own full-text index, so it works regardless of your [search](/docs/configuration/search) provider — and even with `search: false`. The MCP server is a separate feature from on-page search.
 
@@ -54,6 +55,37 @@ Both tools also accept a `filters` object matching against the facets a site dec
 Every `filters` entry must match (results carry their facet values, and `list_pages` shows each page's), so a knowledge base can drive progressive-disclosure agent workflows — enumerate the enforced standards, search only within them — without any server of its own.
 
 A value matches exactly, case included, as `list_pages` shows it: `"enforced"` doesn't match a page whose `status` is `Enforced`. Facet values are strings, so a number or boolean in `filters` matches its string form (`{"priority": 1}` finds `priority: 1`), and a value of any other shape, such as a list, is ignored rather than filtering.
+
+## Connect to MCP menu
+
+The **Connect to MCP** page action copies the server's URL, and then lists the clients it installs the server into: commands to copy for Claude Code and Codex, and install links for Cursor and VS Code. `clients` picks them. `true` (the default) lists every built-in client, `false` none, which leaves just **Copy server URL** in the menu, and a list shows the clients you name, in order, with a rule between the commands and the links.
+
+A client Blume doesn't ship is an object with a `label` and the `command` to copy. `{name}` in the command becomes the server's name as an id: `name`, or the site title, lowercased, with each run of characters other than `a`–`z` and `0`–`9` turned into a hyphen and the ends trimmed (`docs` if nothing is left). `{url}` becomes the server's URL. On a [multilingual](/docs/content/i18n#per-locale-navigation) site, the `label` can be a map of locale code to text. `icon` takes a [built-in icon](/docs/content/components#icon) name, image path/URL, or inline SVG, and defaults to `terminal`.
+
+```ts blume.config.ts lineNumbers
+agents: {
+  mcp: {
+    enabled: true,
+    clients: [
+      "claude-code",
+      "codex",
+      {
+        label: "Copy Copilot CLI command",
+        command: "copilot mcp add --transport http {name} {url}",
+      },
+      "cursor",
+      "vscode",
+    ],
+  },
+}
+```
+
+| Key           | Menu row                                             |
+| ------------- | ---------------------------------------------------- |
+| `claude-code` | Copies the `claude mcp add` command for Claude Code. |
+| `codex`       | Copies the `codex mcp add` command for Codex.        |
+| `cursor`      | Opens Cursor's MCP install link.                     |
+| `vscode`      | Opens VS Code's MCP install link.                    |
 
 ## Server output required
 

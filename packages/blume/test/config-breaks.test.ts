@@ -174,7 +174,11 @@ describe("agents", () => {
       contentSignals: { aiInput: true, aiTrain: true, search: true },
       llmsTxt: { enabled: true, openapi: true },
       markdownComponents: {},
-      mcp: { enabled: false, route: "/mcp" },
+      mcp: {
+        clients: ["claude-code", "codex", "cursor", "vscode"],
+        enabled: false,
+        route: "/mcp",
+      },
       skillMd: true,
       webBotAuth: { keys: [] },
       webmcp: true,
