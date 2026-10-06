@@ -28,7 +28,7 @@
     "@changesets/cli": "^3.0.2",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@orama/orama": "^3.1.18",
-    "astro": "^7.3.2",
+    "astro": "^7.3.4",
     "html-escaper": "^3.0.3",
     "husky": "^9.1.7",
     "oxfmt": "^0.71.0",
