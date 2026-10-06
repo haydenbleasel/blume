@@ -68,21 +68,22 @@ describe("blume dev tunnel flags", () => {
     expect(events).toEqual(["listen", "printUrls"]);
   });
 
-  it("parses tunnel modes and rejects empty or flag-shaped names", async () => {
+  it("parses tunnel modes and requires a valid name to accompany --tunnel", async () => {
     const script = `
       const { parseArgs } = await import("citty");
       const { devCommand, resolveTunnelOptions } = await import(${JSON.stringify(join(PKG_ROOT, "src", "cli", "commands", "dev.ts"))});
       const request = (argv) => {
         const args = parseArgs(argv, devCommand.args);
-        const result = resolveTunnelOptions(args.tunnel, args["tunnel-name"]);
-        return { tunnel: args.tunnel, name: args["tunnel-name"], result };
+        const result = resolveTunnelOptions(args.tunnel, args.name);
+        return { tunnel: args.tunnel, name: args.name, result };
       };
       console.log(JSON.stringify([
         request([]),
         request(["--tunnel"]),
-        request(["--tunnel-name", "docs-share"]),
-        request(["--tunnel-name="]),
-        request(["--tunnel-name", "--debug"]),
+        request(["--tunnel", "--name", "docs-share"]),
+        request(["--tunnel", "--name="]),
+        request(["--tunnel", "--name", "--debug"]),
+        request(["--name", "docs-share"]),
       ]));
     `;
     const result = await runBun(["-e", script], REPO_ROOT);
@@ -97,22 +98,27 @@ describe("blume dev tunnel flags", () => {
           _tag: "ok",
           options: { autoStart: true, name: "docs-share" },
         },
+        tunnel: true,
       },
       {
         name: "",
         result: {
-          _tag: "invalid-name",
-          message:
-            "`--tunnel-name` requires a non-empty name, not an option flag.",
+          _tag: "invalid",
+          message: "`--name` requires a non-empty value, not an option flag.",
         },
+        tunnel: true,
       },
       {
         name: "--debug",
         result: {
-          _tag: "invalid-name",
-          message:
-            "`--tunnel-name` requires a non-empty name, not an option flag.",
+          _tag: "invalid",
+          message: "`--name` requires a non-empty value, not an option flag.",
         },
+        tunnel: true,
+      },
+      {
+        name: "docs-share",
+        result: { _tag: "invalid", message: "`--name` requires `--tunnel`." },
       },
     ]);
   });

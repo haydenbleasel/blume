@@ -78,15 +78,21 @@ export const resolveTunnelOptions = (
   tunnel: boolean | undefined,
   name: string | undefined
 ):
-  | { _tag: "invalid-name"; message: string }
+  | { _tag: "invalid"; message: string }
   | { _tag: "ok"; options?: { autoStart: true; name?: string } } => {
   if (name !== undefined && (name.length === 0 || name.startsWith("-"))) {
     return {
-      _tag: "invalid-name",
-      message: "`--tunnel-name` requires a non-empty name, not an option flag.",
+      _tag: "invalid",
+      message: "`--name` requires a non-empty value, not an option flag.",
     };
   }
   if (name !== undefined) {
+    if (!tunnel) {
+      return {
+        _tag: "invalid",
+        message: "`--name` requires `--tunnel`.",
+      };
+    }
     return { _tag: "ok", options: { autoStart: true, name } };
   }
   return tunnel ? { _tag: "ok", options: { autoStart: true } } : { _tag: "ok" };
@@ -103,6 +109,11 @@ export const devCommand = defineCommand({
       type: "boolean",
     },
     host: { description: "Network host to bind.", type: "string" },
+    name: {
+      description:
+        "Name of a preconfigured Cloudflare tunnel (requires --tunnel).",
+      type: "string",
+    },
     open: { description: "Open the browser on start.", type: "boolean" },
     port: { description: "Port to listen on.", type: "string" },
     preview: {
@@ -115,19 +126,14 @@ export const devCommand = defineCommand({
         "Expose a Cloudflare server dev site through a Quick Tunnel.",
       type: "boolean",
     },
-    "tunnel-name": {
-      description:
-        "Use a preconfigured named Cloudflare tunnel (implies --tunnel).",
-      type: "string",
-    },
   },
   meta: commandMeta.dev,
   async run({ args }) {
     const root = process.cwd();
     await refuseIfEjected(root, "dev");
     const preview = args.preview ?? false;
-    const tunnelResult = resolveTunnelOptions(args.tunnel, args["tunnel-name"]);
-    if (tunnelResult._tag === "invalid-name") {
+    const tunnelResult = resolveTunnelOptions(args.tunnel, args.name);
+    if (tunnelResult._tag === "invalid") {
       logger.error(tunnelResult.message);
       process.exit(1);
     }
