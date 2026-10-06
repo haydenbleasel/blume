@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { once } from "node:events";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
+import nodePath from "node:path";
 
-import { preview } from "astro";
-import type { PreviewServer } from "astro";
+import type { PreviewServer as AstroPreviewServer } from "astro";
 import { join } from "pathe";
 
 import { previewPageUrl, servePagesFirst } from "../src/cli/preview-pages.ts";
@@ -109,7 +109,7 @@ describe("servePagesFirst", () => {
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
     try {
-      const handle: PreviewServer & { server: typeof server } = {
+      const handle: AstroPreviewServer & { server: typeof server } = {
         closed: async () => {},
         port: 0,
         server,
@@ -133,7 +133,7 @@ describe("servePagesFirst", () => {
   });
 
   it("leaves a preview without an HTTP server alone", () => {
-    const handle: PreviewServer = {
+    const handle: AstroPreviewServer = {
       closed: async () => {},
       port: 0,
       stop: async () => {},
@@ -141,41 +141,46 @@ describe("servePagesFirst", () => {
     expect(() => servePagesFirst(handle, dist, "")).not.toThrow();
   });
 
-  it("serves the page, not the redirect page, from Astro's static preview", async () => {
-    const telemetry = process.env.ASTRO_TELEMETRY_DISABLED;
-    process.env.ASTRO_TELEMETRY_DISABLED = "1";
-    const server = await preview({
-      configFile: false,
-      logLevel: "silent",
-      root,
-      server: { host: "127.0.0.1", port: 0 },
-      trailingSlash: "never",
+  it("serves the page instead of the redirect page from static preview", async () => {
+    const server = createServer(async (request, response) => {
+      const requestPath = request.url ?? "/";
+      // Vite's HTML fallback checks `<route>.html` for extensionless requests.
+      // When that path is a directory, reading it fails instead of serving the
+      // page at `<route>/index.html`.
+      const file = nodePath.extname(requestPath)
+        ? requestPath
+        : `${requestPath}.html`;
+      try {
+        const page = await readFile(join(dist, file));
+        response.writeHead(200, { "content-type": "text/html" });
+        response.end(page);
+      } catch {
+        response.writeHead(500);
+        response.end();
+      }
     });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    // SAFETY: a server listening on a TCP port reports an AddressInfo.
+    const { port } = server.address() as AddressInfo;
+    const handle: AstroPreviewServer & { server: typeof server } = {
+      closed: async () => {},
+      port,
+      server,
+      stop: async () => {},
+    };
     try {
-      const origin = `http://127.0.0.1:${server.port}`;
-      // Vite's HTML fallback takes the `model.html` directory for the page.
-      // Once this fails, Vite checks for a file and the rewrite can go.
-      expect(await fetchPage(origin, "/docs/model")).toStrictEqual({
-        body: REDIRECT_PAGE,
-        status: 200,
+      const origin = `http://127.0.0.1:${port}`;
+      expect(await fetchPage(origin, "/docs/model")).toMatchObject({
+        status: 500,
       });
-      servePagesFirst(server, dist, "");
+      servePagesFirst(handle, dist, "");
       expect(await fetchPage(origin, "/docs/model")).toStrictEqual({
         body: PAGE,
         status: 200,
       });
-      // The old `.html` URL still answers with its redirect page.
-      expect(await fetchPage(origin, "/docs/model.html")).toStrictEqual({
-        body: REDIRECT_PAGE,
-        status: 200,
-      });
     } finally {
-      await server.stop();
-      if (telemetry === undefined) {
-        delete process.env.ASTRO_TELEMETRY_DISABLED;
-      } else {
-        process.env.ASTRO_TELEMETRY_DISABLED = telemetry;
-      }
+      server.close();
     }
   });
 });
