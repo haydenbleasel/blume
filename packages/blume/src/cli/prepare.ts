@@ -26,7 +26,7 @@ export interface PrepareOptions {
   strictOptIn?: boolean;
   /** Local dev server URL, used as the `deployment.site` fallback (dev only). */
   devServerUrl?: string;
-  /** Whether `blume dev` is starting a Cloudflare Quick Tunnel. */
+  /** Whether `blume dev` is starting a Quick Tunnel. */
   tunnel?: true;
   /** Render drafts and fetch unpublished CMS content. */
   preview?: boolean;

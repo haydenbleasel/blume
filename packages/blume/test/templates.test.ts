@@ -1410,7 +1410,7 @@ describe("astroConfigTemplate", () => {
     );
   });
 
-  it("allows the Quick Tunnel hostname through Vite only for Cloudflare dev", () => {
+  it("allows the Quick Tunnel hostname through Vite for any non-ejected dev config", () => {
     const cloudflareConfig = blumeConfigSchema.parse({
       deployment: cloudflare(),
     });
@@ -1442,18 +1442,18 @@ describe("astroConfigTemplate", () => {
     expect(withoutTunnel).not.toContain('"tunnel"');
   });
 
-  it("does not emit dev tunnel options for non-Cloudflare, static, or ejected configs", () => {
+  it("allows tunnel hosts for Node and static configs but not ejected apps", () => {
     const nodeConfig = renderTunnelConfig(
       blumeConfigSchema.parse({ deployment: node() })
     );
-    expect(nodeConfig).not.toContain("allowedHosts: true");
+    expect(nodeConfig).toContain("server: { allowedHosts: true }");
     expect(nodeConfig).not.toContain('"tunnel"');
     const staticConfig = renderTunnelConfig(
       blumeConfigSchema.parse({
         deployment: cloudflare({ output: "static" }),
       })
     );
-    expect(staticConfig).not.toContain("allowedHosts: true");
+    expect(staticConfig).toContain("server: { allowedHosts: true }");
     expect(staticConfig).not.toContain('"tunnel"');
     const ejectedConfig = renderTunnelConfig(
       blumeConfigSchema.parse({ deployment: cloudflare() }),

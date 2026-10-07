@@ -13,7 +13,6 @@ import {
 import { scanProject } from "../src/core/project-graph.ts";
 
 const PKG_ROOT = join(import.meta.dir, "..");
-const CLI = join(PKG_ROOT, "bin", "blume.mjs");
 const DEPLOY_ADAPTERS = join(PKG_ROOT, "src", "deploy", "adapters", "index.ts");
 const tempDirs: string[] = [];
 
@@ -146,40 +145,25 @@ describe("blume dev tunnel flags", () => {
     expect(JSON.parse(result.stdout)).toEqual([{}, { tunnel: true }]);
   });
 
-  it("rejects unsupported deployments before Astro starts and releases the dev lock", async () => {
-    const outcomes = await Promise.all(
-      (["node", "cloudflare-static"] as const).map(async (deployment) => {
-        const root = await tempProject(deployment);
-        const result = await runBun([CLI, "dev", "--tunnel"], root);
-        const lockExists = await Bun.file(
-          join(root, ".blume", "dev.lock")
-        ).exists();
-        return { lockExists, result };
-      })
-    );
-    for (const { lockExists, result } of outcomes) {
-      expect(result.exitCode).toBe(1);
-      expect(result.stderr + result.stdout).toContain(
-        "requires `deployment: cloudflare()` with server output"
-      );
-      expect(lockExists).toBe(false);
-    }
-  });
+  it("retains Quick Tunnel host configuration across deployment types and regeneration", async () => {
+    await Promise.all(
+      (["node", "cloudflare-static", "cloudflare-server"] as const).map(
+        async (deployment) => {
+          const root = await tempProject(deployment);
+          const project = await scanProject(root, { mode: "dev" });
+          const configFile = join(root, ".blume", "astro.config.mjs");
 
-  it("retains the transient tunnel option when the runtime is regenerated", async () => {
-    const root = await tempProject("cloudflare-server");
-    const project = await scanProject(root, { mode: "dev" });
-    const tunnel = true as const;
-    const configFile = join(root, ".blume", "astro.config.mjs");
+          await generateRuntime(project, { tunnel: true });
+          expect(await Bun.file(configFile).text()).toContain(
+            "server: { allowedHosts: true }"
+          );
 
-    await generateRuntime(project, { tunnel });
-    expect(await Bun.file(configFile).text()).toContain(
-      "server: { allowedHosts: true }"
-    );
-
-    await generateRuntime(project, { tunnel });
-    expect(await Bun.file(configFile).text()).toContain(
-      "server: { allowedHosts: true }"
+          await generateRuntime(project, { tunnel: true });
+          expect(await Bun.file(configFile).text()).toContain(
+            "server: { allowedHosts: true }"
+          );
+        }
+      )
     );
   });
 });

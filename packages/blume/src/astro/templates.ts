@@ -121,24 +121,14 @@ interface AstroAdapterRender {
   option: string;
 }
 
-const usesCloudflareTunnel = (
-  config: ResolvedConfig,
-  tunnel: true | undefined,
-  ejected: boolean
-): boolean =>
-  tunnel !== undefined &&
-  config.deployment.kind === "cloudflare" &&
-  config.deployment.options.output === "server" &&
-  !ejected;
+const usesQuickTunnel = (tunnel: true | undefined, ejected: boolean): boolean =>
+  tunnel === true && !ejected;
 
 const renderTunnelViteServerOption = (
-  config: ResolvedConfig,
   tunnel: true | undefined,
   ejected: boolean
 ): string =>
-  usesCloudflareTunnel(config, tunnel, ejected)
-    ? "server: { allowedHosts: true },"
-    : "";
+  usesQuickTunnel(tunnel, ejected) ? "server: { allowedHosts: true }," : "";
 
 const renderAstroAdapter = (
   deployment: ResolvedConfig["deployment"],
@@ -650,7 +640,7 @@ export const astroConfigTemplate = (options: {
   contentRoot?: string;
   /** Bridge used to load configured integrations without serializing them. */
   integrationBridge?: IntegrationBridgeOptions;
-  /** Allow the Cloudflare Quick Tunnel hostname in the dev server. */
+  /** Allow the Quick Tunnel hostname in the dev server. */
   tunnel?: true;
 }): string => {
   const { context, config, needsReact, pages, themePath } = options;
@@ -960,7 +950,7 @@ ${userConfigSetup}export default defineConfig({
   // the overlap only adds memory.
   build: { concurrency: Math.min(8, availableParallelism()) },
   vite: {${viteCacheOption}
-    ${renderTunnelViteServerOption(config, options.tunnel, ejected)}
+    ${renderTunnelViteServerOption(options.tunnel, ejected)}
     plugins: [${runtimeModulesPluginEntry}${variablesPluginEntry}tailwindcss(), includeHmrPlugin(${configPath(
       `${context.outDir}/src/generated/includes.json`,
       ejected

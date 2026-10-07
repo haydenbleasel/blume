@@ -139,19 +139,6 @@ export const devCommand = defineCommand({
       tunnel,
     });
 
-    if (
-      tunnel &&
-      (project.config.deployment.kind !== "cloudflare" ||
-        project.config.deployment.options.output !== "server")
-    ) {
-      process.off("exit", releaseLock);
-      releaseLock();
-      logger.error(
-        "`blume dev --tunnel` requires `deployment: cloudflare()` with server output."
-      );
-      process.exit(1);
-    }
-
     // A factory so the regenerate loop can recreate the server when a
     // structural (route-set) change can't be re-synced in place (see below).
     // `open` is honored on first boot only — a restart must not reopen the
