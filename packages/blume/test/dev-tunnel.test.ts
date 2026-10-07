@@ -2,14 +2,14 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
-import cloudflareAdapter from "@astrojs/cloudflare";
-import { getViteConfig } from "astro/config";
 import { join } from "pathe";
-import { createServer } from "vite";
-import type { Plugin, ViteDevServer } from "vite";
 
 import { generateRuntime } from "../src/astro/generate.ts";
-import { cloudflareTunnelOutputPlugin } from "../src/astro/tunnel-output.ts";
+import {
+  cloudflaredArgs,
+  createCloudflareTunnelSpawner,
+  startCloudflareTunnel,
+} from "../src/cli/cloudflare-tunnel.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 
 const PKG_ROOT = join(import.meta.dir, "..");
@@ -55,97 +55,85 @@ const tempProject = async (
 };
 
 describe("blume dev tunnel flags", () => {
-  it("prints Vite URLs after the tunnel-aware server listen completes", async () => {
+  it("starts cloudflared against the port Astro actually bound and stops it", async () => {
     const events: string[] = [];
-    const fakeServer = {
-      listen: () => {
-        events.push("listen");
-        return Promise.resolve(fakeServer);
-      },
-      printUrls: () => events.push("printUrls"),
-    };
-    const plugin = cloudflareTunnelOutputPlugin();
-    plugin.configureServer(fakeServer);
-
-    await fakeServer.listen();
-    expect(events).toEqual(["listen", "printUrls"]);
-  });
-
-  it("forwards auto-start tunnel settings through Astro's Cloudflare adapter", async () => {
-    const root = await mkdtemp(join(PKG_ROOT, ".blume-adapter-tunnel-"));
-    tempDirs.push(root);
-    await mkdir(join(root, "src", "pages"), { recursive: true });
-    await writeFile(
-      join(root, "src", "pages", "index.astro"),
-      "<h1>Docs</h1>\n"
+    let onError: ((error: Error) => void) | undefined;
+    const tunnelErrors: string[] = [];
+    const handle = startCloudflareTunnel(
+      4387,
+      "127.0.0.1",
+      { onError: (error) => tunnelErrors.push(error.message) },
+      (args) => {
+        events.push(`spawn:${args.join(" ")}`);
+        return {
+          exitCode: null,
+          exited: Promise.resolve(0),
+          kill: (signal) => {
+            events.push(`kill:${signal}`);
+            return true;
+          },
+          onError: (listener) => {
+            onError = listener;
+          },
+        };
+      }
     );
 
-    let listenBeforeTunnel: ViteDevServer["listen"] | undefined;
-    let listenAfterTunnel: ViteDevServer["listen"] | undefined;
-    const beforeTunnel: Plugin = {
-      configureServer(server) {
-        listenBeforeTunnel = server.listen;
-      },
-      enforce: "pre",
-      name: "blume:test:tunnel-before",
-    };
-    const afterTunnel: Plugin = {
-      configureServer(server) {
-        listenAfterTunnel = server.listen;
-      },
-      enforce: "post",
-      name: "blume:test:tunnel-after",
-    };
-
-    const adapterOptions = {
-      inspectorPort: false as const,
-      prerenderEnvironment: "node" as const,
-      tunnel: { autoStart: true as const, name: "docs-share" },
-    };
-    const viteConfig = await getViteConfig(
-      {
-        optimizeDeps: { include: [], noDiscovery: true },
-        plugins: [beforeTunnel, afterTunnel],
-        root,
-        ssr: { optimizeDeps: { include: [], noDiscovery: true } },
-      },
-      {
-        adapter: cloudflareAdapter(adapterOptions),
-        output: "server",
-        root,
-      }
-    )({ command: "serve", mode: "development" });
-    const server = await createServer(viteConfig);
-    try {
-      await Promise.all(
-        Object.values(server.environments).map(
-          (environment) => environment.depsOptimizer?.scanProcessing
-        )
-      );
-      expect(listenBeforeTunnel).toBeDefined();
-      expect(listenAfterTunnel).toBeDefined();
-      expect(listenAfterTunnel).not.toBe(listenBeforeTunnel);
-    } finally {
-      await server.close();
-    }
+    expect(cloudflaredArgs(4387)).toEqual([
+      "cloudflared",
+      "tunnel",
+      "--url",
+      "http://127.0.0.1:4387",
+    ]);
+    expect(cloudflaredArgs(4387, "::1")[3]).toBe("http://[::1]:4387");
+    expect(events).toEqual([
+      "spawn:cloudflared tunnel --url http://127.0.0.1:4387",
+    ]);
+    onError?.(new Error("missing executable"));
+    expect(tunnelErrors).toEqual(["missing executable"]);
+    const stopped = handle.stop();
+    expect(events).toEqual([
+      "spawn:cloudflared tunnel --url http://127.0.0.1:4387",
+      "kill:SIGTERM",
+    ]);
+    await stopped;
   });
 
-  it("parses tunnel modes and requires a valid name to accompany --tunnel", async () => {
+  it("stops a spawned tunnel child and reports a missing executable", async () => {
+    const child = startCloudflareTunnel(
+      4387,
+      "127.0.0.1",
+      { onError: () => {} },
+      createCloudflareTunnelSpawner(process.execPath, [
+        "-e",
+        "setTimeout(() => {}, 5000)",
+      ])
+    );
+    await child.stop();
+    expect(await child.exited).not.toBe(0);
+
+    const errors: string[] = [];
+    const missing = startCloudflareTunnel(
+      4387,
+      "127.0.0.1",
+      { onError: (error) => errors.push(error.message) },
+      createCloudflareTunnelSpawner("blume-cloudflared-missing-test-binary")
+    );
+    expect(await missing.exited).toBe(127);
+    expect(errors).toHaveLength(1);
+  });
+
+  it("parses the Quick Tunnel flag", async () => {
     const script = `
       const { parseArgs } = await import("citty");
-      const { devCommand, resolveTunnelOptions } = await import(${JSON.stringify(join(PKG_ROOT, "src", "cli", "commands", "dev.ts"))});
+      const { devCommand } = await import(${JSON.stringify(join(PKG_ROOT, "src", "cli", "commands", "dev.ts"))});
       const request = (argv) => {
         const args = parseArgs(argv, devCommand.args);
-        const result = resolveTunnelOptions(args.tunnel, args.name);
-        return { tunnel: args.tunnel, name: args.name, result };
+        return { tunnel: args.tunnel };
       };
       console.log(JSON.stringify([
         request([]),
         request(["--tunnel"]),
-        request(["--tunnel", "--name", "docs-share"]),
-        request(["--tunnel", "--name="]),
-        request(["--tunnel", "--name", "--debug"]),
-        request(["--name", "docs-share"]),
       ]));
     `;
     const result = await runBun(["-e", script], PKG_ROOT);
@@ -155,38 +143,7 @@ describe("blume dev tunnel flags", () => {
       );
     }
     expect(result.stderr).toBe("");
-    expect(JSON.parse(result.stdout)).toEqual([
-      { result: { _tag: "ok" } },
-      { result: { _tag: "ok", options: { autoStart: true } }, tunnel: true },
-      {
-        name: "docs-share",
-        result: {
-          _tag: "ok",
-          options: { autoStart: true, name: "docs-share" },
-        },
-        tunnel: true,
-      },
-      {
-        name: "",
-        result: {
-          _tag: "invalid",
-          message: "`--name` requires a non-empty value, not an option flag.",
-        },
-        tunnel: true,
-      },
-      {
-        name: "--debug",
-        result: {
-          _tag: "invalid",
-          message: "`--name` requires a non-empty value, not an option flag.",
-        },
-        tunnel: true,
-      },
-      {
-        name: "docs-share",
-        result: { _tag: "invalid", message: "`--name` requires `--tunnel`." },
-      },
-    ]);
+    expect(JSON.parse(result.stdout)).toEqual([{}, { tunnel: true }]);
   });
 
   it("rejects unsupported deployments before Astro starts and releases the dev lock", async () => {
@@ -212,17 +169,17 @@ describe("blume dev tunnel flags", () => {
   it("retains the transient tunnel option when the runtime is regenerated", async () => {
     const root = await tempProject("cloudflare-server");
     const project = await scanProject(root, { mode: "dev" });
-    const tunnel = { autoStart: true as const, name: "docs-share" };
+    const tunnel = true as const;
     const configFile = join(root, ".blume", "astro.config.mjs");
 
     await generateRuntime(project, { tunnel });
     expect(await Bun.file(configFile).text()).toContain(
-      '"tunnel":{"autoStart":true,"name":"docs-share"}'
+      "server: { allowedHosts: true }"
     );
 
     await generateRuntime(project, { tunnel });
     expect(await Bun.file(configFile).text()).toContain(
-      '"tunnel":{"autoStart":true,"name":"docs-share"}'
+      "server: { allowedHosts: true }"
     );
   });
 });

@@ -2013,7 +2013,7 @@ export const clientFeaturesFor = async (
  */
 export const generateRuntime = async (
   project: BlumeProject,
-  generationOptions: { tunnel?: { autoStart: true; name?: string } } = {}
+  generationOptions: { tunnel?: true } = {}
 ): Promise<GenerateResult> => {
   const { context, config } = project;
   assertFontFilesExist(project);

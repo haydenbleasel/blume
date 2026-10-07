@@ -4,7 +4,6 @@ export { includeHmrPlugin } from "./include-hmr.ts";
 export { withIncludeRefresh } from "./include-refresh.ts";
 export { mdxSourceErrorsPlugin } from "./mdx-source-errors.ts";
 export { variablesVitePlugin } from "./variables.ts";
-export { cloudflareTunnelOutputPlugin } from "./tunnel-output.ts";
 export type { GenerateResult } from "./generate.ts";
 export {
   blumeIntegration,

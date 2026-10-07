@@ -143,7 +143,7 @@ const renderTunnelConfig = (
     pages: [],
     searchClientPath: SEARCH_CLIENT_PATH,
     themePath: THEME_PATH,
-    tunnel: { autoStart: true },
+    tunnel: true,
     ...options,
   });
 
@@ -1410,11 +1410,11 @@ describe("astroConfigTemplate", () => {
     );
   });
 
-  it("passes transient Cloudflare dev tunnel options to the adapter constructor", () => {
+  it("allows the Quick Tunnel hostname through Vite only for Cloudflare dev", () => {
     const cloudflareConfig = blumeConfigSchema.parse({
       deployment: cloudflare(),
     });
-    const render = (tunnel?: { autoStart: true; name?: string }) =>
+    const render = (tunnel?: true) =>
       astroConfigTemplate({
         askPath: ASK_PATH,
         config: cloudflareConfig,
@@ -1431,20 +1431,15 @@ describe("astroConfigTemplate", () => {
         tunnel,
       });
 
-    const quickTunnel = render({ autoStart: true });
+    const quickTunnel = render(true);
     expect(quickTunnel).toContain(
-      'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node","tunnel":{"autoStart":true}})'
+      'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node"})'
     );
     expect(quickTunnel).toContain("server: { allowedHosts: true }");
-    expect(quickTunnel).toContain("cloudflareTunnelOutputPlugin(), ");
-    expect(quickTunnel).toContain("cloudflareTunnelOutputPlugin");
-    expect(render({ autoStart: true, name: "docs-share" })).toContain(
-      'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node","tunnel":{"autoStart":true,"name":"docs-share"}})'
-    );
+    expect(quickTunnel).not.toContain('"tunnel"');
     const withoutTunnel = render();
     expect(withoutTunnel).not.toContain("allowedHosts: true");
     expect(withoutTunnel).not.toContain('"tunnel"');
-    expect(withoutTunnel).not.toContain("cloudflareTunnelOutputPlugin");
   });
 
   it("does not emit dev tunnel options for non-Cloudflare, static, or ejected configs", () => {
@@ -1453,7 +1448,6 @@ describe("astroConfigTemplate", () => {
     );
     expect(nodeConfig).not.toContain("allowedHosts: true");
     expect(nodeConfig).not.toContain('"tunnel"');
-    expect(nodeConfig).not.toContain("cloudflareTunnelOutputPlugin");
     const staticConfig = renderTunnelConfig(
       blumeConfigSchema.parse({
         deployment: cloudflare({ output: "static" }),

@@ -14,6 +14,7 @@ import { resolveRuntimeDir } from "../../core/project.ts";
 import { referenceSpecFiles } from "../../openapi/references.ts";
 import { parsePort } from "../args.ts";
 import { astroBuildDiagnostics } from "../build-failure.ts";
+import { startCloudflareTunnel } from "../cloudflare-tunnel.ts";
 import { commandMeta } from "../command-meta.ts";
 import {
   acquireDevLock,
@@ -67,37 +68,6 @@ const boundPortOf = (
   return requested;
 };
 
-/**
- * Resolve CLI tunnel flags to the transient adapter configuration.
- *
- * @param tunnel - Whether the Quick Tunnel flag was supplied.
- * @param name - The optional configured Cloudflare tunnel name.
- * @returns The auto-start adapter option, or a diagnostic for an invalid name.
- */
-export const resolveTunnelOptions = (
-  tunnel: boolean | undefined,
-  name: string | undefined
-):
-  | { _tag: "invalid"; message: string }
-  | { _tag: "ok"; options?: { autoStart: true; name?: string } } => {
-  if (name !== undefined && (name.length === 0 || name.startsWith("-"))) {
-    return {
-      _tag: "invalid",
-      message: "`--name` requires a non-empty value, not an option flag.",
-    };
-  }
-  if (name !== undefined) {
-    if (!tunnel) {
-      return {
-        _tag: "invalid",
-        message: "`--name` requires `--tunnel`.",
-      };
-    }
-    return { _tag: "ok", options: { autoStart: true, name } };
-  }
-  return tunnel ? { _tag: "ok", options: { autoStart: true } } : { _tag: "ok" };
-};
-
 export const devCommand = defineCommand({
   args: {
     "content-dir": {
@@ -109,11 +79,6 @@ export const devCommand = defineCommand({
       type: "boolean",
     },
     host: { description: "Network host to bind.", type: "string" },
-    name: {
-      description:
-        "Name of a preconfigured Cloudflare tunnel (requires --tunnel).",
-      type: "string",
-    },
     open: { description: "Open the browser on start.", type: "boolean" },
     port: { description: "Port to listen on.", type: "string" },
     preview: {
@@ -132,12 +97,7 @@ export const devCommand = defineCommand({
     const root = process.cwd();
     await refuseIfEjected(root, "dev");
     const preview = args.preview ?? false;
-    const tunnelResult = resolveTunnelOptions(args.tunnel, args.name);
-    if (tunnelResult._tag === "invalid") {
-      logger.error(tunnelResult.message);
-      process.exit(1);
-    }
-    const tunnel = tunnelResult.options;
+    const tunnel: true | undefined = args.tunnel || undefined;
     const overrides = args["content-dir"]
       ? { contentRoot: args["content-dir"] }
       : undefined;
@@ -226,6 +186,29 @@ export const devCommand = defineCommand({
     if (boundPort !== port) {
       updateDevLockPort(outDir, boundPort);
       devServerUrl = `http://localhost:${boundPort}`;
+    }
+
+    let shuttingDown = false;
+    let tunnelFailedToStart = false;
+    let tunnelProcess: ReturnType<typeof startCloudflareTunnel> | undefined;
+    if (tunnel) {
+      const tunnelHost = args.host || "127.0.0.1";
+      tunnelProcess = startCloudflareTunnel(boundPort, tunnelHost, {
+        onError(error) {
+          tunnelFailedToStart = true;
+          if (!shuttingDown) {
+            logger.error(
+              `Could not start Cloudflare Tunnel. Install cloudflared and make sure it is available on PATH. ${error.message}`
+            );
+          }
+        },
+      });
+      void (async () => {
+        const exitCode = await tunnelProcess?.exited;
+        if (!shuttingDown && !tunnelFailedToStart && exitCode !== undefined) {
+          logger.error(`Cloudflare Tunnel exited with code ${exitCode}.`);
+        }
+      })();
     }
 
     // Mirror any initial diagnostics into the browser overlay now the server
@@ -331,10 +314,15 @@ export const devCommand = defineCommand({
     ].filter((dispose) => dispose !== undefined);
 
     const shutdown = async () => {
+      if (shuttingDown) {
+        return;
+      }
+      shuttingDown = true;
       for (const dispose of disposers) {
         dispose();
       }
       releaseLock();
+      await tunnelProcess?.stop();
       await server.stop();
       process.exit(0);
     };
