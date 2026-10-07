@@ -33,7 +33,7 @@ import {
 } from "../log.ts";
 import { checkRequiredSecrets } from "../required-secrets.ts";
 
-const FALLBACK_NODE_RANGE = ">=22.12.0";
+const FALLBACK_NODE_RANGE = ">=22.19.0";
 
 /**
  * Plan `components.ts` the way `blume dev`/`build` do, reporting each override

@@ -10,7 +10,7 @@ Drop Markdown or MDX into a folder, start the dev server, and get a production-g
 
 ## Quickstart
 
-Blume needs **Node.js 22.12 or newer** and a content folder with at least one `.md`/`.mdx` file — there's nothing else to set up.
+Blume needs **Node.js 22.19 or newer** and a content folder with at least one `.md`/`.mdx` file — there's nothing else to set up.
 
 ```bash
 npx blume init
@@ -102,7 +102,7 @@ On Vercel, Netlify, and Cloudflare Pages the site URL is detected automatically.
 
 | Requirement      | Supported                         |
 | ---------------- | --------------------------------- |
-| Node             | 22.12+                            |
+| Node             | 22.19+                            |
 | Package managers | Bun, pnpm, npm, yarn              |
 | Adapters         | Vercel, Netlify, Node, Cloudflare |
 

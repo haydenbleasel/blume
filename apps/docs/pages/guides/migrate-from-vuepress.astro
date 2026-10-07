@@ -328,7 +328,7 @@ const pinOutput = [
     <code>error:0308010C:digital envelope routines::unsupported</code>. The{" "}
     <code>NODE_OPTIONS</code> flag above works around it; building under
     Node.js 16, without the flag, also works. Keep <code>../old-site</code>{" "}
-    until you're done. For the migration itself, you need Node.js 22.12 or
+    until you're done. For the migration itself, you need Node.js 22.19 or
     later, and Claude Code or Codex installed and signed in.
   </p>
 
@@ -455,7 +455,7 @@ const pinOutput = [
     </li>
     <li>
       <strong>The repository.</strong> Scripts run <code>blume</code>, Node.js
-      pins in CI, <code>.nvmrc</code>, and <code>engines</code> say 22.12 or
+      pins in CI, <code>.nvmrc</code>, and <code>engines</code> say 22.19 or
       later, and <code>.gitignore</code> lists <code>.blume</code> and{" "}
       <code>dist</code>. In a workspace, regenerate the lockfile from its root.
     </li>
@@ -577,7 +577,7 @@ node check-urls.mjs ../old-urls.txt`}
   <p>
     An <code>error:0308010C</code> from webpack means current Node.js: build
     with <code>NODE_OPTIONS=--openssl-legacy-provider</code>, or under Node.js
-    16 without it. That's only for the old build; Blume itself needs 22.12 or later.
+    16 without it. That's only for the old build; Blume itself needs 22.19 or later.
   </p>
   <h3>A page shows <code>::: tip</code> as text</h3>
   <p>

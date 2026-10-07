@@ -18,7 +18,7 @@ The core idea: **the framework _is_ the template.** There's no starter to clone 
 
 ## Quickstart
 
-Blume needs **Node.js 22.12 or newer**. From an empty folder:
+Blume needs **Node.js 22.19 or newer**. From an empty folder:
 
 ```bash
 npx blume init   # scaffold docs/index.mdx, blume.config.ts, and package.json scripts, then install

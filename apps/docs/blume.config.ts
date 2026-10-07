@@ -294,7 +294,7 @@ export default defineConfig({
     },
     software: {
       license: "https://opensource.org/license/mit",
-      operatingSystem: "Node.js 22.12+",
+      operatingSystem: "Node.js 22.19+",
       price: 0,
       sameAs: [
         "https://www.npmjs.com/package/blume",

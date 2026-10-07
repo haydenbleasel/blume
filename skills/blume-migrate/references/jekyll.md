@@ -234,7 +234,7 @@ Run the codemod without `--old` (or with it, for the URLs): its content and link
 
 ## Repo integration and teardown
 
-- **`package.json`** beside `blume.config.ts` (a Ruby site has none: scaffold it), Node 22.12+, `.gitignore` for `node_modules/`, `.blume/`, `dist/`, `.env.local`.
+- **`package.json`** beside `blume.config.ts` (a Ruby site has none: scaffold it), Node 22.19+, `.gitignore` for `node_modules/`, `.blume/`, `dist/`, `.env.local`.
 - **CI:** replace `bundle exec jekyll build` and the Pages starter workflow with the Blume one (https://useblume.dev/guides/markdown-docs-github-pages). Its `npm ci` needs a lockfile, so commit the `package-lock.json` from `npm install` in the same change. A branch-deployed Pages site moves its source to GitHub Actions in the repo settings, where the custom domain also stays: list both as manual steps. Dependabot's `bundler` entry → `npm`. Scripts that wrapped Jekyll (`serve.bat`, `Rakefile`) → delete or repoint.
 - **Delete** `_config.yml`, `Gemfile`, `Gemfile.lock`, `_layouts/`, `_sass/`, theme hook and HTML includes, JTD's `assets/` files, `_site/`, `.jekyll-cache/`, and `vendor/bundle/`, once everything they declared is harvested. Keep `_includes/` partials pages still `<include>`, and `jekyll-migration.json`.
 - **Grep the whole repo** for moved page paths and for `jekyll` (CODEOWNERS, link checkers, a README "build the docs" section).

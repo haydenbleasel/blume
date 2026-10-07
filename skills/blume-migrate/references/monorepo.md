@@ -134,7 +134,7 @@ This is a **copyable template**, not prose. Three pieces:
 **c) The one setting `vercel.json` can't hold — set it in the Vercel project (dashboard → Settings → General, or `vercel` CLI):**
 
 - **Root Directory** = `apps/docs`. This makes install/build/output paths resolve from the docs package, which is what the `vercel.json` above assumes.
-- **Node version** = 22.12 or newer (Blume requires it). Or pin it in the docs package: `"engines": { "node": ">=22.12" }`.
+- **Node version** = 22.19 or newer (Blume requires it). Or pin it in the docs package: `"engines": { "node": ">=22.19" }`.
 
 How the pieces fit, with Root Directory = `apps/docs`:
 
@@ -231,7 +231,7 @@ Commit **both** the patch file and the `patchedDependencies` entry, then re-run 
 - [ ] `minimumReleaseAge` present? Added `blume` to `minimumReleaseAgeExclude` only.
 - [ ] `npmMinimalAgeGate` present? Added `blume` to `npmPreapprovedPackages` only.
 - [ ] Ran plain `pnpm install`; committed `pnpm-lock.yaml` with the `package.json` change; verified `pnpm install --frozen-lockfile` is clean.
-- [ ] Wrote `apps/docs/vercel.json` + package scripts; told the user to set Root Directory + Node 22.12+ in the Vercel project.
+- [ ] Wrote `apps/docs/vercel.json` + package scripts; told the user to set Root Directory + Node 22.19+ in the Vercel project.
 - [ ] Checked for a workspace Vite override; if the build crashes inside Astro/Vite, gave the pnpm-patch recipe.
 - [ ] Uses Ultracite/oxfmt? Shipped `patches/oxfmt@0.71.0.patch` + registered it under `patchedDependencies` so formatting doesn't mangle `:::` directives.
 - [ ] Reported every repo-specific edit and every manual step left to the user.

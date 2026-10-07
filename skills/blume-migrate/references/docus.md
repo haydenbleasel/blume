@@ -221,7 +221,7 @@ Docus routes a page by its path under `content/`. It strips an `N.` prefix from 
 - **Vercel with `vercel()`:**
   - The build writes the Build Output API folder `.vercel/output` in the Blume project, not `dist/`.
   - In the project's `vercel.json`, set `"framework": null` and the install and build commands (`references/monorepo.md` §4 for a workspace), and **no `outputDirectory`**. `framework: null` overrides a project still set to the Nuxt preset.
-  - In the dashboard, set the Root Directory to the docs package and Node to 22.12 or later. Set `AI_GATEWAY_API_KEY` unless the project relies on Vercel's OIDC token.
+  - In the dashboard, set the Root Directory to the docs package and Node to 22.19 or later. Set `AI_GATEWAY_API_KEY` unless the project relies on Vercel's OIDC token.
   - With Turborepo, add `.vercel/output/**` to the docs' build outputs.
   - List the dashboard settings as steps for the user.
 - **Dependencies:** remove `docus`, `nuxt`, the `@nuxt/*`/`@nuxtjs/*` modules, `nuxt-studio`, `better-sqlite3`, `@iconify-json/*`, `tailwindcss` (if only the theme used it), mapped analytics packages, `@nuxt/eslint-config`, and `vue` (keep it with `@astrojs/vue` for islands). Keep what the site's tests or scripts still import.

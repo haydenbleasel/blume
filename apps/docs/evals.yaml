@@ -13,7 +13,7 @@ questions:
   - id: install-node-version
     question: What do I need installed to use Blume?
     expected:
-      - Node.js 22.12 or newer
+      - Node.js 22.19 or newer
       - a folder with at least one .md or .mdx file
     routes:
       - /docs/quickstart

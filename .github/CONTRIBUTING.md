@@ -6,7 +6,7 @@ The repository is a Bun workspace monorepo: `packages/blume` is the published pa
 
 ## Prerequisites
 
-- Node.js 22.12+
+- Node.js 22.19+
 - Bun 1.4.2+
 
 ```bash

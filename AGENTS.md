@@ -21,7 +21,7 @@ Within `packages/blume/src`: `cli/` (Node-side CLI, the only part bundled to `di
 
 ## Toolchain and commands
 
-Bun is the package manager (`bun install`, version pinned in `package.json#packageManager`); Turbo orchestrates workspaces. Node ≥ 22.12 is required at runtime.
+Bun is the package manager (`bun install`, version pinned in `package.json#packageManager`); Turbo orchestrates workspaces. Node ≥ 22.19 is required at runtime.
 
 From the repo root:
 

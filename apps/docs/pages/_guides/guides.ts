@@ -130,7 +130,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Mintlify docs repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
@@ -164,7 +164,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "An OpenAPI spec in YAML or JSON (Swagger 2.0 works too)",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -198,7 +198,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Notion database of pages",
       "Workspace owner access in Notion",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -229,7 +229,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A GitHub repository with Markdown docs",
       "Access to the repository's Pages settings",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -328,7 +328,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Docusaurus site's repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
@@ -365,7 +365,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A vault of notes that are safe to publish",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -402,7 +402,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume project with Markdown or MDX docs",
       "A breaking release on the way",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -468,7 +468,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A FastAPI app, or Python 3.10 or later with uv",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -500,7 +500,7 @@ export const guides: Guide[] = [
       title: "Add a docs site to your API",
     },
     prerequisites: [
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Hono app, or the example built here",
       "Some TypeScript and Zod",
     ],
@@ -534,7 +534,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A NestJS 12 app built with the Nest CLI",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Controllers that take and return DTO classes",
     ],
     published: "2026-09-27",
@@ -571,7 +571,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "An oRPC 1 contract or router with Zod schemas, or the example built here",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -604,7 +604,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "Bun, to run the Elysia API",
-      "Node.js 22.12 or later, for Blume",
+      "Node.js 22.19 or later, for Blume",
       "A Vercel account, or another static host",
     ],
     published: "2026-09-27",
@@ -642,7 +642,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Fastify 5 app with JSON Schema on its routes",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -675,7 +675,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Spring Boot 4.1 API built with Maven",
       "JDK 21 or later",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A GitHub repository",
     ],
     published: "2026-09-27",
@@ -714,7 +714,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "The .NET 10 SDK",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "An ASP.NET Core API, or the template created in the guide",
     ],
     published: "2026-10-05",
@@ -752,7 +752,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Django REST Framework API, or Python 3.12 or later",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A GitHub repository, for the CI step",
     ],
     published: "2026-09-27",
@@ -792,7 +792,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Laravel API, or PHP 8.3 or later and Composer to create one",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A GitHub repository, for the CI step",
     ],
     published: "2026-10-05",
@@ -831,7 +831,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Rails API, or Ruby 3.2 or later to build the one here",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A GitHub repository, for the CI step",
     ],
     published: "2026-10-05",
@@ -870,7 +870,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A TypeSpec project, or the REST template created in the guide",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Some familiarity with TypeSpec decorators",
     ],
     published: "2026-10-05",
@@ -907,7 +907,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A TypeScript library with TSDoc comments",
       "The library's dependencies installed, since TypeDoc type-checks it",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-10-05",
     summary:
@@ -945,7 +945,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A GraphQL schema as SDL or introspection JSON",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A sandbox endpoint readers can query without a key",
     ],
     published: "2026-09-27",
@@ -979,7 +979,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Blume project",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Kafka broker to test against, or Docker to run one",
     ],
     published: "2026-09-27",
@@ -1015,7 +1015,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "An OpenAPI spec for the API that sends the webhooks",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1050,7 +1050,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume site (the OpenAPI guide shows how to start one)",
       "Two or more OpenAPI specs in YAML or JSON",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1089,7 +1089,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume site with an OpenAPI reference",
       "An SDK for your API on npm or PyPI",
-      "Node.js 22.12 or later, and Python 3 for the Python check",
+      "Node.js 22.19 or later, and Python 3 for the Python check",
     ],
     published: "2026-09-27",
     summary:
@@ -1124,7 +1124,7 @@ export const guides: Guide[] = [
       title: "Make Try it work in production",
     },
     prerequisites: [
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "An HTTP API to document, or the sample API in this guide",
       "curl, to check requests from a terminal",
     ],
@@ -1162,7 +1162,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume site with a Try it panel (OpenAPI, GraphQL, or hand-written pages)",
       "An API you can change, or a server host for the proxy",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1233,7 +1233,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Sanity project and its Studio",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Vercel account for the deploy steps",
     ],
     published: "2026-09-27",
@@ -1272,7 +1272,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Payload 3 app, or a few minutes to create one",
       "A Payload deployment your docs build can reach",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Vercel account for the deploy steps",
     ],
     published: "2026-09-27",
@@ -1310,7 +1310,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Contentful space where you can change the content model",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Vercel account for the deploy steps",
     ],
     published: "2026-09-27",
@@ -1348,7 +1348,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Strapi 5 project you can administer",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Vercel account for the deploy steps",
     ],
     published: "2026-09-27",
@@ -1386,7 +1386,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "Two or more GitHub repositories with Markdown or MDX docs",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A GitHub token, if any repository is private",
     ],
     published: "2026-09-27",
@@ -1422,7 +1422,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume project with Markdown in Git",
       "A Notion database and a connection token",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1462,7 +1462,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A GitHub repository that publishes releases",
-      "A Blume docs site, or Node.js 22.12 or later",
+      "A Blume docs site, or Node.js 22.19 or later",
       "A GitHub token, if the repository is private",
     ],
     published: "2026-09-27",
@@ -1500,7 +1500,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Blume project with a docs folder",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Two or more pages that repeat the same steps",
     ],
     published: "2026-09-27",
@@ -1543,7 +1543,7 @@ export const guides: Guide[] = [
       title: "Start your handbook",
     },
     prerequisites: [
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Git repository for the handbook",
       "Claude Code or another MCP client, for the agent step",
     ],
@@ -1585,7 +1585,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Next.js app using the App Router",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Vercel account for the docs project",
     ],
     published: "2026-09-27",
@@ -1623,7 +1623,7 @@ export const guides: Guide[] = [
       "A Blume project with a package-lock.json",
       "Docker with Compose",
       "A server, and a domain pointed at it for HTTPS",
-      "Node.js 22.12 or later, to build locally",
+      "Node.js 22.19 or later, to build locally",
     ],
     published: "2026-09-27",
     summary:
@@ -1659,7 +1659,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume docs project",
       "A Cloudflare account",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A domain on Cloudflare, for a custom domain",
     ],
     published: "2026-09-27",
@@ -1694,7 +1694,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A domain on your Cloudflare account",
       "Cloudflare Zero Trust set up on that account",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1729,7 +1729,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A pnpm workspace that builds with Turborepo",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Vercel account, for the deploy step",
     ],
     published: "2026-09-27",
@@ -1762,7 +1762,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "An AWS account and the AWS CLI, signed in",
       "A domain whose DNS records you can edit",
-      "A Blume project on Node.js 22.12 or later",
+      "A Blume project on Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1798,7 +1798,7 @@ export const guides: Guide[] = [
       title: "Check your own config",
     },
     prerequisites: [
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Blume project, or a folder to start one in",
       "An AI Gateway API key, to try the built-in assistant (optional)",
     ],
@@ -1838,7 +1838,7 @@ export const guides: Guide[] = [
       "A Blume site with the assistant turned on",
       "A host adapter, such as vercel() or cloudflare()",
       "An Upstash Redis database, if you deploy to Vercel or Netlify",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1873,7 +1873,7 @@ export const guides: Guide[] = [
       "A Blume docs project",
       "A host that runs server code, like Vercel",
       "A Vercel AI Gateway API key",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1914,7 +1914,7 @@ export const guides: Guide[] = [
       "A Blume docs site on a host with server functions",
       "A React app on another origin",
       "An AI Gateway key, or a Vercel deployment",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -1958,7 +1958,7 @@ export const guides: Guide[] = [
       "A Blume docs project",
       "A Linux server or a Mac to run the model on",
       "Ollama 0.34.4",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -2071,7 +2071,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Blume docs site for your SDK",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
@@ -2104,7 +2104,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Blume docs site, deployed or running locally",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -2140,7 +2140,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume project with content pages",
       "A Vercel or Cloudflare account",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -2182,7 +2182,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A deployed Blume docs site",
-      "curl and Node.js 22.12 or later",
+      "curl and Node.js 22.19 or later",
       "Access to your CDN or host's bot settings",
       "Search Console access, for the Google checks",
     ],
@@ -2258,7 +2258,7 @@ export const guides: Guide[] = [
       title: "Audit your own build",
     },
     prerequisites: [
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A GitHub repository for the CI job",
       "Your docs site's public URL",
     ],
@@ -2304,7 +2304,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume site deployed on its own domain",
       "Access to its Search Console property",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -2338,7 +2338,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A deployed Blume docs site",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "curl and a bash shell",
       "Access to your host's domain settings, for a domain move",
     ],
@@ -2370,7 +2370,7 @@ export const guides: Guide[] = [
       title: "Audit your translated pages",
     },
     prerequisites: [
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Blume project, or a folder to start one in",
       "Your docs site's public URL",
     ],
@@ -2414,7 +2414,7 @@ export const guides: Guide[] = [
       title: "Switch your site to Pagefind",
     },
     prerequisites: [
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Blume project, or a folder to start one in",
     ],
     published: "2026-09-27",
@@ -2455,7 +2455,7 @@ export const guides: Guide[] = [
       "A Blume docs project",
       "Docker, locally and on a server with a domain",
       "curl and jq",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -2531,7 +2531,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Blume docs project",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Real queries from your readers, like zero-result searches",
       "An account with each hosted provider you want to test",
     ],
@@ -2568,7 +2568,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Blume project, or an empty folder for the test corpus",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A native speaker to review the test queries",
     ],
     published: "2026-09-27",
@@ -2602,7 +2602,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Blume docs project in a GitHub repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Access to the repository's branch protection settings",
     ],
     published: "2026-09-27",
@@ -2642,7 +2642,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume docs project",
       "A React component to document",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -2680,7 +2680,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Blume project (npx blume init)",
       "An OpenAPI spec for each product's API",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
     ],
     published: "2026-09-27",
     summary:
@@ -2751,7 +2751,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Blume docs site",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Chrome or Firefox, plus Apple Books or calibre to open EPUB files",
     ],
     published: "2026-09-27",
@@ -2790,7 +2790,7 @@ export const guides: Guide[] = [
       title: "Record why the architecture looks this way",
     },
     prerequisites: [
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "A Blume project with a docs folder",
       "A list of your system's components and how they connect",
     ],
@@ -2826,7 +2826,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Fumadocs site's repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
@@ -2861,7 +2861,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Starlight site's repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
@@ -2893,7 +2893,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Nextra 2, 3, or 4 site's repository, with its lockfile",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
@@ -2928,7 +2928,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "An MkDocs, Material for MkDocs, or Zensical site's repository",
       "The Python setup that builds it today",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
@@ -2963,7 +2963,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "An mdBook 0.4 or 0.5 book's repository",
       "The mdBook version and plugins your CI uses",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-06",
@@ -2995,7 +2995,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "GitBook docs synced to a GitHub or GitLab repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-05",
@@ -3027,7 +3027,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A ReadMe project synced to Git, or exported to a repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-05",
@@ -3059,7 +3059,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A VitePress 1.x site's repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-05",
@@ -3091,7 +3091,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Fern Docs project (fern/docs.yml) in Git",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-05",
@@ -3123,7 +3123,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Redocly Realm project in Git",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-05",
@@ -3155,7 +3155,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A VuePress 1 site's repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-05",
@@ -3187,7 +3187,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Docus 3 or later site's repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-06",
@@ -3219,7 +3219,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A Docsify site's repository",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-05",
@@ -3252,7 +3252,7 @@ export const guides: Guide[] = [
     prerequisites: [
       "A Jekyll site on the Just the Docs theme",
       "Ruby and Bundler, to build the old site once",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-06",
@@ -3284,7 +3284,7 @@ export const guides: Guide[] = [
     },
     prerequisites: [
       "A GitHub wiki, cloned",
-      "Node.js 22.12 or later",
+      "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-10-06",
